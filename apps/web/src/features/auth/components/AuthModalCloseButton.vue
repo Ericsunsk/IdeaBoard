@@ -1,9 +1,7 @@
 <template>
   <Button
+    unstyled
     type="button"
-    rounded
-    text
-    severity="secondary"
     :class="authCloseButtonClass"
     :disabled="disabled"
     aria-label="关闭"

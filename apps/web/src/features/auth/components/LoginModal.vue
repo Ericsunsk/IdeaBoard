@@ -1,5 +1,6 @@
 <template>
   <Dialog
+    unstyled
     :visible="show"
     modal
     :dismissable-mask="!loading"
@@ -10,77 +11,99 @@
     :pt="authDialogPt"
     @update:visible="handleVisibleChange"
   >
-    <div v-motion="authModalMotion" :class="authModalShellClass">
-      <AuthModalCloseButton :disabled="loading" @click="handleClose" />
+    <div v-motion="authModalMotion" class="relative">
+      <div :class="authModalShellClass">
+        <div :class="authModalBackdropClass" aria-hidden="true"></div>
+        <AuthModalCloseButton :disabled="loading" @click="handleClose" />
 
-      <div class="mb-8 text-center">
-        <h2 :class="authModalTitleClass">欢迎回来</h2>
-        <p :class="authModalSubtitleClass">登录 IdeaBoard，继续你的创作</p>
-      </div>
+        <div :class="authModalHeaderClass">
+          <p :class="authModalKickerClass">WELCOME BACK</p>
+          <h2 :class="authModalTitleClass">欢迎回来</h2>
+          <p :class="authModalSubtitleClass">登录 IdeaBoard，继续你的创作</p>
+        </div>
 
-      <form class="flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
-        <AuthFormField
-          v-slot="{ describedbyId, invalid }"
-          label="账号"
-          :error="errors.username"
-          error-id="login-username-error"
-        >
-          <InputText
-            v-model="formValue.username"
-            autocomplete="username"
-            :class="authInputClass"
-            :invalid="invalid"
-            placeholder="请输入账号"
-            :aria-describedby="describedbyId"
-            @blur="validateField('username')"
-            @update:model-value="clearFieldError('username')"
-          />
-        </AuthFormField>
+        <form class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
+          <AuthFormField
+            v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+            label="账号"
+            :error="errors.username"
+            error-id="login-username-error"
+          >
+            <div class="relative w-full">
+              <span :class="authInputIconClass">
+                <UserIcon class="size-5" />
+              </span>
+              <InputText
+                v-model="formValue.username"
+                unstyled
+                autocomplete="username"
+                :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
+                :invalid="invalid"
+                :placeholder="inlineError ? inlineErrorText : '请输入账号'"
+                :aria-describedby="describedbyId"
+                @blur="validateField('username')"
+                @update:model-value="clearFieldError('username')"
+              />
+            </div>
+          </AuthFormField>
 
-        <AuthFormField
-          v-slot="{ describedbyId, invalid }"
-          label="密码"
-          :error="errors.password"
-          error-id="login-password-error"
-        >
-          <Password
-            v-model="formValue.password"
-            autocomplete="current-password"
-            :feedback="false"
+          <AuthFormField
+            v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+            label="密码"
+            :error="errors.password"
+            error-id="login-password-error"
+          >
+            <div class="relative w-full">
+              <span :class="authInputIconClass">
+                <LockIcon class="size-5" />
+              </span>
+              <Password
+                v-model="formValue.password"
+                unstyled
+                autocomplete="current-password"
+                :feedback="false"
+                fluid
+                :pt="authPasswordPt"
+                :input-props="{
+                  autocomplete: 'current-password',
+                  'aria-describedby': describedbyId,
+                }"
+                :invalid="invalid"
+                :input-class="[
+                  authInputClass,
+                  inlineError ? authInputErrorClass : '',
+                ]"
+                :placeholder="inlineError ? inlineErrorText : '请输入密码'"
+                toggle-mask
+                @blur="validateField('password')"
+                @update:model-value="clearFieldError('password')"
+              />
+            </div>
+          </AuthFormField>
+
+          <Button
+            unstyled
+            :class="authPrimaryButtonClass"
+            :pt="authButtonPt"
+            type="submit"
+            :label="loading ? '登录中...' : '登录'"
+            :loading="loading"
+            :disabled="loading"
             fluid
-            :input-props="{
-              autocomplete: 'current-password',
-              'aria-describedby': describedbyId,
-            }"
-            :invalid="invalid"
-            :input-class="authInputClass"
-            placeholder="请输入密码"
-            toggle-mask
-            @blur="validateField('password')"
-            @update:model-value="clearFieldError('password')"
           />
-        </AuthFormField>
+        </form>
 
-        <Button
-          :class="authPrimaryButtonClass"
-          type="submit"
-          :label="loading ? '登录中...' : '登录'"
-          :loading="loading"
-          :disabled="loading"
-          fluid
-        />
-      </form>
-
-      <div :class="['mt-8', authFooterClass]">
-        <span>还没有账号？</span>
-        <button
-          type="button"
-          :class="authSwitchButtonClass"
-          :disabled="loading"
-          @click="handleSwitchToRegister"
-        >
-          立即注册
-        </button>
+        <div :class="['mt-8', authFooterClass]">
+          <span>还没有账号？</span>
+          <button
+            type="button"
+            :class="authSwitchButtonClass"
+            :disabled="loading"
+            @click="handleSwitchToRegister"
+          >
+            立即注册
+          </button>
+        </div>
       </div>
     </div>
   </Dialog>
@@ -92,18 +115,26 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
+import { User as UserIcon, Lock as LockIcon } from '@iconoir/vue'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import AuthFormField from './AuthFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
 import {
   authDialogPt,
+  authButtonPt,
   authFooterClass,
+  authInputIconClass,
   authInputClass,
+  authInputErrorClass,
+  authModalBackdropClass,
+  authModalHeaderClass,
+  authModalKickerClass,
   authModalMotion,
   authModalShellClass,
   authModalSubtitleClass,
   authModalTitleClass,
+  authPasswordPt,
   authPrimaryButtonClass,
   authSwitchButtonClass,
 } from './authModalUi'

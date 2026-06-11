@@ -228,17 +228,27 @@
                           fluid
                           :input-props="{
                             autocomplete: 'current-password',
-                            'aria-describedby': 'profile-old-password-error',
+                            'aria-describedby': getPasswordDescribedby(
+                              'oldPassword',
+                              'profile-old-password-error',
+                            ),
                           }"
                           :invalid="Boolean(pwdErrors.oldPassword)"
-                          :input-class="passwordInputClass"
-                          placeholder="请输入当前使用的密码"
+                          :input-class="[
+                            passwordInputClass,
+                            isPasswordInlineError('oldPassword') ? passwordInputErrorClass : '',
+                          ]"
+                          :placeholder="
+                            isPasswordInlineError('oldPassword')
+                              ? pwdErrors.oldPassword
+                              : '请输入当前使用的密码'
+                          "
                           toggle-mask
                           @blur="validatePasswordField('oldPassword')"
                           @update:model-value="clearPasswordFieldError('oldPassword')"
                         />
                         <Message
-                          v-if="pwdErrors.oldPassword"
+                          v-if="shouldShowPasswordMessage('oldPassword')"
                           id="profile-old-password-error"
                           class="!mt-1 !rounded-xl"
                           severity="error"
@@ -259,17 +269,27 @@
                             fluid
                             :input-props="{
                               autocomplete: 'new-password',
-                              'aria-describedby': 'profile-new-password-error',
+                              'aria-describedby': getPasswordDescribedby(
+                                'newPassword',
+                                'profile-new-password-error',
+                              ),
                             }"
                             :invalid="Boolean(pwdErrors.newPassword)"
-                            :input-class="passwordInputClass"
-                            placeholder="不少于6位字符"
+                            :input-class="[
+                              passwordInputClass,
+                              isPasswordInlineError('newPassword') ? passwordInputErrorClass : '',
+                            ]"
+                            :placeholder="
+                              isPasswordInlineError('newPassword')
+                                ? pwdErrors.newPassword
+                                : '不少于6位字符'
+                            "
                             toggle-mask
                             @blur="validatePasswordField('newPassword')"
                             @update:model-value="handleNewPasswordInput"
                           />
                           <Message
-                            v-if="pwdErrors.newPassword"
+                            v-if="shouldShowPasswordMessage('newPassword')"
                             id="profile-new-password-error"
                             class="!mt-1 !rounded-xl"
                             severity="error"
@@ -289,17 +309,27 @@
                             fluid
                             :input-props="{
                               autocomplete: 'new-password',
-                              'aria-describedby': 'profile-confirm-password-error',
+                              'aria-describedby': getPasswordDescribedby(
+                                'confirmPassword',
+                                'profile-confirm-password-error',
+                              ),
                             }"
                             :invalid="Boolean(pwdErrors.confirmPassword)"
-                            :input-class="passwordInputClass"
-                            placeholder="请再次输入新密码"
+                            :input-class="[
+                              passwordInputClass,
+                              isPasswordInlineError('confirmPassword') ? passwordInputErrorClass : '',
+                            ]"
+                            :placeholder="
+                              isPasswordInlineError('confirmPassword')
+                                ? pwdErrors.confirmPassword
+                                : '请再次输入新密码'
+                            "
                             toggle-mask
                             @blur="validatePasswordField('confirmPassword')"
                             @update:model-value="clearPasswordFieldError('confirmPassword')"
                           />
                           <Message
-                            v-if="pwdErrors.confirmPassword"
+                            v-if="shouldShowPasswordMessage('confirmPassword')"
                             id="profile-confirm-password-error"
                             class="!mt-1 !rounded-xl"
                             severity="error"
@@ -337,6 +367,7 @@ import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { uploadApi } from '../../../shared/api/upload'
+import { isRequiredErrorMessage } from '../../../shared/utils/formValidation'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
@@ -410,6 +441,8 @@ const mainContentClass =
 const passwordFieldClass = 'flex min-w-0 flex-col gap-2 text-sm font-medium text-[#1d1d1f]'
 const passwordInputClass =
   '!h-12 !w-full !rounded-xl !border-[#d2d2d7] !bg-white/90 !px-3 !text-[15px] !text-[#1d1d1f] !shadow-none placeholder:!text-[#86868b] enabled:hover:!border-[#9278e6] enabled:focus:!border-[#9278e6]'
+const passwordInputErrorClass =
+  '!border-rose-300 !bg-rose-50/50 placeholder:!text-rose-400 enabled:focus:!border-rose-400'
 
 const emptyPasswordForm = (): PasswordForm => ({
   oldPassword: '',
@@ -504,6 +537,18 @@ function validatePasswordField(field: PasswordField) {
 function validatePasswordForm() {
   const fields: PasswordField[] = ['oldPassword', 'newPassword', 'confirmPassword']
   return fields.map((field) => validatePasswordField(field)).every(Boolean)
+}
+
+function isPasswordInlineError(field: PasswordField) {
+  return isRequiredErrorMessage(pwdErrors.value[field])
+}
+
+function shouldShowPasswordMessage(field: PasswordField) {
+  return Boolean(pwdErrors.value[field]) && !isPasswordInlineError(field)
+}
+
+function getPasswordDescribedby(field: PasswordField, errorId: string) {
+  return shouldShowPasswordMessage(field) ? errorId : undefined
 }
 
 function clearPasswordFieldError(field: PasswordField) {
