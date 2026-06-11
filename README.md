@@ -78,10 +78,10 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 
 ```mermaid
 flowchart TB
-    Browser(["浏览器 / Web App"]) --> Nginx["Nginx 反向代理"]
-    Nginx -- /api/auth/** --> Auth["Better Auth Service<br>Node.js :6001"]
-    Nginx -- /api/* --> GoAPI["Go API<br>Gin :6000"]
-    Nginx -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
+    Browser(["浏览器 / Web App"]) --> Proxy["VPS 反向代理"]
+    Proxy -- /api/auth/** --> Auth["Better Auth Service<br>Node.js :6001"]
+    Proxy -- /api/* --> GoAPI["Go API<br>Gin :6000"]
+    Proxy -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
     Auth --> Postgres[("PostgreSQL 17")]
     GoAPI --> Postgres & Worker["Worker 消费者"] & NATS["NATS JetStream<br>事件层"]
     Worker --> Queue["River Queue<br>PostgreSQL"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / S3-compatible"]
@@ -91,7 +91,7 @@ flowchart TB
     Static --> Storage
 
     style Browser fill:#f9f,stroke:#333,stroke-width:1px
-    style Nginx fill:#fff,stroke:#333,stroke-width:1px
+    style Proxy fill:#fff,stroke:#333,stroke-width:1px
     style Auth fill:#e1f5fe,stroke:#01579b,stroke-width:1px
     style GoAPI fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px
     style Static fill:#fff,stroke:#333,stroke-width:1px
@@ -103,7 +103,7 @@ flowchart TB
     style Storage fill:#f5f5f5,stroke:#616161,stroke-width:1px
 ```
 
-生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth、PostgreSQL 与 NATS JetStream，并由 Cloudflare Tunnel 暴露 API 域名。任务队列由 River 写入 PostgreSQL；JetStream 只承载任务状态事件、audit 与实时 fanout，不作为任务队列。
+生产环境推荐由 Cloudflare Pages 托管前端，Cloudflare DNS/Proxy 指向 VPS 宿主机反代服务，VPS 上的 Docker Compose stack 运行 Go API、Better Auth、PostgreSQL 与 NATS JetStream。任务队列由 River 写入 PostgreSQL；JetStream 只承载任务状态事件、audit 与实时 fanout，不作为任务队列。
 
 <a id="highlights"></a>
 
@@ -373,9 +373,9 @@ ideaboard delete --yes
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
-### Cloudflare Pages + Tunnel + VPS
+### Cloudflare Pages + VPS 反代
 
-适用于前端部署到 Cloudflare Pages，后端、认证服务与 PostgreSQL 继续运行在 VPS，并通过 Cloudflare Tunnel 暴露 `api.example.com` 的混合部署。
+适用于前端部署到 Cloudflare Pages，后端、认证服务与 PostgreSQL 继续运行在 VPS，并通过 Cloudflare DNS/Proxy + 宿主机反代服务暴露 `api.example.com` 的混合部署。
 
 <p>
   <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/pages">
@@ -394,7 +394,7 @@ Pages 配置：
 | Environment variable   | `VITE_API_BASE_URL=https://api.example.com/api` |
 | Environment variable   | `VITE_AUTH_BASE_URL=https://api.example.com`    |
 
-VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api.example.com` 与 `CLOUDFLARE_TUNNEL_TOKEN`；Cloudflare Tunnel 的 Public Hostname 将 `api.example.com` 转发到 compose 内部 Gateway：`http://gateway:80`。
+VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api.example.com`，并执行 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成当前 Nginx 反代配置。默认 upstream 是 `127.0.0.1:6000/6001`，后续可通过 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 切到 Docker bridge。
 
 PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能落有上游 API key、S3 access key/secret 等敏感材料。所有 `postgres-*.sql` 都必须按 secret artifact 处理：建议加密保存，限制下载、传输与共享范围；完成 restore 后按受影响渠道轮换上游 API key 与对象存储凭据。详细规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
 

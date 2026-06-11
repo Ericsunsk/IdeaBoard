@@ -21,7 +21,7 @@ npm run build
 
 ## Cloudflare Pages 部署
 
-用于“前端在 Cloudflare Pages，后端与数据库在 VPS，并通过 Cloudflare Tunnel 暴露 API 域名”的部署方式。
+用于“前端在 Cloudflare Pages，后端与数据库在 VPS，并通过 Cloudflare DNS/Proxy + 宿主机反代服务暴露 API 域名”的部署方式。
 
 Pages 构建配置：
 

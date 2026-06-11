@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  目标运行形态：<code>Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel</code>
+  目标运行形态：<code>Cloudflare Pages + Cloudflare DNS/Proxy + VPS Reverse Proxy + GHCR + Docker Compose</code>
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@
 <a id="deployment-profile"></a>
 ## 部署概览
 
-本文档适用于 `Linux amd64/arm64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + PostgreSQL + Better Auth Node Service` 作为传统部署方式。
+本文档适用于 `Linux amd64/arm64` 服务器。当前优先推荐 `Cloudflare Pages + Cloudflare DNS/Proxy + VPS Reverse Proxy + GHCR + Docker Compose`，保留 `Nginx + systemd + PostgreSQL + Better Auth Node Service` 作为传统部署方式。
 
 ### 推荐拓扑
 
@@ -40,11 +40,10 @@
 graph LR
     Browser((浏览器)) --> Pages["Cloudflare Pages<br>app.example.com"]
     Browser --> ApiDomain["api.example.com"]
-    ApiDomain --> Tunnel["Cloudflare Tunnel"]
-    Tunnel --> Cloudflared["cloudflared<br>Docker container"]
-    Cloudflared --> Gateway["Gateway<br>http://gateway:80"]
-    Gateway -- "/api/auth" --> Auth["ideaboard-auth<br>GHCR image"]
-    Gateway -- "/api /uploads" --> API["ideaboard-api<br>GHCR image"]
+    ApiDomain --> CFProxy["Cloudflare DNS/Proxy"]
+    CFProxy --> EdgeProxy["VPS Reverse Proxy<br>:443"]
+    EdgeProxy -- "/api/auth" --> Auth["ideaboard-auth<br>127.0.0.1:6001"]
+    EdgeProxy -- "/api /uploads" --> API["ideaboard-api<br>127.0.0.1:6000"]
     Auth --> Postgres[("PostgreSQL volume")]
     API --> Postgres
 ```
@@ -79,19 +78,19 @@ graph LR
 | API 可执行文件 | `apps/api/ideaboard-server` |
 | Auth 入口文件 | `apps/auth/dist/index.js` |
 
-### Cloudflare Pages + Cloudflare Tunnel + VPS 拓扑
+### Cloudflare Pages + Cloudflare DNS/Proxy + VPS 反代拓扑
 
-推荐的混合部署方式：Cloudflare Pages 托管前端，Cloudflare Tunnel 暴露后端 API 域名，VPS 只在本机运行后端、认证服务与 PostgreSQL。
+推荐的混合部署方式：Cloudflare Pages 托管前端，Cloudflare DNS/Proxy 把 API 域名指向 VPS，VPS 宿主机反代服务转发到 Docker Compose 中仅绑定本机端口的 API/Auth 容器。
 
 ```mermaid
 graph LR
     Internet((互联网)) --> Pages["Cloudflare Pages"]
     Pages --> Web["apps/web/dist"]
     Internet --> ApiDomain["api.example.com"]
-    ApiDomain --> Tunnel["Cloudflare Tunnel"]
-    Tunnel --> Nginx["VPS Nginx (:80 local)"]
-    Nginx -- "/api/auth" --> Auth["ideaboard-auth (:6001)"]
-    Nginx -- "/api /uploads" --> Server["ideaboard-server (:6000)"]
+    ApiDomain --> CFProxy["Cloudflare DNS/Proxy"]
+    CFProxy --> EdgeProxy["VPS Reverse Proxy (:443)"]
+    EdgeProxy -- "/api/auth" --> Auth["ideaboard-auth (127.0.0.1:6001)"]
+    EdgeProxy -- "/api /uploads" --> Server["ideaboard-server (127.0.0.1:6000)"]
     Auth --> Postgres[("PostgreSQL")]
     Server --> Postgres
 ```
@@ -109,23 +108,26 @@ Pages 项目建议配置：
 
 前端默认从 `VITE_API_BASE_URL` 派生 `/uploads/*` 的访问域名；如需独立素材域名，可额外设置 `VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com`。
 
-VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、PostgreSQL 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
+VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、PostgreSQL 与 NATS，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
 
 ```bash
 # /opt/stacks/ideaboard/docker/.env
 APP_BASE_URL=https://你的前端域名
 API_BASE_URL=https://api.example.com
-CLOUDFLARE_TUNNEL_TOKEN=Cloudflare Tunnel Docker token
 ```
 
-Cloudflare Tunnel 使用 Docker connector。Cloudflare Public Hostname 配置：
+Cloudflare DNS 配置：
 
 ```text
-Hostname: api.example.com
-Service: http://gateway:80
+Type: A 或 AAAA
+Name: api
+Value: VPS 公网 IP
+Proxy status: Proxied 或 DNS only
 ```
 
-VPS 防火墙建议只开放 SSH；API 域名通过 compose 内的 `cloudflared` 到达 Gateway，无需把 `6000/6001/PostgreSQL` 暴露到公网。
+VPS 防火墙建议只开放 SSH、80、443。API/Auth 容器只绑定 `127.0.0.1:6000` 和 `127.0.0.1:6001`，不要把 `6000/6001/PostgreSQL/NATS` 暴露到公网。
+
+默认生成的反代 upstream 指向 `127.0.0.1:6000/6001`。如果宿主机反代服务后续已能稳定直连 Docker bridge，可以在 `/opt/stacks/ideaboard/docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM`，再重新执行 `ideaboard nginx-conf` 生成配置。
 
 <a id="recommended-docker"></a>
 
@@ -202,8 +204,6 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 
 - `APP_BASE_URL`
 - `API_BASE_URL`
-- `CLOUDFLARE_TUNNEL_TOKEN`
-- `CLOUDFLARED_VERSION`
 - `IDEABOARD_API_IMAGE`
 - `IDEABOARD_AUTH_IMAGE`
 - `IDEABOARD_AUTH_MIGRATE_IMAGE`
@@ -218,7 +218,7 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ideaboard update
 ```
 
-`ideaboard update` 会在执行 API / Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 Gateway 的 `/api/health`、`/api/auth/health` 或公网 `${API_BASE_URL}/api/health` health gate 失败都会中止部署并打印相关容器日志。
+`ideaboard update` 会在执行 API / Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后本机 API/Auth health gate 或公网 `${API_BASE_URL}/api/health` health gate 失败都会中止部署并打印相关容器日志。
 
 > [!IMPORTANT]
 > PostgreSQL backup 包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能含有上游 API key、S3 access key/secret、endpoint 与 bucket 配置。`postgres-*.sql` 必须按 secret artifact 处理：建议加密落盘，只允许受控传输和最小必要人员访问；完成 restore 后按受影响范围轮换上游 API key 与对象存储凭据，并清理临时副本。
@@ -255,28 +255,45 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
   api init-admin
 ```
 
-### 5. Cloudflare Tunnel
+### 5. VPS 反代
 
-Cloudflare Public Hostname 指向 compose 内部 Gateway：
+生成 Nginx 配置：
+
+```bash
+ideaboard nginx-conf /tmp/ideaboard.nginx.conf
+sudo cp /tmp/ideaboard.nginx.conf /etc/nginx/sites-available/ideaboard.conf
+sudo ln -sf /etc/nginx/sites-available/ideaboard.conf /etc/nginx/sites-enabled/ideaboard.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+如果你的 VPS 已经有 certbot 或自管的 `443 ssl` server block，可以把生成文件里的 `/api`、`/api/auth`、`/uploads` location 合并进现有 API 域名 server block，而不是直接覆盖现有 TLS 配置。
+
+默认 upstream 是宿主机 loopback 端口：
 
 ```text
-Hostname: api.example.com
-Service: http://gateway:80
+NGINX_API_UPSTREAM=http://127.0.0.1:6000
+NGINX_AUTH_UPSTREAM=http://127.0.0.1:6001
+NGINX_AUTH_HEALTH_UPSTREAM=http://127.0.0.1:6001/api/health
 ```
+
+如果后续改为宿主机反代服务直连 Docker bridge，把这三个值写进 `/opt/stacks/ideaboard/docker/.env` 后重新执行 `ideaboard nginx-conf` 即可。
+
+Cloudflare SSL/TLS 模式建议使用 `Full (strict)`；如果使用 Cloudflare Origin Certificate，请把证书配置在宿主机反代服务的 TLS 层。不要使用 `Flexible`，它会破坏回调地址、Cookie secure 语义和部分代理判断。
 
 ### 6. 验证
 
 ```bash
 docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env ps
 ideaboard smoke
-curl http://127.0.0.1:8080/api/health
-curl http://127.0.0.1:8080/api/auth/health
+curl http://127.0.0.1:6000/api/health
+curl http://127.0.0.1:6001/api/health
 curl "${API_BASE_URL}/api/health"
-curl http://127.0.0.1:8080/api/auth/get-session
+curl "${API_BASE_URL}/api/auth/get-session"
 ```
 
-`/api/auth/get-session` 未登录时返回未认证是正常的；关键是 Gateway 能转发到 Auth Service，不应出现连接失败。
-`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、Gateway API/Auth health、River schema、默认 JetStream event stream，以及公网 `${API_BASE_URL}/api/health`。
+`/api/auth/get-session` 未登录时返回未认证是正常的；关键是宿主机反代服务能转发到 Auth Service，不应出现连接失败。
+`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream，以及公网 `${API_BASE_URL}/api/health`。
 
 ### 7. 升级与回滚
 
@@ -284,7 +301,7 @@ curl http://127.0.0.1:8080/api/auth/get-session
 
 ```bash
 nano /opt/stacks/ideaboard/docker/.env
-# 修改 IDEABOARD_API_IMAGE / IDEABOARD_AUTH_IMAGE / IDEABOARD_AUTH_MIGRATE_IMAGE，并保持 CLOUDFLARED_VERSION 为固定版本
+# 修改 IDEABOARD_API_IMAGE / IDEABOARD_AUTH_IMAGE / IDEABOARD_AUTH_MIGRATE_IMAGE
 ideaboard update
 ```
 
@@ -298,7 +315,7 @@ ideaboard update
 
 ```bash
 ls -lh /opt/stacks/ideaboard-backups/
-docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth postgres nats
+docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 api auth postgres nats
 ```
 
 当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。数据库 backup 与 `api-uploads` tar 分别保留在同一备份目录下；其中 PostgreSQL backup 含密钥材料，恢复完成后必须执行凭据轮换计划。

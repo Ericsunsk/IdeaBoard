@@ -74,6 +74,15 @@ env_value() {
   awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
 }
 
+env_or_file_value() {
+  local key="$1"
+  local value="${!key:-}"
+  if [[ -z "$value" ]]; then
+    value="$(env_value "$key")"
+  fi
+  printf '%s\n' "$value"
+}
+
 set_env_value() {
   local key="$1"
   local value="$2"
@@ -108,6 +117,42 @@ is_ideaboard_image_ref() {
 is_url_userinfo_value() {
   local value="$1"
   [[ "$value" =~ ^[A-Za-z0-9._~-]+$ ]]
+}
+
+api_host_port() {
+  local value
+  value="$(env_or_file_value API_HOST_PORT)"
+  printf '%s\n' "${value:-6000}"
+}
+
+auth_host_port() {
+  local value
+  value="$(env_or_file_value AUTH_HOST_PORT)"
+  printf '%s\n' "${value:-6001}"
+}
+
+nginx_api_upstream() {
+  local value
+  value="$(env_or_file_value NGINX_API_UPSTREAM)"
+  printf '%s\n' "${value:-http://127.0.0.1:$(api_host_port)}"
+}
+
+nginx_auth_upstream() {
+  local value
+  value="$(env_or_file_value NGINX_AUTH_UPSTREAM)"
+  printf '%s\n' "${value:-http://127.0.0.1:$(auth_host_port)}"
+}
+
+nginx_auth_health_upstream() {
+  local value
+  local auth_upstream
+  value="$(env_or_file_value NGINX_AUTH_HEALTH_UPSTREAM)"
+  if [[ -n "$value" ]]; then
+    printf '%s\n' "$value"
+    return
+  fi
+  auth_upstream="$(nginx_auth_upstream)"
+  printf '%s/api/health\n' "${auth_upstream%/}"
 }
 
 image_source_repo_from_ref() {
@@ -159,11 +204,9 @@ validate_env_file() {
   for key in \
     APP_BASE_URL \
     API_BASE_URL \
-    CLOUDFLARE_TUNNEL_TOKEN \
     IDEABOARD_API_IMAGE \
     IDEABOARD_AUTH_IMAGE \
     IDEABOARD_AUTH_MIGRATE_IMAGE \
-    CLOUDFLARED_VERSION \
     POSTGRES_PASSWORD \
     AUTH_INTERNAL_KEY \
     BETTER_AUTH_SECRET \
@@ -366,7 +409,7 @@ backup_api_uploads() {
 print_backend_health_logs() {
   echo "Recent service logs for health gate failure:" >&2
   docker_compose ps >&2 || true
-  docker_compose logs --tail=120 gateway cloudflared api auth postgres nats >&2 || true
+  docker_compose logs --tail=120 api auth postgres nats >&2 || true
 }
 
 wait_for_nats() {
@@ -387,7 +430,7 @@ wait_for_nats() {
   die "NATS JetStream did not become ready within ${timeout}s"
 }
 
-wait_for_http_from_gateway() {
+wait_for_http_local() {
   local name="$1"
   local url="$2"
   local timeout="${HEALTH_WAIT_TIMEOUT_SECONDS:-120}"
@@ -395,8 +438,7 @@ wait_for_http_from_gateway() {
 
   echo "Waiting for $name health: $url"
   while (( elapsed < timeout )); do
-    # shellcheck disable=SC2016 # $1 must expand inside the gateway shell.
-    if docker_compose exec -T gateway sh -c 'wget -q -T 3 -O /dev/null "$1"' sh "$url" >/dev/null 2>&1; then
+    if http_get_quiet "$url"; then
       echo "$name health is OK"
       return 0
     fi
@@ -409,8 +451,10 @@ wait_for_http_from_gateway() {
 }
 
 wait_for_backend_health() {
-  wait_for_http_from_gateway "api gateway route" "http://127.0.0.1/api/health"
-  wait_for_http_from_gateway "auth gateway route" "http://127.0.0.1/api/auth/health"
+  local api_upstream
+  api_upstream="$(nginx_api_upstream)"
+  wait_for_http_local "api upstream" "${api_upstream%/}/api/health"
+  wait_for_http_local "auth upstream" "$(nginx_auth_health_upstream)"
 }
 
 is_false_value() {
@@ -600,6 +644,18 @@ run_api_migration() {
   docker_compose run --rm api-migrate
 }
 
+render_host_nginx_config() {
+  local output_path="${1:-$ROOT_DIR/deploy/nginx/ideaboard.conf}"
+
+  NGINX_API_UPSTREAM="$(nginx_api_upstream)" \
+    NGINX_AUTH_UPSTREAM="$(nginx_auth_upstream)" \
+    NGINX_AUTH_HEALTH_UPSTREAM="$(nginx_auth_health_upstream)" \
+    NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/usr/share/nginx/html}" \
+    NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-return 404}" \
+    bash "$ROOT_DIR/scripts/render-nginx-template.sh" "$output_path"
+  echo "Rendered Nginx config: $output_path"
+}
+
 ensure_env_file
 
 if [[ "$command" == "init-env" ]]; then
@@ -608,6 +664,12 @@ if [[ "$command" == "init-env" ]]; then
   else
     echo "Environment file was created or updated: $ENV_FILE"
   fi
+  exit 0
+fi
+
+if [[ "$command" == "nginx-conf" ]]; then
+  shift || true
+  render_host_nginx_config "${1:-}"
   exit 0
 fi
 
@@ -665,6 +727,7 @@ case "$command" in
   *)
     cat >&2 <<EOF
 Usage: ideaboard [update|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|ps]
+       ideaboard nginx-conf [output-path]
 
 Default command: update
 Environment file: $ENV_FILE

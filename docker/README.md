@@ -3,7 +3,7 @@
 `docker/` 目录同时包含本地开发依赖和生产 Docker Compose stack：
 
 - `compose.local.yml`：本地开发用 PostgreSQL + NATS
-- `compose.yml`：生产 VPS 用 `Cloudflared + Gateway + API + Auth + PostgreSQL + NATS`
+- `compose.yml`：生产 VPS 用 `宿主机反代 + API + Auth + PostgreSQL + NATS`
 
 生产环境请优先使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的 GHCR + Docker Compose 部署方式。
 
@@ -98,9 +98,11 @@ nano docker/.env
 IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update
 ```
 
+默认生产入口是宿主机反代服务，当前用 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成 API 域名的 Nginx 配置。默认 upstream 是 `127.0.0.1:6000/6001`；如果宿主机反代服务已能稳定直连 Docker bridge，可在 `docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 后重新生成配置。
+
 后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。生产 `.env` 必须填写 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 的完整 digest 引用，`ideaboard update` 会在 pull 前自动验签。
 
-推荐生产环境使用 `ideaboard update`，它会在 API / Auth migrations 前把 PostgreSQL dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.sql`，并在启动后检查 PostgreSQL、NATS JetStream、Gateway API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `gateway/cloudflared/api/auth/postgres/nats` 日志，再决定是否把三张镜像 digest 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
+推荐生产环境使用 `ideaboard update`，它会在 API / Auth migrations 前把 PostgreSQL dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.sql`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志，再决定是否把三张镜像 digest 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
 > [!IMPORTANT]
 > `postgres-*.sql` 会包含 `api_account_secrets`、`storage_profile_secrets` 等表中的上游 API key 与 S3 secret，必须按 secret artifact 处理：建议加密保存、限制传输与下载，restore 后轮换受影响的上游 API key 和对象存储凭据。

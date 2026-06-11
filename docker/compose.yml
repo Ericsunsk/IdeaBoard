@@ -1,59 +1,6 @@
 name: ideaboard
 
 services:
-  gateway:
-    image: nginx:1.27-alpine
-    container_name: ideaboard-gateway
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    depends_on:
-      api:
-        condition: service_healthy
-      auth:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
-    environment:
-      NGINX_API_UPSTREAM: http://api:6000
-      NGINX_AUTH_UPSTREAM: http://auth:6001
-      NGINX_AUTH_HEALTH_UPSTREAM: http://auth:6001/api/health
-      NGINX_WEB_ROOT: /usr/share/nginx/html
-      NGINX_ROOT_DIRECTIVE: return 404
-      NGINX_ENVSUBST_FILTER: '^NGINX_'
-    volumes:
-      - ../deploy/templates/nginx/ideaboard.conf.template:/etc/nginx/templates/default.conf.template:ro
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - "wget -q -T 3 -O /dev/null http://127.0.0.1/api/health && wget -q -T 3 -O /dev/null http://127.0.0.1/api/auth/health"
-      interval: 20s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    networks:
-      - ideaboard-network
-
-  cloudflared:
-    image: cloudflare/cloudflared:${CLOUDFLARED_VERSION:?Set CLOUDFLARED_VERSION in docker/.env}
-    container_name: ideaboard-cloudflared
-    restart: unless-stopped
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    depends_on:
-      gateway:
-        condition: service_healthy
-    command:
-      - tunnel
-      - --no-autoupdate
-      - run
-      - --token
-      - ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN}
-    networks:
-      - ideaboard-network
-
   api:
     image: ${IDEABOARD_API_IMAGE:?Set IDEABOARD_API_IMAGE in docker/.env}
     container_name: ideaboard-api
@@ -102,6 +49,8 @@ services:
       NATS_DRAIN_TIMEOUT_SECONDS: ${NATS_DRAIN_TIMEOUT_SECONDS:-2}
     volumes:
       - api-uploads:/app/uploads
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-6000}:6000"
     healthcheck:
       test:
         - CMD
@@ -166,6 +115,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB:-ideaboard}
       DB_SSLMODE: disable
+    ports:
+      - "127.0.0.1:${AUTH_HOST_PORT:-6001}:6001"
     healthcheck:
       test:
         - CMD
