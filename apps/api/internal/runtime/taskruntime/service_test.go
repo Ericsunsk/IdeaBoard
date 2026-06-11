@@ -308,6 +308,129 @@ func TestRecordTaskCancelledPublishesCancelledStatus(t *testing.T) {
 	}
 }
 
+func TestConvergeTaskAfterRiverFinalFailureFailsPendingTask(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
+
+	task := &tasks.Task{
+		TaskID:     "task-river-final-pending",
+		UserID:     1,
+		Status:     tasks.StatusPending,
+		LeaseToken: "",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.ConvergeTaskAfterRiverFinalFailure(ctx, task.TaskID, 101, "river final error"); err != nil {
+		t.Fatalf("ConvergeTaskAfterRiverFinalFailure returned error: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusFailed {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusFailed)
+	}
+	if updated.CompletedAt == nil {
+		t.Fatal("completed_at should be set")
+	}
+	select {
+	case event := <-publisher.ch:
+		if event.TaskID != task.TaskID || event.Status != tasks.StatusFailed {
+			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusFailed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for failed event")
+	}
+}
+
+func TestConvergeTaskAfterRiverFinalFailureFailsRunningTaskWithSameRiverLease(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
+	accountID := seedTaskRuntimeAccount(t, db, 61)
+
+	task := &tasks.Task{
+		TaskID:            "task-river-final-running",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(taskRuntimeChannelID(accountID)),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "river:202:lease",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.ConvergeTaskAfterRiverFinalFailure(ctx, task.TaskID, 202, "river final error"); err != nil {
+		t.Fatalf("ConvergeTaskAfterRiverFinalFailure returned error: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusFailed {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusFailed)
+	}
+	if updated.LeaseToken != "" {
+		t.Fatalf("lease_token = %q, want empty", updated.LeaseToken)
+	}
+	select {
+	case event := <-publisher.ch:
+		if event.TaskID != task.TaskID || event.Status != tasks.StatusFailed {
+			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusFailed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for failed event")
+	}
+}
+
+func TestConvergeTaskAfterRiverFinalFailureRejectsRunningTaskWithDifferentRiverLease(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	accountID := seedTaskRuntimeAccount(t, db, 62)
+
+	task := &tasks.Task{
+		TaskID:            "task-river-final-stale",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(taskRuntimeChannelID(accountID)),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "river:303:lease",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	err := service.ConvergeTaskAfterRiverFinalFailure(ctx, task.TaskID, 202, "river final error")
+	if !errors.Is(err, ErrTaskStateConflict) {
+		t.Fatalf("expected ErrTaskStateConflict, got %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusRunning {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusRunning)
+	}
+	if updated.LeaseToken != task.LeaseToken {
+		t.Fatalf("lease_token = %q, want %q", updated.LeaseToken, task.LeaseToken)
+	}
+}
+
 func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)

@@ -368,6 +368,10 @@ func newTaskLeaseToken(riverJobID int64) (string, error) {
 }
 
 func leaseBelongsToRiverJob(leaseToken string, riverJobID int64) bool {
+	return LeaseBelongsToRiverJob(leaseToken, riverJobID)
+}
+
+func LeaseBelongsToRiverJob(leaseToken string, riverJobID int64) bool {
 	if riverJobID <= 0 {
 		return false
 	}

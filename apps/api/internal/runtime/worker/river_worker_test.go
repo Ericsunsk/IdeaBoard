@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -41,6 +42,65 @@ func TestRiverWorkerRejectsNilJob(t *testing.T) {
 
 	if err := worker.Work(context.Background(), nil); err == nil {
 		t.Fatal("expected nil job error")
+	}
+}
+
+func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T) {
+	runtime := &fakeRuntime{}
+	handler := newRiverFinalFailureHandler(runtime)
+	if handler == nil {
+		t.Fatal("expected final failure handler")
+	}
+	encodedArgs, err := json.Marshal(taskqueue.DrawingTaskArgs{
+		Task: queuetypes.TaskPayload{TaskID: "final-task"},
+	})
+	if err != nil {
+		t.Fatalf("marshal args failed: %v", err)
+	}
+
+	handler.HandleError(context.Background(), &rivertype.JobRow{
+		ID:          9001,
+		Kind:        taskqueue.RiverJobKindDrawingGenerate,
+		EncodedArgs: encodedArgs,
+		Attempt:     1,
+		MaxAttempts: 2,
+	}, errors.New("retryable"))
+	if len(runtime.converged) != 0 {
+		t.Fatalf("non-final attempt converged unexpectedly: %#v", runtime.converged)
+	}
+
+	handler.HandleError(context.Background(), &rivertype.JobRow{
+		ID:          9001,
+		Kind:        taskqueue.RiverJobKindDrawingGenerate,
+		EncodedArgs: encodedArgs,
+		Attempt:     2,
+		MaxAttempts: 2,
+	}, errors.New("final"))
+	if len(runtime.converged) != 1 {
+		t.Fatalf("converged calls=%d, want 1", len(runtime.converged))
+	}
+	call := runtime.converged[0]
+	if call.taskID != "final-task" || call.riverJobID != 9001 {
+		t.Fatalf("converged call=%#v, want task final-task river 9001", call)
+	}
+	if call.reason == "" {
+		t.Fatal("converged reason should not be empty")
+	}
+}
+
+func TestRiverFinalFailureHandlerIgnoresNonDrawingJobs(t *testing.T) {
+	runtime := &fakeRuntime{}
+	handler := newRiverFinalFailureHandler(runtime)
+
+	handler.HandleError(context.Background(), &rivertype.JobRow{
+		ID:          9002,
+		Kind:        "other",
+		EncodedArgs: []byte(`{"task":{"task_id":"ignored"}}`),
+		Attempt:     2,
+		MaxAttempts: 2,
+	}, errors.New("final"))
+	if len(runtime.converged) != 0 {
+		t.Fatalf("non-drawing job converged unexpectedly: %#v", runtime.converged)
 	}
 }
 

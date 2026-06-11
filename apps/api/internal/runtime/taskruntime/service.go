@@ -216,6 +216,39 @@ func (s *Service) MarkTaskFailedWithLeaseAndAttempt(ctx context.Context, assignm
 	return s.markTaskFailedWithAssignment(ctx, assignment, reason, &finish)
 }
 
+func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error {
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if task.Status == tasks.StatusFailed {
+		return nil
+	}
+	if tasks.IsTerminalStatus(task.Status) {
+		return ErrTaskTerminal
+	}
+	if task.Status == tasks.StatusPending {
+		return s.MarkTaskFailed(ctx, taskID, reason)
+	}
+	if task.Status != tasks.StatusRunning {
+		return ErrTaskStateConflict
+	}
+
+	assignment := taskqueue.TaskAssignment{
+		TaskID:     task.TaskID,
+		AccountID:  tasks.IDValue(task.AccountID),
+		ChannelID:  tasks.IDValue(task.AssignedChannelID),
+		LeaseToken: task.LeaseToken,
+	}
+	if !assignment.HasLeaseIdentity() || !taskqueue.LeaseBelongsToRiverJob(task.LeaseToken, riverJobID) {
+		return ErrTaskStateConflict
+	}
+	return s.MarkTaskFailedWithLease(ctx, assignment, reason)
+}
+
 func (s *Service) markTaskFailed(ctx context.Context, taskID string, reason string, attemptFinish *tasks.TaskAttemptFinish) error {
 	now := taskTerminalTime(attemptFinish)
 	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, []string{tasks.StatusPending}, reason, formatTaskFailureResult(taskID, reason), now, attemptFinish)

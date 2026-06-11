@@ -71,6 +71,7 @@ type fakeRuntime struct {
 	failedCalls     int
 	lastFailedTask  string
 	lastFailedCause string
+	converged       []riverFinalFailureCall
 }
 
 func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error {
@@ -84,6 +85,21 @@ func (f *fakeRuntime) MarkTaskFailed(_ context.Context, taskID string, reason st
 	f.failedCalls++
 	f.lastFailedTask = taskID
 	f.lastFailedCause = reason
+	return nil
+}
+
+type riverFinalFailureCall struct {
+	taskID     string
+	riverJobID int64
+	reason     string
+}
+
+func (f *fakeRuntime) ConvergeTaskAfterRiverFinalFailure(_ context.Context, taskID string, riverJobID int64, reason string) error {
+	f.converged = append(f.converged, riverFinalFailureCall{
+		taskID:     taskID,
+		riverJobID: riverJobID,
+		reason:     reason,
+	})
 	return nil
 }
 

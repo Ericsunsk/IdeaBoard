@@ -2,7 +2,9 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"ideaboard/api/internal/accounts"
@@ -17,6 +19,7 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
+	"github.com/riverqueue/river/rivertype"
 )
 
 type RiverTaskWorker struct {
@@ -85,6 +88,10 @@ type RiverServerOptions struct {
 	MaxRetry    int
 }
 
+type riverFinalFailureRuntime interface {
+	ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error
+}
+
 func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverServerOptions) (*river.Client[pgx.Tx], error) {
 	if dbPool == nil {
 		return nil, errors.New("river db pool is nil")
@@ -108,14 +115,73 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)
+	errorHandler := river.ErrorHandler(nil)
+	if worker != nil && worker.processor != nil {
+		errorHandler = newRiverFinalFailureHandler(worker.processor.taskRuntime)
+	}
 	return river.NewClient(riverpgxv5.New(dbPool), &river.Config{
 		Queues: map[string]river.QueueConfig{
 			queueName: {MaxWorkers: concurrency},
 		},
-		Workers:     workers,
-		MaxAttempts: maxRetry,
-		JobTimeout:  jobTimeout,
+		Workers:      workers,
+		MaxAttempts:  maxRetry,
+		JobTimeout:   jobTimeout,
+		ErrorHandler: errorHandler,
 	})
+}
+
+type riverFinalFailureHandler struct {
+	taskRuntime riverFinalFailureRuntime
+}
+
+func newRiverFinalFailureHandler(taskRuntime consumerTaskRuntime) river.ErrorHandler {
+	finalFailureRuntime, ok := taskRuntime.(riverFinalFailureRuntime)
+	if !ok {
+		return nil
+	}
+	return &riverFinalFailureHandler{taskRuntime: finalFailureRuntime}
+}
+
+func (h *riverFinalFailureHandler) HandleError(ctx context.Context, job *rivertype.JobRow, err error) *river.ErrorHandlerResult {
+	h.handle(ctx, job, "任务队列执行失败，请稍后重试")
+	return nil
+}
+
+func (h *riverFinalFailureHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, panicVal any, _ string) *river.ErrorHandlerResult {
+	h.handle(ctx, job, "任务队列执行异常，请稍后重试")
+	return nil
+}
+
+func (h *riverFinalFailureHandler) handle(ctx context.Context, job *rivertype.JobRow, reason string) {
+	if h == nil || h.taskRuntime == nil || !isFinalRiverAttempt(job) {
+		return
+	}
+	taskID, ok := drawingTaskIDFromJob(job)
+	if !ok {
+		return
+	}
+	if err := h.taskRuntime.ConvergeTaskAfterRiverFinalFailure(ctx, taskID, job.ID, reason); err != nil {
+		slog.Warn("converge task after River final failure failed", "task_id", taskID, "river_job_id", job.ID, "err", err)
+	}
+}
+
+func isFinalRiverAttempt(job *rivertype.JobRow) bool {
+	return job != nil && job.Attempt >= job.MaxAttempts
+}
+
+func drawingTaskIDFromJob(job *rivertype.JobRow) (string, bool) {
+	if job == nil || job.Kind != taskqueue.RiverJobKindDrawingGenerate || len(job.EncodedArgs) == 0 {
+		return "", false
+	}
+	var args taskqueue.DrawingTaskArgs
+	if err := json.Unmarshal(job.EncodedArgs, &args); err != nil {
+		slog.Warn("decode River drawing task args failed", "river_job_id", job.ID, "err", err)
+		return "", false
+	}
+	if args.Task.TaskID == "" {
+		return "", false
+	}
+	return args.Task.TaskID, true
 }
 
 func MigrateRiver(ctx context.Context, dbPool *pgxpool.Pool) error {
