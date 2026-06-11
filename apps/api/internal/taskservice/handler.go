@@ -197,11 +197,10 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		return
 	}
 
-	if err := sse.Prepare(c); err != nil {
-		slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
-	}
-
 	if tasks.IsTerminalStatus(task.Status) {
+		if err := sse.Prepare(c); err != nil {
+			slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
+		}
 		if !writeTaskSSEvent(c, task) {
 			return
 		}
@@ -215,6 +214,10 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 	}
 	defer unsubscribe()
 
+	if err := sse.Prepare(c); err != nil {
+		slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
+	}
+
 	task, err = h.taskService.GetUserTask(ctx, taskID, userID)
 	if err != nil {
 		return
@@ -226,7 +229,7 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		return
 	}
 
-	heartbeat := time.NewTicker(15 * time.Second)
+	heartbeat := time.NewTicker(taskStreamHeartbeatInterval)
 	defer heartbeat.Stop()
 	maxConnTimer := time.NewTimer(defaultSSEMaxConnPeriod)
 	defer maxConnTimer.Stop()
@@ -239,7 +242,14 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		case <-c.Request.Context().Done():
 			return
 		case <-heartbeat.C:
-			if !writeSSEvent(c, "ping", gin.H{"ts": time.Now().Unix()}) {
+			latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
+			if err != nil {
+				return
+			}
+			if !writeTaskSSEvent(c, latest) {
+				return
+			}
+			if tasks.IsTerminalStatus(latest.Status) {
 				return
 			}
 		case <-events:

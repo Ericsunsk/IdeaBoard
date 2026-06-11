@@ -177,3 +177,142 @@ RETURNING id`).Scan(&channelID); err != nil {
 		}
 	}
 }
+
+func TestStreamUserTaskReturnsJSONWhenConnectionLimitReached(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	ctx := context.Background()
+	hub := newEventHubWithLimits(10, 1)
+	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})
+
+	task := &tasks.Task{
+		TaskID:     "task-sse-limit",
+		UserID:     9,
+		UserPrompt: "user prompt",
+		Status:     tasks.StatusRunning,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+	_, unsubscribe, ok := hub.Subscribe("occupied-task", 9)
+	if !ok {
+		t.Fatal("pre-subscribe should succeed")
+	}
+	defer unsubscribe()
+
+	handler := NewHandler(service)
+	router := gin.New()
+	router.GET("/events/:task_id", func(c *gin.Context) {
+		c.Set("user_id", int64(9))
+		handler.StreamUserTask(c)
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/events/"+task.TaskID, nil)
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	contentType := rec.Header().Get("Content-Type")
+	if strings.Contains(contentType, "text/event-stream") {
+		t.Fatalf("content-type=%q should not be SSE for JSON error", contentType)
+	}
+	if !strings.Contains(contentType, "application/json") {
+		t.Fatalf("content-type=%q, want application/json", contentType)
+	}
+	if !strings.Contains(rec.Body.String(), "SSE 连接数已达上限") {
+		t.Fatalf("body missing limit message: %s", rec.Body.String())
+	}
+}
+
+func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	previousInterval := taskStreamHeartbeatInterval
+	taskStreamHeartbeatInterval = 20 * time.Millisecond
+	defer func() {
+		taskStreamHeartbeatInterval = previousInterval
+	}()
+
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	ctx := context.Background()
+	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: NewEventHub()})
+
+	task := &tasks.Task{
+		TaskID:     "task-sse-heartbeat",
+		UserID:     10,
+		UserPrompt: "user prompt",
+		Status:     tasks.StatusRunning,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	handler := NewHandler(service)
+	router := gin.New()
+	router.GET("/events/:task_id", func(c *gin.Context) {
+		c.Set("user_id", int64(10))
+		handler.StreamUserTask(c)
+	})
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/events/"+task.TaskID, nil)
+	if err != nil {
+		t.Fatalf("create request failed: %v", err)
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("do request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		rows, updateErr := taskRepo.MarkTaskFailed(ctx, task.TaskID, []string{tasks.StatusRunning}, "provider timeout", "", time.Now(), nil)
+		if updateErr != nil {
+			done <- updateErr
+			return
+		}
+		if rows != 1 {
+			done <- fmt.Errorf("unexpected updated rows: %d", rows)
+			return
+		}
+		done <- nil
+	}()
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	reader := bufio.NewReader(resp.Body)
+	var payload strings.Builder
+	for {
+		select {
+		case <-waitCtx.Done():
+			t.Fatalf("timeout waiting sse payload: %s", payload.String())
+		default:
+		}
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			t.Fatalf("read stream failed: %v, payload=%s", readErr, payload.String())
+		}
+		payload.WriteString(line)
+		body := payload.String()
+		if strings.Contains(body, `"status":"running"`) && strings.Contains(body, `"status":"failed"`) {
+			if strings.Contains(body, "internal prompt") {
+				t.Fatalf("stream leaked internal task fields: %s", body)
+			}
+			if err := <-done; err != nil {
+				t.Fatalf("update failed: %v", err)
+			}
+			return
+		}
+	}
+}

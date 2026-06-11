@@ -35,6 +35,8 @@ const (
 	defaultSSEMaxConnPeriod = 30 * time.Minute
 )
 
+var taskStreamHeartbeatInterval = 15 * time.Second
+
 func NewEventHub() *EventHub {
 	return newEventHubWithLimits(defaultSSEGlobalLimit, defaultSSEPerUserLimit)
 }
