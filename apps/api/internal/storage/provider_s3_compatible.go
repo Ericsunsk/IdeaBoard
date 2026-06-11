@@ -104,11 +104,7 @@ func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multip
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if !s.IsConfigEnabled(cfg) {
-		return "", fmt.Errorf("S3 兼容存储配置未启用或不完整")
-	}
-
-	client, err := s.clientWithConfig(cfg)
+	client, err := s.prepareUploadClient(cfg)
 	if err != nil {
 		return "", err
 	}
@@ -140,12 +136,19 @@ func (s *S3CompatibleService) uploadReaderWithConfig(ctx context.Context, filena
 		return "", fmt.Errorf("文件大小无效")
 	}
 
-	client, err := s.clientWithConfig(cfg)
+	client, err := s.prepareUploadClient(cfg)
 	if err != nil {
 		return "", err
 	}
 
 	return s.putReaderWithConfig(ctx, client, filename, contentType, body, size, cfg, opts)
+}
+
+func (s *S3CompatibleService) prepareUploadClient(cfg *S3CompatibleConfig) (*minio.Client, error) {
+	if !s.IsConfigEnabled(cfg) {
+		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	}
+	return s.clientWithConfig(cfg)
 }
 
 func (s *S3CompatibleService) putReaderWithConfig(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
