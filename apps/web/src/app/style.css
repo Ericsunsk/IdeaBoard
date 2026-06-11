@@ -72,10 +72,18 @@
   /* ── Canvas / node tokens ─────────────────────────────── */
   --color-canvas-accent: #9278e6;
   --color-canvas-accent-hover: #7a6bd5;
+  --color-canvas-accent-pressed: #6d5fd0;
+  --color-canvas-accent-secondary: #c084fc;
   --color-canvas-accent-soft: #f5f2ff;
   --color-canvas-accent-border: rgba(122, 107, 213, 0.28);
   --color-canvas-accent-border-soft: rgba(122, 107, 213, 0.22);
   --color-canvas-accent-tooltip-border: rgba(122, 107, 213, 0.26);
+  --color-canvas-accent-shadow: rgba(146, 120, 230, 0.25);
+  --color-canvas-accent-shadow-hover: rgba(146, 120, 230, 0.35);
+  --color-canvas-accent-glow: rgba(146, 120, 230, 0.18);
+  --color-canvas-accent-ring: rgba(146, 120, 230, 0.1);
+  --color-canvas-accent-wash: rgba(122, 107, 213, 0.08);
+  --color-canvas-accent-clear: rgba(122, 107, 213, 0);
   --color-canvas-node-bg: #ffffff;
   --color-canvas-node-border: #e8ecf4;
   --color-canvas-node-border-alt: #e2e8f0;
@@ -89,6 +97,23 @@
   --color-canvas-tooltip-text: #f4f4f5;
   --color-canvas-running-from: #9278e6;
   --color-canvas-running-to: #6dbef7;
+
+  /* ── Boards list tokens ────────────────────────────────── */
+  --color-board-card-border: #d9dfec;
+  --color-board-card-border-hover: #cdd4e6;
+  --color-board-card-preview-from: #f7f8ff;
+  --color-board-card-preview-to: #eff2fb;
+  --color-board-card-preview-fade: rgba(245, 248, 255, 0.88);
+  --color-board-card-preview-fade-clear: rgba(245, 248, 255, 0);
+  --color-board-card-input-border: rgba(224, 230, 245, 0.75);
+  --color-board-card-title: #293042;
+  --color-board-card-text: #7b8297;
+  --color-board-card-action: #4e556b;
+  --color-board-card-action-hover: #2b3142;
+  --color-board-menu-border: #d8ddea;
+  --color-board-menu-item: #4b5565;
+  --color-board-menu-danger: #d14343;
+  --color-board-menu-danger-hover-bg: rgba(209, 67, 67, 0.1);
 }
 
 @layer base {

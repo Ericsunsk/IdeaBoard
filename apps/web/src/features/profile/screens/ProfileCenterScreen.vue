@@ -28,7 +28,7 @@
             class="!flex !w-full !justify-start !gap-3 !rounded-[14px] !border-0 !px-4 !py-3 !text-left !text-[15px] !font-medium !shadow-none !transition !duration-200"
             :class="
               activeTab === item.key
-                ? '!bg-[#7a6bd5] !text-white'
+                ? '!bg-canvas-accent-hover !text-white'
                 : '!bg-transparent !text-[#86868b] hover:!bg-[#eef1fa] hover:!text-[#2c3448]'
             "
             :aria-current="activeTab === item.key ? 'page' : undefined"
@@ -45,7 +45,7 @@
           <Button
             v-if="userStore.user?.role === 'admin'"
             type="button"
-            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] !px-4 !py-3 !text-[15px] !font-semibold !text-white !shadow-none !transition !duration-200 hover:!bg-[linear-gradient(135deg,#6c54c4,#8b7ad6)]"
+            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[linear-gradient(135deg,var(--color-canvas-accent-hover),var(--color-canvas-accent))] !px-4 !py-3 !text-[15px] !font-semibold !text-white !shadow-none !transition !duration-200 hover:!bg-[linear-gradient(135deg,var(--color-canvas-accent-pressed),var(--color-canvas-accent-hover))]"
             @click="router.push('/admin/users')"
           >
             <Shield class="h-[18px] w-[18px] stroke-[2.1]" />
@@ -89,7 +89,7 @@
             class="!flex !h-10 !justify-center !gap-2 !rounded-xl !border-0 !px-3 !text-[14px] !font-semibold !shadow-none"
             :class="
               activeTab === item.key
-                ? '!bg-[#7a6bd5] !text-white'
+                ? '!bg-canvas-accent-hover !text-white'
                 : '!bg-transparent !text-[#6b7280] hover:!bg-[#eef1fa] hover:!text-[#2c3448]'
             "
             :aria-current="activeTab === item.key ? 'page' : undefined"
@@ -117,7 +117,7 @@
                 v-else
                 :label="userInitial"
                 shape="circle"
-                class="!h-full !w-full !bg-[linear-gradient(135deg,#9278e6,#c084fc)] !text-[32px] !font-bold !text-white"
+                class="!h-full !w-full !bg-[linear-gradient(135deg,var(--color-canvas-accent),var(--color-canvas-accent-secondary))] !text-[32px] !font-bold !text-white"
               />
               <Button
                 type="button"
@@ -240,7 +240,7 @@
                           ]"
                           :placeholder="
                             isPasswordInlineError('oldPassword')
-                              ? pwdErrors.oldPassword
+                              ? displayErrorMessage(pwdErrors.oldPassword)
                               : '请输入当前使用的密码'
                           "
                           toggle-mask
@@ -255,7 +255,7 @@
                           size="small"
                           :closable="false"
                         >
-                          {{ pwdErrors.oldPassword }}
+                          {{ displayErrorMessage(pwdErrors.oldPassword) }}
                         </Message>
                       </label>
 
@@ -281,7 +281,7 @@
                             ]"
                             :placeholder="
                               isPasswordInlineError('newPassword')
-                                ? pwdErrors.newPassword
+                                ? displayErrorMessage(pwdErrors.newPassword)
                                 : '不少于6位字符'
                             "
                             toggle-mask
@@ -296,7 +296,7 @@
                             size="small"
                             :closable="false"
                           >
-                            {{ pwdErrors.newPassword }}
+                            {{ displayErrorMessage(pwdErrors.newPassword) }}
                           </Message>
                         </label>
 
@@ -321,7 +321,7 @@
                             ]"
                             :placeholder="
                               isPasswordInlineError('confirmPassword')
-                                ? pwdErrors.confirmPassword
+                                ? displayErrorMessage(pwdErrors.confirmPassword)
                                 : '请再次输入新密码'
                             "
                             toggle-mask
@@ -336,7 +336,7 @@
                             size="small"
                             :closable="false"
                           >
-                            {{ pwdErrors.confirmPassword }}
+                            {{ displayErrorMessage(pwdErrors.confirmPassword) }}
                           </Message>
                         </label>
                       </div>
@@ -348,7 +348,7 @@
                       :loading="pwdLoading"
                       :disabled="pwdLoading"
                       fluid
-                      class="!h-12 !rounded-[14px] !border-0 !bg-[#7a6bd5] !text-[15px] !font-semibold !text-white !shadow-[0_8px_24px_rgba(122,107,213,0.24)] transition hover:!-translate-y-0.5 hover:!bg-[#6d5fd0] hover:!shadow-[0_12px_32px_rgba(122,107,213,0.32)] active:!translate-y-0"
+                      class="!h-12 !rounded-[14px] !border-0 !bg-canvas-accent-hover !text-[15px] !font-semibold !text-white !shadow-[0_8px_24px_var(--color-canvas-accent-shadow)] transition hover:!-translate-y-0.5 hover:!bg-canvas-accent-pressed hover:!shadow-[0_12px_32px_var(--color-canvas-accent-shadow-hover)] active:!translate-y-0"
                     />
                   </form>
                 </template>
@@ -367,7 +367,7 @@ import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { uploadApi } from '../../../shared/api/upload'
-import { isRequiredErrorMessage } from '../../../shared/utils/formValidation'
+import { isRequiredErrorMessage, markRequiredError, displayErrorMessage } from '../../../shared/utils/formValidation'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
@@ -434,13 +434,13 @@ const profileCardPt = {
 } as const
 
 const profileGridBgClass =
-  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,rgba(122,107,213,0.08)_0%,rgba(122,107,213,0)_42%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
+  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,var(--color-canvas-accent-wash)_0%,var(--color-canvas-accent-clear)_42%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
 
 const mainContentClass =
   'app-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6'
 const passwordFieldClass = 'flex min-w-0 flex-col gap-2 text-sm font-medium text-[#1d1d1f]'
 const passwordInputClass =
-  '!h-12 !w-full !rounded-xl !border-[#d2d2d7] !bg-white/90 !px-3 !text-[15px] !text-[#1d1d1f] !shadow-none placeholder:!text-[#86868b] enabled:hover:!border-[#9278e6] enabled:focus:!border-[#9278e6]'
+  '!h-12 !w-full !rounded-xl !border-[#d2d2d7] !bg-white/90 !px-3 !text-[15px] !text-[#1d1d1f] !shadow-none placeholder:!text-[#86868b] enabled:hover:!border-canvas-accent enabled:focus:!border-canvas-accent'
 const passwordInputErrorClass =
   '!border-rose-300 !bg-rose-50/50 placeholder:!text-rose-400 enabled:focus:!border-rose-400'
 
@@ -516,14 +516,14 @@ function resolvePasswordFieldError(field: PasswordField) {
   const value = pwdForm.value[field]
 
   if (field === 'oldPassword' && !value.trim()) {
-    return '请输入当前原密码'
+    return markRequiredError('请输入当前原密码')
   }
   if (field === 'newPassword') {
-    if (!value.trim()) return '请输入新密码'
+    if (!value.trim()) return markRequiredError('请输入新密码')
     if (value.length < 6) return '密码至少6个字符'
   }
   if (field === 'confirmPassword') {
-    if (!value.trim()) return '请确认新密码'
+    if (!value.trim()) return markRequiredError('请确认新密码')
     if (value !== pwdForm.value.newPassword) return '两次输入密码不一致'
   }
   return ''

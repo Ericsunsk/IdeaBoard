@@ -1,3 +1,5 @@
+import { markRequiredError } from '../../../shared/utils/formValidation'
+
 export const AUTH_USERNAME_LIMIT = {
   min: 3,
   max: 50,
@@ -9,7 +11,7 @@ export const AUTH_PASSWORD_LIMIT = {
 } as const
 
 export function getRequiredError(value: string, label: string) {
-  return value ? '' : `请输入${label}`
+  return value ? '' : markRequiredError(`请输入${label}`)
 }
 
 export function getLengthError(value: string, limit: { min: number; max: number }, label: string) {

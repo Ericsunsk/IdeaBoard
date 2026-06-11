@@ -11,14 +11,14 @@
       :closable="false"
       :pt="authErrorMessagePt"
     >
-      {{ error }}
+      {{ displayErrorMessage(error) }}
     </Message>
   </label>
 </template>
 
 <script setup lang="ts">
 import Message from 'primevue/message'
-import { isRequiredErrorMessage } from '../../../shared/utils/formValidation'
+import { isRequiredErrorMessage, displayErrorMessage } from '../../../shared/utils/formValidation'
 import { authErrorMessagePt, authFieldClass } from './authModalUi'
 
 const props = withDefaults(
@@ -46,7 +46,7 @@ const slotProps = computed(() => ({
   errorId: props.errorId,
   describedbyId: describedbyId.value,
   inlineError: isInlineRequiredError.value,
-  inlineErrorText: isInlineRequiredError.value ? props.error : '',
+  inlineErrorText: isInlineRequiredError.value ? displayErrorMessage(props.error) : '',
   invalid: Boolean(props.error),
 }))
 </script>

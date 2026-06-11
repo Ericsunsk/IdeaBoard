@@ -14,7 +14,7 @@
         transition: { duration: 160, easing: 'ease-out' },
       },
     }"
-    class="relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-[#d9dfec] bg-white/90 text-left transition-colors hover:border-[#cdd4e6]"
+    class="relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-white/90 text-left transition-colors hover:border-board-card-border-hover"
     role="button"
     tabindex="0"
     @keydown.enter.self.prevent="emit('click-board')"
@@ -22,7 +22,7 @@
     @click="emit('click-board')"
   >
     <div
-      class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#f7f8ff_0%,#eff2fb_100%)]"
+      class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
     >
       <img
         v-if="previewSnapshotDataUrl"
@@ -37,7 +37,7 @@
         aria-hidden="true"
       ></div>
       <div
-        class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,rgba(245,248,255,0.88)_0%,rgba(245,248,255,0)_100%)]"
+        class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,var(--color-board-card-preview-fade)_0%,var(--color-board-card-preview-fade-clear)_100%)]"
       ></div>
     </div>
 
@@ -47,7 +47,7 @@
         ref="renameInputEl"
         :value="renameDraft"
         unstyled
-        class="pointer-events-auto h-[30px] w-full rounded-lg border border-[rgba(224,230,245,0.75)] bg-white/80 px-2 text-[13px] text-[#2b3142] outline-none"
+        class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-white/80 px-2 text-[13px] text-board-card-action-hover outline-none"
         maxlength="60"
         @click.stop
         @input="onRenameInput"
@@ -55,8 +55,8 @@
         @keyup.enter.stop.prevent="emit('commit-rename')"
         @keyup.esc.stop.prevent="emit('cancel-rename')"
       />
-      <div v-else class="truncate text-sm font-[650] text-[#293042]">{{ board.name }}</div>
-      <div class="mt-[3px] text-xs text-[#7b8297]">Edited {{ displayDate }}</div>
+      <div v-else class="truncate text-sm font-[650] text-board-card-title">{{ board.name }}</div>
+      <div class="mt-[3px] text-xs text-board-card-text">Edited {{ displayDate }}</div>
     </div>
 
     <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
@@ -67,7 +67,7 @@
         aria-label="More actions"
         aria-haspopup="menu"
         :aria-expanded="isMenuOpen"
-        class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-[#4e556b] hover:text-[#2b3142]"
+        class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
         @click="toggleMenu"
       >
         <MoreHoriz class="size-[18px] stroke-[2.2]" />
