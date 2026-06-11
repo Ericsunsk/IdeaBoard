@@ -356,7 +356,7 @@ async function main() {
     process.exitCode = 1
   } finally {
     if (playwrightCli) {
-      smoke.runCommand(playwrightCli, ['close'], { allowFailure: true })
+      smoke.runCommand(playwrightCli, ['close'], { allowFailure: true, timeoutMs: 10_000 })
     }
     await smoke.stopDevServer()
   }

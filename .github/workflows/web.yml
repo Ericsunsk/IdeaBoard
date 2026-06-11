@@ -64,7 +64,7 @@ jobs:
 
       - name: User route smoke
         working-directory: apps/web
-        timeout-minutes: 5
+        timeout-minutes: 10
         env:
           USER_ROUTE_SMOKE_VERBOSE: "1"
         run: npm run smoke:user

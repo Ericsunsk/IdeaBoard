@@ -14,6 +14,7 @@ export type CommandSpec = {
 
 export type RunCommandOptions = {
   allowFailure?: boolean
+  timeoutMs?: number
 }
 
 type MockSmokeRuntimeOptions = {
@@ -166,6 +167,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
 
   function runCommand(spec: CommandSpec, args: string[], runOptions: RunCommandOptions = {}) {
     const fullArgs = [...spec.args, '--session', sessionName, ...args]
+    const timeoutMs = runOptions.timeoutMs ?? COMMAND_TIMEOUT_MS
     if (isVerbose) {
       console.log(`[mock-smoke] ${args.slice(0, 2).join(' ')}`)
     }
@@ -174,7 +176,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
       encoding: 'utf8',
       env: process.env,
       maxBuffer: COMMAND_BUFFER_SIZE,
-      timeout: COMMAND_TIMEOUT_MS,
+      timeout: timeoutMs,
     })
 
     const stdout = result.stdout || ''
@@ -182,10 +184,13 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
     if (result.error) {
       const timedOut =
         result.error && 'code' in result.error && result.error.code === 'ETIMEDOUT'
+      if (runOptions.allowFailure) {
+        return { stdout, stderr, status: result.status ?? 1 }
+      }
       throw new Error(
         [
           timedOut
-            ? `Command timed out after ${COMMAND_TIMEOUT_MS}ms: ${spec.command} ${fullArgs.join(' ')}`
+            ? `Command timed out after ${timeoutMs}ms: ${spec.command} ${fullArgs.join(' ')}`
             : `Command failed: ${spec.command} ${fullArgs.join(' ')}`,
           stdout.trim(),
           stderr.trim(),

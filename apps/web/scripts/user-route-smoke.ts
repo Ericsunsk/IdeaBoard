@@ -215,6 +215,18 @@ function assertPageReached(snapshot: string, page: SmokePage) {
   }
 }
 
+function waitForExpectedText(playwrightCli: CommandSpec, page: SmokePage) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    page.expectedText
+      .map(
+        (text) =>
+          `await page.getByText(${JSON.stringify(text)}).first().waitFor({ state: "visible", timeout: 15000 })`,
+      )
+      .join('\n'),
+  ])
+}
+
 function assertExpectedUserApiRequests(output: string, page: SmokePage) {
   const unexpectedRequests = output
     .split(/\r?\n/)
@@ -333,6 +345,7 @@ function assertWorkspaceInteractions(playwrightCli: CommandSpec) {
 
 function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
   smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${page.path}`])
+  waitForExpectedText(playwrightCli, page)
   const snapshot = smoke.runCommand(playwrightCli, ['snapshot']).stdout
   assertPageReached(snapshot, page)
 
@@ -381,7 +394,7 @@ async function main() {
     process.exitCode = 1
   } finally {
     if (playwrightCli) {
-      smoke.runCommand(playwrightCli, ['close'], { allowFailure: true })
+      smoke.runCommand(playwrightCli, ['close'], { allowFailure: true, timeoutMs: 10_000 })
     }
     await smoke.stopDevServer()
   }
