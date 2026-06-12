@@ -822,7 +822,13 @@ if [[ "$command" == "cloudflare-real-ip-conf" ]]; then
   exit 0
 fi
 
-if [[ "$is_update" == "1" ]]; then
+if [[ "$is_update" == "1" ]] || \
+   is_placeholder "$(env_value IDEABOARD_API_IMAGE)" || \
+   is_placeholder "$(env_value IDEABOARD_AUTH_IMAGE)" || \
+   is_placeholder "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)" || \
+   ! is_ideaboard_image_ref "$(env_value IDEABOARD_API_IMAGE)" "api" || \
+   ! is_ideaboard_image_ref "$(env_value IDEABOARD_AUTH_IMAGE)" "auth" || \
+   ! is_ideaboard_image_ref "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)" "auth-migrate"; then
   perform_auto_update
 fi
 
