@@ -203,9 +203,17 @@ cosign verify \
 
 ### 2. 首次 VPS 初始化 + 部署
 
+**方法 A：快捷一键运行（自动拉取并部署最新 Release 或 main 分支）**
+
+```bash
+export GITHUB_TOKEN="your-github-token" && curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh" -o /tmp/bootstrap-vps.sh && bash /tmp/bootstrap-vps.sh
+```
+
+**方法 B：部署特定版本（指定 `--ref` 参数）**
+
 ```bash
 TOKEN="your-github-token"
-REF="v0.1.0" # 或改为你想部署的分支/Tag（若留空，脚本会自动解析部署最新 Release 或 main）
+REF="v0.1.0" # 改为你希望锁定的 Tag 或 Commit SHA
 curl -fsSL \
   -H "Authorization: token ${TOKEN}" \
   -H "Accept: application/vnd.github.raw" \
