@@ -340,14 +340,16 @@ IdeaBoard/
 
 后端镜像由 [docker-images.yml](./.github/workflows/docker-images.yml) 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。漏洞 triage 与人工验签命令见 [DEPLOYMENT.md](./DEPLOYMENT.md#recommended-docker)。
 
-首次 VPS 初始化 + 部署（`--ref` 为可选，默认自动拉取最新 Release Tag 或 `main` 分支）：
+首次 VPS 初始化 + 部署（`--ref` 为可选，默认自动拉取最新 Release Tag 或 `main` 分支；私有仓库需传入 Authorization 标头）：
 
 ```bash
+TOKEN="your-github-token"
 curl -fsSL \
+  -H "Authorization: token ${TOKEN}" \
   -H "Accept: application/vnd.github.raw" \
   "https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh" \
   -o /tmp/bootstrap-vps.sh
-GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh
+GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh
 ```
 
 可指定 `--ref <tag-or-commit>` 来部署特定版本。VPS 需要预先安装 `cosign` 用于默认镜像验签；强制重装可加 `IDEABOARD_FORCE=1`，脚本会备份旧目录并恢复 `docker/.env`。

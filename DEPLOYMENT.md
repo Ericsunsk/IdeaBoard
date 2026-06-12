@@ -204,12 +204,14 @@ cosign verify \
 ### 2. 首次 VPS 初始化 + 部署
 
 ```bash
-REF=v0.1.0
+TOKEN="your-github-token"
+REF="v0.1.0" # 或改为你想部署的分支/Tag（若留空，脚本会自动解析部署最新 Release 或 main）
 curl -fsSL \
+  -H "Authorization: token ${TOKEN}" \
   -H "Accept: application/vnd.github.raw" \
   "https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=${REF}" \
   -o /tmp/bootstrap-vps.sh
-GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
+GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ```
 
 把 `REF` 换成明确的发布 tag 或 commit SHA。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。Bootstrap 会在部署前检查 `cosign`，除非你已经在 `docker/.env` 里显式设置 `COSIGN_VERIFY=false`。
