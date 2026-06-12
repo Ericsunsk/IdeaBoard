@@ -671,10 +671,14 @@ verify_image_signature() {
   oidc_issuer="${oidc_issuer:-https://token.actions.githubusercontent.com}"
 
   echo "Verifying image signature: $image_ref"
-  cosign verify \
+  if ! cosign verify \
     --certificate-identity-regexp "$identity_regexp" \
     --certificate-oidc-issuer "$oidc_issuer" \
-    "$image_ref" >/dev/null
+    "$image_ref" >/dev/null; then
+    echo "Error: Image signature verification failed for $image_ref." >&2
+    echo "If you built these images locally (not via GitHub Actions) or want to bypass verification, please set COSIGN_VERIFY=false in /opt/stacks/ideaboard/docker/.env" >&2
+    return 1
+  fi
 }
 
 verify_image_signatures() {
