@@ -128,9 +128,45 @@ cosign_verify_disabled() {
 need_command git
 need_command docker
 
+get_latest_release_tag() {
+  local repo_url="$1"
+  local tags_output
+  tags_output=$(git_with_auth ls-remote --tags --refs "$repo_url" 2>/dev/null || true)
+  if [[ -n "$tags_output" ]]; then
+    local latest
+    latest=$(echo "$tags_output" | awk '{ sub(/^refs\/tags\//, "", $2); print $2 }' | grep '^v[0-9]' | sort -V | tail -n 1)
+    if [[ -n "$latest" ]]; then
+      echo "$latest"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+get_remote_default_branch() {
+  local repo_url="$1"
+  local ref_output
+  ref_output=$(git_with_auth ls-remote --symref "$repo_url" HEAD 2>/dev/null || true)
+  if [[ -n "$ref_output" ]]; then
+    local branch
+    branch=$(echo "$ref_output" | awk '/^ref:[[:space:]]*refs\/heads\// { sub(/^ref:[[:space:]]*refs\/heads\//, ""); sub(/[[:space:]]+HEAD$/, ""); print; exit }')
+    if [[ -n "$branch" ]]; then
+      echo "$branch"
+      return 0
+    fi
+  fi
+  echo "main"
+}
+
 if [[ -z "$BRANCH" ]]; then
-  echo "Error: set IDEABOARD_BRANCH or pass --ref with an explicit release tag or commit." >&2
-  exit 1
+  echo "No --ref or IDEABOARD_BRANCH specified. Detecting latest release tag..."
+  if BRANCH=$(get_latest_release_tag "$REPO_URL"); then
+    echo "Detected latest release tag: $BRANCH"
+  else
+    echo "No release tags found. Querying remote default branch..."
+    BRANCH=$(get_remote_default_branch "$REPO_URL")
+    echo "Using remote default branch: $BRANCH"
+  fi
 fi
 
 if ! docker compose version >/dev/null 2>&1; then

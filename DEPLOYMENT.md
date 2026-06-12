@@ -232,7 +232,11 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ideaboard update
 ```
 
-`ideaboard update` 会在执行 API / Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后本机 API/Auth health gate 或公网 `${API_BASE_URL}/api/health` health gate 失败都会中止部署并打印相关容器日志。
+`ideaboard update` 命令会自动执行以下操作，无需人工手动查找和修改 `.env` 中的镜像 digest：
+1. **自动拉取代码**：若 VPS 部署目录是 Git 分支（如 `main`），会执行 `git pull` 以拉取最新的配置文件、脚本和数据库迁移文件。
+2. **自动解析最新镜像**：自动识别 GitHub 仓库的 owner/repo，获取对应更新通道/Tag（默认为 `latest`，或可通过 `IDEABOARD_UPDATE_TAG` 自定义）的最新 API、Auth、Auth-Migration 镜像，拉取并解析其具体的 `sha256` 唯一哈希值，然后自动更新写入 `docker/.env`。
+3. **备份与升级**：在执行 API / Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar（默认写到 `/opt/stacks/ideaboard-backups/`，保留最近 5 份），最后重启容器并通过健康检查门禁。
+
 
 > [!IMPORTANT]
 > PostgreSQL backup 包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能含有上游 API key、S3 access key/secret、endpoint 与 bucket 配置。`postgres-*.sql` 必须按 secret artifact 处理：建议加密落盘，只允许受控传输和最小必要人员访问；完成 restore 后按受影响范围轮换上游 API key 与对象存储凭据，并清理临时副本。

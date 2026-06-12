@@ -37,8 +37,10 @@ BACKUP_RETAIN="${BACKUP_RETAIN:-5}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-ideaboard}"
 
 command="${1:-deploy}"
+is_update=0
 if [[ "$command" == "update" ]]; then
   command="deploy"
+  is_update=1
 fi
 
 if [[ "$command" == "delete" || "$command" == "uninstall" ]]; then
@@ -667,6 +669,136 @@ render_cloudflare_real_ip_config() {
   bash "$ROOT_DIR/scripts/render-cloudflare-real-ip-conf.sh" "$output_path"
 }
 
+detect_registry_repo() {
+  # 1. Try to read from git remote if in a git repo
+  if [[ -d "$ROOT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+    local remote_url
+    remote_url=$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null || true)
+    if [[ -n "$remote_url" ]]; then
+      local clean_url="${remote_url%.git}"
+      local owner_repo=""
+      if [[ "$clean_url" =~ github\.com[:/]([^/]+/[^/]+) ]]; then
+        owner_repo="${BASH_REMATCH[1]}"
+      fi
+      if [[ -n "$owner_repo" ]]; then
+        owner_repo=$(echo "$owner_repo" | tr '[:upper:]' '[:lower:]')
+        echo "ghcr.io/$owner_repo"
+        return 0
+      fi
+    fi
+  fi
+
+  # 2. Try to parse from existing IDEABOARD_API_IMAGE in .env if not placeholder
+  local api_image
+  api_image=$(env_value IDEABOARD_API_IMAGE)
+  if [[ -n "$api_image" ]] && ! is_placeholder "$api_image"; then
+    local repo
+    repo=$(image_source_repo_from_ref "$api_image")
+    if [[ -n "$repo" ]]; then
+      echo "ghcr.io/$repo"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+detect_update_tag() {
+  local tag
+  tag=$(env_value IDEABOARD_UPDATE_TAG)
+  if [[ -n "$tag" ]] && ! is_placeholder "$tag"; then
+    echo "$tag"
+    return 0
+  fi
+
+  if [[ -d "$ROOT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+    local branch
+    branch=$(git -C "$ROOT_DIR" symbolic-ref --short -q HEAD 2>/dev/null || true)
+    if [[ -n "$branch" ]]; then
+      if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+        echo "latest"
+      else
+        echo "$branch"
+      fi
+      return 0
+    fi
+
+    local tag_name
+    tag_name=$(git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null || true)
+    if [[ -n "$tag_name" ]]; then
+      echo "$tag_name"
+      return 0
+    fi
+  fi
+
+  echo "latest"
+}
+
+resolve_digest_for_image() {
+  local component="$1"
+  local registry_repo="$2"
+  local tag="$3"
+  local image_tag_ref="${registry_repo}/ideaboard-${component}:${tag}"
+
+  echo "Pulling image for ${component} (tag: ${tag})..." >&2
+  if ! docker pull "$image_tag_ref" >&2; then
+    echo "Warning: failed to pull ${image_tag_ref}" >&2
+    return 1
+  fi
+
+  local digest_ref
+  digest_ref=$(docker inspect --format='{{range .RepoDigests}}{{.}} {{end}}' "$image_tag_ref" | tr ' ' '\n' | grep -F "${registry_repo}/ideaboard-${component}@sha256:" | head -n 1)
+  if [[ -z "$digest_ref" ]]; then
+    echo "Warning: failed to find digest for ${image_tag_ref}" >&2
+    return 1
+  fi
+
+  echo "$digest_ref"
+}
+
+perform_auto_update() {
+  echo "=== Running Auto-Update ==="
+
+  # 1. Update local git repository if on a branch
+  if [[ -d "$ROOT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+    local branch
+    branch=$(git -C "$ROOT_DIR" symbolic-ref --short -q HEAD 2>/dev/null || true)
+    if [[ -n "$branch" ]]; then
+      echo "Updating local codebase from git remote (branch: $branch)..."
+      if ! git -C "$ROOT_DIR" pull --ff-only; then
+        echo "Warning: git pull failed. Proceeding with current local files."
+      fi
+    fi
+  fi
+
+  # 2. Detect registry and tag
+  local registry_repo
+  registry_repo=$(detect_registry_repo) || die "Could not detect GHCR registry repository prefix. Please ensure git remote is set or IDEABOARD_API_IMAGE is configured in $ENV_FILE"
+
+  local tag
+  tag=$(detect_update_tag)
+
+  echo "Update channel/tag: $tag"
+  echo "Registry repository: $registry_repo"
+
+  # 3. Login to GHCR if configured
+  login_ghcr_if_configured
+
+  # 4. Resolve digests
+  local api_digest auth_digest auth_migrate_digest
+  api_digest=$(resolve_digest_for_image "api" "$registry_repo" "$tag") || die "Failed to resolve digest for api image"
+  auth_digest=$(resolve_digest_for_image "auth" "$registry_repo" "$tag") || die "Failed to resolve digest for auth image"
+  auth_migrate_digest=$(resolve_digest_for_image "auth-migrate" "$registry_repo" "$tag") || die "Failed to resolve digest for auth-migrate image"
+
+  # 5. Write back to .env
+  set_env_value IDEABOARD_API_IMAGE "$api_digest"
+  set_env_value IDEABOARD_AUTH_IMAGE "$auth_digest"
+  set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_digest"
+
+  echo "Successfully resolved and updated image digests in $ENV_FILE"
+  echo "==========================="
+}
+
 ensure_env_file
 
 if [[ "$command" == "init-env" ]]; then
@@ -688,6 +820,10 @@ if [[ "$command" == "cloudflare-real-ip-conf" ]]; then
   shift || true
   render_cloudflare_real_ip_config "${1:-}"
   exit 0
+fi
+
+if [[ "$is_update" == "1" ]]; then
+  perform_auto_update
 fi
 
 validate_env_file || exit 1
