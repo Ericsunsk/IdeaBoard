@@ -592,6 +592,49 @@ login_ghcr_if_configured() {
   printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$username" --password-stdin
 }
 
+install_cosign() {
+  echo "cosign is missing. Attempting to install it automatically..." >&2
+
+  local os
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  local arch
+  arch=$(uname -m)
+  if [[ "$arch" == "x86_64" ]]; then
+    arch="amd64"
+  elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+    arch="arm64"
+  else
+    echo "Warning: unsupported architecture $arch for auto-installing cosign." >&2
+    return 1
+  fi
+
+  local version="v2.4.1"
+  local url="https://github.com/sigstore/cosign/releases/download/${version}/cosign-${os}-${arch}"
+  local dest="/usr/local/bin/cosign"
+
+  echo "Downloading cosign from $url..." >&2
+  if curl -fsSL "$url" -o "$dest"; then
+    chmod +x "$dest"
+    echo "cosign has been successfully installed to $dest" >&2
+    return 0
+  fi
+
+  # Fallback to local project bin if /usr/local/bin is not writable
+  local local_bin="$ROOT_DIR/bin"
+  mkdir -p "$local_bin"
+  dest="$local_bin/cosign"
+  echo "Retrying download to local bin: $dest..." >&2
+  if curl -fsSL "$url" -o "$dest"; then
+    chmod +x "$dest"
+    export PATH="$local_bin:$PATH"
+    echo "cosign has been successfully installed to $dest and added to PATH" >&2
+    return 0
+  fi
+
+  echo "Error: failed to download cosign automatically." >&2
+  return 1
+}
+
 cosign_verify_enabled() {
   local value
   value="$(env_value COSIGN_VERIFY)"
@@ -612,7 +655,11 @@ verify_image_signature() {
     echo "Skipping cosign verification for $image_ref because COSIGN_VERIFY=false"
     return 0
   fi
-  command -v cosign >/dev/null 2>&1 || die "cosign is required to verify image signatures. Install cosign or set COSIGN_VERIFY=false only for temporary offline recovery."
+  if ! command -v cosign >/dev/null 2>&1; then
+    if ! install_cosign; then
+      die "cosign is required to verify image signatures. Install cosign or set COSIGN_VERIFY=false only for temporary offline recovery."
+    fi
+  fi
 
   identity_regexp="$(env_value COSIGN_CERTIFICATE_IDENTITY_REGEXP)"
   if [[ -z "$identity_regexp" ]]; then

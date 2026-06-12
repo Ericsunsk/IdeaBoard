@@ -125,6 +125,49 @@ cosign_verify_disabled() {
   [[ "$value" == "false" || "$value" == "0" || "$value" == "no" || "$value" == "off" ]]
 }
 
+install_cosign() {
+  echo "cosign is missing. Attempting to install it automatically..." >&2
+
+  local os
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  local arch
+  arch=$(uname -m)
+  if [[ "$arch" == "x86_64" ]]; then
+    arch="amd64"
+  elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+    arch="arm64"
+  else
+    echo "Warning: unsupported architecture $arch for auto-installing cosign." >&2
+    return 1
+  fi
+
+  local version="v2.4.1"
+  local url="https://github.com/sigstore/cosign/releases/download/${version}/cosign-${os}-${arch}"
+  local dest="/usr/local/bin/cosign"
+
+  echo "Downloading cosign from $url..." >&2
+  if curl -fsSL "$url" -o "$dest"; then
+    chmod +x "$dest"
+    echo "cosign has been successfully installed to $dest" >&2
+    return 0
+  fi
+
+  # Fallback to local project bin if /usr/local/bin is not writable
+  local local_bin="$STACK_DIR/bin"
+  mkdir -p "$local_bin"
+  dest="$local_bin/cosign"
+  echo "Retrying download to local bin: $dest..." >&2
+  if curl -fsSL "$url" -o "$dest"; then
+    chmod +x "$dest"
+    export PATH="$local_bin:$PATH"
+    echo "cosign has been successfully installed to $dest and added to PATH" >&2
+    return 0
+  fi
+
+  echo "Error: failed to download cosign automatically." >&2
+  return 1
+}
+
 need_command git
 need_command docker
 
@@ -230,9 +273,10 @@ if [[ -t 0 || -e /dev/tty ]]; then
 fi
 
 if ! command -v cosign >/dev/null 2>&1 && ! cosign_verify_disabled; then
-  echo "Missing command: cosign" >&2
-  echo "Install cosign before running the signed-image deployment, or set COSIGN_VERIFY=false in docker/.env only for temporary offline recovery." >&2
-  exit 1
+  if ! install_cosign; then
+    echo "Error: cosign is required for signed-image deployment. Install it manually or set COSIGN_VERIFY=false in docker/.env." >&2
+    exit 1
+  fi
 fi
 
 if [[ -n "$GIT_TOKEN" && -z "${GHCR_TOKEN:-}" ]]; then
