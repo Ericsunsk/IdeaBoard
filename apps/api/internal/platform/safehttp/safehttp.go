@@ -10,12 +10,15 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const defaultTimeout = 15 * time.Second
+const safeTransportPoolMaxSize = 256
 
 var safeTransportPool sync.Map
+var safeTransportPoolSize int64 // approximate, updated outside sync.Map
 
 type resolvedPolicy struct {
 	parsed           *url.URL
@@ -218,12 +221,35 @@ func transportForRequest(ctx context.Context, req *http.Request, policy *resolve
 
 	transport := cloneDefaultTransport()
 	transport.DialContext = restrictedDialContext(effectivePolicy.allowedHosts, effectivePolicy.allowedHostPorts, effectivePolicy.allowedIPs, effectivePolicy.allowedIPPorts)
-	actual, _ := safeTransportPool.LoadOrStore(key, transport)
+	actual, loaded := safeTransportPool.LoadOrStore(key, transport)
 	stored, ok := actual.(*http.Transport)
 	if !ok {
 		return nil, fmt.Errorf("HTTP 传输配置错误")
 	}
+	if !loaded {
+		pruneSafeTransportPoolIfNeeded()
+	}
 	return stored, nil
+}
+
+func pruneSafeTransportPoolIfNeeded() {
+	size := atomic.AddInt64(&safeTransportPoolSize, 1)
+	if size <= safeTransportPoolMaxSize {
+		return
+	}
+	// Pool exceeded cap; flush least-recently-used entries by clearing the
+	// whole pool. This is deliberately simple — the pool will naturally
+	// repopulate with active policies. A long-running process with many
+	// distinct allowed-host configurations would otherwise leak Transport
+	// instances (each with its own idle connection pool).
+	atomic.StoreInt64(&safeTransportPoolSize, 0)
+	safeTransportPool.Range(func(key, value any) bool {
+		if transport, ok := value.(*http.Transport); ok {
+			transport.CloseIdleConnections()
+		}
+		safeTransportPool.Delete(key)
+		return true
+	})
 }
 
 func cachedSafeTransport(key string) (*http.Transport, bool) {

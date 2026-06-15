@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"ideaboard/api/internal/platform/response"
@@ -23,6 +24,7 @@ const (
 	monitorSnapshotErrorEvent      = "snapshot_error"
 	monitorStreamCloseEvent        = "close"
 	monitorStreamCloseMaxConnCause = "max_connection_duration_reached"
+	monitorStreamMaxConcurrent       = 20
 )
 
 type MonitorInfoProvider interface {
@@ -30,8 +32,9 @@ type MonitorInfoProvider interface {
 }
 
 type Handler struct {
-	service *Service
-	monitor MonitorInfoProvider
+	service              *Service
+	monitor              MonitorInfoProvider
+	monitorStreamCount   atomic.Int32
 }
 
 type adminMonitorSnapshot struct {
@@ -64,6 +67,16 @@ func (h *Handler) GetMonitor(c *gin.Context) {
 }
 
 func (h *Handler) StreamMonitor(c *gin.Context) {
+	if h == nil {
+		return
+	}
+	if count := h.monitorStreamCount.Add(1); count > monitorStreamMaxConcurrent {
+		h.monitorStreamCount.Add(-1)
+		response.Error(c, http.StatusTooManyRequests, "监控连接数已达上限，请稍后重试")
+		return
+	}
+	defer h.monitorStreamCount.Add(-1)
+
 	ctx := c.Request.Context()
 	snapshot, err := h.buildMonitorSnapshot(ctx)
 	if err != nil {

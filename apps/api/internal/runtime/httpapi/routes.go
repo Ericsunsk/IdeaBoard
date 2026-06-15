@@ -132,6 +132,7 @@ func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (map[string
 }
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
+	r.Use(rateLimitMiddleware())
 	r.Use(requestBodyLimitMiddleware(globalRequestBodyLimitBytes))
 	r.Use(deps.CORSMiddleware)
 

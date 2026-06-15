@@ -188,7 +188,8 @@ WHERE account_id = sqlc.arg(account_id)
 -- name: RetireActiveAccountSecrets :exec
 UPDATE api_account_secrets
 SET status = 'retired',
-    retired_at = now()
+    retired_at = now(),
+    secret_payload = ''
 WHERE account_id = sqlc.arg(account_id)
   AND status = 'active'
   AND EXISTS (

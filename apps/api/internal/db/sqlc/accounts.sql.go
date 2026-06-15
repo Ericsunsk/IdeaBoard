@@ -722,7 +722,8 @@ func (q *Queries) ResetAccountFailCount(ctx context.Context, id int64) (int64, e
 const retireActiveAccountSecrets = `-- name: RetireActiveAccountSecrets :exec
 UPDATE api_account_secrets
 SET status = 'retired',
-    retired_at = now()
+    retired_at = now(),
+    secret_payload = ''
 WHERE account_id = $1
   AND status = 'active'
   AND EXISTS (

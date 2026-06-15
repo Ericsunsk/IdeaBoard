@@ -34,7 +34,7 @@ func TestBuildCORSMiddlewareProductionAllowlist(t *testing.T) {
 	}
 }
 
-func TestBuildCORSMiddlewareProductionNoAllowlistIsNoop(t *testing.T) {
+func TestBuildCORSMiddlewareProductionNoAllowlistRejectsCrossOrigin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
@@ -49,11 +49,30 @@ func TestBuildCORSMiddlewareProductionNoAllowlistIsNoop(t *testing.T) {
 
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", res.Code, http.StatusOK)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", res.Code, http.StatusForbidden)
 	}
 	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Fatalf("Access-Control-Allow-Origin = %q, want empty", got)
+	}
+}
+
+func TestBuildCORSMiddlewareProductionNoAllowlistAllowsNoOrigin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(buildCORSMiddleware("production", nil))
+	router.GET("/api/health", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	res := httptest.NewRecorder()
+
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", res.Code, http.StatusOK)
 	}
 }
 

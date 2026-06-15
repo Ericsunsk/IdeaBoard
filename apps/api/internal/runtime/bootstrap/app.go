@@ -238,12 +238,19 @@ func valueOrEmpty(value *string) string {
 }
 
 // buildCORSMiddleware returns a Gin middleware for CORS handling.
-// In production with no explicit allowlist, Nginx handles CORS so this is a no-op.
+// In production with no explicit allowlist, reject cross-origin browser requests.
 // If origins are configured, enforce the same allowlist in every environment.
 func buildCORSMiddleware(appEnv string, allowedOrigins []string) gin.HandlerFunc {
 	allowed := buildAllowedOriginSet(allowedOrigins)
 	if len(allowedOrigins) == 0 && isProductionRuntime(appEnv) {
-		return func(c *gin.Context) { c.Next() }
+		slog.Warn("生产环境未配置 APP_CORS_ALLOWED_ORIGINS，将拒绝跨域请求。请设置该环境变量或在反向代理中处理 CORS。")
+		return func(c *gin.Context) {
+			if origin := c.GetHeader("Origin"); origin != "" {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			c.Next()
+		}
 	}
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
