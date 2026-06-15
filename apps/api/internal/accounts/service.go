@@ -2,7 +2,6 @@ package accounts
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -61,7 +60,5 @@ func NewAccountService(deps AccountServiceDeps, opts AccountServiceOptions) *Acc
 }
 
 func (s *AccountService) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
-	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
-		slog.Warn("publish task status event failed", "task_id", taskID, "status", status, "err", err)
-	}
+	events.PublishTaskStatusLogWarn(ctx, s.taskEvents, taskID, status)
 }

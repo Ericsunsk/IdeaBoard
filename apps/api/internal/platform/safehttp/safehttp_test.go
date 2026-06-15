@@ -219,3 +219,44 @@ func TestTransportForRequestUsesDifferentTransportForDifferentPolicy(t *testing.
 		t.Fatal("expected different policy to use different transport")
 	}
 }
+
+func TestTransportForRequestReusesTransportAfterProxyAllowance(t *testing.T) {
+	safeTransportPool = sync.Map{}
+
+	oldTransport := http.DefaultTransport
+	defer func() {
+		http.DefaultTransport = oldTransport
+	}()
+
+	proxyURL, err := url.Parse("http://127.0.0.1:7890")
+	if err != nil {
+		t.Fatalf("parse proxy URL: %v", err)
+	}
+	http.DefaultTransport = &http.Transport{
+		Proxy: http.ProxyURL(proxyURL),
+	}
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.com/image.png", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	policy := &resolvedPolicy{
+		parsed:           req.URL,
+		allowedHosts:     map[string]bool{"example.com": true},
+		allowedHostPorts: map[string]bool{},
+		allowedIPs:       map[string]bool{},
+		allowedIPPorts:   map[string]bool{},
+	}
+
+	first, err := transportForRequest(context.Background(), req, policy)
+	if err != nil {
+		t.Fatalf("first transport: %v", err)
+	}
+	second, err := transportForRequest(context.Background(), req, policy)
+	if err != nil {
+		t.Fatalf("second transport: %v", err)
+	}
+	if first != second {
+		t.Fatal("expected proxy allowance policy to reuse transport")
+	}
+}

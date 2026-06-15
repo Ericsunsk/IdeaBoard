@@ -30,6 +30,12 @@ func newRuntimeApp(cfg *config.Config) (*runtimeApp, error) {
 
 func (a *runtimeApp) start() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("River worker goroutine panicked", "panic", r)
+				fatal("River worker goroutine panicked", "panic", r)
+			}
+		}()
 		slog.Info("River worker starting", "queue", a.container.workerQueueName, "concurrency", a.container.workerConcurrent)
 		if err := a.container.riverClient.Start(context.Background()); err != nil {
 			fatal("failed to start River worker", "err", err)
@@ -37,6 +43,12 @@ func (a *runtimeApp) start() {
 	}()
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("HTTP server goroutine panicked", "panic", r)
+				fatal("HTTP server goroutine panicked", "panic", r)
+			}
+		}()
 		slog.Info("HTTP server starting", "addr", a.httpServer.Addr)
 		if err := a.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fatal("failed to start HTTP server", "err", err)

@@ -128,6 +128,11 @@ func (s *Service) WatchTaskCancellation(parent context.Context, taskID string) (
 	ctx, cancel := context.WithCancel(parent)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("WatchTaskCancellation goroutine panicked", "task_id", taskID, "panic", r)
+			}
+		}()
 		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 
@@ -150,9 +155,7 @@ func (s *Service) WatchTaskCancellation(parent context.Context, taskID string) (
 }
 
 func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
-	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
-		slog.Warn("publish task status event failed", "task_id", taskID, "status", status, "err", err)
-	}
+	events.PublishTaskStatusLogWarn(ctx, s.taskEvents, taskID, status)
 }
 
 func (s *Service) MarkTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string) error {

@@ -141,6 +141,12 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 	}
 
 	consume, err := consumer.Consume(func(msg jetstream.Msg) {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("NATS consume callback panicked", "subject", msg.Subject(), "panic", r)
+				_ = msg.NakWithDelay(time.Second)
+			}
+		}()
 		var event TaskStatusEvent
 		if err := json.Unmarshal(msg.Data(), &event); err != nil {
 			slog.Warn("discard malformed task status event", "subject", msg.Subject(), "err", err)
@@ -153,11 +159,14 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 			_ = msg.Term()
 			return
 		}
-		if err := handler(context.Background(), event); err != nil {
+		handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := handler(handlerCtx, event); err != nil {
 			slog.Warn("task status handler failed", "task_id", event.TaskID, "status", event.Status, "err", err)
+			handlerCancel()
 			_ = msg.NakWithDelay(time.Second)
 			return
 		}
+		handlerCancel()
 		if err := msg.Ack(); err != nil {
 			slog.Warn("ack task status event failed", "task_id", event.TaskID, "status", event.Status, "err", err)
 		}

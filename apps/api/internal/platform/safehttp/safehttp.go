@@ -201,23 +201,62 @@ func nonNilContext(ctx context.Context) context.Context {
 }
 
 func transportForRequest(ctx context.Context, req *http.Request, policy *resolvedPolicy) (*http.Transport, error) {
-	transport := cloneDefaultTransport()
-	allowRequestProxyDialTarget(ctx, transport, req, policy)
+	effectivePolicy := policy
+	key := transportPolicyKey(effectivePolicy)
+	if existing, ok := cachedSafeTransport(key); ok {
+		return existing, nil
+	}
 
-	key := transportPolicyKey(policy)
-	if cached, ok := safeTransportPool.Load(key); ok {
-		if existing, ok := cached.(*http.Transport); ok {
+	if proxyURL, ok := requestProxyURL(req); ok {
+		effectivePolicy = cloneResolvedPolicy(policy)
+		addProxyDialAllowance(ctx, effectivePolicy, proxyURL)
+		key = transportPolicyKey(effectivePolicy)
+		if existing, ok := cachedSafeTransport(key); ok {
 			return existing, nil
 		}
 	}
 
-	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts)
+	transport := cloneDefaultTransport()
+	transport.DialContext = restrictedDialContext(effectivePolicy.allowedHosts, effectivePolicy.allowedHostPorts, effectivePolicy.allowedIPs, effectivePolicy.allowedIPPorts)
 	actual, _ := safeTransportPool.LoadOrStore(key, transport)
 	stored, ok := actual.(*http.Transport)
 	if !ok {
 		return nil, fmt.Errorf("HTTP 传输配置错误")
 	}
 	return stored, nil
+}
+
+func cachedSafeTransport(key string) (*http.Transport, bool) {
+	cached, ok := safeTransportPool.Load(key)
+	if !ok {
+		return nil, false
+	}
+	transport, ok := cached.(*http.Transport)
+	return transport, ok
+}
+
+func cloneResolvedPolicy(policy *resolvedPolicy) *resolvedPolicy {
+	if policy == nil {
+		return nil
+	}
+	return &resolvedPolicy{
+		parsed:           policy.parsed,
+		allowedHosts:     cloneBoolMap(policy.allowedHosts),
+		allowedHostPorts: cloneBoolMap(policy.allowedHostPorts),
+		allowedIPs:       cloneBoolMap(policy.allowedIPs),
+		allowedIPPorts:   cloneBoolMap(policy.allowedIPPorts),
+	}
+}
+
+func cloneBoolMap(values map[string]bool) map[string]bool {
+	if len(values) == 0 {
+		return map[string]bool{}
+	}
+	cloned := make(map[string]bool, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func transportPolicyKey(policy *resolvedPolicy) string {
@@ -246,15 +285,19 @@ func sortedMapKey(values map[string]bool) string {
 	return strings.Join(keys, ",")
 }
 
-func allowRequestProxyDialTarget(ctx context.Context, transport *http.Transport, req *http.Request, policy *resolvedPolicy) {
-	if transport == nil || transport.Proxy == nil || req == nil || policy == nil {
-		return
+func requestProxyURL(req *http.Request) (*url.URL, bool) {
+	if req == nil {
+		return nil, false
 	}
-	proxyURL, err := transport.Proxy(req)
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok || base.Proxy == nil {
+		return nil, false
+	}
+	proxyURL, err := base.Proxy(req)
 	if err != nil || proxyURL == nil {
-		return
+		return nil, false
 	}
-	addProxyDialAllowance(ctx, policy, proxyURL)
+	return proxyURL, true
 }
 
 func addProxyDialAllowance(ctx context.Context, policy *resolvedPolicy, proxyURL *url.URL) {
@@ -299,7 +342,7 @@ func addProxyDialAllowance(ctx context.Context, policy *resolvedPolicy, proxyURL
 	}
 }
 
-func cloneDefaultTransport() *http.Transport {
+var cloneDefaultTransport = func() *http.Transport {
 	if base, ok := http.DefaultTransport.(*http.Transport); ok {
 		return base.Clone()
 	}

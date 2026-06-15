@@ -24,7 +24,7 @@ func newHTTPServer(cfg *config.Config, handler *gin.Engine) *http.Server {
 
 func listenerAddr(host, port string) string {
 	if strings.TrimSpace(host) == "" {
-		return ":" + port
+		return "127.0.0.1:" + port
 	}
 	return net.JoinHostPort(host, port)
 }

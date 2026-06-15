@@ -131,7 +131,9 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	o.recordProviderTimeline(ctx, task.TaskID, startTime, providerOutput.Timeline)
 	if err != nil {
 		if isContextInterrupted(taskCtx.Err()) || isContextInterrupted(ctx.Err()) {
-			cancelled, checkErr := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
+			checkCtx, checkCancel := taskCleanupContext(ctx)
+			cancelled, checkErr := o.taskRuntime.IsTaskCancelled(checkCtx, task.TaskID)
+			checkCancel()
 			if checkErr != nil {
 				slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", checkErr)
 			}
@@ -202,7 +204,9 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 
-	cancelled, err = o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
+	checkCtx, checkCancel := taskCleanupContext(ctx)
+	cancelled, err = o.taskRuntime.IsTaskCancelled(checkCtx, task.TaskID)
+	checkCancel()
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
 		if requeueErr := o.requeueTask(ctx, task, assignment, "检查任务取消状态失败"); requeueErr != nil {

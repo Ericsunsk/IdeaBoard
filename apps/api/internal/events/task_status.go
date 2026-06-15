@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -54,4 +55,12 @@ func PublishTaskStatusBestEffort(parent context.Context, publisher TaskStatusPub
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), DefaultPublishTimeout)
 	defer cancel()
 	return publisher.PublishTaskStatus(ctx, NormalizeTaskStatusEvent(event))
+}
+
+// PublishTaskStatusLogWarn publishes a task status event and logs a warning on failure.
+// Use this as a shared helper instead of duplicating the publish+warn pattern.
+func PublishTaskStatusLogWarn(ctx context.Context, publisher TaskStatusPublisher, taskID, status string) {
+	if err := PublishTaskStatusBestEffort(ctx, publisher, NewTaskStatusEvent(taskID, status)); err != nil {
+		slog.Warn("publish task status event failed", "task_id", taskID, "status", status, "err", err)
+	}
 }

@@ -319,6 +319,7 @@ func writeTaskStatusFetchErrorSSE(c *gin.Context, taskID string, userID int64, s
 	if writeErr := sse.WriteEvent(c, "error", gin.H{"message": "获取任务状态失败"}); writeErr != nil {
 		slog.Warn("write SSE error event failed", "task_id", taskID, "user_id", userID, "source", source, "err", writeErr)
 	}
+	sse.WriteEvent(c, "close", gin.H{"reason": "fetch_failed"})
 }
 
 func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
