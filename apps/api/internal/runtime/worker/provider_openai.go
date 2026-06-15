@@ -139,7 +139,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	var req *http.Request
 	var err error
 	if useEditEndpoint {
-		body, contentType, buildErr := buildOpenAIEditMultipartRequestBody(ctx, reqBody, timeout)
+		body, contentType, buildErr := c.buildOpenAIEditMultipartRequestBody(ctx, reqBody, timeout)
 		if buildErr != nil {
 			return providerCallResult{}, buildErr
 		}
@@ -195,7 +195,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	}, nil
 }
 
-func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody openAIImageRequestBody, timeout time.Duration) (*bytes.Buffer, string, error) {
+func (c *ProviderExecutor) buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody openAIImageRequestBody, timeout time.Duration) (*bytes.Buffer, string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
@@ -210,7 +210,7 @@ func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody openAIImag
 
 	imageRefs := openAIImageURLRefStrings(reqBody.Images)
 	for index, ref := range imageRefs {
-		if err := writeOpenAIMultipartImagePart(ctx, writer, "image", ref, index, timeout); err != nil {
+		if err := c.writeOpenAIMultipartImagePart(ctx, writer, "image", ref, index, timeout); err != nil {
 			return nil, "", err
 		}
 	}
@@ -220,7 +220,7 @@ func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody openAIImag
 
 	if reqBody.Mask != nil && strings.TrimSpace(reqBody.Mask.ImageURL) != "" {
 		maskRef := reqBody.Mask.ImageURL
-		if err := writeOpenAIMultipartImagePart(ctx, writer, "mask", maskRef, 0, timeout); err != nil {
+		if err := c.writeOpenAIMultipartImagePart(ctx, writer, "mask", maskRef, 0, timeout); err != nil {
 			return nil, "", err
 		}
 	}
@@ -273,8 +273,8 @@ func writeOpenAIMultipartField(writer *multipart.Writer, key string, value inter
 	}
 }
 
-func writeOpenAIMultipartImagePart(ctx context.Context, writer *multipart.Writer, fieldName, ref string, index int, timeout time.Duration) error {
-	filename, mimeType, data, err := resolveOpenAIImageBytes(ctx, strings.TrimSpace(ref), index, timeout)
+func (c *ProviderExecutor) writeOpenAIMultipartImagePart(ctx context.Context, writer *multipart.Writer, fieldName, ref string, index int, timeout time.Duration) error {
+	filename, mimeType, data, err := c.resolveOpenAIImageBytes(ctx, strings.TrimSpace(ref), index, timeout)
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func writeOpenAIMultipartImagePart(ctx context.Context, writer *multipart.Writer
 	return err
 }
 
-func resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout time.Duration) (filename string, mimeType string, data []byte, err error) {
+func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout time.Duration) (filename string, mimeType string, data []byte, err error) {
 	if strings.HasPrefix(ref, "data:") {
 		parsed, decodeErr := mediarefs.ParseDataImageURL(ref, maxOpenAIDataURLBytes)
 		if decodeErr != nil {
@@ -302,6 +302,29 @@ func resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout
 		}
 		ext := strings.TrimPrefix(parsed.Ext, ".")
 		return fmt.Sprintf("image-%d.%s", index+1, ext), parsed.MIMEType, parsed.Data, nil
+	}
+
+	if obj, ok, readErr := c.readRelativeUploadObject(ctx, ref, maxOpenAIDataURLBytes); ok {
+		if readErr != nil {
+			return "", "", nil, fmt.Errorf("读取上传图像失败: %w", readErr)
+		}
+		if err := media.ValidateImageDimensions(obj.Data); err != nil {
+			return "", "", nil, err
+		}
+		mimeType = strings.TrimSpace(obj.ContentType)
+		if parsedMimeType, _, parseMimeErr := mime.ParseMediaType(mimeType); parseMimeErr == nil && strings.HasPrefix(parsedMimeType, "image/") {
+			mimeType = parsedMimeType
+		} else {
+			mimeType = inferLocalAssetMimeType(obj.Filename, obj.Data)
+		}
+		filename = strings.TrimSpace(obj.Filename)
+		if filename == "" || filename == "." || filename == "/" {
+			filename = fmt.Sprintf("image-%d.%s", index+1, inferOpenAIImageFileExtension(mimeType))
+		}
+		if ext := strings.TrimSpace(path.Ext(filename)); ext == "" {
+			filename += "." + inferOpenAIImageFileExtension(mimeType)
+		}
+		return filename, mimeType, obj.Data, nil
 	}
 
 	parsed, parseErr := url.Parse(ref)

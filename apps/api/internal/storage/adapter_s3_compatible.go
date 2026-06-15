@@ -57,3 +57,7 @@ func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *S
 	defer remoteFile.Cleanup()
 	return a.service.s3CompatibleService.uploadReaderWithConfig(ctx, remoteFile.Filename, "application/octet-stream", remoteFile, remoteFile.Size, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
+
+func (a *s3CompatibleStorageAdapter) Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error) {
+	return a.service.s3CompatibleService.readWithConfig(ctx, objectKey, a.service.s3CompatibleConfigFromProfile(profile), maxBytes)
+}

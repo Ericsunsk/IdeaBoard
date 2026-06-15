@@ -100,6 +100,27 @@ func (s *StorageService) StoreBytes(ctx context.Context, filename string, data [
 	return adapter.StoreBytes(ctx, profile, filename, data, opts)
 }
 
+// ReadUploadResourceByURL resolves a structured uploads URL/path and reads it
+// from the active storage profile. Callers must authorize access before reading.
+func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL string, maxBytes int64) (*StoredUploadObject, error) {
+	profile, err := s.resolveActiveProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	key, err := s.extractObjectKeyFromUserUploadURL(*profile, rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := ParseUploadResource(key); err != nil {
+		return nil, err
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.Read(ctx, profile, key, maxBytes)
+}
+
 func (s *StorageService) DeleteWorkspaceUploadByURL(ctx context.Context, storageUID string, boardID string, rawURL string) error {
 	expectedPrefix, err := WorkspaceBoardUploadObjectPrefix(storageUID, boardID)
 	if err != nil {
@@ -437,6 +458,28 @@ func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {
 	return nil
 }
 
+func (s *StorageService) readLocalByObjectKey(objectKey string, maxBytes int64) (*StoredUploadObject, error) {
+	normalized, err := normalizeUploadObjectKey(objectKey)
+	if err != nil {
+		return nil, err
+	}
+	file, err := os.Open(filepath.FromSlash(normalized))
+	if err != nil {
+		return nil, fmt.Errorf("读取文件失败: %v", err)
+	}
+	defer file.Close()
+	data, err := readStorageObject(file, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	return &StoredUploadObject{
+		ObjectKey:   normalized,
+		Filename:    path.Base(normalized),
+		ContentType: inferStoredUploadContentType(path.Base(normalized), data),
+		Data:        data,
+	}, nil
+}
+
 func (s *StorageService) deleteLocalByPrefix(prefix string) error {
 	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
 	if err != nil {
@@ -513,6 +556,30 @@ func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL, b
 	}
 
 	return normalizeUploadObjectKey(candidate)
+}
+
+func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
+	if maxBytes <= 0 || maxBytes > maxRemoteFileSize {
+		maxBytes = maxRemoteFileSize
+	}
+	data, err := io.ReadAll(io.LimitReader(src, maxBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("读取文件失败: %v", err)
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("文件超过大小限制 (%d MB)", maxBytes/1024/1024)
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("文件内容为空")
+	}
+	return data, nil
+}
+
+func inferStoredUploadContentType(filename string, data []byte) string {
+	if ext := media.DetectImageExtensionFromBytes(data); ext != "" {
+		return media.ImageMIMEFromExtension(ext)
+	}
+	return media.ImageMIMEFromExtension(filepath.Ext(filename))
 }
 
 type remoteImageFile struct {

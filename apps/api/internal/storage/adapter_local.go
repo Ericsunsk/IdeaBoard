@@ -76,3 +76,10 @@ func (a *localStorageAdapter) StoreRemote(ctx context.Context, profile *StorageP
 	}
 	return a.service.saveReaderLocal(remoteFile.Filename, remoteFile, remoteFile.Size, opts)
 }
+
+func (a *localStorageAdapter) Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.service.readLocalByObjectKey(objectKey, maxBytes)
+}

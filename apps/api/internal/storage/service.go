@@ -5,6 +5,13 @@ type StorageStoreOptions struct {
 	AllowHosts []string
 }
 
+type StoredUploadObject struct {
+	ObjectKey   string
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
 type StorageService struct {
 	profileRepo         *StorageProfileRepository
 	s3CompatibleService *S3CompatibleService

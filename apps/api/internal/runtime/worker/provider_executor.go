@@ -51,6 +51,21 @@ type ProviderExecutor struct {
 	storageService *storage.StorageService
 }
 
+func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*storage.StoredUploadObject, bool, error) {
+	trimmed := strings.TrimSpace(ref)
+	if !strings.HasPrefix(trimmed, "/uploads/") {
+		return nil, false, nil
+	}
+	if c == nil || c.storageService == nil {
+		return nil, true, fmt.Errorf("存储服务未初始化，无法读取上传文件: %q", ref)
+	}
+	obj, err := c.storageService.ReadUploadResourceByURL(ctx, trimmed, maxBytes)
+	if err != nil {
+		return nil, true, err
+	}
+	return obj, true, nil
+}
+
 type providerCallResult struct {
 	ImageURL  string
 	ImageURLs []string

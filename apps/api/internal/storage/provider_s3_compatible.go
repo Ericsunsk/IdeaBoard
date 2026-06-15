@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/url"
+	"path"
 	"sort"
 	"strings"
 
@@ -194,6 +195,44 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 		return fmt.Errorf("删除失败: %v", err)
 	}
 	return nil
+}
+
+func (s *S3CompatibleService) readWithConfig(ctx context.Context, objectKey string, cfg *S3CompatibleConfig, maxBytes int64) (*StoredUploadObject, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !s.IsConfigEnabled(cfg) {
+		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	}
+	key := strings.TrimSpace(objectKey)
+	if key == "" {
+		return nil, fmt.Errorf("文件路径不能为空")
+	}
+	client, err := s.clientWithConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	object, err := client.GetObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("读取文件失败: %v", err)
+	}
+	defer object.Close()
+
+	stat, statErr := object.Stat()
+	data, err := readStorageObject(object, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	contentType := ""
+	if statErr == nil {
+		contentType = strings.TrimSpace(stat.ContentType)
+	}
+	return &StoredUploadObject{
+		ObjectKey:   key,
+		Filename:    path.Base(key),
+		ContentType: contentType,
+		Data:        data,
+	}, nil
 }
 
 func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, objectKeyPrefix string, cfg *S3CompatibleConfig) error {

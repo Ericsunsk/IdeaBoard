@@ -41,6 +41,10 @@ type Dependencies struct {
 	CORSMiddleware gin.HandlerFunc
 }
 
+type FrontendRouteOptions struct {
+	WarnMissingIndex bool
+}
+
 type AuthDeps struct {
 	AuthServiceClient *auth.ServiceClient
 	UserRepo          *users.UserRepository
@@ -127,7 +131,7 @@ func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (map[string
 	}, true
 }
 
-func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
+func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	r.Use(requestBodyLimitMiddleware(globalRequestBodyLimitBytes))
 	r.Use(deps.CORSMiddleware)
 
@@ -148,7 +152,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
 	adminAPI.Use(auth.AuthMiddleware(deps.Auth.AuthServiceClient, deps.Auth.UserRepo), auth.AdminMiddleware())
 	registerAdminRoutes(adminAPI, deps.AdminRoutes)
 
-	RegisterFrontendRoutes(r, frontendFS)
+	RegisterFrontendRoutes(r, frontendFS, frontendOptions)
 }
 
 func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {
@@ -178,13 +182,15 @@ func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {
 	}
 }
 
-func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
+func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS, opts FrontendRouteOptions) {
 	if frontendFS == nil {
 		return
 	}
 
 	if _, err := iofs.Stat(frontendFS, "index.html"); err != nil {
-		slog.Warn("embedded frontend index.html not found; skip SPA routes", "err", err)
+		if opts.WarnMissingIndex {
+			slog.Warn("embedded frontend index.html not found; skip SPA routes", "err", err)
+		}
 		return
 	}
 

@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"ideaboard/api/internal/testdb"
@@ -316,6 +318,37 @@ func TestListProfilesDoesNotExposeSecretByDefault(t *testing.T) {
 	runtimeProfile := mustFindProfileForTest(t, runtimeProfiles, "s3-secret-boundary")
 	if got := configString(runtimeProfile.Config, storageSecretAccessKeyName); got != rawSecret {
 		t.Fatalf("ListProfilesWithSecrets secret = %q, want %q", got, rawSecret)
+	}
+}
+
+func TestReadUploadResourceByURLLocalInfersContentType(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir temp: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWd)
+	})
+
+	uploadPath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "image.png")
+	if err := os.MkdirAll(filepath.Dir(uploadPath), 0o755); err != nil {
+		t.Fatalf("mkdir upload dir: %v", err)
+	}
+	if err := os.WriteFile(uploadPath, []byte{0x89, 0x50, 0x4E, 0x47}, 0o600); err != nil {
+		t.Fatalf("write upload: %v", err)
+	}
+
+	obj, err := service.ReadUploadResourceByURL(context.Background(), "/uploads/workspace/OWNR1A/board-1/content/image.png", 1024)
+	if err != nil {
+		t.Fatalf("ReadUploadResourceByURL returned error: %v", err)
+	}
+	if obj.ContentType != "image/png" {
+		t.Fatalf("ContentType = %q, want image/png", obj.ContentType)
 	}
 }
 

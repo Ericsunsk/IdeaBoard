@@ -17,6 +17,7 @@ type storageProviderAdapter interface {
 	DeleteByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) error
 	StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error)
 	StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error)
+	Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error)
 }
 
 type storageAdapterRegistry struct {

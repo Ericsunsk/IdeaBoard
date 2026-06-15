@@ -2,12 +2,15 @@ package worker
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/storage"
@@ -82,6 +85,75 @@ func TestMaterializeProviderResultImagesStoresRemoteURLToLocalStorage(t *testing
 	}
 	if _, err := os.Stat(filepath.FromSlash(strings.TrimPrefix(urls[0], "/"))); err != nil {
 		t.Fatalf("stored file not found: %v", err)
+	}
+}
+
+func TestGoogleGeminiReadsRelativeWorkspaceUploadFromStorage(t *testing.T) {
+	executor := newTestProviderExecutorWithLocalStorage(t)
+	source := buildTinyPNGBytes(t)
+	sourcePath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "source.png")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir upload dir: %v", err)
+	}
+	if err := os.WriteFile(sourcePath, source, 0o600); err != nil {
+		t.Fatalf("write source upload: %v", err)
+	}
+
+	var gotRequest googleGeminiRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotRequest); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"` + base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t)) + `"}}]}}]}`))
+	}))
+	defer server.Close()
+
+	params := map[string]interface{}{
+		"feature":            "style-variation",
+		"image_urls":         []interface{}{"/uploads/workspace/OWNR1A/board-1/content/source.png"},
+		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
+	}
+	providerReq := newProviderRequest("prompt", 64, 64, params, "gemini-3.1-flash-image-preview")
+	_, err := executor.callGoogleGeminiGenerateContent(context.Background(), &accounts.ApiAccount{ApiKey: "key"}, server.URL, providerReq, 5*time.Second, providerReq.Model)
+	if err != nil {
+		t.Fatalf("callGoogleGeminiGenerateContent returned error: %v", err)
+	}
+	if len(gotRequest.Contents) != 1 || len(gotRequest.Contents[0].Parts) < 2 {
+		t.Fatalf("expected text plus inline image parts, got %#v", gotRequest.Contents)
+	}
+	inline := gotRequest.Contents[0].Parts[1].InlineData
+	if inline == nil {
+		t.Fatalf("expected inline image part, got %#v", gotRequest.Contents[0].Parts[1])
+	}
+	if inline.normalizedMIMEType() != "image/png" {
+		t.Fatalf("inline mime=%q, want image/png", inline.normalizedMIMEType())
+	}
+	decoded, err := base64.StdEncoding.DecodeString(inline.Data)
+	if err != nil {
+		t.Fatalf("decode inline image: %v", err)
+	}
+	if string(decoded) != string(source) {
+		t.Fatal("inline image data should come from local uploaded file")
+	}
+}
+
+func TestOpenAIRejectsHugeRelativeWorkspaceUploadFromStorage(t *testing.T) {
+	executor := newTestProviderExecutorWithLocalStorage(t)
+	sourcePath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "huge.png")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir upload dir: %v", err)
+	}
+	if err := os.WriteFile(sourcePath, buildConfigOnlyPNGBytes(20000, 20000), 0o600); err != nil {
+		t.Fatalf("write source upload: %v", err)
+	}
+
+	_, _, _, err := executor.resolveOpenAIImageBytes(context.Background(), "/uploads/workspace/OWNR1A/board-1/content/huge.png", 0, time.Second)
+	if err == nil {
+		t.Fatal("expected huge local upload to be rejected")
+	}
+	if !strings.Contains(err.Error(), "图片尺寸超过限制") {
+		t.Fatalf("expected dimension-limit error, got %v", err)
 	}
 }
 

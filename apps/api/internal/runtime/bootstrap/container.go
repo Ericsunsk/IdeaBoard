@@ -191,6 +191,8 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 			BoardService: boardService,
 		},
 		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
+	}, httpapi.FrontendRouteOptions{
+		WarnMissingIndex: isProductionRuntime(cfg.App.Env),
 	})
 
 	return &appContainer{
@@ -223,13 +225,13 @@ func (c *appContainer) close() error {
 	return closeErr
 }
 
-func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {
+func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies, frontendOptions httpapi.FrontendRouteOptions) {
 	frontendFS, err := web.DistFS()
 	if err != nil {
 		slog.Warn("failed to load embedded frontend dist", "err", err)
 	}
 
-	httpapi.RegisterRoutes(r, deps, frontendFS)
+	httpapi.RegisterRoutes(r, deps, frontendFS, frontendOptions)
 }
 
 type taskEventHubPublisher struct {

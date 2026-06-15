@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	maxGoogleDataURLBytes = 10 * 1024 * 1024
+	maxGoogleInlineImageBytes = 10 * 1024 * 1024
+	maxGoogleDataURLBytes     = maxGoogleInlineImageBytes
 )
 
 type googleGeminiRequest struct {
@@ -169,7 +170,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	model := strings.TrimSpace(requestedModel)
 
 	parts := []googleGeminiPart{{Text: providerReq.Prompt}}
-	inlineParts, err := collectGoogleInlineImageParts(ctx, providerReq, timeout)
+	inlineParts, err := c.collectGoogleInlineImageParts(ctx, providerReq, timeout)
 	if err != nil {
 		return providerCallResult{}, err
 	}
@@ -228,7 +229,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	}, nil
 }
 
-func collectGoogleInlineImageParts(ctx context.Context, providerReq providerRequest, timeout time.Duration) ([]googleGeminiPart, error) {
+func (c *ProviderExecutor) collectGoogleInlineImageParts(ctx context.Context, providerReq providerRequest, timeout time.Duration) ([]googleGeminiPart, error) {
 	refs := providerReq.MediaRefs.GoogleImages
 	if len(refs) == 0 {
 		return nil, nil
@@ -236,7 +237,7 @@ func collectGoogleInlineImageParts(ctx context.Context, providerReq providerRequ
 
 	parts := make([]googleGeminiPart, 0, len(refs))
 	for _, ref := range refs {
-		mimeType, data, err := resolveGoogleImageBytes(ctx, ref, timeout)
+		mimeType, data, err := c.resolveGoogleImageBytes(ctx, ref, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -254,7 +255,7 @@ func collectGoogleImageRefs(params map[string]interface{}) []string {
 	return mediarefs.CollectUniqueParamRefs(params, googleImageInputRefKeys)
 }
 
-func resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Duration) (string, []byte, error) {
+func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Duration) (string, []byte, error) {
 	ref = strings.TrimSpace(ref)
 	if strings.HasPrefix(ref, "data:") {
 		parsed, err := mediarefs.ParseDataImageURL(ref, maxGoogleDataURLBytes)
@@ -265,6 +266,20 @@ func resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Durat
 			return "", nil, err
 		}
 		return parsed.MIMEType, parsed.Data, nil
+	}
+
+	if obj, ok, err := c.readRelativeUploadObject(ctx, ref, maxGoogleInlineImageBytes); ok {
+		if err != nil {
+			return "", nil, fmt.Errorf("读取上传图像失败: %w", err)
+		}
+		if err := media.ValidateImageDimensions(obj.Data); err != nil {
+			return "", nil, err
+		}
+		mimeType := strings.TrimSpace(obj.ContentType)
+		if !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+			mimeType = inferLocalAssetMimeType(obj.Filename, obj.Data)
+		}
+		return mimeType, obj.Data, nil
 	}
 
 	parsedURL, err := url.Parse(ref)
