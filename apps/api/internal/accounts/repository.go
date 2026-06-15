@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
 )
 
@@ -441,9 +442,7 @@ func accountForWrite(account *ApiAccount) *ApiAccount {
 		return &ApiAccount{}
 	}
 	normalized := *account
-	if normalized.MaxConcurrent <= 0 {
-		normalized.MaxConcurrent = 3
-	}
+	normalized.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(normalized.MaxConcurrent)
 	if normalized.Timeout <= 0 {
 		normalized.Timeout = 120
 	}

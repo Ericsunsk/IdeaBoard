@@ -220,6 +220,7 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 
 	task, err = h.taskService.GetUserTask(ctx, taskID, userID)
 	if err != nil {
+		writeTaskStatusFetchErrorSSE(c, taskID, userID, "initial_snapshot", err)
 		return
 	}
 	if !writeTaskSSEvent(c, task) {
@@ -244,6 +245,7 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		case <-heartbeat.C:
 			latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
 			if err != nil {
+				writeTaskStatusFetchErrorSSE(c, taskID, userID, "heartbeat", err)
 				return
 			}
 			if !writeTaskSSEvent(c, latest) {
@@ -255,6 +257,7 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		case <-events:
 			latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
 			if err != nil {
+				writeTaskStatusFetchErrorSSE(c, taskID, userID, "event", err)
 				return
 			}
 			if !writeTaskSSEvent(c, latest) {
@@ -309,6 +312,13 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 
 func writeTaskSSEvent(c *gin.Context, task *tasks.Task) bool {
 	return writeSSEvent(c, "task", task.ToUserView())
+}
+
+func writeTaskStatusFetchErrorSSE(c *gin.Context, taskID string, userID int64, source string, err error) {
+	slog.Warn("fetch SSE task status failed", "task_id", taskID, "user_id", userID, "source", source, "err", err)
+	if writeErr := sse.WriteEvent(c, "error", gin.H{"message": "获取任务状态失败"}); writeErr != nil {
+		slog.Warn("write SSE error event failed", "task_id", taskID, "user_id", userID, "source", source, "err", writeErr)
+	}
 }
 
 func writeSSEvent(c *gin.Context, event string, data interface{}) bool {

@@ -248,9 +248,24 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		result["model"] = strings.TrimSpace(callResult.Model)
 	}
 
-	resultJSON, _ := json.Marshal(result)
-	output.Result = string(resultJSON)
+	resultJSON, err := marshalProviderTaskResult(task.TaskID, result)
+	if err != nil {
+		return providerCallOutput{}, err
+	}
+	output.Result = resultJSON
 	return output, nil
+}
+
+func marshalProviderTaskResult(taskID string, result map[string]interface{}) (string, error) {
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryFinalizeError,
+			fmt.Errorf("序列化任务结果失败 (task_id=%s): %w", taskID, err),
+		)
+	}
+	return string(resultJSON), nil
 }
 
 func resolveAccountModelForExecution(account *accounts.ApiAccount, featureSlug string, params map[string]interface{}, assignedModel string) (accounts.AccountModel, bool) {

@@ -1,16 +1,12 @@
 package accounts
 
-const minAccountMaxConcurrent = 1
+import "ideaboard/api/internal/platform/accountlimits"
+
+const minAccountMaxConcurrent = accountlimits.MinMaxConcurrent
 const minAccountTimeoutSeconds = 1
 
 func normalizeMaxConcurrent(value int) int {
-	if value < minAccountMaxConcurrent {
-		return defaultAccountMaxConcurrent
-	}
-	if value > maxAccountMaxConcurrent {
-		return maxAccountMaxConcurrent
-	}
-	return value
+	return accountlimits.NormalizeMaxConcurrent(value)
 }
 
 func NormalizeAccountTimeout(value int) int {

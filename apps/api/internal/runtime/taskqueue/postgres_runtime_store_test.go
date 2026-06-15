@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/tasks"
 )
 
@@ -35,6 +36,34 @@ func TestPostgresTaskRuntimeStoreGetAccountLoadInfoUsesRunningTaskAttempts(t *te
 	}
 	if load.MaxConcurrent != 5 {
 		t.Fatalf("max concurrent=%d, want 5", load.MaxConcurrent)
+	}
+}
+
+func TestPostgresTaskRuntimeStoreClampsAccountMaxConcurrent(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	store := NewPostgresTaskRuntimeStore(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "runtime-load-clamped", 1000)
+
+	loads, err := store.GetAccountLoadInfo(ctx, []int64{accountID})
+	if err != nil {
+		t.Fatalf("GetAccountLoadInfo failed: %v", err)
+	}
+	load := loads[accountID]
+	if load == nil {
+		t.Fatalf("account load for %d missing: %+v", accountID, loads)
+	}
+	if load.MaxConcurrent != accountlimits.MaxMaxConcurrent {
+		t.Fatalf("max concurrent=%d, want clamped %d", load.MaxConcurrent, accountlimits.MaxMaxConcurrent)
+	}
+
+	maxConcurrent, err := store.GetAccountMaxConcurrent(ctx, accountID)
+	if err != nil {
+		t.Fatalf("GetAccountMaxConcurrent failed: %v", err)
+	}
+	if maxConcurrent != accountlimits.MaxMaxConcurrent {
+		t.Fatalf("account max concurrent=%d, want clamped %d", maxConcurrent, accountlimits.MaxMaxConcurrent)
 	}
 }
 

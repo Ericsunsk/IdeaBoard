@@ -348,13 +348,6 @@ func normalizeCandidateAccountIDs(accountIDs []int64) []int64 {
 	return ids
 }
 
-func normalizeMaxConcurrent(value int) int {
-	if value <= 0 {
-		return 3
-	}
-	return value
-}
-
 func newTaskLeaseToken(riverJobID int64) (string, error) {
 	var bytes [16]byte
 	if _, err := rand.Read(bytes[:]); err != nil {

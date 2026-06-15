@@ -2,12 +2,16 @@ package taskservice
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,6 +65,254 @@ ON CONFLICT (id) DO NOTHING`,
 	); err != nil {
 		t.Fatalf("seed SSE user %d failed: %v", id, err)
 	}
+}
+
+type streamTaskFetchResult struct {
+	task *tasks.Task
+	err  error
+}
+
+type streamTaskStore struct {
+	mu          sync.Mutex
+	userResults []streamTaskFetchResult
+}
+
+func newStreamTaskStore(userResults ...streamTaskFetchResult) *streamTaskStore {
+	return &streamTaskStore{userResults: userResults}
+}
+
+func (s *streamTaskStore) GetByTaskID(context.Context, string) (*tasks.Task, error) {
+	return nil, errors.New("unexpected GetByTaskID call")
+}
+
+func (s *streamTaskStore) GetByTaskIDAndUserID(context.Context, string, int64) (*tasks.Task, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.userResults) == 0 {
+		return nil, errors.New("unexpected GetByTaskIDAndUserID call")
+	}
+	result := s.userResults[0]
+	s.userResults = s.userResults[1:]
+	if result.err != nil {
+		return nil, result.err
+	}
+	if result.task == nil {
+		return nil, errors.New("nil task fetch result")
+	}
+	task := *result.task
+	return &task, nil
+}
+
+func (s *streamTaskStore) List(context.Context, int64, int64, string, string, int, int) ([]*tasks.Task, tasks.TaskListCounts, error) {
+	return nil, tasks.TaskListCounts{}, errors.New("unexpected List call")
+}
+
+func (s *streamTaskStore) GetByUserID(context.Context, int64, int, int) ([]*tasks.Task, int64, error) {
+	return nil, 0, errors.New("unexpected GetByUserID call")
+}
+
+func (s *streamTaskStore) DeleteByTaskIDAndUserID(context.Context, string, int64) error {
+	return errors.New("unexpected DeleteByTaskIDAndUserID call")
+}
+
+func (s *streamTaskStore) ListOutputsByTaskIDs(context.Context, []string) (map[string][]tasks.TaskOutput, error) {
+	return map[string][]tasks.TaskOutput{}, nil
+}
+
+func makeStreamTask(taskID string, userID int64, status string) *tasks.Task {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	return &tasks.Task{
+		TaskID:     taskID,
+		UserID:     userID,
+		UserPrompt: "user prompt",
+		Status:     status,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+}
+
+func newStreamTestRouter(handler *Handler, userID int64) *gin.Engine {
+	router := gin.New()
+	router.GET("/events/:task_id", func(c *gin.Context) {
+		c.Set("user_id", userID)
+		handler.StreamUserTask(c)
+	})
+	return router
+}
+
+func captureSlogOutput(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	previous := slog.Default()
+	var buf bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+	return &buf
+}
+
+func serveStreamWithTimeout(t *testing.T, router *gin.Engine, taskID string, trigger func()) *httptest.ResponseRecorder {
+	t.Helper()
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/events/"+taskID, nil)
+	done := make(chan struct{})
+	go func() {
+		router.ServeHTTP(rec, req)
+		close(done)
+	}()
+	if trigger != nil {
+		trigger()
+	}
+
+	select {
+	case <-done:
+		return rec
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting stream response, body=%s", rec.Body.String())
+		return rec
+	}
+}
+
+func waitForTaskSubscriber(t *testing.T, hub *EventHub, taskID string) {
+	t.Helper()
+
+	deadline := time.After(1 * time.Second)
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		if hub.subscriberCount(taskID) > 0 {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timeout waiting subscriber for %s", taskID)
+		case <-tick.C:
+		}
+	}
+}
+
+func assertStreamErrorEvent(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/event-stream") {
+		t.Fatalf("content-type=%q, want text/event-stream", got)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "event: error") {
+		t.Fatalf("body missing error event: %s", body)
+	}
+	if !strings.Contains(body, `"message":"获取任务状态失败"`) {
+		t.Fatalf("body missing status fetch failure message: %s", body)
+	}
+}
+
+func assertStreamFetchWarning(t *testing.T, logs *bytes.Buffer, source string) {
+	t.Helper()
+
+	output := logs.String()
+	if !strings.Contains(output, "fetch SSE task status failed") {
+		t.Fatalf("logs missing fetch warning: %s", output)
+	}
+	if !strings.Contains(output, "source="+source) {
+		t.Fatalf("logs missing source %q: %s", source, output)
+	}
+}
+
+func TestStreamUserTaskKeepsHTTPNotFoundBeforeSSE(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	taskID := "task-sse-before-prepare-not-found"
+	store := newStreamTaskStore(streamTaskFetchResult{err: sql.ErrNoRows})
+	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: NewEventHub()})
+	router := newStreamTestRouter(NewHandler(service), 11)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/events/"+taskID, nil)
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); strings.Contains(got, "text/event-stream") {
+		t.Fatalf("content-type=%q should not be SSE before initial fetch succeeds", got)
+	}
+	if !strings.Contains(rec.Body.String(), "任务不存在") {
+		t.Fatalf("body missing not found message: %s", rec.Body.String())
+	}
+}
+
+func TestStreamUserTaskWritesErrorEventWhenInitialSnapshotFetchFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	taskID := "task-sse-initial-snapshot-fetch-error"
+	userID := int64(12)
+	task := makeStreamTask(taskID, userID, tasks.StatusRunning)
+	store := newStreamTaskStore(
+		streamTaskFetchResult{task: task},
+		streamTaskFetchResult{err: errors.New("snapshot fetch failed")},
+	)
+	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: NewEventHub()})
+	logs := captureSlogOutput(t)
+	router := newStreamTestRouter(NewHandler(service), userID)
+
+	rec := serveStreamWithTimeout(t, router, taskID, nil)
+
+	assertStreamErrorEvent(t, rec)
+	assertStreamFetchWarning(t, logs, "initial_snapshot")
+}
+
+func TestStreamUserTaskWritesErrorEventWhenHeartbeatFetchFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	previousInterval := taskStreamHeartbeatInterval
+	taskStreamHeartbeatInterval = 10 * time.Millisecond
+	defer func() {
+		taskStreamHeartbeatInterval = previousInterval
+	}()
+
+	taskID := "task-sse-heartbeat-fetch-error"
+	userID := int64(13)
+	task := makeStreamTask(taskID, userID, tasks.StatusRunning)
+	store := newStreamTaskStore(
+		streamTaskFetchResult{task: task},
+		streamTaskFetchResult{task: task},
+		streamTaskFetchResult{err: errors.New("heartbeat fetch failed")},
+	)
+	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: NewEventHub()})
+	logs := captureSlogOutput(t)
+	router := newStreamTestRouter(NewHandler(service), userID)
+
+	rec := serveStreamWithTimeout(t, router, taskID, nil)
+
+	assertStreamErrorEvent(t, rec)
+	assertStreamFetchWarning(t, logs, "heartbeat")
+}
+
+func TestStreamUserTaskWritesErrorEventWhenEventFetchFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	taskID := "task-sse-event-fetch-error"
+	userID := int64(14)
+	task := makeStreamTask(taskID, userID, tasks.StatusRunning)
+	hub := NewEventHub()
+	store := newStreamTaskStore(
+		streamTaskFetchResult{task: task},
+		streamTaskFetchResult{task: task},
+		streamTaskFetchResult{err: errors.New("event fetch failed")},
+	)
+	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: hub})
+	logs := captureSlogOutput(t)
+	router := newStreamTestRouter(NewHandler(service), userID)
+
+	rec := serveStreamWithTimeout(t, router, taskID, func() {
+		waitForTaskSubscriber(t, hub, taskID)
+		hub.Publish(taskID, TaskEvent{TaskID: taskID, Status: tasks.StatusRunning})
+	})
+
+	assertStreamErrorEvent(t, rec)
+	assertStreamFetchWarning(t, logs, "event")
 }
 
 func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {

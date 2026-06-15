@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 
@@ -56,7 +57,7 @@ func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accou
 		}
 		loads[accountID] = &queuetypes.AccountLoad{
 			CurrentConcurrent: running,
-			MaxConcurrent:     normalizeMaxConcurrent(maxConcurrent),
+			MaxConcurrent:     accountlimits.NormalizeMaxConcurrent(maxConcurrent),
 		}
 	}
 	return loads, rows.Err()
@@ -87,7 +88,7 @@ func (s *PostgresTaskRuntimeStore) GetAccountMaxConcurrent(ctx context.Context, 
 	if err != nil {
 		return 0, err
 	}
-	return normalizeMaxConcurrent(maxConcurrent), nil
+	return accountlimits.NormalizeMaxConcurrent(maxConcurrent), nil
 }
 
 func (s *PostgresTaskRuntimeStore) MarkCancelled(ctx context.Context, taskID string, ttl time.Duration) error {
