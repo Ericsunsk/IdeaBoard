@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
@@ -148,6 +149,99 @@ func TestResetRunningTasksMissingLeaseTokenToPendingHonorsLimit(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("remaining missing running lease count=%d, want 1", count)
+	}
+}
+
+func TestCompleteWithOutputsAndLeaseTokenRejectsWrongLeaseToken(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 11)
+
+	task := &tasks.Task{
+		TaskID:    "lease-conflict-wrong-token",
+		UserID:    1,
+		AccountID: tasks.IDPtr(accountID),
+		Status:    tasks.StatusRunning,
+		LeaseToken: "correct-token",
+	}
+	seedTasks(t, repo, ctx, task)
+
+	updated, err := repo.CompleteWithOutputsAndLeaseToken(
+		ctx, "lease-conflict-wrong-token",
+		[]string{tasks.StatusRunning},
+		accountID, accountID+10000,
+		"wrong-token", // wrong lease token
+		"result", time.Now(),
+		nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("CompleteWithOutputsAndLeaseToken with wrong token errored: %v", err)
+	}
+	if updated != 0 {
+		t.Fatalf("updated=%d with wrong lease token, want 0", updated)
+	}
+
+	taskAfter, err := repo.GetByTaskID(ctx, "lease-conflict-wrong-token")
+	if err != nil {
+		t.Fatalf("GetByTaskID: %v", err)
+	}
+	if taskAfter.Status != tasks.StatusRunning {
+		t.Fatalf("status=%q, want running (should not complete with wrong token)", taskAfter.Status)
+	}
+}
+
+func TestCompleteWithOutputsAndLeaseTokenConcurrentOnlyOneSucceeds(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 11)
+
+	task := &tasks.Task{
+		TaskID:    "lease-conflict-concurrent",
+		UserID:    1,
+		AccountID: tasks.IDPtr(accountID),
+		Status:    tasks.StatusRunning,
+		LeaseToken: "token-a",
+	}
+	seedTasks(t, repo, ctx, task)
+
+	results := make(chan int64, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			updated, err := repo.CompleteWithOutputsAndLeaseToken(
+				context.Background(), "lease-conflict-concurrent",
+				[]string{tasks.StatusRunning},
+				accountID, accountID+10000,
+				"token-a", // both use correct token, but only one should succeed
+				"result", time.Now(),
+				nil, nil,
+			)
+			if err != nil {
+				results <- -1
+				return
+			}
+			results <- updated
+		}()
+	}
+
+	sum := int64(0)
+	for i := 0; i < 2; i++ {
+		r := <-results
+		if r >= 0 {
+			sum += r
+		}
+	}
+	if sum != 1 {
+		t.Fatalf("total updated rows=%d, want exactly 1 (both goroutines used same token but only one row matches)", sum)
+	}
+
+	taskAfter, err := repo.GetByTaskID(ctx, "lease-conflict-concurrent")
+	if err != nil {
+		t.Fatalf("GetByTaskID: %v", err)
+	}
+	if taskAfter.Status != tasks.StatusCompleted {
+		t.Fatalf("status=%q, want completed", taskAfter.Status)
 	}
 }
 

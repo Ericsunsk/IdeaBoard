@@ -1,16 +1,27 @@
 package assets
 
 import (
+	"context"
+
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-type LineDraftHandler struct {
-	repo *LineDraftModeRepository
+type LineDraftModeStore interface {
+	Create(ctx context.Context, mode *LineDraftMode) error
+	GetByID(ctx context.Context, id int64) (*LineDraftMode, error)
+	List(ctx context.Context) ([]*LineDraftMode, error)
+	ListEnabled(ctx context.Context) ([]*LineDraftMode, error)
+	Update(ctx context.Context, mode *LineDraftMode) error
+	Delete(ctx context.Context, id int64) error
 }
 
-func NewLineDraftHandler(repo *LineDraftModeRepository) *LineDraftHandler {
+type LineDraftHandler struct {
+	repo LineDraftModeStore
+}
+
+func NewLineDraftHandler(repo LineDraftModeStore) *LineDraftHandler {
 	return &LineDraftHandler{repo: repo}
 }
 
