@@ -7,11 +7,15 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
 const defaultTimeout = 15 * time.Second
+
+var safeTransportPool sync.Map
 
 type resolvedPolicy struct {
 	parsed           *url.URL
@@ -120,7 +124,18 @@ func DoWithAllowHosts(
 		return nil, err
 	}
 
-	transport := cloneDefaultTransport()
+	req, err := http.NewRequestWithContext(ctx, method, policy.parsed.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建请求失败")
+	}
+	if buildRequest != nil {
+		buildRequest(req)
+	}
+
+	transport, err := transportForRequest(ctx, req, policy)
+	if err != nil {
+		return nil, err
+	}
 
 	client := &http.Client{
 		Timeout:   effectiveTimeout(timeout),
@@ -133,16 +148,6 @@ func DoWithAllowHosts(
 			return err
 		},
 	}
-
-	req, err := http.NewRequestWithContext(ctx, method, policy.parsed.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("创建请求失败")
-	}
-	if buildRequest != nil {
-		buildRequest(req)
-	}
-	allowRequestProxyDialTarget(req.Context(), transport, req, policy)
-	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts)
 
 	return client.Do(req)
 }
@@ -161,10 +166,11 @@ func DoRequestWithAllowHosts(
 	if err != nil {
 		return nil, err
 	}
-	transport := cloneDefaultTransport()
 	req = req.WithContext(ctx)
-	allowRequestProxyDialTarget(ctx, transport, req, policy)
-	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts)
+	transport, err := transportForRequest(ctx, req, policy)
+	if err != nil {
+		return nil, err
+	}
 	client := &http.Client{
 		Timeout:   effectiveTimeout(timeout),
 		Transport: transport,
@@ -192,6 +198,52 @@ func nonNilContext(ctx context.Context) context.Context {
 		return context.Background()
 	}
 	return ctx
+}
+
+func transportForRequest(ctx context.Context, req *http.Request, policy *resolvedPolicy) (*http.Transport, error) {
+	transport := cloneDefaultTransport()
+	allowRequestProxyDialTarget(ctx, transport, req, policy)
+
+	key := transportPolicyKey(policy)
+	if cached, ok := safeTransportPool.Load(key); ok {
+		if existing, ok := cached.(*http.Transport); ok {
+			return existing, nil
+		}
+	}
+
+	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts)
+	actual, _ := safeTransportPool.LoadOrStore(key, transport)
+	stored, ok := actual.(*http.Transport)
+	if !ok {
+		return nil, fmt.Errorf("HTTP 传输配置错误")
+	}
+	return stored, nil
+}
+
+func transportPolicyKey(policy *resolvedPolicy) string {
+	if policy == nil {
+		return ""
+	}
+	return strings.Join([]string{
+		"hosts=" + sortedMapKey(policy.allowedHosts),
+		"hostports=" + sortedMapKey(policy.allowedHostPorts),
+		"ips=" + sortedMapKey(policy.allowedIPs),
+		"ipports=" + sortedMapKey(policy.allowedIPPorts),
+	}, "|")
+}
+
+func sortedMapKey(values map[string]bool) string {
+	if len(values) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(values))
+	for key, allowed := range values {
+		if allowed {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
 }
 
 func allowRequestProxyDialTarget(ctx context.Context, transport *http.Transport, req *http.Request, policy *resolvedPolicy) {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 )
@@ -148,5 +149,73 @@ func TestProxyDialAllowanceAllowsConfiguredLoopbackProxy(t *testing.T) {
 	addrs := []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}
 	if _, err := filterAllowedIPs("127.0.0.1", "7890", addrs, policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts); err != nil {
 		t.Fatalf("expected configured loopback proxy to be allowed, got %v", err)
+	}
+}
+
+func TestTransportForRequestReusesSamePolicyTransport(t *testing.T) {
+	safeTransportPool = sync.Map{}
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.com/image.png", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	policy := &resolvedPolicy{
+		parsed:           req.URL,
+		allowedHosts:     map[string]bool{"example.com": true},
+		allowedHostPorts: map[string]bool{},
+		allowedIPs:       map[string]bool{},
+		allowedIPPorts:   map[string]bool{},
+	}
+
+	first, err := transportForRequest(context.Background(), req, policy)
+	if err != nil {
+		t.Fatalf("first transport: %v", err)
+	}
+	second, err := transportForRequest(context.Background(), req, policy)
+	if err != nil {
+		t.Fatalf("second transport: %v", err)
+	}
+	if first != second {
+		t.Fatal("expected same policy to reuse transport")
+	}
+}
+
+func TestTransportForRequestUsesDifferentTransportForDifferentPolicy(t *testing.T) {
+	safeTransportPool = sync.Map{}
+
+	reqA, err := http.NewRequest(http.MethodGet, "http://example.com/image.png", nil)
+	if err != nil {
+		t.Fatalf("new request A: %v", err)
+	}
+	reqB, err := http.NewRequest(http.MethodGet, "http://example.org/image.png", nil)
+	if err != nil {
+		t.Fatalf("new request B: %v", err)
+	}
+
+	policyA := &resolvedPolicy{
+		parsed:           reqA.URL,
+		allowedHosts:     map[string]bool{"example.com": true},
+		allowedHostPorts: map[string]bool{},
+		allowedIPs:       map[string]bool{},
+		allowedIPPorts:   map[string]bool{},
+	}
+	policyB := &resolvedPolicy{
+		parsed:           reqB.URL,
+		allowedHosts:     map[string]bool{"example.org": true},
+		allowedHostPorts: map[string]bool{},
+		allowedIPs:       map[string]bool{},
+		allowedIPPorts:   map[string]bool{},
+	}
+
+	first, err := transportForRequest(context.Background(), reqA, policyA)
+	if err != nil {
+		t.Fatalf("first transport: %v", err)
+	}
+	second, err := transportForRequest(context.Background(), reqB, policyB)
+	if err != nil {
+		t.Fatalf("second transport: %v", err)
+	}
+	if first == second {
+		t.Fatal("expected different policy to use different transport")
 	}
 }
