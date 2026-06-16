@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
@@ -38,6 +39,7 @@ type RiverTxClient interface {
 }
 
 type RiverQueue struct {
+	mu               sync.RWMutex
 	client           riverClient
 	db               *sql.DB
 	accountLoadStore AccountLoadStore
@@ -69,6 +71,8 @@ func (q *RiverQueue) SetClient(client riverClient) {
 	if q == nil {
 		return
 	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	q.client = client
 }
 
@@ -79,14 +83,24 @@ func (q *RiverQueue) Enqueue(ctx context.Context, task *queuetypes.TaskPayload) 
 	if strings.TrimSpace(task.TaskID) == "" {
 		return fmt.Errorf("river enqueue: empty task_id")
 	}
-	if q == nil || q.client == nil {
+	client := q.getClient()
+	if client == nil {
 		return fmt.Errorf("river enqueue: client not configured")
 	}
-	_, err := q.client.Insert(ctx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, q.queueName, q.maxRetry))
+	_, err := client.Insert(ctx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, q.queueName, q.maxRetry))
 	if err != nil {
 		return fmt.Errorf("river enqueue: %w", err)
 	}
 	return nil
+}
+
+func (q *RiverQueue) getClient() riverClient {
+	if q == nil {
+		return nil
+	}
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	return q.client
 }
 
 func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, task *queuetypes.TaskPayload, queueName string, maxRetry int) error {

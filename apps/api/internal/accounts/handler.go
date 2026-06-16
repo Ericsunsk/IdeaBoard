@@ -50,7 +50,11 @@ func (h *AccountHandler) GetAccount(c *gin.Context) {
 		response.Error(c, 404, "账号不存在")
 		return
 	}
-	concurrent, maxConcurrent, _ := h.accountService.GetAccountQueueInfo(ctx, id)
+	concurrent, maxConcurrent, err := h.accountService.GetAccountQueueInfo(ctx, id)
+	if err != nil {
+		response.InternalError(c, 500, "获取账号队列信息失败", err)
+		return
+	}
 	response.Success(c, gin.H{"account": account, "current_concurrent": concurrent, "max_concurrent": maxConcurrent})
 }
 

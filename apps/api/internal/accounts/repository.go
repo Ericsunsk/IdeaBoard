@@ -414,7 +414,11 @@ func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []
 	}
 	modelsByAccountID := make(map[int64][]AccountModel, len(accountIDs))
 	for _, row := range rows {
-		modelsByAccountID[row.AccountID] = append(modelsByAccountID[row.AccountID], accountModelFromSQLC(row))
+		model, err := accountModelFromSQLC(row)
+		if err != nil {
+			return err
+		}
+		modelsByAccountID[row.AccountID] = append(modelsByAccountID[row.AccountID], model)
 	}
 	for _, account := range accounts {
 		if account != nil {
@@ -424,10 +428,12 @@ func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []
 	return nil
 }
 
-func accountModelFromSQLC(row dbsqlc.ApiAccountModel) AccountModel {
+func accountModelFromSQLC(row dbsqlc.ApiAccountModel) (AccountModel, error) {
 	var slugs []string
 	if len(row.FeatureSlugs) > 0 {
-		_ = json.Unmarshal(row.FeatureSlugs, &slugs)
+		if err := json.Unmarshal(row.FeatureSlugs, &slugs); err != nil {
+			return AccountModel{}, fmt.Errorf("解析账号模型 %q 的 feature_slugs 失败: %w", row.ModelName, err)
+		}
 	}
 	return AccountModel{
 		ID:            row.ID,
@@ -437,7 +443,7 @@ func accountModelFromSQLC(row dbsqlc.ApiAccountModel) AccountModel {
 		MaxConcurrent: intPtr(row.MaxConcurrent),
 		FeatureSlugs:  slugs,
 		SortOrder:     int(row.SortOrder),
-	}
+	}, nil
 }
 
 func accountModelsForWrite(account *ApiAccount) []AccountModel {

@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,44 @@ WHERE account_id = $1 AND status = 'active'`, account.ID); err != nil {
 
 	if _, err := repo.GetRuntimeByIDWithSecret(ctx, account.ID); err == nil {
 		t.Fatal("GetRuntimeByIDWithSecret should fail on unsupported external secret material")
+	}
+}
+
+func TestAccountReadRejectsInvalidModelFeatureSlugsShape(t *testing.T) {
+	ctx := context.Background()
+	db := newAccountServiceTestDB(t)
+	repo := NewAccountRepository(db)
+	channelID := createAccountTestChannel(t, db, "invalid-feature-slugs")
+
+	account := &ApiAccount{
+		Name:          "invalid-feature-slugs",
+		ChannelID:     channelID,
+		Platform:      "openai-compatible",
+		ApiType:       "openai-compatible",
+		Models:        []AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:        "runtime-secret",
+		ProxyURL:      "https://example.com/invalid-feature-slugs",
+		MaxConcurrent: 1,
+		Timeout:       30,
+		Weight:        1,
+		Status:        1,
+	}
+	if err := repo.Create(ctx, account); err != nil {
+		t.Fatalf("create account failed: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+UPDATE api_account_models
+SET feature_slugs = '{"unexpected":"shape"}'::jsonb
+WHERE account_id = $1`, account.ID); err != nil {
+		t.Fatalf("corrupt account model feature slugs failed: %v", err)
+	}
+
+	_, err := repo.GetByID(ctx, account.ID)
+	if err == nil {
+		t.Fatal("GetByID should reject invalid model feature_slugs shape")
+	}
+	if !strings.Contains(err.Error(), "feature_slugs") {
+		t.Fatalf("error = %v, want feature_slugs context", err)
 	}
 }
 

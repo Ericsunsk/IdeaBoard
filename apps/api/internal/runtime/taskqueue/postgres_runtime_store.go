@@ -123,12 +123,14 @@ func (s *PostgresTaskRuntimeStore) IsCancelled(ctx context.Context, taskID strin
 	if s == nil || s.db == nil {
 		return false, fmt.Errorf("postgres task runtime store: db not configured")
 	}
-	var count int64
+	var exists bool
 	err := s.db.QueryRowContext(ctx, `
-	SELECT COUNT(*)
-	FROM task_cancellations
-	WHERE task_id = $1 AND expires_at > now()`, taskID).Scan(&count)
-	return count > 0, err
+	SELECT EXISTS (
+		SELECT 1
+		FROM task_cancellations
+		WHERE task_id = $1 AND expires_at > now()
+	)`, taskID).Scan(&exists)
+	return exists, err
 }
 
 func (s *PostgresTaskRuntimeStore) ClearCancelled(ctx context.Context, taskID string) error {

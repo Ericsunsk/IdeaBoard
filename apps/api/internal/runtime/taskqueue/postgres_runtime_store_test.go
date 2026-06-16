@@ -120,6 +120,13 @@ func TestPostgresTaskRuntimeStoreMarkCancelledPrunesExpiredRows(t *testing.T) {
 	if !active {
 		t.Fatal("new cancellation should be active")
 	}
+	missing, err := store.IsCancelled(ctx, "missing-cancel")
+	if err != nil {
+		t.Fatalf("IsCancelled missing failed: %v", err)
+	}
+	if missing {
+		t.Fatal("missing cancellation should not be active")
+	}
 
 	var expiredRows int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM task_cancellations WHERE task_id = $1`, "expired-cancel").Scan(&expiredRows); err != nil {

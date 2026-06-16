@@ -2,6 +2,8 @@ package taskqueue
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,6 +21,15 @@ type fakeRiverClient struct {
 func (f *fakeRiverClient) Insert(_ context.Context, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error) {
 	f.args = args
 	f.opts = opts
+	return &rivertype.JobInsertResult{}, nil
+}
+
+type concurrentRiverClient struct {
+	inserts atomic.Int64
+}
+
+func (c *concurrentRiverClient) Insert(_ context.Context, _ river.JobArgs, _ *river.InsertOpts) (*rivertype.JobInsertResult, error) {
+	c.inserts.Add(1)
 	return &rivertype.JobInsertResult{}, nil
 }
 
@@ -74,6 +85,57 @@ func TestRiverQueueRejectsMissingTaskID(t *testing.T) {
 	queue := NewRiverQueueWithClient(client, nil, nil, RiverQueueDefault, 7)
 	if err := queue.Enqueue(context.Background(), &queuetypes.TaskPayload{}); err == nil {
 		t.Fatal("expected error for missing task id")
+	}
+}
+
+func TestRiverQueueSetClientConcurrentWithEnqueue(t *testing.T) {
+	clientA := &concurrentRiverClient{}
+	clientB := &concurrentRiverClient{}
+	queue := NewRiverQueueWithClient(clientA, nil, nil, RiverQueueDefault, 7)
+	ctx := context.Background()
+
+	const (
+		enqueueWorkers = 4
+		iterations     = 200
+	)
+	errs := make(chan error, enqueueWorkers)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			if i%2 == 0 {
+				queue.SetClient(clientA)
+				continue
+			}
+			queue.SetClient(clientB)
+		}
+	}()
+
+	for worker := 0; worker < enqueueWorkers; worker++ {
+		wg.Add(1)
+		go func(userID int64) {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				err := queue.Enqueue(ctx, &queuetypes.TaskPayload{TaskID: "task_concurrent", UserID: userID})
+				if err != nil {
+					errs <- err
+					return
+				}
+			}
+		}(int64(worker + 1))
+	}
+
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("Enqueue failed during concurrent SetClient: %v", err)
+		}
+	}
+	if got := clientA.inserts.Load() + clientB.inserts.Load(); got != enqueueWorkers*iterations {
+		t.Fatalf("insert count=%d, want %d", got, enqueueWorkers*iterations)
 	}
 }
 
