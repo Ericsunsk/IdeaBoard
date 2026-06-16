@@ -13,6 +13,7 @@ import (
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/runtime/taskqueue"
@@ -85,21 +86,6 @@ const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
 const maxSubmitTaskParamsDepth = 24
 const maxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024
 const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加账号"
-
-type taskListValidationError string
-
-func (e taskListValidationError) Error() string {
-	return string(e)
-}
-
-func newTaskListValidationError(message string) error {
-	return taskListValidationError(message)
-}
-
-func isTaskListValidationError(err error) bool {
-	var target taskListValidationError
-	return errors.As(err, &target)
-}
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
@@ -301,7 +287,7 @@ func normalizeTaskListStatus(status string) (string, error) {
 	case "", tasks.StatusPending, tasks.StatusRunning, tasks.StatusCompleted, tasks.StatusFailed, tasks.StatusCancelled:
 		return normalized, nil
 	default:
-		return "", newTaskListValidationError("status 仅支持 pending、running、completed、failed 或 cancelled")
+		return "", validation.New("status 仅支持 pending、running、completed、failed 或 cancelled")
 	}
 }
 

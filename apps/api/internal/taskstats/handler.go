@@ -12,6 +12,7 @@ import (
 
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/sse"
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/runtime/queuetypes"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +25,7 @@ const (
 	monitorSnapshotErrorEvent      = "snapshot_error"
 	monitorStreamCloseEvent        = "close"
 	monitorStreamCloseMaxConnCause = "max_connection_duration_reached"
-	monitorStreamMaxConcurrent       = 20
+	monitorStreamMaxConcurrent     = 20
 )
 
 type MonitorInfoProvider interface {
@@ -32,9 +33,9 @@ type MonitorInfoProvider interface {
 }
 
 type Handler struct {
-	service              *Service
-	monitor              MonitorInfoProvider
-	monitorStreamCount   atomic.Int32
+	service            *Service
+	monitor            MonitorInfoProvider
+	monitorStreamCount atomic.Int32
 }
 
 type adminMonitorSnapshot struct {
@@ -172,7 +173,7 @@ func writeMonitorSnapshot(c *gin.Context, snapshot *adminMonitorSnapshot) bool {
 func (h *Handler) GetStatistics(c *gin.Context) {
 	stats, err := h.service.GetStatistics(c.Request.Context(), c.Query("range"))
 	if err != nil {
-		if isStatisticsRangeValidationError(err) {
+		if validation.Is(err) {
 			response.Error(c, 400, err.Error())
 			return
 		}
@@ -199,7 +200,7 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 
 	result, err := h.service.BackfillStatistics(c.Request.Context(), req.Range)
 	if err != nil {
-		if isStatisticsRangeValidationError(err) {
+		if validation.Is(err) {
 			response.Error(c, 400, err.Error())
 			return
 		}

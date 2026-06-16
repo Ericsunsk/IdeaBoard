@@ -41,7 +41,6 @@ export const useUserStore = defineStore('user', () => {
   const userInfoLoaded = ref(false)
   const sessionValidatedAt = ref(0)
 
-  const isLoggedIn = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
   function updateAuth(newUser: User) {
@@ -207,7 +206,6 @@ export const useUserStore = defineStore('user', () => {
 
   return {
     user,
-    isLoggedIn,
     isAdmin,
     sessionValidatedAt,
     setAuth: updateAuth,

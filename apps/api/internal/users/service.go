@@ -9,24 +9,10 @@ import (
 	"unicode/utf8"
 
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/validation"
 )
 
 const maxUserKeywordLength = 64
-
-type userListValidationError string
-
-func (e userListValidationError) Error() string {
-	return string(e)
-}
-
-func newUserListValidationError(message string) error {
-	return userListValidationError(message)
-}
-
-func isUserListValidationError(err error) bool {
-	var target userListValidationError
-	return errors.As(err, &target)
-}
 
 type UserService struct {
 	repo          *UserRepository
@@ -58,10 +44,10 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 	req.Keyword = strings.TrimSpace(req.Keyword)
 	req.Role = normalizeUserListRole(req.Role)
 	if utf8.RuneCountInString(req.Keyword) > maxUserKeywordLength {
-		return nil, newUserListValidationError("keyword 长度不能超过 64 个字符")
+		return nil, validation.New("keyword 长度不能超过 64 个字符")
 	}
 	if req.Role != "" && req.Role != "admin" && req.Role != "user" {
-		return nil, newUserListValidationError("role 仅支持 admin 或 user")
+		return nil, validation.New("role 仅支持 admin 或 user")
 	}
 	status, hasStatus, err := normalizeUserListStatus(req.Status)
 	if err != nil {
@@ -96,7 +82,7 @@ func normalizeUserListStatus(raw string) (int16, bool, error) {
 	}
 	status, err := strconv.Atoi(value)
 	if err != nil || (status != 0 && status != 1) {
-		return 0, false, newUserListValidationError("status 仅支持 0 或 1")
+		return 0, false, validation.New("status 仅支持 0 或 1")
 	}
 	return int16(status), true, nil
 }

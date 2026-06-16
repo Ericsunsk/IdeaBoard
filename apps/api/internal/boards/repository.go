@@ -44,7 +44,7 @@ func (r *BoardRepository) ListAccessibleByUserID(ctx context.Context, userID int
 				State:              boardStateString(row.State),
 				Revision:           row.Revision,
 				StateSchemaVersion: row.StateSchemaVersion,
-				LastSavedBy:        int64Ptr(row.LastSavedBy),
+				LastSavedBy:        dbutil.Int64Ptr(row.LastSavedBy),
 				CreatedAt:          row.CreatedAt,
 				UpdatedAt:          row.UpdatedAt,
 			},
@@ -68,7 +68,7 @@ func (r *BoardRepository) GetAccessibleByBoardID(ctx context.Context, userID int
 			State:              boardStateString(row.State),
 			Revision:           row.Revision,
 			StateSchemaVersion: row.StateSchemaVersion,
-			LastSavedBy:        int64Ptr(row.LastSavedBy),
+			LastSavedBy:        dbutil.Int64Ptr(row.LastSavedBy),
 			CreatedAt:          row.CreatedAt,
 			UpdatedAt:          row.UpdatedAt,
 		},
@@ -252,7 +252,7 @@ func (r *BoardRepository) CreateShareToken(ctx context.Context, token *BoardShar
 		CreatedBy:   token.CreatedBy,
 		Revoked:     token.Revoked,
 		ExpiresAt:   dbutil.NullTime(token.ExpiresAt),
-		MaxUses:     nullInt32(token.MaxUses),
+		MaxUses:     dbutil.NullInt32(token.MaxUses),
 	})
 	if err != nil {
 		return err
@@ -354,7 +354,7 @@ func userBoardFromSQLC(row dbsqlc.UserBoard) UserBoard {
 		State:              boardStateString(row.State),
 		Revision:           row.Revision,
 		StateSchemaVersion: row.StateSchemaVersion,
-		LastSavedBy:        int64Ptr(row.LastSavedBy),
+		LastSavedBy:        dbutil.Int64Ptr(row.LastSavedBy),
 		CreatedAt:          row.CreatedAt,
 		UpdatedAt:          row.UpdatedAt,
 	}
@@ -385,36 +385,12 @@ func boardShareTokenFromSQLC(row dbsqlc.BoardShareToken) BoardShareToken {
 		CreatedBy:   row.CreatedBy,
 		Revoked:     row.Revoked,
 		UsageCount:  row.UsageCount,
-		MaxUses:     int32Ptr(row.MaxUses),
+		MaxUses:     dbutil.Int32Ptr(row.MaxUses),
 		LastUsedAt:  dbutil.TimePtr(row.LastUsedAt),
 		RevokedAt:   dbutil.TimePtr(row.RevokedAt),
-		RevokedBy:   int64Ptr(row.RevokedBy),
+		RevokedBy:   dbutil.Int64Ptr(row.RevokedBy),
 		ExpiresAt:   dbutil.TimePtr(row.ExpiresAt),
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}
-}
-
-
-func int64Ptr(value sql.NullInt64) *int64 {
-	if !value.Valid {
-		return nil
-	}
-	v := value.Int64
-	return &v
-}
-
-func nullInt32(value *int32) sql.NullInt32 {
-	if value == nil {
-		return sql.NullInt32{}
-	}
-	return sql.NullInt32{Int32: *value, Valid: true}
-}
-
-func int32Ptr(value sql.NullInt32) *int32 {
-	if !value.Valid {
-		return nil
-	}
-	v := value.Int32
-	return &v
 }

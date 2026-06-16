@@ -2,13 +2,13 @@ package taskstats
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 )
@@ -61,17 +61,6 @@ func NewService(store Store) *Service {
 	return &Service{store: store}
 }
 
-type statisticsRangeValidationError string
-
-func (e statisticsRangeValidationError) Error() string {
-	return string(e)
-}
-
-func isStatisticsRangeValidationError(err error) bool {
-	var target statisticsRangeValidationError
-	return errors.As(err, &target)
-}
-
 func normalizeStatisticsRange(raw string) (StatisticsRange, int, error) {
 	switch normalized := StatisticsRange(strings.TrimSpace(strings.ToLower(raw))); normalized {
 	case StatisticsRange1D:
@@ -85,7 +74,7 @@ func normalizeStatisticsRange(raw string) (StatisticsRange, int, error) {
 	case StatisticsRange1Y:
 		return StatisticsRange1Y, 365, nil
 	default:
-		return "", 0, statisticsRangeValidationError("range 仅支持 1d、7d、30d 或 1y")
+		return "", 0, validation.New("range 仅支持 1d、7d、30d 或 1y")
 	}
 }
 

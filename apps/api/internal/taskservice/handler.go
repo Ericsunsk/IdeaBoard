@@ -8,6 +8,7 @@ import (
 
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/sse"
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/tasks"
 
 	"github.com/gin-gonic/gin"
@@ -115,7 +116,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	}
 	taskItems, counts, err := h.taskService.ListTasks(c.Request.Context(), &req)
 	if err != nil {
-		if isTaskListValidationError(err) {
+		if validation.Is(err) {
 			response.Error(c, 400, err.Error())
 			return
 		}
@@ -136,10 +137,10 @@ func (h *Handler) ListTasks(c *gin.Context) {
 
 func validateTaskListQueryIDs(c *gin.Context, userID int64, accountID int64) error {
 	if c.Query("user_id") != "" && userID <= 0 {
-		return newTaskListValidationError("user_id 必须大于 0")
+		return validation.New("user_id 必须大于 0")
 	}
 	if c.Query("account_id") != "" && accountID <= 0 {
-		return newTaskListValidationError("account_id 必须大于 0")
+		return validation.New("account_id 必须大于 0")
 	}
 	return nil
 }

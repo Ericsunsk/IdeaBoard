@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
@@ -117,7 +118,7 @@ func TestNormalizeTaskListStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := normalizeTaskListStatus(tt.raw)
 			if tt.wantErr {
-				if !isTaskListValidationError(err) {
+				if !validation.Is(err) {
 					t.Fatalf("err=%v, want task list validation error", err)
 				}
 				return

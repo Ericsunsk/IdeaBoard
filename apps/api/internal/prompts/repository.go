@@ -189,7 +189,7 @@ func promptConfigFromRow(row dbsqlc.FeaturePrompt) (FeaturePromptConfig, error) 
 		Enabled:       row.Enabled,
 		Variables:     variables,
 		SchemaVersion: row.SchemaVersion,
-		PublishedAt:   nullTimePtr(row.PublishedAt),
+		PublishedAt:   dbutil.TimePtr(row.PublishedAt),
 		UpdatedAt:     &updatedAt,
 	}, nil
 }
@@ -206,7 +206,7 @@ func promptRevisionFromRow(row dbsqlc.FeaturePromptRevision) (FeaturePromptRevis
 		Enabled:       row.Enabled,
 		Variables:     variables,
 		SchemaVersion: row.SchemaVersion,
-		PublishedAt:   nullTimePtr(row.PublishedAt),
+		PublishedAt:   dbutil.TimePtr(row.PublishedAt),
 		CreatedAt:     row.CreatedAt,
 	}, nil
 }
@@ -287,11 +287,4 @@ func promptVariables(keys ...string) []FeaturePromptVariable {
 		variables = append(variables, FeaturePromptVariable{Key: key, Tone: "prompt"})
 	}
 	return variables
-}
-
-func nullTimePtr(value sql.NullTime) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-	return &value.Time
 }

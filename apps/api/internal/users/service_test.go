@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/validation"
 )
 
 type recordingUserUploadCleaner struct {
@@ -75,7 +76,7 @@ func TestListUsersRejectsInvalidFilters(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
-			if !isUserListValidationError(err) {
+			if !validation.Is(err) {
 				t.Fatalf("error type = %T, want user list validation error", err)
 			}
 			if !strings.Contains(err.Error(), tt.want) {

@@ -42,7 +42,6 @@ declare module 'vue' {
     NodeActionButton: typeof import('./features/workspace/components/nodes/NodeActionButton.vue')['default']
     NodeAspectRatioPicker: typeof import('./features/workspace/components/nodes/NodeAspectRatioPicker.vue')['default']
     NodeEmptyStateIcon: typeof import('./features/workspace/components/nodes/NodeEmptyStateIcon.vue')['default']
-    NodeExecutionFooter: typeof import('./features/workspace/components/nodes/NodeExecutionFooter.vue')['default']
     NodeHeader: typeof import('./features/workspace/components/nodes/NodeHeader.vue')['default']
     NodeInputThumbnail: typeof import('./features/workspace/components/nodes/NodeInputThumbnail.vue')['default']
     NodeOutputCountPicker: typeof import('./features/workspace/components/nodes/NodeOutputCountPicker.vue')['default']

@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/autherrors"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/validation"
 
 	"github.com/gin-gonic/gin"
 )
@@ -155,7 +156,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	result, err := h.userService.ListUsers(c.Request.Context(), &req)
 	if err != nil {
-		if isUserListValidationError(err) {
+		if validation.Is(err) {
 			response.Error(c, 400, err.Error())
 			return
 		}

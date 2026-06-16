@@ -15,12 +15,6 @@ declare global {
     readonly VITE_WORKSPACE_FLOW_ENABLE_CULLING?: string
   }
 
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- legacy global dialog/message plugins without type declarations
-    $dialog: any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- legacy global dialog/message plugins without type declarations
-    $message: any
-  }
 }
 
 export {}

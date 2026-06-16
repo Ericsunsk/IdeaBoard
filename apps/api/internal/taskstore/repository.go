@@ -322,7 +322,7 @@ func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
 	return tasks.TaskOutput{
 		ID:             row.ID,
 		TaskID:         row.TaskID,
-		MediaAssetID:   int64Ptr(row.MediaAssetID),
+		MediaAssetID:   dbutil.Int64Ptr(row.MediaAssetID),
 		Role:           row.Role,
 		URL:            row.Url,
 		StorageKey:     row.StorageKey,
@@ -338,15 +338,6 @@ func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 	}
-}
-
-
-func int64Ptr(value sql.NullInt64) *int64 {
-	if !value.Valid {
-		return nil
-	}
-	v := value.Int64
-	return &v
 }
 
 func outputMetadataJSON(value string) json.RawMessage {
@@ -389,26 +380,11 @@ func newMediaAssetID() (string, error) {
 	return "asset_" + hex.EncodeToString(buf[:]), nil
 }
 
-func optionalNonEmptyString(value *string) sql.NullString {
-	if value == nil {
-		return sql.NullString{}
-	}
-	v := strings.TrimSpace(*value)
-	return sql.NullString{String: v, Valid: v != ""}
-}
-
 func optionalString(value *string) sql.NullString {
 	if value == nil {
 		return sql.NullString{}
 	}
 	return sql.NullString{String: strings.TrimSpace(*value), Valid: true}
-}
-
-func optionalInt64(value *int64) sql.NullInt64 {
-	if value == nil {
-		return sql.NullInt64{}
-	}
-	return sql.NullInt64{Int64: *value, Valid: true}
 }
 
 func escapeLikeWildcards(s string) string {

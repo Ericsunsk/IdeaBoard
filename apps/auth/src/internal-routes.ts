@@ -76,6 +76,18 @@ export type InternalRoutesOptions = {
   repository: AuthUserRepository
 }
 
+type AuthUserIDValidation = {
+  value: string
+  error: string
+}
+
+function validateAuthUserID(raw: unknown): AuthUserIDValidation {
+  const value = String(raw ?? '').trim()
+  if (!value) return { value: '', error: 'auth user id is required' }
+  if (value.length > 191) return { value: '', error: 'auth user id is invalid' }
+  return { value, error: '' }
+}
+
 export function registerInternalRoutes(app: FastifyInstance, options: InternalRoutesOptions) {
   const requireInternalKey = createRequireInternalKey(options)
 
@@ -179,14 +191,10 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     '/internal/users/:id/role',
     { preHandler: requireInternalKey },
     async (request, reply) => {
-      const authUserID = String(request.params?.id || '').trim()
+      const authUserID = validateAuthUserID(request.params?.id)
       const role = normalizeAuthRole(request.body?.role)
-      if (!authUserID) {
-        sendError(reply, 400, 'auth user id is required')
-        return
-      }
-      if (authUserID.length > 191) {
-        sendError(reply, 400, 'auth user id is invalid')
+      if (authUserID.error) {
+        sendError(reply, 400, authUserID.error)
         return
       }
       if (!role) {
@@ -195,13 +203,13 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
       }
 
       try {
-        const updated = await options.repository.updateAuthUserRole(authUserID, role)
+        const updated = await options.repository.updateAuthUserRole(authUserID.value, role)
         if (!updated) {
           sendError(reply, 404, 'auth user not found')
           return
         }
         sendSuccess(reply, {
-          auth_user_id: authUserID,
+          auth_user_id: authUserID.value,
           role,
         })
       } catch (error) {
@@ -214,25 +222,21 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     '/internal/users/:id',
     { preHandler: requireInternalKey },
     async (request, reply) => {
-      const authUserID = String(request.params?.id || '').trim()
-      if (!authUserID) {
-        sendError(reply, 400, 'auth user id is required')
-        return
-      }
-      if (authUserID.length > 191) {
-        sendError(reply, 400, 'auth user id is invalid')
+      const authUserID = validateAuthUserID(request.params?.id)
+      if (authUserID.error) {
+        sendError(reply, 400, authUserID.error)
         return
       }
 
       try {
-        const deleted = await options.repository.removeAuthUserCascade(authUserID)
+        const deleted = await options.repository.removeAuthUserCascade(authUserID.value)
         if (!deleted) {
           sendError(reply, 404, 'auth user not found')
           return
         }
         sendSuccess(reply, {
           deleted: true,
-          auth_user_id: authUserID,
+          auth_user_id: authUserID.value,
         })
       } catch (error) {
         sendError(reply, 500, extractErrorMessage(error, 'failed to delete auth user'))
@@ -244,20 +248,16 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     '/internal/users/ban',
     { preHandler: requireInternalKey },
     async (request, reply) => {
-      const authUserID = String(request.body?.userId || '').trim()
+      const authUserID = validateAuthUserID(request.body?.userId)
       const banReason = normalizeOptionalText(request.body?.banReason, 500)
       const banExpiresIn = normalizeOptionalPositiveInteger(request.body?.banExpiresIn)
-      if (!authUserID) {
-        sendError(reply, 400, 'auth user id is required')
-        return
-      }
-      if (authUserID.length > 191) {
-        sendError(reply, 400, 'auth user id is invalid')
+      if (authUserID.error) {
+        sendError(reply, 400, authUserID.error)
         return
       }
       try {
         const banned = await options.repository.updateAuthUserBanState(
-          authUserID,
+          authUserID.value,
           true,
           banReason,
           banExpiresIn,
@@ -266,9 +266,9 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
           sendError(reply, 404, 'auth user not found')
           return
         }
-        await options.repository.deleteAuthUserSessions(authUserID)
+        await options.repository.deleteAuthUserSessions(authUserID.value)
         sendSuccess(reply, {
-          auth_user_id: authUserID,
+          auth_user_id: authUserID.value,
           banned: true,
         })
       } catch (error) {
@@ -281,18 +281,14 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     '/internal/users/unban',
     { preHandler: requireInternalKey },
     async (request, reply) => {
-      const authUserID = String(request.body?.userId || '').trim()
-      if (!authUserID) {
-        sendError(reply, 400, 'auth user id is required')
-        return
-      }
-      if (authUserID.length > 191) {
-        sendError(reply, 400, 'auth user id is invalid')
+      const authUserID = validateAuthUserID(request.body?.userId)
+      if (authUserID.error) {
+        sendError(reply, 400, authUserID.error)
         return
       }
       try {
         const updated = await options.repository.updateAuthUserBanState(
-          authUserID,
+          authUserID.value,
           false,
           null,
           null,
@@ -302,7 +298,7 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
           return
         }
         sendSuccess(reply, {
-          auth_user_id: authUserID,
+          auth_user_id: authUserID.value,
           banned: false,
         })
       } catch (error) {
@@ -315,23 +311,19 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     '/internal/users/revoke-sessions',
     { preHandler: requireInternalKey },
     async (request, reply) => {
-      const authUserID = String(request.body?.userId || '').trim()
-      if (!authUserID) {
-        sendError(reply, 400, 'auth user id is required')
-        return
-      }
-      if (authUserID.length > 191) {
-        sendError(reply, 400, 'auth user id is invalid')
+      const authUserID = validateAuthUserID(request.body?.userId)
+      if (authUserID.error) {
+        sendError(reply, 400, authUserID.error)
         return
       }
       try {
-        const deleted = await options.repository.deleteAuthUserSessions(authUserID)
+        const deleted = await options.repository.deleteAuthUserSessions(authUserID.value)
         if (!deleted) {
           sendError(reply, 404, 'auth user not found')
           return
         }
         sendSuccess(reply, {
-          auth_user_id: authUserID,
+          auth_user_id: authUserID.value,
           revoked: true,
         })
       } catch (error) {

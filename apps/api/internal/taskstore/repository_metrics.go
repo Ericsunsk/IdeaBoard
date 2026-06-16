@@ -34,8 +34,8 @@ func (r *Repository) PatchExecutionMetrics(ctx context.Context, patch tasks.Task
 	}
 	return r.q.PatchTaskExecutionMetrics(ctx, dbsqlc.PatchTaskExecutionMetricsParams{
 		TaskID:             taskID,
-		CurrentStage:       optionalNonEmptyString(patch.CurrentStage),
-		BottleneckSource:   optionalNonEmptyString(patch.BottleneckSource),
+		CurrentStage:       dbutil.NullString(patch.CurrentStage),
+		BottleneckSource:   dbutil.NullString(patch.BottleneckSource),
 		FailureStage:       optionalString(patch.FailureStage),
 		FailureCategory:    optionalString(patch.FailureCategory),
 		AssignedAt:         dbutil.NullTime(patch.AssignedAt),
@@ -43,11 +43,11 @@ func (r *Repository) PatchExecutionMetrics(ctx context.Context, patch tasks.Task
 		ProviderFinishedAt: dbutil.NullTime(patch.ProviderFinishedAt),
 		FinalizeStartedAt:  dbutil.NullTime(patch.FinalizeStartedAt),
 		FinalizeFinishedAt: dbutil.NullTime(patch.FinalizeFinishedAt),
-		QueueWaitMs:        optionalInt64(patch.QueueWaitMS),
-		WorkerOverheadMs:   optionalInt64(patch.WorkerOverheadMS),
-		ProviderLatencyMs:  optionalInt64(patch.ProviderLatencyMS),
-		FinalizeLatencyMs:  optionalInt64(patch.FinalizeLatencyMS),
-		TotalLatencyMs:     optionalInt64(patch.TotalLatencyMS),
+		QueueWaitMs:        dbutil.NullInt64(patch.QueueWaitMS),
+		WorkerOverheadMs:   dbutil.NullInt64(patch.WorkerOverheadMS),
+		ProviderLatencyMs:  dbutil.NullInt64(patch.ProviderLatencyMS),
+		FinalizeLatencyMs:  dbutil.NullInt64(patch.FinalizeLatencyMS),
+		TotalLatencyMs:     dbutil.NullInt64(patch.TotalLatencyMS),
 	})
 }
 
@@ -95,11 +95,11 @@ func patchTerminalExecutionMetricsForTaskTx(
 	}
 	return q.PatchTaskExecutionMetrics(ctx, dbsqlc.PatchTaskExecutionMetricsParams{
 		TaskID:           taskID,
-		CurrentStage:     optionalNonEmptyString(&currentStage),
-		BottleneckSource: optionalNonEmptyString(&bottleneckSource),
+		CurrentStage:     dbutil.NullString(&currentStage),
+		BottleneckSource: dbutil.NullString(&bottleneckSource),
 		FailureStage:     optionalString(&failureStage),
 		FailureCategory:  optionalString(&failureCategory),
-		TotalLatencyMs:   optionalInt64(&totalLatencyMS),
+		TotalLatencyMs:   dbutil.NullInt64(&totalLatencyMS),
 	})
 }
 
