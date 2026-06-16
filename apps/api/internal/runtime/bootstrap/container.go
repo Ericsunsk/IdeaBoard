@@ -47,72 +47,115 @@ type appContainer struct {
 	workerConcurrent int
 }
 
+type appDatabases struct {
+	db        *sql.DB
+	riverPool *pgxpool.Pool
+}
+
+type appRepositories struct {
+	userRepo           *users.UserRepository
+	accountRepo        *accounts.AccountRepository
+	taskRepo           *taskstore.Repository
+	channelRepo        *channels.ChannelRepository
+	systemConfigRepo   *settings.SystemConfigRepository
+	featurePromptRepo  *prompts.FeaturePromptRepository
+	storageProfileRepo *storage.StorageProfileRepository
+	lineDraftModeRepo  *assets.LineDraftModeRepository
+	boardRepo          *boards.BoardRepository
+}
+
+func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, error) {
+	db, err := database.NewPostgres(cfg.Database)
+	if err != nil {
+		return appDatabases{}, fmt.Errorf("failed to connect to database: %w", err)
+	}
+	if err := migrations.Up(ctx, db); err != nil {
+		_ = db.Close()
+		return appDatabases{}, fmt.Errorf("failed to migrate database schema: %w", err)
+	}
+	riverPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
+	if err != nil {
+		_ = db.Close()
+		return appDatabases{}, fmt.Errorf("failed to connect River database pool: %w", err)
+	}
+	if err := worker.MigrateRiver(ctx, riverPool); err != nil {
+		riverPool.Close()
+		_ = db.Close()
+		return appDatabases{}, fmt.Errorf("failed to migrate River schema: %w", err)
+	}
+	return appDatabases{db: db, riverPool: riverPool}, nil
+}
+
+func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error) {
+	repos := appRepositories{
+		userRepo:           users.NewUserRepository(db),
+		accountRepo:        accounts.NewAccountRepository(db),
+		taskRepo:           taskstore.NewRepository(db),
+		channelRepo:        channels.NewChannelRepository(db),
+		systemConfigRepo:   settings.NewSystemConfigRepository(db),
+		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),
+		storageProfileRepo: storage.NewStorageProfileRepository(db),
+		lineDraftModeRepo:  assets.NewLineDraftModeRepository(db),
+		boardRepo:          boards.NewBoardRepository(db),
+	}
+	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {
+		return appRepositories{}, err
+	}
+	return repos, nil
+}
+
+func closeStartupResources(db *sql.DB, riverPool *pgxpool.Pool, eventBus *events.NATSJetStreamEventBus) {
+	if eventBus != nil {
+		_ = eventBus.Close()
+	}
+	if riverPool != nil {
+		riverPool.Close()
+	}
+	if db != nil {
+		_ = db.Close()
+	}
+}
+
 func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	// encryption
 	if err := secrets.LoadEncryptionKey(); err != nil {
 		return nil, fmt.Errorf("failed to load secrets encryption key: %w", err)
 	}
 
-	// database + River
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
+	dbs, err := openAppDatabases(context.Background(), cfg)
+	if err != nil {
+		return nil, err
+	}
 
-	db, err := database.NewPostgres(cfg.Database)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-	if err := migrations.Up(context.Background(), db); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("failed to migrate database schema: %w", err)
-	}
-	riverPool, err := worker.NewRiverPgxPool(context.Background(), database.PostgresDSN(cfg.Database))
-	if err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("failed to connect River database pool: %w", err)
-	}
-	if err := worker.MigrateRiver(context.Background(), riverPool); err != nil {
-		riverPool.Close()
-		_ = db.Close()
-		return nil, fmt.Errorf("failed to migrate River schema: %w", err)
-	}
 	// repositories
-	postgresAssigner := taskqueue.NewPostgresTaskAssigner(db)
-	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(db)
-
-	userRepo := users.NewUserRepository(db)
-	if err := userRepo.EnsureStorageUIDs(context.Background()); err != nil {
-		riverPool.Close()
-		_ = db.Close()
+	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
+	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)
+	repos, err := newAppRepositories(context.Background(), dbs.db)
+	if err != nil {
+		closeStartupResources(dbs.db, dbs.riverPool, nil)
 		return nil, fmt.Errorf("failed to ensure user storage uid: %w", err)
 	}
-	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := taskstore.NewRepository(db)
-	channelRepo := channels.NewChannelRepository(db)
-	systemConfigRepo := settings.NewSystemConfigRepository(db)
-	featurePromptRepo := prompts.NewFeaturePromptRepository(db)
-	storageProfileRepo := storage.NewStorageProfileRepository(db)
-	lineDraftModeRepo := assets.NewLineDraftModeRepository(db)
-	boardRepo := boards.NewBoardRepository(db)
 
-	storageService := storage.NewStorageService(storageProfileRepo)
+	storageService := storage.NewStorageService(repos.storageProfileRepo)
 	if err := storageService.EnsureDefaultProfiles(context.Background()); err != nil {
-		riverPool.Close()
-		_ = db.Close()
+		closeStartupResources(dbs.db, dbs.riverPool, nil)
 		return nil, fmt.Errorf("failed to ensure default storage profiles: %w", err)
 	}
-	userService := users.NewUserService(userRepo, storageService)
-	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
+	userService := users.NewUserService(repos.userRepo, storageService)
+	boardService := boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService)
 	taskEventHub := taskservice.NewEventHub()
 	taskEvents, eventBus, err := newTaskStatusEventPublisher(context.Background(), cfg.Events, taskEventHub)
 	if err != nil {
-		riverPool.Close()
-		_ = db.Close()
+		closeStartupResources(dbs.db, dbs.riverPool, nil)
 		return nil, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
+
 	// services
-	riverQueue := taskqueue.NewRiverQueue(nil, db, postgresRuntimeStore, cfg.Queue.MaxRetry)
+	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, postgresRuntimeStore, cfg.Queue.MaxRetry)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
-		AccountRepo:      accountRepo,
-		TaskRepo:         taskRepo,
+		AccountRepo:      repos.accountRepo,
+		TaskRepo:         repos.taskRepo,
 		QueueStats:       riverQueue,
 		AccountLoadStore: postgresRuntimeStore,
 		ConcurrencyStore: postgresRuntimeStore,
@@ -122,9 +165,9 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		TaskEvents: taskEvents,
 	})
 	riverTaskWorker := worker.NewRiverTaskWorker(
-		accountRepo,
-		channelRepo,
-		taskRepo,
+		repos.accountRepo,
+		repos.channelRepo,
+		repos.taskRepo,
 		riverQueue,
 		postgresAssigner,
 		postgresRuntimeStore,
@@ -132,46 +175,44 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		taskEvents,
 	)
 	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
-	riverClient, err := worker.NewRiverClient(riverPool, riverTaskWorker, worker.RiverServerOptions{
+	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: cfg.Queue.WorkerConcurrency,
 		JobTimeout:  time.Duration(cfg.Queue.TaskTimeoutSeconds) * time.Second,
 		MaxRetry:    cfg.Queue.MaxRetry,
 	})
 	if err != nil {
-		_ = eventBus.Close()
-		riverPool.Close()
-		_ = db.Close()
+		closeStartupResources(dbs.db, dbs.riverPool, eventBus)
 		return nil, fmt.Errorf("failed to initialize River client: %w", err)
 	}
 	riverQueue.SetClient(riverClient)
-	submissionStore := tasksubmission.NewStore(riverPool, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry)
+	submissionStore := tasksubmission.NewStore(dbs.riverPool, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry)
 
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
-		AccountRepo:       accountRepo,
-		TaskRepo:          taskRepo,
+		AccountRepo:       repos.accountRepo,
+		TaskRepo:          repos.taskRepo,
 		SubmissionStore:   submissionStore,
 		CancelStore:       postgresRuntimeStore,
-		FeaturePrompts:    featurePromptRepo,
+		FeaturePrompts:    repos.featurePromptRepo,
 		UploadBoards:      uploadBoardAccessResolver{service: boardService},
-		UploadOwners:      uploadOwnerStorageUIDResolver{repo: userRepo},
+		UploadOwners:      uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 		TaskOutputCleaner: storageService,
 	}, taskservice.ServiceOptions{
 		EventHub:   taskEventHub,
 		TaskEvents: taskEvents,
 	})
-	taskStatsService := taskstats.NewService(taskRepo)
+	taskStatsService := taskstats.NewService(repos.taskRepo)
 	accountHandler := accounts.NewAccountHandler(accountService)
 	taskHandler := taskservice.NewHandler(taskService)
 	taskStatsHandler := taskstats.NewHandler(taskStatsService, accountService)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: authServiceClient,
-		UserRepo:          userRepo,
+		UserRepo:          repos.userRepo,
 	}
 	uploadDeps := httpapi.UploadDeps{
 		StorageService: storageService,
-		UserRepo:       userRepo,
+		UserRepo:       repos.userRepo,
 		BoardService:   boardService,
 	}
 	router := gin.New()
@@ -182,18 +223,18 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 			AuthHandler:      auth.NewAuthHandler(userService),
 			TaskHandler:      taskHandler,
 			BoardHandler:     boards.NewBoardHandler(boardService),
-			LineDraftHandler: assets.NewLineDraftHandler(lineDraftModeRepo),
+			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
-			AdminHandler:         users.NewAdminHandler(userService, systemConfigRepo, authServiceClient),
+			AdminHandler:         users.NewAdminHandler(userService, repos.systemConfigRepo, authServiceClient),
 			AccountHandler:       accountHandler,
 			TaskHandler:          taskHandler,
 			TaskStatsHandler:     taskStatsHandler,
-			ChannelHandler:       channels.NewChannelHandler(channelRepo, cfg.App.Env),
+			ChannelHandler:       channels.NewChannelHandler(repos.channelRepo, cfg.App.Env),
 			StorageHandler:       storage.NewStorageHandler(storageService),
-			LineDraftHandler:     assets.NewLineDraftHandler(lineDraftModeRepo),
-			FeaturePromptHandler: prompts.NewFeaturePromptHandler(featurePromptRepo),
+			LineDraftHandler:     assets.NewLineDraftHandler(repos.lineDraftModeRepo),
+			FeaturePromptHandler: prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			StorageService:       storageService,
 		},
 		StaticUploads: httpapi.StaticUploadDeps{
@@ -207,8 +248,8 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 
 	return &appContainer{
 		router:           router,
-		db:               db,
-		riverPool:        riverPool,
+		db:               dbs.db,
+		riverPool:        dbs.riverPool,
 		riverClient:      riverClient,
 		eventBus:         eventBus,
 		workerQueueName:  taskqueue.RiverQueueDefault,

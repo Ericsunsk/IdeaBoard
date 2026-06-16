@@ -84,106 +84,31 @@ type providerCallOutput struct {
 	Timeline providerCallTimeline
 }
 
+type providerExecutionConfig struct {
+	APIType        string
+	ChannelName    string
+	Timeout        time.Duration
+	LocalRedrawCtx *localRedrawContext
+	Request        providerRequest
+}
+
 func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error) {
 	return c.callDrawingAPIWithAssignment(ctx, account, task, taskqueue.TaskAssignment{})
 }
 
 func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
-	// ── pre-flight: api key + channel validation ──
 	slog.Info("calling provider API", "account_name", account.Name, "channel_id", account.ChannelID, "task_id", task.TaskID)
 
-	if account.ApiKey == "" {
-		return providerCallOutput{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryAuth,
-			fmt.Errorf("账号 %s 的 API Key 为空", account.Name),
-		)
+	exec, err := c.prepareProviderExecution(ctx, account, task, assignment)
+	if err != nil {
+		return providerCallOutput{}, err
 	}
 
-	// 如果账号绑定了渠道商，使用渠道商的 API URL 作为 ProxyURL
-	channelName := ""
-	if account.ChannelID > 0 && c.channelRepo != nil {
-		channel, err := c.channelRepo.GetByID(ctx, account.ChannelID)
-		if err != nil {
-			return providerCallOutput{}, newExecutionFailureError(
-				tasks.ExecutionStageAssigned,
-				tasks.FailureCategoryInputInvalid,
-				fmt.Errorf("渠道商(ID=%d)不存在: %v", account.ChannelID, err),
-			)
-		}
-		proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(channel.ApiURL, outbound.AllowHostsFromEnv()...)
-		if validateErr != nil {
-			return providerCallOutput{}, newExecutionFailureError(
-				tasks.ExecutionStageAssigned,
-				tasks.FailureCategoryInputInvalid,
-				fmt.Errorf("渠道商 API URL 不可用"),
-			)
-		}
-		account.ProxyURL = proxyURL
-		channelName = channel.Name
-		slog.Info("using channel API URL", "channel_name", channel.Name, "channel_id", channel.ID, "api_url", redactLogURL(channel.ApiURL))
-	}
-
-	// 解析任务参数（ratio, count 等）
-	var params map[string]interface{}
-	if task.Params != "" {
-		if err := json.Unmarshal([]byte(task.Params), &params); err != nil {
-			slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
-		}
-	}
-	c.normalizeUpstreamMediaParams(params)
-
-	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
-	if !ok {
-		return providerCallOutput{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("账号 %s 的接口类型不支持: %s", account.Name, account.ApiType),
-		)
-	}
-
-	timeout := resolveAccountTimeout(account)
-
-	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, params, timeout)
-	if redrawErr != nil {
-		return providerCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, redrawErr)
-	}
 	localRedrawStored := false
-
-	// 根据 ratio 或自定义尺寸计算输出尺寸；local redraw 会先改写为 ROI 尺寸。
-	width, height := parseSizeFromParams(params)
-
-	var callResult providerCallResult
-	var err error
-
-	featureSlug := ""
-	if params != nil {
-		if slug, err := workflow.ResolveWorkflowFeatureSlug(params); err == nil {
-			featureSlug = slug
-		}
-	}
-	// ── model resolution + request construction ──
-	resolvedAccountModel, ok := resolveAccountModelForExecution(account, featureSlug, params, assignment.ResolvedModel)
-	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
-	if !ok || resolvedModel == "" {
-		return providerCallOutput{}, newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name),
-		)
-	}
-	providerReq := newProviderRequest(task.Prompt, width, height, params, resolvedModel)
 	output := providerCallOutput{}
-	// ── provider routing + upstream call ──
 	providerStartedAt := time.Now()
 	output.Timeline.ProviderStartedAt = &providerStartedAt
-	switch {
-	case workflow.IsGoogleNativeAPIType(apiType):
-		callResult, err = c.callGoogleAIWithRequest(ctx, account, providerReq, timeout)
-	default:
-		// OpenAI-compatible providers use the DALL-E style image endpoints.
-		callResult, err = c.callOpenAIWithRequest(ctx, account, providerReq, timeout)
-	}
+	callResult, err := c.callProviderWithRequest(ctx, account, exec)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
 
@@ -194,7 +119,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		return output, newExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			providerFailureCategory(err),
-			fmt.Errorf("调用 API 失败 (渠道: %s): %w", channelName, err),
+			fmt.Errorf("调用 API 失败 (渠道: %s): %w", exec.ChannelName, err),
 		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
@@ -209,8 +134,8 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 
 	finalizeStartedAt := time.Now()
 	output.Timeline.FinalizeStartedAt = &finalizeStartedAt
-	if localRedrawCtx != nil {
-		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, localRedrawCtx, imageURL, timeout)
+	if exec.LocalRedrawCtx != nil {
+		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, exec.LocalRedrawCtx, imageURL, exec.Timeout)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return output, err
@@ -240,9 +165,9 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		"task_id":      task.TaskID,
 		"account_id":   account.ID,
 		"channel_id":   account.ChannelID,
-		"channel_name": channelName,
+		"channel_name": exec.ChannelName,
 		"platform":     account.Platform,
-		"api_type":     apiType,
+		"api_type":     exec.APIType,
 		"status":       tasks.ResultStatusSuccess,
 		"image_url":    imageURL,
 		"image_urls":   imageURLs,
@@ -257,6 +182,106 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	}
 	output.Result = resultJSON
 	return output, nil
+}
+
+func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerExecutionConfig, error) {
+	if account.ApiKey == "" {
+		return providerExecutionConfig{}, newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryAuth,
+			fmt.Errorf("账号 %s 的 API Key 为空", account.Name),
+		)
+	}
+
+	channelName, err := c.applyAccountChannelEndpoint(ctx, account)
+	if err != nil {
+		return providerExecutionConfig{}, err
+	}
+
+	params := c.parseAndNormalizeTaskParams(task)
+	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
+	if !ok {
+		return providerExecutionConfig{}, newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			fmt.Errorf("账号 %s 的接口类型不支持: %s", account.Name, account.ApiType),
+		)
+	}
+
+	timeout := resolveAccountTimeout(account)
+	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, params, timeout)
+	if redrawErr != nil {
+		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, redrawErr)
+	}
+
+	featureSlug := ""
+	if params != nil {
+		if slug, err := workflow.ResolveWorkflowFeatureSlug(params); err == nil {
+			featureSlug = slug
+		}
+	}
+	resolvedAccountModel, ok := resolveAccountModelForExecution(account, featureSlug, params, assignment.ResolvedModel)
+	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
+	if !ok || resolvedModel == "" {
+		return providerExecutionConfig{}, newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name),
+		)
+	}
+
+	width, height := parseSizeFromParams(params)
+	return providerExecutionConfig{
+		APIType:        apiType,
+		ChannelName:    channelName,
+		Timeout:        timeout,
+		LocalRedrawCtx: localRedrawCtx,
+		Request:        newProviderRequest(task.Prompt, width, height, params, resolvedModel),
+	}, nil
+}
+
+func (c *ProviderExecutor) applyAccountChannelEndpoint(ctx context.Context, account *accounts.ApiAccount) (string, error) {
+	if account.ChannelID <= 0 || c.channelRepo == nil {
+		return "", nil
+	}
+	channel, err := c.channelRepo.GetByID(ctx, account.ChannelID)
+	if err != nil {
+		return "", newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			fmt.Errorf("渠道商(ID=%d)不存在: %w", account.ChannelID, err),
+		)
+	}
+	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(channel.ApiURL, outbound.AllowHostsFromEnv()...)
+	if validateErr != nil {
+		return "", newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			fmt.Errorf("渠道商 API URL 不可用"),
+		)
+	}
+	account.ProxyURL = proxyURL
+	slog.Info("using channel API URL", "channel_name", channel.Name, "channel_id", channel.ID, "api_url", redactLogURL(channel.ApiURL))
+	return channel.Name, nil
+}
+
+func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *queuetypes.TaskPayload) map[string]interface{} {
+	var params map[string]interface{}
+	if task.Params != "" {
+		if err := json.Unmarshal([]byte(task.Params), &params); err != nil {
+			slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
+		}
+	}
+	c.normalizeUpstreamMediaParams(params)
+	return params
+}
+
+func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account *accounts.ApiAccount, exec providerExecutionConfig) (providerCallResult, error) {
+	if workflow.IsGoogleNativeAPIType(exec.APIType) {
+		return c.callGoogleAIWithRequest(ctx, account, exec.Request, exec.Timeout)
+	}
+	// OpenAI-compatible providers use the DALL-E style image endpoints.
+	return c.callOpenAIWithRequest(ctx, account, exec.Request, exec.Timeout)
 }
 
 func marshalProviderTaskResult(taskID string, result map[string]interface{}) (string, error) {
