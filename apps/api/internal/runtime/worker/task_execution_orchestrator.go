@@ -47,6 +47,7 @@ func newTaskExecutionOrchestrator(
 }
 
 func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) error {
+	// ── Phase 1: pre-flight (account + cancellation check) ──
 	accountID := assignment.AccountID
 	slog.Info("worker executing task", "task_id", task.TaskID, "account_id", accountID)
 	startTime := time.Now()
@@ -79,6 +80,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 
+	// ── Phase 2: lease confirmation + snapshot + attempt start ──
 	taskCtx, stop := o.taskRuntime.WatchTaskCancellation(ctx, task.TaskID)
 	defer stop()
 
@@ -127,8 +129,10 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		WorkerOverheadMS:  int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime))),
 	})
 
+	// ── Phase 3: upstream provider call ──
 	providerOutput, err := o.providerCall(taskCtx, account, task, assignment)
 	o.recordProviderTimeline(ctx, task.TaskID, startTime, providerOutput.Timeline)
+	// ── Phase 4: provider error handling (interrupt / fail / failover) ──
 	if err != nil {
 		if isContextInterrupted(taskCtx.Err()) || isContextInterrupted(ctx.Err()) {
 			checkCtx, checkCancel := taskCleanupContext(ctx)
@@ -204,6 +208,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 
+	// ── Phase 5: post-success cancel check + finalization ──
 	checkCtx, checkCancel := taskCleanupContext(ctx)
 	cancelled, err = o.taskRuntime.IsTaskCancelled(checkCtx, task.TaskID)
 	checkCancel()
