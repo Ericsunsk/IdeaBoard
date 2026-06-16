@@ -124,7 +124,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	}
 	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
 		TaskID:            task.TaskID,
-		CurrentStage:      stringPtr(tasks.ExecutionStageProvider),
+		CurrentStage:      tasks.StringPtr(tasks.ExecutionStageProvider),
 		ProviderStartedAt: &providerStartAt,
 		WorkerOverheadMS:  int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime))),
 	})
@@ -196,10 +196,10 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		}
 		o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
 			TaskID:           task.TaskID,
-			CurrentStage:     stringPtr(tasks.ExecutionStageQueued),
-			BottleneckSource: stringPtr(tasks.BottleneckSourceProvider),
-			FailureStage:     stringPtr(failureStage),
-			FailureCategory:  stringPtr(failureCategory),
+			CurrentStage:     tasks.StringPtr(tasks.ExecutionStageQueued),
+			BottleneckSource: tasks.StringPtr(tasks.BottleneckSourceProvider),
+			FailureStage:     tasks.StringPtr(failureStage),
+			FailureCategory:  tasks.StringPtr(failureCategory),
 		})
 		if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, reason); requeueErr != nil {
 			o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
@@ -428,7 +428,7 @@ func (o *taskExecutionOrchestrator) recordProviderTimeline(ctx context.Context, 
 	if timeline.ProviderStartedAt != nil {
 		o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
 			TaskID:            taskID,
-			CurrentStage:      stringPtr(tasks.ExecutionStageProvider),
+			CurrentStage:      tasks.StringPtr(tasks.ExecutionStageProvider),
 			ProviderStartedAt: timeline.ProviderStartedAt,
 			WorkerOverheadMS:  int64Ptr(nonNegativeMilliseconds(timeline.ProviderStartedAt.Sub(executionStartedAt))),
 		})
@@ -443,7 +443,7 @@ func (o *taskExecutionOrchestrator) recordProviderTimeline(ctx context.Context, 
 	if timeline.FinalizeStartedAt != nil {
 		o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
 			TaskID:            taskID,
-			CurrentStage:      stringPtr(tasks.ExecutionStageFinalizing),
+			CurrentStage:      tasks.StringPtr(tasks.ExecutionStageFinalizing),
 			FinalizeStartedAt: timeline.FinalizeStartedAt,
 		})
 	}
@@ -671,10 +671,6 @@ func nonNegativeMilliseconds(duration time.Duration) int64 {
 		return 0
 	}
 	return ms
-}
-
-func stringPtr(value string) *string {
-	return &value
 }
 
 func int64Ptr(value int64) *int64 {

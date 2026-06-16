@@ -21,6 +21,8 @@ func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		db, err := sql.Open("pgx", dsn)
 		if err == nil {
+			// sql.DB pool (25 conns). The River worker maintains its own pgxpool.Pool;
+			// keep the combined total under the PostgreSQL max_connections limit.
 			db.SetMaxOpenConns(25)
 			db.SetMaxIdleConns(10)
 			db.SetConnMaxLifetime(30 * time.Minute)

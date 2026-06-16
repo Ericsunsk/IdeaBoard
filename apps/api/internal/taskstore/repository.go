@@ -185,7 +185,7 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 	hasUserID := userID > 0
 	hasAccountID := accountID > 0
 	hasStatus := status != ""
-	keywordLike := "%" + keyword + "%"
+	keywordLike := "%" + escapeLikeWildcards(keyword) + "%"
 	hasKeyword := keyword != ""
 	summaryParams := dbsqlc.SummarizeTasksParams{
 		HasUserID:    hasUserID,
@@ -415,4 +415,11 @@ func optionalInt64(value *int64) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: *value, Valid: true}
+}
+
+func escapeLikeWildcards(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
 }

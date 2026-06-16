@@ -339,7 +339,7 @@ func (s *StorageService) storeRemoteWithProfile(ctx context.Context, profile Sto
 func (s *StorageService) saveUploadedFileLocal(file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
 	src, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("打开文件失败: %v", err)
+		return "", fmt.Errorf("打开文件失败: %w", err)
 	}
 	defer src.Close()
 
@@ -361,11 +361,11 @@ func (s *StorageService) saveReaderLocal(filename string, src io.Reader, size in
 	}
 	dst := filepath.FromSlash(objectKey)
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-		return "", fmt.Errorf("创建目录失败: %v", err)
+		return "", fmt.Errorf("创建目录失败: %w", err)
 	}
 	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return "", fmt.Errorf("保存文件失败: %v", err)
+		return "", fmt.Errorf("保存文件失败: %w", err)
 	}
 	cleanupDst := true
 	defer func() {
@@ -375,10 +375,10 @@ func (s *StorageService) saveReaderLocal(filename string, src io.Reader, size in
 	}()
 	if err := copyExactWithStorageBuffer(dstFile, src, size); err != nil {
 		_ = dstFile.Close()
-		return "", fmt.Errorf("保存文件失败: %v", err)
+		return "", fmt.Errorf("保存文件失败: %w", err)
 	}
 	if err := dstFile.Close(); err != nil {
-		return "", fmt.Errorf("保存文件失败: %v", err)
+		return "", fmt.Errorf("保存文件失败: %w", err)
 	}
 	cleanupDst = false
 	return publicUploadURL(objectKey), nil
@@ -472,7 +472,7 @@ func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf("删除文件失败: %v", err)
+		return fmt.Errorf("删除文件失败: %w", err)
 	}
 	return nil
 }
@@ -484,7 +484,7 @@ func (s *StorageService) readLocalByObjectKey(objectKey string, maxBytes int64) 
 	}
 	file, err := os.Open(filepath.FromSlash(normalized))
 	if err != nil {
-		return nil, fmt.Errorf("读取文件失败: %v", err)
+		return nil, fmt.Errorf("读取文件失败: %w", err)
 	}
 	defer file.Close()
 	data, err := readStorageObject(file, maxBytes)
@@ -506,7 +506,7 @@ func (s *StorageService) deleteLocalByPrefix(prefix string) error {
 	}
 	localPath := filepath.FromSlash(strings.TrimSuffix(normalizedPrefix, "/"))
 	if err := os.RemoveAll(localPath); err != nil {
-		return fmt.Errorf("按前缀删除本地文件失败: %v", err)
+		return fmt.Errorf("按前缀删除本地文件失败: %w", err)
 	}
 	return nil
 }
@@ -583,7 +583,7 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 	}
 	data, err := io.ReadAll(io.LimitReader(src, maxBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("读取文件失败: %v", err)
+		return nil, fmt.Errorf("读取文件失败: %w", err)
 	}
 	if int64(len(data)) > maxBytes {
 		return nil, fmt.Errorf("文件超过大小限制 (%d MB)", maxBytes/1024/1024)
@@ -643,7 +643,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 	}
 	resp, err := safehttp.GetWithAllowHosts(ctx, remoteURL, 30*time.Second, allowHosts...)
 	if err != nil {
-		return nil, fmt.Errorf("下载图片失败: %v", err)
+		return nil, fmt.Errorf("下载图片失败: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -653,7 +653,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 
 	tmpFile, err := os.CreateTemp("", "ideaboard-remote-image-*")
 	if err != nil {
-		return nil, fmt.Errorf("创建临时文件失败: %v", err)
+		return nil, fmt.Errorf("创建临时文件失败: %w", err)
 	}
 	cleanupTemp := true
 	defer func() {
@@ -665,7 +665,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 
 	size, err := copyWithStorageBuffer(tmpFile, io.LimitReader(resp.Body, maxSize+1))
 	if err != nil {
-		return nil, fmt.Errorf("读取图片数据失败: %v", err)
+		return nil, fmt.Errorf("读取图片数据失败: %w", err)
 	}
 	if size > maxSize {
 		return nil, fmt.Errorf("远程文件超过大小限制 (%d MB)", maxSize/1024/1024)
@@ -684,7 +684,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 		return nil, err
 	}
 	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("读取临时文件失败: %v", err)
+		return nil, fmt.Errorf("读取临时文件失败: %w", err)
 	}
 
 	filename := fmt.Sprintf("remote_%d%s", time.Now().UnixNano(), ext)
@@ -705,10 +705,10 @@ func validateRemoteImageFile(file *os.File, ext string) error {
 		return fmt.Errorf("仅支持 %s 图片", media.SupportedUploadImageLabel())
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("读取临时文件失败: %v", err)
+		return fmt.Errorf("读取临时文件失败: %w", err)
 	}
 	if err := media.ValidateImageReader(file, ext); err != nil {
-		return fmt.Errorf("远程文件校验失败: %v", err)
+		return fmt.Errorf("远程文件校验失败: %w", err)
 	}
 	return nil
 }
@@ -719,7 +719,7 @@ func validateRemoteImageBytes(filename string, data []byte) error {
 		return fmt.Errorf("仅支持 %s 图片", media.SupportedUploadImageLabel())
 	}
 	if err := media.ValidateImageBytes(data, ext); err != nil {
-		return fmt.Errorf("远程文件校验失败: %v", err)
+		return fmt.Errorf("远程文件校验失败: %w", err)
 	}
 	return nil
 }

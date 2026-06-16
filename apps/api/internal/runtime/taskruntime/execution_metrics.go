@@ -91,23 +91,19 @@ func (s *Service) RecordExecutionTerminal(ctx context.Context, taskID string, cu
 	bottleneckSource := tasks.ResolveExecutionBottleneck(metrics, failureStage, failureCategory)
 	patch := tasks.TaskExecutionMetricsPatch{
 		TaskID:           taskID,
-		CurrentStage:     stringPtr(currentStage),
-		BottleneckSource: stringPtr(bottleneckSource),
+		CurrentStage:     tasks.StringPtr(currentStage),
+		BottleneckSource: tasks.StringPtr(bottleneckSource),
 		TotalLatencyMS:   int64Ptr(totalLatencyMS),
 	}
 	if currentStage == tasks.ExecutionStageFailed {
-		patch.FailureStage = stringPtr(failureStage)
-		patch.FailureCategory = stringPtr(failureCategory)
+		patch.FailureStage = tasks.StringPtr(failureStage)
+		patch.FailureCategory = tasks.StringPtr(failureCategory)
 	} else {
 		empty := ""
 		patch.FailureStage = &empty
 		patch.FailureCategory = &empty
 	}
 	return s.taskRepo.PatchExecutionMetrics(ctx, patch)
-}
-
-func stringPtr(value string) *string {
-	return &value
 }
 
 func int64Ptr(value int64) *int64 {

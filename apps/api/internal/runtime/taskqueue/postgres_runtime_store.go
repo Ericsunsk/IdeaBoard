@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -98,8 +99,9 @@ func (s *PostgresTaskRuntimeStore) MarkCancelled(ctx context.Context, taskID str
 	if s == nil || s.db == nil {
 		return fmt.Errorf("postgres task runtime store: db not configured")
 	}
+	// Best-effort housekeeping; expired rows are already filtered by expires_at > now().
 	if err := s.pruneExpiredTaskCancellations(ctx); err != nil {
-		return err
+		slog.Warn("prune expired task cancellations failed", "err", err)
 	}
 	expiresAt := time.Now().Add(ttl)
 	if ttl <= 0 {

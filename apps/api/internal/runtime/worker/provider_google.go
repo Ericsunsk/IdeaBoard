@@ -313,7 +313,10 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := readLimitedBody(resp.Body)
+		body, readErr := readLimitedBody(resp.Body)
+		if readErr != nil {
+			slog.Warn("read error response body failed", "err", readErr)
+		}
 		return "", nil, fmt.Errorf("拉取图像返回 %d: %s", resp.StatusCode, truncateErrorBody(string(body)))
 	}
 	body, err := readLimitedBody(resp.Body)

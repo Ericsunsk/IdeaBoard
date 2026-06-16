@@ -257,7 +257,7 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
     AND deleted_at IS NULL
 	    AND id = ANY($1::bigint[])
 	  ORDER BY id ASC
-	  FOR UPDATE
+	  FOR UPDATE SKIP LOCKED
 	),
 	eligible_models AS (
 	  SELECT

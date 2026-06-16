@@ -3,21 +3,27 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/platform/outbound"
 	"io"
 	"mime/multipart"
 	"net/url"
 	"path"
 	"sort"
 	"strings"
+	"sync"
+
+	"ideaboard/api/internal/platform/outbound"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-type S3CompatibleService struct{}
+type S3CompatibleService struct {
+	clientCache sync.Map
+}
 
 type s3BucketExistenceChecker interface {
 	BucketExists(ctx context.Context, bucketName string) (bool, error)
@@ -93,7 +99,7 @@ func (s *S3CompatibleService) GetBucketInfoWithConfig(ctx context.Context, cfg *
 func ensureS3BucketAccessible(ctx context.Context, client s3BucketExistenceChecker, bucketName string) error {
 	exists, err := client.BucketExists(ctx, bucketName)
 	if err != nil {
-		return fmt.Errorf("验证 Bucket 失败: %v", err)
+		return fmt.Errorf("验证 Bucket 失败: %w", err)
 	}
 	if !exists {
 		return errors.New("bucket 不存在或当前凭证无权访问")
@@ -112,7 +118,7 @@ func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multip
 
 	src, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("打开文件失败: %v", err)
+		return "", fmt.Errorf("打开文件失败: %w", err)
 	}
 	defer src.Close()
 
@@ -170,7 +176,7 @@ func (s *S3CompatibleService) putReaderWithConfig(ctx context.Context, client *m
 		minio.PutObjectOptions{ContentType: contentType},
 	)
 	if err != nil {
-		return "", fmt.Errorf("上传失败: %v", err)
+		return "", fmt.Errorf("上传失败: %w", err)
 	}
 
 	return s.publicObjectURL(cfg, key)
@@ -192,7 +198,7 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 		return err
 	}
 	if err := client.RemoveObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{}); err != nil {
-		return fmt.Errorf("删除失败: %v", err)
+		return fmt.Errorf("删除失败: %w", err)
 	}
 	return nil
 }
@@ -214,7 +220,7 @@ func (s *S3CompatibleService) readWithConfig(ctx context.Context, objectKey stri
 	}
 	object, err := client.GetObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("读取文件失败: %v", err)
+		return nil, fmt.Errorf("读取文件失败: %w", err)
 	}
 	defer object.Close()
 
@@ -265,7 +271,7 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 			return fmt.Errorf("列举前缀对象失败: %v", object.Err)
 		}
 		if err := client.RemoveObject(ctx, bucketName, object.Key, minio.RemoveObjectOptions{}); err != nil {
-			return fmt.Errorf("删除对象失败: %v", err)
+			return fmt.Errorf("删除对象失败: %w", err)
 		}
 	}
 	return nil
@@ -297,6 +303,11 @@ func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error 
 }
 
 func (s *S3CompatibleService) clientWithConfig(cfg *S3CompatibleConfig) (*minio.Client, error) {
+	cacheKey := s3ClientCacheKey(cfg)
+	if cached, ok := s.clientCache.Load(cacheKey); ok {
+		return cached.(*minio.Client), nil
+	}
+
 	endpointHost, secure, err := parseS3Endpoint(cfg.Endpoint)
 	if err != nil {
 		return nil, err
@@ -314,9 +325,33 @@ func (s *S3CompatibleService) clientWithConfig(cfg *S3CompatibleConfig) (*minio.
 		BucketLookup: bucketLookup,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("初始化 S3 客户端失败: %v", err)
+		return nil, fmt.Errorf("初始化 S3 客户端失败: %w", err)
 	}
-	return client, nil
+
+	actual, _ := s.clientCache.LoadOrStore(cacheKey, client)
+	return actual.(*minio.Client), nil
+}
+
+func s3ClientCacheKey(cfg *S3CompatibleConfig) string {
+	h := sha256.New()
+	writeS3ClientCacheKeyPart(h, cfg.Endpoint)
+	writeS3ClientCacheKeyPart(h, cfg.AccessKeyID)
+	writeS3ClientCacheKeyPart(h, cfg.SecretAccessKey)
+	writeS3ClientCacheKeyPart(h, cfg.RegionID)
+	h.Write([]byte{boolByte(cfg.ForcePathStyle)})
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func writeS3ClientCacheKeyPart(h interface{ Write([]byte) (int, error) }, value string) {
+	_, _ = h.Write([]byte(value))
+	_, _ = h.Write([]byte{0})
+}
+
+func boolByte(b bool) byte {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func (s *S3CompatibleService) publicObjectURL(cfg *S3CompatibleConfig, key string) (string, error) {

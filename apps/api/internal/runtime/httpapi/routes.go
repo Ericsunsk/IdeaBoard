@@ -81,7 +81,8 @@ type AdminRouteDeps struct {
 	StorageService       *storage.StorageService
 }
 
-const globalRequestBodyLimitBytes int64 = 64 * 1024 * 1024
+const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
+const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 
 // validateUploadFileHeader centralises the three-step upload validation:
 // 1. File size limit.
@@ -133,8 +134,8 @@ func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (map[string
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	r.Use(rateLimitMiddleware())
-	r.Use(requestBodyLimitMiddleware(globalRequestBodyLimitBytes))
 	r.Use(deps.CORSMiddleware)
+	r.Use(globalRequestBodyLimitMiddleware())
 
 	r.GET("/api/health", func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
@@ -154,6 +155,29 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	registerAdminRoutes(adminAPI, deps.AdminRoutes)
 
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)
+}
+
+func globalRequestBodyLimitMiddleware() gin.HandlerFunc {
+	base := requestBodyLimitMiddleware(globalRequestBodyLimitBytes)
+	return func(c *gin.Context) {
+		if isUploadRequest(c.Request) {
+			c.Next()
+			return
+		}
+		base(c)
+	}
+}
+
+func isUploadRequest(req *http.Request) bool {
+	if req == nil || strings.ToUpper(strings.TrimSpace(req.Method)) != http.MethodPost {
+		return false
+	}
+	requestPath := path.Clean(req.URL.Path)
+	if requestPath == "/api/user/profile/avatar" || requestPath == "/api/admin/upload" {
+		return true
+	}
+	return strings.HasPrefix(requestPath, "/api/user/boards/") &&
+		strings.HasSuffix(requestPath, "/uploads")
 }
 
 func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {
@@ -250,8 +274,8 @@ func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
 
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
 
-	userApi.POST("/profile/avatar", uploadProfileAvatarHandler(h.Uploads))
-	userApi.POST("/boards/:board_id/uploads", uploadBoardAssetHandler(h.Uploads))
+	userApi.POST("/profile/avatar", requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadProfileAvatarHandler(h.Uploads))
+	userApi.POST("/boards/:board_id/uploads", requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadBoardAssetHandler(h.Uploads))
 	userApi.DELETE("/boards/:board_id/uploads", deleteBoardUploadHandler(h.Uploads))
 	userApi.GET("/download", downloadImageHandler())
 }
@@ -287,7 +311,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.GET("/statistics", h.TaskStatsHandler.GetStatistics)
 	adminApi.POST("/statistics/backfill", h.TaskStatsHandler.BackfillStatistics)
 
-	adminApi.POST("/upload", adminUploadHandler(h.StorageService))
+	adminApi.POST("/upload", requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), adminUploadHandler(h.StorageService))
 
 	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)
 	adminApi.GET("/storage/profiles", h.StorageHandler.ListProfiles)

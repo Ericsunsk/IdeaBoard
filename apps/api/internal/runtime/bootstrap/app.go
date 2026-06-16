@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
@@ -114,7 +115,7 @@ func runInitAdmin() {
 		}
 		changed := false
 		if strings.TrimSpace(valueOrEmpty(user.AuthUserID)) == "" {
-			user.AuthUserID = stringPtr(provisioned.AuthUserID)
+			user.AuthUserID = tasks.StringPtr(provisioned.AuthUserID)
 			changed = true
 		}
 		if user.Role != "admin" {
@@ -153,7 +154,7 @@ func runInitAdmin() {
 
 	localAdmin = &users.User{
 		Username:   "admin",
-		AuthUserID: stringPtr(provisioned.AuthUserID),
+		AuthUserID: tasks.StringPtr(provisioned.AuthUserID),
 		Role:       "admin",
 		Status:     1,
 	}
@@ -220,14 +221,6 @@ func isUnsafeProductionSecret(value string) bool {
 	default:
 		return false
 	}
-}
-
-func stringPtr(value string) *string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil
-	}
-	return &trimmed
 }
 
 func valueOrEmpty(value *string) string {
