@@ -34,6 +34,8 @@ type UseFlowWorkspaceRuntimeOptions = {
 }
 
 export function useFlowWorkspaceRuntime(options: UseFlowWorkspaceRuntimeOptions) {
+  let isNodeDragActive = false
+
   function commitFlowNodes(nextNodes: Node[]) {
     options.nodes.value = nextNodes
     options.setNodes(nextNodes)
@@ -88,6 +90,7 @@ export function useFlowWorkspaceRuntime(options: UseFlowWorkspaceRuntimeOptions)
   const { markDirtyAndSchedule, flushAutosave } = useFlowAutosave({
     isDirty: options.isDirty,
     isSaving: options.isSavingBoard,
+    canRun: () => !isNodeDragActive,
     save: (autosaveOptions) =>
       saveCurrentBoardSnapshot({ waitForPreview: false, silent: autosaveOptions?.silent }),
   })
@@ -99,13 +102,31 @@ export function useFlowWorkspaceRuntime(options: UseFlowWorkspaceRuntimeOptions)
     markDirtyAndSchedule()
   }
 
+  function beginNodeDragTransaction() {
+    isNodeDragActive = true
+    flowHistory.onNodeDragStart()
+  }
+
+  function commitNodeDragTransaction() {
+    try {
+      flowHistory.onNodeDragStop(() => {
+        markDirty()
+      })
+    } finally {
+      isNodeDragActive = false
+    }
+    if (options.isDirty.value) {
+      void flushAutosave({ silent: true })
+    }
+  }
+
   const flowTransactions = useFlowTransactions({
     nodes: options.nodes,
     edges: options.edges,
     captureHistory: flowHistory.capture,
     pushHistory: flowHistory.push,
-    beginDragHistory: flowHistory.onNodeDragStart,
-    commitDragHistory: flowHistory.onNodeDragStop,
+    beginDragHistory: beginNodeDragTransaction,
+    commitDragHistory: commitNodeDragTransaction,
     markDirty,
     refreshSnapshot,
     commitNodes: commitFlowNodes,

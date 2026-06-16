@@ -5,6 +5,7 @@ type UseFlowAutosaveOptions = {
   isDirty: Ref<boolean>
   isSaving: Ref<boolean>
   save: (options?: { silent?: boolean }) => Promise<boolean>
+  canRun?: () => boolean
   delay?: number
 }
 
@@ -21,6 +22,10 @@ export function useFlowAutosave(options: UseFlowAutosaveOptions) {
     do {
       hasPendingSave.value = false
       if (!options.isDirty.value) return
+      if (options.canRun && !options.canRun()) {
+        hasPendingSave.value = true
+        return
+      }
       if (options.isSaving.value) {
         hasPendingSave.value = true
         return
