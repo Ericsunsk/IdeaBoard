@@ -170,7 +170,8 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		UserRepo:       userRepo,
 		BoardService:   boardService,
 	}
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
 	registerHTTPRoutes(router, httpapi.Dependencies{
 		Auth: authDeps,
 		UserRoutes: httpapi.UserRouteDeps{
