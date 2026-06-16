@@ -78,6 +78,64 @@ func TestCallGoogleGeminiGenerateContent(t *testing.T) {
 	}
 }
 
+func TestCallGoogleGeminiGenerateContentAcceptsVersionedBaseURL(t *testing.T) {
+	var gotPath string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"aGVsbG8="}}]}}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL + "/v1beta",
+		ApiKey:   "google-key",
+	}
+
+	_, err := c.callGoogleAI(context.Background(), account, "draw a cat", 2*time.Second, nil, "gemini-2.5-flash-image")
+	if err != nil {
+		t.Fatalf("callGoogleAI error: %v", err)
+	}
+	if gotPath != "/v1beta/models/gemini-2.5-flash-image:generateContent" {
+		t.Fatalf("unexpected path: %s", gotPath)
+	}
+}
+
+func TestBuildGoogleModelEndpoint(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseURL string
+		want    string
+	}{
+		{
+			name:    "root base",
+			baseURL: "https://generativelanguage.googleapis.com",
+			want:    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
+		},
+		{
+			name:    "versioned base",
+			baseURL: "https://generativelanguage.googleapis.com/v1beta",
+			want:    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
+		},
+		{
+			name:    "gateway prefix versioned base",
+			baseURL: "https://api.example.com/google/v1beta/",
+			want:    "https://api.example.com/google/v1beta/models/gemini-2.5-flash-image:generateContent",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildGoogleModelEndpoint(tt.baseURL, "gemini-2.5-flash-image", "generateContent")
+			if got != tt.want {
+				t.Fatalf("endpoint = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 	refs := collectGoogleImageRefs(map[string]interface{}{
 		"image_urls": []interface{}{
@@ -161,6 +219,34 @@ func TestCallGoogleImagenPredict(t *testing.T) {
 	}
 	if parameters["aspectRatio"] != "16:9" {
 		t.Fatalf("unexpected aspectRatio: %#v", parameters["aspectRatio"])
+	}
+}
+
+func TestCallGoogleImagenPredictAcceptsVersionedBaseURL(t *testing.T) {
+	var gotPath string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"predictions":[{"bytesBase64Encoded":"YQ=="}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL + "/v1beta",
+		ApiKey:   "google-key",
+	}
+	params := map[string]interface{}{
+		"model": "imagen-4.0-generate-001",
+	}
+
+	_, err := c.callGoogleAI(context.Background(), account, "draw skyline", 2*time.Second, params, "")
+	if err != nil {
+		t.Fatalf("callGoogleAI error: %v", err)
+	}
+	if gotPath != "/v1beta/models/imagen-4.0-generate-001:predict" {
+		t.Fatalf("unexpected path: %s", gotPath)
 	}
 }
 

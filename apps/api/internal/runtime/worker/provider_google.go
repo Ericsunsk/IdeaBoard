@@ -25,6 +25,7 @@ import (
 const (
 	maxGoogleInlineImageBytes = 10 * 1024 * 1024
 	maxGoogleDataURLBytes     = maxGoogleInlineImageBytes
+	googleAPIVersionPath      = "/v1beta"
 )
 
 type googleGeminiRequest struct {
@@ -166,6 +167,22 @@ func isGoogleImagenModel(model string) bool {
 	return strings.HasPrefix(normalized, "imagen-")
 }
 
+func buildGoogleModelEndpoint(baseURL, model, method string) string {
+	trimmedBaseURL := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if hasGoogleAPIVersionPath(trimmedBaseURL) {
+		return fmt.Sprintf("%s/models/%s:%s", trimmedBaseURL, url.PathEscape(model), method)
+	}
+	return fmt.Sprintf("%s%s/models/%s:%s", trimmedBaseURL, googleAPIVersionPath, url.PathEscape(model), method)
+}
+
+func hasGoogleAPIVersionPath(baseURL string) bool {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	return strings.HasSuffix(strings.TrimRight(parsed.EscapedPath(), "/"), googleAPIVersionPath)
+}
+
 func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, requestedModel string) (providerCallResult, error) {
 	model := strings.TrimSpace(requestedModel)
 
@@ -185,7 +202,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 		},
 	}
 
-	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", strings.TrimRight(baseURL, "/"), url.PathEscape(model))
+	endpoint := buildGoogleModelEndpoint(baseURL, model, "generateContent")
 	bodyJSON, marshalErr := json.Marshal(reqBody)
 	if marshalErr != nil {
 		return providerCallResult{}, fmt.Errorf("序列化 Google Gemini 请求失败: %w", marshalErr)
@@ -361,7 +378,7 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 		reqBody.Parameters.AspectRatio = ratio
 	}
 
-	endpoint := fmt.Sprintf("%s/v1beta/models/%s:predict", strings.TrimRight(baseURL, "/"), url.PathEscape(model))
+	endpoint := buildGoogleModelEndpoint(baseURL, model, "predict")
 	bodyJSON, marshalErr := json.Marshal(reqBody)
 	if marshalErr != nil {
 		return providerCallResult{}, fmt.Errorf("序列化 Google Imagen 请求失败: %w", marshalErr)
