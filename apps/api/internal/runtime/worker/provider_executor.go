@@ -89,6 +89,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 }
 
 func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
+	// ── pre-flight: api key + channel validation ──
 	slog.Info("calling provider API", "account_name", account.Name, "channel_id", account.ChannelID, "task_id", task.TaskID)
 
 	if account.ApiKey == "" {
@@ -161,6 +162,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 			featureSlug = slug
 		}
 	}
+	// ── model resolution + request construction ──
 	resolvedAccountModel, ok := resolveAccountModelForExecution(account, featureSlug, params, assignment.ResolvedModel)
 	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
 	if !ok || resolvedModel == "" {
@@ -172,6 +174,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	}
 	providerReq := newProviderRequest(task.Prompt, width, height, params, resolvedModel)
 	output := providerCallOutput{}
+	// ── provider routing + upstream call ──
 	providerStartedAt := time.Now()
 	output.Timeline.ProviderStartedAt = &providerStartedAt
 	switch {
