@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	defaultTaskRetryLimit = 3
+	defaultTaskRetryLimit        = 3
+	taskCancellationPollInterval = 2 * time.Second
 )
 
 var (
@@ -133,7 +134,7 @@ func (s *Service) WatchTaskCancellation(parent context.Context, taskID string) (
 				slog.Error("WatchTaskCancellation goroutine panicked", "task_id", taskID, "panic", r)
 			}
 		}()
-		ticker := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(taskCancellationPollInterval)
 		defer ticker.Stop()
 
 		for {

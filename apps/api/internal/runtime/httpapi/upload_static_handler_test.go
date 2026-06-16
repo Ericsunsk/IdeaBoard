@@ -100,16 +100,21 @@ func TestUploadStaticHandlerProfileAvatarRequiresLogin(t *testing.T) {
 	}
 }
 
-func TestUploadStaticHandlerProfileAvatarAllowsLoggedInUser(t *testing.T) {
+func TestUploadStaticHandlerProfileAvatarAllowsOwnerOnly(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=owner")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	if strings.TrimSpace(rec.Body.String()) != "profile avatar" {
 		t.Fatalf("body = %q, want profile avatar", rec.Body.String())
+	}
+
+	memberRec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=member")
+	if memberRec.Code != http.StatusForbidden {
+		t.Fatalf("member status = %d, want %d; body=%s", memberRec.Code, http.StatusForbidden, memberRec.Body.String())
 	}
 }
 
@@ -146,16 +151,21 @@ func TestUploadStaticHandlerRejectsLegacyGenericUploadPath(t *testing.T) {
 	}
 }
 
-func TestUploadStaticHandlerProfileAvatarHeadAllowsLoggedInUser(t *testing.T) {
+func TestUploadStaticHandlerProfileAvatarHeadAllowsOwnerOnly(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodHead, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodHead, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=owner")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 	if rec.Body.Len() != 0 {
 		t.Fatalf("body length = %d, want 0 for HEAD response", rec.Body.Len())
+	}
+
+	memberRec := performUploadStaticRequest(env.router, http.MethodHead, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=member")
+	if memberRec.Code != http.StatusForbidden {
+		t.Fatalf("member status = %d, want %d; body=%s", memberRec.Code, http.StatusForbidden, memberRec.Body.String())
 	}
 }
 

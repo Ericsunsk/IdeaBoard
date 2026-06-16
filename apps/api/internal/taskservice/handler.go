@@ -1,6 +1,7 @@
 package taskservice
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -235,6 +236,9 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 	maxConnTimer := time.NewTimer(defaultSSEMaxConnPeriod)
 	defer maxConnTimer.Stop()
 
+	heartbeatTicks := 0
+	const fullRefreshEveryN = 4 // full DB refresh every 4th heartbeat (~60s)
+
 	for {
 		select {
 		case <-maxConnTimer.C:
@@ -243,16 +247,25 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		case <-c.Request.Context().Done():
 			return
 		case <-heartbeat.C:
-			latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
-			if err != nil {
-				writeTaskStatusFetchErrorSSE(c, taskID, userID, "heartbeat", err)
-				return
-			}
-			if !writeTaskSSEvent(c, latest) {
-				return
-			}
-			if tasks.IsTerminalStatus(latest.Status) {
-				return
+			heartbeatTicks++
+			if heartbeatTicks%fullRefreshEveryN == 0 {
+				latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
+				if err != nil {
+					writeTaskStatusFetchErrorSSE(c, taskID, userID, "heartbeat", err)
+					return
+				}
+				if !writeTaskSSEvent(c, latest) {
+					return
+				}
+				if tasks.IsTerminalStatus(latest.Status) {
+					return
+				}
+			} else {
+				// Keepalive-only heartbeat: no DB query, just prevent proxy timeout.
+				if _, err := fmt.Fprintf(c.Writer, ":keepalive\n\n"); err != nil {
+					return
+				}
+				c.Writer.Flush()
 			}
 		case <-events:
 			latest, err := h.taskService.GetUserTask(ctx, taskID, userID)

@@ -86,6 +86,10 @@ jobs:
         working-directory: apps/api
         run: go test -race ./...
 
+      - name: Go vulnerability check
+        working-directory: apps/api
+        run: go tool govulncheck ./...
+
       - name: Lint API
         uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7
         with:

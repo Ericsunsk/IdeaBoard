@@ -48,10 +48,12 @@ type appContainer struct {
 }
 
 func newAppContainer(cfg *config.Config) (*appContainer, error) {
+	// encryption
 	if err := secrets.LoadEncryptionKey(); err != nil {
 		return nil, fmt.Errorf("failed to load secrets encryption key: %w", err)
 	}
 
+	// database + River
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
 
 	db, err := database.NewPostgres(cfg.Database)
@@ -72,6 +74,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("failed to migrate River schema: %w", err)
 	}
+	// repositories
 	postgresAssigner := taskqueue.NewPostgresTaskAssigner(db)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(db)
 
@@ -105,6 +108,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
+	// services
 	riverQueue := taskqueue.NewRiverQueue(nil, db, postgresRuntimeStore, cfg.Queue.MaxRetry)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
 		AccountRepo:      accountRepo,

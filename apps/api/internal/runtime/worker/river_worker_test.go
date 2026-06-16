@@ -83,8 +83,40 @@ func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T)
 	if call.taskID != "final-task" || call.riverJobID != 9001 {
 		t.Fatalf("converged call=%#v, want task final-task river 9001", call)
 	}
-	if call.reason == "" {
-		t.Fatal("converged reason should not be empty")
+	if call.reason != "任务队列执行失败，请稍后重试" {
+		t.Fatalf("converged reason = %q, want safe queue failure message", call.reason)
+	}
+}
+
+func TestRiverFinalFailureHandlerConvergesPanicWithSafeReason(t *testing.T) {
+	runtime := &fakeRuntime{}
+	handler := newRiverFinalFailureHandler(runtime)
+	if handler == nil {
+		t.Fatal("expected final failure handler")
+	}
+	encodedArgs, err := json.Marshal(taskqueue.DrawingTaskArgs{
+		Task: queuetypes.TaskPayload{TaskID: "panic-task"},
+	})
+	if err != nil {
+		t.Fatalf("marshal args failed: %v", err)
+	}
+
+	handler.HandlePanic(context.Background(), &rivertype.JobRow{
+		ID:          9003,
+		Kind:        taskqueue.RiverJobKindDrawingGenerate,
+		EncodedArgs: encodedArgs,
+		Attempt:     2,
+		MaxAttempts: 2,
+	}, "database detail", "stack detail")
+	if len(runtime.converged) != 1 {
+		t.Fatalf("converged calls=%d, want 1", len(runtime.converged))
+	}
+	call := runtime.converged[0]
+	if call.taskID != "panic-task" || call.riverJobID != 9003 {
+		t.Fatalf("converged call=%#v, want task panic-task river 9003", call)
+	}
+	if call.reason != "任务队列执行异常，请稍后重试" {
+		t.Fatalf("converged reason = %q, want safe queue panic message", call.reason)
 	}
 }
 

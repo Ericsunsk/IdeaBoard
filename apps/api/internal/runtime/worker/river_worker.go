@@ -143,11 +143,17 @@ func newRiverFinalFailureHandler(taskRuntime consumerTaskRuntime) river.ErrorHan
 }
 
 func (h *riverFinalFailureHandler) HandleError(ctx context.Context, job *rivertype.JobRow, err error) *river.ErrorHandlerResult {
+	if isFinalRiverAttempt(job) {
+		slog.Warn("River job reached final failure", "river_job_id", job.ID, "err", err)
+	}
 	h.handle(ctx, job, "任务队列执行失败，请稍后重试")
 	return nil
 }
 
-func (h *riverFinalFailureHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, panicVal any, _ string) *river.ErrorHandlerResult {
+func (h *riverFinalFailureHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, panicVal any, stack string) *river.ErrorHandlerResult {
+	if isFinalRiverAttempt(job) {
+		slog.Warn("River job panicked on final attempt", "river_job_id", job.ID, "panic", panicVal, "stack", stack)
+	}
 	h.handle(ctx, job, "任务队列执行异常，请稍后重试")
 	return nil
 }

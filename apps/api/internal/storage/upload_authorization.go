@@ -39,6 +39,16 @@ func AuthorizeUploadResourceRead(
 		if resource.ProfileAvatar == nil {
 			return ErrUploadAccessInvalidPath
 		}
+		if ownerStorage == nil {
+			return ErrUploadAccessDependencyMissing
+		}
+		storageUID, err := ownerStorage.GetStorageUIDByUserID(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if resource.ProfileAvatar.OwnerSegment != storageUID {
+			return ErrUploadAccessOwnerMismatch
+		}
 		return nil
 	case UploadResourceKindTaskOutput:
 		return authorizeTaskOutputUploadResourceRead(userID, resource)
