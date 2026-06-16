@@ -231,84 +231,19 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		return nil, err
 	}
 
-	yesterdayDate := statisticsDateKey(yesterdayStart)
-	monthStartDate := statisticsDateKey(monthStart)
-	var rangeDailyRows, yesterdayRows, monthRows []taskstore.DailyStatAggregate
-	for _, row := range allDailyRows {
-		dateKey := statisticsDateKey(row.StatDate)
-		if dateKey >= rangeStartDate && dateKey <= rangeEndDate {
-			rangeDailyRows = append(rangeDailyRows, row)
-		}
-		if dateKey == yesterdayDate {
-			yesterdayRows = append(yesterdayRows, row)
-		}
-		if dateKey >= monthStartDate {
-			monthRows = append(monthRows, row)
-		}
-	}
+	rangeDailyRows, yesterdayRows, monthRows := splitDailyRows(
+		allDailyRows,
+		statisticsDateKey(rangeStart),
+		statisticsDateKey(todayStart),
+		statisticsDateKey(yesterdayStart),
+		statisticsDateKey(monthStart),
+	)
 
-	buckets := make(map[string]*statisticsTrendBucket, days)
-	orderedDays := make([]string, 0, days)
-	for i := 0; i < days; i++ {
-		d := rangeStart.AddDate(0, 0, i)
-		dateKey := statisticsDateKey(d)
-		buckets[dateKey] = &statisticsTrendBucket{
-			date:   dateKey,
-			label:  d.Format("01/02"),
-			total:  0,
-			models: map[string]int64{},
-		}
-		orderedDays = append(orderedDays, dateKey)
-	}
+	buckets, orderedDays := buildDateBuckets(rangeStart, days)
 
-	type modelMetricAcc struct {
-		total        int64
-		completed    int64
-		failed       int64
-		latencyTotal float64
-		latencyCount int64
-	}
-	modelMetrics := map[string]*modelMetricAcc{}
-
-	var todayCalls, todaySuccess, todayFailed, todayCancelled int64
-	for _, row := range rangeDailyRows {
-		dateKey := statisticsDateKey(row.StatDate)
-		model := row.ModelName
-		if bucket, ok := buckets[dateKey]; ok {
-			bucket.total += row.Total
-			bucket.success += row.Completed
-			bucket.fail += row.Failed
-			bucket.models[model] += row.Total
-		}
-		modelAcc := modelMetrics[model]
-		if modelAcc == nil {
-			modelAcc = &modelMetricAcc{}
-			modelMetrics[model] = modelAcc
-		}
-		modelAcc.total += row.Total
-		modelAcc.completed += row.Completed
-		modelAcc.failed += row.Failed
-
-		if row.LatencyCount > 0 {
-			modelAcc.latencyTotal += row.LatencySecondsSum
-			modelAcc.latencyCount += row.LatencyCount
-		}
-
-		if dateKey == rangeEndDate {
-			todayCalls += row.Total
-			todaySuccess += row.Completed
-			todayFailed += row.Failed
-			todayCancelled += row.Cancelled
-		}
-	}
-
-	var yesterdayCalls, yesterdaySuccess, yesterdayFailed, yesterdayCancelled int64
-	for _, row := range yesterdayRows {
-		yesterdayCalls += row.Total
-		yesterdaySuccess += row.Completed
-		yesterdayFailed += row.Failed
-		yesterdayCancelled += row.Cancelled
-	}
+	todayCalls, todaySuccess, todayFailed, todayCancelled,
+		yesterdayCalls, yesterdaySuccess, yesterdayFailed, yesterdayCancelled,
+		modelMetrics := buildDailyMetrics(rangeDailyRows, yesterdayRows, buckets, statisticsDateKey(todayStart))
 
 	trend := buildTrendItems(orderedDays, buckets)
 	qualityTrend := buildQualityTrendItems(orderedDays, buckets)
@@ -324,68 +259,9 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		latencyByModel[sample.ModelName] = append(latencyByModel[sample.ModelName], sample.LatencySeconds)
 	}
 
-	slowModels := make([]AdminStatisticsSlowModel, 0, len(modelMetrics))
-	modelHealth := make([]AdminStatisticsModelHealth, 0, len(modelMetrics))
-	for name, acc := range modelMetrics {
-		avgSeconds := 0.0
-		if acc.latencyCount > 0 {
-			avgSeconds = acc.latencyTotal / float64(acc.latencyCount)
-		}
-		samples := latencyByModel[name]
-		if acc.latencyCount > 0 || len(samples) > 0 {
-			slowModels = append(slowModels, AdminStatisticsSlowModel{
-				Name:       name,
-				AvgSeconds: avgSeconds,
-				P95Seconds: percentile95(samples),
-				Samples:    int64(len(samples)),
-			})
-		}
-		if acc.total == 0 {
-			continue
-		}
-		attempted := acc.completed + acc.failed
-		failureRate := 0.0
-		if attempted > 0 {
-			failureRate = (float64(acc.failed) / float64(attempted)) * 100
-		}
-		modelHealth = append(modelHealth, AdminStatisticsModelHealth{
-			Name:        name,
-			Total:       acc.total,
-			Completed:   acc.completed,
-			Failed:      acc.failed,
-			FailureRate: failureRate,
-			AvgSeconds:  avgSeconds,
-		})
-	}
-	sort.Slice(slowModels, func(i, j int) bool {
-		if slowModels[i].P95Seconds == slowModels[j].P95Seconds {
-			if slowModels[i].AvgSeconds == slowModels[j].AvgSeconds {
-				if slowModels[i].Samples == slowModels[j].Samples {
-					return slowModels[i].Name < slowModels[j].Name
-				}
-				return slowModels[i].Samples > slowModels[j].Samples
-			}
-			return slowModels[i].AvgSeconds > slowModels[j].AvgSeconds
-		}
-		return slowModels[i].P95Seconds > slowModels[j].P95Seconds
-	})
-	if len(slowModels) > 6 {
-		slowModels = slowModels[:6]
-	}
+	modelHealth, slowModels := buildModelHealthAndSlowModels(modelMetrics, latencyByModel)
 	bottlenecks := buildBottleneckSources(bottleneckRows)
 	failures := buildFailureCategories(failureCategoryRows)
-	sort.Slice(modelHealth, func(i, j int) bool {
-		if modelHealth[i].FailureRate == modelHealth[j].FailureRate {
-			if modelHealth[i].AvgSeconds == modelHealth[j].AvgSeconds {
-				if modelHealth[i].Total == modelHealth[j].Total {
-					return modelHealth[i].Name < modelHealth[j].Name
-				}
-				return modelHealth[i].Total > modelHealth[j].Total
-			}
-			return modelHealth[i].AvgSeconds > modelHealth[j].AvgSeconds
-		}
-		return modelHealth[i].FailureRate > modelHealth[j].FailureRate
-	})
 
 	return &AdminStatisticsResponse{
 		Summary: AdminStatisticsSummary{
@@ -419,6 +295,151 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 			BackfilledDays: len(backfilledDates),
 		},
 	}, nil
+}
+
+// buildDateBuckets creates empty trend buckets for each day in the range.
+func buildDateBuckets(rangeStart time.Time, days int) (map[string]*statisticsTrendBucket, []string) {
+	buckets := make(map[string]*statisticsTrendBucket, days)
+	orderedDays := make([]string, 0, days)
+	for i := 0; i < days; i++ {
+		d := rangeStart.AddDate(0, 0, i)
+		dateKey := statisticsDateKey(d)
+		buckets[dateKey] = &statisticsTrendBucket{
+			date:   dateKey,
+			label:  d.Format("01/02"),
+			total:  0,
+			models: map[string]int64{},
+		}
+		orderedDays = append(orderedDays, dateKey)
+	}
+	return buckets, orderedDays
+}
+
+// splitDailyRows partitions a single merged daily-stats query into yesterday, month,
+// and range slices so callers can compute per-period aggregates without separate DB calls.
+func splitDailyRows(rows []taskstore.DailyStatAggregate, rangeStartDate, rangeEndDate, yesterdayDate, monthStartDate string) (rangeRows, yesterdayRows, monthRows []taskstore.DailyStatAggregate) {
+	for _, row := range rows {
+		dateKey := statisticsDateKey(row.StatDate)
+		if dateKey >= rangeStartDate && dateKey <= rangeEndDate {
+			rangeRows = append(rangeRows, row)
+		}
+		if dateKey == yesterdayDate {
+			yesterdayRows = append(yesterdayRows, row)
+		}
+		if dateKey >= monthStartDate {
+			monthRows = append(monthRows, row)
+		}
+	}
+	return
+}
+
+// buildDailyMetrics aggregates daily stat rows into per-model accumulators and
+// per-day trend buckets, returning today/yesterday call counts.
+func buildDailyMetrics(rangeDailyRows, yesterdayRows []taskstore.DailyStatAggregate, buckets map[string]*statisticsTrendBucket, rangeEndDate string) (todayCalls, todaySuccess, todayFailed, todayCancelled int64, yesterdayCalls, yesterdaySuccess, yesterdayFailed, yesterdayCancelled int64, modelMetrics map[string]*modelMetricAcc) {
+	modelMetrics = map[string]*modelMetricAcc{}
+	for _, row := range rangeDailyRows {
+		dateKey := statisticsDateKey(row.StatDate)
+		model := row.ModelName
+		if bucket, ok := buckets[dateKey]; ok {
+			bucket.total += row.Total
+			bucket.success += row.Completed
+			bucket.fail += row.Failed
+			bucket.models[model] += row.Total
+		}
+		acc := modelMetrics[model]
+		if acc == nil {
+			acc = &modelMetricAcc{}
+			modelMetrics[model] = acc
+		}
+		acc.total += row.Total
+		acc.completed += row.Completed
+		acc.failed += row.Failed
+		if row.LatencyCount > 0 {
+			acc.latencyTotal += row.LatencySecondsSum
+			acc.latencyCount += row.LatencyCount
+		}
+		if dateKey == rangeEndDate {
+			todayCalls += row.Total
+			todaySuccess += row.Completed
+			todayFailed += row.Failed
+			todayCancelled += row.Cancelled
+		}
+	}
+	for _, row := range yesterdayRows {
+		yesterdayCalls += row.Total
+		yesterdaySuccess += row.Completed
+		yesterdayFailed += row.Failed
+		yesterdayCancelled += row.Cancelled
+	}
+	return
+}
+
+// buildModelHealthAndSlowModels transforms per-model accumulators and latency
+// samples into the sorted slices returned to the frontend.
+func buildModelHealthAndSlowModels(modelMetrics map[string]*modelMetricAcc, latencyByModel map[string][]float64) (modelHealth []AdminStatisticsModelHealth, slowModels []AdminStatisticsSlowModel) {
+	modelHealth = make([]AdminStatisticsModelHealth, 0, len(modelMetrics))
+	slowModels = make([]AdminStatisticsSlowModel, 0, len(modelMetrics))
+	for name, acc := range modelMetrics {
+		avgSeconds := 0.0
+		if acc.latencyCount > 0 {
+			avgSeconds = acc.latencyTotal / float64(acc.latencyCount)
+		}
+		samples := latencyByModel[name]
+		if acc.latencyCount > 0 || len(samples) > 0 {
+			slowModels = append(slowModels, AdminStatisticsSlowModel{
+				Name: name, AvgSeconds: avgSeconds,
+				P95Seconds: percentile95(samples), Samples: int64(len(samples)),
+			})
+		}
+		if acc.total == 0 {
+			continue
+		}
+		attempted := acc.completed + acc.failed
+		failureRate := 0.0
+		if attempted > 0 {
+			failureRate = (float64(acc.failed) / float64(attempted)) * 100
+		}
+		modelHealth = append(modelHealth, AdminStatisticsModelHealth{
+			Name: name, Total: acc.total, Completed: acc.completed,
+			Failed: acc.failed, FailureRate: failureRate, AvgSeconds: avgSeconds,
+		})
+	}
+	sort.Slice(slowModels, func(i, j int) bool {
+		if slowModels[i].P95Seconds != slowModels[j].P95Seconds {
+			return slowModels[i].P95Seconds > slowModels[j].P95Seconds
+		}
+		if slowModels[i].AvgSeconds != slowModels[j].AvgSeconds {
+			return slowModels[i].AvgSeconds > slowModels[j].AvgSeconds
+		}
+		if slowModels[i].Samples != slowModels[j].Samples {
+			return slowModels[i].Samples > slowModels[j].Samples
+		}
+		return slowModels[i].Name < slowModels[j].Name
+	})
+	if len(slowModels) > 6 {
+		slowModels = slowModels[:6]
+	}
+	sort.Slice(modelHealth, func(i, j int) bool {
+		if modelHealth[i].FailureRate != modelHealth[j].FailureRate {
+			return modelHealth[i].FailureRate > modelHealth[j].FailureRate
+		}
+		if modelHealth[i].AvgSeconds != modelHealth[j].AvgSeconds {
+			return modelHealth[i].AvgSeconds > modelHealth[j].AvgSeconds
+		}
+		if modelHealth[i].Total != modelHealth[j].Total {
+			return modelHealth[i].Total > modelHealth[j].Total
+		}
+		return modelHealth[i].Name < modelHealth[j].Name
+	})
+	return
+}
+
+type modelMetricAcc struct {
+	total        int64
+	completed    int64
+	failed       int64
+	latencyTotal float64
+	latencyCount int64
 }
 
 func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Time, loc *time.Location) ([]AdminStatisticsTrendItem, []AdminStatisticsQualityTrendItem, error) {
