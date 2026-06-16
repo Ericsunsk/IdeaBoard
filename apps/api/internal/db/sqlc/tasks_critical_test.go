@@ -8,39 +8,55 @@ import (
 	"ideaboard/api/internal/testdb"
 )
 
-func seedTestAccount(t *testing.T, q *Queries) int64 {
+type testTaskAccount struct {
+	accountID int64
+	channelID int64
+}
+
+func seedTestAccount(t *testing.T, q *Queries) testTaskAccount {
 	t.Helper()
+	ctx := context.Background()
+
+	channelID, err := q.CreateChannel(ctx, CreateChannelParams{
+		Type:   "openai-compatible",
+		Name:   "test-channel",
+		ApiUrl: "https://example.invalid/v1",
+		Status: 1,
+	})
+	if err != nil {
+		t.Fatalf("seed channel: %v", err)
+	}
+
 	id, err := q.CreateAccount(context.Background(), CreateAccountParams{
 		Name:          "test-account",
-		ChannelID:     1,
+		ChannelID:     channelID,
 		Platform:      "openai",
 		ApiType:       "chat",
+		ProxyUrl:      "http://127.0.0.1:8080",
 		MaxConcurrent: 3,
 		Timeout:       120,
+		ExtraConfig:   "{}",
 		Status:        1,
 		Weight:        1,
 	})
 	if err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
-	return id
+	return testTaskAccount{accountID: id, channelID: channelID}
 }
 
 func TestCreateAndGetTaskByID(t *testing.T) {
 	db := testdb.Open(t)
 	q := New(db)
 
-	accountID := seedTestAccount(t, q)
 	taskID := "task-create-get-1"
 
 	createdID, err := q.CreateTask(context.Background(), CreateTaskParams{
-		TaskID:            taskID,
-		UserID:            1,
-		AccountID:         sql.NullInt64{Int64: accountID, Valid: true},
-		AssignedChannelID: sql.NullInt64{Int64: 1, Valid: true},
-		UserPrompt:        "test prompt",
-		Status:            "pending",
-		Params:            `{}`,
+		TaskID:     taskID,
+		UserID:     1,
+		UserPrompt: "test prompt",
+		Status:     "pending",
+		Params:     `{}`,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -62,16 +78,12 @@ func TestGetTaskByTaskIDAndUserIDFiltersUser(t *testing.T) {
 	db := testdb.Open(t)
 	q := New(db)
 
-	accountID := seedTestAccount(t, q)
-
 	_, err := q.CreateTask(context.Background(), CreateTaskParams{
-		TaskID:            "task-user-filter-1",
-		UserID:            3,
-		AccountID:         sql.NullInt64{Int64: accountID, Valid: true},
-		AssignedChannelID: sql.NullInt64{Int64: 1, Valid: true},
-		UserPrompt:        "user 3 task",
-		Status:            "pending",
-		Params:            `{}`,
+		TaskID:     "task-user-filter-1",
+		UserID:     3,
+		UserPrompt: "user 3 task",
+		Status:     "pending",
+		Params:     `{}`,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -90,14 +102,14 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 	db := testdb.Open(t)
 	q := New(db)
 
-	accountID := seedTestAccount(t, q)
+	account := seedTestAccount(t, q)
 	taskID := "task-complete-lease-1"
 
 	_, err := q.CreateTask(context.Background(), CreateTaskParams{
 		TaskID:            taskID,
 		UserID:            1,
-		AccountID:         sql.NullInt64{Int64: accountID, Valid: true},
-		AssignedChannelID: sql.NullInt64{Int64: 1, Valid: true},
+		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
+		AssignedChannelID: sql.NullInt64{Int64: account.channelID, Valid: true},
 		UserPrompt:        "complete me",
 		Status:            "running",
 		LeaseToken:        "lease-abc",
@@ -109,9 +121,11 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 
 	// Wrong lease token should return 0 rows updated
 	updated, err := q.CompleteTaskWithLease(context.Background(), CompleteTaskWithLeaseParams{
-		TaskID:     taskID,
-		Statuses:   []string{"running"},
-		LeaseToken: "wrong-lease",
+		TaskID:            taskID,
+		Statuses:          []string{"running"},
+		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
+		AssignedChannelID: sql.NullInt64{Int64: account.channelID, Valid: true},
+		LeaseToken:        "wrong-lease",
 	})
 	if err != nil {
 		t.Fatalf("CompleteTaskWithLease wrong: %v", err)
@@ -122,9 +136,11 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 
 	// Correct lease token should succeed
 	updated, err = q.CompleteTaskWithLease(context.Background(), CompleteTaskWithLeaseParams{
-		TaskID:     taskID,
-		Statuses:   []string{"running"},
-		LeaseToken: "lease-abc",
+		TaskID:            taskID,
+		Statuses:          []string{"running"},
+		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
+		AssignedChannelID: sql.NullInt64{Int64: account.channelID, Valid: true},
+		LeaseToken:        "lease-abc",
 	})
 	if err != nil {
 		t.Fatalf("CompleteTaskWithLease: %v", err)
@@ -132,20 +148,27 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 	if updated != 1 {
 		t.Fatalf("correct lease updated=%d, want 1", updated)
 	}
+	task, err := q.GetTaskByTaskID(context.Background(), taskID)
+	if err != nil {
+		t.Fatalf("GetTaskByTaskID after complete: %v", err)
+	}
+	if task.Status != "completed" || task.LeaseToken != "" {
+		t.Fatalf("completed task status=%q lease=%q, want completed with cleared lease", task.Status, task.LeaseToken)
+	}
 }
 
 func TestMarkTaskFailedWithLease(t *testing.T) {
 	db := testdb.Open(t)
 	q := New(db)
 
-	accountID := seedTestAccount(t, q)
+	account := seedTestAccount(t, q)
 	taskID := "task-fail-lease-1"
 
 	_, err := q.CreateTask(context.Background(), CreateTaskParams{
 		TaskID:            taskID,
 		UserID:            1,
-		AccountID:         sql.NullInt64{Int64: accountID, Valid: true},
-		AssignedChannelID: sql.NullInt64{Int64: 1, Valid: true},
+		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
+		AssignedChannelID: sql.NullInt64{Int64: account.channelID, Valid: true},
 		UserPrompt:        "fail me",
 		Status:            "running",
 		LeaseToken:        "lease-xyz",
@@ -156,10 +179,12 @@ func TestMarkTaskFailedWithLease(t *testing.T) {
 	}
 
 	updated, err := q.MarkTaskFailedWithLease(context.Background(), MarkTaskFailedWithLeaseParams{
-		TaskID:     taskID,
-		Statuses:   []string{"running"},
-		LeaseToken: "lease-xyz",
-		ErrorMsg:   "provider error",
+		TaskID:            taskID,
+		Statuses:          []string{"running"},
+		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
+		AssignedChannelID: sql.NullInt64{Int64: account.channelID, Valid: true},
+		LeaseToken:        "lease-xyz",
+		ErrorMsg:          "provider error",
 	})
 	if err != nil {
 		t.Fatalf("MarkTaskFailedWithLease: %v", err)
@@ -167,22 +192,25 @@ func TestMarkTaskFailedWithLease(t *testing.T) {
 	if updated != 1 {
 		t.Fatalf("MarkTaskFailedWithLease updated=%d, want 1", updated)
 	}
+	task, err := q.GetTaskByTaskID(context.Background(), taskID)
+	if err != nil {
+		t.Fatalf("GetTaskByTaskID after fail: %v", err)
+	}
+	if task.Status != "failed" || task.ErrorMsg != "provider error" || task.LeaseToken != "" {
+		t.Fatalf("failed task status=%q error=%q lease=%q", task.Status, task.ErrorMsg, task.LeaseToken)
+	}
 }
 
 func TestCountTasksByStatus(t *testing.T) {
 	db := testdb.Open(t)
 	q := New(db)
 
-	accountID := seedTestAccount(t, q)
-
 	_, err := q.CreateTask(context.Background(), CreateTaskParams{
-		TaskID:            "task-count-1",
-		UserID:            1,
-		AccountID:         sql.NullInt64{Int64: accountID, Valid: true},
-		AssignedChannelID: sql.NullInt64{Int64: 1, Valid: true},
-		UserPrompt:        "count me",
-		Status:            "pending",
-		Params:            `{}`,
+		TaskID:     "task-count-1",
+		UserID:     1,
+		UserPrompt: "count me",
+		Status:     "pending",
+		Params:     `{}`,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -192,8 +220,8 @@ func TestCountTasksByStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CountTasksByStatus: %v", err)
 	}
-	if count < 1 {
-		t.Fatalf("CountTasksByStatus(pending)=%d, want >=1", count)
+	if count != 1 {
+		t.Fatalf("CountTasksByStatus(pending)=%d, want 1", count)
 	}
 }
 
@@ -201,12 +229,23 @@ func TestCountAllTasks(t *testing.T) {
 	db := testdb.Open(t)
 	q := New(db)
 
+	_, err := q.CreateTask(context.Background(), CreateTaskParams{
+		TaskID:     "task-count-all-1",
+		UserID:     1,
+		UserPrompt: "count all",
+		Status:     "pending",
+		Params:     `{}`,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
 	count, err := q.CountAllTasks(context.Background())
 	if err != nil {
 		t.Fatalf("CountAllTasks: %v", err)
 	}
-	if count < 0 {
-		t.Fatalf("CountAllTasks=%d, want >=0", count)
+	if count != 1 {
+		t.Fatalf("CountAllTasks=%d, want 1", count)
 	}
 }
 
@@ -214,13 +253,13 @@ func TestListRunningTasksMissingLeaseToken(t *testing.T) {
 	db := testdb.Open(t)
 	q := New(db)
 
-	accountID := seedTestAccount(t, q)
+	account := seedTestAccount(t, q)
 
 	_, err := q.CreateTask(context.Background(), CreateTaskParams{
 		TaskID:            "running-no-lease-1",
 		UserID:            1,
-		AccountID:         sql.NullInt64{Int64: accountID, Valid: true},
-		AssignedChannelID: sql.NullInt64{Int64: 1, Valid: true},
+		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
+		AssignedChannelID: sql.NullInt64{Int64: account.channelID, Valid: true},
 		UserPrompt:        "no lease token",
 		Status:            "running",
 		LeaseToken:        "",
