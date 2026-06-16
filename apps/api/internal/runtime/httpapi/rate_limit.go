@@ -1,78 +1,123 @@
 package httpapi
 
 import (
+	"net"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
 )
 
 const (
-	defaultRateLimitRPS    = 60
-	defaultRateLimitBurst  = 120
-	rateLimitMaxTrackedIPs = 10_000
-	rateLimitTokenScale    = 1_000_000
+	defaultRateLimitRPS           = 60
+	defaultRateLimitBurst         = 120
+	defaultRateLimitMaxTrackedIPs = 10_000
+	rateLimitEntryTTL             = 10 * time.Minute
+	rateLimitCleanupEvery         = 1 * time.Minute
 )
 
-type rateLimitState struct {
-	tokens   atomic.Int64 // available tokens (scaled by 1e6 to avoid float)
-	lastTime atomic.Int64 // last refill unix nano
-	seen     atomic.Bool
+type ipRateLimiterStore struct {
+	mu         sync.Mutex
+	entries    map[string]*rateLimiterEntry
+	maxEntries int
+	lastClean  time.Time
+	now        func() time.Time
 }
 
-var (
-	rateLimitStates sync.Map
-	rateLimitCount  atomic.Int64
-)
+type rateLimiterEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+var rateLimitStore = &ipRateLimiterStore{
+	entries:    make(map[string]*rateLimiterEntry),
+	maxEntries: defaultRateLimitMaxTrackedIPs,
+	now:        time.Now,
+}
 
 func rateLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		ip := clientIP(c)
 		if ip == "" {
 			c.Next()
 			return
 		}
 
-		entry, _ := rateLimitStates.LoadOrStore(ip, &rateLimitState{})
-		state := entry.(*rateLimitState)
-
-		now := time.Now().UnixNano()
-		if state.seen.CompareAndSwap(false, true) {
-			state.tokens.Store(defaultRateLimitBurst * rateLimitTokenScale)
-			state.lastTime.Store(now)
-		}
-
-		last := state.lastTime.Swap(now)
-		elapsed := now - last
-		if elapsed < 0 {
-			elapsed = 0
-		}
-
-		// Refill: add tokens proportional to elapsed time (scaled by 1e6)
-		addTokens := elapsed * defaultRateLimitRPS * rateLimitTokenScale / int64(time.Second)
-		state.tokens.Add(addTokens)
-		if state.tokens.Load() > defaultRateLimitBurst*rateLimitTokenScale {
-			state.tokens.Store(defaultRateLimitBurst * rateLimitTokenScale)
-		}
-
-		if state.tokens.Add(-rateLimitTokenScale) < 0 {
+		if !rateLimitStore.allow(ip) {
 			response.Error(c, http.StatusTooManyRequests, "请求过于频繁，请稍后重试")
 			c.Abort()
 			return
 		}
-
-		// Track approximate pool size and trim if needed
-		if count := rateLimitCount.Add(1); count > rateLimitMaxTrackedIPs*2 {
-			rateLimitCount.Store(rateLimitMaxTrackedIPs)
-			rateLimitStates.Range(func(key, _ any) bool {
-				rateLimitStates.Delete(key)
-				return true
-			})
-		}
 		c.Next()
 	}
+}
+
+func (s *ipRateLimiterStore) allow(ip string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := s.now()
+	s.maybeCleanupLocked(now)
+
+	entry, ok := s.entries[ip]
+	if ok {
+		entry.lastSeen = now
+		return entry.limiter.AllowN(now, 1)
+	}
+
+	if s.maxEntries > 0 && len(s.entries) >= s.maxEntries {
+		s.evictOldestLocked(now)
+	}
+
+	entry = &rateLimiterEntry{
+		limiter:  rate.NewLimiter(rate.Limit(defaultRateLimitRPS), defaultRateLimitBurst),
+		lastSeen: now,
+	}
+	s.entries[ip] = entry
+	return entry.limiter.AllowN(now, 1)
+}
+
+func (s *ipRateLimiterStore) maybeCleanupLocked(now time.Time) {
+	if now.Before(s.lastClean.Add(rateLimitCleanupEvery)) {
+		return
+	}
+	s.lastClean = now
+
+	for ip, entry := range s.entries {
+		if now.Sub(entry.lastSeen) > rateLimitEntryTTL {
+			delete(s.entries, ip)
+		}
+	}
+}
+
+func (s *ipRateLimiterStore) evictOldestLocked(now time.Time) {
+	var oldestIP string
+	var oldestTime time.Time
+	for ip, entry := range s.entries {
+		if oldestIP == "" || entry.lastSeen.Before(oldestTime) {
+			oldestIP = ip
+			oldestTime = entry.lastSeen
+		}
+	}
+	if oldestIP != "" {
+		delete(s.entries, oldestIP)
+	}
+}
+
+func clientIP(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	if ip := c.ClientIP(); ip != "" {
+		return ip
+	}
+	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+	if err != nil {
+		return c.Request.RemoteAddr
+	}
+	return host
 }

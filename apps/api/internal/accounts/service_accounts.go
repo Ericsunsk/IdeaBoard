@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
+
+var ErrAccountNotFound = errors.New("account not found")
 
 func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRequest) (*ApiAccount, error) {
 	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
@@ -133,7 +136,7 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("账号不存在")
+		return fmt.Errorf("%w", ErrAccountNotFound)
 	}
 
 	account.Name = req.Name
@@ -168,7 +171,7 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		if database.IsNotFound(err) {
-			return fmt.Errorf("账号不存在")
+			return fmt.Errorf("%w", ErrAccountNotFound)
 		}
 		return err
 	}
@@ -243,7 +246,7 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id int64) error {
 	failedTaskIDs, err := s.accountRepo.ArchiveAccountAndFinalizeRunningTasks(ctx, id, s.makeRunningTaskFinalizer(id, "账号已删除"))
 	if err != nil {
 		if database.IsNotFound(err) {
-			return fmt.Errorf("账号不存在")
+			return fmt.Errorf("%w", ErrAccountNotFound)
 		}
 		return err
 	}
@@ -254,13 +257,13 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id int64) error {
 func (s *AccountService) StartAccount(ctx context.Context, id int64) error {
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("账号不存在")
+		return fmt.Errorf("%w", ErrAccountNotFound)
 	}
 
 	account.MaxConcurrent = normalizeMaxConcurrent(account.MaxConcurrent)
 	if err := s.accountRepo.UpdateStatus(ctx, id, 1); err != nil {
 		if database.IsNotFound(err) {
-			return fmt.Errorf("账号不存在")
+			return fmt.Errorf("%w", ErrAccountNotFound)
 		}
 		return err
 	}
@@ -272,7 +275,7 @@ func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
 	failedTaskIDs, err := s.accountRepo.StopAccountAndFinalizeRunningTasks(ctx, id, s.makeRunningTaskFinalizer(id, "账号已停用"))
 	if err != nil {
 		if database.IsNotFound(err) {
-			return fmt.Errorf("账号不存在")
+			return fmt.Errorf("%w", ErrAccountNotFound)
 		}
 		return err
 	}

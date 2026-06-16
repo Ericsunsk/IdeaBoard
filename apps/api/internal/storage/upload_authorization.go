@@ -112,7 +112,7 @@ func AuthorizeUploadPathRead(
 ) (UploadResource, error) {
 	resource, err := ParseUploadResource(rawPath)
 	if err != nil {
-		return UploadResource{}, fmt.Errorf("%w: %v", ErrUploadAccessInvalidPath, err)
+		return UploadResource{}, fmt.Errorf("%w: %w", ErrUploadAccessInvalidPath, err)
 	}
 	if err := AuthorizeUploadResourceRead(ctx, userID, resource, boardAccess, ownerStorage); err != nil {
 		return UploadResource{}, err

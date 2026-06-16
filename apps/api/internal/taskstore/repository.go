@@ -340,12 +340,6 @@ func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
 	}
 }
 
-func nullInt64Ptr(value *int64) sql.NullInt64 {
-	if value == nil {
-		return sql.NullInt64{}
-	}
-	return sql.NullInt64{Int64: *value, Valid: true}
-}
 
 func int64Ptr(value sql.NullInt64) *int64 {
 	if !value.Valid {

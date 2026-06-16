@@ -158,7 +158,7 @@ func (s *BoardService) DeleteBoard(ctx context.Context, userID int64, boardID st
 			return err
 		}
 		if err := s.workspaceCleaner.DeleteWorkspaceBoardByStorageUID(ctx, owner.StorageUID, board.BoardID); err != nil {
-			return fmt.Errorf("%w: %v", ErrBoardWorkspaceCleanupFailed, err)
+			return fmt.Errorf("%w: %w", ErrBoardWorkspaceCleanupFailed, err)
 		}
 	}
 	return s.repo.DeleteBoardCascade(ctx, board.UserID, board.BoardID)
@@ -601,7 +601,7 @@ func generateBoardShareToken(ctx context.Context, repo *BoardRepository) (string
 	for i := 0; i < 64; i++ {
 		buf := make([]byte, 24)
 		if _, err := rand.Read(buf); err != nil {
-			return "", fmt.Errorf("生成分享令牌失败: %v", err)
+			return "", fmt.Errorf("生成分享令牌失败: %w", err)
 		}
 		token := base64.RawURLEncoding.EncodeToString(buf)
 		exists, err := repo.ShareTokenHashExists(ctx, boardShareTokenHash(token))

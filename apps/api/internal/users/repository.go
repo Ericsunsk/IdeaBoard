@@ -358,10 +358,6 @@ func requireOneUserRow(rows int64) error {
 	return nil
 }
 
-func IsDuplicateConstraintError(err error) bool {
-	return database.IsDuplicateConstraintError(err)
-}
-
 func userFromSQLC(row dbsqlc.User) User {
 	return User{
 		ID:         row.ID,

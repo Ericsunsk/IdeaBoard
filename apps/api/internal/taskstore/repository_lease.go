@@ -190,7 +190,7 @@ func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ow
 		output.MediaAssetID = mediaAssetID
 		taskOutputID, err := q.CreateTaskOutput(ctx, dbsqlc.CreateTaskOutputParams{
 			TaskID:         output.TaskID,
-			MediaAssetID:   nullInt64Ptr(output.MediaAssetID),
+			MediaAssetID:   dbutil.NullInt64(output.MediaAssetID),
 			Role:           output.Role,
 			Url:            output.URL,
 			StorageKey:     output.StorageKey,
