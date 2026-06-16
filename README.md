@@ -228,7 +228,7 @@ cp .env.example .env
 ```
 
 > [!TIP]
-> 至少确认数据库、端口以及 `AUTH_SERVICE_BASE_URL` / `AUTH_INTERNAL_KEY` 配置正确。`.env.example` 里的敏感字段是空值或占位值，不应直接用于部署。
+> 至少确认数据库、端口、`AUTH_SERVICE_BASE_URL` / `AUTH_INTERNAL_KEY` 以及 `APP_SECRETS_ENCRYPTION_KEY` 配置正确。`.env.example` 里的敏感字段是空值或占位值，不应直接用于部署。
 
 如果后端放在 Nginx / 宝塔等反向代理后面，建议额外设置：
 
@@ -257,7 +257,7 @@ npm run migrate
 npm run dev
 ```
 
-本地开发如果暂时不配置 `AUTH_INTERNAL_KEY`，必须显式设置 `AUTH_INSECURE_DEV=1`，且 `AUTH_HOST` 保持为 `127.0.0.1`、`localhost` 或 `::1` 这类 loopback 地址。生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 HTTPS 的 `BETTER_AUTH_URL`（正式访问地址），并让 API 与 Auth 服务使用相同的 `AUTH_INTERNAL_KEY`。
+本地开发如果暂时不配置 `AUTH_INTERNAL_KEY`，必须显式设置 `AUTH_INSECURE_DEV=1`，且 `AUTH_HOST` 保持为 `127.0.0.1`、`localhost` 或 `::1` 这类 loopback 地址。API 服务必须设置 `APP_SECRETS_ENCRYPTION_KEY`（使用 `openssl rand -base64 32` 生成）。生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 HTTPS 的 `BETTER_AUTH_URL`（正式访问地址），并让 API 与 Auth 服务使用相同的 `AUTH_INTERNAL_KEY`。
 
 > [!IMPORTANT]
 > 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（源码生产部署先 build 再执行 `migrate:dist`；发布包已包含 `dist`，直接安装依赖后执行 `migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。迁移脚本使用当前项目安装的 `better-auth` runtime，Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移。

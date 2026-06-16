@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/httpapi"
@@ -47,6 +48,10 @@ type appContainer struct {
 }
 
 func newAppContainer(cfg *config.Config) (*appContainer, error) {
+	if err := secrets.LoadEncryptionKey(); err != nil {
+		return nil, fmt.Errorf("failed to load secrets encryption key: %w", err)
+	}
+
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
 
 	db, err := database.NewPostgres(cfg.Database)

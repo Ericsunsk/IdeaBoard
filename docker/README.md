@@ -102,6 +102,8 @@ IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update
 
 后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。生产 `.env` 必须填写 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 的完整 digest 引用，`ideaboard update` 会在 pull 前自动验签。
 
+API 运行时还必须设置 `APP_SECRETS_ENCRYPTION_KEY`，用于加密 API Key 与对象存储密钥；推荐用 `openssl rand -base64 32` 生成。
+
 推荐生产环境使用 `ideaboard update`，它会在 API / Auth migrations 前把 PostgreSQL dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.sql`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志，再决定是否把三张镜像 digest 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
 > [!IMPORTANT]

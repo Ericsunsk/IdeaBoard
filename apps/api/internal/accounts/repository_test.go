@@ -31,6 +31,16 @@ func TestAccountSecretBoundarySeparatesAdminAndRuntimeReads(t *testing.T) {
 	if err := repo.Create(ctx, account); err != nil {
 		t.Fatalf("create account failed: %v", err)
 	}
+	secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("load active account secret failed: %v", err)
+	}
+	if secretRow.SecretMaterialKind != "encrypted" {
+		t.Fatalf("secret material kind = %q, want encrypted", secretRow.SecretMaterialKind)
+	}
+	if secretRow.SecretPayload == "runtime-secret" {
+		t.Fatalf("secret payload should not equal plaintext")
+	}
 
 	adminAccount, err := repo.GetByID(ctx, account.ID)
 	if err != nil {
@@ -62,6 +72,42 @@ func TestAccountSecretBoundarySeparatesAdminAndRuntimeReads(t *testing.T) {
 	}
 	if runtimeAccount.ApiKey != "runtime-secret" {
 		t.Fatalf("runtime api key = %q, want runtime secret", runtimeAccount.ApiKey)
+	}
+}
+
+func TestRuntimeAccountReadRejectsExternalSecretMaterial(t *testing.T) {
+	ctx := context.Background()
+	db := newAccountServiceTestDB(t)
+	repo := NewAccountRepository(db)
+	channelID := createAccountTestChannel(t, db, "unsupported-secret-kind")
+
+	account := &ApiAccount{
+		Name:          "unsupported-secret-kind",
+		ChannelID:     channelID,
+		Platform:      "openai-compatible",
+		ApiType:       "openai-compatible",
+		Models:        []AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:        "runtime-secret",
+		ProxyURL:      "https://example.com/unsupported-secret-kind",
+		MaxConcurrent: 1,
+		Timeout:       30,
+		Weight:        1,
+		Status:        1,
+	}
+	if err := repo.Create(ctx, account); err != nil {
+		t.Fatalf("create account failed: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+UPDATE api_account_secrets
+SET secret_material_kind = 'external_ref',
+    secret_payload = '',
+    secret_ref = 'vault://account/runtime-secret'
+WHERE account_id = $1 AND status = 'active'`, account.ID); err != nil {
+		t.Fatalf("switch account secret kind failed: %v", err)
+	}
+
+	if _, err := repo.GetRuntimeByIDWithSecret(ctx, account.ID); err == nil {
+		t.Fatal("GetRuntimeByIDWithSecret should fail on unsupported external secret material")
 	}
 }
 

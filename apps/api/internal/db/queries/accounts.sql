@@ -26,16 +26,20 @@ WHERE a.id = sqlc.arg(id)
 -- name: GetRuntimeAccountByIDWithSecret :one
 SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
        secret.secret_payload::text AS api_key,
+       secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
        a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
 INNER JOIN LATERAL (
-  SELECT secret_payload
+  SELECT secret_payload, secret_material_kind
   FROM api_account_secrets
   WHERE account_id = a.id
     AND status = 'active'
-    AND btrim(secret_payload) <> ''
+    AND (
+      (secret_material_kind = 'encrypted' AND btrim(secret_payload) <> '')
+      OR (secret_material_kind = 'external_ref' AND btrim(secret_ref) <> '')
+    )
   ORDER BY rotated_at DESC, id DESC
   LIMIT 1
 ) AS secret ON TRUE

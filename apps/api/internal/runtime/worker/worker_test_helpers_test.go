@@ -9,6 +9,7 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/testsupport/secretstest"
 )
 
 type fakeRequeuer struct {
@@ -132,6 +133,7 @@ func (f *fakeCancelStoreForRiver) ClearCancelled(_ context.Context, taskID strin
 
 func createRiverTestAccount(t *testing.T, db testDB, repo *accounts.AccountRepository, name string) *accounts.ApiAccount {
 	t.Helper()
+	secretstest.EnableEncryption(t)
 	channelID := createRiverTestChannel(t, db, name)
 	acc := &accounts.ApiAccount{
 		Name:          name,

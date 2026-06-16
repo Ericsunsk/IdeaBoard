@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 )
 
 func newAccountServiceTestDB(t *testing.T) *sql.DB {
 	t.Helper()
+	secretstest.EnableEncryption(t)
 	return testdb.Open(t)
 }
 

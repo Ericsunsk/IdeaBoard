@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/secrets"
 )
 
 type AccountRepository struct {
@@ -71,7 +73,11 @@ func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromProjection(accountProjectionFromRuntimeGet(row))
+	projection, err := accountProjectionFromRuntimeGet(row)
+	if err != nil {
+		return nil, err
+	}
+	account := accountFromProjection(projection)
 	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
 		return nil, err
 	}
@@ -308,14 +314,18 @@ func accountProjectionFromGet(row dbsqlc.GetAccountByIDRow) accountProjection {
 	}
 }
 
-func accountProjectionFromRuntimeGet(row dbsqlc.GetRuntimeAccountByIDWithSecretRow) accountProjection {
+func accountProjectionFromRuntimeGet(row dbsqlc.GetRuntimeAccountByIDWithSecretRow) (accountProjection, error) {
+	apiKey, err := decryptAPIKey(row.ApiKey, row.ApiKeyMaterialKind)
+	if err != nil {
+		return accountProjection{}, err
+	}
 	return accountProjection{
 		ID:               row.ID,
 		Name:             row.Name,
 		ChannelID:        row.ChannelID,
 		Platform:         row.Platform,
 		ApiType:          row.ApiType,
-		ApiKey:           row.ApiKey,
+		ApiKey:           apiKey,
 		SecretConfigured: row.SecretConfigured,
 		ProxyURL:         row.ProxyUrl,
 		MaxConcurrent:    row.MaxConcurrent,
@@ -326,7 +336,7 @@ func accountProjectionFromRuntimeGet(row dbsqlc.GetRuntimeAccountByIDWithSecretR
 		Weight:           row.Weight,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
-	}
+	}, nil
 }
 
 func accountProjectionFromList(row dbsqlc.ListAccountsRow) accountProjection {
@@ -507,20 +517,40 @@ func rotateAccountSecret(ctx context.Context, q *dbsqlc.Queries, accountID int64
 	if apiKey == "" {
 		return nil
 	}
+	if err := secrets.RequireEncryptionEnabled(); err != nil {
+		return err
+	}
 	if err := q.RetireActiveAccountSecrets(ctx, accountID); err != nil {
 		return err
 	}
-	_, err := q.CreateAccountSecret(ctx, dbsqlc.CreateAccountSecretParams{
+
+	payload, err := secrets.EncryptString(apiKey)
+	if err != nil {
+		return fmt.Errorf("加密 API Key 失败: %w", err)
+	}
+
+	_, err = q.CreateAccountSecret(ctx, dbsqlc.CreateAccountSecretParams{
 		AccountID:          accountID,
-		SecretMaterialKind: "stored",
+		SecretMaterialKind: secrets.MaterialKindEncrypted,
 		SecretRef:          "",
-		SecretPayload:      apiKey,
+		SecretPayload:      payload,
 		KeyVersion:         "",
 		Fingerprint:        "",
 		Status:             "active",
 		ExpiresAt:          sql.NullTime{},
 	})
 	return err
+}
+
+func decryptAPIKey(apiKey, materialKind string) (string, error) {
+	if strings.TrimSpace(apiKey) == "" {
+		return "", nil
+	}
+	plain, err := secrets.DecryptMaterialString(apiKey, materialKind)
+	if err != nil {
+		return "", fmt.Errorf("解密 API Key 失败: %w", err)
+	}
+	return plain, nil
 }
 
 func nullInt32Ptr(value *int) sql.NullInt32 {

@@ -6,9 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 )
 
 func TestTaskLeaseTokenBindsToRiverJobID(t *testing.T) {
@@ -239,6 +241,7 @@ func TestPostgresTaskAssignerRejectsStaleLease(t *testing.T) {
 
 func newPostgresAssignerTestDB(t *testing.T) *sql.DB {
 	t.Helper()
+	secretstest.EnableEncryption(t)
 	return testdb.Open(t)
 }
 
@@ -266,10 +269,22 @@ VALUES ($1, 'gpt-image-1', TRUE, 0)`, id); err != nil {
 	}
 	if _, err := db.Exec(`
 INSERT INTO api_account_secrets (account_id, secret_material_kind, secret_payload, status)
-VALUES ($1, 'stored', 'k', 'active')`, id); err != nil {
+VALUES ($1, 'encrypted', $2, 'active')`, id, mustEncryptForTest(t, "k")); err != nil {
 		t.Fatalf("create account secret %q failed: %v", name, err)
 	}
 	return id
+}
+
+func mustEncryptForTest(t *testing.T, plain string) string {
+	t.Helper()
+	if err := secrets.LoadEncryptionKey(); err != nil {
+		t.Fatalf("load test encryption key failed: %v", err)
+	}
+	encrypted, err := secrets.EncryptString(plain)
+	if err != nil {
+		t.Fatalf("encrypt test secret failed: %v", err)
+	}
+	return encrypted
 }
 
 func setAssignerModelLimit(t *testing.T, db *sql.DB, accountID int64, modelName string, maxConcurrent int) {

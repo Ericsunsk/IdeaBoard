@@ -275,16 +275,20 @@ func (q *Queries) GetActiveAccountSecretByAccountID(ctx context.Context, account
 const getRuntimeAccountByIDWithSecret = `-- name: GetRuntimeAccountByIDWithSecret :one
 SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
        secret.secret_payload::text AS api_key,
+       secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
        a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
 INNER JOIN LATERAL (
-  SELECT secret_payload
+  SELECT secret_payload, secret_material_kind
   FROM api_account_secrets
   WHERE account_id = a.id
     AND status = 'active'
-    AND btrim(secret_payload) <> ''
+    AND (
+      (secret_material_kind = 'encrypted' AND btrim(secret_payload) <> '')
+      OR (secret_material_kind = 'external_ref' AND btrim(secret_ref) <> '')
+    )
   ORDER BY rotated_at DESC, id DESC
   LIMIT 1
 ) AS secret ON TRUE
@@ -294,22 +298,23 @@ WHERE a.id = $1
 `
 
 type GetRuntimeAccountByIDWithSecretRow struct {
-	ID               int64     `json:"id"`
-	Name             string    `json:"name"`
-	ChannelID        int64     `json:"channel_id"`
-	Platform         string    `json:"platform"`
-	ApiType          string    `json:"api_type"`
-	ApiKey           string    `json:"api_key"`
-	SecretConfigured bool      `json:"secret_configured"`
-	ProxyUrl         string    `json:"proxy_url"`
-	MaxConcurrent    int32     `json:"max_concurrent"`
-	Timeout          int32     `json:"timeout"`
-	ExtraConfig      string    `json:"extra_config"`
-	Status           int16     `json:"status"`
-	FailCount        int32     `json:"fail_count"`
-	Weight           int32     `json:"weight"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	ChannelID          int64     `json:"channel_id"`
+	Platform           string    `json:"platform"`
+	ApiType            string    `json:"api_type"`
+	ApiKey             string    `json:"api_key"`
+	ApiKeyMaterialKind string    `json:"api_key_material_kind"`
+	SecretConfigured   bool      `json:"secret_configured"`
+	ProxyUrl           string    `json:"proxy_url"`
+	MaxConcurrent      int32     `json:"max_concurrent"`
+	Timeout            int32     `json:"timeout"`
+	ExtraConfig        string    `json:"extra_config"`
+	Status             int16     `json:"status"`
+	FailCount          int32     `json:"fail_count"`
+	Weight             int32     `json:"weight"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error) {
@@ -322,6 +327,7 @@ func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64)
 		&i.Platform,
 		&i.ApiType,
 		&i.ApiKey,
+		&i.ApiKeyMaterialKind,
 		&i.SecretConfigured,
 		&i.ProxyUrl,
 		&i.MaxConcurrent,

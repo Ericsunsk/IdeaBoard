@@ -14,6 +14,7 @@ import (
 
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 )
 
 type fakeQueueForService struct {
@@ -88,6 +89,7 @@ func (s *failingAccountTaskStore) FailRunningByAccountIDTx(context.Context, *dbs
 
 func newQueueServiceTestDB(t *testing.T) *sql.DB {
 	t.Helper()
+	secretstest.EnableEncryption(t)
 	return testdb.Open(t)
 }
 

@@ -393,6 +393,7 @@ git diff --exit-code -- internal/db/sqlc
 | `APP_PUBLIC_ASSET_BASE_URL` | 空 | 对外素材/API 地址，用于 `/uploads/*` 与上游模型可访问图片；Docker stack 默认由 `API_BASE_URL` 注入 |
 | `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
 | `AUTH_INTERNAL_KEY` | 空 | Go 调用 auth service internal endpoint 的保护密钥；必须与 Auth 服务同名变量一致 |
+| `APP_SECRETS_ENCRYPTION_KEY` | 无默认值 | API Key 与对象存储密钥静态加密主密钥；必须是 `openssl rand -base64 32` 生成的 base64 编码 32 字节值 |
 
 Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是输入变量，不是 API runtime 直接读取项。生产 stack 会把 `APP_BASE_URL` 映射到 `APP_PUBLIC_BASE_URL`、`APP_CORS_ALLOWED_ORIGINS` 与 `AUTH_TRUSTED_ORIGINS`，把 `API_BASE_URL` 映射到 `APP_PUBLIC_ASSET_BASE_URL` 与 `BETTER_AUTH_URL`。
 

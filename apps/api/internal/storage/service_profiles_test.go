@@ -2,15 +2,20 @@ package storage
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 )
 
 func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileRepository) {
 	t.Helper()
+	secretstest.EnableEncryption(t)
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
@@ -23,6 +28,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 
 func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *StorageProfileRepository) {
 	t.Helper()
+	secretstest.EnableEncryption(t)
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
@@ -298,6 +304,21 @@ func TestListProfilesDoesNotExposeSecretByDefault(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveProfile returned error: %v", err)
 	}
+	var storedMaterialKind, storedPayload string
+	if err := repo.db.QueryRowContext(ctx, `
+SELECT secret_material_kind, secret_payload
+FROM storage_profile_secrets
+WHERE profile_id = $1 AND secret_name = $2 AND status = 'active'`,
+		"s3-secret-boundary", storageSecretAccessKeyName,
+	).Scan(&storedMaterialKind, &storedPayload); err != nil {
+		t.Fatalf("load stored secret failed: %v", err)
+	}
+	if storedMaterialKind != secrets.MaterialKindEncrypted {
+		t.Fatalf("stored material kind = %q, want encrypted", storedMaterialKind)
+	}
+	if storedPayload == rawSecret {
+		t.Fatalf("stored secret payload should not equal plaintext")
+	}
 
 	profiles, err := repo.ListProfiles(ctx, false)
 	if err != nil {
@@ -318,6 +339,81 @@ func TestListProfilesDoesNotExposeSecretByDefault(t *testing.T) {
 	runtimeProfile := mustFindProfileForTest(t, runtimeProfiles, "s3-secret-boundary")
 	if got := configString(runtimeProfile.Config, storageSecretAccessKeyName); got != rawSecret {
 		t.Fatalf("ListProfilesWithSecrets secret = %q, want %q", got, rawSecret)
+	}
+}
+
+func TestListProfilesWithSecretsFailsOnUnsupportedExternalSecretMaterial(t *testing.T) {
+	_, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+
+	if err := repo.SaveProfile(ctx, StorageProfile{
+		ID:       "s3-legacy-secret",
+		Name:     "Legacy Secret",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":     "ak",
+			"secret_access_key": "sk-legacy",
+			"bucket_name":       "bucket",
+			"endpoint":          "s3.example.com",
+			"access_domain":     "https://bucket.s3.example.com",
+		},
+	}); err != nil {
+		t.Fatalf("SaveProfile returned error: %v", err)
+	}
+
+	if _, err := repo.db.ExecContext(ctx, `
+UPDATE storage_profile_secrets
+SET secret_material_kind = 'external_ref',
+    secret_payload = '',
+    secret_ref = 'vault://storage/sk-legacy'
+WHERE profile_id = $1 AND secret_name = $2 AND status = 'active'`,
+		"s3-legacy-secret", storageSecretAccessKeyName); err != nil {
+		t.Fatalf("switch secret kind failed: %v", err)
+	}
+
+	if _, err := repo.ListProfilesWithSecrets(ctx, false); err == nil {
+		t.Fatal("ListProfilesWithSecrets should fail on unsupported external secret material")
+	}
+}
+
+func TestListProfilesWithSecretsFailsOnWrongEncryptionKey(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db := testdb.Open(t)
+	repo := NewStorageProfileRepository(db)
+	ctx := context.Background()
+
+	if err := repo.SaveProfile(ctx, StorageProfile{
+		ID:       "s3-wrong-key",
+		Name:     "Wrong Key",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":     "ak",
+			"secret_access_key": "sk-wrong-key",
+			"bucket_name":       "bucket",
+			"endpoint":          "s3.example.com",
+			"access_domain":     "https://bucket.s3.example.com",
+		},
+	}); err != nil {
+		t.Fatalf("SaveProfile returned error: %v", err)
+	}
+
+	t.Setenv(secrets.EncryptionKeyEnv, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("2", 32))))
+	if err := secrets.LoadEncryptionKey(); err != nil {
+		t.Fatalf("LoadEncryptionKey with alternate valid key failed: %v", err)
+	}
+	if _, err := repo.ListProfilesWithSecrets(ctx, false); err == nil {
+		t.Fatal("ListProfilesWithSecrets should fail when ciphertext was encrypted with another key")
+	}
+}
+
+func TestLikelyObjectStorageHostIncludesCloudflareR2(t *testing.T) {
+	if !isLikelyObjectStorageHost("account.r2.cloudflarestorage.com") {
+		t.Fatal("Cloudflare R2 host should be treated as object storage")
+	}
+	if isLikelyObjectStorageHost("api.example.com") {
+		t.Fatal("application API host should not be treated as object storage")
 	}
 }
 

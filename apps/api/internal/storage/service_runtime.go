@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/url"
 	"os"
@@ -437,9 +438,27 @@ func resolvePublicUploadBaseURL() *url.URL {
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 			continue
 		}
+		logPublicUploadAuthWarningOnce.Do(func() {
+			if isLikelyObjectStorageHost(parsed.Host) {
+				slog.Warn("APP_PUBLIC_ASSET_BASE_URL 指向对象存储域名，上传文件可能绕过应用鉴权被直接访问。建议使用应用自身域名或 CDN 地址。",
+					"host", parsed.Host, "env_key", key)
+			}
+		})
 		return parsed
 	}
 	return nil
+}
+
+var logPublicUploadAuthWarningOnce sync.Once
+
+func isLikelyObjectStorageHost(host string) bool {
+	host = strings.ToLower(host)
+	for _, pattern := range []string{".s3.", ".amazonaws.com", ".digitaloceanspaces.com", ".storage.googleapis.com", ".blob.core.windows.net", ".r2.cloudflarestorage.com"} {
+		if strings.Contains(host, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {

@@ -6,12 +6,14 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/secrets"
 )
 
 const storageSecretAccessKeyName = "secret_access_key"
@@ -143,13 +145,20 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 	if secret == "" {
 		return nil
 	}
+	if err := secrets.RequireEncryptionEnabled(); err != nil {
+		return err
+	}
 	fingerprint := storageSecretFingerprint(secret)
+	encrypted, err := secrets.EncryptString(secret)
+	if err != nil {
+		return fmt.Errorf("加密存储密钥失败: %w", err)
+	}
 	return q.UpsertStorageProfileSecret(ctx, dbsqlc.UpsertStorageProfileSecretParams{
 		ProfileID:          id,
 		SecretName:         storageSecretAccessKeyName,
-		SecretMaterialKind: "stored",
+		SecretMaterialKind: secrets.MaterialKindEncrypted,
 		SecretRef:          "",
-		SecretPayload:      secret,
+		SecretPayload:      encrypted,
 		Fingerprint:        fingerprint,
 		KeyVersion:         "",
 		Status:             "active",
@@ -179,9 +188,15 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 		if err != nil && !database.IsNotFound(err) {
 			return StorageProfile{}, err
 		}
-		if err == nil && strings.TrimSpace(secret.SecretPayload) != "" {
-			config[storageSecretAccessKeyName] = secret.SecretPayload
-			secretConfigured = true
+		if err == nil {
+			plain, err := secrets.DecryptMaterialString(secret.SecretPayload, secret.SecretMaterialKind)
+			if err != nil {
+				return StorageProfile{}, fmt.Errorf("解密存储密钥失败: %w", err)
+			}
+			if strings.TrimSpace(plain) != "" {
+				config[storageSecretAccessKeyName] = plain
+				secretConfigured = true
+			}
 		}
 	} else {
 		configured, err := r.q.HasStorageProfileSecret(ctx, dbsqlc.HasStorageProfileSecretParams{
