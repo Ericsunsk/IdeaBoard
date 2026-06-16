@@ -7,6 +7,7 @@
     :data-flow-node-id="flowNodeId || undefined"
     :class="{
       'is-loading': directGenerating && !displayImage,
+      'is-running': !!directGenerating,
       'is-expand-mode': !!expandModeActive,
       'is-mask-editor-mode': !!maskEditorModeActive,
       'is-active': active && !expandModeActive,
@@ -75,11 +76,9 @@
       </div>
     </template>
     <button
-      v-if="!displayImage"
+      v-if="!displayImage && !emptyStateDisabled"
       type="button"
       class="image-node-stage-empty"
-      :class="{ 'is-readonly': inputLocked, 'is-loading': directGenerating }"
-      :disabled="emptyStateDisabled"
       :aria-label="emptyStageAriaLabel"
       @click="onEmptyStateClick"
     >
@@ -87,8 +86,21 @@
         :variant="emptyIconVariantComputed"
         :class="{ 'image-node-stage-loader-logo': directGenerating }"
       />
-      <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
+      <span>{{ emptyStateLabel }}</span>
     </button>
+    <div
+      v-else-if="!displayImage"
+      class="image-node-stage-empty is-readonly"
+      :class="{ 'is-loading': directGenerating }"
+      role="status"
+      :aria-label="emptyStageAriaLabel"
+    >
+      <NodeEmptyStateIcon
+        :variant="emptyIconVariantComputed"
+        :class="{ 'image-node-stage-loader-logo': directGenerating }"
+      />
+      <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
+    </div>
   </div>
 </template>
 
@@ -211,6 +223,11 @@ function selectOutputCount(value: number) {
   cursor: grabbing;
 }
 
+.image-node-stage.is-running .image-node-stage-image,
+.image-node-stage.is-running .image-node-stage-image.is-dragging {
+  cursor: default;
+}
+
 .image-node-stage.is-expand-mode .image-node-stage-image,
 .image-node-stage.is-mask-editor-mode .image-node-stage-image {
   pointer-events: none;
@@ -300,14 +317,10 @@ function selectOutputCount(value: number) {
   cursor: default;
 }
 
-.image-node-stage-empty:disabled {
-  cursor: not-allowed;
-}
-
 .image-node-stage-empty.is-loading {
   background: rgba(255, 255, 255, 0.56);
   color: #a8b3be;
-  cursor: wait;
+  cursor: default;
 }
 
 .image-node-stage-loader-logo {

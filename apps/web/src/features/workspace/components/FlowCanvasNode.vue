@@ -2,7 +2,7 @@
   <div
     ref="flowCanvasNodeRef"
     class="flow-canvas-node"
-    :class="[`is-${data.kind}`, { 'is-selected': selected }]"
+    :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': nodeRunning }]"
     @mouseenter="onNodeMouseEnter"
     @mouseleave="onNodeMouseLeave"
     @focusin="onNodeFocusIn"
@@ -38,6 +38,7 @@
     <template v-else-if="isImageNode && imageSnapshot">
       <div
         class="flow-canvas-node__drag-surface relative overflow-visible"
+        :class="{ 'is-running': nodeRunning }"
         @mousedown="onNodeMouseDown"
         @click.stop
         @contextmenu.stop
@@ -101,6 +102,7 @@
     <template v-else-if="isFusionNode && fusionSnapshot">
       <div
         class="flow-canvas-node__drag-surface relative overflow-visible"
+        :class="{ 'is-running': nodeRunning }"
         @mousedown="onNodeMouseDown"
         @click.stop
         @contextmenu.stop
@@ -325,6 +327,7 @@ const displayImage = computed<{ url: string } | null>(() => {
 const imageGenerating = computed(
   () => !!props.imageDirectGenerating || imageSnapshot.value?.outputStatus === 'running',
 )
+const nodeRunning = computed(() => imageGenerating.value || !!props.uiState?.isRunning)
 const imageInputLocked = computed(() => imageGenerating.value && !displayImage.value)
 const imageEmptyIconVariant = computed<'image' | 'fusion'>(() => {
   const uiState = props.uiState as NodeUiState<'image'> | undefined
@@ -496,6 +499,11 @@ function noopMouse() {}
 
 .flow-canvas-node__drag-surface:active {
   cursor: grabbing;
+}
+
+.flow-canvas-node__drag-surface.is-running,
+.flow-canvas-node__drag-surface.is-running:active {
+  cursor: default;
 }
 
 .flow-canvas-node__unsupported {
