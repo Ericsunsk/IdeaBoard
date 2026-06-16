@@ -549,9 +549,6 @@ func rotateAccountSecret(ctx context.Context, q *dbsqlc.Queries, accountID int64
 }
 
 func decryptAPIKey(apiKey, materialKind string) (string, error) {
-	if strings.TrimSpace(apiKey) == "" {
-		return "", nil
-	}
 	plain, err := secrets.DecryptMaterialString(apiKey, materialKind)
 	if err != nil {
 		return "", fmt.Errorf("解密 API Key 失败: %w", err)

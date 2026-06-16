@@ -39,12 +39,12 @@ func TestPostgresTaskRuntimeStoreGetAccountLoadInfoUsesRunningTaskAttempts(t *te
 	}
 }
 
-func TestPostgresTaskRuntimeStoreClampsAccountMaxConcurrent(t *testing.T) {
+func TestPostgresTaskRuntimeStoreUsesAccountMaxConcurrentLimit(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	store := NewPostgresTaskRuntimeStore(db)
 	ctx := context.Background()
 
-	accountID := createAssignerAccount(t, db, "runtime-load-clamped", 1000)
+	accountID := createAssignerAccount(t, db, "runtime-load-limit", accountlimits.MaxMaxConcurrent)
 
 	loads, err := store.GetAccountLoadInfo(ctx, []int64{accountID})
 	if err != nil {
@@ -55,7 +55,7 @@ func TestPostgresTaskRuntimeStoreClampsAccountMaxConcurrent(t *testing.T) {
 		t.Fatalf("account load for %d missing: %+v", accountID, loads)
 	}
 	if load.MaxConcurrent != accountlimits.MaxMaxConcurrent {
-		t.Fatalf("max concurrent=%d, want clamped %d", load.MaxConcurrent, accountlimits.MaxMaxConcurrent)
+		t.Fatalf("max concurrent=%d, want configured limit %d", load.MaxConcurrent, accountlimits.MaxMaxConcurrent)
 	}
 
 	maxConcurrent, err := store.GetAccountMaxConcurrent(ctx, accountID)
@@ -63,7 +63,7 @@ func TestPostgresTaskRuntimeStoreClampsAccountMaxConcurrent(t *testing.T) {
 		t.Fatalf("GetAccountMaxConcurrent failed: %v", err)
 	}
 	if maxConcurrent != accountlimits.MaxMaxConcurrent {
-		t.Fatalf("account max concurrent=%d, want clamped %d", maxConcurrent, accountlimits.MaxMaxConcurrent)
+		t.Fatalf("account max concurrent=%d, want configured limit %d", maxConcurrent, accountlimits.MaxMaxConcurrent)
 	}
 }
 

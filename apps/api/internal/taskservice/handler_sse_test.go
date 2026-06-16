@@ -19,12 +19,14 @@ import (
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/gin-gonic/gin"
 )
 
 func seedTaskServiceSSEAccount(t testing.TB, ctx context.Context, db *sql.DB, suffix string) *accounts.ApiAccount {
 	t.Helper()
+	secretstest.EnableEncryption(t)
 
 	var channelID int64
 	if err := db.QueryRowContext(ctx, `

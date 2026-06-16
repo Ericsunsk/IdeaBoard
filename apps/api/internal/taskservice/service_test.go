@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 	"ideaboard/api/internal/users"
 	"ideaboard/api/internal/workflow"
 )
@@ -520,6 +521,7 @@ func (c *recordingTaskOutputCleaner) DeleteTaskOutputsByUserTask(_ context.Conte
 
 func TestDeleteUserTaskCleansOutputsAndTaskOutputObjects(t *testing.T) {
 	ctx := context.Background()
+	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
 	accountRepo := accounts.NewAccountRepository(db)

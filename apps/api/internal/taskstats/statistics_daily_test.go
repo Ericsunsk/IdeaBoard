@@ -10,11 +10,13 @@ import (
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 )
 
 func newStatisticsTestService(t *testing.T) (*Service, *taskstore.Repository, *sql.DB) {
 	t.Helper()
 
+	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
 	svc := NewService(taskRepo)

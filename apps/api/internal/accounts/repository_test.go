@@ -136,7 +136,7 @@ func TestAccountReadRejectsInvalidModelFeatureSlugsShape(t *testing.T) {
 	}
 	if _, err := db.ExecContext(ctx, `
 UPDATE api_account_models
-SET feature_slugs = '{"unexpected":"shape"}'::jsonb
+SET feature_slugs = '[{"unexpected":"shape"}]'::jsonb
 WHERE account_id = $1`, account.ID); err != nil {
 		t.Fatalf("corrupt account model feature slugs failed: %v", err)
 	}
