@@ -3,6 +3,7 @@ import type { Node } from '@vue-flow/core'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import { clampImageNodeOutputCount } from '../types/canvasNodes'
 import { MASK_EDITOR_CHROME_LAYOUT, getMaskEditorChromeOutset } from '../config/maskEditorChrome'
+import { waitForNextAnimationFrame } from '../utils/animationFrame'
 
 type FlowViewport = { x: number; y: number; zoom: number }
 
@@ -160,13 +161,6 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
     return requestId === maskEditorFocusRequestId && options.flowMaskEditorNodeId.value === nodeId
   }
 
-  function waitForAnimationFrame(): Promise<void> {
-    if (typeof requestAnimationFrame === 'undefined') return Promise.resolve()
-    return new Promise((resolve) => {
-      requestAnimationFrame(() => resolve())
-    })
-  }
-
   async function focusMaskEditorStage(nodeId: string, requestId: number) {
     await nextTick()
     if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
@@ -233,7 +227,7 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
     maskEditorChromeAnchorRect.value = null
     await focusMaskEditorStage(nodeId, requestId)
     if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-    await waitForAnimationFrame()
+    await waitForNextAnimationFrame()
     if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
     updateMaskEditorChromeAnchorRect()
     if (maskEditorChromeAnchorRect.value) {

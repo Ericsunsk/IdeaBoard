@@ -1,4 +1,4 @@
-import { nextTick, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { createImageNodeAt } from '../utils/canvasNodeFactory'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../types/canvasNodes'
@@ -9,6 +9,7 @@ import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
 } from '../utils/flowImageDirectActionSource'
+import { waitForNextRenderFrame } from '../utils/animationFrame'
 import type { FlowTransactions } from './useFlowTransactions'
 
 type UsePendingImageResultNodesOptions = {
@@ -175,16 +176,6 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     })
   }
 
-  function waitForFlowRenderFrame(): Promise<void> {
-    if (typeof window === 'undefined') return nextTick()
-    return nextTick().then(
-      () =>
-        new Promise((resolve) => {
-          window.requestAnimationFrame(() => resolve())
-        }),
-    )
-  }
-
   function buildPendingImageNodeSnapshot(
     base: ImageNodeItem,
     params: { sourceImageRatio: number; width: number },
@@ -201,7 +192,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
   }
 
   async function appendPendingImageResultEdge(anchorNodeId: string, resultNodeId: string) {
-    await waitForFlowRenderFrame()
+    await waitForNextRenderFrame()
     if (cancelledResultNodeIds.has(resultNodeId)) return
     const hasSource = options.nodes.value.some((node) => node.id === anchorNodeId)
     const targetNode = options.nodes.value.find((node) => node.id === resultNodeId)

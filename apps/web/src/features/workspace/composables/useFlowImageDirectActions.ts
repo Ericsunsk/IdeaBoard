@@ -63,6 +63,7 @@ import {
   resolveConnectedInput,
   resolveConnectedPromptText,
 } from '../services/flowTaskExecutorUtils'
+import { readCurrentBoardId } from '../utils/currentBoardId'
 
 type DirectActionKey = ImageDirectTaskAction | ImageStrengthAction
 type RunImageDirectActionOptions = {
@@ -117,12 +118,8 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     runningNodeIds.value = next
   }
 
-  function readCurrentBoardId(): string {
-    return `${options.getCurrentBoardId?.() ?? ''}`.trim()
-  }
-
   function isBoardStillCurrent(boardId: string): boolean {
-    return !boardId || readCurrentBoardId() === boardId
+    return !boardId || readCurrentBoardId(options.getCurrentBoardId) === boardId
   }
 
   function removePendingImageResultNodesIfCurrent(boardId: string, resultNodeIds: string[]) {
@@ -240,7 +237,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   }
 
   async function reattachPendingImageResults(): Promise<void> {
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardId(options.getCurrentBoardId)
     const pendingTasks = collectPendingImageTasks()
     if (pendingTasks.length === 0) return
     let successCount = 0
@@ -317,7 +314,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
 
     let resultNodeId: string | null = null
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardId(options.getCurrentBoardId)
     try {
       if (action === IMAGE_NODE_ACTION.hdUpscale) {
         await assertHdUpscaleSubmitReady()
@@ -369,7 +366,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
     const normalizedPrompt = `${intent.prompt ?? ''}`.trim()
     const resolvedOutputCount = clampImageNodeOutputCount(intent.outputCount ?? 1)
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardId(options.getCurrentBoardId)
     let resultNodeIds: string[] = []
     try {
       await assertCanvasExtendSubmitReady()
@@ -430,7 +427,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     let resultNodeIds: string[] = []
     let localInpaint: FlowLocalInpaintCropResult | null = null
     let temporaryMaskUrl = ''
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardId(options.getCurrentBoardId)
     try {
       await assertPromptImageSubmitReady()
       const normalizedMaskUrl = await ensureFlowMaskImageUrl(rawMaskDataUrl, { boardId })
@@ -528,7 +525,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       return
     }
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardId(options.getCurrentBoardId)
     let resultNodeIds: string[] = []
     try {
       await assertPromptImageSubmitReady()
@@ -589,7 +586,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       width: Number(snapshot?.width) > 0 ? Number(snapshot?.width) : 280,
     }
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardId(options.getCurrentBoardId)
     let resultNodeIds: string[] = []
     try {
       resultNodeIds = appendPendingImageResultNodes(source, anchorNodeId, resolvedOutputCount, {
@@ -678,7 +675,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       ? `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`
       : EXECUTION_FUSION_META.promptPrefix
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardId(options.getCurrentBoardId)
     let resultNodeIds: string[] = []
     try {
       await assertTaskSubmitReady(

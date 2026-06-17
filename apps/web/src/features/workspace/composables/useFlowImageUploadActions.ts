@@ -6,6 +6,7 @@ import {
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
+import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 
 type FlowImageUploadResult = { url: string; ratio: number }
 
@@ -51,12 +52,8 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
   }
 
-  function readCurrentBoardId(): string {
-    return `${options.currentBoardId.value ?? ''}`.trim()
-  }
-
   function isBoardStillCurrent(boardId: string): boolean {
-    return readCurrentBoardId() === boardId
+    return readCurrentBoardIdRef(options.currentBoardId) === boardId
   }
 
   function startNodeUploadRequest(nodeId: string): number {
@@ -114,7 +111,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
   }
 
   async function uploadImageToBoard(file: File): Promise<FlowImageUploadResult> {
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardIdRef(options.currentBoardId)
     const uploaded = await uploadImageToBoardForBoard(file, boardId)
     if (!isBoardStillCurrent(boardId)) {
       throw new Error('上传结果已过期，请重新选择图片')
@@ -128,7 +125,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       options.onWarning('Image 节点不存在')
       return false
     }
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardIdRef(options.currentBoardId)
     const requestId = startNodeUploadRequest(nodeId)
     try {
       const uploaded = await uploadImageToBoardForBoard(file, boardId)
@@ -189,7 +186,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       options.onWarning(unsupportedUploadImageMessage())
       return null
     }
-    const boardId = readCurrentBoardId()
+    const boardId = readCurrentBoardIdRef(options.currentBoardId)
     const uploaded = await uploadImageToBoardForBoard(file, boardId)
     if (!isBoardStillCurrent(boardId)) return null
     return createImageNodeFromPayload(point, uploaded, resolveImageFileTitle(file))
