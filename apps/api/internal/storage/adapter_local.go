@@ -65,6 +65,13 @@ func (a *localStorageAdapter) StoreBytes(ctx context.Context, profile *StoragePr
 	return a.service.saveBytesLocal(filename, data, opts)
 }
 
+func (a *localStorageAdapter) StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return a.service.saveBytesLocalRef(filename, data, opts)
+}
+
 func (a *localStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
 	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
 	if err != nil {
@@ -75,6 +82,24 @@ func (a *localStorageAdapter) StoreRemote(ctx context.Context, profile *StorageP
 		return "", err
 	}
 	return a.service.saveReaderLocal(remoteFile.Filename, remoteFile, remoteFile.Size, opts)
+}
+
+func (a *localStorageAdapter) StoreRemoteRef(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
+	if err != nil {
+		return nil, err
+	}
+	defer remoteFile.Cleanup()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	ref, err := a.service.saveReaderLocalRef(remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, opts)
+	if err != nil {
+		return nil, err
+	}
+	ref.Width = remoteFile.Width
+	ref.Height = remoteFile.Height
+	return ref, nil
 }
 
 func (a *localStorageAdapter) Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error) {

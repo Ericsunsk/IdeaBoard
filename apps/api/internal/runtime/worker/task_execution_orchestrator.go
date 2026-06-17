@@ -156,7 +156,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 
 	elapsed := time.Since(startTime).Seconds()
 	completedFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusCompleted, "", "", "", startTime, providerOutput.Timeline, time.Now())
-	completed, completeErr := o.completeTask(ctx, task, assignment, providerOutput.Result, elapsed, &completedFinish)
+	completed, completeErr := o.completeTask(ctx, task, assignment, providerOutput.Result, providerOutput.Outputs, elapsed, &completedFinish)
 	if completeErr != nil {
 		o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, "任务结果保存失败，请稍后重试", tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, startTime, providerOutput.Timeline, time.Now())
 		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, time.Now())
@@ -299,15 +299,15 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *queue
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, result string, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
+func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
 	var err error
 	if attemptFinish != nil {
-		err = o.taskRuntime.MarkTaskCompletedWithAttempt(cleanupCtx, assignment, result, *attemptFinish)
+		err = o.taskRuntime.MarkTaskCompletedWithOutputsAndAttempt(cleanupCtx, assignment, result, outputs, *attemptFinish)
 	} else {
-		err = o.taskRuntime.MarkTaskCompleted(cleanupCtx, assignment, result)
+		err = o.taskRuntime.MarkTaskCompletedWithOutputs(cleanupCtx, assignment, result, outputs)
 	}
 	if err != nil {
 		if isTaskConvergedError(err) {

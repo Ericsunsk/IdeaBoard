@@ -5,6 +5,16 @@ type StorageStoreOptions struct {
 	AllowHosts []string
 }
 
+type StoredUploadRef struct {
+	URL            string
+	StorageKey     string
+	StorageProfile string
+	MIMEType       string
+	Width          int
+	Height         int
+	SizeBytes      int64
+}
+
 type StoredUploadObject struct {
 	ObjectKey   string
 	Filename    string

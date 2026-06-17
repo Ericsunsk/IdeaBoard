@@ -2,6 +2,7 @@ package storage
 
 // S3CompatibleConfig 通用 S3 兼容对象存储配置
 type S3CompatibleConfig struct {
+	ProfileID       string `json:"-"`
 	Enabled         bool   `json:"enabled"`
 	AccessKeyID     string `json:"access_key_id"`
 	SecretAccessKey string `json:"secret_access_key"`

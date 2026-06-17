@@ -49,13 +49,32 @@ func (a *s3CompatibleStorageAdapter) StoreBytes(ctx context.Context, profile *St
 	return a.service.s3CompatibleService.uploadBytesWithConfig(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
 
+func (a *s3CompatibleStorageAdapter) StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	return a.service.s3CompatibleService.uploadBytesWithConfigRef(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
+}
+
 func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
 	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
 	if err != nil {
 		return "", err
 	}
 	defer remoteFile.Cleanup()
-	return a.service.s3CompatibleService.uploadReaderWithConfig(ctx, remoteFile.Filename, "application/octet-stream", remoteFile, remoteFile.Size, a.service.s3CompatibleConfigFromProfile(profile), opts)
+	return a.service.s3CompatibleService.uploadReaderWithConfig(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, a.service.s3CompatibleConfigFromProfile(profile), opts)
+}
+
+func (a *s3CompatibleStorageAdapter) StoreRemoteRef(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
+	if err != nil {
+		return nil, err
+	}
+	defer remoteFile.Cleanup()
+	ref, err := a.service.s3CompatibleService.uploadReaderWithConfigRef(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, a.service.s3CompatibleConfigFromProfile(profile), opts)
+	if err != nil {
+		return nil, err
+	}
+	ref.Width = remoteFile.Width
+	ref.Height = remoteFile.Height
+	return ref, nil
 }
 
 func (a *s3CompatibleStorageAdapter) Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error) {

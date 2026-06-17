@@ -10,6 +10,7 @@ func (s *StorageService) s3CompatibleConfigFromProfile(profile *StorageProfile) 
 		return &S3CompatibleConfig{}
 	}
 	return &S3CompatibleConfig{
+		ProfileID:       profile.ID,
 		Enabled:         profile.Enabled,
 		AccessKeyID:     strings.TrimSpace(configString(profile.Config, "access_key_id")),
 		SecretAccessKey: configString(profile.Config, "secret_access_key"),

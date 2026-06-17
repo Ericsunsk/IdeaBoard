@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/tasks"
 )
@@ -24,9 +25,22 @@ func (s *Service) attachOutputsForTasks(ctx context.Context, items []*tasks.Task
 		return
 	}
 
-	outputsByTaskID, err := s.taskRepo.ListOutputsByTaskIDs(ctx, taskIDs)
+	// Short retry: a single transient DB blip should not cause all outputs
+	// to be silently missing from the task list.
+	const maxRetries = 2
+	var outputsByTaskID map[string][]tasks.TaskOutput
+	var err error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		outputsByTaskID, err = s.taskRepo.ListOutputsByTaskIDs(ctx, taskIDs)
+		if err == nil {
+			break
+		}
+		if attempt < maxRetries {
+			time.Sleep(50 * time.Millisecond * time.Duration(attempt+1))
+		}
+	}
 	if err != nil {
-		slog.Warn("load task outputs failed", "err", err)
+		slog.Warn("load task outputs failed after retries", "err", err, "retries", maxRetries)
 		return
 	}
 	for _, item := range items {

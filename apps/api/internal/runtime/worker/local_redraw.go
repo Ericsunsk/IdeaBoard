@@ -83,11 +83,11 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 	}
 
 	allowHosts := trustedImageDownloadHosts(account)
-	originalImage, err := loadImageFromRef(ctx, originalRef, timeout, allowHosts)
+	originalImage, err := c.loadImageFromRef(ctx, originalRef, timeout, allowHosts)
 	if err != nil {
 		return nil, fmt.Errorf("local redraw 读取原图失败: feature=%s err=%w", featureSlug, err)
 	}
-	maskImage, err := loadImageFromRef(ctx, maskRef, timeout, allowHosts)
+	maskImage, err := c.loadImageFromRef(ctx, maskRef, timeout, allowHosts)
 	if err != nil {
 		return nil, fmt.Errorf("local redraw 读取蒙版失败: feature=%s err=%w", featureSlug, err)
 	}
@@ -124,13 +124,13 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 	}, nil
 }
 
-func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, bool, error) {
+func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, []tasks.TaskOutput, bool, error) {
 	if redraw == nil {
-		return upstreamImageRef, false, nil
+		return upstreamImageRef, nil, false, nil
 	}
-	upstreamImage, err := loadImageFromRef(ctx, upstreamImageRef, timeout, redraw.allowHosts)
+	upstreamImage, err := c.loadImageFromRef(ctx, upstreamImageRef, timeout, redraw.allowHosts)
 	if err != nil {
-		return "", false, newExecutionFailureError(
+		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
 			fmt.Errorf("local redraw 读取上游结果失败: feature=%s err=%w", redraw.featureSlug, err),
@@ -139,7 +139,7 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 	roiWidth := redraw.roi.Dx()
 	roiHeight := redraw.roi.Dy()
 	if roiWidth <= 0 || roiHeight <= 0 {
-		return "", false, newExecutionFailureError(
+		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
 			fmt.Errorf("local redraw 回贴 ROI 尺寸无效: feature=%s", redraw.featureSlug),
@@ -149,7 +149,7 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 	upstreamScaled := scaleImageToNRGBA(upstreamImage, roiWidth, roiHeight)
 	composed, err := applyMaskedComposite(redraw.original, redraw.maskSampler, redraw.roi, upstreamScaled)
 	if err != nil {
-		return "", false, newExecutionFailureError(
+		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
 			fmt.Errorf("local redraw 回贴失败: feature=%s err=%w", redraw.featureSlug, err),
@@ -157,7 +157,7 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 	}
 	composedBytes, err := encodeImagePNG(composed)
 	if err != nil {
-		return "", false, newExecutionFailureError(
+		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
 			fmt.Errorf("local redraw 编码结果失败: feature=%s err=%w", redraw.featureSlug, err),
@@ -165,22 +165,22 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 	}
 
 	if c.storageService == nil {
-		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(composedBytes), false, nil
+		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(composedBytes), nil, false, nil
 	}
 	filename := fmt.Sprintf("local-redraw-%s-%d.png", sanitizeFeatureSlug(redraw.featureSlug), time.Now().UnixNano())
 	storeOpts := storage.StorageStoreOptions{}
 	if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
 		storeOpts.DirPrefix = dirPrefix
 	}
-	storedURL, err := c.storageService.StoreBytes(ctx, filename, composedBytes, storeOpts)
+	storedRef, err := c.storageService.StoreBytesRef(ctx, filename, composedBytes, storeOpts)
 	if err != nil {
-		return "", false, newExecutionFailureError(
+		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("local redraw 持久化失败: feature=%s err=%w", redraw.featureSlug, err),
 		)
 	}
-	return storedURL, true, nil
+	return storedRef.URL, []tasks.TaskOutput{taskOutputFromStoredRef(taskID, storedRef, upstreamImageRef, 0)}, true, nil
 }
 
 func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
@@ -244,12 +244,12 @@ func stripLocalRedrawMaskParams(params map[string]interface{}) {
 	}
 }
 
-func loadImageFromRef(ctx context.Context, ref string, timeout time.Duration, allowHosts []string) (image.Image, error) {
+func (c *ProviderExecutor) loadImageFromRef(ctx context.Context, ref string, timeout time.Duration, allowHosts []string) (image.Image, error) {
 	trimmed := strings.TrimSpace(ref)
 	if trimmed == "" {
 		return nil, fmt.Errorf("图像引用为空")
 	}
-	data, err := loadImageBytesFromRef(ctx, trimmed, timeout, allowHosts)
+	data, err := c.loadImageBytesFromRef(ctx, trimmed, timeout, allowHosts)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func loadImageFromRef(ctx context.Context, ref string, timeout time.Duration, al
 	return decoded, nil
 }
 
-func loadImageBytesFromRef(ctx context.Context, ref string, timeout time.Duration, allowHosts []string) ([]byte, error) {
+func (c *ProviderExecutor) loadImageBytesFromRef(ctx context.Context, ref string, timeout time.Duration, allowHosts []string) ([]byte, error) {
 	if strings.HasPrefix(ref, "data:") {
 		parsed, err := mediarefs.ParseDataImageURL(ref, maxOpenAIDataURLBytes)
 		if err != nil {
@@ -271,16 +271,22 @@ func loadImageBytesFromRef(ctx context.Context, ref string, timeout time.Duratio
 		}
 		return parsed.Data, nil
 	}
+	if obj, ok, objErr := c.readRelativeUploadObject(ctx, ref, maxOpenAIDataURLBytes); ok {
+		if objErr != nil {
+			return nil, fmt.Errorf("读取本地上传文件失败: %w", objErr)
+		}
+		return obj.Data, nil
+	}
 	resp, err := safehttp.GetWithAllowHosts(ctx, ref, timeout, allowHosts...)
 	if err != nil {
 		return nil, fmt.Errorf("拉取图像失败: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := readLimitedBody(resp.Body)
+		body, _ := readLimitedImageRef(resp.Body)
 		return nil, fmt.Errorf("拉取图像返回 %d: %s", resp.StatusCode, truncateErrorBody(string(body)))
 	}
-	body, err := readLimitedBody(resp.Body)
+	body, err := readLimitedImageRef(resp.Body)
 	if err != nil {
 		return nil, err
 	}

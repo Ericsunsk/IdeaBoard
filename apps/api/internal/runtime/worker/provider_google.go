@@ -149,10 +149,10 @@ func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account 
 }
 
 func resolveGoogleModel(params map[string]interface{}, resolvedModel string) (model string, useImagen bool) {
-	if fromParams, ok := workflow.ReadWorkflowStringParam(params, "model"); ok && strings.TrimSpace(fromParams) != "" {
-		model = normalizeGoogleModelName(fromParams)
-	} else if strings.TrimSpace(resolvedModel) != "" {
+	if strings.TrimSpace(resolvedModel) != "" {
 		model = normalizeGoogleModelName(resolvedModel)
+	} else if fromParams, ok := workflow.ReadWorkflowStringParam(params, "model"); ok && strings.TrimSpace(fromParams) != "" {
+		model = normalizeGoogleModelName(fromParams)
 	}
 	return model, isGoogleImagenModel(model)
 }
@@ -313,13 +313,13 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, readErr := readLimitedBody(resp.Body)
+		body, readErr := readLimitedImageRef(resp.Body)
 		if readErr != nil {
 			slog.Warn("read error response body failed", "err", readErr)
 		}
 		return "", nil, fmt.Errorf("拉取图像返回 %d: %s", resp.StatusCode, truncateErrorBody(string(body)))
 	}
-	body, err := readLimitedBody(resp.Body)
+	body, err := readLimitedImageRef(resp.Body)
 	if err != nil {
 		return "", nil, err
 	}

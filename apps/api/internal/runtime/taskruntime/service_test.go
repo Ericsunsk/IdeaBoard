@@ -704,9 +704,23 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	result := `{"status":"success","image_url":"/uploads/2026/05/15/out-a.png","image_urls":["/uploads/2026/05/15/out-a.png","https://cdn.example.com/uploads/2026/05/15/out-b.png"]}`
-	if err := service.MarkTaskCompleted(ctx, taskRuntimeAssignment(task), result); err != nil {
-		t.Fatalf("MarkTaskCompleted returned error: %v", err)
+	result := `{"status":"success","image_url":"/uploads/tasks/7/task-completed-outputs/out-a.png","image_urls":["/uploads/tasks/7/task-completed-outputs/out-a.png","https://assets.example.com/uploads/tasks/7/task-completed-outputs/out-b.png"]}`
+	taskOutputs := []tasks.TaskOutput{
+		{
+			URL:            "/uploads/tasks/7/task-completed-outputs/out-a.png",
+			StorageKey:     "uploads/tasks/7/task-completed-outputs/out-a.png",
+			MIMEType:       "image/png",
+			StorageProfile: "builtin-local",
+		},
+		{
+			URL:            "https://assets.example.com/uploads/tasks/7/task-completed-outputs/out-b.png",
+			StorageKey:     "uploads/tasks/7/task-completed-outputs/out-b.png",
+			MIMEType:       "image/png",
+			StorageProfile: "builtin-local",
+		},
+	}
+	if err := service.MarkTaskCompletedWithOutputs(ctx, taskRuntimeAssignment(task), result, taskOutputs); err != nil {
+		t.Fatalf("MarkTaskCompletedWithOutputs returned error: %v", err)
 	}
 
 	outputsByTaskID, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
@@ -717,10 +731,10 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 	if len(outputs) != 2 {
 		t.Fatalf("outputs len=%d, want 2", len(outputs))
 	}
-	if outputs[0].URL != "/uploads/2026/05/15/out-a.png" || outputs[0].StorageKey != "uploads/2026/05/15/out-a.png" {
+	if outputs[0].URL != "/uploads/tasks/7/task-completed-outputs/out-a.png" || outputs[0].StorageKey != "uploads/tasks/7/task-completed-outputs/out-a.png" {
 		t.Fatalf("unexpected first output: %+v", outputs[0])
 	}
-	if outputs[1].URL != "https://cdn.example.com/uploads/2026/05/15/out-b.png" || outputs[1].StorageKey != "uploads/2026/05/15/out-b.png" {
+	if outputs[1].URL != "https://assets.example.com/uploads/tasks/7/task-completed-outputs/out-b.png" || outputs[1].StorageKey != "uploads/tasks/7/task-completed-outputs/out-b.png" {
 		t.Fatalf("unexpected second output: %+v", outputs[1])
 	}
 	for _, output := range outputs {
@@ -744,7 +758,38 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 	}
 }
 
-func TestMarkTaskCompletedRejectsInlineImageResult(t *testing.T) {
+func TestMarkTaskCompletedDoesNotInferOutputsFromResultURL(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	accountID := seedTaskRuntimeAccount(t, db, 204)
+
+	task := &tasks.Task{
+		TaskID:            "task-foreign-origin",
+		UserID:            7,
+		AssignedChannelID: tasks.IDPtr(taskRuntimeChannelID(accountID)),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-foreign-origin",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.MarkTaskCompleted(ctx, taskRuntimeAssignment(task), `{"status":"success","image_url":"https://evil.example.com/uploads/tasks/7/task-foreign-origin/out-a.png"}`); err != nil {
+		t.Fatalf("MarkTaskCompleted returned error: %v", err)
+	}
+	outputsByTaskID, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("ListOutputsByTaskIDs returned error: %v", err)
+	}
+	if len(outputsByTaskID[task.TaskID]) != 0 {
+		t.Fatalf("outputs len=%d, want 0", len(outputsByTaskID[task.TaskID]))
+	}
+}
+
+func TestMarkTaskCompletedRejectsOutputWithoutStorageKey(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
@@ -763,9 +808,11 @@ func TestMarkTaskCompletedRejectsInlineImageResult(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.MarkTaskCompleted(ctx, taskRuntimeAssignment(task), `{"status":"success","image_url":"data:image/png;base64,aGVsbG8="}`)
+	err := service.MarkTaskCompletedWithOutputs(ctx, taskRuntimeAssignment(task), `{"status":"success","image_url":"/uploads/tasks/7/task-inline-result/out-a.png"}`, []tasks.TaskOutput{
+		{URL: "/uploads/tasks/7/task-inline-result/out-a.png"},
+	})
 	if err == nil {
-		t.Fatal("expected inline image result to be rejected")
+		t.Fatal("expected missing storage_key to be rejected")
 	}
 	updated, getErr := taskRepo.GetByTaskID(ctx, task.TaskID)
 	if getErr != nil {

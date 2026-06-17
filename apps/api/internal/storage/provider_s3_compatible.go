@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"ideaboard/api/internal/platform/media"
 	"ideaboard/api/internal/platform/outbound"
 
 	"github.com/minio/minio-go/v7"
@@ -126,29 +127,51 @@ func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multip
 }
 
 func (s *S3CompatibleService) uploadBytesWithConfig(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
-	return s.uploadReaderWithConfig(ctx, filename, "application/octet-stream", bytes.NewReader(data), int64(len(data)), cfg, opts)
+	ref, err := s.uploadBytesWithConfigRef(ctx, filename, data, cfg, opts)
+	if err != nil {
+		return "", err
+	}
+	return ref.URL, nil
+}
+
+func (s *S3CompatibleService) uploadBytesWithConfigRef(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	contentType := inferStoredUploadContentType(filename, data)
+	ref, err := s.uploadReaderWithConfigRef(ctx, filename, contentType, bytes.NewReader(data), int64(len(data)), cfg, opts)
+	if err != nil {
+		return nil, err
+	}
+	ref.Width, ref.Height, _ = media.ImageDimensions(data)
+	return ref, nil
 }
 
 func (s *S3CompatibleService) uploadReaderWithConfig(ctx context.Context, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
-	if err := ctx.Err(); err != nil {
+	ref, err := s.uploadReaderWithConfigRef(ctx, filename, contentType, body, size, cfg, opts)
+	if err != nil {
 		return "", err
 	}
+	return ref.URL, nil
+}
+
+func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !s.IsConfigEnabled(cfg) {
-		return "", fmt.Errorf("S3 兼容存储配置未启用或不完整")
+		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
 	}
 	if body == nil {
-		return "", fmt.Errorf("文件内容不能为空")
+		return nil, fmt.Errorf("文件内容不能为空")
 	}
 	if size < 0 {
-		return "", fmt.Errorf("文件大小无效")
+		return nil, fmt.Errorf("文件大小无效")
 	}
 
 	client, err := s.prepareUploadClient(cfg)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return s.putReaderWithConfig(ctx, client, filename, contentType, body, size, cfg, opts)
+	return s.putReaderWithConfigRef(ctx, client, filename, contentType, body, size, cfg, opts)
 }
 
 func (s *S3CompatibleService) prepareUploadClient(cfg *S3CompatibleConfig) (*minio.Client, error) {
@@ -159,9 +182,17 @@ func (s *S3CompatibleService) prepareUploadClient(cfg *S3CompatibleConfig) (*min
 }
 
 func (s *S3CompatibleService) putReaderWithConfig(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
-	key, err := buildObjectKey(opts.DirPrefix, filepathExt(filename))
+	ref, err := s.putReaderWithConfigRef(ctx, client, filename, contentType, body, size, cfg, opts)
 	if err != nil {
 		return "", err
+	}
+	return ref.URL, nil
+}
+
+func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	key, err := buildObjectKey(opts.DirPrefix, filepathExt(filename))
+	if err != nil {
+		return nil, err
 	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
@@ -176,10 +207,20 @@ func (s *S3CompatibleService) putReaderWithConfig(ctx context.Context, client *m
 		minio.PutObjectOptions{ContentType: contentType},
 	)
 	if err != nil {
-		return "", fmt.Errorf("上传失败: %w", err)
+		return nil, fmt.Errorf("上传失败: %w", err)
 	}
 
-	return s.publicObjectURL(cfg, key)
+	publicURL, err := s.publicObjectURL(cfg, key)
+	if err != nil {
+		return nil, err
+	}
+	return &StoredUploadRef{
+		URL:            publicURL,
+		StorageKey:     key,
+		StorageProfile: strings.TrimSpace(cfg.ProfileID),
+		MIMEType:       contentType,
+		SizeBytes:      size,
+	}, nil
 }
 
 func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey string, cfg *S3CompatibleConfig) error {

@@ -64,6 +64,7 @@ import {
   resolveConnectedPromptText,
 } from '../services/flowTaskExecutorUtils'
 import { readCurrentBoardId } from '../utils/currentBoardId'
+import { isTaskResultPendingError } from '../../../shared/api/taskEvents'
 
 type DirectActionKey = ImageDirectTaskAction | ImageStrengthAction
 type RunImageDirectActionOptions = {
@@ -136,6 +137,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await options.flushAutosave?.({ silent: true })
     } catch (error) {
       console.warn('[workspace] flush pending task snapshot failed', error)
+      options.onWarning('画布保存失败，刷新页面后任务进度可能丢失')
     }
   }
 
@@ -201,35 +203,43 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     totalCount: number
     boardId: string
   }) {
-    const results = await Promise.allSettled(
+    let successCount = 0
+    let pendingCount = 0
+    let failureCount = 0
+    let firstFailure: unknown = null
+    await Promise.allSettled(
       params.resultNodeIds.map(async (resultNodeId) => {
-        const { taskId } = await params.submitTask(resultNodeId)
-        await persistPendingImageTaskId(params.boardId, resultNodeId, taskId)
-        const resolved = await params.resolveResult(taskId)
-        return { resultNodeId, ...resolved }
+        try {
+          const { taskId } = await params.submitTask(resultNodeId)
+          await persistPendingImageTaskId(params.boardId, resultNodeId, taskId)
+          const resolved = await params.resolveResult(taskId)
+          if (isBoardStillCurrent(params.boardId)) {
+            updatePendingImageResultNode(resultNodeId, resolved.url, resolved.ratio)
+          }
+          successCount += 1
+        } catch (error) {
+          firstFailure ??= error
+          if (isTaskResultPendingError(error)) {
+            pendingCount += 1
+            return
+          }
+          failureCount += 1
+          if (isBoardStillCurrent(params.boardId)) {
+            removePendingImageResultNode(resultNodeId)
+          }
+        }
       }),
     )
     if (!isBoardStillCurrent(params.boardId)) return
-    let successCount = 0
-    let firstFailure: unknown = null
-    results.forEach((result) => {
-      if (result.status === 'fulfilled') {
-        successCount += 1
-        updatePendingImageResultNode(
-          result.value.resultNodeId,
-          result.value.url,
-          result.value.ratio,
-        )
-        return
-      }
-      firstFailure ??= result.reason
-    })
-    params.resultNodeIds.forEach((resultNodeId, index) => {
-      if (results[index]?.status !== 'fulfilled') removePendingImageResultNode(resultNodeId)
-    })
+    if (successCount === 0 && pendingCount > 0) {
+      options.onWarning('任务进行中，稍后可在画布上查看结果')
+      return
+    }
     if (successCount === 0)
       throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
-    if (successCount < params.totalCount) {
+    if (pendingCount > 0) {
+      options.onWarning(`生成完成 ${successCount}/${params.totalCount} 张，其余任务稍后可查看`)
+    } else if (failureCount > 0) {
       options.onWarning(`生成完成 ${successCount}/${params.totalCount} 张，部分任务失败`)
     } else {
       options.onSuccess(successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成')
@@ -336,6 +346,10 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       updatePendingImageResultNode(resultNodeId, firstUrl, ratio)
       options.onSuccess('处理完成')
     } catch (error) {
+      if (isTaskResultPendingError(error) && resultNodeId) {
+        warnIfBoardCurrent(boardId, error.message)
+        return
+      }
       if (resultNodeId && isBoardStillCurrent(boardId)) {
         removePendingImageResultNode(resultNodeId)
       }

@@ -24,6 +24,9 @@ import (
 const (
 	// maxAPIResponseBody caps upstream API reads to prevent OOM from malicious or broken streams.
 	maxAPIResponseBody = 50 * 1024 * 1024 // 50 MB
+	// maxRemoteImageRefBytes caps remote image reference downloads to match the
+	// 10 MB limit already enforced for data URLs and local uploads.
+	maxRemoteImageRefBytes = 10 * 1024 * 1024
 	// maxErrorBodyLen caps error messages stored in task records.
 	maxErrorBodyLen = 500
 )
@@ -35,6 +38,22 @@ func readLimitedBody(body io.Reader) ([]byte, error) {
 	}
 	if len(data) > maxAPIResponseBody {
 		return nil, fmt.Errorf("响应体超过大小限制 (%d MB)", maxAPIResponseBody/1024/1024)
+	}
+	return data, nil
+}
+
+// readLimitedImageRef reads a remote image reference body with the 10 MB cap
+// that matches data URL and local upload limits.
+func readLimitedImageRef(body io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(body, maxRemoteImageRefBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxRemoteImageRefBytes {
+		return nil, fmt.Errorf("参考图像超过大小限制 (%d MB)", maxRemoteImageRefBytes/1024/1024)
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("参考图像为空")
 	}
 	return data, nil
 }
@@ -81,6 +100,7 @@ type providerCallTimeline struct {
 
 type providerCallOutput struct {
 	Result   string
+	Outputs  []tasks.TaskOutput
 	Timeline providerCallTimeline
 }
 
@@ -131,11 +151,12 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		)
 	}
 	imageURL := imageURLs[0]
+	var taskOutputs []tasks.TaskOutput
 
 	finalizeStartedAt := time.Now()
 	output.Timeline.FinalizeStartedAt = &finalizeStartedAt
 	if exec.LocalRedrawCtx != nil {
-		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, exec.LocalRedrawCtx, imageURL, exec.Timeout)
+		imageURL, taskOutputs, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, exec.LocalRedrawCtx, imageURL, exec.Timeout)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return output, err
@@ -149,7 +170,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	}
 
 	if !localRedrawStored {
-		imageURLs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, account, imageURLs)
+		imageURLs, taskOutputs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, account, imageURLs)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return output, err
@@ -181,6 +202,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		return providerCallOutput{}, err
 	}
 	output.Result = resultJSON
+	output.Outputs = taskOutputs
 	return output, nil
 }
 
@@ -303,12 +325,12 @@ func resolveAccountModelForExecution(account *accounts.ApiAccount, featureSlug s
 	return accounts.ResolveAccountModelForParams(account, featureSlug, params)
 }
 
-func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, error) {
+func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, []tasks.TaskOutput, error) {
 	if len(imageURLs) == 0 {
-		return imageURLs, nil
+		return imageURLs, nil, nil
 	}
 	if c.storageService == nil {
-		return nil, newExecutionFailureError(
+		return nil, nil, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("持久化上游图片失败: 存储服务未初始化"),
@@ -318,6 +340,8 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	slog.Info("provider result storage check", "object_storage", c.storageService.UsesObjectStorage(ctx), "image_count", len(imageURLs))
 
 	next := append([]string(nil), imageURLs...)
+	outputs := make([]tasks.TaskOutput, 0, len(next))
+	storedKeys := make([]string, 0, len(next))
 	for index, currentURL := range next {
 		storeOpts := storage.StorageStoreOptions{
 			AllowHosts: trustedImageDownloadHosts(account),
@@ -325,22 +349,52 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
 			storeOpts.DirPrefix = dirPrefix
 		}
-		storedURL, storeErr := c.storageService.StoreRemote(ctx, currentURL, storeOpts)
+		storedRef, storeErr := c.storageService.StoreRemoteRef(ctx, currentURL, storeOpts)
 		if storeErr == nil {
-			slog.Info("provider image materialized", "source_url", redactLogURL(currentURL), "stored_url", redactLogURL(storedURL))
-			next[index] = storedURL
+			slog.Info("provider image materialized", "source_url", redactLogURL(currentURL), "stored_url", redactLogURL(storedRef.URL))
+			next[index] = storedRef.URL
+			outputs = append(outputs, taskOutputFromStoredRef(taskID, storedRef, currentURL, len(outputs)))
+			if strings.TrimSpace(storedRef.StorageKey) != "" {
+				storedKeys = append(storedKeys, storedRef.StorageKey)
+			}
 			continue
 		}
-		if errors.Is(storeErr, context.Canceled) {
-			return nil, storeErr
+		if len(storedKeys) > 0 {
+			for _, storageKey := range storedKeys {
+				if delErr := c.storageService.DeleteObjectByKey(ctx, storageKey); delErr != nil {
+					slog.Warn("cleanup orphan materialized image failed", "task_id", taskID, "storage_key", storageKey, "err", delErr)
+				}
+			}
 		}
-		return nil, newExecutionFailureError(
+		if errors.Is(storeErr, context.Canceled) {
+			return nil, nil, storeErr
+		}
+		return nil, nil, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("持久化上游图片失败: %w", storeErr),
 		)
 	}
-	return next, nil
+	return next, outputs, nil
+}
+
+func taskOutputFromStoredRef(taskID string, ref *storage.StoredUploadRef, sourceURL string, sortIndex int) tasks.TaskOutput {
+	if ref == nil {
+		return tasks.TaskOutput{TaskID: taskID, Role: "image", SourceURL: sourceURL, SortIndex: sortIndex}
+	}
+	return tasks.TaskOutput{
+		TaskID:         taskID,
+		Role:           "image",
+		URL:            ref.URL,
+		StorageKey:     ref.StorageKey,
+		MIMEType:       ref.MIMEType,
+		Width:          ref.Width,
+		Height:         ref.Height,
+		SizeBytes:      ref.SizeBytes,
+		SourceURL:      sourceURL,
+		StorageProfile: ref.StorageProfile,
+		SortIndex:      sortIndex,
+	}
 }
 
 func isInlineDataImageURL(raw string) bool {

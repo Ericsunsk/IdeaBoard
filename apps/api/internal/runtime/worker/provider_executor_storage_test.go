@@ -22,7 +22,7 @@ func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *tes
 
 	dataURL := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQBx3Y4ZAAAAAElFTkSuQmCC"
 
-	urls, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", &accounts.ApiAccount{}, []string{dataURL})
+	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", &accounts.ApiAccount{}, []string{dataURL})
 	if err != nil {
 		t.Fatalf("materializeProviderResultImages returned error: %v", err)
 	}
@@ -37,6 +37,15 @@ func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *tes
 	}
 	if _, err := os.Stat(filepath.FromSlash(strings.TrimPrefix(urls[0], "/"))); err != nil {
 		t.Fatalf("stored file not found: %v", err)
+	}
+	if len(outputs) != 1 {
+		t.Fatalf("outputs len=%d, want 1", len(outputs))
+	}
+	if outputs[0].URL != urls[0] || !strings.HasPrefix(outputs[0].StorageKey, "uploads/tasks/42/task-owned/") {
+		t.Fatalf("unexpected output: %+v", outputs[0])
+	}
+	if outputs[0].StorageProfile != "builtin-local" || outputs[0].MIMEType != "image/png" || outputs[0].Width != 1 || outputs[0].Height != 1 {
+		t.Fatalf("unexpected output metadata: %+v", outputs[0])
 	}
 }
 
@@ -73,7 +82,8 @@ func TestMaterializeProviderResultImagesStoresRemoteURLToLocalStorage(t *testing
 
 	executor := newTestProviderExecutorWithLocalStorage(t)
 
-	urls, err := executor.materializeProviderResultImages(context.Background(), 42, "task-remote", &accounts.ApiAccount{ProxyURL: server.URL}, []string{server.URL + "/image.png?token=secret"})
+	sourceURL := server.URL + "/image.png?token=secret"
+	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-remote", &accounts.ApiAccount{ProxyURL: server.URL}, []string{sourceURL})
 	if err != nil {
 		t.Fatalf("materializeProviderResultImages returned error: %v", err)
 	}
@@ -85,6 +95,15 @@ func TestMaterializeProviderResultImagesStoresRemoteURLToLocalStorage(t *testing
 	}
 	if _, err := os.Stat(filepath.FromSlash(strings.TrimPrefix(urls[0], "/"))); err != nil {
 		t.Fatalf("stored file not found: %v", err)
+	}
+	if len(outputs) != 1 {
+		t.Fatalf("outputs len=%d, want 1", len(outputs))
+	}
+	if outputs[0].URL != urls[0] || outputs[0].SourceURL != sourceURL || !strings.HasPrefix(outputs[0].StorageKey, "uploads/tasks/42/task-remote/") {
+		t.Fatalf("unexpected output: %+v", outputs[0])
+	}
+	if outputs[0].Width != 1 || outputs[0].Height != 1 {
+		t.Fatalf("unexpected output dimensions: %+v", outputs[0])
 	}
 }
 
@@ -168,7 +187,7 @@ func TestMaterializeProviderResultImagesFailsWhenRemoteCannotBeStored(t *testing
 		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db)),
 	}
 
-	_, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{ProxyURL: server.URL}, []string{server.URL + "/image.png"})
+	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{ProxyURL: server.URL}, []string{server.URL + "/image.png"})
 	if err == nil {
 		t.Fatal("expected materializeProviderResultImages to fail")
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"ideaboard/api/internal/platform/response"
@@ -70,7 +71,7 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 	}
 	taskID, err := h.taskService.SubmitTask(c.Request.Context(), userID, &req)
 	if err != nil {
-		response.Error(c, 400, err.Error())
+		response.Error(c, 400, userFacingSubmitError(err))
 		return
 	}
 	response.Success(c, gin.H{"task_id": taskID})
@@ -88,7 +89,7 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 	}
 	featureSlug, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
 	if err != nil {
-		response.Success(c, gin.H{"ready": false, "message": err.Error()})
+		response.Success(c, gin.H{"ready": false, "message": userFacingSubmitError(err)})
 		return
 	}
 	response.Success(c, gin.H{"ready": true, "feature": featureSlug})
@@ -143,6 +144,23 @@ func validateTaskListQueryIDs(c *gin.Context, userID int64, accountID int64) err
 		return validation.New("account_id 必须大于 0")
 	}
 	return nil
+}
+
+// userFacingSubmitError maps internal errors to user-safe messages.
+// Validation errors and expected user-facing sentinels pass through unchanged.
+func userFacingSubmitError(err error) string {
+	if err == nil {
+		return "未知错误"
+	}
+	msg := err.Error()
+	// Known user-facing messages from the validation layer are safe to expose.
+	if strings.Contains(msg, "提示词") || strings.Contains(msg, "图片") || strings.Contains(msg, "参数") ||
+		strings.Contains(msg, "格式") || strings.Contains(msg, "数量") || strings.Contains(msg, "大小") ||
+		strings.Contains(msg, "feature") || strings.Contains(msg, "API 账号") ||
+		strings.Contains(msg, "任务提交失败") || strings.Contains(msg, "请先添加账号") {
+		return msg
+	}
+	return "任务提交失败，请稍后重试"
 }
 
 func (h *Handler) GetUserTasks(c *gin.Context) {

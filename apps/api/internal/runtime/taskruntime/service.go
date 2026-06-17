@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strings"
 	"time"
 
@@ -160,20 +159,27 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 }
 
 func (s *Service) MarkTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string) error {
-	return s.markTaskCompleted(ctx, assignment, result, nil)
+	return s.markTaskCompleted(ctx, assignment, result, nil, nil)
 }
 
 func (s *Service) MarkTaskCompletedWithAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, result string, finish tasks.TaskAttemptFinish) error {
-	return s.markTaskCompleted(ctx, assignment, result, &finish)
+	return s.markTaskCompleted(ctx, assignment, result, nil, &finish)
 }
 
-func (s *Service) markTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string, attemptFinish *tasks.TaskAttemptFinish) error {
+func (s *Service) MarkTaskCompletedWithOutputs(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput) error {
+	return s.markTaskCompleted(ctx, assignment, result, outputs, nil)
+}
+
+func (s *Service) MarkTaskCompletedWithOutputsAndAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, finish tasks.TaskAttemptFinish) error {
+	return s.markTaskCompleted(ctx, assignment, result, outputs, &finish)
+}
+
+func (s *Service) markTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) error {
 	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
 	now := taskTerminalTime(attemptFinish)
-	outputs, err := taskOutputsFromResult(assignment.TaskID, result)
-	if err != nil {
+	if err := validateTaskOutputs(assignment.TaskID, outputs); err != nil {
 		return err
 	}
 	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, result, now, outputs, attemptFinish)
@@ -465,83 +471,19 @@ func (s *Service) ResetAccountFailure(ctx context.Context, accountID int64) erro
 	return s.accountRepo.ResetFailCount(ctx, accountID)
 }
 
-func taskOutputsFromResult(taskID string, rawResult string) ([]tasks.TaskOutput, error) {
-	rawResult = strings.TrimSpace(rawResult)
-	if rawResult == "" {
-		return nil, nil
-	}
-
-	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(rawResult), &payload); err != nil {
-		return nil, nil
-	}
-
-	urls := resultImageURLs(payload)
-	outputs := make([]tasks.TaskOutput, 0, len(urls))
-	seen := make(map[string]struct{}, len(urls))
-	for _, rawURL := range urls {
-		imageURL := strings.TrimSpace(rawURL)
-		if imageURL == "" {
-			continue
+func validateTaskOutputs(taskID string, outputs []tasks.TaskOutput) error {
+	for _, output := range outputs {
+		if strings.TrimSpace(output.TaskID) != "" && strings.TrimSpace(output.TaskID) != taskID {
+			return fmt.Errorf("任务结果包含非本任务的输出")
 		}
-		if _, ok := seen[imageURL]; ok {
-			continue
+		if strings.TrimSpace(output.URL) == "" {
+			return fmt.Errorf("任务结果输出缺少 URL")
 		}
-		seen[imageURL] = struct{}{}
-		if isInlineImageDataURL(imageURL) {
-			return nil, fmt.Errorf("任务结果包含未持久化的内联图片")
-		}
-		outputs = append(outputs, tasks.TaskOutput{
-			TaskID:     taskID,
-			Role:       "image",
-			URL:        imageURL,
-			StorageKey: outputStorageKey(imageURL),
-			SortIndex:  len(outputs),
-		})
-	}
-	return outputs, nil
-}
-
-func resultImageURLs(payload map[string]interface{}) []string {
-	urls := make([]string, 0, 4)
-	if raw, ok := payload["image_urls"]; ok {
-		switch values := raw.(type) {
-		case []interface{}:
-			for _, value := range values {
-				if imageURL, ok := value.(string); ok {
-					urls = append(urls, imageURL)
-				}
-			}
-		case []string:
-			urls = append(urls, values...)
+		if strings.TrimSpace(output.StorageKey) == "" {
+			return fmt.Errorf("任务结果输出缺少 storage_key")
 		}
 	}
-	if raw, ok := payload["image_url"].(string); ok {
-		urls = append(urls, raw)
-	}
-	return urls
-}
-
-func isInlineImageDataURL(raw string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(raw)), "data:image/")
-}
-
-func outputStorageKey(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if strings.HasPrefix(trimmed, "/uploads/") {
-		return strings.TrimPrefix(trimmed, "/")
-	}
-
-	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed == nil {
-		return ""
-	}
-	path := strings.TrimSpace(parsed.Path)
-	index := strings.Index(path, "/uploads/")
-	if index < 0 {
-		return ""
-	}
-	return strings.TrimPrefix(path[index:], "/")
+	return nil
 }
 
 func formatTaskFailureResult(taskID string, reason string) string {

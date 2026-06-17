@@ -23,6 +23,17 @@ type WaitTaskResultOptions = {
   pollMaxDelayMs?: number
 }
 
+export class TaskResultPendingError extends Error {
+  constructor(message = '任务仍在处理中，请稍后查看结果') {
+    super(message)
+    this.name = 'TaskResultPendingError'
+  }
+}
+
+export function isTaskResultPendingError(error: unknown): error is TaskResultPendingError {
+  return error instanceof TaskResultPendingError
+}
+
 export function waitTaskResultWithSse(
   taskId: string,
   options?: WaitTaskResultOptions,
@@ -79,7 +90,7 @@ function waitWithEventSource(
 
     timeout = window.setTimeout(
       () => {
-        settleReject(new Error('任务进度推送超时，请稍后查看结果'))
+        settleReject(new TaskResultPendingError('任务进度推送超时，请稍后查看结果'))
       },
       Math.max(0, deadlineAt - Date.now()),
     )
@@ -179,9 +190,9 @@ async function waitWithPolling(
   }
 
   if (lastError) {
-    throw new Error('任务状态查询超时，请稍后查看结果')
+    throw new TaskResultPendingError('任务状态查询超时，请稍后查看结果')
   }
-  throw new Error('任务进度推送超时，请稍后查看结果')
+  throw new TaskResultPendingError('任务进度推送超时，请稍后查看结果')
 }
 
 function sleep(ms: number): Promise<void> {
