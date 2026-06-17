@@ -159,10 +159,10 @@ func TestCompleteWithOutputsAndLeaseTokenRejectsWrongLeaseToken(t *testing.T) {
 	accountID := seedRepositoryTestAccount(t, db, 11)
 
 	task := &tasks.Task{
-		TaskID:    "lease-conflict-wrong-token",
-		UserID:    1,
-		AccountID: tasks.IDPtr(accountID),
-		Status:    tasks.StatusRunning,
+		TaskID:     "lease-conflict-wrong-token",
+		UserID:     1,
+		AccountID:  tasks.IDPtr(accountID),
+		Status:     tasks.StatusRunning,
 		LeaseToken: "correct-token",
 	}
 	seedTasks(t, repo, ctx, task)
@@ -198,10 +198,10 @@ func TestCompleteWithOutputsAndLeaseTokenConcurrentOnlyOneSucceeds(t *testing.T)
 	accountID := seedRepositoryTestAccount(t, db, 11)
 
 	task := &tasks.Task{
-		TaskID:    "lease-conflict-concurrent",
-		UserID:    1,
-		AccountID: tasks.IDPtr(accountID),
-		Status:    tasks.StatusRunning,
+		TaskID:     "lease-conflict-concurrent",
+		UserID:     1,
+		AccountID:  tasks.IDPtr(accountID),
+		Status:     tasks.StatusRunning,
 		LeaseToken: "token-a",
 	}
 	seedTasks(t, repo, ctx, task)

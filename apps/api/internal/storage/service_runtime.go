@@ -382,16 +382,6 @@ func (s *StorageService) saveUploadedFileLocal(file *multipart.FileHeader, opts 
 	return s.saveReaderLocal(file.Filename, src, file.Size, opts)
 }
 
-func (s *StorageService) saveUploadedFileLocalRef(file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
-	src, err := file.Open()
-	if err != nil {
-		return nil, fmt.Errorf("打开文件失败: %w", err)
-	}
-	defer src.Close()
-
-	return s.saveReaderLocalRef(file.Filename, file.Header.Get("Content-Type"), src, file.Size, opts)
-}
-
 func (s *StorageService) saveBytesLocal(filename string, data []byte, opts StorageStoreOptions) (string, error) {
 	return s.saveReaderLocal(filename, bytes.NewReader(data), int64(len(data)), opts)
 }

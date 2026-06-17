@@ -203,9 +203,10 @@ func TestRateLimitConcurrentRequestsDontOverflow(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 				req.RemoteAddr = "203.0.113.40:12345"
 				router.ServeHTTP(res, req)
-				if res.Code == http.StatusOK {
+				switch res.Code {
+				case http.StatusOK:
 					ok.Add(1)
-				} else if res.Code == http.StatusTooManyRequests {
+				case http.StatusTooManyRequests:
 					limited.Add(1)
 				}
 			}
