@@ -44,6 +44,7 @@ const USER_INFO = {
 }
 
 const MOCK_BOARD_STATE = {
+  schemaVersion: 1 as const,
   imageNodes: [],
   promptNodes: [
     {
@@ -70,6 +71,8 @@ const MOCK_BOARD = {
   name: MOCK_BOARD_NAME,
   state: MOCK_BOARD_STATE,
   access_role: 'owner',
+  revision: 1,
+  state_schema_version: 1,
   created_at: MOCK_UPDATED_AT - 86_400_000,
   updated_at: MOCK_UPDATED_AT,
 } satisfies UserBoardItem

@@ -5,7 +5,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * @nullable
- */
-export type UserBoardUpsertRequestState = { [key: string]: unknown } | null
+export interface LocalStorageProfileConfig {
+  [key: string]: unknown
+}

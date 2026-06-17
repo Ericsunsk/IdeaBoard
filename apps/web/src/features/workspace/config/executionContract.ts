@@ -1,4 +1,4 @@
-import type { SubmitTaskData } from '../../../shared/api/task'
+import type { SubmitTaskData, SubmitTaskParams } from '../../../shared/api/task'
 import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls'
 import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
 
@@ -72,11 +72,11 @@ interface BuildExecutionTaskRequestOptions {
   prompt: string
   feature?: ExecutionFeature
   imageUrls?: string[]
-  params?: Record<string, unknown>
+  params?: SubmitTaskParams
 }
 
-const MEDIA_STRING_PARAM_KEYS = new Set(['image_url', 'original_image_url', 'mask_image_url'])
-const MEDIA_LIST_PARAM_KEYS = new Set(['image_urls', 'mask_image_urls', 'reference_image_urls'])
+const MEDIA_STRING_PARAM_KEYS = new Set(['original_image_url', 'mask_image_url'])
+const MEDIA_LIST_PARAM_KEYS = new Set(['reference_image_urls'])
 
 function canonicalizeTaskMediaParam(key: string, value: unknown): unknown {
   if (MEDIA_STRING_PARAM_KEYS.has(key) && typeof value === 'string') {
@@ -109,9 +109,7 @@ export function buildExecutionTaskRequest(
       key,
       canonicalizeTaskMediaParam(key, value),
     ]),
-  )
-  delete nextParams.feature
-  delete nextParams.image_urls
+  ) as SubmitTaskParams
   if (Object.keys(nextParams).length > 0) {
     request.params = nextParams
   }

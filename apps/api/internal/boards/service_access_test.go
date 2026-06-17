@@ -22,16 +22,16 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	memberC := createBoardTestUser(t, userRepo, "member-c")
 
 	boardID := "shared-board"
-	boardA, err := service.UpsertBoard(ctx, ownerA.ID, boardID, &UpsertBoardRequest{Name: "Alpha Board", State: map[string]interface{}{"v": 1}})
+	boardA, err := service.UpsertBoard(ctx, ownerA.ID, boardID, &UpsertBoardRequest{Name: "Alpha Board", State: validBoardState(1, 101)})
 	if err != nil {
 		t.Fatalf("create board A failed: %v", err)
 	}
-	if _, err := service.UpsertBoard(ctx, ownerB.ID, boardID, &UpsertBoardRequest{Name: "Beta Board", State: map[string]interface{}{"v": 2}}); !errors.Is(err, ErrBoardIDConflict) {
+	if _, err := service.UpsertBoard(ctx, ownerB.ID, boardID, &UpsertBoardRequest{Name: "Beta Board", State: validBoardState(1, 102)}); !errors.Is(err, ErrBoardIDConflict) {
 		t.Fatalf("duplicate board id err = %v, want ErrBoardIDConflict", err)
 	}
 
 	boardBID := "owner-b-board"
-	boardB, err := service.UpsertBoard(ctx, ownerB.ID, boardBID, &UpsertBoardRequest{Name: "Beta Board", State: map[string]interface{}{"v": 2}})
+	boardB, err := service.UpsertBoard(ctx, ownerB.ID, boardBID, &UpsertBoardRequest{Name: "Beta Board", State: validBoardState(1, 102)})
 	if err != nil {
 		t.Fatalf("create board B failed: %v", err)
 	}
@@ -97,14 +97,14 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	editor := createBoardTestUser(t, userRepo, "editor-member")
 
 	boardID := "editable-board"
-	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: map[string]interface{}{"v": 1}}); err != nil {
+	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: validBoardState(1, 100)}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
 	if _, err := service.InviteMember(ctx, owner.ID, boardID, editor.StorageUID, string(BoardAccessRoleEditor)); err != nil {
 		t.Fatalf("invite editor failed: %v", err)
 	}
 
-	updated, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: map[string]interface{}{"v": 2}})
+	updated, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: validBoardState(1, 250)})
 	if err != nil {
 		t.Fatalf("editor update failed: %v", err)
 	}
@@ -114,15 +114,23 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	if updated.Board.UserID != owner.ID {
 		t.Fatalf("updated owner id = %d, want %d", updated.Board.UserID, owner.ID)
 	}
-	var state map[string]int
+	var state struct {
+		SchemaVersion int `json:"schemaVersion"`
+		Viewport      struct {
+			ZoomLevel int `json:"zoomLevel"`
+		} `json:"viewport"`
+	}
 	if err := json.Unmarshal([]byte(updated.Board.State), &state); err != nil {
 		t.Fatalf("decode updated state failed: %v", err)
 	}
-	if state["v"] != 2 {
-		t.Fatalf("updated state v = %d, want 2", state["v"])
+	if state.SchemaVersion != 1 {
+		t.Fatalf("updated schemaVersion = %d, want 1", state.SchemaVersion)
+	}
+	if state.Viewport.ZoomLevel != 250 {
+		t.Fatalf("updated zoomLevel = %d, want 250", state.Viewport.ZoomLevel)
 	}
 
-	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Renamed Board", State: map[string]interface{}{"v": 3}}); !errors.Is(err, ErrBoardPermissionDenied) {
+	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Renamed Board", State: validBoardState(1, 300)}); !errors.Is(err, ErrBoardPermissionDenied) {
 		t.Fatalf("editor rename err = %v, want ErrBoardPermissionDenied", err)
 	}
 }

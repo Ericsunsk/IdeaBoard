@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * @nullable
- */
-export type UserBoardItemState = { [key: string]: unknown } | null
+export interface BoardStateMediaRef {
+  url: string
+  role?: string
+}

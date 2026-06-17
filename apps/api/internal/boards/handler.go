@@ -348,7 +348,7 @@ func toBoardDTO(board UserBoard, role BoardAccessRole) boardDTO {
 		State:              parseBoardState(board.State),
 		AccessRole:         string(role),
 		Revision:           board.Revision,
-		StateSchemaVersion: board.StateSchemaVersion,
+		StateSchemaVersion: int32(StateSchemaVersion(&board)),
 		CreatedAt:          board.CreatedAt.UnixMilli(),
 		UpdatedAt:          board.UpdatedAt.UnixMilli(),
 	}

@@ -1262,17 +1262,17 @@ components:
 
     UserBoardItem:
       type: object
-      required: [board_id, name, state, created_at, updated_at]
+      required: [board_id, name, state, revision, state_schema_version, created_at, updated_at]
       properties:
         board_id: { type: string }
         name: { type: string }
         state:
-          type: object
-          nullable: true
-          additionalProperties: true
+          $ref: '#/components/schemas/BoardStateEnvelope'
         access_role:
           type: string
           enum: [owner, editor, viewer]
+        revision: { type: integer }
+        state_schema_version: { type: integer }
         created_at: { type: number }
         updated_at: { type: number }
 
@@ -1282,11 +1282,69 @@ components:
       properties:
         name: { type: string }
         state:
-          type: object
-          nullable: true
-          additionalProperties: true
+          $ref: '#/components/schemas/BoardStateEnvelope'
         created_at: { type: number }
         updated_at: { type: number }
+
+    BoardStateEnvelope:
+      type: object
+      required: [schemaVersion, imageNodes, promptNodes, fusionNodes, connections, viewport, updatedAt]
+      additionalProperties: false
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        imageNodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardStateNode'
+        promptNodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardStateNode'
+        fusionNodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardStateNode'
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardStateConnection'
+        viewport:
+          $ref: '#/components/schemas/BoardStateViewport'
+        mediaRefs:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardStateMediaRef'
+        previewSnapshotDataUrl: { type: string }
+        previewSnapshotUpdatedAt: { type: number }
+        previewSnapshotVersion: { type: integer }
+        updatedAt: { type: number }
+
+    BoardStateNode:
+      type: object
+      additionalProperties: true
+
+    BoardStateConnection:
+      type: object
+      additionalProperties: true
+
+    BoardStateViewport:
+      type: object
+      required: [canvasX, canvasY, zoomLevel]
+      additionalProperties: false
+      properties:
+        canvasX: { type: number }
+        canvasY: { type: number }
+        zoomLevel: { type: number }
+
+    BoardStateMediaRef:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url: { type: string }
+        role: { type: string }
 
     BoardMemberItem:
       type: object
@@ -1496,13 +1554,206 @@ components:
       required: [prompt]
       properties:
         prompt: { type: string }
-        feature: { type: string }
+        feature:
+          $ref: '#/components/schemas/WorkflowFeatureSlug'
         image_urls:
           type: array
           items: { type: string }
         params:
+          $ref: '#/components/schemas/SubmitTaskRequestParams'
+
+    WorkflowFeatureSlug:
+      type: string
+      enum:
+        - partial-edit
+        - remove-bg
+        - style-fusion
+        - pattern-gen
+        - sketch-to-image
+        - style-variation
+        - hd-upscale
+        - image-extend
+
+    SubmitTaskRequestParams:
+      type: object
+      additionalProperties: false
+      properties:
+        model: { type: string }
+        original_image_url: { type: string }
+        mask_image_url: { type: string }
+        reference_image_urls:
+          type: array
+          items: { type: string }
+        use_mask: { type: boolean }
+        custom_width:
+          type: number
+          minimum: 1
+        custom_height:
+          type: number
+          minimum: 1
+        original_image_width:
+          type: number
+          minimum: 1
+        original_image_height:
+          type: number
+          minimum: 1
+        ratio: { type: string }
+        quality: { type: string }
+        sample_count:
+          type: integer
+          minimum: 1
+        output_count:
+          type: integer
+          minimum: 1
+        image_count:
+          type: integer
+          minimum: 1
+        prompt_upsampling: { type: boolean }
+        variation:
+          $ref: '#/components/schemas/StyleVariationParams'
+        extend:
+          $ref: '#/components/schemas/ImageExtendParams'
+        hd:
+          $ref: '#/components/schemas/HDUpscaleParams'
+        fusion:
+          $ref: '#/components/schemas/StyleFusionParams'
+
+    WorkflowTaskParams:
+      type: object
+      additionalProperties: false
+      properties:
+        schema_version:
+          type: integer
+          minimum: 1
+        feature:
+          $ref: '#/components/schemas/WorkflowFeatureSlug'
+        model: { type: string }
+        media:
+          $ref: '#/components/schemas/WorkflowMediaInputs'
+        controls:
+          $ref: '#/components/schemas/GenerationControls'
+        variation:
+          $ref: '#/components/schemas/StyleVariationParams'
+        extend:
+          $ref: '#/components/schemas/ImageExtendParams'
+        hd:
+          $ref: '#/components/schemas/HDUpscaleParams'
+        fusion:
+          $ref: '#/components/schemas/StyleFusionParams'
+        extra:
           type: object
           additionalProperties: true
+
+    WorkflowMediaInputs:
+      type: object
+      additionalProperties: false
+      properties:
+        inputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowMediaRef'
+        references:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowMediaRef'
+        mask:
+          $ref: '#/components/schemas/WorkflowMediaRef'
+        original:
+          $ref: '#/components/schemas/WorkflowMediaRef'
+        use_mask: { type: boolean }
+
+    WorkflowMediaRef:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url: { type: string }
+        role: { type: string }
+        weight:
+          type: number
+          minimum: 0
+
+    GenerationControls:
+      type: object
+      additionalProperties: false
+      properties:
+        custom_width:
+          type: number
+          minimum: 1
+        custom_height:
+          type: number
+          minimum: 1
+        original_image_width:
+          type: number
+          minimum: 1
+        original_image_height:
+          type: number
+          minimum: 1
+        ratio: { type: string }
+        quality: { type: string }
+        sample_count:
+          type: integer
+          minimum: 1
+        output_count:
+          type: integer
+          minimum: 1
+        image_count:
+          type: integer
+          minimum: 1
+        prompt_upsampling: { type: boolean }
+
+    StyleVariationParams:
+      type: object
+      required: [strength]
+      additionalProperties: false
+      properties:
+        strength:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    ImageExtendParams:
+      type: object
+      required: [top_percent, right_percent, bottom_percent, left_percent]
+      additionalProperties: false
+      properties:
+        top_percent:
+          type: number
+          minimum: 0
+        right_percent:
+          type: number
+          minimum: 0
+        bottom_percent:
+          type: number
+          minimum: 0
+        left_percent:
+          type: number
+          minimum: 0
+
+    HDUpscaleParams:
+      type: object
+      required: [clarity_strength]
+      additionalProperties: false
+      properties:
+        clarity_strength:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    StyleFusionParams:
+      type: object
+      required: [input_weights]
+      additionalProperties: false
+      properties:
+        mode:
+          type: string
+          enum: [weighted_reference]
+        input_weights:
+          type: array
+          minItems: 1
+          items:
+            type: number
+            minimum: 0
 
     RateLimitSetting:
       type: object
@@ -1923,8 +2174,7 @@ components:
         builtin: { type: boolean }
         secret_configured: { type: boolean }
         config:
-          type: object
-          additionalProperties: true
+          $ref: '#/components/schemas/StorageProfileConfig'
 
     StorageProfilePayload:
       type: object
@@ -1934,8 +2184,29 @@ components:
         provider: { type: string }
         enabled: { type: boolean }
         config:
-          type: object
-          additionalProperties: true
+          $ref: '#/components/schemas/StorageProfileConfig'
+
+    StorageProfileConfig:
+      oneOf:
+        - $ref: '#/components/schemas/LocalStorageProfileConfig'
+        - $ref: '#/components/schemas/S3CompatibleStorageProfileConfig'
+
+    LocalStorageProfileConfig:
+      type: object
+      additionalProperties: false
+
+    S3CompatibleStorageProfileConfig:
+      type: object
+      required: [access_key_id, bucket_name, endpoint, access_domain, force_path_style]
+      additionalProperties: false
+      properties:
+        access_key_id: { type: string }
+        secret_access_key: { type: string }
+        bucket_name: { type: string }
+        endpoint: { type: string }
+        region_id: { type: string }
+        access_domain: { type: string }
+        force_path_style: { type: boolean }
 
     UploadImageMetadata:
       type: object

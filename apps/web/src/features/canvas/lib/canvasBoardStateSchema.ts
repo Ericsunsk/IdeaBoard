@@ -5,6 +5,7 @@ import {
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   MAX_IMAGE_NODE_OUTPUT_COUNT,
   MIN_IMAGE_NODE_OUTPUT_COUNT,
+  CANVAS_BOARD_STATE_SCHEMA_VERSION,
   type CanvasBoardSnapshot,
 } from '../../workspace/types/canvasNodes'
 import { PROMPT_ASPECT_RATIO_OPTIONS } from '../../workspace/config/promptAspectRatio'
@@ -116,6 +117,7 @@ const canvasViewportStateSchema = v.strictObject({
 })
 
 const canvasBoardSnapshotShape = v.strictObject({
+  schemaVersion: v.literal(CANVAS_BOARD_STATE_SCHEMA_VERSION),
   imageNodes: v.array(imageNodeItemSchema),
   promptNodes: v.array(promptNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),
@@ -129,6 +131,7 @@ export const canvasBoardSnapshotSchema = canvasBoardSnapshotShape satisfies v.Ge
 >
 
 const canvasBoardStateShape = v.strictObject({
+  schemaVersion: v.literal(CANVAS_BOARD_STATE_SCHEMA_VERSION),
   imageNodes: v.array(imageNodeItemSchema),
   promptNodes: v.array(promptNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),

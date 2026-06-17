@@ -27,12 +27,14 @@ export type StorageProviderMeta = Omit<GeneratedStorageProviderMeta, 'provider' 
   provider: StorageProvider
   fields: StorageProviderField[]
 }
-export type StorageProfile = Omit<GeneratedStorageProfile, 'provider' | 'secret_configured'> & {
+export type StorageProfile = Omit<GeneratedStorageProfile, 'provider' | 'secret_configured' | 'config'> & {
   provider: StorageProvider
   secret_configured: boolean
+  config: Record<string, unknown>
 }
-export type StorageProfilePayload = Omit<GeneratedStorageProfilePayload, 'provider'> & {
+export type StorageProfilePayload = Omit<GeneratedStorageProfilePayload, 'provider' | 'config'> & {
   provider: StorageProvider
+  config: Record<string, unknown>
 }
 
 function normalizeStorageProfile(profile: GeneratedStorageProfile): StorageProfile {
@@ -40,6 +42,7 @@ function normalizeStorageProfile(profile: GeneratedStorageProfile): StorageProfi
     ...profile,
     provider: profile.provider,
     secret_configured: profile.secret_configured ?? false,
+    config: profile.config as Record<string, unknown>,
   }
 }
 
@@ -60,7 +63,7 @@ export const storageApi = {
     data: StorageProfilePayload,
     options?: CreateAdminStorageProfileParams,
   ): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> => {
-    const res = await createAdminStorageProfile(data, options)
+    const res = await createAdminStorageProfile(data as GeneratedStorageProfilePayload, options)
     return {
       ...res,
       data: res.data && {
@@ -74,7 +77,7 @@ export const storageApi = {
     data: StorageProfilePayload,
     options?: UpdateAdminStorageProfileParams,
   ): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> => {
-    const res = await updateAdminStorageProfile(id, data, options)
+    const res = await updateAdminStorageProfile(id, data as GeneratedStorageProfilePayload, options)
     return {
       ...res,
       data: res.data && {

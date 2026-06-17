@@ -222,7 +222,7 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 }
 
 func storageProfileConfigForDB(profile StorageProfile) (json.RawMessage, string, error) {
-	config := cloneConfig(profile.Config)
+	config := storageProfileConfigMap(profile.Provider, profile.Config)
 	secret := strings.TrimSpace(configString(config, storageSecretAccessKeyName))
 	delete(config, storageSecretAccessKeyName)
 	if config == nil {

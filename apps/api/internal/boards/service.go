@@ -89,7 +89,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 	if normalizedID == "" || name == "" {
 		return nil, ErrInvalidBoardInput
 	}
-	state, err := marshalState(req.State)
+	state, stateSchemaVersion, err := marshalState(req.State)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +104,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		board := existing.Board
 		board.Name = name
 		board.State = state
+		board.StateSchemaVersion = stateSchemaVersion
 		board.LastSavedBy = &userID
 		board.UpdatedAt = updatedAt
 		return s.saveAndReloadBoardForActor(ctx, userID, &board)
@@ -120,6 +121,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		}
 		board := accessible.Board
 		board.State = state
+		board.StateSchemaVersion = stateSchemaVersion
 		board.LastSavedBy = &userID
 		board.UpdatedAt = updatedAt
 		return s.saveAndReloadBoardForActor(ctx, userID, &board)
@@ -139,7 +141,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		Name:               name,
 		State:              state,
 		Revision:           1,
-		StateSchemaVersion: 1,
+		StateSchemaVersion: stateSchemaVersion,
 		LastSavedBy:        &userID,
 		CreatedAt:          createdAt,
 		UpdatedAt:          updatedAt,
@@ -477,21 +479,25 @@ func normalizeBoardMemberRole(role string) BoardAccessRole {
 	}
 }
 
-func marshalState(state interface{}) (string, error) {
+func marshalState(state interface{}) (string, int32, error) {
 	if state == nil {
-		return "null", nil
+		return "", 0, ErrInvalidBoardInput
 	}
 	if jsonlimit.ValueDepth(state) > maxBoardStateDepth {
-		return "", ErrInvalidBoardInput
+		return "", 0, ErrInvalidBoardInput
 	}
 	payload, err := json.Marshal(state)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if len(payload) > maxBoardStateBytes {
-		return "", ErrInvalidBoardInput
+		return "", 0, ErrInvalidBoardInput
 	}
-	return string(payload), nil
+	envelope, err := validateBoardStateEnvelopeJSON(payload)
+	if err != nil {
+		return "", 0, err
+	}
+	return string(payload), int32(envelope.SchemaVersion), nil
 }
 
 func resolveClientTime(raw *int64, fallback time.Time) time.Time {

@@ -4,5 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { LocalStorageProfileConfig } from './localStorageProfileConfig'
+import type { S3CompatibleStorageProfileConfig } from './s3CompatibleStorageProfileConfig'
 
-export type StorageProfileConfig = { [key: string]: unknown }
+export type StorageProfileConfig = LocalStorageProfileConfig | S3CompatibleStorageProfileConfig

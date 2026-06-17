@@ -5,10 +5,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SubmitTaskRequestParams } from './submitTaskRequestParams'
+import type { WorkflowFeatureSlug } from './workflowFeatureSlug'
 
 export interface SubmitTaskRequest {
   prompt: string
-  feature?: string
+  feature?: WorkflowFeatureSlug
   image_urls?: string[]
   params?: SubmitTaskRequestParams
 }

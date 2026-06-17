@@ -1,11 +1,12 @@
-import type {
-  CanvasBoardSnapshot,
-  CanvasConnection,
-  CanvasViewportState,
-  FusionNodeItem,
-  ImageNodeItem,
-  ImageNodeOutputItem,
-  PromptNodeItem,
+import {
+  CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  type CanvasBoardSnapshot,
+  type CanvasConnection,
+  type CanvasViewportState,
+  type FusionNodeItem,
+  type ImageNodeItem,
+  type ImageNodeOutputItem,
+  type PromptNodeItem,
 } from '../../workspace/types/canvasNodes'
 import * as v from 'valibot'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
@@ -66,12 +67,29 @@ function readRawStateMap(): Record<string, CanvasBoardState> {
 
 function stripPreviewSnapshot(state: CanvasBoardState): CanvasBoardState {
   return {
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     imageNodes: state.imageNodes,
     promptNodes: state.promptNodes,
     fusionNodes: state.fusionNodes,
     connections: state.connections,
     viewport: state.viewport,
     updatedAt: state.updatedAt,
+  }
+}
+
+export function createEmptyCanvasBoardState(updatedAt = Date.now()): CanvasBoardState {
+  return {
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+    imageNodes: [],
+    promptNodes: [],
+    fusionNodes: [],
+    connections: [],
+    viewport: {
+      canvasX: 0,
+      canvasY: 0,
+      zoomLevel: 100,
+    },
+    updatedAt,
   }
 }
 
@@ -172,6 +190,7 @@ export function setCanvasBoardState(
   const existing = stateMap[id]
   const validState = toValidBoardState({
     ...state,
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     previewSnapshotDataUrl: existing?.previewSnapshotDataUrl,
     previewSnapshotUpdatedAt: existing?.previewSnapshotUpdatedAt,
     previewSnapshotVersion: existing?.previewSnapshotVersion,

@@ -1,4 +1,4 @@
-import boardApi, { type UserBoardItem } from '../../../shared/api/board'
+import boardApi, { type BoardStateEnvelope, type UserBoardItem } from '../../../shared/api/board'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import {
   getCanvasBoardById,
@@ -8,6 +8,7 @@ import {
   type CanvasBoardMeta,
 } from './canvasBoards'
 import {
+  createEmptyCanvasBoardState,
   getCanvasBoardState,
   replaceCanvasBoardStateMap,
   type CanvasBoardState,
@@ -44,7 +45,7 @@ function toLocalMeta(board: UserBoardItem): CanvasBoardMeta | null {
 
 function toLocalState(board: UserBoardItem): CanvasBoardState | null {
   if (!board.state || typeof board.state !== 'object') return null
-  const state = board.state as Record<string, unknown>
+  const state = board.state as unknown as Record<string, unknown>
   return {
     ...state,
     updatedAt:
@@ -193,11 +194,11 @@ export async function syncCanvasBoardToServer(
 ) {
   const board = getCanvasBoardById(boardId)
   if (!board) return
-  const state = stateOverride ?? getCanvasBoardState(boardId)
+  const state = stateOverride ?? getCanvasBoardState(boardId) ?? createEmptyCanvasBoardState(board.updatedAt)
   try {
     await boardApi.upsert(boardId, {
       name: board.name,
-      state,
+      state: state as unknown as BoardStateEnvelope,
       created_at: board.createdAt,
       updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
     })

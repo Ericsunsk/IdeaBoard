@@ -91,7 +91,11 @@ export function useStorageManager() {
   const vendorPresets = computed(() => buildVendorPresets(creatableProviders.value))
   const storages = computed<StorageCard[]>(() =>
     (profilesQuery.data.value?.data?.profiles ?? []).map((profile) =>
-      normalizeProfile({ ...profile, secret_configured: profile.secret_configured ?? false }),
+      normalizeProfile({
+        ...profile,
+        secret_configured: profile.secret_configured ?? false,
+        config: profile.config as Record<string, unknown>,
+      }),
     ),
   )
   const form = ref<StorageCard>(createEmptyStorageProfile('s3-compatible', providerMap.value))

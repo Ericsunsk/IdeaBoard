@@ -27,8 +27,39 @@ func TestNormalizeBoardID(t *testing.T) {
 }
 
 func TestMarshalStateLimits(t *testing.T) {
+	t.Run("valid envelope", func(t *testing.T) {
+		raw, version, err := marshalState(validBoardState(1, 100))
+		if err != nil {
+			t.Fatalf("marshalState returned error: %v", err)
+		}
+		if raw == "" {
+			t.Fatal("raw state should not be empty")
+		}
+		if version != 1 {
+			t.Fatalf("schema version = %d, want 1", version)
+		}
+	})
+
+	t.Run("missing schema version", func(t *testing.T) {
+		_, _, err := marshalState(map[string]interface{}{
+			"imageNodes":  []interface{}{},
+			"promptNodes": []interface{}{},
+			"fusionNodes": []interface{}{},
+			"connections": []interface{}{},
+			"viewport": map[string]interface{}{
+				"canvasX":   0,
+				"canvasY":   0,
+				"zoomLevel": 100,
+			},
+			"updatedAt": 1,
+		})
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
 	t.Run("state byte limit", func(t *testing.T) {
-		_, err := marshalState(map[string]interface{}{
+		_, _, err := marshalState(map[string]interface{}{
 			"payload": strings.Repeat("x", maxBoardStateBytes+1),
 		})
 		if !errors.Is(err, ErrInvalidBoardInput) {
@@ -41,9 +72,25 @@ func TestMarshalStateLimits(t *testing.T) {
 		for i := 0; i < maxBoardStateDepth+1; i++ {
 			current = map[string]interface{}{"next": current}
 		}
-		_, err := marshalState(map[string]interface{}{"root": current})
+		_, _, err := marshalState(map[string]interface{}{"root": current})
 		if !errors.Is(err, ErrInvalidBoardInput) {
 			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
 		}
 	})
+}
+
+func validBoardState(schemaVersion int, zoomLevel int) map[string]interface{} {
+	return map[string]interface{}{
+		"schemaVersion": schemaVersion,
+		"imageNodes":    []interface{}{},
+		"promptNodes":   []interface{}{},
+		"fusionNodes":   []interface{}{},
+		"connections":   []interface{}{},
+		"viewport": map[string]interface{}{
+			"canvasX":   0,
+			"canvasY":   0,
+			"zoomLevel": zoomLevel,
+		},
+		"updatedAt": 1,
+	}
 }

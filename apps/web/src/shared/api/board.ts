@@ -4,19 +4,15 @@ import {
   listUserBoards,
   upsertUserBoard,
 } from './generated-query/boards/boards'
-import type { UserBoardUpsertRequest, UserBoardUpsertRequestState } from './generated-query/model'
+import type { UserBoardUpsertRequest } from './generated-query/model'
 
-export type { UserBoardItem, UserBoardUpsertRequest } from './generated-query/model'
-export type UpsertBoardPayload = Omit<UserBoardUpsertRequest, 'state'> & { state: unknown }
+export type { BoardStateEnvelope, UserBoardItem, UserBoardUpsertRequest } from './generated-query/model'
+export type UpsertBoardPayload = UserBoardUpsertRequest
 export type UserBoardPayload = UpsertBoardPayload & { board_id: string }
 
 export const boardApi = {
   list: listUserBoards,
-  upsert: (boardId: string, payload: UpsertBoardPayload) =>
-    upsertUserBoard(boardId, {
-      ...payload,
-      state: (payload.state ?? null) as UserBoardUpsertRequestState,
-    }),
+  upsert: upsertUserBoard,
   remove: deleteUserBoard,
   joinByShareToken: (token: string) => joinBoardByShareToken({ token }),
 }

@@ -7,7 +7,11 @@ import type {
   ImageNodeItem,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
-import { getDefaultCanvasNodeTitle, isCanvasConnectionNodeType } from '../types/canvasNodes'
+import {
+  CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  getDefaultCanvasNodeTitle,
+  isCanvasConnectionNodeType,
+} from '../types/canvasNodes'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
@@ -51,6 +55,7 @@ function cloneSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {
 
 export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
   return {
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     imageNodes: [],
     promptNodes: [],
     fusionNodes: [],

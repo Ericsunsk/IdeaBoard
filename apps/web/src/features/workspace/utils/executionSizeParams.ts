@@ -1,7 +1,14 @@
+import type { SubmitTaskParams } from '../../../shared/api/task'
+
 export interface ExecutionImageSize {
   width: number
   height: number
 }
+
+type ExecutionSizeTaskParams = Pick<
+  SubmitTaskParams,
+  'custom_width' | 'custom_height' | 'original_image_width' | 'original_image_height'
+>
 
 function normalizeExecutionImageSize(
   size: ExecutionImageSize | null | undefined,
@@ -16,7 +23,7 @@ function normalizeExecutionImageSize(
 export function buildExecutionSizeParams(
   sourceSize: ExecutionImageSize | null | undefined,
   targetSize?: ExecutionImageSize | null,
-): Record<string, number> {
+): ExecutionSizeTaskParams {
   const normalizedSource = normalizeExecutionImageSize(sourceSize)
   const normalizedTarget = normalizeExecutionImageSize(targetSize ?? sourceSize)
   if (!normalizedSource || !normalizedTarget) return {}

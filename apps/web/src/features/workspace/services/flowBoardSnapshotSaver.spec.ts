@@ -7,6 +7,7 @@ import {
   type CanvasBoardState,
 } from '../../canvas/lib/canvasBoardState'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../types/canvasNodes'
 import { saveBoardSnapshotFromFlow } from './flowBoardSnapshotSaver'
 
 const mocks = vi.hoisted(() => {
@@ -26,6 +27,7 @@ vi.mock('../../../shared/api/board', () => ({
 
 function makeSnapshot(zoomLevel: number): CanvasBoardSnapshot {
   return {
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     imageNodes: [],
     promptNodes: [],
     fusionNodes: [],

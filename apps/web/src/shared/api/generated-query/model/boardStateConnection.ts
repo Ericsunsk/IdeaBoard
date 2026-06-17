@@ -5,4 +5,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type StorageProfilePayloadConfig = { [key: string]: unknown }
+export interface BoardStateConnection {
+  [key: string]: unknown
+}

@@ -4,5 +4,36 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { HDUpscaleParams } from './hDUpscaleParams'
+import type { ImageExtendParams } from './imageExtendParams'
+import type { StyleFusionParams } from './styleFusionParams'
+import type { StyleVariationParams } from './styleVariationParams'
 
-export type SubmitTaskRequestParams = { [key: string]: unknown }
+export interface SubmitTaskRequestParams {
+  model?: string
+  original_image_url?: string
+  mask_image_url?: string
+  reference_image_urls?: string[]
+  use_mask?: boolean
+  /** @minimum 1 */
+  custom_width?: number
+  /** @minimum 1 */
+  custom_height?: number
+  /** @minimum 1 */
+  original_image_width?: number
+  /** @minimum 1 */
+  original_image_height?: number
+  ratio?: string
+  quality?: string
+  /** @minimum 1 */
+  sample_count?: number
+  /** @minimum 1 */
+  output_count?: number
+  /** @minimum 1 */
+  image_count?: number
+  prompt_upsampling?: boolean
+  variation?: StyleVariationParams
+  extend?: ImageExtendParams
+  hd?: HDUpscaleParams
+  fusion?: StyleFusionParams
+}

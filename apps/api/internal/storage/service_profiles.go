@@ -274,25 +274,20 @@ func (s *StorageService) normalizeProfile(existing StorageProfile, incoming Stor
 
 	switch next.Provider {
 	case StorageProviderLocal:
-		next.Config = map[string]interface{}{}
+		next.Config = LocalStorageProfileConfig{}.Map()
 	case StorageProviderS3Compatible:
+		typedConfig := S3CompatibleProfileConfigFromMap(cfg)
 		secret := strings.TrimSpace(configString(incoming.Config, storageSecretAccessKeyName))
 		if secret == "" || strings.Contains(secret, "*") {
 			if oldSecret := configString(existing.Config, storageSecretAccessKeyName); oldSecret != "" {
-				cfg[storageSecretAccessKeyName] = oldSecret
+				typedConfig.SecretAccessKey = oldSecret
 			} else {
-				cfg[storageSecretAccessKeyName] = ""
+				typedConfig.SecretAccessKey = ""
 			}
 		} else {
-			cfg[storageSecretAccessKeyName] = secret
+			typedConfig.SecretAccessKey = secret
 		}
-		cfg["access_key_id"] = strings.TrimSpace(configString(cfg, "access_key_id"))
-		cfg["bucket_name"] = strings.TrimSpace(configString(cfg, "bucket_name"))
-		cfg["endpoint"] = strings.TrimSpace(configString(cfg, "endpoint"))
-		cfg["region_id"] = strings.TrimSpace(configString(cfg, "region_id"))
-		cfg["access_domain"] = strings.TrimSpace(configString(cfg, "access_domain"))
-		cfg["force_path_style"] = configBool(cfg, "force_path_style")
-		next.Config = cfg
+		next.Config = typedConfig.Map()
 	default:
 		next.Config = cfg
 	}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../workspace/types/canvasNodes'
 
 function createValidState() {
   return {
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     imageNodes: [
       {
         id: 2,
@@ -70,6 +72,7 @@ function createValidState() {
 describe('canvasBoardStateSchema', () => {
   it('accepts an empty snapshot', () => {
     const parsed = v.safeParse(canvasBoardStateSchema, {
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
       imageNodes: [],
       promptNodes: [],
       fusionNodes: [],

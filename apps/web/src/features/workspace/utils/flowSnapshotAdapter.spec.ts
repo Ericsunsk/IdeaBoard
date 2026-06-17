@@ -5,6 +5,7 @@ import {
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from './flowSnapshotAdapter'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../types/canvasNodes'
 
 function makeImageFlowNode(params: {
   flowId: string
@@ -344,6 +345,7 @@ describe('flowSnapshotAdapter', () => {
 
   it('preserves fusion blend points across round trips', () => {
     const flow = canvasBoardSnapshotToFlow({
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
       imageNodes: [],
       promptNodes: [],
       fusionNodes: [

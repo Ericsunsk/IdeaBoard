@@ -10,12 +10,33 @@ type StorageHandler struct {
 	storageService *StorageService
 }
 
+type storageProvidersDTO struct {
+	Providers []StorageProviderMeta `json:"providers"`
+}
+
+type storageProfilesDTO struct {
+	Profiles []StorageProfile `json:"profiles"`
+}
+
+type storageProfileWithMessageDTO struct {
+	Profile *StorageProfile `json:"profile"`
+	Message string          `json:"message"`
+}
+
+type storageMessageDTO struct {
+	Message string `json:"message"`
+}
+
+type storageBucketInfoDTO struct {
+	Info map[string]interface{} `json:"info"`
+}
+
 func NewStorageHandler(storageService *StorageService) *StorageHandler {
 	return &StorageHandler{storageService: storageService}
 }
 
 func (h *StorageHandler) ListProviders(c *gin.Context) {
-	response.Success(c, gin.H{"providers": h.storageService.ListProviderMeta()})
+	response.SuccessDTO(c, storageProvidersDTO{Providers: h.storageService.ListProviderMeta()})
 }
 
 func (h *StorageHandler) ListProfiles(c *gin.Context) {
@@ -24,7 +45,7 @@ func (h *StorageHandler) ListProfiles(c *gin.Context) {
 		response.Error(c, 500, "获取存储列表失败")
 		return
 	}
-	response.Success(c, gin.H{"profiles": profiles})
+	response.SuccessDTO(c, storageProfilesDTO{Profiles: profiles})
 }
 
 func (h *StorageHandler) CreateProfile(c *gin.Context) {
@@ -39,7 +60,10 @@ func (h *StorageHandler) CreateProfile(c *gin.Context) {
 		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"profile": profile, "message": storageSaveProfileMessage(c)})
+	response.SuccessDTO(c, storageProfileWithMessageDTO{
+		Profile: profile,
+		Message: storageSaveProfileMessage(c),
+	})
 }
 
 func (h *StorageHandler) UpdateProfile(c *gin.Context) {
@@ -55,7 +79,10 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"profile": profile, "message": storageSaveProfileMessage(c)})
+	response.SuccessDTO(c, storageProfileWithMessageDTO{
+		Profile: profile,
+		Message: storageSaveProfileMessage(c),
+	})
 }
 
 func (h *StorageHandler) DeleteProfile(c *gin.Context) {
@@ -63,7 +90,7 @@ func (h *StorageHandler) DeleteProfile(c *gin.Context) {
 		response.InternalError(c, 400, "删除失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"message": "删除成功"})
+	response.SuccessDTO(c, storageMessageDTO{Message: "删除成功"})
 }
 
 func (h *StorageHandler) ApplyProfile(c *gin.Context) {
@@ -72,7 +99,10 @@ func (h *StorageHandler) ApplyProfile(c *gin.Context) {
 		response.InternalError(c, 400, "设为当前失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"profile": profile, "message": "已设为当前存储"})
+	response.SuccessDTO(c, storageProfileWithMessageDTO{
+		Profile: profile,
+		Message: "已设为当前存储",
+	})
 }
 
 func (h *StorageHandler) TestProfile(c *gin.Context) {
@@ -80,7 +110,7 @@ func (h *StorageHandler) TestProfile(c *gin.Context) {
 		response.InternalError(c, 400, "连接测试失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"message": "连接成功"})
+	response.SuccessDTO(c, storageMessageDTO{Message: "连接成功"})
 }
 
 func (h *StorageHandler) GetBucketInfo(c *gin.Context) {
@@ -89,7 +119,7 @@ func (h *StorageHandler) GetBucketInfo(c *gin.Context) {
 		response.InternalError(c, 400, "获取 Bucket 信息失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"info": info})
+	response.SuccessDTO(c, storageBucketInfoDTO{Info: info})
 }
 
 func (h *StorageHandler) saveProfile(c *gin.Context, req *StorageProfile) (*StorageProfile, error) {

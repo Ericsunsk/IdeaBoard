@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserBoardItem } from '../../../shared/api/board'
 import type { CanvasBoardState } from '../../canvas/lib/canvasBoardState'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../workspace/types/canvasNodes'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas/lib/canvasBoardState'
 import { listCanvasBoards, replaceCanvasBoards } from './canvasBoards'
@@ -23,6 +24,7 @@ vi.mock('../../../shared/api/board', () => ({
 
 function makeState(updatedAt: number, zoomLevel: number): CanvasBoardState {
   return {
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     imageNodes: [],
     promptNodes: [],
     fusionNodes: [],
@@ -44,7 +46,9 @@ function makeRemoteBoard(params: {
     name: params.name,
     created_at: params.createdAt,
     updated_at: params.updatedAt,
-    state: (params.state ?? null) as UserBoardItem['state'],
+    revision: 1,
+    state_schema_version: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+    state: params.state as unknown as UserBoardItem['state'],
   }
 }
 
