@@ -434,9 +434,6 @@ func openAISharedAllowedParamKeys() []string {
 		"extend_bottom",
 		"extend_left",
 		"original_image_url",
-		"upscale_mode",
-		"upscale_factor",
-		"output_format",
 		"output_quality",
 	}
 }
@@ -558,15 +555,5 @@ func extractOpenAIImageResponses(respBody []byte, params map[string]interface{})
 }
 
 func inferOpenAIImageMimeType(params map[string]interface{}) string {
-	if params != nil {
-		if format, ok := params["output_format"].(string); ok {
-			switch strings.ToLower(strings.TrimSpace(format)) {
-			case "jpg", "jpeg":
-				return "image/jpeg"
-			case "webp":
-				return "image/webp"
-			}
-		}
-	}
 	return "image/png"
 }

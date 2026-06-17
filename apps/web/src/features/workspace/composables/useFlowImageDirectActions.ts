@@ -18,6 +18,7 @@ import { buildExecutionTaskRequest, EXECUTION_FUSION_META } from '../config/exec
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
 import { resolveFusionOutputSize } from '../utils/fusionOutputSizing'
+import { computeFusionBlendWeights } from '../utils/fusionBlend'
 import {
   cleanupFlowLocalInpaintAssets,
   composeFlowLocalInpaint,
@@ -690,12 +691,24 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       : EXECUTION_FUSION_META.promptPrefix
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
+    const fusionInputWeights = computeFusionBlendWeights(
+      imageUrls.length,
+      snapshot.blendPoint,
+      snapshot.width,
+    ).slice(0, imageUrls.length)
     let resultNodeIds: string[] = []
     try {
       await assertTaskSubmitReady(
         buildExecutionTaskRequest({
           prompt: 'submit readiness',
           feature: EXECUTION_FUSION_META.feature,
+          imageUrls,
+          params: {
+            fusion: {
+              mode: 'weighted_reference',
+              input_weights: fusionInputWeights,
+            },
+          },
         }),
         '提交任务失败',
       )
@@ -738,7 +751,10 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
               params: {
                 ...buildExecutionSizeParams(sizeSource, outputSize.targetSize),
                 ...buildPromptAspectRatioTaskParams(normalizedAspectRatio),
-                image_weights: imageWeights,
+                fusion: {
+                  mode: 'weighted_reference',
+                  input_weights: imageWeights,
+                },
               },
             }),
           )

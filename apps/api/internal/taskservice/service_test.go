@@ -2,7 +2,9 @@ package taskservice
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,9 +42,11 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			basePrompt: "base fusion prompt",
 			userPrompt: "融合但不要太夸张",
 			params: map[string]interface{}{
-				"image_weights": []interface{}{0.6, 0.4},
+				"fusion": map[string]interface{}{
+					"input_weights": []interface{}{0.6, 0.4},
+				},
 			},
-			template: "SYS {{user_prompt}} weights={{image_weights}}",
+			template: "SYS {{user_prompt}} weights={{fusion_input_weights}}",
 			want:     "SYS 融合但不要太夸张 weights=Image 1: 60%, Image 2: 40%",
 		},
 		{
@@ -56,7 +60,7 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 				"extend_bottom": 0,
 				"extend_left":   0,
 			},
-			template: "SYS {{user_prompt}} top={{extend_top}} right={{extend_right}} bottom={{extend_bottom}} left={{extend_left}}",
+			template: "SYS {{user_prompt}} top={{extend_top_percent}} right={{extend_right_percent}} bottom={{extend_bottom_percent}} left={{extend_left_percent}}",
 			want:     "SYS 右侧延展为工作室背景 top=0 right=22 bottom=0 left=0",
 		},
 		{
@@ -66,11 +70,10 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			userPrompt: "",
 			params: map[string]interface{}{
 				"original_image_url": "https://example.com/original.png",
-				"upscale_mode":       "enhancement",
-				"upscale_factor":     2,
+				"clarity_strength":   90,
 			},
-			template: "SYS mode={{upscale_mode}} factor={{upscale_factor}}",
-			want:     "SYS mode=enhancement factor=2",
+			template: "SYS clarity={{clarity_strength}}",
+			want:     "SYS clarity=90",
 		},
 	}
 
@@ -144,7 +147,7 @@ func TestImageExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) {
 			"extend_right": 30,
 		},
 		func(string) (string, error) {
-			return "SYS 扩图 right={{extend_right}}", nil
+			return "SYS 扩图 right={{extend_right_percent}}", nil
 		},
 	)
 
@@ -330,6 +333,92 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 	})
 }
 
+func TestNormalizeStyleFusionParams(t *testing.T) {
+	t.Run("normalizes canonical weights", func(t *testing.T) {
+		params := map[string]interface{}{
+			"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
+			"fusion": map[string]interface{}{
+				"input_weights": []interface{}{2.0, 1.0},
+			},
+		}
+
+		if err := normalizeStyleFusionParams(params); err != nil {
+			t.Fatalf("normalizeStyleFusionParams returned error: %v", err)
+		}
+		fusion, ok := params["fusion"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("fusion = %#v, want map", params["fusion"])
+		}
+		if fusion["mode"] != "weighted_reference" {
+			t.Fatalf("mode = %#v, want weighted_reference", fusion["mode"])
+		}
+		weights, ok := fusion["input_weights"].([]float64)
+		if !ok {
+			t.Fatalf("input_weights = %#v, want []float64", fusion["input_weights"])
+		}
+		if len(weights) != 2 ||
+			math.Abs(weights[0]-2.0/3.0) > 0.000001 ||
+			math.Abs(weights[1]-1.0/3.0) > 0.000001 {
+			t.Fatalf("weights = %#v, want normalized 2:1", weights)
+		}
+	})
+
+	tests := []struct {
+		name   string
+		params map[string]interface{}
+	}{
+		{
+			name: "rejects image count below range",
+			params: map[string]interface{}{
+				"image_urls": []string{"https://example.com/a.png"},
+				"fusion": map[string]interface{}{
+					"input_weights": []interface{}{1.0},
+				},
+			},
+		},
+		{
+			name: "rejects missing fusion object",
+			params: map[string]interface{}{
+				"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
+			},
+		},
+		{
+			name: "rejects weight count mismatch",
+			params: map[string]interface{}{
+				"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
+				"fusion": map[string]interface{}{
+					"input_weights": []interface{}{1.0},
+				},
+			},
+		},
+		{
+			name: "rejects negative weight",
+			params: map[string]interface{}{
+				"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
+				"fusion": map[string]interface{}{
+					"input_weights": []interface{}{1.0, -1.0},
+				},
+			},
+		},
+		{
+			name: "rejects zero total weight",
+			params: map[string]interface{}{
+				"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
+				"fusion": map[string]interface{}{
+					"input_weights": []interface{}{0.0, 0.0},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := normalizeStyleFusionParams(tt.params); err == nil {
+				t.Fatalf("expected normalizeStyleFusionParams error")
+			}
+		})
+	}
+}
+
 func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
@@ -416,6 +505,67 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	}
 	if len(taskEvents.events) != 1 || taskEvents.events[0].TaskID != taskID || taskEvents.events[0].Status != tasks.StatusPending {
 		t.Fatalf("unexpected task events: %+v", taskEvents.events)
+	}
+}
+
+func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+		{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name:         "gpt-image-1",
+				Enabled:      true,
+				FeatureSlugs: []string{workflow.FeatureSlugStyleFusion},
+			}},
+		},
+	}}
+	submissionStore := &recordingSubmissionStore{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+	}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:  "融合但不要太夸张",
+		Feature: workflow.FeatureSlugStyleFusion,
+		ImageURLs: []string{
+			"https://example.com/a.png",
+			"https://example.com/b.png",
+		},
+		Params: map[string]interface{}{
+			"fusion": map[string]interface{}{
+				"input_weights": []interface{}{2.0, 1.0},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if len(submissionStore.calls) != 1 {
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+	var params map[string]interface{}
+	if err := json.Unmarshal([]byte(submissionStore.calls[0].task.Params), &params); err != nil {
+		t.Fatalf("unmarshal task params: %v", err)
+	}
+	fusion, ok := params["fusion"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("fusion = %#v, want object", params["fusion"])
+	}
+	if fusion["mode"] != "weighted_reference" {
+		t.Fatalf("fusion mode=%#v, want weighted_reference", fusion["mode"])
+	}
+	weights, ok := fusion["input_weights"].([]interface{})
+	if !ok || len(weights) != 2 {
+		t.Fatalf("fusion input_weights=%#v, want two weights", fusion["input_weights"])
+	}
+	if math.Abs(weights[0].(float64)-2.0/3.0) > 0.000001 ||
+		math.Abs(weights[1].(float64)-1.0/3.0) > 0.000001 {
+		t.Fatalf("fusion input_weights=%#v, want normalized 2:1", weights)
+	}
+	if params["feature"] != workflow.FeatureSlugStyleFusion {
+		t.Fatalf("feature=%#v, want style-fusion", params["feature"])
 	}
 }
 

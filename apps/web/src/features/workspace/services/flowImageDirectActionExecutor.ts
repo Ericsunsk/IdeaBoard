@@ -11,7 +11,6 @@ import {
 import {
   buildExecutionSizeParams,
   extendExecutionImageSize,
-  scaleExecutionImageSize,
 } from '../utils/executionSizeParams'
 import {
   buildPromptAspectRatioTaskParams,
@@ -25,8 +24,6 @@ import {
   IMAGE_NODE_ACTION,
   type ImageDirectTaskAction,
 } from '../types/imageActions'
-
-export type ImageHdUpscaleFactor = 2 | 3 | 4
 
 type ImageSizeLoader = (url: string) => Promise<{ width: number; height: number } | null>
 
@@ -58,23 +55,15 @@ const DIRECT_ACTION_FEATURES = {
   [IMAGE_NODE_ACTION.sketchToImage]: EXECUTION_DIRECT_ACTION_META.sketchToImage.feature,
 } satisfies Record<ImageDirectTaskAction, ExecutionFeature>
 
-export function resolveHdUpscaleFactor(strength: number | undefined): ImageHdUpscaleFactor {
-  const normalized = Number.isFinite(strength)
-    ? Math.max(0, Math.min(100, Math.round(strength as number)))
-    : DEFAULT_IMAGE_ACTION_STRENGTH
-  if (normalized >= 67) return 4
-  if (normalized >= 34) return 3
-  return 2
+export function resolveHdOutputQuality(strength: number | undefined): number {
+  const clarityStrength = resolveHdClarityStrength(strength)
+  return Math.max(60, Math.min(100, Math.round(60 + clarityStrength * 0.4)))
 }
 
-export function resolveSourceOutputFormat(url: string): 'jpg' | 'png' {
-  try {
-    const pathname = new URL(url).pathname
-    return /\.png$/i.test(pathname) ? 'png' : 'jpg'
-  } catch {
-    const path = url.split(/[?#]/)[0] ?? ''
-    return /\.png$/i.test(path) ? 'png' : 'jpg'
-  }
+export function resolveHdClarityStrength(strength: number | undefined): number {
+  return Number.isFinite(strength)
+    ? Math.max(0, Math.min(100, Math.round(strength as number)))
+    : DEFAULT_IMAGE_ACTION_STRENGTH
 }
 
 export async function assertDirectActionSubmitReady(action: ImageDirectTaskAction): Promise<void> {
@@ -153,7 +142,6 @@ export async function submitDirectActionTask(
             original_image_url: source.url,
             ...buildExecutionSizeParams(imageSize),
             variation_strength: strength,
-            strength,
           },
         })
       : buildExecutionTaskRequest({
@@ -252,19 +240,17 @@ export async function submitHdUpscaleTask(
   strength?: number,
 ): Promise<string> {
   const imageSize = await loadImageSize(source.url)
-  const upscaleFactor = resolveHdUpscaleFactor(strength)
-  const outputFormat = resolveSourceOutputFormat(source.url)
+  const clarityStrength = resolveHdClarityStrength(strength)
+  const outputQuality = resolveHdOutputQuality(strength)
   const request = buildExecutionTaskRequest({
     prompt: EXECUTION_IMAGE_TOOL_META.hdUpscale.prompt,
     feature: EXECUTION_IMAGE_TOOL_META.hdUpscale.feature,
     imageUrls: [source.url],
     params: {
       original_image_url: source.url,
-      ...buildExecutionSizeParams(imageSize, scaleExecutionImageSize(imageSize, upscaleFactor)),
-      upscale_mode: 'enhancement',
-      upscale_factor: upscaleFactor,
-      output_format: outputFormat,
-      output_quality: 95,
+      ...buildExecutionSizeParams(imageSize, imageSize),
+      clarity_strength: clarityStrength,
+      output_quality: outputQuality,
     },
   })
 

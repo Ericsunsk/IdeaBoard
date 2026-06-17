@@ -21,7 +21,7 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 		Enabled: false,
 		Variables: []FeaturePromptVariable{
 			{Key: "{{user_prompt}}", Tone: "prompt"},
-			{Key: "{{image_weights}}", Tone: "control"},
+			{Key: "{{fusion_input_weights}}", Tone: "control"},
 		},
 	}, nil)
 	if err != nil {
@@ -48,16 +48,16 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 	if adminConfig.Prompt != disabledConfig.Prompt {
 		t.Fatalf("admin prompt = %q, want %q", adminConfig.Prompt, disabledConfig.Prompt)
 	}
-	if !hasPromptVariable(adminConfig.Variables, "{{image_weights}}", "control") {
-		t.Fatalf("admin variables = %#v, want image_weights control variable", adminConfig.Variables)
+	if !hasPromptVariable(adminConfig.Variables, "{{fusion_input_weights}}", "control") {
+		t.Fatalf("admin variables = %#v, want fusion_input_weights control variable", adminConfig.Variables)
 	}
 
 	enabledConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:  "enabled prompt {{image_weights}}",
+		Prompt:  "enabled prompt {{fusion_input_weights}}",
 		Enabled: true,
 		Variables: []FeaturePromptVariable{
-			{Key: " {{image_weights}} ", Tone: "control"},
-			{Key: "{{image_weights}}", Tone: "prompt"},
+			{Key: " {{fusion_input_weights}} ", Tone: "control"},
+			{Key: "{{fusion_input_weights}}", Tone: "prompt"},
 			{Key: "{{custom_context}}", Tone: "unknown-tone"},
 		},
 	}, nil)
@@ -73,8 +73,8 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 	if enabledConfig.SchemaVersion != 2 {
 		t.Fatalf("enabled schema version = %d, want 2", enabledConfig.SchemaVersion)
 	}
-	if !hasPromptVariable(enabledConfig.Variables, "{{image_weights}}", "control") {
-		t.Fatalf("enabled variables = %#v, want normalized image_weights control variable", enabledConfig.Variables)
+	if !hasPromptVariable(enabledConfig.Variables, "{{fusion_input_weights}}", "control") {
+		t.Fatalf("enabled variables = %#v, want normalized fusion_input_weights control variable", enabledConfig.Variables)
 	}
 	if !hasPromptVariable(enabledConfig.Variables, "{{custom_context}}", "context") {
 		t.Fatalf("enabled variables = %#v, want unknown tone normalized to context", enabledConfig.Variables)
@@ -135,6 +135,23 @@ func TestFeaturePromptDefaultConfigUsesStableSchemaVersion(t *testing.T) {
 	}
 	if !hasPromptVariable(config.Variables, "{{user_prompt}}", "prompt") {
 		t.Fatalf("default variables = %#v, want user_prompt variable", config.Variables)
+	}
+}
+
+func TestFeaturePromptDefaultConfigHDUpscaleUsesSingleControlVariable(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+
+	config, err := repo.GetPromptConfig(ctx, workflow.FeatureSlugHDUpscale)
+	if err != nil {
+		t.Fatalf("GetPromptConfig default returned error: %v", err)
+	}
+	if len(config.Variables) != 1 {
+		t.Fatalf("default hd variables = %#v, want one variable", config.Variables)
+	}
+	if !hasPromptVariable(config.Variables, "{{clarity_strength}}", "control") {
+		t.Fatalf("default hd variables = %#v, want clarity_strength control variable", config.Variables)
 	}
 }
 

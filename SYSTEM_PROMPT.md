@@ -30,7 +30,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 - `{{user_prompt}}` 始终会被替换为字符串，用户没有输入时替换为空字符串。
 - 模板中存在但后端不支持或运行时没有提供的变量会原样保留，所以不要写不属于当前 feature 的变量。
 - 除 `style-variation` 外，如果模板没有显式写 `{{user_prompt}}`，运行时可能把用户输入追加到模板末尾。
-- `style-variation` 不会自动追加用户输入；当前 Image 右键风格延展只稳定提供 `{{strength}}`。
+- `style-variation` 不会自动追加用户输入；当前 Image 右键风格延展只稳定提供 `{{variation_strength}}`。
 - URL、base64、mask 文件、多参考图、multipart、本地重绘窗口属于运行时上下文，prompt 正文里只写业务边界。
 - 当前前端 `HD` 是整图高清处理，不读取 `use_mask` 或 mask 参数；局部 mask、本地重绘窗口和局部边界统一维护在 `partial-edit`。
 
@@ -39,16 +39,13 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 | 变量                 | 主要适用 feature                                              | 说明                                                       |
 | -------------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
 | `{{user_prompt}}`    | `partial-edit`、`pattern-gen`、`style-fusion`、`image-extend` | 用户或连接 Prompt 文本；只能作为补充要求，不能覆盖系统边界 |
-| `{{strength}}`       | `style-variation`                                             | 风格延展强度百分比，来自 `variation_strength`              |
-| `{{image_weights}}`  | `style-fusion`                                                | Fusion 输入图的有序权重，例如 `Image 1: 60%, Image 2: 40%` |
-| `{{extend_top}}`     | `image-extend`                                                | 基于原图高度向上扩展的百分比                               |
-| `{{extend_right}}`   | `image-extend`                                                | 基于原图宽度向右扩展的百分比                               |
-| `{{extend_bottom}}`  | `image-extend`                                                | 基于原图高度向下扩展的百分比                               |
-| `{{extend_left}}`    | `image-extend`                                                | 基于原图宽度向左扩展的百分比                               |
-| `{{upscale_mode}}`   | `hd-upscale`                                                  | HD 增强模式                                                |
-| `{{upscale_factor}}` | `hd-upscale`                                                  | 放大倍数                                                   |
-| `{{output_format}}`  | `hd-upscale`                                                  | 输出格式                                                   |
-| `{{output_quality}}` | `hd-upscale`                                                  | 输出质量                                                   |
+| `{{variation_strength}}` | `style-variation`                                          | 风格延展强度百分比，来自 `variation_strength`              |
+| `{{fusion_input_weights}}` | `style-fusion`                                             | Fusion 输入图的有序权重，例如 `Image 1: 60%, Image 2: 40%` |
+| `{{extend_top_percent}}` | `image-extend`                                             | 基于原图高度向上扩展的百分比                               |
+| `{{extend_right_percent}}` | `image-extend`                                           | 基于原图宽度向右扩展的百分比                               |
+| `{{extend_bottom_percent}}` | `image-extend`                                          | 基于原图高度向下扩展的百分比                               |
+| `{{extend_left_percent}}` | `image-extend`                                             | 基于原图宽度向左扩展的百分比                               |
+| `{{clarity_strength}}` | `hd-upscale`                                                  | HD 清晰度强度百分比                                         |
 
 以下字段是运行时媒体或任务参数，不是 prompt 模板变量，不要写进正文：
 
@@ -59,7 +56,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 | `reference_image_urls`                                | 多参考图会作为媒体输入传给 provider，prompt 只描述如何参考    |
 | `ratio`、尺寸、模型、质量、sample count、本地重绘标记 | 这些由运行时、provider 或渲染链路控制，不属于自然语言任务边界 |
 
-Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义或使用；统一使用 `{{image_weights}}`。
+Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义或使用；统一使用 `{{fusion_input_weights}}`。
 
 ## 编写规范
 
@@ -99,14 +96,14 @@ Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义�
 
 ### `style-variation`
 
-可用变量：`{{strength}}`。
+可用变量：`{{variation_strength}}`。
 
 ```text
 你是基于原图进行可控风格延展的图像助手。
 
 任务：在保留原图主体、主体品类、核心轮廓、主要构图、视角关系与基础光影逻辑的前提下，做可控的风格延展与细节升级。
 
-当前延展强度：{{strength}}%。
+当前延展强度：{{variation_strength}}%。
 
 强度语义：
 - 0 到 20：仅做轻微润色、材质优化、局部装饰变化。
@@ -164,18 +161,19 @@ Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义�
 
 ### `hd-upscale`
 
-可用变量：`{{upscale_mode}}`、`{{upscale_factor}}`、`{{output_format}}`、`{{output_quality}}`。
+可用变量：`{{clarity_strength}}`。
 
 ```text
 你是图像 HD 与细节恢复助手。
 
 任务：对目标图像执行高清增强、细节恢复和画质提升，提高图像清晰度、边缘质量、纹理层次和后续可用度。
 
-增强参数：
-- 增强模式：{{upscale_mode}}。
-- 放大倍数：{{upscale_factor}}。
-- 输出格式：{{output_format}}。
-- 输出质量：{{output_quality}}。
+清晰度强度：{{clarity_strength}}%。
+
+强度语义：
+- 0 到 20：轻度清理压缩痕迹和边缘毛刺，保持原始质感。
+- 21 到 60：增强局部纹理、边缘和材质层次，但避免明显锐化。
+- 61 到 100：更积极地恢复细节和清晰度，但仍不得新增无关结构。
 
 执行原则：
 1. 保持原图主体、款式、结构、颜色关系和视觉语义不变，不要借增强之名重做内容。
@@ -187,7 +185,7 @@ Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义�
 
 ### `image-extend`
 
-可用变量：`{{user_prompt}}`、`{{extend_top}}`、`{{extend_right}}`、`{{extend_bottom}}`、`{{extend_left}}`。
+可用变量：`{{user_prompt}}`、`{{extend_top_percent}}`、`{{extend_right_percent}}`、`{{extend_bottom_percent}}`、`{{extend_left_percent}}`。
 
 ```text
 你是扩图助手。
@@ -195,10 +193,10 @@ Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义�
 任务：在保持原图主体和原始画面逻辑稳定的前提下，对新增画布区域做自然补全。
 
 扩边参数：
-- 基于原图高度向上扩展：{{extend_top}}%
-- 基于原图宽度向右扩展：{{extend_right}}%
-- 基于原图高度向下扩展：{{extend_bottom}}%
-- 基于原图宽度向左扩展：{{extend_left}}%
+- 基于原图高度向上扩展：{{extend_top_percent}}%
+- 基于原图宽度向右扩展：{{extend_right_percent}}%
+- 基于原图高度向下扩展：{{extend_bottom_percent}}%
+- 基于原图宽度向左扩展：{{extend_left_percent}}%
 
 执行原则：
 1. 原图主体、结构、比例、颜色关系、已有内容和核心语义必须保持稳定，不要改动原始核心内容。
@@ -239,14 +237,14 @@ Prompt 节点的 `pattern-gen` system prompt 是可选配置；未配置时直�
 
 ### `style-fusion`
 
-可用变量：`{{user_prompt}}`、`{{image_weights}}`。
+可用变量：`{{user_prompt}}`、`{{fusion_input_weights}}`。
 
 ```text
 你是多图融合设计助手。
 
 任务：将输入的 2 到 4 张图片融合为一张视觉统一、语义完整、结果自然的新图。
 
-当前融合权重：{{image_weights}}。
+当前融合权重：{{fusion_input_weights}}。
 权重越高的图片，越应保留其主体特征、结构、风格和视觉主导权；权重较低的图片用于补充风格、材质、细节或氛围。
 
 执行原则：
@@ -265,7 +263,7 @@ Prompt 节点的 `pattern-gen` system prompt 是可选配置；未配置时直�
 - 模板是否按真实节点归属维护：Image、Prompt、Fusion。
 - slug 是否是当前 canonical slug。
 - 模板是否只使用当前 feature 稳定变量。
-- Fusion 是否只使用 `{{image_weights}}`，没有旧的 A/B/ratio 变量。
+- Fusion 是否只使用 `{{fusion_input_weights}}`，没有旧的 A/B/ratio 变量。
 - 局部编辑类模板是否明确锁定未选区、窗口外内容和原图主体身份。
 - 需要用户文本参与时，是否显式包含 `{{user_prompt}}`。
 - 是否避免直接写 `original_image_url`、`mask_image_url`、`reference_image_urls` 等运行时媒体字段。
@@ -278,4 +276,5 @@ Prompt 节点的 `pattern-gen` system prompt 是可选配置；未配置时直�
 - 新增 workflow feature 时，同步更新本文件、Admin prompt 变量面板和 `DEVELOPMENT.md`。
 - 新增模板变量时，先确认后端 `ApplyFeatureSystemPrompt` 已注入，再更新后台变量说明。
 - 调整 mask、本地重绘、多参考图或媒体安全边界时，优先复查 `partial-edit`；调整整图高清参数时复查 `hd-upscale`。
+- `hd-upscale` 当前不建议依赖任何模式变量；如果未来增加 UI 控制，再补充对应变量并同步代码和文档。
 - 运营侧通过管理后台保存 prompt，避免直接改数据库值。

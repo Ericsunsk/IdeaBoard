@@ -14,11 +14,11 @@ func TestApplyFeatureSystemPromptStyleVariationUsesConfiguredPromptOnly(t *testi
 			"variation_strength": 40,
 		},
 		func(string) (string, error) {
-			return "BACKEND-ONLY strength={{strength}}", nil
+			return "BACKEND-ONLY variation_strength={{variation_strength}}", nil
 		},
 	)
 
-	if got != "BACKEND-ONLY strength=40" {
+	if got != "BACKEND-ONLY variation_strength=40" {
 		t.Fatalf("got %q, want backend-only configured prompt", got)
 	}
 }
@@ -77,10 +77,12 @@ func TestApplyFeatureSystemPromptTemplateWithoutUserPromptStillKeepsBasePrompt(t
 		"user prompt",
 		"style-fusion",
 		map[string]interface{}{
-			"image_weights": []interface{}{0.6, 0.4},
+			"fusion": map[string]interface{}{
+				"input_weights": []interface{}{0.6, 0.4},
+			},
 		},
 		func(string) (string, error) {
-			return "SYS weights={{image_weights}}", nil
+			return "SYS weights={{fusion_input_weights}}", nil
 		},
 	)
 
@@ -89,21 +91,23 @@ func TestApplyFeatureSystemPromptTemplateWithoutUserPromptStillKeepsBasePrompt(t
 	}
 }
 
-func TestApplyFeatureSystemPromptImageWeightsIgnoresInvalidListItems(t *testing.T) {
+func TestApplyFeatureSystemPromptInvalidFusionWeightsLeavePlaceholderUnresolved(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"",
 		"",
 		"style-fusion",
 		map[string]interface{}{
-			"image_weights": []interface{}{0.5, "invalid", 0.25},
+			"fusion": map[string]interface{}{
+				"input_weights": []interface{}{0.5, "invalid", 0.25},
+			},
 		},
 		func(string) (string, error) {
-			return "SYS {{image_weights}}", nil
+			return "SYS {{fusion_input_weights}}", nil
 		},
 	)
 
-	if got != "SYS Image 1: 50%, Image 2: 25%" {
-		t.Fatalf("got %q, want only numeric image weights", got)
+	if got != "SYS {{fusion_input_weights}}" {
+		t.Fatalf("got %q, want unresolved fusion weights placeholder", got)
 	}
 }
 
@@ -118,13 +122,14 @@ func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *test
 			"original_image_url": "https://img.example/original.png",
 			"mask_image_url":     "https://img.example/mask.png",
 			"use_mask":           true,
+			"clarity_strength":   75,
 		},
 		func(string) (string, error) {
-			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}}", nil
+			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{clarity_strength}}", nil
 		},
 	)
 
-	want := "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}}"
+	want := "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} 75"
 	if got != want {
 		t.Fatalf("got %q, want unsupported placeholders to remain unchanged", got)
 	}
@@ -156,17 +161,17 @@ func TestApplyFeatureSystemPromptTemplateWithUserPromptDoesNotAppendBasePromptTw
 func TestApplyFeatureSystemPromptDoesNotReplacePlaceholdersInsideUserPrompt(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"",
-		"literal {{strength}}",
+		"literal {{variation_strength}}",
 		"style-variation",
 		map[string]interface{}{
 			"variation_strength": 40,
 		},
 		func(string) (string, error) {
-			return "SYS strength={{strength}} prompt={{user_prompt}}", nil
+			return "SYS variation_strength={{variation_strength}} prompt={{user_prompt}}", nil
 		},
 	)
 
-	if got != "SYS strength=40 prompt=literal {{strength}}" {
+	if got != "SYS variation_strength=40 prompt=literal {{variation_strength}}" {
 		t.Fatalf("got %q, want user prompt placeholder content left literal", got)
 	}
 }
@@ -180,14 +185,14 @@ func TestApplyFeatureSystemPromptHDUpscaleDoesNotExposeUseMask(t *testing.T) {
 			"image_urls":         []interface{}{"https://img.example/original.png"},
 			"original_image_url": "https://img.example/original.png",
 			"use_mask":           true,
-			"upscale_mode":       "enhancement",
+			"clarity_strength":   75,
 		},
 		func(string) (string, error) {
-			return "SYS use_mask={{use_mask}} mode={{upscale_mode}}", nil
+			return "SYS use_mask={{use_mask}} clarity={{clarity_strength}}", nil
 		},
 	)
 
-	if got != "SYS use_mask={{use_mask}} mode=enhancement" {
+	if got != "SYS use_mask={{use_mask}} clarity=75" {
 		t.Fatalf("got %q, want unsupported use_mask placeholder to remain unchanged", got)
 	}
 }

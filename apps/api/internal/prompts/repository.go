@@ -255,26 +255,23 @@ func defaultPromptVariables(slug string) []FeaturePromptVariable {
 	case workflow.FeatureSlugPartialEdit, workflow.FeatureSlugPatternGen:
 		return promptVariables("{{user_prompt}}")
 	case workflow.FeatureSlugStyleVariation:
-		return []FeaturePromptVariable{{Key: "{{strength}}", Tone: "control"}}
+		return []FeaturePromptVariable{{Key: "{{variation_strength}}", Tone: "control"}}
 	case workflow.FeatureSlugStyleFusion:
 		return []FeaturePromptVariable{
 			{Key: "{{user_prompt}}", Tone: "prompt"},
-			{Key: "{{image_weights}}", Tone: "control"},
+			{Key: "{{fusion_input_weights}}", Tone: "control"},
 		}
 	case workflow.FeatureSlugHDUpscale:
 		return []FeaturePromptVariable{
-			{Key: "{{upscale_mode}}", Tone: "control"},
-			{Key: "{{upscale_factor}}", Tone: "control"},
-			{Key: "{{output_format}}", Tone: "control"},
-			{Key: "{{output_quality}}", Tone: "control"},
+			{Key: "{{clarity_strength}}", Tone: "control"},
 		}
 	case workflow.FeatureSlugImageExtend:
 		return []FeaturePromptVariable{
 			{Key: "{{user_prompt}}", Tone: "prompt"},
-			{Key: "{{extend_top}}", Tone: "control"},
-			{Key: "{{extend_right}}", Tone: "control"},
-			{Key: "{{extend_bottom}}", Tone: "control"},
-			{Key: "{{extend_left}}", Tone: "control"},
+			{Key: "{{extend_top_percent}}", Tone: "control"},
+			{Key: "{{extend_right_percent}}", Tone: "control"},
+			{Key: "{{extend_bottom_percent}}", Tone: "control"},
+			{Key: "{{extend_left_percent}}", Tone: "control"},
 		}
 	default:
 		return []FeaturePromptVariable{}

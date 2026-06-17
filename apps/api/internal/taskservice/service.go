@@ -222,6 +222,11 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 			req.Params["feature"] = featureSlug
 		}
 	}
+	if featureSlug == workflow.FeatureSlugStyleFusion {
+		if err := normalizeStyleFusionParams(req.Params); err != nil {
+			return nil, nil, "", "", err
+		}
+	}
 	apiAccounts = accounts.FilterAccountsForRequest(apiAccounts, featureSlug, req.Params)
 	if len(apiAccounts) == 0 {
 		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)

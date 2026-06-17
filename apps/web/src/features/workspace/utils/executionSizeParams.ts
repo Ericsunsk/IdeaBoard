@@ -28,19 +28,6 @@ export function buildExecutionSizeParams(
   }
 }
 
-export function scaleExecutionImageSize(
-  size: ExecutionImageSize | null | undefined,
-  factor: number,
-): ExecutionImageSize | null {
-  const normalized = normalizeExecutionImageSize(size)
-  if (!normalized) return null
-  const safeFactor = Number.isFinite(factor) && factor > 0 ? factor : 1
-  return {
-    width: Math.max(1, Math.round(normalized.width * safeFactor)),
-    height: Math.max(1, Math.round(normalized.height * safeFactor)),
-  }
-}
-
 export function extendExecutionImageSize(
   size: ExecutionImageSize | null | undefined,
   extend: { top: number; right: number; bottom: number; left: number },

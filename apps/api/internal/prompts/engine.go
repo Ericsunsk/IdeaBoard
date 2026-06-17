@@ -1,7 +1,6 @@
 package prompts
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -27,26 +26,24 @@ type featurePromptMergePolicy struct {
 
 var featurePromptBindings = map[string][]promptTemplateBinding{
 	workflow.FeatureSlugStyleVariation: {
-		stringPromptBinding("{{strength}}", "variation_strength"),
+		stringPromptBinding("{{variation_strength}}", "variation_strength"),
 	},
 	workflow.FeatureSlugStyleFusion: {
 		{
-			placeholder: "{{image_weights}}",
-			paramKey:    "image_weights",
+			placeholder: "{{fusion_input_weights}}",
+			paramKey:    "fusion.input_weights",
+			reader:      readStyleFusionInputWeightsPromptParam,
 			formatter:   formatImageWeightsTemplateValue,
 		},
 	},
 	workflow.FeatureSlugImageExtend: {
-		stringPromptBinding("{{extend_top}}", "extend_top"),
-		stringPromptBinding("{{extend_right}}", "extend_right"),
-		stringPromptBinding("{{extend_bottom}}", "extend_bottom"),
-		stringPromptBinding("{{extend_left}}", "extend_left"),
+		stringPromptBinding("{{extend_top_percent}}", "extend_top"),
+		stringPromptBinding("{{extend_right_percent}}", "extend_right"),
+		stringPromptBinding("{{extend_bottom_percent}}", "extend_bottom"),
+		stringPromptBinding("{{extend_left_percent}}", "extend_left"),
 	},
 	workflow.FeatureSlugHDUpscale: {
-		workflowPromptBinding("{{upscale_mode}}", "upscale_mode"),
-		stringPromptBinding("{{upscale_factor}}", "upscale_factor"),
-		stringPromptBinding("{{output_format}}", "output_format"),
-		stringPromptBinding("{{output_quality}}", "output_quality"),
+		stringPromptBinding("{{clarity_strength}}", "clarity_strength"),
 	},
 }
 
@@ -68,12 +65,6 @@ func stringPromptBinding(placeholder string, paramKey string) promptTemplateBind
 		paramKey:    paramKey,
 		formatter:   stringPromptValue,
 	}
-}
-
-func workflowPromptBinding(placeholder string, paramKey string) promptTemplateBinding {
-	binding := stringPromptBinding(placeholder, paramKey)
-	binding.reader = workflow.ReadWorkflowParam
-	return binding
 }
 
 func applyPromptTemplateBindings(
@@ -107,6 +98,10 @@ func applyPromptTemplateBindings(
 func readDirectPromptParam(params map[string]interface{}, key string) (interface{}, bool) {
 	value, ok := params[key]
 	return value, ok
+}
+
+func readStyleFusionInputWeightsPromptParam(params map[string]interface{}, _ string) (interface{}, bool) {
+	return workflow.ReadStyleFusionInputWeights(params)
 }
 
 func stringPromptValue(value interface{}) (string, bool) {
@@ -174,67 +169,12 @@ func formatImageWeightsTemplateValue(raw interface{}) (string, bool) {
 	switch values := raw.(type) {
 	case []float64:
 		return formatImageWeightFloats(values)
-	case []int:
-		weights := make([]float64, 0, len(values))
-		for _, value := range values {
-			weights = append(weights, float64(value))
-		}
-		return formatImageWeightFloats(weights)
-	case []interface{}:
-		weights := make([]float64, 0, len(values))
-		for _, value := range values {
-			if weight, ok := readImageWeightNumber(value); ok {
-				weights = append(weights, weight)
-			}
-		}
-		return formatImageWeightFloats(weights)
 	case string:
 		trimmed := strings.TrimSpace(values)
 		return trimmed, trimmed != ""
 	default:
 		return "", false
 	}
-}
-
-func readImageWeightNumber(value interface{}) (float64, bool) {
-	switch typed := value.(type) {
-	case float64:
-		return finiteImageWeightNumber(typed)
-	case float32:
-		return finiteImageWeightNumber(float64(typed))
-	case int:
-		return finiteImageWeightNumber(float64(typed))
-	case int8:
-		return finiteImageWeightNumber(float64(typed))
-	case int16:
-		return finiteImageWeightNumber(float64(typed))
-	case int32:
-		return finiteImageWeightNumber(float64(typed))
-	case int64:
-		return finiteImageWeightNumber(float64(typed))
-	case uint:
-		return finiteImageWeightNumber(float64(typed))
-	case uint8:
-		return finiteImageWeightNumber(float64(typed))
-	case uint16:
-		return finiteImageWeightNumber(float64(typed))
-	case uint32:
-		return finiteImageWeightNumber(float64(typed))
-	case uint64:
-		return finiteImageWeightNumber(float64(typed))
-	case json.Number:
-		weight, err := typed.Float64()
-		if err != nil {
-			return 0, false
-		}
-		return finiteImageWeightNumber(weight)
-	default:
-		return 0, false
-	}
-}
-
-func finiteImageWeightNumber(weight float64) (float64, bool) {
-	return weight, !math.IsNaN(weight) && !math.IsInf(weight, 0)
 }
 
 func formatImageWeightFloats(weights []float64) (string, bool) {

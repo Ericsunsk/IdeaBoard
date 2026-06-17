@@ -722,8 +722,7 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 		"mask_image_url":     maskDataURL,
 		"mask_image_urls":    []interface{}{maskDataURL},
 		"use_mask":           true,
-		"upscale_mode":       "enhancement",
-		"upscale_factor":     2,
+		"output_quality":     90,
 	}
 
 	if _, err := c.callOpenAI(context.Background(), account, "upscale prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
@@ -738,10 +737,10 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 	if gotBody["original_image_url"] != sourceDataURL {
 		t.Fatalf("expected original_image_url field to stay, got %#v", gotBody["original_image_url"])
 	}
-	if gotBody["upscale_mode"] != "enhancement" {
-		t.Fatalf("expected upscale_mode field, got %#v", gotBody["upscale_mode"])
+	if gotBody["output_quality"] != float64(90) {
+		t.Fatalf("expected output_quality field, got %#v", gotBody["output_quality"])
 	}
-	for _, key := range []string{"mask", "images", "mask_image_url", "mask_image_urls", "use_mask"} {
+	for _, key := range []string{"mask", "images", "mask_image_url", "mask_image_urls", "use_mask", "upscale_factor", "output_format", "upscale_mode"} {
 		if _, exists := gotBody[key]; exists {
 			t.Fatalf("did not expect %s in hd-upscale generation request body: %#v", key, gotBody[key])
 		}

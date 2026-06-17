@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 )
@@ -91,6 +92,88 @@ func ReadWorkflowStringParam(params map[string]interface{}, canonicalKey string)
 		return "", false
 	}
 	return s, true
+}
+
+func ReadStyleFusionInputWeights(params map[string]interface{}) ([]float64, bool) {
+	rawFusion, ok := ReadWorkflowParam(params, "fusion")
+	if !ok {
+		return nil, false
+	}
+	fusion, ok := rawFusion.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	rawWeights, ok := fusion["input_weights"]
+	if !ok {
+		return nil, false
+	}
+	weights, ok := readNumberList(rawWeights)
+	if !ok || len(weights) == 0 {
+		return nil, false
+	}
+	return weights, true
+}
+
+func readNumberList(raw interface{}) ([]float64, bool) {
+	switch values := raw.(type) {
+	case []float64:
+		return copyFiniteNumbers(values)
+	case []interface{}:
+		weights := make([]float64, 0, len(values))
+		for _, value := range values {
+			weight, ok := readFiniteNumber(value)
+			if !ok {
+				return nil, false
+			}
+			weights = append(weights, weight)
+		}
+		return weights, true
+	default:
+		return nil, false
+	}
+}
+
+func copyFiniteNumbers(values []float64) ([]float64, bool) {
+	weights := make([]float64, 0, len(values))
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return nil, false
+		}
+		weights = append(weights, value)
+	}
+	return weights, true
+}
+
+func readFiniteNumber(value interface{}) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, !math.IsNaN(typed) && !math.IsInf(typed, 0)
+	case float32:
+		value := float64(typed)
+		return value, !math.IsNaN(value) && !math.IsInf(value, 0)
+	case int:
+		return float64(typed), true
+	case int8:
+		return float64(typed), true
+	case int16:
+		return float64(typed), true
+	case int32:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case uint:
+		return float64(typed), true
+	case uint8:
+		return float64(typed), true
+	case uint16:
+		return float64(typed), true
+	case uint32:
+		return float64(typed), true
+	case uint64:
+		return float64(typed), true
+	default:
+		return 0, false
+	}
 }
 
 func ResolveWorkflowFeatureSlug(params map[string]interface{}) (string, error) {

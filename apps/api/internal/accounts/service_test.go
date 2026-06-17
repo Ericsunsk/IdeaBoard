@@ -49,7 +49,7 @@ func TestNormalizeAccountModelInputsRejectsInvalidFeatureSlug(t *testing.T) {
 
 func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
-		"upscale_mode": "enhancement",
+		"clarity_strength": 75,
 	}
 
 	got := prompts.ApplyFeatureSystemPrompt(
@@ -58,11 +58,11 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 		"hd-upscale",
 		params,
 		func(slug string) (string, error) {
-			return "SYS={{user_prompt}}|{{upscale_mode}}", nil
+			return "SYS={{user_prompt}}|{{clarity_strength}}", nil
 		},
 	)
 
-	want := "SYS=user prompt|enhancement"
+	want := "SYS=user prompt|75"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}

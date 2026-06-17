@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"path"
@@ -13,6 +14,7 @@ import (
 	"ideaboard/api/internal/platform/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/workflow"
 )
 
 func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
@@ -31,6 +33,68 @@ func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
 	} else {
 		delete(params, "reference_image_urls")
 	}
+}
+
+func normalizeStyleFusionParams(params map[string]interface{}) error {
+	if params == nil {
+		return nil
+	}
+	imageURLs := mediarefs.CollectStringList(params["image_urls"])
+	if len(imageURLs) < 2 || len(imageURLs) > 4 {
+		return fmt.Errorf("Fusion 节点需要 2 到 4 张输入图")
+	}
+	rawFusion, ok := params["fusion"]
+	if !ok {
+		return fmt.Errorf("Fusion 参数缺少 fusion.input_weights")
+	}
+	fusion, ok := rawFusion.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("Fusion 参数格式错误")
+	}
+	if _, ok := fusion["input_weights"]; !ok {
+		return fmt.Errorf("Fusion 参数缺少 fusion.input_weights")
+	}
+	weights, ok := workflow.ReadStyleFusionInputWeights(params)
+	if !ok {
+		return fmt.Errorf("Fusion 权重必须是数字数组")
+	}
+	if len(weights) != len(imageURLs) {
+		return fmt.Errorf("Fusion 权重数量必须与输入图数量一致")
+	}
+	normalizedWeights, err := normalizeFusionInputWeights(weights)
+	if err != nil {
+		return err
+	}
+	normalizedFusion := make(map[string]interface{}, len(fusion)+2)
+	for key, value := range fusion {
+		normalizedFusion[key] = value
+	}
+	normalizedFusion["mode"] = "weighted_reference"
+	normalizedFusion["input_weights"] = normalizedWeights
+	params["fusion"] = normalizedFusion
+	return nil
+}
+
+func normalizeFusionInputWeights(weights []float64) ([]float64, error) {
+	out := make([]float64, 0, len(weights))
+	total := 0.0
+	for _, weight := range weights {
+		if math.IsNaN(weight) || math.IsInf(weight, 0) {
+			return nil, fmt.Errorf("Fusion 权重必须是有限数字")
+		}
+		if weight < 0 {
+			return nil, fmt.Errorf("Fusion 权重不能为负数")
+		}
+		out = append(out, weight)
+		total += weight
+	}
+	if total <= 0 {
+		return nil, fmt.Errorf("Fusion 权重总和必须大于 0")
+	}
+	for index := range out {
+		out[index] = out[index] / total
+	}
+	return out, nil
 }
 
 func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
