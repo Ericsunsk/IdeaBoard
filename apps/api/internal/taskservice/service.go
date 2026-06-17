@@ -110,6 +110,44 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 	events.PublishTaskStatusLogWarn(ctx, s.taskEvents, taskID, status)
 }
 
+// convertToWorkflowTaskParams bridges the legacy map-based params to the
+// typed WorkflowTaskParams contract. This is a transitional helper;
+// the long-term goal is for the submit path to produce WorkflowTaskParams
+// directly without the intermediate map step.
+func convertToWorkflowTaskParams(params map[string]interface{}) *tasks.WorkflowTaskParams {
+	if params == nil {
+		return &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion}
+	}
+	p := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "feature"); ok {
+		p.Feature = v
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
+		p.Model = strings.TrimSpace(v)
+	}
+	if contract, ok := workflow.ReadStyleVariationPromptContract(params); ok {
+		p.Variation = &tasks.StyleVariationParams{Strength: contract.Strength}
+	}
+	if contract, ok := workflow.ReadImageExtendPromptContract(params); ok {
+		p.Extend = &tasks.ImageExtendParams{
+			TopPercent:    contract.TopPercent,
+			RightPercent:  contract.RightPercent,
+			BottomPercent: contract.BottomPercent,
+			LeftPercent:   contract.LeftPercent,
+		}
+	}
+	if contract, ok := workflow.ReadHDUpscalePromptContract(params); ok {
+		p.HD = &tasks.HDUpscaleParams{ClarityStrength: contract.ClarityStrength}
+	}
+	if weights, ok := workflow.ReadStyleFusionInputWeights(params); ok {
+		p.Fusion = &tasks.StyleFusionParams{
+			Mode:         "weighted_reference",
+			InputWeights: weights,
+		}
+	}
+	return p
+}
+
 func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
@@ -126,10 +164,9 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		return "", err
 	}
 
-	requestedModel := ""
-	if model, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
-		requestedModel = strings.TrimSpace(model)
-	}
+	// Convert to typed params for model resolution (layer boundary).
+	typedParams := convertToWorkflowTaskParams(params)
+	requestedModel := typedParams.Model
 
 	task := &tasks.Task{
 		TaskID:         taskID,
