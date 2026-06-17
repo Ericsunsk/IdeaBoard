@@ -6,9 +6,9 @@ import (
 	"ideaboard/api/internal/tasks"
 )
 
-// FlattenWorkflowTaskParams adapts the canonical task params contract to the
-// flat provider-facing map expected by current provider integrations.
-func FlattenWorkflowTaskParams(params *tasks.WorkflowTaskParams) map[string]interface{} {
+// BuildProviderTaskParams adapts the canonical task params contract to the
+// provider request map expected by current integrations.
+func BuildProviderTaskParams(params *tasks.WorkflowTaskParams) map[string]interface{} {
 	if params == nil {
 		return nil
 	}

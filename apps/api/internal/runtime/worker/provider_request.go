@@ -26,7 +26,7 @@ type providerMediaRefs struct {
 }
 
 func newProviderRequest(prompt string, width, height int, params map[string]interface{}, resolvedModel string) providerRequest {
-	providerParams := workflow.FlattenProviderTaskParams(params)
+	providerParams := workflow.BuildProviderPromptParams(params)
 	return providerRequest{
 		Prompt:    prompt,
 		Model:     resolvedModel,

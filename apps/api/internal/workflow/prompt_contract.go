@@ -152,7 +152,7 @@ func NormalizeStructuredPromptContractParams(params map[string]interface{}, feat
 	}
 }
 
-func FlattenProviderTaskParams(params map[string]interface{}) map[string]interface{} {
+func BuildProviderPromptParams(params map[string]interface{}) map[string]interface{} {
 	if params == nil {
 		return nil
 	}

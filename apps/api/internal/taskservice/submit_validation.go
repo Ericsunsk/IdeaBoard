@@ -18,7 +18,7 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-var deprecatedSubmitTaskParamKeys = []string{
+var unsupportedSubmitTaskParamKeys = []string{
 	"image_url",
 	"mask_image_urls",
 	"variation_strength",
@@ -163,7 +163,7 @@ func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}
 	if params == nil {
 		return nil
 	}
-	if err := validateNoDeprecatedSubmitTaskParams(params); err != nil {
+	if err := validateSubmitTaskContractKeys(params); err != nil {
 		return err
 	}
 	for _, key := range mediarefs.CanonicalListKeys() {
@@ -180,10 +180,10 @@ func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}
 	})
 }
 
-func validateNoDeprecatedSubmitTaskParams(params map[string]interface{}) error {
-	for _, key := range deprecatedSubmitTaskParamKeys {
+func validateSubmitTaskContractKeys(params map[string]interface{}) error {
+	for _, key := range unsupportedSubmitTaskParamKeys {
 		if _, ok := params[key]; ok {
-			return fmt.Errorf("%s 已废弃，请使用当前结构化参数", key)
+			return fmt.Errorf("任务参数必须使用结构化字段")
 		}
 	}
 	return nil

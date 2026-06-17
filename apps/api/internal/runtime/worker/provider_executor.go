@@ -293,7 +293,7 @@ func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *queuetypes.TaskPayl
 		slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
 		return nil
 	}
-	params := workflow.FlattenWorkflowTaskParams(typedParams)
+	params := workflow.BuildProviderTaskParams(typedParams)
 	c.normalizeUpstreamMediaParams(params)
 	return params
 }

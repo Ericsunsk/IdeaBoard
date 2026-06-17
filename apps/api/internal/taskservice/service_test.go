@@ -253,12 +253,12 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 		}
 	})
 
-	t.Run("reject deprecated flat feature params", func(t *testing.T) {
+	t.Run("reject non-structured feature params", func(t *testing.T) {
 		err := validateSubmitTaskMediaParams(map[string]interface{}{
 			"variation_strength": 42,
 		})
 		if err == nil {
-			t.Fatalf("expected deprecated flat param error")
+			t.Fatalf("expected structured param validation error")
 		}
 	})
 
@@ -630,7 +630,7 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 		t.Fatalf("fusion = %#v, want nested object preserved", params["fusion"])
 	}
 	if _, exists := params["image_urls"]; exists {
-		t.Fatalf("did not expect flat image_urls in stored params: %#v", params)
+		t.Fatalf("did not expect provider image_urls in stored params: %#v", params)
 	}
 	media, ok := params["media"].(map[string]interface{})
 	if !ok {
@@ -691,10 +691,10 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 		t.Fatalf("right_percent = %#v, want 25", extend["right_percent"])
 	}
 	if _, exists := params["extend_right"]; exists {
-		t.Fatalf("did not expect flat extend_right in stored params: %#v", params)
+		t.Fatalf("did not expect provider extend_right in stored params: %#v", params)
 	}
 	if _, exists := params["image_urls"]; exists {
-		t.Fatalf("did not expect flat image_urls in stored params: %#v", params)
+		t.Fatalf("did not expect provider image_urls in stored params: %#v", params)
 	}
 	media, ok := params["media"].(map[string]interface{})
 	if !ok {

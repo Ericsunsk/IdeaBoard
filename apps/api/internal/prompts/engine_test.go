@@ -142,7 +142,7 @@ func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *test
 		strings.Contains(got, "https://img.example/original.png") ||
 		strings.Contains(got, "https://img.example/mask.png") ||
 		strings.Contains(got, "true") {
-		t.Fatalf("got %q, want no runtime media or deprecated values exposed", got)
+		t.Fatalf("got %q, want no runtime media or provider-only values exposed", got)
 	}
 }
 

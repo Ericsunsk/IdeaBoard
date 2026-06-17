@@ -53,61 +53,116 @@ type TaskOutput struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-func (t *Task) ToUserView() map[string]interface{} {
-	safeResult := t.Result
-	if safeResult != "" {
-		var resultMap map[string]interface{}
-		if err := json.Unmarshal([]byte(safeResult), &resultMap); err == nil {
-			delete(resultMap, "prompt")
-			delete(resultMap, "account_id")
-			delete(resultMap, "channel_id")
-			delete(resultMap, "assigned_channel_id")
-			delete(resultMap, "channel_name")
-			delete(resultMap, "platform")
-			delete(resultMap, "api_type")
-			if b, err := json.Marshal(resultMap); err == nil {
-				safeResult = string(b)
-			}
-		}
-	}
+type TaskUserView struct {
+	ID           int64                `json:"id"`
+	TaskID       string               `json:"task_id"`
+	UserID       int64                `json:"user_id"`
+	Prompt       string               `json:"prompt"`
+	Status       string               `json:"status"`
+	ErrorMsg     string               `json:"error_msg"`
+	CancelReason string               `json:"cancel_reason"`
+	Result       string               `json:"result"`
+	Outputs      []TaskOutputUserView `json:"outputs,omitempty"`
+	CreatedAt    time.Time            `json:"created_at"`
+	UpdatedAt    time.Time            `json:"updated_at"`
+	CompletedAt  *time.Time           `json:"completed_at"`
+}
 
-	return map[string]interface{}{
-		"id":            t.ID,
-		"task_id":       t.TaskID,
-		"user_id":       t.UserID,
-		"prompt":        t.UserPrompt,
-		"status":        t.Status,
-		"error_msg":     t.ErrorMsg,
-		"cancel_reason": t.CancelReason,
-		"result":        safeResult,
-		"outputs":       taskOutputsUserView(t.Outputs),
-		"created_at":    t.CreatedAt,
-		"updated_at":    t.UpdatedAt,
-		"completed_at":  t.CompletedAt,
+type TaskOutputUserView struct {
+	ID        int64     `json:"id"`
+	TaskID    string    `json:"task_id"`
+	Role      string    `json:"role"`
+	URL       string    `json:"url"`
+	MIMEType  string    `json:"mime_type"`
+	Width     int       `json:"width"`
+	Height    int       `json:"height"`
+	SizeBytes int64     `json:"size_bytes"`
+	SortIndex int       `json:"sort_index"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type TaskResultUserView struct {
+	TaskID    string   `json:"task_id,omitempty"`
+	Status    string   `json:"status,omitempty"`
+	ImageURL  string   `json:"image_url,omitempty"`
+	ImageURLs []string `json:"image_urls,omitempty"`
+	Model     string   `json:"model,omitempty"`
+}
+
+func (t *Task) ToUserView() TaskUserView {
+	return TaskUserView{
+		ID:           t.ID,
+		TaskID:       t.TaskID,
+		UserID:       t.UserID,
+		Prompt:       t.UserPrompt,
+		Status:       t.Status,
+		ErrorMsg:     t.ErrorMsg,
+		CancelReason: t.CancelReason,
+		Result:       SafeTaskResultJSON(t.Result),
+		Outputs:      taskOutputsUserView(t.Outputs),
+		CreatedAt:    t.CreatedAt,
+		UpdatedAt:    t.UpdatedAt,
+		CompletedAt:  t.CompletedAt,
 	}
 }
 
-func taskOutputsUserView(outputs []TaskOutput) []map[string]interface{} {
+func taskOutputsUserView(outputs []TaskOutput) []TaskOutputUserView {
 	if len(outputs) == 0 {
 		return nil
 	}
-	result := make([]map[string]interface{}, 0, len(outputs))
+	result := make([]TaskOutputUserView, 0, len(outputs))
 	for _, output := range outputs {
-		result = append(result, map[string]interface{}{
-			"id":         output.ID,
-			"task_id":    output.TaskID,
-			"role":       output.Role,
-			"url":        output.URL,
-			"mime_type":  output.MIMEType,
-			"width":      output.Width,
-			"height":     output.Height,
-			"size_bytes": output.SizeBytes,
-			"sort_index": output.SortIndex,
-			"created_at": output.CreatedAt,
-			"updated_at": output.UpdatedAt,
+		result = append(result, TaskOutputUserView{
+			ID:        output.ID,
+			TaskID:    output.TaskID,
+			Role:      output.Role,
+			URL:       output.URL,
+			MIMEType:  output.MIMEType,
+			Width:     output.Width,
+			Height:    output.Height,
+			SizeBytes: output.SizeBytes,
+			SortIndex: output.SortIndex,
+			CreatedAt: output.CreatedAt,
+			UpdatedAt: output.UpdatedAt,
 		})
 	}
 	return result
+}
+
+func SafeTaskResultJSON(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	var resultMap map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &resultMap); err != nil {
+		return ""
+	}
+	safe := TaskResultUserView{}
+	if value, ok := resultMap["task_id"].(string); ok {
+		safe.TaskID = value
+	}
+	if value, ok := resultMap["status"].(string); ok {
+		safe.Status = value
+	}
+	if value, ok := resultMap["image_url"].(string); ok {
+		safe.ImageURL = value
+	}
+	if values, ok := resultMap["image_urls"].([]interface{}); ok {
+		for _, value := range values {
+			if text, ok := value.(string); ok {
+				safe.ImageURLs = append(safe.ImageURLs, text)
+			}
+		}
+	}
+	if value, ok := resultMap["model"].(string); ok {
+		safe.Model = value
+	}
+	payload, err := json.Marshal(safe)
+	if err != nil {
+		return ""
+	}
+	return string(payload)
 }
 
 type SubmitTaskRequest struct {

@@ -46,8 +46,66 @@ func TestTaskUserViewIncludesCancelReason(t *testing.T) {
 	}
 
 	view := task.ToUserView()
-	if got := view["cancel_reason"]; got != "用户取消" {
+	if got := view.CancelReason; got != "用户取消" {
 		t.Fatalf("cancel_reason = %#v, want 用户取消", got)
+	}
+}
+
+func TestTaskUserViewResultUsesAllowlist(t *testing.T) {
+	task := &Task{
+		ID:         1,
+		TaskID:     "task-safe-result",
+		UserID:     42,
+		UserPrompt: "draw",
+		Status:     StatusCompleted,
+		Result: `{
+			"task_id":"task-safe-result",
+			"status":"success",
+			"image_url":"/uploads/tasks/42/task-safe-result/out.png",
+			"image_urls":["/uploads/tasks/42/task-safe-result/out.png"],
+			"model":"gpt-image-1",
+			"prompt":"secret prompt",
+			"account_id":7,
+			"channel_id":8,
+			"platform":"openai"
+		}`,
+		Outputs: []TaskOutput{{
+			ID:             10,
+			TaskID:         "task-safe-result",
+			Role:           "image",
+			URL:            "/uploads/tasks/42/task-safe-result/out.png",
+			StorageKey:     "uploads/tasks/42/task-safe-result/out.png",
+			SourceURL:      "https://provider.example/out.png",
+			ChecksumSHA256: "secret-checksum",
+			MIMEType:       "image/png",
+			Width:          1024,
+			Height:         1024,
+			SizeBytes:      123,
+		}},
+	}
+
+	view := task.ToUserView()
+
+	if strings.Contains(view.Result, "prompt") ||
+		strings.Contains(view.Result, "account_id") ||
+		strings.Contains(view.Result, "channel_id") ||
+		strings.Contains(view.Result, "platform") {
+		t.Fatalf("result leaked non-allowlisted provider metadata: %s", view.Result)
+	}
+	if !strings.Contains(view.Result, `"image_url":"/uploads/tasks/42/task-safe-result/out.png"`) {
+		t.Fatalf("result missing image_url allowlist field: %s", view.Result)
+	}
+	if len(view.Outputs) != 1 {
+		t.Fatalf("outputs len = %d, want 1", len(view.Outputs))
+	}
+	if view.Outputs[0].URL != "/uploads/tasks/42/task-safe-result/out.png" {
+		t.Fatalf("output url = %#v", view.Outputs[0].URL)
+	}
+}
+
+func TestSafeTaskResultJSONDropsInvalidRawResult(t *testing.T) {
+	if got := SafeTaskResultJSON("not json"); got != "" {
+		t.Fatalf("safe result = %#v, want empty string", got)
 	}
 }
 

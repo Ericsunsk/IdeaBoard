@@ -173,13 +173,13 @@ func (h *Handler) GetUserTasks(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	tasks, total, err := h.taskService.GetUserTasks(c.Request.Context(), userID, req.Page, req.PageSize)
+	taskItems, total, err := h.taskService.GetUserTasks(c.Request.Context(), userID, req.Page, req.PageSize)
 	if err != nil {
 		response.InternalError(c, 500, "获取任务列表失败", err)
 		return
 	}
-	safeList := make([]map[string]interface{}, len(tasks))
-	for i, t := range tasks {
+	safeList := make([]tasks.TaskUserView, len(taskItems))
+	for i, t := range taskItems {
 		safeList[i] = t.ToUserView()
 	}
 	response.Success(c, gin.H{"total": total, "list": safeList})

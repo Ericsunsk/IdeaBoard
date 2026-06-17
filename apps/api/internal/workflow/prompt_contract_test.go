@@ -50,7 +50,7 @@ func TestNormalizeStructuredPromptContractParamsNormalizesExtendContract(t *test
 	}
 }
 
-func TestFlattenProviderTaskParamsDerivesProviderFieldsFromNestedContract(t *testing.T) {
+func TestBuildProviderPromptParamsDerivesProviderFieldsFromNestedContract(t *testing.T) {
 	params := map[string]interface{}{
 		"feature": FeatureSlugHDUpscale,
 		ParamKeyHD: map[string]interface{}{
@@ -58,17 +58,17 @@ func TestFlattenProviderTaskParamsDerivesProviderFieldsFromNestedContract(t *tes
 		},
 	}
 
-	flat := FlattenProviderTaskParams(params)
+	providerParams := BuildProviderPromptParams(params)
 
-	if _, exists := flat["clarity_strength"]; exists {
-		t.Fatalf("did not expect HD clarity strength to be flattened for providers: %#v", flat)
+	if _, exists := providerParams["clarity_strength"]; exists {
+		t.Fatalf("did not expect HD clarity strength in provider params: %#v", providerParams)
 	}
 	if _, exists := params["output_quality"]; exists {
-		t.Fatalf("flatten should not mutate original params: %#v", params)
+		t.Fatalf("provider param build should not mutate original params: %#v", params)
 	}
 }
 
-func TestFlattenWorkflowTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
+func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
 	useMask := true
 	params := &tasks.WorkflowTaskParams{
 		Feature: FeatureSlugStyleFusion,
@@ -98,31 +98,31 @@ func TestFlattenWorkflowTaskParamsDerivesProviderMapFromCanonicalContract(t *tes
 		},
 	}
 
-	flat := FlattenWorkflowTaskParams(params)
+	providerParams := BuildProviderTaskParams(params)
 
-	if got := flat["feature"]; got != FeatureSlugStyleFusion {
+	if got := providerParams["feature"]; got != FeatureSlugStyleFusion {
 		t.Fatalf("feature = %#v, want style-fusion", got)
 	}
-	if !reflect.DeepEqual(flat["image_urls"], []string{"https://img.example/a.png", "https://img.example/b.png"}) {
-		t.Fatalf("image_urls = %#v", flat["image_urls"])
+	if !reflect.DeepEqual(providerParams["image_urls"], []string{"https://img.example/a.png", "https://img.example/b.png"}) {
+		t.Fatalf("image_urls = %#v", providerParams["image_urls"])
 	}
-	if !reflect.DeepEqual(flat["reference_image_urls"], []string{"https://img.example/ref.png"}) {
-		t.Fatalf("reference_image_urls = %#v", flat["reference_image_urls"])
+	if !reflect.DeepEqual(providerParams["reference_image_urls"], []string{"https://img.example/ref.png"}) {
+		t.Fatalf("reference_image_urls = %#v", providerParams["reference_image_urls"])
 	}
-	if got := flat["mask_image_url"]; got != "https://img.example/mask.png" {
+	if got := providerParams["mask_image_url"]; got != "https://img.example/mask.png" {
 		t.Fatalf("mask_image_url = %#v", got)
 	}
-	if got := flat["custom_width"]; got != float64(640) {
+	if got := providerParams["custom_width"]; got != float64(640) {
 		t.Fatalf("custom_width = %#v", got)
 	}
-	if got := flat["fusion_input_weights"]; !reflect.DeepEqual(got, []float64{0.7, 0.3}) {
+	if got := providerParams["fusion_input_weights"]; !reflect.DeepEqual(got, []float64{0.7, 0.3}) {
 		t.Fatalf("fusion_input_weights = %#v", got)
 	}
-	if got := flat["provider_hint"]; got != "keep" {
+	if got := providerParams["provider_hint"]; got != "keep" {
 		t.Fatalf("provider_hint = %#v, want keep", got)
 	}
-	if _, exists := flat["variation_strength"]; exists {
-		t.Fatalf("reserved old flat key leaked from Extra: %#v", flat)
+	if _, exists := providerParams["variation_strength"]; exists {
+		t.Fatalf("provider-only key from Extra leaked into provider params: %#v", providerParams)
 	}
 }
 

@@ -51,6 +51,6 @@ func TestMarshalParamsUsesNestedCanonicalContract(t *testing.T) {
 		t.Fatalf("extend = %#v, want nested canonical contract", params.Extend)
 	}
 	if _, exists := params.Extra["extend_right"]; exists {
-		t.Fatalf("legacy flat extend_right leaked into Extra: %#v", params.Extra)
+		t.Fatalf("provider edge extend_right leaked into Extra: %#v", params.Extra)
 	}
 }

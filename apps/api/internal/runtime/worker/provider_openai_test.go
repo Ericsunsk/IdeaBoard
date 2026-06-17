@@ -455,7 +455,7 @@ func TestCallOpenAIStyleVariationFlattensNestedContractParams(t *testing.T) {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotBody["variation_strength"] != float64(5) {
-		t.Fatalf("expected flattened variation_strength field, got %#v", gotBody["variation_strength"])
+		t.Fatalf("expected provider variation_strength field, got %#v", gotBody["variation_strength"])
 	}
 	if _, exists := gotBody["variation"]; exists {
 		t.Fatalf("did not expect nested variation contract in provider body")
