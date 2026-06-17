@@ -400,10 +400,11 @@ func TestCallOpenAIStyleVariationDataURLDropsRedundantImageCopies(t *testing.T) 
 	}
 	dataURL := "data:image/png;base64,aGVsbG8="
 	params := map[string]interface{}{
-		"feature":            "style-variation",
-		"image_urls":         []interface{}{dataURL},
-		"original_image_url": dataURL,
-		"variation_strength": 5,
+		"feature":    "style-variation",
+		"image_urls": []interface{}{dataURL},
+		"variation": map[string]interface{}{
+			"strength": 5,
+		},
 	}
 
 	if _, err := c.callOpenAI(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
@@ -418,6 +419,46 @@ func TestCallOpenAIStyleVariationDataURLDropsRedundantImageCopies(t *testing.T) 
 	}
 	if _, exists := gotBody["original_image_url"]; exists {
 		t.Fatalf("did not expect redundant original_image_url field for data-url request")
+	}
+}
+
+func TestCallOpenAIStyleVariationFlattensNestedContractParams(t *testing.T) {
+	var gotBody map[string]interface{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/style.png"}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+	}
+	params := map[string]interface{}{
+		"feature": "style-variation",
+		"variation": map[string]interface{}{
+			"strength": 5,
+		},
+	}
+
+	if _, err := c.callOpenAI(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+		t.Fatalf("callOpenAI returned error: %v", err)
+	}
+	if gotBody["variation_strength"] != float64(5) {
+		t.Fatalf("expected flattened variation_strength field, got %#v", gotBody["variation_strength"])
+	}
+	if _, exists := gotBody["variation"]; exists {
+		t.Fatalf("did not expect nested variation contract in provider body")
 	}
 }
 
@@ -716,13 +757,14 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 	sourceDataURL := buildTinyPNGDataURL(t)
 	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "hd-upscale",
-		"image_urls":         []interface{}{sourceDataURL},
-		"original_image_url": sourceDataURL,
-		"mask_image_url":     maskDataURL,
-		"mask_image_urls":    []interface{}{maskDataURL},
-		"use_mask":           true,
-		"output_quality":     90,
+		"feature":    "hd-upscale",
+		"image_urls": []interface{}{sourceDataURL},
+		"hd": map[string]interface{}{
+			"clarity_strength": 75,
+		},
+		"mask_image_url":  maskDataURL,
+		"mask_image_urls": []interface{}{maskDataURL},
+		"use_mask":        true,
 	}
 
 	if _, err := c.callOpenAI(context.Background(), account, "upscale prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
@@ -733,9 +775,6 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 	}
 	if gotBody["image"] != sourceDataURL {
 		t.Fatalf("expected source image field, got %#v", gotBody["image"])
-	}
-	if gotBody["original_image_url"] != sourceDataURL {
-		t.Fatalf("expected original_image_url field to stay, got %#v", gotBody["original_image_url"])
 	}
 	if gotBody["output_quality"] != float64(90) {
 		t.Fatalf("expected output_quality field, got %#v", gotBody["output_quality"])

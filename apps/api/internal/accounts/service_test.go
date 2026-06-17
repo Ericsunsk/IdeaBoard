@@ -49,7 +49,9 @@ func TestNormalizeAccountModelInputsRejectsInvalidFeatureSlug(t *testing.T) {
 
 func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
-		"clarity_strength": 75,
+		"hd": map[string]interface{}{
+			"clarity_strength": 75,
+		},
 	}
 
 	got := prompts.ApplyFeatureSystemPrompt(
@@ -74,7 +76,12 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 		"user prompt",
 		"image-extend",
 		map[string]interface{}{
-			"extend_top": 30,
+			"extend": map[string]interface{}{
+				"top_percent":    30,
+				"right_percent":  0,
+				"bottom_percent": 0,
+				"left_percent":   0,
+			},
 		},
 		func(slug string) (string, error) {
 			return "SYS=canvas extend only", nil

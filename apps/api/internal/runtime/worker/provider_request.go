@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/workflow"
 )
 
 var (
@@ -25,12 +26,13 @@ type providerMediaRefs struct {
 }
 
 func newProviderRequest(prompt string, width, height int, params map[string]interface{}, resolvedModel string) providerRequest {
+	providerParams := workflow.FlattenProviderTaskParams(params)
 	return providerRequest{
 		Prompt:    prompt,
 		Model:     resolvedModel,
 		Size:      providerImageSize(width, height),
-		Params:    params,
-		MediaRefs: collectProviderMediaRefs(params),
+		Params:    providerParams,
+		MediaRefs: collectProviderMediaRefs(providerParams),
 	}
 }
 

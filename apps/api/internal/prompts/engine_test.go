@@ -11,7 +11,9 @@ func TestApplyFeatureSystemPromptStyleVariationUsesConfiguredPromptOnly(t *testi
 		"[style-variation] 延展强度：40%，前端默认文案",
 		"style-variation",
 		map[string]interface{}{
-			"variation_strength": 40,
+			"variation": map[string]interface{}{
+				"strength": 40,
+			},
 		},
 		func(string) (string, error) {
 			return "BACKEND-ONLY variation_strength={{variation_strength}}", nil
@@ -122,7 +124,9 @@ func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *test
 			"original_image_url": "https://img.example/original.png",
 			"mask_image_url":     "https://img.example/mask.png",
 			"use_mask":           true,
-			"clarity_strength":   75,
+			"hd": map[string]interface{}{
+				"clarity_strength": 75,
+			},
 		},
 		func(string) (string, error) {
 			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{clarity_strength}}", nil
@@ -164,7 +168,9 @@ func TestApplyFeatureSystemPromptDoesNotReplacePlaceholdersInsideUserPrompt(t *t
 		"literal {{variation_strength}}",
 		"style-variation",
 		map[string]interface{}{
-			"variation_strength": 40,
+			"variation": map[string]interface{}{
+				"strength": 40,
+			},
 		},
 		func(string) (string, error) {
 			return "SYS variation_strength={{variation_strength}} prompt={{user_prompt}}", nil
@@ -182,10 +188,11 @@ func TestApplyFeatureSystemPromptHDUpscaleDoesNotExposeUseMask(t *testing.T) {
 		"",
 		"hd-upscale",
 		map[string]interface{}{
-			"image_urls":         []interface{}{"https://img.example/original.png"},
-			"original_image_url": "https://img.example/original.png",
-			"use_mask":           true,
-			"clarity_strength":   75,
+			"image_urls": []interface{}{"https://img.example/original.png"},
+			"hd": map[string]interface{}{
+				"clarity_strength": 75,
+			},
+			"use_mask": true,
 		},
 		func(string) (string, error) {
 			return "SYS use_mask={{use_mask}} clarity={{clarity_strength}}", nil

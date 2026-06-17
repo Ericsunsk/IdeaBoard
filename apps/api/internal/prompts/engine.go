@@ -24,10 +24,15 @@ type featurePromptMergePolicy struct {
 	appendBasePromptWithoutTemplate               bool
 }
 
+type featurePromptVariableProvider func(map[string]interface{}) map[string]interface{}
+
+var featurePromptVariableProviders = map[string]featurePromptVariableProvider{
+	workflow.FeatureSlugStyleVariation: styleVariationPromptVariables,
+	workflow.FeatureSlugImageExtend:    imageExtendPromptVariables,
+	workflow.FeatureSlugHDUpscale:      hdUpscalePromptVariables,
+}
+
 var featurePromptBindings = map[string][]promptTemplateBinding{
-	workflow.FeatureSlugStyleVariation: {
-		stringPromptBinding("{{variation_strength}}", "variation_strength"),
-	},
 	workflow.FeatureSlugStyleFusion: {
 		{
 			placeholder: "{{fusion_input_weights}}",
@@ -35,15 +40,6 @@ var featurePromptBindings = map[string][]promptTemplateBinding{
 			reader:      readStyleFusionInputWeightsPromptParam,
 			formatter:   formatImageWeightsTemplateValue,
 		},
-	},
-	workflow.FeatureSlugImageExtend: {
-		stringPromptBinding("{{extend_top_percent}}", "extend_top"),
-		stringPromptBinding("{{extend_right_percent}}", "extend_right"),
-		stringPromptBinding("{{extend_bottom_percent}}", "extend_bottom"),
-		stringPromptBinding("{{extend_left_percent}}", "extend_left"),
-	},
-	workflow.FeatureSlugHDUpscale: {
-		stringPromptBinding("{{clarity_strength}}", "clarity_strength"),
 	},
 }
 
@@ -75,6 +71,14 @@ func applyPromptTemplateBindings(
 	if params == nil {
 		return
 	}
+	if provider := featurePromptVariableProviders[featureSlug]; provider != nil {
+		for placeholder, value := range provider(params) {
+			formatted, ok := stringPromptValue(value)
+			if ok {
+				varMap[placeholder] = formatted
+			}
+		}
+	}
 	for _, binding := range featurePromptBindings[featureSlug] {
 		reader := binding.reader
 		if reader == nil {
@@ -102,6 +106,30 @@ func readDirectPromptParam(params map[string]interface{}, key string) (interface
 
 func readStyleFusionInputWeightsPromptParam(params map[string]interface{}, _ string) (interface{}, bool) {
 	return workflow.ReadStyleFusionInputWeights(params)
+}
+
+func styleVariationPromptVariables(params map[string]interface{}) map[string]interface{} {
+	contract, ok := workflow.ReadStyleVariationPromptContract(params)
+	if !ok {
+		return nil
+	}
+	return contract.PromptVariables()
+}
+
+func imageExtendPromptVariables(params map[string]interface{}) map[string]interface{} {
+	contract, ok := workflow.ReadImageExtendPromptContract(params)
+	if !ok {
+		return nil
+	}
+	return contract.PromptVariables()
+}
+
+func hdUpscalePromptVariables(params map[string]interface{}) map[string]interface{} {
+	contract, ok := workflow.ReadHDUpscalePromptContract(params)
+	if !ok {
+		return nil
+	}
+	return contract.PromptVariables()
 }
 
 func stringPromptValue(value interface{}) (string, bool) {

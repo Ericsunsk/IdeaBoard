@@ -222,6 +222,9 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 			req.Params["feature"] = featureSlug
 		}
 	}
+	if err := workflow.NormalizeStructuredPromptContractParams(req.Params, featureSlug); err != nil {
+		return nil, nil, "", "", err
+	}
 	if featureSlug == workflow.FeatureSlugStyleFusion {
 		if err := normalizeStyleFusionParams(req.Params); err != nil {
 			return nil, nil, "", "", err

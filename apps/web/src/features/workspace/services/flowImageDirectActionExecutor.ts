@@ -55,11 +55,6 @@ const DIRECT_ACTION_FEATURES = {
   [IMAGE_NODE_ACTION.sketchToImage]: EXECUTION_DIRECT_ACTION_META.sketchToImage.feature,
 } satisfies Record<ImageDirectTaskAction, ExecutionFeature>
 
-export function resolveHdOutputQuality(strength: number | undefined): number {
-  const clarityStrength = resolveHdClarityStrength(strength)
-  return Math.max(60, Math.min(100, Math.round(60 + clarityStrength * 0.4)))
-}
-
 export function resolveHdClarityStrength(strength: number | undefined): number {
   return Number.isFinite(strength)
     ? Math.max(0, Math.min(100, Math.round(strength as number)))
@@ -67,10 +62,15 @@ export function resolveHdClarityStrength(strength: number | undefined): number {
 }
 
 export async function assertDirectActionSubmitReady(action: ImageDirectTaskAction): Promise<void> {
+  const params =
+    action === IMAGE_NODE_ACTION.styleVariation
+      ? { variation: { strength: DEFAULT_IMAGE_ACTION_STRENGTH } }
+      : undefined
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
       feature: DIRECT_ACTION_FEATURES[action],
+      params,
     }),
     '提交任务失败',
   )
@@ -91,6 +91,14 @@ export async function assertCanvasExtendSubmitReady(): Promise<void> {
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
       feature: EXECUTION_IMAGE_TOOL_META.imageExtend.feature,
+      params: {
+        extend: {
+          top_percent: 0,
+          right_percent: 1,
+          bottom_percent: 0,
+          left_percent: 0,
+        },
+      },
     }),
     '提交任务失败',
   )
@@ -101,6 +109,11 @@ export async function assertHdUpscaleSubmitReady(): Promise<void> {
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
       feature: EXECUTION_IMAGE_TOOL_META.hdUpscale.feature,
+      params: {
+        hd: {
+          clarity_strength: DEFAULT_IMAGE_ACTION_STRENGTH,
+        },
+      },
     }),
     '提交任务失败',
   )
@@ -139,9 +152,10 @@ export async function submitDirectActionTask(
           feature: DIRECT_ACTION_FEATURES[action],
           imageUrls: [source.url],
           params: {
-            original_image_url: source.url,
             ...buildExecutionSizeParams(imageSize),
-            variation_strength: strength,
+            variation: {
+              strength,
+            },
           },
         })
       : buildExecutionTaskRequest({
@@ -220,10 +234,12 @@ export async function submitCanvasExtendTask(input: SubmitCanvasExtendTaskInput)
         imageSize,
         extendExecutionImageSize(imageSize, input.extendPercent),
       ),
-      extend_top: input.extendPercent.top,
-      extend_right: input.extendPercent.right,
-      extend_bottom: input.extendPercent.bottom,
-      extend_left: input.extendPercent.left,
+      extend: {
+        top_percent: input.extendPercent.top,
+        right_percent: input.extendPercent.right,
+        bottom_percent: input.extendPercent.bottom,
+        left_percent: input.extendPercent.left,
+      },
     },
   })
 
@@ -241,16 +257,15 @@ export async function submitHdUpscaleTask(
 ): Promise<string> {
   const imageSize = await loadImageSize(source.url)
   const clarityStrength = resolveHdClarityStrength(strength)
-  const outputQuality = resolveHdOutputQuality(strength)
   const request = buildExecutionTaskRequest({
     prompt: EXECUTION_IMAGE_TOOL_META.hdUpscale.prompt,
     feature: EXECUTION_IMAGE_TOOL_META.hdUpscale.feature,
     imageUrls: [source.url],
     params: {
-      original_image_url: source.url,
       ...buildExecutionSizeParams(imageSize, imageSize),
-      clarity_strength: clarityStrength,
-      output_quality: outputQuality,
+      hd: {
+        clarity_strength: clarityStrength,
+      },
     },
   })
 

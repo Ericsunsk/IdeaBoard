@@ -39,13 +39,13 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 | 变量                 | 主要适用 feature                                              | 说明                                                       |
 | -------------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
 | `{{user_prompt}}`    | `partial-edit`、`pattern-gen`、`style-fusion`、`image-extend` | 用户或连接 Prompt 文本；只能作为补充要求，不能覆盖系统边界 |
-| `{{variation_strength}}` | `style-variation`                                          | 风格延展强度百分比，来自 `variation_strength`              |
+| `{{variation_strength}}` | `style-variation`                                          | 风格延展强度百分比，来自 `variation.strength`              |
 | `{{fusion_input_weights}}` | `style-fusion`                                             | Fusion 输入图的有序权重，例如 `Image 1: 60%, Image 2: 40%` |
-| `{{extend_top_percent}}` | `image-extend`                                             | 基于原图高度向上扩展的百分比                               |
-| `{{extend_right_percent}}` | `image-extend`                                           | 基于原图宽度向右扩展的百分比                               |
-| `{{extend_bottom_percent}}` | `image-extend`                                          | 基于原图高度向下扩展的百分比                               |
-| `{{extend_left_percent}}` | `image-extend`                                             | 基于原图宽度向左扩展的百分比                               |
-| `{{clarity_strength}}` | `hd-upscale`                                                  | HD 清晰度强度百分比                                         |
+| `{{extend_top_percent}}` | `image-extend`                                             | 基于原图高度向上扩展的百分比，来自 `extend.top_percent`     |
+| `{{extend_right_percent}}` | `image-extend`                                           | 基于原图宽度向右扩展的百分比，来自 `extend.right_percent`   |
+| `{{extend_bottom_percent}}` | `image-extend`                                          | 基于原图高度向下扩展的百分比，来自 `extend.bottom_percent`  |
+| `{{extend_left_percent}}` | `image-extend`                                             | 基于原图宽度向左扩展的百分比，来自 `extend.left_percent`    |
+| `{{clarity_strength}}` | `hd-upscale`                                                  | HD 清晰度强度百分比，来自 `hd.clarity_strength`             |
 
 以下字段是运行时媒体或任务参数，不是 prompt 模板变量，不要写进正文：
 
@@ -55,6 +55,17 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 | `mask_image_url`、`mask_image_urls`                   | mask 是编辑边界和裁剪依据，不是模型需要阅读的正文信息         |
 | `reference_image_urls`                                | 多参考图会作为媒体输入传给 provider，prompt 只描述如何参考    |
 | `ratio`、尺寸、模型、质量、sample count、本地重绘标记 | 这些由运行时、provider 或渲染链路控制，不属于自然语言任务边界 |
+
+结构化控制参数约定：
+
+| feature           | canonical params                                                                                 | prompt 变量来源                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `style-variation` | `variation: { strength: number }`                                                                | `{{variation_strength}}` 派生自 `variation.strength` |
+| `image-extend`    | `extend: { top_percent, right_percent, bottom_percent, left_percent }`                           | 四个扩边变量派生自 `extend.*_percent`           |
+| `hd-upscale`      | `hd: { clarity_strength: number }`                                                              | `{{clarity_strength}}` 派生自 `hd.clarity_strength` |
+| `style-fusion`    | `fusion: { mode: "weighted_reference", input_weights: number[] }`                                | `{{fusion_input_weights}}` 派生自 `fusion.input_weights` |
+
+HD 的 `output_quality` 由后端根据 `hd.clarity_strength` 派生；输出尺寸按原图尺寸由运行时尺寸参数控制，不作为 prompt 变量或 UI contract 字段。
 
 Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义或使用；统一使用 `{{fusion_input_weights}}`。
 

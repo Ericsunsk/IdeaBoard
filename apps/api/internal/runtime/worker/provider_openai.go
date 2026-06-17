@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -424,6 +425,7 @@ func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq prov
 			reqBody.setExtra(key, v)
 		}
 	}
+	appendOpenAIHDUpscaleDerivedParams(reqBody, providerReq.Params)
 }
 
 func openAISharedAllowedParamKeys() []string {
@@ -434,8 +436,24 @@ func openAISharedAllowedParamKeys() []string {
 		"extend_bottom",
 		"extend_left",
 		"original_image_url",
-		"output_quality",
 	}
+}
+
+func appendOpenAIHDUpscaleDerivedParams(reqBody *openAIImageRequestBody, params map[string]interface{}) {
+	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
+	if featureSlug != workflow.FeatureSlugHDUpscale {
+		return
+	}
+	hd, ok := workflow.ReadHDUpscalePromptContract(params)
+	if !ok {
+		return
+	}
+	reqBody.setExtra("output_quality", resolveOpenAIHDUpscaleOutputQuality(hd.ClarityStrength))
+}
+
+func resolveOpenAIHDUpscaleOutputQuality(clarityStrength float64) int {
+	clarityStrength = math.Max(0, math.Min(100, math.Round(clarityStrength)))
+	return int(math.Max(60, math.Min(100, math.Round(60+clarityStrength*0.4))))
 }
 
 func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, params map[string]interface{}) {
