@@ -186,6 +186,16 @@ describe('boardSync', () => {
     expect(getCanvasBoardState('board-1')?.viewport.zoomLevel).toBe(100)
   })
 
+  it('returns hydrate failure without clearing local boards', async () => {
+    replaceCanvasBoards([{ id: 'board-1', name: 'Local Board', createdAt: 100, updatedAt: 2_000 }])
+    mocks.boardApi.list.mockRejectedValueOnce(new Error('network failed'))
+
+    const result = await hydrateCanvasBoardsFromServer()
+
+    expect(result.ok).toBe(false)
+    expect(listCanvasBoards()[0]?.name).toBe('Local Board')
+  })
+
   it('syncs a rename with the board metadata timestamp when state is older', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 3_000 }])
     replaceCanvasBoardStateMap({ 'board-1': makeState(1_000, 100) })

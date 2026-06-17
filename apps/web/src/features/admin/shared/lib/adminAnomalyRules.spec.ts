@@ -121,7 +121,6 @@ function createInput(overrides: Partial<AdminAnomalyInput> = {}): AdminAnomalyIn
     monitorData: null,
     monitorStats: null,
     statistics: null,
-    isMonitorDegraded: false,
     isMonitorUnavailable: false,
     isStatisticsUnavailable: false,
     now: 1_700_000_000_000,

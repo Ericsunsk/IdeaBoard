@@ -71,7 +71,6 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
       monitorData: monitorData.value,
       monitorStats: monitorStats.value,
       statistics: statistics.value,
-      isMonitorDegraded: false,
       isMonitorUnavailable: monitorQuery.isError.value,
       isStatisticsUnavailable: statisticsQuery.isError.value,
     })

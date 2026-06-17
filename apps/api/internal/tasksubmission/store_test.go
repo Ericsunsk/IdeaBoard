@@ -55,3 +55,28 @@ type failingRiverTxClient struct {
 func (c failingRiverTxClient) InsertTx(context.Context, pgx.Tx, river.JobArgs, *river.InsertOpts) (*rivertype.JobInsertResult, error) {
 	return nil, c.err
 }
+
+func TestInsertTaskSQLMatchesSchemaColumns(t *testing.T) {
+	ctx := context.Background()
+	_, pool := testdb.OpenWithPool(t)
+
+	task := &tasks.Task{
+		TaskID:     "task_schema_drift_test",
+		UserID:     42,
+		Prompt:     "draw a chair",
+		UserPrompt: "draw a chair",
+		Params:     `{"size":"1024x1024"}`,
+		Status:     tasks.StatusPending,
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := insertTask(ctx, tx, task); err != nil {
+		t.Fatalf("insertTask: %v", err)
+	}
+	_ = tx.Rollback(ctx)
+}

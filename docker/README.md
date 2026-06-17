@@ -13,7 +13,7 @@
 ```bash
 cd docker
 cp .env.example .env
-# 生产 stack 至少修改 POSTGRES_PASSWORD 和对外域名/密钥。
+# compose.local.yml 仅启动本地开发依赖（PostgreSQL + NATS），不包含应用容器。
 docker compose -f compose.local.yml up -d
 ```
 

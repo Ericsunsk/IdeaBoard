@@ -575,9 +575,13 @@ async function handleUpdatePassword() {
   await runAsyncAction(
     async () => {
       await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
-      appToast.success('密码更新成功，请重新登录')
       resetPasswordForm()
-      await router.push('/user/login')
+      const isLoggedOut = await userStore.logout()
+      if (!isLoggedOut) {
+        throw new Error('密码已更新，但退出登录失败，请手动退出后重新登录')
+      }
+      appToast.success('密码更新成功，请重新登录')
+      await router.replace('/user/login')
     },
     {
       loading: pwdLoading,

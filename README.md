@@ -344,6 +344,7 @@ IdeaBoard/
 
 ```bash
 export GITHUB_TOKEN="your-github-token" && curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh" -o /tmp/bootstrap-vps.sh && bash /tmp/bootstrap-vps.sh
+# 若为 fork 或自建仓库，请将上述 URL 中的 Ericsunsk/IdeaBoard 替换为你自己的仓库路径。
 ```
 
 可指定 `--ref <tag-or-commit>` 来部署特定版本。VPS 需要预先安装 `cosign` 用于默认镜像验签；强制重装可加 `IDEABOARD_FORCE=1`，脚本会备份旧目录并恢复 `docker/.env`。
@@ -424,14 +425,19 @@ PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` �
 
 ## 验证建议
 
-上线前建议至少确认：
+上线前建议按分层验证矩阵确认：
 
-1. `curl http://127.0.0.1:6000/api/health` 返回成功。
-2. `curl http://127.0.0.1:6001/api/health` 返回成功。
-3. 用户端首页可正常访问。
-4. 管理员可登录后台。
-5. 图片上传与结果回写正常。
-6. 任务提交后能看到完整状态流转。
+| 层 | 验证项 | 命令 |
+|----|--------|------|
+| Web | Lint + 测试 | `cd apps/web && npm run lint && npm run test:run` |
+| Web | 类型检查 | `cd apps/web && npm run build` |
+| API | 单元测试 | `cd apps/api && go test ./...` |
+| API | 竞态检测 | `cd apps/api && go test -race ./...` |
+| API | sqlc 一致性 | `cd apps/api && go tool sqlc generate && git diff --exit-code -- internal/db/sqlc` |
+| Auth | 构建 + 测试 | `cd apps/auth && npm run build && npm test` |
+| 生产 | 健康检查 | `curl http://127.0.0.1:6000/api/health` `curl http://127.0.0.1:6001/api/health` |
+| 生产 | 冒烟测试 | `cd apps/web && npm run smoke:user` / `cd apps/web && npm run smoke:admin-mock` |
+| 手工 | 首页访问、登录、上传、任务流转 | 浏览器点检 |
 
 <p align="center">
   <sub>本项目为闭源私有项目，未经授权不得复制、分发或使用。保留所有权利。</sub>

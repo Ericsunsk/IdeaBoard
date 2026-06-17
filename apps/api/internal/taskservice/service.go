@@ -305,18 +305,24 @@ func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int6
 	if err != nil {
 		return err
 	}
+	// Cancel and delete the task row first (idempotent DB operations).
+	// Object-storage cleanup runs best-effort afterward to avoid leaving
+	// a half-deleted task entry when output files cannot be removed.
 	if s.cancelStore == nil {
 		return fmt.Errorf("task cancellation store not configured")
 	}
 	if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
 		return err
 	}
+	if err := s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID); err != nil {
+		return err
+	}
 	if s.taskOutputCleaner != nil {
 		if err := s.taskOutputCleaner.DeleteTaskOutputsByUserTask(ctx, task.UserID, task.TaskID); err != nil {
-			return err
+			slog.Warn("delete task outputs after task row deleted", "task_id", taskID, "user_id", userID, "err", err)
 		}
 	}
-	return s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID)
+	return nil
 }
 
 func (s *Service) GetUserTasks(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {

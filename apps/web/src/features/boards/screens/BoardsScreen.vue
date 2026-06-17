@@ -700,7 +700,10 @@ async function logout() {
 
 onMounted(async () => {
   try {
-    await hydrateCanvasBoardsFromServer()
+    const hydrateResult = await hydrateCanvasBoardsFromServer()
+    if (!hydrateResult.ok) {
+      appToast.error('画布同步失败，请稍后重试')
+    }
     reloadBoards()
   } finally {
     isBoardsLoading.value = false

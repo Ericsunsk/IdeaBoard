@@ -23,7 +23,6 @@ type AdminAnomalyInput = {
   monitorData: MonitorData | null
   monitorStats: MonitorStats | null
   statistics: AdminStatistics | null
-  isMonitorDegraded: boolean
   isMonitorUnavailable: boolean
   isStatisticsUnavailable: boolean
   now?: number
@@ -57,18 +56,6 @@ export function buildAdminAnomalyItems(input: AdminAnomalyInput): AdminAnomalyIt
 }
 
 function pushSystemAnomalies(drafts: AdminAnomalyDraft[], input: AdminAnomalyInput) {
-  if (input.isMonitorDegraded) {
-    drafts.push({
-      id: 'system.monitor-stream-degraded',
-      severity: 'warning',
-      source: 'system',
-      title: '监控流连接异常',
-      summary: '实时监控流处于降级状态，数据可能正在回退到轮询。',
-      route: TASK_MONITOR_ROUTE,
-      actionLabel: '查看任务监控',
-    })
-  }
-
   if (input.isMonitorUnavailable) {
     drafts.push({
       id: 'system.monitor-unavailable',

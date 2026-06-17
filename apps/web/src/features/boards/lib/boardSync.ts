@@ -13,7 +13,11 @@ import {
   type CanvasBoardState,
 } from '../../canvas/lib/canvasBoardState'
 
-const hydrateInFlight = new Map<string, Promise<void>>()
+export type HydrateCanvasBoardsFromServerResult =
+  | { ok: true }
+  | { ok: false; error: unknown }
+
+const hydrateInFlight = new Map<string, Promise<HydrateCanvasBoardsFromServerResult>>()
 const pendingRollbackBoardIds = new Set<string>()
 
 export type HydrateCanvasBoardsFromServerOptions = {
@@ -158,7 +162,7 @@ export async function hydrateCanvasBoardsFromServer(
   options: HydrateCanvasBoardsFromServerOptions = {},
 ) {
   const scope = getAuthStorageUserScope()
-  if (!scope) return
+  if (!scope) return { ok: true } satisfies HydrateCanvasBoardsFromServerResult
   const resolvedOptions = resolveHydrateOptions(options)
   const rollbackKey = [...resolvedOptions.rollbackBoardIds].sort().join(',')
   const hydrateKey = `${scope}:${resolvedOptions.preserveLocalNewer ? 'preserve' : 'replace'}:${rollbackKey}`
@@ -170,9 +174,11 @@ export async function hydrateCanvasBoardsFromServer(
     resolvedOptions.rollbackBoardIds.forEach((boardId) => {
       pendingRollbackBoardIds.delete(boardId)
     })
+    return { ok: true } satisfies HydrateCanvasBoardsFromServerResult
   })()
     .catch((error) => {
       console.warn('[boards] hydrate from server failed', error)
+      return { ok: false, error } satisfies HydrateCanvasBoardsFromServerResult
     })
     .finally(() => {
       hydrateInFlight.delete(hydrateKey)

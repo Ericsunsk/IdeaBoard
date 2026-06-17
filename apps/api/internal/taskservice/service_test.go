@@ -2,6 +2,7 @@ package taskservice
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
@@ -508,6 +510,7 @@ func (f *fakeCancelStore) ClearCancelled(context.Context, string) error      { r
 
 type recordingTaskOutputCleaner struct {
 	calls []taskOutputCleanerCall
+	err   error
 }
 
 type taskOutputCleanerCall struct {
@@ -517,6 +520,9 @@ type taskOutputCleanerCall struct {
 
 func (c *recordingTaskOutputCleaner) DeleteTaskOutputsByUserTask(_ context.Context, userID int64, taskID string) error {
 	c.calls = append(c.calls, taskOutputCleanerCall{userID: userID, taskID: taskID})
+	if c.err != nil {
+		return c.err
+	}
 	return nil
 }
 
@@ -602,5 +608,43 @@ RETURNING id`).Scan(&channelID); err != nil {
 	}
 	if _, err := taskRepo.GetByTaskID(ctx, task.TaskID); err == nil {
 		t.Fatal("deleted task is still queryable")
+	}
+}
+
+func TestDeleteUserTaskSucceedsWhenOutputCleanupFails(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+
+	task := &tasks.Task{
+		TaskID:     "task_delete_output_fail",
+		UserID:     42,
+		UserPrompt: "test",
+		Prompt:     "test",
+		Status:     tasks.StatusCompleted,
+		Params:     "{}",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	failingCleaner := &recordingTaskOutputCleaner{err: errors.New("output cleanup failed")}
+	svc := NewService(ServiceDeps{
+		TaskRepo:          taskRepo,
+		CancelStore:       taskqueue.NewPostgresTaskRuntimeStore(db),
+		TaskOutputCleaner: failingCleaner,
+	}, ServiceOptions{EventHub: NewEventHub()})
+
+	// Should succeed despite output cleanup failure (best-effort)
+	if err := svc.DeleteUserTask(ctx, "task_delete_output_fail", 42); err != nil {
+		t.Fatalf("DeleteUserTask should succeed even when output cleanup fails: %v", err)
+	}
+
+	if len(failingCleaner.calls) == 0 {
+		t.Fatal("output cleaner should have been called")
+	}
+
+	if _, err := taskRepo.GetByTaskID(ctx, "task_delete_output_fail"); err == nil {
+		t.Fatal("task row should be deleted after DeleteUserTask")
 	}
 }
