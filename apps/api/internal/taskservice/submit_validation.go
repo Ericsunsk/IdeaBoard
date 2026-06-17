@@ -18,6 +18,21 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
+var deprecatedSubmitTaskParamKeys = []string{
+	"image_url",
+	"mask_image_urls",
+	"variation_strength",
+	"extend_top",
+	"extend_right",
+	"extend_bottom",
+	"extend_left",
+	"clarity_strength",
+	"fusion_input_weights",
+	"upscale_mode",
+	"upscale_factor",
+	"output_quality",
+}
+
 func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
 	if params == nil {
 		return
@@ -148,6 +163,9 @@ func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}
 	if params == nil {
 		return nil
 	}
+	if err := validateNoDeprecatedSubmitTaskParams(params); err != nil {
+		return err
+	}
 	for _, key := range mediarefs.CanonicalListKeys() {
 		values := mediarefs.CollectStringList(params[key])
 		if len(values) > maxSubmitTaskImageURLs {
@@ -160,6 +178,15 @@ func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}
 		}
 		return nil
 	})
+}
+
+func validateNoDeprecatedSubmitTaskParams(params map[string]interface{}) error {
+	for _, key := range deprecatedSubmitTaskParamKeys {
+		if _, ok := params[key]; ok {
+			return fmt.Errorf("%s 已废弃，请使用当前结构化参数", key)
+		}
+	}
+	return nil
 }
 
 func validateSubmitTaskMediaRef(raw string) error {
@@ -255,9 +282,25 @@ func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {
 	return string(payload), nil
 }
 
-// workflowTaskParamsFromMap converts the legacy map into a typed
-// WorkflowTaskParams using the canonical nested contracts. It delegates
-// to prompt_contract.go for feature-specific parsing.
+func marshalWorkflowTaskParams(params *tasks.WorkflowTaskParams, source map[string]interface{}) (string, error) {
+	if params == nil {
+		return "", nil
+	}
+	if source != nil && jsonlimit.ValueDepth(source) > maxSubmitTaskParamsDepth {
+		return "", fmt.Errorf("任务参数层级过深")
+	}
+	payload, err := json.Marshal(params)
+	if err != nil {
+		return "", fmt.Errorf("任务参数格式错误")
+	}
+	if len(payload) > maxSubmitTaskParamsBytes {
+		return "", fmt.Errorf("任务参数不能超过 %dMB", maxSubmitTaskParamsBytes/1024/1024)
+	}
+	return string(payload), nil
+}
+
+// workflowTaskParamsFromMap converts submit params into the canonical typed
+// WorkflowTaskParams stored on the task and passed through the queue.
 func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string) (*tasks.WorkflowTaskParams, error) {
 	p := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion}
 	if params == nil {
@@ -279,15 +322,8 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		p.Model = strings.TrimSpace(v)
 	}
 
-	// Media
-	p.ImageURLs = mediarefs.CollectStringList(params["image_urls"])
-	p.ReferenceImageURLs = mediarefs.CollectStringList(params["reference_image_urls"])
-	if v, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
-		p.MaskImageURL = v
-	}
-	p.MaskImageURLs = mediarefs.CollectStringList(params["mask_image_urls"])
-	if v, ok := workflow.ReadWorkflowStringParam(params, "original_image_url"); ok {
-		p.OriginalImageURL = v
+	if media := workflowMediaInputsFromMap(params, featureSlug); media != nil {
+		p.Media = media
 	}
 
 	controls := &tasks.GenerationControls{}
@@ -328,6 +364,10 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		controls.ImageCount = v
 		hasControls = true
 	}
+	if v, ok := readBoolParam(params, "prompt_upsampling"); ok {
+		controls.PromptUpsampling = &v
+		hasControls = true
+	}
 	if hasControls {
 		p.Controls = controls
 	}
@@ -361,6 +401,63 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 	return p, nil
 }
 
+func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug string) *tasks.MediaInputs {
+	media := &tasks.MediaInputs{}
+	hasMedia := false
+
+	inputWeights := []float64(nil)
+	if featureSlug == workflow.FeatureSlugStyleFusion {
+		if weights, ok := workflow.ReadStyleFusionInputWeights(params); ok {
+			inputWeights = weights
+		}
+	}
+
+	imageURLs := mediarefs.CollectStringList(params["image_urls"])
+	if len(imageURLs) > 0 {
+		media.Inputs = mediaRefsFromURLs(imageURLs, "input", inputWeights)
+		hasMedia = true
+	}
+	referenceImageURLs := mediarefs.CollectStringList(params["reference_image_urls"])
+	if len(referenceImageURLs) > 0 {
+		media.References = mediaRefsFromURLs(referenceImageURLs, "reference", nil)
+		hasMedia = true
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
+		media.Mask = &tasks.MediaRef{URL: v, Role: "mask"}
+		hasMedia = true
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "original_image_url"); ok {
+		media.Original = &tasks.MediaRef{URL: v, Role: "original"}
+		hasMedia = true
+	}
+	if v, ok := readBoolParam(params, "use_mask"); ok {
+		media.UseMask = &v
+		hasMedia = true
+	}
+	if !hasMedia {
+		return nil
+	}
+	return media
+}
+
+func mediaRefsFromURLs(urls []string, role string, weights []float64) []tasks.MediaRef {
+	if len(urls) == 0 {
+		return nil
+	}
+	refs := make([]tasks.MediaRef, 0, len(urls))
+	for index, raw := range urls {
+		ref := tasks.MediaRef{
+			URL:  strings.TrimSpace(raw),
+			Role: role,
+		}
+		if index < len(weights) {
+			ref.Weight = weights[index]
+		}
+		refs = append(refs, ref)
+	}
+	return refs
+}
+
 func isWorkflowTaskParamsKnownMapKey(key string) bool {
 	switch key {
 	case "feature",
@@ -380,6 +477,7 @@ func isWorkflowTaskParamsKnownMapKey(key string) bool {
 		"sample_count",
 		"output_count",
 		"image_count",
+		"prompt_upsampling",
 		"variation",
 		"extend",
 		"hd",
@@ -387,6 +485,29 @@ func isWorkflowTaskParamsKnownMapKey(key string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func readBoolParam(params map[string]interface{}, key string) (bool, bool) {
+	raw, ok := params[key]
+	if !ok {
+		return false, false
+	}
+	switch v := raw.(type) {
+	case bool:
+		return v, true
+	case string:
+		normalized := strings.ToLower(strings.TrimSpace(v))
+		switch normalized {
+		case "true", "1", "yes":
+			return true, true
+		case "false", "0", "no":
+			return false, true
+		default:
+			return false, false
+		}
+	default:
+		return false, false
 	}
 }
 

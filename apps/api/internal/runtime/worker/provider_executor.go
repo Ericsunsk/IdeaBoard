@@ -288,12 +288,12 @@ func (c *ProviderExecutor) applyAccountChannelEndpoint(ctx context.Context, acco
 }
 
 func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *queuetypes.TaskPayload) map[string]interface{} {
-	var params map[string]interface{}
-	if task.Params != "" {
-		if err := json.Unmarshal([]byte(task.Params), &params); err != nil {
-			slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
-		}
+	typedParams, err := tasks.UnmarshalParams(task.Params)
+	if err != nil {
+		slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
+		return nil
 	}
+	params := workflow.FlattenWorkflowTaskParams(typedParams)
 	c.normalizeUpstreamMediaParams(params)
 	return params
 }

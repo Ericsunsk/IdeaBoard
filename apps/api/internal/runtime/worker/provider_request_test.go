@@ -4,6 +4,9 @@ import (
 	"image"
 	"reflect"
 	"testing"
+
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 )
 
 func TestNewProviderRequestCollectsProviderMediaRefs(t *testing.T) {
@@ -68,5 +71,47 @@ func TestProviderRequestAfterLocalRedrawKeepsOpenAIROIInput(t *testing.T) {
 	}
 	if !reflect.DeepEqual(req.MediaRefs.OpenAIImages, want) {
 		t.Fatalf("unexpected OpenAI refs after local redraw: got=%#v want=%#v", req.MediaRefs.OpenAIImages, want)
+	}
+}
+
+func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T) {
+	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       "image-extend",
+		Media: &tasks.MediaInputs{
+			Inputs:   []tasks.MediaRef{{URL: "https://img.example/source.png", Role: "input"}},
+			Original: &tasks.MediaRef{URL: "https://img.example/source.png", Role: "original"},
+		},
+		Controls: &tasks.GenerationControls{
+			CustomWidth:  640,
+			CustomHeight: 480,
+		},
+		Extend: &tasks.ImageExtendParams{
+			TopPercent:    0,
+			RightPercent:  20,
+			BottomPercent: 0,
+			LeftPercent:   0,
+		},
+	})
+	if err != nil {
+		t.Fatalf("MarshalParams: %v", err)
+	}
+
+	got := (&ProviderExecutor{}).parseAndNormalizeTaskParams(&queuetypes.TaskPayload{
+		TaskID: "task-canonical-params",
+		Params: raw,
+	})
+
+	if !reflect.DeepEqual(got["image_urls"], []string{"https://img.example/source.png"}) {
+		t.Fatalf("image_urls = %#v", got["image_urls"])
+	}
+	if got["custom_width"] != float64(640) || got["custom_height"] != float64(480) {
+		t.Fatalf("custom size = %#v x %#v", got["custom_width"], got["custom_height"])
+	}
+	if got["extend_right"] != float64(20) {
+		t.Fatalf("extend_right = %#v, want 20", got["extend_right"])
+	}
+	if _, exists := got["media"]; exists {
+		t.Fatalf("provider map should not expose canonical media object: %#v", got)
 	}
 }

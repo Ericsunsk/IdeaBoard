@@ -5,14 +5,11 @@ import (
 	"fmt"
 )
 
-// SchemaVersion tracks the WorkflowTaskParams schema so consumers can
-// handle legacy shapes without breaking.
+// SchemaVersion tracks the WorkflowTaskParams schema carried by task records.
 const CurrentParamsSchemaVersion = 1
 
 // WorkflowTaskParams is the typed contract for task parameters flowing
 // from frontend submit through API, River, and into the worker/provider layer.
-// It replaces ad-hoc map[string]interface{} access for the common fields;
-// provider-specific hints and future extensions live in Extra.
 type WorkflowTaskParams struct {
 	SchemaVersion int `json:"schema_version,omitempty"`
 
@@ -20,15 +17,8 @@ type WorkflowTaskParams struct {
 	Feature string `json:"feature,omitempty"`
 	Model   string `json:"model,omitempty"`
 
-	// Runtime media refs. These remain string refs for now because validation,
-	// ownership checks, and provider adapters still operate on canonical media keys.
-	ImageURLs          []string     `json:"image_urls,omitempty"`
-	ReferenceImageURLs []string     `json:"reference_image_urls,omitempty"`
-	MaskImageURL       string       `json:"mask_image_url,omitempty"`
-	MaskImageURLs      []string     `json:"mask_image_urls,omitempty"`
-	OriginalImageURL   string       `json:"original_image_url,omitempty"`
-	UseMask            *bool        `json:"use_mask,omitempty"`
-	Media              *MediaInputs `json:"media,omitempty"`
+	// Runtime media refs. Provider adapters flatten this object at the edge.
+	Media *MediaInputs `json:"media,omitempty"`
 
 	// Generation controls shared by multiple providers.
 	Controls *GenerationControls `json:"controls,omitempty"`
@@ -52,6 +42,7 @@ type MediaInputs struct {
 	References []MediaRef `json:"references,omitempty"`
 	Mask       *MediaRef  `json:"mask,omitempty"`
 	Original   *MediaRef  `json:"original,omitempty"`
+	UseMask    *bool      `json:"use_mask,omitempty"`
 }
 
 type MediaRef struct {
@@ -106,8 +97,7 @@ func MarshalParams(p *WorkflowTaskParams) (string, error) {
 }
 
 // UnmarshalParams deserialises the JSON string from task.Params.
-// Unknown or legacy keys are preserved in Extra so the typed contract
-// degrades gracefully for older task records.
+// Unknown provider-specific keys are preserved in Extra.
 func UnmarshalParams(raw string) (*WorkflowTaskParams, error) {
 	if raw == "" {
 		return &WorkflowTaskParams{SchemaVersion: CurrentParamsSchemaVersion}, nil
@@ -164,12 +154,6 @@ func knownWorkflowTaskParamKey(key string) bool {
 	case "schema_version",
 		"feature",
 		"model",
-		"image_urls",
-		"reference_image_urls",
-		"mask_image_url",
-		"mask_image_urls",
-		"original_image_url",
-		"use_mask",
 		"media",
 		"controls",
 		"variation",

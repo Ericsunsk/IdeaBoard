@@ -253,6 +253,15 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 		}
 	})
 
+	t.Run("reject deprecated flat feature params", func(t *testing.T) {
+		err := validateSubmitTaskMediaParams(map[string]interface{}{
+			"variation_strength": 42,
+		})
+		if err == nil {
+			t.Fatalf("expected deprecated flat param error")
+		}
+	})
+
 	t.Run("params byte limit", func(t *testing.T) {
 		_, err := marshalSubmitTaskParams(map[string]interface{}{
 			"payload": strings.Repeat("x", maxSubmitTaskParamsBytes+1),
@@ -458,6 +467,12 @@ func TestWorkflowTaskParamsFromMapPreservesExtraAndFusionContract(t *testing.T) 
 	if len(typedParams.Fusion.InputWeights) != 2 || typedParams.Fusion.InputWeights[0] != 0.7 || typedParams.Fusion.InputWeights[1] != 0.3 {
 		t.Fatalf("fusion input weights = %#v, want [0.7 0.3]", typedParams.Fusion.InputWeights)
 	}
+	if typedParams.Media == nil || len(typedParams.Media.Inputs) != 2 {
+		t.Fatalf("media inputs = %#v, want two inputs", typedParams.Media)
+	}
+	if typedParams.Media.Inputs[0].Weight != 0.7 || typedParams.Media.Inputs[1].Weight != 0.3 {
+		t.Fatalf("media input weights = %#v, want fusion weights", typedParams.Media.Inputs)
+	}
 	if got := typedParams.Extra["provider_only"]; got != "keep-me" {
 		t.Fatalf("provider_only extra = %#v, want keep-me", got)
 	}
@@ -614,6 +629,17 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 	if _, ok := params["fusion"].(map[string]interface{}); !ok {
 		t.Fatalf("fusion = %#v, want nested object preserved", params["fusion"])
 	}
+	if _, exists := params["image_urls"]; exists {
+		t.Fatalf("did not expect flat image_urls in stored params: %#v", params)
+	}
+	media, ok := params["media"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("media = %#v, want object", params["media"])
+	}
+	inputs, ok := media["inputs"].([]interface{})
+	if !ok || len(inputs) != 2 {
+		t.Fatalf("media inputs = %#v, want two inputs", media["inputs"])
+	}
 }
 
 func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
@@ -666,6 +692,17 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	}
 	if _, exists := params["extend_right"]; exists {
 		t.Fatalf("did not expect flat extend_right in stored params: %#v", params)
+	}
+	if _, exists := params["image_urls"]; exists {
+		t.Fatalf("did not expect flat image_urls in stored params: %#v", params)
+	}
+	media, ok := params["media"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("media = %#v, want object", params["media"])
+	}
+	inputs, ok := media["inputs"].([]interface{})
+	if !ok || len(inputs) != 1 {
+		t.Fatalf("media inputs = %#v, want one input", media["inputs"])
 	}
 }
 

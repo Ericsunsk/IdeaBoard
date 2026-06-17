@@ -110,62 +110,22 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 	events.PublishTaskStatusLogWarn(ctx, s.taskEvents, taskID, status)
 }
 
-// convertToWorkflowTaskParams bridges the legacy map-based params to the
-// typed WorkflowTaskParams contract. This is a transitional helper;
-// the long-term goal is for the submit path to produce WorkflowTaskParams
-// directly without the intermediate map step.
-func convertToWorkflowTaskParams(params map[string]interface{}) *tasks.WorkflowTaskParams {
-	if params == nil {
-		return &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion}
-	}
-	p := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "feature"); ok {
-		p.Feature = v
-	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
-		p.Model = strings.TrimSpace(v)
-	}
-	if contract, ok := workflow.ReadStyleVariationPromptContract(params); ok {
-		p.Variation = &tasks.StyleVariationParams{Strength: contract.Strength}
-	}
-	if contract, ok := workflow.ReadImageExtendPromptContract(params); ok {
-		p.Extend = &tasks.ImageExtendParams{
-			TopPercent:    contract.TopPercent,
-			RightPercent:  contract.RightPercent,
-			BottomPercent: contract.BottomPercent,
-			LeftPercent:   contract.LeftPercent,
-		}
-	}
-	if contract, ok := workflow.ReadHDUpscalePromptContract(params); ok {
-		p.HD = &tasks.HDUpscaleParams{ClarityStrength: contract.ClarityStrength}
-	}
-	if weights, ok := workflow.ReadStyleFusionInputWeights(params); ok {
-		p.Fusion = &tasks.StyleFusionParams{
-			Mode:         "weighted_reference",
-			InputWeights: weights,
-		}
-	}
-	return p
-}
-
 func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	apiAccounts, params, featureSlug, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
+	apiAccounts, typedParams, sourceParams, featureSlug, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
 
 	taskID := generateSecureTaskID("task")
 
-	paramsJSON, err := marshalSubmitTaskParams(params)
+	paramsJSON, err := marshalWorkflowTaskParams(typedParams, sourceParams)
 	if err != nil {
 		return "", err
 	}
 
-	// Convert to typed params for model resolution (layer boundary).
-	typedParams, _ := workflowTaskParamsFromMap(params, featureSlug)
 	requestedModel := typedParams.Model
 
 	task := &tasks.Task{
@@ -210,27 +170,27 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	_, _, featureSlug, _, err := s.prepareSubmitTask(ctx, userID, req)
+	_, _, _, featureSlug, _, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
 	return featureSlug, nil
 }
 
-func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) ([]*accounts.ApiAccount, map[string]interface{}, string, string, error) {
+func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) ([]*accounts.ApiAccount, *tasks.WorkflowTaskParams, map[string]interface{}, string, string, error) {
 	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", "", err
 	}
 	if err := s.validateSubmitTaskImageURLs(ctx, userID, req.ImageURLs); err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", "", err
 	}
 
 	apiAccounts, err := s.accountRepo.GetAllEnabled(ctx)
 	if err != nil {
-		return nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
+		return nil, nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 	if len(apiAccounts) == 0 {
-		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
+		return nil, nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
 	params := make(map[string]interface{}, len(req.Params)+2)
@@ -246,30 +206,34 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 	normalizeSubmitTaskMediaParams(params)
 	req.Params = params
 	if err := s.validateSubmitTaskMediaParams(ctx, userID, req.Params); err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", "", err
 	}
 
 	featureSlug := ""
 	if req.Params != nil {
 		featureSlug, err = workflow.ResolveWorkflowFeatureSlug(req.Params)
 		if err != nil {
-			return nil, nil, "", "", err
+			return nil, nil, nil, "", "", err
 		}
 		if featureSlug != "" {
 			req.Params["feature"] = featureSlug
 		}
 	}
 	if err := workflow.NormalizeStructuredPromptContractParams(req.Params, featureSlug); err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", "", err
 	}
 	if featureSlug == workflow.FeatureSlugStyleFusion {
 		if err := normalizeStyleFusionParams(req.Params); err != nil {
-			return nil, nil, "", "", err
+			return nil, nil, nil, "", "", err
 		}
+	}
+	typedParams, err := workflowTaskParamsFromMap(req.Params, featureSlug)
+	if err != nil {
+		return nil, nil, nil, "", "", err
 	}
 	apiAccounts = accounts.FilterAccountsForRequest(apiAccounts, featureSlug, req.Params)
 	if len(apiAccounts) == 0 {
-		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
+		return nil, nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
 	fullPrompt := applyTaskSystemPrompt(req.Prompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
@@ -279,13 +243,13 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 		return s.featurePrompts.GetPrompt(ctx, slug)
 	})
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", "", err
 	}
 	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
-		return nil, nil, "", "", err
+		return nil, nil, nil, "", "", err
 	}
 
-	return apiAccounts, req.Params, featureSlug, fullPrompt, nil
+	return apiAccounts, typedParams, req.Params, featureSlug, fullPrompt, nil
 }
 
 func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {

@@ -1,6 +1,11 @@
 package workflow
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	"ideaboard/api/internal/tasks"
+)
 
 func TestNormalizeStructuredPromptContractParamsMovesFlatVariationParams(t *testing.T) {
 	params := map[string]interface{}{
@@ -60,6 +65,64 @@ func TestFlattenProviderTaskParamsDerivesProviderFieldsFromNestedContract(t *tes
 	}
 	if _, exists := params["output_quality"]; exists {
 		t.Fatalf("flatten should not mutate original params: %#v", params)
+	}
+}
+
+func TestFlattenWorkflowTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
+	useMask := true
+	params := &tasks.WorkflowTaskParams{
+		Feature: FeatureSlugStyleFusion,
+		Model:   "gpt-image-1",
+		Media: &tasks.MediaInputs{
+			Inputs: []tasks.MediaRef{
+				{URL: "https://img.example/a.png", Role: "input", Weight: 0.7},
+				{URL: "https://img.example/b.png", Role: "input", Weight: 0.3},
+			},
+			References: []tasks.MediaRef{{URL: "https://img.example/ref.png", Role: "reference"}},
+			Mask:       &tasks.MediaRef{URL: "https://img.example/mask.png", Role: "mask"},
+			UseMask:    &useMask,
+		},
+		Controls: &tasks.GenerationControls{
+			CustomWidth:  640,
+			CustomHeight: 480,
+			Ratio:        "4:3",
+			OutputCount:  2,
+		},
+		Fusion: &tasks.StyleFusionParams{
+			Mode:         "weighted_reference",
+			InputWeights: []float64{0.7, 0.3},
+		},
+		Extra: map[string]interface{}{
+			"provider_hint":      "keep",
+			"variation_strength": 99,
+		},
+	}
+
+	flat := FlattenWorkflowTaskParams(params)
+
+	if got := flat["feature"]; got != FeatureSlugStyleFusion {
+		t.Fatalf("feature = %#v, want style-fusion", got)
+	}
+	if !reflect.DeepEqual(flat["image_urls"], []string{"https://img.example/a.png", "https://img.example/b.png"}) {
+		t.Fatalf("image_urls = %#v", flat["image_urls"])
+	}
+	if !reflect.DeepEqual(flat["reference_image_urls"], []string{"https://img.example/ref.png"}) {
+		t.Fatalf("reference_image_urls = %#v", flat["reference_image_urls"])
+	}
+	if got := flat["mask_image_url"]; got != "https://img.example/mask.png" {
+		t.Fatalf("mask_image_url = %#v", got)
+	}
+	if got := flat["custom_width"]; got != float64(640) {
+		t.Fatalf("custom_width = %#v", got)
+	}
+	if got := flat["fusion_input_weights"]; !reflect.DeepEqual(got, []float64{0.7, 0.3}) {
+		t.Fatalf("fusion_input_weights = %#v", got)
+	}
+	if got := flat["provider_hint"]; got != "keep" {
+		t.Fatalf("provider_hint = %#v, want keep", got)
+	}
+	if _, exists := flat["variation_strength"]; exists {
+		t.Fatalf("reserved old flat key leaked from Extra: %#v", flat)
 	}
 }
 

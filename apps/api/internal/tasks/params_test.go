@@ -7,7 +7,7 @@ func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 		"feature": "hd-upscale",
 		"hd": {"clarity_strength": 75},
 		"provider_only": {"mode": "test"},
-		"sample_count": 2
+		"controls": {"sample_count": 2}
 	}`)
 	if err != nil {
 		t.Fatalf("UnmarshalParams returned error: %v", err)
@@ -24,8 +24,8 @@ func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	if _, ok := params.Extra["provider_only"].(map[string]interface{}); !ok {
 		t.Fatalf("provider_only extra = %#v, want object", params.Extra["provider_only"])
 	}
-	if got := params.Extra["sample_count"]; got != float64(2) {
-		t.Fatalf("sample_count extra = %#v, want 2", got)
+	if params.Controls == nil || params.Controls.SampleCount != 2 {
+		t.Fatalf("controls = %#v, want sample_count 2", params.Controls)
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/tasks"
 )
 
 func mustEncodePNGDataURL(t *testing.T, img image.Image) string {
@@ -209,14 +210,20 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	}))
 	defer server.Close()
 
-	params := map[string]interface{}{
-		"feature":            "partial-edit",
-		"image_urls":         []interface{}{originalDataURL},
-		"original_image_url": originalDataURL,
-		"mask_image_url":     maskDataURL,
-		"use_mask":           true,
-	}
-	paramsJSON, err := json.Marshal(params)
+	useMask := true
+	paramsJSON, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       "partial-edit",
+		Media: &tasks.MediaInputs{
+			Inputs: []tasks.MediaRef{{
+				URL:  originalDataURL,
+				Role: "input",
+			}},
+			Original: &tasks.MediaRef{URL: originalDataURL, Role: "original"},
+			Mask:     &tasks.MediaRef{URL: maskDataURL, Role: "mask"},
+			UseMask:  &useMask,
+		},
+	})
 	if err != nil {
 		t.Fatalf("marshal params: %v", err)
 	}
@@ -230,7 +237,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	task := &queuetypes.TaskPayload{
 		TaskID: "task-local-redraw",
 		Prompt: "test prompt",
-		Params: string(paramsJSON),
+		Params: paramsJSON,
 	}
 
 	output, err := c.callDrawingAPI(context.Background(), account, task)
