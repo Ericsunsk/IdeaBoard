@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/platform/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -252,4 +253,191 @@ func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("任务参数不能超过 %dMB", maxSubmitTaskParamsBytes/1024/1024)
 	}
 	return string(payload), nil
+}
+
+// workflowTaskParamsFromMap converts the legacy map into a typed
+// WorkflowTaskParams using the canonical nested contracts. It delegates
+// to prompt_contract.go for feature-specific parsing.
+func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string) (*tasks.WorkflowTaskParams, error) {
+	p := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion}
+	if params == nil {
+		return p, nil
+	}
+	for key, value := range params {
+		if isWorkflowTaskParamsKnownMapKey(key) {
+			continue
+		}
+		if p.Extra == nil {
+			p.Extra = map[string]interface{}{}
+		}
+		p.Extra[key] = value
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "feature"); ok {
+		p.Feature = v
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
+		p.Model = strings.TrimSpace(v)
+	}
+
+	// Media
+	p.ImageURLs = mediarefs.CollectStringList(params["image_urls"])
+	p.ReferenceImageURLs = mediarefs.CollectStringList(params["reference_image_urls"])
+	if v, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
+		p.MaskImageURL = v
+	}
+	p.MaskImageURLs = mediarefs.CollectStringList(params["mask_image_urls"])
+	if v, ok := workflow.ReadWorkflowStringParam(params, "original_image_url"); ok {
+		p.OriginalImageURL = v
+	}
+
+	controls := &tasks.GenerationControls{}
+	hasControls := false
+	if v, ok := readFloatParam(params, "custom_width"); ok {
+		controls.CustomWidth = v
+		hasControls = true
+	}
+	if v, ok := readFloatParam(params, "custom_height"); ok {
+		controls.CustomHeight = v
+		hasControls = true
+	}
+	if v, ok := readFloatParam(params, "original_image_width"); ok {
+		controls.OriginalWidth = v
+		hasControls = true
+	}
+	if v, ok := readFloatParam(params, "original_image_height"); ok {
+		controls.OriginalHeight = v
+		hasControls = true
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "ratio"); ok {
+		controls.Ratio = v
+		hasControls = true
+	}
+	if v, ok := workflow.ReadWorkflowStringParam(params, "quality"); ok {
+		controls.Quality = v
+		hasControls = true
+	}
+	if v, ok := readIntParam(params, "sample_count"); ok {
+		controls.SampleCount = v
+		hasControls = true
+	}
+	if v, ok := readIntParam(params, "output_count"); ok {
+		controls.OutputCount = v
+		hasControls = true
+	}
+	if v, ok := readIntParam(params, "image_count"); ok {
+		controls.ImageCount = v
+		hasControls = true
+	}
+	if hasControls {
+		p.Controls = controls
+	}
+
+	// Feature-specific nested contracts
+	switch featureSlug {
+	case workflow.FeatureSlugStyleVariation:
+		if c, ok := workflow.ReadStyleVariationPromptContract(params); ok {
+			p.Variation = &tasks.StyleVariationParams{Strength: c.Strength}
+		}
+	case workflow.FeatureSlugImageExtend:
+		if c, ok := workflow.ReadImageExtendPromptContract(params); ok {
+			p.Extend = &tasks.ImageExtendParams{
+				TopPercent: c.TopPercent, RightPercent: c.RightPercent,
+				BottomPercent: c.BottomPercent, LeftPercent: c.LeftPercent,
+			}
+		}
+	case workflow.FeatureSlugHDUpscale:
+		if c, ok := workflow.ReadHDUpscalePromptContract(params); ok {
+			p.HD = &tasks.HDUpscaleParams{ClarityStrength: c.ClarityStrength}
+		}
+	case workflow.FeatureSlugStyleFusion:
+		if c, ok := workflow.ReadStyleFusionPromptContract(params); ok {
+			p.Fusion = &tasks.StyleFusionParams{
+				Mode:         c.Mode,
+				InputWeights: c.InputWeights,
+			}
+		}
+	}
+
+	return p, nil
+}
+
+func isWorkflowTaskParamsKnownMapKey(key string) bool {
+	switch key {
+	case "feature",
+		"model",
+		"image_urls",
+		"reference_image_urls",
+		"mask_image_url",
+		"mask_image_urls",
+		"original_image_url",
+		"use_mask",
+		"custom_width",
+		"custom_height",
+		"original_image_width",
+		"original_image_height",
+		"ratio",
+		"quality",
+		"sample_count",
+		"output_count",
+		"image_count",
+		"variation",
+		"extend",
+		"hd",
+		"fusion":
+		return true
+	default:
+		return false
+	}
+}
+
+func readFloatParam(params map[string]interface{}, key string) (float64, bool) {
+	raw, ok := params[key]
+	if !ok {
+		return 0, false
+	}
+	switch v := raw.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case json.Number:
+		f, err := v.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return f, true
+	default:
+		return 0, false
+	}
+}
+
+func readIntParam(params map[string]interface{}, key string) (int, bool) {
+	raw, ok := params[key]
+	if !ok {
+		return 0, false
+	}
+	switch v := raw.(type) {
+	case int:
+		return v, true
+	case int64:
+		return int(v), true
+	case int32:
+		return int(v), true
+	case float64:
+		return int(v), true
+	case float32:
+		return int(v), true
+	case json.Number:
+		n, err := v.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(n), true
+	default:
+		return 0, false
+	}
 }

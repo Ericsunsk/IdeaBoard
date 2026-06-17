@@ -62,3 +62,28 @@ func TestFlattenProviderTaskParamsDerivesProviderFieldsFromNestedContract(t *tes
 		t.Fatalf("flatten should not mutate original params: %#v", params)
 	}
 }
+
+func TestStyleFusionPromptContractUsesPublishedWeightsVariable(t *testing.T) {
+	params := map[string]interface{}{
+		ParamKeyFusion: map[string]interface{}{
+			"mode":          "weighted_reference",
+			"input_weights": []interface{}{0.6, 0.4},
+		},
+	}
+
+	contract, ok := ReadStyleFusionPromptContract(params)
+	if !ok {
+		t.Fatal("ReadStyleFusionPromptContract returned false")
+	}
+	vars := contract.PromptVariables()
+	if _, exists := vars["{{fusion_mode}}"]; exists {
+		t.Fatalf("did not expect unpublished fusion_mode variable: %#v", vars)
+	}
+	weights, ok := vars["{{fusion_input_weights}}"].([]float64)
+	if !ok {
+		t.Fatalf("fusion_input_weights = %#v, want []float64", vars["{{fusion_input_weights}}"])
+	}
+	if len(weights) != 2 || weights[0] != 0.6 || weights[1] != 0.4 {
+		t.Fatalf("weights = %#v, want [0.6 0.4]", weights)
+	}
+}

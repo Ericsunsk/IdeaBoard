@@ -84,6 +84,16 @@ type AdminRouteDeps struct {
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
 const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 
+// Hand-written route paths that bypass the Orval-generated client.
+const (
+	RouteHealth                 = "/api/health"
+	RouteUserProfileAvatar      = "/profile/avatar"
+	RouteUserBoardUploads       = "/boards/:board_id/uploads"
+	RouteUserDownload           = "/download"
+	RouteAdminUpload            = "/upload"
+	RouteAdminSettingsRateLimit = "/settings/rate-limit"
+)
+
 // validateUploadFileHeader centralises the three-step upload validation:
 // 1. File size limit.
 // 2. Extension allow-list (lowercase, with leading dot).
@@ -137,7 +147,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	r.Use(deps.CORSMiddleware)
 	r.Use(globalRequestBodyLimitMiddleware())
 
-	r.GET("/api/health", func(c *gin.Context) {
+	r.GET(RouteHealth, func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
 	})
 
@@ -274,17 +284,17 @@ func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
 
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
 
-	userApi.POST("/profile/avatar", requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadProfileAvatarHandler(h.Uploads))
-	userApi.POST("/boards/:board_id/uploads", requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadBoardAssetHandler(h.Uploads))
-	userApi.DELETE("/boards/:board_id/uploads", deleteBoardUploadHandler(h.Uploads))
-	userApi.GET("/download", downloadImageHandler())
+	userApi.POST(RouteUserProfileAvatar, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadProfileAvatarHandler(h.Uploads))
+	userApi.POST(RouteUserBoardUploads, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadBoardAssetHandler(h.Uploads))
+	userApi.DELETE(RouteUserBoardUploads, deleteBoardUploadHandler(h.Uploads))
+	userApi.GET(RouteUserDownload, downloadImageHandler())
 }
 
 func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.GET("/settings/registration", h.AdminHandler.GetRegistrationSetting)
 	adminApi.PUT("/settings/registration", h.AdminHandler.UpdateRegistrationSetting)
-	adminApi.GET("/settings/rate-limit", h.AdminHandler.GetRateLimitSettings)
-	adminApi.PUT("/settings/rate-limit", h.AdminHandler.UpdateRateLimitSettings)
+	adminApi.GET(RouteAdminSettingsRateLimit, h.AdminHandler.GetRateLimitSettings)
+	adminApi.PUT(RouteAdminSettingsRateLimit, h.AdminHandler.UpdateRateLimitSettings)
 
 	adminApi.GET("/users", h.AdminHandler.ListUsers)
 	adminApi.POST("/users/:id/ban", h.AdminHandler.BanUser)
@@ -311,7 +321,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.GET("/statistics", h.TaskStatsHandler.GetStatistics)
 	adminApi.POST("/statistics/backfill", h.TaskStatsHandler.BackfillStatistics)
 
-	adminApi.POST("/upload", requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), adminUploadHandler(h.StorageService))
+	adminApi.POST(RouteAdminUpload, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), adminUploadHandler(h.StorageService))
 
 	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)
 	adminApi.GET("/storage/profiles", h.StorageHandler.ListProfiles)

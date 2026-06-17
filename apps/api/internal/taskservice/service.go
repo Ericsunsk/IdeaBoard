@@ -165,7 +165,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	}
 
 	// Convert to typed params for model resolution (layer boundary).
-	typedParams := convertToWorkflowTaskParams(params)
+	typedParams, _ := workflowTaskParamsFromMap(params, featureSlug)
 	requestedModel := typedParams.Model
 
 	task := &tasks.Task{

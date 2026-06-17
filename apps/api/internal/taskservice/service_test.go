@@ -427,6 +427,42 @@ func TestNormalizeStyleFusionParams(t *testing.T) {
 	}
 }
 
+func TestWorkflowTaskParamsFromMapPreservesExtraAndFusionContract(t *testing.T) {
+	params := map[string]interface{}{
+		"feature": "style-fusion",
+		"model":   "gpt-image-1",
+		"image_urls": []string{
+			"https://example.com/a.png",
+			"https://example.com/b.png",
+		},
+		"fusion": map[string]interface{}{
+			"mode":          "weighted_reference",
+			"input_weights": []interface{}{0.7, 0.3},
+		},
+		"provider_only": "keep-me",
+	}
+
+	typedParams, err := workflowTaskParamsFromMap(params, workflow.FeatureSlugStyleFusion)
+	if err != nil {
+		t.Fatalf("workflowTaskParamsFromMap returned error: %v", err)
+	}
+	if typedParams.SchemaVersion != tasks.CurrentParamsSchemaVersion {
+		t.Fatalf("schema version = %d, want %d", typedParams.SchemaVersion, tasks.CurrentParamsSchemaVersion)
+	}
+	if typedParams.Fusion == nil {
+		t.Fatal("Fusion params are nil")
+	}
+	if typedParams.Fusion.Mode != "weighted_reference" {
+		t.Fatalf("fusion mode = %q, want weighted_reference", typedParams.Fusion.Mode)
+	}
+	if len(typedParams.Fusion.InputWeights) != 2 || typedParams.Fusion.InputWeights[0] != 0.7 || typedParams.Fusion.InputWeights[1] != 0.3 {
+		t.Fatalf("fusion input weights = %#v, want [0.7 0.3]", typedParams.Fusion.InputWeights)
+	}
+	if got := typedParams.Extra["provider_only"]; got != "keep-me" {
+		t.Fatalf("provider_only extra = %#v, want keep-me", got)
+	}
+}
+
 func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)

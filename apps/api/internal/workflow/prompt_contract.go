@@ -9,6 +9,7 @@ const (
 	ParamKeyVariation = "variation"
 	ParamKeyExtend    = "extend"
 	ParamKeyHD        = "hd"
+	ParamKeyFusion    = "fusion"
 )
 
 type StyleVariationPromptContract struct {
@@ -100,6 +101,39 @@ func (c HDUpscalePromptContract) PromptVariables() map[string]interface{} {
 	}
 }
 
+type StyleFusionPromptContract struct {
+	Mode         string
+	InputWeights []float64
+}
+
+func ReadStyleFusionPromptContract(params map[string]interface{}) (StyleFusionPromptContract, bool) {
+	obj, ok := readWorkflowObjectParam(params, ParamKeyFusion)
+	if !ok {
+		return StyleFusionPromptContract{}, false
+	}
+	mode, _ := readStringField(obj, "mode")
+	weights, _ := ReadStyleFusionInputWeights(params)
+	if len(weights) == 0 {
+		return StyleFusionPromptContract{}, false
+	}
+	return StyleFusionPromptContract{Mode: mode, InputWeights: weights}, true
+}
+
+func (c StyleFusionPromptContract) PromptVariables() map[string]interface{} {
+	return map[string]interface{}{
+		"{{fusion_input_weights}}": c.InputWeights,
+	}
+}
+
+func readStringField(obj map[string]interface{}, key string) (string, bool) {
+	raw, ok := obj[key]
+	if !ok {
+		return "", false
+	}
+	s, ok := raw.(string)
+	return s, ok
+}
+
 func NormalizeStructuredPromptContractParams(params map[string]interface{}, featureSlug string) error {
 	if params == nil {
 		return nil
@@ -111,6 +145,8 @@ func NormalizeStructuredPromptContractParams(params map[string]interface{}, feat
 		return normalizeImageExtendContract(params)
 	case FeatureSlugHDUpscale:
 		return normalizeHDUpscaleContract(params)
+	case FeatureSlugStyleFusion:
+		return normalizeStyleFusionContract(params)
 	default:
 		return nil
 	}
@@ -132,6 +168,9 @@ func FlattenProviderTaskParams(params map[string]interface{}) map[string]interfa
 		out["extend_right"] = contract.RightPercent
 		out["extend_bottom"] = contract.BottomPercent
 		out["extend_left"] = contract.LeftPercent
+	}
+	if contract, ok := ReadStyleFusionPromptContract(params); ok {
+		out["fusion_input_weights"] = contract.InputWeights
 	}
 	return out
 }
@@ -185,6 +224,21 @@ func normalizeHDUpscaleContract(params map[string]interface{}) error {
 	}
 	obj["clarity_strength"] = clampPercent(clarity)
 	params[ParamKeyHD] = obj
+	return nil
+}
+
+func normalizeStyleFusionContract(params map[string]interface{}) error {
+	obj, err := requiredWorkflowObjectParam(params, ParamKeyFusion)
+	if err != nil {
+		return err
+	}
+	weights, ok := ReadStyleFusionInputWeights(params)
+	if !ok || len(weights) == 0 {
+		return fmt.Errorf("fusion.input_weights 至少需要一个权重")
+	}
+	obj["input_weights"] = weights
+	obj["mode"] = "weighted_reference"
+	params[ParamKeyFusion] = obj
 	return nil
 }
 

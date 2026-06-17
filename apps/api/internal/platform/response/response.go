@@ -35,6 +35,16 @@ func ErrorWithStatus(c *gin.Context, httpStatus int, code int, msg string) {
 	})
 }
 
+// SuccessDTO is a typed variant of Success for callers that already have a
+// struct with json tags. It avoids the implicit serialisation of gin.H.
+func SuccessDTO[T any](c *gin.Context, data T) {
+	c.JSON(http.StatusOK, Response{
+		Code: 0,
+		Msg:  "success",
+		Data: data,
+	})
+}
+
 func InternalError(c *gin.Context, httpStatus int, publicMsg string, err error) {
 	if err != nil {
 		slog.Warn("HTTP error response", "message", publicMsg, "err", err)
