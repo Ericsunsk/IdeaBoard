@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasks"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
@@ -17,13 +17,13 @@ import (
 func TestRiverWorkerNoCapacitySnoozesJob(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusNoCapacity}
 	runtime := &fakeRuntime{}
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called without capacity")
 		return nil
 	}))
 
 	err := worker.Work(context.Background(), &river.Job[taskqueue.DrawingTaskArgs]{
-		Args: taskqueue.DrawingTaskArgs{Task: queuetypes.TaskPayload{TaskID: "cap-1", AccountIDs: []int64{1}}},
+		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "cap-1", AccountIDs: []int64{1}}},
 	})
 	var snoozeErr *river.JobSnoozeError
 	if !errors.As(err, &snoozeErr) {
@@ -52,7 +52,7 @@ func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T)
 		t.Fatal("expected final failure handler")
 	}
 	encodedArgs, err := json.Marshal(taskqueue.DrawingTaskArgs{
-		Task: queuetypes.TaskPayload{TaskID: "final-task"},
+		Task: tasks.TaskPayload{TaskID: "final-task"},
 	})
 	if err != nil {
 		t.Fatalf("marshal args failed: %v", err)
@@ -95,7 +95,7 @@ func TestRiverFinalFailureHandlerConvergesPanicWithSafeReason(t *testing.T) {
 		t.Fatal("expected final failure handler")
 	}
 	encodedArgs, err := json.Marshal(taskqueue.DrawingTaskArgs{
-		Task: queuetypes.TaskPayload{TaskID: "panic-task"},
+		Task: tasks.TaskPayload{TaskID: "panic-task"},
 	})
 	if err != nil {
 		t.Fatalf("marshal args failed: %v", err)
@@ -140,14 +140,14 @@ func TestTaskProcessorProcessesSynchronously(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}
 	executed := false
-	processor := newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
+	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
 		time.Sleep(80 * time.Millisecond)
 		executed = true
 		return nil
 	})
 
 	start := time.Now()
-	err := processor.Process(context.Background(), &queuetypes.TaskPayload{TaskID: "sync-1", AccountIDs: []int64{9}})
+	err := processor.Process(context.Background(), &tasks.TaskPayload{TaskID: "sync-1", AccountIDs: []int64{9}})
 	if err != nil {
 		t.Fatalf("process task failed: %v", err)
 	}
@@ -162,12 +162,12 @@ func TestTaskProcessorProcessesSynchronously(t *testing.T) {
 func TestTaskProcessorDiscardDoesNotCallProvider(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusDiscard}
 	runtime := &fakeRuntime{}
-	processor := newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
+	processor := newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called for discarded assignment")
 		return nil
 	})
 
-	if err := processor.Process(context.Background(), &queuetypes.TaskPayload{TaskID: "discard-1", AccountIDs: []int64{1}}); err != nil {
+	if err := processor.Process(context.Background(), &tasks.TaskPayload{TaskID: "discard-1", AccountIDs: []int64{1}}); err != nil {
 		t.Fatalf("process discard task failed: %v", err)
 	}
 }
@@ -175,13 +175,13 @@ func TestTaskProcessorDiscardDoesNotCallProvider(t *testing.T) {
 func TestRiverWorkerPassesRiverJobIDToProcessor(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}
-	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
 		return nil
 	}))
 
 	err := worker.Work(context.Background(), &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 12345},
-		Args:   taskqueue.DrawingTaskArgs{Task: queuetypes.TaskPayload{TaskID: "job-id-1", AccountIDs: []int64{9}}},
+		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "job-id-1", AccountIDs: []int64{9}}},
 	})
 	if err != nil {
 		t.Fatalf("Work failed: %v", err)

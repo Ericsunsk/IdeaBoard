@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasks"
 	"image"
 	"image/color"
 	"image/png"
@@ -662,7 +662,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
-	task := &queuetypes.TaskPayload{
+	task := &tasks.TaskPayload{
 		TaskID: "task-model-field",
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,
@@ -709,7 +709,7 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 			{Name: "imagen-4", Enabled: true},
 		},
 	}
-	task := &queuetypes.TaskPayload{
+	task := &tasks.TaskPayload{
 		TaskID: "task-assignment-model",
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,

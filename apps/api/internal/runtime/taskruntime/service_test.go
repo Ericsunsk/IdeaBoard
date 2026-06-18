@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"

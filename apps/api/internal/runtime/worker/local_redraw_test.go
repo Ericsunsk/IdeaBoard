@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 	"image"
 	"image/color"
 	"image/png"
@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/tasks"
 )
 
 func mustEncodePNGDataURL(t *testing.T, img image.Image) string {
@@ -233,7 +232,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
-	task := &queuetypes.TaskPayload{
+	task := &tasks.TaskPayload{
 		TaskID: "task-local-redraw",
 		Prompt: "test prompt",
 		Params: paramsJSON,

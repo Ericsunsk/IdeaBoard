@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/accountlimits"
-	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 
 	"github.com/lib/pq"
@@ -23,8 +22,8 @@ func NewPostgresTaskRuntimeStore(db *sql.DB) *PostgresTaskRuntimeStore {
 	return &PostgresTaskRuntimeStore{db: db}
 }
 
-func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error) {
-	loads := make(map[int64]*queuetypes.AccountLoad, len(accountIDs))
+func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*tasks.AccountLoad, error) {
+	loads := make(map[int64]*tasks.AccountLoad, len(accountIDs))
 	if s == nil || s.db == nil {
 		return loads, nil
 	}
@@ -56,7 +55,7 @@ func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accou
 		if err := rows.Scan(&accountID, &maxConcurrent, &running); err != nil {
 			return nil, err
 		}
-		loads[accountID] = &queuetypes.AccountLoad{
+		loads[accountID] = &tasks.AccountLoad{
 			CurrentConcurrent: running,
 			MaxConcurrent:     accountlimits.NormalizeMaxConcurrent(maxConcurrent),
 		}

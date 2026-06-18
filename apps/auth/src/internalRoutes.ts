@@ -7,8 +7,8 @@ import {
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
   normalizeUsername,
-} from './auth-utils.js'
-import { getHeaderValue, sendError, sendSuccess, toHeaders } from './http-response.js'
+} from './authUtils.js'
+import { getHeaderValue, sendError, sendSuccess, toHeaders } from './httpResponse.js'
 
 type EnsureUserBody = {
   username?: unknown

@@ -1,7 +1,7 @@
 <template>
-  <ProfileCenterScreen />
+  <ProfileCenterPage />
 </template>
 
 <script setup lang="ts">
-import ProfileCenterScreen from '../../profile/screens/ProfileCenterScreen.vue'
+import ProfileCenterPage from '../../profile/pages/ProfileCenterPage.vue'
 </script>

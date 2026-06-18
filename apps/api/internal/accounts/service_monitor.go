@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 )
 
-func (s *AccountService) GetMonitorInfo(ctx context.Context) (*queuetypes.MonitorInfo, error) {
+func (s *AccountService) GetMonitorInfo(ctx context.Context) (*tasks.MonitorInfo, error) {
 	if s.monitorStore == nil {
 		return nil, fmt.Errorf("monitor store not configured")
 	}

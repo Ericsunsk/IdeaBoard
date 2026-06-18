@@ -1,13 +1,13 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
-import { createAuthEntryGuard, isAuthRoute, type AuthNodeHandler } from './auth-entry-guard.js'
-import type { AuthGuardSettings } from './auth-guard-settings.js'
-import { extractErrorMessage } from './auth-utils.js'
+import { createAuthEntryGuard, isAuthRoute, type AuthNodeHandler } from './authEntryGuard.js'
+import type { AuthGuardSettings } from './authGuardSettings.js'
+import { extractErrorMessage } from './authUtils.js'
 import {
   type AuthUserRepository,
   type InternalAuthAPI,
   registerInternalRoutes,
-} from './internal-routes.js'
-import { getErrorStatus, sendError, sendSuccess } from './http-response.js'
+} from './internalRoutes.js'
+import { getErrorStatus, sendError, sendSuccess } from './httpResponse.js'
 
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions['trustProxy']

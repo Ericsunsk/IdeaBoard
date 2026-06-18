@@ -1,7 +1,7 @@
 <template>
-  <WorkspaceLandingScreen />
+  <WorkspaceLandingPage />
 </template>
 
 <script setup lang="ts">
-import WorkspaceLandingScreen from '../../workspace/screens/WorkspaceLandingScreen.vue'
+import WorkspaceLandingPage from '../../workspace/pages/WorkspaceLandingPage.vue'
 </script>

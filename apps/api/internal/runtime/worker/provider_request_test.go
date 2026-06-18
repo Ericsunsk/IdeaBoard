@@ -5,8 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 )
 
@@ -97,7 +96,7 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 		t.Fatalf("MarshalParams: %v", err)
 	}
 
-	got := (&ProviderExecutor{}).parseAndNormalizeTaskParams(&queuetypes.TaskPayload{
+	got := (&ProviderExecutor{}).parseAndNormalizeTaskParams(&tasks.TaskPayload{
 		TaskID: "task-canonical-params",
 		Params: raw,
 	})
@@ -145,7 +144,7 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MarshalParams: %v", err)
 	}
-	submitted := &queuetypes.TaskPayload{
+	submitted := &tasks.TaskPayload{
 		TaskID:     "task-river-contract",
 		UserID:     42,
 		Prompt:     "融合两张图",

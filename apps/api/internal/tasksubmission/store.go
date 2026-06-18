@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 
 	"github.com/jackc/pgx/v5"
@@ -31,7 +30,7 @@ func NewStore(pool *pgxpool.Pool, client taskqueue.RiverTxClient, queueName stri
 	}
 }
 
-func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *queuetypes.TaskPayload) error {
+func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) error {
 	if s == nil || s.pool == nil {
 		return fmt.Errorf("submit task: pgx pool not configured")
 	}

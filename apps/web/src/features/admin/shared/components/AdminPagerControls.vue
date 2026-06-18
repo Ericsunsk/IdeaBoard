@@ -29,10 +29,7 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import { NavArrowLeft, NavArrowRight } from '@iconoir/vue'
-import {
-  adminToolbarPageLabelClass,
-  adminToolbarPagerButtonClass,
-} from '../lib/adminUiClasses'
+import { adminToolbarPageLabelClass, adminToolbarPagerButtonClass } from '../lib/adminUiClasses'
 
 defineProps<{
   currentPage: number

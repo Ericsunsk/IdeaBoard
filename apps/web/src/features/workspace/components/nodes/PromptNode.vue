@@ -143,5 +143,4 @@ const {
 :global(.prompt-node-sortable-fallback) {
   opacity: 0 !important;
 }
-
 </style>

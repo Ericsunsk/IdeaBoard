@@ -1,10 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
-import type {
-  StorageProfile,
-  StorageProvider,
-  StorageProviderMeta,
-} from '../../shared/api/storage'
+import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../shared/api/storage'
 import {
   getListAdminStorageProfilesQueryKey,
   useListAdminStorageProfiles,
@@ -76,12 +72,10 @@ export function useStorageManager() {
   const editorMode = ref<'create' | 'edit'>('create')
   const editingId = ref<string | null>(null)
   const selectedVendorKey = ref('aliyun-oss')
-  const loading = computed(
-    () => providersQuery.isLoading.value || profilesQuery.isLoading.value,
-  )
+  const loading = computed(() => providersQuery.isLoading.value || profilesQuery.isLoading.value)
 
-  const providers = computed<StorageProviderMeta[]>(() =>
-    providersQuery.data.value?.data?.providers ?? [],
+  const providers = computed<StorageProviderMeta[]>(
+    () => providersQuery.data.value?.data?.providers ?? [],
   )
   const bucketDomains = ref<string[]>([])
   const providerMap = computed(() => toProviderMetaMap(providers.value))

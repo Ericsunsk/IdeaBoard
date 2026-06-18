@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
@@ -34,7 +34,7 @@ func (c *concurrentRiverClient) Insert(_ context.Context, _ river.JobArgs, _ *ri
 }
 
 func TestRiverPayloadEncodeDecodeRoundTrip(t *testing.T) {
-	task := &queuetypes.TaskPayload{
+	task := &tasks.TaskPayload{
 		TaskID:     "task_123",
 		UserID:     42,
 		Prompt:     "draw",
@@ -60,7 +60,7 @@ func TestRiverPayloadEncodeDecodeRoundTrip(t *testing.T) {
 func TestRiverQueueEnqueueUsesDrawingArgs(t *testing.T) {
 	client := &fakeRiverClient{}
 	queue := NewRiverQueueWithClient(client, nil, nil, RiverQueueDefault, 7)
-	task := &queuetypes.TaskPayload{TaskID: "task_123", UserID: 42}
+	task := &tasks.TaskPayload{TaskID: "task_123", UserID: 42}
 
 	if err := queue.Enqueue(context.Background(), task); err != nil {
 		t.Fatalf("Enqueue failed: %v", err)
@@ -83,7 +83,7 @@ func TestRiverQueueEnqueueUsesDrawingArgs(t *testing.T) {
 func TestRiverQueueRejectsMissingTaskID(t *testing.T) {
 	client := &fakeRiverClient{}
 	queue := NewRiverQueueWithClient(client, nil, nil, RiverQueueDefault, 7)
-	if err := queue.Enqueue(context.Background(), &queuetypes.TaskPayload{}); err == nil {
+	if err := queue.Enqueue(context.Background(), &tasks.TaskPayload{}); err == nil {
 		t.Fatal("expected error for missing task id")
 	}
 }
@@ -118,7 +118,7 @@ func TestRiverQueueSetClientConcurrentWithEnqueue(t *testing.T) {
 		go func(userID int64) {
 			defer wg.Done()
 			for i := 0; i < iterations; i++ {
-				err := queue.Enqueue(ctx, &queuetypes.TaskPayload{TaskID: "task_concurrent", UserID: userID})
+				err := queue.Enqueue(ctx, &tasks.TaskPayload{TaskID: "task_concurrent", UserID: userID})
 				if err != nil {
 					errs <- err
 					return

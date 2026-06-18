@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 
@@ -16,7 +16,7 @@ type fakeRequeuer struct {
 	calls int
 }
 
-func (f *fakeRequeuer) Enqueue(context.Context, *queuetypes.TaskPayload) error {
+func (f *fakeRequeuer) Enqueue(context.Context, *tasks.TaskPayload) error {
 	f.calls++
 	return nil
 }
@@ -33,7 +33,7 @@ type fakeAssigner struct {
 	lastRiverJobID int64
 }
 
-func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
+func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *tasks.TaskPayload) (taskqueue.TaskAssignment, error) {
 	if f.assignErr != nil {
 		return taskqueue.TaskAssignment{}, f.assignErr
 	}
@@ -68,14 +68,14 @@ func (f *fakeAssigner) leaseToken() string {
 }
 
 type fakeRuntime struct {
-	refreshFn       func(ctx context.Context, task *queuetypes.TaskPayload) error
+	refreshFn       func(ctx context.Context, task *tasks.TaskPayload) error
 	failedCalls     int
 	lastFailedTask  string
 	lastFailedCause string
 	converged       []riverFinalFailureCall
 }
 
-func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error {
+func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error {
 	if f.refreshFn != nil {
 		return f.refreshFn(ctx, task)
 	}

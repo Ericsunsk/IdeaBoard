@@ -12,7 +12,8 @@ export const authDialogPt = {
 
 export const authErrorMessagePt = {
   root: {
-    class: 'm-0 border-0 bg-transparent p-0 text-[12px] font-semibold text-rose-500 tracking-wide mt-1.5',
+    class:
+      'm-0 border-0 bg-transparent p-0 text-[12px] font-semibold text-rose-500 tracking-wide mt-1.5',
   },
   contentWrapper: { class: 'contents' },
   content: { class: 'contents' },

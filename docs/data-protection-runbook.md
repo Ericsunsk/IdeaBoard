@@ -1,6 +1,6 @@
 # IdeaBoard 数据保护运维手册
 
-本文档聚焦 PostgreSQL backup、restore 与密钥材料处理。账号安全操作边界见 [AUTH_OPERATION_RUNBOOK.md](./AUTH_OPERATION_RUNBOOK.md)，部署步骤见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
+本文档聚焦 PostgreSQL backup、restore 与密钥材料处理。账号安全操作边界见 [auth-operation-runbook.md](./auth-operation-runbook.md)，部署步骤见 [DEPLOYMENT.md](../DEPLOYMENT.md)。
 
 ## PostgreSQL Backup 安全基线
 

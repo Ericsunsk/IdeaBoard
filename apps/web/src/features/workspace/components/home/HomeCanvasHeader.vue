@@ -120,10 +120,7 @@
             class="ib-user-avatar-button__image"
             alt="用户头像"
           />
-          <div
-            v-else
-            class="ib-user-avatar-button__placeholder"
-          >
+          <div v-else class="ib-user-avatar-button__placeholder">
             <User class="size-5 [stroke-width:var(--canvas-control-icon-stroke)]" />
           </div>
         </button>

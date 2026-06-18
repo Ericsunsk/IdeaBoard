@@ -1,18 +1,18 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { AuthGuardSettings } from './auth-guard-settings.js'
+import type { AuthGuardSettings } from './authGuardSettings.js'
 import {
   getAuthSubpath,
   isRateLimitedAuthPath,
   isSignUpPath,
   normalizeAuthPath,
   normalizeURLPath,
-} from './auth-utils.js'
+} from './authUtils.js'
 import {
   appendVaryHeader,
   getHeaderValue,
   sendNodeJSON,
   sendNodeStatus,
-} from './http-response.js'
+} from './httpResponse.js'
 
 type MemoryRateLimitEntry = {
   count: number

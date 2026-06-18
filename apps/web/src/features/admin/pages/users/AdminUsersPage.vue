@@ -613,9 +613,7 @@ const updateRegistrationSettingMutation = useMutation({
 })
 
 const users = computed<User[]>(() => usersData.value?.list ?? [])
-const loading = computed(
-  () => usersQuery.isLoading.value || usersQuery.isFetching.value,
-)
+const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
 const userPlaceholderRows = computed(() => {
   if (loading.value || users.value.length === 0) return 0
   return Math.max(0, pageSize.value - users.value.length)

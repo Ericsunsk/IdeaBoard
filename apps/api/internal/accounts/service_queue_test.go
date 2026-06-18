@@ -7,12 +7,11 @@ import (
 	"errors"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -21,16 +20,16 @@ type fakeQueueForService struct {
 	queuedLen int64
 }
 
-func (f *fakeQueueForService) Enqueue(context.Context, *queuetypes.TaskPayload) error { return nil }
+func (f *fakeQueueForService) Enqueue(context.Context, *tasks.TaskPayload) error { return nil }
 func (f *fakeQueueForService) QueueLengths(context.Context) (int64, int64, error) {
 	return f.queuedLen, 0, nil
 }
 
 type fakeAccountLoadStore struct {
-	loadInfo map[int64]*queuetypes.AccountLoad
+	loadInfo map[int64]*tasks.AccountLoad
 }
 
-func (f *fakeAccountLoadStore) GetAccountLoadInfo(context.Context, []int64) (map[int64]*queuetypes.AccountLoad, error) {
+func (f *fakeAccountLoadStore) GetAccountLoadInfo(context.Context, []int64) (map[int64]*tasks.AccountLoad, error) {
 	return f.loadInfo, nil
 }
 
@@ -59,8 +58,8 @@ func (f *fakeCancelStore) ClearCancelled(context.Context, string) error      { r
 
 type fakeMonitorStore struct{}
 
-func (f *fakeMonitorStore) MonitorInfo(context.Context, []int64) (*queuetypes.MonitorInfo, error) {
-	return &queuetypes.MonitorInfo{}, nil
+func (f *fakeMonitorStore) MonitorInfo(context.Context, []int64) (*tasks.MonitorInfo, error) {
+	return &tasks.MonitorInfo{}, nil
 }
 
 type recordingTaskStatusPublisher struct {
@@ -149,7 +148,7 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 		TaskRepo:    taskRepo,
 		QueueStats:  &fakeQueueForService{queuedLen: 7},
 		AccountLoadStore: &fakeAccountLoadStore{
-			loadInfo: map[int64]*queuetypes.AccountLoad{
+			loadInfo: map[int64]*tasks.AccountLoad{
 				acc.ID: {CurrentConcurrent: 2, MaxConcurrent: 3},
 			},
 		},

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
 
@@ -26,7 +25,7 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 		Params:     `{"size":"1024x1024"}`,
 		Status:     tasks.StatusPending,
 	}
-	queueTask := &queuetypes.TaskPayload{
+	queueTask := &tasks.TaskPayload{
 		TaskID:     task.TaskID,
 		UserID:     task.UserID,
 		Prompt:     task.Prompt,

@@ -7,7 +7,7 @@
     ]"
     @mousedown.self="closeBoardHeaderEditing"
   >
-    <WorkspaceScreenChrome
+    <WorkspacePageChrome
       :active-tool="activeTool"
       :inert="isMaskEditorChromeHidden"
       :current-board-name="currentBoardName"
@@ -264,7 +264,7 @@ import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowWorkspaceRuntime } from '../composables/useFlowWorkspaceRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
-import WorkspaceScreenChrome from '../components/WorkspaceScreenChrome.vue'
+import WorkspacePageChrome from '../components/WorkspacePageChrome.vue'
 import { useMaskEditorViewportController } from '../composables/useMaskEditorViewportController'
 
 const appToast = useAppToast()

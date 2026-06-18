@@ -1,7 +1,7 @@
 <template>
-  <WorkspaceScreen />
+  <WorkspacePage />
 </template>
 
 <script setup lang="ts">
-import WorkspaceScreen from '../../workspace/screens/WorkspaceScreen.vue'
+import WorkspacePage from '../../workspace/pages/WorkspacePage.vue'
 </script>

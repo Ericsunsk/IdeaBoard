@@ -15,9 +15,8 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
@@ -53,7 +52,7 @@ type TaskStore interface {
 }
 
 type TaskSubmissionStore interface {
-	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *queuetypes.TaskPayload) error
+	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) error
 }
 
 type FeaturePromptStore interface {
@@ -144,7 +143,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		accountIDs[i] = acc.ID
 	}
 
-	queueTask := &queuetypes.TaskPayload{
+	queueTask := &tasks.TaskPayload{
 		TaskID:     taskID,
 		UserID:     userID,
 		Prompt:     fullPrompt,

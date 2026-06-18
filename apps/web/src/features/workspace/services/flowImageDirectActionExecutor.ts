@@ -8,10 +8,7 @@ import {
   EXECUTION_PARTIAL_EDIT_META,
   EXECUTION_IMAGE_TOOL_META,
 } from '../config/executionContract'
-import {
-  buildExecutionSizeParams,
-  extendExecutionImageSize,
-} from '../utils/executionSizeParams'
+import { buildExecutionSizeParams, extendExecutionImageSize } from '../utils/executionSizeParams'
 import {
   buildPromptAspectRatioTaskParams,
   type PromptAspectRatio,

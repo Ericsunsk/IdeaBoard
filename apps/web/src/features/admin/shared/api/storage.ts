@@ -27,7 +27,10 @@ export type StorageProviderMeta = Omit<GeneratedStorageProviderMeta, 'provider' 
   provider: StorageProvider
   fields: StorageProviderField[]
 }
-export type StorageProfile = Omit<GeneratedStorageProfile, 'provider' | 'secret_configured' | 'config'> & {
+export type StorageProfile = Omit<
+  GeneratedStorageProfile,
+  'provider' | 'secret_configured' | 'config'
+> & {
   provider: StorageProvider
   secret_configured: boolean
   config: Record<string, unknown>

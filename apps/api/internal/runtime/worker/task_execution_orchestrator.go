@@ -4,20 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/runtime/taskruntime"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/workflow"
 )
 
-type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
+type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
 
 type accountLookupStore interface {
 	GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*accounts.ApiAccount, error)
@@ -46,7 +45,7 @@ func newTaskExecutionOrchestrator(
 	}
 }
 
-func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) error {
+func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error {
 	// ── Phase 1: pre-flight (account + cancellation check) ──
 	accountID := assignment.AccountID
 	slog.Info("worker executing task", "task_id", task.TaskID, "account_id", accountID)
@@ -179,7 +178,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 func (o *taskExecutionOrchestrator) handleProviderFailure(
 	ctx context.Context,
 	taskCtx context.Context,
-	task *queuetypes.TaskPayload,
+	task *tasks.TaskPayload,
 	assignment taskqueue.TaskAssignment,
 	accountID int64,
 	startTime time.Time,
@@ -264,7 +263,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, reason string) error {
+func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, reason string) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -299,7 +298,7 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *queue
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
+func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -324,13 +323,13 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queu
 	return true, nil
 }
 
-func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, reason string, elapsedSec float64) error {
+func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, reason string, elapsedSec float64) error {
 	return o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, elapsedSec, tasks.ExecutionStageAssigned, tasks.FailureCategoryUnknown)
 }
 
 func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 	ctx context.Context,
-	task *queuetypes.TaskPayload,
+	task *tasks.TaskPayload,
 	assignment taskqueue.TaskAssignment,
 	reason string,
 	elapsedSec float64,
@@ -342,7 +341,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 
 func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	ctx context.Context,
-	task *queuetypes.TaskPayload,
+	task *tasks.TaskPayload,
 	assignment taskqueue.TaskAssignment,
 	reason string,
 	elapsedSec float64,
@@ -382,11 +381,11 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) failTask(ctx context.Context, task *queuetypes.TaskPayload, reason string) error {
+func (o *taskExecutionOrchestrator) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) error {
 	return o.completeFailedTask(ctx, task, taskqueue.TaskAssignment{}, reason, 0)
 }
 
-func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *queuetypes.TaskPayload, attemptFinish *tasks.TaskAttemptFinish) {
+func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *tasks.TaskPayload, attemptFinish *tasks.TaskAttemptFinish) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -414,11 +413,11 @@ func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task 
 	slog.Info("task cancelled; stop execution", "task_id", task.TaskID)
 }
 
-func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *queuetypes.TaskPayload, reason string) {
+func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
 	slog.Info("task dropped", "task_id", task.TaskID, "reason", reason)
 }
 
-func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {
+func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -510,7 +509,7 @@ func (o *taskExecutionOrchestrator) recordExecutionSnapshot(ctx context.Context,
 
 func (o *taskExecutionOrchestrator) startTaskAttempt(
 	ctx context.Context,
-	task *queuetypes.TaskPayload,
+	task *tasks.TaskPayload,
 	assignment taskqueue.TaskAssignment,
 	snapshot tasks.TaskExecutionSnapshot,
 	providerStartedAt time.Time,
@@ -608,7 +607,7 @@ func (o *taskExecutionOrchestrator) finishTaskAttempt(
 	}
 }
 
-func taskExecutionSnapshot(task *queuetypes.TaskPayload, account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) tasks.TaskExecutionSnapshot {
+func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) tasks.TaskExecutionSnapshot {
 	snapshot := tasks.TaskExecutionSnapshot{}
 	if task == nil {
 		return snapshot

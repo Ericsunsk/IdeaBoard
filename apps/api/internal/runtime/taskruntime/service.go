@@ -12,8 +12,7 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 )
 
@@ -78,7 +77,7 @@ func (s *Service) SetTaskStatusPublisher(publisher events.TaskStatusPublisher) {
 	s.taskEvents = publisher
 }
 
-func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error {
+func (s *Service) RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error {
 	enabledAccounts, err := s.accountRepo.GetAllEnabled(ctx)
 	if err != nil {
 		return err

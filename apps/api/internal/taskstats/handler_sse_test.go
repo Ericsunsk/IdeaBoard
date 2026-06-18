@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 
@@ -18,11 +17,11 @@ import (
 )
 
 type fakeMonitorProvider struct {
-	info *queuetypes.MonitorInfo
+	info *tasks.MonitorInfo
 	err  error
 }
 
-func (p fakeMonitorProvider) GetMonitorInfo(context.Context) (*queuetypes.MonitorInfo, error) {
+func (p fakeMonitorProvider) GetMonitorInfo(context.Context) (*tasks.MonitorInfo, error) {
 	if p.err != nil {
 		return nil, p.err
 	}
@@ -129,7 +128,7 @@ func TestGetMonitorExecutionPressureBuildsStableBuckets(t *testing.T) {
 }
 
 func TestAdminMonitorDataFromRuntimeNormalizesNilCollections(t *testing.T) {
-	data := adminMonitorDataFromRuntime(&queuetypes.MonitorInfo{
+	data := adminMonitorDataFromRuntime(&tasks.MonitorInfo{
 		GlobalQueueLen:  4,
 		WaitQueueLen:    1,
 		RunningAttempts: 2,
@@ -179,7 +178,7 @@ func TestBuildMonitorSnapshotFailsWhenExecutionPressureUnavailable(t *testing.T)
 			counts:      map[string]int64{},
 			pressureErr: errors.New("pressure unavailable"),
 		}),
-		fakeMonitorProvider{info: &queuetypes.MonitorInfo{}},
+		fakeMonitorProvider{info: &tasks.MonitorInfo{}},
 	)
 
 	_, err := handler.buildMonitorSnapshot(context.Background())
@@ -202,11 +201,11 @@ func TestStreamMonitorSendsInitialSnapshot(t *testing.T) {
 		}, pressureRows: []taskstore.MonitorExecutionPressureAggregate{
 			{Key: "normal_running", Total: 1, AvgDurationSeconds: 12, MaxDurationSeconds: 12},
 		}}),
-		fakeMonitorProvider{info: &queuetypes.MonitorInfo{
+		fakeMonitorProvider{info: &tasks.MonitorInfo{
 			GlobalQueueLen:  3,
 			WaitQueueLen:    2,
 			RunningAttempts: 1,
-			AccountLoads: map[int64]*queuetypes.AccountLoad{
+			AccountLoads: map[int64]*tasks.AccountLoad{
 				9: {CurrentConcurrent: 1, MaxConcurrent: 4},
 			},
 		}},

@@ -28,7 +28,7 @@
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员在内部部署与运维场景下使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
 >
-> 账号安全与业务运维的职责边界请同时参考 [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)；PostgreSQL backup / restore 的密钥材料处理规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
+> 账号安全与业务运维的职责边界请同时参考 [docs/auth-operation-runbook.md](./docs/auth-operation-runbook.md)；PostgreSQL backup / restore 的密钥材料处理规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
 
 <a id="deployment-profile"></a>
 ## 部署概览
@@ -398,8 +398,10 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 │       ├── ideaboard.service
 │       └── ideaboard-auth.service
 ├── docs/
-│   ├── AUTH_OPERATION_RUNBOOK.md
 │   ├── architecture-constraints.md
+│   ├── auth-operation-runbook.md
+│   ├── data-protection-runbook.md
+│   ├── river-migration.md
 │   └── assets/
 ├── docker/
 │   └── README.md

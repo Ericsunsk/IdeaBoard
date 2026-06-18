@@ -1,14 +1,14 @@
 import { toNodeHandler } from 'better-auth/node'
 import { auth, authDB } from './auth.js'
-import { createAuthApp } from './auth-app.js'
-import { getAuthGuardSettings } from './auth-guard-settings.js'
+import { createAuthApp } from './authApp.js'
+import { getAuthGuardSettings } from './authGuardSettings.js'
 import {
   deleteAuthUserSessions,
   findUserByUsernameOrEmail,
   removeAuthUserCascade,
   updateAuthUserBanState,
   updateAuthUserRole,
-} from './auth-repository.js'
+} from './authRepository.js'
 import { env } from './env.js'
 
 const app = createAuthApp({

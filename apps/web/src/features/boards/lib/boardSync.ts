@@ -14,9 +14,7 @@ import {
   type CanvasBoardState,
 } from '../../canvas/lib/canvasBoardState'
 
-export type HydrateCanvasBoardsFromServerResult =
-  | { ok: true }
-  | { ok: false; error: unknown }
+export type HydrateCanvasBoardsFromServerResult = { ok: true } | { ok: false; error: unknown }
 
 const hydrateInFlight = new Map<string, Promise<HydrateCanvasBoardsFromServerResult>>()
 const pendingRollbackBoardIds = new Set<string>()
@@ -194,7 +192,8 @@ export async function syncCanvasBoardToServer(
 ) {
   const board = getCanvasBoardById(boardId)
   if (!board) return
-  const state = stateOverride ?? getCanvasBoardState(boardId) ?? createEmptyCanvasBoardState(board.updatedAt)
+  const state =
+    stateOverride ?? getCanvasBoardState(boardId) ?? createEmptyCanvasBoardState(board.updatedAt)
   try {
     await boardApi.upsert(boardId, {
       name: board.name,

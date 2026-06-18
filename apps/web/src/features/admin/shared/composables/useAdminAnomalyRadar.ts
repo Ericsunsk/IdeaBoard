@@ -59,8 +59,8 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
 
   const monitorData = computed(() => monitorQuery.data.value?.data?.monitor || null)
   const monitorStats = computed(() => monitorQuery.data.value?.data?.stats || null)
-  const statistics = computed<AdminStatistics | null>(() =>
-    statisticsQuery.data.value?.data ?? null,
+  const statistics = computed<AdminStatistics | null>(
+    () => statisticsQuery.data.value?.data ?? null,
   )
   const stableRecords = ref(new Map<string, StableAnomalyRecord>())
   const anomalies = ref<AdminAnomalyItem[]>([])

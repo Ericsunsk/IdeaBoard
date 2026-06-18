@@ -14,7 +14,6 @@ declare global {
     readonly VITE_PUBLIC_ASSET_BASE_URL?: string
     readonly VITE_WORKSPACE_FLOW_ENABLE_CULLING?: string
   }
-
 }
 
 export {}

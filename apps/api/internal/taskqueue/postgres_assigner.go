@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 
@@ -25,7 +24,7 @@ func NewPostgresTaskAssigner(db *sql.DB) *PostgresTaskAssigner {
 	return &PostgresTaskAssigner{db: db}
 }
 
-func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, task *queuetypes.TaskPayload) (TaskAssignment, error) {
+func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, task *tasks.TaskPayload) (TaskAssignment, error) {
 	if a == nil || a.db == nil {
 		return TaskAssignment{}, fmt.Errorf("postgres task assigner: db not configured")
 	}

@@ -22,7 +22,11 @@
           <p :class="authModalSubtitleClass">创建你的 IdeaBoard 账号，开始创作</p>
         </div>
 
-        <form class="relative z-[1] flex flex-col gap-4" novalidate @submit.prevent="handleRegister">
+        <form
+          class="relative z-[1] flex flex-col gap-4"
+          novalidate
+          @submit.prevent="handleRegister"
+        >
           <AuthFormField
             v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
             label="账号"
@@ -69,10 +73,7 @@
                   'aria-describedby': describedbyId,
                 }"
                 :invalid="invalid"
-                :input-class="[
-                  authInputClass,
-                  inlineError ? authInputErrorClass : '',
-                ]"
+                :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
                 :placeholder="inlineError ? inlineErrorText : '设置登录密码'"
                 toggle-mask
                 @blur="validateField('password')"
@@ -103,10 +104,7 @@
                   'aria-describedby': describedbyId,
                 }"
                 :invalid="invalid"
-                :input-class="[
-                  authInputClass,
-                  inlineError ? authInputErrorClass : '',
-                ]"
+                :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
                 :placeholder="inlineError ? inlineErrorText : '再次输入密码'"
                 toggle-mask
                 @blur="validateField('confirmPassword')"

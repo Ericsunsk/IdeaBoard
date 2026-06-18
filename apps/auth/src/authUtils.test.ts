@@ -14,7 +14,7 @@ import {
   normalizeOptionalText,
   normalizeURLPath,
   normalizeUsername,
-} from './auth-utils.js'
+} from './authUtils.js'
 
 describe('auth route helpers', () => {
   it('normalizes URL paths and auth subpaths', () => {

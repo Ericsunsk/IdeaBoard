@@ -39,11 +39,7 @@
             :class="userAvatarImageClass"
             alt="用户头像"
           />
-          <span
-            v-else
-            :class="userAvatarPlaceholderClass"
-            aria-hidden="true"
-          >
+          <span v-else :class="userAvatarPlaceholderClass" aria-hidden="true">
             <UserIcon :class="userAvatarIconClass" />
           </span>
         </button>

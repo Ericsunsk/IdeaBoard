@@ -317,7 +317,9 @@
                             :invalid="Boolean(pwdErrors.confirmPassword)"
                             :input-class="[
                               passwordInputClass,
-                              isPasswordInlineError('confirmPassword') ? passwordInputErrorClass : '',
+                              isPasswordInlineError('confirmPassword')
+                                ? passwordInputErrorClass
+                                : '',
                             ]"
                             :placeholder="
                               isPasswordInlineError('confirmPassword')
@@ -367,7 +369,11 @@ import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { uploadApi } from '../../../shared/api/upload'
-import { isRequiredErrorMessage, markRequiredError, displayErrorMessage } from '../../../shared/utils/formValidation'
+import {
+  isRequiredErrorMessage,
+  markRequiredError,
+  displayErrorMessage,
+} from '../../../shared/utils/formValidation'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Card from 'primevue/card'

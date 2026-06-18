@@ -1,7 +1,7 @@
 <template>
-  <BoardsScreen />
+  <BoardsPage />
 </template>
 
 <script setup lang="ts">
-import BoardsScreen from '../../boards/screens/BoardsScreen.vue'
+import BoardsPage from '../../boards/pages/BoardsPage.vue'
 </script>

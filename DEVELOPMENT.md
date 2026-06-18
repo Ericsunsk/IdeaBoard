@@ -117,11 +117,11 @@ graph LR
 ### 契约规则
 
 - `feature` 应作为顶层任务字段传递，并在后端统一校验。
-- `image_urls` 应作为顶层任务字段传递，不再在 `params` 里双轨存放。
-- `params` 只承载 feature 专属参数，不再额外复制 `feature` 与 `image_urls`。
-- 工作流参数只接受最新 canonical key，例如 `feature`、`upscale_mode`、`mask_image_url`、`reference_image_urls`。
+- `image_urls` 应作为顶层任务字段传递，媒体引用由顶层媒体字段或 feature 运行时字段表达。
+- `params` 只承载 feature 专属结构化参数，例如 `hd.clarity_strength`、`fusion.input_weights`、`mask_image_url`、`reference_image_urls`。
+- 工作流参数只接受 canonical key；前端执行 contract、OpenAPI 与 Go validation 必须保持同名同层级。
 - `use_mask`、`mask_image_url`、`mask_image_urls` 是 `partial-edit` 局部重绘链路的运行时边界参数，不是 prompt 模板变量。
-- 已下线能力不进入产品文案、展示分组或模板 contract。
+- 产品文案、展示分组和模板 contract 只描述当前可执行能力。
 
 对应实现：
 
@@ -141,7 +141,10 @@ graph LR
   "feature": "style-fusion",
   "image_urls": ["https://..."],
   "params": {
-    "image_weights": [0.6, 0.4]
+    "fusion": {
+      "mode": "weighted_reference",
+      "input_weights": [0.6, 0.4]
+    }
   }
 }
 ```
@@ -151,7 +154,7 @@ graph LR
 - [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/workspace/composables/useFlowPromptGenerationOrchestrator.ts)
 - [useFlowImageDirectActions.ts](./apps/web/src/features/workspace/composables/useFlowImageDirectActions.ts)
 - [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)
-- [WorkspaceScreen.vue](./apps/web/src/features/workspace/screens/WorkspaceScreen.vue)
+- [WorkspacePage.vue](./apps/web/src/features/workspace/pages/WorkspacePage.vue)
 
 ### 后端流程
 
@@ -184,22 +187,26 @@ sequenceDiagram
 
 关键代码：
 
-- [service.go](./apps/api/internal/accounts/service.go)
+- [service.go](./apps/api/internal/taskservice/service.go)
+- [store.go](./apps/api/internal/tasksubmission/store.go)
+- [river_queue.go](./apps/api/internal/taskqueue/river_queue.go)
 - [engine.go](./apps/api/internal/prompts/engine.go)
-- [consumer.go](./apps/api/internal/runtime/worker/consumer.go)
+- [river_worker.go](./apps/api/internal/runtime/worker/river_worker.go)
+- [task_processor.go](./apps/api/internal/runtime/worker/task_processor.go)
+- [provider_request.go](./apps/api/internal/runtime/worker/provider_request.go)
 
 
 ## 提示词系统
 
-系统提示词由后台配置项 `feature_prompt:<slug>` 驱动，支持 `{{变量}}` 模板语法。
+系统提示词由后台 `feature_prompts` 配置驱动，按 `feature_slug` 读取启用配置，并支持 `{{变量}}` 模板语法。
 
 ### 核心规则
 
 - `feature slug` 是唯一索引，只接受当前 canonical slug。
 - `{{user_prompt}}` 是用户输入信号，与系统提示词模板分层装配。
-- `mode -> template` 映射仅保留必要项。
-- 执行语义由后台模板和显式参数表达；后端不再注入不可见 hidden constraint 片段。
-- Fusion 节点使用 `{{image_weights}}` 表达 2 到 4 张输入图的有序权重；旧的 A/B/ratio 变量已下线。
+- 执行语义由后台模板和显式参数表达，模板变量必须来自稳定变量表。
+- Fusion 节点使用 `{{fusion_input_weights}}` 表达 2 到 4 张输入图的有序权重。
+- HD 节点使用 `{{clarity_strength}}` 表达清晰度强度；输出尺寸按原图尺寸由运行时尺寸参数控制。
 - Prompt 节点的 `pattern-gen` system prompt 是可选配置；为空时直接使用用户输入，后续可通过后台补充辅助性约束。
 
 ### 常用变量
@@ -207,13 +214,10 @@ sequenceDiagram
 | 变量 | 说明 |
 |------|------|
 | `{{user_prompt}}` | 用户输入文本 |
-| `{{strength}}` | 风格延展强度百分比 |
-| `{{image_weights}}` | Fusion 有序图片权重，例如 `Image 1: 60%, Image 2: 40%` |
-| `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 扩图参数 |
-| `{{upscale_mode}}` | HD 增强模式 |
-| `{{upscale_factor}}` | HD 倍数 |
-| `{{output_format}}` | HD 输出格式 |
-| `{{output_quality}}` | HD 输出质量 |
+| `{{variation_strength}}` | 风格延展强度百分比 |
+| `{{fusion_input_weights}}` | Fusion 有序图片权重，例如 `Image 1: 60%, Image 2: 40%` |
+| `{{extend_top_percent}}` `{{extend_right_percent}}` `{{extend_bottom_percent}}` `{{extend_left_percent}}` | 扩图方向百分比 |
+| `{{clarity_strength}}` | HD 清晰度强度百分比 |
 
 `original_image_url`、`image_urls`、`mask_image_url`、`mask_image_urls`、`reference_image_urls` 是运行时媒体字段，不是 prompt 模板变量；不要写成 `{{...}}` 插入 system prompt 正文。
 
@@ -236,7 +240,7 @@ sequenceDiagram
 - `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销；不开放后台改密。
 - 角色升降级必须经由 Go Admin API：前端不直连 `authClient.admin.setRole`，由 Go 校验后同步 Auth Service 与业务侧 `users.role`。
 - 彻底注销必须经由 Go Admin API：先校验目标不是当前管理员/管理员账号，再调用 Auth Service internal endpoint 删除身份、会话与凭据，最后清理业务侧用户数据；前端不得直接调用 `authClient.admin.removeUser`。
-- 账号安全运维边界见 [AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)，遵循“业务治理在 Admin，高风险身份操作由 Go Admin API 编排”的原则。
+- 账号安全运维边界见 [auth-operation-runbook.md](./docs/auth-operation-runbook.md)，遵循“业务治理在 Admin，高风险身份操作由 Go Admin API 编排”的原则。
 
 关键代码：
 
@@ -436,15 +440,16 @@ Auth 服务关键变量：
 
 ```text
 .github/workflows/           # CI / release workflow
+deploy/                      # 生产部署模板
 docker/                      # 本地数据库与开发环境
 docs/                        # 设计、运行与约束文档
 scripts/                     # 打包、部署与发布脚本
 
 apps/web/src/
 ├── app/                      # 入口、router、store 装配
-├── pages/                    # 路由级容器
 ├── features/                 # 领域模块
 │   ├── workspace/            # 画布、节点与执行链路
+│   │   ├── pages/            # 路由级页面
 │   │   └── components/nodes/ # 节点组件，内部按 config/utils/styles/composables 拆分
 │   ├── boards/               # 画板列表、预览与同步
 │   ├── admin/                # 管理后台
@@ -457,18 +462,22 @@ apps/web/src/
 apps/api/
 ├── cmd/                      # 服务入口
 ├── internal/platform/        # 基础设施：config、database、response、safehttp
-├── internal/runtime/         # 启动、HTTP 路由、队列与 worker
+├── internal/runtime/         # 启动、HTTP 路由、worker 与 embedded dist
 ├── internal/auth/            # 鉴权中间件与 auth service client
 ├── internal/users/           # 用户管理
 ├── internal/accounts/        # 账号池与任务调度
 ├── internal/boards/          # 画板管理
 ├── internal/channels/        # 渠道管理
 ├── internal/tasks/           # 任务模型与状态
+├── internal/taskqueue/       # 队列接口与 River/PostgreSQL 实现
+├── internal/taskservice/     # 任务提交、查询与 SSE handler
+├── internal/taskstore/       # 任务持久化 repository
+├── internal/tasksubmission/  # 任务 + River job 事务提交
+├── internal/taskstats/       # 任务统计与监控 API
 ├── internal/workflow/        # feature contract
 ├── internal/prompts/         # 提示词模板与装配
 ├── internal/storage/         # 对象存储配置与实现
-├── internal/assets/          # 线稿模式等业务模板
-└── internal/imageproc/       # 分割、线稿、向量化等图片处理
+└── internal/assets/          # 线稿模式等业务模板
 
 apps/auth/
 ├── src/auth.ts               # Better Auth 配置
@@ -484,5 +493,5 @@ apps/auth/
 
 1. 以 working tree 为准，不回滚用户未提交改动。
 2. 改任务 contract 时，优先同步前端执行链、后端 canonical helper 和 admin 配置页。
-3. 已下线能力不应继续出现在产品文案、模板 contract 或展示分组里。
+3. 产品文案、模板 contract 与展示分组只描述当前可执行能力。
 4. 跨层变更默认需要同时验证前端与后端。

@@ -27,9 +27,11 @@
 
 - `apps/api/cmd` 保持轻量，只负责启动应用。
 - `apps/api/internal/platform` 负责 config 和基础设施适配层。
-- `apps/api/internal/runtime` 负责 HTTP 注册、bootstrap 和 worker。
-- 各领域包在同一包内收口自己的 handler、service、repository 和 model。
-- 对外 contract 以当前 HTTP 路由、JSON 字段名、环境变量语义和数据库结构为准；不提供已下线能力或历史字段别名的适配层。
+- `apps/api/internal/runtime` 负责 HTTP 注册、bootstrap、worker 和 embedded frontend dist。
+- `apps/api/internal/taskqueue` 负责任务队列接口和 River/PostgreSQL 队列实现，业务领域包不得依赖 `internal/runtime` 下的队列实现细节。
+- Task 领域按稳定边界拆为 `tasks` 模型、`taskservice` 应用服务、`taskstore` 持久化、`tasksubmission` 事务提交、`taskstats` 统计监控。
+- 其他领域包在同一包内收口自己的 handler、service、repository 和 model。
+- 对外 contract 以当前 HTTP 路由、JSON 字段名、环境变量语义和数据库结构为准；字段命名与层级应在 OpenAPI、前端调用和后端 validation 中保持一致。
 
 
 ## 命名规范
@@ -37,11 +39,13 @@
 | 层 | 规范 | 示例 |
 |----|------|------|
 | 目录 | `kebab-case` | `image-processing/` |
-| Vue SFC | `PascalCase` | `WorkspaceScreen.vue` |
+| Vue SFC | `PascalCase` | `WorkspacePage.vue` |
 | TS helper / composable | `camelCase.ts` | `useChannelAccounts.ts` |
 | Go 文件 | `snake_case.go` | `task_runtime_service.go` |
 
-Go package 目录例外：保持 Go 生态习惯，使用小写无分隔符命名，例如 `autherrors/`、`imageproc/`；不要为了匹配前端目录风格改成 `kebab-case`。
+Go package 目录例外：保持 Go 生态习惯，使用小写无分隔符命名，例如 `autherrors/`、`webdist/`；不要为了匹配前端目录风格改成 `kebab-case`。
+
+仓库根目录文档保留传统大写文件名，例如 `README.md`、`DEVELOPMENT.md`、`DEPLOYMENT.md`；`docs/` 下普通文档使用 `kebab-case.md`。
 
 
 ## 验证要求

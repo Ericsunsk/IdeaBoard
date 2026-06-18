@@ -5,25 +5,25 @@ import (
 	"fmt"
 	"log/slog"
 
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasks"
 )
 
 type consumerTaskRuntime interface {
-	RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error
+	RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error
 	MarkTaskFailed(ctx context.Context, taskID string, reason string) error
 }
 
 type taskProcessor struct {
 	assigner    taskqueue.TaskAssigner
 	taskRuntime consumerTaskRuntime
-	executeTask func(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) error
+	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error
 }
 
 func newTaskProcessor(
 	assigner taskqueue.TaskAssigner,
 	taskRuntime consumerTaskRuntime,
-	executeTask func(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) error,
+	executeTask func(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error,
 ) *taskProcessor {
 	return &taskProcessor{
 		assigner:    assigner,
@@ -32,7 +32,7 @@ func newTaskProcessor(
 	}
 }
 
-func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayload) error {
+func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) error {
 	if task == nil {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 	return p.executeTask(ctx, task, assignment)
 }
 
-func (p *taskProcessor) failTask(ctx context.Context, task *queuetypes.TaskPayload, reason string) {
+func (p *taskProcessor) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
 	if err := p.taskRuntime.MarkTaskFailed(ctx, task.TaskID, reason); err != nil {
 		slog.Warn("mark task failed failed", "task_id", task.TaskID, "err", err)
 	}

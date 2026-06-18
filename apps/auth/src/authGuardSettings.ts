@@ -1,5 +1,5 @@
 import { authDB } from './auth.js'
-import { clampInteger } from './auth-utils.js'
+import { clampInteger } from './authUtils.js'
 
 export type AuthGuardSettings = {
   registrationEnabled: boolean

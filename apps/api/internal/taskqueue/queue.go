@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 var ErrNoAccountCapacity = errors.New("no account capacity")
 
 type TaskEnqueuer interface {
-	Enqueue(ctx context.Context, task *queuetypes.TaskPayload) error
+	Enqueue(ctx context.Context, task *tasks.TaskPayload) error
 }
 
 type QueueStatsStore interface {
@@ -25,7 +25,7 @@ type QueueStatsStore interface {
 }
 
 type TaskAssigner interface {
-	Assign(ctx context.Context, accountIDs []int64, task *queuetypes.TaskPayload) (TaskAssignment, error)
+	Assign(ctx context.Context, accountIDs []int64, task *tasks.TaskPayload) (TaskAssignment, error)
 	ConfirmTaskLease(ctx context.Context, assignment TaskAssignment) error
 }
 
@@ -48,7 +48,7 @@ type AccountConcurrencyStore interface {
 }
 
 type AccountLoadStore interface {
-	GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error)
+	GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*tasks.AccountLoad, error)
 }
 
 type TaskCancellationStore interface {
@@ -58,5 +58,5 @@ type TaskCancellationStore interface {
 }
 
 type TaskMonitorStore interface {
-	MonitorInfo(ctx context.Context, accountIDs []int64) (*queuetypes.MonitorInfo, error)
+	MonitorInfo(ctx context.Context, accountIDs []int64) (*tasks.MonitorInfo, error)
 }

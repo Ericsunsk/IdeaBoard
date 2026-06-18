@@ -6,9 +6,9 @@ import {
   drawMaskRasterPreviewToCanvas,
   featherMaskPreviewCanvas,
   invertMaskPreviewCanvas,
-} from './useMaskPaintingCanvas'
-import type { MaskPaintBrushShape } from './maskBrushEngine'
-import { drawMaskStrokeSegment } from './maskBrushEngine'
+} from '../utils/maskPaintingCanvas'
+import type { MaskPaintBrushShape } from '../utils/maskBrushEngine'
+import { drawMaskStrokeSegment } from '../utils/maskBrushEngine'
 import { containImageRect } from '../utils/canvasExtendGeometry'
 import { getMaskCanvasPoint } from '../utils/maskCanvasGeometry'
 import { isEditableEventTarget } from '../utils/domEventTargets'

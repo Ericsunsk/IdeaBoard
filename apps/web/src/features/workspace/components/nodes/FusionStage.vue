@@ -255,7 +255,6 @@ function getBlendWeightBadgeStyle(index: number) {
     top: `${anchor.y * 100}%`,
   }
 }
-
 </script>
 
 <style scoped src="./styles/node-tool-buttons.css"></style>

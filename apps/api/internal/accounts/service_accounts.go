@@ -11,7 +11,6 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
@@ -85,7 +84,7 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 	for i := range accounts {
 		accountIDs[i] = accounts[i].ID
 	}
-	loadInfo := map[int64]*queuetypes.AccountLoad{}
+	loadInfo := map[int64]*tasks.AccountLoad{}
 	if s.accountLoadStore != nil {
 		loads, loadErr := s.accountLoadStore.GetAccountLoadInfo(ctx, accountIDs)
 		if loadErr != nil {

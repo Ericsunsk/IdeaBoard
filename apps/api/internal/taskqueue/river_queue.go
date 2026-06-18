@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 
 	"github.com/jackc/pgx/v5"
@@ -23,7 +22,7 @@ const (
 )
 
 type DrawingTaskArgs struct {
-	Task queuetypes.TaskPayload `json:"task"`
+	Task tasks.TaskPayload `json:"task"`
 }
 
 func (DrawingTaskArgs) Kind() string {
@@ -76,7 +75,7 @@ func (q *RiverQueue) SetClient(client riverClient) {
 	q.client = client
 }
 
-func (q *RiverQueue) Enqueue(ctx context.Context, task *queuetypes.TaskPayload) error {
+func (q *RiverQueue) Enqueue(ctx context.Context, task *tasks.TaskPayload) error {
 	if task == nil {
 		return fmt.Errorf("river enqueue: task is nil")
 	}
@@ -103,7 +102,7 @@ func (q *RiverQueue) getClient() riverClient {
 	return q.client
 }
 
-func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, task *queuetypes.TaskPayload, queueName string, maxRetry int) error {
+func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, task *tasks.TaskPayload, queueName string, maxRetry int) error {
 	if task == nil {
 		return fmt.Errorf("river enqueue tx: task is nil")
 	}
@@ -123,7 +122,7 @@ func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, t
 	return nil
 }
 
-func drawingTaskInsertOpts(task *queuetypes.TaskPayload, queueName string, maxRetry int) *river.InsertOpts {
+func drawingTaskInsertOpts(task *tasks.TaskPayload, queueName string, maxRetry int) *river.InsertOpts {
 	if strings.TrimSpace(queueName) == "" {
 		queueName = RiverQueueDefault
 	}
@@ -152,7 +151,7 @@ func (q *RiverQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
 	return global, 0, nil
 }
 
-func (q *RiverQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*queuetypes.MonitorInfo, error) {
+func (q *RiverQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*tasks.MonitorInfo, error) {
 	global, wait, err := q.QueueLengths(ctx)
 	if err != nil {
 		return nil, err
@@ -161,14 +160,14 @@ func (q *RiverQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*queu
 	if err != nil {
 		return nil, fmt.Errorf("river monitor info running attempts: %w", err)
 	}
-	loads := map[int64]*queuetypes.AccountLoad{}
+	loads := map[int64]*tasks.AccountLoad{}
 	if q != nil && q.accountLoadStore != nil {
 		loads, err = q.accountLoadStore.GetAccountLoadInfo(ctx, accountIDs)
 		if err != nil {
 			return nil, fmt.Errorf("river monitor info account loads: %w", err)
 		}
 	}
-	return &queuetypes.MonitorInfo{
+	return &tasks.MonitorInfo{
 		GlobalQueueLen:  global,
 		WaitQueueLen:    wait,
 		RunningAttempts: running,
@@ -215,7 +214,7 @@ func queuedRiverJobStateValues() []string {
 	return values
 }
 
-func EncodeRiverPayload(task *queuetypes.TaskPayload) ([]byte, error) {
+func EncodeRiverPayload(task *tasks.TaskPayload) ([]byte, error) {
 	if task == nil {
 		return nil, fmt.Errorf("encode river payload: task is nil")
 	}
@@ -225,8 +224,8 @@ func EncodeRiverPayload(task *queuetypes.TaskPayload) ([]byte, error) {
 	return json.Marshal(task)
 }
 
-func DecodeRiverPayload(data []byte) (*queuetypes.TaskPayload, error) {
-	var task queuetypes.TaskPayload
+func DecodeRiverPayload(data []byte) (*tasks.TaskPayload, error) {
+	var task tasks.TaskPayload
 	if err := json.Unmarshal(data, &task); err != nil {
 		return nil, fmt.Errorf("decode river payload: %w", err)
 	}

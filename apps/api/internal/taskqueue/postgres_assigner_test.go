@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/platform/secrets"
-	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -43,7 +42,7 @@ func TestPostgresTaskAssignerAssignsLowestLoadRatioAccount(t *testing.T) {
 	createAssignerTask(t, db, "running-low", lowRatio, tasks.StatusRunning, "lease-low")
 	createAssignerTask(t, db, "pending-lowest-ratio", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{highRatio, lowRatio}, &queuetypes.TaskPayload{
+	assignment, err := assigner.Assign(ctx, []int64{highRatio, lowRatio}, &tasks.TaskPayload{
 		TaskID:     "pending-lowest-ratio",
 		RiverJobID: 101,
 	})
@@ -68,7 +67,7 @@ func TestPostgresTaskAssignerAssignsNextAccountWhenFirstIsFull(t *testing.T) {
 	createAssignerTask(t, db, "running-next-2", next, tasks.StatusRunning, "lease-next-2")
 	createAssignerTask(t, db, "pending-next", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{full, next}, &queuetypes.TaskPayload{
+	assignment, err := assigner.Assign(ctx, []int64{full, next}, &tasks.TaskPayload{
 		TaskID:     "pending-next",
 		RiverJobID: 102,
 	})
@@ -91,7 +90,7 @@ func TestPostgresTaskAssignerAssignReturnsNoCapacityWhenAllAccountsFull(t *testi
 	createAssignerTask(t, db, "running-full-2", second, tasks.StatusRunning, "lease-full-2")
 	createAssignerTask(t, db, "pending-no-capacity", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{first, second}, &queuetypes.TaskPayload{
+	assignment, err := assigner.Assign(ctx, []int64{first, second}, &tasks.TaskPayload{
 		TaskID:     "pending-no-capacity",
 		RiverJobID: 103,
 	})
@@ -115,7 +114,7 @@ func TestPostgresTaskAssignerHonorsModelMaxConcurrent(t *testing.T) {
 	createAssignerTaskWithModel(t, db, "running-model-full", modelFull, tasks.StatusRunning, "lease-model-full", "gpt-image-1")
 	createAssignerTask(t, db, "pending-model-capacity", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{modelFull, modelOpen}, &queuetypes.TaskPayload{
+	assignment, err := assigner.Assign(ctx, []int64{modelFull, modelOpen}, &tasks.TaskPayload{
 		TaskID:     "pending-model-capacity",
 		Params:     `{"model":"gpt-image-1"}`,
 		RiverJobID: 107,
@@ -143,7 +142,7 @@ func TestPostgresTaskAssignerUsesOpenModelWithinSameAccount(t *testing.T) {
 	createAssignerTaskWithModel(t, db, "running-first-model-full", accountID, tasks.StatusRunning, "lease-first-model-full", "gpt-image-1")
 	createAssignerTask(t, db, "pending-same-account-open-model", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &queuetypes.TaskPayload{
+	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
 		TaskID:     "pending-same-account-open-model",
 		RiverJobID: 108,
 	})
@@ -167,7 +166,7 @@ func TestPostgresTaskAssignerReusesRunningLeaseForSameRiverJob(t *testing.T) {
 	accountID := createAssignerAccount(t, db, "reuse", 1)
 	createAssignerTask(t, db, "running-reuse", accountID, tasks.StatusRunning, "river:104:existing")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &queuetypes.TaskPayload{
+	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
 		TaskID:     "running-reuse",
 		RiverJobID: 104,
 	})
@@ -187,7 +186,7 @@ func TestPostgresTaskAssignerDiscardsRunningTaskForDifferentRiverJob(t *testing.
 	accountID := createAssignerAccount(t, db, "discard", 1)
 	createAssignerTask(t, db, "running-discard", accountID, tasks.StatusRunning, "river:105:existing")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &queuetypes.TaskPayload{
+	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
 		TaskID:     "running-discard",
 		RiverJobID: 106,
 	})

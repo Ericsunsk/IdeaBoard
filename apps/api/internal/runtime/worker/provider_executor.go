@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasks"
 	"io"
 	"log/slog"
 	"net/url"
@@ -17,7 +17,6 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -112,11 +111,11 @@ type providerExecutionConfig struct {
 	Request        providerRequest
 }
 
-func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error) {
+func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload) (providerCallOutput, error) {
 	return c.callDrawingAPIWithAssignment(ctx, account, task, taskqueue.TaskAssignment{})
 }
 
-func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
+func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
 	slog.Info("calling provider API", "account_name", account.Name, "channel_id", account.ChannelID, "task_id", task.TaskID)
 
 	exec, err := c.prepareProviderExecution(ctx, account, task, assignment)
@@ -206,7 +205,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	return output, nil
 }
 
-func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerExecutionConfig, error) {
+func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerExecutionConfig, error) {
 	if account.ApiKey == "" {
 		return providerExecutionConfig{}, newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
@@ -280,7 +279,7 @@ func (c *ProviderExecutor) applyAccountChannelEndpoint(ctx context.Context, acco
 	return channel.Name, nil
 }
 
-func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *queuetypes.TaskPayload) providerTaskParams {
+func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *tasks.TaskPayload) providerTaskParams {
 	typedParams, err := tasks.UnmarshalParams(task.Params)
 	if err != nil {
 		slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)

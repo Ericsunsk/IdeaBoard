@@ -69,10 +69,7 @@
                   'aria-describedby': describedbyId,
                 }"
                 :invalid="invalid"
-                :input-class="[
-                  authInputClass,
-                  inlineError ? authInputErrorClass : '',
-                ]"
+                :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
                 :placeholder="inlineError ? inlineErrorText : '请输入密码'"
                 toggle-mask
                 @blur="validateField('password')"

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -312,7 +312,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		ApiKey:   "google-key",
 		Models:   []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
 	}
-	task := &queuetypes.TaskPayload{
+	task := &tasks.TaskPayload{
 		TaskID: "task-google-native",
 		UserID: 42,
 		Prompt: "draw a cat",

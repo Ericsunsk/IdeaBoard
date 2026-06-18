@@ -1,5 +1,5 @@
 import type { PrimeVueConfiguration } from 'primevue/config'
-import { adminPrimeDialogPt } from '../features/admin/shared/lib/adminOverlayPt'
+import { baseDialogPt } from '../shared/theme/baseDialogPt'
 
 const adminRouteMutedTextClass = '[body.admin-route_&]:!text-[#718096]'
 
@@ -28,7 +28,7 @@ export const ideaBoardPrimePt = {
       ],
     }),
   },
-  dialog: adminPrimeDialogPt,
+  dialog: baseDialogPt,
   datatable: {
     root: { class: 'overflow-hidden rounded-2xl' },
     column: {

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'
 import { isIP } from 'node:net'
-import { isProductionRuntime } from './runtime-env.js'
+import { isProductionRuntime } from './runtimeEnv.js'
 
 dotenv.config({ quiet: true })
 

@@ -1,5 +1,5 @@
 import { authDB } from './auth.js'
-import type { InternalUserShape } from './auth-utils.js'
+import type { InternalUserShape } from './authUtils.js'
 
 type UserRow = {
   id?: unknown

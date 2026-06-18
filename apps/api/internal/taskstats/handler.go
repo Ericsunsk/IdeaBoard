@@ -13,7 +13,7 @@ import (
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/sse"
 	"ideaboard/api/internal/platform/validation"
-	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,7 +29,7 @@ const (
 )
 
 type MonitorInfoProvider interface {
-	GetMonitorInfo(ctx context.Context) (*queuetypes.MonitorInfo, error)
+	GetMonitorInfo(ctx context.Context) (*tasks.MonitorInfo, error)
 }
 
 type Handler struct {
@@ -44,11 +44,11 @@ type adminMonitorSnapshot struct {
 }
 
 type adminMonitorData struct {
-	GlobalQueueLen    int64                             `json:"global_queue_len"`
-	WaitQueueLen      int64                             `json:"wait_queue_len"`
-	RunningAttempts   int64                             `json:"running_attempts"`
-	AccountLoads      map[int64]*queuetypes.AccountLoad `json:"account_loads"`
-	ExecutionPressure []MonitorExecutionPressurePoint   `json:"execution_pressure"`
+	GlobalQueueLen    int64                           `json:"global_queue_len"`
+	WaitQueueLen      int64                           `json:"wait_queue_len"`
+	RunningAttempts   int64                           `json:"running_attempts"`
+	AccountLoads      map[int64]*tasks.AccountLoad    `json:"account_loads"`
+	ExecutionPressure []MonitorExecutionPressurePoint `json:"execution_pressure"`
 }
 
 func NewHandler(service *Service, monitor MonitorInfoProvider) *Handler {
@@ -139,11 +139,11 @@ func (h *Handler) buildMonitorSnapshot(ctx context.Context) (*adminMonitorSnapsh
 	return &adminMonitorSnapshot{Monitor: adminMonitorDataFromRuntime(info, pressure), Stats: stats}, nil
 }
 
-func adminMonitorDataFromRuntime(info *queuetypes.MonitorInfo, pressure []MonitorExecutionPressurePoint) *adminMonitorData {
+func adminMonitorDataFromRuntime(info *tasks.MonitorInfo, pressure []MonitorExecutionPressurePoint) *adminMonitorData {
 	if pressure == nil {
 		pressure = []MonitorExecutionPressurePoint{}
 	}
-	accountLoads := map[int64]*queuetypes.AccountLoad{}
+	accountLoads := map[int64]*tasks.AccountLoad{}
 	if info == nil {
 		return &adminMonitorData{
 			AccountLoads:      accountLoads,

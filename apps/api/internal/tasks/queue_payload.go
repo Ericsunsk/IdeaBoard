@@ -1,4 +1,4 @@
-package queuetypes
+package tasks
 
 // TaskPayload is the durable drawing task payload carried by River.
 type TaskPayload struct {

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import type { AuthAppConfig, AuthAppDependencies } from './auth-app.js'
-import { createAuthApp } from './auth-app.js'
-import type { AuthUserRepository, InternalAuthAPI } from './internal-routes.js'
+import type { AuthAppConfig, AuthAppDependencies } from './authApp.js'
+import { createAuthApp } from './authApp.js'
+import type { AuthUserRepository, InternalAuthAPI } from './internalRoutes.js'
 
 type TestOverrides = Omit<Partial<AuthAppDependencies>, 'authApi' | 'config' | 'repository'> & {
   authApi?: Partial<InternalAuthAPI>

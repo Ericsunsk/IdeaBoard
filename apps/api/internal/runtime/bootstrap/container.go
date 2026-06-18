@@ -20,15 +20,15 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/httpapi"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/runtime/webdist"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/taskservice"
 	"ideaboard/api/internal/taskstats"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/tasksubmission"
 	"ideaboard/api/internal/users"
-	"ideaboard/api/web"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -277,7 +277,7 @@ func (c *appContainer) close() error {
 }
 
 func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies, frontendOptions httpapi.FrontendRouteOptions) {
-	frontendFS, err := web.DistFS()
+	frontendFS, err := webdist.DistFS()
 	if err != nil {
 		slog.Warn("failed to load embedded frontend dist", "err", err)
 	}

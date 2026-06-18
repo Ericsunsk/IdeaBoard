@@ -44,8 +44,8 @@ export function useUsageStatisticsData() {
     },
   })
 
-  const adminStatistics = computed<AdminStatistics | null>(() =>
-    statisticsQuery.data.value?.data ?? null,
+  const adminStatistics = computed<AdminStatistics | null>(
+    () => statisticsQuery.data.value?.data ?? null,
   )
   const qualityStatistics = computed<AdminStatistics | null>(() =>
     isQualityRangeShared.value

@@ -16,8 +16,7 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/validation"
-	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
@@ -788,10 +787,10 @@ type recordingSubmissionStore struct {
 
 type submitCall struct {
 	task      *tasks.Task
-	queueTask *queuetypes.TaskPayload
+	queueTask *tasks.TaskPayload
 }
 
-func (s *recordingSubmissionStore) SubmitTask(_ context.Context, task *tasks.Task, queueTask *queuetypes.TaskPayload) error {
+func (s *recordingSubmissionStore) SubmitTask(_ context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) error {
 	if s.err != nil {
 		return s.err
 	}

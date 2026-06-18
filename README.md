@@ -327,6 +327,7 @@ IdeaBoard/
 │   └── api/                  # Go API、任务、Worker、服务逻辑
 │       └── internal/         # 领域包（accounts、channels、users、workflow 等）
 ├── docs/                     # 架构约束与补充文档
+├── deploy/                   # Nginx 等生产部署模板
 ├── docker/                   # 本地依赖与生产 Docker Compose
 ├── scripts/                  # 打包与部署脚本
 └── *.md                      # README、DEVELOPMENT、DEPLOYMENT、CHANGELOG
@@ -417,8 +418,8 @@ PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` �
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)                                 | Feature System Prompt 配置手册与推荐模板                 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、edge hardening、传统 Linux 部署、升级与回滚 |
 | [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)   | PostgreSQL backup、restore 与密钥材料处理规则            |
-| [docs/river_migration.md](./docs/river_migration.md)                   | River + PostgreSQL 任务队列迁移决策                      |
-| [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)     | Auth 运维边界与应急流程                                  |
+| [docs/river-migration.md](./docs/river-migration.md)                   | River + PostgreSQL 任务队列迁移决策                      |
+| [docs/auth-operation-runbook.md](./docs/auth-operation-runbook.md)     | Auth 运维边界与应急流程                                  |
 | [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束                                       |
 | [docker/README.md](./docker/README.md)                                 | Docker 本地依赖与生产 stack 说明                         |
 | [CHANGELOG.md](./CHANGELOG.md)                                         | 发布记录                                                 |
