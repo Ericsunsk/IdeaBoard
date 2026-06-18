@@ -134,7 +134,7 @@ func TestGoogleGeminiReadsRelativeWorkspaceUploadFromStorage(t *testing.T) {
 		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
 	}
 	providerReq := newProviderRequest("prompt", 64, 64, params, "gemini-3.1-flash-image-preview")
-	_, err := executor.callGoogleGeminiGenerateContent(context.Background(), &accounts.ApiAccount{ApiKey: "key"}, server.URL, providerReq, 5*time.Second, providerReq.Model)
+	_, err := executor.callGoogleGeminiGenerateContent(context.Background(), &accounts.ApiAccount{ApiKey: "key"}, server.URL, providerReq, 5*time.Second, readGoogleProviderParams(providerReq))
 	if err != nil {
 		t.Fatalf("callGoogleGeminiGenerateContent returned error: %v", err)
 	}

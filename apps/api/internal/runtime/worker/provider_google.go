@@ -122,8 +122,37 @@ func (p googleImagenPrediction) base64Data() string {
 	return ""
 }
 
+type googleProviderParams struct {
+	Model       string
+	UseImagen   bool
+	ImageRefs   []string
+	SampleCount int
+	AspectRatio string
+}
+
+func readGoogleProviderParams(providerReq providerRequest) googleProviderParams {
+	model := resolveGoogleProviderModel(providerReq.Params, providerReq.Model)
+	return googleProviderParams{
+		Model:       model,
+		UseImagen:   isGoogleImagenModel(model),
+		ImageRefs:   providerReq.MediaRefs.GoogleImages,
+		SampleCount: parseGoogleSampleCount(providerReq.Params),
+		AspectRatio: parseGoogleAspectRatioValue(providerReq.Params),
+	}
+}
+
+func resolveGoogleProviderModel(params map[string]interface{}, resolvedModel string) string {
+	if strings.TrimSpace(resolvedModel) != "" {
+		return normalizeGoogleModelName(resolvedModel)
+	}
+	if fromParams, ok := workflow.ReadWorkflowStringParam(params, "model"); ok && strings.TrimSpace(fromParams) != "" {
+		return normalizeGoogleModelName(fromParams)
+	}
+	return ""
+}
+
 func (c *ProviderExecutor) callGoogleAI(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
-	req := newProviderRequest(prompt, 0, 0, params, resolvedModel)
+	req := newProviderTaskParamsFromProviderMap(params).providerRequestWithSize(prompt, 0, 0, resolvedModel)
 	return c.callGoogleAIWithRequest(ctx, account, req, timeout)
 }
 
@@ -138,22 +167,18 @@ func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account 
 	}
 	baseURL = validatedBaseURL
 
-	requestedModel, useImagen := resolveGoogleModel(providerReq.Params, providerReq.Model)
-	if useImagen {
-		if len(providerReq.MediaRefs.GoogleImages) > 0 {
+	googleParams := readGoogleProviderParams(providerReq)
+	if googleParams.UseImagen {
+		if len(googleParams.ImageRefs) > 0 {
 			return providerCallResult{}, errors.New("google imagen 当前不支持图像参考输入，请选择 gemini 图像模型")
 		}
-		return c.callGoogleImagenPredict(ctx, account, baseURL, providerReq, timeout, requestedModel)
+		return c.callGoogleImagenPredict(ctx, account, baseURL, providerReq, timeout, googleParams)
 	}
-	return c.callGoogleGeminiGenerateContent(ctx, account, baseURL, providerReq, timeout, requestedModel)
+	return c.callGoogleGeminiGenerateContent(ctx, account, baseURL, providerReq, timeout, googleParams)
 }
 
 func resolveGoogleModel(params map[string]interface{}, resolvedModel string) (model string, useImagen bool) {
-	if strings.TrimSpace(resolvedModel) != "" {
-		model = normalizeGoogleModelName(resolvedModel)
-	} else if fromParams, ok := workflow.ReadWorkflowStringParam(params, "model"); ok && strings.TrimSpace(fromParams) != "" {
-		model = normalizeGoogleModelName(fromParams)
-	}
+	model = resolveGoogleProviderModel(params, resolvedModel)
 	return model, isGoogleImagenModel(model)
 }
 
@@ -183,11 +208,11 @@ func hasGoogleAPIVersionPath(baseURL string) bool {
 	return strings.HasSuffix(strings.TrimRight(parsed.EscapedPath(), "/"), googleAPIVersionPath)
 }
 
-func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, requestedModel string) (providerCallResult, error) {
-	model := strings.TrimSpace(requestedModel)
+func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, googleParams googleProviderParams) (providerCallResult, error) {
+	model := strings.TrimSpace(googleParams.Model)
 
 	parts := []googleGeminiPart{{Text: providerReq.Prompt}}
-	inlineParts, err := c.collectGoogleInlineImageParts(ctx, providerReq, timeout)
+	inlineParts, err := c.collectGoogleInlineImageParts(ctx, googleParams.ImageRefs, timeout)
 	if err != nil {
 		return providerCallResult{}, err
 	}
@@ -246,8 +271,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	}, nil
 }
 
-func (c *ProviderExecutor) collectGoogleInlineImageParts(ctx context.Context, providerReq providerRequest, timeout time.Duration) ([]googleGeminiPart, error) {
-	refs := providerReq.MediaRefs.GoogleImages
+func (c *ProviderExecutor) collectGoogleInlineImageParts(ctx context.Context, refs []string, timeout time.Duration) ([]googleGeminiPart, error) {
 	if len(refs) == 0 {
 		return nil, nil
 	}
@@ -366,19 +390,18 @@ func extractGoogleGeminiImageResponses(respBody []byte) ([]string, error) {
 	return urls, nil
 }
 
-func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, requestedModel string) (providerCallResult, error) {
-	model := strings.TrimSpace(requestedModel)
-	sampleCount := parseGoogleSampleCount(providerReq.Params)
+func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, googleParams googleProviderParams) (providerCallResult, error) {
+	model := strings.TrimSpace(googleParams.Model)
 	reqBody := googleImagenRequest{
 		Instances: []googleImagenInstance{
 			{Prompt: providerReq.Prompt},
 		},
 		Parameters: googleImagenParameters{
-			SampleCount: sampleCount,
+			SampleCount: googleParams.SampleCount,
 		},
 	}
-	if ratio, ok := parseGoogleAspectRatio(providerReq.Params); ok {
-		reqBody.Parameters.AspectRatio = ratio
+	if googleParams.AspectRatio != "" {
+		reqBody.Parameters.AspectRatio = googleParams.AspectRatio
 	}
 
 	endpoint := buildGoogleModelEndpoint(baseURL, model, "predict")
@@ -393,7 +416,7 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", account.ApiKey)
 
-	slog.Info("Google Imagen request", "endpoint", redactLogURL(endpoint), "model", model, "sample_count", sampleCount)
+	slog.Info("Google Imagen request", "endpoint", redactLogURL(endpoint), "model", model, "sample_count", googleParams.SampleCount)
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -474,19 +497,24 @@ func parseGoogleSampleCount(params map[string]interface{}) int {
 }
 
 func parseGoogleAspectRatio(params map[string]interface{}) (string, bool) {
+	ratio := parseGoogleAspectRatioValue(params)
+	return ratio, ratio != ""
+}
+
+func parseGoogleAspectRatioValue(params map[string]interface{}) string {
 	if params == nil {
-		return "", false
+		return ""
 	}
 	raw, ok := workflow.ReadWorkflowStringParam(params, "ratio")
 	if !ok {
-		return "", false
+		return ""
 	}
 	ratio := strings.TrimSpace(raw)
 	switch ratio {
 	case "1:1", "16:9", "9:16", "3:4", "4:3":
-		return ratio, true
+		return ratio
 	default:
-		return "", false
+		return ""
 	}
 }
 

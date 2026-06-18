@@ -37,6 +37,59 @@ type localRedrawContext struct {
 	allowHosts  []string
 }
 
+type localRedrawRequest struct {
+	FeatureSlug string
+	OriginalRef string
+	MaskRef     string
+}
+
+type localRedrawUpstreamPatch struct {
+	ROIDataURL string
+	ROI        image.Rectangle
+}
+
+func readLocalRedrawRequest(params map[string]interface{}) (localRedrawRequest, bool, error) {
+	if params == nil {
+		return localRedrawRequest{}, false, nil
+	}
+	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
+	if !ok || featureSlug != workflow.FeatureSlugPartialEdit {
+		return localRedrawRequest{}, false, nil
+	}
+	maskRef, ok := readLocalRedrawMaskRef(params)
+	if !ok {
+		return localRedrawRequest{}, false, nil
+	}
+	originalRef, ok := readLocalRedrawOriginalImageRef(params)
+	if !ok {
+		return localRedrawRequest{}, true, fmt.Errorf("local redraw 缺少原图: feature=%s", featureSlug)
+	}
+	return localRedrawRequest{
+		FeatureSlug: featureSlug,
+		OriginalRef: originalRef,
+		MaskRef:     maskRef,
+	}, true, nil
+}
+
+func (p localRedrawUpstreamPatch) apply(params map[string]interface{}) error {
+	if params == nil {
+		return fmt.Errorf("local redraw 参数为空")
+	}
+	if strings.TrimSpace(p.ROIDataURL) == "" {
+		return fmt.Errorf("local redraw ROI 为空")
+	}
+	if p.ROI.Empty() {
+		return fmt.Errorf("local redraw ROI 尺寸无效")
+	}
+	params["image_urls"] = toInterfaceSlice([]string{p.ROIDataURL})
+	params["image_url"] = p.ROIDataURL
+	params["original_image_url"] = p.ROIDataURL
+	params["custom_width"] = float64(p.ROI.Dx())
+	params["custom_height"] = float64(p.ROI.Dy())
+	stripLocalRedrawMaskParams(params)
+	return nil
+}
+
 type maskCoverageSampler struct {
 	mask         image.Image
 	maskBounds   image.Rectangle
@@ -69,54 +122,49 @@ func (s maskCoverageSampler) coverageAt(x, y int) uint8 {
 }
 
 func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, account *accounts.ApiAccount, params map[string]interface{}, timeout time.Duration) (*localRedrawContext, error) {
-	if !shouldUseLocalRedrawPipeline(params) {
+	redrawReq, ok, err := readLocalRedrawRequest(params)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, nil
-	}
-	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
-	originalRef, ok := readLocalRedrawOriginalImageRef(params)
-	if !ok {
-		return nil, fmt.Errorf("local redraw 缺少原图: feature=%s", featureSlug)
-	}
-	maskRef, ok := readLocalRedrawMaskRef(params)
-	if !ok {
-		return nil, fmt.Errorf("local redraw 缺少蒙版: feature=%s", featureSlug)
 	}
 
 	allowHosts := trustedImageDownloadHosts(account)
-	originalImage, err := c.loadImageFromRef(ctx, originalRef, timeout, allowHosts)
+	originalImage, err := c.loadImageFromRef(ctx, redrawReq.OriginalRef, timeout, allowHosts)
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 读取原图失败: feature=%s err=%w", featureSlug, err)
+		return nil, fmt.Errorf("local redraw 读取原图失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
 	}
-	maskImage, err := c.loadImageFromRef(ctx, maskRef, timeout, allowHosts)
+	maskImage, err := c.loadImageFromRef(ctx, redrawReq.MaskRef, timeout, allowHosts)
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 读取蒙版失败: feature=%s err=%w", featureSlug, err)
+		return nil, fmt.Errorf("local redraw 读取蒙版失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
 	}
 
 	originalNRGBA := cloneImageToNRGBA(originalImage)
 	if originalNRGBA.Bounds().Dx() == 0 || originalNRGBA.Bounds().Dy() == 0 {
-		return nil, fmt.Errorf("local redraw 原图尺寸无效: feature=%s", featureSlug)
+		return nil, fmt.Errorf("local redraw 原图尺寸无效: feature=%s", redrawReq.FeatureSlug)
 	}
 
 	sampler, bbox, err := buildLocalRedrawMaskSampler(maskImage, originalNRGBA.Bounds())
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 计算蒙版区域失败: feature=%s err=%w", featureSlug, err)
+		return nil, fmt.Errorf("local redraw 计算蒙版区域失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
 	}
 	roi, err := expandBBoxWithPadding(bbox, originalNRGBA.Bounds())
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 裁剪区域无效: feature=%s err=%w", featureSlug, err)
+		return nil, fmt.Errorf("local redraw 裁剪区域无效: feature=%s err=%w", redrawReq.FeatureSlug, err)
 	}
 	roiDataURL, err := encodeROIToDataURL(originalNRGBA, roi)
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 裁剪 ROI 失败: feature=%s err=%w", featureSlug, err)
+		return nil, fmt.Errorf("local redraw 裁剪 ROI 失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
 	}
 
-	if err := rewriteLocalRedrawUpstreamInputs(params, featureSlug, roiDataURL, roi); err != nil {
+	patch := localRedrawUpstreamPatch{ROIDataURL: roiDataURL, ROI: roi}
+	if err := patch.apply(params); err != nil {
 		return nil, err
 	}
-	stripLocalRedrawMaskParams(params)
 
 	return &localRedrawContext{
-		featureSlug: featureSlug,
+		featureSlug: redrawReq.FeatureSlug,
 		original:    originalNRGBA,
 		maskSampler: sampler,
 		roi:         roi,
@@ -184,18 +232,8 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 }
 
 func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
-	if params == nil {
-		return false
-	}
-	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
-	if !ok {
-		return false
-	}
-	if featureSlug != workflow.FeatureSlugPartialEdit {
-		return false
-	}
-	_, hasMask := readLocalRedrawMaskRef(params)
-	return hasMask
+	_, ok, err := readLocalRedrawRequest(params)
+	return err == nil && ok
 }
 
 func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, bool) {
@@ -223,15 +261,6 @@ func readLocalRedrawMaskRef(params map[string]interface{}) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func rewriteLocalRedrawUpstreamInputs(params map[string]interface{}, featureSlug, roiDataURL string, roi image.Rectangle) error {
-	params["image_urls"] = toInterfaceSlice([]string{roiDataURL})
-	params["image_url"] = roiDataURL
-	params["original_image_url"] = roiDataURL
-	params["custom_width"] = float64(roi.Dx())
-	params["custom_height"] = float64(roi.Dy())
-	return nil
 }
 
 func stripLocalRedrawMaskParams(params map[string]interface{}) {

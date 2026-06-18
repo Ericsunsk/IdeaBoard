@@ -122,13 +122,12 @@ func TestRewriteLocalRedrawUpstreamInputsKeepsSingleImageURLSemantic(t *testing.
 		},
 	}
 
-	if err := rewriteLocalRedrawUpstreamInputs(
-		params,
-		"partial-edit",
-		"data:image/png;base64,roi",
-		image.Rect(0, 0, 64, 72),
-	); err != nil {
-		t.Fatalf("rewriteLocalRedrawUpstreamInputs: %v", err)
+	patch := localRedrawUpstreamPatch{
+		ROIDataURL: "data:image/png;base64,roi",
+		ROI:        image.Rect(0, 0, 64, 72),
+	}
+	if err := patch.apply(params); err != nil {
+		t.Fatalf("localRedrawUpstreamPatch.apply: %v", err)
 	}
 
 	imageURLs, ok := params["image_urls"].([]interface{})

@@ -220,7 +220,7 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		return providerExecutionConfig{}, err
 	}
 
-	params := c.parseAndNormalizeTaskParams(task)
+	taskParams := c.parseAndNormalizeTaskParams(task)
 	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
 	if !ok {
 		return providerExecutionConfig{}, newExecutionFailureError(
@@ -231,18 +231,12 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 	}
 
 	timeout := resolveAccountTimeout(account)
-	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, params, timeout)
+	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, taskParams.Provider, timeout)
 	if redrawErr != nil {
 		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, redrawErr)
 	}
 
-	featureSlug := ""
-	if params != nil {
-		if slug, err := workflow.ResolveWorkflowFeatureSlug(params); err == nil {
-			featureSlug = slug
-		}
-	}
-	resolvedAccountModel, ok := resolveAccountModelForExecution(account, featureSlug, params, assignment.ResolvedModel)
+	resolvedAccountModel, ok := resolveAccountModelForExecution(account, taskParams, assignment.ResolvedModel)
 	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
 	if !ok || resolvedModel == "" {
 		return providerExecutionConfig{}, newExecutionFailureError(
@@ -252,13 +246,12 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		)
 	}
 
-	width, height := parseSizeFromParams(params)
 	return providerExecutionConfig{
 		APIType:        apiType,
 		ChannelName:    channelName,
 		Timeout:        timeout,
 		LocalRedrawCtx: localRedrawCtx,
-		Request:        newProviderRequest(task.Prompt, width, height, params, resolvedModel),
+		Request:        taskParams.providerRequest(task.Prompt, resolvedModel),
 	}, nil
 }
 
@@ -287,14 +280,14 @@ func (c *ProviderExecutor) applyAccountChannelEndpoint(ctx context.Context, acco
 	return channel.Name, nil
 }
 
-func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *queuetypes.TaskPayload) map[string]interface{} {
+func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *queuetypes.TaskPayload) providerTaskParams {
 	typedParams, err := tasks.UnmarshalParams(task.Params)
 	if err != nil {
 		slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
-		return nil
+		return providerTaskParams{}
 	}
-	params := workflow.BuildProviderTaskParams(typedParams)
-	c.normalizeUpstreamMediaParams(params)
+	params := newProviderTaskParams(typedParams)
+	c.normalizeUpstreamMediaParams(params.Provider)
 	return params
 }
 
@@ -318,11 +311,11 @@ func marshalProviderTaskResult(taskID string, result map[string]interface{}) (st
 	return string(resultJSON), nil
 }
 
-func resolveAccountModelForExecution(account *accounts.ApiAccount, featureSlug string, params map[string]interface{}, assignedModel string) (accounts.AccountModel, bool) {
+func resolveAccountModelForExecution(account *accounts.ApiAccount, params providerTaskParams, assignedModel string) (accounts.AccountModel, bool) {
 	if model := strings.TrimSpace(assignedModel); model != "" {
-		return accounts.ResolveAccountModel(account, featureSlug, model)
+		return accounts.ResolveAccountModel(account, params.featureSlug(), model)
 	}
-	return accounts.ResolveAccountModelForParams(account, featureSlug, params)
+	return accounts.ResolveAccountModel(account, params.featureSlug(), params.requestedModel())
 }
 
 func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, []tasks.TaskOutput, error) {

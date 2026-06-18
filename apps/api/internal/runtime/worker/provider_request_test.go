@@ -55,13 +55,12 @@ func TestProviderRequestAfterLocalRedrawKeepsOpenAIROIInput(t *testing.T) {
 			"https://cdn.example/ref-a.png",
 		},
 	}
-	if err := rewriteLocalRedrawUpstreamInputs(
-		params,
-		"partial-edit",
-		"data:image/png;base64,roi",
-		image.Rect(0, 0, 64, 72),
-	); err != nil {
-		t.Fatalf("rewriteLocalRedrawUpstreamInputs: %v", err)
+	patch := localRedrawUpstreamPatch{
+		ROIDataURL: "data:image/png;base64,roi",
+		ROI:        image.Rect(0, 0, 64, 72),
+	}
+	if err := patch.apply(params); err != nil {
+		t.Fatalf("localRedrawUpstreamPatch.apply: %v", err)
 	}
 
 	req := newProviderRequest("prompt", 64, 72, params, "gpt-image-1")
@@ -102,16 +101,19 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 		Params: raw,
 	})
 
-	if !reflect.DeepEqual(got["image_urls"], []string{"https://img.example/source.png"}) {
-		t.Fatalf("image_urls = %#v", got["image_urls"])
+	if got.featureSlug() != "image-extend" {
+		t.Fatalf("feature slug = %q", got.featureSlug())
 	}
-	if got["custom_width"] != float64(640) || got["custom_height"] != float64(480) {
-		t.Fatalf("custom size = %#v x %#v", got["custom_width"], got["custom_height"])
+	if !reflect.DeepEqual(got.Provider["image_urls"], []string{"https://img.example/source.png"}) {
+		t.Fatalf("image_urls = %#v", got.Provider["image_urls"])
 	}
-	if got["extend_right"] != float64(20) {
-		t.Fatalf("extend_right = %#v, want 20", got["extend_right"])
+	if got.Provider["custom_width"] != float64(640) || got.Provider["custom_height"] != float64(480) {
+		t.Fatalf("custom size = %#v x %#v", got.Provider["custom_width"], got.Provider["custom_height"])
 	}
-	if _, exists := got["media"]; exists {
-		t.Fatalf("provider map should not expose canonical media object: %#v", got)
+	if got.Provider["extend_right"] != float64(20) {
+		t.Fatalf("extend_right = %#v, want 20", got.Provider["extend_right"])
+	}
+	if _, exists := got.Provider["media"]; exists {
+		t.Fatalf("provider map should not expose canonical media object: %#v", got.Provider)
 	}
 }

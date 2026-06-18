@@ -43,6 +43,112 @@ type openAIImageRequestBody struct {
 	Extra     map[string]interface{}
 }
 
+type openAIProviderParams struct {
+	FeatureSlug     string
+	EditImageRefs   []string
+	MaskImageRef    string
+	SharedExtras    map[string]interface{}
+	HDOutputQuality *int
+}
+
+type openAIRequestFinalizer struct {
+	FeatureSlug string
+}
+
+func (f openAIRequestFinalizer) apply(reqBody *openAIImageRequestBody) {
+	if reqBody == nil {
+		return
+	}
+	f.dropSingleImageFallbackForMultipleInputs(reqBody)
+	f.dropRedundantDataURLImageList(reqBody)
+	f.dropRedundantStyleVariationOriginalRef(reqBody)
+}
+
+func (f openAIRequestFinalizer) dropSingleImageFallbackForMultipleInputs(reqBody *openAIImageRequestBody) {
+	if len(reqBody.ImageURLs) > 1 {
+		reqBody.Image = ""
+	}
+}
+
+func (f openAIRequestFinalizer) dropRedundantDataURLImageList(reqBody *openAIImageRequestBody) {
+	image := reqBody.Image
+	if image == "" || !strings.HasPrefix(image, "data:") {
+		return
+	}
+	if len(reqBody.ImageURLs) == 1 && reqBody.ImageURLs[0] == image {
+		reqBody.ImageURLs = nil
+	}
+}
+
+func (f openAIRequestFinalizer) dropRedundantStyleVariationOriginalRef(reqBody *openAIImageRequestBody) {
+	if f.FeatureSlug != workflow.FeatureSlugStyleVariation {
+		return
+	}
+	image := reqBody.Image
+	if image == "" || !strings.HasPrefix(image, "data:") {
+		return
+	}
+	if original, ok := reqBody.Extra["original_image_url"].(string); ok && original == image {
+		delete(reqBody.Extra, "original_image_url")
+	}
+}
+
+func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams {
+	params := providerReq.Params
+	out := openAIProviderParams{
+		EditImageRefs: normalizeOpenAIImageURLStrings(providerReq.MediaRefs.OpenAIImages),
+		SharedExtras:  readOpenAISharedExtras(params),
+	}
+	if params == nil {
+		return out
+	}
+	out.FeatureSlug, _ = workflow.ReadWorkflowStringParam(params, "feature")
+	if maskURL, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
+		out.MaskImageRef = strings.TrimSpace(maskURL)
+	}
+	if out.FeatureSlug == workflow.FeatureSlugHDUpscale {
+		if hd, ok := workflow.ReadHDUpscalePromptContract(params); ok {
+			quality := resolveOpenAIHDUpscaleOutputQuality(hd.ClarityStrength)
+			out.HDOutputQuality = &quality
+		}
+	}
+	return out
+}
+
+func readOpenAISharedExtras(params map[string]interface{}) map[string]interface{} {
+	extras := map[string]interface{}{}
+	for _, key := range openAISharedAllowedParamKeys() {
+		if v, ok := params[key]; ok {
+			extras[key] = v
+		}
+	}
+	return extras
+}
+
+func (p openAIProviderParams) useEditEndpoint() bool {
+	if len(p.EditImageRefs) == 0 {
+		return false
+	}
+	switch p.FeatureSlug {
+	case workflow.FeatureSlugImageExtend,
+		workflow.FeatureSlugPartialEdit,
+		workflow.FeatureSlugRemoveBg,
+		workflow.FeatureSlugStyleFusion:
+		return true
+	default:
+		return false
+	}
+}
+
+func (p openAIProviderParams) applySharedExtras(reqBody *openAIImageRequestBody) {
+	for key, value := range p.SharedExtras {
+		reqBody.setExtra(key, value)
+	}
+	if p.HDOutputQuality != nil {
+		reqBody.setExtra("output_quality", *p.HDOutputQuality)
+	}
+}
+
 func newOpenAIImageRequestBody(providerReq providerRequest) openAIImageRequestBody {
 	return openAIImageRequestBody{
 		Model:  providerReq.Model,
@@ -94,7 +200,7 @@ func (b *openAIImageRequestBody) setExtra(key string, value interface{}) {
 
 // callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）
 func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
-	req := newProviderRequest(prompt, width, height, params, resolvedModel)
+	req := newProviderTaskParamsFromProviderMap(params).providerRequestWithSize(prompt, width, height, resolvedModel)
 	return c.callOpenAIWithRequest(ctx, account, req, timeout)
 }
 
@@ -112,18 +218,19 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	model := strings.TrimSpace(providerReq.Model)
 
 	size := providerReq.Size
-	useEditEndpoint := shouldUseOpenAIEditEndpoint(providerReq.Params)
+	openAIParams := readOpenAIProviderParams(providerReq)
+	useEditEndpoint := openAIParams.useEditEndpoint()
 	imageInputCount := len(providerReq.MediaRefs.OpenAIImages)
-	featureSlug, _ := workflow.ReadWorkflowStringParam(providerReq.Params, "feature")
+	featureSlug := openAIParams.FeatureSlug
 
 	reqBody := newOpenAIImageRequestBody(providerReq)
 
 	if useEditEndpoint {
-		appendOpenAIEditParams(&reqBody, providerReq)
+		appendOpenAIEditParams(&reqBody, providerReq, openAIParams)
 	} else {
-		appendOpenAIAllowedParams(&reqBody, providerReq)
+		appendOpenAIAllowedParams(&reqBody, providerReq, openAIParams)
 	}
-	finalizeOpenAIRequestBody(&reqBody, providerReq.Params)
+	finalizeOpenAIRequestBody(&reqBody, openAIParams)
 
 	// 如果 ProxyURL 已包含 /v1，则不再拼接 /v1
 	endpoint := baseURL + "/v1/images/generations"
@@ -406,12 +513,12 @@ func openAIImageURLRefs(refs []string) []openAIImageURLRef {
 	return out
 }
 
-func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq providerRequest) {
+func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq providerRequest, openAIParams openAIProviderParams) {
 	if providerReq.Params == nil {
 		return
 	}
 
-	if imageURLs := normalizeOpenAIImageURLStrings(providerReq.MediaRefs.OpenAIImages); len(imageURLs) > 0 {
+	if imageURLs := openAIParams.EditImageRefs; len(imageURLs) > 0 {
 		// 默认保留首图 image 字段以兼容部分只接收单图的上游实现。
 		// 但多图输入必须避免回退成单图字段，防止上游优先读取首图导致退化。
 		if len(imageURLs) == 1 {
@@ -420,12 +527,7 @@ func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq prov
 		reqBody.ImageURLs = imageURLs
 	}
 
-	for _, key := range openAISharedAllowedParamKeys() {
-		if v, ok := providerReq.Params[key]; ok {
-			reqBody.setExtra(key, v)
-		}
-	}
-	appendOpenAIHDUpscaleDerivedParams(reqBody, providerReq.Params)
+	openAIParams.applySharedExtras(reqBody)
 }
 
 func openAISharedAllowedParamKeys() []string {
@@ -439,62 +541,21 @@ func openAISharedAllowedParamKeys() []string {
 	}
 }
 
-func appendOpenAIHDUpscaleDerivedParams(reqBody *openAIImageRequestBody, params map[string]interface{}) {
-	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
-	if featureSlug != workflow.FeatureSlugHDUpscale {
-		return
-	}
-	hd, ok := workflow.ReadHDUpscalePromptContract(params)
-	if !ok {
-		return
-	}
-	reqBody.setExtra("output_quality", resolveOpenAIHDUpscaleOutputQuality(hd.ClarityStrength))
-}
-
 func resolveOpenAIHDUpscaleOutputQuality(clarityStrength float64) int {
 	clarityStrength = math.Max(0, math.Min(100, math.Round(clarityStrength)))
 	return int(math.Max(60, math.Min(100, math.Round(60+clarityStrength*0.4))))
 }
 
-func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, params map[string]interface{}) {
-	if reqBody == nil || params == nil {
-		return
-	}
-	// 兜底保护：当 image_urls 已是多图时，确保不会携带退化的单图 image 字段。
-	if len(reqBody.ImageURLs) > 1 {
-		reqBody.Image = ""
-	}
-	image := reqBody.Image
-	if image == "" || !strings.HasPrefix(image, "data:") {
-		return
-	}
-	if len(reqBody.ImageURLs) == 1 && reqBody.ImageURLs[0] == image {
-		reqBody.ImageURLs = nil
-	}
-	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
-	if featureSlug != workflow.FeatureSlugStyleVariation {
-		return
-	}
-	if original, ok := reqBody.Extra["original_image_url"].(string); ok && original == image {
-		delete(reqBody.Extra, "original_image_url")
-	}
+func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, openAIParams openAIProviderParams) {
+	openAIRequestFinalizer{FeatureSlug: openAIParams.FeatureSlug}.apply(reqBody)
 }
 
 func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
-	if len(collectOpenAIEditImageRefs(params)) == 0 {
-		return false
+	providerReq := providerRequest{
+		Params:    params,
+		MediaRefs: collectProviderMediaRefs(params),
 	}
-	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
-	if !ok {
-		return false
-	}
-	if featureSlug == workflow.FeatureSlugImageExtend ||
-		featureSlug == workflow.FeatureSlugPartialEdit ||
-		featureSlug == workflow.FeatureSlugRemoveBg ||
-		featureSlug == workflow.FeatureSlugStyleFusion {
-		return true
-	}
-	return false
+	return readOpenAIProviderParams(providerReq).useEditEndpoint()
 }
 
 func trustedOpenAIAssetHosts() []string {
@@ -520,23 +581,18 @@ func normalizeOpenAIImageURLStrings(refs []string) []string {
 	return urls
 }
 
-func appendOpenAIEditParams(reqBody *openAIImageRequestBody, providerReq providerRequest) {
+func appendOpenAIEditParams(reqBody *openAIImageRequestBody, providerReq providerRequest, openAIParams openAIProviderParams) {
 	if providerReq.Params == nil {
 		return
 	}
-	if refs := openAIImageURLRefs(providerReq.MediaRefs.OpenAIImages); len(refs) > 0 {
+	if refs := openAIImageURLRefs(openAIParams.EditImageRefs); len(refs) > 0 {
 		reqBody.Images = refs
 	}
-	if maskURL, ok := workflow.ReadWorkflowStringParam(providerReq.Params, "mask_image_url"); ok {
-		reqBody.Mask = &openAIImageURLRef{ImageURL: maskURL}
+	if openAIParams.MaskImageRef != "" {
+		reqBody.Mask = &openAIImageURLRef{ImageURL: openAIParams.MaskImageRef}
 	}
 
-	allowedKeys := openAISharedAllowedParamKeys()
-	for _, key := range allowedKeys {
-		if v, ok := providerReq.Params[key]; ok {
-			reqBody.setExtra(key, v)
-		}
-	}
+	openAIParams.applySharedExtras(reqBody)
 }
 
 func collectOpenAIEditImageRefs(params map[string]interface{}) []string {
