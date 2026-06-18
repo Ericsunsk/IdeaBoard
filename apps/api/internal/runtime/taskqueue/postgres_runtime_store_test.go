@@ -30,6 +30,7 @@ func TestPostgresTaskRuntimeStoreGetAccountLoadInfoUsesRunningTaskAttempts(t *te
 	load := loads[accountID]
 	if load == nil {
 		t.Fatalf("account load for %d missing: %+v", accountID, loads)
+		return
 	}
 	if load.CurrentConcurrent != 1 {
 		t.Fatalf("current concurrent=%d, want running task attempt count 1", load.CurrentConcurrent)
@@ -53,6 +54,7 @@ func TestPostgresTaskRuntimeStoreUsesAccountMaxConcurrentLimit(t *testing.T) {
 	load := loads[accountID]
 	if load == nil {
 		t.Fatalf("account load for %d missing: %+v", accountID, loads)
+		return
 	}
 	if load.MaxConcurrent != accountlimits.MaxMaxConcurrent {
 		t.Fatalf("max concurrent=%d, want configured limit %d", load.MaxConcurrent, accountlimits.MaxMaxConcurrent)

@@ -177,11 +177,6 @@ func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account 
 	return c.callGoogleGeminiGenerateContent(ctx, account, baseURL, providerReq, timeout, googleParams)
 }
 
-func resolveGoogleModel(params map[string]interface{}, resolvedModel string) (model string, useImagen bool) {
-	model = resolveGoogleProviderModel(params, resolvedModel)
-	return model, isGoogleImagenModel(model)
-}
-
 func normalizeGoogleModelName(model string) string {
 	trimmed := strings.TrimSpace(model)
 	return strings.TrimPrefix(trimmed, "models/")
@@ -494,11 +489,6 @@ func parseGoogleSampleCount(params map[string]interface{}) int {
 		}
 	}
 	return 1
-}
-
-func parseGoogleAspectRatio(params map[string]interface{}) (string, bool) {
-	ratio := parseGoogleAspectRatioValue(params)
-	return ratio, ratio != ""
 }
 
 func parseGoogleAspectRatioValue(params map[string]interface{}) string {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/tasks"
 )
 
@@ -115,6 +116,72 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 	}
 	if _, exists := got.Provider["media"]; exists {
 		t.Fatalf("provider map should not expose canonical media object: %#v", got.Provider)
+	}
+}
+
+func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
+	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       "style-fusion",
+		Model:         "gpt-image-1",
+		Media: &tasks.MediaInputs{
+			Inputs: []tasks.MediaRef{
+				{URL: "https://img.example/a.png", Role: "input", Weight: 0.75},
+				{URL: "https://img.example/b.png", Role: "input", Weight: 0.25},
+			},
+			References: []tasks.MediaRef{
+				{URL: "https://img.example/ref.png", Role: "reference"},
+			},
+		},
+		Controls: &tasks.GenerationControls{
+			CustomWidth:  512,
+			CustomHeight: 768,
+		},
+		Fusion: &tasks.StyleFusionParams{
+			Mode:         "weighted_reference",
+			InputWeights: []float64{0.75, 0.25},
+		},
+	})
+	if err != nil {
+		t.Fatalf("MarshalParams: %v", err)
+	}
+	submitted := &queuetypes.TaskPayload{
+		TaskID:     "task-river-contract",
+		UserID:     42,
+		Prompt:     "融合两张图",
+		Params:     raw,
+		AccountIDs: []int64{101},
+	}
+	encoded, err := taskqueue.EncodeRiverPayload(submitted)
+	if err != nil {
+		t.Fatalf("EncodeRiverPayload: %v", err)
+	}
+	decoded, err := taskqueue.DecodeRiverPayload(encoded)
+	if err != nil {
+		t.Fatalf("DecodeRiverPayload: %v", err)
+	}
+
+	params := (&ProviderExecutor{}).parseAndNormalizeTaskParams(decoded)
+	req := params.providerRequest(decoded.Prompt, "gpt-image-1")
+
+	if req.Prompt != submitted.Prompt || req.Model != "gpt-image-1" || req.Size != "512x768" {
+		t.Fatalf("provider request = prompt:%q model:%q size:%q", req.Prompt, req.Model, req.Size)
+	}
+	if !reflect.DeepEqual(req.MediaRefs.OpenAIImages, []string{
+		"https://img.example/a.png",
+		"https://img.example/b.png",
+		"https://img.example/ref.png",
+	}) {
+		t.Fatalf("OpenAI refs=%#v", req.MediaRefs.OpenAIImages)
+	}
+	if !reflect.DeepEqual(req.Params["fusion_input_weights"], []float64{0.75, 0.25}) {
+		t.Fatalf("fusion_input_weights=%#v", req.Params["fusion_input_weights"])
+	}
+	if req.Params["feature"] != "style-fusion" {
+		t.Fatalf("feature=%#v, want style-fusion", req.Params["feature"])
+	}
+	if _, exists := req.Params["media"]; exists {
+		t.Fatalf("provider request should not expose canonical media object: %#v", req.Params)
 	}
 }
 

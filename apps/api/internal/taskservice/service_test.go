@@ -604,9 +604,33 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 	if len(submissionStore.calls) != 1 {
 		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
 	}
+	call := submissionStore.calls[0]
+	if call.queueTask.Params != call.task.Params {
+		t.Fatalf("queue params differ from task params: queue=%s task=%s", call.queueTask.Params, call.task.Params)
+	}
+	if call.queueTask.Prompt != call.task.Prompt {
+		t.Fatalf("queue prompt=%q, want task prompt=%q", call.queueTask.Prompt, call.task.Prompt)
+	}
 	var params map[string]interface{}
-	if err := json.Unmarshal([]byte(submissionStore.calls[0].task.Params), &params); err != nil {
+	if err := json.Unmarshal([]byte(call.task.Params), &params); err != nil {
 		t.Fatalf("unmarshal task params: %v", err)
+	}
+	typedParams, err := tasks.UnmarshalParams(call.queueTask.Params)
+	if err != nil {
+		t.Fatalf("unmarshal queue params: %v", err)
+	}
+	if typedParams.Feature != workflow.FeatureSlugStyleFusion {
+		t.Fatalf("typed feature=%q, want style-fusion", typedParams.Feature)
+	}
+	if typedParams.Media == nil || len(typedParams.Media.Inputs) != 2 {
+		t.Fatalf("typed media inputs=%#v, want two inputs", typedParams.Media)
+	}
+	if math.Abs(typedParams.Media.Inputs[0].Weight-2.0/3.0) > 0.000001 ||
+		math.Abs(typedParams.Media.Inputs[1].Weight-1.0/3.0) > 0.000001 {
+		t.Fatalf("typed media weights=%#v, want normalized 2:1", typedParams.Media.Inputs)
+	}
+	if typedParams.Fusion == nil || typedParams.Fusion.Mode != "weighted_reference" {
+		t.Fatalf("typed fusion=%#v, want weighted_reference", typedParams.Fusion)
 	}
 	fusion, ok := params["fusion"].(map[string]interface{})
 	if !ok {

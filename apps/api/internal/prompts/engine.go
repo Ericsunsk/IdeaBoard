@@ -55,14 +55,6 @@ func resolveFeaturePromptMergePolicy(featureSlug string) featurePromptMergePolic
 	return defaultFeaturePromptMergePolicy
 }
 
-func stringPromptBinding(placeholder string, paramKey string) promptTemplateBinding {
-	return promptTemplateBinding{
-		placeholder: placeholder,
-		paramKey:    paramKey,
-		formatter:   stringPromptValue,
-	}
-}
-
 func applyPromptTemplateBindings(
 	varMap map[string]string,
 	featureSlug string,

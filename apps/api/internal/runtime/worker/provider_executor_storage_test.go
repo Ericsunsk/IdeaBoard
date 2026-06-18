@@ -144,6 +144,7 @@ func TestGoogleGeminiReadsRelativeWorkspaceUploadFromStorage(t *testing.T) {
 	inline := gotRequest.Contents[0].Parts[1].InlineData
 	if inline == nil {
 		t.Fatalf("expected inline image part, got %#v", gotRequest.Contents[0].Parts[1])
+		return
 	}
 	if inline.normalizedMIMEType() != "image/png" {
 		t.Fatalf("inline mime=%q, want image/png", inline.normalizedMIMEType())

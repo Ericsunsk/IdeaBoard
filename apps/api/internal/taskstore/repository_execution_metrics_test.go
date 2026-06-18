@@ -59,6 +59,7 @@ func TestListAttachesExecutionMetrics(t *testing.T) {
 	metrics := items[0].ExecutionMetrics
 	if metrics == nil {
 		t.Fatal("execution_metrics missing from task list item")
+		return
 	}
 	if metrics.CurrentStage != nextStage {
 		t.Fatalf("current_stage=%q, want %q", metrics.CurrentStage, nextStage)
@@ -169,6 +170,7 @@ func TestPatchExecutionMetricsDoesNotOverwriteTerminalStage(t *testing.T) {
 	metrics := loaded.ExecutionMetrics
 	if metrics == nil {
 		t.Fatal("execution metrics missing")
+		return
 	}
 	if metrics.CurrentStage != terminalStage {
 		t.Fatalf("current_stage=%q, want terminal %q", metrics.CurrentStage, terminalStage)

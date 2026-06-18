@@ -60,6 +60,7 @@ func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 		}
 		if board == nil {
 			t.Fatalf("board is nil")
+			return
 		}
 		if board.BoardID != boardID {
 			t.Fatalf("board.BoardID = %q, want %q", board.BoardID, boardID)
@@ -74,6 +75,7 @@ func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 		}
 		if accessible == nil {
 			t.Fatal("accessible board is nil")
+			return
 		}
 		if accessible.Board.UserID != owner.ID {
 			t.Fatalf("accessible owner id = %d, want %d", accessible.Board.UserID, owner.ID)
