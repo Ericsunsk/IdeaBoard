@@ -29,6 +29,15 @@ type AuthUserManager interface {
 	RevokeUserSessions(ctx context.Context, authUserID string) error
 }
 
+type registrationSettingPayload struct {
+	Enabled bool `json:"enabled"`
+}
+
+type rateLimitSettingsPayload struct {
+	WindowSeconds int `json:"window_seconds"`
+	MaxRequests   int `json:"max_requests"`
+}
+
 type adminActionError struct {
 	status int
 	msg    string
@@ -60,17 +69,15 @@ func NewAdminHandler(userService *UserService, configRepo *settings.SystemConfig
 func (h *AdminHandler) GetRegistrationSetting(c *gin.Context) {
 	val, err := h.configRepo.Get(c.Request.Context(), "auth_registration_enabled")
 	if err != nil {
-		response.Success(c, gin.H{"enabled": false})
+		response.SuccessDTO(c, registrationSettingPayload{Enabled: false})
 		return
 	}
-	response.Success(c, gin.H{"enabled": val == "true"})
+	response.SuccessDTO(c, registrationSettingPayload{Enabled: val == "true"})
 }
 
 // UpdateRegistrationSetting 更新注册开关状态
 func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
-	var req struct {
-		Enabled bool `json:"enabled"`
-	}
+	var req registrationSettingPayload
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -86,7 +93,7 @@ func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"enabled": req.Enabled})
+	response.SuccessDTO(c, registrationSettingPayload{Enabled: req.Enabled})
 }
 
 // GetRateLimitSettings 获取频率限制设置
@@ -108,18 +115,12 @@ func (h *AdminHandler) GetRateLimitSettings(c *gin.Context) {
 		}
 	}
 
-	response.Success(c, gin.H{
-		"window_seconds": window,
-		"max_requests":   maxReq,
-	})
+	response.SuccessDTO(c, rateLimitSettingsPayload{WindowSeconds: window, MaxRequests: maxReq})
 }
 
 // UpdateRateLimitSettings 更新频率限制设置
 func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
-	var req struct {
-		WindowSeconds int `json:"window_seconds"`
-		MaxRequests   int `json:"max_requests"`
-	}
+	var req rateLimitSettingsPayload
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -143,7 +144,7 @@ func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, req)
+	response.SuccessDTO(c, req)
 }
 
 // ListUsers 获取用户列表

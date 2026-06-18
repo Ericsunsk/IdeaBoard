@@ -43,6 +43,38 @@ type boardShareTokenDTO struct {
 	ShareURL    string `json:"share_url,omitempty"`
 }
 
+type boardListResponse struct {
+	List []boardDTO `json:"list"`
+}
+
+type boardResponse struct {
+	Board boardDTO `json:"board"`
+}
+
+type boardDeleteResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+type boardMemberListResponse struct {
+	List []BoardMemberWithUser `json:"list"`
+}
+
+type boardMemberResponse struct {
+	Member *BoardMemberWithUser `json:"member"`
+}
+
+type boardShareTokenResponse struct {
+	Token boardShareTokenDTO `json:"token"`
+}
+
+type boardShareTokenListResponse struct {
+	List []boardShareTokenDTO `json:"list"`
+}
+
+type boardShareTokenRevokeResponse struct {
+	Revoked bool `json:"revoked"`
+}
+
 func NewBoardHandler(service *BoardService) *BoardHandler {
 	return &BoardHandler{service: service}
 }
@@ -62,7 +94,7 @@ func (h *BoardHandler) ListBoards(c *gin.Context) {
 	for _, board := range list {
 		result = append(result, toBoardDTO(board.Board, board.Role))
 	}
-	response.Success(c, gin.H{"list": result})
+	response.SuccessDTO(c, boardListResponse{List: result})
 }
 
 func (h *BoardHandler) UpsertBoard(c *gin.Context) {
@@ -102,7 +134,7 @@ func (h *BoardHandler) UpsertBoard(c *gin.Context) {
 		response.InternalError(c, 500, "更新画布失败", err)
 		return
 	}
-	response.Success(c, gin.H{"board": toBoardDTO(board.Board, board.Role)})
+	response.SuccessDTO(c, boardResponse{Board: toBoardDTO(board.Board, board.Role)})
 }
 
 func (h *BoardHandler) DeleteBoard(c *gin.Context) {
@@ -136,7 +168,7 @@ func (h *BoardHandler) DeleteBoard(c *gin.Context) {
 		response.InternalError(c, 500, "删除画布失败", err)
 		return
 	}
-	response.Success(c, gin.H{"deleted": true})
+	response.SuccessDTO(c, boardDeleteResponse{Deleted: true})
 }
 
 func (h *BoardHandler) ListMembers(c *gin.Context) {
@@ -151,7 +183,7 @@ func (h *BoardHandler) ListMembers(c *gin.Context) {
 		h.respondBoardMemberError(c, err, "获取成员列表失败")
 		return
 	}
-	response.Success(c, gin.H{"list": members})
+	response.SuccessDTO(c, boardMemberListResponse{List: members})
 }
 
 func (h *BoardHandler) InviteMember(c *gin.Context) {
@@ -171,7 +203,7 @@ func (h *BoardHandler) InviteMember(c *gin.Context) {
 		h.respondBoardMemberError(c, err, "邀请成员失败")
 		return
 	}
-	response.Success(c, gin.H{"member": member})
+	response.SuccessDTO(c, boardMemberResponse{Member: member})
 }
 
 func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
@@ -196,7 +228,7 @@ func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 		h.respondBoardMemberError(c, err, "更新成员角色失败")
 		return
 	}
-	response.Success(c, gin.H{"member": member})
+	response.SuccessDTO(c, boardMemberResponse{Member: member})
 }
 
 func (h *BoardHandler) RemoveMember(c *gin.Context) {
@@ -215,7 +247,7 @@ func (h *BoardHandler) RemoveMember(c *gin.Context) {
 		h.respondBoardMemberError(c, err, "移除成员失败")
 		return
 	}
-	response.Success(c, gin.H{"deleted": true})
+	response.SuccessDTO(c, boardDeleteResponse{Deleted: true})
 }
 
 func (h *BoardHandler) CreateShareToken(c *gin.Context) {
@@ -236,9 +268,7 @@ func (h *BoardHandler) CreateShareToken(c *gin.Context) {
 		return
 	}
 	baseURL := ResolvePublicBaseURL(requestScheme(c), c.Request.Host)
-	response.Success(c, gin.H{
-		"token": toBoardShareTokenDTO(*shareToken, baseURL),
-	})
+	response.SuccessDTO(c, boardShareTokenResponse{Token: toBoardShareTokenDTO(*shareToken, baseURL)})
 }
 
 func (h *BoardHandler) ListShareTokens(c *gin.Context) {
@@ -258,7 +288,7 @@ func (h *BoardHandler) ListShareTokens(c *gin.Context) {
 	for _, item := range list {
 		result = append(result, toBoardShareTokenDTO(item, baseURL))
 	}
-	response.Success(c, gin.H{"list": result})
+	response.SuccessDTO(c, boardShareTokenListResponse{List: result})
 }
 
 func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
@@ -277,7 +307,7 @@ func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
 		h.respondShareTokenError(c, err, "撤销分享链接失败")
 		return
 	}
-	response.Success(c, gin.H{"revoked": true})
+	response.SuccessDTO(c, boardShareTokenRevokeResponse{Revoked: true})
 }
 
 func (h *BoardHandler) JoinByShareToken(c *gin.Context) {
@@ -296,7 +326,7 @@ func (h *BoardHandler) JoinByShareToken(c *gin.Context) {
 		h.respondShareTokenError(c, err, "加入画布失败")
 		return
 	}
-	response.Success(c, gin.H{"board": toBoardDTO(board.Board, board.Role)})
+	response.SuccessDTO(c, boardResponse{Board: toBoardDTO(board.Board, board.Role)})
 }
 
 func (h *BoardHandler) respondBoardMemberError(c *gin.Context, err error, internalMessage string) {

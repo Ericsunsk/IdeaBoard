@@ -11,6 +11,10 @@ type AuthHandler struct {
 	userService *users.UserService
 }
 
+type currentUserResponse struct {
+	User *users.User `json:"user"`
+}
+
 func NewAuthHandler(userService *users.UserService) *AuthHandler {
 	return &AuthHandler{
 		userService: userService,
@@ -31,7 +35,5 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{
-		"user": user,
-	})
+	response.SuccessDTO(c, currentUserResponse{User: user})
 }

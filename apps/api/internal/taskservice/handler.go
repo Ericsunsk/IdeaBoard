@@ -46,6 +46,44 @@ type adminTaskDTO struct {
 	CancelReason      string                      `json:"cancel_reason"`
 }
 
+type submitTaskResponse struct {
+	TaskID string `json:"task_id"`
+}
+
+type submitTaskReadinessResponse struct {
+	Ready   bool   `json:"ready"`
+	Message string `json:"message,omitempty"`
+	Feature string `json:"feature,omitempty"`
+}
+
+type adminTaskResponse struct {
+	Task adminTaskDTO `json:"task"`
+}
+
+type adminTaskListResponse struct {
+	Total          int64          `json:"total"`
+	PendingCount   int64          `json:"pending_count"`
+	RunningCount   int64          `json:"running_count"`
+	CompletedCount int64          `json:"completed_count"`
+	FailedCount    int64          `json:"failed_count"`
+	CancelledCount int64          `json:"cancelled_count"`
+	OtherCount     int64          `json:"other_count"`
+	List           []adminTaskDTO `json:"list"`
+}
+
+type userTaskListResponse struct {
+	Total int64                `json:"total"`
+	List  []tasks.TaskUserView `json:"list"`
+}
+
+type userTaskResponse struct {
+	Task tasks.TaskUserView `json:"task"`
+}
+
+type taskDeleteResponse struct {
+	Message string `json:"message"`
+}
+
 func NewHandler(taskService *Service) *Handler {
 	return &Handler{taskService: taskService}
 }
@@ -74,7 +112,7 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 		response.Error(c, 400, userFacingSubmitError(err))
 		return
 	}
-	response.Success(c, gin.H{"task_id": taskID})
+	response.SuccessDTO(c, submitTaskResponse{TaskID: taskID})
 }
 
 func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
@@ -89,10 +127,10 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 	}
 	featureSlug, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
 	if err != nil {
-		response.Success(c, gin.H{"ready": false, "message": userFacingSubmitError(err)})
+		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err)})
 		return
 	}
-	response.Success(c, gin.H{"ready": true, "feature": featureSlug})
+	response.SuccessDTO(c, submitTaskReadinessResponse{Ready: true, Feature: featureSlug})
 }
 
 func (h *Handler) GetTask(c *gin.Context) {
@@ -102,7 +140,7 @@ func (h *Handler) GetTask(c *gin.Context) {
 		response.Error(c, 404, "任务不存在")
 		return
 	}
-	response.Success(c, gin.H{"task": toAdminTaskDTO(task)})
+	response.SuccessDTO(c, adminTaskResponse{Task: toAdminTaskDTO(task)})
 }
 
 func (h *Handler) ListTasks(c *gin.Context) {
@@ -124,15 +162,15 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		response.InternalError(c, 500, "获取任务列表失败", err)
 		return
 	}
-	response.Success(c, gin.H{
-		"total":           counts.Total,
-		"pending_count":   counts.PendingCount,
-		"running_count":   counts.RunningCount,
-		"completed_count": counts.CompletedCount,
-		"failed_count":    counts.FailedCount,
-		"cancelled_count": counts.CancelledCount,
-		"other_count":     counts.OtherCount,
-		"list":            toAdminTaskDTOs(taskItems),
+	response.SuccessDTO(c, adminTaskListResponse{
+		Total:          counts.Total,
+		PendingCount:   counts.PendingCount,
+		RunningCount:   counts.RunningCount,
+		CompletedCount: counts.CompletedCount,
+		FailedCount:    counts.FailedCount,
+		CancelledCount: counts.CancelledCount,
+		OtherCount:     counts.OtherCount,
+		List:           toAdminTaskDTOs(taskItems),
 	})
 }
 
@@ -182,7 +220,7 @@ func (h *Handler) GetUserTasks(c *gin.Context) {
 	for i, t := range taskItems {
 		safeList[i] = t.ToUserView()
 	}
-	response.Success(c, gin.H{"total": total, "list": safeList})
+	response.SuccessDTO(c, userTaskListResponse{Total: total, List: safeList})
 }
 
 func (h *Handler) GetUserTask(c *gin.Context) {
@@ -196,7 +234,7 @@ func (h *Handler) GetUserTask(c *gin.Context) {
 		response.Error(c, 404, "任务不存在")
 		return
 	}
-	response.Success(c, gin.H{"task": task.ToUserView()})
+	response.SuccessDTO(c, userTaskResponse{Task: task.ToUserView()})
 }
 
 func (h *Handler) StreamUserTask(c *gin.Context) {
@@ -368,5 +406,5 @@ func (h *Handler) DeleteUserTask(c *gin.Context) {
 		response.Error(c, 500, "删除失败")
 		return
 	}
-	response.Success(c, gin.H{"message": "删除成功"})
+	response.SuccessDTO(c, taskDeleteResponse{Message: "删除成功"})
 }

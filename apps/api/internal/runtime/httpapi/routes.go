@@ -45,6 +45,10 @@ type FrontendRouteOptions struct {
 	WarnMissingIndex bool
 }
 
+type healthResponse struct {
+	Status string `json:"status"`
+}
+
 type AuthDeps struct {
 	AuthServiceClient *auth.ServiceClient
 	UserRepo          *users.UserRepository
@@ -116,15 +120,15 @@ func validateUploadFileHeader(c *gin.Context, fh *multipart.FileHeader, maxBytes
 	return ext, true
 }
 
-func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (map[string]interface{}, bool) {
+func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (uploadImageMetadata, bool) {
 	f, err := fh.Open()
 	if err != nil {
-		return nil, false
+		return uploadImageMetadata{}, false
 	}
 	defer f.Close()
 	cfg, format, err := image.DecodeConfig(f)
 	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
-		return nil, false
+		return uploadImageMetadata{}, false
 	}
 	formatExt, ok := media.NormalizeImageExtension(format)
 	if !ok {
@@ -134,11 +138,11 @@ func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (map[string
 	if mimeType == "" {
 		mimeType = media.ImageMIMEFromExtension(ext)
 	}
-	return map[string]interface{}{
-		"width":  cfg.Width,
-		"height": cfg.Height,
-		"mime":   mimeType,
-		"ext":    strings.TrimPrefix(formatExt, "."),
+	return uploadImageMetadata{
+		Width:  cfg.Width,
+		Height: cfg.Height,
+		Mime:   mimeType,
+		Ext:    strings.TrimPrefix(formatExt, "."),
 	}, true
 }
 
@@ -148,7 +152,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	r.Use(globalRequestBodyLimitMiddleware())
 
 	r.GET(RouteHealth, func(c *gin.Context) {
-		response.Success(c, gin.H{"status": "ok"})
+		response.SuccessDTO(c, healthResponse{Status: "ok"})
 	})
 
 	os.MkdirAll("uploads", 0700)

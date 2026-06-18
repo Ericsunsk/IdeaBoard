@@ -26,6 +26,19 @@ const (
 	maxDetectedModels     = 100
 )
 
+type channelListResponse struct {
+	List []*Channel `json:"list"`
+}
+
+type channelResponse struct {
+	Channel *Channel `json:"channel"`
+}
+
+type detectedModelsResponse struct {
+	Models  []string `json:"models"`
+	APIType string   `json:"api_type"`
+}
+
 type ChannelHandler struct {
 	channelRepo *ChannelRepository
 	appEnv      string
@@ -45,7 +58,7 @@ func (h *ChannelHandler) List(c *gin.Context) {
 		response.Error(c, 500, "获取渠道商列表失败")
 		return
 	}
-	response.Success(c, gin.H{"list": channels})
+	response.SuccessDTO(c, channelListResponse{List: channels})
 }
 
 func (h *ChannelHandler) Create(c *gin.Context) {
@@ -79,7 +92,7 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"channel": channel})
+	response.SuccessDTO(c, channelResponse{Channel: channel})
 }
 
 func (h *ChannelHandler) Update(c *gin.Context) {
@@ -126,7 +139,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"channel": channel})
+	response.SuccessDTO(c, channelResponse{Channel: channel})
 }
 
 func (h *ChannelHandler) Delete(c *gin.Context) {
@@ -214,7 +227,7 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"models": models, "api_type": apiType})
+	response.SuccessDTO(c, detectedModelsResponse{Models: models, APIType: apiType})
 }
 
 func (h *ChannelHandler) detectModelsAllowHosts() []string {

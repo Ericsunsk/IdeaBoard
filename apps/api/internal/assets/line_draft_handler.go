@@ -21,6 +21,24 @@ type LineDraftHandler struct {
 	repo LineDraftModeStore
 }
 
+type lineDraftModeUserView struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	CoverImage string `json:"cover_image"`
+}
+
+type lineDraftModeUserListResponse struct {
+	List []lineDraftModeUserView `json:"list"`
+}
+
+type lineDraftModeListResponse struct {
+	List []*LineDraftMode `json:"list"`
+}
+
+type lineDraftModeResponse struct {
+	Mode *LineDraftMode `json:"mode"`
+}
+
 func NewLineDraftHandler(repo LineDraftModeStore) *LineDraftHandler {
 	return &LineDraftHandler{repo: repo}
 }
@@ -34,17 +52,11 @@ func (h *LineDraftHandler) ListEnabled(c *gin.Context) {
 		response.Error(c, 500, "获取线稿模式失败")
 		return
 	}
-	// 对用户隐藏 prompt
-	type ModeView struct {
-		ID         int64  `json:"id"`
-		Name       string `json:"name"`
-		CoverImage string `json:"cover_image"`
-	}
-	var list []ModeView
+	list := make([]lineDraftModeUserView, 0, len(modes))
 	for _, m := range modes {
-		list = append(list, ModeView{ID: m.ID, Name: m.Name, CoverImage: m.CoverImage})
+		list = append(list, lineDraftModeUserView{ID: m.ID, Name: m.Name, CoverImage: m.CoverImage})
 	}
-	response.Success(c, gin.H{"list": list})
+	response.SuccessDTO(c, lineDraftModeUserListResponse{List: list})
 }
 
 // ============ 管理端接口 ============
@@ -56,7 +68,7 @@ func (h *LineDraftHandler) List(c *gin.Context) {
 		response.Error(c, 500, "获取列表失败")
 		return
 	}
-	response.Success(c, gin.H{"list": modes})
+	response.SuccessDTO(c, lineDraftModeListResponse{List: modes})
 }
 
 // Create 创建线稿模式
@@ -76,7 +88,7 @@ func (h *LineDraftHandler) Create(c *gin.Context) {
 		response.InternalError(c, 500, "创建失败", err)
 		return
 	}
-	response.Success(c, gin.H{"mode": mode})
+	response.SuccessDTO(c, lineDraftModeResponse{Mode: mode})
 }
 
 // Update 更新线稿模式

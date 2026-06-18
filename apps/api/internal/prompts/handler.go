@@ -17,6 +17,14 @@ type featurePromptPayload struct {
 	Variables []FeaturePromptVariable `json:"variables"`
 }
 
+type featurePromptListResponse struct {
+	Prompts []FeaturePromptConfig `json:"prompts"`
+}
+
+type featurePromptRevisionListResponse struct {
+	Revisions []FeaturePromptRevision `json:"revisions"`
+}
+
 func NewFeaturePromptHandler(promptRepo *FeaturePromptRepository) *FeaturePromptHandler {
 	return &FeaturePromptHandler{promptRepo: promptRepo}
 }
@@ -99,7 +107,7 @@ func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
 		response.InternalError(c, 500, "获取失败", err)
 		return
 	}
-	response.Success(c, gin.H{"prompts": prompts})
+	response.SuccessDTO(c, featurePromptListResponse{Prompts: prompts})
 }
 
 func (h *FeaturePromptHandler) ListRevisions(c *gin.Context) {
@@ -118,7 +126,7 @@ func (h *FeaturePromptHandler) ListRevisions(c *gin.Context) {
 		response.InternalError(c, 500, "获取版本失败", err)
 		return
 	}
-	response.Success(c, gin.H{"revisions": revisions})
+	response.SuccessDTO(c, featurePromptRevisionListResponse{Revisions: revisions})
 }
 
 func promptUpdatedBy(c *gin.Context) *int64 {

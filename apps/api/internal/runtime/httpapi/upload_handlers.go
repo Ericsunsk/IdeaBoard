@@ -25,6 +25,26 @@ var (
 	uploadLimiter     chan struct{}
 )
 
+type uploadImageResponse struct {
+	URL    string `json:"url,omitempty"`
+	Avatar string `json:"avatar,omitempty"`
+	Width  int    `json:"width,omitempty"`
+	Height int    `json:"height,omitempty"`
+	Mime   string `json:"mime,omitempty"`
+	Ext    string `json:"ext,omitempty"`
+}
+
+type deleteUploadResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+type uploadImageMetadata struct {
+	Width  int
+	Height int
+	Mime   string
+	Ext    string
+}
+
 func acquireUploadSlot() (func(), bool) {
 	uploadLimiterOnce.Do(func() {
 		limit := defaultUploadMaxConcurrent
@@ -94,7 +114,7 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		response.Success(c, uploadImageResponsePayload("avatar", url, file, ext))
+		response.SuccessDTO(c, newUploadImageResponse("avatar", url, file, ext))
 	}
 }
 
@@ -157,7 +177,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		response.Success(c, uploadImageResponsePayload("url", url, file, ext))
+		response.SuccessDTO(c, newUploadImageResponse("url", url, file, ext))
 	}
 }
 
@@ -203,7 +223,7 @@ func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		response.Success(c, gin.H{"deleted": true})
+		response.SuccessDTO(c, deleteUploadResponse{Deleted: true})
 	}
 }
 
@@ -235,16 +255,23 @@ func adminUploadHandler(storageService *storage.StorageService) gin.HandlerFunc 
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		response.Success(c, uploadImageResponsePayload("url", url, file, ext))
+		response.SuccessDTO(c, newUploadImageResponse("url", url, file, ext))
 	}
 }
 
-func uploadImageResponsePayload(urlKey string, url string, file *multipart.FileHeader, ext string) gin.H {
-	payload := gin.H{urlKey: url}
+func newUploadImageResponse(urlKey string, url string, file *multipart.FileHeader, ext string) uploadImageResponse {
+	payload := uploadImageResponse{}
+	switch urlKey {
+	case "avatar":
+		payload.Avatar = url
+	default:
+		payload.URL = url
+	}
 	if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-		for k, v := range meta {
-			payload[k] = v
-		}
+		payload.Width = meta.Width
+		payload.Height = meta.Height
+		payload.Mime = meta.Mime
+		payload.Ext = meta.Ext
 	}
 	return payload
 }

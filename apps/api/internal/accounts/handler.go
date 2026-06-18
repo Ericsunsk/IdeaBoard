@@ -13,6 +13,30 @@ type AccountHandler struct {
 	accountService *AccountService
 }
 
+type accountLimitsResponse struct {
+	Limits AccountLimits `json:"limits"`
+}
+
+type accountListResponse struct {
+	Total int64              `json:"total"`
+	List  []*AccountWithLoad `json:"list"`
+}
+
+type accountResponse struct {
+	Account *ApiAccount `json:"account"`
+}
+
+type accountDetailResponse struct {
+	Account           *ApiAccount `json:"account"`
+	CurrentConcurrent int         `json:"current_concurrent"`
+	MaxConcurrent     int         `json:"max_concurrent"`
+}
+
+type accountQueueResponse struct {
+	CurrentConcurrent int `json:"current_concurrent"`
+	MaxConcurrent     int `json:"max_concurrent"`
+}
+
 func NewAccountHandler(accountService *AccountService) *AccountHandler {
 	return &AccountHandler{accountService: accountService}
 }
@@ -20,7 +44,7 @@ func NewAccountHandler(accountService *AccountService) *AccountHandler {
 // ============ 账号池 API ============
 
 func (h *AccountHandler) GetAccountLimits(c *gin.Context) {
-	response.Success(c, gin.H{"limits": CurrentAccountLimits()})
+	response.SuccessDTO(c, accountLimitsResponse{Limits: CurrentAccountLimits()})
 }
 
 func (h *AccountHandler) ListAccounts(c *gin.Context) {
@@ -35,7 +59,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		response.InternalError(c, 500, "获取账号列表失败", err)
 		return
 	}
-	response.Success(c, gin.H{"total": total, "list": accounts})
+	response.SuccessDTO(c, accountListResponse{Total: total, List: accounts})
 }
 
 func (h *AccountHandler) GetAccount(c *gin.Context) {
@@ -56,7 +80,7 @@ func (h *AccountHandler) GetAccount(c *gin.Context) {
 		response.InternalError(c, 500, "获取账号队列信息失败", err)
 		return
 	}
-	response.Success(c, gin.H{"account": account, "current_concurrent": concurrent, "max_concurrent": maxConcurrent})
+	response.SuccessDTO(c, accountDetailResponse{Account: account, CurrentConcurrent: concurrent, MaxConcurrent: maxConcurrent})
 }
 
 func (h *AccountHandler) CreateAccount(c *gin.Context) {
@@ -70,7 +94,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		response.InternalError(c, 500, "创建失败", err)
 		return
 	}
-	response.Success(c, gin.H{"account": account})
+	response.SuccessDTO(c, accountResponse{Account: account})
 }
 
 func (h *AccountHandler) UpdateAccount(c *gin.Context) {
@@ -162,5 +186,5 @@ func (h *AccountHandler) GetAccountQueue(c *gin.Context) {
 		response.InternalError(c, 500, "获取失败", err)
 		return
 	}
-	response.Success(c, gin.H{"current_concurrent": concurrent, "max_concurrent": maxConcurrent})
+	response.SuccessDTO(c, accountQueueResponse{CurrentConcurrent: concurrent, MaxConcurrent: maxConcurrent})
 }
