@@ -429,6 +429,19 @@ check_disk_space() {
   fi
 }
 
+check_backup_encryption_tool() {
+  local recipient
+  recipient="$(backup_encryption_recipient)"
+  [[ -n "$recipient" ]] || return 0
+
+  if [[ "$recipient" != gpg:* ]] && is_age_recipient "$recipient"; then
+    command -v age >/dev/null 2>&1 || die "BACKUP_ENCRYPTION_RECIPIENT is configured for age, but age is not installed"
+    return 0
+  fi
+
+  command -v gpg >/dev/null 2>&1 || die "BACKUP_ENCRYPTION_RECIPIENT is configured for gpg, but gpg is not installed"
+}
+
 check_port_available_or_used_by_compose() {
   local port="$1"
   local service_name="$2"
@@ -465,6 +478,7 @@ preflight_checks() {
   if ! docker compose version >/dev/null 2>&1; then
     die "missing command: docker compose"
   fi
+  docker info >/dev/null 2>&1 || die "Docker daemon is not available"
   if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
     die "curl or wget is required"
   fi
@@ -472,6 +486,7 @@ preflight_checks() {
   docker_compose config >/dev/null
   check_backup_dir_writable
   check_disk_space
+  check_backup_encryption_tool
   check_port_available_or_used_by_compose "$(api_host_port)" "api" "ideaboard-api"
   check_port_available_or_used_by_compose "$(auth_host_port)" "auth" "ideaboard-auth"
   if [[ -n "$(nginx_real_ip_include)" && ! -r "$(nginx_real_ip_include)" ]]; then
@@ -513,7 +528,7 @@ prune_backups() {
 
   while IFS= read -r backup; do
     backups+=("$backup")
-  done < <(find "$BACKUP_DIR" -type f -name "$pattern" | sort)
+  done < <(find "$BACKUP_DIR" -type f -name "$pattern" ! -name '*.sha256' ! -name '*.tmp' | sort)
 
   delete_count=$(( ${#backups[@]} - retain ))
   if (( delete_count <= 0 )); then
@@ -521,8 +536,117 @@ prune_backups() {
   fi
 
   for (( i = 0; i < delete_count; i++ )); do
-    rm -f -- "${backups[$i]}"
+    rm -f -- "${backups[$i]}" "${backups[$i]}.sha256"
   done
+}
+
+checksum_file() {
+  local file="$1"
+  local checksum_file="${file}.sha256"
+  local tmp_file="${checksum_file}.tmp"
+  local digest
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    digest="$(sha256sum "$file" | awk '{ print $1 }')"
+  elif command -v shasum >/dev/null 2>&1; then
+    digest="$(shasum -a 256 "$file" | awk '{ print $1 }')"
+  else
+    die "sha256sum or shasum is required to checksum backups"
+  fi
+
+  [[ -n "$digest" ]] || die "failed to calculate SHA-256 for backup: $file"
+  printf '%s  %s\n' "$digest" "$(basename "$file")" > "$tmp_file"
+  mv "$tmp_file" "$checksum_file"
+  chmod 600 "$checksum_file"
+}
+
+backup_checksum_status() {
+  local file="$1"
+  local checksum_file="${file}.sha256"
+  local checksum_name
+  local backup_dir
+
+  [[ -f "$checksum_file" ]] || {
+    printf 'missing'
+    return 0
+  }
+
+  checksum_name="$(basename "$checksum_file")"
+  backup_dir="$(dirname "$file")"
+  if command -v sha256sum >/dev/null 2>&1; then
+    if (cd "$backup_dir" && sha256sum -c "$checksum_name" >/dev/null 2>&1); then
+      printf 'valid'
+    else
+      printf 'invalid'
+    fi
+    return 0
+  fi
+
+  if command -v shasum >/dev/null 2>&1; then
+    if (cd "$backup_dir" && shasum -a 256 -c "$checksum_name" >/dev/null 2>&1); then
+      printf 'valid'
+    else
+      printf 'invalid'
+    fi
+    return 0
+  fi
+
+  printf 'unchecked'
+}
+
+backup_encryption_recipient() {
+  env_or_file_value BACKUP_ENCRYPTION_RECIPIENT
+}
+
+is_age_recipient() {
+  local recipient="$1"
+  [[ "$recipient" == age1* || "$recipient" == ssh-* || "$recipient" == age:* ]]
+}
+
+encrypt_backup_file() {
+  local backup_file="$1"
+  local recipient
+  local clean_recipient
+  local encrypted_file
+  recipient="$(backup_encryption_recipient)"
+  [[ -n "$recipient" ]] || {
+    printf '%s\n' "$backup_file"
+    return 0
+  }
+
+  clean_recipient="$recipient"
+  if [[ "$recipient" == age:* ]]; then
+    clean_recipient="${recipient#age:}"
+  elif [[ "$recipient" == gpg:* ]]; then
+    clean_recipient="${recipient#gpg:}"
+  fi
+  [[ -n "$clean_recipient" ]] || die "BACKUP_ENCRYPTION_RECIPIENT is empty after prefix parsing"
+
+  if [[ "$recipient" != gpg:* ]] && is_age_recipient "$recipient"; then
+    command -v age >/dev/null 2>&1 || {
+      rm -f -- "$backup_file"
+      die "BACKUP_ENCRYPTION_RECIPIENT requires age, but age is not installed"
+    }
+    encrypted_file="${backup_file}.age"
+    age -r "$clean_recipient" -o "$encrypted_file" "$backup_file" || {
+      rm -f -- "$backup_file" "$encrypted_file"
+      die "age encryption failed for backup: $backup_file"
+    }
+  else
+    command -v gpg >/dev/null 2>&1 || {
+      rm -f -- "$backup_file"
+      die "BACKUP_ENCRYPTION_RECIPIENT requires gpg, but gpg is not installed"
+    }
+    encrypted_file="${backup_file}.gpg"
+    gpg --batch --yes --trust-model always --recipient "$clean_recipient" --encrypt --output "$encrypted_file" "$backup_file" || {
+      rm -f -- "$backup_file" "$encrypted_file"
+      die "gpg encryption failed for backup: $backup_file"
+    }
+  fi
+
+  chmod 600 "$encrypted_file"
+  rm -f -- "$backup_file"
+  printf '%s\n' "$encrypted_file"
 }
 
 finalize_backup_file() {
@@ -531,14 +655,125 @@ finalize_backup_file() {
   local prune_pattern="$3"
   local success_message="$4"
   local failure_message="$5"
+  local final_file
 
   if ! mv "$tmp_file" "$backup_file"; then
     rm -f -- "$tmp_file"
     die "$failure_message"
   fi
   chmod 600 "$backup_file"
+  final_file="$(encrypt_backup_file "$backup_file")"
+  checksum_file "$final_file"
   prune_backups "$prune_pattern"
-  echo "$success_message"
+  echo "${success_message/$backup_file/$final_file}" >&2
+  printf '%s\n' "$final_file"
+}
+
+verify_postgres_custom_backup() {
+  local backup_file="$1"
+
+  if ! docker_compose exec -T postgres sh -c 'command -v pg_restore >/dev/null 2>&1'; then
+    echo "pg_restore is missing in the postgres container; cannot verify custom PostgreSQL backup" >&2
+    return 1
+  fi
+
+  docker_compose exec -T postgres pg_restore --list < "$backup_file" >/dev/null || {
+    echo "PostgreSQL custom backup verification failed: $backup_file" >&2
+    return 1
+  }
+}
+
+verify_tar_gz_backup() {
+  local backup_file="$1"
+  tar -tzf "$backup_file" >/dev/null || {
+    echo "tar backup verification failed: $backup_file" >&2
+    return 1
+  }
+}
+
+compose_declared_volume_name() {
+  local source_name="$1"
+
+  [[ -n "$source_name" ]] || return 0
+  docker_compose config 2>/dev/null | awk -v source="$source_name" '
+    /^volumes:/ {
+      in_volumes = 1
+      next
+    }
+    in_volumes && /^[^[:space:]]/ {
+      exit
+    }
+    in_volumes && $0 ~ "^  " source ":" {
+      in_target = 1
+      next
+    }
+    in_target && /^  [^[:space:]]/ {
+      exit
+    }
+    in_target && /^[[:space:]]+name:/ {
+      line = $0
+      sub("^[[:space:]]+name:[[:space:]]*", "", line)
+      gsub("\"", "", line)
+      print line
+      exit
+    }
+  ' || true
+}
+
+compose_service_uploads_source() {
+  if command -v jq >/dev/null 2>&1; then
+    docker_compose config --format json 2>/dev/null \
+      | jq -r '.services.api.volumes[]? | select(.target == "/app/uploads") | .source // empty' \
+      | head -n 1 \
+      || true
+    return 0
+  fi
+
+  docker_compose config 2>/dev/null | awk '
+    /^services:/ {
+      in_services = 1
+      next
+    }
+    in_services && /^  api:/ {
+      in_api = 1
+      next
+    }
+    in_api && /^  [^[:space:]]/ {
+      exit
+    }
+    in_api && /^    volumes:/ {
+      in_volumes = 1
+      next
+    }
+    in_volumes && /^    [^[:space:]]/ {
+      in_volumes = 0
+    }
+    in_volumes && /^[[:space:]]+-[[:space:]]+type:[[:space:]]+volume/ {
+      in_mount = 1
+      source = ""
+      target = ""
+      next
+    }
+    in_mount && /^[[:space:]]+-[[:space:]]+/ {
+      in_mount = 0
+    }
+    in_mount && /^[[:space:]]+source:/ {
+      line = $0
+      sub("^[[:space:]]+source:[[:space:]]*", "", line)
+      gsub("\"", "", line)
+      source = line
+    }
+    in_mount && /^[[:space:]]+target:/ {
+      line = $0
+      sub("^[[:space:]]+target:[[:space:]]*", "", line)
+      gsub("\"", "", line)
+      target = line
+    }
+    in_mount && source != "" && target == "/app/uploads" {
+      print source
+      exit
+    }
+  ' || true
 }
 
 backup_postgres() {
@@ -552,24 +787,117 @@ backup_postgres() {
   timestamp="$(date +%Y%m%d-%H%M%S)"
   database="$(env_value POSTGRES_DB)"
   database="${database:-ideaboard}"
-  backup_file="$BACKUP_DIR/postgres-${database}-${timestamp}.sql"
+  backup_file="$BACKUP_DIR/postgres-${database}-${timestamp}.dump"
   tmp_file="${backup_file}.tmp"
 
   echo "Creating PostgreSQL backup: $backup_file"
   # shellcheck disable=SC2016 # Container env vars must expand inside postgres.
-  if docker_compose exec -T postgres sh -c 'pg_dump --clean --if-exists --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$tmp_file"; then
-    finalize_backup_file \
+  if docker_compose exec -T postgres sh -c 'pg_dump --format=custom --clean --if-exists --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$tmp_file"; then
+    if ! verify_postgres_custom_backup "$tmp_file"; then
+      rm -f -- "$tmp_file"
+      die "PostgreSQL backup verification failed; deployment aborted before migration"
+    fi
+    DEPLOY_POSTGRES_BACKUP="$(
+      finalize_backup_file \
       "$tmp_file" \
       "$backup_file" \
-      'postgres-*.sql' \
+      'postgres-*.dump*' \
       "PostgreSQL backup completed: $backup_file" \
       "PostgreSQL backup finalize failed; deployment aborted before migration"
-    DEPLOY_POSTGRES_BACKUP="$backup_file"
+    )"
     return 0
   fi
 
   rm -f -- "$tmp_file"
   die "PostgreSQL backup failed; deployment aborted before migration"
+}
+
+resolve_compose_volume_name() {
+  local source_name="$1"
+  local volume_name
+  local declared_volume_name
+
+  [[ -n "$source_name" ]] || return 0
+  if docker volume inspect "$source_name" >/dev/null 2>&1; then
+    printf '%s\n' "$source_name"
+    return 0
+  fi
+
+  declared_volume_name="$(compose_declared_volume_name "$source_name")"
+  if [[ -n "$declared_volume_name" ]] && docker volume inspect "$declared_volume_name" >/dev/null 2>&1; then
+    printf '%s\n' "$declared_volume_name"
+    return 0
+  fi
+
+  volume_name="$(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.volume=$source_name" 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$volume_name" ]]; then
+    printf '%s\n' "$volume_name"
+    return 0
+  fi
+
+  volume_name="${COMPOSE_PROJECT_NAME}_${source_name}"
+  if docker volume inspect "$volume_name" >/dev/null 2>&1; then
+    printf '%s\n' "$volume_name"
+    return 0
+  fi
+
+  return 0
+}
+
+api_container_uploads_volume_name() {
+  local container_id
+  local volume_name
+
+  while IFS= read -r container_id; do
+    [[ -n "$container_id" ]] || continue
+    volume_name="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/uploads"}}{{.Name}}{{end}}{{end}}' "$container_id" 2>/dev/null || true)"
+    if [[ -n "$volume_name" ]]; then
+      printf '%s\n' "$volume_name"
+      return 0
+    fi
+  done < <(
+    {
+      docker ps -a \
+        --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" \
+        --filter "label=com.docker.compose.service=api" \
+        --format '{{.ID}}' 2>/dev/null || true
+      docker ps -a --filter "name=^/ideaboard-api$" --format '{{.ID}}' 2>/dev/null || true
+    } | awk 'NF && !seen[$0]++'
+  )
+
+  return 0
+}
+
+compose_uploads_volume_name() {
+  local source_name=""
+  local volume_name=""
+
+  source_name="$(compose_service_uploads_source)"
+  volume_name="$(api_container_uploads_volume_name)"
+
+  if [[ -z "$volume_name" && -n "$source_name" ]]; then
+    volume_name="$(resolve_compose_volume_name "$source_name")"
+  fi
+
+  if [[ -z "$volume_name" ]]; then
+    volume_name="$(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.volume=api-uploads" 2>/dev/null | head -n 1 || true)"
+  fi
+
+  printf '%s\n' "$volume_name"
+}
+
+api_uploads_state_exists() {
+  local fallback_volume="${COMPOSE_PROJECT_NAME}_api-uploads"
+  local declared_volume_name
+
+  docker_compose ps -a -q api 2>/dev/null | grep -q . && return 0
+  docker ps -a --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=api" --format '{{.ID}}' 2>/dev/null | grep -q . && return 0
+  docker ps -a --filter "name=^/ideaboard-api$" --format '{{.ID}}' 2>/dev/null | grep -q . && return 0
+  docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.volume=api-uploads" 2>/dev/null | grep -q . && return 0
+  declared_volume_name="$(compose_declared_volume_name "api-uploads")"
+  [[ -n "$declared_volume_name" ]] && docker volume inspect "$declared_volume_name" >/dev/null 2>&1 && return 0
+  docker volume inspect "$fallback_volume" >/dev/null 2>&1 && return 0
+  return 1
 }
 
 backup_api_uploads() {
@@ -583,36 +911,55 @@ backup_api_uploads() {
   timestamp="$(date +%Y%m%d-%H%M%S)"
   backup_file="$BACKUP_DIR/api-uploads-${timestamp}.tar.gz"
   tmp_file="${backup_file}.tmp"
-  volume_name="${COMPOSE_PROJECT_NAME}_api-uploads"
+  volume_name="$(compose_uploads_volume_name)"
 
-  echo "Creating api-uploads backup: $backup_file"
-  if docker volume inspect "$volume_name" >/dev/null 2>&1; then
+  if [[ -n "$volume_name" ]]; then
+    echo "Creating api-uploads backup from volume ${volume_name}: $backup_file"
+  else
+    echo "Creating api-uploads backup: no existing volume resolved"
+  fi
+  if [[ -n "$volume_name" ]] && docker volume inspect "$volume_name" >/dev/null 2>&1; then
     if docker run --rm \
       -v "$volume_name:/data:ro" \
       -v "$BACKUP_DIR:/backup" \
       postgres:17-alpine \
       sh -c "tar -C /data -czf /backup/$(basename "$tmp_file") ." ; then
-      finalize_backup_file \
+      if ! verify_tar_gz_backup "$tmp_file"; then
+        rm -f -- "$tmp_file"
+        die "api-uploads backup verification failed; deployment aborted before migration"
+      fi
+      DEPLOY_UPLOADS_BACKUP="$(
+        finalize_backup_file \
         "$tmp_file" \
         "$backup_file" \
-        'api-uploads-*.tar.gz' \
+        'api-uploads-*.tar.gz*' \
         "api-uploads backup completed: $backup_file" \
         "api-uploads backup finalize failed; deployment aborted before migration"
-      DEPLOY_UPLOADS_BACKUP="$backup_file"
+      )"
       return 0
     fi
     rm -f -- "$tmp_file"
     die "api-uploads backup failed; deployment aborted before migration"
   fi
 
+  if api_uploads_state_exists; then
+    die "api-uploads volume could not be resolved; refusing to write an empty backup"
+  fi
+  docker info >/dev/null 2>&1 || die "Docker daemon is unavailable; refusing to write an empty api-uploads backup"
+
   if tar -czf "$tmp_file" --files-from /dev/null; then
-    finalize_backup_file \
+    if ! verify_tar_gz_backup "$tmp_file"; then
+      rm -f -- "$tmp_file"
+      die "api-uploads empty backup verification failed; deployment aborted before migration"
+    fi
+    DEPLOY_UPLOADS_BACKUP="$(
+      finalize_backup_file \
       "$tmp_file" \
       "$backup_file" \
-      'api-uploads-*.tar.gz' \
+      'api-uploads-*.tar.gz*' \
       "api-uploads volume not found; wrote empty archive: $backup_file" \
       "api-uploads empty backup finalize failed; deployment aborted before migration"
-    DEPLOY_UPLOADS_BACKUP="$backup_file"
+    )"
     return 0
   fi
 
@@ -987,6 +1334,9 @@ print_release_file_summary() {
     -e 's/^[[:space:]]*"stage":[[:space:]]*"\([^"]*\)".*/  stage: \1/p' \
     -e 's/^[[:space:]]*"started_at":[[:space:]]*"\([^"]*\)".*/  started_at: \1/p' \
     -e 's/^[[:space:]]*"completed_at":[[:space:]]*"\([^"]*\)".*/  completed_at: \1/p' \
+    -e 's/^[[:space:]]*"postgres":[[:space:]]*"\([^"]*\)".*/  backup.postgres: \1/p' \
+    -e 's/^[[:space:]]*"uploads":[[:space:]]*"\([^"]*\)".*/  backup.uploads: \1/p' \
+    -e 's/^[[:space:]]*"backup":[[:space:]]*"\([^"]*\)".*/  gate.backup: \1/p' \
     "$file"
 }
 
@@ -1004,15 +1354,26 @@ print_env_image_refs() {
 }
 
 print_recent_backups() {
+  local backup
+  local encrypted
+  local checksum
+
   echo "Recent backups: $BACKUP_DIR"
   if [[ ! -d "$BACKUP_DIR" ]]; then
     echo "  not found"
     return 0
   fi
-  find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'postgres-*.sql' -o -name 'api-uploads-*.tar.gz' \) \
+  find "$BACKUP_DIR" -maxdepth 1 -type f \
+    \( -name 'postgres-*.dump' -o -name 'postgres-*.dump.age' -o -name 'postgres-*.dump.gpg' -o -name 'api-uploads-*.tar.gz' -o -name 'api-uploads-*.tar.gz.age' -o -name 'api-uploads-*.tar.gz.gpg' \) \
+    ! -name '*.sha256' \
     | sort \
     | tail -n 10 \
-    | sed 's/^/  /'
+    | while IFS= read -r backup; do
+      encrypted="no"
+      checksum="$(backup_checksum_status "$backup")"
+      [[ "$backup" == *.age || "$backup" == *.gpg ]] && encrypted="yes"
+      printf '  %s checksum=%s encrypted=%s\n' "$backup" "$checksum" "$encrypted"
+    done
 }
 
 run_doctor() {

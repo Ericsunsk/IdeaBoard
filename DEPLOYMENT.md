@@ -253,7 +253,14 @@ ideaboard update
 
 
 > [!IMPORTANT]
-> PostgreSQL backup 包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能含有上游 API key、S3 access key/secret、endpoint 与 bucket 配置。`postgres-*.sql` 必须按 secret artifact 处理：建议加密落盘，只允许受控传输和最小必要人员访问；完成 restore 后按受影响范围轮换上游 API key 与对象存储凭据，并清理临时副本。
+> PostgreSQL backup 包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能含有上游 API key、S3 access key/secret、endpoint 与 bucket 配置。`postgres-*.dump[.age|.gpg]` 必须按 secret artifact 处理：建议设置 `BACKUP_ENCRYPTION_RECIPIENT` 加密落盘，只允许受控传输和最小必要人员访问；完成 restore 后按受影响范围轮换上游 API key 与对象存储凭据，并清理临时副本。
+
+Backup hardening 约定：
+
+- 每个 PostgreSQL 与 uploads backup 应生成同名 `.sha256` 文件，例如 `postgres-ideaboard-YYYYMMDD-HHMMSS.dump.sha256`、`postgres-ideaboard-YYYYMMDD-HHMMSS.dump.age.sha256`、`api-uploads-YYYYMMDD-HHMMSS.tar.gz.sha256`。restore 前先在备份目录执行 `sha256sum -c <backup>.sha256`，不匹配时停止恢复。
+- 设置 `BACKUP_ENCRYPTION_RECIPIENT` 后，backup 应先加密再为最终落盘 artifact 生成 checksum。`age1...`、`ssh-*` 或 `age:<recipient>` 使用 age 加密；`gpg:<recipient>` 或其他值按 GPG recipient 处理，使用本机 `gpg` keyring 加密。未设置该变量时，backup 仍是明文 secret artifact，必须依赖目录权限、传输控制和临时副本清理。
+- `ideaboard doctor` 应展示最近 backup 的路径、时间、`checksum=valid|invalid|missing|unchecked`、是否加密，以及最近 release 记录中的 backup 阶段状态。`doctor --deep` 可用于补充运行态连通性检查，但不替代 restore drill。
+- 当前 DB restore 仍需人工确认：先判断 migration 是否可逆、是否需要同时恢复 uploads、是否要保留故障现场，再执行受控 restore；脚本不应在 migration 后失败时自动回滚数据库。
 
 当前 Docker stack 只管理 PostgreSQL 数据库；`ideaboard update` 不会自动转换或导入其他数据库形态的数据。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
 
@@ -371,6 +378,14 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
 ```
 
 当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。数据库 backup 与 `api-uploads` tar 分别保留在同一备份目录下；其中 PostgreSQL backup 含密钥材料，恢复完成后必须执行凭据轮换计划。
+
+受控 restore drill 建议至少记录以下检查项：
+
+1. 在隔离环境复制目标 backup、对应 `.sha256` 和必要的解密 key；不要直接在生产库上演练。
+2. 对最终落盘 artifact 执行 `sha256sum -c <backup>.sha256`；如果 backup 已加密，校验通过后再用 age 或 gpg 解密到受控临时目录。
+3. 对解密后的 PostgreSQL dump 执行 `pg_restore --list`，对 uploads tar 执行 `tar -tzf`；恢复前确认目标库可被覆盖、当前 migration 影响已评估，并记录需要同时恢复的 uploads backup。
+4. restore 后运行 API/Auth health、关键登录路径和对象存储读取 smoke；涉及密钥表时按影响范围轮换上游 API key 与对象存储凭据。
+5. 演练结束后清理解密后的 dump、tar、临时目录和本地下载副本。
 
 数据保存在 Docker volumes：`postgres-data`、`nats-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 

@@ -104,10 +104,17 @@ IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update
 
 API 运行时还必须设置 `APP_SECRETS_ENCRYPTION_KEY`，用于加密 API Key 与对象存储密钥；推荐用 `openssl rand -base64 32` 生成。
 
-推荐生产环境使用 `ideaboard update`，也可以用 `ideaboard update --manifest release-manifest.json` 部署同一发布批次的三张镜像。脚本会先执行 preflight，在 API / Auth migrations 前把 PostgreSQL dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.sql`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。成功后会写入 `docker/releases/current.json` 与 `previous.json`；已启动的 stack 可用 `ideaboard status` 查看 release 摘要，也可以执行 `ideaboard doctor` / `ideaboard doctor --deep` 排查运行态。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志；需要回退运行镜像时用 `ideaboard rollback --to previous`，DB restore 需要基于 backup 人工确认后执行。
+推荐生产环境使用 `ideaboard update`，也可以用 `ideaboard update --manifest release-manifest.json` 部署同一发布批次的三张镜像。脚本会先执行 preflight，在 API / Auth migrations 前把 PostgreSQL custom dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.dump[.age|.gpg]`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。成功后会写入 `docker/releases/current.json` 与 `previous.json`；已启动的 stack 可用 `ideaboard status` 查看 release 摘要，也可以执行 `ideaboard doctor` / `ideaboard doctor --deep` 排查运行态。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志；需要回退运行镜像时用 `ideaboard rollback --to previous`，DB restore 需要基于 backup 人工确认后执行。
 
 > [!IMPORTANT]
-> `postgres-*.sql` 会包含 `api_account_secrets`、`storage_profile_secrets` 等表中的上游 API key 与 S3 secret，必须按 secret artifact 处理：建议加密保存、限制传输与下载，restore 后轮换受影响的上游 API key 和对象存储凭据。
+> `postgres-*.dump[.age|.gpg]` 会包含 `api_account_secrets`、`storage_profile_secrets` 等表中的上游 API key 与 S3 secret，必须按 secret artifact 处理：建议设置 `BACKUP_ENCRYPTION_RECIPIENT` 加密保存、限制传输与下载，restore 后轮换受影响的上游 API key 和对象存储凭据。
+
+Backup hardening 运行约定：
+
+- 每个 PostgreSQL 与 uploads backup 应带同名 `.sha256`；restore 前先对最终落盘 artifact 执行 `sha256sum -c <backup>.sha256`。
+- `BACKUP_ENCRYPTION_RECIPIENT=age1...`、`ssh-*` 或 `age:<recipient>` 表示使用 age recipient 加密；`gpg:<recipient>` 或其他值按 GPG recipient 处理。未设置时 backup 仍是明文 secret artifact。
+- `ideaboard doctor` 应显示最近 backup 路径、时间、checksum 校验状态、是否加密和最近 release 中的 backup 阶段状态。
+- DB restore 仍需人工确认 migration 影响和 uploads 是否同步恢复；脚本不自动恢复数据库。
 
 直接运行 `docker compose pull && docker compose up -d` 只适合本地排障；这条路径不会自动执行 Cosign 验签、API / Auth migrations、数据备份和 smoke gate。
 
