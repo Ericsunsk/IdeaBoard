@@ -166,6 +166,43 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 	}
 }
 
+func TestReadGoogleProviderParamsDerivesModelRefsAndImagenControls(t *testing.T) {
+	geminiReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
+		"model":                "models/gemini-2.5-flash-image",
+		"image_urls":           []interface{}{"https://img.example/source.png"},
+		"reference_image_urls": []interface{}{"https://img.example/ref.png"},
+	}, "")
+	geminiParams := readGoogleProviderParams(geminiReq)
+	if geminiParams.Model != "gemini-2.5-flash-image" {
+		t.Fatalf("gemini model = %q", geminiParams.Model)
+	}
+	if geminiParams.UseImagen {
+		t.Fatalf("gemini model should not use Imagen")
+	}
+	wantRefs := []string{"https://img.example/source.png", "https://img.example/ref.png"}
+	if strings.Join(geminiParams.ImageRefs, "\n") != strings.Join(wantRefs, "\n") {
+		t.Fatalf("gemini refs = %#v", geminiParams.ImageRefs)
+	}
+
+	imagenReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
+		"output_count": 9,
+		"ratio":        "16:9",
+	}, "models/imagen-4.0-generate-001")
+	imagenParams := readGoogleProviderParams(imagenReq)
+	if imagenParams.Model != "imagen-4.0-generate-001" {
+		t.Fatalf("imagen model = %q", imagenParams.Model)
+	}
+	if !imagenParams.UseImagen {
+		t.Fatalf("imagen model should use Imagen")
+	}
+	if imagenParams.SampleCount != 4 {
+		t.Fatalf("sample count = %d, want 4", imagenParams.SampleCount)
+	}
+	if imagenParams.AspectRatio != "16:9" {
+		t.Fatalf("aspect ratio = %q, want 16:9", imagenParams.AspectRatio)
+	}
+}
+
 func TestCallGoogleImagenPredict(t *testing.T) {
 	var gotPath string
 	var gotAPIKey string

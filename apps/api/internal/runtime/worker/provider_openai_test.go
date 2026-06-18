@@ -821,6 +821,71 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	}
 }
 
+func TestReadOpenAIProviderParamsDerivesEditMaskAndHDQuality(t *testing.T) {
+	maskURL := "https://img.example/mask.png"
+	req := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
+		"feature":        "partial-edit",
+		"image_urls":     []interface{}{"https://img.example/source.png"},
+		"mask_image_url": maskURL,
+	}, "gpt-image-1")
+
+	params := readOpenAIProviderParams(req)
+	if !params.useEditEndpoint() {
+		t.Fatalf("expected partial-edit image request to use edit endpoint")
+	}
+	if params.MaskImageRef != maskURL {
+		t.Fatalf("mask ref = %q, want %q", params.MaskImageRef, maskURL)
+	}
+	if len(params.EditImageRefs) != 1 || params.EditImageRefs[0] != "https://img.example/source.png" {
+		t.Fatalf("edit refs = %#v", params.EditImageRefs)
+	}
+
+	hdReq := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
+		"feature": "hd-upscale",
+		"hd": map[string]interface{}{
+			"clarity_strength": 75,
+		},
+	}, "gpt-image-1")
+	hdParams := readOpenAIProviderParams(hdReq)
+	if hdParams.HDOutputQuality == nil || *hdParams.HDOutputQuality != 90 {
+		t.Fatalf("HD output quality = %#v, want 90", hdParams.HDOutputQuality)
+	}
+	if hdParams.useEditEndpoint() {
+		t.Fatalf("hd-upscale should stay on generation endpoint")
+	}
+}
+
+func TestOpenAIRequestFinalizerDropsRedundantFields(t *testing.T) {
+	reqBody := openAIImageRequestBody{
+		Image:     "data:image/png;base64,abc",
+		ImageURLs: []string{"data:image/png;base64,abc"},
+		Extra: map[string]interface{}{
+			"original_image_url": "data:image/png;base64,abc",
+		},
+	}
+	openAIRequestFinalizer{FeatureSlug: workflow.FeatureSlugStyleVariation}.apply(&reqBody)
+
+	if reqBody.Image != "data:image/png;base64,abc" {
+		t.Fatalf("image = %q", reqBody.Image)
+	}
+	if reqBody.ImageURLs != nil {
+		t.Fatalf("image_urls should be dropped, got %#v", reqBody.ImageURLs)
+	}
+	if _, exists := reqBody.Extra["original_image_url"]; exists {
+		t.Fatalf("original_image_url should be dropped, got %#v", reqBody.Extra)
+	}
+
+	reqBody = openAIImageRequestBody{
+		Image:     "https://img.example/first.png",
+		ImageURLs: []string{"https://img.example/first.png", "https://img.example/second.png"},
+		Extra:     map[string]interface{}{},
+	}
+	openAIRequestFinalizer{FeatureSlug: workflow.FeatureSlugStyleFusion}.apply(&reqBody)
+	if reqBody.Image != "" {
+		t.Fatalf("multi image fallback should be dropped, got %q", reqBody.Image)
+	}
+}
+
 func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 	refs := collectOpenAIEditImageRefs(map[string]interface{}{
 		"image_urls": []interface{}{

@@ -117,3 +117,25 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 		t.Fatalf("provider map should not expose canonical media object: %#v", got.Provider)
 	}
 }
+
+func TestProviderTaskParamsPreferCanonicalFeatureAndModel(t *testing.T) {
+	params := newProviderTaskParams(&tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       "style-fusion",
+		Model:         "gpt-image-1",
+		Extra: map[string]interface{}{
+			"feature": "partial-edit",
+			"model":   "other-model",
+		},
+	})
+
+	if got := params.featureSlug(); got != "style-fusion" {
+		t.Fatalf("featureSlug = %q, want style-fusion", got)
+	}
+	if got := params.requestedModel(); got != "gpt-image-1" {
+		t.Fatalf("requestedModel = %q, want gpt-image-1", got)
+	}
+	if params.Provider["feature"] != "style-fusion" || params.Provider["model"] != "gpt-image-1" {
+		t.Fatalf("provider params should keep canonical feature/model, got %#v", params.Provider)
+	}
+}
