@@ -67,7 +67,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 HD 的 `output_quality` 由后端根据 `hd.clarity_strength` 派生；输出尺寸按原图尺寸由运行时尺寸参数控制，不作为 prompt 变量或 UI contract 字段。
 
-Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义或使用；统一使用 `{{fusion_input_weights}}`。
+Fusion 只发布 `{{fusion_input_weights}}` 作为 prompt 变量；融合主次、图片顺序和权重解释都通过这一变量表达。
 
 ## 编写规范
 
@@ -274,7 +274,7 @@ Prompt 节点的 `pattern-gen` system prompt 是可选配置；未配置时直�
 - 模板是否按真实节点归属维护：Image、Prompt、Fusion。
 - slug 是否是当前 canonical slug。
 - 模板是否只使用当前 feature 稳定变量。
-- Fusion 是否只使用 `{{fusion_input_weights}}`，没有旧的 A/B/ratio 变量。
+- Fusion 是否只使用 `{{fusion_input_weights}}` 表达图片顺序和权重。
 - 局部编辑类模板是否明确锁定未选区、窗口外内容和原图主体身份。
 - 需要用户文本参与时，是否显式包含 `{{user_prompt}}`。
 - 是否避免直接写 `original_image_url`、`mask_image_url`、`reference_image_urls` 等运行时媒体字段。
