@@ -47,6 +47,7 @@ output/
 # ===== Release Artifacts =====
 release/
 release-temp/
+docker/releases/
 .cache/
 
 # ===== Temp Files =====

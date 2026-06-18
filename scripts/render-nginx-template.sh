@@ -17,6 +17,12 @@ NGINX_AUTH_HEALTH_UPSTREAM="${NGINX_AUTH_HEALTH_UPSTREAM:-http://127.0.0.1:6001/
 NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/opt/ideaboard/apps/web/dist}"
 NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-try_files \$uri \$uri/ /index.html}"
 NGINX_REAL_IP_INCLUDE="${NGINX_REAL_IP_INCLUDE:-}"
+NGINX_SERVER_NAME="${NGINX_SERVER_NAME:-_}"
+
+if [[ "$NGINX_SERVER_NAME" == *";"* || "$NGINX_SERVER_NAME" == *$'\n'* || "$NGINX_SERVER_NAME" == *$'\r'* ]]; then
+  echo "NGINX_SERVER_NAME must not contain semicolons or newlines." >&2
+  exit 1
+fi
 
 if [[ -n "$NGINX_REAL_IP_INCLUDE" ]]; then
   if [[ "$NGINX_REAL_IP_INCLUDE" != /* || "$NGINX_REAL_IP_INCLUDE" =~ [[:space:]\;] ]]; then
@@ -32,13 +38,24 @@ escape_sed_replacement() {
   printf '%s' "$1" | sed -e 's/[|&\\]/\\&/g'
 }
 
-mkdir -p "$(dirname "$OUTPUT_PATH")"
+OUTPUT_DIR="$(dirname "$OUTPUT_PATH")"
+mkdir -p "$OUTPUT_DIR"
+TMP_OUTPUT="$(mktemp "$OUTPUT_DIR/.ideaboard-nginx.XXXXXX")"
+
+cleanup() {
+  rm -f "$TMP_OUTPUT"
+}
+trap cleanup EXIT
 
 sed \
+  -e "s|\${NGINX_SERVER_NAME}|$(escape_sed_replacement "$NGINX_SERVER_NAME")|g" \
   -e "s|\${NGINX_API_UPSTREAM}|$(escape_sed_replacement "$NGINX_API_UPSTREAM")|g" \
   -e "s|\${NGINX_AUTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_UPSTREAM")|g" \
   -e "s|\${NGINX_AUTH_HEALTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_HEALTH_UPSTREAM")|g" \
   -e "s|\${NGINX_WEB_ROOT}|$(escape_sed_replacement "$NGINX_WEB_ROOT")|g" \
   -e "s|\${NGINX_ROOT_DIRECTIVE}|$(escape_sed_replacement "$NGINX_ROOT_DIRECTIVE")|g" \
   -e "s|\${NGINX_REAL_IP_INCLUDE_DIRECTIVE}|$(escape_sed_replacement "$NGINX_REAL_IP_INCLUDE_DIRECTIVE")|g" \
-  "$TEMPLATE_PATH" > "$OUTPUT_PATH"
+  "$TEMPLATE_PATH" > "$TMP_OUTPUT"
+
+mv "$TMP_OUTPUT" "$OUTPUT_PATH"
+trap - EXIT

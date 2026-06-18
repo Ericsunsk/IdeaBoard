@@ -296,6 +296,13 @@ jobs:
             printf '# IdeaBoard %s\n\n自动发布版本 %s。\n' "$TAG" "$TAG" > "$NOTES_FILE"
           fi
 
+          {
+            echo
+            echo "## Docker image manifest"
+            echo
+            echo "同一 tag 会触发 Docker Images workflow 发布 GHCR 镜像，并把 \`release-manifest.json\` 上传为本 Release asset 与 workflow artifact。该 manifest 是三张镜像 digest、SBOM artifact 与 Cosign identity 的部署契约。"
+          } >> "$NOTES_FILE"
+
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:

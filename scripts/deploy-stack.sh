@@ -35,13 +35,77 @@ ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
 BACKUP_DIR="${BACKUP_DIR:-$(cd "$ROOT_DIR/.." && pwd)/$(basename "$ROOT_DIR")-backups}"
 BACKUP_RETAIN="${BACKUP_RETAIN:-5}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-ideaboard}"
+RELEASE_STATE_DIR="${RELEASE_STATE_DIR:-$ROOT_DIR/docker/releases}"
+RELEASE_HISTORY_DIR="$RELEASE_STATE_DIR/history"
+CURRENT_RELEASE_FILE="$RELEASE_STATE_DIR/current.json"
+PREVIOUS_RELEASE_FILE="$RELEASE_STATE_DIR/previous.json"
 
-command="${1:-deploy}"
+requested_command="${1:-update}"
+command="$requested_command"
 is_update=0
 if [[ "$command" == "update" ]]; then
   command="deploy"
   is_update=1
 fi
+update_manifest_source=""
+
+if [[ "$requested_command" == "update" || "$requested_command" == "deploy" ]]; then
+  args=("${@:2}")
+  remaining_args=()
+  i=0
+  while (( i < ${#args[@]} )); do
+    case "${args[$i]}" in
+      --manifest)
+        if (( i + 1 >= ${#args[@]} )); then
+          echo "Error: --manifest requires a path or URL" >&2
+          exit 1
+        fi
+        update_manifest_source="${args[$((i + 1))]}"
+        i=$((i + 2))
+        ;;
+      --manifest=*)
+        update_manifest_source="${args[$i]#--manifest=}"
+        i=$((i + 1))
+        ;;
+      *)
+        remaining_args+=("${args[$i]}")
+        i=$((i + 1))
+        ;;
+    esac
+  done
+  if (( ${#remaining_args[@]} > 0 )); then
+    echo "Error: unexpected arguments for $requested_command: ${remaining_args[*]}" >&2
+    exit 1
+  fi
+fi
+
+DEPLOY_STAGE="init"
+DEPLOY_RELEASE_ID=""
+DEPLOY_STARTED_AT=""
+DEPLOY_COMPLETED_AT=""
+DEPLOY_GIT_REF=""
+DEPLOY_GIT_COMMIT=""
+DEPLOY_POSTGRES_BACKUP=""
+DEPLOY_UPLOADS_BACKUP=""
+DEPLOY_ENV_SNAPSHOT=""
+DEPLOY_IMAGE_UPDATE_PENDING=0
+DEPLOY_ENV_RESTORE_ALLOWED=1
+DEPLOY_MIGRATION_STARTED=0
+DEPLOY_TRAP_ENABLED=0
+DEPLOY_SUCCEEDED=0
+DEPLOY_PREFLIGHT_GATE="pending"
+DEPLOY_COSIGN_GATE="pending"
+DEPLOY_BACKUP_GATE="pending"
+DEPLOY_MIGRATION_GATE="pending"
+DEPLOY_SMOKE_GATE="pending"
+DEPLOY_SOURCE_MANIFEST=""
+DEPLOY_SOURCE_MANIFEST_COPY=""
+DEPLOY_API_IMAGE=""
+DEPLOY_AUTH_IMAGE=""
+DEPLOY_AUTH_MIGRATE_IMAGE=""
+PREVIOUS_API_IMAGE=""
+PREVIOUS_AUTH_IMAGE=""
+PREVIOUS_AUTH_MIGRATE_IMAGE=""
 
 if [[ "$command" == "delete" || "$command" == "uninstall" ]]; then
   shift || true
@@ -51,6 +115,65 @@ fi
 die() {
   echo "Error: $*" >&2
   exit 1
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+json_value() {
+  printf '"%s"' "$(json_escape "$1")"
+}
+
+json_string_field() {
+  local key="$1"
+  local file="$2"
+  awk -v key="$key" '
+    $0 ~ "\"" key "\"[[:space:]]*:" {
+      line = $0
+      sub(".*\"" key "\"[[:space:]]*:[[:space:]]*\"", "", line)
+      sub("\".*", "", line)
+      print line
+      exit
+    }
+  ' "$file"
+}
+
+json_object_string_field() {
+  local object="$1"
+  local key="$2"
+  local file="$3"
+  awk -v object="$object" -v key="$key" '
+    $0 ~ "\"" object "\"[[:space:]]*:" { in_object = 1; next }
+    in_object && /^[[:space:]]*}/ { exit }
+    in_object && $0 ~ "\"" key "\"[[:space:]]*:" {
+      line = $0
+      sub(".*\"" key "\"[[:space:]]*:[[:space:]]*\"", "", line)
+      sub("\".*", "", line)
+      print line
+      exit
+    }
+  ' "$file"
+}
+
+json_image_field() {
+  local key="$1"
+  local file="$2"
+  json_object_string_field "images" "$key" "$file"
+}
+
+utc_now() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+release_timestamp() {
+  date -u '+%Y%m%d-%H%M%S'
 }
 
 generate_secret() {
@@ -89,7 +212,7 @@ set_env_value() {
   local key="$1"
   local value="$2"
   local tmp
-  tmp="$(mktemp)"
+  tmp="$(mktemp "$(dirname "$ENV_FILE")/.env.XXXXXX")"
   awk -v key="$key" -v value="$value" '
     BEGIN { found = 0 }
     $0 ~ "^" key "=" {
@@ -103,6 +226,7 @@ set_env_value() {
     }
   ' "$ENV_FILE" > "$tmp"
   mv "$tmp" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
 }
 
 is_placeholder() {
@@ -188,10 +312,13 @@ ensure_env_file() {
   if [[ ! -f "$ENV_FILE" ]]; then
     [[ -f "$ENV_EXAMPLE" ]] || die "missing $ENV_EXAMPLE"
     cp "$ENV_EXAMPLE" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
     echo "Created $ENV_FILE"
   fi
 
-  for key in POSTGRES_PASSWORD AUTH_INTERNAL_KEY BETTER_AUTH_SECRET; do
+  chmod 600 "$ENV_FILE"
+
+  for key in POSTGRES_PASSWORD AUTH_INTERNAL_KEY APP_SECRETS_ENCRYPTION_KEY BETTER_AUTH_SECRET; do
     if is_placeholder "$(env_value "$key")"; then
       set_env_value "$key" "$(generate_secret)"
       echo "Generated $key"
@@ -215,6 +342,7 @@ validate_env_file() {
     IDEABOARD_AUTH_MIGRATE_IMAGE \
     POSTGRES_PASSWORD \
     AUTH_INTERNAL_KEY \
+    APP_SECRETS_ENCRYPTION_KEY \
     BETTER_AUTH_SECRET \
     NATS_PASSWORD; do
     if is_placeholder "$(env_value "$key")"; then
@@ -275,6 +403,83 @@ validate_env_file() {
 
 docker_compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+}
+
+need_runtime_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
+}
+
+check_backup_dir_writable() {
+  local probe
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+  probe="$(mktemp "$BACKUP_DIR/.write-test.XXXXXX")" || die "backup dir is not writable: $BACKUP_DIR"
+  rm -f -- "$probe"
+}
+
+check_disk_space() {
+  local min_mb="${DEPLOY_MIN_FREE_MB:-1024}"
+  local available_kb
+  [[ "$min_mb" =~ ^[0-9]+$ ]] || min_mb=1024
+  available_kb="$(df -Pk "$BACKUP_DIR" | awk 'NR == 2 { print $4 }')"
+  if [[ -n "$available_kb" && "$available_kb" =~ ^[0-9]+$ ]]; then
+    if (( available_kb < min_mb * 1024 )); then
+      die "backup filesystem has less than ${min_mb}MB free: $BACKUP_DIR"
+    fi
+  fi
+}
+
+check_port_available_or_used_by_compose() {
+  local port="$1"
+  local service_name="$2"
+  local container_name="$3"
+  local ports
+  [[ "$port" =~ ^[0-9]+$ ]] || die "$service_name host port must be numeric: $port"
+  if command -v lsof >/dev/null 2>&1; then
+    if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+      ports="$(docker ps --filter "name=^/${container_name}$" --format '{{.Ports}}' 2>/dev/null || true)"
+      if [[ "$ports" == *"127.0.0.1:${port}->"* || "$ports" == *"0.0.0.0:${port}->"* || "$ports" == *":::${port}->"* ]]; then
+        echo "Port $port is already listening; assuming it belongs to the existing $service_name container."
+        return 0
+      fi
+      die "port $port is already in use outside the expected $service_name container"
+    fi
+  fi
+}
+
+check_nginx_template_render() {
+  local tmp
+  tmp="$(mktemp)"
+  render_host_nginx_config "$tmp" >/dev/null
+  if grep -F '${' "$tmp" >/dev/null; then
+    rm -f -- "$tmp"
+    die "rendered Nginx config still contains unresolved template variables"
+  fi
+  rm -f -- "$tmp"
+}
+
+preflight_checks() {
+  echo "Running deployment preflight checks..."
+  need_runtime_command docker
+  need_runtime_command tar
+  if ! docker compose version >/dev/null 2>&1; then
+    die "missing command: docker compose"
+  fi
+  if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+    die "curl or wget is required"
+  fi
+  validate_env_file || exit 1
+  docker_compose config >/dev/null
+  check_backup_dir_writable
+  check_disk_space
+  check_port_available_or_used_by_compose "$(api_host_port)" "api" "ideaboard-api"
+  check_port_available_or_used_by_compose "$(auth_host_port)" "auth" "ideaboard-auth"
+  if [[ -n "$(nginx_real_ip_include)" && ! -r "$(nginx_real_ip_include)" ]]; then
+    die "NGINX_REAL_IP_INCLUDE is not readable: $(nginx_real_ip_include)"
+  fi
+  check_nginx_template_render
+  DEPLOY_PREFLIGHT_GATE="passed"
+  echo "Preflight checks passed"
 }
 
 wait_for_postgres() {
@@ -359,6 +564,7 @@ backup_postgres() {
       'postgres-*.sql' \
       "PostgreSQL backup completed: $backup_file" \
       "PostgreSQL backup finalize failed; deployment aborted before migration"
+    DEPLOY_POSTGRES_BACKUP="$backup_file"
     return 0
   fi
 
@@ -392,6 +598,7 @@ backup_api_uploads() {
         'api-uploads-*.tar.gz' \
         "api-uploads backup completed: $backup_file" \
         "api-uploads backup finalize failed; deployment aborted before migration"
+      DEPLOY_UPLOADS_BACKUP="$backup_file"
       return 0
     fi
     rm -f -- "$tmp_file"
@@ -405,6 +612,7 @@ backup_api_uploads() {
       'api-uploads-*.tar.gz' \
       "api-uploads volume not found; wrote empty archive: $backup_file" \
       "api-uploads empty backup finalize failed; deployment aborted before migration"
+    DEPLOY_UPLOADS_BACKUP="$backup_file"
     return 0
   fi
 
@@ -535,6 +743,22 @@ http_get_quiet() {
   wget -q -T 5 -O /dev/null "$url"
 }
 
+http_reaches_server() {
+  local url="$1"
+  local status
+  local output
+
+  if command -v curl >/dev/null 2>&1; then
+    status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "$url" || true)"
+    [[ "$status" =~ ^[1-5][0-9][0-9]$ ]]
+    return
+  fi
+
+  command -v wget >/dev/null 2>&1 || die "curl or wget is required for public HTTP checks"
+  output="$(wget -S -T 5 -O /dev/null "$url" 2>&1 || true)"
+  grep -E 'HTTP/[0-9.]+[[:space:]]+[1-5][0-9][0-9]' <<< "$output" >/dev/null
+}
+
 public_api_health_url() {
   local base_url="$1"
 
@@ -578,6 +802,410 @@ run_backend_smoke_checks() {
   check_nats_event_stream
   check_public_api_health
   echo "Backend smoke checks passed"
+}
+
+current_git_ref() {
+  if [[ -d "$ROOT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+    git -C "$ROOT_DIR" symbolic-ref --short -q HEAD 2>/dev/null || \
+      git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null || \
+      git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || true
+  fi
+}
+
+current_git_commit() {
+  if [[ -d "$ROOT_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+    git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || true
+  fi
+}
+
+release_manifest_path() {
+  local release_id="$1"
+  printf '%s/%s.json\n' "$RELEASE_HISTORY_DIR" "$release_id"
+}
+
+init_release_context() {
+  [[ -n "$DEPLOY_RELEASE_ID" ]] && return 0
+  DEPLOY_RELEASE_ID="$(release_timestamp)"
+  DEPLOY_STARTED_AT="$(utc_now)"
+  DEPLOY_GIT_REF="$(current_git_ref)"
+  DEPLOY_GIT_COMMIT="$(current_git_commit)"
+  mkdir -p "$RELEASE_HISTORY_DIR"
+  chmod 700 "$RELEASE_STATE_DIR" "$RELEASE_HISTORY_DIR"
+  PREVIOUS_API_IMAGE="$(env_value IDEABOARD_API_IMAGE)"
+  PREVIOUS_AUTH_IMAGE="$(env_value IDEABOARD_AUTH_IMAGE)"
+  PREVIOUS_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+  DEPLOY_ENV_SNAPSHOT="$(mktemp "$RELEASE_STATE_DIR/env.${DEPLOY_RELEASE_ID}.XXXXXX")"
+  cp "$ENV_FILE" "$DEPLOY_ENV_SNAPSHOT"
+  chmod 600 "$DEPLOY_ENV_SNAPSHOT"
+}
+
+write_release_manifest() {
+  local status="$1"
+  local manifest
+  local tmp
+  local completed_at=""
+  manifest="$(release_manifest_path "$DEPLOY_RELEASE_ID")"
+  tmp="${manifest}.tmp"
+  if [[ "$status" == "active" || "$status" == "failed" ]]; then
+    completed_at="$(utc_now)"
+  fi
+  cat > "$tmp" <<EOF
+{
+  "release_id": $(json_value "$DEPLOY_RELEASE_ID"),
+  "status": $(json_value "$status"),
+  "stage": $(json_value "$DEPLOY_STAGE"),
+  "started_at": $(json_value "$DEPLOY_STARTED_AT"),
+  "completed_at": $(json_value "$completed_at"),
+  "git_ref": $(json_value "$DEPLOY_GIT_REF"),
+  "git_commit": $(json_value "$DEPLOY_GIT_COMMIT"),
+  "images": {
+    "api": $(json_value "${DEPLOY_API_IMAGE:-$(env_value IDEABOARD_API_IMAGE)}"),
+    "auth": $(json_value "${DEPLOY_AUTH_IMAGE:-$(env_value IDEABOARD_AUTH_IMAGE)}"),
+    "auth_migrate": $(json_value "${DEPLOY_AUTH_MIGRATE_IMAGE:-$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)}")
+  },
+  "previous_images": {
+    "api": $(json_value "$PREVIOUS_API_IMAGE"),
+    "auth": $(json_value "$PREVIOUS_AUTH_IMAGE"),
+    "auth_migrate": $(json_value "$PREVIOUS_AUTH_MIGRATE_IMAGE")
+  },
+  "backups": {
+    "postgres": $(json_value "$DEPLOY_POSTGRES_BACKUP"),
+    "uploads": $(json_value "$DEPLOY_UPLOADS_BACKUP")
+  },
+  "source_manifest": {
+    "source": $(json_value "$DEPLOY_SOURCE_MANIFEST"),
+    "local_copy": $(json_value "$DEPLOY_SOURCE_MANIFEST_COPY")
+  },
+  "gates": {
+    "preflight": $(json_value "$DEPLOY_PREFLIGHT_GATE"),
+    "cosign": $(json_value "$DEPLOY_COSIGN_GATE"),
+    "backup": $(json_value "$DEPLOY_BACKUP_GATE"),
+    "migration": $(json_value "$DEPLOY_MIGRATION_GATE"),
+    "smoke": $(json_value "$DEPLOY_SMOKE_GATE"),
+    "migration_started": $(json_value "$DEPLOY_MIGRATION_STARTED")
+  }
+}
+EOF
+  mv "$tmp" "$manifest"
+  chmod 600 "$manifest"
+  if [[ "$status" == "active" ]]; then
+    if [[ -f "$CURRENT_RELEASE_FILE" ]]; then
+      cp "$CURRENT_RELEASE_FILE" "$PREVIOUS_RELEASE_FILE"
+      chmod 600 "$PREVIOUS_RELEASE_FILE"
+    fi
+    cp "$manifest" "$CURRENT_RELEASE_FILE"
+    chmod 600 "$CURRENT_RELEASE_FILE"
+  fi
+}
+
+restore_env_snapshot() {
+  if [[ -n "$DEPLOY_ENV_SNAPSHOT" && -f "$DEPLOY_ENV_SNAPSHOT" ]]; then
+    cp "$DEPLOY_ENV_SNAPSHOT" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+  fi
+}
+
+capture_deploy_image_refs() {
+  DEPLOY_API_IMAGE="$(env_value IDEABOARD_API_IMAGE)"
+  DEPLOY_AUTH_IMAGE="$(env_value IDEABOARD_AUTH_IMAGE)"
+  DEPLOY_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+}
+
+print_recovery_hint() {
+  local manifest=""
+  if [[ -n "$DEPLOY_RELEASE_ID" ]]; then
+    manifest="$(release_manifest_path "$DEPLOY_RELEASE_ID")"
+  fi
+  echo >&2
+  echo "Deployment did not complete." >&2
+  [[ -n "$manifest" ]] && echo "Release manifest: $manifest" >&2
+  [[ -n "$DEPLOY_POSTGRES_BACKUP" ]] && echo "PostgreSQL backup: $DEPLOY_POSTGRES_BACKUP" >&2
+  [[ -n "$DEPLOY_UPLOADS_BACKUP" ]] && echo "Uploads backup: $DEPLOY_UPLOADS_BACKUP" >&2
+  echo "Previous API image: $PREVIOUS_API_IMAGE" >&2
+  echo "Previous Auth image: $PREVIOUS_AUTH_IMAGE" >&2
+  echo "Previous Auth migration image: $PREVIOUS_AUTH_MIGRATE_IMAGE" >&2
+  echo "Inspect logs: ideaboard logs --tail=200 api auth postgres nats" >&2
+  if (( DEPLOY_MIGRATION_STARTED == 0 )); then
+    if (( DEPLOY_ENV_RESTORE_ALLOWED == 1 )); then
+      echo "Migration did not start; .env was restored to the previous image refs." >&2
+    else
+      echo "Migration did not start; .env was left at the requested image refs for inspection." >&2
+    fi
+  else
+    echo "Migration may have run; database restore is not automatic. Inspect backups before rolling back DB state." >&2
+  fi
+}
+
+handle_deploy_failure() {
+  local exit_code="$1"
+  if [[ "$DEPLOY_TRAP_ENABLED" == "1" && "$DEPLOY_SUCCEEDED" == "0" && "$exit_code" != "0" && -n "$DEPLOY_RELEASE_ID" ]]; then
+    DEPLOY_COMPLETED_AT="$(utc_now)"
+    if (( DEPLOY_IMAGE_UPDATE_PENDING == 1 && DEPLOY_ENV_RESTORE_ALLOWED == 1 && DEPLOY_MIGRATION_STARTED == 0 )); then
+      restore_env_snapshot
+    fi
+    write_release_manifest "failed" || true
+    if [[ -n "$DEPLOY_ENV_SNAPSHOT" ]]; then
+      rm -f -- "$DEPLOY_ENV_SNAPSHOT"
+    fi
+    print_recovery_hint
+  fi
+  exit "$exit_code"
+}
+
+enable_deploy_failure_trap() {
+  DEPLOY_TRAP_ENABLED=1
+  trap 'handle_deploy_failure "$?"' EXIT
+}
+
+complete_deploy_success() {
+  DEPLOY_STAGE="complete"
+  DEPLOY_SMOKE_GATE="passed"
+  write_release_manifest "active"
+  finish_trapped_command_success
+}
+
+finish_trapped_command_success() {
+  if [[ -n "$DEPLOY_ENV_SNAPSHOT" ]]; then
+    rm -f -- "$DEPLOY_ENV_SNAPSHOT"
+  fi
+  DEPLOY_SUCCEEDED=1
+  trap - EXIT
+}
+
+print_release_file_summary() {
+  local label="$1"
+  local file="$2"
+
+  echo "$label: $file"
+  if [[ ! -f "$file" ]]; then
+    echo "  not found"
+    return 0
+  fi
+  sed -n \
+    -e 's/^[[:space:]]*"release_id":[[:space:]]*"\([^"]*\)".*/  release_id: \1/p' \
+    -e 's/^[[:space:]]*"status":[[:space:]]*"\([^"]*\)".*/  status: \1/p' \
+    -e 's/^[[:space:]]*"stage":[[:space:]]*"\([^"]*\)".*/  stage: \1/p' \
+    -e 's/^[[:space:]]*"started_at":[[:space:]]*"\([^"]*\)".*/  started_at: \1/p' \
+    -e 's/^[[:space:]]*"completed_at":[[:space:]]*"\([^"]*\)".*/  completed_at: \1/p' \
+    "$file"
+}
+
+print_release_summary() {
+  echo "Release state directory: $RELEASE_STATE_DIR"
+  print_release_file_summary "Current release" "$CURRENT_RELEASE_FILE"
+  print_release_file_summary "Previous release" "$PREVIOUS_RELEASE_FILE"
+}
+
+print_env_image_refs() {
+  echo "Configured image refs:"
+  echo "  api: $(env_value IDEABOARD_API_IMAGE)"
+  echo "  auth: $(env_value IDEABOARD_AUTH_IMAGE)"
+  echo "  auth-migrate: $(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+}
+
+print_recent_backups() {
+  echo "Recent backups: $BACKUP_DIR"
+  if [[ ! -d "$BACKUP_DIR" ]]; then
+    echo "  not found"
+    return 0
+  fi
+  find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'postgres-*.sql' -o -name 'api-uploads-*.tar.gz' \) \
+    | sort \
+    | tail -n 10 \
+    | sed 's/^/  /'
+}
+
+run_doctor() {
+  local mode="${1:-}"
+
+  print_release_summary
+  print_env_image_refs
+  echo
+  echo "Compose services:"
+  docker_compose ps || true
+  echo
+  print_recent_backups
+
+  if [[ "$mode" == "--deep" ]]; then
+    echo
+    echo "Deep health checks:"
+    run_backend_smoke_checks
+    local base_url
+    base_url="$(env_value API_BASE_URL)"
+    base_url="${base_url%/}"
+    if [[ -n "$base_url" ]]; then
+      echo "Checking public auth session route: ${base_url}/api/auth/get-session"
+      http_reaches_server "${base_url}/api/auth/get-session" || die "public auth session route check failed"
+    fi
+  fi
+}
+
+fetch_update_manifest() {
+  local source="$1"
+  local dest
+
+  [[ -n "$source" ]] || die "manifest source is required"
+  dest="$(mktemp "$RELEASE_STATE_DIR/source-manifest.${DEPLOY_RELEASE_ID}.XXXXXX")"
+  case "$source" in
+    http://*|https://*)
+      if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --connect-timeout 10 --max-time 60 "$source" -o "$dest"
+      elif command -v wget >/dev/null 2>&1; then
+        wget -q -T 60 -O "$dest" "$source"
+      else
+        die "curl or wget is required to fetch release manifest URL"
+      fi
+      ;;
+    *)
+      [[ -r "$source" ]] || die "manifest file is not readable: $source"
+      cp "$source" "$dest"
+      ;;
+  esac
+  chmod 600 "$dest"
+  printf '%s\n' "$dest"
+}
+
+apply_update_manifest() {
+  local manifest_file="$1"
+  local api_image
+  local auth_image
+  local auth_migrate_image
+  local tag
+  local commit
+
+  api_image="$(json_image_field "api" "$manifest_file")"
+  auth_image="$(json_image_field "auth" "$manifest_file")"
+  auth_migrate_image="$(json_image_field "auth-migrate" "$manifest_file")"
+  if [[ -z "$auth_migrate_image" ]]; then
+    auth_migrate_image="$(json_image_field "auth_migrate" "$manifest_file")"
+  fi
+  [[ -n "$api_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || \
+    die "release manifest must contain images.api, images.auth, and images.auth-migrate"
+  is_ideaboard_image_ref "$api_image" "api" || die "release manifest has invalid api image ref"
+  is_ideaboard_image_ref "$auth_image" "auth" || die "release manifest has invalid auth image ref"
+  is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate" || die "release manifest has invalid auth-migrate image ref"
+
+  tag="$(json_string_field "tag" "$manifest_file")"
+  commit="$(json_string_field "commit" "$manifest_file")"
+  echo "Applying release manifest${tag:+ tag: $tag}${commit:+ commit: $commit}"
+  set_env_value IDEABOARD_API_IMAGE "$api_image"
+  set_env_value IDEABOARD_AUTH_IMAGE "$auth_image"
+  set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_image"
+  DEPLOY_IMAGE_UPDATE_PENDING=1
+}
+
+needs_auto_update() {
+  [[ "$is_update" == "1" ]] || \
+    is_placeholder "$(env_value IDEABOARD_API_IMAGE)" || \
+    is_placeholder "$(env_value IDEABOARD_AUTH_IMAGE)" || \
+    is_placeholder "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)" || \
+    ! is_ideaboard_image_ref "$(env_value IDEABOARD_API_IMAGE)" "api" || \
+    ! is_ideaboard_image_ref "$(env_value IDEABOARD_AUTH_IMAGE)" "auth" || \
+    ! is_ideaboard_image_ref "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)" "auth-migrate"
+}
+
+resolve_deploy_images() {
+  if [[ -n "$update_manifest_source" ]]; then
+    local manifest_file
+    manifest_file="$(fetch_update_manifest "$update_manifest_source")"
+    DEPLOY_SOURCE_MANIFEST="$update_manifest_source"
+    DEPLOY_SOURCE_MANIFEST_COPY="$manifest_file"
+    apply_update_manifest "$manifest_file"
+    return 0
+  fi
+
+  if needs_auto_update; then
+    perform_auto_update
+  fi
+}
+
+run_deploy_transaction() {
+  init_release_context
+  enable_deploy_failure_trap
+
+  DEPLOY_STAGE="resolve-images"
+  resolve_deploy_images
+  capture_deploy_image_refs
+
+  DEPLOY_STAGE="preflight"
+  preflight_checks
+
+  DEPLOY_STAGE="pull"
+  prepare_stack_images
+
+  DEPLOY_STAGE="start-postgres"
+  docker_compose up -d postgres
+  wait_for_postgres
+
+  DEPLOY_STAGE="backup"
+  backup_postgres
+  backup_api_uploads
+  DEPLOY_BACKUP_GATE="passed"
+
+  DEPLOY_STAGE="api-migration"
+  DEPLOY_MIGRATION_STARTED=1
+  run_api_migration
+
+  DEPLOY_STAGE="auth-migration"
+  run_auth_migration
+  DEPLOY_MIGRATION_GATE="passed"
+  DEPLOY_ENV_RESTORE_ALLOWED=0
+
+  DEPLOY_STAGE="up"
+  docker_compose up -d
+
+  DEPLOY_STAGE="smoke"
+  run_backend_smoke_checks
+
+  complete_deploy_success
+  docker_compose ps
+}
+
+restore_previous_image_refs() {
+  [[ -f "$PREVIOUS_RELEASE_FILE" ]] || die "previous release manifest not found: $PREVIOUS_RELEASE_FILE"
+  local api_image
+  local auth_image
+  local auth_migrate_image
+  api_image="$(json_object_string_field "images" "api" "$PREVIOUS_RELEASE_FILE")"
+  auth_image="$(json_object_string_field "images" "auth" "$PREVIOUS_RELEASE_FILE")"
+  auth_migrate_image="$(json_object_string_field "images" "auth_migrate" "$PREVIOUS_RELEASE_FILE")"
+  if [[ -z "$auth_migrate_image" ]]; then
+    auth_migrate_image="$(json_object_string_field "images" "auth-migrate" "$PREVIOUS_RELEASE_FILE")"
+  fi
+  [[ -n "$api_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || die "previous release manifest is missing image refs"
+  is_ideaboard_image_ref "$api_image" "api" || die "previous release manifest has invalid api image ref"
+  is_ideaboard_image_ref "$auth_image" "auth" || die "previous release manifest has invalid auth image ref"
+  is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate" || die "previous release manifest has invalid auth-migrate image ref"
+  set_env_value IDEABOARD_API_IMAGE "$api_image"
+  set_env_value IDEABOARD_AUTH_IMAGE "$auth_image"
+  set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_image"
+}
+
+run_previous_rollback() {
+  echo "Restoring previous image refs from $PREVIOUS_RELEASE_FILE"
+  init_release_context
+  DEPLOY_IMAGE_UPDATE_PENDING=1
+  enable_deploy_failure_trap
+
+  DEPLOY_STAGE="rollback-restore-env"
+  restore_previous_image_refs
+  capture_deploy_image_refs
+
+  DEPLOY_STAGE="preflight"
+  preflight_checks
+
+  DEPLOY_STAGE="pull"
+  prepare_stack_images
+
+  DEPLOY_STAGE="up"
+  docker_compose up -d
+  DEPLOY_ENV_RESTORE_ALLOWED=0
+
+  DEPLOY_STAGE="smoke"
+  run_backend_smoke_checks
+
+  complete_deploy_success
+  docker_compose ps
 }
 
 login_ghcr_if_configured() {
@@ -685,6 +1313,7 @@ verify_image_signatures() {
   verify_image_signature "$(env_value IDEABOARD_API_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_AUTH_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+  DEPLOY_COSIGN_GATE="passed"
 }
 
 prepare_stack_images() {
@@ -705,9 +1334,10 @@ render_host_nginx_config() {
   local output_path="${1:-$ROOT_DIR/deploy/nginx/ideaboard.conf}"
 
   NGINX_API_UPSTREAM="$(nginx_api_upstream)" \
-    NGINX_AUTH_UPSTREAM="$(nginx_auth_upstream)" \
+  NGINX_AUTH_UPSTREAM="$(nginx_auth_upstream)" \
     NGINX_AUTH_HEALTH_UPSTREAM="$(nginx_auth_health_upstream)" \
     NGINX_REAL_IP_INCLUDE="$(nginx_real_ip_include)" \
+    NGINX_SERVER_NAME="${NGINX_SERVER_NAME:-$(env_or_file_value NGINX_SERVER_NAME)}" \
     NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/usr/share/nginx/html}" \
     NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-return 404}" \
     bash "$ROOT_DIR/scripts/render-nginx-template.sh" "$output_path"
@@ -845,6 +1475,9 @@ perform_auto_update() {
   set_env_value IDEABOARD_API_IMAGE "$api_digest"
   set_env_value IDEABOARD_AUTH_IMAGE "$auth_digest"
   set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_digest"
+  DEPLOY_IMAGE_UPDATE_PENDING=1
+  DEPLOY_GIT_REF="$(current_git_ref)"
+  DEPLOY_GIT_COMMIT="$(current_git_commit)"
 
   echo "Successfully resolved and updated image digests in $ENV_FILE"
   echo "==========================="
@@ -873,70 +1506,91 @@ if [[ "$command" == "cloudflare-real-ip-conf" ]]; then
   exit 0
 fi
 
-if [[ "$is_update" == "1" ]] || \
-   is_placeholder "$(env_value IDEABOARD_API_IMAGE)" || \
-   is_placeholder "$(env_value IDEABOARD_AUTH_IMAGE)" || \
-   is_placeholder "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)" || \
-   ! is_ideaboard_image_ref "$(env_value IDEABOARD_API_IMAGE)" "api" || \
-   ! is_ideaboard_image_ref "$(env_value IDEABOARD_AUTH_IMAGE)" "auth" || \
-   ! is_ideaboard_image_ref "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)" "auth-migrate"; then
-  perform_auto_update
-fi
-
-validate_env_file || exit 1
-
 case "$command" in
   deploy)
-    prepare_stack_images
-    docker_compose up -d postgres
-    wait_for_postgres
-    backup_postgres
-    backup_api_uploads
-    run_api_migration
-    run_auth_migration
-    docker_compose up -d
-    run_backend_smoke_checks
-    docker_compose ps
+    run_deploy_transaction
     ;;
   smoke)
+    validate_env_file || exit 1
     run_backend_smoke_checks
     docker_compose ps
     ;;
   restart)
+    validate_env_file || exit 1
     docker_compose restart
     docker_compose ps
     ;;
   stop)
+    validate_env_file || exit 1
     docker_compose stop
     ;;
   status)
+    validate_env_file || exit 1
+    print_release_summary
+    print_env_image_refs
+    echo
     docker_compose ps
     ;;
+  doctor)
+    validate_env_file || exit 1
+    shift || true
+    run_doctor "${1:-}"
+    ;;
+  preflight)
+    preflight_checks
+    ;;
+  rollback)
+    validate_env_file || exit 1
+    shift || true
+    if [[ "${1:-}" != "--to" || "${2:-}" != "previous" || -n "${3:-}" ]]; then
+      die "usage: ideaboard rollback --to previous"
+    fi
+    run_previous_rollback
+    ;;
   logs)
+    validate_env_file || exit 1
     shift || true
     docker_compose logs -f "$@"
     ;;
   pull)
+    validate_env_file || exit 1
     prepare_stack_images
     ;;
   up)
+    validate_env_file || exit 1
     docker_compose up -d
     ;;
   migrate)
+    validate_env_file || exit 1
+    init_release_context
+    enable_deploy_failure_trap
+    DEPLOY_STAGE="pull"
     prepare_stack_images
+    DEPLOY_STAGE="start-postgres"
     docker_compose up -d postgres
     wait_for_postgres
+    DEPLOY_STAGE="backup"
     backup_postgres
     backup_api_uploads
+    DEPLOY_BACKUP_GATE="passed"
+    DEPLOY_STAGE="api-migration"
+    DEPLOY_MIGRATION_STARTED=1
     run_api_migration
+    DEPLOY_STAGE="auth-migration"
     run_auth_migration
+    DEPLOY_MIGRATION_GATE="passed"
+    finish_trapped_command_success
     ;;
   ps)
+    validate_env_file || exit 1
     docker_compose ps
     ;;
   *)
     cat >&2 <<EOF
-Usage: ideaboard [update|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|ps]
+Usage: ideaboard [update|deploy|preflight|doctor|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|rollback|ps]
+       ideaboard update [--manifest path-or-url]
+       ideaboard doctor [--deep]
+       ideaboard rollback --to previous
        ideaboard nginx-conf [output-path]
        ideaboard cloudflare-real-ip-conf [output-path]
 

@@ -5,7 +5,7 @@ map $http_x_forwarded_proto $proxy_x_forwarded_proto {
 
 server {
     listen 80;
-    server_name _;
+    server_name ${NGINX_SERVER_NAME};
 
     ${NGINX_REAL_IP_INCLUDE_DIRECTIVE}
 

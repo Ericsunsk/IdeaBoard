@@ -169,6 +169,8 @@ VPS
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
+Docker Images workflow 会在发布镜像后上传 `release-manifest` artifact，tag 发布还会把 `release-manifest.json` 附到同一 GitHub Release。该 manifest 记录本次 workflow 的 `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、SBOM artifact 名称与 Cosign OIDC identity；部署时可直接使用 `ideaboard update --manifest release-manifest.json`。
+
 镜像命名约定：
 
 ```text
@@ -233,6 +235,7 @@ GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh --ref "${REF}"
 - `IDEABOARD_AUTH_MIGRATE_IMAGE`
 - `POSTGRES_PASSWORD`
 - `AUTH_INTERNAL_KEY`
+- `APP_SECRETS_ENCRYPTION_KEY`
 - `BETTER_AUTH_SECRET`
 - `NATS_PASSWORD`
 
@@ -244,8 +247,9 @@ ideaboard update
 
 `ideaboard update` 命令会自动执行以下操作，无需人工手动查找和修改 `.env` 中的镜像 digest：
 1. **自动拉取代码**：若 VPS 部署目录是 Git 分支（如 `main`），会执行 `git pull` 以拉取最新的配置文件、脚本和数据库迁移文件。
-2. **自动解析最新镜像**：自动识别 GitHub 仓库的 owner/repo，获取对应更新通道/Tag（默认为 `latest`，或可通过 `IDEABOARD_UPDATE_TAG` 自定义）的最新 API、Auth、Auth-Migration 镜像，拉取并解析其具体的 `sha256` 唯一哈希值，然后自动更新写入 `docker/.env`。
-3. **备份与升级**：在执行 API / Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar（默认写到 `/opt/stacks/ideaboard-backups/`，保留最近 5 份），最后重启容器并通过健康检查门禁。
+2. **确定镜像输入**：可优先使用 `ideaboard update --manifest release-manifest.json` 写入同一发布批次的 API、Auth、Auth-Migration digest；未提供 manifest 时，自动识别 GitHub 仓库的 owner/repo，获取对应更新通道/Tag（默认为 `latest`，或可通过 `IDEABOARD_UPDATE_TAG` 自定义）的最新镜像并解析 `sha256` digest。
+3. **事务化升级**：创建 `.env` snapshot 与 `docker/releases/history/*.json` 发布记录，执行 preflight、Cosign 验签、pull、backup、migration、重启与 smoke gate。migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 restore DB，但会输出 release id、失败阶段、backup 路径和 previous digest。
+4. **标记 active release**：成功后写入 `docker/releases/current.json`，并把上一版保存为 `docker/releases/previous.json`。
 
 
 > [!IMPORTANT]
@@ -266,6 +270,9 @@ Go API 业务表使用单 baseline migration。空 PostgreSQL 库会在 API migr
 常用运维：
 
 ```bash
+ideaboard preflight
+ideaboard doctor
+ideaboard doctor --deep
 ideaboard restart
 ideaboard stop
 ideaboard status
@@ -306,6 +313,8 @@ NGINX_AUTH_HEALTH_UPSTREAM=http://127.0.0.1:6001/api/health
 ```
 
 如果后续改为宿主机反代服务直连 Docker bridge，把这三个值写进 `/opt/stacks/ideaboard/docker/.env` 后重新执行 `ideaboard nginx-conf` 即可。
+
+默认生成的 `server_name` 是 `_`，以兼容单站点或已有上游反代部署；如需明确绑定 API 域名，可设置 `NGINX_SERVER_NAME=api.example.com` 后重新执行 `ideaboard nginx-conf`。
 
 如果 API 域名使用 Cloudflare `Proxied`，并且 VPS 防火墙已限制 80/443 只接受 Cloudflare IP ranges，可以生成真实客户端 IP include：
 
@@ -762,6 +771,6 @@ nginx -t && systemctl reload nginx
 6. 执行 `systemctl restart ideaboard-auth ideaboard`。
 7. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
 
-Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 改回上一版 digest 并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 API / Auth migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复；restore 后按 secret artifact 规则轮换上游 API key 与对象存储凭据。
+Docker stack 成功部署后会维护 `/opt/stacks/ideaboard/docker/releases/current.json` 与 `previous.json`。需要回退运行镜像时，可执行 `ideaboard rollback --to previous`，脚本会把 previous manifest 中的三张 image digest 写回 `.env`、重新 pull/验签、启动服务并跑 smoke gate。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复；restore 后按 secret artifact 规则轮换上游 API key 与对象存储凭据。
 
 Docker stack 的数据面以 PostgreSQL volume 为准；回滚镜像不会自动转换、导入或恢复非 PostgreSQL 数据。
