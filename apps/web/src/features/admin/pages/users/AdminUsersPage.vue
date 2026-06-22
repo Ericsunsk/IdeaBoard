@@ -237,10 +237,10 @@
   </AdminTablePanel>
 
   <AdminUserBanDialog
-    :visible="showBanModal"
-    :description="banModalDescription"
     v-model:expires-in-days="banForm.expiresInDays"
     v-model:reason="banForm.reason"
+    :visible="showBanModal"
+    :description="banModalDescription"
     :duration-options="banDurationOptions"
     :loading="banFormLoading"
     @update:visible="handleBanDialogVisibleUpdate"

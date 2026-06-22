@@ -82,7 +82,6 @@ fi
 DEPLOY_STAGE="init"
 DEPLOY_RELEASE_ID=""
 DEPLOY_STARTED_AT=""
-DEPLOY_COMPLETED_AT=""
 DEPLOY_GIT_REF=""
 DEPLOY_GIT_COMMIT=""
 DEPLOY_POSTGRES_BACKUP=""
@@ -464,7 +463,7 @@ check_nginx_template_render() {
   local tmp
   tmp="$(mktemp)"
   render_host_nginx_config "$tmp" >/dev/null
-  if grep -F '${' "$tmp" >/dev/null; then
+  if grep -F "\${" "$tmp" >/dev/null; then
     rm -f -- "$tmp"
     die "rendered Nginx config still contains unresolved template variables"
   fi
@@ -1286,7 +1285,6 @@ print_recovery_hint() {
 handle_deploy_failure() {
   local exit_code="$1"
   if [[ "$DEPLOY_TRAP_ENABLED" == "1" && "$DEPLOY_SUCCEEDED" == "0" && "$exit_code" != "0" && -n "$DEPLOY_RELEASE_ID" ]]; then
-    DEPLOY_COMPLETED_AT="$(utc_now)"
     if (( DEPLOY_IMAGE_UPDATE_PENDING == 1 && DEPLOY_ENV_RESTORE_ALLOWED == 1 && DEPLOY_MIGRATION_STARTED == 0 )); then
       restore_env_snapshot
     fi
