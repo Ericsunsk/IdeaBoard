@@ -1,5 +1,11 @@
 import { computed, onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
-import { resolveFetchUrl } from '../services/flowMediaIO'
+import { canvasToBlob, resolveFetchUrl } from '../services/flowMediaIO'
+import {
+  detectCanvasTransparency,
+  resolvePreviewMimeType,
+  WEBP_PREVIEW_MIME_TYPE,
+  WEBP_PREVIEW_QUALITY,
+} from '../utils/displayImagePreviewEncoding'
 
 interface PreviewOptions {
   maxSide?: number
@@ -96,11 +102,13 @@ async function createPreviewObjectUrl(sourceUrl: string, maxSide: number): Promi
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
 
-  const previewBlob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob(resolve, 'image/webp', 0.82)
-  })
-
-  if (!previewBlob) return null
+  const hasTransparentPixels = detectCanvasTransparency(ctx, width, height)
+  const previewMime = resolvePreviewMimeType(sourceBlob.type, hasTransparentPixels)
+  const previewBlob = await canvasToBlob(
+    canvas,
+    previewMime,
+    previewMime === WEBP_PREVIEW_MIME_TYPE ? WEBP_PREVIEW_QUALITY : undefined,
+  )
   return URL.createObjectURL(previewBlob)
 }
 

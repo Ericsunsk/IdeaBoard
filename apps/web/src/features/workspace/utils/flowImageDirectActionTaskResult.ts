@@ -1,9 +1,8 @@
-import { extractImageUrlsFromTaskResult } from '../../../shared/query/taskResult'
-
-type TaskResultLike = {
-  outputs?: Array<{ role?: string; url?: string }>
-  result?: string | null
-}
+import {
+  normalizeTaskImageResult,
+  normalizeTaskImageResults,
+  type TaskImageResult,
+} from '../../../shared/query/taskResult'
 
 type ImageSize = {
   width: number
@@ -12,25 +11,8 @@ type ImageSize = {
 
 type ImageSizeLoader = (url: string) => Promise<ImageSize | null>
 
-export function extractTaskImageUrls(task: TaskResultLike): string[] {
-  const outputUrls = Array.isArray(task.outputs)
-    ? task.outputs
-        .filter((output) => output?.role === 'image' && typeof output.url === 'string')
-        .map((output) => output.url?.trim() ?? '')
-        .filter((url) => url.length > 0)
-    : []
-  if (outputUrls.length > 0) return outputUrls
-  return extractImageUrlsFromTaskResult(task.result)
-}
-
-export function pickFirstValidUrl(urls: string[]): string {
-  return urls.find((url) => typeof url === 'string' && url.trim())?.trim() ?? ''
-}
-
-export function normalizeTaskImageUrls(urls: string[]): string[] {
-  return urls
-    .map((url) => (typeof url === 'string' ? url.trim() : ''))
-    .filter((url) => url.length > 0)
+export function pickFirstValidImageResult(results: TaskImageResult[]): TaskImageResult | null {
+  return normalizeTaskImageResults(results)[0] ?? null
 }
 
 export async function resolveTaskImageRatio(
@@ -47,4 +29,15 @@ export async function resolveTaskImageRatio(
     console.warn('[workspace] failed to probe task image size', error)
   }
   return fallbackRatio > 0 ? fallbackRatio : 1
+}
+
+export async function resolveTaskImageResultRatio(
+  result: TaskImageResult,
+  fallbackRatio: number,
+  loadImageSize: ImageSizeLoader,
+): Promise<number> {
+  const normalized = normalizeTaskImageResult(result)
+  if (!normalized) return fallbackRatio > 0 ? fallbackRatio : 1
+  if (normalized.width && normalized.height) return normalized.height / normalized.width
+  return resolveTaskImageRatio(normalized.url, fallbackRatio, loadImageSize)
 }

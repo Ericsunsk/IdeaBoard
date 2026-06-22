@@ -181,6 +181,78 @@ func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 	}
 }
 
+func TestCallOpenAIRemoveBgForcesTransparentPNGOutput(t *testing.T) {
+	var gotPath string
+	var gotMultipart multipartRequestCapture
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMultipart = readMultipartRequest(t, r)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/no-bg.png"}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+	}
+	params := map[string]interface{}{
+		"feature":       "remove-bg",
+		"image_urls":    []interface{}{buildTinyPNGDataURL(t)},
+		"output_format": "jpeg",
+	}
+
+	if _, err := c.callOpenAI(context.Background(), account, "remove background", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+		t.Fatalf("callOpenAI returned error: %v", err)
+	}
+	if gotPath != "/v1/images/edits" {
+		t.Fatalf("expected edit endpoint, got %s", gotPath)
+	}
+	if gotMultipart.Fields["output_format"][0] != "png" {
+		t.Fatalf("output_format = %#v, want png", gotMultipart.Fields["output_format"])
+	}
+	if gotMultipart.Fields["background"][0] != "transparent" {
+		t.Fatalf("background = %#v, want transparent", gotMultipart.Fields["background"])
+	}
+}
+
+func TestCallOpenAIRemoveBgRejectsModelWithoutTransparentBackground(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected upstream request: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-2", Enabled: true}},
+	}
+	params := map[string]interface{}{
+		"feature":    "remove-bg",
+		"image_urls": []interface{}{buildTinyPNGDataURL(t)},
+	}
+
+	if _, err := c.callOpenAI(context.Background(), account, "remove background", 1024, 1024, 2*time.Second, params, "gpt-image-2"); err == nil {
+		t.Fatalf("expected transparent background capability error")
+	}
+}
+
+func TestOpenAIImageModelCapabilitiesFor(t *testing.T) {
+	if openAIImageModelCapabilitiesFor(" GPT-IMAGE-2 ").SupportsTransparentBackground {
+		t.Fatalf("expected gpt-image-2 to reject transparent backgrounds")
+	}
+	if !openAIImageModelCapabilitiesFor("gpt-image-1").SupportsTransparentBackground {
+		t.Fatalf("expected gpt-image-1 to support transparent backgrounds")
+	}
+	if !openAIImageModelCapabilitiesFor("custom-openai-compatible-image-model").SupportsTransparentBackground {
+		t.Fatalf("expected unknown OpenAI-compatible models to keep transparent background enabled")
+	}
+}
+
 func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 	var gotPath string
 	var gotBody map[string]interface{}

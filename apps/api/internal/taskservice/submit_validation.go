@@ -30,6 +30,7 @@ var unsupportedSubmitTaskParamKeys = []string{
 	"fusion_input_weights",
 	"upscale_mode",
 	"upscale_factor",
+	"output_format",
 	"output_quality",
 }
 

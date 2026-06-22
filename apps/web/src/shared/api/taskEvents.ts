@@ -1,11 +1,14 @@
 import { queryClient } from '../query/queryClient'
 import { getGetUserTaskQueryKey } from './generated-query/tasks/tasks'
 import type { ApiResponseTask } from './generated-query/model'
-import { extractImageUrlsFromTaskResult } from '../query/taskResult'
+import {
+  extractImageResultsFromTaskPayload,
+  type TaskImageResult,
+} from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
 import type { Task } from './task'
-import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
+import { resolveApiUrl } from '../config/runtimeUrls'
 
 type TaskEventPayload = Pick<
   Task,
@@ -34,10 +37,10 @@ export function isTaskResultPendingError(error: unknown): error is TaskResultPen
   return error instanceof TaskResultPendingError
 }
 
-export function waitTaskResultWithSse(
+export function waitTaskImageResultsWithSse(
   taskId: string,
   options?: WaitTaskResultOptions,
-): Promise<string[]> {
+): Promise<TaskImageResult[]> {
   const timeoutMs = options?.timeoutMs ?? SSE_TIMEOUT_MS
   const deadlineAt = Date.now() + timeoutMs
   const pollOptions = {
@@ -54,7 +57,7 @@ function waitWithEventSource(
   taskId: string,
   deadlineAt: number,
   pollOptions: { initialDelayMs: number; maxDelayMs: number },
-): Promise<string[]> {
+): Promise<TaskImageResult[]> {
   return new Promise((resolve, reject) => {
     const es = new EventSource(resolveApiUrl(`/user/tasks/${encodeURIComponent(taskId)}/events`), {
       withCredentials: true,
@@ -67,7 +70,7 @@ function waitWithEventSource(
       es.close()
     }
 
-    const settleResolve = (value: string[]) => {
+    const settleResolve = (value: TaskImageResult[]) => {
       if (settled) return
       settled = true
       cleanup()
@@ -116,7 +119,7 @@ function waitWithEventSource(
       )
 
       if (task.status === 'completed') {
-        settleResolve(extractImageUrlsFromTaskEvent(task))
+        settleResolve(extractImageResultsFromTaskEvent(task))
         return
       }
       if (task.status === 'failed') {
@@ -151,7 +154,7 @@ async function waitWithPolling(
   taskId: string,
   deadlineAt: number,
   options: { initialDelayMs: number; maxDelayMs: number },
-): Promise<string[]> {
+): Promise<TaskImageResult[]> {
   let nextDelayMs = options.initialDelayMs
   let lastError: unknown
 
@@ -170,7 +173,7 @@ async function waitWithPolling(
     }
 
     if (task?.status === 'completed') {
-      return extractImageUrlsFromTaskEvent(task)
+      return extractImageResultsFromTaskEvent(task)
     }
     if (task?.status === 'failed') {
       const msg = task.error_msg?.trim() || '生成失败'
@@ -214,14 +217,6 @@ export function createTaskCancelledError(task?: Pick<Task, 'error_msg' | 'cancel
   return new Error(sanitizeApiErrorMessage(msg, '任务已取消'))
 }
 
-function extractImageUrlsFromTaskEvent(task: TaskEventPayload): string[] {
-  const outputUrls = Array.isArray(task.outputs)
-    ? task.outputs
-        .filter((output) => output?.role === 'image' && typeof output.url === 'string')
-        .map((output) => output.url.trim())
-        .filter((url) => url.length > 0)
-        .map(resolveAssetUrl)
-    : []
-  if (outputUrls.length > 0) return outputUrls
-  return extractImageUrlsFromTaskResult(task.result)
+function extractImageResultsFromTaskEvent(task: TaskEventPayload): TaskImageResult[] {
+  return extractImageResultsFromTaskPayload(task)
 }

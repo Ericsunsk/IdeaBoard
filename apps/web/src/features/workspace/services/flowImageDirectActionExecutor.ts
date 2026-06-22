@@ -1,5 +1,12 @@
 import { taskApi } from '../../../shared/api/task'
-import { createTaskCancelledError } from '../../../shared/api/taskEvents'
+import {
+  createTaskCancelledError,
+  waitTaskImageResultsWithSse,
+} from '../../../shared/api/taskEvents'
+import {
+  extractImageResultsFromTaskPayload,
+  type TaskImageResult,
+} from '../../../shared/query/taskResult'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   type ExecutionFeature,
@@ -13,8 +20,7 @@ import {
   buildPromptAspectRatioTaskParams,
   type PromptAspectRatio,
 } from '../config/promptAspectRatio'
-import { extractTaskImageUrls } from '../utils/flowImageDirectActionTaskResult'
-import { assertTaskSubmitReady, waitTaskResult } from './flowTaskExecutorUtils'
+import { assertTaskSubmitReady } from './flowTaskExecutorUtils'
 import type { ImageDirectActionSource } from '../utils/flowImageDirectActionSource'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
@@ -273,11 +279,19 @@ export async function submitHdUpscaleTask(
   return submitRes.data.task_id
 }
 
-export async function waitExistingOrLiveTaskResult(taskId: string): Promise<string[]> {
+export async function waitExistingOrLiveTaskImageResults(
+  taskId: string,
+): Promise<TaskImageResult[]> {
   let task:
     | {
         status?: string
-        outputs?: Array<{ role?: string; url?: string }>
+        outputs?: Array<{
+          role?: string
+          url?: string
+          width?: number
+          height?: number
+          mime_type?: string
+        }>
         result?: string | null
         error_msg?: string
         cancel_reason?: string
@@ -290,11 +304,11 @@ export async function waitExistingOrLiveTaskResult(taskId: string): Promise<stri
     const status = Number((error as { status?: unknown; code?: unknown })?.status)
     const code = Number((error as { status?: unknown; code?: unknown })?.code)
     if (status === 404 || code === 404) throw error
-    return waitTaskResult(taskId)
+    return waitTaskImageResultsWithSse(taskId)
   }
   if (task?.status === 'completed') {
-    const urls = extractTaskImageUrls(task)
-    if (urls.length > 0) return urls
+    const results = extractImageResultsFromTaskPayload(task)
+    if (results.length > 0) return results
     throw new Error('任务完成但未返回图片')
   }
   if (task?.status === 'failed') {
@@ -303,5 +317,5 @@ export async function waitExistingOrLiveTaskResult(taskId: string): Promise<stri
   if (task?.status === 'cancelled') {
     throw createTaskCancelledError(task)
   }
-  return waitTaskResult(taskId)
+  return waitTaskImageResultsWithSse(taskId)
 }

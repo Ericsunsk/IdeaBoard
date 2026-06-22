@@ -17,8 +17,9 @@ const mocks = vi.hoisted(() => ({
   submitImageInpaintTask: vi.fn(),
   submitPromptImageGenerationTask: vi.fn(),
   submitPromptTextGenerationTask: vi.fn(),
-  waitExistingOrLiveTaskResult: vi.fn(),
+  waitExistingOrLiveTaskImageResults: vi.fn(),
   resolveTaskImageRatio: vi.fn(),
+  resolveTaskImageResultRatio: vi.fn(),
 }))
 
 vi.mock('../services/flowImageDirectActionExecutor', () => ({
@@ -32,13 +33,14 @@ vi.mock('../services/flowImageDirectActionExecutor', () => ({
   submitImageInpaintTask: mocks.submitImageInpaintTask,
   submitPromptImageGenerationTask: mocks.submitPromptImageGenerationTask,
   submitPromptTextGenerationTask: mocks.submitPromptTextGenerationTask,
-  waitExistingOrLiveTaskResult: mocks.waitExistingOrLiveTaskResult,
+  waitExistingOrLiveTaskImageResults: mocks.waitExistingOrLiveTaskImageResults,
 }))
 
 vi.mock('../utils/flowImageDirectActionTaskResult', () => ({
-  normalizeTaskImageUrls: (urls: string[]) => urls.map((url) => url.trim()).filter(Boolean),
-  pickFirstValidUrl: (urls: string[]) => urls.map((url) => url.trim()).find(Boolean) ?? null,
+  pickFirstValidImageResult: (results: Array<{ url: string }>) =>
+    results.find((result) => result.url.trim()) ?? null,
   resolveTaskImageRatio: mocks.resolveTaskImageRatio,
+  resolveTaskImageResultRatio: mocks.resolveTaskImageResultRatio,
 }))
 
 type Deferred<T> = {
@@ -157,18 +159,22 @@ function findPendingResultNode(nodes: Node[]): Node {
 describe('useFlowImageDirectActions pending task recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.assertCanvasExtendSubmitReady.mockResolvedValue(undefined)
     mocks.assertDirectActionSubmitReady.mockResolvedValue(undefined)
     mocks.assertHdUpscaleSubmitReady.mockResolvedValue(undefined)
     mocks.resolveTaskImageRatio.mockImplementation(async (_url: string, fallback: number) =>
       fallback > 0 ? fallback : 1,
     )
+    mocks.resolveTaskImageResultRatio.mockImplementation(
+      async (_result: { url: string }, fallback: number) => (fallback > 0 ? fallback : 1),
+    )
   })
 
   it('persists task id after submit and clears it after completion', async () => {
     const submitTask = createDeferred<string>()
-    const waitTask = createDeferred<string[]>()
+    const waitTask = createDeferred<Array<{ url: string }>>()
     mocks.submitDirectActionTask.mockReturnValue(submitTask.promise)
-    mocks.waitExistingOrLiveTaskResult.mockReturnValue(waitTask.promise)
+    mocks.waitExistingOrLiveTaskImageResults.mockReturnValue(waitTask.promise)
     const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
 
     const run = harness.actions.runImageDirectAction('image-1', IMAGE_NODE_ACTION.removeBg)
@@ -181,7 +187,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     expect(findImageNode(harness.nodes.value, pendingNode.id).pendingTaskId).toBe('task-1')
     expect(harness.flushAutosave).toHaveBeenCalledWith({ silent: true })
 
-    waitTask.resolve(['https://example.com/result.png'])
+    waitTask.resolve([{ url: 'https://example.com/result.png' }])
     await run
 
     const completed = findImageNode(harness.nodes.value, pendingNode.id)
@@ -192,8 +198,8 @@ describe('useFlowImageDirectActions pending task recovery', () => {
   })
 
   it('reattaches a loaded pending result once and saves the recovered image', async () => {
-    const waitTask = createDeferred<string[]>()
-    mocks.waitExistingOrLiveTaskResult.mockReturnValue(waitTask.promise)
+    const waitTask = createDeferred<Array<{ url: string }>>()
+    mocks.waitExistingOrLiveTaskImageResults.mockReturnValue(waitTask.promise)
     const harness = createHarness([
       makeImageNode(
         'image-2',
@@ -210,9 +216,9 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     const first = harness.actions.reattachPendingImageResults()
     const second = harness.actions.reattachPendingImageResults()
     await flushPromises()
-    expect(mocks.waitExistingOrLiveTaskResult).toHaveBeenCalledTimes(1)
+    expect(mocks.waitExistingOrLiveTaskImageResults).toHaveBeenCalledTimes(1)
 
-    waitTask.resolve(['https://example.com/recovered.png'])
+    waitTask.resolve([{ url: 'https://example.com/recovered.png' }])
     await Promise.all([first, second])
 
     const recovered = findImageNode(harness.nodes.value, 'image-2')
@@ -224,8 +230,8 @@ describe('useFlowImageDirectActions pending task recovery', () => {
   })
 
   it('does not overwrite the current board when reattach resolves after a board switch', async () => {
-    const waitTask = createDeferred<string[]>()
-    mocks.waitExistingOrLiveTaskResult.mockReturnValue(waitTask.promise)
+    const waitTask = createDeferred<Array<{ url: string }>>()
+    mocks.waitExistingOrLiveTaskImageResults.mockReturnValue(waitTask.promise)
     const harness = createHarness([
       makeImageNode(
         'image-3',
@@ -242,7 +248,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     const reattach = harness.actions.reattachPendingImageResults()
     await flushPromises()
     harness.boardId.value = 'board-b'
-    waitTask.resolve(['https://example.com/stale.png'])
+    waitTask.resolve([{ url: 'https://example.com/stale.png' }])
     await reattach
 
     const stale = findImageNode(harness.nodes.value, 'image-3')
@@ -250,5 +256,33 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     expect(stale.outputStatus).toBe('running')
     expect(stale.pendingTaskId).toBe('task-3')
     expect(harness.onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('uses completed image dimensions when resolving canvas extend result ratio', async () => {
+    mocks.submitCanvasExtendTask.mockResolvedValue('task-extend')
+    mocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
+      { url: 'https://example.com/extended.png', width: 400, height: 100 },
+    ])
+    mocks.resolveTaskImageResultRatio.mockImplementation(
+      async (result: { width?: number; height?: number }, fallback: number) =>
+        result.width && result.height ? result.height / result.width : fallback,
+    )
+    const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
+
+    await harness.actions.runCanvasExtendAction('image-1', {
+      originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
+      frameRect: { left: 0, top: 0, width: 100, height: 200 },
+      outputCount: 1,
+    })
+
+    const completed = harness.nodes.value
+      .map((node) => node.data?.snapshotNode as ImageNodeItem | undefined)
+      .find((snapshot) => snapshot?.sourceImageUrl === 'https://example.com/extended.png')
+    expect(completed?.sourceImageRatio).toBe(0.25)
+    expect(mocks.resolveTaskImageResultRatio).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 400, height: 100 }),
+      2,
+      expect.any(Function),
+    )
   })
 })

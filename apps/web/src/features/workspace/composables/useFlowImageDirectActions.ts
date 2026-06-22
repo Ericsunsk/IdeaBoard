@@ -38,13 +38,13 @@ import {
   submitImageInpaintTask,
   submitPromptImageGenerationTask,
   submitPromptTextGenerationTask,
-  waitExistingOrLiveTaskResult,
+  waitExistingOrLiveTaskImageResults,
 } from '../services/flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from '../utils/imageSize'
 import { usePendingImageResultNodes } from './usePendingImageResultNodes'
 import {
-  normalizeTaskImageUrls,
-  pickFirstValidUrl,
+  pickFirstValidImageResult,
+  resolveTaskImageResultRatio,
   resolveTaskImageRatio,
 } from '../utils/flowImageDirectActionTaskResult'
 import {
@@ -146,6 +146,13 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     if (!isBoardStillCurrent(boardId)) return
     markPendingImageResultTask(nodeId, taskId)
     await flushPendingTaskSnapshot()
+  }
+
+  async function resolveFirstTaskImageResult(taskId: string, fallbackRatio: number) {
+    const result = pickFirstValidImageResult(await waitExistingOrLiveTaskImageResults(taskId))
+    if (!result) throw new Error('任务完成但未返回图片')
+    const ratio = await resolveTaskImageResultRatio(result, fallbackRatio, loadImageSizeFromUrl)
+    return { url: result.url, ratio }
   }
 
   function getPendingImageSnapshot(nodeId: string): ImageNodeItem | null {
@@ -260,14 +267,11 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         activeReattachKeys.add(reattachKey)
         setNodeRunning(nodeId, true)
         try {
-          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
-          const url = urls[0]
-          if (!url) throw new Error('任务完成但未返回图片')
-          const ratio = await resolveTaskImageRatio(url, fallbackRatio, loadImageSizeFromUrl)
+          const resolved = await resolveFirstTaskImageResult(taskId, fallbackRatio)
           if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
             return
           }
-          updatePendingImageResultNode(nodeId, url, ratio)
+          updatePendingImageResultNode(nodeId, resolved.url, resolved.ratio)
           successCount += 1
         } catch (error) {
           if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
@@ -339,12 +343,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           ? await submitHdUpscaleTask(source, loadImageSizeFromUrl, runOptions?.strength)
           : await submitDirectActionTask(source, action, loadImageSizeFromUrl, runOptions?.strength)
       await persistPendingImageTaskId(boardId, resultNodeId, taskId)
-      const urls = await waitExistingOrLiveTaskResult(taskId)
+      const resolved = await resolveFirstTaskImageResult(taskId, source.ratio)
       if (!isBoardStillCurrent(boardId)) return
-      const firstUrl = pickFirstValidUrl(urls)
-      if (!firstUrl) throw new Error('任务完成但未返回图片')
-      const ratio = await resolveTaskImageRatio(firstUrl, source.ratio, loadImageSizeFromUrl)
-      updatePendingImageResultNode(resultNodeId, firstUrl, ratio)
+      updatePendingImageResultNode(resultNodeId, resolved.url, resolved.ratio)
       options.onSuccess('处理完成')
     } catch (error) {
       if (isTaskResultPendingError(error) && resultNodeId) {
@@ -403,10 +404,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           return { taskId }
         },
         resolveResult: async (taskId) => {
-          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
-          const url = urls[0]
-          if (!url) throw new Error('任务完成但未返回图片')
-          return { url, ratio: targetRatio }
+          return resolveFirstTaskImageResult(taskId, targetRatio)
         },
       })
     } catch (error) {
@@ -469,8 +467,10 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           return { taskId }
         },
         resolveResult: async (taskId) => {
-          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
-          const croppedResultUrl = urls[0]
+          const croppedResult = pickFirstValidImageResult(
+            await waitExistingOrLiveTaskImageResults(taskId),
+          )
+          const croppedResultUrl = croppedResult?.url
           if (!croppedResultUrl) throw new Error('任务完成但未返回图片')
           const finalUrl = await composeFlowLocalInpaint({
             originalImageUrl: source.url,
@@ -562,11 +562,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           return { taskId }
         },
         resolveResult: async (taskId) => {
-          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
-          const url = urls[0]
-          if (!url) throw new Error('任务完成但未返回图片')
-          const ratio = await resolveTaskImageRatio(url, source.ratio, loadImageSizeFromUrl)
-          return { url, ratio }
+          return resolveFirstTaskImageResult(taskId, source.ratio)
         },
       })
     } catch (error) {
@@ -620,11 +616,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           return { taskId }
         },
         resolveResult: async (taskId) => {
-          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
-          const url = urls[0]
-          if (!url) throw new Error('任务完成但未返回图片')
-          const ratio = await resolveTaskImageRatio(url, 1, loadImageSizeFromUrl)
-          return { url, ratio }
+          return resolveFirstTaskImageResult(taskId, 1)
         },
       })
     } catch (error) {
@@ -764,11 +756,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           return { taskId: submitRes.data.task_id }
         },
         resolveResult: async (taskId) => {
-          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
-          const url = urls[0]
-          if (!url) throw new Error('任务完成但未返回图片')
-          const ratio = await resolveTaskImageRatio(url, targetRatio, loadImageSizeFromUrl)
-          return { url, ratio }
+          return resolveFirstTaskImageResult(taskId, targetRatio)
         },
       })
     } catch (error) {

@@ -5,15 +5,18 @@ import {
   submitCanvasExtendTask,
   submitDirectActionTask,
   submitHdUpscaleTask,
+  waitExistingOrLiveTaskImageResults,
 } from './flowImageDirectActionExecutor'
 import { IMAGE_NODE_ACTION } from '../types/imageActions'
 
 const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
   submit: vi.fn(),
 }))
 
 vi.mock('../../../shared/api/task', () => ({
   taskApi: {
+    get: mocks.get,
     submit: mocks.submit,
   },
 }))
@@ -21,6 +24,7 @@ vi.mock('../../../shared/api/task', () => ({
 describe('flowImageDirectActionExecutor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.get.mockReset()
     mocks.submit.mockResolvedValue({ code: 0, data: { task_id: 'task-hd' } })
   })
 
@@ -83,6 +87,58 @@ describe('flowImageDirectActionExecutor', () => {
       },
     })
     expect(request.params).not.toHaveProperty('variation_strength')
+  })
+
+  it('keeps remove-bg submit params limited to image sizing', async () => {
+    await submitDirectActionTask(
+      {
+        url: 'https://assets.example.com/remove-bg-source.png',
+        width: 320,
+        ratio: 1,
+        x: 0,
+        y: 0,
+      },
+      IMAGE_NODE_ACTION.removeBg,
+      async () => ({ width: 1024, height: 1024 }),
+    )
+
+    const request = mocks.submit.mock.calls[0]?.[0] as SubmitTaskData
+    expect(request.params).toMatchObject({
+      custom_width: 1024,
+      custom_height: 1024,
+      original_image_width: 1024,
+      original_image_height: 1024,
+    })
+    expect(request.params).not.toHaveProperty('output_format')
+  })
+
+  it('returns canonical image results from completed task fast path', async () => {
+    mocks.get.mockResolvedValueOnce({
+      code: 0,
+      data: {
+        task: {
+          status: 'completed',
+          outputs: [
+            {
+              role: 'image',
+              url: ' https://cdn.example.com/done.png ',
+              width: 1000,
+              height: 750,
+              mime_type: ' image/png ',
+            },
+          ],
+        },
+      },
+    })
+
+    await expect(waitExistingOrLiveTaskImageResults('task-done')).resolves.toEqual([
+      {
+        url: 'https://cdn.example.com/done.png',
+        width: 1000,
+        height: 750,
+        mimeType: 'image/png',
+      },
+    ])
   })
 
   it('submits image extend params under the nested extend contract', async () => {

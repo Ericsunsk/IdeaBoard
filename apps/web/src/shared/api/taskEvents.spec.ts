@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseTask, Task } from './generated-query/model'
 import { queryClient } from '../query/queryClient'
-import { waitTaskResultWithSse } from './taskEvents'
+import { waitTaskImageResultsWithSse } from './taskEvents'
 
 const mocks = vi.hoisted(() => ({
   getTask: vi.fn(),
@@ -90,7 +90,7 @@ function makeTaskResponse(status: string, task: Partial<Task> = {}): ApiResponse
   }
 }
 
-describe('waitTaskResultWithSse', () => {
+describe('waitTaskImageResultsWithSse', () => {
   beforeEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
@@ -107,8 +107,13 @@ describe('waitTaskResultWithSse', () => {
       }),
     )
 
-    await expect(waitTaskResultWithSse('task-1')).resolves.toEqual([
-      'https://cdn.example.com/image.png',
+    await expect(waitTaskImageResultsWithSse('task-1')).resolves.toEqual([
+      {
+        url: 'https://cdn.example.com/image.png',
+        width: 1024,
+        height: 1024,
+        mimeType: 'image/png',
+      },
     ])
     expect(mocks.getTask).toHaveBeenCalledWith('task-1')
   })
@@ -122,7 +127,7 @@ describe('waitTaskResultWithSse', () => {
       }),
     )
 
-    const result = waitTaskResultWithSse('task-1', {
+    const result = waitTaskImageResultsWithSse('task-1', {
       timeoutMs: 10_000,
       pollInitialDelayMs: 50,
       pollMaxDelayMs: 50,
@@ -131,7 +136,7 @@ describe('waitTaskResultWithSse', () => {
 
     await vi.advanceTimersByTimeAsync(50)
 
-    await expect(result).resolves.toEqual(['https://cdn.example.com/done.png'])
+    await expect(result).resolves.toEqual([{ url: 'https://cdn.example.com/done.png' }])
     expect(mocks.getTask).toHaveBeenCalledTimes(2)
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
@@ -144,17 +149,24 @@ describe('waitTaskResultWithSse', () => {
       }),
     )
 
-    const result = waitTaskResultWithSse('task-1')
+    const result = waitTaskImageResultsWithSse('task-1')
     MockEventSource.instances[0]?.emit('close', { reason: 'max_connection_duration_reached' })
 
-    await expect(result).resolves.toEqual(['https://cdn.example.com/after-close.png'])
+    await expect(result).resolves.toEqual([
+      {
+        url: 'https://cdn.example.com/after-close.png',
+        width: 1024,
+        height: 1024,
+        mimeType: 'image/png',
+      },
+    ])
     expect(mocks.getTask).toHaveBeenCalledTimes(1)
   })
 
   it('rejects explicitly when a task is cancelled from the SSE stream', async () => {
     vi.stubGlobal('EventSource', MockEventSource)
 
-    const result = waitTaskResultWithSse('task-1')
+    const result = waitTaskImageResultsWithSse('task-1')
     MockEventSource.instances[0]?.emit('task', {
       task_id: 'task-1',
       status: 'cancelled',
@@ -173,6 +185,6 @@ describe('waitTaskResultWithSse', () => {
       }),
     )
 
-    await expect(waitTaskResultWithSse('task-1')).rejects.toThrow('账号已停用')
+    await expect(waitTaskImageResultsWithSse('task-1')).rejects.toThrow('账号已停用')
   })
 })

@@ -1,5 +1,4 @@
 import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../types/canvasNodes'
-import { waitTaskResultWithSse } from '../../../shared/api/taskEvents'
 import { taskApi, type SubmitTaskData } from '../../../shared/api/task'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
@@ -151,10 +150,6 @@ export function resolveConnectedInput(
   return resolveConnectedNodeInput(options, targetNodeId, targetPort, (sourceNode) =>
     resolveNodeType(sourceNode.id),
   )
-}
-
-export async function waitTaskResult(taskId: string): Promise<string[]> {
-  return waitTaskResultWithSse(taskId)
 }
 
 export async function assertTaskSubmitReady(
