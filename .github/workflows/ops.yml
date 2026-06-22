@@ -43,7 +43,6 @@ jobs:
         run: |
           bash -n scripts/render-nginx-template.sh
           bash -n scripts/render-cloudflare-real-ip-conf.sh
-          bash -n scripts/package-deploy.sh
           bash -n scripts/uninstall-vps.sh
           bash -n scripts/deploy-stack.sh
 
@@ -62,7 +61,6 @@ jobs:
           shellcheck \
             scripts/render-nginx-template.sh \
             scripts/render-cloudflare-real-ip-conf.sh \
-            scripts/package-deploy.sh \
             scripts/uninstall-vps.sh \
             scripts/deploy-stack.sh
 

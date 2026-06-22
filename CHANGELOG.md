@@ -74,7 +74,7 @@
 
 ## v0.1.0 - 2026-04-26
 
-首个发布版基线，提供完整的 AI 画布工作流、后台运营配置、身份认证与标准 Linux 部署能力。
+首个发布版基线，提供完整的 AI 画布工作流、后台运营配置、身份认证与部署文档。
 
 ### 核心能力
 
@@ -92,6 +92,4 @@
 
 ### 部署与文档
 
-- 标准部署形态为 `Nginx + systemd + Go API + Better Auth Node Service + PostgreSQL`。
-- 发布包由 `scripts/package-deploy.sh` 生成，包含前端静态产物、Go API 二进制、Auth Service 构建产物、systemd 与 Nginx 模板。
-- 文档覆盖项目入口、开发 contract、系统提示词配置、Auth 运维边界、本地依赖与 Linux 部署流程。
+- 文档覆盖项目入口、开发 contract、系统提示词配置、Auth 运维边界、本地依赖与生产部署流程。

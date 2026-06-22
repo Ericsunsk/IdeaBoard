@@ -166,84 +166,6 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "../../release/$TAG/${API_LINUX}" ./cmd
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o "../../release/$TAG/${API_DARWIN}" ./cmd
 
-      - name: Assemble deployment bundle
-        shell: bash
-        run: |
-          TAG="${{ steps.meta.outputs.tag }}"
-          RELEASE_DIR="release/$TAG"
-          BUNDLE_NAME="ideaboard-bundle-${TAG}-linux-amd64"
-          BUNDLE_DIR="$RELEASE_DIR/$BUNDLE_NAME"
-          BUNDLE_ARCHIVE="${BUNDLE_NAME}.tar.gz"
-
-          rm -rf "$BUNDLE_DIR"
-          mkdir -p \
-            "$BUNDLE_DIR/apps/auth" \
-            "$BUNDLE_DIR/apps/api/uploads" \
-            "$BUNDLE_DIR/apps/web" \
-            "$BUNDLE_DIR/docker" \
-            "$BUNDLE_DIR/docs" \
-            "$BUNDLE_DIR/deploy/nginx" \
-            "$BUNDLE_DIR/deploy/systemd"
-
-          cp "$RELEASE_DIR/ideaboard-api-${TAG}-linux-amd64" "$BUNDLE_DIR/apps/api/ideaboard-server"
-          cp -R apps/web/dist "$BUNDLE_DIR/apps/web/dist"
-          cp -R apps/auth/dist "$BUNDLE_DIR/apps/auth/dist"
-          cp apps/auth/package.json "$BUNDLE_DIR/apps/auth/package.json"
-          cp apps/auth/package-lock.json "$BUNDLE_DIR/apps/auth/package-lock.json"
-          cp apps/auth/.env.example "$BUNDLE_DIR/apps/auth/.env.example"
-          cp apps/api/.env.example "$BUNDLE_DIR/apps/api/.env.example"
-          cp README.md "$BUNDLE_DIR/README.md"
-          cp DEPLOYMENT.md "$BUNDLE_DIR/DEPLOYMENT.md"
-          cp DEVELOPMENT.md "$BUNDLE_DIR/DEVELOPMENT.md"
-          cp SYSTEM_PROMPT.md "$BUNDLE_DIR/SYSTEM_PROMPT.md"
-          cp CHANGELOG.md "$BUNDLE_DIR/CHANGELOG.md"
-          cp -R docs/. "$BUNDLE_DIR/docs/"
-          cp docker/README.md "$BUNDLE_DIR/docker/README.md"
-
-          cat > "$BUNDLE_DIR/deploy/systemd/ideaboard.service" <<'EOF'
-          [Unit]
-          Description=IdeaBoard API
-          After=network.target
-
-          [Service]
-          WorkingDirectory=/opt/ideaboard/apps/api
-          User=ideaboard
-          Group=ideaboard
-          Environment=APP_ENV=production
-          ExecStart=/opt/ideaboard/apps/api/ideaboard-server
-          Restart=always
-          RestartSec=3
-          EnvironmentFile=/opt/ideaboard/apps/api/.env
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          sed -i 's/^          //' "$BUNDLE_DIR/deploy/systemd/ideaboard.service"
-
-          cat > "$BUNDLE_DIR/deploy/systemd/ideaboard-auth.service" <<'EOF'
-          [Unit]
-          Description=IdeaBoard Auth Service
-          After=network.target
-
-          [Service]
-          WorkingDirectory=/opt/ideaboard/apps/auth
-          User=ideaboard
-          Group=ideaboard
-          ExecStart=/usr/bin/env node /opt/ideaboard/apps/auth/dist/index.js
-          Restart=always
-          RestartSec=3
-          Environment=NODE_ENV=production
-          EnvironmentFile=/opt/ideaboard/apps/auth/.env
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-          sed -i 's/^          //' "$BUNDLE_DIR/deploy/systemd/ideaboard-auth.service"
-
-          bash scripts/render-nginx-template.sh "$BUNDLE_DIR/deploy/nginx/ideaboard.conf"
-
-          tar -czf "$RELEASE_DIR/$BUNDLE_ARCHIVE" -C "$RELEASE_DIR" "$BUNDLE_NAME"
-
       - name: Generate release metadata
         shell: bash
         run: |
@@ -252,7 +174,6 @@ jobs:
           WEB_ARCHIVE="ideaboard-web-${TAG}.tar.gz"
           API_DARWIN="ideaboard-api-${TAG}-darwin-arm64"
           API_LINUX="ideaboard-api-${TAG}-linux-amd64"
-          BUNDLE_ARCHIVE="ideaboard-bundle-${TAG}-linux-amd64.tar.gz"
           WEB_VERSION="$(node -p "require('./apps/web/package.json').version")"
           AUTH_VERSION="$(node -p "require('./apps/auth/package.json').version")"
 
@@ -270,7 +191,6 @@ jobs:
               "$API_DARWIN" \
               "$API_LINUX" \
               "$WEB_ARCHIVE" \
-              "$BUNDLE_ARCHIVE" \
               > SHA256SUMS.txt
           )
 
@@ -313,7 +233,6 @@ jobs:
             release/${{ steps.meta.outputs.tag }}/ideaboard-api-${{ steps.meta.outputs.tag }}-darwin-arm64
             release/${{ steps.meta.outputs.tag }}/ideaboard-api-${{ steps.meta.outputs.tag }}-linux-amd64
             release/${{ steps.meta.outputs.tag }}/ideaboard-web-${{ steps.meta.outputs.tag }}.tar.gz
-            release/${{ steps.meta.outputs.tag }}/ideaboard-bundle-${{ steps.meta.outputs.tag }}-linux-amd64.tar.gz
             release/${{ steps.meta.outputs.tag }}/RELEASE_INFO.txt
             release/${{ steps.meta.outputs.tag }}/SHA256SUMS.txt
           fail_on_unmatched_files: true

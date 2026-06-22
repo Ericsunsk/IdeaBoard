@@ -71,7 +71,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 维度         | 当前配置                                                         |
 | ------------ | ---------------------------------------------------------------- |
 | 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001`，NATS `4222/8222` |
-| 运行方式     | 本地开发、Cloudflare Pages + VPS Docker Compose、标准 Linux 部署 |
+| 运行方式     | 本地开发、Cloudflare Pages + VPS Docker Compose |
 | 核心界面     | 用户画布工作台、画板管理、管理后台                               |
 
 ### 系统架构
@@ -260,7 +260,7 @@ npm run dev
 本地开发如果暂时不配置 `AUTH_INTERNAL_KEY`，必须显式设置 `AUTH_INSECURE_DEV=1`，且 `AUTH_HOST` 保持为 `127.0.0.1`、`localhost` 或 `::1` 这类 loopback 地址。API 服务必须设置 `APP_SECRETS_ENCRYPTION_KEY`（使用 `openssl rand -base64 32` 生成）。生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 HTTPS 的 `BETTER_AUTH_URL`（正式访问地址），并让 API 与 Auth 服务使用相同的 `AUTH_INTERNAL_KEY`。
 
 > [!IMPORTANT]
-> 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（源码生产部署先 build 再执行 `migrate:dist`；发布包已包含 `dist`，直接安装依赖后执行 `migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。迁移脚本使用当前项目安装的 `better-auth` runtime，Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移。
+> 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（直接部署 Auth 构建产物时先 build 再执行 `migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。迁移脚本使用当前项目安装的 `better-auth` runtime，Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移。
 
 <details>
 <summary>Auth 服务能力说明</summary>
@@ -353,8 +353,10 @@ export GITHUB_TOKEN="your-github-token" && curl -fsSL -H "Authorization: token $
 后续部署 / 升级：
 
 ```bash
-ideaboard update
+ideaboard update --manifest release-manifest.json
 ```
+
+没有 manifest 时可使用 `ideaboard update` fallback。
 
 常用运维：
 
@@ -395,15 +397,7 @@ VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api
 
 生产上线前还要按 [Cloudflare edge hardening checklist](./DEPLOYMENT.md#cloudflare-edge-hardening) 复核源站防火墙、真实客户端 IP、API/Auth/SSE 缓存绕过、Rate Limiting/WAF、Pages preview/prod 环境隔离，以及 HTTPS/HSTS 灰度启用。
 
-PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能落有上游 API key、S3 access key/secret 等敏感材料。所有 `postgres-*.sql` 都必须按 secret artifact 处理：建议加密保存，限制下载、传输与共享范围；完成 restore 后按受影响渠道轮换上游 API key 与对象存储凭据。详细规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
-
-### 传统 Linux 部署
-
-仍保留 `systemd + Nginx` 发布包方式，适合不使用 Docker 的服务器环境。
-
-```bash
-./scripts/package-deploy.sh
-```
+PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能落有上游 API key、S3 access key/secret 等敏感材料。所有 `postgres-*.dump[.age|.gpg]` 都必须按 secret artifact 处理：建议加密保存，限制下载、传输与共享范围；完成 restore 后按受影响渠道轮换上游 API key 与对象存储凭据。详细规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
 
 > [!NOTE]
 > Cloudflare 官方 `Deploy to Cloudflare` 一键按钮目前面向 Workers 应用；本项目此形态使用 Pages 托管 Vue 前端，因此 README 按钮跳转到 Pages 创建入口。
@@ -416,7 +410,7 @@ PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` �
 | ---------------------------------------------------------------------- | -------------------------------------------------------- |
 | [DEVELOPMENT.md](./DEVELOPMENT.md)                                     | 架构、contract、本地开发与目录边界                       |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)                                 | Feature System Prompt 配置手册与推荐模板                 |
-| [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、edge hardening、传统 Linux 部署、升级与回滚 |
+| [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、edge hardening、升级与回滚 |
 | [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)   | PostgreSQL backup、restore 与密钥材料处理规则            |
 | [docs/river-migration.md](./docs/river-migration.md)                   | River + PostgreSQL 任务队列迁移决策                      |
 | [docs/auth-operation-runbook.md](./docs/auth-operation-runbook.md)     | Auth 运维边界与应急流程                                  |
