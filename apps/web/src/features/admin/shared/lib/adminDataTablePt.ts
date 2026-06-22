@@ -4,7 +4,7 @@ export const adminDenseDataTablePt = {
   root: { class: '!rounded-none' },
   bodyRow: { class: 'last:[&>td]:!border-b-0' },
   column: {
-    headerCell: { class: '!bg-white !py-2.5' },
-    bodyCell: { class: '!py-2.5' },
+    headerCell: { class: '!bg-white !px-4 !py-2.5 !text-left' },
+    bodyCell: { class: '!px-4 !py-2.5 !text-left !align-middle' },
   },
 } satisfies DataTablePassThroughOptions

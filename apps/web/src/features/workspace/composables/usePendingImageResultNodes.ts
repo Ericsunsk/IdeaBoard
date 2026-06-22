@@ -361,22 +361,28 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
   }
 
   function updatePendingImageResultNode(nodeId: string, url: string, ratio: number) {
-    const frameSize = resolveImageNodeFrameSize(ratio, true)
+    const normalizedRatio = ratio > 0 ? ratio : 1
     options.commitGraphMutation(
       (items, currentEdges) => ({
         nodes: items.map((item) => {
           if (item.id !== nodeId || item.data?.kind !== 'image') return item
           const snapshot = item.data.snapshotNode
           if (!snapshot || typeof snapshot !== 'object') return item
+          const currentSnapshot = snapshot as ImageNodeItem
+          const currentWidth = Number(currentSnapshot.width)
+          const width =
+            Number.isFinite(currentWidth) && currentWidth > 0
+              ? Math.max(1, Math.round(currentWidth))
+              : resolveImageNodeFrameSize(normalizedRatio, true).width
           return {
             ...item,
             data: {
               ...item.data,
               snapshotNode: {
-                ...(snapshot as ImageNodeItem),
-                width: frameSize.width,
+                ...currentSnapshot,
+                width,
                 sourceImageUrl: url,
-                sourceImageRatio: ratio > 0 ? ratio : 1,
+                sourceImageRatio: normalizedRatio,
                 pendingTaskId: undefined,
                 outputStatus: 'ready',
                 outputImages: [],
@@ -392,7 +398,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
       }),
       { recordHistory: false },
     )
-    updateResultNodeLayout(nodeId, { url, ratio: ratio > 0 ? ratio : 1 })
+    updateResultNodeLayout(nodeId, { url, ratio: normalizedRatio })
     options.refreshNodeInternals?.([nodeId])
   }
 

@@ -57,7 +57,7 @@ export const adminConfigPopoverClass =
   'flex w-[280px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4'
 
 export const adminAnomalyPopoverClass =
-  'w-[340px] max-w-[calc(100vw_-_28px)] overflow-hidden bg-white'
+  'flex max-h-[calc(100dvh_-_24px)] w-[340px] max-w-[calc(100vw_-_28px)] flex-col overflow-hidden bg-white'
 
 export const adminPopoverSectionHeaderClass = 'border-b border-admin-border pb-2'
 

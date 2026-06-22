@@ -285,4 +285,28 @@ describe('useFlowImageDirectActions pending task recovery', () => {
       expect.any(Function),
     )
   })
+
+  it('sizes canvas extend result nodes from the expanded frame width', async () => {
+    mocks.submitCanvasExtendTask.mockResolvedValue('task-extend')
+    mocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
+      { url: 'https://example.com/extended-wide.png', width: 400, height: 200 },
+    ])
+    mocks.resolveTaskImageResultRatio.mockImplementation(
+      async (result: { width?: number; height?: number }, fallback: number) =>
+        result.width && result.height ? result.height / result.width : fallback,
+    )
+    const harness = createHarness([makeImageNode('image-1', makeImageSnapshot({ width: 280 }))])
+
+    await harness.actions.runCanvasExtendAction('image-1', {
+      originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
+      frameRect: { left: -50, top: 0, width: 200, height: 100 },
+      outputCount: 1,
+    })
+
+    const completed = harness.nodes.value
+      .map((node) => node.data?.snapshotNode as ImageNodeItem | undefined)
+      .find((snapshot) => snapshot?.sourceImageUrl === 'https://example.com/extended-wide.png')
+    expect(completed?.width).toBe(560)
+    expect(completed?.sourceImageRatio).toBe(0.5)
+  })
 })

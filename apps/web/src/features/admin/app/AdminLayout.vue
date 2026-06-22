@@ -109,7 +109,7 @@
                 />
               </div>
 
-              <div v-if="hasAnomalies" class="max-h-[420px] overflow-y-auto p-2">
+              <div v-if="hasAnomalies" class="app-scrollbar min-h-0 flex-1 overflow-y-auto p-2">
                 <button
                   v-for="item in anomalies"
                   :key="item.id"
@@ -330,7 +330,10 @@ const userMenuPt = createAdminMenuPt({
   rootClass:
     'min-w-[180px] overflow-hidden rounded-[14px] border border-admin-border bg-white shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
 })
-const anomalyRadarPopoverPt = createAdminPopoverPt({ contentClass: '!p-0' })
+const anomalyRadarPopoverPt = createAdminPopoverPt({
+  rootClass: '!max-h-[calc(100dvh-24px)] !overflow-hidden',
+  contentClass: '!max-h-[calc(100dvh-24px)] !overflow-hidden !p-0',
+})
 const mobileDrawerPt = {
   root: {
     class: '!w-[min(320px,calc(100vw-32px))] !border-0 !bg-admin-control-bg',

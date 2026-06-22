@@ -155,6 +155,28 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     return { url: result.url, ratio }
   }
 
+  function resolveCanvasExtendResultWidth(
+    sourceWidthValue: unknown,
+    frameRect: CanvasExtendRect,
+    originalImageRect: CanvasExtendRect,
+    fallbackRatio: number,
+  ): number {
+    const sourceWidth = Number(sourceWidthValue)
+    const frameWidth = Number(frameRect.width)
+    const originalWidth = Number(originalImageRect.width)
+    if (
+      Number.isFinite(sourceWidth) &&
+      sourceWidth > 0 &&
+      Number.isFinite(frameWidth) &&
+      frameWidth > 0 &&
+      Number.isFinite(originalWidth) &&
+      originalWidth > 0
+    ) {
+      return Math.max(1, Math.round(sourceWidth * (frameWidth / originalWidth)))
+    }
+    return resolveImageNodeFrameSize(fallbackRatio, true).width
+  }
+
   function getPendingImageSnapshot(nodeId: string): ImageNodeItem | null {
     const node = options.nodes.value.find((item) => item.id === nodeId)
     if (!node || node.data?.kind !== 'image') return null
@@ -371,14 +393,21 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       return
     }
 
-    const { extendPercent, targetRatio, hasExtension } = resolveCanvasExtendIntent(
+    const resolvedIntent = resolveCanvasExtendIntent(
       intent.frameRect,
       intent.originalImageRect,
     )
+    const { extendPercent, targetRatio, hasExtension } = resolvedIntent
     if (!hasExtension) {
       options.onWarning('请先拖动扩图框')
       return
     }
+    const targetWidth = resolveCanvasExtendResultWidth(
+      source.width,
+      resolvedIntent.frameRect,
+      resolvedIntent.originalImageRect,
+      targetRatio,
+    )
 
     const normalizedPrompt = `${intent.prompt ?? ''}`.trim()
     const resolvedOutputCount = clampImageNodeOutputCount(intent.outputCount ?? 1)
@@ -388,6 +417,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await assertCanvasExtendSubmitReady()
       resultNodeIds = appendPendingImageResultNodes(source, nodeId, resolvedOutputCount, {
         targetRatio,
+        targetWidth,
       })
       resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
       await runPendingImageBatchGeneration({
