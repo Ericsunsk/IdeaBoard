@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAccountLoadRows,
   buildExecutionPressureChartData,
+  buildTaskDistributionChartData,
   buildTaskDistributionRows,
   buildTaskStatusSnapshot,
 } from './useTaskMonitorCharts'
+import {
+  adminChartBubbleClipPadding,
+  adminChartPointClipPadding,
+} from '../../shared/lib/adminChart'
 
 describe('useTaskMonitorCharts builders', () => {
   it('builds stable task distribution rows from monitor stats', () => {
@@ -82,9 +87,26 @@ describe('useTaskMonitorCharts builders', () => {
     ])
 
     expect(chartData.datasets).toHaveLength(2)
+    expect(chartData.datasets[0]).toMatchObject({ clip: adminChartBubbleClipPadding })
     expect(chartData.datasets[0]?.data).toEqual([
       expect.objectContaining({ x: 30, y: 20, count: 4 }),
     ])
     expect(chartData.datasets[1]?.data).toEqual([])
+  })
+
+  it('allows radar points to render past chart boundaries without changing scale', () => {
+    const rows = buildTaskDistributionRows(
+      buildTaskStatusSnapshot({
+        pending: 0,
+        running: 0,
+        completed: 10,
+        failed: 0,
+        cancelled: 0,
+      }),
+    )
+
+    const chartData = buildTaskDistributionChartData(rows)
+
+    expect(chartData.datasets[0]).toMatchObject({ clip: adminChartPointClipPadding })
   })
 })

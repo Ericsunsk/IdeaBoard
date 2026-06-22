@@ -7,10 +7,13 @@ export type AdminTooltipItem = TooltipItem<ChartType>
 
 const adminHiddenScaleTitle = { display: false } as const
 export const adminChartStrokeWidth = 1
+export const adminChartPointClipPadding = 6
 const adminChartBubbleFillOpacity = 0.3
 const adminChartBubbleRadiusMin = 5
 const adminChartBubbleRadiusMax = 18
 const adminChartBubbleHoverRadiusOffset = 2
+export const adminChartBubbleClipPadding =
+  adminChartBubbleRadiusMax + adminChartBubbleHoverRadiusOffset
 
 const adminChartFontFamily =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
@@ -186,12 +189,18 @@ export function defineAdminChartRadialPercentScale(input: AdminChartNumericScale
   }
 }
 
+export function defineAdminChartPointClipStyle() {
+  return {
+    clip: adminChartPointClipPadding,
+  }
+}
+
 export function defineAdminChartBubbleDatasetStyle(color: string | string[]) {
   return {
     backgroundColor: mapChartColor(color, (value) => withAlpha(value, adminChartBubbleFillOpacity)),
     borderColor: color,
     borderWidth: adminChartStrokeWidth,
-    clip: false as const,
+    clip: adminChartBubbleClipPadding,
     hoverBorderWidth: adminChartStrokeWidth,
   }
 }
@@ -204,6 +213,7 @@ export function defineAdminChartBubblePointStyle(color: string | string[]) {
     pointBorderColor: color,
     pointBorderWidth: adminChartStrokeWidth,
     pointHoverBorderWidth: adminChartStrokeWidth,
+    clip: adminChartBubbleClipPadding,
   }
 }
 
