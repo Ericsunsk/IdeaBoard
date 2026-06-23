@@ -321,7 +321,7 @@ const notificationButtonClass = [
   shellButtonSkinClass,
   'relative',
 ].join(' ')
-const navIconClass = 'size-[17px] stroke-2'
+const navIconClass = 'size-[17px]'
 const shellIconClass = 'size-[19px] stroke-2'
 const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
 const headerClass =

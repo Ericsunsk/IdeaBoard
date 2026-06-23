@@ -1,366 +1,368 @@
 <template>
-  <AdminManagementFrame :content-class="systemSettingsContentClass">
-    <div class="grid w-full items-start gap-5 lg:grid-cols-2">
-      <Card class="!rounded-lg" :pt="adminCardPt">
-        <template #title>
-          <div class="flex min-w-0 items-center justify-between gap-3">
-            <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-              站点设置
-            </span>
-            <Tag
-              :value="brandingForm.logo_url ? '自定义 Logo' : '默认标识'"
-              class="shrink-0"
-              severity="secondary"
-              rounded
-            />
-          </div>
-        </template>
+  <AdminResourceGridFrame
+    empty-description="系统配置加载完成后会显示在这里。"
+    empty-title="暂无系统配置"
+    :grid-class="adminTwoColumnMasonryGridClass"
+    :is-empty="false"
+    :is-loading="false"
+  >
+    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
+      <template #title>
+        <div class="flex min-w-0 items-center justify-between gap-3">
+          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
+            站点设置
+          </span>
+          <Tag
+            :value="brandingForm.logo_url ? '自定义 Logo' : '默认标识'"
+            class="shrink-0"
+            severity="secondary"
+            rounded
+          />
+        </div>
+      </template>
 
-        <template #content>
-          <div :class="settingCardBodyClass">
-            <div class="grid gap-5 xl:grid-cols-[136px_minmax(0,1fr)]">
-              <div class="flex min-w-0 flex-col gap-3">
-                <button
-                  class="flex size-28 items-center justify-center overflow-hidden rounded-lg border border-admin-border bg-white text-admin-accent-pressed transition-colors hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
-                  type="button"
-                  :disabled="brandingLoading || brandingSaving || uploading"
-                  aria-label="上传站点 Logo"
-                  @click="openLogoPicker"
-                >
-                  <img
-                    v-if="brandingForm.logo_url"
-                    :src="brandingForm.logo_url"
-                    class="h-full w-full object-contain p-2"
-                    alt="站点 Logo"
-                  />
-                  <span v-else class="text-xl font-[850] tracking-normal">
-                    {{ brandingFallbackText }}
-                  </span>
-                </button>
-
-                <input
-                  ref="logoFileInputRef"
-                  class="hidden"
-                  type="file"
-                  :accept="IMAGE_UPLOAD_ACCEPT"
-                  @change="handleLogoInputChange"
-                />
-
-                <div class="grid gap-2">
-                  <Button
-                    v-if="brandingForm.logo_url"
-                    class="!h-9 !rounded-lg"
-                    label="清除 Logo"
-                    severity="contrast"
-                    text
-                    :disabled="brandingLoading || brandingSaving || uploading"
-                    @click="clearBrandingLogo"
-                  >
-                    <template #icon>
-                      <Trash class="size-4" />
-                    </template>
-                  </Button>
-                </div>
-              </div>
-
-              <div class="grid content-start gap-4">
-                <label :class="settingFieldClass">
-                  <span class="text-admin-meta font-[680] text-admin-text-2">站点名称</span>
-                  <InputText
-                    v-model="brandingForm.project_name"
-                    autocomplete="off"
-                    maxlength="40"
-                    placeholder="IdeaBoard"
-                    :disabled="brandingLoading || brandingSaving"
-                    @keyup.enter="handleSaveBranding()"
-                  />
-                </label>
-
-                <label :class="settingFieldClass">
-                  <span class="text-admin-meta font-[680] text-admin-text-2">Logo 地址</span>
-                  <InputText
-                    v-model="brandingForm.logo_url"
-                    autocomplete="off"
-                    maxlength="2048"
-                    placeholder="/uploads/admin/logo.png"
-                    :disabled="brandingLoading || brandingSaving || uploading"
-                    @keyup.enter="handleSaveBranding()"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div :class="settingActionRowClass">
-              <Button
-                class="!h-9 !rounded-lg"
-                label="保存站点设置"
-                severity="contrast"
+      <template #content>
+        <div :class="settingCardBodyClass">
+          <div class="grid gap-5 xl:grid-cols-[136px_minmax(0,1fr)]">
+            <div class="flex min-w-0 flex-col gap-3">
+              <button
+                class="flex size-28 items-center justify-center overflow-hidden rounded-lg border border-admin-border bg-white text-admin-accent-pressed transition-colors hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
                 :disabled="brandingLoading || brandingSaving || uploading"
-                :loading="brandingSaving"
-                @click="handleSaveBranding"
+                aria-label="上传站点 Logo"
+                @click="openLogoPicker"
               >
-                <template #icon>
-                  <Check class="size-4" />
-                </template>
-              </Button>
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <Card class="!rounded-lg" :pt="adminCardPt">
-        <template #title>
-          <div class="flex min-w-0 items-center justify-between gap-3">
-            <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-              注册与 API 限流
-            </span>
-            <Tag
-              :value="registrationEnabled ? '开放注册' : '关闭注册'"
-              class="shrink-0"
-              severity="secondary"
-              rounded
-            />
-          </div>
-        </template>
-
-        <template #content>
-          <div :class="settingCardBodyClass">
-            <div :class="settingToggleRowClass">
-              <span class="text-admin-body font-bold text-admin-text-1">开放注册</span>
-              <ToggleSwitch
-                v-model="registrationEnabled"
-                :disabled="registrationSettingLoading"
-                aria-label="开放注册"
-                @update:model-value="handleToggleRegistration"
-              />
-            </div>
-
-            <div class="grid gap-4 md:grid-cols-2">
-              <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">最大请求 (次)</span>
-                <InputNumber
-                  v-model="rateLimitForm.max_requests"
-                  :min="1"
-                  :max="RATE_LIMIT_MAX_REQUESTS"
-                  fluid
-                  :disabled="rateLimitLoading || rateLimitSaving"
+                <img
+                  v-if="brandingForm.logo_url"
+                  :src="brandingForm.logo_url"
+                  class="h-full w-full object-contain p-2"
+                  alt="站点 Logo"
                 />
-              </label>
-
-              <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">窗口周期 (秒)</span>
-                <InputNumber
-                  v-model="rateLimitForm.window_seconds"
-                  :min="1"
-                  :max="RATE_LIMIT_MAX_WINDOW_SECONDS"
-                  fluid
-                  :disabled="rateLimitLoading || rateLimitSaving"
-                />
-              </label>
-            </div>
-
-            <div :class="settingActionRowClass">
-              <Button
-                class="!h-9 !rounded-lg"
-                label="保存 API 限流"
-                severity="contrast"
-                :disabled="rateLimitLoading || rateLimitSaving"
-                :loading="rateLimitSaving"
-                @click="handleSaveRateLimit"
-              >
-                <template #icon>
-                  <Check class="size-4" />
-                </template>
-              </Button>
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <Card class="!rounded-lg" :pt="adminCardPt">
-        <template #title>
-          <div class="flex min-w-0 items-center justify-between gap-3">
-            <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-              任务监控展示
-            </span>
-            <Tag
-              :value="taskMonitorForm.auto_refresh_enabled ? '自动刷新' : '手动刷新'"
-              class="shrink-0"
-              severity="secondary"
-              rounded
-            />
-          </div>
-        </template>
-
-        <template #content>
-          <div :class="settingCardBodyClass">
-            <div class="grid gap-4 sm:grid-cols-2">
-              <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">
-                  任务列表每页数量
+                <span v-else class="text-xl font-[850] tracking-normal">
+                  {{ brandingFallbackText }}
                 </span>
-                <InputNumber
-                  v-model="taskMonitorForm.list_page_size"
-                  :min="TASK_MONITOR_MIN_PAGE_SIZE"
-                  :max="TASK_MONITOR_MAX_PAGE_SIZE"
-                  fluid
-                  :disabled="taskMonitorLoading || taskMonitorSaving"
-                />
-              </label>
+              </button>
 
-              <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">刷新间隔 (秒)</span>
-                <InputNumber
-                  v-model="taskMonitorForm.refresh_interval_seconds"
-                  :min="TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS"
-                  :max="TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS"
-                  fluid
-                  :disabled="taskMonitorLoading || taskMonitorSaving"
-                />
-              </label>
-            </div>
+              <input
+                ref="logoFileInputRef"
+                class="hidden"
+                type="file"
+                :accept="IMAGE_UPLOAD_ACCEPT"
+                @change="handleLogoInputChange"
+              />
 
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div :class="settingToggleRowClass">
-                <span class="text-admin-body font-bold text-admin-text-1">自动刷新</span>
-                <ToggleSwitch
-                  v-model="taskMonitorForm.auto_refresh_enabled"
-                  :disabled="taskMonitorLoading || taskMonitorSaving"
-                  aria-label="自动刷新"
-                />
-              </div>
-
-              <div :class="settingToggleRowClass">
-                <span class="text-admin-body font-bold text-admin-text-1">结果预览</span>
-                <ToggleSwitch
-                  v-model="taskMonitorForm.result_preview_enabled"
-                  :disabled="taskMonitorLoading || taskMonitorSaving"
-                  aria-label="结果预览"
-                />
+              <div class="grid gap-2">
+                <Button
+                  v-if="brandingForm.logo_url"
+                  class="!h-9 !rounded-lg"
+                  label="清除 Logo"
+                  severity="contrast"
+                  text
+                  :disabled="brandingLoading || brandingSaving || uploading"
+                  @click="clearBrandingLogo"
+                >
+                  <template #icon>
+                    <Trash class="size-4" />
+                  </template>
+                </Button>
               </div>
             </div>
 
-            <div :class="settingActionRowClass">
-              <Button
-                class="!h-9 !rounded-lg"
-                label="保存任务设置"
-                severity="contrast"
-                :disabled="taskMonitorLoading"
-                :loading="taskMonitorSaving"
-                @click="handleSaveTaskMonitorSettings"
-              >
-                <template #icon>
-                  <Check class="size-4" />
-                </template>
-              </Button>
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <Card class="!rounded-lg" :pt="adminCardPt">
-        <template #title>
-          <div class="flex min-w-0 items-center justify-between gap-3">
-            <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-              链接与域名
-            </span>
-            <Tag :value="publicURLStatusLabel" class="shrink-0" severity="secondary" rounded />
-          </div>
-        </template>
-
-        <template #content>
-          <div :class="settingCardBodyClass">
-            <div class="grid gap-4">
+            <div class="grid content-start gap-4">
               <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">前端访问地址</span>
+                <span class="text-admin-meta font-[680] text-admin-text-2">站点名称</span>
                 <InputText
-                  v-model="publicURLForm.public_base_url"
+                  v-model="brandingForm.project_name"
                   autocomplete="off"
-                  maxlength="2048"
-                  placeholder="https://app.example.com"
-                  :disabled="publicURLLoading || publicURLSaving"
-                  @keyup.enter="handleSavePublicURLSettings()"
+                  maxlength="40"
+                  placeholder="IdeaBoard"
+                  :disabled="brandingLoading || brandingSaving"
+                  @keyup.enter="handleSaveBranding()"
                 />
               </label>
 
               <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">素材访问地址</span>
+                <span class="text-admin-meta font-[680] text-admin-text-2">Logo 地址</span>
                 <InputText
-                  v-model="publicURLForm.public_asset_base_url"
+                  v-model="brandingForm.logo_url"
                   autocomplete="off"
                   maxlength="2048"
-                  placeholder="https://api.example.com"
-                  :disabled="publicURLLoading || publicURLSaving"
-                  @keyup.enter="handleSavePublicURLSettings()"
+                  placeholder="/uploads/admin/logo.png"
+                  :disabled="brandingLoading || brandingSaving || uploading"
+                  @keyup.enter="handleSaveBranding()"
                 />
               </label>
             </div>
-
-            <div :class="settingActionRowClass">
-              <Button
-                class="!h-9 !rounded-lg"
-                label="保存链接"
-                severity="contrast"
-                :disabled="publicURLLoading"
-                :loading="publicURLSaving"
-                @click="handleSavePublicURLSettings"
-              >
-                <template #icon>
-                  <Check class="size-4" />
-                </template>
-              </Button>
-            </div>
           </div>
-        </template>
-      </Card>
 
-      <Card class="!rounded-lg" :pt="adminCardPt">
-        <template #title>
-          <div class="flex min-w-0 items-center justify-between gap-3">
-            <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-              上传并发
-            </span>
-            <Tag
-              :value="`并发 ${mediaUploadForm.upload_max_concurrent}`"
-              class="shrink-0"
-              severity="secondary"
-              rounded
+          <div :class="settingActionRowClass">
+            <Button
+              class="!h-9 !rounded-lg"
+              label="保存站点设置"
+              severity="contrast"
+              :disabled="brandingLoading || brandingSaving || uploading"
+              :loading="brandingSaving"
+              @click="handleSaveBranding"
+            >
+              <template #icon>
+                <Check class="size-4" />
+              </template>
+            </Button>
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
+      <template #title>
+        <div class="flex min-w-0 items-center justify-between gap-3">
+          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
+            注册与 API 限流
+          </span>
+          <Tag
+            :value="registrationEnabled ? '开放注册' : '关闭注册'"
+            class="shrink-0"
+            severity="secondary"
+            rounded
+          />
+        </div>
+      </template>
+
+      <template #content>
+        <div :class="settingCardBodyClass">
+          <div :class="settingToggleRowClass">
+            <span class="text-admin-body font-bold text-admin-text-1">开放注册</span>
+            <ToggleSwitch
+              v-model="registrationEnabled"
+              :disabled="registrationSettingLoading"
+              aria-label="开放注册"
+              @update:model-value="handleToggleRegistration"
             />
           </div>
-        </template>
 
-        <template #content>
-          <div :class="settingCardBodyClass">
+          <div class="grid gap-4 md:grid-cols-2">
             <label :class="settingFieldClass">
-              <span class="text-admin-meta font-[680] text-admin-text-2">上传并发上限</span>
+              <span class="text-admin-meta font-[680] text-admin-text-2">最大请求 (次)</span>
               <InputNumber
-                v-model="mediaUploadForm.upload_max_concurrent"
-                :min="MEDIA_UPLOAD_MIN_CONCURRENT"
-                :max="MEDIA_UPLOAD_MAX_CONCURRENT"
+                v-model="rateLimitForm.max_requests"
+                :min="1"
+                :max="RATE_LIMIT_MAX_REQUESTS"
                 fluid
-                :disabled="mediaUploadLoading || mediaUploadSaving"
+                :disabled="rateLimitLoading || rateLimitSaving"
               />
             </label>
 
-            <div :class="settingActionRowClass">
-              <Button
-                class="!h-9 !rounded-lg"
-                label="保存上传设置"
-                severity="contrast"
-                :disabled="mediaUploadLoading"
-                :loading="mediaUploadSaving"
-                @click="handleSaveMediaUploadSettings"
-              >
-                <template #icon>
-                  <Check class="size-4" />
-                </template>
-              </Button>
+            <label :class="settingFieldClass">
+              <span class="text-admin-meta font-[680] text-admin-text-2">窗口周期 (秒)</span>
+              <InputNumber
+                v-model="rateLimitForm.window_seconds"
+                :min="1"
+                :max="RATE_LIMIT_MAX_WINDOW_SECONDS"
+                fluid
+                :disabled="rateLimitLoading || rateLimitSaving"
+              />
+            </label>
+          </div>
+
+          <div :class="settingActionRowClass">
+            <Button
+              class="!h-9 !rounded-lg"
+              label="保存 API 限流"
+              severity="contrast"
+              :disabled="rateLimitLoading || rateLimitSaving"
+              :loading="rateLimitSaving"
+              @click="handleSaveRateLimit"
+            >
+              <template #icon>
+                <Check class="size-4" />
+              </template>
+            </Button>
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
+      <template #title>
+        <div class="flex min-w-0 items-center justify-between gap-3">
+          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
+            任务监控展示
+          </span>
+          <Tag
+            :value="taskMonitorForm.auto_refresh_enabled ? '自动刷新' : '手动刷新'"
+            class="shrink-0"
+            severity="secondary"
+            rounded
+          />
+        </div>
+      </template>
+
+      <template #content>
+        <div :class="settingCardBodyClass">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label :class="settingFieldClass">
+              <span class="text-admin-meta font-[680] text-admin-text-2">任务列表每页数量</span>
+              <InputNumber
+                v-model="taskMonitorForm.list_page_size"
+                :min="TASK_MONITOR_MIN_PAGE_SIZE"
+                :max="TASK_MONITOR_MAX_PAGE_SIZE"
+                fluid
+                :disabled="taskMonitorLoading || taskMonitorSaving"
+              />
+            </label>
+
+            <label :class="settingFieldClass">
+              <span class="text-admin-meta font-[680] text-admin-text-2">刷新间隔 (秒)</span>
+              <InputNumber
+                v-model="taskMonitorForm.refresh_interval_seconds"
+                :min="TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS"
+                :max="TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS"
+                fluid
+                :disabled="taskMonitorLoading || taskMonitorSaving"
+              />
+            </label>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div :class="settingToggleRowClass">
+              <span class="text-admin-body font-bold text-admin-text-1">自动刷新</span>
+              <ToggleSwitch
+                v-model="taskMonitorForm.auto_refresh_enabled"
+                :disabled="taskMonitorLoading || taskMonitorSaving"
+                aria-label="自动刷新"
+              />
+            </div>
+
+            <div :class="settingToggleRowClass">
+              <span class="text-admin-body font-bold text-admin-text-1">结果预览</span>
+              <ToggleSwitch
+                v-model="taskMonitorForm.result_preview_enabled"
+                :disabled="taskMonitorLoading || taskMonitorSaving"
+                aria-label="结果预览"
+              />
             </div>
           </div>
-        </template>
-      </Card>
-    </div>
-  </AdminManagementFrame>
+
+          <div :class="settingActionRowClass">
+            <Button
+              class="!h-9 !rounded-lg"
+              label="保存任务设置"
+              severity="contrast"
+              :disabled="taskMonitorLoading"
+              :loading="taskMonitorSaving"
+              @click="handleSaveTaskMonitorSettings"
+            >
+              <template #icon>
+                <Check class="size-4" />
+              </template>
+            </Button>
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
+      <template #title>
+        <div class="flex min-w-0 items-center justify-between gap-3">
+          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
+            链接与域名
+          </span>
+          <Tag :value="publicURLStatusLabel" class="shrink-0" severity="secondary" rounded />
+        </div>
+      </template>
+
+      <template #content>
+        <div :class="settingCardBodyClass">
+          <div class="grid gap-4">
+            <label :class="settingFieldClass">
+              <span class="text-admin-meta font-[680] text-admin-text-2">前端访问地址</span>
+              <InputText
+                v-model="publicURLForm.public_base_url"
+                autocomplete="off"
+                maxlength="2048"
+                placeholder="https://app.example.com"
+                :disabled="publicURLLoading || publicURLSaving"
+                @keyup.enter="handleSavePublicURLSettings()"
+              />
+            </label>
+
+            <label :class="settingFieldClass">
+              <span class="text-admin-meta font-[680] text-admin-text-2">素材访问地址</span>
+              <InputText
+                v-model="publicURLForm.public_asset_base_url"
+                autocomplete="off"
+                maxlength="2048"
+                placeholder="https://api.example.com"
+                :disabled="publicURLLoading || publicURLSaving"
+                @keyup.enter="handleSavePublicURLSettings()"
+              />
+            </label>
+          </div>
+
+          <div :class="settingActionRowClass">
+            <Button
+              class="!h-9 !rounded-lg"
+              label="保存链接"
+              severity="contrast"
+              :disabled="publicURLLoading"
+              :loading="publicURLSaving"
+              @click="handleSavePublicURLSettings"
+            >
+              <template #icon>
+                <Check class="size-4" />
+              </template>
+            </Button>
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
+      <template #title>
+        <div class="flex min-w-0 items-center justify-between gap-3">
+          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
+            上传并发
+          </span>
+          <Tag
+            :value="`并发 ${mediaUploadForm.upload_max_concurrent}`"
+            class="shrink-0"
+            severity="secondary"
+            rounded
+          />
+        </div>
+      </template>
+
+      <template #content>
+        <div :class="settingCardBodyClass">
+          <label :class="settingFieldClass">
+            <span class="text-admin-meta font-[680] text-admin-text-2">上传并发上限</span>
+            <InputNumber
+              v-model="mediaUploadForm.upload_max_concurrent"
+              :min="MEDIA_UPLOAD_MIN_CONCURRENT"
+              :max="MEDIA_UPLOAD_MAX_CONCURRENT"
+              fluid
+              :disabled="mediaUploadLoading || mediaUploadSaving"
+            />
+          </label>
+
+          <div :class="settingActionRowClass">
+            <Button
+              class="!h-9 !rounded-lg"
+              label="保存上传设置"
+              severity="contrast"
+              :disabled="mediaUploadLoading"
+              :loading="mediaUploadSaving"
+              @click="handleSaveMediaUploadSettings"
+            >
+              <template #icon>
+                <Check class="size-4" />
+              </template>
+            </Button>
+          </div>
+        </div>
+      </template>
+    </Card>
+  </AdminResourceGridFrame>
 </template>
 
 <script setup lang="ts">
@@ -373,7 +375,7 @@ import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
-import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
+import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import {
   RATE_LIMIT_MAX_REQUESTS,
   RATE_LIMIT_MAX_WINDOW_SECONDS,
@@ -394,8 +396,11 @@ import {
 } from '../../shared/composables/useAdminTaskMonitorSettings'
 import { useAdminPublicURLSettings } from '../../shared/composables/useAdminPublicURLSettings'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
+import {
+  adminMasonryCardClass,
+  adminTwoColumnMasonryGridClass,
+} from '../../shared/lib/adminUiClasses'
 
-const systemSettingsContentClass = 'p-6'
 const settingCardBodyClass = 'flex flex-col gap-5'
 const settingFieldClass = 'flex min-w-0 flex-col gap-1.5'
 const settingActionRowClass = 'flex flex-wrap items-center gap-2 pt-1'

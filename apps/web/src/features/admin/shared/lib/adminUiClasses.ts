@@ -28,6 +28,8 @@ export const adminChartCanvasClass = 'h-full w-full min-w-0'
 
 export const adminMasonryGridClass = 'columns-1 gap-3.5 md:columns-2 xl:columns-3'
 
+export const adminTwoColumnMasonryGridClass = 'columns-1 gap-3.5 md:columns-2'
+
 export const adminMasonryCardClass = 'mb-3.5 break-inside-avoid !rounded-lg'
 
 export const adminToolbarSearchInputClass =

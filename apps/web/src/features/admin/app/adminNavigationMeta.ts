@@ -61,19 +61,19 @@ export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
     routeName: 'AdminFeaturePrompts',
   },
   {
-    key: 'system-settings',
-    path: '/admin/settings',
-    childPath: 'settings',
-    label: '系统设置',
-    title: '系统设置',
-    routeName: 'AdminSystemSettings',
-  },
-  {
     key: 'oss-config',
     path: '/admin/oss-config',
     childPath: 'oss-config',
     label: '系统存储',
     title: '系统存储',
     routeName: 'AdminOSSConfig',
+  },
+  {
+    key: 'system-settings',
+    path: '/admin/settings',
+    childPath: 'settings',
+    label: '系统设置',
+    title: '系统设置',
+    routeName: 'AdminSystemSettings',
   },
 ]
