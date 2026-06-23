@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"image"
 	"reflect"
 	"testing"
@@ -96,7 +97,7 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 		t.Fatalf("MarshalParams: %v", err)
 	}
 
-	got := (&ProviderExecutor{}).parseAndNormalizeTaskParams(&tasks.TaskPayload{
+	got := (&ProviderExecutor{}).parseAndNormalizeTaskParams(context.Background(), &tasks.TaskPayload{
 		TaskID: "task-canonical-params",
 		Params: raw,
 	})
@@ -160,7 +161,7 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 		t.Fatalf("DecodeRiverPayload: %v", err)
 	}
 
-	params := (&ProviderExecutor{}).parseAndNormalizeTaskParams(decoded)
+	params := (&ProviderExecutor{}).parseAndNormalizeTaskParams(context.Background(), decoded)
 	req := params.providerRequest(decoded.Prompt, "gpt-image-1")
 
 	if req.Prompt != submitted.Prompt || req.Model != "gpt-image-1" || req.Size != "512x768" {

@@ -9,6 +9,7 @@ import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
 } from '../utils/flowImageDirectActionSource'
+import type { ResolvedTaskImageResult } from '../utils/flowImageDirectActionTaskResult'
 import { waitForNextRenderFrame } from '../utils/animationFrame'
 import type { FlowTransactions } from './useFlowTransactions'
 
@@ -360,8 +361,22 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     )
   }
 
-  function updatePendingImageResultNode(nodeId: string, url: string, ratio: number) {
-    const normalizedRatio = ratio > 0 ? ratio : 1
+  function updatePendingImageResultNode(nodeId: string, result: ResolvedTaskImageResult) {
+    const resolvedImageWidth = Number(result.width)
+    const resolvedImageHeight = Number(result.height)
+    const hasResolvedSize =
+      Number.isFinite(resolvedImageWidth) &&
+      resolvedImageWidth > 0 &&
+      Number.isFinite(resolvedImageHeight) &&
+      resolvedImageHeight > 0
+    const normalizedRatio = hasResolvedSize
+      ? resolvedImageHeight / resolvedImageWidth
+      : result.ratio > 0
+        ? result.ratio
+        : 1
+    const resolvedFrameWidth = hasResolvedSize
+      ? resolveImageNodeFrameSize(normalizedRatio, true).width
+      : null
     options.commitGraphMutation(
       (items, currentEdges) => ({
         nodes: items.map((item) => {
@@ -371,9 +386,10 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
           const currentSnapshot = snapshot as ImageNodeItem
           const currentWidth = Number(currentSnapshot.width)
           const width =
-            Number.isFinite(currentWidth) && currentWidth > 0
+            resolvedFrameWidth ??
+            (Number.isFinite(currentWidth) && currentWidth > 0
               ? Math.max(1, Math.round(currentWidth))
-              : resolveImageNodeFrameSize(normalizedRatio, true).width
+              : resolveImageNodeFrameSize(normalizedRatio, true).width)
           return {
             ...item,
             data: {
@@ -381,7 +397,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
               snapshotNode: {
                 ...currentSnapshot,
                 width,
-                sourceImageUrl: url,
+                sourceImageUrl: result.url,
                 sourceImageRatio: normalizedRatio,
                 pendingTaskId: undefined,
                 outputStatus: 'ready',
@@ -398,7 +414,11 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
       }),
       { recordHistory: false },
     )
-    updateResultNodeLayout(nodeId, { url, ratio: normalizedRatio })
+    updateResultNodeLayout(nodeId, {
+      url: result.url,
+      ratio: normalizedRatio,
+      ...(resolvedFrameWidth ? { width: resolvedFrameWidth } : {}),
+    })
     options.refreshNodeInternals?.([nodeId])
   }
 

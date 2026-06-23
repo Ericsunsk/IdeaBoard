@@ -8,6 +8,7 @@ const adminPageComponents = {
   statistics: () => import('../pages/statistics/AdminStatisticsPage.vue'),
   'task-monitor': () => import('../pages/task-monitor/AdminTaskMonitorPage.vue'),
   'feature-prompts': () => import('../pages/prompt-config/AdminPromptConfigPage.vue'),
+  'system-settings': () => import('../pages/system-settings/AdminSystemSettingsPage.vue'),
   'oss-config': () => import('../pages/storage/AdminStoragePage.vue'),
 } satisfies Record<AdminNavigationKey, RouteRecordRaw['component']>
 

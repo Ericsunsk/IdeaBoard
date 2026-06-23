@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -8,8 +9,27 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/settings"
+
 	"github.com/gin-gonic/gin"
 )
+
+type mutableRateLimitSettingsProvider struct {
+	mu      sync.Mutex
+	setting settings.RateLimitSetting
+}
+
+func (p *mutableRateLimitSettingsProvider) GetRateLimit(_ context.Context) (settings.RateLimitSetting, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.setting, nil
+}
+
+func (p *mutableRateLimitSettingsProvider) set(setting settings.RateLimitSetting) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.setting = setting
+}
 
 func resetRateLimitStore() {
 	resetRateLimitStoreWithClock(time.Now)
@@ -28,7 +48,7 @@ func TestRateLimitMiddlewareAllowsInitialBurst(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -50,7 +70,7 @@ func TestRateLimitMiddlewareRejectsAfterBurst(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -75,13 +95,55 @@ func TestRateLimitMiddlewareRejectsAfterBurst(t *testing.T) {
 	}
 }
 
+func TestRateLimitMiddlewareAppliesRuntimeSettingsChanges(t *testing.T) {
+	resetRateLimitStore()
+	gin.SetMode(gin.TestMode)
+
+	provider := &mutableRateLimitSettingsProvider{}
+	provider.set(settings.RateLimitSetting{WindowSeconds: 60, MaxRequests: 1})
+
+	router := gin.New()
+	router.Use(rateLimitMiddleware(provider))
+	router.GET("/ping", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.RemoteAddr = "203.0.113.12:12345"
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("first status = %d, want %d", res.Code, http.StatusOK)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/ping", nil)
+	req.RemoteAddr = "203.0.113.12:12345"
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status = %d, want %d", res.Code, http.StatusTooManyRequests)
+	}
+
+	provider.set(settings.RateLimitSetting{WindowSeconds: 60, MaxRequests: 2})
+
+	for i := 0; i < 2; i++ {
+		req = httptest.NewRequest(http.MethodGet, "/ping", nil)
+		req.RemoteAddr = "203.0.113.12:12345"
+		res = httptest.NewRecorder()
+		router.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("post-update request %d status = %d, want %d", i+1, res.Code, http.StatusOK)
+		}
+	}
+}
+
 func TestRateLimitTokenRefillAfterIdle(t *testing.T) {
 	now := time.Unix(1_000, 0)
 	resetRateLimitStoreWithClock(func() time.Time { return now })
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -133,7 +195,7 @@ func TestRateLimitLargeTimeJumpDoesNotOverflow(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -182,7 +244,7 @@ func TestRateLimitConcurrentRequestsDontOverflow(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -226,7 +288,7 @@ func TestRateLimitUsesRemoteAddr(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -271,7 +333,7 @@ func TestRateLimitEvictsOldestOnOverflow(t *testing.T) {
 	rateLimitStore.mu.Unlock()
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -316,7 +378,7 @@ func TestRateLimitCleansStaleEntries(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(rateLimitMiddleware())
+	router.Use(rateLimitMiddleware(nil))
 	router.GET("/ping", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})

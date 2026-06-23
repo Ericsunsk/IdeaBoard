@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/taskqueue"
-	"ideaboard/api/internal/tasks"
 	"io"
 	"log/slog"
 	"net/url"
@@ -16,7 +13,11 @@ import (
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/channels"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -67,6 +68,7 @@ func truncateErrorBody(body string) string {
 type ProviderExecutor struct {
 	channelRepo    *channels.ChannelRepository
 	storageService *storage.StorageService
+	publicURLs     settings.PublicURLSettingProvider
 }
 
 func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*storage.StoredUploadObject, bool, error) {
@@ -219,7 +221,7 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		return providerExecutionConfig{}, err
 	}
 
-	taskParams := c.parseAndNormalizeTaskParams(task)
+	taskParams := c.parseAndNormalizeTaskParams(ctx, task)
 	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
 	if !ok {
 		return providerExecutionConfig{}, newExecutionFailureError(
@@ -279,14 +281,14 @@ func (c *ProviderExecutor) applyAccountChannelEndpoint(ctx context.Context, acco
 	return channel.Name, nil
 }
 
-func (c *ProviderExecutor) parseAndNormalizeTaskParams(task *tasks.TaskPayload) providerTaskParams {
+func (c *ProviderExecutor) parseAndNormalizeTaskParams(ctx context.Context, task *tasks.TaskPayload) providerTaskParams {
 	typedParams, err := tasks.UnmarshalParams(task.Params)
 	if err != nil {
 		slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
 		return providerTaskParams{}
 	}
 	params := newProviderTaskParams(typedParams)
-	c.normalizeUpstreamMediaParams(params.Provider)
+	c.normalizeUpstreamMediaParams(ctx, params.Provider)
 	return params
 }
 
@@ -336,7 +338,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	storedKeys := make([]string, 0, len(next))
 	for index, currentURL := range next {
 		storeOpts := storage.StorageStoreOptions{
-			AllowHosts: trustedImageDownloadHosts(account),
+			AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicURLs),
 		}
 		if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
 			storeOpts.DirPrefix = dirPrefix

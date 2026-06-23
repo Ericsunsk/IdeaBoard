@@ -2,6 +2,8 @@ package users
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +13,7 @@ import (
 
 	"ideaboard/api/internal/autherrors"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,6 +27,30 @@ type fakeAdminAuthManager struct {
 	bannedAuthUserID   string
 	unbannedAuthUserID string
 	revokedAuthUserID  string
+}
+
+type adminBrandingSettingsResponse struct {
+	Code int                      `json:"code"`
+	Msg  string                   `json:"msg"`
+	Data settings.BrandingSetting `json:"data"`
+}
+
+type adminTaskMonitorSettingsResponse struct {
+	Code int                         `json:"code"`
+	Msg  string                      `json:"msg"`
+	Data settings.TaskMonitorSetting `json:"data"`
+}
+
+type adminPublicURLSettingsResponse struct {
+	Code int                       `json:"code"`
+	Msg  string                    `json:"msg"`
+	Data settings.PublicURLSetting `json:"data"`
+}
+
+type adminMediaUploadSettingsResponse struct {
+	Code int                         `json:"code"`
+	Msg  string                      `json:"msg"`
+	Data settings.MediaUploadSetting `json:"data"`
 }
 
 func (f *fakeAdminAuthManager) DeleteUser(_ context.Context, authUserID string) error {
@@ -50,6 +77,10 @@ func (f *fakeAdminAuthManager) RevokeUserSessions(_ context.Context, authUserID 
 	return f.revokeErr
 }
 
+func newAdminHandlerForRuntimeSettings(db *sql.DB) *AdminHandler {
+	return NewAdminHandler(nil, settings.NewRuntimeSettingsService(settings.NewSystemConfigRepository(db)), nil)
+}
+
 func TestAdminListUsersRejectsInvalidFilters(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -68,6 +99,507 @@ func TestAdminListUsersRejectsInvalidFilters(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "role 仅支持 admin 或 user") {
 		t.Fatalf("body = %s, want role validation message", rec.Body.String())
+	}
+}
+
+func TestAdminRuntimeSettingsGetFailsWhenRepositoryUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewAdminHandler(nil, settings.NewRuntimeSettingsService(nil), nil)
+	tests := []struct {
+		name     string
+		path     string
+		register func(*gin.Engine)
+	}{
+		{
+			name: "registration",
+			path: "/admin/settings/registration",
+			register: func(router *gin.Engine) {
+				router.GET("/admin/settings/registration", handler.GetRegistrationSetting)
+			},
+		},
+		{
+			name: "rate limit",
+			path: "/admin/settings/rate-limit",
+			register: func(router *gin.Engine) {
+				router.GET("/admin/settings/rate-limit", handler.GetRateLimitSettings)
+			},
+		},
+		{
+			name: "public URLs",
+			path: "/admin/settings/public-urls",
+			register: func(router *gin.Engine) {
+				router.GET("/admin/settings/public-urls", handler.GetPublicURLSettings)
+			},
+		},
+		{
+			name: "media upload",
+			path: "/admin/settings/media-upload",
+			register: func(router *gin.Engine) {
+				router.GET("/admin/settings/media-upload", handler.GetMediaUploadSettings)
+			},
+		},
+		{
+			name: "branding",
+			path: "/admin/settings/branding",
+			register: func(router *gin.Engine) {
+				router.GET("/admin/settings/branding", handler.GetBrandingSettings)
+			},
+		},
+		{
+			name: "task monitor",
+			path: "/admin/settings/task-monitor",
+			register: func(router *gin.Engine) {
+				router.GET("/admin/settings/task-monitor", handler.GetTaskMonitorSettings)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			tt.register(router)
+
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusInternalServerError {
+				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), "读取系统设置失败") {
+				t.Fatalf("body = %s, want runtime settings read failure message", rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestAdminBrandingSettingsDefaultsWhenConfigMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/branding", handler.GetBrandingSettings)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings/branding", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var got adminBrandingSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	if got.Data.ProjectName != settings.DefaultBrandingSetting().ProjectName || got.Data.LogoURL != "" {
+		t.Fatalf("branding = %+v, want default name and empty logo", got.Data)
+	}
+}
+
+func TestAdminBrandingSettingsUpdateNormalizesAndPersists(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/branding", handler.GetBrandingSettings)
+	router.PUT("/admin/settings/branding", handler.UpdateBrandingSettings)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings/branding", strings.NewReader(`{"project_name":"  Design Ops  ","logo_url":"  /uploads/admin/logo.png  "}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var updated adminBrandingSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode update response failed: %v", err)
+	}
+	if updated.Data.ProjectName != "Design Ops" || updated.Data.LogoURL != "/uploads/admin/logo.png" {
+		t.Fatalf("updated branding = %+v, want trimmed values", updated.Data)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/admin/settings/branding", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+
+	var got adminBrandingSettingsResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode get response failed: %v", err)
+	}
+	if got.Data != updated.Data {
+		t.Fatalf("persisted branding = %+v, want %+v", got.Data, updated.Data)
+	}
+}
+
+func TestAdminBrandingSettingsRejectsInvalidPayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.PUT("/admin/settings/branding", handler.UpdateBrandingSettings)
+
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "blank project name",
+			body: `{"project_name":"  ","logo_url":""}`,
+			want: "project_name 不能为空",
+		},
+		{
+			name: "too long project name",
+			body: `{"project_name":"` + strings.Repeat("名", 41) + `","logo_url":""}`,
+			want: "project_name 不能超过 40 个字符",
+		},
+		{
+			name: "invalid logo url",
+			body: `{"project_name":"IdeaBoard","logo_url":"javascript:alert(1)"}`,
+			want: "logo_url 必须为空、/uploads/ 路径或 http(s) URL",
+		},
+		{
+			name: "unsafe upload logo path",
+			body: `{"project_name":"IdeaBoard","logo_url":"/uploads/../secret.png"}`,
+			want: "logo_url 必须为空、/uploads/ 路径或 http(s) URL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/admin/settings/branding", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), tt.want) {
+				t.Fatalf("body = %s, want %q", rec.Body.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestAdminTaskMonitorSettingsDefaultsWhenConfigMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/task-monitor", handler.GetTaskMonitorSettings)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings/task-monitor", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var got adminTaskMonitorSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	if got.Data != settings.DefaultTaskMonitorSetting() {
+		t.Fatalf("task monitor settings = %+v, want defaults", got.Data)
+	}
+}
+
+func TestAdminTaskMonitorSettingsUpdatePersists(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/task-monitor", handler.GetTaskMonitorSettings)
+	router.PUT("/admin/settings/task-monitor", handler.UpdateTaskMonitorSettings)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings/task-monitor", strings.NewReader(`{"list_page_size":24,"auto_refresh_enabled":false,"refresh_interval_seconds":10,"result_preview_enabled":false}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var updated adminTaskMonitorSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode update response failed: %v", err)
+	}
+	want := settings.TaskMonitorSetting{ListPageSize: 24, AutoRefreshEnabled: false, RefreshIntervalSeconds: 10, ResultPreviewEnabled: false}
+	if updated.Data != want {
+		t.Fatalf("updated task monitor settings = %+v, want %+v", updated.Data, want)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/admin/settings/task-monitor", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+
+	var got adminTaskMonitorSettingsResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode get response failed: %v", err)
+	}
+	if got.Data != want {
+		t.Fatalf("persisted task monitor settings = %+v, want %+v", got.Data, want)
+	}
+}
+
+func TestAdminTaskMonitorSettingsRejectsInvalidPayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.PUT("/admin/settings/task-monitor", handler.UpdateTaskMonitorSettings)
+
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "page size too small",
+			body: `{"list_page_size":4,"auto_refresh_enabled":true,"refresh_interval_seconds":4,"result_preview_enabled":true}`,
+			want: "list_page_size 必须在 5 到 50 之间",
+		},
+		{
+			name: "refresh interval too small",
+			body: `{"list_page_size":12,"auto_refresh_enabled":true,"refresh_interval_seconds":1,"result_preview_enabled":true}`,
+			want: "refresh_interval_seconds 必须在 2 到 60 秒之间",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/admin/settings/task-monitor", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), tt.want) {
+				t.Fatalf("body = %s, want %q", rec.Body.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestAdminPublicURLSettingsDefaultsWhenConfigMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/public-urls", handler.GetPublicURLSettings)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings/public-urls", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var got adminPublicURLSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	want := settings.PublicURLSetting{}
+	if got.Data != want {
+		t.Fatalf("public URL settings = %+v, want %+v", got.Data, want)
+	}
+}
+
+func TestAdminPublicURLSettingsUpdateNormalizesAndPersists(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/public-urls", handler.GetPublicURLSettings)
+	router.PUT("/admin/settings/public-urls", handler.UpdatePublicURLSettings)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings/public-urls", strings.NewReader(`{"public_base_url":"  https://app.example.com/  ","public_asset_base_url":""}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var updated adminPublicURLSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode update response failed: %v", err)
+	}
+	want := settings.PublicURLSetting{PublicBaseURL: "https://app.example.com", PublicAssetBaseURL: ""}
+	if updated.Data != want {
+		t.Fatalf("updated public URL settings = %+v, want %+v", updated.Data, want)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/admin/settings/public-urls", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+
+	var got adminPublicURLSettingsResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode get response failed: %v", err)
+	}
+	if got.Data != want {
+		t.Fatalf("persisted public URL settings = %+v, want %+v", got.Data, want)
+	}
+}
+
+func TestAdminPublicURLSettingsRejectsInvalidPayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.PUT("/admin/settings/public-urls", handler.UpdatePublicURLSettings)
+
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "invalid public base URL",
+			body: `{"public_base_url":"javascript:alert(1)","public_asset_base_url":""}`,
+			want: "public_base_url 必须为空或 http(s) URL",
+		},
+		{
+			name: "invalid public asset base URL",
+			body: `{"public_base_url":"","public_asset_base_url":"ftp://assets.example.com"}`,
+			want: "public_asset_base_url 必须为空或 http(s) URL",
+		},
+		{
+			name: "public base URL with credentials",
+			body: `{"public_base_url":"https://user:pass@app.example.com","public_asset_base_url":""}`,
+			want: "public_base_url 必须为空或 http(s) URL",
+		},
+		{
+			name: "public base URL with query",
+			body: `{"public_base_url":"https://app.example.com?token=1","public_asset_base_url":""}`,
+			want: "public_base_url 必须为空或 http(s) URL",
+		},
+		{
+			name: "public asset URL with fragment",
+			body: `{"public_base_url":"","public_asset_base_url":"https://assets.example.com#uploads"}`,
+			want: "public_asset_base_url 必须为空或 http(s) URL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/admin/settings/public-urls", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), tt.want) {
+				t.Fatalf("body = %s, want %q", rec.Body.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestAdminMediaUploadSettingsDefaultsWhenConfigMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/media-upload", handler.GetMediaUploadSettings)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings/media-upload", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var got adminMediaUploadSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	if got.Data != settings.DefaultMediaUploadSetting() {
+		t.Fatalf("media upload settings = %+v, want %+v", got.Data, settings.DefaultMediaUploadSetting())
+	}
+}
+
+func TestAdminMediaUploadSettingsUpdatePersists(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/media-upload", handler.GetMediaUploadSettings)
+	router.PUT("/admin/settings/media-upload", handler.UpdateMediaUploadSettings)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings/media-upload", strings.NewReader(`{"upload_max_concurrent":4}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var updated adminMediaUploadSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode update response failed: %v", err)
+	}
+	want := settings.MediaUploadSetting{UploadMaxConcurrent: 4}
+	if updated.Data != want {
+		t.Fatalf("updated media upload settings = %+v, want %+v", updated.Data, want)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/admin/settings/media-upload", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+
+	var got adminMediaUploadSettingsResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode get response failed: %v", err)
+	}
+	if got.Data != want {
+		t.Fatalf("persisted media upload settings = %+v, want %+v", got.Data, want)
+	}
+}
+
+func TestAdminMediaUploadSettingsRejectsInvalidPayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.PUT("/admin/settings/media-upload", handler.UpdateMediaUploadSettings)
+
+	for _, body := range []string{
+		`{"upload_max_concurrent":0}`,
+		`{"upload_max_concurrent":65}`,
+	} {
+		req := httptest.NewRequest(http.MethodPut, "/admin/settings/media-upload", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), "upload_max_concurrent 必须在 1 到 64 之间") {
+			t.Fatalf("body = %s, want upload_max_concurrent validation message", rec.Body.String())
+		}
 	}
 }
 

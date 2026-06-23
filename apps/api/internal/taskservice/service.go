@@ -13,6 +13,7 @@ import (
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/storage"
@@ -32,6 +33,7 @@ type Service struct {
 	taskOutputCleaner TaskOutputObjectCleaner
 	eventHub          *EventHub
 	taskEvents        events.TaskStatusPublisher
+	publicURLs        settings.PublicURLSettingProvider
 }
 
 type TaskOutputObjectCleaner interface {
@@ -68,6 +70,7 @@ type ServiceDeps struct {
 	UploadBoards      storage.UploadBoardAccessResolver
 	UploadOwners      storage.UploadOwnerStorageUIDResolver
 	TaskOutputCleaner TaskOutputObjectCleaner
+	PublicURLs        settings.PublicURLSettingProvider
 }
 
 type ServiceOptions struct {
@@ -98,6 +101,7 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		taskOutputCleaner: deps.TaskOutputCleaner,
 		eventHub:          opts.EventHub,
 		taskEvents:        opts.TaskEvents,
+		publicURLs:        deps.PublicURLs,
 	}
 }
 

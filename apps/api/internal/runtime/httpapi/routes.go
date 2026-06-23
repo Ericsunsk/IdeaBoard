@@ -22,6 +22,7 @@ import (
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/platform/media"
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/taskservice"
@@ -39,6 +40,7 @@ type Dependencies struct {
 	AdminRoutes    AdminRouteDeps
 	StaticUploads  StaticUploadDeps
 	CORSMiddleware gin.HandlerFunc
+	RateLimit      settings.RateLimitSettingProvider
 }
 
 type FrontendRouteOptions struct {
@@ -58,6 +60,7 @@ type UploadDeps struct {
 	StorageService *storage.StorageService
 	UserRepo       *users.UserRepository
 	BoardService   *boards.BoardService
+	UploadSettings settings.MediaUploadSettingProvider
 }
 
 type StaticUploadDeps struct {
@@ -83,6 +86,7 @@ type AdminRouteDeps struct {
 	LineDraftHandler     *assets.LineDraftHandler
 	FeaturePromptHandler *prompts.FeaturePromptHandler
 	StorageService       *storage.StorageService
+	UploadSettings       settings.MediaUploadSettingProvider
 }
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
@@ -90,12 +94,16 @@ const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 
 // Hand-written route paths that bypass the Orval-generated client.
 const (
-	RouteHealth                 = "/api/health"
-	RouteUserProfileAvatar      = "/profile/avatar"
-	RouteUserBoardUploads       = "/boards/:board_id/uploads"
-	RouteUserDownload           = "/download"
-	RouteAdminUpload            = "/upload"
-	RouteAdminSettingsRateLimit = "/settings/rate-limit"
+	RouteHealth                   = "/api/health"
+	RouteUserProfileAvatar        = "/profile/avatar"
+	RouteUserBoardUploads         = "/boards/:board_id/uploads"
+	RouteUserDownload             = "/download"
+	RouteAdminUpload              = "/upload"
+	RouteAdminSettingsBranding    = "/settings/branding"
+	RouteAdminSettingsMediaUpload = "/settings/media-upload"
+	RouteAdminSettingsPublicURLs  = "/settings/public-urls"
+	RouteAdminSettingsRateLimit   = "/settings/rate-limit"
+	RouteAdminSettingsTaskMonitor = "/settings/task-monitor"
 )
 
 // validateUploadFileHeader centralises the three-step upload validation:
@@ -147,7 +155,7 @@ func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (uploadImag
 }
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
-	r.Use(rateLimitMiddleware())
+	r.Use(rateLimitMiddleware(deps.RateLimit))
 	r.Use(deps.CORSMiddleware)
 	r.Use(globalRequestBodyLimitMiddleware())
 
@@ -299,6 +307,14 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.PUT("/settings/registration", h.AdminHandler.UpdateRegistrationSetting)
 	adminApi.GET(RouteAdminSettingsRateLimit, h.AdminHandler.GetRateLimitSettings)
 	adminApi.PUT(RouteAdminSettingsRateLimit, h.AdminHandler.UpdateRateLimitSettings)
+	adminApi.GET(RouteAdminSettingsBranding, h.AdminHandler.GetBrandingSettings)
+	adminApi.PUT(RouteAdminSettingsBranding, h.AdminHandler.UpdateBrandingSettings)
+	adminApi.GET(RouteAdminSettingsMediaUpload, h.AdminHandler.GetMediaUploadSettings)
+	adminApi.PUT(RouteAdminSettingsMediaUpload, h.AdminHandler.UpdateMediaUploadSettings)
+	adminApi.GET(RouteAdminSettingsPublicURLs, h.AdminHandler.GetPublicURLSettings)
+	adminApi.PUT(RouteAdminSettingsPublicURLs, h.AdminHandler.UpdatePublicURLSettings)
+	adminApi.GET(RouteAdminSettingsTaskMonitor, h.AdminHandler.GetTaskMonitorSettings)
+	adminApi.PUT(RouteAdminSettingsTaskMonitor, h.AdminHandler.UpdateTaskMonitorSettings)
 
 	adminApi.GET("/users", h.AdminHandler.ListUsers)
 	adminApi.POST("/users/:id/ban", h.AdminHandler.BanUser)
@@ -325,7 +341,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.GET("/statistics", h.TaskStatsHandler.GetStatistics)
 	adminApi.POST("/statistics/backfill", h.TaskStatsHandler.BackfillStatistics)
 
-	adminApi.POST(RouteAdminUpload, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), adminUploadHandler(h.StorageService))
+	adminApi.POST(RouteAdminUpload, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), adminUploadHandler(h.StorageService, h.UploadSettings))
 
 	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)
 	adminApi.GET("/storage/profiles", h.StorageHandler.ListProfiles)

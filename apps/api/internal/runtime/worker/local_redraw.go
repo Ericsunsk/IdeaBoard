@@ -130,7 +130,7 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 		return nil, nil
 	}
 
-	allowHosts := trustedImageDownloadHosts(account)
+	allowHosts := trustedImageDownloadHosts(ctx, account, c.publicURLs)
 	originalImage, err := c.loadImageFromRef(ctx, redrawReq.OriginalRef, timeout, allowHosts)
 	if err != nil {
 		return nil, fmt.Errorf("local redraw 读取原图失败: feature=%s err=%w", redrawReq.FeatureSlug, err)

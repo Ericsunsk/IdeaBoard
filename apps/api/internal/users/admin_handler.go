@@ -16,9 +16,9 @@ import (
 )
 
 type AdminHandler struct {
-	userService *UserService
-	configRepo  *settings.SystemConfigRepository
-	authService AuthUserManager
+	userService     *UserService
+	runtimeSettings *settings.RuntimeSettingsService
+	authService     AuthUserManager
 }
 
 type AuthUserManager interface {
@@ -27,15 +27,6 @@ type AuthUserManager interface {
 	BanUser(ctx context.Context, authUserID string, reason string, expiresInSeconds int) error
 	UnbanUser(ctx context.Context, authUserID string) error
 	RevokeUserSessions(ctx context.Context, authUserID string) error
-}
-
-type registrationSettingPayload struct {
-	Enabled bool `json:"enabled"`
-}
-
-type rateLimitSettingsPayload struct {
-	WindowSeconds int `json:"window_seconds"`
-	MaxRequests   int `json:"max_requests"`
 }
 
 type adminActionError struct {
@@ -57,94 +48,206 @@ func (e *adminActionError) Error() string {
 	return "admin action failed"
 }
 
-func NewAdminHandler(userService *UserService, configRepo *settings.SystemConfigRepository, authService AuthUserManager) *AdminHandler {
+func NewAdminHandler(userService *UserService, runtimeSettings *settings.RuntimeSettingsService, authService AuthUserManager) *AdminHandler {
 	return &AdminHandler{
-		userService: userService,
-		configRepo:  configRepo,
-		authService: authService,
+		userService:     userService,
+		runtimeSettings: runtimeSettings,
+		authService:     authService,
 	}
 }
 
 // GetRegistrationSetting 获取注册开关状态
 func (h *AdminHandler) GetRegistrationSetting(c *gin.Context) {
-	val, err := h.configRepo.Get(c.Request.Context(), "auth_registration_enabled")
-	if err != nil {
-		response.SuccessDTO(c, registrationSettingPayload{Enabled: false})
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
 		return
 	}
-	response.SuccessDTO(c, registrationSettingPayload{Enabled: val == "true"})
+	setting, err := runtimeSettings.GetRegistration(c.Request.Context())
+	if h.respondRuntimeSettingsReadError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, setting)
 }
 
 // UpdateRegistrationSetting 更新注册开关状态
 func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
-	var req registrationSettingPayload
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	var req settings.RegistrationSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
 
-	val := "false"
-	if req.Enabled {
-		val = "true"
-	}
-
-	if err := h.configRepo.Set(c.Request.Context(), "auth_registration_enabled", val); err != nil {
-		response.InternalError(c, 500, "保存设置失败", err)
+	updated, err := runtimeSettings.UpdateRegistration(c.Request.Context(), req)
+	if h.respondRuntimeSettingsWriteError(c, err) {
 		return
 	}
 
-	response.SuccessDTO(c, registrationSettingPayload{Enabled: req.Enabled})
+	response.SuccessDTO(c, updated)
 }
 
 // GetRateLimitSettings 获取频率限制设置
 func (h *AdminHandler) GetRateLimitSettings(c *gin.Context) {
-	windowStr, err1 := h.configRepo.Get(c.Request.Context(), "auth_rate_limit_window")
-	maxReqStr, err2 := h.configRepo.Get(c.Request.Context(), "auth_rate_limit_max_requests")
-
-	window := 60
-	maxReq := 30
-
-	if err1 == nil {
-		if w, err := strconv.Atoi(windowStr); err == nil {
-			window = w
-		}
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
 	}
-	if err2 == nil {
-		if m, err := strconv.Atoi(maxReqStr); err == nil {
-			maxReq = m
-		}
+	setting, err := runtimeSettings.GetRateLimit(c.Request.Context())
+	if h.respondRuntimeSettingsReadError(c, err) {
+		return
 	}
-
-	response.SuccessDTO(c, rateLimitSettingsPayload{WindowSeconds: window, MaxRequests: maxReq})
+	response.SuccessDTO(c, setting)
 }
 
 // UpdateRateLimitSettings 更新频率限制设置
 func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
-	var req rateLimitSettingsPayload
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	var req settings.RateLimitSetting
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
 
-	if req.WindowSeconds < 1 || req.WindowSeconds > 3600 {
-		response.Error(c, 400, "window_seconds 必须在 1 到 3600 秒之间")
-		return
-	}
-	if req.MaxRequests < 1 || req.MaxRequests > 10000 {
-		response.Error(c, 400, "max_requests 必须在 1 到 10000 之间")
+	updated, err := runtimeSettings.UpdateRateLimit(c.Request.Context(), req)
+	if h.respondRuntimeSettingsWriteError(c, err) {
 		return
 	}
 
-	if err := h.configRepo.Set(c.Request.Context(), "auth_rate_limit_window", strconv.Itoa(req.WindowSeconds)); err != nil {
-		response.InternalError(c, 500, "保存设置失败", err)
+	response.SuccessDTO(c, updated)
+}
+
+// GetPublicURLSettings 获取公开链接设置
+func (h *AdminHandler) GetPublicURLSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
 		return
 	}
-	if err := h.configRepo.Set(c.Request.Context(), "auth_rate_limit_max_requests", strconv.Itoa(req.MaxRequests)); err != nil {
-		response.InternalError(c, 500, "保存设置失败", err)
+	setting, err := runtimeSettings.GetPublicURL(c.Request.Context())
+	if h.respondRuntimeSettingsReadError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, setting)
+}
+
+// UpdatePublicURLSettings 更新公开链接设置
+func (h *AdminHandler) UpdatePublicURLSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	var req settings.PublicURLSetting
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
-	response.SuccessDTO(c, req)
+	updated, err := runtimeSettings.UpdatePublicURL(c.Request.Context(), req)
+	if h.respondRuntimeSettingsWriteError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, updated)
+}
+
+// GetMediaUploadSettings 获取媒体上传设置
+func (h *AdminHandler) GetMediaUploadSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	setting, err := runtimeSettings.GetMediaUpload(c.Request.Context())
+	if h.respondRuntimeSettingsReadError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, setting)
+}
+
+// UpdateMediaUploadSettings 更新媒体上传设置
+func (h *AdminHandler) UpdateMediaUploadSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	var req settings.MediaUploadSetting
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+
+	updated, err := runtimeSettings.UpdateMediaUpload(c.Request.Context(), req)
+	if h.respondRuntimeSettingsWriteError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, updated)
+}
+
+// GetBrandingSettings 获取后台品牌设置
+func (h *AdminHandler) GetBrandingSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	branding, err := runtimeSettings.GetBranding(c.Request.Context())
+	if h.respondRuntimeSettingsReadError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, branding)
+}
+
+// UpdateBrandingSettings 更新后台品牌设置
+func (h *AdminHandler) UpdateBrandingSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	var req settings.BrandingSetting
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+
+	updated, err := runtimeSettings.UpdateBranding(c.Request.Context(), req)
+	if h.respondRuntimeSettingsWriteError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, updated)
+}
+
+// GetTaskMonitorSettings 获取任务监控设置
+func (h *AdminHandler) GetTaskMonitorSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	setting, err := runtimeSettings.GetTaskMonitor(c.Request.Context())
+	if h.respondRuntimeSettingsReadError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, setting)
+}
+
+// UpdateTaskMonitorSettings 更新任务监控设置
+func (h *AdminHandler) UpdateTaskMonitorSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	var req settings.TaskMonitorSetting
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+
+	updated, err := runtimeSettings.UpdateTaskMonitor(c.Request.Context(), req)
+	if h.respondRuntimeSettingsWriteError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, updated)
 }
 
 // ListUsers 获取用户列表
@@ -166,6 +269,34 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+func (h *AdminHandler) requireRuntimeSettings(c *gin.Context) (*settings.RuntimeSettingsService, bool) {
+	if h.runtimeSettings == nil {
+		response.InternalError(c, 500, "系统设置服务未初始化", errors.New("runtime settings service is not initialized"))
+		return nil, false
+	}
+	return h.runtimeSettings, true
+}
+
+func (h *AdminHandler) respondRuntimeSettingsWriteError(c *gin.Context, err error) bool {
+	if err == nil {
+		return false
+	}
+	if validation.Is(err) {
+		response.Error(c, 400, err.Error())
+		return true
+	}
+	response.InternalError(c, 500, "保存设置失败", err)
+	return true
+}
+
+func (h *AdminHandler) respondRuntimeSettingsReadError(c *gin.Context, err error) bool {
+	if err == nil {
+		return false
+	}
+	response.InternalError(c, 500, "读取系统设置失败", err)
+	return true
 }
 
 func (h *AdminHandler) BanUser(c *gin.Context) {

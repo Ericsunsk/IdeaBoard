@@ -16,8 +16,12 @@ const ALLOWED_API_REQUESTS = [
   /\/api\/admin\/channels(?:[?#\s]|$)/,
   /\/api\/admin\/accounts(?:[/?#\s]|$)/,
   /\/api\/admin\/users(?:[?#\s]|$)/,
+  /\/api\/admin\/settings\/branding(?:[?#\s]|$)/,
+  /\/api\/admin\/settings\/media-upload(?:[?#\s]|$)/,
   /\/api\/admin\/settings\/registration(?:[?#\s]|$)/,
   /\/api\/admin\/settings\/rate-limit(?:[?#\s]|$)/,
+  /\/api\/admin\/settings\/task-monitor(?:[?#\s]|$)/,
+  /\/api\/admin\/settings\/public-urls(?:[?#\s]|$)/,
   /\/api\/admin\/feature-prompts(?:[?#\s]|$)/,
   /\/api\/admin\/storage\/providers(?:[?#\s]|$)/,
   /\/api\/admin\/storage\/profiles(?:[?#\s]|$)/,
@@ -184,12 +188,49 @@ const ADMIN_REGISTRATION_SETTING = {
   },
 }
 
+const ADMIN_BRANDING_SETTING = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    project_name: 'IdeaBoard',
+    logo_url: '',
+  },
+}
+
 const ADMIN_RATE_LIMIT_SETTINGS = {
   code: 0,
   msg: 'ok',
   data: {
-    window_seconds: 60,
-    max_requests: 30,
+    window_seconds: 2,
+    max_requests: 120,
+  },
+}
+
+const ADMIN_TASK_MONITOR_SETTINGS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    list_page_size: 12,
+    auto_refresh_enabled: true,
+    refresh_interval_seconds: 4,
+    result_preview_enabled: true,
+  },
+}
+
+const ADMIN_PUBLIC_URL_SETTINGS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    public_base_url: 'https://app.example.test',
+    public_asset_base_url: 'https://api.example.test',
+  },
+}
+
+const ADMIN_MEDIA_UPLOAD_SETTINGS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    upload_max_concurrent: 8,
   },
 }
 
@@ -275,8 +316,12 @@ function setupBrowser(playwrightCli: CommandSpec) {
   smoke.routeJson(playwrightCli, '**/api/admin/accounts/limits', ADMIN_ACCOUNT_LIMITS)
   smoke.routeJson(playwrightCli, '**/api/admin/accounts**', EMPTY_ADMIN_ACCOUNTS)
   smoke.routeJson(playwrightCli, '**/api/admin/users**', EMPTY_ADMIN_USERS)
+  smoke.routeJson(playwrightCli, '**/api/admin/settings/branding', ADMIN_BRANDING_SETTING)
+  smoke.routeJson(playwrightCli, '**/api/admin/settings/media-upload', ADMIN_MEDIA_UPLOAD_SETTINGS)
   smoke.routeJson(playwrightCli, '**/api/admin/settings/registration', ADMIN_REGISTRATION_SETTING)
   smoke.routeJson(playwrightCli, '**/api/admin/settings/rate-limit', ADMIN_RATE_LIMIT_SETTINGS)
+  smoke.routeJson(playwrightCli, '**/api/admin/settings/task-monitor', ADMIN_TASK_MONITOR_SETTINGS)
+  smoke.routeJson(playwrightCli, '**/api/admin/settings/public-urls', ADMIN_PUBLIC_URL_SETTINGS)
   smoke.routeJson(playwrightCli, '**/api/admin/feature-prompts', EMPTY_FEATURE_PROMPTS)
   smoke.routeJson(playwrightCli, '**/api/admin/storage/providers', STORAGE_PROVIDERS)
   smoke.routeJson(playwrightCli, '**/api/admin/storage/profiles', STORAGE_PROFILES)

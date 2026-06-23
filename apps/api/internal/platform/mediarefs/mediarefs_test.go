@@ -10,7 +10,7 @@ func TestValidateUploadPath(t *testing.T) {
 		t.Fatalf("expected valid upload path, got %v", err)
 	}
 	if _, err := ValidateUploadPath("/uploads/2026/05/13/a.png"); err == nil {
-		t.Fatalf("expected legacy generic upload path to fail")
+		t.Fatalf("expected generic upload path to fail")
 	}
 	if _, err := ValidateUploadPath("/tmp/a.png"); err == nil {
 		t.Fatalf("expected invalid non-upload path")

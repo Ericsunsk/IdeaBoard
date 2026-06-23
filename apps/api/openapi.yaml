@@ -429,6 +429,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseRegistrationSetting'
+  /admin/settings/branding:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminBrandingSetting
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBrandingSetting'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminBrandingSetting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BrandingSetting'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBrandingSetting'
+  /admin/settings/public-urls:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminPublicURLSetting
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePublicURLSetting'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminPublicURLSetting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicURLSetting'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponsePublicURLSetting'
+  /admin/settings/media-upload:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminMediaUploadSetting
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMediaUploadSetting'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminMediaUploadSetting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaUploadSetting'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMediaUploadSetting'
   /admin/settings/rate-limit:
     get:
       tags: [AdminSettings]
@@ -456,6 +537,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseRateLimitSetting'
+  /admin/settings/task-monitor:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminTaskMonitorSetting
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskMonitorSetting'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminTaskMonitorSetting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskMonitorSetting'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskMonitorSetting'
 
   /admin/users:
     get:
@@ -1755,12 +1863,67 @@ components:
             type: number
             minimum: 0
 
+    BrandingSetting:
+      type: object
+      required: [project_name, logo_url]
+      properties:
+        project_name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        logo_url:
+          type: string
+          maxLength: 2048
+
     RateLimitSetting:
       type: object
       required: [window_seconds, max_requests]
       properties:
-        window_seconds: { type: integer }
-        max_requests: { type: integer }
+        window_seconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+        max_requests:
+          type: integer
+          minimum: 1
+          maximum: 10000
+
+    PublicURLSetting:
+      type: object
+      required: [public_base_url, public_asset_base_url]
+      properties:
+        public_base_url:
+          type: string
+          maxLength: 2048
+        public_asset_base_url:
+          type: string
+          maxLength: 2048
+
+    MediaUploadSetting:
+      type: object
+      required: [upload_max_concurrent]
+      properties:
+        upload_max_concurrent:
+          type: integer
+          minimum: 1
+          maximum: 64
+
+    TaskMonitorSetting:
+      type: object
+      required: [list_page_size, auto_refresh_enabled, refresh_interval_seconds, result_preview_enabled]
+      properties:
+        list_page_size:
+          type: integer
+          minimum: 5
+          maximum: 50
+        auto_refresh_enabled:
+          type: boolean
+        refresh_interval_seconds:
+          type: integer
+          minimum: 2
+          maximum: 60
+        result_preview_enabled:
+          type: boolean
 
     AdminAccount:
       type: object
@@ -2504,6 +2667,14 @@ components:
               properties:
                 enabled: { type: boolean }
 
+    ApiResponseBrandingSetting:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/BrandingSetting'
+
     ApiResponseRateLimitSetting:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
@@ -2511,6 +2682,30 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/RateLimitSetting'
+
+    ApiResponsePublicURLSetting:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PublicURLSetting'
+
+    ApiResponseMediaUploadSetting:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/MediaUploadSetting'
+
+    ApiResponseTaskMonitorSetting:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/TaskMonitorSetting'
 
     ApiResponseUserList:
       allOf:

@@ -1,5 +1,4 @@
 import { authDB } from './auth.js'
-import { clampInteger } from './authUtils.js'
 
 export type AuthGuardSettings = {
   registrationEnabled: boolean
@@ -18,10 +17,14 @@ type AuthGuardSettingsRow = {
 }
 
 const AUTH_GUARD_SETTINGS_TTL_MS = 10_000
+export const DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS = 60
+export const DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS = 30
+
+// Auth 登录/注册限流由代码常量控制；后台 runtime settings 只调 Go API 全局限流。
 const DEFAULT_AUTH_GUARD_SETTINGS: AuthGuardSettings = {
   registrationEnabled: false,
-  windowSeconds: 60,
-  maxRequests: 30,
+  windowSeconds: DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,
+  maxRequests: DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS,
 }
 
 let authGuardSettingsCache: AuthGuardSettingsCache | null = null
@@ -39,11 +42,7 @@ export async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
     const result = await authDB.query(
       'SELECT config_key, value FROM system_configs WHERE config_key = ANY($1::text[])',
       [
-        [
-          'auth_registration_enabled',
-          'auth_rate_limit_window',
-          'auth_rate_limit_max_requests',
-        ],
+        ['auth_registration_enabled'],
       ],
     )
     for (const row of result.rows as AuthGuardSettingsRow[]) {
@@ -65,21 +64,5 @@ export async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
 function applyAuthGuardSettingsRow(settings: AuthGuardSettings, row: AuthGuardSettingsRow) {
   if (row?.config_key === 'auth_registration_enabled' && typeof row?.value === 'string') {
     settings.registrationEnabled = row.value === 'true'
-  }
-  if (row?.config_key === 'auth_rate_limit_window' && row?.value) {
-    settings.windowSeconds = clampInteger(
-      row.value,
-      1,
-      3600,
-      DEFAULT_AUTH_GUARD_SETTINGS.windowSeconds,
-    )
-  }
-  if (row?.config_key === 'auth_rate_limit_max_requests' && row?.value) {
-    settings.maxRequests = clampInteger(
-      row.value,
-      1,
-      10000,
-      DEFAULT_AUTH_GUARD_SETTINGS.maxRequests,
-    )
   }
 }

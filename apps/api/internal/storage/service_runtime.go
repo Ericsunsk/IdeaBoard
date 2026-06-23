@@ -18,6 +18,7 @@ import (
 	"ideaboard/api/internal/platform/media"
 	"ideaboard/api/internal/platform/mediarefs"
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/settings"
 )
 
 const (
@@ -372,22 +373,22 @@ func (s *StorageService) storeRemoteRefWithProfile(ctx context.Context, profile 
 	return adapter.StoreRemoteRef(ctx, &profile, remoteURL, opts)
 }
 
-func (s *StorageService) saveUploadedFileLocal(file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
+func (s *StorageService) saveUploadedFileLocal(ctx context.Context, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
 	src, err := file.Open()
 	if err != nil {
 		return "", fmt.Errorf("打开文件失败: %w", err)
 	}
 	defer src.Close()
 
-	return s.saveReaderLocal(file.Filename, src, file.Size, opts)
+	return s.saveReaderLocal(ctx, file.Filename, src, file.Size, opts)
 }
 
-func (s *StorageService) saveBytesLocal(filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	return s.saveReaderLocal(filename, bytes.NewReader(data), int64(len(data)), opts)
+func (s *StorageService) saveBytesLocal(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (string, error) {
+	return s.saveReaderLocal(ctx, filename, bytes.NewReader(data), int64(len(data)), opts)
 }
 
-func (s *StorageService) saveBytesLocalRef(filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
-	ref, err := s.saveReaderLocalRef(filename, inferStoredUploadContentType(filename, data), bytes.NewReader(data), int64(len(data)), opts)
+func (s *StorageService) saveBytesLocalRef(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	ref, err := s.saveReaderLocalRef(ctx, filename, inferStoredUploadContentType(filename, data), bytes.NewReader(data), int64(len(data)), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -395,15 +396,15 @@ func (s *StorageService) saveBytesLocalRef(filename string, data []byte, opts St
 	return ref, nil
 }
 
-func (s *StorageService) saveReaderLocal(filename string, src io.Reader, size int64, opts StorageStoreOptions) (string, error) {
-	ref, err := s.saveReaderLocalRef(filename, "", src, size, opts)
+func (s *StorageService) saveReaderLocal(ctx context.Context, filename string, src io.Reader, size int64, opts StorageStoreOptions) (string, error) {
+	ref, err := s.saveReaderLocalRef(ctx, filename, "", src, size, opts)
 	if err != nil {
 		return "", err
 	}
 	return ref.URL, nil
 }
 
-func (s *StorageService) saveReaderLocalRef(filename string, contentType string, src io.Reader, size int64, opts StorageStoreOptions) (*StoredUploadRef, error) {
+func (s *StorageService) saveReaderLocalRef(ctx context.Context, filename string, contentType string, src io.Reader, size int64, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext == "" {
 		ext = ".png"
@@ -441,7 +442,7 @@ func (s *StorageService) saveReaderLocalRef(filename string, contentType string,
 		contentType = "application/octet-stream"
 	}
 	return &StoredUploadRef{
-		URL:            publicUploadURL(objectKey),
+		URL:            s.publicUploadURL(ctx, objectKey),
 		StorageKey:     objectKey,
 		StorageProfile: builtinLocalProfileID(),
 		MIMEType:       contentType,
@@ -480,38 +481,41 @@ func copyExactWithStorageBuffer(dst io.Writer, src io.Reader, size int64) error 
 	return nil
 }
 
-func publicUploadURL(objectKey string) string {
+func publicUploadURL(ctx context.Context, objectKey string) string {
+	return publicUploadURLWithProvider(ctx, nil, objectKey)
+}
+
+func (s *StorageService) publicUploadURL(ctx context.Context, objectKey string) string {
+	if s == nil {
+		return publicUploadURL(ctx, objectKey)
+	}
+	return publicUploadURLWithProvider(ctx, s.publicURLs, objectKey)
+}
+
+func publicUploadURLWithProvider(ctx context.Context, provider settings.PublicURLSettingProvider, objectKey string) string {
 	normalized := "/" + strings.TrimLeft(filepath.ToSlash(objectKey), "/")
-	base := resolvePublicUploadBaseURL()
+	base := resolvePublicUploadBaseURL(ctx, provider)
 	if base == nil {
 		return normalized
 	}
-	rel, err := url.Parse(normalized)
-	if err != nil {
-		return normalized
-	}
-	return base.ResolveReference(rel).String()
+	out := *base
+	out.Path = path.Join(base.Path, normalized)
+	out.RawQuery = ""
+	out.Fragment = ""
+	return out.String()
 }
 
-func resolvePublicUploadBaseURL() *url.URL {
-	for _, key := range []string{"APP_PUBLIC_ASSET_BASE_URL", "APP_PUBLIC_BASE_URL"} {
-		raw := strings.TrimSpace(os.Getenv(key))
-		if raw == "" {
-			continue
-		}
-		parsed, err := url.Parse(raw)
-		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			continue
-		}
+func resolvePublicUploadBaseURL(ctx context.Context, provider settings.PublicURLSettingProvider) *url.URL {
+	parsed := settings.ResolvePublicAssetBaseURL(ctx, provider)
+	if parsed != nil {
 		logPublicUploadAuthWarningOnce.Do(func() {
 			if isLikelyObjectStorageHost(parsed.Host) {
-				slog.Warn("APP_PUBLIC_ASSET_BASE_URL 指向对象存储域名，上传文件可能绕过应用鉴权被直接访问。建议使用应用自身域名或 CDN 地址。",
-					"host", parsed.Host, "env_key", key)
+				slog.Warn("系统设置的素材访问地址指向对象存储域名，上传文件可能绕过应用鉴权被直接访问。建议使用应用自身域名或 CDN 地址。",
+					"host", parsed.Host)
 			}
 		})
-		return parsed
 	}
-	return nil
+	return parsed
 }
 
 var logPublicUploadAuthWarningOnce sync.Once

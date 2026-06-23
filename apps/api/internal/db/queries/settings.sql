@@ -3,6 +3,12 @@ SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
 WHERE config_key = sqlc.arg(config_key);
 
+-- name: ListSystemConfigsByKeys :many
+SELECT id, config_key, value, created_at, updated_at
+FROM system_configs
+WHERE config_key = ANY(sqlc.arg(config_keys)::text[])
+ORDER BY config_key ASC;
+
 -- name: ListSystemConfigsByPrefix :many
 SELECT id, config_key, value, created_at, updated_at
 FROM system_configs

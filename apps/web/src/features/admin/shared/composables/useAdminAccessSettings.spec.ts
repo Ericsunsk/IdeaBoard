@@ -3,9 +3,9 @@ import {
   RATE_LIMIT_MAX_REQUESTS,
   RATE_LIMIT_MAX_WINDOW_SECONDS,
   validateRateLimitSettings,
-} from './useAdminUserSettings'
+} from './useAdminAccessSettings'
 
-describe('admin user settings validation', () => {
+describe('admin access settings validation', () => {
   it('accepts valid integer rate limit settings', () => {
     expect(validateRateLimitSettings({ max_requests: 100, window_seconds: 60 })).toBe('')
   })

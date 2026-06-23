@@ -7,13 +7,15 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )
 
 type BoardHandler struct {
-	service *BoardService
+	service    *BoardService
+	publicURLs settings.PublicURLSettingProvider
 }
 
 type boardDTO struct {
@@ -75,8 +77,8 @@ type boardShareTokenRevokeResponse struct {
 	Revoked bool `json:"revoked"`
 }
 
-func NewBoardHandler(service *BoardService) *BoardHandler {
-	return &BoardHandler{service: service}
+func NewBoardHandler(service *BoardService, publicURLs settings.PublicURLSettingProvider) *BoardHandler {
+	return &BoardHandler{service: service, publicURLs: publicURLs}
 }
 
 func (h *BoardHandler) ListBoards(c *gin.Context) {
@@ -267,7 +269,7 @@ func (h *BoardHandler) CreateShareToken(c *gin.Context) {
 		h.respondShareTokenError(c, err, "创建分享链接失败")
 		return
 	}
-	baseURL := ResolvePublicBaseURL(requestScheme(c), c.Request.Host)
+	baseURL := settings.ResolvePublicBaseURL(c.Request.Context(), h.publicURLs, requestScheme(c), c.Request.Host)
 	response.SuccessDTO(c, boardShareTokenResponse{Token: toBoardShareTokenDTO(*shareToken, baseURL)})
 }
 
@@ -283,7 +285,7 @@ func (h *BoardHandler) ListShareTokens(c *gin.Context) {
 		h.respondShareTokenError(c, err, "获取分享链接失败")
 		return
 	}
-	baseURL := ResolvePublicBaseURL(requestScheme(c), c.Request.Host)
+	baseURL := settings.ResolvePublicBaseURL(c.Request.Context(), h.publicURLs, requestScheme(c), c.Request.Host)
 	result := make([]boardShareTokenDTO, 0, len(list))
 	for _, item := range list {
 		result = append(result, toBoardShareTokenDTO(item, baseURL))

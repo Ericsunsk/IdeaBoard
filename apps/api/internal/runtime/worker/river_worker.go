@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/runtime/taskruntime"
 	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/taskqueue"
@@ -42,10 +43,12 @@ func NewRiverTaskWorker(
 	cancelStore taskqueue.TaskCancellationStore,
 	storageService *storage.StorageService,
 	taskEvents events.TaskStatusPublisher,
+	publicURLs settings.PublicURLSettingProvider,
 ) *RiverTaskWorker {
 	executor := &ProviderExecutor{
 		channelRepo:    channelRepo,
 		storageService: storageService,
+		publicURLs:     publicURLs,
 	}
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	taskRuntime.SetTaskStatusPublisher(taskEvents)

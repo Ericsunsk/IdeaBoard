@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   submitPromptTextGenerationTask: vi.fn(),
   waitExistingOrLiveTaskImageResults: vi.fn(),
   resolveTaskImageRatio: vi.fn(),
-  resolveTaskImageResultRatio: vi.fn(),
+  resolveTaskImageResultDisplay: vi.fn(),
 }))
 
 vi.mock('../services/flowImageDirectActionExecutor', () => ({
@@ -39,8 +39,8 @@ vi.mock('../services/flowImageDirectActionExecutor', () => ({
 vi.mock('../utils/flowImageDirectActionTaskResult', () => ({
   pickFirstValidImageResult: (results: Array<{ url: string }>) =>
     results.find((result) => result.url.trim()) ?? null,
+  resolveTaskImageResultDisplay: mocks.resolveTaskImageResultDisplay,
   resolveTaskImageRatio: mocks.resolveTaskImageRatio,
-  resolveTaskImageResultRatio: mocks.resolveTaskImageResultRatio,
 }))
 
 type Deferred<T> = {
@@ -165,8 +165,20 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     mocks.resolveTaskImageRatio.mockImplementation(async (_url: string, fallback: number) =>
       fallback > 0 ? fallback : 1,
     )
-    mocks.resolveTaskImageResultRatio.mockImplementation(
-      async (_result: { url: string }, fallback: number) => (fallback > 0 ? fallback : 1),
+    mocks.resolveTaskImageResultDisplay.mockImplementation(
+      async (result: { url: string; width?: number; height?: number }, fallback: number) => {
+        const hasSize = Number(result.width) > 0 && Number(result.height) > 0
+        const ratio = hasSize
+          ? Number(result.height) / Number(result.width)
+          : fallback > 0
+            ? fallback
+            : 1
+        return {
+          url: result.url,
+          ratio,
+          ...(hasSize ? { width: Number(result.width), height: Number(result.height) } : {}),
+        }
+      },
     )
   })
 
@@ -192,6 +204,8 @@ describe('useFlowImageDirectActions pending task recovery', () => {
 
     const completed = findImageNode(harness.nodes.value, pendingNode.id)
     expect(completed.sourceImageUrl).toBe('https://example.com/result.png')
+    expect(completed.sourceImageRatio).toBe(1)
+    expect(completed.width).toBe(260)
     expect(completed.outputStatus).toBe('ready')
     expect(completed.pendingTaskId).toBeUndefined()
     expect(harness.onSuccess).toHaveBeenCalledWith('处理完成')
@@ -258,15 +272,11 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     expect(harness.onSuccess).not.toHaveBeenCalled()
   })
 
-  it('uses completed image dimensions when resolving canvas extend result ratio', async () => {
+  it('uses completed image dimensions when resolving canvas extend result display', async () => {
     mocks.submitCanvasExtendTask.mockResolvedValue('task-extend')
     mocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
       { url: 'https://example.com/extended.png', width: 400, height: 100 },
     ])
-    mocks.resolveTaskImageResultRatio.mockImplementation(
-      async (result: { width?: number; height?: number }, fallback: number) =>
-        result.width && result.height ? result.height / result.width : fallback,
-    )
     const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
 
     await harness.actions.runCanvasExtendAction('image-1', {
@@ -279,22 +289,18 @@ describe('useFlowImageDirectActions pending task recovery', () => {
       .map((node) => node.data?.snapshotNode as ImageNodeItem | undefined)
       .find((snapshot) => snapshot?.sourceImageUrl === 'https://example.com/extended.png')
     expect(completed?.sourceImageRatio).toBe(0.25)
-    expect(mocks.resolveTaskImageResultRatio).toHaveBeenCalledWith(
+    expect(mocks.resolveTaskImageResultDisplay).toHaveBeenCalledWith(
       expect.objectContaining({ width: 400, height: 100 }),
       2,
       expect.any(Function),
     )
   })
 
-  it('sizes canvas extend result nodes from the expanded frame width', async () => {
+  it('resizes completed canvas extend result nodes from the actual output dimensions', async () => {
     mocks.submitCanvasExtendTask.mockResolvedValue('task-extend')
     mocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
       { url: 'https://example.com/extended-wide.png', width: 400, height: 200 },
     ])
-    mocks.resolveTaskImageResultRatio.mockImplementation(
-      async (result: { width?: number; height?: number }, fallback: number) =>
-        result.width && result.height ? result.height / result.width : fallback,
-    )
     const harness = createHarness([makeImageNode('image-1', makeImageSnapshot({ width: 280 }))])
 
     await harness.actions.runCanvasExtendAction('image-1', {
@@ -306,7 +312,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     const completed = harness.nodes.value
       .map((node) => node.data?.snapshotNode as ImageNodeItem | undefined)
       .find((snapshot) => snapshot?.sourceImageUrl === 'https://example.com/extended-wide.png')
-    expect(completed?.width).toBe(560)
+    expect(completed?.width).toBe(520)
     expect(completed?.sourceImageRatio).toBe(0.5)
   })
 })

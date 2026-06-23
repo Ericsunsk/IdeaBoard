@@ -322,7 +322,7 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 	if err != nil || parsedURL == nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		return "", nil, fmt.Errorf("不支持的图像引用: %q", ref)
 	}
-	allowHosts := trustedOpenAIAssetHosts()
+	allowHosts := trustedRuntimeAssetHosts(ctx, c.publicURLs)
 	if len(allowHosts) == 0 {
 		return "", nil, fmt.Errorf("远程图像输入仅支持可信资产域名")
 	}

@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import { ChatBubble, Cloud, DashboardSpeed, Group, Link, List } from '@iconoir/vue'
+import { ChatBubble, Cloud, DashboardSpeed, Group, Link, List, Settings } from '@iconoir/vue'
 import {
   ADMIN_DEFAULT_PATH,
   ADMIN_LOGIN_PATH,
@@ -20,6 +20,7 @@ const adminNavigationIcons = {
   statistics: DashboardSpeed,
   'task-monitor': List,
   'feature-prompts': ChatBubble,
+  'system-settings': Settings,
   'oss-config': Cloud,
 } satisfies Record<AdminNavigationKey, Component>
 

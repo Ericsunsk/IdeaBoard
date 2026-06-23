@@ -4,9 +4,8 @@ import {
   type ListAdminTasksParams,
   type ListAdminTasksStatus as ListAdminTasksStatusValue,
 } from '../../../../shared/api/generated-query/model'
+import { useAdminTaskMonitorSettingQuery } from '../../shared/composables/useAdminTaskMonitorSettings'
 import { useAdminQueryPolling } from '../../shared/composables/useAdminQueryPolling'
-
-export const TASK_MONITOR_PAGE_SIZE = 12
 
 type TaskStatusStats = {
   running: number
@@ -24,13 +23,19 @@ export function useTaskMonitor() {
   const searchKeyword = ref('')
   const appliedSearchKeyword = ref('')
   const hasActiveTasks = ref(true)
+  const {
+    settings: taskMonitorSettings,
+    settingsError: taskMonitorSettingsError,
+  } = useAdminTaskMonitorSettingQuery()
+  const pageSize = computed(() => taskMonitorSettings.value.list_page_size)
+  const resultPreviewEnabled = computed(() => taskMonitorSettings.value.result_preview_enabled)
 
   function resolveParams(): ListAdminTasksParams {
     const params: ListAdminTasksParams = {
       status: filterStatus.value || undefined,
       account_id: accountIdFilter.value || undefined,
       page: page.value,
-      page_size: TASK_MONITOR_PAGE_SIZE,
+      page_size: pageSize.value,
     }
     if (appliedSearchKeyword.value) {
       if (/^\d+$/.test(appliedSearchKeyword.value))
@@ -41,7 +46,10 @@ export function useTaskMonitor() {
   }
 
   const polling = useAdminQueryPolling({
-    visibleInterval: 4_000,
+    visibleInterval: () =>
+      taskMonitorSettings.value.auto_refresh_enabled
+        ? taskMonitorSettings.value.refresh_interval_seconds * 1000
+        : false,
     hiddenInterval: false,
     isEnabled: () => hasActiveTasks.value,
   })
@@ -93,6 +101,10 @@ export function useTaskMonitor() {
     page.value = 1
   })
 
+  watch(pageSize, () => {
+    page.value = 1
+  })
+
   watch(polling.isPageVisible, (isVisible, wasVisible) => {
     if (isVisible && !wasVisible && hasActiveTasks.value) void tasksQuery.refetch()
   })
@@ -108,6 +120,9 @@ export function useTaskMonitor() {
     isError,
     error,
     page,
+    pageSize,
+    resultPreviewEnabled,
+    taskMonitorSettingsError,
     taskStats,
     filterStatus,
     accountIdFilter,

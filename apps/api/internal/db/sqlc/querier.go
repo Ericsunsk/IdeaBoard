@@ -111,6 +111,7 @@ type Querier interface {
 	ListSingleEnabledModelsByAccountIDs(ctx context.Context, ids []int64) ([]ListSingleEnabledModelsByAccountIDsRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
 	ListStorageProfiles(ctx context.Context, includeDeleted bool) ([]StorageProfile, error)
+	ListSystemConfigsByKeys(ctx context.Context, configKeys []string) ([]SystemConfig, error)
 	ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error)
 	ListTaskAttemptsByTaskID(ctx context.Context, taskID string) ([]TaskAttempt, error)
 	ListTaskExecutionBottleneckStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionBottleneckStatsByCreatedRangeParams) ([]ListTaskExecutionBottleneckStatsByCreatedRangeRow, error)

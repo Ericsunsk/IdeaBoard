@@ -1,34 +1,19 @@
 package worker
 
 import (
-	"ideaboard/api/internal/platform/media"
-	"ideaboard/api/internal/platform/mediarefs"
+	"context"
 	"log/slog"
 	"net/url"
-	"os"
 	"path"
 	"sort"
 	"strings"
 
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/workflow"
 )
-
-func resolvePublicAssetBaseURL() *url.URL {
-	for _, key := range []string{"APP_PUBLIC_ASSET_BASE_URL", "APP_PUBLIC_BASE_URL"} {
-		raw := strings.TrimSpace(os.Getenv(key))
-		if raw == "" {
-			continue
-		}
-		parsed, err := url.Parse(raw)
-		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			slog.Warn("ignore invalid public asset base URL", "key", key, "value", raw)
-			continue
-		}
-		return parsed
-	}
-	return nil
-}
 
 func inferLocalAssetMimeType(filename string, data []byte) string {
 	if len(data) > 0 {
@@ -77,12 +62,12 @@ func absolutizeAssetURL(base *url.URL, raw string) (string, bool, bool) {
 	return base.ResolveReference(rel).String(), true, false
 }
 
-func (c *ProviderExecutor) normalizeUpstreamMediaParams(params map[string]interface{}) {
+func (c *ProviderExecutor) normalizeUpstreamMediaParams(ctx context.Context, params map[string]interface{}) {
 	if len(params) == 0 {
 		return
 	}
 
-	base := resolvePublicAssetBaseURL()
+	base := settings.ResolvePublicAssetBaseURL(ctx, c.publicURLs)
 	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
 	converted := 0
 	unresolvedKeys := map[string]struct{}{}
@@ -170,6 +155,6 @@ func (c *ProviderExecutor) normalizeUpstreamMediaParams(params map[string]interf
 			keys = append(keys, key)
 		}
 		sort.Strings(keys)
-		slog.Warn("upstream media URLs remain relative; configure APP_PUBLIC_ASSET_BASE_URL", "feature", featureSlug, "keys", strings.Join(keys, ","))
+		slog.Warn("upstream media URLs remain relative; configure public asset base URL in system settings", "feature", featureSlug, "keys", strings.Join(keys, ","))
 	}
 }

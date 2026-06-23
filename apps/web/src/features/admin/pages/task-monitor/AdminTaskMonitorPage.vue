@@ -1,5 +1,9 @@
 <template>
   <div :class="adminDashboardRootClass">
+    <Message v-if="taskMonitorSettingsError" severity="warn" :closable="false">
+      {{ taskMonitorSettingsErrorMessage }}
+    </Message>
+
     <Message v-if="isMonitorError" severity="error" :closable="false">
       {{ monitorErrorMessage }}
     </Message>
@@ -212,7 +216,7 @@
               <template #body="{ data }">
                 <div class="flex h-12 w-12 shrink-0 items-center justify-start">
                   <PrimeImage
-                    v-if="getTaskResultImageUrl(data)"
+                    v-if="resultPreviewEnabled && getTaskResultImageUrl(data)"
                     :src="getTaskResultImageUrl(data)"
                     preview
                     image-class="block h-12 w-12 min-w-12 shrink-0 overflow-hidden rounded-[10px] border border-admin-border-soft bg-admin-surface-muted object-cover"
@@ -638,7 +642,7 @@ import {
 } from './taskMonitorColumns'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { useTaskMonitorCharts } from './useTaskMonitorCharts'
-import { TASK_MONITOR_PAGE_SIZE, useTaskMonitor } from './useTaskMonitor'
+import { useTaskMonitor } from './useTaskMonitor'
 import { useTaskRuntimeMonitor } from './useTaskRuntimeMonitor'
 
 const appToast = useAppToast()
@@ -694,6 +698,9 @@ const {
   isError: isTaskListError,
   error: taskListError,
   page,
+  pageSize,
+  resultPreviewEnabled,
+  taskMonitorSettingsError,
   taskStats,
   filterStatus,
   accountIdFilter,
@@ -713,12 +720,15 @@ const selectedTasks = ref<Task[]>([])
 const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
   useTransientScrolling()
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
-const totalPages = computed(() => Math.ceil(total.value / TASK_MONITOR_PAGE_SIZE) || 1)
+const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1)
 const taskListErrorMessage = computed(() =>
   formatDisplayErrorMessage(taskListError.value, '加载任务列表失败'),
 )
 const monitorErrorMessage = computed(() =>
   formatDisplayErrorMessage(monitorError.value, '加载任务运行监控失败'),
+)
+const taskMonitorSettingsErrorMessage = computed(() =>
+  formatDisplayErrorMessage(taskMonitorSettingsError.value, '加载任务监控设置失败，当前使用默认展示配置'),
 )
 
 watch(totalPages, (newTotal) => {

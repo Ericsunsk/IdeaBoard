@@ -31,7 +31,7 @@
 
 - 内嵌入口：后台 `用户管理` 页。
 - 当前已开放：身份用户列表、角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销。
-- 配套控制项：开放注册开关、防刷限流设置（落 `system_configs`）。
+- 配套控制项：开放注册开关（落 `system_configs`）。登录/注册入口限流由 Auth Service 固定安全默认值控制。
 
 > [!NOTE]
 > 暂不在内嵌 UI 暴露：后台改密。未开放的高风险动作应走受控身份运维流程，并在明确审计要求后再扩展 UI。
@@ -92,7 +92,7 @@
 - 登录/注册限流依赖可信代理解析后的客户端 IP；不要让公网直接访问 `:6001`。
 - 使用最小权限账号，避免共享管理员口令。
 - 对删号、改密、会话吊销与批量操作执行双人复核。
-- 定期检查后台"防刷限流设置"与 `system_configs`（`auth_rate_limit_window`、`auth_rate_limit_max_requests`）是否符合流量规模。
+- 定期检查后台"注册与 API 限流"是否符合 Go API 流量规模；Auth Service 登录/注册入口限流使用代码内固定默认值，不读取后台 runtime settings。
 - 启用 Admin plugin 后先执行迁移：开发环境 `npm --prefix apps/auth run migrate`，生产环境 `npm --prefix apps/auth run migrate:dist`。
 
 

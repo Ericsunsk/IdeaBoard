@@ -141,4 +141,4 @@ docker compose -f compose.local.yml up -d
 2. `apps/api/.env` 中 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 是否与 compose 配置一致。
 3. 若你改过 `POSTGRES_DB`、`POSTGRES_USER` 或 `POSTGRES_PASSWORD`，后端也必须同步修改。
 
-> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 只是 compose / deploy 层的输入；API 容器实际读取 `APP_PUBLIC_BASE_URL`、`APP_PUBLIC_ASSET_BASE_URL` 和 `AUTH_SERVICE_BASE_URL`，Auth 容器读取 `BETTER_AUTH_URL`。
+> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 是 compose / deploy 层输入；API 容器读取 CORS 与 Auth 内部地址，分享链接和上传素材访问地址在后台「系统设置」里配置，Auth 容器读取 `BETTER_AUTH_URL`。

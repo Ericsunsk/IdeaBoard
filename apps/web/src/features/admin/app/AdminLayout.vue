@@ -2,8 +2,9 @@
   <router-view v-if="isLoginRoute" />
   <div v-else :class="layoutShellClass">
     <aside :class="siderClass" aria-label="后台导航">
-      <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" aria-label="IdeaBoard Admin">
-        <span :class="brandTextClass">IB</span>
+      <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" :aria-label="brandAriaLabel">
+        <img v-if="logoURL" :src="logoURL" :class="brandImageClass" alt="" />
+        <span v-else :class="brandTextClass">{{ fallbackText }}</span>
       </router-link>
 
       <nav :class="navRailClass" aria-label="后台功能">
@@ -176,10 +177,11 @@
             <router-link
               :class="[brandMarkClass, '!ml-0']"
               :to="ADMIN_DEFAULT_PATH"
-              aria-label="IdeaBoard Admin"
+              :aria-label="brandAriaLabel"
               @click="closeCallback"
             >
-              <span :class="brandTextClass">IB</span>
+              <img v-if="logoURL" :src="logoURL" :class="brandImageClass" alt="" />
+              <span v-else :class="brandTextClass">{{ fallbackText }}</span>
             </router-link>
             <Button
               :class="shellButtonClass"
@@ -237,6 +239,7 @@ import {
 } from './adminNavigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
+import { useAdminBranding } from '../shared/composables/useAdminBrandingSettings'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 import { createAdminMenuPt, createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
@@ -261,10 +264,15 @@ const userMenuOpen = ref(false)
 const userMenuRef = ref<PrimePopupMenu | null>(null)
 const anomalyRadarPopoverRef = ref<PrimePopupPanel | null>(null)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
-const isAnomalyRadarEnabled = computed(() => !isLoginRoute.value)
+const isAdminShellRoute = computed(() => !isLoginRoute.value)
+const isAnomalyRadarEnabled = computed(() => isAdminShellRoute.value)
 const { anomalies, anomalyCount, hasAnomalies } = useAdminAnomalyRadar({
   enabled: isAnomalyRadarEnabled,
 })
+const { fallbackText, logoURL, projectName } = useAdminBranding({
+  enabled: isAdminShellRoute,
+})
+const brandAriaLabel = computed(() => `${projectName.value} Admin`)
 
 const layoutShellClass =
   'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-white text-admin-text-1 max-[1080px]:grid-cols-1'
@@ -277,6 +285,7 @@ const brandMarkClass = [
   railItemSizeClass,
 ].join(' ')
 const brandTextClass = 'text-xs font-[850] tracking-normal'
+const brandImageClass = 'h-full w-full object-contain p-1.5'
 const navRailClass =
   'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'

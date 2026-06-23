@@ -235,7 +235,7 @@ sequenceDiagram
 - Go API 中间件读取 `Cookie`，通过 auth service 的 internal endpoint 校验 session。
 - Go 仅维护本地业务用户档案（`id/username/auth_user_id/storage_uid/role/status`）与权限判定。
 - 可在管理后台通过“开放注册”开关实时控制注册入口，状态持久化在 `system_configs` 表中。
-- 可在管理后台通过“防刷限流设置”调整登录/注册入口限流参数，配置落在 `system_configs`（`auth_rate_limit_window`、`auth_rate_limit_max_requests`）。
+- 可在管理后台通过“注册与 API 限流”调整 Go API 全局 IP 限流，配置落在 `system_configs`（`api_rate_limit_window_seconds`、`api_rate_limit_max_requests`）。
 - `apps/auth` 对 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 启用基于来源 IP 的内存限流；反向代理场景依赖 Fastify `request.ip` 与 loopback `trustProxy` 解析客户端 IP。
 - `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销；不开放后台改密。
 - 角色升降级必须经由 Go Admin API：前端不直连 `authClient.admin.setRole`，由 Go 校验后同步 Auth Service 与业务侧 `users.role`。
@@ -393,13 +393,11 @@ git diff --exit-code -- internal/db/sqlc
 | `APP_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
 | `APP_GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
 | `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
-| `APP_PUBLIC_BASE_URL` | 空 | 对外前端地址，用于生成分享链接；Docker stack 默认由 `APP_BASE_URL` 注入 |
-| `APP_PUBLIC_ASSET_BASE_URL` | 空 | 对外素材/API 地址，用于 `/uploads/*` 与上游模型可访问图片；Docker stack 默认由 `API_BASE_URL` 注入 |
 | `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
 | `AUTH_INTERNAL_KEY` | 空 | Go 调用 auth service internal endpoint 的保护密钥；必须与 Auth 服务同名变量一致 |
 | `APP_SECRETS_ENCRYPTION_KEY` | 无默认值 | API Key 与对象存储密钥静态加密主密钥；必须是 `openssl rand -base64 32` 生成的 base64 编码 32 字节值 |
 
-Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是输入变量，不是 API runtime 直接读取项。生产 stack 会把 `APP_BASE_URL` 映射到 `APP_PUBLIC_BASE_URL`、`APP_CORS_ALLOWED_ORIGINS` 与 `AUTH_TRUSTED_ORIGINS`，把 `API_BASE_URL` 映射到 `APP_PUBLIC_ASSET_BASE_URL` 与 `BETTER_AUTH_URL`。
+Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是输入变量，不是 API runtime 直接读取的公开链接配置。生产 stack 会把 `APP_BASE_URL` 映射到 `APP_CORS_ALLOWED_ORIGINS` 与 `AUTH_TRUSTED_ORIGINS`，把 `API_BASE_URL` 映射到 `BETTER_AUTH_URL`；首次部署后在后台「系统设置」配置「前端访问地址」和「素材访问地址」，用于分享链接和上传素材公网访问。
 
 Auth 服务关键变量：
 

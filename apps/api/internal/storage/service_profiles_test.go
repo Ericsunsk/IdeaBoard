@@ -19,7 +19,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo)
+	service := NewStorageService(repo, nil)
 	if err := service.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
 	}
@@ -32,7 +32,7 @@ func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *Storag
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	return NewStorageService(repo), repo
+	return NewStorageService(repo, nil), repo
 }
 
 func TestListProfilesStartsWithLocalProfile(t *testing.T) {

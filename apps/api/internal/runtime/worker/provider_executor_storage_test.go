@@ -51,8 +51,6 @@ func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *tes
 
 func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	t.Helper()
-	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "")
-	t.Setenv("APP_PUBLIC_BASE_URL", "")
 	oldWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("get cwd: %v", err)
@@ -68,7 +66,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	db := testdb.Open(t)
 
 	return &ProviderExecutor{
-		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db)),
+		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db), nil),
 	}
 }
 
@@ -185,7 +183,7 @@ func TestMaterializeProviderResultImagesFailsWhenRemoteCannotBeStored(t *testing
 
 	db := testdb.Open(t)
 	executor := &ProviderExecutor{
-		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db)),
+		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db), nil),
 	}
 
 	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{ProxyURL: server.URL}, []string{server.URL + "/image.png"})

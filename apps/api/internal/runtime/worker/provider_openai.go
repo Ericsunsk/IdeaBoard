@@ -23,6 +23,7 @@ import (
 	"ideaboard/api/internal/platform/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -99,13 +100,7 @@ func (f openAIRequestFinalizer) dropRedundantStyleVariationOriginalRef(reqBody *
 	if f.FeatureSlug != workflow.FeatureSlugStyleVariation {
 		return
 	}
-	image := reqBody.Image
-	if image == "" || !strings.HasPrefix(image, "data:") {
-		return
-	}
-	if original, ok := reqBody.Extra["original_image_url"].(string); ok && original == image {
-		delete(reqBody.Extra, "original_image_url")
-	}
+	delete(reqBody.Extra, "original_image_url")
 }
 
 func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams {
@@ -148,6 +143,8 @@ func (p openAIProviderParams) useEditEndpoint() bool {
 	case workflow.FeatureSlugImageExtend,
 		workflow.FeatureSlugPartialEdit,
 		workflow.FeatureSlugRemoveBg,
+		workflow.FeatureSlugSketchToImage,
+		workflow.FeatureSlugStyleVariation,
 		workflow.FeatureSlugStyleFusion:
 		return true
 	default:
@@ -457,7 +454,7 @@ func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref stri
 		return "", "", nil, fmt.Errorf("不支持的图像引用: %q", ref)
 	}
 
-	allowHosts := trustedOpenAIAssetHosts()
+	allowHosts := trustedRuntimeAssetHosts(ctx, c.publicURLs)
 	resp, doErr := safehttp.GetWithAllowHosts(ctx, ref, timeout, allowHosts...)
 	if doErr != nil {
 		return "", "", nil, fmt.Errorf("拉取图像失败: %w", doErr)
@@ -536,8 +533,6 @@ func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq prov
 	}
 
 	if imageURLs := openAIParams.EditImageRefs; len(imageURLs) > 0 {
-		// 默认保留首图 image 字段以兼容部分只接收单图的上游实现。
-		// 但多图输入必须避免回退成单图字段，防止上游优先读取首图导致退化。
 		if len(imageURLs) == 1 {
 			reqBody.Image = imageURLs[0]
 		}
@@ -575,12 +570,12 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 	return readOpenAIProviderParams(providerReq).useEditEndpoint()
 }
 
-func trustedOpenAIAssetHosts() []string {
-	base := resolvePublicAssetBaseURL()
-	if base == nil || strings.TrimSpace(base.Hostname()) == "" {
+func trustedRuntimeAssetHosts(ctx context.Context, provider settings.PublicURLSettingProvider) []string {
+	base := settings.ResolvePublicAssetBaseURL(ctx, provider)
+	if base == nil || strings.TrimSpace(base.Host) == "" {
 		return nil
 	}
-	return []string{base.Hostname()}
+	return []string{base.Host}
 }
 
 func normalizeOpenAIImageURLStrings(refs []string) []string {

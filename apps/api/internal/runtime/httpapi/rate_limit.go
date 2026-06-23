@@ -1,12 +1,15 @@
 package httpapi
 
 import (
+	"context"
+	"log/slog"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
@@ -31,6 +34,12 @@ type ipRateLimiterStore struct {
 type rateLimiterEntry struct {
 	limiter  *rate.Limiter
 	lastSeen time.Time
+	policy   rateLimitPolicy
+}
+
+type rateLimitPolicy struct {
+	limit rate.Limit
+	burst int
 }
 
 var rateLimitStore = &ipRateLimiterStore{
@@ -39,7 +48,7 @@ var rateLimitStore = &ipRateLimiterStore{
 	now:        time.Now,
 }
 
-func rateLimitMiddleware() gin.HandlerFunc {
+func rateLimitMiddleware(provider settings.RateLimitSettingProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := clientIP(c)
 		if ip == "" {
@@ -47,7 +56,8 @@ func rateLimitMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if !rateLimitStore.allow(ip) {
+		policy := resolveRateLimitPolicy(c.Request.Context(), provider)
+		if !rateLimitStore.allow(ip, policy) {
 			response.Error(c, http.StatusTooManyRequests, "请求过于频繁，请稍后重试")
 			c.Abort()
 			return
@@ -56,7 +66,7 @@ func rateLimitMiddleware() gin.HandlerFunc {
 	}
 }
 
-func (s *ipRateLimiterStore) allow(ip string) bool {
+func (s *ipRateLimiterStore) allow(ip string, policy rateLimitPolicy) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -66,6 +76,10 @@ func (s *ipRateLimiterStore) allow(ip string) bool {
 	entry, ok := s.entries[ip]
 	if ok {
 		entry.lastSeen = now
+		if entry.policy != policy {
+			entry.limiter = rate.NewLimiter(policy.limit, policy.burst)
+			entry.policy = policy
+		}
 		return entry.limiter.AllowN(now, 1)
 	}
 
@@ -74,11 +88,43 @@ func (s *ipRateLimiterStore) allow(ip string) bool {
 	}
 
 	entry = &rateLimiterEntry{
-		limiter:  rate.NewLimiter(rate.Limit(defaultRateLimitRPS), defaultRateLimitBurst),
+		limiter:  rate.NewLimiter(policy.limit, policy.burst),
 		lastSeen: now,
+		policy:   policy,
 	}
 	s.entries[ip] = entry
 	return entry.limiter.AllowN(now, 1)
+}
+
+func resolveRateLimitPolicy(ctx context.Context, provider settings.RateLimitSettingProvider) rateLimitPolicy {
+	if provider == nil {
+		return defaultRateLimitPolicy()
+	}
+	setting, err := provider.GetRateLimit(ctx)
+	if err != nil {
+		slog.WarnContext(ctx, "runtime rate limit settings read failed; using defaults", "error", err)
+		return defaultRateLimitPolicy()
+	}
+	policy, ok := rateLimitPolicyFromSetting(setting)
+	if !ok {
+		slog.WarnContext(ctx, "runtime rate limit settings invalid; using defaults", "window_seconds", setting.WindowSeconds, "max_requests", setting.MaxRequests)
+		return defaultRateLimitPolicy()
+	}
+	return policy
+}
+
+func defaultRateLimitPolicy() rateLimitPolicy {
+	return rateLimitPolicy{limit: rate.Limit(defaultRateLimitRPS), burst: defaultRateLimitBurst}
+}
+
+func rateLimitPolicyFromSetting(setting settings.RateLimitSetting) (rateLimitPolicy, bool) {
+	if setting.WindowSeconds <= 0 || setting.MaxRequests <= 0 {
+		return rateLimitPolicy{}, false
+	}
+	return rateLimitPolicy{
+		limit: rate.Every(time.Duration(setting.WindowSeconds) * time.Second / time.Duration(setting.MaxRequests)),
+		burst: setting.MaxRequests,
+	}, true
 }
 
 func (s *ipRateLimiterStore) maybeCleanupLocked(now time.Time) {

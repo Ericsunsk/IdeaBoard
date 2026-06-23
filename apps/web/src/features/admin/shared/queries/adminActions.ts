@@ -1,6 +1,10 @@
 import {
+  updateAdminBrandingSetting,
+  updateAdminMediaUploadSetting,
+  updateAdminPublicURLSetting,
   updateAdminRateLimitSettings,
   updateAdminRegistrationSetting,
+  updateAdminTaskMonitorSetting,
 } from '../../../../shared/api/generated-query/admin-settings/admin-settings'
 import {
   banAdminUser as requestBanAdminUser,
@@ -15,11 +19,15 @@ import type { ApiResponse } from '../../../../shared/types'
 import type {
   AdminStatisticsBackfillResult,
   ApiResponseRegistrationSettingData,
+  BrandingSetting,
   CreateAdminStorageProfileParams,
   FeaturePrompt,
   GetAdminStatisticsRange,
+  MediaUploadSetting,
+  PublicURLSetting,
   RateLimitSetting,
   SetAdminFeaturePromptBody,
+  TaskMonitorSetting,
   UpdateAdminStorageProfileParams,
   UpdateAdminRegistrationSettingBody,
 } from '../../../../shared/api/generated-query/model'
@@ -57,7 +65,33 @@ function requireApiOk<T>(res: ApiResponse<T>, fallback: string): T | undefined {
 
 export async function updateRateLimitSettings(data: RateLimitSetting): Promise<RateLimitSetting> {
   const res = await updateAdminRateLimitSettings(data)
-  return requireApiData(res, '保存限流配置失败')
+  return requireApiData(res, '保存访问限流失败')
+}
+
+export async function updateBrandingSetting(data: BrandingSetting): Promise<BrandingSetting> {
+  const res = await updateAdminBrandingSetting(data)
+  return requireApiData(res, '保存项目品牌失败')
+}
+
+export async function updateTaskMonitorSetting(
+  data: TaskMonitorSetting,
+): Promise<TaskMonitorSetting> {
+  const res = await updateAdminTaskMonitorSetting(data)
+  return requireApiData(res, '保存任务监控设置失败')
+}
+
+export async function updateMediaUploadSetting(
+  data: MediaUploadSetting,
+): Promise<MediaUploadSetting> {
+  const res = await updateAdminMediaUploadSetting(data)
+  return requireApiData(res, '保存上传设置失败')
+}
+
+export async function updatePublicURLSetting(
+  data: PublicURLSetting,
+): Promise<PublicURLSetting> {
+  const res = await updateAdminPublicURLSetting(data)
+  return requireApiData(res, '保存链接与域名失败')
 }
 
 export async function updateRegistrationSetting(

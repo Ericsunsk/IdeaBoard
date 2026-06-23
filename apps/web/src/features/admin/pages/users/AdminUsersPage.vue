@@ -44,30 +44,6 @@
         </label>
       </AdminFilterPopover>
 
-      <Button
-        text
-        :class="adminToolbarIconButtonClass"
-        aria-label="用户配置"
-        @click="toggleUserConfigPanel"
-      >
-        <template #icon>
-          <Settings class="size-4 text-admin-text-2" />
-        </template>
-      </Button>
-      <AdminUserConfigPopover
-        ref="userConfigPopoverRef"
-        v-model:registration-enabled="registrationEnabled"
-        v-model:rate-limit-form="rateLimitForm"
-        :registration-setting-loading="registrationSettingLoading"
-        :rate-limit-saving="rateLimitSaving"
-        :max-requests-limit="RATE_LIMIT_MAX_REQUESTS"
-        :window-seconds-limit="RATE_LIMIT_MAX_WINDOW_SECONDS"
-        @toggle-registration="handleToggleRegistration"
-        @save-rate-limit="handleSaveRateLimit"
-      />
-
-      <div class="h-5 w-[1px] bg-admin-border-soft"></div>
-
       <Button text :class="adminToolbarIconButtonClass" aria-label="刷新用户" @click="loadUsers">
         <template #icon>
           <Refresh class="size-4 text-admin-text-2" />
@@ -250,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { Refresh, Search, Settings } from '@iconoir/vue'
+import { Refresh, Search } from '@iconoir/vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -277,7 +253,6 @@ import {
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
-import AdminUserConfigPopover from './AdminUserConfigPopover.vue'
 import {
   getUserInitial,
   isActiveUser,
@@ -290,11 +265,6 @@ import {
   banDurationOptions,
   useAdminUserActions,
 } from './useAdminUserActions'
-import {
-  RATE_LIMIT_MAX_REQUESTS,
-  RATE_LIMIT_MAX_WINDOW_SECONDS,
-  useAdminUserSettings,
-} from './useAdminUserSettings'
 import { useAdminUsersList } from './useAdminUsersList'
 
 const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
@@ -307,7 +277,6 @@ type PrimePopupPanel = {
 
 const appToast = useAppToast()
 const confirm = useConfirm()
-const userConfigPopoverRef = ref<InstanceType<typeof AdminUserConfigPopover> | null>(null)
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
 const { isScrolling: isUserTableScrolling, handleScroll: handleUserTableScroll } =
   useTransientScrolling()
@@ -337,15 +306,6 @@ const {
 } = useAdminUsersList()
 
 const {
-  rateLimitForm,
-  rateLimitSaving,
-  registrationEnabled,
-  registrationSettingLoading,
-  handleSaveRateLimit,
-  handleToggleRegistration,
-} = useAdminUserSettings({ message: appToast })
-
-const {
   userActionItems,
   showBanModal,
   banFormLoading,
@@ -368,10 +328,6 @@ watch(
     if (error) appToast.error(formatDisplayErrorMessage(error, '加载用户失败'))
   },
 )
-
-function toggleUserConfigPanel(event: Event) {
-  userConfigPopoverRef.value?.toggle(event)
-}
 
 function toggleUserActionMenu(event: Event, user: User) {
   openUserActionMenu(user)

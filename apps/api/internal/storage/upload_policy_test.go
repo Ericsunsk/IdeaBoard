@@ -136,9 +136,9 @@ func TestUserUploadObjectPrefixesIncludesAllUserOwnedUploadRoots(t *testing.T) {
 	}
 }
 
-func TestParseUploadResourceRejectsLegacyGenericPath(t *testing.T) {
+func TestParseUploadResourceRejectsGenericPath(t *testing.T) {
 	if _, err := ParseUploadResource("/uploads/2026/05/30/demo.png"); err == nil {
-		t.Fatalf("expected legacy generic upload path to fail")
+		t.Fatalf("expected generic upload path to fail")
 	}
 }
 

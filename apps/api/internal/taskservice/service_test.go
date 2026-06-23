@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
@@ -24,6 +25,14 @@ import (
 	"ideaboard/api/internal/users"
 	"ideaboard/api/internal/workflow"
 )
+
+type testPublicURLProvider struct {
+	setting settings.PublicURLSetting
+}
+
+func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
+	return p.setting, nil
+}
 
 func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 	tests := []struct {
@@ -293,9 +302,9 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 		}
 	})
 
-	t.Run("reject legacy generic upload path", func(t *testing.T) {
+	t.Run("reject generic upload path", func(t *testing.T) {
 		if err := validateSubmitTaskMediaRef("/uploads/2026/05/13/a.png"); err == nil {
-			t.Fatal("expected legacy generic upload path to fail")
+			t.Fatal("expected generic upload path to fail")
 		}
 	})
 
@@ -496,12 +505,12 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	svc := NewService(ServiceDeps{
 		UploadBoards: testTaskUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
 		UploadOwners: testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
+		PublicURLs:   testPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
 	}, ServiceOptions{})
 	allowed := "/uploads/workspace/OWNR1A/board-1/content/demo.png"
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, allowed); err != nil {
 		t.Fatalf("expected member to use workspace upload: %v", err)
 	}
-	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "https://assets.example.com")
 	absoluteAllowed := "https://assets.example.com/uploads/workspace/OWNR1A/board-1/content/demo.png"
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, absoluteAllowed); err != nil {
 		t.Fatalf("expected member to use public workspace upload URL: %v", err)
@@ -516,7 +525,7 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 		t.Fatalf("expected owner segment mismatch to be rejected")
 	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/2026/05/13/demo.png"); err == nil {
-		t.Fatalf("expected legacy generic upload path to be rejected")
+		t.Fatalf("expected generic upload path to be rejected")
 	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/profile/MEMB1A/avatar/demo.png"); err == nil {
 		t.Fatalf("expected non-workspace upload path to be rejected")

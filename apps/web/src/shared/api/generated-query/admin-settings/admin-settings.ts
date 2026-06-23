@@ -18,9 +18,17 @@ import { unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
 import type {
+  ApiResponseBrandingSetting,
+  ApiResponseMediaUploadSetting,
+  ApiResponsePublicURLSetting,
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
+  ApiResponseTaskMonitorSetting,
+  BrandingSetting,
+  MediaUploadSetting,
+  PublicURLSetting,
   RateLimitSetting,
+  TaskMonitorSetting,
   UpdateAdminRegistrationSettingBody,
 } from '../model'
 
@@ -183,6 +191,447 @@ export function useUpdateAdminRegistrationSetting<
   return query
 }
 
+export const getGetAdminBrandingSettingUrl = () => {
+  return `/admin/settings/branding`
+}
+
+export const getAdminBrandingSetting = async (
+  options?: RequestInit,
+): Promise<ApiResponseBrandingSetting> => {
+  return orvalMutator<ApiResponseBrandingSetting>(getGetAdminBrandingSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminBrandingSettingQueryKey = () => {
+  return ['admin', 'settings', 'branding'] as const
+}
+
+export const getGetAdminBrandingSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminBrandingSetting>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminBrandingSetting>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminBrandingSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminBrandingSetting>>> = ({
+    signal,
+  }) => getAdminBrandingSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminBrandingSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminBrandingSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminBrandingSetting>>
+>
+export type GetAdminBrandingSettingQueryError = ErrorType<unknown>
+
+export function useGetAdminBrandingSetting<
+  TData = Awaited<ReturnType<typeof getAdminBrandingSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminBrandingSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminBrandingSettingQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateAdminBrandingSettingUrl = () => {
+  return `/admin/settings/branding`
+}
+
+export const updateAdminBrandingSetting = async (
+  brandingSetting: BrandingSetting,
+  options?: RequestInit,
+): Promise<ApiResponseBrandingSetting> => {
+  return orvalMutator<ApiResponseBrandingSetting>(getUpdateAdminBrandingSettingUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(brandingSetting),
+  })
+}
+
+export const getUpdateAdminBrandingSettingQueryKey = (
+  brandingSetting?: MaybeRef<BrandingSetting>,
+) => {
+  return ['PUT', 'admin', 'settings', 'branding', brandingSetting] as const
+}
+
+export const getUpdateAdminBrandingSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  brandingSetting: MaybeRef<BrandingSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminBrandingSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminBrandingSettingQueryKey(brandingSetting)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminBrandingSetting>>> = ({
+    signal,
+  }) => updateAdminBrandingSetting(unref(brandingSetting), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminBrandingSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminBrandingSetting>>
+>
+export type UpdateAdminBrandingSettingQueryError = ErrorType<unknown>
+
+export function useUpdateAdminBrandingSetting<
+  TData = Awaited<ReturnType<typeof updateAdminBrandingSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  brandingSetting: MaybeRef<BrandingSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminBrandingSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminBrandingSettingQueryOptions(brandingSetting, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminPublicURLSettingUrl = () => {
+  return `/admin/settings/public-urls`
+}
+
+export const getAdminPublicURLSetting = async (
+  options?: RequestInit,
+): Promise<ApiResponsePublicURLSetting> => {
+  return orvalMutator<ApiResponsePublicURLSetting>(getGetAdminPublicURLSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminPublicURLSettingQueryKey = () => {
+  return ['admin', 'settings', 'public-urls'] as const
+}
+
+export const getGetAdminPublicURLSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminPublicURLSetting>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminPublicURLSetting>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminPublicURLSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminPublicURLSetting>>> = ({
+    signal,
+  }) => getAdminPublicURLSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminPublicURLSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminPublicURLSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminPublicURLSetting>>
+>
+export type GetAdminPublicURLSettingQueryError = ErrorType<unknown>
+
+export function useGetAdminPublicURLSetting<
+  TData = Awaited<ReturnType<typeof getAdminPublicURLSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminPublicURLSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminPublicURLSettingQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateAdminPublicURLSettingUrl = () => {
+  return `/admin/settings/public-urls`
+}
+
+export const updateAdminPublicURLSetting = async (
+  publicURLSetting: PublicURLSetting,
+  options?: RequestInit,
+): Promise<ApiResponsePublicURLSetting> => {
+  return orvalMutator<ApiResponsePublicURLSetting>(getUpdateAdminPublicURLSettingUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(publicURLSetting),
+  })
+}
+
+export const getUpdateAdminPublicURLSettingQueryKey = (
+  publicURLSetting?: MaybeRef<PublicURLSetting>,
+) => {
+  return ['PUT', 'admin', 'settings', 'public-urls', publicURLSetting] as const
+}
+
+export const getUpdateAdminPublicURLSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminPublicURLSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  publicURLSetting: MaybeRef<PublicURLSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminPublicURLSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminPublicURLSettingQueryKey(publicURLSetting)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminPublicURLSetting>>> = ({
+    signal,
+  }) => updateAdminPublicURLSetting(unref(publicURLSetting), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminPublicURLSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminPublicURLSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminPublicURLSetting>>
+>
+export type UpdateAdminPublicURLSettingQueryError = ErrorType<unknown>
+
+export function useUpdateAdminPublicURLSetting<
+  TData = Awaited<ReturnType<typeof updateAdminPublicURLSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  publicURLSetting: MaybeRef<PublicURLSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminPublicURLSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminPublicURLSettingQueryOptions(publicURLSetting, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminMediaUploadSettingUrl = () => {
+  return `/admin/settings/media-upload`
+}
+
+export const getAdminMediaUploadSetting = async (
+  options?: RequestInit,
+): Promise<ApiResponseMediaUploadSetting> => {
+  return orvalMutator<ApiResponseMediaUploadSetting>(getGetAdminMediaUploadSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminMediaUploadSettingQueryKey = () => {
+  return ['admin', 'settings', 'media-upload'] as const
+}
+
+export const getGetAdminMediaUploadSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminMediaUploadSetting>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaUploadSetting>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminMediaUploadSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminMediaUploadSetting>>> = ({
+    signal,
+  }) => getAdminMediaUploadSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminMediaUploadSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminMediaUploadSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminMediaUploadSetting>>
+>
+export type GetAdminMediaUploadSettingQueryError = ErrorType<unknown>
+
+export function useGetAdminMediaUploadSetting<
+  TData = Awaited<ReturnType<typeof getAdminMediaUploadSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaUploadSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminMediaUploadSettingQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateAdminMediaUploadSettingUrl = () => {
+  return `/admin/settings/media-upload`
+}
+
+export const updateAdminMediaUploadSetting = async (
+  mediaUploadSetting: MediaUploadSetting,
+  options?: RequestInit,
+): Promise<ApiResponseMediaUploadSetting> => {
+  return orvalMutator<ApiResponseMediaUploadSetting>(getUpdateAdminMediaUploadSettingUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mediaUploadSetting),
+  })
+}
+
+export const getUpdateAdminMediaUploadSettingQueryKey = (
+  mediaUploadSetting?: MaybeRef<MediaUploadSetting>,
+) => {
+  return ['PUT', 'admin', 'settings', 'media-upload', mediaUploadSetting] as const
+}
+
+export const getUpdateAdminMediaUploadSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  mediaUploadSetting: MaybeRef<MediaUploadSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminMediaUploadSettingQueryKey(mediaUploadSetting)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>> = ({
+    signal,
+  }) => updateAdminMediaUploadSetting(unref(mediaUploadSetting), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminMediaUploadSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>
+>
+export type UpdateAdminMediaUploadSettingQueryError = ErrorType<unknown>
+
+export function useUpdateAdminMediaUploadSetting<
+  TData = Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  mediaUploadSetting: MaybeRef<MediaUploadSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminMediaUploadSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminMediaUploadSettingQueryOptions(mediaUploadSetting, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getGetAdminRateLimitSettingsUrl = () => {
   return `/admin/settings/rate-limit`
 }
@@ -320,6 +769,153 @@ export function useUpdateAdminRateLimitSettings<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getUpdateAdminRateLimitSettingsQueryOptions(rateLimitSetting, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminTaskMonitorSettingUrl = () => {
+  return `/admin/settings/task-monitor`
+}
+
+export const getAdminTaskMonitorSetting = async (
+  options?: RequestInit,
+): Promise<ApiResponseTaskMonitorSetting> => {
+  return orvalMutator<ApiResponseTaskMonitorSetting>(getGetAdminTaskMonitorSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminTaskMonitorSettingQueryKey = () => {
+  return ['admin', 'settings', 'task-monitor'] as const
+}
+
+export const getGetAdminTaskMonitorSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminTaskMonitorSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>> = ({
+    signal,
+  }) => getAdminTaskMonitorSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminTaskMonitorSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>
+>
+export type GetAdminTaskMonitorSettingQueryError = ErrorType<unknown>
+
+export function useGetAdminTaskMonitorSetting<
+  TData = Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminTaskMonitorSettingQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateAdminTaskMonitorSettingUrl = () => {
+  return `/admin/settings/task-monitor`
+}
+
+export const updateAdminTaskMonitorSetting = async (
+  taskMonitorSetting: TaskMonitorSetting,
+  options?: RequestInit,
+): Promise<ApiResponseTaskMonitorSetting> => {
+  return orvalMutator<ApiResponseTaskMonitorSetting>(getUpdateAdminTaskMonitorSettingUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(taskMonitorSetting),
+  })
+}
+
+export const getUpdateAdminTaskMonitorSettingQueryKey = (
+  taskMonitorSetting?: MaybeRef<TaskMonitorSetting>,
+) => {
+  return ['PUT', 'admin', 'settings', 'task-monitor', taskMonitorSetting] as const
+}
+
+export const getUpdateAdminTaskMonitorSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  taskMonitorSetting: MaybeRef<TaskMonitorSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminTaskMonitorSettingQueryKey(taskMonitorSetting)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>> = ({
+    signal,
+  }) => updateAdminTaskMonitorSetting(unref(taskMonitorSetting), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminTaskMonitorSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>
+>
+export type UpdateAdminTaskMonitorSettingQueryError = ErrorType<unknown>
+
+export function useUpdateAdminTaskMonitorSetting<
+  TData = Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  taskMonitorSetting: MaybeRef<TaskMonitorSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminTaskMonitorSettingQueryOptions(taskMonitorSetting, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

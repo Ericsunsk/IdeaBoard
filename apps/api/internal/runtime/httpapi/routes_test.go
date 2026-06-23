@@ -63,17 +63,29 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 
 	adminGroup := router.Group("/api/admin")
 	adminGroup.POST(RouteAdminUpload, func(c *gin.Context) {})
+	adminGroup.GET(RouteAdminSettingsBranding, func(c *gin.Context) {})
+	adminGroup.GET(RouteAdminSettingsMediaUpload, func(c *gin.Context) {})
+	adminGroup.GET(RouteAdminSettingsPublicURLs, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsRateLimit, func(c *gin.Context) {})
+	adminGroup.GET(RouteAdminSettingsTaskMonitor, func(c *gin.Context) {})
 
 	want := map[string]bool{
-		http.MethodPost + " /api/user/profile/avatar":                false,
-		http.MethodPost + " /api/user/boards/:board_id/uploads":      false,
-		http.MethodGet + " /api/user/download":                       false,
-		http.MethodPost + " /api/admin/upload":                       false,
-		http.MethodGet + " /api/admin/settings/rate-limit":           false,
-		http.MethodPost + " /api/user/api/user/profile/avatar":       true,
-		http.MethodPost + " /api/admin/api/admin/upload":             true,
-		http.MethodGet + " /api/admin/api/admin/settings/rate-limit": true,
+		http.MethodPost + " /api/user/profile/avatar":                  false,
+		http.MethodPost + " /api/user/boards/:board_id/uploads":        false,
+		http.MethodGet + " /api/user/download":                         false,
+		http.MethodPost + " /api/admin/upload":                         false,
+		http.MethodGet + " /api/admin/settings/branding":               false,
+		http.MethodGet + " /api/admin/settings/media-upload":           false,
+		http.MethodGet + " /api/admin/settings/public-urls":            false,
+		http.MethodGet + " /api/admin/settings/rate-limit":             false,
+		http.MethodGet + " /api/admin/settings/task-monitor":           false,
+		http.MethodPost + " /api/user/api/user/profile/avatar":         true,
+		http.MethodPost + " /api/admin/api/admin/upload":               true,
+		http.MethodGet + " /api/admin/api/admin/settings/branding":     true,
+		http.MethodGet + " /api/admin/api/admin/settings/media-upload": true,
+		http.MethodGet + " /api/admin/api/admin/settings/public-urls":  true,
+		http.MethodGet + " /api/admin/api/admin/settings/rate-limit":   true,
+		http.MethodGet + " /api/admin/api/admin/settings/task-monitor": true,
 	}
 	for _, route := range router.Routes() {
 		key := route.Method + " " + route.Path

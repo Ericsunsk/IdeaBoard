@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -411,21 +410,6 @@ func BuildBoardShareURL(baseURL, token string) string {
 	q.Set("token", trimmedToken)
 	u.RawQuery = q.Encode()
 	return u.String()
-}
-
-func ResolvePublicBaseURL(requestScheme, requestHost string) string {
-	if value := strings.TrimSpace(os.Getenv("APP_PUBLIC_BASE_URL")); value != "" {
-		return strings.TrimRight(value, "/")
-	}
-	host := strings.TrimSpace(requestHost)
-	if host == "" {
-		return ""
-	}
-	scheme := strings.TrimSpace(requestScheme)
-	if scheme == "" {
-		scheme = "http"
-	}
-	return scheme + "://" + host
 }
 
 func normalizeBoardID(boardID string) string {

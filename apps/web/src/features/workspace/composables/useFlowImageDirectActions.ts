@@ -44,8 +44,9 @@ import { loadImageSizeFromUrl } from '../utils/imageSize'
 import { usePendingImageResultNodes } from './usePendingImageResultNodes'
 import {
   pickFirstValidImageResult,
-  resolveTaskImageResultRatio,
+  resolveTaskImageResultDisplay,
   resolveTaskImageRatio,
+  type ResolvedTaskImageResult,
 } from '../utils/flowImageDirectActionTaskResult'
 import {
   resolveImageDirectActionSource,
@@ -151,8 +152,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   async function resolveFirstTaskImageResult(taskId: string, fallbackRatio: number) {
     const result = pickFirstValidImageResult(await waitExistingOrLiveTaskImageResults(taskId))
     if (!result) throw new Error('任务完成但未返回图片')
-    const ratio = await resolveTaskImageResultRatio(result, fallbackRatio, loadImageSizeFromUrl)
-    return { url: result.url, ratio }
+    const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSizeFromUrl)
+    if (!resolved) throw new Error('任务完成但未返回图片')
+    return resolved
   }
 
   function resolveCanvasExtendResultWidth(
@@ -229,7 +231,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   async function runPendingImageBatchGeneration(params: {
     resultNodeIds: string[]
     submitTask: (resultNodeId: string) => Promise<{ taskId: string }>
-    resolveResult: (taskId: string) => Promise<{ url: string; ratio: number }>
+    resolveResult: (taskId: string) => Promise<ResolvedTaskImageResult>
     totalCount: number
     boardId: string
   }) {
@@ -244,7 +246,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           await persistPendingImageTaskId(params.boardId, resultNodeId, taskId)
           const resolved = await params.resolveResult(taskId)
           if (isBoardStillCurrent(params.boardId)) {
-            updatePendingImageResultNode(resultNodeId, resolved.url, resolved.ratio)
+            updatePendingImageResultNode(resultNodeId, resolved)
           }
           successCount += 1
         } catch (error) {
@@ -293,7 +295,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
             return
           }
-          updatePendingImageResultNode(nodeId, resolved.url, resolved.ratio)
+          updatePendingImageResultNode(nodeId, resolved)
           successCount += 1
         } catch (error) {
           if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
@@ -367,7 +369,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await persistPendingImageTaskId(boardId, resultNodeId, taskId)
       const resolved = await resolveFirstTaskImageResult(taskId, source.ratio)
       if (!isBoardStillCurrent(boardId)) return
-      updatePendingImageResultNode(resultNodeId, resolved.url, resolved.ratio)
+      updatePendingImageResultNode(resultNodeId, resolved)
       options.onSuccess('处理完成')
     } catch (error) {
       if (isTaskResultPendingError(error) && resultNodeId) {

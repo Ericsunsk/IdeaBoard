@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -37,6 +38,14 @@ type multipartFilePart struct {
 type multipartRequestCapture struct {
 	Fields map[string][]string
 	Files  map[string][]multipartFilePart
+}
+
+type testPublicURLProvider struct {
+	setting settings.PublicURLSetting
+}
+
+func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
+	return p.setting, nil
 }
 
 func mustDecodeBase64(t *testing.T, value string) []byte {
@@ -133,9 +142,10 @@ func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/extended.png"}]}`))
 	}))
 	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -193,7 +203,9 @@ func TestCallOpenAIRemoveBgForcesTransparentPNGOutput(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -225,7 +237,9 @@ func TestCallOpenAIRemoveBgRejectsModelWithoutTransparentBackground(t *testing.T
 	}))
 	defer server.Close()
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -270,9 +284,10 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":[{"b64_json":"aGVsbG8="}]}`))
 	}))
 	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -313,7 +328,9 @@ func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t 
 	}))
 	defer server.Close()
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -341,26 +358,27 @@ func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t 
 	}
 }
 
-func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
+func TestCallOpenAIStyleVariationUsesEditEndpointAndMultipartImage(t *testing.T) {
 	var gotPath string
-	var gotBody map[string]interface{}
+	var gotMultipart multipartRequestCapture
+	imageBytes := buildTinyPNGBytes(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/source.png" {
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(imageBytes)
+			return
+		}
 		gotPath = r.URL.Path
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if err := json.Unmarshal(body, &gotBody); err != nil {
-			t.Fatalf("unmarshal body: %v", err)
-		}
+		gotMultipart = readMultipartRequest(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/style.png"}]}`))
 	}))
 	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -368,7 +386,10 @@ func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
 	}
 	params := map[string]interface{}{
 		"feature":    "style-variation",
-		"image_urls": []interface{}{"https://img.example/source.png"},
+		"image_urls": []interface{}{server.URL + "/source.png"},
+		"variation": map[string]interface{}{
+			"strength": 42,
+		},
 	}
 
 	gotResult, err := c.callOpenAI(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
@@ -378,22 +399,18 @@ func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
 	if gotResult.ImageURL != "https://cdn.example/style.png" {
 		t.Fatalf("unexpected image url: %s", gotResult.ImageURL)
 	}
-	if gotPath != "/v1/images/generations" {
-		t.Fatalf("expected generations endpoint, got %s", gotPath)
+	if gotPath != "/v1/images/edits" {
+		t.Fatalf("expected edits endpoint, got %s", gotPath)
 	}
-	image, ok := gotBody["image"].(string)
-	if !ok {
-		t.Fatalf("expected image field as string, got %#v", gotBody["image"])
+	images := gotMultipart.Files["image"]
+	if len(images) != 1 {
+		t.Fatalf("expected one image file, got %#v", images)
 	}
-	if image != "https://img.example/source.png" {
-		t.Fatalf("unexpected image field value: %s", image)
+	if string(images[0].Data) != string(imageBytes) {
+		t.Fatalf("unexpected image part payload")
 	}
-	imageURLs, ok := gotBody["image_urls"].([]interface{})
-	if !ok || len(imageURLs) != 1 {
-		t.Fatalf("expected one image_urls entry, got %#v", gotBody["image_urls"])
-	}
-	if imageURLs[0] != "https://img.example/source.png" {
-		t.Fatalf("unexpected image_urls entry: %#v", imageURLs[0])
+	if got := gotMultipart.Fields["variation_strength"]; len(got) != 1 || got[0] != "42" {
+		t.Fatalf("expected variation_strength field, got %#v", got)
 	}
 }
 
@@ -420,9 +437,10 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/fusion.png"}]}`))
 	}))
 	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -448,29 +466,27 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIStyleVariationDataURLDropsRedundantImageCopies(t *testing.T) {
-	var gotBody map[string]interface{}
+func TestCallOpenAIStyleVariationDataURLUsesMultipartWithoutLegacyImageFields(t *testing.T) {
+	var gotPath string
+	var gotMultipart multipartRequestCapture
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if err := json.Unmarshal(body, &gotBody); err != nil {
-			t.Fatalf("unmarshal body: %v", err)
-		}
+		gotPath = r.URL.Path
+		gotMultipart = readMultipartRequest(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/style.png"}]}`))
 	}))
 	defer server.Close()
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
-	dataURL := "data:image/png;base64,aGVsbG8="
+	dataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
 		"feature":    "style-variation",
 		"image_urls": []interface{}{dataURL},
@@ -482,15 +498,19 @@ func TestCallOpenAIStyleVariationDataURLDropsRedundantImageCopies(t *testing.T) 
 	if _, err := c.callOpenAI(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
-	image, ok := gotBody["image"].(string)
-	if !ok || image != dataURL {
-		t.Fatalf("expected image field to keep data url, got %#v", gotBody["image"])
+	if gotPath != "/v1/images/edits" {
+		t.Fatalf("expected edits endpoint, got %s", gotPath)
 	}
-	if _, exists := gotBody["image_urls"]; exists {
-		t.Fatalf("did not expect redundant image_urls field for data-url request")
+	if images := gotMultipart.Files["image"]; len(images) != 1 {
+		t.Fatalf("expected one image file, got %#v", images)
 	}
-	if _, exists := gotBody["original_image_url"]; exists {
-		t.Fatalf("did not expect redundant original_image_url field for data-url request")
+	for _, field := range []string{"image", "image_urls", "original_image_url"} {
+		if _, exists := gotMultipart.Fields[field]; exists {
+			t.Fatalf("did not expect legacy %s field in multipart request: %#v", field, gotMultipart.Fields)
+		}
+	}
+	if got := gotMultipart.Fields["variation_strength"]; len(got) != 1 || got[0] != "5" {
+		t.Fatalf("expected variation_strength field, got %#v", got)
 	}
 }
 
@@ -642,9 +662,10 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/edit.png"}]}`))
 	}))
 	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &ProviderExecutor{}
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -883,7 +904,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 		t.Fatalf("expected hd-upscale to stay on generation endpoint even with stale mask params")
 	}
 
-	for _, feature := range []string{"style-fusion", "remove-bg"} {
+	for _, feature := range []string{"style-fusion", "remove-bg", "style-variation", "sketch-to-image"} {
 		if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
 			"feature":    feature,
 			"image_urls": []interface{}{"https://img.example/source.png", "https://img.example/ref.png"},
@@ -981,8 +1002,6 @@ func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 }
 
 func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing.T) {
-	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
-
 	params := map[string]interface{}{
 		"feature":            "style-variation",
 		"image_urls":         []interface{}{"/uploads/workspace/OWNR1A/board-1/content/source.png"},
@@ -991,8 +1010,10 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 		"variation_strength": 5,
 	}
 
-	c := &ProviderExecutor{}
-	c.normalizeUpstreamMediaParams(params)
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: "https://app.example.com"}},
+	}
+	c.normalizeUpstreamMediaParams(context.Background(), params)
 
 	imageURLs, ok := params["image_urls"].([]interface{})
 	if !ok || len(imageURLs) != 1 {
@@ -1013,16 +1034,18 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 }
 
 func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURLForStructuredUploadPaths(t *testing.T) {
-	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "https://api.example.com")
-	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
-
 	params := map[string]interface{}{
 		"feature":            "style-variation",
 		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
 	}
 
-	c := &ProviderExecutor{}
-	c.normalizeUpstreamMediaParams(params)
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{
+			PublicBaseURL:      "https://app.example.com",
+			PublicAssetBaseURL: "https://api.example.com",
+		}},
+	}
+	c.normalizeUpstreamMediaParams(context.Background(), params)
 
 	if got := params["original_image_url"]; got != "https://api.example.com/uploads/workspace/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
@@ -1030,8 +1053,6 @@ func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURLForStructuredUploadPaths
 }
 
 func TestNormalizeUpstreamMediaParamsRejectsLegacyGenericUploadPaths(t *testing.T) {
-	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
-
 	ref := "/uploads/2026/04/23/source.png"
 	params := map[string]interface{}{
 		"feature":            "style-variation",
@@ -1039,8 +1060,10 @@ func TestNormalizeUpstreamMediaParamsRejectsLegacyGenericUploadPaths(t *testing.
 		"original_image_url": ref,
 	}
 
-	c := &ProviderExecutor{}
-	c.normalizeUpstreamMediaParams(params)
+	c := &ProviderExecutor{
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: "https://app.example.com"}},
+	}
+	c.normalizeUpstreamMediaParams(context.Background(), params)
 
 	imageURLs, ok := params["image_urls"].([]interface{})
 	if !ok || len(imageURLs) != 1 {
@@ -1087,7 +1110,7 @@ func TestNormalizeUpstreamMediaParamsDoesNotInlineUploadPathsWithoutPublicBaseUR
 	}
 
 	c := &ProviderExecutor{}
-	c.normalizeUpstreamMediaParams(params)
+	c.normalizeUpstreamMediaParams(context.Background(), params)
 
 	imageURLs, ok := params["image_urls"].([]interface{})
 	if !ok || len(imageURLs) != 1 {
@@ -1130,7 +1153,7 @@ func TestNormalizeUpstreamMediaParamsDoesNotInlineWorkspaceUploadWithoutPublicBa
 	}
 
 	c := &ProviderExecutor{}
-	c.normalizeUpstreamMediaParams(params)
+	c.normalizeUpstreamMediaParams(context.Background(), params)
 
 	imageURLs, ok := params["image_urls"].([]interface{})
 	if !ok || len(imageURLs) != 1 {

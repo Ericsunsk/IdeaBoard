@@ -137,7 +137,8 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		return nil, fmt.Errorf("failed to ensure user storage uid: %w", err)
 	}
 
-	storageService := storage.NewStorageService(repos.storageProfileRepo)
+	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
+	storageService := storage.NewStorageService(repos.storageProfileRepo, runtimeSettings)
 	if err := storageService.EnsureDefaultProfiles(context.Background()); err != nil {
 		closeStartupResources(dbs.db, dbs.riverPool, nil)
 		return nil, fmt.Errorf("failed to ensure default storage profiles: %w", err)
@@ -173,6 +174,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		postgresRuntimeStore,
 		storageService,
 		taskEvents,
+		runtimeSettings,
 	)
 	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
@@ -197,6 +199,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		UploadBoards:      uploadBoardAccessResolver{service: boardService},
 		UploadOwners:      uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 		TaskOutputCleaner: storageService,
+		PublicURLs:        runtimeSettings,
 	}, taskservice.ServiceOptions{
 		EventHub:   taskEventHub,
 		TaskEvents: taskEvents,
@@ -214,6 +217,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		StorageService: storageService,
 		UserRepo:       repos.userRepo,
 		BoardService:   boardService,
+		UploadSettings: runtimeSettings,
 	}
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -222,12 +226,12 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		UserRoutes: httpapi.UserRouteDeps{
 			AuthHandler:      auth.NewAuthHandler(userService),
 			TaskHandler:      taskHandler,
-			BoardHandler:     boards.NewBoardHandler(boardService),
+			BoardHandler:     boards.NewBoardHandler(boardService, runtimeSettings),
 			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
-			AdminHandler:         users.NewAdminHandler(userService, repos.systemConfigRepo, authServiceClient),
+			AdminHandler:         users.NewAdminHandler(userService, runtimeSettings, authServiceClient),
 			AccountHandler:       accountHandler,
 			TaskHandler:          taskHandler,
 			TaskStatsHandler:     taskStatsHandler,
@@ -236,12 +240,14 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 			LineDraftHandler:     assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			FeaturePromptHandler: prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			StorageService:       storageService,
+			UploadSettings:       runtimeSettings,
 		},
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,
 			BoardService: boardService,
 		},
 		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
+		RateLimit:      runtimeSettings,
 	}, httpapi.FrontendRouteOptions{
 		WarnMissingIndex: isProductionRuntime(cfg.App.Env),
 	})

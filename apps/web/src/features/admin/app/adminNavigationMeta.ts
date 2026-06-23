@@ -7,6 +7,7 @@ export type AdminNavigationKey =
   | 'statistics'
   | 'task-monitor'
   | 'feature-prompts'
+  | 'system-settings'
   | 'oss-config'
 
 export type AdminNavigationRouteDef = {
@@ -58,6 +59,14 @@ export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
     label: '系统提示词',
     title: '系统提示词',
     routeName: 'AdminFeaturePrompts',
+  },
+  {
+    key: 'system-settings',
+    path: '/admin/settings',
+    childPath: 'settings',
+    label: '系统设置',
+    title: '系统设置',
+    routeName: 'AdminSystemSettings',
   },
   {
     key: 'oss-config',

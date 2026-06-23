@@ -41,7 +41,7 @@ func (a *localStorageAdapter) Upload(ctx context.Context, profile *StorageProfil
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	return a.service.saveUploadedFileLocal(file, opts)
+	return a.service.saveUploadedFileLocal(ctx, file, opts)
 }
 
 func (a *localStorageAdapter) Delete(ctx context.Context, profile *StorageProfile, objectKey string) error {
@@ -62,14 +62,14 @@ func (a *localStorageAdapter) StoreBytes(ctx context.Context, profile *StoragePr
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	return a.service.saveBytesLocal(filename, data, opts)
+	return a.service.saveBytesLocal(ctx, filename, data, opts)
 }
 
 func (a *localStorageAdapter) StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return a.service.saveBytesLocalRef(filename, data, opts)
+	return a.service.saveBytesLocalRef(ctx, filename, data, opts)
 }
 
 func (a *localStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -81,7 +81,7 @@ func (a *localStorageAdapter) StoreRemote(ctx context.Context, profile *StorageP
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	return a.service.saveReaderLocal(remoteFile.Filename, remoteFile, remoteFile.Size, opts)
+	return a.service.saveReaderLocal(ctx, remoteFile.Filename, remoteFile, remoteFile.Size, opts)
 }
 
 func (a *localStorageAdapter) StoreRemoteRef(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {
@@ -93,7 +93,7 @@ func (a *localStorageAdapter) StoreRemoteRef(ctx context.Context, profile *Stora
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	ref, err := a.service.saveReaderLocalRef(remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, opts)
+	ref, err := a.service.saveReaderLocalRef(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, opts)
 	if err != nil {
 		return nil, err
 	}

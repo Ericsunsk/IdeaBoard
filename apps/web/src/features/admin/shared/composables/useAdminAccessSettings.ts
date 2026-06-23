@@ -6,13 +6,19 @@ import {
   useGetAdminRateLimitSettings,
   useGetAdminRegistrationSetting,
 } from '../../../../shared/api/generated-query/admin-settings/admin-settings'
+import type {
+  ApiResponseRateLimitSetting,
+  ApiResponseRegistrationSetting,
+  ApiResponseRegistrationSettingData,
+  RateLimitSetting,
+} from '../../../../shared/api/generated-query/model'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
 import {
   updateRateLimitSettings,
   updateRegistrationSetting,
-} from '../../shared/queries/adminActions'
+} from '../queries/adminActions'
 
-type AdminUserSettingsMessage = {
+type AdminAccessSettingsMessage = {
   error: (message: string) => void
   success: (message: string) => void
 }
@@ -20,23 +26,34 @@ type AdminUserSettingsMessage = {
 export const RATE_LIMIT_MAX_REQUESTS = 10_000
 export const RATE_LIMIT_MAX_WINDOW_SECONDS = 3_600
 
-export type AdminUserRateLimitForm = {
+export type AdminAccessRateLimitForm = {
   window_seconds: number | null
   max_requests: number | null
 }
 
-const DEFAULT_RATE_LIMIT_SETTINGS: AdminUserRateLimitForm = {
-  window_seconds: 60,
-  max_requests: 30,
+const DEFAULT_RATE_LIMIT_SETTING: RateLimitSetting = {
+  window_seconds: 2,
+  max_requests: 120,
+}
+const DEFAULT_RATE_LIMIT_FORM: AdminAccessRateLimitForm = {
+  ...DEFAULT_RATE_LIMIT_SETTING,
 }
 const DEFAULT_REGISTRATION_ENABLED = false
 
-export function useAdminUserSettings(options: { message: AdminUserSettingsMessage }) {
+export function useAdminAccessSettings(options: { message: AdminAccessSettingsMessage }) {
   const queryClient = useQueryClient()
   const registrationSettingQuery = useGetAdminRegistrationSetting()
   const rateLimitSettingsQuery = useGetAdminRateLimitSettings()
-  const rateLimitForm = ref<AdminUserRateLimitForm>({ ...DEFAULT_RATE_LIMIT_SETTINGS })
+  const rateLimitForm = ref<AdminAccessRateLimitForm>({ ...DEFAULT_RATE_LIMIT_FORM })
   const registrationEnabled = ref(DEFAULT_REGISTRATION_ENABLED)
+  const lastSyncedRateLimitSettings = ref<RateLimitSetting>({
+    ...DEFAULT_RATE_LIMIT_SETTING,
+  })
+  const rateLimitFormDirty = computed(
+    () =>
+      rateLimitForm.value.window_seconds !== lastSyncedRateLimitSettings.value.window_seconds ||
+      rateLimitForm.value.max_requests !== lastSyncedRateLimitSettings.value.max_requests,
+  )
 
   function invalidateRegistrationSettingQuery() {
     return queryClient.invalidateQueries({ queryKey: getGetAdminRegistrationSettingQueryKey() })
@@ -46,11 +63,33 @@ export function useAdminUserSettings(options: { message: AdminUserSettingsMessag
     return queryClient.invalidateQueries({ queryKey: getGetAdminRateLimitSettingsQueryKey() })
   }
 
+  function writeRateLimitSettingsQueryCache(settings: RateLimitSetting) {
+    queryClient.setQueryData<ApiResponseRateLimitSetting>(
+      getGetAdminRateLimitSettingsQueryKey(),
+      (previous) => ({
+        code: previous?.code ?? 0,
+        msg: previous?.msg ?? 'ok',
+        data: settings,
+      }),
+    )
+  }
+
+  function writeRegistrationSettingQueryCache(setting: ApiResponseRegistrationSettingData) {
+    queryClient.setQueryData<ApiResponseRegistrationSetting>(
+      getGetAdminRegistrationSettingQueryKey(),
+      (previous) => ({
+        code: previous?.code ?? 0,
+        msg: previous?.msg ?? 'ok',
+        data: setting,
+      }),
+    )
+  }
+
   const saveRateLimitMutation = useMutation({
     mutationFn: updateRateLimitSettings,
     onSuccess: async (settings) => {
-      rateLimitForm.value.window_seconds = settings.window_seconds
-      rateLimitForm.value.max_requests = settings.max_requests
+      hydrateRateLimitForm(settings)
+      writeRateLimitSettingsQueryCache(settings)
       await invalidateRateLimitSettingsQuery()
     },
   })
@@ -58,11 +97,15 @@ export function useAdminUserSettings(options: { message: AdminUserSettingsMessag
     mutationFn: updateRegistrationSetting,
     onSuccess: async (setting) => {
       registrationEnabled.value = setting.enabled
+      writeRegistrationSettingQueryCache(setting)
       await invalidateRegistrationSettingQuery()
     },
   })
 
   const rateLimitSaving = computed(() => saveRateLimitMutation.isPending.value)
+  const rateLimitLoading = computed(
+    () => rateLimitSettingsQuery.isLoading.value || rateLimitSettingsQuery.isFetching.value,
+  )
   const registrationSettingLoading = computed(
     () =>
       registrationSettingQuery.isLoading.value ||
@@ -74,7 +117,7 @@ export function useAdminUserSettings(options: { message: AdminUserSettingsMessag
     () => registrationSettingQuery.error.value || rateLimitSettingsQuery.error.value,
     (error) => {
       if (error) {
-        options.message.error(formatDisplayErrorMessage(error, '加载后台配置失败'))
+        options.message.error(formatDisplayErrorMessage(error, '加载访问控制设置失败'))
       }
     },
   )
@@ -83,9 +126,8 @@ export function useAdminUserSettings(options: { message: AdminUserSettingsMessag
     () => rateLimitSettingsQuery.data.value,
     (response) => {
       const settings = response?.data
-      if (!settings || saveRateLimitMutation.isPending.value) return
-      rateLimitForm.value.window_seconds = settings.window_seconds
-      rateLimitForm.value.max_requests = settings.max_requests
+      if (!settings || saveRateLimitMutation.isPending.value || rateLimitFormDirty.value) return
+      hydrateRateLimitForm(settings)
     },
     { immediate: true },
   )
@@ -112,10 +154,19 @@ export function useAdminUserSettings(options: { message: AdminUserSettingsMessag
         window_seconds: Number(rateLimitForm.value.window_seconds),
         max_requests: Number(rateLimitForm.value.max_requests),
       })
-      options.message.success('限流配置已保存')
+      options.message.success('访问限流已保存')
     } catch (error) {
       options.message.error(formatDisplayErrorMessage(error, '保存失败'))
     }
+  }
+
+  function hydrateRateLimitForm(settings: RateLimitSetting) {
+    lastSyncedRateLimitSettings.value = {
+      window_seconds: settings.window_seconds,
+      max_requests: settings.max_requests,
+    }
+    rateLimitForm.value.window_seconds = settings.window_seconds
+    rateLimitForm.value.max_requests = settings.max_requests
   }
 
   async function handleToggleRegistration(newValue: boolean) {
@@ -131,6 +182,7 @@ export function useAdminUserSettings(options: { message: AdminUserSettingsMessag
 
   return {
     rateLimitForm,
+    rateLimitLoading,
     rateLimitSaving,
     registrationEnabled,
     registrationSettingLoading,
@@ -139,7 +191,7 @@ export function useAdminUserSettings(options: { message: AdminUserSettingsMessag
   }
 }
 
-export function validateRateLimitSettings(settings: AdminUserRateLimitForm) {
+export function validateRateLimitSettings(settings: AdminAccessRateLimitForm) {
   const maxRequests = Number(settings.max_requests)
   const windowSeconds = Number(settings.window_seconds)
   if (!Number.isInteger(maxRequests) || maxRequests < 1) {

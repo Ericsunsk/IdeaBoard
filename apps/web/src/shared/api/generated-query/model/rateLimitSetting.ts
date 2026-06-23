@@ -6,6 +6,14 @@
  */
 
 export interface RateLimitSetting {
+  /**
+   * @minimum 1
+   * @maximum 3600
+   */
   window_seconds: number
+  /**
+   * @minimum 1
+   * @maximum 10000
+   */
   max_requests: number
 }

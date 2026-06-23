@@ -82,8 +82,6 @@ func BenchmarkStorageStoreRemoteLocal(b *testing.B) {
 
 func newBenchmarkStorageService(b *testing.B) *StorageService {
 	b.Helper()
-	b.Setenv("APP_PUBLIC_ASSET_BASE_URL", "")
-	b.Setenv("APP_PUBLIC_BASE_URL", "")
 
 	originalWD, err := os.Getwd()
 	if err != nil {
@@ -97,7 +95,7 @@ func newBenchmarkStorageService(b *testing.B) *StorageService {
 		_ = os.Chdir(originalWD)
 	})
 
-	return NewStorageService(nil)
+	return NewStorageService(nil, nil)
 }
 
 func benchmarkLocalProfile() StorageProfile {

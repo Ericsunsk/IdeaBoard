@@ -1,25 +1,38 @@
 package worker
 
 import (
+	"context"
 	"testing"
 
 	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/settings"
 )
 
+type testImageDownloadPublicURLProvider struct {
+	setting settings.PublicURLSetting
+}
+
+func (p testImageDownloadPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
+	return p.setting, nil
+}
+
 func TestTrustedImageDownloadHostsIncludesProxyEnvAndTrustedAssets(t *testing.T) {
-	t.Setenv("APP_PUBLIC_BASE_URL", "https://assets.example.com")
 	t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "cdn.example.com, https://media.example.org:8443")
 
-	got := trustedImageDownloadHosts(&accounts.ApiAccount{ProxyURL: "https://proxy.example.com/v1"})
+	got := trustedImageDownloadHosts(
+		context.Background(),
+		&accounts.ApiAccount{ProxyURL: "https://proxy.example.com/v1"},
+		testImageDownloadPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
+	)
 	if len(got) != 4 {
 		t.Fatalf("got %d hosts, want 4: %#v", len(got), got)
 	}
 
 	want := map[string]bool{
-		"proxy.example.com":  true,
-		"assets.example.com": true,
-		"cdn.example.com":    true,
-		"media.example.org":  true,
+		"proxy.example.com":      true,
+		"assets.example.com":     true,
+		"cdn.example.com":        true,
+		"media.example.org:8443": true,
 	}
 	for _, host := range got {
 		delete(want, host)

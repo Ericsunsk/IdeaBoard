@@ -6,6 +6,7 @@ import {
   type ApiResponseTaskList,
   type MonitorData,
   type MonitorStats,
+  type TaskMonitorSetting,
   type Task,
 } from '../../../../shared/api/generated-query/model'
 import { useTaskMonitor } from './useTaskMonitor'
@@ -17,6 +18,7 @@ const mockState = vi.hoisted(() => ({
   pageVisible: undefined as unknown,
   pollingOptions: [] as unknown[],
   streamReturn: undefined as unknown,
+  taskMonitorSettings: undefined as unknown as { value: TaskMonitorSetting },
 }))
 
 vi.mock('../../../../shared/api/generated-query/admin-tasks/admin-tasks', () => ({
@@ -47,6 +49,12 @@ vi.mock('../../shared/composables/useAdminQueryPolling', () => ({
   ),
 }))
 
+vi.mock('../../shared/composables/useAdminTaskMonitorSettings', () => ({
+  useAdminTaskMonitorSettingQuery: vi.fn(() => ({
+    settings: mockState.taskMonitorSettings,
+  })),
+}))
+
 vi.mock('./useTaskMonitorStream', () => ({
   useTaskMonitorStream: vi.fn(() => mockState.streamReturn),
 }))
@@ -57,6 +65,12 @@ beforeEach(() => {
   mockState.pageVisible = ref(true)
   mockState.pollingOptions = []
   mockState.streamReturn = undefined
+  mockState.taskMonitorSettings = ref({
+    list_page_size: 12,
+    auto_refresh_enabled: true,
+    refresh_interval_seconds: 4,
+    result_preview_enabled: true,
+  })
 })
 
 describe('useTaskMonitor polling', () => {
@@ -104,6 +118,30 @@ describe('useTaskMonitor polling', () => {
 
     expect(monitor.isError.value).toBe(true)
     expect(monitor.error.value).toBe(error)
+  })
+
+  it('uses task monitor settings for page size and refresh interval', () => {
+    const data = ref<ApiResponseTaskList>()
+    mockState.taskMonitorSettings.value = {
+      list_page_size: 24,
+      auto_refresh_enabled: true,
+      refresh_interval_seconds: 10,
+      result_preview_enabled: false,
+    }
+    mockState.listAdminTasksReturn = {
+      data,
+      error: ref(null),
+      isError: ref(false),
+      isLoading: ref(false),
+      refetch: vi.fn(),
+    }
+
+    const monitor = useTaskMonitor()
+    const polling = mockState.pollingOptions[0] as { visibleInterval: () => number | false }
+
+    expect(monitor.pageSize.value).toBe(24)
+    expect(monitor.resultPreviewEnabled.value).toBe(false)
+    expect(polling.visibleInterval()).toBe(10_000)
   })
 })
 

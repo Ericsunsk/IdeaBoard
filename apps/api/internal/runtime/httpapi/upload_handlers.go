@@ -1,29 +1,29 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"mime/multipart"
-	"os"
-	"strconv"
 	"strings"
 	"sync"
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/platform/media"
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
 
-const defaultUploadMaxConcurrent = 8
+var uploadLimiter = &uploadConcurrencyLimiter{}
 
-var (
-	uploadLimiterOnce sync.Once
-	uploadLimiter     chan struct{}
-)
+type uploadConcurrencyLimiter struct {
+	mu       sync.Mutex
+	inFlight int
+}
 
 type uploadImageResponse struct {
 	URL    string `json:"url,omitempty"`
@@ -45,27 +45,47 @@ type uploadImageMetadata struct {
 	Ext    string
 }
 
-func acquireUploadSlot() (func(), bool) {
-	uploadLimiterOnce.Do(func() {
-		limit := defaultUploadMaxConcurrent
-		if raw := strings.TrimSpace(os.Getenv("UPLOAD_MAX_CONCURRENT")); raw != "" {
-			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
-				limit = parsed
-			}
-		}
-		uploadLimiter = make(chan struct{}, limit)
-	})
-	select {
-	case uploadLimiter <- struct{}{}:
-		return func() { <-uploadLimiter }, true
-	default:
+func acquireUploadSlot(ctx context.Context, provider settings.MediaUploadSettingProvider) (func(), bool) {
+	limit := resolveUploadMaxConcurrent(ctx, provider)
+	return uploadLimiter.acquire(limit)
+}
+
+func (l *uploadConcurrencyLimiter) acquire(limit int) (func(), bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.inFlight >= limit {
 		return nil, false
 	}
+	l.inFlight++
+	return func() {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		if l.inFlight > 0 {
+			l.inFlight--
+		}
+	}, true
+}
+
+func resolveUploadMaxConcurrent(ctx context.Context, provider settings.MediaUploadSettingProvider) int {
+	setting := settings.DefaultMediaUploadSetting()
+	if provider != nil {
+		nextSetting, err := provider.GetMediaUpload(ctx)
+		if err != nil {
+			slog.WarnContext(ctx, "runtime media upload settings read failed; using defaults", "error", err)
+		} else {
+			setting = nextSetting
+		}
+	}
+	normalized, err := settings.NormalizeMediaUploadSetting(setting)
+	if err != nil {
+		return settings.DefaultMediaUploadSetting().UploadMaxConcurrent
+	}
+	return normalized.UploadMaxConcurrent
 }
 
 func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		release, ok := acquireUploadSlot()
+		release, ok := acquireUploadSlot(c.Request.Context(), h.UploadSettings)
 		if !ok {
 			response.Error(c, 429, "当前上传请求过多，请稍后重试")
 			return
@@ -120,7 +140,7 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 
 func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		release, ok := acquireUploadSlot()
+		release, ok := acquireUploadSlot(c.Request.Context(), h.UploadSettings)
 		if !ok {
 			response.Error(c, 429, "当前上传请求过多，请稍后重试")
 			return
@@ -227,9 +247,9 @@ func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
 	}
 }
 
-func adminUploadHandler(storageService *storage.StorageService) gin.HandlerFunc {
+func adminUploadHandler(storageService *storage.StorageService, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		release, ok := acquireUploadSlot()
+		release, ok := acquireUploadSlot(c.Request.Context(), uploadSettings)
 		if !ok {
 			response.Error(c, 429, "当前上传请求过多，请稍后重试")
 			return
