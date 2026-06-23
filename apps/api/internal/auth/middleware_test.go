@@ -3,8 +3,10 @@ package auth
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/platform/config"
@@ -89,4 +91,93 @@ func TestAuthMiddlewareReturnsServiceUnavailableWhenLocalLookupFails(t *testing.
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
 	}
+}
+
+func TestAuthMiddlewareAbortsQuietlyWhenSessionRequestIsCanceled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	authServer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer authServer.Close()
+
+	db := testdb.Open(t)
+	userRepo := users.NewUserRepository(db)
+
+	router := gin.New()
+	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
+		BaseURL:        authServer.URL,
+		TimeoutSeconds: 1,
+	}), userRepo))
+	router.GET("/api/user/info", func(c *gin.Context) {
+		t.Fatal("handler should not run after request cancellation")
+		c.Status(http.StatusOK)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/user/info", nil)
+	req.Header.Set("Cookie", "better-auth.session_token=test")
+	cancel()
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want untouched recorder status %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if rec.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty body", rec.Body.String())
+	}
+}
+
+func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := testdb.Open(t)
+	userRepo := users.NewUserRepository(db)
+	var cancelRequest context.CancelFunc
+	authService := NewServiceClient(config.AuthServiceConfig{
+		BaseURL:        "http://auth.test",
+		TimeoutSeconds: 1,
+	})
+	authService.httpClient.Transport = roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		cancelRequest()
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body: io.NopCloser(strings.NewReader(
+				`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-canceled","username":"alice"}}}`,
+			)),
+		}, nil
+	})
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		ctx, cancel := context.WithCancel(c.Request.Context())
+		cancelRequest = cancel
+		c.Request = c.Request.WithContext(ctx)
+	})
+	router.Use(AuthMiddleware(authService, userRepo))
+	router.GET("/api/user/info", func(c *gin.Context) {
+		t.Fatal("handler should not run after request cancellation")
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user/info", nil)
+	req.Header.Set("Cookie", "better-auth.session_token=test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want untouched recorder status %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if rec.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty body", rec.Body.String())
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
 }

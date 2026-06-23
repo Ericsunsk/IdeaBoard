@@ -32,6 +32,9 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 
 		identity, err := authService.ValidateSession(c.Request.Context(), cookieHeader)
 		if err != nil {
+			if abortIfRequestCanceled(c, err) {
+				return
+			}
 			switch {
 			case errors.Is(err, ErrSessionUnauthorized):
 				response.Error(c, http.StatusUnauthorized, "会话已失效，请重新登录")
@@ -44,6 +47,9 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 
 		user, err := resolveLocalUserByAuthIdentity(c.Request.Context(), userRepo, identity)
 		if err != nil {
+			if abortIfRequestCanceled(c, err) {
+				return
+			}
 			if database.IsNotFound(err) {
 				response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
 			} else {
@@ -64,6 +70,18 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 		c.Set("auth_user_id", identity.AuthUserID)
 		c.Next()
 	}
+}
+
+func abortIfRequestCanceled(c *gin.Context, err error) bool {
+	if !isRequestCanceled(c.Request.Context(), err) {
+		return false
+	}
+	c.Abort()
+	return true
+}
+
+func isRequestCanceled(ctx context.Context, err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled)
 }
 
 func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRepository, identity *SessionIdentity) (*users.User, error) {
