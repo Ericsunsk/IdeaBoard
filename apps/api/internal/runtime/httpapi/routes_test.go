@@ -124,7 +124,7 @@ func TestPublicBrandingSettingsHandlerReturnsBranding(t *testing.T) {
 	router.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(stubBrandingSettingsProvider{
 		setting: settings.BrandingSetting{
 			ProjectName: "Design Ops",
-			LogoURL:     "/uploads/admin/logo.png",
+			LogoURL:     "/uploads/site/assets/logo.png",
 		},
 	}))
 
@@ -136,7 +136,7 @@ func TestPublicBrandingSettingsHandlerReturnsBranding(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", res.Code, http.StatusOK, res.Body.String())
 	}
 	body := res.Body.String()
-	if !strings.Contains(body, `"project_name":"Design Ops"`) || !strings.Contains(body, `"logo_url":"/uploads/admin/logo.png"`) {
+	if !strings.Contains(body, `"project_name":"Design Ops"`) || !strings.Contains(body, `"logo_url":"/uploads/site/assets/logo.png"`) {
 		t.Fatalf("body = %s, want branding payload", body)
 	}
 }

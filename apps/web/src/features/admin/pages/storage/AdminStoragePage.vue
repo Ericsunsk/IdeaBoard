@@ -63,11 +63,15 @@
               shape="circle"
               :class="[
                 '!h-10 !w-10 !shrink-0 !text-sm !font-bold',
-                card.vendorLogo
-                  ? '!bg-admin-surface-muted !p-1'
+                card.vendorLogo || card.vendorIcon
+                  ? '!bg-admin-surface-muted !p-1 !text-admin-text-2'
                   : '!bg-admin-accent !text-admin-text-inverse',
               ]"
-            />
+            >
+              <template v-if="card.vendorIcon" #icon>
+                <component :is="card.vendorIcon" class="size-5" />
+              </template>
+            </Avatar>
             <div class="min-w-0">
               <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
                 {{ card.storage.name }}
@@ -108,17 +112,6 @@
                 {{ item.value }}
               </span>
             </div>
-          </div>
-
-          <div class="flex flex-wrap gap-1.5">
-            <Tag
-              v-for="chip in card.featureChips"
-              :key="`${card.storage.id}-${chip}`"
-              :value="chip"
-              severity="secondary"
-              :class="adminCompactTagClass"
-              rounded
-            />
           </div>
 
           <div class="mt-auto flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
@@ -427,7 +420,7 @@ import {
   adminToolbarIconButtonClass,
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
-import { storageVendorLogo } from './storageMeta'
+import { storageVendorIcon, storageVendorLogo } from './storageMeta'
 import { storageStatusSeverity, type StorageCard } from './storageHelpers'
 import { useStorageManager } from './useStorageManager'
 
@@ -461,7 +454,6 @@ const {
   statusClass,
   storageSubtitle,
   storageMetaItems,
-  storageFeatureChips,
   handleVendorSelect,
   openCreate,
   openEdit,
@@ -502,31 +494,30 @@ const emptyStorageMessage = computed(() => (hasStorageSearch.value ? '无匹配�
 
 function createStorageCardView(storage: StorageCard) {
   const vendorLogo = storageVendorLogo(storage)
+  const vendorIcon = storageVendorIcon(storage)
   const providerName = providerLabel(storage.provider)
   const storageStatusClass = statusClass(storage)
   const metaItems = storageMetaItems(storage)
-  const featureChips = storageFeatureChips(storage)
   const storageStatusText = statusText(storage)
   const subtitle = storageSubtitle(storage)
 
   return {
     storage,
     vendorLogo,
-    avatarLabel: vendorLogo ? undefined : providerName.slice(0, 2).toUpperCase(),
+    vendorIcon,
+    avatarLabel: vendorLogo || vendorIcon ? undefined : providerName.slice(0, 2).toUpperCase(),
     providerLabel: providerName,
     subtitle,
     statusText: storageStatusText,
     statusClass: storageStatusClass,
     statusSeverity: storageStatusSeverity(storageStatusClass),
     metaItems,
-    featureChips,
     searchableText: [
       storage.name,
       providerName,
       subtitle,
       storageStatusText,
       ...metaItems.flatMap((item) => [item.label, item.value]),
-      ...featureChips,
     ]
       .join(' ')
       .toLowerCase(),

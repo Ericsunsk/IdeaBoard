@@ -207,7 +207,7 @@ func TestAdminBrandingSettingsUpdateNormalizesAndPersists(t *testing.T) {
 	router.GET("/admin/settings/branding", handler.GetBrandingSettings)
 	router.PUT("/admin/settings/branding", handler.UpdateBrandingSettings)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/settings/branding", strings.NewReader(`{"project_name":"  Design Ops  ","logo_url":"  /uploads/admin/logo.png  "}`))
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings/branding", strings.NewReader(`{"project_name":"  Design Ops  ","logo_url":"  /uploads/site/assets/logo.png  "}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -219,7 +219,7 @@ func TestAdminBrandingSettingsUpdateNormalizesAndPersists(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
 		t.Fatalf("decode update response failed: %v", err)
 	}
-	if updated.Data.ProjectName != "Design Ops" || updated.Data.LogoURL != "/uploads/admin/logo.png" {
+	if updated.Data.ProjectName != "Design Ops" || updated.Data.LogoURL != "/uploads/site/assets/logo.png" {
 		t.Fatalf("updated branding = %+v, want trimmed values", updated.Data)
 	}
 
@@ -262,12 +262,17 @@ func TestAdminBrandingSettingsRejectsInvalidPayload(t *testing.T) {
 		{
 			name: "invalid logo url",
 			body: `{"project_name":"IdeaBoard","logo_url":"javascript:alert(1)"}`,
-			want: "logo_url 必须为空、/uploads/ 路径或 http(s) URL",
+			want: "logo_url 必须为空、/uploads/site/assets/ 路径或 http(s) URL",
 		},
 		{
 			name: "unsafe upload logo path",
-			body: `{"project_name":"IdeaBoard","logo_url":"/uploads/../secret.png"}`,
-			want: "logo_url 必须为空、/uploads/ 路径或 http(s) URL",
+			body: `{"project_name":"IdeaBoard","logo_url":"/uploads/site/assets/../secret.png"}`,
+			want: "logo_url 必须为空、/uploads/site/assets/ 路径或 http(s) URL",
+		},
+		{
+			name: "private upload logo path",
+			body: `{"project_name":"IdeaBoard","logo_url":"/uploads/profile/OWNR1A/avatar/logo.png"}`,
+			want: "logo_url 必须为空、/uploads/site/assets/ 路径或 http(s) URL",
 		},
 	}
 

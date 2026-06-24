@@ -103,10 +103,6 @@ export function configText(storage: StorageCard, key: string) {
   return typeof value === 'string' ? value : value == null ? '' : String(value)
 }
 
-export function configBool(storage: StorageCard, key: string) {
-  return Boolean(storage.config[key])
-}
-
 function requiredFieldsFor(storage: StorageCard, providerMap: ProviderMetaMap) {
   const fields = providerMap[storage.provider]?.fields || []
   return fields.filter((field) => field.required)
@@ -187,23 +183,6 @@ export function storageMetaItems(storage: StorageCard) {
   }
 
   return [{ label: '类型', value: storage.provider }]
-}
-
-export function storageFeatureChips(storage: StorageCard) {
-  if (storage.provider === 'local') {
-    return [`状态 ${storage.enabled ? '开启' : '关闭'}`, '模式 本地目录']
-  }
-
-  if (storage.provider === 's3-compatible') {
-    return [
-      `状态 ${storage.enabled ? '开启' : '关闭'}`,
-      `Bucket ${configText(storage, 'bucket_name') || '未配置'}`,
-      `Path Style ${configBool(storage, 'force_path_style') ? '开启' : '关闭'}`,
-      `密钥 ${storage.secretConfigured ? '已配置' : '未配置'}`,
-    ]
-  }
-
-  return [`状态 ${storage.enabled ? '开启' : '关闭'}`]
 }
 
 export function buildPayload(

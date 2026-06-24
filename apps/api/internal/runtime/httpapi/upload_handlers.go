@@ -270,7 +270,9 @@ func adminUploadHandler(storageService *storage.StorageService, uploadSettings s
 			response.InternalError(c, 500, "上传失败", fmt.Errorf("storage service not configured"))
 			return
 		}
-		url, err := storageService.Upload(c.Request.Context(), file)
+		url, err := storageService.UploadWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
+			DirPrefix: storage.SiteAssetUploadDirPrefix(),
+		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return

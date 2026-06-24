@@ -70,7 +70,7 @@
         class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
         @click="toggleMenu"
       >
-        <MoreHoriz class="size-[18px] stroke-[2.2]" />
+        <MoreHoriz class="size-[18px]" />
       </Button>
       <Menu
         ref="menuRef"

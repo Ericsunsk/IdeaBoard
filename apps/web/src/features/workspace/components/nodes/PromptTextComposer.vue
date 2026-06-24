@@ -30,9 +30,7 @@
         aria-label="添加图片输入"
         @click="emit('image-input-open')"
       >
-        <Plus
-          class="prompt-text-composer-image-add-icon size-4 stroke-[var(--node-tool-icon-stroke)]"
-        />
+        <Plus class="prompt-text-composer-image-add-icon size-4" />
         <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
       </button>
     </div>
@@ -74,9 +72,7 @@
         aria-label="发送"
         @click="submit"
       >
-        <SendDiagonalSolid
-          class="size-4 translate-x-[0.5px] stroke-[var(--node-tool-icon-stroke)]"
-        />
+        <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
         <span class="node-tool-tooltip" aria-hidden="true">发送</span>
       </button>
     </div>

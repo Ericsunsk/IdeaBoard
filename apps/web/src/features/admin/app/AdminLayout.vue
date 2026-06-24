@@ -280,12 +280,15 @@ const siderClass =
   "sticky top-0 flex h-screen self-start flex-col items-start bg-white py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[14px] before:bg-admin-control-bg before:content-['']"
 const railItemSizeClass = 'size-10 min-w-[40px]'
 const railButtonSizeClass = '!size-10 !min-w-[40px]'
-const brandMarkClass = [
-  'relative z-[1] ml-[42px] inline-flex flex-none items-center justify-center rounded-xl border border-black bg-white text-admin-accent-pressed no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]',
+const brandMarkBaseClass = [
+  'relative z-[1] ml-[42px] inline-flex flex-none items-center justify-center overflow-hidden rounded-xl border bg-white text-admin-accent-pressed no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]',
   railItemSizeClass,
 ].join(' ')
+const brandMarkClass = computed(() =>
+  [brandMarkBaseClass, logoURL.value ? 'border-transparent' : 'border-black'].join(' '),
+)
 const brandTextClass = 'text-xs font-[850] tracking-normal'
-const brandImageClass = 'h-full w-full object-contain p-1.5'
+const brandImageClass = 'h-full w-full object-cover'
 const navRailClass =
   'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
@@ -302,7 +305,7 @@ const railButtonActiveClass =
 const userAvatarButtonClass = 'ib-user-avatar-button admin-user-avatar-button'
 const userAvatarImageClass = 'ib-user-avatar-button__image'
 const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
-const userAvatarIconClass = 'size-[17px] stroke-2'
+const userAvatarIconClass = 'size-[17px]'
 const shellButtonSkinClass = [
   '!size-[42px] !items-center !justify-center !rounded-[9px] !text-admin-text-2 !transition-colors !duration-200',
   'hover:!border-admin-border hover:!bg-admin-surface-hover hover:!text-admin-text-1',
@@ -322,7 +325,7 @@ const notificationButtonClass = [
   'relative',
 ].join(' ')
 const navIconClass = 'size-[17px]'
-const shellIconClass = 'size-[19px] stroke-2'
+const shellIconClass = 'size-[19px]'
 const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
 const headerClass =
   'flex min-h-[88px] items-start justify-between gap-6 bg-white py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'

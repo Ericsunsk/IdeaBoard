@@ -101,10 +101,15 @@ export function useAdminMediaUploadSettings(options: {
     return normalizedSetting
   }
 
+  function resetMediaUploadForm() {
+    form.value = { ...lastSyncedForm.value }
+  }
+
   return {
     form,
     handleSaveMediaUploadSettings,
     loading,
+    resetMediaUploadForm,
     saving,
   }
 }

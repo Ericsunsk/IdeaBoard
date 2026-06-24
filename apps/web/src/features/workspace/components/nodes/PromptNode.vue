@@ -53,7 +53,7 @@
             @dragleave.stop="onAddSlotDragLeave"
             @drop.stop.prevent="onAddSlotDrop"
           >
-            <Plus class="size-4 stroke-[var(--node-tool-icon-stroke)]" />
+            <Plus class="size-4" />
             <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
           </button>
         </div>

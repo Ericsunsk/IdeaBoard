@@ -118,14 +118,12 @@ const resolvedAriaLabel = computed(
   width: 100%;
   height: 100%;
   display: block;
-  stroke-width: var(--node-tool-icon-stroke, 1.5);
 }
 
 .node-tool-icon-button__icon :slotted(svg) {
   width: 100%;
   height: 100%;
   display: block;
-  stroke-width: var(--node-tool-icon-stroke, 1.5);
 }
 </style>
 <style scoped src="./styles/node-tool-buttons.css"></style>

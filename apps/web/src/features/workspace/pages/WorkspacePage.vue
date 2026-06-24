@@ -927,7 +927,6 @@ onMounted(async () => {
 
 .canvas-layout {
   --canvas-control-border-width: 1.2px;
-  --canvas-control-icon-stroke: 1.5;
   --canvas-chrome-fade-duration: 0.18s;
   --canvas-chrome-slide-duration: 0.28s;
   --canvas-chrome-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);

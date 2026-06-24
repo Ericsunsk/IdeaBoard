@@ -16,7 +16,7 @@
       @pointerdown.stop
       @click.stop="emit('remove')"
     >
-      <Xmark class="size-2.5 [stroke-width:2.4]" />
+      <Xmark class="size-2.5" />
     </button>
   </div>
 </template>

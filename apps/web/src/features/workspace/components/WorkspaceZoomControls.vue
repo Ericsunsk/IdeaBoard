@@ -13,7 +13,7 @@
         aria-label="缩小"
         @click="emit('zoom-out')"
       >
-        <Minus class="size-4 [stroke-width:var(--canvas-control-icon-stroke)]" />
+        <Minus class="size-4" />
       </button>
       <span class="min-w-[33px] text-center text-[13px] leading-[1.2] font-normal text-[#202124]">
         {{ zoomLevel }}%
@@ -24,7 +24,7 @@
         aria-label="放大"
         @click="emit('zoom-in')"
       >
-        <Plus class="size-4 [stroke-width:var(--canvas-control-icon-stroke)]" />
+        <Plus class="size-4" />
       </button>
     </div>
   </div>

@@ -7,6 +7,7 @@ import {
   useGetSiteBrandingSetting,
 } from '../api/generated-query/settings/settings'
 import type { ApiResponseBrandingSetting, BrandingSetting } from '../api/generated-query/model'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 
 export const SITE_BRANDING_QUERY_KEY = getGetSiteBrandingSettingQueryKey()
@@ -18,6 +19,7 @@ export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
 
 export const SITE_BRANDING_PROJECT_NAME_MAX_CHARS = 40
 export const SITE_BRANDING_LOGO_URL_MAX_LENGTH = 2048
+export const SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX = '/uploads/site/assets/'
 
 export async function fetchSiteBranding(): Promise<BrandingSetting> {
   const res = await getSiteBrandingSetting()
@@ -38,7 +40,7 @@ export function useSiteBranding(options?: { enabled?: MaybeRef<boolean> }) {
   })
   const branding = computed(() => normalizeSiteBrandingSetting(brandingQuery.data.value?.data))
   const projectName = computed(() => branding.value.project_name)
-  const logoURL = computed(() => branding.value.logo_url)
+  const logoURL = computed(() => resolveSiteBrandingLogoURL(branding.value.logo_url))
   const fallbackText = computed(() => getSiteBrandFallbackText(projectName.value))
 
   return {
@@ -66,11 +68,16 @@ export function normalizeSiteBrandingSetting(
   setting: Partial<BrandingSetting> | null | undefined,
 ): BrandingSetting {
   const projectName = typeof setting?.project_name === 'string' ? setting.project_name.trim() : ''
-  const logoURL = typeof setting?.logo_url === 'string' ? setting.logo_url.trim() : ''
+  const rawLogoURL = typeof setting?.logo_url === 'string' ? setting.logo_url.trim() : ''
+  const logoURL = rawLogoURL ? canonicalizeRuntimeUploadRef(rawLogoURL) : ''
   return {
     project_name: projectName || DEFAULT_SITE_BRANDING_SETTING.project_name,
     logo_url: logoURL,
   }
+}
+
+export function resolveSiteBrandingLogoURL(logoURL: string): string {
+  return resolveAssetUrl(logoURL.trim())
 }
 
 export function validateSiteBrandingSetting(setting: BrandingSetting): string {
@@ -86,7 +93,7 @@ export function validateSiteBrandingSetting(setting: BrandingSetting): string {
     return `Logo 地址不能超过 ${SITE_BRANDING_LOGO_URL_MAX_LENGTH} 个字符`
   }
   if (!isValidSiteBrandingLogoURL(logoURL)) {
-    return 'Logo 地址必须为空、/uploads/ 路径或 http(s) URL'
+    return 'Logo 地址必须为空、/uploads/site/assets/ 路径或 http(s) URL'
   }
   return ''
 }
@@ -94,7 +101,9 @@ export function validateSiteBrandingSetting(setting: BrandingSetting): string {
 export function isValidSiteBrandingLogoURL(logoURL: string): boolean {
   const value = logoURL.trim()
   if (!value) return true
-  if (value.startsWith('/uploads/')) return !value.includes('..') && !value.includes('\\')
+  if (value.startsWith(SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX)) {
+    return !value.includes('..') && !value.includes('\\')
+  }
   try {
     const parsed = new URL(value)
     return parsed.protocol === 'http:' || parsed.protocol === 'https:'

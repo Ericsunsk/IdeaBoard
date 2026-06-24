@@ -27,7 +27,6 @@ import {
   providerSupportsTest,
   statusClass as resolveStatusClass,
   statusText as resolveStatusText,
-  storageFeatureChips as resolveStorageFeatureChips,
   storageMetaItems as resolveStorageMetaItems,
   storageSubtitle as resolveStorageSubtitle,
   toProviderMetaMap,
@@ -187,10 +186,6 @@ export function useStorageManager() {
 
   function storageMetaItems(storage: StorageCard) {
     return resolveStorageMetaItems(storage)
-  }
-
-  function storageFeatureChips(storage: StorageCard) {
-    return resolveStorageFeatureChips(storage)
   }
 
   function handleVendorSelect(nextKey: string | undefined) {
@@ -405,7 +400,6 @@ export function useStorageManager() {
     statusClass,
     storageSubtitle,
     storageMetaItems,
-    storageFeatureChips,
     handleVendorSelect,
     openCreate,
     openEdit,

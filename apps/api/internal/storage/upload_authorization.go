@@ -29,13 +29,18 @@ func AuthorizeUploadResourceRead(
 	boardAccess UploadBoardAccessResolver,
 	ownerStorage UploadOwnerStorageUIDResolver,
 ) error {
-	if userID == 0 {
-		return ErrUploadAccessDenied
-	}
 	switch resource.Kind {
+	case UploadResourceKindSiteAsset:
+		return nil
 	case UploadResourceKindWorkspace:
+		if userID == 0 {
+			return ErrUploadAccessDenied
+		}
 		return authorizeWorkspaceUploadResourceRead(ctx, userID, resource, boardAccess, ownerStorage)
 	case UploadResourceKindProfileAvatar:
+		if userID == 0 {
+			return ErrUploadAccessDenied
+		}
 		if resource.ProfileAvatar == nil {
 			return ErrUploadAccessInvalidPath
 		}
@@ -51,6 +56,9 @@ func AuthorizeUploadResourceRead(
 		}
 		return nil
 	case UploadResourceKindTaskOutput:
+		if userID == 0 {
+			return ErrUploadAccessDenied
+		}
 		return authorizeTaskOutputUploadResourceRead(userID, resource)
 	default:
 		return ErrUploadAccessInvalidPath

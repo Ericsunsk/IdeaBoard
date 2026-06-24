@@ -22,6 +22,7 @@ import {
   SITE_BRANDING_QUERY_KEY,
   getSiteBrandFallbackText,
   normalizeSiteBrandingSetting,
+  resolveSiteBrandingLogoURL,
   validateSiteBrandingSetting,
   writeSiteBrandingQueryCache,
 } from '../../../../shared/composables/useSiteBranding'
@@ -69,7 +70,10 @@ export function useAdminBrandingSettings(options: { message: AdminBrandingSettin
   const uploadLogoMutation = useMutation({
     mutationFn: uploadBrandingLogoFile,
     onSuccess: (logoURL) => {
-      form.value.logo_url = logoURL
+      form.value.logo_url = normalizeSiteBrandingSetting({
+        ...form.value,
+        logo_url: logoURL,
+      }).logo_url
     },
   })
 
@@ -77,6 +81,7 @@ export function useAdminBrandingSettings(options: { message: AdminBrandingSettin
   const saving = computed(() => saveBrandingMutation.isPending.value)
   const uploading = computed(() => uploadLogoMutation.isPending.value)
   const fallbackText = computed(() => getSiteBrandFallbackText(form.value.project_name))
+  const logoPreviewURL = computed(() => resolveSiteBrandingLogoURL(form.value.logo_url))
   const formDirty = computed(() => !isSameBrandingSetting(form.value, lastSyncedForm.value))
 
   watch(
@@ -98,14 +103,15 @@ export function useAdminBrandingSettings(options: { message: AdminBrandingSettin
   )
 
   async function handleSaveBranding() {
-    const validationError = validateSiteBrandingSetting(form.value)
+    const normalizedSetting = normalizeSiteBrandingSetting(form.value)
+    const validationError = validateSiteBrandingSetting(normalizedSetting)
     if (validationError) {
       options.message.error(validationError)
       return
     }
 
     try {
-      await saveBrandingMutation.mutateAsync(normalizeSiteBrandingSetting(form.value))
+      await saveBrandingMutation.mutateAsync(normalizedSetting)
       options.message.success('项目品牌已保存')
     } catch (error) {
       options.message.error(formatDisplayErrorMessage(error, '保存项目品牌失败'))
@@ -116,13 +122,19 @@ export function useAdminBrandingSettings(options: { message: AdminBrandingSettin
     try {
       await uploadLogoMutation.mutateAsync(file)
       options.message.success('Logo 已上传，保存后生效')
+      return true
     } catch (error) {
       options.message.error(formatDisplayErrorMessage(error, '上传 Logo 失败'))
+      return false
     }
   }
 
   function clearLogo() {
     form.value.logo_url = ''
+  }
+
+  function resetBrandingForm() {
+    form.value = { ...lastSyncedForm.value }
   }
 
   function hydrateBrandingForm(setting: Partial<BrandingSetting> | null | undefined) {
@@ -139,6 +151,8 @@ export function useAdminBrandingSettings(options: { message: AdminBrandingSettin
     handleSaveBranding,
     handleUploadLogo,
     loading,
+    logoPreviewURL,
+    resetBrandingForm,
     saving,
     uploading,
   }

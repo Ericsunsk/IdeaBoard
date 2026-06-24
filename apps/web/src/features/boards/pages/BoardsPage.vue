@@ -259,7 +259,7 @@ const userMenuWrapClass = 'relative'
 const userAvatarButtonClass = 'ib-user-avatar-button'
 const userAvatarClass = 'ib-user-avatar-button__image'
 const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
-const avatarIconClass = 'size-5 stroke-2'
+const avatarIconClass = 'size-5'
 const mainClass = 'relative z-[1] mx-auto mt-[46px] max-w-[1080px]'
 const pageTitleClass =
   'm-0 break-words text-center text-[62px] leading-[1.05] font-bold tracking-normal max-[860px]:text-[40px]'
@@ -271,7 +271,7 @@ const createButtonClass =
   '!h-[42px] !rounded-full !border-0 !bg-[#7a6bd5] !px-5 !text-sm !font-bold !tracking-normal !text-white !shadow-none hover:!bg-[#6d5fd0] focus-visible:!shadow-[0_0_0_3px_rgba(122,107,213,0.18)] max-[860px]:!w-full'
 const searchWrapClass =
   'flex h-[42px] min-w-0 items-center gap-2 rounded-full border border-[#d9dfec] bg-white/90 px-3'
-const searchIconClass = 'size-3.5 shrink-0 text-[#8a90a3] stroke-2'
+const searchIconClass = 'size-3.5 shrink-0 text-[#8a90a3]'
 const searchInputClass = 'min-w-0 flex-1 bg-transparent text-[13px] text-[#2f3446] outline-none'
 const sortSelectClass =
   '!inline-flex !h-[42px] !w-[108px] !min-w-[108px] !items-center !justify-center !gap-2 !rounded-full !border-[#d9dfec] !bg-white/90 !text-[13px] !font-semibold !text-[#3e4457] !shadow-none max-[860px]:!w-full'

@@ -116,10 +116,15 @@ export function useAdminTaskMonitorSettings(options: {
     return normalizedSetting
   }
 
+  function resetTaskMonitorForm() {
+    form.value = { ...lastSyncedForm.value }
+  }
+
   return {
     form,
     handleSaveTaskMonitorSettings,
     loading,
+    resetTaskMonitorForm,
     saving,
   }
 }

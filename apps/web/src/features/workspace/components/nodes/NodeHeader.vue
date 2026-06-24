@@ -7,7 +7,7 @@
     <div class="node-header-title">
       <span
         v-if="$slots.icon"
-        class="inline-flex size-5 flex-none items-center justify-center opacity-95 [&_svg]:block [&_svg]:size-5 [&_svg]:stroke-2"
+        class="inline-flex size-5 flex-none items-center justify-center opacity-95 [&_svg]:block [&_svg]:size-5"
       >
         <slot name="icon" />
       </span>

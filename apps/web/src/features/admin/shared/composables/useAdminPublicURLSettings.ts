@@ -99,10 +99,15 @@ export function useAdminPublicURLSettings(options: {
     return normalizedSetting
   }
 
+  function resetPublicURLForm() {
+    form.value = { ...lastSyncedForm.value }
+  }
+
   return {
     form,
     handleSavePublicURLSettings,
     loading,
+    resetPublicURLForm,
     saving,
   }
 }

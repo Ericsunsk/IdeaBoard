@@ -29,11 +29,11 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("rate limit = %+v, want persisted payload", rateLimit)
 	}
 
-	branding, err := service.UpdateBranding(ctx, BrandingSetting{ProjectName: "  Design Ops  ", LogoURL: "  /uploads/admin/logo.png  "})
+	branding, err := service.UpdateBranding(ctx, BrandingSetting{ProjectName: "  Design Ops  ", LogoURL: "  /uploads/site/assets/logo.png  "})
 	if err != nil {
 		t.Fatalf("update branding failed: %v", err)
 	}
-	if branding != (BrandingSetting{ProjectName: "Design Ops", LogoURL: "/uploads/admin/logo.png"}) {
+	if branding != (BrandingSetting{ProjectName: "Design Ops", LogoURL: "/uploads/site/assets/logo.png"}) {
 		t.Fatalf("branding = %+v, want normalized values", branding)
 	}
 

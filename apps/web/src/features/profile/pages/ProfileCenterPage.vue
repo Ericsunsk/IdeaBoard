@@ -36,7 +36,7 @@
             @click="activeTab = item.key"
           >
             <span class="flex h-5 w-5 items-center justify-center">
-              <component :is="item.icon" class="h-5 w-5 stroke-[2]" />
+              <component :is="item.icon" class="h-5 w-5" />
             </span>
             <span>{{ item.label }}</span>
           </Button>
@@ -49,7 +49,7 @@
             class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[linear-gradient(135deg,var(--color-canvas-accent-hover),var(--color-canvas-accent))] !px-4 !py-3 !text-[15px] !font-semibold !text-white !shadow-none !transition !duration-200 hover:!bg-[linear-gradient(135deg,var(--color-canvas-accent-pressed),var(--color-canvas-accent-hover))]"
             @click="router.push('/admin/users')"
           >
-            <Shield class="h-[18px] w-[18px] stroke-[2.1]" />
+            <Shield class="h-[18px] w-[18px]" />
             管理后台
           </Button>
 
@@ -58,7 +58,7 @@
             class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[#f1f3f9] !px-4 !py-3 !text-[15px] !font-semibold !text-[#4d556a] !shadow-none !transition !duration-200 hover:!bg-[#e8ecf7] hover:!text-[#2a3142]"
             @click="router.back()"
           >
-            <NavArrowLeft class="h-[18px] w-[18px] stroke-[2.4]" />
+            <NavArrowLeft class="h-[18px] w-[18px]" />
             返回上级
           </Button>
 
@@ -68,7 +68,7 @@
             class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-transparent !px-4 !py-3 !text-[15px] !font-semibold !text-[#ff3b30] !shadow-none !transition !duration-200 hover:!bg-[rgba(255,59,48,0.05)]"
             @click="handleLogout"
           >
-            <LogOut class="h-[18px] w-[18px] stroke-[2.1]" />
+            <LogOut class="h-[18px] w-[18px]" />
             退出登录
           </Button>
         </div>
@@ -96,7 +96,7 @@
             :aria-current="activeTab === item.key ? 'page' : undefined"
             @click="activeTab = item.key"
           >
-            <component :is="item.icon" class="h-4 w-4 stroke-[2]" />
+            <component :is="item.icon" class="h-4 w-4" />
             <span>{{ item.label }}</span>
           </Button>
         </nav>
@@ -130,7 +130,7 @@
                 title="更换头像"
                 @click="openAvatarPicker"
               >
-                <Camera class="h-[15px] w-[15px] stroke-[2]" />
+                <Camera class="h-[15px] w-[15px]" />
               </Button>
               <input
                 ref="avatarInputRef"

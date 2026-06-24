@@ -439,7 +439,6 @@ onBeforeUnmount(() => {
   --mask-editor-tool-button-radius: 10px;
   --mask-editor-tool-button-gap: 7px;
   --mask-editor-tool-icon-size: 21px;
-  --mask-editor-tool-icon-stroke: 1.5;
   position: absolute;
   pointer-events: none;
   z-index: 21;
@@ -457,7 +456,6 @@ onBeforeUnmount(() => {
   --node-tool-button-radius: var(--mask-editor-tool-button-radius);
   --node-tool-button-gap: var(--mask-editor-tool-button-gap);
   --node-tool-icon-size: var(--mask-editor-tool-icon-size);
-  --node-tool-icon-stroke: var(--mask-editor-tool-icon-stroke);
   border-radius: 0;
   box-sizing: border-box;
   display: flex;
@@ -516,7 +514,6 @@ onBeforeUnmount(() => {
   --node-tool-button-radius: var(--mask-editor-tool-button-radius);
   --node-tool-button-gap: var(--mask-editor-tool-button-gap);
   --node-tool-icon-size: var(--mask-editor-tool-icon-size);
-  --node-tool-icon-stroke: var(--mask-editor-tool-icon-stroke);
   animation: mask-editor-soft-pop-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) 75ms both;
 }
 

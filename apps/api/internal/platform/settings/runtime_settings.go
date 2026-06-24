@@ -91,6 +91,7 @@ const (
 	defaultBrandingProjectName = "IdeaBoard"
 	maxBrandingProjectNameLen  = 40
 	maxBrandingLogoURLLen      = 2048
+	brandingUploadLogoPrefix   = "/uploads/site/assets/"
 
 	taskMonitorListPageSizeKey           = "task_monitor_list_page_size"
 	taskMonitorAutoRefreshEnabledKey     = "task_monitor_auto_refresh_enabled"
@@ -442,7 +443,7 @@ func normalizeBranding(setting BrandingSetting) (BrandingSetting, error) {
 		return BrandingSetting{}, validation.New("logo_url 不能超过 2048 个字符")
 	}
 	if !isValidBrandingLogoURL(logoURL) {
-		return BrandingSetting{}, validation.New("logo_url 必须为空、/uploads/ 路径或 http(s) URL")
+		return BrandingSetting{}, validation.New("logo_url 必须为空、/uploads/site/assets/ 路径或 http(s) URL")
 	}
 	return BrandingSetting{ProjectName: projectName, LogoURL: logoURL}, nil
 }
@@ -451,7 +452,7 @@ func isValidBrandingLogoURL(raw string) bool {
 	if raw == "" {
 		return true
 	}
-	if strings.HasPrefix(raw, "/uploads/") {
+	if strings.HasPrefix(raw, brandingUploadLogoPrefix) {
 		return !strings.Contains(raw, "..") && !strings.Contains(raw, "\\")
 	}
 	parsed, err := url.ParseRequestURI(raw)

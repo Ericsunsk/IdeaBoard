@@ -16,6 +16,7 @@ const (
 	UploadResourceKindWorkspace     UploadResourceKind = "workspace"
 	UploadResourceKindProfileAvatar UploadResourceKind = "profile_avatar"
 	UploadResourceKindTaskOutput    UploadResourceKind = "task_output"
+	UploadResourceKindSiteAsset     UploadResourceKind = "site_asset"
 )
 
 type UploadWorkspaceResource struct {
@@ -35,12 +36,17 @@ type UploadTaskOutputResource struct {
 	RelativePath string
 }
 
+type UploadSiteAssetResource struct {
+	RelativePath string
+}
+
 type UploadResource struct {
 	Kind          UploadResourceKind
 	ObjectKey     string
 	Workspace     *UploadWorkspaceResource
 	ProfileAvatar *UploadProfileAvatarResource
 	TaskOutput    *UploadTaskOutputResource
+	SiteAsset     *UploadSiteAssetResource
 }
 
 func WorkspaceContentUploadDirPrefix(storageUID string, boardID string) (string, error) {
@@ -117,6 +123,14 @@ func TaskOutputUploadObjectPrefix(userID int64, taskID string) (string, error) {
 	return path.Join(uploadObjectRoot, dirPrefix) + "/", nil
 }
 
+func SiteAssetUploadDirPrefix() string {
+	return path.Join("site", "assets")
+}
+
+func SiteAssetUploadObjectPrefix() string {
+	return path.Join(uploadObjectRoot, SiteAssetUploadDirPrefix()) + "/"
+}
+
 func userUploadObjectPrefixes(userID int64, storageUID string) ([]string, error) {
 	workspacePrefix, err := WorkspaceUserUploadObjectPrefix(storageUID)
 	if err != nil {
@@ -174,6 +188,14 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 			UserSegment:  parts[1],
 			TaskSegment:  parts[2],
 			RelativePath: strings.Join(parts[3:], "/"),
+		}
+		return resource, nil
+	}
+
+	if parts[0] == "site" && len(parts) >= 3 && parts[1] == "assets" && strings.Join(parts[2:], "") != "" {
+		resource.Kind = UploadResourceKindSiteAsset
+		resource.SiteAsset = &UploadSiteAssetResource{
+			RelativePath: strings.Join(parts[2:], "/"),
 		}
 		return resource, nil
 	}

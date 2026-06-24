@@ -3,7 +3,6 @@
   --canvas-control-size: 40px;
   --canvas-control-gap: 12px;
   --canvas-control-icon-size: 19px;
-  --canvas-control-icon-stroke: 1.5;
   --canvas-control-active-color: var(--color-canvas-accent);
   display: flex;
   gap: var(--canvas-control-gap);
@@ -53,7 +52,6 @@
 .canvas-control-icon {
   width: var(--canvas-control-icon-size);
   height: var(--canvas-control-icon-size);
-  stroke-width: var(--canvas-control-icon-stroke);
 }
 
 .canvas-icon-swap {

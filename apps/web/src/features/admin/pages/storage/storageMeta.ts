@@ -1,3 +1,5 @@
+import type { Component } from 'vue'
+import { DatabaseExport } from '@iconoir/vue'
 import type { StorageProvider, StorageProviderMeta } from '../../shared/api/storage'
 import type { StorageCard } from './storageHelpers'
 import logoAlibabaCloud from '../../../../shared/assets/storage-vendors/alibabacloud.svg'
@@ -26,6 +28,10 @@ export const vendorLogoMap: Partial<Record<StorageProvider, string>> = {
   'aws-s3': logoAmazonS3,
   'cloudflare-r2': logoCloudflare,
   minio: logoMinio,
+}
+
+export const vendorIconMap: Partial<Record<StorageProvider, Component>> = {
+  local: DatabaseExport,
 }
 
 export const vendorPresetCatalog: VendorPreset[] = [
@@ -132,6 +138,10 @@ export function storageVendorLogo(storage: StorageCard) {
   )
 
   return matchedRule?.logoSrc || vendorLogoMap[storage.provider]
+}
+
+export function storageVendorIcon(storage: StorageCard) {
+  return vendorIconMap[storage.provider]
 }
 
 export function buildVendorPresets(

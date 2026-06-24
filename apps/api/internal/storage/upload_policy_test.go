@@ -90,6 +90,19 @@ func TestParseUploadResourceTaskOutput(t *testing.T) {
 	}
 }
 
+func TestParseUploadResourceSiteAsset(t *testing.T) {
+	resource, err := ParseUploadResource("/uploads/site/assets/logo.png")
+	if err != nil {
+		t.Fatalf("ParseUploadResource returned error: %v", err)
+	}
+	if resource.Kind != UploadResourceKindSiteAsset || resource.SiteAsset == nil {
+		t.Fatalf("kind = %q siteAsset=%#v, want site asset", resource.Kind, resource.SiteAsset)
+	}
+	if resource.SiteAsset.RelativePath != "logo.png" {
+		t.Fatalf("relative path = %q, want %q", resource.SiteAsset.RelativePath, "logo.png")
+	}
+}
+
 func TestTaskOutputUploadPrefixes(t *testing.T) {
 	dirPrefix, err := TaskOutputUploadDirPrefix(42, "task-abc")
 	if err != nil {
@@ -116,6 +129,15 @@ func TestTaskOutputUploadPrefixes(t *testing.T) {
 	}
 }
 
+func TestSiteAssetUploadPrefixes(t *testing.T) {
+	if got := SiteAssetUploadDirPrefix(); got != "site/assets" {
+		t.Fatalf("dir prefix = %q, want %q", got, "site/assets")
+	}
+	if got := SiteAssetUploadObjectPrefix(); got != "uploads/site/assets/" {
+		t.Fatalf("object prefix = %q, want %q", got, "uploads/site/assets/")
+	}
+}
+
 func TestUserUploadObjectPrefixesIncludesAllUserOwnedUploadRoots(t *testing.T) {
 	prefixes, err := userUploadObjectPrefixes(42, "OWNR1A")
 	if err != nil {
@@ -139,6 +161,12 @@ func TestUserUploadObjectPrefixesIncludesAllUserOwnedUploadRoots(t *testing.T) {
 func TestParseUploadResourceRejectsGenericPath(t *testing.T) {
 	if _, err := ParseUploadResource("/uploads/2026/05/30/demo.png"); err == nil {
 		t.Fatalf("expected generic upload path to fail")
+	}
+}
+
+func TestParseUploadResourceRejectsUnsupportedSitePath(t *testing.T) {
+	if _, err := ParseUploadResource("/uploads/site/private/logo.png"); err == nil {
+		t.Fatalf("expected unsupported site upload path to fail")
 	}
 }
 

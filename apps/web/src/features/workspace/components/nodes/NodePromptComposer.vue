@@ -44,9 +44,7 @@
         :disabled="submitButtonDisabled"
         aria-label="发送"
       >
-        <SendDiagonalSolid
-          class="size-4 translate-x-[0.5px] stroke-[var(--node-tool-icon-stroke)]"
-        />
+        <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
         <span class="node-tool-tooltip" aria-hidden="true">发送</span>
       </button>
     </div>

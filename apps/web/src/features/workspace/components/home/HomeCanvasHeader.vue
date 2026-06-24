@@ -1,6 +1,6 @@
 <template>
   <header
-    class="pointer-events-none absolute top-4 right-4 left-4 z-[100] flex items-start justify-between gap-4 [--canvas-control-border-width:1.2px] [--canvas-control-icon-stroke:1.5]"
+    class="pointer-events-none absolute top-4 right-4 left-4 z-[100] flex items-start justify-between gap-4 [--canvas-control-border-width:1.2px]"
     @wheel.prevent.stop
   >
     <div
@@ -13,7 +13,7 @@
         aria-label="返回画布列表"
         @click.stop="emit('navigate-back')"
       >
-        <ArrowLeft class="size-4 [stroke-width:var(--canvas-control-icon-stroke)]" />
+        <ArrowLeft class="size-4" />
       </button>
 
       <div class="relative flex min-w-0 flex-1 items-center gap-2">
@@ -42,7 +42,7 @@
           aria-label="选择画布"
           @click.stop="emit('toggle-board-menu')"
         >
-          <SquareCursor class="size-4 [stroke-width:var(--canvas-control-icon-stroke)]" />
+          <SquareCursor class="size-4" />
         </button>
         <div
           v-if="isBoardMenuOpen"
@@ -121,7 +121,7 @@
             alt="用户头像"
           />
           <div v-else class="ib-user-avatar-button__placeholder">
-            <User class="size-5 [stroke-width:var(--canvas-control-icon-stroke)]" />
+            <User class="size-5" />
           </div>
         </button>
         <div

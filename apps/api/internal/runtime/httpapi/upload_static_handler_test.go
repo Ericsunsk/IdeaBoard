@@ -90,6 +90,19 @@ func TestUploadStaticHandlerDoesNotListDirectories(t *testing.T) {
 	}
 }
 
+func TestUploadStaticHandlerSiteAssetIsPublic(t *testing.T) {
+	env := newUploadStaticTestEnv(t)
+
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/site/assets/logo.txt", "")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if strings.TrimSpace(rec.Body.String()) != "site logo" {
+		t.Fatalf("body = %q, want site logo", rec.Body.String())
+	}
+}
+
 func TestUploadStaticHandlerProfileAvatarRequiresLogin(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
@@ -193,6 +206,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "demo.txt"), "workspace content")
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "thumb", "demo.txt"), "workspace thumb")
+	mustWriteTestFile(t, filepath.Join("uploads", "site", "assets", "logo.txt"), "site logo")
 	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "avatar", "avatar.txt"), "profile avatar")
 	mustWriteTestFile(t, filepath.Join("uploads", "2026", "05", "13", "legacy.txt"), "legacy upload")
 

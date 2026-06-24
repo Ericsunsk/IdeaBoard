@@ -27,23 +27,44 @@
         <div :class="settingCardBodyClass">
           <div class="grid gap-5 xl:grid-cols-[136px_minmax(0,1fr)]">
             <div class="flex min-w-0 flex-col gap-3">
-              <button
-                class="flex size-28 items-center justify-center overflow-hidden rounded-lg border border-admin-border bg-white text-admin-accent-pressed transition-colors hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
-                type="button"
-                :disabled="brandingLoading || brandingSaving || uploading"
-                aria-label="上传站点 Logo"
-                @click="openLogoPicker"
-              >
-                <img
+              <div class="group/logo relative size-28">
+                <button
+                  class="flex size-full items-center justify-center overflow-hidden rounded-lg border border-admin-border bg-white text-admin-accent-pressed transition-colors hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+                  type="button"
+                  :disabled="brandingLoading || brandingSaving || uploading"
+                  aria-label="上传站点 Logo"
+                  @click="openLogoPicker"
+                >
+                  <img
+                    v-if="brandingLogoPreviewURL"
+                    :src="brandingLogoPreviewURL"
+                    class="h-full w-full object-cover"
+                    alt="站点 Logo"
+                  />
+                  <span v-else class="text-xl font-[850] tracking-normal">
+                    {{ brandingFallbackText }}
+                  </span>
+                </button>
+
+                <button
                   v-if="brandingForm.logo_url"
-                  :src="brandingForm.logo_url"
-                  class="h-full w-full object-contain p-2"
-                  alt="站点 Logo"
-                />
-                <span v-else class="text-xl font-[850] tracking-normal">
-                  {{ brandingFallbackText }}
-                </span>
-              </button>
+                  class="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full border-0 bg-white/90 p-0 text-admin-text-2 leading-none transition-opacity hover:bg-white hover:text-admin-text-1 focus-visible:bg-white focus-visible:text-admin-text-1 focus-visible:outline-none disabled:cursor-not-allowed"
+                  :class="
+                    brandingLoading || brandingSaving || uploading
+                      ? 'opacity-40'
+                      : 'opacity-0 group-hover/logo:opacity-100 group-focus-within/logo:opacity-100 focus-visible:opacity-100'
+                  "
+                  type="button"
+                  title="清除 Logo"
+                  aria-label="清除 Logo"
+                  :disabled="brandingLoading || brandingSaving || uploading"
+                  @mousedown.stop
+                  @pointerdown.stop
+                  @click.stop="clearBrandingLogo"
+                >
+                  <Xmark class="size-2.5" />
+                </button>
+              </div>
 
               <input
                 ref="logoFileInputRef"
@@ -52,22 +73,6 @@
                 :accept="IMAGE_UPLOAD_ACCEPT"
                 @change="handleLogoInputChange"
               />
-
-              <div class="grid gap-2">
-                <Button
-                  v-if="brandingForm.logo_url"
-                  class="!h-9 !rounded-lg"
-                  label="清除 Logo"
-                  severity="contrast"
-                  text
-                  :disabled="brandingLoading || brandingSaving || uploading"
-                  @click="clearBrandingLogo"
-                >
-                  <template #icon>
-                    <Trash class="size-4" />
-                  </template>
-                </Button>
-              </div>
             </div>
 
             <div class="grid content-start gap-4">
@@ -89,7 +94,7 @@
                   v-model="brandingForm.logo_url"
                   autocomplete="off"
                   maxlength="2048"
-                  placeholder="/uploads/admin/logo.png"
+                  placeholder="/uploads/site/assets/logo.png"
                   :disabled="brandingLoading || brandingSaving || uploading"
                   @keyup.enter="handleSaveBranding()"
                 />
@@ -100,16 +105,20 @@
           <div :class="settingActionRowClass">
             <Button
               class="!h-9 !rounded-lg"
-              label="保存站点设置"
+              label="保存"
               severity="contrast"
               :disabled="brandingLoading || brandingSaving || uploading"
               :loading="brandingSaving"
               @click="handleSaveBranding"
-            >
-              <template #icon>
-                <Check class="size-4" />
-              </template>
-            </Button>
+            />
+            <Button
+              class="!h-9 !rounded-lg"
+              label="重置"
+              severity="secondary"
+              outlined
+              :disabled="brandingLoading || brandingSaving || uploading"
+              @click="resetBrandingForm"
+            />
           </div>
         </div>
       </template>
@@ -169,16 +178,20 @@
           <div :class="settingActionRowClass">
             <Button
               class="!h-9 !rounded-lg"
-              label="保存 API 限流"
+              label="保存"
               severity="contrast"
               :disabled="rateLimitLoading || rateLimitSaving"
               :loading="rateLimitSaving"
               @click="handleSaveRateLimit"
-            >
-              <template #icon>
-                <Check class="size-4" />
-              </template>
-            </Button>
+            />
+            <Button
+              class="!h-9 !rounded-lg"
+              label="重置"
+              severity="secondary"
+              outlined
+              :disabled="rateLimitLoading || rateLimitSaving"
+              @click="resetRateLimitForm"
+            />
           </div>
         </div>
       </template>
@@ -248,16 +261,20 @@
           <div :class="settingActionRowClass">
             <Button
               class="!h-9 !rounded-lg"
-              label="保存任务设置"
+              label="保存"
               severity="contrast"
-              :disabled="taskMonitorLoading"
+              :disabled="taskMonitorLoading || taskMonitorSaving"
               :loading="taskMonitorSaving"
               @click="handleSaveTaskMonitorSettings"
-            >
-              <template #icon>
-                <Check class="size-4" />
-              </template>
-            </Button>
+            />
+            <Button
+              class="!h-9 !rounded-lg"
+              label="重置"
+              severity="secondary"
+              outlined
+              :disabled="taskMonitorLoading || taskMonitorSaving"
+              @click="resetTaskMonitorForm"
+            />
           </div>
         </div>
       </template>
@@ -304,16 +321,20 @@
           <div :class="settingActionRowClass">
             <Button
               class="!h-9 !rounded-lg"
-              label="保存链接"
+              label="保存"
               severity="contrast"
-              :disabled="publicURLLoading"
+              :disabled="publicURLLoading || publicURLSaving"
               :loading="publicURLSaving"
               @click="handleSavePublicURLSettings"
-            >
-              <template #icon>
-                <Check class="size-4" />
-              </template>
-            </Button>
+            />
+            <Button
+              class="!h-9 !rounded-lg"
+              label="重置"
+              severity="secondary"
+              outlined
+              :disabled="publicURLLoading || publicURLSaving"
+              @click="resetPublicURLForm"
+            />
           </div>
         </div>
       </template>
@@ -350,25 +371,36 @@
           <div :class="settingActionRowClass">
             <Button
               class="!h-9 !rounded-lg"
-              label="保存上传设置"
+              label="保存"
               severity="contrast"
-              :disabled="mediaUploadLoading"
+              :disabled="mediaUploadLoading || mediaUploadSaving"
               :loading="mediaUploadSaving"
               @click="handleSaveMediaUploadSettings"
-            >
-              <template #icon>
-                <Check class="size-4" />
-              </template>
-            </Button>
+            />
+            <Button
+              class="!h-9 !rounded-lg"
+              label="重置"
+              severity="secondary"
+              outlined
+              :disabled="mediaUploadLoading || mediaUploadSaving"
+              @click="resetMediaUploadForm"
+            />
           </div>
         </div>
       </template>
     </Card>
   </AdminResourceGridFrame>
+
+  <AdminLogoCropDialog
+    v-model:visible="logoCropDialogVisible"
+    :busy="uploading"
+    :file="pendingLogoFile"
+    @confirm="handleLogoCropConfirm"
+  />
 </template>
 
 <script setup lang="ts">
-import { Check, Trash } from '@iconoir/vue'
+import { Xmark } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputNumber from 'primevue/inputnumber'
@@ -377,6 +409,11 @@ import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
+import {
+  isSupportedUploadImageFile,
+  unsupportedUploadImageMessage,
+} from '../../../../shared/utils/imageUploadSupport'
+import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import {
   RATE_LIMIT_MAX_REQUESTS,
@@ -416,6 +453,8 @@ const {
   handleScroll: handleSystemSettingsPanelScroll,
 } = useTransientScrolling()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
+const logoCropDialogVisible = ref(false)
+const pendingLogoFile = ref<File | null>(null)
 const {
   clearLogo: clearBrandingLogo,
   fallbackText: brandingFallbackText,
@@ -423,6 +462,8 @@ const {
   handleSaveBranding,
   handleUploadLogo,
   loading: brandingLoading,
+  logoPreviewURL: brandingLogoPreviewURL,
+  resetBrandingForm,
   saving: brandingSaving,
   uploading,
 } = useAdminBrandingSettings({ message: appToast })
@@ -434,23 +475,27 @@ const {
   rateLimitSaving,
   registrationEnabled,
   registrationSettingLoading,
+  resetRateLimitForm,
 } = useAdminAccessSettings({ message: appToast })
 const {
   form: taskMonitorForm,
   handleSaveTaskMonitorSettings,
   loading: taskMonitorLoading,
+  resetTaskMonitorForm,
   saving: taskMonitorSaving,
 } = useAdminTaskMonitorSettings({ message: appToast })
 const {
   form: publicURLForm,
   handleSavePublicURLSettings,
   loading: publicURLLoading,
+  resetPublicURLForm,
   saving: publicURLSaving,
 } = useAdminPublicURLSettings({ message: appToast })
 const {
   form: mediaUploadForm,
   handleSaveMediaUploadSettings,
   loading: mediaUploadLoading,
+  resetMediaUploadForm,
   saving: mediaUploadSaving,
 } = useAdminMediaUploadSettings({ message: appToast })
 
@@ -462,6 +507,12 @@ const publicURLStatusLabel = computed(() => {
   return '使用默认'
 })
 
+watch(logoCropDialogVisible, (visible) => {
+  if (!visible) {
+    pendingLogoFile.value = null
+  }
+})
+
 function openLogoPicker() {
   logoFileInputRef.value?.click()
 }
@@ -471,6 +522,18 @@ async function handleLogoInputChange(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  await handleUploadLogo(file)
+  if (!isSupportedUploadImageFile(file)) {
+    appToast.error(unsupportedUploadImageMessage())
+    return
+  }
+  pendingLogoFile.value = file
+  logoCropDialogVisible.value = true
+}
+
+async function handleLogoCropConfirm(file: File) {
+  const uploaded = await handleUploadLogo(file)
+  if (!uploaded) return
+  logoCropDialogVisible.value = false
+  pendingLogoFile.value = null
 }
 </script>

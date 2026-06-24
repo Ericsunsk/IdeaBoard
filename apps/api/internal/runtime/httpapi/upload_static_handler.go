@@ -26,6 +26,11 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 			return
 		}
 
+		if resource.Kind == storage.UploadResourceKindSiteAsset {
+			serveLocalUploadFile(c, resource.ObjectKey)
+			return
+		}
+
 		if !authorizeUploadRead(c, deps.Auth) {
 			return
 		}
@@ -48,14 +53,18 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 			return
 		}
 
-		localPath := filepath.FromSlash(resource.ObjectKey)
-		info, err := os.Stat(localPath)
-		if err != nil || info.IsDir() {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		c.File(localPath)
+		serveLocalUploadFile(c, resource.ObjectKey)
 	}
+}
+
+func serveLocalUploadFile(c *gin.Context, objectKey string) {
+	localPath := filepath.FromSlash(objectKey)
+	info, err := os.Stat(localPath)
+	if err != nil || info.IsDir() {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	c.File(localPath)
 }
 
 func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {

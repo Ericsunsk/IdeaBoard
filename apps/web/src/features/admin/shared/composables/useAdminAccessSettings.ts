@@ -169,6 +169,10 @@ export function useAdminAccessSettings(options: { message: AdminAccessSettingsMe
     rateLimitForm.value.max_requests = settings.max_requests
   }
 
+  function resetRateLimitForm() {
+    rateLimitForm.value = { ...lastSyncedRateLimitSettings.value }
+  }
+
   async function handleToggleRegistration(newValue: boolean) {
     const fallbackEnabled = registrationSettingQuery.data.value?.data?.enabled ?? !newValue
     try {
@@ -188,6 +192,7 @@ export function useAdminAccessSettings(options: { message: AdminAccessSettingsMe
     registrationSettingLoading,
     handleSaveRateLimit,
     handleToggleRegistration,
+    resetRateLimitForm,
   }
 }
 

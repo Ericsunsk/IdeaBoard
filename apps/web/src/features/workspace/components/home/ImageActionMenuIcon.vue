@@ -1,9 +1,6 @@
 <template>
   <span class="flex items-center justify-center">
-    <component
-      :is="resolvedIcon"
-      class="size-[21px] [stroke-width:var(--node-tool-icon-stroke,1.5)]"
-    />
+    <component :is="resolvedIcon" class="size-[21px]" />
   </span>
 </template>
 
