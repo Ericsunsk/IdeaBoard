@@ -238,8 +238,8 @@ import {
   findAdminNavigationItemByPath,
 } from './adminNavigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
-import { useAdminBranding } from '../shared/composables/useAdminBrandingSettings'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 import { createAdminMenuPt, createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
@@ -269,7 +269,7 @@ const isAnomalyRadarEnabled = computed(() => isAdminShellRoute.value)
 const { anomalies, anomalyCount, hasAnomalies } = useAdminAnomalyRadar({
   enabled: isAnomalyRadarEnabled,
 })
-const { fallbackText, logoURL, projectName } = useAdminBranding({
+const { fallbackText, logoURL, projectName } = useSiteBranding({
   enabled: isAdminShellRoute,
 })
 const brandAriaLabel = computed(() => `${projectName.value} Admin`)

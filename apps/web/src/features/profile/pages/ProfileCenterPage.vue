@@ -12,10 +12,11 @@
           <Button
             type="button"
             text
-            class="!border-0 !bg-transparent !p-0 !text-[33px] !leading-none !font-bold !text-[#1d1d1f] !shadow-none hover:!bg-transparent hover:!text-[#1d1d1f]"
+            class="!inline-flex !max-w-full !items-center !gap-2 !border-0 !bg-transparent !p-0 !text-[33px] !leading-none !font-bold !text-[#1d1d1f] !shadow-none hover:!bg-transparent hover:!text-[#1d1d1f]"
             @click="router.push('/user/home')"
           >
-            IdeaBoard
+            <img v-if="logoURL" :src="logoURL" class="h-8 w-8 shrink-0 object-contain" alt="" />
+            <span class="min-w-0 truncate">{{ projectName }}</span>
           </Button>
         </div>
 
@@ -368,6 +369,7 @@ import { useUserStore } from '../../../app/stores/user'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { uploadApi } from '../../../shared/api/upload'
 import {
   isRequiredErrorMessage,
@@ -406,6 +408,7 @@ const userStore = useUserStore()
 const appToast = useAppToast()
 const { runAsyncAction } = useAsyncAction()
 const { logoutAndRedirect } = useLogoutRedirect()
+const { logoURL, projectName } = useSiteBranding()
 
 const activeTab = ref<NavItem['key']>('profile')
 const avatarInputRef = ref<HTMLInputElement | null>(null)

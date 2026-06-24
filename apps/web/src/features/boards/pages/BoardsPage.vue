@@ -7,7 +7,8 @@
 
     <header :class="headerClass">
       <div :class="brandClass">
-        <span :class="brandNameClass">IdeaBoard</span>
+        <img v-if="logoURL" :src="logoURL" :class="brandLogoClass" alt="" />
+        <span :class="brandNameClass">{{ projectName }}</span>
       </div>
       <div :class="userMenuWrapClass" @pointerdown.stop @mousedown.stop @click.stop>
         <Button
@@ -52,7 +53,7 @@
     </header>
 
     <main :class="mainClass">
-      <h1 :class="pageTitleClass">Welcome to IdeaBoard!</h1>
+      <h1 :class="pageTitleClass">Welcome to {{ projectName }}!</h1>
       <p :class="pageSubtitleClass">Explore, expand, and refine your ideas</p>
 
       <section :class="toolbarClass">
@@ -197,6 +198,7 @@ import {
 } from '../lib/boardSync'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useUserStore } from '../../../app/stores/user'
 import { Search, User } from '@iconoir/vue'
 import Button from 'primevue/button'
@@ -217,6 +219,7 @@ const router = useRouter()
 const appToast = useAppToast()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
+const { logoURL, projectName } = useSiteBranding()
 
 const boards = ref<CanvasBoardMeta[]>([])
 const isBoardsLoading = ref(true)
@@ -249,8 +252,9 @@ const pageClass =
 const pageBackgroundClass =
   'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,rgba(150,120,230,0.24)_0%,rgba(150,120,230,0)_100%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-position:center_center,center_center] [background-size:100%_100%,12px_12px]'
 const headerClass = 'relative z-[1] flex items-center justify-between'
-const brandClass = 'inline-flex items-center gap-2'
-const brandNameClass = 'text-[32px] font-bold tracking-normal'
+const brandClass = 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center gap-2'
+const brandLogoClass = 'h-9 w-9 rounded-lg object-contain'
+const brandNameClass = 'min-w-0 truncate text-[32px] font-bold tracking-normal'
 const userMenuWrapClass = 'relative'
 const userAvatarButtonClass = 'ib-user-avatar-button'
 const userAvatarClass = 'ib-user-avatar-button__image'
@@ -258,7 +262,7 @@ const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
 const avatarIconClass = 'size-5 stroke-2'
 const mainClass = 'relative z-[1] mx-auto mt-[46px] max-w-[1080px]'
 const pageTitleClass =
-  'm-0 text-center text-[62px] leading-[1.05] font-bold tracking-normal max-[860px]:text-[40px]'
+  'm-0 break-words text-center text-[62px] leading-[1.05] font-bold tracking-normal max-[860px]:text-[40px]'
 const pageSubtitleClass =
   'mt-4 mb-[34px] text-center text-[19px] tracking-normal text-[#6e7487] max-[860px]:text-[15px]'
 const toolbarClass =

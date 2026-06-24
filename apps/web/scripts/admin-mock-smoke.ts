@@ -6,8 +6,9 @@ type SmokePage = {
   path: string
 }
 
-const API_REQUEST_RE = /\/api\/(?:admin|auth|user)(?:[/?#]|$)/
+const API_REQUEST_RE = /\/api\/(?:admin|auth|settings|user)(?:[/?#]|$)/
 const ALLOWED_API_REQUESTS = [
+  /\/api\/settings\/branding(?:[?#\s]|$)/,
   /\/api\/auth\/get-session(?:[?#\s]|$)/,
   /\/api\/user\/info(?:[?#\s]|$)/,
   /\/api\/admin\/statistics(?:[?#\s]|$)/,
@@ -305,6 +306,7 @@ const pages: SmokePage[] = adminNavigationRouteDefs.map((route) => ({
 function setupBrowser(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, ['open', 'about:blank'])
   smoke.routeJson(playwrightCli, '**/api/auth/get-session', AUTH_SESSION)
+  smoke.routeJson(playwrightCli, '**/api/settings/branding', ADMIN_BRANDING_SETTING)
   smoke.routeJson(playwrightCli, '**/api/user/info', USER_INFO)
   smoke.routeResponse(playwrightCli, '**/api/admin/monitor/stream', ADMIN_MONITOR_STREAM, {
     contentType: 'text/event-stream',

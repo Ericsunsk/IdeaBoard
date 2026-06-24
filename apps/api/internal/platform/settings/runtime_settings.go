@@ -60,6 +60,10 @@ type RateLimitSettingProvider interface {
 	GetRateLimit(ctx context.Context) (RateLimitSetting, error)
 }
 
+type BrandingSettingProvider interface {
+	GetBranding(ctx context.Context) (BrandingSetting, error)
+}
+
 var ErrRuntimeSettingsRepositoryUnavailable = errors.New("runtime settings repository unavailable")
 
 const (

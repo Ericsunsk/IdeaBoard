@@ -10,9 +10,10 @@
         <router-link
           class="inline-flex h-[52px] w-[52px] items-center justify-center rounded-[15px] border border-admin-accent-pressed bg-white text-sm font-black text-admin-accent-pressed shadow-[0_10px_22px_rgba(45,64,89,0.08)]"
           to="/"
-          aria-label="IdeaBoard"
+          :aria-label="projectName"
         >
-          IB
+          <img v-if="logoURL" :src="logoURL" class="h-full w-full object-contain p-1.5" alt="" />
+          <span v-else>{{ fallbackText }}</span>
         </router-link>
       </template>
 
@@ -81,12 +82,14 @@ import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
+import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 const appToast = useAppToast()
+const { fallbackText, logoURL, projectName } = useSiteBranding()
 
 const loading = ref(false)
 const formError = ref('')

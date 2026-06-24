@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -41,6 +42,7 @@ type Dependencies struct {
 	StaticUploads  StaticUploadDeps
 	CORSMiddleware gin.HandlerFunc
 	RateLimit      settings.RateLimitSettingProvider
+	Branding       settings.BrandingSettingProvider
 }
 
 type FrontendRouteOptions struct {
@@ -95,6 +97,7 @@ const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 // Hand-written route paths that bypass the Orval-generated client.
 const (
 	RouteHealth                   = "/api/health"
+	RoutePublicSettingsBranding   = "/api/settings/branding"
 	RouteUserProfileAvatar        = "/profile/avatar"
 	RouteUserBoardUploads         = "/boards/:board_id/uploads"
 	RouteUserDownload             = "/download"
@@ -162,6 +165,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	r.GET(RouteHealth, func(c *gin.Context) {
 		response.SuccessDTO(c, healthResponse{Status: "ok"})
 	})
+	r.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(deps.Branding))
 
 	os.MkdirAll("uploads", 0700)
 	uploadsHandler := uploadStaticHandler(deps.StaticUploads)
@@ -177,6 +181,21 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, fronte
 	registerAdminRoutes(adminAPI, deps.AdminRoutes)
 
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)
+}
+
+func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if provider == nil {
+			response.InternalError(c, http.StatusInternalServerError, "系统设置服务未初始化", errors.New("branding settings provider is not initialized"))
+			return
+		}
+		branding, err := provider.GetBranding(c.Request.Context())
+		if err != nil {
+			response.InternalError(c, http.StatusInternalServerError, "读取系统设置失败", err)
+			return
+		}
+		response.SuccessDTO(c, branding)
+	}
 }
 
 func globalRequestBodyLimitMiddleware() gin.HandlerFunc {

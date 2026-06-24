@@ -5,6 +5,7 @@ info:
 servers:
   - url: /api
 tags:
+  - name: Settings
   - name: User
   - name: Boards
   - name: Tasks
@@ -22,6 +23,17 @@ tags:
   - name: UserLineDraftModes
   - name: AdminLineDraftModes
 paths:
+  /settings/branding:
+    get:
+      tags: [Settings]
+      operationId: getSiteBrandingSetting
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBrandingSetting'
   /user/info:
     get:
       tags: [User]

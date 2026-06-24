@@ -19,7 +19,7 @@
         <div :class="authModalHeaderClass">
           <p :class="authModalKickerClass">WELCOME BACK</p>
           <h2 :class="authModalTitleClass">欢迎回来</h2>
-          <p :class="authModalSubtitleClass">登录 IdeaBoard，继续你的创作</p>
+          <p :class="authModalSubtitleClass">登录 {{ projectName }}，继续你的创作</p>
         </div>
 
         <form class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
@@ -114,6 +114,7 @@ import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { User as UserIcon, Lock as LockIcon } from '@iconoir/vue'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import AuthFormField from './AuthFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
@@ -145,6 +146,8 @@ const emit = defineEmits<{
   (e: 'to-register'): void
   (e: 'login-success'): void
 }>()
+
+const { projectName } = useSiteBranding()
 
 type LoginField = 'username' | 'password'
 

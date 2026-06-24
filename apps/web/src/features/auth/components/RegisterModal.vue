@@ -19,7 +19,7 @@
         <div :class="authModalHeaderClass">
           <p :class="authModalKickerClass">START MAKING</p>
           <h2 :class="authModalTitleClass">创建账号</h2>
-          <p :class="authModalSubtitleClass">创建你的 IdeaBoard 账号，开始创作</p>
+          <p :class="authModalSubtitleClass">创建你的 {{ projectName }} 账号，开始创作</p>
         </div>
 
         <form
@@ -149,6 +149,7 @@ import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { User as UserIcon, Lock as LockIcon, Shield as ShieldIcon } from '@iconoir/vue'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import AuthFormField from './AuthFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
@@ -185,6 +186,8 @@ const emit = defineEmits<{
   (e: 'to-login'): void
   (e: 'register-success'): void
 }>()
+
+const { projectName } = useSiteBranding()
 
 type RegisterField = 'username' | 'password' | 'confirmPassword'
 

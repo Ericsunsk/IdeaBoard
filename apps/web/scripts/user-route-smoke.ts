@@ -43,6 +43,15 @@ const USER_INFO = {
   data: { user: MOCK_USER },
 }
 
+const SITE_BRANDING_SETTING = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    project_name: 'IdeaBoard',
+    logo_url: '',
+  },
+}
+
 const MOCK_BOARD_STATE = {
   schemaVersion: 1 as const,
   imageNodes: [],
@@ -118,6 +127,7 @@ const AVATAR_UPLOAD = {
 }
 
 const allowedUserApiRequestPatterns = [
+  /\/api\/settings\/branding(?:[?#]|\s|$)/,
   /\/api\/auth\/get-session(?:[?#]|\s|$)/,
   /\/api\/user\/info(?:[?#]|\s|$)/,
   /\/api\/user\/boards(?:[?#]|\s|$)/,
@@ -152,6 +162,7 @@ const pages: SmokePage[] = [
 function setupBrowser(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, ['open', 'about:blank'])
   smoke.routeJson(playwrightCli, '**/api/auth/get-session', AUTH_SESSION)
+  smoke.routeJson(playwrightCli, '**/api/settings/branding', SITE_BRANDING_SETTING)
   smoke.routeJson(playwrightCli, '**/api/user/info', USER_INFO)
   smoke.routeJson(playwrightCli, '**/api/user/boards', USER_BOARDS)
   smoke.routeJson(playwrightCli, `**/api/user/boards/${MOCK_BOARD_ID}`, BOARD_UPSERT)

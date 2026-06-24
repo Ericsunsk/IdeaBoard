@@ -5,6 +5,8 @@
     :grid-class="adminTwoColumnMasonryGridClass"
     :is-empty="false"
     :is-loading="false"
+    :is-scrolling="isSystemSettingsPanelScrolling"
+    @scroll="handleSystemSettingsPanelScroll"
   >
     <Card :class="adminMasonryCardClass" :pt="adminCardPt">
       <template #title>
@@ -395,6 +397,7 @@ import {
   useAdminTaskMonitorSettings,
 } from '../../shared/composables/useAdminTaskMonitorSettings'
 import { useAdminPublicURLSettings } from '../../shared/composables/useAdminPublicURLSettings'
+import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
   adminMasonryCardClass,
@@ -408,6 +411,10 @@ const settingToggleRowClass =
   'flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border bg-admin-surface-muted px-3.5 py-3'
 
 const appToast = useAppToast()
+const {
+  isScrolling: isSystemSettingsPanelScrolling,
+  handleScroll: handleSystemSettingsPanelScroll,
+} = useTransientScrolling()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
 const {
   clearLogo: clearBrandingLogo,

@@ -20,10 +20,16 @@
         <div
           class="hero-content absolute left-[22.2%] top-[38.9%] z-10 flex w-[55.6%] flex-col items-center gap-6 text-center"
         >
+          <img
+            v-if="logoURL"
+            :src="logoURL"
+            class="h-16 w-16 object-contain drop-shadow-[0_14px_22px_rgba(32,33,36,0.12)]"
+            alt=""
+          />
           <h1
-            class="m-0 text-[90px] font-semibold leading-none tracking-[-0.02em] text-[#202124] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif]"
+            class="m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[#202124] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif]"
           >
-            IdeaBoard
+            {{ projectName }}
           </h1>
           <p
             class="mt-4 text-[15px] font-normal uppercase tracking-[0.1em] text-[#202124] [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif]"
@@ -45,8 +51,8 @@
           <div
             class="absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] bg-[#e6ded5] px-8 py-7 text-[12px] leading-[1.5] text-[#202124] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
           >
-            IdeaBoard is an AI-powered concepting board that helps you explore, expand, and refine
-            your ideas.
+            {{ projectName }} is an AI-powered concepting board that helps you explore, expand, and
+            refine your ideas.
           </div>
           <img
             :src="homeHeroAssets.starburst"
@@ -87,8 +93,10 @@ import bootsAsset from '../assets/home/boots.svg'
 import portraitAsset from '../assets/home/portrait.svg'
 import socksAsset from '../assets/home/socks.svg'
 import starburstAsset from '../assets/home/starburst.svg'
+import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 
 const router = useRouter()
+const { logoURL, projectName } = useSiteBranding()
 
 const homeHeroAssets = {
   boots: bootsAsset,

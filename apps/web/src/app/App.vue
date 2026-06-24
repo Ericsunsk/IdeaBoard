@@ -19,7 +19,9 @@
 <script setup lang="ts">
 import { IconoirProvider } from '@iconoir/vue'
 import { Toaster } from 'vue-sonner'
+import { useSiteBranding } from '../shared/composables/useSiteBranding'
 
+const { projectName } = useSiteBranding()
 const iconoirProps = {
   color: 'currentColor',
   width: '1.5em',
@@ -45,6 +47,14 @@ function handleAppScroll() {
     appScrollTimer = undefined
   }, 700)
 }
+
+watch(
+  projectName,
+  (value) => {
+    document.title = value
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   window.addEventListener('scroll', handleAppScroll, { passive: true })

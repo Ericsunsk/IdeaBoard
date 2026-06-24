@@ -248,6 +248,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		},
 		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 		RateLimit:      runtimeSettings,
+		Branding:       runtimeSettings,
 	}, httpapi.FrontendRouteOptions{
 		WarnMissingIndex: isProductionRuntime(cfg.App.Env),
 	})
