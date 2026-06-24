@@ -20,11 +20,9 @@
         <div
           class="hero-content absolute left-[22.2%] top-[38.9%] z-10 flex w-[55.6%] flex-col items-center gap-6 text-center"
         >
-          <img
-            v-if="logoURL"
+          <SiteBrandLogo
             :src="logoURL"
-            class="h-16 w-16 object-contain drop-shadow-[0_14px_22px_rgba(32,33,36,0.12)]"
-            alt=""
+            class="h-16 w-16 rounded-2xl drop-shadow-[0_14px_22px_rgba(32,33,36,0.12)]"
           />
           <h1
             class="m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[#202124] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif]"
@@ -93,6 +91,7 @@ import bootsAsset from '../assets/home/boots.svg'
 import portraitAsset from '../assets/home/portrait.svg'
 import socksAsset from '../assets/home/socks.svg'
 import starburstAsset from '../assets/home/starburst.svg'
+import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 
 const router = useRouter()

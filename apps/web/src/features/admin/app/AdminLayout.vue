@@ -3,8 +3,11 @@
   <div v-else :class="layoutShellClass">
     <aside :class="siderClass" aria-label="后台导航">
       <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" :aria-label="brandAriaLabel">
-        <img v-if="logoURL" :src="logoURL" :class="brandImageClass" alt="" />
-        <span v-else :class="brandTextClass">{{ fallbackText }}</span>
+        <SiteBrandLogo
+          :src="logoURL"
+          :fallback-text="fallbackText"
+          class="h-full w-full"
+        />
       </router-link>
 
       <nav :class="navRailClass" aria-label="后台功能">
@@ -180,8 +183,11 @@
               :aria-label="brandAriaLabel"
               @click="closeCallback"
             >
-              <img v-if="logoURL" :src="logoURL" :class="brandImageClass" alt="" />
-              <span v-else :class="brandTextClass">{{ fallbackText }}</span>
+              <SiteBrandLogo
+                :src="logoURL"
+                :fallback-text="fallbackText"
+                class="h-full w-full"
+              />
             </router-link>
             <Button
               :class="shellButtonClass"
@@ -239,6 +245,7 @@ import {
 } from './adminNavigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 import { createAdminMenuPt, createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
@@ -287,8 +294,6 @@ const brandMarkBaseClass = [
 const brandMarkClass = computed(() =>
   [brandMarkBaseClass, logoURL.value ? 'border-transparent' : 'border-black'].join(' '),
 )
-const brandTextClass = 'text-xs font-[850] tracking-normal'
-const brandImageClass = 'h-full w-full object-cover'
 const navRailClass =
   'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'

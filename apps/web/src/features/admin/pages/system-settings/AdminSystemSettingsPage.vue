@@ -35,15 +35,12 @@
                   aria-label="上传站点 Logo"
                   @click="openLogoPicker"
                 >
-                  <img
-                    v-if="brandingLogoPreviewURL"
+                  <SiteBrandLogo
                     :src="brandingLogoPreviewURL"
-                    class="h-full w-full object-cover"
-                    alt="站点 Logo"
+                    :fallback-text="brandingFallbackText"
+                    fallback-class="select-none text-center text-xl leading-none font-[850] tracking-normal"
+                    class="h-full w-full"
                   />
-                  <span v-else class="text-xl font-[850] tracking-normal">
-                    {{ brandingFallbackText }}
-                  </span>
                 </button>
 
                 <button
@@ -440,6 +437,7 @@ import {
   adminMasonryCardClass,
   adminTwoColumnMasonryGridClass,
 } from '../../shared/lib/adminUiClasses'
+import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
 const settingFieldClass = 'flex min-w-0 flex-col gap-1.5'

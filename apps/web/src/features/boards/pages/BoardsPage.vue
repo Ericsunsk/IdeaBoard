@@ -7,7 +7,7 @@
 
     <header :class="headerClass">
       <div :class="brandClass">
-        <img v-if="logoURL" :src="logoURL" :class="brandLogoClass" alt="" />
+        <SiteBrandLogo :src="logoURL" :class="brandLogoClass" />
         <span :class="brandNameClass">{{ projectName }}</span>
       </div>
       <div :class="userMenuWrapClass" @pointerdown.stop @mousedown.stop @click.stop>
@@ -199,6 +199,7 @@ import {
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useUserStore } from '../../../app/stores/user'
 import { Search, User } from '@iconoir/vue'
 import Button from 'primevue/button'
@@ -253,7 +254,7 @@ const pageBackgroundClass =
   'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,rgba(150,120,230,0.24)_0%,rgba(150,120,230,0)_100%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-position:center_center,center_center] [background-size:100%_100%,12px_12px]'
 const headerClass = 'relative z-[1] flex items-center justify-between'
 const brandClass = 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center gap-2'
-const brandLogoClass = 'h-9 w-9 rounded-lg object-contain'
+const brandLogoClass = 'h-9 w-9 rounded-lg'
 const brandNameClass = 'min-w-0 truncate text-[32px] font-bold tracking-normal'
 const userMenuWrapClass = 'relative'
 const userAvatarButtonClass = 'ib-user-avatar-button'

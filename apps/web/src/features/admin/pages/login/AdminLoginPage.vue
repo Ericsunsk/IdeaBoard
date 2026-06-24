@@ -8,12 +8,11 @@
     >
       <template #header>
         <router-link
-          class="inline-flex h-[52px] w-[52px] items-center justify-center rounded-[15px] border border-admin-accent-pressed bg-white text-sm font-black text-admin-accent-pressed shadow-[0_10px_22px_rgba(45,64,89,0.08)]"
+          :class="brandMarkClass"
           to="/"
           :aria-label="projectName"
         >
-          <img v-if="logoURL" :src="logoURL" class="h-full w-full object-contain p-1.5" alt="" />
-          <span v-else>{{ fallbackText }}</span>
+          <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
         </router-link>
       </template>
 
@@ -80,6 +79,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
+import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
@@ -90,6 +90,12 @@ const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 const appToast = useAppToast()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
+const brandMarkClass = computed(() =>
+  [
+    'inline-flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-[15px] border bg-white text-sm font-black text-admin-accent-pressed shadow-[0_10px_22px_rgba(45,64,89,0.08)]',
+    logoURL.value ? 'border-transparent' : 'border-admin-accent-pressed',
+  ].join(' '),
+)
 
 const loading = ref(false)
 const formError = ref('')
