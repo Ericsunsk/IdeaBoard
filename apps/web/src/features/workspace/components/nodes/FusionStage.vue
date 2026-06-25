@@ -1,11 +1,11 @@
 <template>
-  <div
-    ref="stageRef"
+  <NodeStageFrame
+    ref="stageFrameRef"
     class="fusion-node-stage node-tool-surface node-input-thumbnail-contract variant-standard"
-    data-flow-handle-frame
+    variant="square"
+    :active="active"
+    :drop-target="addSlotDragOver"
     :class="{
-      'is-active': active,
-      'is-drop-target': addSlotDragOver,
       'is-blend-dragging': blendDragging,
     }"
     @dragenter.stop.prevent="onAddSlotDragOver"
@@ -72,11 +72,11 @@
         </div>
       </div>
     </div>
-  </div>
+  </NodeStageFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watchPostEffect } from 'vue'
 import type { FusionNodeItem } from '../../types/canvasNodes'
 import {
   FUSION_SLOT_LAYOUT,
@@ -90,6 +90,7 @@ import {
 import { useFusionBlendControl } from './composables/useFusionBlendControl'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
+import NodeStageFrame from './NodeStageFrame.vue'
 import { useImageInputSlots } from './composables/useImageInputSlots'
 
 const props = defineProps<{
@@ -108,6 +109,8 @@ const emit = defineEmits<{
 }>()
 
 const thumbsRef = ref<HTMLElement | null>(null)
+type NodeStageFrameExpose = { stageElement: HTMLElement | null }
+const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
 const maxInputImages = FUSION_SLOT_LAYOUT.maxSlots
 const fusionSlotMotion = {
@@ -159,6 +162,11 @@ const {
   onDrop: (event) => emit('input-image-drop', event),
   onRemove: (item) => emit('input-image-remove', item),
 })
+
+watchPostEffect(() => {
+  stageRef.value = stageFrameRef.value?.stageElement ?? null
+})
+
 const imageCount = computed(() => Math.min(visibleInputImages.value.length || 0, maxInputImages))
 const showBlendPad = computed(() => imageCount.value >= 2)
 const showEmptyFusionMark = computed(() => imageCount.value === 0)
@@ -261,16 +269,6 @@ function getBlendWeightBadgeStyle(index: number) {
 <style scoped>
 .fusion-node-stage {
   --fusion-slot-size: var(--node-input-thumbnail-size);
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1;
-  min-height: 280px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 11px;
-  background: #ffffff;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease;
-  overflow: hidden;
 }
 
 .fusion-node-connection-layer {
@@ -307,11 +305,6 @@ function getBlendWeightBadgeStyle(index: number) {
   position: absolute;
   inset: 0;
   z-index: 2;
-}
-
-.fusion-node-stage.is-active,
-.fusion-node-stage.is-drop-target {
-  border-color: #9278e6;
 }
 
 .fusion-node-stage.is-active .fusion-node-ray,

@@ -10,7 +10,7 @@ import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
   DEFAULT_IMAGE_ACTION_STRENGTHS,
   type ImageStrengthAction,
-} from '../types/imageActions'
+} from '../config/imageActionRegistry'
 
 export function useFlowImageActionStrengthControl(options: {
   onCommit: (action: ImageStrengthAction, strength: number) => void

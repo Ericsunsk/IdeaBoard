@@ -1,17 +1,14 @@
 import type { Connection } from '@vue-flow/core'
 import { isCanvasConnectionAllowed } from '../config/canvasConnections'
-import {
-  isCanvasConnectionNodeType,
-  type CanvasConnectionNodeType,
-  type CanvasConnectionPort,
-} from '../types/canvasNodes'
+import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
+  isCanvasConnectionNodeType,
   type CanvasConnectionContractNode,
   type CanvasNodePortContract,
-} from '../config/canvasNodeConnectionContract'
+} from '../config/canvasNodeRegistry'
 
 const AUTO_HANDLE_PORT = '__auto'
 

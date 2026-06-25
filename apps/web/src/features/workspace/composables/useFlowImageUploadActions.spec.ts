@@ -86,9 +86,7 @@ describe('useFlowImageUploadActions', () => {
       updateSnapshotNode: (nodeId, patcher) => {
         const current = snapshots.get(nodeId)
         if (!current) return
-        const next = patcher(
-          current as unknown as Record<string, unknown>,
-        ) as unknown as ImageNodeItem
+        const next = patcher(current) as ImageNodeItem
         snapshots.set(nodeId, next)
         updates.push(next.sourceImageUrl)
       },

@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { createImageNodeAt } from '../utils/canvasNodeFactory'
+import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
@@ -233,7 +233,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     pruneResultNodeLayouts()
     const anchor = readOutputAnchorLayout(anchorNodeId, source)
     const position = resolvePendingImageResultPosition(anchor, anchorNodeId)
-    const imageNode = createImageNodeAt(position)
+    const imageNode = createCanvasNodeAt('image', position)
     const resolvedRatio =
       Number.isFinite(optionsOverride?.targetRatio) && (optionsOverride?.targetRatio as number) > 0
         ? (optionsOverride?.targetRatio as number)

@@ -1,26 +1,29 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
+import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import {
-  createFusionNodeAt,
-  createImageNodeAt,
-  createPromptNodeAt,
-} from '../utils/canvasNodeFactory'
+  getCanvasNodePortInputLimit,
+  getDefaultCanvasNodeTitle,
+  isCanvasExecutionOutputNodeType,
+  type CanvasCreatableNodeKind,
+} from '../config/canvasNodeRegistry'
 import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
-import { patchFlowSnapshotParam } from '../utils/flowSnapshotParamMutations'
+import {
+  patchFlowSnapshotParam,
+  type FlowSnapshotParamPatch,
+} from '../utils/flowSnapshotParamMutations'
 import { useFlowConnectionMutations } from './useFlowConnectionMutations'
-import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransactions'
-
-export type FlowCreatableNodeKind = 'prompt' | 'image' | 'fusion'
+import type { CanvasNodeItem, CanvasNodeItemByKind } from '../types/canvasNodes'
 
 type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   nodes: Ref<Array<Record<string, any>>>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
-  createNodeKind: Ref<FlowCreatableNodeKind>
+  createNodeKind: Ref<CanvasCreatableNodeKind>
   commitGraphMutation: FlowTransactions['commitGraphMutation']
   commitNodeMutation: FlowTransactions['commitNodeMutation']
   commitEdgeMutation: FlowTransactions['commitEdgeMutation']
@@ -33,7 +36,7 @@ type UpdateSnapshotNodeOptions = {
   historyBefore?: FlowHistorySnapshot
 }
 
-type InitialSnapshotPatch = Record<string, unknown>
+type InitialSnapshotPatch<T extends CanvasCreatableNodeKind> = Partial<CanvasNodeItemByKind[T]>
 
 export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   function resolveNodePosition(baseX = 120, baseY = 100) {
@@ -45,16 +48,12 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return { x: baseX, y: maxY + 40 }
   }
 
-  function createSnapshotNodeForKind(kind: FlowCreatableNodeKind, x: number, y: number) {
-    const point = { x, y }
-    switch (kind) {
-      case 'prompt':
-        return createPromptNodeAt(point)
-      case 'image':
-        return createImageNodeAt(point)
-      case 'fusion':
-        return createFusionNodeAt(point)
-    }
+  function createSnapshotNodeForKind<T extends CanvasCreatableNodeKind>(
+    kind: T,
+    x: number,
+    y: number,
+  ) {
+    return createCanvasNodeAt(kind, { x, y })
   }
 
   function lookupData(nodeId: string) {
@@ -73,23 +72,26 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     isValidConnection,
     normalizeConnection: (connection, existingEdges) =>
       normalizeFlowConnection(connection, lookupData, existingEdges),
-    allowsMultipleTargetConnections: (connection) =>
-      (lookupData(connection.target ?? '')?.kind === 'prompt' ||
-        lookupData(connection.target ?? '')?.kind === 'fusion') &&
-      connection.targetHandle === 'in:image',
+    allowsMultipleTargetConnections: (connection) => {
+      const targetKind = lookupData(connection.target ?? '')?.kind
+      return (
+        !!targetKind &&
+        getCanvasNodePortInputLimit(targetKind, 'image') > 1 &&
+        connection.targetHandle === 'in:image'
+      )
+    },
     validateConnectionMutation: (connection, existingEdges) => {
       const targetKind = lookupData(connection.target ?? '')?.kind
-      if (
-        (targetKind !== 'prompt' && targetKind !== 'fusion') ||
-        connection.targetHandle !== 'in:image'
-      ) {
+      if (!targetKind || connection.targetHandle !== 'in:image') {
         return null
       }
+      const inputLimit = getCanvasNodePortInputLimit(targetKind, 'image')
+      if (inputLimit <= 1) return null
       const imageInputCount = existingEdges.filter(
         (edge) => edge.target === connection.target && edge.targetHandle === 'in:image',
       ).length
-      if (imageInputCount >= 4) {
-        return targetKind === 'fusion' ? 'Fusion 最多接入 4 张图片' : 'Prompt 最多接入 4 张图片'
+      if (imageInputCount >= inputLimit) {
+        return `${getDefaultCanvasNodeTitle(targetKind)} 最多接入 ${inputLimit} 张图片`
       }
       return null
     },
@@ -104,11 +106,11 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     appendNodeAtPosition(kind, position.x, position.y)
   }
 
-  function appendNodeAtPosition(
-    kind: FlowCreatableNodeKind,
+  function appendNodeAtPosition<T extends CanvasCreatableNodeKind>(
+    kind: T,
     x: number,
     y: number,
-    initialSnapshotPatch?: InitialSnapshotPatch,
+    initialSnapshotPatch?: InitialSnapshotPatch<T>,
   ) {
     const baseSnapshotNode = createSnapshotNodeForKind(kind, x, y)
     const snapshotNode = initialSnapshotPatch
@@ -137,11 +139,11 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return flowNodeId
   }
 
-  function createNodeAtPosition(
-    kind: FlowCreatableNodeKind,
+  function createNodeAtPosition<T extends CanvasCreatableNodeKind>(
+    kind: T,
     x: number,
     y: number,
-    initialSnapshotPatch?: InitialSnapshotPatch,
+    initialSnapshotPatch?: InitialSnapshotPatch<T>,
   ) {
     return appendNodeAtPosition(kind, x, y, initialSnapshotPatch)
   }
@@ -158,8 +160,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function updateSnapshotNode(
     nodeId: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- snapshotNode is a union of 3 node shapes; patcher is a generic transformer that can't be narrowed here
-    patcher: (snapshotNode: Record<string, any>) => Record<string, any>,
+    patcher: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
     mutationOptions: UpdateSnapshotNodeOptions = {},
   ) {
     const shouldPushHistory = mutationOptions.history ?? true
@@ -172,8 +173,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         const node = nextNodes[index]
         const data = (node.data ?? {}) as { snapshotNode?: unknown; title?: string }
         if (!data.snapshotNode || typeof data.snapshotNode !== 'object') return items
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- narrowed to object above; cast needed to match patcher's parameter type
-        const snapshotNode = data.snapshotNode as Record<string, any>
+        const snapshotNode = data.snapshotNode as CanvasNodeItem
         const nextSnapshotNode = patcher(snapshotNode)
         if (nextSnapshotNode === snapshotNode) return items
         nextNodes[index] = {
@@ -225,16 +225,15 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function onFlowPromptTextUpdate(nodeId: string, value: string) {
     updateSnapshotNode(nodeId, (snapshotNode) => {
+      if (snapshotNode.type !== 'prompt') return snapshotNode
       if (snapshotNode.text === value) return snapshotNode
       return { ...snapshotNode, text: value }
     })
   }
 
-  function onFlowNodeParamUpdate(nodeId: string, payload: { key: string; value: unknown }) {
+  function onFlowNodeParamUpdate(nodeId: string, payload: FlowSnapshotParamPatch) {
     updateSnapshotNode(nodeId, (snapshotNode) => patchFlowSnapshotParam(snapshotNode, payload))
   }
-
-  const EXECUTION_NODE_KINDS = new Set(['fusion'])
 
   function markFlowExecutionNodeDirty(
     nodeId: string,
@@ -244,11 +243,11 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const queue: string[] = []
     if (includeSelf) {
       const selfData = lookupData(nodeId)
-      if (selfData && EXECUTION_NODE_KINDS.has(selfData.kind)) {
+      if (selfData && isCanvasExecutionOutputNodeType(selfData.kind)) {
         updateSnapshotNode(
           nodeId,
           (snapshotNode) => {
-            if (snapshotNode.outputStatus === 'ready')
+            if ('outputStatus' in snapshotNode && snapshotNode.outputStatus === 'ready')
               return { ...snapshotNode, outputStatus: 'stale' }
             return snapshotNode
           },
@@ -268,11 +267,11 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     while (queue.length > 0) {
       const currentId = queue.shift()!
       const data = lookupData(currentId)
-      if (data && EXECUTION_NODE_KINDS.has(data.kind)) {
+      if (data && isCanvasExecutionOutputNodeType(data.kind)) {
         updateSnapshotNode(
           currentId,
           (snapshotNode) => {
-            if (snapshotNode.outputStatus === 'ready')
+            if ('outputStatus' in snapshotNode && snapshotNode.outputStatus === 'ready')
               return { ...snapshotNode, outputStatus: 'stale' }
             return snapshotNode
           },

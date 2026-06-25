@@ -1,31 +1,40 @@
 import { ref } from 'vue'
 
-export type ClearActiveNodePanelsOptions = {
-  keepImageAction?: boolean
-  keepImagePrompt?: boolean
-  keepFusionPrompt?: boolean
-}
+export const ACTIVE_NODE_PANEL_KIND = {
+  imageTools: 'image-tools',
+  fusionPrompt: 'fusion-prompt',
+} as const
+
+export type ActiveNodePanel =
+  | { kind: typeof ACTIVE_NODE_PANEL_KIND.imageTools; nodeId: string }
+  | { kind: typeof ACTIVE_NODE_PANEL_KIND.fusionPrompt; nodeId: string }
+
+export type ActiveNodePanelKind = ActiveNodePanel['kind']
 
 export function useFlowActiveNodePanels() {
-  const activeImageActionNodeId = ref<string | null>(null)
-  const activeImagePromptNodeId = ref<string | null>(null)
-  const activeFusionPromptNodeId = ref<string | null>(null)
+  const activeNodePanel = ref<ActiveNodePanel | null>(null)
 
-  function closeActiveImagePromptComposer() {
-    activeImagePromptNodeId.value = null
+  function openActiveNodePanel(panel: ActiveNodePanel) {
+    activeNodePanel.value = panel
   }
 
-  function clearActiveNodePanels(options?: ClearActiveNodePanelsOptions) {
-    if (!options?.keepImageAction) activeImageActionNodeId.value = null
-    if (!options?.keepImagePrompt) activeImagePromptNodeId.value = null
-    if (!options?.keepFusionPrompt) activeFusionPromptNodeId.value = null
+  function clearActiveNodePanel() {
+    activeNodePanel.value = null
+  }
+
+  function isActiveNodePanel(kind: ActiveNodePanelKind, nodeId: string) {
+    return activeNodePanel.value?.kind === kind && activeNodePanel.value.nodeId === nodeId
+  }
+
+  function getActiveNodePanelNodeId(kind: ActiveNodePanelKind): string | null {
+    return activeNodePanel.value?.kind === kind ? activeNodePanel.value.nodeId : null
   }
 
   return {
-    activeImageActionNodeId,
-    activeImagePromptNodeId,
-    activeFusionPromptNodeId,
-    closeActiveImagePromptComposer,
-    clearActiveNodePanels,
+    activeNodePanel,
+    openActiveNodePanel,
+    clearActiveNodePanel,
+    isActiveNodePanel,
+    getActiveNodePanelNodeId,
   }
 }

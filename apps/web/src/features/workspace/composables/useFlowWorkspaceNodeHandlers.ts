@@ -1,13 +1,12 @@
 import type { DismissTransientWorkspaceUi } from './useFlowTransientUiDismissal'
-
-type NodeParamPayload = { key: string; value: unknown }
+import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 type UseFlowWorkspaceNodeHandlersOptions = {
   dismissTransientWorkspaceUi: DismissTransientWorkspaceUi
   clearFlowMaskEditorCommittedData: (nodeId: string) => void
   _onFlowDeleteNode: (nodeId: string) => void
   _onFlowPromptTextUpdate: (nodeId: string, value: string) => void
-  _onFlowNodeParamUpdate: (nodeId: string, payload: NodeParamPayload) => void
+  _onFlowNodeParamUpdate: (nodeId: string, payload: FlowSnapshotParamPatch) => void
   _onFlowImageReset: (nodeId: string) => void
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
@@ -24,7 +23,7 @@ export function useFlowWorkspaceNodeHandlers(options: UseFlowWorkspaceNodeHandle
     options.markFlowExecutionNodeDirty(nodeId)
   }
 
-  function onFlowNodeParamUpdate(nodeId: string, payload: NodeParamPayload) {
+  function onFlowNodeParamUpdate(nodeId: string, payload: FlowSnapshotParamPatch) {
     options._onFlowNodeParamUpdate(nodeId, payload)
     options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
   }

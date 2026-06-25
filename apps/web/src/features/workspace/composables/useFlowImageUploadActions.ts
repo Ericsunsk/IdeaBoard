@@ -1,5 +1,5 @@
-import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
-import type { ImageNodeItem } from '../types/canvasNodes'
+import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
+import type { CanvasNodeItem, ImageNodeItem } from '../types/canvasNodes'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
@@ -21,15 +21,12 @@ type UploadImageResponseData = {
 type UseFlowImageUploadActionsOptions = {
   currentBoardId: { value: string | null | undefined }
   createNodeAtPosition: (
-    kind: FlowCreatableNodeKind,
+    kind: Extract<CanvasCreatableNodeKind, 'image'>,
     x: number,
     y: number,
-    initialSnapshotPatch?: Record<string, unknown>,
+    initialSnapshotPatch?: Partial<ImageNodeItem>,
   ) => string | null
-  updateSnapshotNode: (
-    nodeId: string,
-    patcher: (prev: Record<string, unknown>) => Record<string, unknown>,
-  ) => void
+  updateSnapshotNode: (nodeId: string, patcher: (prev: CanvasNodeItem) => CanvasNodeItem) => void
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   uploadApi: {
     upload: (
@@ -136,15 +133,18 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       ) {
         return false
       }
-      options.updateSnapshotNode(nodeId, (prev) => ({
-        ...prev,
-        title: resolveImageFileTitle(file) || prev.title,
-        width: resolveImageNodeFrameSize(uploaded.ratio, true).width,
-        sourceImageUrl: uploaded.url,
-        sourceImageRatio: uploaded.ratio,
-        outputStatus: 'ready',
-        outputImages: [],
-      }))
+      options.updateSnapshotNode(nodeId, (prev) => {
+        if (prev.type !== 'image-node') return prev
+        return {
+          ...prev,
+          title: resolveImageFileTitle(file) || prev.title,
+          width: resolveImageNodeFrameSize(uploaded.ratio, true).width,
+          sourceImageUrl: uploaded.url,
+          sourceImageRatio: uploaded.ratio,
+          outputStatus: 'ready',
+          outputImages: [],
+        }
+      })
       options.onNodeMutated?.(nodeId)
       options.onSuccess('Image 节点输入已更新')
       return true

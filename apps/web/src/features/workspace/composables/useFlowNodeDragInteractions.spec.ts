@@ -49,7 +49,7 @@ describe('useFlowNodeDragInteractions', () => {
 
     expect(harness.dismissTransientWorkspaceUi).toHaveBeenCalledWith({
       closeExpand: true,
-      clearNodePanels: false,
+      clearNodePanel: false,
       hideStrength: false,
     })
     expect(harness.finishFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(false)

@@ -2,6 +2,13 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { watch } from 'vue'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
+import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
+import type {
+  CanvasNodeItem,
+  FusionNodeItem,
+  PromptNodeInputImage,
+  PromptNodeItem,
+} from '../types/canvasNodes'
 
 export type MediaInputImage = {
   id: string
@@ -18,7 +25,7 @@ type UseFlowMediaInputImagesOptions = {
   uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
   updateSnapshotNodeBase: (
     nodeId: string,
-    mutate: (snapshotNode: Record<string, unknown>) => Record<string, unknown>,
+    mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
     options?: { history?: boolean; dirty?: boolean },
   ) => void
   commitGraphMutation: (
@@ -39,6 +46,19 @@ type LinkedNodePreviewImage = {
   ratio: number
 }
 
+type MediaInputSnapshotNode = PromptNodeItem | FusionNodeItem
+type MediaInputNodeKind = MediaInputSnapshotNode['type']
+
+function isMediaInputSnapshotNode(
+  snapshotNode: CanvasNodeItem,
+): snapshotNode is MediaInputSnapshotNode {
+  return snapshotNode.type === 'prompt' || snapshotNode.type === 'fusion'
+}
+
+function isMediaInputNodeKind(value: unknown): value is MediaInputNodeKind {
+  return value === 'prompt' || value === 'fusion'
+}
+
 export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions) {
   watch(
     [options.nodes, options.edges],
@@ -56,17 +76,13 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
           options.updateSnapshotNodeBase(
             mediaInputNode.id,
             (snapshotNode) => {
-              const current = Array.isArray(snapshotNode.inputImages)
-                ? snapshotNode.inputImages
-                : []
+              if (!isMediaInputSnapshotNode(snapshotNode)) return snapshotNode
+              const current = snapshotNode.inputImages
               const nextImages = current
                 .map((item) => {
-                  const sourceType = (item as { sourceType?: unknown })?.sourceType
+                  const sourceType = item.sourceType
                   if (sourceType === 'external') return item
-                  const sourceId =
-                    typeof (item as { sourceId?: unknown })?.sourceId === 'string'
-                      ? (item as { sourceId: string }).sourceId
-                      : ''
+                  const sourceId = item.sourceId
                   return sourceId ? linkedBySourceId.get(sourceId) : null
                 })
                 .filter((item): item is MediaInputImage => !!item)
@@ -78,18 +94,17 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
               nextImages.push(
                 ...linkedImages.filter((item) => !nextNodeSourceIds.has(item.sourceId)),
               )
-              const limitedNextImages = nextImages.slice(0, 4)
+              const inputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
+              const limitedNextImages = nextImages.slice(0, inputLimit)
               const same =
                 current.length === limitedNextImages.length &&
                 current.every(
                   (item, idx) =>
-                    (item as { id?: unknown })?.id === limitedNextImages[idx]?.id &&
-                    (item as { sourceType?: unknown })?.sourceType ===
-                      limitedNextImages[idx]?.sourceType &&
-                    (item as { sourceId?: unknown })?.sourceId ===
-                      limitedNextImages[idx]?.sourceId &&
-                    (item as { url?: unknown })?.url === limitedNextImages[idx]?.url &&
-                    (item as { ratio?: unknown })?.ratio === limitedNextImages[idx]?.ratio,
+                    item.id === limitedNextImages[idx]?.id &&
+                    item.sourceType === limitedNextImages[idx]?.sourceType &&
+                    item.sourceId === limitedNextImages[idx]?.sourceId &&
+                    item.url === limitedNextImages[idx]?.url &&
+                    item.ratio === limitedNextImages[idx]?.ratio,
                 )
               return same ? snapshotNode : { ...snapshotNode, inputImages: limitedNextImages }
             },
@@ -134,16 +149,23 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     }
   }
 
-  function resolveMediaInputNodeLabel(nodeId: string) {
+  function resolveMediaInputNodeKind(nodeId: string): MediaInputNodeKind | null {
     const kind = options.nodes.value.find((node) => node.id === nodeId)?.data?.kind
+    return isMediaInputNodeKind(kind) ? kind : null
+  }
+
+  function resolveMediaInputNodeLabel(kind: MediaInputNodeKind | null) {
     return kind === 'prompt' ? 'Prompt' : '节点'
   }
 
   async function onFlowMediaInputImageDrop(nodeId: string, event: DragEvent) {
+    const kind = resolveMediaInputNodeKind(nodeId)
+    if (!kind) return
+    const inputLimit = getCanvasNodeImageInputLimit(kind)
     const currentInputCount = getMediaInputImages(nodeId).length
-    const label = resolveMediaInputNodeLabel(nodeId)
-    if (currentInputCount >= 4) {
-      options.onWarning(`${label} 最多接入 4 张图片`)
+    const label = resolveMediaInputNodeLabel(kind)
+    if (currentInputCount >= inputLimit) {
+      options.onWarning(`${label} 最多接入 ${inputLimit} 张图片`)
       return
     }
     const file = event.dataTransfer?.files?.[0]
@@ -151,19 +173,19 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     try {
       const uploaded = await options.uploadImageToBoard(file)
       options.updateSnapshotNodeBase(nodeId, (snapshotNode) => {
-        const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
+        if (!isMediaInputSnapshotNode(snapshotNode)) return snapshotNode
+        const current = snapshotNode.inputImages
+        const snapshotInputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
+        const externalImage: PromptNodeInputImage = {
+          id: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
+          sourceType: 'external',
+          sourceId: uploaded.url,
+          url: uploaded.url,
+          ratio: uploaded.ratio,
+        }
         return {
           ...snapshotNode,
-          inputImages: [
-            ...current,
-            {
-              id: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
-              sourceType: 'external',
-              sourceId: uploaded.url,
-              url: uploaded.url,
-              ratio: uploaded.ratio,
-            },
-          ].slice(0, 4),
+          inputImages: [...current, externalImage].slice(0, snapshotInputLimit),
         }
       })
       options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
@@ -174,12 +196,13 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
   }
 
   function onFlowMediaInputImageOpen(nodeId: string) {
-    const kind = options.nodes.value.find((node) => node.id === nodeId)?.data?.kind
+    const kind = resolveMediaInputNodeKind(nodeId)
     if (kind !== 'prompt') return
+    const inputLimit = getCanvasNodeImageInputLimit(kind)
     const currentInputCount = getMediaInputImages(nodeId).length
-    const label = resolveMediaInputNodeLabel(nodeId)
-    if (currentInputCount >= 4) {
-      options.onWarning(`${label} 最多接入 4 张图片`)
+    const label = resolveMediaInputNodeLabel(kind)
+    if (currentInputCount >= inputLimit) {
+      options.onWarning(`${label} 最多接入 ${inputLimit} 张图片`)
       return
     }
     const input = document.createElement('input')

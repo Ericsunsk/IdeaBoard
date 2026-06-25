@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
+import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
 import { useFlowCanvasShellInteractions } from './useFlowCanvasShellInteractions'
 
 function createCanvasElement() {
@@ -68,7 +68,7 @@ describe('useFlowCanvasShellInteractions', () => {
     const harness = createHarness()
     harness.nodeContextMenu.value = { visible: true, x: 10, y: 20, flowX: 120, flowY: 180 }
 
-    harness.shell.handleNodeContextMenuCreate('prompt' as FlowCreatableNodeKind)
+    harness.shell.handleNodeContextMenuCreate('prompt' as CanvasCreatableNodeKind)
 
     expect(harness.createNodeAtPosition).toHaveBeenCalledWith('prompt', 120, 180)
     expect(harness.dismissTransientWorkspaceUi).toHaveBeenCalledWith({
@@ -82,7 +82,7 @@ describe('useFlowCanvasShellInteractions', () => {
     expect(expandHarness.shell.onEscapeShortcut()).toBe(true)
     expect(expandHarness.dismissTransientWorkspaceUi).toHaveBeenCalledWith({
       closeExpand: true,
-      clearNodePanels: false,
+      clearNodePanel: false,
       hideStrength: false,
     })
     expect(expandHarness.clearFlowSelection).not.toHaveBeenCalled()
@@ -91,7 +91,7 @@ describe('useFlowCanvasShellInteractions', () => {
     expect(headerHarness.shell.onEscapeShortcut()).toBe(true)
     expect(headerHarness.dismissTransientWorkspaceUi).toHaveBeenCalledWith({
       closeBoardHeader: true,
-      clearNodePanels: false,
+      clearNodePanel: false,
       hideStrength: false,
     })
     expect(headerHarness.clearFlowSelection).not.toHaveBeenCalled()

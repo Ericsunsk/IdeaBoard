@@ -1,11 +1,44 @@
-import type { PromptNodeInputImage } from '../types/canvasNodes'
+import type { PromptAspectRatio } from '../config/promptAspectRatio'
+import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import { clampImageNodeOutputCount } from '../types/canvasNodes'
+import type {
+  CanvasNodeItem,
+  FusionNodeItem,
+  ImageNodeItem,
+  PromptNodeInputImage,
+  PromptNodeItem,
+} from '../types/canvasNodes'
 import {
   areFusionBlendPointsEqual,
   constrainFusionBlendPoint,
   normalizeFusionBlendPoint,
+  type FusionBlendPoint,
 } from './fusionBlend'
+
+export type FlowSnapshotParamPatch =
+  | { key: 'title'; value: string }
+  | { key: 'outputCount'; value: number }
+  | { key: 'prompt'; value: string }
+  | { key: 'aspectRatio'; value: PromptAspectRatio }
+  | { key: 'inputImages'; value: PromptNodeInputImage[] }
+  | { key: 'blendPoint'; value: FusionBlendPoint }
+
+type NodeWithOutputCount = ImageNodeItem | PromptNodeItem | FusionNodeItem
+type NodeWithAspectRatio = PromptNodeItem | FusionNodeItem
+type NodeWithInputImages = PromptNodeItem | FusionNodeItem
+
+function hasOutputCount(snapshotNode: CanvasNodeItem): snapshotNode is NodeWithOutputCount {
+  return 'outputCount' in snapshotNode
+}
+
+function hasAspectRatio(snapshotNode: CanvasNodeItem): snapshotNode is NodeWithAspectRatio {
+  return snapshotNode.type === 'prompt' || snapshotNode.type === 'fusion'
+}
+
+function hasInputImages(snapshotNode: CanvasNodeItem): snapshotNode is NodeWithInputImages {
+  return snapshotNode.type === 'prompt' || snapshotNode.type === 'fusion'
+}
 
 function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
   if (!value || typeof value !== 'object') return false
@@ -25,7 +58,7 @@ function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
   )
 }
 
-function normalizePromptInputImages(value: unknown): PromptNodeInputImage[] {
+function normalizePromptInputImages(value: unknown, inputLimit: number): PromptNodeInputImage[] {
   if (!Array.isArray(value)) return []
   return value
     .filter(isPromptNodeInputImage)
@@ -37,11 +70,15 @@ function normalizePromptInputImages(value: unknown): PromptNodeInputImage[] {
       url: item.url.trim(),
       ratio: item.ratio,
     }))
-    .slice(0, 4)
+    .slice(0, inputLimit)
 }
 
-function arePromptInputImagesEqual(a: unknown, b: PromptNodeInputImage[]): boolean {
-  const current = normalizePromptInputImages(a)
+function arePromptInputImagesEqual(
+  a: unknown,
+  b: PromptNodeInputImage[],
+  inputLimit: number,
+): boolean {
+  const current = normalizePromptInputImages(a, inputLimit)
   return (
     current.length === b.length &&
     current.every(
@@ -56,11 +93,9 @@ function arePromptInputImagesEqual(a: unknown, b: PromptNodeInputImage[]): boole
   )
 }
 export function patchFlowSnapshotParam(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- snapshotNode is a union of 3 node shapes handled via switch(key); can't be statically narrowed at this boundary
-  snapshotNode: Record<string, any>,
-  payload: { key: string; value: unknown },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- return type mirrors input shape
-): Record<string, any> {
+  snapshotNode: CanvasNodeItem,
+  payload: FlowSnapshotParamPatch,
+): CanvasNodeItem {
   const { key, value } = payload
   switch (key) {
     case 'title': {
@@ -69,24 +104,32 @@ export function patchFlowSnapshotParam(
       return { ...snapshotNode, title: nextTitle }
     }
     case 'outputCount': {
+      if (!hasOutputCount(snapshotNode)) return snapshotNode
       const nextOutputCount = clampImageNodeOutputCount(value)
       if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
       return { ...snapshotNode, outputCount: nextOutputCount }
     }
     case 'prompt': {
+      if (snapshotNode.type !== 'fusion') return snapshotNode
       const nextPrompt = String(value ?? '').trim()
-      if (snapshotNode.type !== 'fusion' && !nextPrompt) return snapshotNode
       if (snapshotNode.prompt === nextPrompt) return snapshotNode
       return { ...snapshotNode, prompt: nextPrompt }
     }
     case 'aspectRatio': {
+      if (!hasAspectRatio(snapshotNode)) return snapshotNode
       const nextAspectRatio = normalizePromptAspectRatio(value)
       if (snapshotNode.aspectRatio === nextAspectRatio) return snapshotNode
       return { ...snapshotNode, aspectRatio: nextAspectRatio }
     }
     case 'inputImages': {
-      const nextInputImages = normalizePromptInputImages(value)
-      const inputUnchanged = arePromptInputImagesEqual(snapshotNode.inputImages, nextInputImages)
+      if (!hasInputImages(snapshotNode)) return snapshotNode
+      const inputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
+      const nextInputImages = normalizePromptInputImages(value, inputLimit)
+      const inputUnchanged = arePromptInputImagesEqual(
+        snapshotNode.inputImages,
+        nextInputImages,
+        inputLimit,
+      )
       if (snapshotNode.type !== 'fusion') {
         if (inputUnchanged) return snapshotNode
         return { ...snapshotNode, inputImages: nextInputImages }
@@ -116,11 +159,6 @@ export function patchFlowSnapshotParam(
       const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
       if (areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)) return snapshotNode
       return { ...snapshotNode, blendPoint: nextBlendPoint }
-    }
-    case 'strength': {
-      const nextStrength = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
-      if (snapshotNode.strength === nextStrength) return snapshotNode
-      return { ...snapshotNode, strength: nextStrength }
     }
     default:
       return snapshotNode

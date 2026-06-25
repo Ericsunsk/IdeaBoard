@@ -1,4 +1,6 @@
-type SnapshotMutator = (snapshotNode: Record<string, unknown>) => Record<string, unknown>
+import type { CanvasNodeItem } from '../types/canvasNodes'
+
+type SnapshotMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
 type SnapshotOptions = { history?: boolean }
 
 type UseFlowSnapshotNodeUpdaterOptions = {

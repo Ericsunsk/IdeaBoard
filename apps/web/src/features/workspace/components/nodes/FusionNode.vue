@@ -1,23 +1,20 @@
 <template>
-  <div
-    class="workflow-node fusion-node overflow-visible"
-    data-node-kind="fusion"
-    :data-node-id="node.id"
-    :class="{ active, dragging, 'copy-mode': copyMode }"
-    :style="nodeStyle"
+  <NodeShell
+    kind="fusion"
+    :node-id="node.id"
+    :width="node.width"
+    :title="node.title || 'Fusion'"
+    :active="active"
+    :dragging="dragging"
+    :copy-mode="copyMode"
+    rounded-header
+    @node-mousedown="emit('node-mousedown', $event)"
+    @update:title="emit('update:title', $event)"
+    @delete="emit('delete')"
   >
-    <NodeHeader
-      :title="node.title || 'Fusion'"
-      rounded
-      @node-mousedown="emit('node-mousedown', $event)"
-      @update:title="emit('update:title', $event)"
-      @delete="emit('delete')"
-    >
-      <template #icon>
-        <Keyframes />
-      </template>
-    </NodeHeader>
-
+    <template #icon>
+      <Keyframes />
+    </template>
     <div
       class="relative box-border flex flex-col gap-2 overflow-visible rounded-[11px] bg-white p-0"
       @contextmenu.stop
@@ -47,7 +44,7 @@
         @submit="submitPrompt"
       />
     </div>
-  </div>
+  </NodeShell>
 </template>
 
 <script setup lang="ts">
@@ -58,8 +55,8 @@ import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../config
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import type { FusionBlendPoint } from '../../utils/fusionBlend'
 import FusionStage from './FusionStage.vue'
+import NodeShell from './NodeShell.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
-import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: FusionNodeItem
@@ -84,7 +81,6 @@ const emit = defineEmits<{
   (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
 
-const nodeStyle = useCanvasNodeStyle(() => props.node)
 const promptDraft = ref('')
 const visibleInputImages = computed(() => props.node.inputImages)
 const canGenerate = computed(() => visibleInputImages.value.length >= 2)
@@ -110,5 +106,3 @@ function selectOutputCount(value: number) {
   emit('update:output-count', clampImageNodeOutputCount(value))
 }
 </script>
-
-<style scoped src="./styles/node-shared.css"></style>

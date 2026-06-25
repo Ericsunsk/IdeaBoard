@@ -9,12 +9,12 @@ import {
 } from '../../../shared/query/taskResult'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
-  type ExecutionFeature,
   buildExecutionTaskRequest,
-  EXECUTION_DIRECT_ACTION_META,
+  EXECUTION_FEATURE,
+  EXECUTION_META,
   EXECUTION_PARTIAL_EDIT_META,
-  EXECUTION_IMAGE_TOOL_META,
 } from '../config/executionContract'
+import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
 import { buildExecutionSizeParams, extendExecutionImageSize } from '../utils/executionSizeParams'
 import {
   buildPromptAspectRatioTaskParams,
@@ -24,9 +24,12 @@ import { assertTaskSubmitReady } from './flowTaskExecutorUtils'
 import type { ImageDirectActionSource } from '../utils/flowImageDirectActionSource'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
-  IMAGE_NODE_ACTION,
+  IMAGE_ACTION_REGISTRY,
+  IMAGE_CANVAS_EXTEND_ACTION,
+  IMAGE_HD_UPSCALE_ACTION,
+  requireImageActionExecution,
   type ImageDirectTaskAction,
-} from '../types/imageActions'
+} from '../config/imageActionRegistry'
 
 type ImageSizeLoader = (url: string) => Promise<{ width: number; height: number } | null>
 
@@ -52,12 +55,6 @@ type SubmitImageInpaintTaskInput = {
   cropSize: { width: number; height: number } | null
 }
 
-const DIRECT_ACTION_FEATURES = {
-  [IMAGE_NODE_ACTION.removeBg]: EXECUTION_DIRECT_ACTION_META.removeBg.feature,
-  [IMAGE_NODE_ACTION.styleVariation]: EXECUTION_DIRECT_ACTION_META.styleVariation.feature,
-  [IMAGE_NODE_ACTION.sketchToImage]: EXECUTION_DIRECT_ACTION_META.sketchToImage.feature,
-} satisfies Record<ImageDirectTaskAction, ExecutionFeature>
-
 export function resolveHdClarityStrength(strength: number | undefined): number {
   return Number.isFinite(strength)
     ? Math.max(0, Math.min(100, Math.round(strength as number)))
@@ -65,14 +62,16 @@ export function resolveHdClarityStrength(strength: number | undefined): number {
 }
 
 export async function assertDirectActionSubmitReady(action: ImageDirectTaskAction): Promise<void> {
+  const actionMeta = IMAGE_ACTION_REGISTRY[action]
+  const execution = requireImageActionExecution(action)
   const params =
-    action === IMAGE_NODE_ACTION.styleVariation
-      ? { variation: { strength: DEFAULT_IMAGE_ACTION_STRENGTH } }
+    'strength' in actionMeta && actionMeta.strength.paramPath === 'variation.strength'
+      ? { variation: { strength: actionMeta.strength.defaultValue } }
       : undefined
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
-      feature: DIRECT_ACTION_FEATURES[action],
+      feature: execution.feature,
       params,
     }),
     '提交任务失败',
@@ -90,10 +89,11 @@ export async function assertPromptImageSubmitReady(): Promise<void> {
 }
 
 export async function assertCanvasExtendSubmitReady(): Promise<void> {
+  const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
-      feature: EXECUTION_IMAGE_TOOL_META.imageExtend.feature,
+      feature: execution.feature,
       params: {
         extend: {
           top_percent: 0,
@@ -108,13 +108,15 @@ export async function assertCanvasExtendSubmitReady(): Promise<void> {
 }
 
 export async function assertHdUpscaleSubmitReady(): Promise<void> {
+  const actionMeta = IMAGE_ACTION_REGISTRY[IMAGE_HD_UPSCALE_ACTION]
+  const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
-      feature: EXECUTION_IMAGE_TOOL_META.hdUpscale.feature,
+      feature: execution.feature,
       params: {
         hd: {
-          clarity_strength: DEFAULT_IMAGE_ACTION_STRENGTH,
+          clarity_strength: actionMeta.strength.defaultValue,
         },
       },
     }),
@@ -128,7 +130,7 @@ export async function submitPromptTextGenerationTask(
 ): Promise<string> {
   const request = buildExecutionTaskRequest({
     prompt,
-    feature: EXECUTION_DIRECT_ACTION_META.patternGen.feature,
+    feature: EXECUTION_META[EXECUTION_FEATURE.patternGen].feature,
     params: buildPromptAspectRatioTaskParams(aspectRatio),
   })
   const submitRes = await taskApi.submit(request)
@@ -145,14 +147,16 @@ export async function submitDirectActionTask(
   strengthOverride?: number,
 ): Promise<string> {
   const imageSize = await loadImageSize(source.url)
+  const actionMeta = IMAGE_ACTION_REGISTRY[action]
+  const execution = requireImageActionExecution(action)
   const strength = Number.isFinite(strengthOverride)
     ? Math.max(0, Math.min(100, Math.round(strengthOverride as number)))
     : DEFAULT_IMAGE_ACTION_STRENGTH
   const request =
-    action === IMAGE_NODE_ACTION.styleVariation
+    'strength' in actionMeta && actionMeta.strength.paramPath === 'variation.strength'
       ? buildExecutionTaskRequest({
           prompt: '',
-          feature: DIRECT_ACTION_FEATURES[action],
+          feature: execution.feature,
           imageUrls: [source.url],
           params: {
             ...buildExecutionSizeParams(imageSize),
@@ -163,7 +167,7 @@ export async function submitDirectActionTask(
         })
       : buildExecutionTaskRequest({
           prompt: '',
-          feature: DIRECT_ACTION_FEATURES[action],
+          feature: execution.feature,
           imageUrls: [source.url],
           params: buildExecutionSizeParams(imageSize),
         })
@@ -201,10 +205,11 @@ export async function submitPromptImageGenerationTask(
 }
 
 export async function submitImageInpaintTask(input: SubmitImageInpaintTaskInput): Promise<string> {
+  const referenceImageLimit = getCanvasNodeImageInputLimit('prompt')
   const referenceImageUrls = (input.referenceImageUrls ?? [])
     .map((url) => url.trim())
     .filter(Boolean)
-    .slice(0, 4)
+    .slice(0, referenceImageLimit)
   const request = buildExecutionTaskRequest({
     prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
     feature: EXECUTION_PARTIAL_EDIT_META.feature,
@@ -228,9 +233,12 @@ export async function submitImageInpaintTask(input: SubmitImageInpaintTaskInput)
 export async function submitCanvasExtendTask(input: SubmitCanvasExtendTaskInput): Promise<string> {
   const imageSize = await input.loadImageSize(input.source.url)
   const prompt = `${input.prompt ?? ''}`.trim()
+  const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
+  const executionPrompt =
+    prompt && execution.promptPrefix ? `${execution.promptPrefix} ${prompt}` : prompt
   const request = buildExecutionTaskRequest({
-    prompt: prompt ? `${EXECUTION_IMAGE_TOOL_META.imageExtend.promptPrefix} ${prompt}` : '',
-    feature: EXECUTION_IMAGE_TOOL_META.imageExtend.feature,
+    prompt: executionPrompt,
+    feature: execution.feature,
     imageUrls: [input.source.url],
     params: {
       ...buildExecutionSizeParams(
@@ -260,9 +268,13 @@ export async function submitHdUpscaleTask(
 ): Promise<string> {
   const imageSize = await loadImageSize(source.url)
   const clarityStrength = resolveHdClarityStrength(strength)
+  const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
+  if (!execution.prompt) {
+    throw new Error('HD action execution prompt is not configured')
+  }
   const request = buildExecutionTaskRequest({
-    prompt: EXECUTION_IMAGE_TOOL_META.hdUpscale.prompt,
-    feature: EXECUTION_IMAGE_TOOL_META.hdUpscale.feature,
+    prompt: execution.prompt,
+    feature: execution.feature,
     imageUrls: [source.url],
     params: {
       ...buildExecutionSizeParams(imageSize, imageSize),

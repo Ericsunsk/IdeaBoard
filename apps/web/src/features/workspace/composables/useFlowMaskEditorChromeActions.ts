@@ -1,5 +1,8 @@
 import type { Ref } from 'vue'
 import { clampImageNodeOutputCount } from '../types/canvasNodes'
+import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
+
+type OutputCountParamPatch = Extract<FlowSnapshotParamPatch, { key: 'outputCount' }>
 
 type MaskEditorReferenceImage = {
   url: string
@@ -12,7 +15,7 @@ type UseFlowMaskEditorChromeActionsOptions = {
   getFlowMaskEditorCommittedData: (
     nodeId: string,
   ) => { executionMaskDataUrl?: string | null } | null | undefined
-  clearActiveNodePanels: () => void
+  clearActiveNodePanel: () => void
   hideStrengthControl: () => void
   runImageInpaintAction: (
     nodeId: string,
@@ -23,7 +26,7 @@ type UseFlowMaskEditorChromeActionsOptions = {
       referenceImageUrls?: string[]
     },
   ) => Promise<void> | void
-  onFlowNodeParamUpdate: (nodeId: string, payload: { key: 'outputCount'; value: number }) => void
+  onFlowNodeParamUpdate: (nodeId: string, payload: OutputCountParamPatch) => void
   onWarning: (message: string) => void
 }
 
@@ -37,7 +40,7 @@ export function useFlowMaskEditorChromeActions(options: UseFlowMaskEditorChromeA
       options.onWarning('请先标记局部重绘区域')
       return
     }
-    options.clearActiveNodePanels()
+    options.clearActiveNodePanel()
     options.hideStrengthControl()
     void options.runImageInpaintAction(nodeId, {
       prompt,

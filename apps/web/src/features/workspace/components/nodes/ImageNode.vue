@@ -1,29 +1,25 @@
 <template>
-  <div
-    class="workflow-node image-node overflow-visible"
-    data-node-kind="image"
-    :data-node-id="node.id"
+  <NodeShell
+    kind="image"
+    :node-id="node.id"
+    :width="node.width"
+    :title="node.title || 'Image'"
+    :active="active"
+    :dragging="dragging"
+    :copy-mode="copyMode"
     :class="{
-      active,
-      dragging,
-      'copy-mode': copyMode,
       'is-expand-mode': !!expandModeActive,
       'is-mask-editor-mode': !!maskEditorModeActive,
     }"
-    :style="nodeStyle"
+    rounded-header
+    :header-hidden="!!expandModeActive || !!maskEditorModeActive"
+    @node-mousedown="emit('node-mousedown', $event)"
+    @update:title="emit('update:title', $event)"
+    @delete="emit('delete')"
   >
-    <NodeHeader
-      :class="{ 'invisible pointer-events-none': !!expandModeActive || !!maskEditorModeActive }"
-      :title="node.title || 'Image'"
-      rounded
-      @node-mousedown="emit('node-mousedown', $event)"
-      @update:title="emit('update:title', $event)"
-      @delete="emit('delete')"
-    >
-      <template #icon>
-        <MediaImage />
-      </template>
-    </NodeHeader>
+    <template #icon>
+      <MediaImage />
+    </template>
     <div
       class="relative flex flex-col gap-2 overflow-visible rounded-[11px] p-0"
       :class="expandModeActive || maskEditorModeActive ? 'bg-transparent' : 'bg-white'"
@@ -91,18 +87,18 @@
         @submit="submitPrompt"
       />
     </div>
-  </div>
+  </NodeShell>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watchPostEffect, type ComponentPublicInstance } from 'vue'
 import { MediaImage } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../../types/canvasNodes'
-import type { ImageNodeAction, ImageStrengthAction } from '../../types/imageActions'
+import type { ImageNodeAction, ImageStrengthAction } from '../../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
-import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
+import NodeShell from './NodeShell.vue'
 
 const props = defineProps<{
   node: ImageNodeItem
@@ -163,7 +159,6 @@ const emit = defineEmits<{
   (e: 'mask-canvas-pointerdown', event: PointerEvent): void
 }>()
 
-const nodeStyle = useCanvasNodeStyle(() => props.node)
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 
 const showImageActionMenu = computed(
@@ -212,13 +207,3 @@ function onImageStageContextMenu(event: MouseEvent) {
   emit('contextmenu', event)
 }
 </script>
-
-<style scoped src="./styles/node-shared.css"></style>
-<style scoped>
-.workflow-node.image-node.is-expand-mode .image-node-stage,
-.workflow-node.image-node.is-expand-mode.active .image-node-stage,
-.workflow-node.image-node.is-mask-editor-mode .image-node-stage,
-.workflow-node.image-node.is-mask-editor-mode.active .image-node-stage {
-  border-color: transparent;
-}
-</style>

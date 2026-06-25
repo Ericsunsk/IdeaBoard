@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
+import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
 import type { DismissTransientWorkspaceUi } from './useFlowTransientUiDismissal'
 
 type FlowTool = 'select' | 'hand' | 'text'
@@ -10,7 +10,7 @@ type UseFlowCanvasShellInteractionsOptions = {
   activeTool: Ref<FlowTool>
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   openNodeContextMenu: (x: number, y: number, flowX: number, flowY: number) => void
-  createNodeAtPosition: (kind: FlowCreatableNodeKind, flowX: number, flowY: number) => void
+  createNodeAtPosition: (kind: CanvasCreatableNodeKind, flowX: number, flowY: number) => void
   dismissTransientWorkspaceUi: DismissTransientWorkspaceUi
   clearFlowSelection: () => boolean
   toastInfo: (message: string) => void
@@ -31,7 +31,7 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
     options.openNodeContextMenu(x, y, flowPoint.x, flowPoint.y)
   }
 
-  function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
+  function handleNodeContextMenuCreate(kind: CanvasCreatableNodeKind) {
     options.createNodeAtPosition(
       kind,
       options.nodeContextMenu.value.flowX,
@@ -53,7 +53,7 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
     if (options.isFlowExpandActive()) {
       options.dismissTransientWorkspaceUi({
         closeExpand: true,
-        clearNodePanels: false,
+        clearNodePanel: false,
         hideStrength: false,
       })
       return true
@@ -61,7 +61,7 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
     if (options.isBoardHeaderEditingActive()) {
       options.dismissTransientWorkspaceUi({
         closeBoardHeader: true,
-        clearNodePanels: false,
+        clearNodePanel: false,
         hideStrength: false,
       })
       return true

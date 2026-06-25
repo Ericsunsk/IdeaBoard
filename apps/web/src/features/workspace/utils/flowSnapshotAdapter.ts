@@ -8,10 +8,14 @@ import type {
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  CANVAS_NODE_REGISTRY_LIST,
+  getCanvasNodePortInputLimit,
+  getCanvasNodeSnapshotCollectionKey,
   getDefaultCanvasNodeTitle,
   isCanvasConnectionNodeType,
-} from '../types/canvasNodes'
+  type CanvasSnapshotNodeCollectionKey,
+} from '../config/canvasNodeRegistry'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../types/canvasNodes'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
@@ -33,17 +37,6 @@ export interface FlowAdapterEdge {
   class?: string
   data?: unknown
 }
-
-type SnapshotNodeCollectionKey = 'imageNodes' | 'promptNodes' | 'fusionNodes'
-
-const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
-  key: SnapshotNodeCollectionKey
-  nodeType: CanvasConnectionNodeType
-}> = [
-  { key: 'imageNodes', nodeType: 'image' },
-  { key: 'promptNodes', nodeType: 'prompt' },
-  { key: 'fusionNodes', nodeType: 'fusion' },
-]
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -101,6 +94,19 @@ function resolveNodeTitle(nodeType: CanvasConnectionNodeType, node: { title?: un
   return title || getDefaultCanvasNodeTitle(nodeType)
 }
 
+function getSnapshotNodeCollection(
+  snapshot: CanvasBoardSnapshot,
+  key: CanvasSnapshotNodeCollectionKey,
+): CanvasNodeItem[] {
+  return snapshot[key] as CanvasNodeItem[]
+}
+
+function resetSnapshotNodeCollections(snapshot: CanvasBoardSnapshot) {
+  CANVAS_NODE_REGISTRY_LIST.forEach(({ snapshotCollection }) => {
+    getSnapshotNodeCollection(snapshot, snapshotCollection).length = 0
+  })
+}
+
 function toFlowDataFromCanvasNode(
   nodeType: CanvasConnectionNodeType,
   node: CanvasNodeItem,
@@ -122,15 +128,15 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   const edges: FlowAdapterEdge[] = []
   const flowNodeIds = new Set<string>()
 
-  SNAPSHOT_NODE_COLLECTIONS.forEach(({ key, nodeType }) => {
-    snapshot[key].forEach((node) => {
-      const id = toFlowNodeId(nodeType, node.id)
+  CANVAS_NODE_REGISTRY_LIST.forEach(({ snapshotCollection, kind }) => {
+    getSnapshotNodeCollection(snapshot, snapshotCollection).forEach((node) => {
+      const id = toFlowNodeId(kind, node.id)
       nodes.push({
         id,
         type: 'canvas',
-        dragHandle: resolveFlowNodeDragHandle(nodeType),
+        dragHandle: resolveFlowNodeDragHandle(kind),
         position: { x: node.x, y: node.y },
-        data: toFlowDataFromCanvasNode(nodeType, node),
+        data: toFlowDataFromCanvasNode(kind, node),
       })
       flowNodeIds.add(id)
     })
@@ -156,19 +162,6 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   return { nodes, edges }
 }
 
-function resolveCollectionKeyByNodeType(
-  nodeType: CanvasConnectionNodeType,
-): SnapshotNodeCollectionKey {
-  switch (nodeType) {
-    case 'image':
-      return 'imageNodes'
-    case 'prompt':
-      return 'promptNodes'
-    case 'fusion':
-      return 'fusionNodes'
-  }
-}
-
 function hasRenderableImageSource(node: CanvasNodeItem): boolean {
   if (node.type !== 'image-node') return true
   const imageNode = node as ImageNodeItem
@@ -192,9 +185,7 @@ export function flowToCanvasBoardSnapshot(
 ): CanvasBoardSnapshot {
   const snapshot = base ? cloneSnapshot(base) : createEmptyCanvasBoardSnapshot()
 
-  SNAPSHOT_NODE_COLLECTIONS.forEach(({ key }) => {
-    snapshot[key] = []
-  })
+  resetSnapshotNodeCollections(snapshot)
   snapshot.connections = []
   const usedConnectionIds = new Set<number>()
   const persistedFlowNodeIds = new Set<string>()
@@ -221,8 +212,8 @@ export function flowToCanvasBoardSnapshot(
     } as CanvasNodeItem
     if (!hasRenderableImageSource(positionedNode)) return
 
-    const collectionKey = resolveCollectionKeyByNodeType(ref.nodeType)
-    ;(snapshot[collectionKey] as CanvasNodeItem[]).push(positionedNode as CanvasNodeItem)
+    const collectionKey = getCanvasNodeSnapshotCollectionKey(ref.nodeType)
+    getSnapshotNodeCollection(snapshot, collectionKey).push(positionedNode)
     persistedFlowNodeIds.add(node.id)
   })
 
@@ -257,8 +248,7 @@ export function flowToCanvasBoardSnapshot(
         ? restoredId
         : nextConnectionId()
     usedConnectionIds.add(connectionId)
-    const allowsMultipleInputs =
-      (toRef.nodeType === 'prompt' || toRef.nodeType === 'fusion') && toPort === 'image'
+    const allowsMultipleInputs = getCanvasNodePortInputLimit(toRef.nodeType, toPort) > 1
     if (!allowsMultipleInputs) {
       // Remove any existing connection targeting the same input port (last-write wins).
       const dupIndex = snapshot.connections.findIndex(

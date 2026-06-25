@@ -11,7 +11,7 @@ function createHarness(options: { didCommitMask?: boolean; maskDataUrl?: string 
       ? { executionMaskDataUrl: 'data:image/png;base64,mask' }
       : { executionMaskDataUrl: options.maskDataUrl },
   )
-  const clearActiveNodePanels = vi.fn()
+  const clearActiveNodePanel = vi.fn()
   const hideStrengthControl = vi.fn()
   const runImageInpaintAction = vi.fn()
   const onFlowNodeParamUpdate = vi.fn()
@@ -22,7 +22,7 @@ function createHarness(options: { didCommitMask?: boolean; maskDataUrl?: string 
     maskEditorReferenceImages,
     commitFlowMaskEditorMode,
     getFlowMaskEditorCommittedData,
-    clearActiveNodePanels,
+    clearActiveNodePanel,
     hideStrengthControl,
     runImageInpaintAction,
     onFlowNodeParamUpdate,
@@ -33,7 +33,7 @@ function createHarness(options: { didCommitMask?: boolean; maskDataUrl?: string 
     actions,
     commitFlowMaskEditorMode,
     getFlowMaskEditorCommittedData,
-    clearActiveNodePanels,
+    clearActiveNodePanel,
     hideStrengthControl,
     runImageInpaintAction,
     onWarning,
@@ -49,7 +49,7 @@ describe('useFlowMaskEditorChromeActions', () => {
     expect(harness.commitFlowMaskEditorMode).toHaveBeenCalledTimes(1)
     expect(harness.getFlowMaskEditorCommittedData).toHaveBeenCalledWith('node-1')
     expect(harness.onWarning).toHaveBeenCalledWith('请先标记局部重绘区域')
-    expect(harness.clearActiveNodePanels).not.toHaveBeenCalled()
+    expect(harness.clearActiveNodePanel).not.toHaveBeenCalled()
     expect(harness.hideStrengthControl).not.toHaveBeenCalled()
     expect(harness.runImageInpaintAction).not.toHaveBeenCalled()
   })
@@ -59,7 +59,7 @@ describe('useFlowMaskEditorChromeActions', () => {
 
     harness.actions.onMaskEditorChromeSubmit('paint this area', 2)
 
-    expect(harness.clearActiveNodePanels).toHaveBeenCalledTimes(1)
+    expect(harness.clearActiveNodePanel).toHaveBeenCalledTimes(1)
     expect(harness.hideStrengthControl).toHaveBeenCalledTimes(1)
     expect(harness.runImageInpaintAction).toHaveBeenCalledWith('node-1', {
       prompt: 'paint this area',

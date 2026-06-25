@@ -1,22 +1,27 @@
 import type { Ref } from 'vue'
 import {
-  IMAGE_NODE_ACTION,
+  IMAGE_ACTION_MODE,
+  IMAGE_ACTION_REGISTRY,
+  isImageTaskAction,
   isImageStrengthAction,
-  type ImageDirectTaskAction,
   type ImageNodeAction,
   type ImageStrengthAction,
-} from '../types/imageActions'
+  type ImageTaskAction,
+} from '../config/imageActionRegistry'
+import type { PromptAspectRatio } from '../config/promptAspectRatio'
+import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
+import { ACTIVE_NODE_PANEL_KIND, type ActiveNodePanel } from './useFlowActiveNodePanels'
 
-type DirectActionKey = ImageDirectTaskAction | ImageStrengthAction
+type FusionPromptParamPatch = Extract<
+  FlowSnapshotParamPatch,
+  { key: 'prompt' | 'outputCount' | 'aspectRatio' }
+>
 
 type UseFlowImageActionOrchestratorOptions = {
   flowMaskEditorNodeId: Ref<string | null>
-  activeImageActionNodeId: Ref<string | null>
-  activeImagePromptNodeId: Ref<string | null>
-  activeFusionPromptNodeId: Ref<string | null>
   suppressClickAction: Ref<ImageStrengthAction | null>
-  clearActiveNodePanels: (options?: { keepFusionPrompt?: boolean }) => void
-  closeActiveImagePromptComposer: () => void
+  openActiveNodePanel: (panel: ActiveNodePanel) => void
+  clearActiveNodePanel: () => void
   hideStrengthControl: () => void
   selectFlowNodeForContextMenu: (nodeId: string) => void
   cancelFlowExpandMode: () => void
@@ -26,7 +31,7 @@ type UseFlowImageActionOrchestratorOptions = {
   focusMaskEditorAndShowChrome: (nodeId: string) => void | Promise<void>
   runImageDirectAction: (
     nodeId: string,
-    action: DirectActionKey,
+    action: ImageTaskAction,
     options?: { strength?: number },
   ) => Promise<void> | void
   runImagePromptGeneration: (
@@ -47,15 +52,12 @@ type UseFlowImageActionOrchestratorOptions = {
     nodeId: string,
     prompt: string,
     outputCount: number,
-    aspectRatio: string,
+    aspectRatio: PromptAspectRatio,
   ) => Promise<void> | void
   getFlowMaskEditorCommittedData: (
     nodeId: string,
   ) => { executionMaskDataUrl?: string | null } | null | undefined
-  onFlowNodeParamUpdate: (
-    nodeId: string,
-    patch: { key: 'prompt' | 'outputCount' | 'aspectRatio'; value: string | number },
-  ) => void
+  onFlowNodeParamUpdate: (nodeId: string, patch: FusionPromptParamPatch) => void
   onWarning: (message: string) => void
   getActionStrength: (action: ImageStrengthAction) => number
 }
@@ -66,9 +68,7 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
     if (options.flowMaskEditorNodeId.value === nodeId) return
     options.cancelFlowExpandMode()
     options.selectFlowNodeForContextMenu(nodeId)
-    options.activeImageActionNodeId.value = nodeId
-    options.activeImagePromptNodeId.value = nodeId
-    options.activeFusionPromptNodeId.value = null
+    options.openActiveNodePanel({ kind: ACTIVE_NODE_PANEL_KIND.imageTools, nodeId })
     options.hideStrengthControl()
   }
 
@@ -76,29 +76,31 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
     event.preventDefault()
     options.cancelFlowExpandMode()
     options.selectFlowNodeForContextMenu(nodeId)
-    options.clearActiveNodePanels({ keepFusionPrompt: true })
-    options.activeFusionPromptNodeId.value = nodeId
+    options.openActiveNodePanel({ kind: ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeId })
     options.hideStrengthControl()
   }
 
   function onFlowImageDirectAction(nodeId: string, action: ImageNodeAction) {
-    if (action === IMAGE_NODE_ACTION.imageExtend) {
+    const actionMode = IMAGE_ACTION_REGISTRY[action].mode
+    if (actionMode === IMAGE_ACTION_MODE.canvasExtend) {
       options.cancelFlowMaskEditorMode()
       const entered = options.enterFlowExpandMode(nodeId)
-      options.clearActiveNodePanels()
+      options.clearActiveNodePanel()
       options.hideStrengthControl()
       if (!entered) options.onWarning('当前图片不可扩图')
       return
     }
-    if (action === IMAGE_NODE_ACTION.imageInpaint) {
+    if (actionMode === IMAGE_ACTION_MODE.localInpaint) {
       options.cancelFlowExpandMode()
-      options.closeActiveImagePromptComposer()
       const entered = options.enterFlowMaskEditorMode(nodeId)
-      options.activeImageActionNodeId.value = null
-      options.activeFusionPromptNodeId.value = null
+      options.clearActiveNodePanel()
       options.hideStrengthControl()
       if (!entered) options.onWarning('当前图片不可局部重绘')
       else void options.focusMaskEditorAndShowChrome(nodeId)
+      return
+    }
+    if (!isImageTaskAction(action)) {
+      options.onWarning('当前图片工具不可执行')
       return
     }
     if (isImageStrengthAction(action) && options.suppressClickAction.value === action) {
@@ -106,7 +108,7 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
     }
     options.cancelFlowExpandMode()
     options.cancelFlowMaskEditorMode()
-    options.clearActiveNodePanels()
+    options.clearActiveNodePanel()
     options.hideStrengthControl()
     void options.runImageDirectAction(
       nodeId,
@@ -118,7 +120,7 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
   function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: number) {
     options.cancelFlowExpandMode()
     options.cancelFlowMaskEditorMode()
-    options.clearActiveNodePanels()
+    options.clearActiveNodePanel()
     options.hideStrengthControl()
     const committedMaskData = options.getFlowMaskEditorCommittedData(nodeId)
     if (committedMaskData?.executionMaskDataUrl) {
@@ -136,11 +138,11 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
     nodeId: string,
     prompt: string,
     outputCount: number,
-    aspectRatio: string,
+    aspectRatio: PromptAspectRatio,
   ) {
     options.cancelFlowExpandMode()
     options.cancelFlowMaskEditorMode()
-    options.clearActiveNodePanels()
+    options.clearActiveNodePanel()
     options.hideStrengthControl()
     options.onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })
     options.onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: outputCount })

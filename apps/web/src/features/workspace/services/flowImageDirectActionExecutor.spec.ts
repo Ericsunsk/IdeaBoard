@@ -5,9 +5,11 @@ import {
   submitCanvasExtendTask,
   submitDirectActionTask,
   submitHdUpscaleTask,
+  submitImageInpaintTask,
   waitExistingOrLiveTaskImageResults,
 } from './flowImageDirectActionExecutor'
-import { IMAGE_NODE_ACTION } from '../types/imageActions'
+import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
+import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -110,6 +112,30 @@ describe('flowImageDirectActionExecutor', () => {
       original_image_height: 1024,
     })
     expect(request.params).not.toHaveProperty('output_format')
+  })
+
+  it('limits inpaint reference images by the canvas image input contract', async () => {
+    const referenceImageLimit = getCanvasNodeImageInputLimit('prompt')
+    const referenceImageUrls = Array.from(
+      { length: referenceImageLimit + 2 },
+      (_, index) => ` https://assets.example.com/ref-${index}.png `,
+    )
+
+    await submitImageInpaintTask({
+      prompt: 'redraw the selected area',
+      croppedImageUrl: 'https://assets.example.com/crop.png',
+      croppedMaskUrl: 'https://assets.example.com/mask.png',
+      referenceImageUrls,
+      cropSize: { width: 512, height: 384 },
+    })
+
+    const request = mocks.submit.mock.calls[0]?.[0] as SubmitTaskData
+    expect(request.params).toMatchObject({
+      reference_image_urls: referenceImageUrls
+        .map((url) => url.trim())
+        .slice(0, referenceImageLimit),
+      use_mask: true,
+    })
   })
 
   it('returns canonical image results from completed task fast path', async () => {

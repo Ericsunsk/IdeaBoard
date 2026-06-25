@@ -1,12 +1,15 @@
 import { computed, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import {
+  formatCanvasNodePortLabel,
+  getCanvasNodeExecutionActionLabels,
+  getCanvasNodePrimaryOutputPort,
   getCanvasNodeRequiredInputPorts,
   getCanvasNodeVisibleInputPorts,
-} from '../config/canvasNodeConnectionContract'
-import {
   isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
+} from '../config/canvasNodeRegistry'
+import {
   resolveWorkflowNodeOutputStatus,
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
@@ -37,32 +40,6 @@ type FlowNodeConnectionStatus = {
   pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>>
   incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>>
   outgoing: Partial<Record<CanvasConnectionPort, boolean>>
-}
-
-type ExecutionActionLabels = { ready: string; running: string }
-
-function getNodeOutputPort(nodeType: CanvasConnectionNodeType): CanvasConnectionPort {
-  if (nodeType === 'prompt') return 'prompt'
-  return 'image'
-}
-
-function resolveExecutionActionLabels(
-  nodeType: CanvasExecutionOutputNodeType,
-): ExecutionActionLabels {
-  switch (nodeType) {
-    case 'fusion':
-      return { ready: '融合', running: '融合中...' }
-  }
-}
-
-function formatNodePortLabel(
-  nodeType: CanvasConnectionNodeType,
-  port: CanvasConnectionPort,
-): string {
-  void nodeType
-  if (port === 'image') return 'Image'
-  if (port === 'prompt') return 'Prompt'
-  return port
 }
 
 export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
@@ -96,7 +73,8 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
           snapshotNode.outputStatus,
           outputImages,
         )
-        return outputStatus !== 'running' && !!`${snapshotNode.sourceImageUrl ?? ''}`.trim()
+        const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
+        return outputStatus !== 'running' && !!outputUrl
       }
       if (!nodeType || !isCanvasExecutionOutputNodeType(nodeType)) return false
       const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
@@ -135,7 +113,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         pendingIncoming[portContract.port] = false
       })
 
-      const outputPort = getNodeOutputPort(nodeType)
+      const outputPort = getCanvasNodePrimaryOutputPort(nodeType)
       outgoing[outputPort] = flowEdges.some(
         (edge) => edge.source === nodeId && parseHandlePort(edge.sourceHandle) === outputPort,
       )
@@ -156,7 +134,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       nodeId: string,
       status: FlowNodeConnectionStatus,
     ) {
-      const actionLabels = resolveExecutionActionLabels(nodeType)
+      const actionLabels = getCanvasNodeExecutionActionLabels(nodeType)
       if (options.isFlowExecutionNodeRunning?.(nodeType, nodeId)) {
         return {
           label: actionLabels.running,
@@ -169,7 +147,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       )
       const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
       if (disconnectedPorts.length > 0) {
-        const missingLabels = disconnectedPorts.map((port) => formatNodePortLabel(nodeType, port))
+        const missingLabels = disconnectedPorts.map((port) => formatCanvasNodePortLabel(port))
         return {
           label:
             disconnectedPorts.length === 1
@@ -183,7 +161,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         .map((port) => port.port)
         .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
       if (pendingPorts.length > 0) {
-        const pendingLabels = pendingPorts.map((port) => formatNodePortLabel(nodeType, port))
+        const pendingLabels = pendingPorts.map((port) => formatCanvasNodePortLabel(port))
         return {
           label:
             pendingPorts.length === 1
@@ -216,7 +194,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         hasAnyConnection: status.hasAnyConnection,
         connected: {
           ...status.incoming,
-          output: !!status.outgoing[getNodeOutputPort(nodeType)],
+          output: !!status.outgoing[getCanvasNodePrimaryOutputPort(nodeType)],
         },
         pending: {
           ...status.pendingIncoming,

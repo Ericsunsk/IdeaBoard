@@ -151,13 +151,14 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, ref, watch } from 'vue'
-import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
-import type { ImageNodeAction, ImageStrengthAction } from '../types/imageActions'
+import type { ImageNodeAction, ImageStrengthAction } from '../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
-import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
+import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
+import type { PromptAspectRatio } from '../config/promptAspectRatio'
+import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 const props = withDefaults(
   defineProps<{
@@ -224,7 +225,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update-prompt-text', value: string): void
-  (e: 'update-node-param', payload: { key: string; value: unknown }): void
+  (e: 'update-node-param', payload: FlowSnapshotParamPatch): void
   (e: 'delete-node'): void
   (e: 'image-stage-drop', event: DragEvent): void
   (e: 'media-input-image-drop', nodeId: string, event: DragEvent): void
@@ -240,8 +241,13 @@ const emit = defineEmits<{
   (e: 'fusion-contextmenu', event: MouseEvent): void
   (e: 'image-prompt-generate', prompt: string, outputCount: number): void
   (e: 'image-expand-submit', prompt: string, outputCount: number): void
-  (e: 'fusion-prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
-  (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
+  (
+    e: 'fusion-prompt-generate',
+    prompt: string,
+    outputCount: number,
+    aspectRatio: PromptAspectRatio,
+  ): void
+  (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
   (e: 'image-action', action: ImageNodeAction): void
   (e: 'strength-action-mousedown', action: ImageStrengthAction, event: MouseEvent): void
   (e: 'strength-track-mousedown', event: MouseEvent): void
@@ -256,17 +262,31 @@ const emit = defineEmits<{
   (e: 'request-internals-update'): void
 }>()
 
-const isPromptNode = computed(() => props.data.kind === 'prompt')
-const isImageNode = computed(() => props.data.kind === 'image')
-const isFusionNode = computed(() => props.data.kind === 'fusion')
 const showDefaultDragZone = false
-const disableHandleRailInteraction = computed(
-  () => isImageNode.value && (!!props.expandModeActive || !!props.maskEditorModeActive),
-)
-const promptUiState = computed<PromptNodeUiState | undefined>(
-  () => props.uiState as PromptNodeUiState | undefined,
-)
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
+
+const {
+  disableHandleRailInteraction,
+  displayImage,
+  fusionSnapshot,
+  imageEmptyIconVariant,
+  imageGenerating,
+  imageInputLocked,
+  imageSnapshot,
+  isFusionNode,
+  isImageNode,
+  isPromptNode,
+  nodeRunning,
+  promptSnapshot,
+  promptUiState,
+  stageHeight,
+} = useFlowCanvasNodeAdapter({
+  data: () => props.data,
+  uiState: () => props.uiState,
+  imageDirectGenerating: () => !!props.imageDirectGenerating,
+  expandModeActive: () => !!props.expandModeActive,
+  maskEditorModeActive: () => !!props.maskEditorModeActive,
+})
 
 const {
   handleRailStyle,
@@ -295,70 +315,15 @@ const showHandleControlsGated = computed(
   () => !disableHandleRailInteraction.value && showHandleControls.value,
 )
 
-function resolveSnapshotNode<T>() {
-  return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
-    ? ({ ...(props.data.snapshotNode as T) } as T)
-    : null
-}
-
-const promptSnapshot = computed<PromptNodeItem | null>(() => {
-  if (!isPromptNode.value) return null
-  return resolveSnapshotNode<PromptNodeItem>()
-})
-
-const imageSnapshot = computed<ImageNodeItem | null>(() => {
-  if (!isImageNode.value) return null
-  return resolveSnapshotNode<ImageNodeItem>()
-})
-const fusionSnapshot = computed<FusionNodeItem | null>(() =>
-  isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
-)
-
-const displayImage = computed<{ url: string } | null>(() => {
-  if (!imageSnapshot.value) return null
-  const outputs = Array.isArray(imageSnapshot.value.outputImages)
-    ? imageSnapshot.value.outputImages
-    : []
-  const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
-  const url = latestOutput?.url || imageSnapshot.value.sourceImageUrl || ''
-  return url ? { url } : null
-})
-
-const imageGenerating = computed(
-  () => !!props.imageDirectGenerating || imageSnapshot.value?.outputStatus === 'running',
-)
-const nodeRunning = computed(() => imageGenerating.value || !!props.uiState?.isRunning)
-const imageInputLocked = computed(() => imageGenerating.value && !displayImage.value)
-const imageEmptyIconVariant = computed<'image' | 'fusion'>(() => {
-  const uiState = props.uiState as NodeUiState<'image'> | undefined
-  return uiState?.connection?.sourceKind?.image === 'fusion' ? 'fusion' : 'image'
-})
-
-const stageHeight = computed(() => {
-  if (!imageSnapshot.value) return 280
-  const outputs = Array.isArray(imageSnapshot.value.outputImages)
-    ? imageSnapshot.value.outputImages
-    : []
-  const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
-  const outputRatio = Number(latestOutput?.ratio)
-  const sourceRatio = Number(imageSnapshot.value.sourceImageRatio)
-  const hasRunningOutput = imageSnapshot.value.outputStatus === 'running'
-  const hasImageFrame = !!displayImage.value || hasRunningOutput
-  const ratio =
-    Number.isFinite(outputRatio) && outputRatio > 0
-      ? outputRatio
-      : Number.isFinite(sourceRatio) && sourceRatio > 0
-        ? sourceRatio
-        : 1
-  return resolveImageNodeStageHeight(imageSnapshot.value.width, ratio, hasImageFrame)
-})
-
 function onPromptTextUpdate(value: string) {
   emit('update-prompt-text', value)
 }
 
-function emitNodeParam(key: string, value: unknown) {
-  emit('update-node-param', { key, value })
+function emitNodeParam<Key extends FlowSnapshotParamPatch['key']>(
+  key: Key,
+  value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
+) {
+  emit('update-node-param', { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>)
 }
 
 function onDeleteRequest() {
@@ -418,7 +383,11 @@ function onImagePromptGenerate(prompt: string, outputCount: number) {
 function onImageExpandSubmit(prompt: string, outputCount: number) {
   emit('image-expand-submit', prompt, outputCount)
 }
-function onFusionPromptGenerate(prompt: string, outputCount: number, aspectRatio: string) {
+function onFusionPromptGenerate(
+  prompt: string,
+  outputCount: number,
+  aspectRatio: PromptAspectRatio,
+) {
   emit('fusion-prompt-generate', prompt, outputCount, aspectRatio)
 }
 function onPromptGenerate() {
@@ -527,45 +496,6 @@ function noopMouse() {}
 .flow-canvas-node__handle-rail.is-disabled :deep(.flow-canvas-node__handle-aggregate::before) {
   pointer-events: none;
   opacity: 0;
-}
-
-.flow-canvas-node :deep(.workflow-node) {
-  position: relative;
-  z-index: 1;
-  overflow: visible;
-  pointer-events: auto;
-}
-
-.flow-canvas-node :deep(.workflow-node:not(.prompt-node)) {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.flow-canvas-node
-  :deep(
-    .workflow-node:not(.prompt-node):not(.image-node):not(.fusion-node)
-      > :not(.workflow-node-header):first-of-type
-  ) {
-  border: var(--node-tool-border-width, 1.2px) solid var(--color-canvas-node-border-alt);
-  border-radius: 14px;
-  background: var(--color-canvas-node-bg);
-  transition: border-color 0.2s ease;
-}
-
-.flow-canvas-node
-  :deep(
-    .workflow-node:not(.prompt-node):not(.image-node):not(.fusion-node).active
-      > :not(.workflow-node-header):first-of-type
-  ) {
-  border-color: var(--color-canvas-accent);
-}
-
-.flow-canvas-node :deep(.workflow-node.dragging) {
-  transition: none;
 }
 
 .flow-canvas-node :deep(.image-action-menu) {

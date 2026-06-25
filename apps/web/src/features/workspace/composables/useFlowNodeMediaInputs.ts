@@ -1,12 +1,10 @@
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
+import type { CanvasNodeItem } from '../types/canvasNodes'
 import { IMAGE_NODE_EMPTY_SIZE } from '../utils/imageNodeSizing'
 
 type UseFlowNodeMediaInputsOptions = {
   applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>
-  updateSnapshotNode: (
-    nodeId: string,
-    patcher: (prev: Record<string, unknown>) => Record<string, unknown>,
-  ) => void
+  updateSnapshotNode: (nodeId: string, patcher: (prev: CanvasNodeItem) => CanvasNodeItem) => void
   markFlowExecutionNodeDirty: (nodeId: string) => void
 }
 
@@ -25,15 +23,18 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
   }
 
   function onFlowImageReset(nodeId: string) {
-    options.updateSnapshotNode(nodeId, (prev) => ({
-      ...prev,
-      width: IMAGE_NODE_EMPTY_SIZE,
-      sourceImageUrl: '',
-      sourceImageRatio: 1,
-      pendingTaskId: undefined,
-      outputStatus: 'idle',
-      outputImages: [],
-    }))
+    options.updateSnapshotNode(nodeId, (prev) => {
+      if (prev.type !== 'image-node') return prev
+      return {
+        ...prev,
+        width: IMAGE_NODE_EMPTY_SIZE,
+        sourceImageUrl: '',
+        sourceImageRatio: 1,
+        pendingTaskId: undefined,
+        outputStatus: 'idle',
+        outputImages: [],
+      }
+    })
     options.markFlowExecutionNodeDirty(nodeId)
   }
 

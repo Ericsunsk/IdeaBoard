@@ -2,6 +2,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 import type { Node } from '@vue-flow/core'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import { clampImageNodeOutputCount } from '../types/canvasNodes'
+import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
 import { MASK_EDITOR_CHROME_LAYOUT, getMaskEditorChromeOutset } from '../config/maskEditorChrome'
 import { waitForNextAnimationFrame } from '../utils/animationFrame'
 
@@ -48,6 +49,7 @@ const MASK_EDITOR_CANVAS_SELECTOR = '.image-mask-editor-canvas'
 const MASK_EDITOR_FOCUS_MAX_ZOOM = 2
 const MASK_EDITOR_FOCUS_MIN_ZOOM = 0.1
 const WORKSPACE_OVERSCROLL_GUARD_CLASS = 'workspace-overscroll-guard'
+const MASK_EDITOR_REFERENCE_IMAGE_LIMIT = getCanvasNodeImageInputLimit('prompt')
 
 function setWorkspaceOverscrollGuard(enabled: boolean) {
   if (typeof document === 'undefined') return
@@ -241,8 +243,8 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
   }
 
   function onMaskEditorReferenceImageOpen() {
-    if (maskEditorReferenceImages.value.length >= 4) {
-      options.onWarning('局部重绘最多添加 4 张参考图')
+    if (maskEditorReferenceImages.value.length >= MASK_EDITOR_REFERENCE_IMAGE_LIMIT) {
+      options.onWarning(`局部重绘最多添加 ${MASK_EDITOR_REFERENCE_IMAGE_LIMIT} 张参考图`)
       return
     }
     const input = document.createElement('input')
@@ -257,8 +259,8 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
   }
 
   async function addMaskEditorReferenceImage(file: File) {
-    if (maskEditorReferenceImages.value.length >= 4) {
-      options.onWarning('局部重绘最多添加 4 张参考图')
+    if (maskEditorReferenceImages.value.length >= MASK_EDITOR_REFERENCE_IMAGE_LIMIT) {
+      options.onWarning(`局部重绘最多添加 ${MASK_EDITOR_REFERENCE_IMAGE_LIMIT} 张参考图`)
       return
     }
     try {
@@ -270,7 +272,7 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
           url: uploaded.url,
           ratio: uploaded.ratio,
         },
-      ].slice(0, 4)
+      ].slice(0, MASK_EDITOR_REFERENCE_IMAGE_LIMIT)
     } catch (error) {
       const msg = error instanceof Error ? error.message : '上传失败'
       options.onWarning(msg)

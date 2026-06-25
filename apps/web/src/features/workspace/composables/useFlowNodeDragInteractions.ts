@@ -20,7 +20,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   function onNodeDragStop() {
     options.dismissTransientWorkspaceUi({
       closeExpand: true,
-      clearNodePanels: false,
+      clearNodePanel: false,
       hideStrength: false,
     })
     options.finishFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)

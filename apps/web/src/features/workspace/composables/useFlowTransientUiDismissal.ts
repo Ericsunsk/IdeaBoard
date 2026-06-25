@@ -1,10 +1,8 @@
-import type { ClearActiveNodePanelsOptions } from './useFlowActiveNodePanels'
-
 export type DismissTransientWorkspaceUiOptions = {
   closeExpand?: boolean
   closeBoardHeader?: boolean
   closeContextMenu?: boolean
-  clearNodePanels?: boolean | ClearActiveNodePanelsOptions
+  clearNodePanel?: boolean
   hideStrength?: boolean
 }
 
@@ -14,21 +12,19 @@ type UseFlowTransientUiDismissalOptions = {
   cancelFlowExpandMode: () => void
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
-  clearActiveNodePanels: (options?: ClearActiveNodePanelsOptions) => void
+  clearActiveNodePanel: () => void
   hideStrengthControl: () => void
 }
 
 export function useFlowTransientUiDismissal(options: UseFlowTransientUiDismissalOptions) {
   function dismissTransientWorkspaceUi(request: DismissTransientWorkspaceUiOptions = {}) {
-    const clearNodePanels = request.clearNodePanels ?? true
+    const clearNodePanel = request.clearNodePanel ?? true
     const hideStrength = request.hideStrength ?? true
 
     if (request.closeExpand) options.cancelFlowExpandMode()
     if (request.closeBoardHeader) options.closeBoardHeaderEditing()
     if (request.closeContextMenu) options.closeNodeContextMenu()
-    if (clearNodePanels !== false) {
-      options.clearActiveNodePanels(clearNodePanels === true ? undefined : clearNodePanels)
-    }
+    if (clearNodePanel !== false) options.clearActiveNodePanel()
     if (hideStrength) options.hideStrengthControl()
   }
 

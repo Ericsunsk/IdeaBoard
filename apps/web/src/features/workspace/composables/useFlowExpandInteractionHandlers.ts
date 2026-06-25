@@ -3,12 +3,7 @@ import type { CanvasExtendDragAnchor } from './useImageCanvasExtendOverlay'
 
 type UseFlowExpandInteractionHandlersOptions = {
   flowExpandNodeId: Ref<string | null>
-  closeActiveImagePromptComposer: () => void
-  clearActiveNodePanels: (options?: {
-    keepImageAction?: boolean
-    keepImagePrompt?: boolean
-    keepFusionPrompt?: boolean
-  }) => void
+  clearActiveNodePanel: () => void
   hideStrengthControl: () => void
   commitFlowExpandMode: (prompt: string, outputCount: number) => Promise<void> | void
   beginFlowExpandHandleResize: (event: PointerEvent, anchor: CanvasExtendDragAnchor) => void
@@ -18,8 +13,7 @@ type UseFlowExpandInteractionHandlersOptions = {
 export function useFlowExpandInteractionHandlers(options: UseFlowExpandInteractionHandlersOptions) {
   function onFlowImageExpandSubmit(nodeId: string, prompt: string, outputCount: number) {
     if (options.flowExpandNodeId.value !== nodeId) return
-    options.closeActiveImagePromptComposer()
-    options.clearActiveNodePanels({ keepImagePrompt: true })
+    options.clearActiveNodePanel()
     options.hideStrengthControl()
     void options.commitFlowExpandMode(prompt, outputCount)
   }

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { IMAGE_NODE_ACTION } from '../types/imageActions'
+import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeItem } from '../types/canvasNodes'
 import { useFlowImageDirectActions } from './useFlowImageDirectActions'
@@ -180,6 +180,27 @@ describe('useFlowImageDirectActions pending task recovery', () => {
         }
       },
     )
+  })
+
+  it('routes direct action readiness failures through warning without creating a pending node', async () => {
+    const readinessError = new Error('缺少提示词，请填写 Prompt 或配置后台 system prompt')
+    mocks.assertDirectActionSubmitReady.mockRejectedValueOnce(readinessError)
+    const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
+
+    await expect(
+      harness.actions.runImageDirectAction('image-1', IMAGE_NODE_ACTION.removeBg),
+    ).resolves.toBeUndefined()
+
+    expect(harness.onWarning).toHaveBeenCalledWith(readinessError.message)
+    expect(mocks.submitDirectActionTask).not.toHaveBeenCalled()
+    expect(harness.flushAutosave).not.toHaveBeenCalled()
+    expect(harness.nodes.value).toHaveLength(1)
+    expect(
+      harness.nodes.value.some((node) => {
+        const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
+        return snapshot?.outputStatus === 'running'
+      }),
+    ).toBe(false)
   })
 
   it('persists task id after submit and clears it after completion', async () => {

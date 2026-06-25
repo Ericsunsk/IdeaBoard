@@ -56,18 +56,6 @@ export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.part
 
 export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.styleFusion]
 
-export const EXECUTION_DIRECT_ACTION_META = {
-  patternGen: EXECUTION_META[EXECUTION_FEATURE.patternGen],
-  sketchToImage: EXECUTION_META[EXECUTION_FEATURE.sketchToImage],
-  styleVariation: EXECUTION_META[EXECUTION_FEATURE.styleVariation],
-  removeBg: EXECUTION_META[EXECUTION_FEATURE.removeBg],
-} as const
-
-export const EXECUTION_IMAGE_TOOL_META = {
-  hdUpscale: EXECUTION_META[EXECUTION_FEATURE.hdUpscale],
-  imageExtend: EXECUTION_META[EXECUTION_FEATURE.imageExtend],
-} as const
-
 interface BuildExecutionTaskRequestOptions {
   prompt: string
   feature?: ExecutionFeature

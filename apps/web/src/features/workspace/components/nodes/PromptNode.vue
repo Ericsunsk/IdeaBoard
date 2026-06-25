@@ -1,26 +1,20 @@
 <template>
-  <div
-    class="workflow-node prompt-node flex flex-col gap-0.5 border-0 bg-transparent shadow-none"
-    data-node-kind="prompt"
-    :data-node-id="node.id"
-    :class="{ active, dragging, 'copy-mode': copyMode }"
-    :style="nodeStyle"
+  <NodeShell
+    kind="prompt"
+    :node-id="node.id"
+    :width="node.width"
+    :title="node.title || 'Prompt'"
+    :active="active"
+    :dragging="dragging"
+    :copy-mode="copyMode"
+    @node-mousedown="emit('node-mousedown', $event)"
+    @update:title="emit('update:title', $event)"
+    @delete="emit('delete')"
   >
-    <NodeHeader
-      :title="node.title || 'Prompt'"
-      @node-mousedown="emit('node-mousedown', $event)"
-      @update:title="emit('update:title', $event)"
-      @delete="emit('delete')"
-    >
-      <template #icon>
-        <ChatLines />
-      </template>
-    </NodeHeader>
-    <div
-      class="relative min-h-[280px] overflow-visible rounded-2xl border-[1.5px] bg-white transition-colors"
-      :class="active ? 'border-[#9278e6]' : 'border-[#e2e8f0]'"
-      data-flow-handle-frame
-    >
+    <template #icon>
+      <ChatLines />
+    </template>
+    <NodeStageFrame variant="prompt" :active="active">
       <div class="box-border flex min-h-[280px] flex-col gap-3 p-5">
         <div
           ref="thumbsRef"
@@ -70,8 +64,8 @@
           @submit="emit('generate')"
         />
       </div>
-    </div>
-  </div>
+    </NodeStageFrame>
+  </NodeShell>
 </template>
 
 <script setup lang="ts">
@@ -80,8 +74,9 @@ import { ChatLines, Plus } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
+import NodeShell from './NodeShell.vue'
+import NodeStageFrame from './NodeStageFrame.vue'
 import PromptTextComposer from './PromptTextComposer.vue'
-import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 import { useImageInputSlots } from './composables/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../config/promptAspectRatio'
 
@@ -109,7 +104,6 @@ const emit = defineEmits<{
   (e: 'generate'): void
 }>()
 
-const nodeStyle = useCanvasNodeStyle(() => props.node)
 const thumbsRef = ref<HTMLElement | null>(null)
 const maxInputImages = 4
 const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
@@ -136,7 +130,6 @@ const {
 })
 </script>
 
-<style scoped src="./styles/node-shared.css"></style>
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped src="./styles/node-input-thumbnails.css"></style>
 <style scoped>

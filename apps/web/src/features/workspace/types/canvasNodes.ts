@@ -120,17 +120,6 @@ export interface FusionNodeItem {
 
 export type CanvasExecutionOutputNodeType = 'fusion'
 
-export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = ['fusion']
-
-export function isCanvasExecutionOutputNodeType(
-  value: unknown,
-): value is CanvasExecutionOutputNodeType {
-  return (
-    typeof value === 'string' &&
-    EXECUTION_OUTPUT_NODE_TYPES.includes(value as CanvasExecutionOutputNodeType)
-  )
-}
-
 export type CanvasExecutionOutputNodeItem = FusionNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
@@ -139,29 +128,6 @@ export type CanvasImageOutputNodeItem = ImageNodeItem | CanvasExecutionOutputNod
 
 export type CanvasConnectionNodeType = 'image' | 'prompt' | 'fusion'
 
-export const CANVAS_CONNECTION_NODE_TYPES: readonly CanvasConnectionNodeType[] = [
-  'image',
-  'prompt',
-  'fusion',
-] as const
-
-export function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNodeType {
-  return (
-    typeof value === 'string' &&
-    CANVAS_CONNECTION_NODE_TYPES.includes(value as CanvasConnectionNodeType)
-  )
-}
-
-export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): string {
-  switch (nodeType) {
-    case 'image':
-      return 'Image'
-    case 'prompt':
-      return 'Prompt'
-    case 'fusion':
-      return 'Fusion'
-  }
-}
 export type CanvasConnectionPort = 'image' | 'prompt'
 
 export interface CanvasConnection {
@@ -175,6 +141,12 @@ export interface CanvasConnection {
 }
 
 export type CanvasNodeItem = PromptNodeItem | ImageNodeItem | FusionNodeItem
+
+export type CanvasNodeItemByKind = {
+  image: ImageNodeItem
+  prompt: PromptNodeItem
+  fusion: FusionNodeItem
+}
 
 export interface CanvasViewportState {
   canvasX: number

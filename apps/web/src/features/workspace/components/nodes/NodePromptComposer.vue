@@ -3,7 +3,7 @@
     class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-[42] grid grid-cols-[minmax(0,1fr)_auto] items-end gap-[var(--node-tool-button-gap)] rounded-[13px] bg-white/[0.96] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[10px] [border:var(--node-tool-border-width)_solid_rgba(122,107,213,0.28)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
     :class="{ 'count-stacked': shouldStackOutputCount, 'has-text': draft.trim() }"
     :style="{ '--node-prompt-composer-offset': offset }"
-    @submit.prevent="submitPrompt"
+    @submit.prevent="submit"
     @mousedown.stop
     @click.stop
     @contextmenu.stop.prevent
@@ -30,7 +30,7 @@
         @select="selectAspectRatio"
       />
       <NodeOutputCountPicker
-        :model-value="outputCount"
+        :model-value="outputCountValue"
         :visible="outputCountPickerVisible"
         :disabled="disabled"
         tooltip="选择张数"
@@ -41,7 +41,7 @@
       <button
         class="image-node-prompt-send node-tool-send node-tool-button node-tool-tooltip-trigger"
         type="submit"
-        :disabled="submitButtonDisabled"
+        :disabled="!canSubmit"
         aria-label="发送"
       >
         <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
@@ -52,14 +52,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { SendDiagonalSolid } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../config/promptAspectRatio'
-import { normalizePromptAspectRatio } from '../../config/promptAspectRatio'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
-import { useAutoResizeTextarea } from './composables/useAutoResizeTextarea'
-import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
+import { usePromptComposerControls } from './composables/usePromptComposerControls'
 
 const props = withDefaults(
   defineProps<{
@@ -88,69 +86,41 @@ const emit = defineEmits<{
   (e: 'submit', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
 
-const promptInputRef = ref<HTMLTextAreaElement | null>(null)
-const actionsRef = ref<HTMLElement | null>(null)
 const shouldStackOutputCount = ref(false)
-const toolPopovers = useNodeToolPopoverGroup({
-  keys: ['aspect-ratio', 'output-count'] as const,
-  rootRefs: [actionsRef],
-})
 const showAspectRatio = computed(() => props.aspectRatio !== undefined)
-const aspectRatioValue = computed(() => normalizePromptAspectRatio(props.aspectRatio))
-const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
-const outputCountPickerVisible = toolPopovers.isOpen('output-count')
-const draft = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
-})
-const submitButtonDisabled = computed(
-  () => props.disabled || props.submitDisabled || (!props.allowEmpty && !draft.value.trim()),
-)
-const promptTextarea = useAutoResizeTextarea(promptInputRef, {
-  watchSource: () => props.modelValue,
-  onResize: ({ naturalHeight, singleLineHeight }) => {
+
+const {
+  actionsRef,
+  aspectRatioPickerVisible,
+  aspectRatioValue,
+  canSubmit,
+  draft,
+  inputRef: promptInputRef,
+  onEnter: onPromptEnter,
+  outputCountPickerVisible,
+  outputCountValue,
+  selectAspectRatio,
+  selectOutputCount,
+  submit,
+  toggleAspectRatioPicker,
+  toggleOutputCountPicker,
+} = usePromptComposerControls({
+  modelValue: () => props.modelValue,
+  outputCount: () => props.outputCount,
+  aspectRatio: () => props.aspectRatio,
+  disabled: () => props.disabled,
+  submitDisabled: () => props.submitDisabled,
+  allowEmpty: () => props.allowEmpty,
+  autofocus: () => true,
+  showAspectRatio: () => showAspectRatio.value,
+  onTextUpdate: (value) => emit('update:modelValue', value),
+  onOutputCountUpdate: (value) => emit('update:output-count', value),
+  onAspectRatioUpdate: (value) => emit('update:aspect-ratio', value),
+  onSubmit: (prompt, outputCount, aspectRatio) => emit('submit', prompt, outputCount, aspectRatio),
+  onTextareaResize: ({ naturalHeight, singleLineHeight }) => {
     shouldStackOutputCount.value = naturalHeight > singleLineHeight + 2
   },
 })
-
-onMounted(async () => {
-  await nextTick()
-  promptTextarea.resize()
-  promptInputRef.value?.focus()
-})
-
-function submitPrompt() {
-  if (submitButtonDisabled.value) return
-  emit('submit', draft.value.trim(), props.outputCount, aspectRatioValue.value)
-  toolPopovers.close('output-count')
-  toolPopovers.close('aspect-ratio')
-}
-
-function onPromptEnter(event: KeyboardEvent) {
-  if (event.isComposing) return
-  event.preventDefault()
-  submitPrompt()
-}
-
-function toggleOutputCountPicker() {
-  if (props.disabled) return
-  toolPopovers.toggle('output-count')
-}
-
-function toggleAspectRatioPicker() {
-  if (props.disabled || !showAspectRatio.value) return
-  toolPopovers.toggle('aspect-ratio')
-}
-
-function selectOutputCount(value: number) {
-  emit('update:output-count', value)
-  toolPopovers.close('output-count')
-}
-
-function selectAspectRatio(value: PromptAspectRatio) {
-  emit('update:aspect-ratio', value)
-  toolPopovers.close('aspect-ratio')
-}
 </script>
 
 <style scoped src="./styles/node-tool-buttons.css"></style>

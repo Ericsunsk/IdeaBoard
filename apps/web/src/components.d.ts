@@ -47,6 +47,8 @@ declare module 'vue' {
     NodeInputThumbnail: typeof import('./features/workspace/components/nodes/NodeInputThumbnail.vue')['default']
     NodeOutputCountPicker: typeof import('./features/workspace/components/nodes/NodeOutputCountPicker.vue')['default']
     NodePromptComposer: typeof import('./features/workspace/components/nodes/NodePromptComposer.vue')['default']
+    NodeShell: typeof import('./features/workspace/components/nodes/NodeShell.vue')['default']
+    NodeStageFrame: typeof import('./features/workspace/components/nodes/NodeStageFrame.vue')['default']
     NodeToolIconButton: typeof import('./features/workspace/components/nodes/NodeToolIconButton.vue')['default']
     NodeToolPopover: typeof import('./features/workspace/components/nodes/NodeToolPopover.vue')['default']
     PromptNode: typeof import('./features/workspace/components/nodes/PromptNode.vue')['default']

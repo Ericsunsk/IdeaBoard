@@ -1,6 +1,11 @@
-import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../types/canvasNodes'
+import type { CanvasConnectionNodeType, ImageNodeItem, ImageNodeOutputItem } from '../types/canvasNodes'
+import {
+  isCanvasConnectionNodeType,
+  isCanvasImageInputSourceNodeType,
+} from '../config/canvasNodeRegistry'
 import { taskApi, type SubmitTaskData } from '../../../shared/api/task'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { resolveImageNodeDisplayRatio, resolveImageNodeDisplayUrl } from '../utils/flowImageNodeSelectors'
 
 export interface FlowTaskExecutorGraphOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
@@ -14,7 +19,7 @@ export interface FlowTaskExecutorGraphOptions {
 
 export interface FlowConnectedInput {
   sourceType: CanvasConnectionNodeType
-  snapshotNode: Record<string, unknown>
+  snapshotNode: FlowSnapshotNodeLike
 }
 export interface ResolvedFlowInputImage {
   id: string
@@ -28,6 +33,17 @@ export interface ResolvedFlowInputImage {
 type FlowConnectedInputPort = 'image' | 'prompt'
 type FlowGraphNode = FlowTaskExecutorGraphOptions['nodes'][number]
 type FlowSourceTypeResolver = (sourceNode: FlowGraphNode) => CanvasConnectionNodeType | null
+export type FlowSnapshotNodeLike = {
+  type?: unknown
+  outputImages?: unknown
+  sourceImageUrl?: unknown
+  sourceImageRatio?: unknown
+  outputStatus?: unknown
+}
+
+function isImageNodeSnapshot(snapshotNode: FlowSnapshotNodeLike): snapshotNode is ImageNodeItem {
+  return snapshotNode.type === 'image-node'
+}
 
 function resolvePromptInputSourceNodeId(
   options: FlowTaskExecutorGraphOptions,
@@ -88,14 +104,11 @@ export function parseHandlePort(handle: string | null | undefined): string {
 
 export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null {
   const [head] = nodeId.split('-')
-  if (head === 'prompt' || head === 'image' || head === 'fusion') {
-    return head
-  }
-  return null
+  return isCanvasConnectionNodeType(head) ? head : null
 }
 
 export function readLatestOutputImage(
-  snapshotNode: Record<string, unknown>,
+  snapshotNode: FlowSnapshotNodeLike,
 ): ImageNodeOutputItem | null {
   const outputImages = Array.isArray(snapshotNode.outputImages)
     ? (snapshotNode.outputImages as ImageNodeOutputItem[])
@@ -105,13 +118,10 @@ export function readLatestOutputImage(
 
 export function resolveSourceImageFromNode(
   nodeType: CanvasConnectionNodeType,
-  snapshotNode: Record<string, unknown>,
+  snapshotNode: FlowSnapshotNodeLike,
 ): string {
   if (nodeType === 'image') {
-    const latestOutput = readLatestOutputImage(snapshotNode)
-    const sourceImageUrl =
-      typeof snapshotNode.sourceImageUrl === 'string' ? snapshotNode.sourceImageUrl.trim() : ''
-    return (latestOutput?.url || sourceImageUrl || '').trim()
+    return isImageNodeSnapshot(snapshotNode) ? resolveImageNodeDisplayUrl(snapshotNode) : ''
   }
   const latestOutput = readLatestOutputImage(snapshotNode)
   return (latestOutput?.url || '').trim()
@@ -138,7 +148,7 @@ function resolveConnectedNodeInput(
   if (!sourceType) return null
   return {
     sourceType,
-    snapshotNode: sourceNode.data.snapshotNode as Record<string, unknown>,
+    snapshotNode: sourceNode.data.snapshotNode as FlowSnapshotNodeLike,
   }
 }
 
@@ -165,20 +175,16 @@ export async function assertTaskSubmitReady(
   }
 }
 
-/** All node kinds that can produce image output usable as downstream source. */
-export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>(['image', 'fusion'])
-
 export function isFlowExecutionSourceKind(kind: string): kind is CanvasConnectionNodeType {
-  return FLOW_EXECUTION_SOURCE_KINDS.has(kind as CanvasConnectionNodeType)
+  return isCanvasImageInputSourceNodeType(kind)
 }
 
 export function resolveFlowSourceImageRatio(
   sourceKind: CanvasConnectionNodeType,
-  snapshotNode: Record<string, unknown>,
+  snapshotNode: FlowSnapshotNodeLike,
 ): number {
   if (sourceKind === 'image') {
-    const sourceImageRatio = Number(snapshotNode.sourceImageRatio)
-    if (Number.isFinite(sourceImageRatio) && sourceImageRatio > 0) return sourceImageRatio
+    return isImageNodeSnapshot(snapshotNode) ? resolveImageNodeDisplayRatio(snapshotNode) : 1
   }
   const outputImages = Array.isArray(snapshotNode.outputImages)
     ? (snapshotNode.outputImages as Array<{ ratio?: unknown }>)
@@ -236,7 +242,7 @@ export function resolveConnectedImageInputs(
     ) {
       return
     }
-    const snapshotNode = sourceNode.data.snapshotNode as Record<string, unknown>
+    const snapshotNode = sourceNode.data.snapshotNode as FlowSnapshotNodeLike
     const url = resolveSourceImageFromNode(sourceKind, snapshotNode).trim()
     if (!url) return
     edgeConnectedNodeInputs.push({

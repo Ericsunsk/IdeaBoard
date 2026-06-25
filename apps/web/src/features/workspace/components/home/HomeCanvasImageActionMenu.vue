@@ -47,8 +47,12 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { IMAGE_ACTION_MENU_ITEMS, type ImageActionMenuItem } from '../../config/imageActionMenu'
-import { type ImageNodeAction, type ImageStrengthAction } from '../../types/imageActions'
+import {
+  IMAGE_ACTION_MENU_ITEMS,
+  type ImageActionMenuItem,
+  type ImageNodeAction,
+  type ImageStrengthAction,
+} from '../../config/imageActionRegistry'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
 

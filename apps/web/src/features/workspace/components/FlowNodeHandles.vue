@@ -62,7 +62,7 @@ import { Handle, Position } from '@vue-flow/core'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
-} from '../config/canvasNodeConnectionContract'
+} from '../config/canvasNodeRegistry'
 import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'

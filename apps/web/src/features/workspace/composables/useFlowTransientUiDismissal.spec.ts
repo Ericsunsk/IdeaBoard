@@ -5,14 +5,14 @@ function createHarness() {
   const cancelFlowExpandMode = vi.fn()
   const closeBoardHeaderEditing = vi.fn()
   const closeNodeContextMenu = vi.fn()
-  const clearActiveNodePanels = vi.fn()
+  const clearActiveNodePanel = vi.fn()
   const hideStrengthControl = vi.fn()
 
   const { dismissTransientWorkspaceUi } = useFlowTransientUiDismissal({
     cancelFlowExpandMode,
     closeBoardHeaderEditing,
     closeNodeContextMenu,
-    clearActiveNodePanels,
+    clearActiveNodePanel,
     hideStrengthControl,
   })
 
@@ -21,7 +21,7 @@ function createHarness() {
     cancelFlowExpandMode,
     closeBoardHeaderEditing,
     closeNodeContextMenu,
-    clearActiveNodePanels,
+    clearActiveNodePanel,
     hideStrengthControl,
   }
 }
@@ -32,27 +32,26 @@ describe('useFlowTransientUiDismissal', () => {
 
     harness.dismissTransientWorkspaceUi()
 
-    expect(harness.clearActiveNodePanels).toHaveBeenCalledWith(undefined)
+    expect(harness.clearActiveNodePanel).toHaveBeenCalledTimes(1)
     expect(harness.hideStrengthControl).toHaveBeenCalledTimes(1)
     expect(harness.cancelFlowExpandMode).not.toHaveBeenCalled()
     expect(harness.closeBoardHeaderEditing).not.toHaveBeenCalled()
     expect(harness.closeNodeContextMenu).not.toHaveBeenCalled()
   })
 
-  it('closes explicit surfaces and forwards panel keep options', () => {
+  it('closes explicit surfaces and clears the active node panel', () => {
     const harness = createHarness()
 
     harness.dismissTransientWorkspaceUi({
       closeExpand: true,
       closeBoardHeader: true,
       closeContextMenu: true,
-      clearNodePanels: { keepFusionPrompt: true },
     })
 
     expect(harness.cancelFlowExpandMode).toHaveBeenCalledTimes(1)
     expect(harness.closeBoardHeaderEditing).toHaveBeenCalledTimes(1)
     expect(harness.closeNodeContextMenu).toHaveBeenCalledTimes(1)
-    expect(harness.clearActiveNodePanels).toHaveBeenCalledWith({ keepFusionPrompt: true })
+    expect(harness.clearActiveNodePanel).toHaveBeenCalledTimes(1)
     expect(harness.hideStrengthControl).toHaveBeenCalledTimes(1)
   })
 
@@ -61,12 +60,12 @@ describe('useFlowTransientUiDismissal', () => {
 
     harness.dismissTransientWorkspaceUi({
       closeExpand: true,
-      clearNodePanels: false,
+      clearNodePanel: false,
       hideStrength: false,
     })
 
     expect(harness.cancelFlowExpandMode).toHaveBeenCalledTimes(1)
-    expect(harness.clearActiveNodePanels).not.toHaveBeenCalled()
+    expect(harness.clearActiveNodePanel).not.toHaveBeenCalled()
     expect(harness.hideStrengthControl).not.toHaveBeenCalled()
   })
 })

@@ -42,7 +42,7 @@ import type {
   ImageMaskBrushShape,
   ImageMaskDrawMode,
 } from '../composables/useImageMaskEditorOverlay'
-import type { FlowCreatableNodeKind } from '../composables/useFlowNodeMutations'
+import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
 import ImageMaskEditorChrome from './nodes/ImageMaskEditorChrome.vue'
 import WorkspaceNodeContextMenu from './WorkspaceNodeContextMenu.vue'
 
@@ -67,7 +67,7 @@ defineProps<{
   canUndoFlowMaskEditor: boolean
   canRedoFlowMaskEditor: boolean
   nodeContextMenu: { visible: boolean; x: number; y: number }
-  canvasNodeMenuItems: ReadonlyArray<{ key: FlowCreatableNodeKind; label: string }>
+  canvasNodeMenuItems: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
 }>()
 
 const emit = defineEmits<{
@@ -86,6 +86,6 @@ const emit = defineEmits<{
   'reference-image-remove': [imageId: string]
   'reference-image-preview': [image: MaskEditorReferenceImage]
   submit: [prompt: string, outputCount: number]
-  'create-node': [kind: FlowCreatableNodeKind]
+  'create-node': [kind: CanvasCreatableNodeKind]
 }>()
 </script>

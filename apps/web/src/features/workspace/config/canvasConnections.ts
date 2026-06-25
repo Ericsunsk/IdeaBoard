@@ -2,7 +2,7 @@ import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
   type CanvasConnectionContractNode,
-} from './canvasNodeConnectionContract'
+} from './canvasNodeRegistry'
 import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 
 export type CanvasConnectionTone = 'image' | 'prompt'
@@ -17,8 +17,6 @@ export type CanvasConnectionNodeLookup = (
   nodeType: CanvasConnectionNodeType,
   nodeId: number,
 ) => CanvasConnectionContractNode | null
-
-const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>(['fusion'])
 
 export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {
   if (port === 'prompt') return 'prompt'
@@ -40,17 +38,5 @@ export function isCanvasConnectionAllowed(
   const toPort = getCanvasNodeVisibleInputPorts(to.nodeType).find((port) => port.port === to.port)
   if (!fromPort || !toPort) return false
 
-  if (from.nodeType === 'prompt') {
-    return fromPort.kind === toPort.kind
-  }
-
-  if (from.nodeType === 'image') {
-    return fromPort.kind === 'image' && toPort.kind === 'image'
-  }
-
-  if (RELAY_IMAGE_OUTPUT_NODE_TYPES.has(from.nodeType)) {
-    return fromPort.kind === 'image' && toPort.kind === 'image'
-  }
-
-  return false
+  return fromPort.kind === toPort.kind
 }

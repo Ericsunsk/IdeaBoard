@@ -1,6 +1,10 @@
 import type { Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { ImageNodeItem } from '../types/canvasNodes'
+import {
+  resolveImageNodeDisplayPayload,
+  type ImageNodeDisplayPayload,
+} from '../utils/flowImageNodeSelectors'
 
 type UseFlowImageNodeSnapshotsOptions = {
   nodes: Ref<Node[]>
@@ -21,24 +25,10 @@ export function useFlowImageNodeSnapshots(options: UseFlowImageNodeSnapshotsOpti
     return node.data.snapshotNode as ImageNodeItem
   }
 
-  function getImageNodeDisplayPayload(nodeId: string): { url: string; ratio: number } | null {
+  function getImageNodeDisplayPayload(nodeId: string): ImageNodeDisplayPayload | null {
     const snapshot = getImageNodeSnapshot(nodeId)
     if (!snapshot) return null
-    const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-    const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
-    const url = `${latestOutput?.url || snapshot.sourceImageUrl || ''}`.trim()
-    if (!url) return null
-    const outputRatio = Number(latestOutput?.ratio)
-    const sourceRatio = Number(snapshot.sourceImageRatio)
-    return {
-      url,
-      ratio:
-        Number.isFinite(outputRatio) && outputRatio > 0
-          ? outputRatio
-          : Number.isFinite(sourceRatio) && sourceRatio > 0
-            ? sourceRatio
-            : 1,
-    }
+    return resolveImageNodeDisplayPayload(snapshot)
   }
 
   return {

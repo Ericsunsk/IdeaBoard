@@ -1,19 +1,20 @@
 <template>
-  <div
-    ref="stageElement"
+  <NodeStageFrame
+    ref="stageFrameRef"
     class="image-node-stage"
-    data-flow-handle-frame
     :data-image-node-id="nodeId"
     :data-flow-node-id="flowNodeId || undefined"
     :class="{
-      'is-loading': directGenerating && !displayImage,
-      'is-running': !!directGenerating,
       'is-expand-mode': !!expandModeActive,
       'is-mask-editor-mode': !!maskEditorModeActive,
-      'is-active': active && !expandModeActive,
     }"
-    :style="{ height: `${stageHeight}px` }"
-    :aria-busy="directGenerating ? 'true' : undefined"
+    layout="center"
+    :height="stageHeight"
+    :active="active && !expandModeActive"
+    :loading="!!directGenerating && !displayImage"
+    :running="!!directGenerating"
+    :transparent="!!expandModeActive || !!maskEditorModeActive"
+    :aria-busy="!!directGenerating"
     aria-label="图片节点输入与预览区域"
     @dragover.stop="onStageDragOver"
     @drop.stop="onStageDrop"
@@ -101,7 +102,7 @@
       />
       <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
     </div>
-  </div>
+  </NodeStageFrame>
 </template>
 
 <script setup lang="ts">
@@ -113,6 +114,7 @@ import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import ImageMaskEditorOverlay from './ImageMaskEditorOverlay.vue'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
+import NodeStageFrame from './NodeStageFrame.vue'
 
 const props = defineProps<{
   nodeId: string | number
@@ -171,8 +173,14 @@ const emptyStageAriaLabel = computed(() => {
 })
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.outputCount))
-const stageElement = ref<HTMLElement | null>(null)
-defineExpose({ stageElement })
+type NodeStageFrameExpose = { stageElement: HTMLElement | null }
+const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
+
+defineExpose({
+  get stageElement() {
+    return stageFrameRef.value?.stageElement ?? null
+  },
+})
 
 function onStageDragOver(event: DragEvent) {
   event.preventDefault()
@@ -231,40 +239,6 @@ function selectOutputCount(value: number) {
 .image-node-stage.is-expand-mode .image-node-stage-image,
 .image-node-stage.is-mask-editor-mode .image-node-stage-image {
   pointer-events: none;
-}
-
-.image-node-stage {
-  position: relative;
-  width: 100%;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 11px;
-  background: #ffffff;
-  box-sizing: border-box;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-node-stage.is-expand-mode,
-.image-node-stage.is-mask-editor-mode {
-  overflow: visible;
-  border-color: transparent;
-}
-
-.image-node-stage.is-active {
-  border-color: #9278e6;
-}
-
-.image-node-stage.is-mask-editor-mode.is-active {
-  border-color: transparent;
-}
-
-.image-node-stage.is-loading {
-  border-color: #e2e8f0;
-  box-shadow:
-    0 0 30px rgba(239, 68, 68, 0.2),
-    0 0 48px rgba(146, 120, 230, 0.18);
 }
 
 .image-node-stage-empty {

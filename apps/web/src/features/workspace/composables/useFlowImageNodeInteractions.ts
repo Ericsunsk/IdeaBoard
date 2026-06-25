@@ -1,8 +1,9 @@
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import { createImageNodeAt } from '../utils/canvasNodeFactory'
+import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
+import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { ImageNodeItem } from '../types/canvasNodes'
 import type { FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -61,7 +62,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
     const payload = options.getImageNodeDisplayPayload(nodeId)
     const sourceNode = options.getImageNodeSnapshot(nodeId)
     if (!payload || !sourceNode) return
-    const imageNode = createImageNodeAt({
+    const imageNode = createCanvasNodeAt('image', {
       x: sourceNode.x + Math.max(240, sourceNode.width + 64),
       y: sourceNode.y + 18,
     })
@@ -122,7 +123,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
       const sourceNode = idToNode.get(nodeId)
       const source = sourceNode?.data?.snapshotNode as ImageNodeItem | undefined
       if (!source || typeof source !== 'object') return
-      const copied = createImageNodeAt({
+      const copied = createCanvasNodeAt('image', {
         x: Number(source.x ?? 0) + delta.x,
         y: Number(source.y ?? 0) + delta.y,
       })
@@ -133,12 +134,8 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
           : 1
       copied.outputCount = source.outputCount ?? copied.outputCount
       copied.outputImages = cloneImageOutputs(source)
-      const latestOutput =
-        copied.outputImages.length > 0 ? copied.outputImages[copied.outputImages.length - 1] : null
-      copied.width = resolveImageNodeFrameSize(
-        latestOutput?.ratio ?? copied.sourceImageRatio,
-        !!(latestOutput?.url || copied.sourceImageUrl),
-      ).width
+      const displayPayload = resolveImageNodeDisplayPayload(copied)
+      copied.width = resolveImageNodeFrameSize(displayPayload?.ratio ?? 1, !!displayPayload).width
       copied.outputStatus = source.outputStatus
       appended.push(createImageFlowNode(copied))
     })

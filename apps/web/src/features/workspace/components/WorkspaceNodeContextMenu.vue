@@ -28,17 +28,17 @@
 </template>
 
 <script setup lang="ts">
-import type { FlowCreatableNodeKind } from '../composables/useFlowNodeMutations'
+import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
 
 const props = defineProps<{
   visible: boolean
   x: number
   y: number
-  items: ReadonlyArray<{ key: FlowCreatableNodeKind; label: string }>
+  items: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
 }>()
 
 const emit = defineEmits<{
-  create: [kind: FlowCreatableNodeKind]
+  create: [kind: CanvasCreatableNodeKind]
 }>()
 
 void props

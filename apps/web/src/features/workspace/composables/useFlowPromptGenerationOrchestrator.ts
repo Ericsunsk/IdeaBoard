@@ -37,7 +37,7 @@ export function useFlowPromptGenerationOrchestrator(
     promptNodeId: string,
     prompt: string,
     outputCount: number,
-    aspectRatio: string,
+    aspectRatio: PromptAspectRatio,
   ) {
     options.cancelFlowExpandMode()
     options.cancelFlowMaskEditorMode()

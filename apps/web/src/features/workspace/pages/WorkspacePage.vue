@@ -80,17 +80,24 @@
             :dragging="!!nodeProps.dragging"
             :copy-mode="duplicateModifierPressed"
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
-            :image-action-visible="activeImageActionNodeId === nodeProps.id"
-            :image-prompt-composer-visible="activeImagePromptNodeId === nodeProps.id"
+            :image-action-visible="
+              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeProps.id)
+            "
+            :image-prompt-composer-visible="
+              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeProps.id)
+            "
             :image-prompt-placeholder="
               getFlowMaskEditorCommittedData(nodeProps.id)
                 ? '描述如何重绘选区'
                 : '输入提示词改造这张图'
             "
-            :fusion-prompt-composer-visible="activeFusionPromptNodeId === nodeProps.id"
+            :fusion-prompt-composer-visible="
+              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeProps.id)
+            "
             :image-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
             :show-strength-control="
-              !!activeStrengthAction && activeImageActionNodeId === nodeProps.id
+              !!activeStrengthAction &&
+              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeProps.id)
             "
             :strength-pct="activeStrengthValue"
             :set-strength-track-ref="setStrengthTrackRef"
@@ -226,10 +233,8 @@ import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
-import {
-  useFlowNodeMutations,
-  type FlowCreatableNodeKind,
-} from '../composables/useFlowNodeMutations'
+import { useFlowNodeMutations } from '../composables/useFlowNodeMutations'
+import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
 import { useFlowImageDirectActions } from '../composables/useFlowImageDirectActions'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
@@ -247,7 +252,10 @@ import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewL
 import { useFlowMediaInputImages } from '../composables/useFlowMediaInputImages'
 import { useFlowNodeInternalsRefreshQueue } from '../composables/useFlowNodeInternalsRefreshQueue'
 import { useFlowViewportControls } from '../composables/useFlowViewportControls'
-import { useFlowActiveNodePanels } from '../composables/useFlowActiveNodePanels'
+import {
+  ACTIVE_NODE_PANEL_KIND,
+  useFlowActiveNodePanels,
+} from '../composables/useFlowActiveNodePanels'
 import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
 import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
 import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
@@ -313,17 +321,17 @@ const activeTool = ref<'select' | 'hand' | 'text'>('select')
 let hasPendingViewportChange = false
 let isApplyingBoardViewport = false
 
-const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
+const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
 
 const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING =
   import.meta.env.VITE_WORKSPACE_FLOW_ENABLE_CULLING === 'true'
 
 const {
-  activeImageActionNodeId,
-  activeImagePromptNodeId,
-  activeFusionPromptNodeId,
-  closeActiveImagePromptComposer,
-  clearActiveNodePanels,
+  activeNodePanel,
+  openActiveNodePanel,
+  clearActiveNodePanel,
+  isActiveNodePanel,
+  getActiveNodePanelNodeId,
 } = useFlowActiveNodePanels()
 const duplicateModifierPressed = ref(false)
 const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
@@ -481,11 +489,7 @@ const {
 const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
   useFlowNodeContextMenu()
 const hasWorkspaceDismissableLayer = computed(
-  () =>
-    nodeContextMenu.value.visible ||
-    activeImageActionNodeId.value !== null ||
-    activeImagePromptNodeId.value !== null ||
-    activeFusionPromptNodeId.value !== null,
+  () => nodeContextMenu.value.visible || activeNodePanel.value !== null,
 )
 
 const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
@@ -574,9 +578,9 @@ const {
   onStrengthTrackMouseDown: onFlowImageStrengthTrackMouseDown,
 } = useFlowImageActionStrengthControl({
   onCommit: (action, strength) => {
-    const targetNodeId = activeImageActionNodeId.value
+    const targetNodeId = getActiveNodePanelNodeId(ACTIVE_NODE_PANEL_KIND.imageTools)
     if (!targetNodeId) return
-    clearActiveNodePanels()
+    clearActiveNodePanel()
     void runImageDirectAction(targetNodeId, action, { strength })
   },
 })
@@ -612,7 +616,7 @@ const { dismissTransientWorkspaceUi } = useFlowTransientUiDismissal({
   cancelFlowExpandMode,
   closeBoardHeaderEditing,
   closeNodeContextMenu,
-  clearActiveNodePanels,
+  clearActiveNodePanel,
   hideStrengthControl,
 })
 
@@ -689,8 +693,7 @@ const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, onFlowI
 const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFramePointerDown } =
   useFlowExpandInteractionHandlers({
     flowExpandNodeId,
-    closeActiveImagePromptComposer,
-    clearActiveNodePanels,
+    clearActiveNodePanel,
     hideStrengthControl,
     commitFlowExpandMode,
     beginFlowExpandHandleResize,
@@ -740,7 +743,7 @@ const { onMaskEditorChromeSubmit, onMaskEditorChromeOutputCountUpdate } =
     maskEditorReferenceImages,
     commitFlowMaskEditorMode,
     getFlowMaskEditorCommittedData,
-    clearActiveNodePanels,
+    clearActiveNodePanel,
     hideStrengthControl,
     runImageInpaintAction,
     onFlowNodeParamUpdate,
@@ -844,12 +847,9 @@ const {
   onFlowFusionPromptGenerate,
 } = useFlowImageActionOrchestrator({
   flowMaskEditorNodeId,
-  activeImageActionNodeId,
-  activeImagePromptNodeId,
-  activeFusionPromptNodeId,
   suppressClickAction,
-  clearActiveNodePanels,
-  closeActiveImagePromptComposer,
+  openActiveNodePanel,
+  clearActiveNodePanel,
   hideStrengthControl,
   selectFlowNodeForContextMenu,
   cancelFlowExpandMode,
