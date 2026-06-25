@@ -133,7 +133,7 @@
             <span>状态</span>
             <Select
               v-model="filterStatus"
-              :options="taskStatusOptions"
+              :options="taskStatusSelectOptions"
               option-label="label"
               option-value="value"
               size="small"
@@ -271,8 +271,8 @@
             <Column header="状态" :style="{ width: '104px' }">
               <template #body="{ data }">
                 <Tag
-                  :value="getTaskStatusConfig(data.status).text"
-                  :severity="getTaskStatusConfig(data.status).severity"
+                  :value="getTaskStatusDefinition(data.status).text"
+                  :severity="getTaskStatusDefinition(data.status).severity"
                   rounded
                   class="min-w-16 justify-center"
                 />
@@ -331,7 +331,7 @@
           <div class="flex min-w-0 items-center gap-3">
             <span
               class="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[14px] border border-admin-border-soft bg-admin-surface-muted"
-              :style="{ color: getTaskStatusConfig(detailTask?.status || '').color }"
+              :style="{ color: getTaskStatusDefinition(detailTask?.status || '').color }"
             >
               <CheckCircle v-if="detailTask?.status === ListAdminTasksStatus.completed" />
               <XmarkCircle
@@ -354,8 +354,8 @@
           <div class="flex shrink-0 items-center gap-2">
             <Tag
               v-if="detailTask"
-              :value="getTaskStatusConfig(detailTask.status).text"
-              :severity="getTaskStatusConfig(detailTask.status).severity"
+              :value="getTaskStatusDefinition(detailTask.status).text"
+              :severity="getTaskStatusDefinition(detailTask.status).severity"
               rounded
               class="max-md:hidden"
             />
@@ -381,7 +381,7 @@
             <span class="flex items-center gap-[9px]">
               <span :class="getTaskStatusDotClass(detailTask.status)" />
               <span class="text-admin-heading leading-[1.15] font-extrabold text-admin-text-1">
-                {{ getTaskStatusConfig(detailTask.status).text }}
+                {{ getTaskStatusDefinition(detailTask.status).text }}
               </span>
             </span>
           </div>
@@ -607,10 +607,7 @@ import {
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import type { Task } from '../../../../shared/api/task'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import {
-  ListAdminTasksStatus,
-  type ListAdminTasksStatus as ListAdminTasksStatusValue,
-} from '../../../../shared/api/generated-query/model'
+import { ListAdminTasksStatus } from '../../../../shared/api/generated-query/model'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
@@ -636,10 +633,12 @@ import {
   getTaskDuration,
   getTaskResultImageUrl,
   getTaskSanitizedError,
-  getTaskStatusConfig,
   getTaskUserIdentifier,
-  taskStatusOptions,
 } from './taskMonitorColumns'
+import {
+  getTaskStatusDefinition,
+  taskStatusSelectOptions,
+} from './taskMonitorStatus'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { useTaskMonitorCharts } from './useTaskMonitorCharts'
 import { useTaskMonitor } from './useTaskMonitor'
@@ -657,24 +656,8 @@ const taskDetailDialogPt = createAdminDialogPt({
 })
 const detailBannerBaseClass =
   'relative flex flex-col gap-3 overflow-hidden rounded-[18px] border border-admin-border-soft bg-admin-surface-muted px-[18px] py-4 before:absolute before:top-3.5 before:bottom-3.5 before:left-0 before:w-1 before:rounded-full before:bg-admin-text-3'
-const detailStatusBannerClassByStatus: Partial<Record<ListAdminTasksStatusValue, string>> = {
-  [ListAdminTasksStatus.completed]:
-    'bg-[linear-gradient(135deg,rgba(47,158,115,0.1),rgba(255,255,255,0.74))] before:bg-admin-success',
-  [ListAdminTasksStatus.failed]:
-    'bg-[linear-gradient(135deg,rgba(209,77,90,0.095),rgba(255,255,255,0.74))] before:bg-admin-danger',
-  [ListAdminTasksStatus.cancelled]:
-    'bg-[linear-gradient(135deg,rgba(152,162,179,0.12),rgba(255,255,255,0.74))] before:bg-admin-text-3',
-  [ListAdminTasksStatus.running]:
-    'bg-[linear-gradient(135deg,rgba(212,136,48,0.1),rgba(255,255,255,0.74))] before:bg-admin-warning',
-}
 const detailStatusDotBaseClass =
   'h-[9px] w-[9px] shrink-0 rounded-full bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]'
-const detailStatusDotClassByStatus: Partial<Record<ListAdminTasksStatusValue, string>> = {
-  [ListAdminTasksStatus.completed]: 'bg-admin-success shadow-[0_0_0_4px_rgba(47,158,115,0.14)]',
-  [ListAdminTasksStatus.failed]: 'bg-admin-danger shadow-[0_0_0_4px_rgba(209,77,90,0.14)]',
-  [ListAdminTasksStatus.cancelled]: 'bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]',
-  [ListAdminTasksStatus.running]: 'bg-admin-warning shadow-[0_0_0_4px_rgba(212,136,48,0.15)]',
-}
 
 const {
   detailModalVisible,
@@ -808,17 +791,11 @@ function clearSearch() {
 }
 
 function getTaskStatusBannerClass(status: string) {
-  return [
-    detailBannerBaseClass,
-    detailStatusBannerClassByStatus[status as ListAdminTasksStatusValue],
-  ]
+  return [detailBannerBaseClass, getTaskStatusDefinition(status).bannerClass]
 }
 
 function getTaskStatusDotClass(status: string) {
-  return [
-    detailStatusDotBaseClass,
-    detailStatusDotClassByStatus[status as ListAdminTasksStatusValue],
-  ]
+  return [detailStatusDotBaseClass, getTaskStatusDefinition(status).dotClass]
 }
 
 function getTaskDurationClass(task: Parameters<typeof getTaskDuration>[0]) {

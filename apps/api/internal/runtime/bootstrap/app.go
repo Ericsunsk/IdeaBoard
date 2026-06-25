@@ -4,14 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
 	"ideaboard/api/internal/auth"
 	"ideaboard/api/internal/db/migrations"
-	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasks"
@@ -165,62 +162,9 @@ func runInitAdmin() {
 	slog.Info("created Better Auth admin account and local admin profile")
 }
 
-func requireAuthInternalKeyForProduction(cfg *config.Config) {
-	if cfg == nil {
-		return
-	}
-	if !isProductionRuntime(cfg.App.Env) {
-		return
-	}
-	internalKey := strings.TrimSpace(cfg.Auth.InternalAPIKey)
-	if internalKey == "" {
-		fatal("AUTH_INTERNAL_KEY must be set when APP_ENV=production")
-	}
-	if isUnsafeProductionSecret(internalKey) {
-		fatal("AUTH_INTERNAL_KEY must not use placeholder or development values in production")
-	}
-}
-
-func configureRuntimeLogging(cfg *config.Config) {
-	if cfg == nil {
-		return
-	}
-	if err := applog.Configure(cfg.App.LogFile, cfg.App.Env); err != nil {
-		slog.Warn("failed to open log file", "path", cfg.App.LogFile, "err", err)
-	}
-}
-
 func fatal(msg string, attrs ...any) {
 	slog.Error(msg, attrs...)
 	os.Exit(1)
-}
-
-func isProductionRuntime(env string) bool {
-	switch strings.ToLower(strings.TrimSpace(env)) {
-	case "prod", "production", "release":
-		return true
-	default:
-		return false
-	}
-}
-
-func isUnsafeProductionSecret(value string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(value))
-	if normalized == "" {
-		return true
-	}
-	if strings.HasPrefix(normalized, "replace-with") {
-		return true
-	}
-	if strings.Contains(normalized, "change-before-production") {
-		return true
-	}
-	switch normalized {
-	case "changeme", "change-me", "password", "secret":
-		return true
-	default:
-		return false
-	}
 }
 
 func valueOrEmpty(value *string) string {
@@ -228,74 +172,4 @@ func valueOrEmpty(value *string) string {
 		return ""
 	}
 	return *value
-}
-
-// buildCORSMiddleware returns a Gin middleware for CORS handling.
-// In production with no explicit allowlist, reject cross-origin browser requests.
-// If origins are configured, enforce the same allowlist in every environment.
-func buildCORSMiddleware(appEnv string, allowedOrigins []string) gin.HandlerFunc {
-	allowed := buildAllowedOriginSet(allowedOrigins)
-	if len(allowedOrigins) == 0 && isProductionRuntime(appEnv) {
-		slog.Warn("生产环境未配置 APP_CORS_ALLOWED_ORIGINS，将拒绝跨域请求。请设置该环境变量或在反向代理中处理 CORS。")
-		return func(c *gin.Context) {
-			if origin := c.GetHeader("Origin"); origin != "" {
-				c.AbortWithStatus(http.StatusForbidden)
-				return
-			}
-			c.Next()
-		}
-	}
-	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		if origin == "" {
-			c.Next()
-			return
-		}
-		if !allowed[normalizeCORSOrigin(origin)] {
-			if c.Request.Method == "OPTIONS" {
-				c.AbortWithStatus(http.StatusForbidden)
-				return
-			}
-			c.Next()
-			return
-		}
-		c.Header("Access-Control-Allow-Origin", origin)
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With")
-		c.Header("Vary", "Origin")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-		c.Next()
-	}
-}
-
-func buildAllowedOriginSet(origins []string) map[string]bool {
-	allowed := make(map[string]bool, len(origins))
-	for _, origin := range origins {
-		normalized := normalizeCORSOrigin(origin)
-		if normalized == "" {
-			continue
-		}
-		allowed[normalized] = true
-	}
-	return allowed
-}
-
-func normalizeCORSOrigin(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return ""
-	}
-	scheme := strings.ToLower(parsed.Scheme)
-	if scheme != "http" && scheme != "https" {
-		return ""
-	}
-	return scheme + "://" + strings.ToLower(parsed.Host)
 }

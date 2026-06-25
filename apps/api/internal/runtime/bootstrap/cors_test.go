@@ -96,23 +96,50 @@ func TestBuildCORSMiddlewareRejectsDisallowedPreflight(t *testing.T) {
 	}
 }
 
-func TestBuildCORSMiddlewareInvalidProductionAllowlistDoesNotFallbackToNoop(t *testing.T) {
+func TestBuildCORSMiddlewareRejectsDisallowedSimpleRequest(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
-	router.Use(buildCORSMiddleware("production", []string{"not-a-valid-origin"}))
-	router.OPTIONS("/api/health", func(c *gin.Context) {
+	router.Use(buildCORSMiddleware("development", []string{"http://localhost:5173"}))
+	router.GET("/api/health", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
-	req.Header.Set("Origin", "https://app.example.com")
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	req.Header.Set("Origin", "https://evil.example.com")
 	res := httptest.NewRecorder()
 
 	router.ServeHTTP(res, req)
 
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", res.Code, http.StatusForbidden)
+	}
+	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want empty", got)
+	}
+}
+
+func TestBuildCORSMiddlewareInvalidProductionAllowlistDoesNotFallbackToNoop(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(buildCORSMiddleware("production", []string{"not-a-valid-origin"}))
+	router.Any("/api/health", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	for _, method := range []string{http.MethodOptions, http.MethodGet} {
+		t.Run(method, func(t *testing.T) {
+			req := httptest.NewRequest(method, "/api/health", nil)
+			req.Header.Set("Origin", "https://app.example.com")
+			res := httptest.NewRecorder()
+
+			router.ServeHTTP(res, req)
+
+			if res.Code != http.StatusForbidden {
+				t.Fatalf("status = %d, want %d", res.Code, http.StatusForbidden)
+			}
+		})
 	}
 }
 

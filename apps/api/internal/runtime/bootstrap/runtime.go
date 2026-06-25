@@ -1,88 +1,62 @@
 package bootstrap
 
 import (
-	"context"
 	"log/slog"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	"strings"
 
+	"ideaboard/api/internal/platform/applog"
 	"ideaboard/api/internal/platform/config"
 )
 
-type runtimeApp struct {
-	container  *appContainer
-	httpServer *http.Server
-}
-
-func newRuntimeApp(cfg *config.Config) (*runtimeApp, error) {
-	container, err := newAppContainer(cfg)
-	if err != nil {
-		return nil, err
+func configureRuntimeLogging(cfg *config.Config) {
+	if cfg == nil {
+		return
 	}
-	return &runtimeApp{
-		container:  container,
-		httpServer: newHTTPServer(cfg, container.router),
-	}, nil
-}
-
-func (a *runtimeApp) start() {
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				slog.Error("River worker goroutine panicked", "panic", r)
-				fatal("River worker goroutine panicked", "panic", r)
-			}
-		}()
-		slog.Info("River worker starting", "queue", a.container.workerQueueName, "concurrency", a.container.workerConcurrent)
-		if err := a.container.riverClient.Start(context.Background()); err != nil {
-			fatal("failed to start River worker", "err", err)
-		}
-	}()
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				slog.Error("HTTP server goroutine panicked", "panic", r)
-				fatal("HTTP server goroutine panicked", "panic", r)
-			}
-		}()
-		slog.Info("HTTP server starting", "addr", a.httpServer.Addr)
-		if err := a.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fatal("failed to start HTTP server", "err", err)
-		}
-	}()
-}
-
-func (a *runtimeApp) waitForShutdownSignal() {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-}
-
-func (a *runtimeApp) shutdown() error {
-	slog.Info("server shutting down")
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer stopCancel()
-	if err := a.container.riverClient.Stop(stopCtx); err != nil {
-		slog.Warn("River worker graceful stop failed", "err", err)
+	if err := applog.Configure(cfg.App.LogFile, cfg.App.Env); err != nil {
+		slog.Warn("failed to open log file", "path", cfg.App.LogFile, "err", err)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := a.httpServer.Shutdown(ctx); err != nil {
-		return err
-	}
-
-	slog.Info("server exited")
-	return nil
 }
 
-func (a *runtimeApp) close() error {
-	if a == nil || a.container == nil {
-		return nil
+func requireAuthInternalKeyForProduction(cfg *config.Config) {
+	if cfg == nil {
+		return
 	}
-	return a.container.close()
+	if !isProductionRuntime(cfg.App.Env) {
+		return
+	}
+	internalKey := strings.TrimSpace(cfg.Auth.InternalAPIKey)
+	if internalKey == "" {
+		fatal("AUTH_INTERNAL_KEY must be set when APP_ENV=production")
+	}
+	if isUnsafeProductionSecret(internalKey) {
+		fatal("AUTH_INTERNAL_KEY must not use placeholder or development values in production")
+	}
+}
+
+func isProductionRuntime(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "prod", "production", "release":
+		return true
+	default:
+		return false
+	}
+}
+
+func isUnsafeProductionSecret(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return true
+	}
+	if strings.HasPrefix(normalized, "replace-with") {
+		return true
+	}
+	if strings.Contains(normalized, "change-before-production") {
+		return true
+	}
+	switch normalized {
+	case "changeme", "change-me", "password", "secret":
+		return true
+	default:
+		return false
+	}
 }

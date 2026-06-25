@@ -20,6 +20,7 @@ import {
   type AdminChartOptions,
   withAlpha,
 } from '../../shared/lib/adminChart'
+import { getTaskStatusDefinition, taskStatusOrder } from './taskMonitorStatus'
 import {
   normalizeMonitorExecutionPressurePoints,
   type TaskExecutionPressurePoint,
@@ -73,16 +74,10 @@ const executionPressureColorByKey: Record<TaskExecutionSignalKey, string> = {
   other: adminChartTheme.emptyText,
 }
 
-const taskDistributionStatuses: Array<{
-  key: ListAdminTasksStatusValue
-  label: string
-}> = [
-  { key: ListAdminTasksStatus.pending, label: '等待中' },
-  { key: ListAdminTasksStatus.running, label: '执行中' },
-  { key: ListAdminTasksStatus.completed, label: '已完成' },
-  { key: ListAdminTasksStatus.failed, label: '失败' },
-  { key: ListAdminTasksStatus.cancelled, label: '已取消' },
-]
+const taskDistributionStatuses = taskStatusOrder.map((key) => ({
+  key,
+  label: getTaskStatusDefinition(key).text,
+}))
 
 export function useTaskMonitorCharts(options: {
   monitorData: Ref<MonitorData | null>

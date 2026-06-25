@@ -1,22 +1,12 @@
 import type { Task } from '../../../../shared/api/task'
-import {
-  ListAdminTasksStatus,
-  type ListAdminTasksStatus as ListAdminTasksStatusValue,
-} from '../../../../shared/api/generated-query/model'
+import { ListAdminTasksStatus } from '../../../../shared/api/generated-query/model'
 import { calcDurationSeconds, formatAdminDateTime } from '../../../../shared/utils/dateTime'
 import { sanitizeTaskErrorMessage } from '../../../../shared/utils/errorMessages'
 import { getSafeTaskResultImageUrl } from './taskResultImages'
 
-type TaskStatusTagSeverity = 'secondary' | 'warn' | 'success' | 'danger'
 type TaskDurationTone = 'success' | 'warning' | 'danger'
 type TaskApiCallInfo = {
   platform: string
-}
-
-interface TaskStatusConfig {
-  severity: TaskStatusTagSeverity
-  text: string
-  color: string
 }
 
 type MonitorTaskRow = Task & {
@@ -28,51 +18,7 @@ type MonitorTaskRow = Task & {
   }
 }
 
-const ERROR_TEXT_COLOR = 'var(--color-admin-danger)'
-const DEFAULT_STATUS_COLOR = 'var(--color-admin-text-3)'
 const taskApiCallCache = new WeakMap<Task, { result: string; value: TaskApiCallInfo | null }>()
-
-export const taskStatusOptions: Array<{ label: string; value: ListAdminTasksStatusValue }> = [
-  { label: '等待中', value: ListAdminTasksStatus.pending },
-  { label: '执行中', value: ListAdminTasksStatus.running },
-  { label: '已完成', value: ListAdminTasksStatus.completed },
-  { label: '失败', value: ListAdminTasksStatus.failed },
-  { label: '已取消', value: ListAdminTasksStatus.cancelled },
-]
-
-const taskStatusConfigMap: Record<ListAdminTasksStatusValue, TaskStatusConfig> = {
-  [ListAdminTasksStatus.pending]: {
-    severity: 'secondary',
-    text: '等待中',
-    color: DEFAULT_STATUS_COLOR,
-  },
-  [ListAdminTasksStatus.running]: {
-    severity: 'warn',
-    text: '执行中',
-    color: 'var(--color-admin-warning)',
-  },
-  [ListAdminTasksStatus.completed]: {
-    severity: 'success',
-    text: '已完成',
-    color: 'var(--color-admin-success)',
-  },
-  [ListAdminTasksStatus.failed]: { severity: 'danger', text: '失败', color: ERROR_TEXT_COLOR },
-  [ListAdminTasksStatus.cancelled]: {
-    severity: 'secondary',
-    text: '已取消',
-    color: DEFAULT_STATUS_COLOR,
-  },
-}
-
-export function getTaskStatusConfig(status: string): TaskStatusConfig {
-  return (
-    taskStatusConfigMap[status as ListAdminTasksStatusValue] || {
-      severity: 'secondary',
-      text: status,
-      color: DEFAULT_STATUS_COLOR,
-    }
-  )
-}
 
 export function formatTaskCreatedAt(row: Task) {
   return formatAdminDateTime(row.created_at, row.created_at)

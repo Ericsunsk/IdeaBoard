@@ -145,9 +145,6 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 	if secret == "" {
 		return nil
 	}
-	if err := secrets.RequireEncryptionEnabled(); err != nil {
-		return err
-	}
 	fingerprint := storageSecretFingerprint(secret)
 	encrypted, err := secrets.EncryptString(secret)
 	if err != nil {

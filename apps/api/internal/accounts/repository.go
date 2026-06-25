@@ -523,16 +523,12 @@ func rotateAccountSecret(ctx context.Context, q *dbsqlc.Queries, accountID int64
 	if apiKey == "" {
 		return nil
 	}
-	if err := secrets.RequireEncryptionEnabled(); err != nil {
-		return err
-	}
-	if err := q.RetireActiveAccountSecrets(ctx, accountID); err != nil {
-		return err
-	}
-
 	payload, err := secrets.EncryptString(apiKey)
 	if err != nil {
 		return fmt.Errorf("加密 API Key 失败: %w", err)
+	}
+	if err := q.RetireActiveAccountSecrets(ctx, accountID); err != nil {
+		return err
 	}
 
 	_, err = q.CreateAccountSecret(ctx, dbsqlc.CreateAccountSecretParams{
