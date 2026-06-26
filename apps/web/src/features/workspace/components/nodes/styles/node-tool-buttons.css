@@ -1,14 +1,33 @@
 .node-tool-surface {
-  --node-tool-border-width: 1.2px;
+  --node-tool-border-width: var(--workspace-control-border-width);
   --node-tool-button-size: 35px;
   --node-tool-button-radius: 10px;
-  --node-tool-button-gap: 7px;
+  --node-tool-button-gap: var(--workspace-tool-button-gap);
   --node-tool-icon-size: 21px;
   --node-tool-popover-option-height: 33px;
   --node-tool-tooltip-delay: 200ms;
   --node-tool-button-border: var(--color-canvas-accent-border);
   --node-tool-button-accent: var(--color-canvas-accent);
   --node-tool-button-brand: var(--color-canvas-accent-hover);
+  --node-tool-icon-button-size: var(--node-tool-button-size);
+  --node-tool-icon-button-radius: var(--node-tool-button-radius);
+  --node-tool-icon-button-border: var(--node-tool-button-border);
+  --node-tool-icon-button-bg: #ffffff;
+  --node-tool-icon-button-color: #6f61c6;
+  --node-tool-icon-button-active-border: var(--node-tool-button-brand);
+  --node-tool-icon-button-active-color: var(--node-tool-button-brand);
+  --node-tool-icon-button-active-bg: #ffffff;
+  --node-tool-icon-button-hover-border: var(--node-tool-button-brand);
+  --node-tool-icon-button-hover-color: var(--node-tool-button-brand);
+  --node-tool-icon-button-hover-bg: #ffffff;
+  --node-tool-icon-button-hover-transform: scale(1.06);
+  --node-tool-icon-button-primary-border: var(--node-tool-button-brand);
+  --node-tool-icon-button-primary-color: #ffffff;
+  --node-tool-icon-button-primary-bg: var(--node-tool-button-brand);
+  --node-tool-icon-button-primary-hover-border: #6c5cb8;
+  --node-tool-icon-button-primary-hover-color: #ffffff;
+  --node-tool-icon-button-primary-hover-bg: #6c5cb8;
+  --node-tool-icon-button-icon-size: var(--node-tool-icon-size);
 }
 
 .node-tool-button {
@@ -41,9 +60,9 @@
 .node-tool-output-count,
 .node-tool-output-count-option {
   transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
+    background-color var(--workspace-motion-fast) ease,
+    border-color var(--workspace-motion-fast) ease,
+    color var(--workspace-motion-fast) ease;
 }
 
 .node-tool-output-count:hover:not(:disabled),
@@ -76,20 +95,18 @@
   opacity: 0;
   pointer-events: none;
   transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
+    opacity var(--workspace-motion-fast) ease,
+    transform var(--workspace-motion-fast) ease;
 }
 
 .node-tool-tooltip-trigger {
   position: relative;
 }
 
-.node-tool-tooltip-trigger:not(:disabled):hover .node-tool-tooltip,
-.node-tool-tooltip-trigger:not(:disabled):focus-visible .node-tool-tooltip,
-.node-tool-tooltip-trigger:not(:disabled):focus-within .node-tool-tooltip {
+.node-tool-tooltip-trigger:not(:disabled):hover .node-tool-tooltip {
   opacity: 1;
   transform: translate(-50%, 0);
-  transition-delay: var(--node-tool-tooltip-delay, 200ms);
+  transition-delay: var(--node-tool-tooltip-delay);
 }
 
 .node-tool-send {
@@ -97,14 +114,14 @@
   color: #ffffff;
   background: var(--node-tool-button-brand);
   transition:
-    transform 0.16s ease,
-    opacity 0.16s ease,
-    background-color 0.16s ease;
+    transform var(--workspace-motion-fast) ease,
+    opacity var(--workspace-motion-fast) ease,
+    background-color var(--workspace-motion-fast) ease;
 }
 
 .node-tool-send:hover:not(:disabled) {
   transform: translateX(1px);
-  background: #6f61c6;
+  background: var(--workspace-accent-hover);
 }
 
 .node-tool-send:disabled {
@@ -118,10 +135,10 @@
   bottom: calc(100% + var(--node-tool-button-gap));
   z-index: 43;
   border: var(--node-tool-border-width) solid var(--color-canvas-accent-border-soft);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.98);
+  border-radius: var(--workspace-floating-radius);
+  background: var(--workspace-surface-bg);
   box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--workspace-surface-blur));
 }
 
 .node-tool-popover-grid {

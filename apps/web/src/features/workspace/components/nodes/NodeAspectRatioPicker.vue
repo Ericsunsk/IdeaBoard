@@ -3,7 +3,7 @@
     class="node-aspect-ratio-wrap relative h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)]"
   >
     <button
-      class="node-aspect-ratio-trigger node-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-white p-0 text-xs leading-none font-bold text-[#505766] outline-none transition-colors duration-[160ms] ease-[ease] disabled:cursor-wait disabled:opacity-[0.55]"
+      class="node-aspect-ratio-trigger node-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-white p-0 text-xs leading-none font-bold text-[#505766] outline-none disabled:cursor-wait disabled:opacity-[0.55]"
       type="button"
       :class="{ active: visible }"
       :disabled="disabled"
@@ -15,7 +15,7 @@
         :data-ratio="ratio"
       >
         <span
-          class="grid h-5 w-5 place-items-center rounded border border-[#cbd5e1] text-[#94a3b8] transition-colors duration-[160ms] ease-[ease]"
+          class="grid h-5 w-5 place-items-center rounded border border-[#cbd5e1] text-[#94a3b8]"
           aria-hidden="true"
         ></span>
       </span>
@@ -26,7 +26,7 @@
         v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
         :key="option"
         type="button"
-        class="node-aspect-ratio-option node-tool-tooltip-trigger relative h-[var(--node-tool-popover-option-height)] w-[var(--node-tool-button-size)] cursor-pointer rounded-none border-0 bg-transparent p-0 text-[#5f6878] transition-colors duration-[160ms] ease-[ease]"
+        class="node-aspect-ratio-option node-tool-tooltip-trigger relative h-[var(--node-tool-popover-option-height)] w-[var(--node-tool-button-size)] cursor-pointer rounded-none border-0 bg-transparent p-0 text-[#5f6878]"
         :class="{ active: option === ratio }"
         :disabled="disabled"
         :aria-label="option"
@@ -37,7 +37,7 @@
           :data-ratio="option"
         >
           <span
-            class="grid h-5 w-5 place-items-center rounded border border-[#cbd5e1] text-[#94a3b8] transition-colors duration-[160ms] ease-[ease]"
+            class="grid h-5 w-5 place-items-center rounded border border-[#cbd5e1] text-[#94a3b8]"
             aria-hidden="true"
           ></span>
         </span>
@@ -104,6 +104,15 @@ const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
 
 .node-aspect-ratio-popover {
   right: 0;
+}
+
+.node-aspect-ratio-trigger,
+.node-aspect-ratio-option,
+.node-aspect-ratio-icon > span {
+  transition:
+    background-color var(--workspace-motion-fast) ease,
+    border-color var(--workspace-motion-fast) ease,
+    color var(--workspace-motion-fast) ease;
 }
 
 .node-aspect-ratio-trigger:hover:not(:disabled),

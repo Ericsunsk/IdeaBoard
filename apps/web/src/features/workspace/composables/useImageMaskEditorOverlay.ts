@@ -1,5 +1,4 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
-import type { Node } from '@vue-flow/core'
 import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 import {
   buildMaskCommitResult,
@@ -9,14 +8,8 @@ import {
 } from '../utils/maskPaintingCanvas'
 import type { MaskPaintBrushShape } from '../utils/maskBrushEngine'
 import { drawMaskStrokeSegment } from '../utils/maskBrushEngine'
-import { containImageRect } from '../utils/canvasExtendGeometry'
 import { getMaskCanvasPoint } from '../utils/maskCanvasGeometry'
-import { isEditableEventTarget } from '../utils/domEventTargets'
-
-type ImageDisplayPayload = {
-  url: string
-  ratio: number
-}
+import type { ImageEditorModeState } from './useImageEditorMode'
 
 export type ImageMaskDrawMode = 'paint' | 'erase'
 export type ImageMaskBrushShape = MaskPaintBrushShape
@@ -34,11 +27,6 @@ function strengthToFeatherRadius(strength: number) {
   return Math.max(1, Math.round((clamped / 100) * MAX_FEATHER_RADIUS))
 }
 
-type ImageMaskEditorState = {
-  nodeId: string
-  imageRect: { left: number; top: number; width: number; height: number }
-}
-
 type MaskHistoryEntry = {
   width: number
   height: number
@@ -46,17 +34,12 @@ type MaskHistoryEntry = {
 }
 
 type UseImageMaskEditorOverlayOptions = {
-  nodes: Ref<Node[]>
-  activeTool: Ref<string>
-  getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
-  getImageStageElement: (nodeId: string) => HTMLElement | null
-  onBeforePointerCancel?: () => void
+  imageEditorState: Ref<ImageEditorModeState | null>
   startCanvasInteraction?: (key: CanvasInteractionKey) => void
   stopCanvasInteraction?: (key: CanvasInteractionKey) => void
 }
 
 export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOptions) {
-  const state = ref<ImageMaskEditorState | null>(null)
   const drawMode = ref<ImageMaskDrawMode>('paint')
   const brushSize = ref(18)
   const brushHardness = ref(70)
@@ -78,16 +61,14 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
 
   const MASK_HISTORY_LIMIT = 40
 
-  const isMaskEditorMode = computed(() => !!state.value)
-  const maskEditorNodeId = computed(() => state.value?.nodeId ?? null)
-  const activeEditorNodeKind = computed(() => {
-    const nodeId = state.value?.nodeId
-    if (!nodeId) return null
-    return options.nodes.value.find((item) => item.id === nodeId)?.data?.kind ?? null
+  const inpaintEditorState = computed(() => {
+    const state = options.imageEditorState.value
+    return state?.mode === 'inpaint' ? state : null
   })
+  const maskEditorNodeId = computed(() => inpaintEditorState.value?.nodeId ?? null)
   const maskEditorOverlayStyle = computed<Record<string, string> | null>(() => {
-    if (!state.value) return null
-    const rect = state.value.imageRect
+    const rect = inpaintEditorState.value?.imageRect
+    if (!rect) return null
     return {
       left: `${rect.left}px`,
       top: `${rect.top}px`,
@@ -155,7 +136,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     return true
   }
 
-  function updateHistoryAvailability(nodeId = state.value?.nodeId ?? null) {
+  function updateHistoryAvailability(nodeId = maskEditorNodeId.value) {
     canUndoMask.value = nodeId ? readUndoStack(nodeId).length > 0 : false
     canRedoMask.value = nodeId ? readRedoStack(nodeId).length > 0 : false
   }
@@ -229,9 +210,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingBeforeEntry = null
   }
 
-  function saveMaskDraft(): boolean {
-    const nodeId = state.value?.nodeId
-    if (!nodeId) return false
+  function saveMaskDraftForNode(nodeId: string): boolean {
     stopPainting()
     const canvas = canvasRefs.get(nodeId)
     if (!canvas) return false
@@ -244,27 +223,9 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     return true
   }
 
-  function cancelMaskEditorMode() {
-    saveMaskDraft()
-    state.value = null
-  }
-
-  function enterMaskEditorMode(nodeId: string): boolean {
-    const display = options.getImageNodeDisplayPayload(nodeId)
-    if (!display?.url) return false
-    const stage = options.getImageStageElement(nodeId)
-    if (!stage) return false
-    const containRect = containImageRect(stage.clientWidth, stage.clientHeight, display.ratio)
-    if (!containRect) return false
-    stopPainting()
-    state.value = {
-      nodeId,
-      imageRect: containRect,
-    }
-    drawMode.value = 'paint'
-    drawCommittedMask(nodeId)
-    updateHistoryAvailability(nodeId)
-    return true
+  function saveMaskDraft(): boolean {
+    const nodeId = maskEditorNodeId.value
+    return nodeId ? saveMaskDraftForNode(nodeId) : false
   }
 
   function onPointerMove(event: PointerEvent) {
@@ -304,15 +265,16 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function onCanvasPointerDown(event: PointerEvent) {
-    if (!state.value) return
+    const editorState = inpaintEditorState.value
+    if (!editorState) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
-    const canvas = canvasRefs.get(state.value.nodeId)
+    const canvas = canvasRefs.get(editorState.nodeId)
     if (!canvas) return
     event.preventDefault()
     event.stopPropagation()
     stopPainting()
     const point = getMaskCanvasPoint(event.clientX, event.clientY, canvas)
-    paintingNodeId = state.value.nodeId
+    paintingNodeId = editorState.nodeId
     paintingCanvas = canvas
     paintingPointerId = event.pointerId
     paintingBeforeEntry = captureMaskHistoryEntry(canvas)
@@ -354,7 +316,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function clearMask() {
-    const nodeId = state.value?.nodeId
+    const nodeId = maskEditorNodeId.value
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
     const ctx = canvas?.getContext('2d')
@@ -365,7 +327,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function invertMask() {
-    const nodeId = state.value?.nodeId
+    const nodeId = maskEditorNodeId.value
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
     if (!canvas) return
@@ -375,7 +337,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function featherMask(strength = 35) {
-    const nodeId = state.value?.nodeId
+    const nodeId = maskEditorNodeId.value
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
     if (!canvas) return
@@ -389,7 +351,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function undoMask() {
-    const nodeId = state.value?.nodeId
+    const nodeId = maskEditorNodeId.value
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
     if (!canvas) return
@@ -408,7 +370,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function redoMask() {
-    const nodeId = state.value?.nodeId
+    const nodeId = maskEditorNodeId.value
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
     if (!canvas) return
@@ -426,11 +388,9 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     updateHistoryAvailability(nodeId)
   }
 
-  function commitMaskEditorMode(): boolean {
+  function commitMaskDraft(): boolean {
     const saved = saveMaskDraft()
     if (!saved) return false
-    state.value = null
-    updateHistoryAvailability(null)
     return true
   }
 
@@ -453,58 +413,25 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     brushShape.value = value === 'square' ? 'square' : 'round'
   }
 
-  function onGlobalPointerDown(event: PointerEvent) {
-    if (!state.value || event.button !== 0) return
-    const target = event.target as HTMLElement | null
-    if (!target) return
-    const inEditor = !!target.closest('[data-image-mask-editor]')
-    if (inEditor) return
-    options.onBeforePointerCancel?.()
-    cancelMaskEditorMode()
-  }
-
-  function onGlobalKeydown(event: KeyboardEvent) {
-    if (!state.value) return
-    if (isEditableEventTarget(event.target)) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      cancelMaskEditorMode()
+  watch(maskEditorNodeId, (nodeId) => {
+    stopPainting()
+    if (!nodeId) {
       updateHistoryAvailability(null)
+      return
     }
-  }
-
-  watch(
-    () => options.activeTool.value,
-    () => {
-      if (options.activeTool.value !== 'select' && state.value) {
-        cancelMaskEditorMode()
-      }
-    },
-  )
-
-  watch(activeEditorNodeKind, (kind) => {
-    if (!state.value) return
-    if (kind !== 'image') cancelMaskEditorMode()
+    drawMode.value = 'paint'
+    drawCommittedMask(nodeId)
+    updateHistoryAvailability(nodeId)
   })
-
-  if (typeof window !== 'undefined') {
-    window.addEventListener('pointerdown', onGlobalPointerDown, true)
-    window.addEventListener('keydown', onGlobalKeydown, true)
-  }
 
   onBeforeUnmount(() => {
     stopPainting()
     canvasRefs.clear()
     undoStacksByNodeId.clear()
     redoStacksByNodeId.clear()
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('pointerdown', onGlobalPointerDown, true)
-      window.removeEventListener('keydown', onGlobalKeydown, true)
-    }
   })
 
   return {
-    isMaskEditorMode,
     maskEditorNodeId,
     maskEditorOverlayStyle,
     drawMode,
@@ -513,9 +440,8 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     brushShape,
     canUndoMask,
     canRedoMask,
-    enterMaskEditorMode,
-    cancelMaskEditorMode,
-    commitMaskEditorMode,
+    saveMaskDraft,
+    commitMaskDraft,
     clearMask,
     invertMask,
     featherMask,

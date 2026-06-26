@@ -279,9 +279,9 @@ function getBlendWeightBadgeStyle(index: number) {
 }
 
 .fusion-node-ray {
-  --fusion-node-ray-color: var(--flow-edge-color, #b1b1b7);
+  --fusion-node-ray-color: var(--flow-edge-color);
   position: absolute;
-  height: calc(var(--flow-edge-width, 2) * 1px);
+  height: calc(var(--flow-edge-width) * 1px);
   border-radius: 999px;
   background-image: repeating-linear-gradient(
     90deg,
@@ -291,13 +291,13 @@ function getBlendWeightBadgeStyle(index: number) {
   background-size: 10px 100%;
   transform-origin: left center;
   translate: 0 -50%;
-  animation: fusion-node-ray-flow var(--flow-edge-running-duration, 0.5s) linear infinite;
+  animation: fusion-node-ray-flow var(--flow-edge-running-duration) linear infinite;
   transition:
-    left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    top 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    background-image 0.16s ease;
+    left var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    top var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    width var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    transform var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    background-image var(--workspace-motion-fast) ease;
   will-change: left, top, width, transform;
 }
 
@@ -309,7 +309,7 @@ function getBlendWeightBadgeStyle(index: number) {
 
 .fusion-node-stage.is-active .fusion-node-ray,
 .fusion-node-stage.is-drop-target .fusion-node-ray {
-  --fusion-node-ray-color: var(--flow-edge-active-color, #9278e6);
+  --fusion-node-ray-color: var(--flow-edge-active-color);
 }
 
 .fusion-empty-mark {
@@ -322,7 +322,7 @@ function getBlendWeightBadgeStyle(index: number) {
   z-index: 1;
   pointer-events: none;
   color: #a8b3be;
-  transition: color 0.2s ease;
+  transition: color var(--workspace-motion-standard) ease;
 }
 
 .fusion-node-stage:hover .fusion-empty-mark {
@@ -340,9 +340,9 @@ function getBlendWeightBadgeStyle(index: number) {
   overflow: hidden;
   padding: 0;
   transition:
-    left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    top 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.16s ease;
+    left var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    top var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity var(--workspace-motion-fast) ease;
   will-change: left, top;
 }
 
@@ -382,8 +382,8 @@ function getBlendWeightBadgeStyle(index: number) {
   pointer-events: auto;
   cursor: grab;
   transition:
-    left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    top 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    left var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    top var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
     scale 0.12s ease,
     background-color 0.12s ease;
   will-change: left, top, scale;
@@ -428,13 +428,13 @@ function getBlendWeightBadgeStyle(index: number) {
   text-align: center;
   box-shadow: none;
   transition:
-    left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    top 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    left var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1),
+    top var(--workspace-motion-dock) cubic-bezier(0.22, 1, 0.36, 1);
   will-change: left, top, translate;
 }
 
 .fusion-node-stage.is-blend-dragging .fusion-node-ray {
-  transition: background-image 0.16s ease;
+  transition: background-image var(--workspace-motion-fast) ease;
 }
 
 .fusion-node-stage.is-blend-dragging .fusion-blend-handle {

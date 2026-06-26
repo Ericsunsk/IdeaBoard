@@ -1,11 +1,6 @@
 <template>
-  <div
-    class="image-mask-editor-chrome"
-    :style="chromeStyle"
-    data-image-mask-editor
-    @pointerdown.stop
-  >
-    <div class="image-mask-editor-left-panel node-tool-surface">
+  <ImageEditorChromeFrame mode="inpaint" :anchor-rect="anchorRect">
+    <template #tools>
       <NodeToolIconButton
         class="image-mask-editor-tool-btn"
         :active="drawMode === 'paint'"
@@ -48,8 +43,8 @@
       >
         <Sparks />
       </NodeToolIconButton>
-    </div>
-    <div class="image-mask-editor-right-dock">
+    </template>
+    <template #dock>
       <div class="image-mask-editor-panel image-mask-editor-right-panel">
         <section class="image-mask-editor-section">
           <div class="image-mask-editor-field">
@@ -221,12 +216,12 @@
         @image-input-preview="emit('reference-image-preview', $event)"
         @submit="onSubmit"
       />
-    </div>
-  </div>
+    </template>
+  </ImageEditorChromeFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref } from 'vue'
 import {
   Circle,
   CircleSpark,
@@ -246,7 +241,7 @@ import type {
   ImageMaskDrawMode,
 } from '../../composables/useImageMaskEditorOverlay'
 import { clampImageNodeOutputCount } from '../../types/canvasNodes'
-import { MASK_EDITOR_CHROME_LAYOUT } from '../../config/maskEditorChrome'
+import ImageEditorChromeFrame from './ImageEditorChromeFrame.vue'
 import NodeToolIconButton from './NodeToolIconButton.vue'
 import PromptTextComposer from './PromptTextComposer.vue'
 
@@ -256,7 +251,7 @@ type MaskEditorReferenceImage = {
   ratio?: number
 }
 
-const props = defineProps<{
+defineProps<{
   drawMode: ImageMaskDrawMode
   brushShape: ImageMaskBrushShape
   brushSize: number
@@ -303,17 +298,6 @@ let featherLongPressTimer: number | null = null
 let featherDragging = false
 let featherPointerX = 0
 let suppressNextFeatherClick = false
-const chromeStyle = computed(() => ({
-  top: `${props.anchorRect.top}px`,
-  left: `${props.anchorRect.left}px`,
-  width: `${props.anchorRect.width}px`,
-  height: `${props.anchorRect.height}px`,
-  '--mask-editor-image-gap': `${MASK_EDITOR_CHROME_LAYOUT.imageGap}px`,
-  '--mask-editor-stack-gap': `${MASK_EDITOR_CHROME_LAYOUT.stackGap}px`,
-  '--mask-editor-right-panel-width': `${MASK_EDITOR_CHROME_LAYOUT.rightPanelWidth}px`,
-  '--mask-editor-tool-button-size': `${MASK_EDITOR_CHROME_LAYOUT.toolButtonSize}px`,
-  '--mask-editor-tool-button-gap': `${MASK_EDITOR_CHROME_LAYOUT.toolButtonGap}px`,
-}))
 
 function onBrushSizeInput(event: Event) {
   const target = event.target as HTMLInputElement | null
@@ -430,58 +414,10 @@ onBeforeUnmount(() => {
 <style scoped>
 @import './styles/node-tool-buttons.css';
 
-.image-mask-editor-chrome {
-  --mask-editor-image-gap: 12px;
-  --mask-editor-stack-gap: 8px;
-  --mask-editor-right-panel-width: 203px;
-  --mask-editor-tool-border-width: 1.2px;
-  --mask-editor-tool-button-size: 35px;
-  --mask-editor-tool-button-radius: 10px;
-  --mask-editor-tool-button-gap: 7px;
-  --mask-editor-tool-icon-size: 21px;
-  position: absolute;
-  pointer-events: none;
-  z-index: 21;
-  overflow: visible;
-}
-
-.image-mask-editor-left-panel {
-  top: 0;
-  left: calc((var(--mask-editor-tool-button-size) + var(--mask-editor-image-gap)) * -1);
-  width: var(--mask-editor-tool-button-size);
-  padding: 0;
-  position: absolute;
-  --node-tool-border-width: var(--mask-editor-tool-border-width);
-  --node-tool-button-size: var(--mask-editor-tool-button-size);
-  --node-tool-button-radius: var(--mask-editor-tool-button-radius);
-  --node-tool-button-gap: var(--mask-editor-tool-button-gap);
-  --node-tool-icon-size: var(--mask-editor-tool-icon-size);
-  border-radius: 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: var(--node-tool-button-gap);
-  justify-content: flex-start;
-  animation: mask-editor-slide-left-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  pointer-events: auto;
-}
-
-.image-mask-editor-right-dock {
-  top: 0;
-  right: calc((var(--mask-editor-right-panel-width) + var(--mask-editor-image-gap)) * -1);
-  width: var(--mask-editor-right-panel-width);
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  gap: var(--mask-editor-stack-gap);
-  animation: mask-editor-slide-right-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  pointer-events: auto;
-}
-
 .image-mask-editor-panel {
-  border: var(--mask-editor-tool-border-width) solid rgba(122, 107, 213, 0.22);
-  border-radius: 13px;
-  background: #ffffff;
+  border: var(--node-tool-border-width) solid var(--workspace-accent-outline);
+  border-radius: var(--workspace-floating-radius);
+  background: var(--workspace-surface-bg);
   box-sizing: border-box;
 }
 
@@ -489,19 +425,18 @@ onBeforeUnmount(() => {
   width: 100%;
   min-height: 0;
   overflow: visible;
-  padding: 10px 12px;
+  padding: var(--workspace-panel-content-gap) 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  animation: mask-editor-soft-pop-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) 40ms both;
+  gap: var(--workspace-panel-content-gap);
 }
 
 .image-mask-editor-tool-btn {
   width: 100%;
   --node-tool-icon-button-size: var(--node-tool-button-size);
   --node-tool-icon-button-radius: var(--node-tool-button-radius);
-  --node-tool-icon-button-primary-hover-border: #6c5cb8;
-  --node-tool-icon-button-primary-hover-bg: #6c5cb8;
+  --node-tool-icon-button-primary-hover-border: var(--workspace-accent-hover);
+  --node-tool-icon-button-primary-hover-bg: var(--workspace-accent-hover);
   --node-tool-icon-button-primary-hover-color: #ffffff;
 }
 
@@ -509,12 +444,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   gap: var(--node-tool-button-gap);
-  --node-tool-border-width: var(--mask-editor-tool-border-width);
-  --node-tool-button-size: var(--mask-editor-tool-button-size);
-  --node-tool-button-radius: var(--mask-editor-tool-button-radius);
-  --node-tool-button-gap: var(--mask-editor-tool-button-gap);
-  --node-tool-icon-size: var(--mask-editor-tool-icon-size);
-  animation: mask-editor-soft-pop-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) 75ms both;
 }
 
 .image-mask-editor-right-actions .image-mask-editor-tool-btn {
@@ -544,7 +473,7 @@ onBeforeUnmount(() => {
   border: none;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(122, 107, 213, 0.2);
+  background: var(--workspace-accent-outline);
   cursor: ew-resize;
 }
 
@@ -554,58 +483,14 @@ onBeforeUnmount(() => {
   top: 0;
   bottom: 0;
   border-radius: inherit;
-  background: #7a6bd5;
+  background: var(--workspace-accent-hover);
   transition: width 0.06s linear;
 }
 
 .image-mask-editor-composer {
   width: 100%;
-  min-height: var(--mask-editor-right-panel-width);
+  min-height: var(--image-editor-right-panel-width);
   aspect-ratio: 1 / 1;
-  animation: mask-editor-soft-pop-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) 110ms both;
-}
-
-@keyframes mask-editor-slide-left-in {
-  from {
-    opacity: 0;
-    transform: translateX(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes mask-editor-slide-right-in {
-  from {
-    opacity: 0;
-    transform: translateX(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes mask-editor-soft-pop-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .image-mask-editor-left-panel,
-  .image-mask-editor-right-dock,
-  .image-mask-editor-right-panel,
-  .image-mask-editor-right-actions,
-  .image-mask-editor-composer {
-    animation: none;
-  }
 }
 
 .image-mask-editor-section {
@@ -630,7 +515,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   font-size: 11px;
   font-weight: 500;
-  color: #5f6877;
+  color: var(--color-canvas-text-option);
   line-height: 1;
   text-align: center;
   white-space: nowrap;
@@ -646,24 +531,24 @@ onBeforeUnmount(() => {
   width: 28px;
   border: 0;
   border-radius: 8px;
-  background: #ffffff;
-  color: #5f6877;
+  background: var(--workspace-surface-bg);
+  color: var(--color-canvas-text-option);
   display: grid;
   place-items: center;
   cursor: pointer;
   transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    opacity 0.2s ease;
+    background-color var(--workspace-motion-standard) ease,
+    color var(--workspace-motion-standard) ease,
+    opacity var(--workspace-motion-standard) ease;
 }
 
 .image-mask-editor-segmented-btn:hover:not(:disabled):not(.active) {
-  color: #272932;
+  color: var(--workspace-text-strong);
 }
 
 .image-mask-editor-segmented-btn.active {
-  background: #f8f7ff;
-  color: #9278e6;
+  background: var(--workspace-accent-wash);
+  color: var(--workspace-accent);
 }
 
 .image-mask-editor-segmented-btn:disabled {
@@ -708,7 +593,7 @@ onBeforeUnmount(() => {
   height: 4px;
   border: none;
   border-radius: 999px;
-  background: #eef2f5;
+  background: var(--workspace-surface-muted);
 }
 
 .image-mask-editor-range-wrap input[type='range']::-webkit-slider-thumb {
@@ -718,16 +603,16 @@ onBeforeUnmount(() => {
   margin-top: -2.5px;
   border: 0;
   border-radius: 999px;
-  background: #9278e6;
+  background: var(--workspace-accent);
   box-shadow: none;
-  transition: background-color 0.16s ease;
+  transition: background-color var(--workspace-motion-fast) ease;
 }
 
 .image-mask-editor-range-wrap input[type='range']::-moz-range-track {
   height: 4px;
   border: none;
   border-radius: 999px;
-  background: #eef2f5;
+  background: var(--workspace-surface-muted);
 }
 
 .image-mask-editor-range-wrap input[type='range']::-moz-range-thumb {
@@ -735,19 +620,20 @@ onBeforeUnmount(() => {
   height: 9px;
   border: 0;
   border-radius: 999px;
-  background: #9278e6;
+  background: var(--workspace-accent);
 }
 
 .image-mask-editor-range-tooltip {
+  --mask-editor-range-value: 0%;
   position: absolute;
-  left: var(--mask-editor-range-value, 0%);
+  left: var(--mask-editor-range-value);
   bottom: calc(100% - 2px);
   transform: translate(-50%, 2px);
   min-width: 18px;
   padding: 3px 5px;
   border-radius: 5px;
-  background: rgba(24, 24, 27, 0.94);
-  color: #ffffff;
+  background: var(--color-canvas-tooltip-bg);
+  color: var(--color-canvas-tooltip-text);
   font-size: 10px;
   font-weight: 600;
   line-height: 1;

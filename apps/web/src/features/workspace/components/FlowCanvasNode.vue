@@ -65,7 +65,7 @@
           :expand-mode-active="!!props.expandModeActive"
           :expand-overlay-style="props.expandOverlayStyle ?? null"
           :expand-handle-radius="props.expandHandleRadius ?? 4"
-          :mask-editor-mode-active="!!props.maskEditorModeActive"
+          :image-editor-mode="props.imageEditorMode ?? null"
           :mask-editor-overlay-style="props.maskEditorOverlayStyle ?? null"
           :mask-editor-canvas-width="props.maskEditorCanvasWidth ?? 0"
           :mask-editor-canvas-height="props.maskEditorCanvasHeight ?? 0"
@@ -155,6 +155,7 @@ import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction, ImageStrengthAction } from '../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
+import type { ImageEditorMode } from '../types/imageEditor'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../config/promptAspectRatio'
@@ -181,7 +182,7 @@ const props = withDefaults(
     expandModeActive?: boolean
     expandOverlayStyle?: Record<string, string> | null
     expandHandleRadius?: number
-    maskEditorModeActive?: boolean
+    imageEditorMode?: ImageEditorMode | null
     maskEditorOverlayStyle?: Record<string, string> | null
     maskEditorCanvasWidth?: number
     maskEditorCanvasHeight?: number
@@ -210,7 +211,7 @@ const props = withDefaults(
     expandModeActive: false,
     expandOverlayStyle: null,
     expandHandleRadius: 4,
-    maskEditorModeActive: false,
+    imageEditorMode: null,
     maskEditorOverlayStyle: null,
     maskEditorCanvasWidth: 0,
     maskEditorCanvasHeight: 0,
@@ -264,6 +265,7 @@ const emit = defineEmits<{
 
 const showDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
+const isImageEditorActive = computed(() => props.imageEditorMode != null)
 
 const {
   disableHandleRailInteraction,
@@ -285,7 +287,7 @@ const {
   uiState: () => props.uiState,
   imageDirectGenerating: () => !!props.imageDirectGenerating,
   expandModeActive: () => !!props.expandModeActive,
-  maskEditorModeActive: () => !!props.maskEditorModeActive,
+  isImageEditorActive: () => isImageEditorActive.value,
 })
 
 const {

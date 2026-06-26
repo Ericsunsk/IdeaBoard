@@ -64,14 +64,11 @@ defineExpose({ stageElement })
 
 <style scoped>
 .node-stage-frame {
-  --node-stage-frame-bg: var(--color-canvas-node-bg, #ffffff);
-  --node-stage-frame-border: var(--color-canvas-node-border-alt, #e2e8f0);
-  --node-stage-frame-active-border: var(--color-canvas-accent, #9278e6);
+  --node-stage-frame-bg: var(--color-canvas-node-bg);
+  --node-stage-frame-border: var(--color-canvas-node-border-alt);
+  --node-stage-frame-active-border: var(--color-canvas-accent);
   --node-stage-frame-loading-shadow-warm: rgba(239, 68, 68, 0.2);
-  --node-stage-frame-loading-shadow-accent: var(
-    --color-canvas-accent-glow,
-    rgba(146, 120, 230, 0.18)
-  );
+  --node-stage-frame-loading-shadow-accent: var(--color-canvas-accent-glow);
 
   position: relative;
   width: 100%;
@@ -81,8 +78,8 @@ defineExpose({ stageElement })
   box-sizing: border-box;
   overflow: hidden;
   transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    border-color var(--workspace-motion-standard) ease,
+    box-shadow var(--workspace-motion-standard) ease;
 }
 
 .node-stage-frame--prompt {

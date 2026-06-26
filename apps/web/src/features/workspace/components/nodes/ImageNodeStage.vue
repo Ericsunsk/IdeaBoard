@@ -4,16 +4,17 @@
     class="image-node-stage"
     :data-image-node-id="nodeId"
     :data-flow-node-id="flowNodeId || undefined"
+    :data-image-editor="isImageEditorActive ? '' : undefined"
     :class="{
       'is-expand-mode': !!expandModeActive,
-      'is-mask-editor-mode': !!maskEditorModeActive,
+      'is-image-editor-active': isImageEditorActive,
     }"
     layout="center"
     :height="stageHeight"
     :active="active && !expandModeActive"
     :loading="!!directGenerating && !displayImage"
     :running="!!directGenerating"
-    :transparent="!!expandModeActive || !!maskEditorModeActive"
+    :transparent="!!expandModeActive || isImageEditorActive"
     :aria-busy="!!directGenerating"
     aria-label="图片节点输入与预览区域"
     @dragover.stop="onStageDragOver"
@@ -48,7 +49,7 @@
         @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
       />
       <ImageMaskEditorOverlay
-        v-if="maskEditorModeActive && maskEditorOverlayStyle"
+        v-if="isMaskEditorActive && maskEditorOverlayStyle"
         :style="maskEditorOverlayStyle"
         :canvas-width="maskEditorCanvasWidth ?? 0"
         :canvas-height="maskEditorCanvasHeight ?? 0"
@@ -109,6 +110,7 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../types/canvasNodes'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
+import type { ImageEditorMode } from '../../types/imageEditor'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import ImageMaskEditorOverlay from './ImageMaskEditorOverlay.vue'
@@ -127,7 +129,7 @@ const props = defineProps<{
   expandModeActive?: boolean
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
-  maskEditorModeActive?: boolean
+  imageEditorMode?: ImageEditorMode | null
   maskEditorOverlayStyle?: Record<string, string> | null
   maskEditorCanvasWidth?: number
   maskEditorCanvasHeight?: number
@@ -162,6 +164,8 @@ const emit = defineEmits<{
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
+const isImageEditorActive = computed(() => props.imageEditorMode != null)
+const isMaskEditorActive = computed(() => props.imageEditorMode === 'inpaint')
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )
@@ -237,7 +241,7 @@ function selectOutputCount(value: number) {
 }
 
 .image-node-stage.is-expand-mode .image-node-stage-image,
-.image-node-stage.is-mask-editor-mode .image-node-stage-image {
+.image-node-stage.is-image-editor-active .image-node-stage-image {
   pointer-events: none;
 }
 
@@ -258,8 +262,8 @@ function selectOutputCount(value: number) {
   cursor: pointer;
   outline: none;
   transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
+    background-color var(--workspace-motion-standard) ease,
+    color var(--workspace-motion-standard) ease;
 }
 
 .image-node-stage-empty:hover {
@@ -309,7 +313,7 @@ function selectOutputCount(value: number) {
   gap: 6px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.16s ease;
+  transition: opacity var(--workspace-motion-fast) ease;
 }
 
 .image-node-stage:hover .image-node-stage-actions,
@@ -323,7 +327,7 @@ function selectOutputCount(value: number) {
   pointer-events: none;
 }
 
-.image-node-stage.is-mask-editor-mode .image-node-stage-actions {
+.image-node-stage.is-image-editor-active .image-node-stage-actions {
   opacity: 0;
   pointer-events: none;
 }

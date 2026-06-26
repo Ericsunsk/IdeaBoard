@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width,1.2px)] border-solid border-[#d6dcec] bg-white px-2.5 text-[11px] leading-none font-medium text-[#5f6877] transition-[background-color,border-color,color,opacity] duration-200 ease-[ease] disabled:cursor-not-allowed disabled:opacity-[0.45]"
+    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width)] border-solid border-[#d6dcec] bg-white px-2.5 text-[11px] leading-none font-medium text-[#5f6877] transition-[background-color,border-color,color,opacity] duration-200 ease-[ease] disabled:cursor-not-allowed disabled:opacity-[0.45]"
     :class="[
       variantClass,
       {
@@ -66,6 +66,13 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
+.node-action-btn {
+  --node-tool-border-width: var(--workspace-control-border-width);
+  --node-tool-tooltip-delay: 200ms;
+  --node-tool-button-accent: var(--color-canvas-accent);
+  --node-tool-button-brand: var(--color-canvas-accent-hover);
+}
+
 .node-action-btn.variant-stage-ghost {
   border: none;
   border-radius: 8px;
@@ -82,13 +89,13 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 
 .node-action-btn.variant-tool:hover:not(:disabled),
 .node-action-btn.variant-chip:hover:not(:disabled) {
-  border-color: var(--node-tool-button-accent, #9278e6);
+  border-color: var(--node-tool-button-accent);
   color: #272932;
 }
 
 .node-action-btn.variant-tool.active,
 .node-action-btn.variant-chip.active {
-  border-color: var(--node-tool-button-accent, #9278e6);
+  border-color: var(--node-tool-button-accent);
   background: #f8f7ff;
   color: #272932;
 }
@@ -104,9 +111,9 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 
 .node-action-btn.variant-primary {
   min-height: 32px;
-  border-color: var(--node-tool-button-brand, #7a6bd5);
+  border-color: var(--node-tool-button-brand);
   border-radius: 999px;
-  background: var(--node-tool-button-brand, #7a6bd5);
+  background: var(--node-tool-button-brand);
   color: #ffffff;
   font-size: 12px;
   font-weight: 600;

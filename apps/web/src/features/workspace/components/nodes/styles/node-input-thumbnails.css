@@ -16,9 +16,9 @@
   background: transparent;
   color: inherit;
   transition:
-    background-color 0.16s ease,
-    color 0.16s ease,
-    opacity 0.16s ease;
+    background-color var(--workspace-motion-fast) ease,
+    color var(--workspace-motion-fast) ease,
+    opacity var(--workspace-motion-fast) ease;
 }
 
 .node-input-thumbnail img {

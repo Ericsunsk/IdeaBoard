@@ -203,9 +203,9 @@ const {
   gap: var(--node-tool-button-gap);
   padding: 9px;
   border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.28);
-  border-radius: 13px;
+  border-radius: var(--workspace-floating-radius);
   background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--workspace-surface-blur));
 }
 
 .prompt-text-composer.variant-floating:focus-within,

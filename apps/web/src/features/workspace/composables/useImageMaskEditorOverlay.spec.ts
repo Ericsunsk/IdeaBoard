@@ -1,6 +1,7 @@
 import type { Node } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
+import { useImageEditorMode } from './useImageEditorMode'
 import { useImageMaskEditorOverlay } from './useImageMaskEditorOverlay'
 
 function createStageElement() {
@@ -14,27 +15,30 @@ function createStageElement() {
 
 function createHarness() {
   const stage = createStageElement()
-  const overlay = useImageMaskEditorOverlay({
+  const editorMode = useImageEditorMode({
     nodes: ref([{ id: 'node-1', data: { kind: 'image' } }] as Node[]),
     activeTool: ref('select'),
     getImageNodeDisplayPayload: (nodeId) =>
       nodeId === 'node-1' ? { url: 'https://example.com/source.png', ratio: 1 } : null,
     getImageStageElement: (nodeId) => (nodeId === 'node-1' ? stage : null),
   })
+  const overlay = useImageMaskEditorOverlay({
+    imageEditorState: editorMode.imageEditorState,
+  })
 
-  return { overlay }
+  return { editorMode, overlay }
 }
 
 describe('useImageMaskEditorOverlay', () => {
   it('keeps mask editor active when committing without a drawable mask', () => {
-    const { overlay } = createHarness()
+    const { editorMode, overlay } = createHarness()
 
-    expect(overlay.enterMaskEditorMode('node-1')).toBe(true)
+    expect(editorMode.enterImageEditorMode('node-1', 'inpaint')).toBe(true)
     expect(overlay.maskEditorNodeId.value).toBe('node-1')
 
-    expect(overlay.commitMaskEditorMode()).toBe(false)
+    expect(overlay.commitMaskDraft()).toBe(false)
 
-    expect(overlay.isMaskEditorMode.value).toBe(true)
+    expect(editorMode.imageEditorState.value).not.toBeNull()
     expect(overlay.maskEditorNodeId.value).toBe('node-1')
   })
 })

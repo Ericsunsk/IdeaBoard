@@ -6,6 +6,7 @@ import { EXECUTION_FEATURE, EXECUTION_META, type ExecutionFeature } from './exec
 export const IMAGE_NODE_ACTION = {
   ...WORKFLOW_IMAGE_NODE_ACTION,
   imageInpaint: 'image-inpaint',
+  localImageEditor: 'local-image-editor',
 } as const
 
 export type ImageNodeAction = (typeof IMAGE_NODE_ACTION)[keyof typeof IMAGE_NODE_ACTION]
@@ -15,6 +16,7 @@ export const IMAGE_ACTION_MODE = {
   hdUpscaleTask: 'hd-upscale-task',
   canvasExtend: 'canvas-extend',
   localInpaint: 'local-inpaint',
+  localImageEditor: 'local-image-editor',
 } as const
 
 export type ImageActionMode = (typeof IMAGE_ACTION_MODE)[keyof typeof IMAGE_ACTION_MODE]
@@ -26,6 +28,7 @@ export type ImageActionMenuIcon =
   | 'hd'
   | 'image-extend'
   | 'image-inpaint'
+  | 'adobe-photoshop'
 
 export const DEFAULT_IMAGE_ACTION_STRENGTH = 50
 
@@ -115,6 +118,13 @@ export const IMAGE_ACTION_REGISTRY_LIST = [
     label: '局部重绘',
     title: '局部重绘',
     icon: 'image-inpaint',
+  },
+  {
+    action: IMAGE_NODE_ACTION.localImageEditor,
+    mode: IMAGE_ACTION_MODE.localImageEditor,
+    label: '图像调整',
+    title: '图像调整',
+    icon: 'adobe-photoshop',
   },
 ] as const satisfies readonly ImageActionRegistryItem[]
 

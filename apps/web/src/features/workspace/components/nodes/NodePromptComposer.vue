@@ -1,6 +1,6 @@
 <template>
   <form
-    class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-[42] grid grid-cols-[minmax(0,1fr)_auto] items-end gap-[var(--node-tool-button-gap)] rounded-[13px] bg-white/[0.96] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[10px] [border:var(--node-tool-border-width)_solid_rgba(122,107,213,0.28)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
+    class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-[42] grid grid-cols-[minmax(0,1fr)_auto] items-end gap-[var(--node-tool-button-gap)] rounded-[var(--workspace-floating-radius)] bg-white/[0.96] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[var(--workspace-surface-blur)] [border:var(--node-tool-border-width)_solid_rgba(122,107,213,0.28)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
     :class="{ 'count-stacked': shouldStackOutputCount, 'has-text': draft.trim() }"
     :style="{ '--node-prompt-composer-offset': offset }"
     @submit.prevent="submit"
@@ -126,7 +126,7 @@ const {
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-node-prompt-composer {
-  animation: image-node-prompt-rise 0.16s ease-out;
+  animation: image-node-prompt-rise var(--workspace-motion-fast) ease-out;
 }
 
 .image-node-prompt-composer.node-tool-surface {

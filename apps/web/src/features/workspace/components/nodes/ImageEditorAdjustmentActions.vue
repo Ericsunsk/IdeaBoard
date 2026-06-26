@@ -1,0 +1,68 @@
+<template>
+  <div class="image-editor-adjustment-actions node-tool-surface">
+    <NodeToolIconButton
+      v-for="item in actionItems"
+      :key="item.kind"
+      class="image-editor-adjustment-actions__button"
+      :active="selectedKind === item.kind"
+      :aria-label-value="item.label"
+      :tooltip="item.label"
+      @click="emit('select-adjustment', item.kind)"
+    >
+      <component :is="item.icon" />
+    </NodeToolIconButton>
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { Component } from 'vue'
+import {
+  Brightness,
+  ColorFilter,
+  MaskSquare,
+  ReportsSolid,
+  SineWave,
+} from '@iconoir/vue'
+import type { ImageAdjustmentKind } from '../../types/imageEditor'
+import NodeToolIconButton from './NodeToolIconButton.vue'
+
+defineProps<{
+  selectedKind: ImageAdjustmentKind | null
+}>()
+
+const emit = defineEmits<{
+  (e: 'select-adjustment', kind: ImageAdjustmentKind): void
+}>()
+
+const actionItems: Array<{
+  kind: ImageAdjustmentKind
+  label: string
+  icon: Component
+}> = [
+  { kind: 'threshold', label: '阈值', icon: Brightness },
+  { kind: 'hsl', label: '色相/饱和度', icon: ColorFilter },
+  { kind: 'invert', label: '反相', icon: MaskSquare },
+  { kind: 'curves', label: '曲线', icon: SineWave },
+  { kind: 'levels', label: '色阶', icon: ReportsSolid },
+]
+</script>
+
+<style scoped src="./styles/node-tool-buttons.css"></style>
+<style scoped>
+.image-editor-adjustment-actions {
+  display: grid;
+  grid-template-columns: repeat(5, var(--node-tool-button-size));
+  justify-content: space-between;
+  gap: var(--node-tool-button-gap);
+}
+
+.image-editor-adjustment-actions__button {
+  width: var(--node-tool-button-size);
+  flex: 0 0 var(--node-tool-button-size);
+  --node-tool-icon-button-size: var(--node-tool-button-size);
+  --node-tool-icon-button-radius: var(--node-tool-button-radius);
+  --node-tool-icon-button-primary-hover-border: var(--workspace-accent-hover);
+  --node-tool-icon-button-primary-hover-bg: var(--workspace-accent-hover);
+  --node-tool-icon-button-primary-hover-color: #ffffff;
+}
+</style>

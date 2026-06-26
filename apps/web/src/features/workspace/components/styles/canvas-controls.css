@@ -1,5 +1,5 @@
 .canvas-control-group {
-  --canvas-control-border-width: 1.2px;
+  --canvas-control-border-width: var(--workspace-control-border-width);
   --canvas-control-size: 40px;
   --canvas-control-gap: 12px;
   --canvas-control-icon-size: 19px;
@@ -26,19 +26,19 @@
   justify-content: center;
   cursor: pointer;
   transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
+    background-color var(--workspace-motion-standard) ease,
+    border-color var(--workspace-motion-standard) ease,
+    color var(--workspace-motion-standard) ease;
 }
 
 .canvas-icon-button:hover:not(:disabled) {
-  border-color: #d8ddea;
+  border-color: var(--workspace-surface-border);
   background: var(--ib-control-bg-hover);
   color: var(--ib-control-icon-hover);
 }
 
 .canvas-icon-button.is-active {
-  border-color: #d8ddea;
+  border-color: var(--workspace-surface-border);
   background: #f1f3f9;
   color: var(--canvas-control-active-color);
 }
@@ -64,7 +64,7 @@
 .canvas-icon-swap .canvas-control-icon {
   position: absolute;
   inset: 0;
-  transition: opacity 0.16s ease;
+  transition: opacity var(--workspace-motion-fast) ease;
 }
 
 .canvas-icon-swap-default {

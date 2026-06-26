@@ -1,0 +1,15 @@
+.image-editor-panel {
+  --image-editor-panel-border-width: var(--node-tool-border-width);
+  --image-editor-panel-row-height: 31px;
+  --image-editor-panel-control-height: 28px;
+  --image-editor-panel-control-radius: 8px;
+  --image-editor-panel-inset: 7px;
+  --image-editor-panel-content-gap: var(--workspace-panel-content-gap);
+  --image-editor-panel-text-size: 11px;
+  --image-editor-panel-meta-text-size: 10px;
+  border: var(--image-editor-panel-border-width) solid var(--workspace-accent-outline);
+  border-radius: var(--workspace-floating-radius);
+  background: var(--workspace-surface-bg);
+  box-sizing: border-box;
+  overflow: hidden;
+}

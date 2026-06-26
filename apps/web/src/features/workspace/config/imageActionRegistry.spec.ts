@@ -25,6 +25,7 @@ describe('imageActionRegistry', () => {
       IMAGE_NODE_ACTION.hdUpscale,
       IMAGE_NODE_ACTION.imageExtend,
       IMAGE_NODE_ACTION.imageInpaint,
+      IMAGE_NODE_ACTION.localImageEditor,
     ])
   })
 
@@ -59,6 +60,9 @@ describe('imageActionRegistry', () => {
       }
     }
     expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.imageInpaint]).not.toHaveProperty('execution')
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.localImageEditor]).not.toHaveProperty(
+      'execution',
+    )
   })
 
   it('keeps task and local tool modes explicit', () => {
@@ -73,6 +77,9 @@ describe('imageActionRegistry', () => {
     )
     expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.imageInpaint].mode).toBe(
       IMAGE_ACTION_MODE.localInpaint,
+    )
+    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.localImageEditor].mode).toBe(
+      IMAGE_ACTION_MODE.localImageEditor,
     )
   })
 })

@@ -3,13 +3,14 @@
     class="canvas-layout"
     :class="[
       `tool-${activeTool}`,
-      { 'interaction-lite': isFlowInteractionActive, 'is-mask-editing': isMaskEditorChromeHidden },
+      { 'interaction-lite': isFlowInteractionActive },
     ]"
     @mousedown.self="closeBoardHeaderEditing"
   >
     <WorkspacePageChrome
       :active-tool="activeTool"
-      :inert="isMaskEditorChromeHidden"
+      :inert="isImageEditorChromeHidden"
+      :chrome-hidden="isImageEditorChromeHidden"
       :current-board-name="currentBoardName"
       :board-options="boardOptions"
       :current-board-id="currentBoardId"
@@ -108,7 +109,9 @@
               flowExpandNodeId === nodeProps.id ? flowExpandOverlayStyle : null
             "
             :expand-handle-radius="flowExpandHandleRadius"
-            :mask-editor-mode-active="flowMaskEditorNodeId === nodeProps.id"
+            :image-editor-mode="
+              flowImageEditorNodeId === nodeProps.id ? imageEditorMode : null
+            "
             :mask-editor-overlay-style="
               flowMaskEditorNodeId === nodeProps.id ? flowMaskEditorOverlayStyle : null
             "
@@ -183,9 +186,10 @@
         </template>
       </VueFlow>
       <WorkspaceCanvasOverlays
-        :flow-mask-editor-node-id="flowMaskEditorNodeId"
-        :mask-editor-chrome-anchor-rect="maskEditorChromeAnchorRect"
-        :is-mask-editor-chrome-ready="isMaskEditorChromeReady"
+        :image-editor-node-id="flowImageEditorNodeId"
+        :image-editor-mode="imageEditorMode"
+        :image-editor-chrome-anchor-rect="imageEditorChromeAnchorRect"
+        :is-image-editor-chrome-ready="isImageEditorChromeReady"
         :flow-mask-editor-draw-mode="flowMaskEditorDrawMode"
         :flow-mask-editor-brush-shape="flowMaskEditorBrushShape"
         :flow-mask-editor-brush-size="flowMaskEditorBrushSize"
@@ -196,6 +200,10 @@
         :is-node-direct-action-running="isNodeDirectActionRunning"
         :can-undo-flow-mask-editor="canUndoFlowMaskEditor"
         :can-redo-flow-mask-editor="canRedoFlowMaskEditor"
+        :active-image-editor-tool="activeImageEditorTool"
+        :image-editor-layers="imageEditorLayers"
+        :selected-image-editor-layer-id="selectedImageEditorLayerId"
+        :selected-image-editor-adjustment-layer="selectedImageEditorAdjustmentLayer"
         :node-context-menu="nodeContextMenu"
         :canvas-node-menu-items="canvasNodeMenuItems"
         @set-draw-mode="setFlowMaskEditorDrawMode"
@@ -212,6 +220,12 @@
         @image-input-open="onMaskEditorReferenceImageOpen"
         @reference-image-remove="onMaskEditorReferenceImageRemove"
         @reference-image-preview="onMaskEditorReferenceImagePreview"
+        @select-image-editor-tool="selectImageEditorTool"
+        @select-image-adjustment-layer="selectImageAdjustmentLayer"
+        @select-image-editor-layer="selectImageEditorLayer"
+        @set-image-editor-layer-visible="setImageEditorLayerVisible"
+        @remove-image-editor-layer="removeImageEditorLayer"
+        @update-image-editor-param="updateSelectedImageEditorLayerParam"
         @submit="onMaskEditorChromeSubmit"
         @create-node="handleNodeContextMenuCreate"
       />
@@ -267,13 +281,16 @@ import { useFlowSnapshotNodeUpdater } from '../composables/useFlowSnapshotNodeUp
 import { useFlowImageNodeSnapshots } from '../composables/useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from '../composables/useFlowImageUploadActions'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
+import { useImageEditorMode } from '../composables/useImageEditorMode'
+import { useImageEditorSession } from '../composables/useImageEditorSession'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowWorkspaceRuntime } from '../composables/useFlowWorkspaceRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
 import WorkspacePageChrome from '../components/WorkspacePageChrome.vue'
-import { useMaskEditorViewportController } from '../composables/useMaskEditorViewportController'
+import { useImageEditorViewportController } from '../composables/useImageEditorViewportController'
+import type { ImageEditorMode } from '../types/imageEditor'
 
 const appToast = useAppToast()
 const route = useRoute()
@@ -354,8 +371,8 @@ function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: 
   const transform = payload.flowTransform
   if (!transform) return
   if (applyFlowTransform(transform)) hasPendingViewportChange = true
-  if (!isMaskEditorChromeReady.value) return
-  scheduleMaskEditorChromeAnchorUpdate()
+  if (!isImageEditorChromeReady.value) return
+  scheduleImageEditorChromeAnchorUpdate()
 }
 
 function onFlowMoveEnd(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
@@ -622,11 +639,33 @@ const { dismissTransientWorkspaceUi } = useFlowTransientUiDismissal({
 
 useDismissableLayer({
   enabled: hasWorkspaceDismissableLayer,
-  ignore: ['.node-tool-surface', '.workspace-node-context-menu', '[data-image-mask-editor]'],
+  ignore: [
+    '.node-tool-surface',
+    '.workspace-node-context-menu',
+    '[data-image-mask-editor]',
+    '[data-image-editor]',
+  ],
   ownerDocument: () =>
     canvasWrapRef.value?.ownerDocument ?? (typeof document === 'undefined' ? null : document),
   onDismiss: () => {
     dismissTransientWorkspaceUi({ closeContextMenu: true })
+  },
+})
+
+const {
+  imageEditorState,
+  imageEditorMode,
+  imageEditorNodeId: flowImageEditorNodeId,
+  enterImageEditorMode: enterFlowImageEditorModeBase,
+  exitImageEditorMode,
+} = useImageEditorMode({
+  nodes: nodes as Ref<Node[]>,
+  activeTool: activeTool as Ref<string>,
+  getImageNodeDisplayPayload,
+  getImageStageElement,
+  onBeforePointerCancel: clearSelectedFlowElementsSync,
+  onBeforeExit: (state) => {
+    if (state.mode === 'inpaint') saveFlowMaskDraft()
   },
 })
 
@@ -639,9 +678,8 @@ const {
   brushShape: flowMaskEditorBrushShape,
   canUndoMask: canUndoFlowMaskEditor,
   canRedoMask: canRedoFlowMaskEditor,
-  enterMaskEditorMode: enterFlowMaskEditorMode,
-  cancelMaskEditorMode: cancelFlowMaskEditorMode,
-  commitMaskEditorMode: commitFlowMaskEditorMode,
+  saveMaskDraft: saveFlowMaskDraft,
+  commitMaskDraft: commitFlowMaskDraft,
   clearMask: clearFlowMaskEditorMask,
   invertMask: invertFlowMaskEditorMask,
   featherMask: featherFlowMaskEditorMask,
@@ -656,14 +694,46 @@ const {
   setBrushShape: setFlowMaskEditorBrushShape,
   getCommittedMaskData: getFlowMaskEditorCommittedData,
 } = useImageMaskEditorOverlay({
-  nodes: nodes as Ref<Node[]>,
-  activeTool: activeTool as Ref<string>,
-  getImageNodeDisplayPayload,
-  getImageStageElement,
-  onBeforePointerCancel: clearSelectedFlowElementsSync,
+  imageEditorState,
   startCanvasInteraction: startFlowInteraction,
   stopCanvasInteraction: stopFlowInteraction,
 })
+
+const {
+  activeImageEditorTool,
+  imageEditorLayers,
+  selectedImageEditorLayerId,
+  selectedImageEditorAdjustmentLayer,
+  resetImageEditorSession,
+  selectImageEditorTool,
+  selectImageAdjustmentLayer,
+  selectImageEditorLayer,
+  setImageEditorLayerVisible,
+  removeImageEditorLayer,
+  updateSelectedImageEditorLayerParam,
+} = useImageEditorSession()
+
+function cancelFlowImageEditorMode() {
+  exitImageEditorMode()
+}
+
+function cancelFlowMaskEditorMode() {
+  cancelFlowImageEditorMode()
+}
+
+function enterFlowImageEditorMode(nodeId: string, mode: ImageEditorMode): boolean {
+  const entered = enterFlowImageEditorModeBase(nodeId, mode)
+  if (!entered) return false
+  if (mode === 'adjust') resetImageEditorSession()
+  return true
+}
+
+function commitFlowMaskEditorMode() {
+  const didCommit = commitFlowMaskDraft()
+  if (!didCommit) return false
+  exitImageEditorMode({ runBeforeExit: false })
+  return true
+}
 
 const {
   onFlowImageOpenFile,
@@ -701,8 +771,8 @@ const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFram
   })
 
 const {
-  maskEditorChromeAnchorRect,
-  isMaskEditorChromeReady,
+  imageEditorChromeAnchorRect,
+  isImageEditorChromeReady,
   maskEditorLayerOpacity,
   maskEditorReferenceImages,
   activeMaskEditorOutputCount,
@@ -711,12 +781,12 @@ const {
   onMaskEditorReferenceImageRemove,
   onMaskEditorReferenceImagePreview,
   onCanvasWheel,
-  focusMaskEditorAndShowChrome,
-  scheduleMaskEditorChromeAnchorUpdate,
-} = useMaskEditorViewportController({
+  focusImageEditorAndShowChrome,
+  scheduleImageEditorChromeAnchorUpdate,
+} = useImageEditorViewportController({
   nodes: nodes as Ref<Node[]>,
   canvasWrapRef,
-  flowMaskEditorNodeId,
+  imageEditorNodeId: flowImageEditorNodeId,
   getImageNodeSnapshot,
   getImageStageElement,
   screenToFlowCoordinate,
@@ -732,9 +802,9 @@ const {
     applyFlowTransform(viewport)
   },
 })
-const isMaskEditorChromeHidden = computed(() => !!flowMaskEditorNodeId.value)
+const isImageEditorChromeHidden = computed(() => !!flowImageEditorNodeId.value)
 const isFlowCanvasLocked = computed(
-  () => isFlowInteractionActive.value || !!flowMaskEditorNodeId.value,
+  () => isFlowInteractionActive.value || !!flowImageEditorNodeId.value,
 )
 
 const { onMaskEditorChromeSubmit, onMaskEditorChromeOutputCountUpdate } =
@@ -846,7 +916,7 @@ const {
   onFlowImagePromptGenerate,
   onFlowFusionPromptGenerate,
 } = useFlowImageActionOrchestrator({
-  flowMaskEditorNodeId,
+  flowImageEditorNodeId,
   suppressClickAction,
   openActiveNodePanel,
   clearActiveNodePanel,
@@ -855,8 +925,8 @@ const {
   cancelFlowExpandMode,
   cancelFlowMaskEditorMode,
   enterFlowExpandMode,
-  enterFlowMaskEditorMode,
-  focusMaskEditorAndShowChrome,
+  enterFlowImageEditorMode,
+  focusImageEditorAndShowChrome,
   runImageDirectAction,
   runImagePromptGeneration,
   runImageInpaintAction,
@@ -926,10 +996,43 @@ onMounted(async () => {
 }
 
 .canvas-layout {
-  --canvas-control-border-width: 1.2px;
-  --canvas-chrome-fade-duration: 0.18s;
-  --canvas-chrome-slide-duration: 0.28s;
-  --canvas-chrome-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --workspace-control-border-width: 1.2px;
+  --workspace-tool-button-gap: 7px;
+  --workspace-page-chrome-fade-duration: 0.18s;
+  --workspace-page-chrome-slide-duration: 0.28s;
+  --workspace-page-chrome-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --workspace-surface-bg: rgba(255, 255, 255, 0.98);
+  --workspace-surface-bg-soft: rgba(255, 255, 255, 0.94);
+  --workspace-surface-muted: #f4f7fb;
+  --workspace-surface-border: #d8ddea;
+  --workspace-surface-border-soft: rgba(34, 42, 54, 0.08);
+  --workspace-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
+  --workspace-surface-blur: 10px;
+  --workspace-surface-radius: 10px;
+  --workspace-floating-radius: 13px;
+  --workspace-panel-radius: 8px;
+  --workspace-panel-border-width: 1px;
+  --workspace-panel-content-gap: 10px;
+  --workspace-panel-border: rgba(34, 42, 54, 0.14);
+  --workspace-panel-border-soft: rgba(34, 42, 54, 0.1);
+  --workspace-panel-header-from: #f8fafc;
+  --workspace-panel-header-to: #eef2f7;
+  --workspace-text-strong: #111827;
+  --workspace-text-body: #334155;
+  --workspace-text-muted: #64748b;
+  --workspace-text-subtle: #94a3b8;
+  --workspace-accent: #9278e6;
+  --workspace-accent-hover: #7a6bd5;
+  --workspace-accent-strong: #6757c8;
+  --workspace-accent-soft: rgba(146, 120, 230, 0.12);
+  --workspace-accent-soft-strong: rgba(146, 120, 230, 0.16);
+  --workspace-accent-wash: #f8f7ff;
+  --workspace-accent-outline: rgba(122, 107, 213, 0.22);
+  --workspace-motion-fast: 160ms;
+  --workspace-motion-standard: 200ms;
+  --workspace-motion-panel: 220ms;
+  --workspace-motion-dock: 240ms;
+  --workspace-motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --flow-edge-color: rgb(177 177 183 / 50%);
   --flow-edge-active-color: rgb(146 120 230 / 50%);
   --flow-edge-selected-color: rgb(123 135 152 / 50%);
@@ -943,45 +1046,6 @@ onMounted(async () => {
   overflow: hidden;
   overscroll-behavior: none;
   overscroll-behavior-x: none;
-}
-
-.canvas-layout :deep(.canvas-chrome) {
-  opacity: 1;
-  filter: blur(0);
-  transform-origin: center;
-  transition:
-    opacity var(--canvas-chrome-fade-duration) ease,
-    filter var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease),
-    transform var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease);
-  will-change: transform, opacity, filter;
-}
-
-.canvas-layout.is-mask-editing :deep(.canvas-chrome) {
-  opacity: 0;
-  filter: blur(5px);
-  pointer-events: none;
-}
-
-.canvas-layout.is-mask-editing :deep(.canvas-chrome *) {
-  pointer-events: none;
-}
-
-.canvas-layout.is-mask-editing :deep(.canvas-chrome-header) {
-  transform: translateY(-82px) scale(0.985);
-}
-
-.canvas-layout.is-mask-editing :deep(.canvas-chrome-left) {
-  transform: translate(-76px, -50%) scale(0.985);
-}
-
-.canvas-layout.is-mask-editing :deep(.canvas-chrome-status) {
-  transform: translateY(76px) scale(0.985);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .canvas-layout :deep(.canvas-chrome) {
-    transition-duration: 1ms;
-  }
 }
 
 .canvas-layout.interaction-lite :deep(.workflow-node),

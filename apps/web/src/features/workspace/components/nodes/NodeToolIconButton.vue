@@ -69,49 +69,48 @@ const resolvedAriaLabel = computed(
 
 <style scoped>
 .node-tool-icon-button {
-  width: var(--node-tool-icon-button-size, var(--node-tool-button-size, 20px));
-  height: var(--node-tool-icon-button-size, var(--node-tool-button-size, 20px));
-  border: var(--node-tool-border-width, 1.2px) solid
-    var(--node-tool-icon-button-border, var(--node-tool-button-border, rgba(122, 107, 213, 0.28)));
-  border-radius: var(--node-tool-icon-button-radius, var(--node-tool-button-radius, 10px));
-  background: var(--node-tool-icon-button-bg, #ffffff);
-  color: var(--node-tool-icon-button-color, #6f61c6);
+  width: var(--node-tool-icon-button-size);
+  height: var(--node-tool-icon-button-size);
+  border: var(--node-tool-border-width) solid var(--node-tool-icon-button-border);
+  border-radius: var(--node-tool-icon-button-radius);
+  background: var(--node-tool-icon-button-bg);
+  color: var(--node-tool-icon-button-color);
   transition:
-    border-color 0.16s ease,
-    background-color 0.16s ease,
-    color 0.16s ease,
+    border-color var(--workspace-motion-fast) ease,
+    background-color var(--workspace-motion-fast) ease,
+    color var(--workspace-motion-fast) ease,
     transform 0.18s ease,
     opacity 0.18s ease;
 }
 
 .node-tool-icon-button.active {
-  border-color: var(--node-tool-icon-button-active-border, var(--node-tool-button-brand, #7a6bd5));
-  color: var(--node-tool-icon-button-active-color, var(--node-tool-button-brand, #7a6bd5));
-  background: var(--node-tool-icon-button-active-bg, #ffffff);
+  border-color: var(--node-tool-icon-button-active-border);
+  color: var(--node-tool-icon-button-active-color);
+  background: var(--node-tool-icon-button-active-bg);
 }
 
 .node-tool-icon-button:hover:not(:disabled) {
-  border-color: var(--node-tool-icon-button-hover-border, var(--node-tool-button-brand, #7a6bd5));
-  color: var(--node-tool-icon-button-hover-color, var(--node-tool-button-brand, #7a6bd5));
-  background: var(--node-tool-icon-button-hover-bg, #ffffff);
-  transform: var(--node-tool-icon-button-hover-transform, scale(1.06));
+  border-color: var(--node-tool-icon-button-hover-border);
+  color: var(--node-tool-icon-button-hover-color);
+  background: var(--node-tool-icon-button-hover-bg);
+  transform: var(--node-tool-icon-button-hover-transform);
 }
 
 .node-tool-icon-button.primary {
-  border-color: var(--node-tool-icon-button-primary-border, var(--node-tool-button-brand, #7a6bd5));
-  color: var(--node-tool-icon-button-primary-color, #ffffff);
-  background: var(--node-tool-icon-button-primary-bg, var(--node-tool-button-brand, #7a6bd5));
+  border-color: var(--node-tool-icon-button-primary-border);
+  color: var(--node-tool-icon-button-primary-color);
+  background: var(--node-tool-icon-button-primary-bg);
 }
 
 .node-tool-icon-button.primary:hover:not(:disabled) {
-  border-color: var(--node-tool-icon-button-primary-hover-border, #6c5cb8);
-  color: var(--node-tool-icon-button-primary-hover-color, #ffffff);
-  background: var(--node-tool-icon-button-primary-hover-bg, #6c5cb8);
+  border-color: var(--node-tool-icon-button-primary-hover-border);
+  color: var(--node-tool-icon-button-primary-hover-color);
+  background: var(--node-tool-icon-button-primary-hover-bg);
 }
 
 .node-tool-icon-button__icon {
-  width: var(--node-tool-icon-button-icon-size, var(--node-tool-icon-size, 21px));
-  height: var(--node-tool-icon-button-icon-size, var(--node-tool-icon-size, 21px));
+  width: var(--node-tool-icon-button-icon-size);
+  height: var(--node-tool-icon-button-icon-size);
 }
 
 .node-tool-icon-button__icon :deep(svg) {

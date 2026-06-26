@@ -1,6 +1,7 @@
 <template>
   <HomeCanvasHeader
-    class="canvas-chrome canvas-chrome-header"
+    class="workspace-page-chrome workspace-page-chrome--header"
+    :class="{ 'is-hidden': chromeHidden }"
     :inert="inert"
     :current-board-name="currentBoardName"
     :board-options="boardOptions"
@@ -23,12 +24,16 @@
   />
 
   <WorkspaceToolPalette
+    class="workspace-page-chrome workspace-page-chrome--left"
+    :class="{ 'is-hidden': chromeHidden }"
     :active-tool="activeTool"
     :inert="inert"
     @select-tool="emit('select-tool', $event)"
   />
 
   <WorkspaceZoomControls
+    class="workspace-page-chrome workspace-page-chrome--status"
+    :class="{ 'is-hidden': chromeHidden }"
     :zoom-level="zoomLevel"
     :inert="inert"
     @zoom-out="emit('zoom-out')"
@@ -43,6 +48,7 @@ import WorkspaceZoomControls from './WorkspaceZoomControls.vue'
 
 defineProps<{
   inert: boolean
+  chromeHidden: boolean
   currentBoardName: string
   boardOptions: Array<{ id: string; name: string }>
   currentBoardId: string | null
@@ -71,3 +77,40 @@ const emit = defineEmits<{
   'zoom-in': []
 }>()
 </script>
+
+<style scoped>
+.workspace-page-chrome {
+  opacity: 1;
+  filter: blur(0);
+  transform-origin: center;
+  transition:
+    opacity var(--workspace-page-chrome-fade-duration) ease,
+    filter var(--workspace-page-chrome-slide-duration) var(--workspace-page-chrome-slide-ease),
+    transform var(--workspace-page-chrome-slide-duration) var(--workspace-page-chrome-slide-ease);
+  will-change: transform, opacity, filter;
+}
+
+.workspace-page-chrome.is-hidden {
+  opacity: 0;
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+.workspace-page-chrome--header.is-hidden {
+  transform: translateY(-82px) scale(0.985);
+}
+
+.workspace-page-chrome--left.is-hidden {
+  transform: translate(-76px, -50%) scale(0.985);
+}
+
+.workspace-page-chrome--status.is-hidden {
+  transform: translateY(76px) scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-page-chrome {
+    transition-duration: 1ms;
+  }
+}
+</style>

@@ -7,7 +7,15 @@
 <script setup lang="ts">
 import type { ImageActionMenuIcon } from '../../config/imageActionRegistry'
 import type { Component } from 'vue'
-import { BorderInner, DesignPencil, EditPencil, Expand, Hd, Spark } from '@iconoir/vue'
+import {
+  AdobePhotoshop,
+  BorderInner,
+  DesignPencil,
+  EditPencil,
+  Expand,
+  Hd,
+  Spark,
+} from '@iconoir/vue'
 
 const props = defineProps<{
   icon: ImageActionMenuIcon
@@ -20,6 +28,7 @@ const iconMap: Record<ImageActionMenuIcon, Component> = {
   hd: Hd,
   'image-extend': Expand,
   'image-inpaint': DesignPencil,
+  'adobe-photoshop': AdobePhotoshop,
 }
 
 const resolvedIcon = computed<Component>(() => iconMap[props.icon])

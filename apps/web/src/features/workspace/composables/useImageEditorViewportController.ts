@@ -3,12 +3,12 @@ import type { Node } from '@vue-flow/core'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import { clampImageNodeOutputCount } from '../types/canvasNodes'
 import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
-import { MASK_EDITOR_CHROME_LAYOUT, getMaskEditorChromeOutset } from '../config/maskEditorChrome'
+import { IMAGE_EDITOR_CHROME_LAYOUT, getImageEditorChromeOutset } from '../config/imageEditorChrome'
 import { waitForNextAnimationFrame } from '../utils/animationFrame'
 
 type FlowViewport = { x: number; y: number; zoom: number }
 
-type MaskEditorAnchorRect = {
+type ImageEditorAnchorRect = {
   top: number
   left: number
   width: number
@@ -21,10 +21,10 @@ type MaskEditorReferenceImage = {
   ratio: number
 }
 
-type UseMaskEditorViewportControllerOptions = {
+type UseImageEditorViewportControllerOptions = {
   nodes: Ref<Node[]>
   canvasWrapRef: Ref<HTMLElement | null>
-  flowMaskEditorNodeId: Ref<string | null>
+  imageEditorNodeId: Ref<string | null>
   getImageNodeSnapshot: (nodeId: string) => { outputCount?: number } | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
@@ -44,10 +44,11 @@ type UseMaskEditorViewportControllerOptions = {
   onViewportTransform?: (viewport: FlowViewport) => void
 }
 
-const MASK_EDITOR_OVERLAY_SELECTOR = '[data-image-mask-editor]'
+const IMAGE_MASK_EDITOR_OVERLAY_SELECTOR = '[data-image-mask-editor]'
 const MASK_EDITOR_CANVAS_SELECTOR = '.image-mask-editor-canvas'
-const MASK_EDITOR_FOCUS_MAX_ZOOM = 2
-const MASK_EDITOR_FOCUS_MIN_ZOOM = 0.1
+const IMAGE_STAGE_IMAGE_SELECTOR = '.image-node-stage-image'
+const IMAGE_EDITOR_FOCUS_MAX_ZOOM = 2
+const IMAGE_EDITOR_FOCUS_MIN_ZOOM = 0.1
 const WORKSPACE_OVERSCROLL_GUARD_CLASS = 'workspace-overscroll-guard'
 const MASK_EDITOR_REFERENCE_IMAGE_LIMIT = getCanvasNodeImageInputLimit('prompt')
 
@@ -57,15 +58,15 @@ function setWorkspaceOverscrollGuard(enabled: boolean) {
   document.body.classList.toggle(WORKSPACE_OVERSCROLL_GUARD_CLASS, enabled)
 }
 
-export function useMaskEditorViewportController(options: UseMaskEditorViewportControllerOptions) {
-  const maskEditorChromeAnchorRect = ref<MaskEditorAnchorRect | null>(null)
-  const isMaskEditorChromeReady = ref(false)
+export function useImageEditorViewportController(options: UseImageEditorViewportControllerOptions) {
+  const imageEditorChromeAnchorRect = ref<ImageEditorAnchorRect | null>(null)
+  const isImageEditorChromeReady = ref(false)
   const maskEditorLayerOpacity = ref(72)
   const maskEditorReferenceImages = ref<MaskEditorReferenceImage[]>([])
 
-  let maskEditorReturnViewport: FlowViewport | null = null
-  let maskEditorFocusRequestId = 0
-  let maskEditorChromeAnchorFrame = 0
+  let imageEditorReturnViewport: FlowViewport | null = null
+  let imageEditorFocusRequestId = 0
+  let imageEditorChromeAnchorFrame = 0
 
   function resolveFlowNodeCenter(nodeId: string): { x: number; y: number } | null {
     const stage = options.getImageStageElement(nodeId)
@@ -101,27 +102,26 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
     }
   }
 
-  function resolveMaskEditorFocusTarget(nodeId: string): FlowViewport | null {
+  function resolveImageEditorFocusTarget(nodeId: string): FlowViewport | null {
     const stage = options.getImageStageElement(nodeId)
     if (!stage) {
       const center = resolveFlowNodeCenter(nodeId)
-      return center ? { ...center, zoom: MASK_EDITOR_FOCUS_MAX_ZOOM } : null
+      return center ? { ...center, zoom: IMAGE_EDITOR_FOCUS_MAX_ZOOM } : null
     }
 
-    const overlay = stage.querySelector<HTMLElement>(MASK_EDITOR_OVERLAY_SELECTOR)
-    if (!overlay) {
+    const target = resolveImageEditorChromeTarget(stage)
+    if (!target) {
       const center = resolveFlowNodeCenter(nodeId)
-      return center ? { ...center, zoom: MASK_EDITOR_FOCUS_MAX_ZOOM } : null
+      return center ? { ...center, zoom: IMAGE_EDITOR_FOCUS_MAX_ZOOM } : null
     }
 
-    const overlayCanvas = overlay.querySelector<HTMLElement>(MASK_EDITOR_CANVAS_SELECTOR)
-    const rect = overlayCanvas?.getBoundingClientRect()
+    const rect = target.getBoundingClientRect()
     if (!rect || rect.width <= 0 || rect.height <= 0) {
       const center = resolveFlowNodeCenter(nodeId)
-      return center ? { ...center, zoom: MASK_EDITOR_FOCUS_MAX_ZOOM } : null
+      return center ? { ...center, zoom: IMAGE_EDITOR_FOCUS_MAX_ZOOM } : null
     }
 
-    const chromeOutset = getMaskEditorChromeOutset()
+    const chromeOutset = getImageEditorChromeOutset()
     const viewport = options.getViewport()
     const currentZoom = Number.isFinite(viewport.zoom) && viewport.zoom > 0 ? viewport.zoom : 1
     const flowImageWidth = rect.width / currentZoom
@@ -129,11 +129,11 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
     const viewportRect = getViewportRect()
     const availableWidth = Math.max(
       1,
-      viewportRect.width - MASK_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
+      viewportRect.width - IMAGE_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
     )
     const availableHeight = Math.max(
       1,
-      viewportRect.height - MASK_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
+      viewportRect.height - IMAGE_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
     )
     const availableImageWidth = Math.max(1, availableWidth - chromeOutset.left - chromeOutset.right)
     const fitZoom = Math.min(
@@ -141,10 +141,10 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
       availableHeight / flowImageHeight,
     )
     const zoom = Math.max(
-      MASK_EDITOR_FOCUS_MIN_ZOOM,
+      IMAGE_EDITOR_FOCUS_MIN_ZOOM,
       Math.min(
-        MASK_EDITOR_FOCUS_MAX_ZOOM,
-        Number.isFinite(fitZoom) && fitZoom > 0 ? fitZoom : MASK_EDITOR_FOCUS_MAX_ZOOM,
+        IMAGE_EDITOR_FOCUS_MAX_ZOOM,
+        Number.isFinite(fitZoom) && fitZoom > 0 ? fitZoom : IMAGE_EDITOR_FOCUS_MAX_ZOOM,
       ),
     )
     const imageCenter = options.screenToFlowCoordinate({
@@ -159,37 +159,36 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
     }
   }
 
-  function isMaskEditorFocusRequestCurrent(nodeId: string, requestId: number) {
-    return requestId === maskEditorFocusRequestId && options.flowMaskEditorNodeId.value === nodeId
+  function isImageEditorFocusRequestCurrent(nodeId: string, requestId: number) {
+    return requestId === imageEditorFocusRequestId && options.imageEditorNodeId.value === nodeId
   }
 
-  async function focusMaskEditorStage(nodeId: string, requestId: number) {
+  async function focusImageEditorStage(nodeId: string, requestId: number) {
     await nextTick()
-    if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-    const target = resolveMaskEditorFocusTarget(nodeId)
+    if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
+    const target = resolveImageEditorFocusTarget(nodeId)
     if (!target) return
-    if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
+    if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
     await options.setCenter(target.x, target.y, {
       zoom: target.zoom,
       duration: 220,
       interpolate: 'smooth',
     })
-    if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
+    if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
     options.onViewportTransform?.(options.getViewport())
   }
 
-  function updateMaskEditorChromeAnchorRect() {
-    maskEditorChromeAnchorFrame = 0
-    const nodeId = options.flowMaskEditorNodeId.value
-    maskEditorChromeAnchorRect.value = nodeId ? resolveMaskEditorChromeAnchorRect(nodeId) : null
+  function updateImageEditorChromeAnchorRect() {
+    imageEditorChromeAnchorFrame = 0
+    const nodeId = options.imageEditorNodeId.value
+    imageEditorChromeAnchorRect.value = nodeId ? resolveImageEditorChromeAnchorRect(nodeId) : null
   }
 
-  function resolveMaskEditorChromeAnchorRect(nodeId: string): MaskEditorAnchorRect | null {
+  function resolveImageEditorChromeAnchorRect(nodeId: string): ImageEditorAnchorRect | null {
     const wrap = options.canvasWrapRef.value
     const stage = options.getImageStageElement(nodeId)
     if (!wrap || !stage) return null
-    const overlay = stage.querySelector<HTMLElement>(MASK_EDITOR_OVERLAY_SELECTOR)
-    const target = overlay?.querySelector<HTMLElement>(MASK_EDITOR_CANVAS_SELECTOR) ?? overlay
+    const target = resolveImageEditorChromeTarget(stage)
     if (!target) return null
 
     const wrapRect = wrap.getBoundingClientRect()
@@ -203,37 +202,43 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
     }
   }
 
-  function scheduleMaskEditorChromeAnchorUpdate() {
+  function resolveImageEditorChromeTarget(stage: HTMLElement): HTMLElement | null {
+    const overlay = stage.querySelector<HTMLElement>(IMAGE_MASK_EDITOR_OVERLAY_SELECTOR)
+    const overlayCanvas = overlay?.querySelector<HTMLElement>(MASK_EDITOR_CANVAS_SELECTOR)
+    return overlayCanvas ?? overlay ?? stage.querySelector<HTMLElement>(IMAGE_STAGE_IMAGE_SELECTOR)
+  }
+
+  function scheduleImageEditorChromeAnchorUpdate() {
     if (typeof requestAnimationFrame === 'undefined') {
-      updateMaskEditorChromeAnchorRect()
+      updateImageEditorChromeAnchorRect()
       return
     }
-    if (maskEditorChromeAnchorFrame) cancelAnimationFrame(maskEditorChromeAnchorFrame)
-    maskEditorChromeAnchorFrame = requestAnimationFrame(updateMaskEditorChromeAnchorRect)
+    if (imageEditorChromeAnchorFrame) cancelAnimationFrame(imageEditorChromeAnchorFrame)
+    imageEditorChromeAnchorFrame = requestAnimationFrame(updateImageEditorChromeAnchorRect)
   }
 
-  function restoreMaskEditorReturnViewport() {
-    maskEditorFocusRequestId += 1
-    const viewport = maskEditorReturnViewport
+  function restoreImageEditorReturnViewport() {
+    imageEditorFocusRequestId += 1
+    const viewport = imageEditorReturnViewport
     if (!viewport) return
-    maskEditorReturnViewport = null
+    imageEditorReturnViewport = null
     void options.setViewport({ ...viewport }, { duration: 220, interpolate: 'smooth' })
     options.onViewportTransform?.(viewport)
-    scheduleMaskEditorChromeAnchorUpdate()
+    scheduleImageEditorChromeAnchorUpdate()
   }
 
-  async function focusMaskEditorAndShowChrome(nodeId: string) {
-    const requestId = ++maskEditorFocusRequestId
-    maskEditorReturnViewport = { ...options.getViewport() }
-    isMaskEditorChromeReady.value = false
-    maskEditorChromeAnchorRect.value = null
-    await focusMaskEditorStage(nodeId, requestId)
-    if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
+  async function focusImageEditorAndShowChrome(nodeId: string) {
+    const requestId = ++imageEditorFocusRequestId
+    imageEditorReturnViewport = { ...options.getViewport() }
+    isImageEditorChromeReady.value = false
+    imageEditorChromeAnchorRect.value = null
+    await focusImageEditorStage(nodeId, requestId)
+    if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
     await waitForNextAnimationFrame()
-    if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-    updateMaskEditorChromeAnchorRect()
-    if (maskEditorChromeAnchorRect.value) {
-      isMaskEditorChromeReady.value = true
+    if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
+    updateImageEditorChromeAnchorRect()
+    if (imageEditorChromeAnchorRect.value) {
+      isImageEditorChromeReady.value = true
     }
   }
 
@@ -293,54 +298,54 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
   }
 
   function onCanvasWheel(event: WheelEvent) {
-    const isMaskEditing = !!options.flowMaskEditorNodeId.value
+    const isImageEditing = !!options.imageEditorNodeId.value
     const isBrowserGestureCandidate = event.ctrlKey || Math.abs(event.deltaX) > 0
-    if (!isMaskEditing && !isBrowserGestureCandidate) return
+    if (!isImageEditing && !isBrowserGestureCandidate) return
     event.preventDefault()
-    if (isMaskEditing) event.stopPropagation()
+    if (isImageEditing) event.stopPropagation()
   }
 
   const activeMaskEditorOutputCount = computed(() => {
-    const nodeId = options.flowMaskEditorNodeId.value
+    const nodeId = options.imageEditorNodeId.value
     if (!nodeId) return 1
     const snapshot = options.getImageNodeSnapshot(nodeId)
     return snapshot ? clampImageNodeOutputCount(snapshot.outputCount) : 1
   })
 
   watch(
-    () => options.flowMaskEditorNodeId.value,
+    () => options.imageEditorNodeId.value,
     (nextNodeId, prevNodeId) => {
       if (nextNodeId) {
-        isMaskEditorChromeReady.value = false
+        isImageEditorChromeReady.value = false
         maskEditorLayerOpacity.value = 72
         maskEditorReferenceImages.value = []
-        maskEditorChromeAnchorRect.value = null
+        imageEditorChromeAnchorRect.value = null
         return
       }
-      isMaskEditorChromeReady.value = false
-      maskEditorChromeAnchorRect.value = null
+      isImageEditorChromeReady.value = false
+      imageEditorChromeAnchorRect.value = null
       maskEditorReferenceImages.value = []
-      if (prevNodeId) restoreMaskEditorReturnViewport()
+      if (prevNodeId) restoreImageEditorReturnViewport()
     },
   )
 
   onMounted(() => {
     if (typeof window === 'undefined') return
     setWorkspaceOverscrollGuard(true)
-    window.addEventListener('resize', scheduleMaskEditorChromeAnchorUpdate)
+    window.addEventListener('resize', scheduleImageEditorChromeAnchorUpdate)
   })
 
   onBeforeUnmount(() => {
-    if (maskEditorChromeAnchorFrame) cancelAnimationFrame(maskEditorChromeAnchorFrame)
+    if (imageEditorChromeAnchorFrame) cancelAnimationFrame(imageEditorChromeAnchorFrame)
     if (typeof window !== 'undefined') {
-      window.removeEventListener('resize', scheduleMaskEditorChromeAnchorUpdate)
+      window.removeEventListener('resize', scheduleImageEditorChromeAnchorUpdate)
       setWorkspaceOverscrollGuard(false)
     }
   })
 
   return {
-    maskEditorChromeAnchorRect,
-    isMaskEditorChromeReady,
+    imageEditorChromeAnchorRect,
+    isImageEditorChromeReady,
     maskEditorLayerOpacity,
     maskEditorReferenceImages,
     activeMaskEditorOutputCount,
@@ -349,7 +354,7 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
     onMaskEditorReferenceImageRemove,
     onMaskEditorReferenceImagePreview,
     onCanvasWheel,
-    focusMaskEditorAndShowChrome,
-    scheduleMaskEditorChromeAnchorUpdate,
+    focusImageEditorAndShowChrome,
+    scheduleImageEditorChromeAnchorUpdate,
   }
 }

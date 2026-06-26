@@ -9,10 +9,10 @@
     :copy-mode="copyMode"
     :class="{
       'is-expand-mode': !!expandModeActive,
-      'is-mask-editor-mode': !!maskEditorModeActive,
+      'is-image-editor-active': isImageEditorActive,
     }"
     rounded-header
-    :header-hidden="!!expandModeActive || !!maskEditorModeActive"
+    :header-hidden="!!expandModeActive || isImageEditorActive"
     @node-mousedown="emit('node-mousedown', $event)"
     @update:title="emit('update:title', $event)"
     @delete="emit('delete')"
@@ -22,7 +22,7 @@
     </template>
     <div
       class="relative flex flex-col gap-2 overflow-visible rounded-[11px] p-0"
-      :class="expandModeActive || maskEditorModeActive ? 'bg-transparent' : 'bg-white'"
+      :class="expandModeActive || isImageEditorActive ? 'bg-transparent' : 'bg-white'"
       @contextmenu.stop
     >
       <ImageNodeStage
@@ -37,7 +37,7 @@
         :expand-mode-active="expandModeActive"
         :expand-overlay-style="expandOverlayStyle"
         :expand-handle-radius="expandHandleRadius"
-        :mask-editor-mode-active="maskEditorModeActive"
+        :image-editor-mode="imageEditorMode"
         :mask-editor-overlay-style="maskEditorOverlayStyle"
         :mask-editor-canvas-width="maskEditorCanvasWidth"
         :mask-editor-canvas-height="maskEditorCanvasHeight"
@@ -96,6 +96,7 @@ import { MediaImage } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../../types/canvasNodes'
 import type { ImageNodeAction, ImageStrengthAction } from '../../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
+import type { ImageEditorMode } from '../../types/imageEditor'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import NodeShell from './NodeShell.vue'
@@ -122,7 +123,7 @@ const props = defineProps<{
   expandModeActive?: boolean
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
-  maskEditorModeActive?: boolean
+  imageEditorMode?: ImageEditorMode | null
   maskEditorOverlayStyle?: Record<string, string> | null
   maskEditorCanvasWidth?: number
   maskEditorCanvasHeight?: number
@@ -160,9 +161,10 @@ const emit = defineEmits<{
 }>()
 
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
+const isImageEditorActive = computed(() => props.imageEditorMode != null)
 
 const showImageActionMenu = computed(
-  () => !!props.actionMenuVisible && !!props.displayImage && !props.maskEditorModeActive,
+  () => !!props.actionMenuVisible && !!props.displayImage && !isImageEditorActive.value,
 )
 const showPromptComposer = computed(
   () => !!props.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
@@ -199,7 +201,7 @@ function selectOutputCount(value: number) {
 }
 
 function onImageStageContextMenu(event: MouseEvent) {
-  if (props.maskEditorModeActive) {
+  if (isImageEditorActive.value) {
     event.preventDefault()
     event.stopPropagation()
     return

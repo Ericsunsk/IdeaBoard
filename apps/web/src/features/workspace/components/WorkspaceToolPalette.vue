@@ -1,6 +1,6 @@
 <template>
   <aside
-    class="canvas-chrome canvas-chrome-left canvas-control-group canvas-control-group--vertical absolute top-1/2 left-4 z-[100] rounded-none border-0 bg-transparent p-0 [transform:translateY(-50%)]"
+    class="canvas-control-group canvas-control-group--vertical absolute top-1/2 left-4 z-[100] rounded-none border-0 bg-transparent p-0 [transform:translateY(-50%)]"
     :inert="inert"
     @wheel.prevent.stop
   >

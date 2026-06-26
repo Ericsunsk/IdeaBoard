@@ -11,6 +11,7 @@ import {
 import type { PromptAspectRatio } from '../config/promptAspectRatio'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import { ACTIVE_NODE_PANEL_KIND, type ActiveNodePanel } from './useFlowActiveNodePanels'
+import type { ImageEditorMode } from '../types/imageEditor'
 
 type FusionPromptParamPatch = Extract<
   FlowSnapshotParamPatch,
@@ -18,7 +19,7 @@ type FusionPromptParamPatch = Extract<
 >
 
 type UseFlowImageActionOrchestratorOptions = {
-  flowMaskEditorNodeId: Ref<string | null>
+  flowImageEditorNodeId: Ref<string | null>
   suppressClickAction: Ref<ImageStrengthAction | null>
   openActiveNodePanel: (panel: ActiveNodePanel) => void
   clearActiveNodePanel: () => void
@@ -27,8 +28,8 @@ type UseFlowImageActionOrchestratorOptions = {
   cancelFlowExpandMode: () => void
   cancelFlowMaskEditorMode: () => void
   enterFlowExpandMode: (nodeId: string) => boolean
-  enterFlowMaskEditorMode: (nodeId: string) => boolean
-  focusMaskEditorAndShowChrome: (nodeId: string) => void | Promise<void>
+  enterFlowImageEditorMode: (nodeId: string, mode: ImageEditorMode) => boolean
+  focusImageEditorAndShowChrome: (nodeId: string) => void | Promise<void>
   runImageDirectAction: (
     nodeId: string,
     action: ImageTaskAction,
@@ -65,7 +66,7 @@ type UseFlowImageActionOrchestratorOptions = {
 export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrchestratorOptions) {
   function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
     event.preventDefault()
-    if (options.flowMaskEditorNodeId.value === nodeId) return
+    if (options.flowImageEditorNodeId.value === nodeId) return
     options.cancelFlowExpandMode()
     options.selectFlowNodeForContextMenu(nodeId)
     options.openActiveNodePanel({ kind: ACTIVE_NODE_PANEL_KIND.imageTools, nodeId })
@@ -90,13 +91,24 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
       if (!entered) options.onWarning('当前图片不可扩图')
       return
     }
-    if (actionMode === IMAGE_ACTION_MODE.localInpaint) {
+    if (
+      actionMode === IMAGE_ACTION_MODE.localInpaint ||
+      actionMode === IMAGE_ACTION_MODE.localImageEditor
+    ) {
       options.cancelFlowExpandMode()
-      const entered = options.enterFlowMaskEditorMode(nodeId)
+      const editorMode = actionMode === IMAGE_ACTION_MODE.localImageEditor ? 'adjust' : 'inpaint'
+      const entered = options.enterFlowImageEditorMode(nodeId, editorMode)
       options.clearActiveNodePanel()
       options.hideStrengthControl()
-      if (!entered) options.onWarning('当前图片不可局部重绘')
-      else void options.focusMaskEditorAndShowChrome(nodeId)
+      if (!entered) {
+        options.onWarning(
+          actionMode === IMAGE_ACTION_MODE.localImageEditor
+            ? '当前图片不可图像调整'
+            : '当前图片不可局部重绘',
+        )
+      } else {
+        void options.focusImageEditorAndShowChrome(nodeId)
+      }
       return
     }
     if (!isImageTaskAction(action)) {

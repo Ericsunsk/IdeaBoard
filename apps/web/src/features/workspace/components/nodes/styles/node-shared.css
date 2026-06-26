@@ -14,8 +14,8 @@
   cursor: grab;
   user-select: none;
   transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
+    background-color var(--workspace-motion-standard) ease,
+    color var(--workspace-motion-standard) ease;
 }
 
 .workflow-node.active .workflow-node-header {
@@ -73,7 +73,7 @@
 }
 
 .node-execution-body {
-  --node-tool-border-width: 1.2px;
+  --node-tool-border-width: var(--workspace-control-border-width);
   --node-tool-button-accent: var(--color-canvas-accent);
   --node-tool-button-brand: var(--color-canvas-accent-hover);
   padding: 8px;
