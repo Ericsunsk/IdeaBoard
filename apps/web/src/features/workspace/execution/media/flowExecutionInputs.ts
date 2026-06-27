@@ -4,15 +4,10 @@ import {
   type CanvasConnectionNodeType,
   type ImageNodeItem,
   type ImageNodeOutputItem,
-} from '../../canvas-board/domain'
-import {
-  taskApi,
-  type SubmitTaskData,
-} from '../../../shared/api/task'
-import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import { resolveImageNodeDisplayRatio, resolveImageNodeDisplayUrl } from '../utils/flowImageNodeSelectors'
+} from '../../../canvas-board/domain'
+import { resolveImageNodeDisplayRatio, resolveImageNodeDisplayUrl } from '../../utils/flowImageNodeSelectors'
 
-export interface FlowTaskExecutorGraphOptions {
+export interface FlowExecutionGraphOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
   edges: Array<{
     source: string
@@ -35,8 +30,8 @@ export interface ResolvedFlowInputImage {
   ratio: number
 }
 
-type FlowConnectedInputPort = 'image' | 'prompt'
-type FlowGraphNode = FlowTaskExecutorGraphOptions['nodes'][number]
+export type FlowConnectedInputPort = 'image' | 'prompt'
+type FlowGraphNode = FlowExecutionGraphOptions['nodes'][number]
 type FlowSourceTypeResolver = (sourceNode: FlowGraphNode) => CanvasConnectionNodeType | null
 export type FlowSnapshotNodeLike = {
   type?: unknown
@@ -51,7 +46,7 @@ function isImageNodeSnapshot(snapshotNode: FlowSnapshotNodeLike): snapshotNode i
 }
 
 function resolvePromptInputSourceNodeId(
-  options: FlowTaskExecutorGraphOptions,
+  options: FlowExecutionGraphOptions,
   targetNodeId: string,
 ): string {
   const incoming = options.edges.find(
@@ -61,7 +56,7 @@ function resolvePromptInputSourceNodeId(
 }
 
 function resolvePromptChainText(
-  options: FlowTaskExecutorGraphOptions,
+  options: FlowExecutionGraphOptions,
   promptNodeId: string,
   visited: Set<string>,
 ): string {
@@ -92,7 +87,7 @@ function resolvePromptChainText(
 }
 
 export function resolveConnectedPromptText(
-  options: FlowTaskExecutorGraphOptions,
+  options: FlowExecutionGraphOptions,
   targetNodeId: string,
 ): string {
   const promptSourceNodeId = resolvePromptInputSourceNodeId(options, targetNodeId)
@@ -133,7 +128,7 @@ export function resolveSourceImageFromNode(
 }
 
 function resolveConnectedNodeInput(
-  options: FlowTaskExecutorGraphOptions,
+  options: FlowExecutionGraphOptions,
   targetNodeId: string,
   targetPort: FlowConnectedInputPort,
   resolveSourceType: FlowSourceTypeResolver,
@@ -158,26 +153,13 @@ function resolveConnectedNodeInput(
 }
 
 export function resolveConnectedInput(
-  options: FlowTaskExecutorGraphOptions,
+  options: FlowExecutionGraphOptions,
   targetNodeId: string,
   targetPort: FlowConnectedInputPort,
 ): FlowConnectedInput | null {
   return resolveConnectedNodeInput(options, targetNodeId, targetPort, (sourceNode) =>
     resolveNodeType(sourceNode.id),
   )
-}
-
-export async function assertTaskSubmitReady(
-  request: SubmitTaskData,
-  fallbackMessage = '提交任务失败',
-): Promise<void> {
-  const readiness = await taskApi.checkSubmitReadiness(request)
-  if (readiness.code !== 0) {
-    throw new Error(sanitizeApiErrorMessage(readiness.msg, fallbackMessage))
-  }
-  if (!readiness.data?.ready) {
-    throw new Error(sanitizeApiErrorMessage(readiness.data?.message, fallbackMessage))
-  }
 }
 
 export function isFlowExecutionSourceKind(kind: string): kind is CanvasConnectionNodeType {
@@ -201,7 +183,7 @@ export function resolveFlowSourceImageRatio(
 }
 
 export function resolveConnectedImageInputs(
-  options: FlowTaskExecutorGraphOptions,
+  options: FlowExecutionGraphOptions,
   targetNodeId: string,
   snapshotInputImages: unknown,
   maxImages = 4,

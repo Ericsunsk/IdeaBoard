@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ImageNodeItem } from '../../canvas-board/domain'
-import { resolveFlowSourceImageRatio, resolveSourceImageFromNode } from './flowTaskExecutorUtils'
+import type { ImageNodeItem } from '../../../canvas-board/domain'
+import { resolveFlowSourceImageRatio, resolveSourceImageFromNode } from './flowExecutionInputs'
 
 function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {
@@ -17,7 +17,7 @@ function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   }
 }
 
-describe('flowTaskExecutorUtils', () => {
+describe('flowExecutionInputs', () => {
   it('uses the image node display output for connected image source data', () => {
     const snapshot = makeImageNode({
       outputImages: [

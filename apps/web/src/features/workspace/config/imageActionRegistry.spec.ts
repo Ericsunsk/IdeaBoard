@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_IMAGE_ACTION_STRENGTH,
-  DEFAULT_IMAGE_ACTION_STRENGTHS,
   IMAGE_ACTION_MENU_ITEMS,
   IMAGE_ACTION_MODE,
   IMAGE_ACTION_REGISTRY,
   IMAGE_ACTION_REGISTRY_LIST,
+  IMAGE_NODE_ACTION,
+} from './imageActionRegistry'
+import {
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
-  IMAGE_NODE_ACTION,
-  isImageDirectTaskAction,
   isImageStrengthAction,
-} from './imageActionRegistry'
+} from '../execution'
 
 describe('imageActionRegistry', () => {
   it('defines each image action exactly once', () => {
@@ -36,39 +35,29 @@ describe('imageActionRegistry', () => {
         label: item.label,
         title: item.title,
         icon: item.icon,
-        ...('strength' in item ? { strengthAction: item.action } : {}),
+        ...(isImageStrengthAction(item.action) ? { strengthAction: item.action } : {}),
       })),
     )
   })
 
-  it('derives strength actions and defaults from registry metadata', () => {
-    expect(isImageStrengthAction(IMAGE_NODE_ACTION.styleVariation)).toBe(true)
-    expect(isImageStrengthAction(IMAGE_NODE_ACTION.hdUpscale)).toBe(true)
-    expect(isImageStrengthAction(IMAGE_NODE_ACTION.removeBg)).toBe(false)
-    expect(DEFAULT_IMAGE_ACTION_STRENGTHS).toEqual({
-      [IMAGE_NODE_ACTION.styleVariation]: DEFAULT_IMAGE_ACTION_STRENGTH,
-      [IMAGE_NODE_ACTION.hdUpscale]: DEFAULT_IMAGE_ACTION_STRENGTH,
-    })
-  })
-
   it('does not expose submit authority fields that runtime does not consume', () => {
-    const unusedAuthorityKeys = ['prompt', 'input', 'result', 'readiness'] as const
+    const unusedAuthorityKeys = [
+      'execution',
+      'strength',
+      'prompt',
+      'input',
+      'result',
+      'readiness',
+    ] as const
 
     for (const item of IMAGE_ACTION_REGISTRY_LIST) {
       for (const key of unusedAuthorityKeys) {
         expect(item).not.toHaveProperty(key)
       }
     }
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.imageInpaint]).not.toHaveProperty('execution')
-    expect(IMAGE_ACTION_REGISTRY[IMAGE_NODE_ACTION.localImageEditor]).not.toHaveProperty(
-      'execution',
-    )
   })
 
   it('keeps task and local tool modes explicit', () => {
-    expect(isImageDirectTaskAction(IMAGE_NODE_ACTION.removeBg)).toBe(true)
-    expect(isImageDirectTaskAction(IMAGE_NODE_ACTION.styleVariation)).toBe(true)
-    expect(isImageDirectTaskAction(IMAGE_NODE_ACTION.sketchToImage)).toBe(true)
     expect(IMAGE_ACTION_REGISTRY[IMAGE_HD_UPSCALE_ACTION].mode).toBe(
       IMAGE_ACTION_MODE.hdUpscaleTask,
     )

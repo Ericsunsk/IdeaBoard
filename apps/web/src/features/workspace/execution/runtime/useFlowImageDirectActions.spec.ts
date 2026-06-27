@@ -2,42 +2,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
-import type { FlowNodeData } from '../types/flowTypes'
-import type { ImageNodeItem } from '../../canvas-board/domain'
+import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
+import type { FlowNodeData } from '../../types/flowTypes'
+import type { ImageNodeItem } from '../../../canvas-board/domain'
 import { useFlowImageDirectActions } from './useFlowImageDirectActions'
 
 const mocks = vi.hoisted(() => ({
-  assertCanvasExtendSubmitReady: vi.fn(),
-  assertDirectActionSubmitReady: vi.fn(),
-  assertHdUpscaleSubmitReady: vi.fn(),
-  assertPromptImageSubmitReady: vi.fn(),
-  submitCanvasExtendTask: vi.fn(),
-  submitDirectActionTask: vi.fn(),
-  submitHdUpscaleTask: vi.fn(),
-  submitImageInpaintTask: vi.fn(),
-  submitPromptImageGenerationTask: vi.fn(),
-  submitPromptTextGenerationTask: vi.fn(),
+  assertTaskRequestReady: vi.fn(),
+  submitTaskRequest: vi.fn(),
   waitExistingOrLiveTaskImageResults: vi.fn(),
   resolveTaskImageRatio: vi.fn(),
   resolveTaskImageResultDisplay: vi.fn(),
 }))
 
-vi.mock('../services/flowImageDirectActionExecutor', () => ({
-  assertCanvasExtendSubmitReady: mocks.assertCanvasExtendSubmitReady,
-  assertDirectActionSubmitReady: mocks.assertDirectActionSubmitReady,
-  assertHdUpscaleSubmitReady: mocks.assertHdUpscaleSubmitReady,
-  assertPromptImageSubmitReady: mocks.assertPromptImageSubmitReady,
-  submitCanvasExtendTask: mocks.submitCanvasExtendTask,
-  submitDirectActionTask: mocks.submitDirectActionTask,
-  submitHdUpscaleTask: mocks.submitHdUpscaleTask,
-  submitImageInpaintTask: mocks.submitImageInpaintTask,
-  submitPromptImageGenerationTask: mocks.submitPromptImageGenerationTask,
-  submitPromptTextGenerationTask: mocks.submitPromptTextGenerationTask,
+vi.mock('./flowImageDirectActionExecutor', () => ({
+  assertTaskRequestReady: mocks.assertTaskRequestReady,
+  submitTaskRequest: mocks.submitTaskRequest,
   waitExistingOrLiveTaskImageResults: mocks.waitExistingOrLiveTaskImageResults,
 }))
 
-vi.mock('../utils/flowImageDirectActionTaskResult', () => ({
+vi.mock('../media/imageSize', () => ({
+  loadImageSizeFromUrl: vi.fn(async () => ({ width: 1000, height: 1000 })),
+}))
+
+vi.mock('../results/flowImageDirectActionTaskResult', () => ({
   pickFirstValidImageResult: (results: Array<{ url: string }>) =>
     results.find((result) => result.url.trim()) ?? null,
   resolveTaskImageResultDisplay: mocks.resolveTaskImageResultDisplay,
@@ -160,9 +148,7 @@ function findPendingResultNode(nodes: Node[]): Node {
 describe('useFlowImageDirectActions pending task recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.assertCanvasExtendSubmitReady.mockResolvedValue(undefined)
-    mocks.assertDirectActionSubmitReady.mockResolvedValue(undefined)
-    mocks.assertHdUpscaleSubmitReady.mockResolvedValue(undefined)
+    mocks.assertTaskRequestReady.mockResolvedValue(undefined)
     mocks.resolveTaskImageRatio.mockImplementation(async (_url: string, fallback: number) =>
       fallback > 0 ? fallback : 1,
     )
@@ -185,7 +171,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
 
   it('routes direct action readiness failures through warning without creating a pending node', async () => {
     const readinessError = new Error('缺少提示词，请填写 Prompt 或配置后台 system prompt')
-    mocks.assertDirectActionSubmitReady.mockRejectedValueOnce(readinessError)
+    mocks.assertTaskRequestReady.mockRejectedValueOnce(readinessError)
     const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
 
     await expect(
@@ -193,7 +179,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     ).resolves.toBeUndefined()
 
     expect(harness.onWarning).toHaveBeenCalledWith(readinessError.message)
-    expect(mocks.submitDirectActionTask).not.toHaveBeenCalled()
+    expect(mocks.submitTaskRequest).not.toHaveBeenCalled()
     expect(harness.flushAutosave).not.toHaveBeenCalled()
     expect(harness.nodes.value).toHaveLength(1)
     expect(
@@ -205,9 +191,9 @@ describe('useFlowImageDirectActions pending task recovery', () => {
   })
 
   it('persists task id after submit and clears it after completion', async () => {
-    const submitTask = createDeferred<string>()
+    const submitTask = createDeferred<{ taskId: string }>()
     const waitTask = createDeferred<Array<{ url: string }>>()
-    mocks.submitDirectActionTask.mockReturnValue(submitTask.promise)
+    mocks.submitTaskRequest.mockReturnValue(submitTask.promise)
     mocks.waitExistingOrLiveTaskImageResults.mockReturnValue(waitTask.promise)
     const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
 
@@ -216,7 +202,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     const pendingNode = findPendingResultNode(harness.nodes.value)
     expect((pendingNode.data?.snapshotNode as ImageNodeItem).pendingTaskId).toBeUndefined()
 
-    submitTask.resolve('task-1')
+    submitTask.resolve({ taskId: 'task-1' })
     await flushPromises()
     expect(findImageNode(harness.nodes.value, pendingNode.id).pendingTaskId).toBe('task-1')
     expect(harness.flushAutosave).toHaveBeenCalledWith({ silent: true })
@@ -295,7 +281,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
   })
 
   it('uses completed image dimensions when resolving canvas extend result display', async () => {
-    mocks.submitCanvasExtendTask.mockResolvedValue('task-extend')
+    mocks.submitTaskRequest.mockResolvedValue({ taskId: 'task-extend' })
     mocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
       { url: 'https://example.com/extended.png', width: 400, height: 100 },
     ])
@@ -319,7 +305,7 @@ describe('useFlowImageDirectActions pending task recovery', () => {
   })
 
   it('resizes completed canvas extend result nodes from the actual output dimensions', async () => {
-    mocks.submitCanvasExtendTask.mockResolvedValue('task-extend')
+    mocks.submitTaskRequest.mockResolvedValue({ taskId: 'task-extend' })
     mocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
       { url: 'https://example.com/extended-wide.png', width: 400, height: 200 },
     ])

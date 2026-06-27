@@ -1,5 +1,5 @@
-import { uploadApi } from '../../../shared/api/upload'
-import { isDataUrl } from './flowMediaIO'
+import { uploadApi } from '../../../../shared/api/upload'
+import { isDataUrl } from '../../services/flowMediaIO'
 
 interface EnsureFlowMaskImageUrlOptions {
   boardId?: string

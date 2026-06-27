@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
+import type { SubmitTaskData } from '../../../../shared/api/task'
 import {
   clampImageNodeOutputCount,
   getCanvasNodeImageInputLimit,
@@ -8,50 +9,56 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptAspectRatio,
-} from '../../canvas-board/domain'
-import type { FlowNodeData } from '../types/flowTypes'
-import { uploadApi } from '../../../shared/api/upload'
-import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import { EXECUTION_FUSION_META } from '../config/executionContract'
-import { resolveFusionOutputSize } from '../utils/fusionOutputSizing'
+} from '../../../canvas-board/domain'
+import type { FlowNodeData } from '../../types/flowTypes'
+import { uploadApi } from '../../../../shared/api/upload'
+import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
+import { EXECUTION_FUSION_META } from '../contracts/executionContract'
+import { resolveFusionOutputSize } from '../commands/fusionOutputSizing'
 import {
   cleanupFlowLocalInpaintAssets,
   composeFlowLocalInpaint,
   prepareFlowLocalInpaint,
   type FlowLocalInpaintCropResult,
-} from '../services/flowLocalInpaint'
-import { ensureFlowMaskImageUrl } from '../services/flowMediaUpload'
-import { isDataUrl } from '../services/flowMediaIO'
-import { waitExistingOrLiveTaskImageResults } from '../services/flowImageDirectActionExecutor'
-import { loadImageSizeFromUrl } from '../utils/imageSize'
-import { usePendingImageResultNodes } from './usePendingImageResultNodes'
+} from '../media/flowLocalInpaint'
+import { ensureFlowMaskImageUrl } from '../media/flowMediaUpload'
+import { isDataUrl } from '../../services/flowMediaIO'
+import {
+  assertTaskRequestReady,
+  submitTaskRequest,
+  waitExistingOrLiveTaskImageResults,
+} from './flowImageDirectActionExecutor'
+import { loadImageSizeFromUrl } from '../media/imageSize'
+import { usePendingImageResultNodes } from '../results/usePendingImageResultNodes'
 import {
   pickFirstValidImageResult,
   resolveTaskImageRatio,
-} from '../utils/flowImageDirectActionTaskResult'
+} from '../results/flowImageDirectActionTaskResult'
 import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
-} from '../utils/flowImageDirectActionSource'
-import type { ImageTaskAction } from '../config/imageActionRegistry'
-import type { FlowTransactions } from './useFlowTransactions'
-import { resolveCanvasExtendIntent, type CanvasExtendRect } from '../utils/canvasExtendGeometry'
+} from '../media/flowImageDirectActionSource'
+import type { FlowTransactions } from '../../composables/useFlowTransactions'
+import { resolveCanvasExtendIntent, type CanvasExtendRect } from '../../utils/canvasExtendGeometry'
 import {
   resolveConnectedImageInputs,
   resolveConnectedInput,
   resolveConnectedPromptText,
-} from '../services/flowTaskExecutorUtils'
-import { readCurrentBoardId } from '../utils/currentBoardId'
+} from '../media/flowExecutionInputs'
+import { readCurrentBoardId } from '../../utils/currentBoardId'
 import {
-  assertImageInpaintTaskSubmitReady,
-  buildCanvasExtendTaskCommand,
-  buildFusionTaskCommand,
-  buildImageDirectTaskCommand,
-  buildImageInpaintTaskCommand,
-  buildPromptImageTaskCommand,
-  buildTextPromptTaskCommand,
-} from '../services/flowImageDirectActionCommands'
+  buildCanvasExtendReadinessRequest,
+  buildCanvasExtendTaskRequest,
+  buildFusionTaskRequest,
+  buildImageInpaintTaskRequest,
+  buildImageActionReadinessRequest,
+  buildImageTaskRequest,
+  buildPromptImageReadinessRequest,
+  buildPromptImageTaskRequest,
+  buildTextPromptTaskRequest,
+} from '../commands/flowImageTaskRequests'
 import { useFlowImageDirectActionRunner } from './useFlowImageDirectActionRunner'
+import type { ImageTaskAction } from '../contracts/imageActionExecution'
 
 type RunImageDirectActionOptions = {
   strength?: number
@@ -82,6 +89,35 @@ type CanvasExtendRectIntent = {
   originalImageRect: CanvasExtendRect
   prompt?: string
   outputCount?: number
+}
+
+type TaskSubmissionCallbacks = {
+  assertReady?: () => Promise<void>
+  submitTask: () => Promise<{ taskId: string }>
+}
+
+function createTaskSubmissionCallbacks(options: {
+  readinessRequest?: () => SubmitTaskData
+  buildRequest: () => SubmitTaskData | Promise<SubmitTaskData>
+  fallbackMessage?: string
+}): TaskSubmissionCallbacks {
+  const { readinessRequest } = options
+  const assertReady = readinessRequest
+    ? () => assertTaskRequestReady(readinessRequest(), options.fallbackMessage)
+    : undefined
+  return {
+    assertReady,
+    submitTask: async () =>
+      submitTaskRequest(await options.buildRequest(), options.fallbackMessage),
+  }
+}
+
+function requirePreparedTaskRequest(
+  request: SubmitTaskData | null,
+  fallbackMessage: string,
+): SubmitTaskData {
+  if (!request) throw new Error(fallbackMessage)
+  return request
 }
 
 export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOptions) {
@@ -155,22 +191,22 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
 
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
-    const command = buildImageDirectTaskCommand({
-      source,
-      action,
-      loadImageSize: loadImageSizeFromUrl,
-      strength: runOptions?.strength,
+    const taskSubmission = createTaskSubmissionCallbacks({
+      readinessRequest: () => buildImageActionReadinessRequest(action),
+      buildRequest: async () =>
+        buildImageTaskRequest({
+          source,
+          action,
+          imageSize: await loadImageSizeFromUrl(source.url),
+          strength: runOptions?.strength,
+        }),
     })
-    if (!command) {
-      options.onWarning('当前图片工具不可执行')
-      return
-    }
     await runPendingImageGeneration({
       source,
       sourceNodeId: nodeId,
       boardId,
-      assertReady: command.assertReady,
-      submitTask: () => command.submit(),
+      assertReady: taskSubmission.assertReady,
+      submitTask: taskSubmission.submitTask,
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, source.ratio),
       successMessage: '处理完成',
       fallbackErrorMessage: '执行失败',
@@ -200,11 +236,15 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     const normalizedPrompt = `${intent.prompt ?? ''}`.trim()
     const resolvedOutputCount = clampImageNodeOutputCount(intent.outputCount ?? 1)
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
-    const command = buildCanvasExtendTaskCommand({
-      source,
-      loadImageSize: loadImageSizeFromUrl,
-      extendPercent,
-      prompt: normalizedPrompt,
+    const taskSubmission = createTaskSubmissionCallbacks({
+      readinessRequest: buildCanvasExtendReadinessRequest,
+      buildRequest: async () =>
+        buildCanvasExtendTaskRequest({
+          source,
+          imageSize: await loadImageSizeFromUrl(source.url),
+          extendPercent,
+          prompt: normalizedPrompt,
+        }),
     })
     await runPendingImageBatchWorkflow({
       source,
@@ -215,8 +255,8 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         targetRatio,
         targetWidth,
       },
-      assertReady: command.assertReady,
-      submitTask: () => command.submit(),
+      assertReady: taskSubmission.assertReady,
+      submitTask: taskSubmission.submitTask,
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, targetRatio),
       fallbackErrorMessage: '扩图失败',
     })
@@ -246,14 +286,18 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     const resolvedOutputCount = clampImageNodeOutputCount(inpaint.outputCount)
     let localInpaint: FlowLocalInpaintCropResult | null = null
     let temporaryMaskUrl = ''
-    let command: ReturnType<typeof buildImageInpaintTaskCommand> | null = null
+    let request: ReturnType<typeof buildImageInpaintTaskRequest> | null = null
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
+    const taskSubmission = createTaskSubmissionCallbacks({
+      buildRequest: () => requirePreparedTaskRequest(request, '局部重绘任务未准备完成'),
+      fallbackMessage: '提交局部重绘任务失败',
+    })
     await runPendingImageBatchWorkflow({
       source,
       sourceNodeId: nodeId,
       boardId,
       outputCount: resolvedOutputCount,
-      preflight: assertImageInpaintTaskSubmitReady,
+      preflight: () => assertTaskRequestReady(buildPromptImageReadinessRequest()),
       prepare: async () => {
         const normalizedMaskUrl = await ensureFlowMaskImageUrl(rawMaskDataUrl, { boardId })
         if (isDataUrl(rawMaskDataUrl)) temporaryMaskUrl = normalizedMaskUrl
@@ -262,7 +306,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           maskUrl: normalizedMaskUrl,
           boardId,
         })
-        command = buildImageInpaintTaskCommand({
+        request = buildImageInpaintTaskRequest({
           prompt: normalizedPrompt,
           croppedImageUrl: localInpaint.croppedImageUrl,
           croppedMaskUrl: localInpaint.croppedMaskUrl,
@@ -270,10 +314,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           cropSize: localInpaint.cropSize,
         })
       },
-      submitTask: () => {
-        if (!command) throw new Error('局部重绘任务未准备完成')
-        return command.submit()
-      },
+      submitTask: taskSubmission.submitTask,
       resolveResult: async (taskId) => {
         if (!localInpaint) throw new Error('局部重绘任务未准备完成')
         const croppedResult = pickFirstValidImageResult(
@@ -347,11 +388,15 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
-    const command = buildPromptImageTaskCommand({
-      source,
-      prompt: normalizedPrompt,
-      loadImageSize: loadImageSizeFromUrl,
-      aspectRatio,
+    const taskSubmission = createTaskSubmissionCallbacks({
+      readinessRequest: buildPromptImageReadinessRequest,
+      buildRequest: async () =>
+        buildPromptImageTaskRequest({
+          source,
+          prompt: normalizedPrompt,
+          imageSize: await loadImageSizeFromUrl(source.url),
+          aspectRatio,
+        }),
     })
     await runPendingImageBatchWorkflow({
       source,
@@ -361,8 +406,8 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       resultOptions: {
         outputAnchorNodeId: optionsOverride.outputAnchorNodeId,
       },
-      assertReady: command.assertReady,
-      submitTask: () => command.submit(),
+      assertReady: taskSubmission.assertReady,
+      submitTask: taskSubmission.submitTask,
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, source.ratio),
       fallbackErrorMessage: '生成失败',
     })
@@ -390,9 +435,12 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
-    const command = buildTextPromptTaskCommand({
-      prompt: normalizedPrompt,
-      aspectRatio: normalizePromptAspectRatio(aspectRatio),
+    const taskSubmission = createTaskSubmissionCallbacks({
+      buildRequest: () =>
+        buildTextPromptTaskRequest({
+          prompt: normalizedPrompt,
+          aspectRatio: normalizePromptAspectRatio(aspectRatio),
+        }),
     })
     await runPendingImageBatchWorkflow({
       source,
@@ -402,8 +450,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       resultOptions: {
         outputAnchorNodeId: anchorNodeId,
       },
-      assertReady: command.assertReady,
-      submitTask: () => command.submit(),
+      submitTask: taskSubmission.submitTask,
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, 1),
       fallbackErrorMessage: '生成失败',
     })
@@ -472,7 +519,12 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       width: Number(snapshot.width) > 0 ? Number(snapshot.width) : 280,
     }
     let targetRatio = firstInput.ratio
-    let command: ReturnType<typeof buildFusionTaskCommand> | null = null
+    let request: ReturnType<typeof buildFusionTaskRequest> | null = null
+    const taskSubmission = createTaskSubmissionCallbacks({
+      readinessRequest: () => requirePreparedTaskRequest(request, 'Fusion 任务未准备完成'),
+      buildRequest: () => requirePreparedTaskRequest(request, 'Fusion 任务未准备完成'),
+      fallbackMessage: '提交 Fusion 任务失败',
+    })
     await runPendingImageBatchWorkflow({
       source,
       sourceNodeId: nodeId,
@@ -491,7 +543,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         })
         const imageWeights = outputSize.weights.slice(0, imageUrls.length)
         targetRatio = outputSize.targetRatio
-        command = buildFusionTaskCommand({
+        request = buildFusionTaskRequest({
           prompt: taskPrompt,
           imageUrls,
           inputWeights: imageWeights,
@@ -511,14 +563,8 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
           },
         }
       },
-      assertReady: () => {
-        if (!command) throw new Error('Fusion 任务未准备完成')
-        return command.assertReady()
-      },
-      submitTask: () => {
-        if (!command) throw new Error('Fusion 任务未准备完成')
-        return command.submit()
-      },
+      assertReady: taskSubmission.assertReady,
+      submitTask: taskSubmission.submitTask,
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, targetRatio),
       fallbackErrorMessage: 'Fusion 生成失败',
       formatErrorMessage: (error) => sanitizeApiErrorMessage(error.message, 'Fusion 生成失败'),

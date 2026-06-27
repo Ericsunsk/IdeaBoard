@@ -2,12 +2,14 @@ import type { Ref } from 'vue'
 import {
   IMAGE_ACTION_MODE,
   IMAGE_ACTION_REGISTRY,
+  type ImageNodeAction,
+} from '../config/imageActionRegistry'
+import {
   isImageTaskAction,
   isImageStrengthAction,
-  type ImageNodeAction,
   type ImageStrengthAction,
   type ImageTaskAction,
-} from '../config/imageActionRegistry'
+} from '../execution'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import { ACTIVE_NODE_PANEL_KIND, type ActiveNodePanel } from './useFlowActiveNodePanels'

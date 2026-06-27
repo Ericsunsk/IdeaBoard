@@ -1,17 +1,17 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
-import { clampImageNodeOutputCount, type ImageNodeItem } from '../../canvas-board/domain'
-import type { FlowNodeData } from '../types/flowTypes'
-import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
-import { resolveImageNodeFrameSize, resolveImageNodeStageHeight } from '../../canvas-board/domain'
+import { createCanvasNodeAt } from '../../utils/canvasNodeFactory'
+import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
+import type { FlowNodeData } from '../../types/flowTypes'
+import { resolveFlowNodeDragHandle } from '../../utils/flowNodeDragHandle'
+import { resolveImageNodeFrameSize, resolveImageNodeStageHeight } from '../../../canvas-board/domain'
 import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
-} from '../utils/flowImageDirectActionSource'
-import type { ResolvedTaskImageResult } from '../utils/flowImageDirectActionTaskResult'
-import { waitForNextRenderFrame } from '../utils/animationFrame'
-import type { FlowTransactions } from './useFlowTransactions'
+} from '../media/flowImageDirectActionSource'
+import type { ResolvedTaskImageResult } from './flowImageDirectActionTaskResult'
+import { waitForNextRenderFrame } from '../../utils/animationFrame'
+import type { FlowTransactions } from '../../composables/useFlowTransactions'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>

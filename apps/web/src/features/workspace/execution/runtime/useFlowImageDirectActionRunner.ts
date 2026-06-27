@@ -1,16 +1,16 @@
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { ImageNodeItem } from '../../canvas-board/domain'
-import { waitExistingOrLiveTaskImageResults } from '../services/flowImageDirectActionExecutor'
-import { loadImageSizeFromUrl } from '../utils/imageSize'
-import { readCurrentBoardId } from '../utils/currentBoardId'
-import { isTaskResultPendingError } from '../../../shared/api/taskEvents'
+import type { ImageNodeItem } from '../../../canvas-board/domain'
+import { waitExistingOrLiveTaskImageResults } from './flowImageDirectActionExecutor'
+import { loadImageSizeFromUrl } from '../media/imageSize'
+import { readCurrentBoardId } from '../../utils/currentBoardId'
+import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
 import {
   pickFirstValidImageResult,
   resolveTaskImageResultDisplay,
   type ResolvedTaskImageResult,
-} from '../utils/flowImageDirectActionTaskResult'
-import type { ImageDirectActionSource } from '../utils/flowImageDirectActionSource'
+} from '../results/flowImageDirectActionTaskResult'
+import type { ImageDirectActionSource } from '../media/flowImageDirectActionSource'
 
 type PendingImageResultNodes = {
   appendPendingImageResultNode: (source: ImageDirectActionSource, sourceNodeId: string) => string

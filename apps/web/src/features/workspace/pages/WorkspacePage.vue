@@ -258,7 +258,7 @@ import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcut
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
 import { useFlowNodeMutations } from '../composables/useFlowNodeMutations'
-import { useFlowImageDirectActions } from '../composables/useFlowImageDirectActions'
+import { useFlowImageDirectActions } from '../execution'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'

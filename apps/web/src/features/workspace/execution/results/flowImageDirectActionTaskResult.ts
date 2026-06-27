@@ -2,7 +2,7 @@ import {
   normalizeTaskImageResult,
   normalizeTaskImageResults,
   type TaskImageResult,
-} from '../../../shared/query/taskResult'
+} from '../../../../shared/query/taskResult'
 
 type ImageSize = {
   width: number

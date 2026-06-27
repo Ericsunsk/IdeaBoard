@@ -51,8 +51,8 @@ import {
   IMAGE_ACTION_MENU_ITEMS,
   type ImageActionMenuItem,
   type ImageNodeAction,
-  type ImageStrengthAction,
 } from '../../config/imageActionRegistry'
+import type { ImageStrengthAction } from '../../execution'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
 

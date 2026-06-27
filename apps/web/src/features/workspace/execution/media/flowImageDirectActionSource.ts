@@ -1,6 +1,6 @@
 import type { Node } from '@vue-flow/core'
-import type { ImageNodeItem } from '../../canvas-board/domain'
-import { resolveImageNodeLayoutAnchor, type ImageNodeLayoutAnchor } from './flowImageNodeSelectors'
+import type { ImageNodeItem } from '../../../canvas-board/domain'
+import { resolveImageNodeLayoutAnchor, type ImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 
 export type ImageDirectActionSource = ImageNodeLayoutAnchor
 

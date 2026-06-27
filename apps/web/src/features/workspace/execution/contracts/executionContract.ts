@@ -1,6 +1,6 @@
-import type { SubmitTaskData, SubmitTaskParams } from '../../../shared/api/task'
-import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls'
-import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
+import type { SubmitTaskData, SubmitTaskParams } from '../../../../shared/api/task'
+import { canonicalizeRuntimeUploadRef } from '../../../../shared/config/runtimeUrls'
+import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 
 export const EXECUTION_FEATURE = {
   partialEdit: WORKFLOW_FEATURE.partialEdit,
