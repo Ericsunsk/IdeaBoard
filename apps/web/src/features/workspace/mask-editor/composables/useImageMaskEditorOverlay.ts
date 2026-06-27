@@ -1,23 +1,20 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
-import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
+import { MASK_EDITOR_INTERACTION_KEY } from '../types'
+import type {
+  ImageMaskBrushShape,
+  ImageMaskDrawMode,
+  ImageMaskEditorCommittedData,
+  MaskEditorInteractionKey,
+} from '../types'
 import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
   featherMaskPreviewCanvas,
   invertMaskPreviewCanvas,
-} from '../utils/maskPaintingCanvas'
-import type { MaskPaintBrushShape } from '../utils/maskBrushEngine'
-import { drawMaskStrokeSegment } from '../utils/maskBrushEngine'
-import { getMaskCanvasPoint } from '../utils/maskCanvasGeometry'
-import type { ImageEditorModeState } from '../image-editor'
-
-export type ImageMaskDrawMode = 'paint' | 'erase'
-export type ImageMaskBrushShape = MaskPaintBrushShape
-
-export type ImageMaskEditorCommittedData = {
-  executionMaskDataUrl: string
-  maskDataUrl: string
-}
+} from '../lib/maskPaintingCanvas'
+import { drawMaskStrokeSegment } from '../lib/maskBrushEngine'
+import { getMaskCanvasPoint } from '../lib/maskCanvasGeometry'
+import type { ImageEditorModeState } from '../../image-editor'
 
 const MAX_FEATHER_RADIUS = 16
 
@@ -35,8 +32,8 @@ type MaskHistoryEntry = {
 
 type UseImageMaskEditorOverlayOptions = {
   imageEditorState: Ref<ImageEditorModeState | null>
-  startCanvasInteraction?: (key: CanvasInteractionKey) => void
-  stopCanvasInteraction?: (key: CanvasInteractionKey) => void
+  startCanvasInteraction?: (key: MaskEditorInteractionKey) => void
+  stopCanvasInteraction?: (key: MaskEditorInteractionKey) => void
 }
 
 export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOptions) {
@@ -80,13 +77,13 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   function startInteraction() {
     if (interactionActive) return
     interactionActive = true
-    options.startCanvasInteraction?.('image-mask-editor')
+    options.startCanvasInteraction?.(MASK_EDITOR_INTERACTION_KEY)
   }
 
   function stopInteraction() {
     if (!interactionActive) return
     interactionActive = false
-    options.stopCanvasInteraction?.('image-mask-editor')
+    options.stopCanvasInteraction?.(MASK_EDITOR_INTERACTION_KEY)
   }
 
   function captureMaskHistoryEntry(canvas: HTMLCanvasElement): MaskHistoryEntry | null {

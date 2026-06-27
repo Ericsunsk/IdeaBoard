@@ -1,3 +1,5 @@
+import type { ImageMaskBrushShape, ImageMaskDrawMode } from '../types'
+
 export const MASK_PAINT_RGB = {
   r: 122,
   g: 107,
@@ -16,13 +18,11 @@ type CachedBrushStamp = {
   spacing: number
 }
 
-export type MaskPaintBrushShape = 'round' | 'square'
-
 export type MaskPaintBrushState = {
   brushSize: number
   brushHardness: number
-  brushShape: MaskPaintBrushShape
-  drawMode: 'paint' | 'erase'
+  brushShape: ImageMaskBrushShape
+  drawMode: ImageMaskDrawMode
 }
 
 const brushStampCache = new Map<string, CachedBrushStamp>()
@@ -51,7 +51,7 @@ function resolveMaskBrushHardness(value: number) {
   return Math.max(0, Math.min(100, Number(value) || 0))
 }
 
-function resolveMaskBrushShape(value: MaskPaintBrushShape | undefined): MaskPaintBrushShape {
+function resolveMaskBrushShape(value: ImageMaskBrushShape | undefined): ImageMaskBrushShape {
   return value === 'square' ? 'square' : 'round'
 }
 
@@ -64,7 +64,7 @@ function drawMaskStrokeWithStamp(
   toY: number,
   brushSize: number,
   hardness: number,
-  brushShape: MaskPaintBrushShape,
+  brushShape: ImageMaskBrushShape,
 ) {
   const stamp = getOrCreateBrushStamp(brushSize, hardness, brushShape, node.drawMode)
   const distance = Math.hypot(toX - fromX, toY - fromY)
@@ -84,8 +84,8 @@ function drawMaskStrokeWithStamp(
 function getOrCreateBrushStamp(
   brushSize: number,
   hardness: number,
-  brushShape: MaskPaintBrushShape,
-  drawMode: MaskPaintBrushState['drawMode'],
+  brushShape: ImageMaskBrushShape,
+  drawMode: ImageMaskDrawMode,
 ): CachedBrushStamp {
   const key = `${brushSize}:${hardness}:${brushShape}:${drawMode}`
   const cached = brushStampCache.get(key)
@@ -154,7 +154,7 @@ function paintSquareBrushStamp(
   radius: number,
   offset: number,
   hardness: number,
-  drawMode: MaskPaintBrushState['drawMode'],
+  drawMode: ImageMaskDrawMode,
 ) {
   const imageData = ctx.createImageData(ctx.canvas.width, ctx.canvas.height)
   const data = imageData.data

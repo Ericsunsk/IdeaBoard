@@ -36,8 +36,6 @@ declare module 'vue' {
     ImageActionMenuIcon: typeof import('./features/workspace/components/home/ImageActionMenuIcon.vue')['default']
     ImageCanvasExtendOverlay: typeof import('./features/workspace/components/nodes/ImageCanvasExtendOverlay.vue')['default']
     ImageEditorChromeFrame: typeof import('./features/workspace/components/nodes/ImageEditorChromeFrame.vue')['default']
-    ImageMaskEditorChrome: typeof import('./features/workspace/components/nodes/ImageMaskEditorChrome.vue')['default']
-    ImageMaskEditorOverlay: typeof import('./features/workspace/components/nodes/ImageMaskEditorOverlay.vue')['default']
     ImageNode: typeof import('./features/workspace/components/nodes/ImageNode.vue')['default']
     ImageNodeStage: typeof import('./features/workspace/components/nodes/ImageNodeStage.vue')['default']
     LoginModal: typeof import('./features/auth/components/LoginModal.vue')['default']

@@ -70,9 +70,11 @@
 import type {
   ImageMaskBrushShape,
   ImageMaskDrawMode,
-} from '../composables/useImageMaskEditorOverlay'
+  MaskEditorReferenceImage,
+} from '../mask-editor'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { ImageEditorChrome } from '../image-editor'
+import { ImageMaskEditorChrome } from '../mask-editor'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
@@ -82,14 +84,7 @@ import type {
   ImageEditorParamValue,
   ImageEditorTool,
 } from '../image-editor'
-import ImageMaskEditorChrome from './nodes/ImageMaskEditorChrome.vue'
 import WorkspaceNodeContextMenu from './WorkspaceNodeContextMenu.vue'
-
-type MaskEditorReferenceImage = {
-  id: string
-  url: string
-  ratio?: number
-}
 
 defineProps<{
   imageEditorNodeId: string | null

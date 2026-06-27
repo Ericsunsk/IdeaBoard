@@ -141,8 +141,8 @@ import type {
   ImageEditorMode,
 } from '../../image-editor'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
+import { ImageMaskEditorOverlay } from '../../mask-editor'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
-import ImageMaskEditorOverlay from './ImageMaskEditorOverlay.vue'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeStageFrame from './NodeStageFrame.vue'

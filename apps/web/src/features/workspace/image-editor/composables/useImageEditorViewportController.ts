@@ -1,7 +1,5 @@
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
-import { clampImageNodeOutputCount, getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
 import { IMAGE_EDITOR_CHROME_LAYOUT, getImageEditorChromeOutset } from '../config/imageEditorChrome'
 import { waitForNextAnimationFrame } from '../../utils/animationFrame'
 
@@ -14,17 +12,10 @@ type ImageEditorAnchorRect = {
   height: number
 }
 
-type MaskEditorReferenceImage = {
-  id: string
-  url: string
-  ratio: number
-}
-
 type UseImageEditorViewportControllerOptions = {
   nodes: Ref<Node[]>
   canvasWrapRef: Ref<HTMLElement | null>
   imageEditorNodeId: Ref<string | null>
-  getImageNodeSnapshot: (nodeId: string) => { outputCount?: number } | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   getViewport: () => FlowViewport
@@ -37,9 +28,6 @@ type UseImageEditorViewportControllerOptions = {
     y: number,
     options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
   ) => Promise<unknown> | unknown
-  uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
-  onWarning: (msg: string) => void
-  onReferenceImagePreview?: (image: { url: string; ratio: number }) => void
   onViewportTransform?: (viewport: FlowViewport) => void
 }
 
@@ -49,7 +37,6 @@ const IMAGE_STAGE_IMAGE_SELECTOR = '.image-node-stage-image'
 const IMAGE_EDITOR_FOCUS_MAX_ZOOM = 2
 const IMAGE_EDITOR_FOCUS_MIN_ZOOM = 0.1
 const WORKSPACE_OVERSCROLL_GUARD_CLASS = 'workspace-overscroll-guard'
-const MASK_EDITOR_REFERENCE_IMAGE_LIMIT = getCanvasNodeImageInputLimit('prompt')
 
 function setWorkspaceOverscrollGuard(enabled: boolean) {
   if (typeof document === 'undefined') return
@@ -60,8 +47,6 @@ function setWorkspaceOverscrollGuard(enabled: boolean) {
 export function useImageEditorViewportController(options: UseImageEditorViewportControllerOptions) {
   const imageEditorChromeAnchorRect = ref<ImageEditorAnchorRect | null>(null)
   const isImageEditorChromeReady = ref(false)
-  const maskEditorLayerOpacity = ref(72)
-  const maskEditorReferenceImages = ref<MaskEditorReferenceImage[]>([])
 
   let imageEditorReturnViewport: FlowViewport | null = null
   let imageEditorFocusRequestId = 0
@@ -241,61 +226,6 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
     }
   }
 
-  function setMaskEditorLayerOpacity(value: number) {
-    const next = Math.max(15, Math.min(100, Number(value) || 72))
-    maskEditorLayerOpacity.value = next
-  }
-
-  function onMaskEditorReferenceImageOpen() {
-    if (maskEditorReferenceImages.value.length >= MASK_EDITOR_REFERENCE_IMAGE_LIMIT) {
-      options.onWarning(`局部重绘最多添加 ${MASK_EDITOR_REFERENCE_IMAGE_LIMIT} 张参考图`)
-      return
-    }
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = IMAGE_UPLOAD_ACCEPT
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return
-      void addMaskEditorReferenceImage(file)
-    }
-    input.click()
-  }
-
-  async function addMaskEditorReferenceImage(file: File) {
-    if (maskEditorReferenceImages.value.length >= MASK_EDITOR_REFERENCE_IMAGE_LIMIT) {
-      options.onWarning(`局部重绘最多添加 ${MASK_EDITOR_REFERENCE_IMAGE_LIMIT} 张参考图`)
-      return
-    }
-    try {
-      const uploaded = await options.uploadImageToBoard(file)
-      maskEditorReferenceImages.value = [
-        ...maskEditorReferenceImages.value,
-        {
-          id: `mask-ref:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
-          url: uploaded.url,
-          ratio: uploaded.ratio,
-        },
-      ].slice(0, MASK_EDITOR_REFERENCE_IMAGE_LIMIT)
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : '上传失败'
-      options.onWarning(msg)
-    }
-  }
-
-  function onMaskEditorReferenceImageRemove(imageId: string) {
-    maskEditorReferenceImages.value = maskEditorReferenceImages.value.filter(
-      (image) => image.id !== imageId,
-    )
-  }
-
-  function onMaskEditorReferenceImagePreview(image: { url: string; ratio?: number }) {
-    options.onReferenceImagePreview?.({
-      url: image.url,
-      ratio: Number(image.ratio) || 1,
-    })
-  }
-
   function onCanvasWheel(event: WheelEvent) {
     const isImageEditing = !!options.imageEditorNodeId.value
     const isBrowserGestureCandidate = event.ctrlKey || Math.abs(event.deltaX) > 0
@@ -304,26 +234,16 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
     if (isImageEditing) event.stopPropagation()
   }
 
-  const activeMaskEditorOutputCount = computed(() => {
-    const nodeId = options.imageEditorNodeId.value
-    if (!nodeId) return 1
-    const snapshot = options.getImageNodeSnapshot(nodeId)
-    return snapshot ? clampImageNodeOutputCount(snapshot.outputCount) : 1
-  })
-
   watch(
     () => options.imageEditorNodeId.value,
     (nextNodeId, prevNodeId) => {
       if (nextNodeId) {
         isImageEditorChromeReady.value = false
-        maskEditorLayerOpacity.value = 72
-        maskEditorReferenceImages.value = []
         imageEditorChromeAnchorRect.value = null
         return
       }
       isImageEditorChromeReady.value = false
       imageEditorChromeAnchorRect.value = null
-      maskEditorReferenceImages.value = []
       if (prevNodeId) restoreImageEditorReturnViewport()
     },
   )
@@ -345,13 +265,6 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
   return {
     imageEditorChromeAnchorRect,
     isImageEditorChromeReady,
-    maskEditorLayerOpacity,
-    maskEditorReferenceImages,
-    activeMaskEditorOutputCount,
-    setMaskEditorLayerOpacity,
-    onMaskEditorReferenceImageOpen,
-    onMaskEditorReferenceImageRemove,
-    onMaskEditorReferenceImagePreview,
     onCanvasWheel,
     focusImageEditorAndShowChrome,
     scheduleImageEditorChromeAnchorUpdate,

@@ -2,7 +2,7 @@ import type { Node } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
 import { ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
-import { useImageEditorMode } from '../image-editor'
+import { useImageEditorMode } from '../../image-editor'
 import { useImageMaskEditorOverlay } from './useImageMaskEditorOverlay'
 
 function createStageElement() {

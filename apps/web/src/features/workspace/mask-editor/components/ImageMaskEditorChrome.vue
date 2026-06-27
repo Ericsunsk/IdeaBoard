@@ -239,17 +239,12 @@ import {
 import type {
   ImageMaskBrushShape,
   ImageMaskDrawMode,
-} from '../../composables/useImageMaskEditorOverlay'
+  MaskEditorReferenceImage,
+} from '../types'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
-import ImageEditorChromeFrame from './ImageEditorChromeFrame.vue'
-import NodeToolIconButton from './NodeToolIconButton.vue'
-import PromptTextComposer from './PromptTextComposer.vue'
-
-type MaskEditorReferenceImage = {
-  id: string
-  url: string
-  ratio?: number
-}
+import ImageEditorChromeFrame from '../../components/nodes/ImageEditorChromeFrame.vue'
+import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
+import PromptTextComposer from '../../components/nodes/PromptTextComposer.vue'
 
 defineProps<{
   drawMode: ImageMaskDrawMode
@@ -412,7 +407,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-@import './styles/node-tool-buttons.css';
+@import '../../components/nodes/styles/node-tool-buttons.css';
 
 .image-mask-editor-panel {
   border: var(--node-tool-border-width) solid var(--workspace-accent-outline);

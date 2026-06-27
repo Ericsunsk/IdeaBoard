@@ -281,7 +281,7 @@ import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShel
 import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
 import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
-import { useFlowMaskEditorChromeActions } from '../composables/useFlowMaskEditorChromeActions'
+import { useMaskEditorChromeActions, useMaskEditorChromeState } from '../mask-editor'
 import { useFlowWorkspaceNodeHandlers } from '../composables/useFlowWorkspaceNodeHandlers'
 import { useFlowTransientUiDismissal } from '../composables/useFlowTransientUiDismissal'
 import { useFlowSnapshotNodeUpdater } from '../composables/useFlowSnapshotNodeUpdater'
@@ -705,13 +705,6 @@ const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFram
 const {
   imageEditorChromeAnchorRect,
   isImageEditorChromeReady,
-  maskEditorLayerOpacity,
-  maskEditorReferenceImages,
-  activeMaskEditorOutputCount,
-  setMaskEditorLayerOpacity,
-  onMaskEditorReferenceImageOpen,
-  onMaskEditorReferenceImageRemove,
-  onMaskEditorReferenceImagePreview,
   onCanvasWheel,
   focusImageEditorAndShowChrome,
   scheduleImageEditorChromeAnchorUpdate,
@@ -719,19 +712,31 @@ const {
   nodes: nodes as Ref<Node[]>,
   canvasWrapRef,
   imageEditorNodeId: flowImageEditorNodeId,
-  getImageNodeSnapshot,
   getImageStageElement,
   screenToFlowCoordinate,
   getViewport,
   setViewport: (viewport, options) => setViewport(viewport, options),
   setCenter: (x, y, options) => setCenter(x, y, options),
+  onViewportTransform: (viewport) => {
+    applyFlowTransform(viewport)
+  },
+})
+
+const {
+  maskEditorLayerOpacity,
+  maskEditorReferenceImages,
+  activeMaskEditorOutputCount,
+  setMaskEditorLayerOpacity,
+  onMaskEditorReferenceImageOpen,
+  onMaskEditorReferenceImageRemove,
+  onMaskEditorReferenceImagePreview,
+} = useMaskEditorChromeState({
+  imageEditorNodeId: flowImageEditorNodeId,
+  getImageNodeSnapshot,
   uploadImageToBoard,
   onWarning: (msg) => appToast.warning(msg),
   onReferenceImagePreview: (image) => {
     void openImageUrlPreview(image.url, image.ratio)
-  },
-  onViewportTransform: (viewport) => {
-    applyFlowTransform(viewport)
   },
 })
 const isImageEditorChromeHidden = computed(() => !!flowImageEditorNodeId.value)
@@ -740,15 +745,20 @@ const isFlowCanvasLocked = computed(
 )
 
 const { onMaskEditorChromeSubmit, onMaskEditorChromeOutputCountUpdate } =
-  useFlowMaskEditorChromeActions({
-    flowMaskEditorNodeId,
-    maskEditorReferenceImages,
-    commitFlowMaskEditorMode,
-    getFlowMaskEditorCommittedData,
+  useMaskEditorChromeActions({
+    maskEditorNodeId: flowMaskEditorNodeId,
+    referenceImages: maskEditorReferenceImages,
+    commitMaskEditorMode: commitFlowMaskEditorMode,
+    getCommittedMaskData: getFlowMaskEditorCommittedData,
     clearActiveNodePanel,
     hideStrengthControl,
-    runImageInpaintAction,
-    onFlowNodeParamUpdate,
+    runInpaintAction: runImageInpaintAction,
+    updateOutputCount: (nodeId, outputCount) => {
+      onFlowNodeParamUpdate(nodeId, {
+        key: 'outputCount',
+        value: outputCount,
+      })
+    },
     onWarning: (message) => appToast.warning(message),
   })
 

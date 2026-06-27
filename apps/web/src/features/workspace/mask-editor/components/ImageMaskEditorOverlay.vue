@@ -29,7 +29,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Circle, Square } from '@iconoir/vue'
-import type { ImageMaskBrushShape } from '../../composables/useImageMaskEditorOverlay'
+import type { ImageMaskBrushShape } from '../types'
 
 const props = defineProps<{
   canvasWidth: number

@@ -23,7 +23,7 @@ import {
   type ImageMaskBrushShape,
   type ImageMaskDrawMode,
   type ImageMaskEditorCommittedData,
-} from './useImageMaskEditorOverlay'
+} from '../mask-editor'
 
 type ValueRef<T> = {
   readonly value: T
