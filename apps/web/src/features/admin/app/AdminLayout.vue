@@ -245,6 +245,7 @@ import {
 } from './adminNavigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { USER_CENTER_PATH } from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
@@ -412,7 +413,7 @@ async function handleUserAction(key: 'profile' | 'logout') {
   if (key === 'logout') {
     await logoutAndRedirect(ADMIN_LOGIN_PATH)
   } else {
-    await router.push('/user/center')
+    await router.push(USER_CENTER_PATH)
   }
 }
 

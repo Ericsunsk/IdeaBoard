@@ -3,6 +3,10 @@ import type {
   MonitorData,
   MonitorStats,
 } from '../../../../shared/api/generated-query/model'
+import {
+  ADMIN_STATISTICS_PATH,
+  ADMIN_TASK_MONITOR_PATH,
+} from '../../../../shared/constants/routePaths'
 
 export type AdminAnomalySeverity = 'critical' | 'warning' | 'info'
 export type AdminAnomalySource = 'runtime' | 'statistics' | 'account' | 'provider' | 'system'
@@ -30,8 +34,8 @@ type AdminAnomalyInput = {
 
 type AdminAnomalyDraft = Omit<AdminAnomalyItem, 'detectedAt'>
 
-const TASK_MONITOR_ROUTE = '/admin/task-monitor'
-const STATISTICS_ROUTE = '/admin/statistics'
+const TASK_MONITOR_ROUTE = ADMIN_TASK_MONITOR_PATH
+const STATISTICS_ROUTE = ADMIN_STATISTICS_PATH
 
 const QUEUE_WARNING_THRESHOLD = 30
 const QUEUE_CRITICAL_THRESHOLD = 80

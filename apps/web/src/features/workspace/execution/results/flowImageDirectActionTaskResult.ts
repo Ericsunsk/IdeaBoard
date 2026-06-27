@@ -4,12 +4,12 @@ import {
   type TaskImageResult,
 } from '../../../../shared/query/taskResult'
 
-type ImageSize = {
+export type ImageSize = {
   width: number
   height: number
 }
 
-type ImageSizeLoader = (url: string) => Promise<ImageSize | null>
+export type ImageSizeLoader = (url: string) => Promise<ImageSize | null>
 
 export type ResolvedTaskImageResult = {
   url: string
@@ -37,6 +37,18 @@ function normalizePositiveImageSize(width: unknown, height: unknown): ImageSize 
 
 export function pickFirstValidImageResult(results: TaskImageResult[]): TaskImageResult | null {
   return normalizeTaskImageResults(results)[0] ?? null
+}
+
+export async function resolveFirstTaskImageResultDisplay(
+  results: TaskImageResult[],
+  fallbackRatio: number,
+  loadImageSize: ImageSizeLoader,
+): Promise<ResolvedTaskImageResult> {
+  const result = pickFirstValidImageResult(results)
+  if (!result) throw new Error('任务完成但未返回图片')
+  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
+  if (!resolved) throw new Error('任务完成但未返回图片')
+  return resolved
 }
 
 export async function resolveTaskImageRatio(

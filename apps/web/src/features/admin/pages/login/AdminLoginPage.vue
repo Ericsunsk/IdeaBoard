@@ -72,6 +72,13 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../../app/stores/user'
+import {
+  ADMIN_LOGIN_PATH,
+  ADMIN_ROOT_PATH,
+  USER_LOGIN_PATH,
+  isPathUnderRoute,
+} from '../../../../shared/constants/routePaths'
+import { ADMIN_DEFAULT_PATH } from '../../app/adminNavigationMeta'
 import { User } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
@@ -83,6 +90,7 @@ import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
+import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -120,16 +128,22 @@ function resolveAdminRedirectPath() {
     ? route.query.redirect[0]
     : route.query.redirect
   if (!redirect || typeof redirect !== 'string') {
-    return '/admin/users'
+    return ADMIN_DEFAULT_PATH
   }
-  if (!redirect.startsWith('/admin/') || redirect.startsWith('/admin/login')) {
-    return '/admin/users'
+
+  const safeRedirect = normalizeSafeInternalRedirectPath(redirect)
+  if (!safeRedirect || !isPathUnderRoute(safeRedirect.pathname, ADMIN_ROOT_PATH)) {
+    return ADMIN_DEFAULT_PATH
   }
-  return redirect
+  if (isPathUnderRoute(safeRedirect.pathname, ADMIN_LOGIN_PATH)) {
+    return ADMIN_DEFAULT_PATH
+  }
+
+  return safeRedirect.fullPath
 }
 
 function goUserLogin() {
-  void router.push('/user/login')
+  void router.push(USER_LOGIN_PATH)
 }
 
 async function handleLogin() {
@@ -148,7 +162,7 @@ async function handleLogin() {
       appToast.success('管理员登录成功')
       await router.replace(resolveAdminRedirectPath())
     } else {
-      const logoutSuccess = await logoutAndRedirect('/admin/login', { replace: true })
+      const logoutSuccess = await logoutAndRedirect(ADMIN_LOGIN_PATH, { replace: true })
       if (!logoutSuccess) {
         appToast.warning('会话撤销失败，请稍后重试')
       }

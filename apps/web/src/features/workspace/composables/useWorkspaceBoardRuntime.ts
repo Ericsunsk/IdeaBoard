@@ -5,6 +5,7 @@ import {
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
 } from '../../canvas-board/domain'
+import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
 import type { FlowHistory } from './useFlowHistory'
 import type { FlowTransactions } from './useFlowTransactions'
@@ -129,7 +130,7 @@ export function useWorkspaceBoardRuntime(
 
   async function onLogoutRequest() {
     await flushAutosave()
-    await options.logoutAndRedirect('/user/home')
+    await options.logoutAndRedirect(USER_HOME_PATH)
   }
 
   function markBoardViewportChanged() {

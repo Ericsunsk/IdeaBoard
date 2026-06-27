@@ -18,6 +18,11 @@
 
 <script setup lang="ts">
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
+import {
+  USER_HOME_PATH,
+  USER_LOGIN_PATH,
+  USER_REGISTER_PATH,
+} from '../../../shared/constants/routePaths'
 
 const props = defineProps<{
   mode: 'login' | 'register'
@@ -31,11 +36,11 @@ const showLogin = computed(() => props.mode === 'login')
 const showRegister = computed(() => props.mode === 'register')
 
 function goLogin() {
-  void router.replace('/user/login')
+  void router.replace(USER_LOGIN_PATH)
 }
 
 function goRegister() {
-  void router.replace('/user/register')
+  void router.replace(USER_REGISTER_PATH)
 }
 
 function resolveLoginRedirectPath() {
@@ -43,10 +48,10 @@ function resolveLoginRedirectPath() {
   const redirectPath = Array.isArray(redirect) ? redirect[0] : redirect
   const normalizedPath = typeof redirectPath === 'string' ? redirectPath.trim() : ''
   if (!normalizedPath) {
-    return '/user/home'
+    return USER_HOME_PATH
   }
   if (!isSafeInternalRedirectPath(normalizedPath)) {
-    return '/user/home'
+    return USER_HOME_PATH
   }
   return normalizedPath
 }
@@ -67,7 +72,7 @@ function onLoginVisibleChange(visible: boolean) {
     skipCloseRedirectOnce.value = false
     return
   }
-  void router.replace('/user/home')
+  void router.replace(USER_HOME_PATH)
 }
 
 function onRegisterVisibleChange(visible: boolean) {
@@ -77,6 +82,6 @@ function onRegisterVisibleChange(visible: boolean) {
     return
   }
   // 关闭注册弹窗时回到公开首页
-  void router.replace('/user/home')
+  void router.replace(USER_HOME_PATH)
 }
 </script>

@@ -1,8 +1,6 @@
-import type {
-  CanvasBoardSnapshot,
-  CanvasConnectionNodeType,
-} from '../../canvas-board/domain'
 import {
+  type CanvasBoardSnapshot,
+  type CanvasConnectionNodeType,
   DEFAULT_FUSION_BLEND_POINT,
   FUSION_SLOT_LAYOUT,
   getFusionLineAnchors,

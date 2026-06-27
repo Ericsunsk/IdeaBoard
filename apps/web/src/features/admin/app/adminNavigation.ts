@@ -13,6 +13,7 @@ import {
   ADMIN_LOGIN_PATH,
   adminNavigationRouteDefs,
 } from './adminNavigationMeta'
+import { isPathUnderRoute } from '../../../shared/constants/routePaths'
 import type { AdminNavigationKey, AdminNavigationRouteDef } from './adminNavigationMeta'
 
 export { ADMIN_DEFAULT_PATH, ADMIN_LOGIN_PATH }
@@ -46,5 +47,5 @@ export const adminNavigationByKey = adminNavigationItems.reduce(
 )
 
 export function findAdminNavigationItemByPath(path: string) {
-  return adminNavigationItems.find((item) => path === item.path || path.startsWith(`${item.path}/`))
+  return adminNavigationItems.find((item) => isPathUnderRoute(path, item.path))
 }

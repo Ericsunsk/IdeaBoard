@@ -27,9 +27,9 @@
       @confirm-board-rename="onConfirmBoardRename"
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
-      @open-center="onNavigateRequest('/user/center')"
+      @open-center="onNavigateRequest(USER_CENTER_PATH)"
       @logout="onLogoutRequest"
-      @navigate-back="onNavigateRequest('/user/boards')"
+      @navigate-back="onNavigateRequest(USER_BOARDS_PATH)"
       @select-tool="setActiveTool"
       @zoom-out="onZoomOut"
       @zoom-in="onZoomIn"
@@ -250,28 +250,19 @@ import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
+import { USER_BOARDS_PATH, USER_CENTER_PATH } from '../../../shared/constants/routePaths'
 import type { Edge, Node } from '@vue-flow/core'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
-import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
-import { useFlowNodeMutations } from '../composables/useFlowNodeMutations'
-import { useFlowImageDirectActions } from '../execution'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
-import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
-import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
-import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
-import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
-import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowSelectionController } from '../composables/useFlowSelectionController'
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
-import { useFlowMediaInputImages } from '../composables/useFlowMediaInputImages'
-import { useFlowNodeInternalsRefreshQueue } from '../composables/useFlowNodeInternalsRefreshQueue'
 import { useFlowViewportControls } from '../composables/useFlowViewportControls'
 import {
   ACTIVE_NODE_PANEL_KIND,
@@ -284,14 +275,13 @@ import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandIn
 import { useMaskEditorChromeActions, useMaskEditorChromeState } from '../mask-editor'
 import { useFlowWorkspaceNodeHandlers } from '../composables/useFlowWorkspaceNodeHandlers'
 import { useFlowTransientUiDismissal } from '../composables/useFlowTransientUiDismissal'
-import { useFlowSnapshotNodeUpdater } from '../composables/useFlowSnapshotNodeUpdater'
-import { useFlowImageNodeSnapshots } from '../composables/useFlowImageNodeSnapshots'
-import { useFlowImageUploadActions } from '../composables/useFlowImageUploadActions'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageEditorViewportController } from '../image-editor'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useWorkspaceBoardRuntime } from '../composables/useWorkspaceBoardRuntime'
+import { useWorkspaceGraphRuntime } from '../composables/useWorkspaceGraphRuntime'
 import { useWorkspaceImageToolRuntime } from '../composables/useWorkspaceImageToolRuntime'
+import { useWorkspaceTaskRuntime } from '../composables/useWorkspaceTaskRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
 import WorkspacePageChrome from '../components/WorkspacePageChrome.vue'
@@ -322,12 +312,6 @@ const { zoomLevel, onZoomIn, onZoomOut, applyFlowTransform, onPanViewport } =
     setViewport: (viewport) => setViewport(viewport),
   })
 
-function clearSelectedFlowElementsSync() {
-  const selectedElements = [...getSelectedElements.value]
-  if (selectedElements.length === 0) return
-  removeSelectedElements(selectedElements)
-}
-
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const flowHandleVisibilityRefreshToken = ref(0)
 
@@ -347,9 +331,6 @@ const {
 } = useFlowActiveNodePanels()
 const duplicateModifierPressed = ref(false)
 const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
-const { scheduleFlowNodeInternalsRefresh } = useFlowNodeInternalsRefreshQueue({
-  updateNodeInternals,
-})
 
 const {
   nodes,
@@ -395,6 +376,64 @@ const {
   },
 })
 
+const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
+const {
+  scheduleFlowNodeInternalsRefresh,
+  clearSelectedFlowElementsSync,
+  isValidConnection,
+  onConnect,
+  onEdgeUpdate,
+  createNodeAtPosition,
+  deleteSelectedFlowElements: deleteSelectedFlowElementsBase,
+  _onFlowDeleteNode,
+  _onFlowPromptTextUpdate,
+  _onFlowNodeParamUpdate,
+  markFlowExecutionNodeDirty,
+  updateSnapshotNode,
+  hasSelectedFlowNodes,
+  onExportSelectedImages,
+  isFlowInteractionActive,
+  startFlowInteraction,
+  stopFlowInteraction,
+  nodeContextMenu,
+  canvasNodeMenuItems,
+  closeNodeContextMenu,
+  openNodeContextMenu,
+  getImageNodeSnapshot,
+  getImageNodeDisplayPayload,
+  uploadImageToBoard,
+  applyImageFileToImageNode,
+  createImageNodeFromFile,
+  onFlowMediaInputImageDrop,
+  onFlowMediaInputImageOpen,
+  onFlowMediaInputImagePreview,
+  onFlowMediaInputImageRemove,
+  getMediaInputImages,
+  resolvePromptInputImageNodeIds,
+  onCanvasDrop,
+  onCanvasDragOver: onFlowCanvasDropDragOver,
+  onFlowImageOpenPreview,
+  onFlowImageAppendToCanvas,
+  beginFlowNodeDragDuplicateTracking,
+  finishFlowNodeDragDuplicateTracking,
+  getFlowNodeUiStateCached,
+} = useWorkspaceGraphRuntime({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  currentBoardId,
+  createNodeKind,
+  flowTransactions,
+  updateNodeInternals,
+  screenToFlowCoordinate,
+  getSelectedElements,
+  removeSelectedElements,
+  uploadApi,
+  sanitizeApiErrorMessage,
+  openNodeImagePreview,
+  openImageUrlPreview,
+  message: appToast,
+})
+
 function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
   closeBoardHeaderEditing()
   const transform = payload.flowTransform
@@ -410,39 +449,6 @@ function onFlowMoveEnd(payload: { flowTransform?: { x?: number; y?: number; zoom
   commitPendingBoardViewportChange()
 }
 
-const flowNodeMutations = useFlowNodeMutations({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
-  createNodeKind,
-  commitGraphMutation: flowTransactions.commitGraphMutation,
-  commitNodeMutation: flowTransactions.commitNodeMutation,
-  commitEdgeMutation: flowTransactions.commitEdgeMutation,
-  onWarning: (text) => {
-    appToast.warning(text)
-  },
-})
-
-const isValidConnection = flowNodeMutations.isValidConnection
-const onConnect = flowNodeMutations.onConnect
-const onEdgeUpdate = flowNodeMutations.onEdgeUpdate
-const createNodeAtPosition = flowNodeMutations.createNodeAtPosition
-const _onFlowDeleteNode = flowNodeMutations.onFlowDeleteNode
-const updateSnapshotNodeBase = flowNodeMutations.updateSnapshotNode
-const _onFlowPromptTextUpdate = flowNodeMutations.onFlowPromptTextUpdate
-const _onFlowNodeParamUpdate = flowNodeMutations.onFlowNodeParamUpdate
-const markFlowExecutionNodeDirty = flowNodeMutations.markFlowExecutionNodeDirty
-const { updateSnapshotNode } = useFlowSnapshotNodeUpdater({
-  updateSnapshotNodeBase,
-  scheduleFlowNodeInternalsRefresh,
-})
-
-const selectionExport = useFlowSelectionExport({ nodes, message: appToast })
-const hasSelectedFlowNodes = computed(() => selectionExport.hasSelectedNodes())
-
-function onExportSelectedImages() {
-  selectionExport.exportSelectedImages()
-}
-
 function onFlowConnectEnd() {
   refreshFlowHandleVisibility()
 }
@@ -451,64 +457,9 @@ function refreshFlowHandleVisibility() {
   flowHandleVisibilityRefreshToken.value += 1
 }
 
-const {
-  isCanvasInteractionActive: isFlowInteractionActive,
-  startCanvasInteraction: startFlowInteraction,
-  stopCanvasInteraction: stopFlowInteraction,
-} = useFlowCanvasInteractionState()
-
-const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
-  useFlowNodeContextMenu()
 const hasWorkspaceDismissableLayer = computed(
   () => nodeContextMenu.value.visible || activeNodePanel.value !== null,
 )
-
-const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
-  nodes: nodes as Ref<Node[]>,
-})
-const { uploadImageToBoard, applyImageFileToImageNode, createImageNodeFromFile } =
-  useFlowImageUploadActions({
-    currentBoardId,
-    createNodeAtPosition,
-    updateSnapshotNode,
-    getImageNodeSnapshot,
-    uploadApi,
-    sanitizeApiErrorMessage,
-    onWarning: (msg) => appToast.warning(msg),
-    onSuccess: (msg) => appToast.success(msg),
-    onNodeMutated: (nodeId) => markFlowExecutionNodeDirty(nodeId),
-  })
-const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
-const {
-  onFlowMediaInputImageDrop,
-  onFlowMediaInputImageOpen,
-  onFlowMediaInputImagePreview,
-  onFlowMediaInputImageRemove,
-  getMediaInputImages,
-  resolvePromptInputImageNodeIds,
-} = useFlowMediaInputImages({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
-  uploadImageToBoard,
-  updateSnapshotNodeBase,
-  commitGraphMutation: flowTransactions.commitGraphMutation,
-  markFlowExecutionNodeDirty,
-  getImageNodeDisplayPayload,
-  openImageUrlPreview,
-  onWarning: (message) => {
-    appToast.warning(message)
-  },
-})
-
-async function onCanvasDrop(event: DragEvent) {
-  await canvasDrop.onCanvasDrop(event)
-}
-
-function onFlowImageOpenPreview(nodeId: string) {
-  const snapshot = getImageNodeSnapshot(nodeId)
-  if (!snapshot) return
-  void openNodeImagePreview(snapshot, 'latest-output')
-}
 
 const {
   isNodeDirectActionRunning,
@@ -520,21 +471,16 @@ const {
   runImagePromptGenerationFromSource,
   runFusionPromptGeneration,
   runTextPromptGeneration,
-} = useFlowImageDirectActions({
+} = useWorkspaceTaskRuntime({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
-  commitGraphMutation: flowTransactions.commitGraphMutation,
-  commitNodeMutation: flowTransactions.commitNodeMutation,
-  commitEdgeMutation: flowTransactions.commitEdgeMutation,
-  commitDirty: flowTransactions.commitDirty,
+  flowTransactions,
   flushAutosave,
+  currentBoardId,
   refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
-  getCurrentBoardId: () => currentBoardId.value ?? '',
-  onSuccess: (text) => {
-    appToast.success(text)
-  },
-  onWarning: (text) => {
-    appToast.warning(text)
+  message: {
+    success: (text) => appToast.success(text),
+    warning: (text) => appToast.warning(text),
   },
 })
 
@@ -782,29 +728,7 @@ const {
 } = useFlowSelectionController({
   activeTool: activeTool as Ref<string>,
   dismissTransientWorkspaceUi,
-  _deleteSelectedFlowElements: () => {
-    flowNodeMutations.deleteSelectedFlowElements()
-  },
-})
-
-const {
-  onFlowImageAppendToCanvas,
-  beginFlowNodeDragDuplicateTracking,
-  finishFlowNodeDragDuplicateTracking,
-} = useFlowImageNodeInteractions({
-  nodes: nodes as Ref<Node[]>,
-  getImageNodeDisplayPayload,
-  getImageNodeSnapshot: (nodeId) => {
-    const snapshot = getImageNodeSnapshot(nodeId)
-    if (!snapshot) return null
-    return {
-      x: Number(snapshot.x ?? 0),
-      y: Number(snapshot.y ?? 0),
-      width: Number(snapshot.width ?? 300),
-      outputCount: snapshot.outputCount,
-    }
-  },
-  commitNodeMutation: flowTransactions.commitNodeMutation,
+  _deleteSelectedFlowElements: deleteSelectedFlowElementsBase,
 })
 
 const { onNodeDragStart, onNodeDragStop: stopNodeDragInteraction } = useFlowNodeDragInteractions({
@@ -824,12 +748,6 @@ function onNodeDragStop() {
   }
 }
 
-const canvasDrop = useFlowCanvasDrop({
-  screenToFlowCoordinate,
-  onWarning: (msg) => appToast.warning(msg),
-  createImageNodeFromFile,
-})
-
 const {
   onPaneContextMenu,
   handleNodeContextMenuCreate,
@@ -846,7 +764,7 @@ const {
   dismissTransientWorkspaceUi,
   clearFlowSelection,
   toastInfo: (message) => appToast.info(message),
-  onCanvasDropDragOver: (event) => canvasDrop.onCanvasDragOver(event),
+  onCanvasDropDragOver: onFlowCanvasDropDragOver,
   isFlowExpandActive: () => !!flowExpandNodeId.value,
   isBoardHeaderEditingActive: () => isBoardMenuOpen.value || isRenamingBoard.value,
 })
@@ -877,11 +795,6 @@ const {
   onFlowNodeParamUpdate,
   onWarning: (message) => appToast.warning(message),
   getActionStrength,
-})
-
-const { getFlowNodeUiStateCached } = useFlowNodeUiState({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
 })
 
 watch(

@@ -88,6 +88,7 @@ import portraitAsset from '../assets/home/portrait.svg'
 import socksAsset from '../assets/home/socks.svg'
 import starburstAsset from '../assets/home/starburst.svg'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 
 const router = useRouter()
 const { projectName } = useSiteBranding()
@@ -100,7 +101,7 @@ const homeHeroAssets = {
 } as const
 
 function startJourney() {
-  router.push('/user/boards')
+  router.push(USER_BOARDS_PATH)
 }
 </script>
 

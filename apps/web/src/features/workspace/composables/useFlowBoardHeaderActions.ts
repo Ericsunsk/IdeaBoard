@@ -11,6 +11,7 @@ import {
   isBoardNameConflictError,
   syncCanvasBoardToServer,
 } from '../../boards/lib/boardSync'
+import { USER_WORKSPACE_PATH } from '../../../shared/constants/routePaths'
 
 type BoardMeta = { id: string; name: string }
 
@@ -137,7 +138,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
   async function navigateToBoard(boardId: string) {
     await options.flushAutosave()
     await options.router.push({
-      path: '/user/workspace',
+      path: USER_WORKSPACE_PATH,
       query: { ...options.route.query, boardId },
     })
   }

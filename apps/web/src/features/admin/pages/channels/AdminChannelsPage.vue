@@ -441,9 +441,14 @@
 </template>
 
 <script setup lang="ts">
-import channelApi from '../../../../shared/api/channel'
-import type { Channel, ChannelFormData } from '../../../../shared/api/channel'
-import type { AdminAccount } from '../../shared/api/adminAccounts'
+import type { AdminAccount } from '../../shared/queries/adminAccountActions'
+import {
+  deleteAdminChannel,
+  fetchAdminChannels,
+  saveAdminChannel,
+  type Channel,
+  type ChannelFormData,
+} from '../../shared/queries/adminChannelActions'
 import AutoComplete from 'primevue/autocomplete'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -528,9 +533,7 @@ const emptyChannelMessage = computed(() => (hasChannelSearch.value ? '无匹配�
 async function loadData() {
   await runAsyncAction(
     async () => {
-      const chRes = await channelApi.list()
-
-      if (chRes.code === 0) channels.value = chRes.data?.list || []
+      channels.value = await fetchAdminChannels()
       await loadAccounts()
     },
     {
@@ -639,13 +642,11 @@ async function handleSaveChannel() {
     async () => {
       const submitData = { ...channelForm.value }
 
-      if (isEditChannel.value) {
-        await channelApi.update(currentChannelId.value, submitData)
-        appToast.success('渠道商已更新')
-      } else {
-        await channelApi.create(submitData)
-        appToast.success('渠道商已创建')
-      }
+      await saveAdminChannel({
+        id: isEditChannel.value ? currentChannelId.value : undefined,
+        data: submitData,
+      })
+      appToast.success(isEditChannel.value ? '渠道商已更新' : '渠道商已创建')
       showChannelModal.value = false
       resetChannelFormErrors()
       loadData()
@@ -710,7 +711,7 @@ function handleDeleteChannel(row: Channel) {
     acceptLabel: '确定',
     accept: async () => {
       try {
-        await channelApi.delete(row.id)
+        await deleteAdminChannel(row.id)
         appToast.success('删除成功')
         await loadData()
       } catch (error) {

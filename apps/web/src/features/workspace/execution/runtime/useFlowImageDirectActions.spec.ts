@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
+import { TaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { FlowNodeData } from '../../types/flowTypes'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
@@ -11,8 +12,10 @@ const mocks = vi.hoisted(() => ({
   assertTaskRequestReady: vi.fn(),
   submitTaskRequest: vi.fn(),
   waitExistingOrLiveTaskImageResults: vi.fn(),
-  resolveTaskImageRatio: vi.fn(),
   resolveTaskImageResultDisplay: vi.fn(),
+  prepareFlowLocalInpaintMedia: vi.fn(),
+  composeFlowLocalInpaintTaskResult: vi.fn(),
+  cleanupFlowLocalInpaintMedia: vi.fn(),
 }))
 
 vi.mock('./flowImageDirectActionExecutor', () => ({
@@ -25,11 +28,28 @@ vi.mock('../media/imageSize', () => ({
   loadImageSizeFromUrl: vi.fn(async () => ({ width: 1000, height: 1000 })),
 }))
 
+vi.mock('../media/flowLocalInpaint', () => ({
+  prepareFlowLocalInpaintMedia: mocks.prepareFlowLocalInpaintMedia,
+  cleanupFlowLocalInpaintMedia: mocks.cleanupFlowLocalInpaintMedia,
+}))
+
+vi.mock('../results/flowLocalInpaintTaskResult', () => ({
+  composeFlowLocalInpaintTaskResult: mocks.composeFlowLocalInpaintTaskResult,
+}))
+
 vi.mock('../results/flowImageDirectActionTaskResult', () => ({
-  pickFirstValidImageResult: (results: Array<{ url: string }>) =>
-    results.find((result) => result.url.trim()) ?? null,
+  resolveFirstTaskImageResultDisplay: async (
+    results: Array<{ url: string; width?: number; height?: number }>,
+    fallback: number,
+    loadImageSize: (url: string) => Promise<{ width: number; height: number } | null>,
+  ) => {
+    const result = results.find((item) => item.url.trim())
+    if (!result) throw new Error('任务完成但未返回图片')
+    const resolved = await mocks.resolveTaskImageResultDisplay(result, fallback, loadImageSize)
+    if (!resolved) throw new Error('任务完成但未返回图片')
+    return resolved
+  },
   resolveTaskImageResultDisplay: mocks.resolveTaskImageResultDisplay,
-  resolveTaskImageRatio: mocks.resolveTaskImageRatio,
 }))
 
 type Deferred<T> = {
@@ -149,9 +169,6 @@ describe('useFlowImageDirectActions pending task recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.assertTaskRequestReady.mockResolvedValue(undefined)
-    mocks.resolveTaskImageRatio.mockImplementation(async (_url: string, fallback: number) =>
-      fallback > 0 ? fallback : 1,
-    )
     mocks.resolveTaskImageResultDisplay.mockImplementation(
       async (result: { url: string; width?: number; height?: number }, fallback: number) => {
         const hasSize = Number(result.width) > 0 && Number(result.height) > 0
@@ -167,6 +184,21 @@ describe('useFlowImageDirectActions pending task recovery', () => {
         }
       },
     )
+    mocks.prepareFlowLocalInpaintMedia.mockResolvedValue({
+      crop: {
+        croppedImageUrl: 'https://example.com/cropped.png',
+        croppedMaskUrl: 'https://example.com/cropped-mask.png',
+        bbox: { x: 0, y: 0, width: 64, height: 64 },
+        originalSize: { width: 1000, height: 1000 },
+        cropSize: { width: 64, height: 64 },
+      },
+      temporaryMaskUrl: 'https://example.com/temp-mask.png',
+    })
+    mocks.composeFlowLocalInpaintTaskResult.mockResolvedValue({
+      url: 'https://example.com/inpaint.png',
+      ratio: 1,
+    })
+    mocks.cleanupFlowLocalInpaintMedia.mockResolvedValue(undefined)
   })
 
   it('routes direct action readiness failures through warning without creating a pending node', async () => {
@@ -322,5 +354,48 @@ describe('useFlowImageDirectActions pending task recovery', () => {
       .find((snapshot) => snapshot?.sourceImageUrl === 'https://example.com/extended-wide.png')
     expect(completed?.width).toBe(520)
     expect(completed?.sourceImageRatio).toBe(0.5)
+  })
+
+  it('removes local inpaint pending nodes when composed results cannot be recovered later', async () => {
+    mocks.submitTaskRequest.mockResolvedValue({ taskId: 'task-inpaint' })
+    mocks.waitExistingOrLiveTaskImageResults.mockRejectedValue(
+      new TaskResultPendingError('任务进度推送超时，请稍后查看结果'),
+    )
+    const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
+
+    await harness.actions.runImageInpaintAction('image-1', {
+      prompt: 'replace selected area',
+      maskDataUrl: 'data:image/png;base64,mask',
+      outputCount: 1,
+    })
+
+    expect(mocks.prepareFlowLocalInpaintMedia).toHaveBeenCalledWith({
+      originalImageUrl: 'https://example.com/source.png',
+      rawMaskDataUrl: 'data:image/png;base64,mask',
+      boardId: 'board-a',
+    })
+    expect(mocks.cleanupFlowLocalInpaintMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        crop: expect.objectContaining({
+          croppedImageUrl: 'https://example.com/cropped.png',
+        }),
+      }),
+      'board-a',
+    )
+    expect(harness.onWarning).toHaveBeenCalledWith('局部重绘仍在处理中，请稍后重试')
+    expect(harness.flushAutosave).not.toHaveBeenCalled()
+    expect(harness.nodes.value).toHaveLength(1)
+    expect(
+      harness.nodes.value.some((node) => {
+        const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
+        return snapshot?.pendingTaskId === 'task-inpaint'
+      }),
+    ).toBe(false)
+    expect(
+      harness.nodes.value.some((node) => {
+        const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
+        return snapshot?.outputStatus === 'running' || !!snapshot?.pendingTaskId
+      }),
+    ).toBe(false)
   })
 })

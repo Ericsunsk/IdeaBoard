@@ -1,6 +1,11 @@
 import { computed, ref, watch } from 'vue'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
-import { clampImageNodeOutputCount, getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
+import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
+import {
+  clampMaskLayerOpacity,
+  MASK_EDITOR_DEFAULT_LAYER_OPACITY,
+  MASK_EDITOR_REFERENCE_IMAGE_LIMIT,
+} from '../config/maskEditorConstants'
 import type { MaskEditorReferenceImage } from '../types'
 
 type ValueRef<T> = {
@@ -15,10 +20,8 @@ type UseMaskEditorChromeStateOptions = {
   onReferenceImagePreview?: (image: { url: string; ratio: number }) => void
 }
 
-const MASK_EDITOR_REFERENCE_IMAGE_LIMIT = getCanvasNodeImageInputLimit('prompt')
-
 export function useMaskEditorChromeState(options: UseMaskEditorChromeStateOptions) {
-  const maskEditorLayerOpacity = ref(72)
+  const maskEditorLayerOpacity = ref(MASK_EDITOR_DEFAULT_LAYER_OPACITY)
   const maskEditorReferenceImages = ref<MaskEditorReferenceImage[]>([])
 
   const activeMaskEditorOutputCount = computed(() => {
@@ -29,7 +32,7 @@ export function useMaskEditorChromeState(options: UseMaskEditorChromeStateOption
   })
 
   function setMaskEditorLayerOpacity(value: number) {
-    maskEditorLayerOpacity.value = Math.max(15, Math.min(100, Number(value) || 72))
+    maskEditorLayerOpacity.value = clampMaskLayerOpacity(value)
   }
 
   function onMaskEditorReferenceImageOpen() {
@@ -84,7 +87,7 @@ export function useMaskEditorChromeState(options: UseMaskEditorChromeStateOption
   watch(
     () => options.imageEditorNodeId.value,
     () => {
-      maskEditorLayerOpacity.value = 72
+      maskEditorLayerOpacity.value = MASK_EDITOR_DEFAULT_LAYER_OPACITY
       maskEditorReferenceImages.value = []
     },
   )

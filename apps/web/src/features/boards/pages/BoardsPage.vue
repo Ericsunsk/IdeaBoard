@@ -198,6 +198,11 @@ import {
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import {
+  USER_CENTER_PATH,
+  USER_HOME_PATH,
+  USER_WORKSPACE_PATH,
+} from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../../app/stores/user'
 import { Search, User } from '@iconoir/vue'
 import Button from 'primevue/button'
@@ -486,12 +491,12 @@ async function createAndOpenBoard() {
     return
   }
   reloadBoards()
-  router.push({ path: '/user/workspace', query: { boardId: board.id } })
+  router.push({ path: USER_WORKSPACE_PATH, query: { boardId: board.id } })
 }
 
 function openBoard(board: CanvasBoardMeta) {
   touchCanvasBoard(board.id)
-  router.push({ path: '/user/workspace', query: { boardId: board.id } })
+  router.push({ path: USER_WORKSPACE_PATH, query: { boardId: board.id } })
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -687,17 +692,17 @@ function toggleUserMenu(event: Event) {
 
 function openCenter() {
   closeUserMenu()
-  router.push('/user/center')
+  router.push(USER_CENTER_PATH)
 }
 
 function goHome() {
   closeUserMenu()
-  router.push('/user/home')
+  router.push(USER_HOME_PATH)
 }
 
 async function logout() {
   closeUserMenu()
-  await logoutAndRedirect('/user/home')
+  await logoutAndRedirect(USER_HOME_PATH)
 }
 
 onMounted(async () => {

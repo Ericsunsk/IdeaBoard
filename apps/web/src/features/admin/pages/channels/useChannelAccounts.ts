@@ -1,15 +1,22 @@
 import { computed, ref } from 'vue'
-import channelApi, { type Channel } from '../../../../shared/api/channel'
 import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
-import adminAccountApi, {
+import {
+  detectAdminChannelModels,
+  type Channel,
+} from '../../shared/queries/adminChannelActions'
+import {
+  createAdminAccountRecord,
+  deleteAdminAccountRecord,
   FALLBACK_ADMIN_ACCOUNT_LIMITS,
-  normalizeAdminAccountLimits,
+  fetchAdminAccountLimits,
+  fetchAllAdminAccounts,
   type AdminAccount,
   type AdminAccountLimits,
   type AdminAccountModel,
   type AdminAccountModelInput,
   type AdminAccountUpdateRequest,
-} from '../../shared/api/adminAccounts'
+  updateAdminAccountRecord,
+} from '../../shared/queries/adminAccountActions'
 import { DEFAULT_ADMIN_CHANNEL_API_TYPE } from './channelApiTypes'
 import { extractApiErrorMessage } from './channelModelUtils'
 
@@ -85,38 +92,17 @@ export function useChannelAccounts(options: {
 
   async function loadAccountLimits() {
     try {
-      const res = await adminAccountApi.getLimits()
-      accountLimits.value = normalizeAdminAccountLimits(res.data?.limits)
+      accountLimits.value = await fetchAdminAccountLimits()
     } catch {
       accountLimits.value = FALLBACK_ADMIN_ACCOUNT_LIMITS
     }
   }
 
-  async function loadAllAccounts(): Promise<AdminAccount[]> {
-    const all: AdminAccount[] = []
-    let page = 1
-    let total = Number.POSITIVE_INFINITY
-
-    while (true) {
-      const res = await adminAccountApi.list({
-        page,
-        page_size: ACCOUNT_PAGE_SIZE,
-      })
-      if (res.code !== 0) {
-        throw new Error(res.msg || '加载账号失败')
-      }
-      const list = res.data?.list || []
-      total = res.data?.total ?? total
-      all.push(...list)
-      if (all.length >= total || list.length === 0) break
-      page += 1
-    }
-
-    return all
-  }
-
   async function loadAccounts() {
-    const [nextAccounts] = await Promise.all([loadAllAccounts(), loadAccountLimits()])
+    const [nextAccounts] = await Promise.all([
+      fetchAllAdminAccounts(ACCOUNT_PAGE_SIZE),
+      loadAccountLimits(),
+    ])
     accounts.value = nextAccounts
   }
 
@@ -196,12 +182,12 @@ export function useChannelAccounts(options: {
 
     await runAsyncAction(
       async () => {
-        const res = await channelApi.detectModels({
+        const detectedModels = await detectAdminChannelModels({
           base_url: baseURL,
           api_key: secret,
           api_type: apiType,
         })
-        const models = (res.data?.models || [])
+        const models = detectedModels
           .map((m) => (m || '').trim())
           .filter(Boolean)
           .slice(0, MAX_DETECTED_MODELS)
@@ -261,10 +247,10 @@ export function useChannelAccounts(options: {
             extra_config: existingAccount?.extra_config ?? '{}',
             ...(accountForm.value.secret ? { secret: accountForm.value.secret } : {}),
           }
-          await adminAccountApi.update(currentAccountId.value, updateData)
+          await updateAdminAccountRecord(currentAccountId.value, updateData)
           options.message.success('账号已更新')
         } else {
-          await adminAccountApi.create({
+          await createAdminAccountRecord({
             ...baseData,
             channel_id: channelId,
             secret: accountForm.value.secret,
@@ -316,7 +302,7 @@ export function useChannelAccounts(options: {
       updated_at: updatedAt,
     }
 
-    await adminAccountApi.update(account.id, createAccountUpdatePayload(nextAccount))
+    await updateAdminAccountRecord(account.id, createAccountUpdatePayload(nextAccount))
 
     accounts.value = accounts.value.map((item) => (item.id === account.id ? nextAccount : item))
   }
@@ -341,7 +327,7 @@ export function useChannelAccounts(options: {
       content: '确定删除该 APIKey 吗？关联的执行中任务会由后端统一结束。',
       onConfirm: async () => {
         try {
-          await adminAccountApi.delete(account.id)
+          await deleteAdminAccountRecord(account.id)
           options.message.success('账号已删除')
           await options.onAfterMutation()
         } catch (error) {

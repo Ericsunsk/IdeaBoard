@@ -15,14 +15,16 @@ import {
 import { drawMaskStrokeSegment } from '../lib/maskBrushEngine'
 import { getMaskCanvasPoint } from '../lib/maskCanvasGeometry'
 import type { ImageEditorModeState } from '../../image-editor'
-
-const MAX_FEATHER_RADIUS = 16
-
-function strengthToFeatherRadius(strength: number) {
-  const clamped = Math.max(0, Math.min(100, Math.round(strength)))
-  if (clamped <= 0) return 0
-  return Math.max(1, Math.round((clamped / 100) * MAX_FEATHER_RADIUS))
-}
+import {
+  clampMaskBrushHardness,
+  clampMaskBrushSize,
+  MASK_EDITOR_DEFAULT_BRUSH_HARDNESS,
+  MASK_EDITOR_DEFAULT_BRUSH_SIZE,
+  MASK_EDITOR_DEFAULT_FEATHER_STRENGTH,
+  MASK_EDITOR_HISTORY_LIMIT,
+  normalizeMaskBrushShape,
+  resolveMaskFeatherRadius,
+} from '../config/maskEditorConstants'
 
 type MaskHistoryEntry = {
   width: number
@@ -38,8 +40,8 @@ type UseImageMaskEditorOverlayOptions = {
 
 export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOptions) {
   const drawMode = ref<ImageMaskDrawMode>('paint')
-  const brushSize = ref(18)
-  const brushHardness = ref(70)
+  const brushSize = ref(MASK_EDITOR_DEFAULT_BRUSH_SIZE)
+  const brushHardness = ref(MASK_EDITOR_DEFAULT_BRUSH_HARDNESS)
   const brushShape = ref<ImageMaskBrushShape>('round')
   const canUndoMask = ref(false)
   const canRedoMask = ref(false)
@@ -55,8 +57,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   let paintingLastY = 0
   let paintingBeforeEntry: MaskHistoryEntry | null = null
   let interactionActive = false
-
-  const MASK_HISTORY_LIMIT = 40
 
   const inpaintEditorState = computed(() => {
     const state = options.imageEditorState.value
@@ -142,7 +142,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (!entry) return false
     const undoStack = readUndoStack(nodeId).slice()
     undoStack.push(entry)
-    undoStacksByNodeId.set(nodeId, undoStack.slice(-MASK_HISTORY_LIMIT))
+    undoStacksByNodeId.set(nodeId, undoStack.slice(-MASK_EDITOR_HISTORY_LIMIT))
     redoStacksByNodeId.set(nodeId, [])
     updateHistoryAvailability(nodeId)
     return true
@@ -333,13 +333,13 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     commitUndoHistoryIfChanged(nodeId, before, canvas)
   }
 
-  function featherMask(strength = 35) {
+  function featherMask(strength = MASK_EDITOR_DEFAULT_FEATHER_STRENGTH) {
     const nodeId = maskEditorNodeId.value
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
     if (!canvas) return
     const before = captureMaskHistoryEntry(canvas)
-    const changed = featherMaskPreviewCanvas(canvas, strengthToFeatherRadius(strength))
+    const changed = featherMaskPreviewCanvas(canvas, resolveMaskFeatherRadius(strength))
     if (!changed) {
       updateHistoryAvailability(nodeId)
       return
@@ -359,7 +359,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (current) {
       const redoStack = readRedoStack(nodeId).slice()
       redoStack.push(current)
-      redoStacksByNodeId.set(nodeId, redoStack.slice(-MASK_HISTORY_LIMIT))
+      redoStacksByNodeId.set(nodeId, redoStack.slice(-MASK_EDITOR_HISTORY_LIMIT))
     }
     undoStacksByNodeId.set(nodeId, undoStack)
     restoreMaskHistoryEntry(canvas, previous)
@@ -378,7 +378,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (current) {
       const undoStack = readUndoStack(nodeId).slice()
       undoStack.push(current)
-      undoStacksByNodeId.set(nodeId, undoStack.slice(-MASK_HISTORY_LIMIT))
+      undoStacksByNodeId.set(nodeId, undoStack.slice(-MASK_EDITOR_HISTORY_LIMIT))
     }
     redoStacksByNodeId.set(nodeId, redoStack)
     restoreMaskHistoryEntry(canvas, next)
@@ -399,15 +399,15 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function updateBrushSize(value: number) {
-    brushSize.value = Math.max(4, Math.min(48, Number(value) || 18))
+    brushSize.value = clampMaskBrushSize(value)
   }
 
   function updateBrushHardness(value: number) {
-    brushHardness.value = Math.max(0, Math.min(100, Number(value) || 0))
+    brushHardness.value = clampMaskBrushHardness(value)
   }
 
   function updateBrushShape(value: ImageMaskBrushShape) {
-    brushShape.value = value === 'square' ? 'square' : 'round'
+    brushShape.value = normalizeMaskBrushShape(value)
   }
 
   watch(maskEditorNodeId, (nodeId) => {

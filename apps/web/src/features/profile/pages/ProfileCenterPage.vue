@@ -13,7 +13,7 @@
             type="button"
             text
             class="!inline-flex !max-w-full !items-center !gap-2 !border-0 !bg-transparent !p-0 !text-[33px] !leading-none !font-bold !text-[#1d1d1f] !shadow-none hover:!bg-transparent hover:!text-[#1d1d1f]"
-            @click="router.push('/user/home')"
+            @click="router.push(USER_HOME_PATH)"
           >
             <SiteBrandLogo :src="logoURL" class="h-8 w-8 rounded-lg" />
             <span class="min-w-0 truncate">{{ projectName }}</span>
@@ -47,7 +47,7 @@
             v-if="userStore.user?.role === 'admin'"
             type="button"
             class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[linear-gradient(135deg,var(--color-canvas-accent-hover),var(--color-canvas-accent))] !px-4 !py-3 !text-[15px] !font-semibold !text-white !shadow-none !transition !duration-200 hover:!bg-[linear-gradient(135deg,var(--color-canvas-accent-pressed),var(--color-canvas-accent-hover))]"
-            @click="router.push('/admin/users')"
+            @click="router.push(ADMIN_USERS_PATH)"
           >
             <Shield class="h-[18px] w-[18px]" />
             管理后台
@@ -370,6 +370,11 @@ import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import {
+  ADMIN_USERS_PATH,
+  USER_HOME_PATH,
+  USER_LOGIN_PATH,
+} from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { uploadApi } from '../../../shared/api/upload'
 import {
@@ -591,7 +596,7 @@ async function handleUpdatePassword() {
         throw new Error('密码已更新，但退出登录失败，请手动退出后重新登录')
       }
       appToast.success('密码更新成功，请重新登录')
-      await router.replace('/user/login')
+      await router.replace(USER_LOGIN_PATH)
     },
     {
       loading: pwdLoading,
@@ -602,7 +607,7 @@ async function handleUpdatePassword() {
 }
 
 async function handleLogout() {
-  await logoutAndRedirect('/user/home')
+  await logoutAndRedirect(USER_HOME_PATH)
 }
 
 function openAvatarPicker() {

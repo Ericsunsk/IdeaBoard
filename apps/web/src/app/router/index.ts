@@ -5,6 +5,7 @@ import { dismissAppToasts } from '../../shared/composables/useAppToast'
 import { ADMIN_DEFAULT_PATH, ADMIN_LOGIN_PATH } from '../../features/admin/app/adminNavigationMeta'
 import { adminRoutes } from '../../features/admin/app/adminRoutes'
 import { USER_DEFAULT_PATH, USER_LOGIN_PATH, userRoutes } from '../../features/user/app/userRoutes'
+import { ADMIN_ROOT_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -22,7 +23,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
-  const isAdminRoute = to.path.startsWith('/admin')
+  const isAdminRoute = isPathUnderRoute(to.path, ADMIN_ROOT_PATH)
   // Only force-refresh session when >25 s have elapsed since last validation;
   // this honours the 30 s TTL instead of bypassing it on every navigation.
   const SESSION_FRESH_THRESHOLD_MS = 25_000

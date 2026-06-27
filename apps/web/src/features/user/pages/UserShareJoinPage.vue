@@ -31,6 +31,7 @@ import Button from 'primevue/button'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
 import boardApi from '../../../shared/api/board'
+import { USER_BOARDS_PATH, USER_WORKSPACE_PATH } from '../../../shared/constants/routePaths'
 import { hydrateCanvasBoardsFromServer } from '../../boards/lib/boardSync'
 
 const route = useRoute()
@@ -61,7 +62,7 @@ function getTokenFromQuery(): string {
 }
 
 function goBoards() {
-  void router.replace('/user/boards')
+  void router.replace(USER_BOARDS_PATH)
 }
 
 async function joinSharedBoard() {
@@ -78,7 +79,7 @@ async function joinSharedBoard() {
 
   await hydrateCanvasBoardsFromServer()
   await router.replace({
-    path: '/user/workspace',
+    path: USER_WORKSPACE_PATH,
     query: { boardId },
   })
 }

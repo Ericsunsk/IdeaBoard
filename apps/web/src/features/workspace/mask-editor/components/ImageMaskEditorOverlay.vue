@@ -30,6 +30,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Circle, Square } from '@iconoir/vue'
 import type { ImageMaskBrushShape } from '../types'
+import { clampMaskBrushSize } from '../config/maskEditorConstants'
 
 const props = defineProps<{
   canvasWidth: number
@@ -54,7 +55,7 @@ const ICONOIR_CIRCLE_PATH_DIAMETER_RATIO = 20 / 24
 const ICONOIR_SQUARE_PATH_DIAMETER_RATIO = 16 / 24
 const brushCursorComponent = computed(() => (props.brushShape === 'square' ? Square : Circle))
 const brushCursorDiameter = computed(() => {
-  const brushSize = Math.max(4, Math.min(48, Number(props.brushSize) || 18))
+  const brushSize = clampMaskBrushSize(props.brushSize)
   const ratio =
     props.brushShape === 'square'
       ? ICONOIR_SQUARE_PATH_DIAMETER_RATIO

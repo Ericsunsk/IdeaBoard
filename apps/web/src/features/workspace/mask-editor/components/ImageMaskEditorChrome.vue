@@ -79,12 +79,18 @@
             <div class="image-mask-editor-size-input-row">
               <div
                 class="image-mask-editor-range-wrap"
-                :style="rangeTooltipStyle(brushSize, 4, 48)"
+                :style="
+                  rangeTooltipStyle(
+                    brushSize,
+                    MASK_EDITOR_MIN_BRUSH_SIZE,
+                    MASK_EDITOR_MAX_BRUSH_SIZE,
+                  )
+                "
               >
                 <input
                   type="range"
-                  min="4"
-                  max="48"
+                  :min="MASK_EDITOR_MIN_BRUSH_SIZE"
+                  :max="MASK_EDITOR_MAX_BRUSH_SIZE"
                   step="1"
                   :value="brushSize"
                   @input="onBrushSizeInput"
@@ -98,12 +104,18 @@
             <div class="image-mask-editor-size-input-row">
               <div
                 class="image-mask-editor-range-wrap"
-                :style="rangeTooltipStyle(brushHardness, 0, 100)"
+                :style="
+                  rangeTooltipStyle(
+                    brushHardness,
+                    MASK_EDITOR_MIN_BRUSH_HARDNESS,
+                    MASK_EDITOR_MAX_BRUSH_HARDNESS,
+                  )
+                "
               >
                 <input
                   type="range"
-                  min="0"
-                  max="100"
+                  :min="MASK_EDITOR_MIN_BRUSH_HARDNESS"
+                  :max="MASK_EDITOR_MAX_BRUSH_HARDNESS"
                   step="1"
                   :value="brushHardness"
                   @input="onBrushHardnessInput"
@@ -119,12 +131,18 @@
             <div class="image-mask-editor-size-input-row">
               <div
                 class="image-mask-editor-range-wrap"
-                :style="rangeTooltipStyle(maskLayerOpacity, 15, 100)"
+                :style="
+                  rangeTooltipStyle(
+                    maskLayerOpacity,
+                    MASK_EDITOR_MIN_LAYER_OPACITY,
+                    MASK_EDITOR_MAX_LAYER_OPACITY,
+                  )
+                "
               >
                 <input
                   type="range"
-                  min="15"
-                  max="100"
+                  :min="MASK_EDITOR_MIN_LAYER_OPACITY"
+                  :max="MASK_EDITOR_MAX_LAYER_OPACITY"
                   step="1"
                   :value="maskLayerOpacity"
                   @input="onMaskOpacityInput"
@@ -191,8 +209,8 @@
             role="slider"
             aria-label="羽化强度"
             :aria-valuenow="featherStrength"
-            aria-valuemin="0"
-            aria-valuemax="100"
+            :aria-valuemin="MASK_EDITOR_MIN_FEATHER_STRENGTH"
+            :aria-valuemax="MASK_EDITOR_MAX_FEATHER_STRENGTH"
             @mousedown.stop.prevent="onFeatherTrackMouseDown"
           >
             <div class="image-mask-editor-feather-fill" :style="{ width: `${featherStrength}%` }" />
@@ -207,7 +225,7 @@
         :disabled="directGenerating"
         :output-count="outputCount"
         :image-inputs="referenceImages"
-        :max-image-inputs="4"
+        :max-image-inputs="MASK_EDITOR_REFERENCE_IMAGE_LIMIT"
         :show-aspect-ratio="false"
         show-image-input
         @update:output-count="emit('update:output-count', $event)"
@@ -242,6 +260,22 @@ import type {
   MaskEditorReferenceImage,
 } from '../types'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
+import {
+  clampMaskBrushHardness,
+  clampMaskBrushSize,
+  clampMaskFeatherStrength,
+  clampMaskLayerOpacity,
+  MASK_EDITOR_DEFAULT_FEATHER_STRENGTH,
+  MASK_EDITOR_MAX_BRUSH_HARDNESS,
+  MASK_EDITOR_MAX_BRUSH_SIZE,
+  MASK_EDITOR_MAX_FEATHER_STRENGTH,
+  MASK_EDITOR_MAX_LAYER_OPACITY,
+  MASK_EDITOR_MIN_BRUSH_HARDNESS,
+  MASK_EDITOR_MIN_BRUSH_SIZE,
+  MASK_EDITOR_MIN_FEATHER_STRENGTH,
+  MASK_EDITOR_MIN_LAYER_OPACITY,
+  MASK_EDITOR_REFERENCE_IMAGE_LIMIT,
+} from '../config/maskEditorConstants'
 import ImageEditorChromeFrame from '../../components/nodes/ImageEditorChromeFrame.vue'
 import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 import PromptTextComposer from '../../components/nodes/PromptTextComposer.vue'
@@ -285,8 +319,7 @@ const emit = defineEmits<{
 
 const promptDraft = ref('')
 const FEATHER_LONG_PRESS_MS = 260
-const FEATHER_STRENGTH_DEFAULT = 35
-const featherStrength = ref(FEATHER_STRENGTH_DEFAULT)
+const featherStrength = ref(MASK_EDITOR_DEFAULT_FEATHER_STRENGTH)
 const featherStrengthVisible = ref(false)
 const featherStrengthTrackRef = ref<HTMLElement | null>(null)
 let featherLongPressTimer: number | null = null
@@ -296,17 +329,17 @@ let suppressNextFeatherClick = false
 
 function onBrushSizeInput(event: Event) {
   const target = event.target as HTMLInputElement | null
-  emit('set-brush-size', Number(target?.value) || 18)
+  emit('set-brush-size', clampMaskBrushSize(Number(target?.value)))
 }
 
 function onBrushHardnessInput(event: Event) {
   const target = event.target as HTMLInputElement | null
-  emit('set-brush-hardness', Number(target?.value) || 0)
+  emit('set-brush-hardness', clampMaskBrushHardness(Number(target?.value)))
 }
 
 function onMaskOpacityInput(event: Event) {
   const target = event.target as HTMLInputElement | null
-  emit('set-mask-layer-opacity', Number(target?.value) || 72)
+  emit('set-mask-layer-opacity', clampMaskLayerOpacity(Number(target?.value)))
 }
 
 function clearFeatherLongPressTimer() {
@@ -315,17 +348,13 @@ function clearFeatherLongPressTimer() {
   featherLongPressTimer = null
 }
 
-function clampFeatherStrength(value: number) {
-  return Math.max(0, Math.min(100, Math.round(value)))
-}
-
 function updateFeatherStrengthFromClientX(clientX: number) {
   const track = featherStrengthTrackRef.value
   if (!track) return
   const rect = track.getBoundingClientRect()
   if (rect.width <= 0) return
   const ratio = (clientX - rect.left) / rect.width
-  featherStrength.value = clampFeatherStrength(ratio * 100)
+  featherStrength.value = clampMaskFeatherStrength(ratio * 100)
 }
 
 function addFeatherGlobalListeners() {

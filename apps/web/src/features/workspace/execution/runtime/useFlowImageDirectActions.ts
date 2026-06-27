@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { SubmitTaskData } from '../../../../shared/api/task'
+import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
 import {
   clampImageNodeOutputCount,
   getCanvasNodeImageInputLimit,
@@ -11,18 +12,14 @@ import {
   type PromptAspectRatio,
 } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
-import { uploadApi } from '../../../../shared/api/upload'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import { resolveFusionOutputSize } from '../commands/fusionOutputSizing'
 import {
-  cleanupFlowLocalInpaintAssets,
-  composeFlowLocalInpaint,
-  prepareFlowLocalInpaint,
-  type FlowLocalInpaintCropResult,
+  cleanupFlowLocalInpaintMedia,
+  prepareFlowLocalInpaintMedia,
+  type PreparedFlowLocalInpaintMedia,
 } from '../media/flowLocalInpaint'
-import { ensureFlowMaskImageUrl } from '../media/flowMediaUpload'
-import { isDataUrl } from '../../services/flowMediaIO'
 import {
   assertTaskRequestReady,
   submitTaskRequest,
@@ -30,10 +27,7 @@ import {
 } from './flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import { usePendingImageResultNodes } from '../results/usePendingImageResultNodes'
-import {
-  pickFirstValidImageResult,
-  resolveTaskImageRatio,
-} from '../results/flowImageDirectActionTaskResult'
+import { composeFlowLocalInpaintTaskResult } from '../results/flowLocalInpaintTaskResult'
 import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
@@ -284,8 +278,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       .filter(Boolean)
       .slice(0, referenceImageLimit)
     const resolvedOutputCount = clampImageNodeOutputCount(inpaint.outputCount)
-    let localInpaint: FlowLocalInpaintCropResult | null = null
-    let temporaryMaskUrl = ''
+    let localInpaint: PreparedFlowLocalInpaintMedia | null = null
     let request: ReturnType<typeof buildImageInpaintTaskRequest> | null = null
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
     const taskSubmission = createTaskSubmissionCallbacks({
@@ -299,46 +292,40 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       outputCount: resolvedOutputCount,
       preflight: () => assertTaskRequestReady(buildPromptImageReadinessRequest()),
       prepare: async () => {
-        const normalizedMaskUrl = await ensureFlowMaskImageUrl(rawMaskDataUrl, { boardId })
-        if (isDataUrl(rawMaskDataUrl)) temporaryMaskUrl = normalizedMaskUrl
-        localInpaint = await prepareFlowLocalInpaint({
+        localInpaint = await prepareFlowLocalInpaintMedia({
           originalImageUrl: source.url,
-          maskUrl: normalizedMaskUrl,
+          rawMaskDataUrl,
           boardId,
         })
         request = buildImageInpaintTaskRequest({
           prompt: normalizedPrompt,
-          croppedImageUrl: localInpaint.croppedImageUrl,
-          croppedMaskUrl: localInpaint.croppedMaskUrl,
+          croppedImageUrl: localInpaint.crop.croppedImageUrl,
+          croppedMaskUrl: localInpaint.crop.croppedMaskUrl,
           referenceImageUrls,
-          cropSize: localInpaint.cropSize,
+          cropSize: localInpaint.crop.cropSize,
         })
       },
       submitTask: taskSubmission.submitTask,
       resolveResult: async (taskId) => {
         if (!localInpaint) throw new Error('局部重绘任务未准备完成')
-        const croppedResult = pickFirstValidImageResult(
-          await waitExistingOrLiveTaskImageResults(taskId),
-        )
-        const croppedResultUrl = croppedResult?.url
-        if (!croppedResultUrl) throw new Error('任务完成但未返回图片')
-        const finalUrl = await composeFlowLocalInpaint({
+        return await composeFlowLocalInpaintTaskResult({
           originalImageUrl: source.url,
-          croppedResultUrl,
-          croppedMaskUrl: localInpaint.croppedMaskUrl,
-          bbox: localInpaint.bbox,
+          croppedTaskResults: await waitExistingOrLiveTaskImageResults(taskId),
+          prepared: localInpaint,
           boardId,
+          fallbackRatio: source.ratio,
+          loadImageSize: loadImageSizeFromUrl,
         })
-        const ratio = await resolveTaskImageRatio(finalUrl, source.ratio, loadImageSizeFromUrl)
-        return { url: finalUrl, ratio }
       },
       cleanup: async () => {
-        await cleanupFlowLocalInpaintAssets(localInpaint, boardId)
-        if (temporaryMaskUrl && boardId) {
-          await Promise.allSettled([uploadApi.recycle(temporaryMaskUrl, boardId)])
-        }
+        await cleanupFlowLocalInpaintMedia(localInpaint, boardId)
       },
+      persistPendingTaskIds: false,
       fallbackErrorMessage: '局部重绘失败',
+      formatErrorMessage: (error) => {
+        const message = error.message
+        return isTaskResultPendingError(error) ? '局部重绘仍在处理中，请稍后重试' : message
+      },
     })
   }
 

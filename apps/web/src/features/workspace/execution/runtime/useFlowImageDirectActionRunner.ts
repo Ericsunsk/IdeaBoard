@@ -1,16 +1,19 @@
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { ImageNodeItem } from '../../../canvas-board/domain'
 import { waitExistingOrLiveTaskImageResults } from './flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import { readCurrentBoardId } from '../../utils/currentBoardId'
 import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
 import {
-  pickFirstValidImageResult,
-  resolveTaskImageResultDisplay,
+  resolveFirstTaskImageResultDisplay,
   type ResolvedTaskImageResult,
 } from '../results/flowImageDirectActionTaskResult'
 import type { ImageDirectActionSource } from '../media/flowImageDirectActionSource'
+import {
+  collectPendingImageTasks,
+  isPendingImageTaskSnapshot,
+  readPendingImageSnapshot,
+} from '../results/flowPendingImageTaskSnapshot'
 
 type PendingImageResultNodes = {
   appendPendingImageResultNode: (source: ImageDirectActionSource, sourceNodeId: string) => string
@@ -46,6 +49,7 @@ type PendingImageBatchGenerationParams = {
   resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
   totalCount: number
   boardId: string
+  persistPendingTaskIds?: boolean
 }
 
 type PendingImageBatchWorkflowParams = {
@@ -59,6 +63,7 @@ type PendingImageBatchWorkflowParams = {
   prepare?: () => Promise<PendingImageBatchWorkflowPrepared | void>
   submitTask: (resultNodeId: string) => Promise<{ taskId: string }>
   resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
+  persistPendingTaskIds?: boolean
   cleanup?: () => Promise<void>
   fallbackErrorMessage: string
   formatErrorMessage?: (error: Error) => string
@@ -131,67 +136,20 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
   }
 
   async function resolveFirstTaskImageResult(taskId: string, fallbackRatio: number) {
-    const result = pickFirstValidImageResult(await waitExistingOrLiveTaskImageResults(taskId))
-    if (!result) throw new Error('任务完成但未返回图片')
-    const resolved = await resolveTaskImageResultDisplay(
-      result,
+    return await resolveFirstTaskImageResultDisplay(
+      await waitExistingOrLiveTaskImageResults(taskId),
       fallbackRatio,
       loadImageSizeFromUrl,
     )
-    if (!resolved) throw new Error('任务完成但未返回图片')
-    return resolved
-  }
-
-  function getPendingImageSnapshot(nodeId: string): ImageNodeItem | null {
-    const node = options.nodes.value.find((item) => item.id === nodeId)
-    if (!node || node.data?.kind !== 'image') return null
-    const snapshot = node.data.snapshotNode
-    if (!snapshot || typeof snapshot !== 'object') return null
-    return snapshot as ImageNodeItem
-  }
-
-  function hasRenderableImageResult(snapshot: ImageNodeItem): boolean {
-    const sourceUrl = `${snapshot.sourceImageUrl ?? ''}`.trim()
-    if (sourceUrl) return true
-    const outputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-    return outputImages.some((item) => `${item?.url ?? ''}`.trim().length > 0)
-  }
-
-  function isPendingImageTaskSnapshot(snapshot: ImageNodeItem, taskId?: string): boolean {
-    const pendingTaskId = `${snapshot.pendingTaskId ?? ''}`.trim()
-    if (!pendingTaskId) return false
-    if (taskId && pendingTaskId !== taskId) return false
-    return snapshot.outputStatus === 'running' && !hasRenderableImageResult(snapshot)
   }
 
   function isPendingImageTaskStillCurrent(nodeId: string, taskId: string): boolean {
-    const snapshot = getPendingImageSnapshot(nodeId)
+    const snapshot = readPendingImageSnapshot(options.nodes.value, nodeId)
     return !!snapshot && isPendingImageTaskSnapshot(snapshot, taskId)
   }
 
-  function collectPendingImageTasks(): Array<{
-    nodeId: string
-    taskId: string
-    fallbackRatio: number
-  }> {
-    return options.nodes.value.flatMap((node) => {
-      if (node.data?.kind !== 'image') return []
-      const snapshot = node.data.snapshotNode
-      if (!snapshot || typeof snapshot !== 'object') return []
-      const imageSnapshot = snapshot as ImageNodeItem
-      if (!isPendingImageTaskSnapshot(imageSnapshot)) return []
-      const fallbackRatio = Number(imageSnapshot.sourceImageRatio)
-      return [
-        {
-          nodeId: node.id,
-          taskId: imageSnapshot.pendingTaskId!.trim(),
-          fallbackRatio: Number.isFinite(fallbackRatio) && fallbackRatio > 0 ? fallbackRatio : 1,
-        },
-      ]
-    })
-  }
-
   async function runPendingImageBatchGeneration(params: PendingImageBatchGenerationParams) {
+    const persistPendingTaskIds = params.persistPendingTaskIds ?? true
     let successCount = 0
     let pendingCount = 0
     let failureCount = 0
@@ -200,7 +158,9 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
       params.resultNodeIds.map(async (resultNodeId) => {
         try {
           const { taskId } = await params.submitTask(resultNodeId)
-          await persistPendingImageTaskId(params.boardId, resultNodeId, taskId)
+          if (persistPendingTaskIds) {
+            await persistPendingImageTaskId(params.boardId, resultNodeId, taskId)
+          }
           const resolved = await params.resolveResult(taskId, resultNodeId)
           if (isBoardStillCurrent(params.boardId)) {
             updatePendingImageResultNode(resultNodeId, resolved)
@@ -210,6 +170,9 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
           firstFailure ??= error
           if (isTaskResultPendingError(error)) {
             pendingCount += 1
+            if (!persistPendingTaskIds && isBoardStillCurrent(params.boardId)) {
+              removePendingImageResultNode(resultNodeId)
+            }
             return
           }
           failureCount += 1
@@ -221,13 +184,20 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
     )
     if (!isBoardStillCurrent(params.boardId)) return
     if (successCount === 0 && pendingCount > 0) {
+      if (!persistPendingTaskIds) {
+        throw firstFailure instanceof Error ? firstFailure : new Error('任务仍在处理中，请稍后重试')
+      }
       options.onWarning('任务进行中，稍后可在画布上查看结果')
       return
     }
     if (successCount === 0)
       throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
     if (pendingCount > 0) {
-      options.onWarning(`生成完成 ${successCount}/${params.totalCount} 张，其余任务稍后可查看`)
+      options.onWarning(
+        persistPendingTaskIds
+          ? `生成完成 ${successCount}/${params.totalCount} 张，其余任务稍后可查看`
+          : `生成完成 ${successCount}/${params.totalCount} 张，部分任务仍在处理中，请稍后重试`,
+      )
     } else if (failureCount > 0) {
       options.onWarning(`生成完成 ${successCount}/${params.totalCount} 张，部分任务失败`)
     } else {
@@ -256,6 +226,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
         boardId: params.boardId,
         submitTask: params.submitTask,
         resolveResult: params.resolveResult,
+        persistPendingTaskIds: params.persistPendingTaskIds,
       })
     } catch (error) {
       removePendingImageResultNodesIfCurrent(params.boardId, resultNodeIds)
@@ -299,7 +270,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
 
   async function reattachPendingImageResults(): Promise<void> {
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
-    const pendingTasks = collectPendingImageTasks()
+    const pendingTasks = collectPendingImageTasks(options.nodes.value)
     if (pendingTasks.length === 0) return
     let successCount = 0
     let failureCount = 0

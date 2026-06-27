@@ -1,7 +1,9 @@
-import { MASK_PAINT_RGB } from './maskBrushEngine'
-
-const MASK_PAINT_ALPHA = 0.5
-const MASK_EMPTY_ALPHA_THRESHOLD = 0
+import {
+  MASK_EDITOR_EMPTY_ALPHA_THRESHOLD,
+  MASK_EDITOR_DEFAULT_FEATHER_RADIUS,
+  MASK_EDITOR_PAINT_RGB,
+  MASK_EDITOR_PREVIEW_ALPHA,
+} from '../config/maskEditorConstants'
 
 export type MaskCommitResult = {
   executionMaskDataUrl: string
@@ -31,9 +33,9 @@ export function drawMaskRasterPreviewToCanvas(
   for (let i = 0; i < total; i += 1) {
     const base = i * 4
     const hasMask = source.data[base + 3] > 0
-    imageData.data[base] = MASK_PAINT_RGB.r
-    imageData.data[base + 1] = MASK_PAINT_RGB.g
-    imageData.data[base + 2] = MASK_PAINT_RGB.b
+    imageData.data[base] = MASK_EDITOR_PAINT_RGB.r
+    imageData.data[base + 1] = MASK_EDITOR_PAINT_RGB.g
+    imageData.data[base + 2] = MASK_EDITOR_PAINT_RGB.b
     imageData.data[base + 3] = hasMask ? 255 : 0
   }
 
@@ -47,9 +49,9 @@ export function invertMaskPreviewCanvas(canvas: HTMLCanvasElement) {
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const data = imageData.data
   for (let idx = 0; idx < data.length; idx += 4) {
-    data[idx] = MASK_PAINT_RGB.r
-    data[idx + 1] = MASK_PAINT_RGB.g
-    data[idx + 2] = MASK_PAINT_RGB.b
+    data[idx] = MASK_EDITOR_PAINT_RGB.r
+    data[idx + 1] = MASK_EDITOR_PAINT_RGB.g
+    data[idx + 2] = MASK_EDITOR_PAINT_RGB.b
     data[idx + 3] = 255 - data[idx + 3]
   }
   ctx.putImageData(imageData, 0, 0)
@@ -102,7 +104,10 @@ function blurAlphaVertical(
   }
 }
 
-export function featherMaskPreviewCanvas(canvas: HTMLCanvasElement, radius = 6): boolean {
+export function featherMaskPreviewCanvas(
+  canvas: HTMLCanvasElement,
+  radius = MASK_EDITOR_DEFAULT_FEATHER_RADIUS,
+): boolean {
   const width = canvas.width
   const height = canvas.height
   if (!width || !height) return false
@@ -130,9 +135,9 @@ export function featherMaskPreviewCanvas(canvas: HTMLCanvasElement, radius = 6):
   let changed = false
   for (let i = 0; i < total; i += 1) {
     const base = i * 4
-    source[base] = MASK_PAINT_RGB.r
-    source[base + 1] = MASK_PAINT_RGB.g
-    source[base + 2] = MASK_PAINT_RGB.b
+    source[base] = MASK_EDITOR_PAINT_RGB.r
+    source[base + 1] = MASK_EDITOR_PAINT_RGB.g
+    source[base + 2] = MASK_EDITOR_PAINT_RGB.b
     const nextAlpha = alphaBlurred[i]
     if (source[base + 3] !== nextAlpha) changed = true
     source[base + 3] = nextAlpha
@@ -155,7 +160,7 @@ function extractMaskIntensity(data: Uint8ClampedArray): Float32Array {
 
 function hasMaskPaint(values: Float32Array): boolean {
   for (const value of values) {
-    if (value > MASK_EMPTY_ALPHA_THRESHOLD) return true
+    if (value > MASK_EDITOR_EMPTY_ALPHA_THRESHOLD) return true
   }
   return false
 }
@@ -192,10 +197,10 @@ function paintPreviewMaskValuesToCanvas(
   const imageData = ctx.createImageData(width, height)
   for (let i = 0; i < values.length; i += 1) {
     const base = i * 4
-    const alpha = Math.max(0, Math.min(1, values[i])) * MASK_PAINT_ALPHA
-    imageData.data[base] = MASK_PAINT_RGB.r
-    imageData.data[base + 1] = MASK_PAINT_RGB.g
-    imageData.data[base + 2] = MASK_PAINT_RGB.b
+    const alpha = Math.max(0, Math.min(1, values[i])) * MASK_EDITOR_PREVIEW_ALPHA
+    imageData.data[base] = MASK_EDITOR_PAINT_RGB.r
+    imageData.data[base + 1] = MASK_EDITOR_PAINT_RGB.g
+    imageData.data[base + 2] = MASK_EDITOR_PAINT_RGB.b
     imageData.data[base + 3] = Math.round(alpha * 255)
   }
   ctx.clearRect(0, 0, width, height)

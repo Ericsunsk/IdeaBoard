@@ -30,7 +30,7 @@
       </Button>
     </div>
     <div class="min-h-0 flex-1 overflow-hidden bg-transparent">
-      <router-view :key="route.path === '/user/workspace' ? route.path : route.fullPath" />
+      <router-view :key="route.path === USER_WORKSPACE_PATH ? route.path : route.fullPath" />
     </div>
 
     <UserAuthModals v-if="authMode" :mode="authMode" />
@@ -43,6 +43,12 @@ import Button from 'primevue/button'
 import { useUserStore } from '../../../app/stores/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import {
+  ADMIN_USERS_PATH,
+  USER_LOGIN_PATH,
+  USER_REGISTER_PATH,
+  USER_WORKSPACE_PATH,
+} from '../../../shared/constants/routePaths'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 
 const router = useRouter()
@@ -61,8 +67,8 @@ const isImpersonating = computed(() =>
   Boolean((authSession.value?.data as AuthSessionData | null | undefined)?.session?.impersonatedBy),
 )
 const authMode = computed<'login' | 'register' | null>(() => {
-  if (route.path === '/user/login') return 'login'
-  if (route.path === '/user/register') return 'register'
+  if (route.path === USER_LOGIN_PATH) return 'login'
+  if (route.path === USER_REGISTER_PATH) return 'register'
   return null
 })
 
@@ -74,7 +80,7 @@ async function handleStopImpersonating() {
     await userStore.fetchUserInfo(true)
     await authSession.value?.refetch?.()
     appToast.success('已退出伪装身份')
-    await router.push('/admin/users')
+    await router.push(ADMIN_USERS_PATH)
   } catch (err: unknown) {
     appToast.error(extractBetterAuthErrorMessage(err, '退出伪装失败，请重新登录管理员账号'))
   } finally {
