@@ -1,8 +1,8 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { ImageEditorMode } from '../types/imageEditor'
-import { containImageRect } from '../utils/canvasExtendGeometry'
-import { isEditableEventTarget } from '../utils/domEventTargets'
+import type { ImageEditorMode } from '../types'
+import { containImageRect } from '../../utils/canvasExtendGeometry'
+import { isEditableEventTarget } from '../../utils/domEventTargets'
 
 type ImageDisplayPayload = {
   url: string

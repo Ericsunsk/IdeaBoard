@@ -23,8 +23,8 @@ import {
   ReportsSolid,
   SineWave,
 } from '@iconoir/vue'
-import type { ImageAdjustmentKind } from '../../types/imageEditor'
-import NodeToolIconButton from './NodeToolIconButton.vue'
+import type { ImageAdjustmentKind } from '../types'
+import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 
 defineProps<{
   selectedKind: ImageAdjustmentKind | null
@@ -47,7 +47,7 @@ const actionItems: Array<{
 ]
 </script>
 
-<style scoped src="./styles/node-tool-buttons.css"></style>
+<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-editor-adjustment-actions {
   display: grid;

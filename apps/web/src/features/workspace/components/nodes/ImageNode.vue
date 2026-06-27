@@ -38,6 +38,7 @@
         :expand-overlay-style="expandOverlayStyle"
         :expand-handle-radius="expandHandleRadius"
         :image-editor-mode="imageEditorMode"
+        :image-editor-filter-previews="imageEditorFilterPreviews"
         :mask-editor-overlay-style="maskEditorOverlayStyle"
         :mask-editor-canvas-width="maskEditorCanvasWidth"
         :mask-editor-canvas-height="maskEditorCanvasHeight"
@@ -96,7 +97,7 @@ import { MediaImage } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../../types/canvasNodes'
 import type { ImageNodeAction, ImageStrengthAction } from '../../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorMode } from '../../types/imageEditor'
+import type { ImageEditorFilterPreview, ImageEditorMode } from '../../image-editor'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import NodeShell from './NodeShell.vue'
@@ -124,6 +125,7 @@ const props = defineProps<{
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
   imageEditorMode?: ImageEditorMode | null
+  imageEditorFilterPreviews?: ImageEditorFilterPreview[]
   maskEditorOverlayStyle?: Record<string, string> | null
   maskEditorCanvasWidth?: number
   maskEditorCanvasHeight?: number

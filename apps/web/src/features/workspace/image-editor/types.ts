@@ -54,6 +54,18 @@ export type ImageEditorSourceLayer = {
   visible: true
 }
 
+export type ImageEditorPaintContent = {
+  kind: 'empty'
+}
+
+export type ImageEditorPaintLayer = {
+  id: string
+  type: 'paint'
+  name: string
+  visible: boolean
+  content: ImageEditorPaintContent
+}
+
 export type ImageEditorHslLayer = {
   id: string
   type: 'adjustment'
@@ -106,9 +118,35 @@ export type ImageEditorAdjustmentLayer =
   | ImageEditorLevelsLayer
   | ImageEditorInvertLayer
 
-export type ImageEditorLayer = ImageEditorSourceLayer | ImageEditorAdjustmentLayer
+export type ImageEditorMergedLayer = {
+  id: string
+  type: 'merged'
+  name: string
+  visible: boolean
+  children: ImageEditorEditableLayer[]
+}
+
+export type ImageEditorEditableLayer =
+  | ImageEditorAdjustmentLayer
+  | ImageEditorPaintLayer
+  | ImageEditorMergedLayer
+
+export type ImageEditorLayer = ImageEditorSourceLayer | ImageEditorEditableLayer
 
 export type ImageEditorLayerByKind<TKind extends ImageAdjustmentKind> = Extract<
   ImageEditorAdjustmentLayer,
   { kind: TKind }
 >
+
+export type ImageEditorCssFilterPreview = {
+  type: 'css-filter'
+  value: string
+}
+
+export type ImageEditorChannelLutPreview = {
+  type: 'channel-lut'
+  tableValues: string
+  grayscale: boolean
+}
+
+export type ImageEditorFilterPreview = ImageEditorCssFilterPreview | ImageEditorChannelLutPreview

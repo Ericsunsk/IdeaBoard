@@ -45,12 +45,17 @@
     :layers="imageEditorLayers"
     :selected-layer-id="selectedImageEditorLayerId"
     :selected-adjustment-layer="selectedImageEditorAdjustmentLayer"
+    :applying-adjustments="applyingImageEditorAdjustments"
     @select-tool="emit('select-image-editor-tool', $event)"
     @select-adjustment="emit('select-image-adjustment-layer', $event)"
     @select-layer="emit('select-image-editor-layer', $event)"
     @set-layer-visible="(layerId, visible) => emit('set-image-editor-layer-visible', layerId, visible)"
+    @add-layer="emit('add-image-editor-layer')"
+    @copy-layer="emit('copy-image-editor-layer')"
+    @merge-layer="emit('merge-image-editor-layer')"
     @remove-layer="emit('remove-image-editor-layer', $event)"
     @update-param="(key, value) => emit('update-image-editor-param', key, value)"
+    @apply-adjustments="emit('apply-image-editor-adjustments')"
   />
   <WorkspaceNodeContextMenu
     :visible="nodeContextMenu.visible"
@@ -67,6 +72,7 @@ import type {
   ImageMaskDrawMode,
 } from '../composables/useImageMaskEditorOverlay'
 import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
+import { ImageEditorChrome } from '../image-editor'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
@@ -75,8 +81,7 @@ import type {
   ImageEditorParamKey,
   ImageEditorParamValue,
   ImageEditorTool,
-} from '../types/imageEditor'
-import ImageEditorChrome from './nodes/ImageEditorChrome.vue'
+} from '../image-editor'
 import ImageMaskEditorChrome from './nodes/ImageMaskEditorChrome.vue'
 import WorkspaceNodeContextMenu from './WorkspaceNodeContextMenu.vue'
 
@@ -105,6 +110,7 @@ defineProps<{
   imageEditorLayers: ImageEditorLayer[]
   selectedImageEditorLayerId: string
   selectedImageEditorAdjustmentLayer: ImageEditorAdjustmentLayer | null
+  applyingImageEditorAdjustments: boolean
   nodeContextMenu: { visible: boolean; x: number; y: number }
   canvasNodeMenuItems: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
 }>()
@@ -128,8 +134,12 @@ const emit = defineEmits<{
   'select-image-adjustment-layer': [kind: ImageAdjustmentKind]
   'select-image-editor-layer': [layerId: string]
   'set-image-editor-layer-visible': [layerId: string, visible: boolean]
+  'add-image-editor-layer': []
+  'copy-image-editor-layer': []
+  'merge-image-editor-layer': []
   'remove-image-editor-layer': [layerId: string]
   'update-image-editor-param': [key: ImageEditorParamKey, value: ImageEditorParamValue]
+  'apply-image-editor-adjustments': []
   submit: [prompt: string, outputCount: number]
   'create-node': [kind: CanvasCreatableNodeKind]
 }>()

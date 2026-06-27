@@ -26,6 +26,7 @@
         :src="stageDisplayUrl"
         class="image-node-stage-image"
         :class="{ 'is-dragging': dragging }"
+        :style="stageImageStyle"
         alt="图片节点预览"
         draggable="false"
         role="button"
@@ -35,6 +36,30 @@
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
       />
+      <svg
+        v-if="channelLutPreviewEntries.length > 0"
+        class="image-node-stage-filter-defs"
+        width="0"
+        height="0"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <defs>
+          <filter
+            v-for="entry in channelLutPreviewEntries"
+            :id="entry.id"
+            :key="entry.id"
+          >
+            <feColorMatrix v-if="entry.preview.grayscale" type="saturate" values="0" />
+            <feComponentTransfer>
+              <feFuncR type="discrete" :tableValues="entry.preview.tableValues" />
+              <feFuncG type="discrete" :tableValues="entry.preview.tableValues" />
+              <feFuncB type="discrete" :tableValues="entry.preview.tableValues" />
+              <feFuncA type="identity" />
+            </feComponentTransfer>
+          </filter>
+        </defs>
+      </svg>
       <ImageCanvasExtendOverlay
         v-if="expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
@@ -110,7 +135,11 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../types/canvasNodes'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorMode } from '../../types/imageEditor'
+import type {
+  ImageEditorChannelLutPreview,
+  ImageEditorFilterPreview,
+  ImageEditorMode,
+} from '../../image-editor'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import ImageMaskEditorOverlay from './ImageMaskEditorOverlay.vue'
@@ -130,6 +159,7 @@ const props = defineProps<{
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
   imageEditorMode?: ImageEditorMode | null
+  imageEditorFilterPreviews?: ImageEditorFilterPreview[]
   maskEditorOverlayStyle?: Record<string, string> | null
   maskEditorCanvasWidth?: number
   maskEditorCanvasHeight?: number
@@ -166,6 +196,30 @@ const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
 const isImageEditorActive = computed(() => props.imageEditorMode != null)
 const isMaskEditorActive = computed(() => props.imageEditorMode === 'inpaint')
+const imageEditorFilterPreviews = computed(() => props.imageEditorFilterPreviews ?? [])
+const channelLutPreviewEntries = computed(() =>
+  imageEditorFilterPreviews.value.reduce<
+    { preview: ImageEditorChannelLutPreview; previewIndex: number; id: string }[]
+  >((entries, preview, previewIndex) => {
+    if (preview.type !== 'channel-lut') return entries
+    entries.push({
+      preview,
+      previewIndex,
+      id: `image-channel-lut-preview-${props.flowNodeId ?? props.nodeId}-${previewIndex}`,
+    })
+    return entries
+  }, []),
+)
+const stageImageStyle = computed<Record<string, string> | undefined>(() => {
+  const filters = imageEditorFilterPreviews.value
+    .map((preview, previewIndex) => {
+      if (preview.type === 'css-filter') return preview.value.trim()
+      return `url(#image-channel-lut-preview-${props.flowNodeId ?? props.nodeId}-${previewIndex})`
+    })
+    .filter(Boolean)
+
+  return filters.length > 0 ? { filter: filters.join(' ') } : undefined
+})
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )
@@ -214,6 +268,7 @@ function submitExpand(prompt: string, outputCount: number) {
 function selectOutputCount(value: number) {
   emit('update:output-count', clampImageNodeOutputCount(value))
 }
+
 </script>
 
 <style scoped>
@@ -233,6 +288,13 @@ function selectOutputCount(value: number) {
 
 .image-node-stage-image.is-dragging {
   cursor: grabbing;
+}
+
+.image-node-stage-filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
 .image-node-stage.is-running .image-node-stage-image,

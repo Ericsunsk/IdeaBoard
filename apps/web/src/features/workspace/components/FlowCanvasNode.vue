@@ -66,6 +66,7 @@
           :expand-overlay-style="props.expandOverlayStyle ?? null"
           :expand-handle-radius="props.expandHandleRadius ?? 4"
           :image-editor-mode="props.imageEditorMode ?? null"
+          :image-editor-filter-previews="props.imageEditorFilterPreviews ?? []"
           :mask-editor-overlay-style="props.maskEditorOverlayStyle ?? null"
           :mask-editor-canvas-width="props.maskEditorCanvasWidth ?? 0"
           :mask-editor-canvas-height="props.maskEditorCanvasHeight ?? 0"
@@ -155,7 +156,7 @@ import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction, ImageStrengthAction } from '../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorMode } from '../types/imageEditor'
+import type { ImageEditorFilterPreview, ImageEditorMode } from '../image-editor'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../config/promptAspectRatio'
@@ -183,6 +184,7 @@ const props = withDefaults(
     expandOverlayStyle?: Record<string, string> | null
     expandHandleRadius?: number
     imageEditorMode?: ImageEditorMode | null
+    imageEditorFilterPreviews?: ImageEditorFilterPreview[]
     maskEditorOverlayStyle?: Record<string, string> | null
     maskEditorCanvasWidth?: number
     maskEditorCanvasHeight?: number
@@ -212,6 +214,7 @@ const props = withDefaults(
     expandOverlayStyle: null,
     expandHandleRadius: 4,
     imageEditorMode: null,
+    imageEditorFilterPreviews: () => [],
     maskEditorOverlayStyle: null,
     maskEditorCanvasWidth: 0,
     maskEditorCanvasHeight: 0,

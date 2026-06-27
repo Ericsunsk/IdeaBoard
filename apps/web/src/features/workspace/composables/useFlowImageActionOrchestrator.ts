@@ -11,7 +11,7 @@ import {
 import type { PromptAspectRatio } from '../config/promptAspectRatio'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import { ACTIVE_NODE_PANEL_KIND, type ActiveNodePanel } from './useFlowActiveNodePanels'
-import type { ImageEditorMode } from '../types/imageEditor'
+import type { ImageEditorMode } from '../image-editor'
 
 type FusionPromptParamPatch = Extract<
   FlowSnapshotParamPatch,

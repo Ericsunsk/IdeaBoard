@@ -17,8 +17,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IMAGE_EDITOR_CHROME_LAYOUT } from '../../config/imageEditorChrome'
-import type { ImageEditorMode } from '../../types/imageEditor'
+import { IMAGE_EDITOR_CHROME_LAYOUT } from '../../image-editor/config/imageEditorChrome'
+import type { ImageEditorMode } from '../../image-editor/types'
 
 const props = defineProps<{
   anchorRect: {

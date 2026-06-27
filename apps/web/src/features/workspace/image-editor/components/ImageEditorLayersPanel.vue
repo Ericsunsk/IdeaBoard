@@ -13,17 +13,6 @@
         :class="{ active: selectedLayerId === layer.id }"
         @click="emit('select-layer', layer.id)"
       >
-        <span
-          class="image-editor-layer-row__visibility node-tool-tooltip-trigger"
-          :aria-label="layer.visible ? '隐藏图层' : '显示图层'"
-          @click.stop="onToggleVisibility(layer)"
-        >
-          <Eye v-if="layer.visible" class="image-editor-layer-row__icon" />
-          <EyeClosed v-else class="image-editor-layer-row__icon" />
-          <span class="node-tool-tooltip" aria-hidden="true">
-            {{ layer.visible ? '隐藏图层' : '显示图层' }}
-          </span>
-        </span>
         <span class="image-editor-layer-row__thumb" :class="`kind-${resolveLayerKind(layer)}`">
           <component :is="resolveLayerIcon(layer)" class="image-editor-layer-row__thumb-icon" />
         </span>
@@ -33,12 +22,15 @@
         </span>
         <span
           v-else
-          class="image-editor-layer-row__delete node-tool-tooltip-trigger"
-          aria-label="删除图层"
-          @click.stop="emit('remove-layer', layer.id)"
+          class="image-editor-layer-row__visibility node-tool-tooltip-trigger"
+          :aria-label="layer.visible ? '隐藏图层' : '显示图层'"
+          @click.stop="onToggleVisibility(layer)"
         >
-          <Trash class="image-editor-layer-row__icon" />
-          <span class="node-tool-tooltip" aria-hidden="true">删除图层</span>
+          <Eye v-if="layer.visible" class="image-editor-layer-row__icon" />
+          <EyeClosed v-else class="image-editor-layer-row__icon" />
+          <span class="node-tool-tooltip" aria-hidden="true">
+            {{ layer.visible ? '隐藏图层' : '显示图层' }}
+          </span>
         </span>
       </button>
     </div>
@@ -57,11 +49,12 @@ import {
   Lock,
   MaskSquare,
   MediaImage,
+  EditPencil,
   ReportsSolid,
   SineWave,
-  Trash,
+  VerticalMerge,
 } from '@iconoir/vue'
-import type { ImageEditorLayer } from '../../types/imageEditor'
+import type { ImageEditorLayer } from '../types'
 
 const props = defineProps<{
   layers: ImageEditorLayer[]
@@ -71,7 +64,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-layer', layerId: string): void
   (e: 'set-layer-visible', layerId: string, visible: boolean): void
-  (e: 'remove-layer', layerId: string): void
 }>()
 
 const isLayerListScrolling = ref(false)
@@ -98,11 +90,15 @@ function onToggleVisibility(layer: ImageEditorLayer) {
 }
 
 function resolveLayerKind(layer: ImageEditorLayer) {
-  return layer.type === 'source' ? 'source' : layer.kind
+  if (layer.type === 'source') return 'source'
+  if (layer.type === 'adjustment') return layer.kind
+  return layer.type
 }
 
 function resolveLayerIcon(layer: ImageEditorLayer): Component {
   if (layer.type === 'source') return MediaImage
+  if (layer.type === 'paint') return EditPencil
+  if (layer.type === 'merged') return VerticalMerge
   if (layer.kind === 'hsl') return ColorFilter
   if (layer.kind === 'threshold') return Brightness
   if (layer.kind === 'curves') return SineWave
@@ -114,7 +110,7 @@ onBeforeUnmount(clearLayerListScrollTimer)
 </script>
 
 <style scoped src="./styles/image-editor-panel.css"></style>
-<style scoped src="./styles/node-tool-buttons.css"></style>
+<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-editor-layers-panel {
   height: calc(
@@ -145,7 +141,7 @@ onBeforeUnmount(clearLayerListScrollTimer)
   border-radius: var(--image-editor-panel-control-radius);
   padding: 0 6px;
   display: grid;
-  grid-template-columns: 18px 24px minmax(0, 1fr) 18px;
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
   align-items: center;
   gap: var(--image-editor-panel-inset);
   background: transparent;
@@ -166,7 +162,6 @@ onBeforeUnmount(clearLayerListScrollTimer)
 }
 
 .image-editor-layer-row__visibility,
-.image-editor-layer-row__delete,
 .image-editor-layer-row__lock {
   width: 18px;
   height: 18px;
@@ -175,35 +170,20 @@ onBeforeUnmount(clearLayerListScrollTimer)
   color: var(--workspace-text-muted);
 }
 
-.image-editor-layer-row__visibility,
-.image-editor-layer-row__delete {
+.image-editor-layer-row__visibility {
   cursor: pointer;
 }
 
-.image-editor-layer-row__visibility .node-tool-tooltip,
-.image-editor-layer-row__delete .node-tool-tooltip {
+.image-editor-layer-row__visibility .node-tool-tooltip {
   top: 50%;
   bottom: auto;
-}
-
-.image-editor-layer-row__visibility .node-tool-tooltip {
-  left: calc(100% + 6px);
-  transform: translate(2px, -50%);
-}
-
-.image-editor-layer-row__delete .node-tool-tooltip {
   right: calc(100% + 6px);
   left: auto;
   transform: translate(-2px, -50%);
 }
 
-.image-editor-layer-row__visibility.node-tool-tooltip-trigger:hover .node-tool-tooltip,
-.image-editor-layer-row__delete.node-tool-tooltip-trigger:hover .node-tool-tooltip {
+.image-editor-layer-row__visibility.node-tool-tooltip-trigger:hover .node-tool-tooltip {
   transform: translate(0, -50%);
-}
-
-.image-editor-layer-row__delete:hover {
-  color: var(--workspace-accent-hover);
 }
 
 .image-editor-layer-row__icon,
@@ -242,6 +222,16 @@ onBeforeUnmount(clearLayerListScrollTimer)
 .image-editor-layer-row__thumb.kind-invert {
   color: #ffffff;
   background: var(--workspace-text-strong);
+}
+
+.image-editor-layer-row__thumb.kind-paint {
+  color: var(--workspace-text-body);
+  background: var(--workspace-surface-bg);
+}
+
+.image-editor-layer-row__thumb.kind-merged {
+  color: var(--workspace-accent-strong);
+  background: var(--workspace-accent-soft);
 }
 
 .image-editor-layer-row__thumb-icon {

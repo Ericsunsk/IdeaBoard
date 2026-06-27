@@ -23,8 +23,8 @@ import {
   SquareCursor,
   ZoomIn,
 } from '@iconoir/vue'
-import type { ImageEditorTool } from '../../types/imageEditor'
-import NodeToolIconButton from './NodeToolIconButton.vue'
+import type { ImageEditorTool } from '../types'
+import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 
 defineProps<{
   activeTool: ImageEditorTool
@@ -49,7 +49,7 @@ const toolItems: Array<{
 ]
 </script>
 
-<style scoped src="./styles/node-tool-buttons.css"></style>
+<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-editor-tool-rail__button {
   width: 100%;

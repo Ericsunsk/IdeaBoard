@@ -9,7 +9,7 @@ import {
 import type { MaskPaintBrushShape } from '../utils/maskBrushEngine'
 import { drawMaskStrokeSegment } from '../utils/maskBrushEngine'
 import { getMaskCanvasPoint } from '../utils/maskCanvasGeometry'
-import type { ImageEditorModeState } from './useImageEditorMode'
+import type { ImageEditorModeState } from '../image-editor'
 
 export type ImageMaskDrawMode = 'paint' | 'erase'
 export type ImageMaskBrushShape = MaskPaintBrushShape

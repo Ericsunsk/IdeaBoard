@@ -112,6 +112,11 @@
             :image-editor-mode="
               flowImageEditorNodeId === nodeProps.id ? imageEditorMode : null
             "
+            :image-editor-filter-previews="
+              flowImageEditorNodeId === nodeProps.id && imageEditorMode === 'adjust'
+                ? imageAdjustmentFilterPreviews
+                : []
+            "
             :mask-editor-overlay-style="
               flowMaskEditorNodeId === nodeProps.id ? flowMaskEditorOverlayStyle : null
             "
@@ -204,6 +209,7 @@
         :image-editor-layers="imageEditorLayers"
         :selected-image-editor-layer-id="selectedImageEditorLayerId"
         :selected-image-editor-adjustment-layer="selectedImageEditorAdjustmentLayer"
+        :applying-image-editor-adjustments="isApplyingImageEditorAdjustments"
         :node-context-menu="nodeContextMenu"
         :canvas-node-menu-items="canvasNodeMenuItems"
         @set-draw-mode="setFlowMaskEditorDrawMode"
@@ -224,8 +230,12 @@
         @select-image-adjustment-layer="selectImageAdjustmentLayer"
         @select-image-editor-layer="selectImageEditorLayer"
         @set-image-editor-layer-visible="setImageEditorLayerVisible"
+        @add-image-editor-layer="addImageEditorLayer"
+        @copy-image-editor-layer="copyImageEditorLayer"
+        @merge-image-editor-layer="mergeImageEditorLayer"
         @remove-image-editor-layer="removeImageEditorLayer"
         @update-image-editor-param="updateSelectedImageEditorLayerParam"
+        @apply-image-editor-adjustments="onApplyImageEditorAdjustments"
         @submit="onMaskEditorChromeSubmit"
         @create-node="handleNodeContextMenuCreate"
       />
@@ -281,16 +291,21 @@ import { useFlowSnapshotNodeUpdater } from '../composables/useFlowSnapshotNodeUp
 import { useFlowImageNodeSnapshots } from '../composables/useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from '../composables/useFlowImageUploadActions'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
-import { useImageEditorMode } from '../composables/useImageEditorMode'
-import { useImageEditorSession } from '../composables/useImageEditorSession'
+import {
+  flattenVisibleImageEditorAdjustmentLayers,
+  renderImageAdjustmentFile,
+  useImageAdjustmentFilterPreviews,
+  useImageEditorMode,
+  useImageEditorSession,
+  useImageEditorViewportController,
+  type ImageEditorMode,
+} from '../image-editor'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowWorkspaceRuntime } from '../composables/useFlowWorkspaceRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
 import WorkspacePageChrome from '../components/WorkspacePageChrome.vue'
-import { useImageEditorViewportController } from '../composables/useImageEditorViewportController'
-import type { ImageEditorMode } from '../types/imageEditor'
 
 const appToast = useAppToast()
 const route = useRoute()
@@ -709,9 +724,70 @@ const {
   selectImageAdjustmentLayer,
   selectImageEditorLayer,
   setImageEditorLayerVisible,
+  addImageEditorLayer,
+  copyImageEditorLayer,
+  mergeImageEditorLayer,
   removeImageEditorLayer,
   updateSelectedImageEditorLayerParam,
 } = useImageEditorSession()
+
+const isApplyingImageEditorAdjustments = ref(false)
+const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
+const { imageAdjustmentFilterPreviews } =
+  useImageAdjustmentFilterPreviews({
+    isAdjustMode: isImageAdjustmentMode,
+    layers: imageEditorLayers,
+  })
+
+async function onApplyImageEditorAdjustments() {
+  if (isApplyingImageEditorAdjustments.value) return
+
+  const nodeId = flowImageEditorNodeId.value
+  if (!nodeId || imageEditorMode.value !== 'adjust') return
+
+  const boardId = currentBoardId.value
+  const source = getImageNodeDisplayPayload(nodeId)
+  const sourceNode = getImageNodeSnapshot(nodeId)
+  if (!source || !sourceNode) {
+    appToast.warning('当前图片不可调整')
+    return
+  }
+
+  const visibleAdjustmentLayers = flattenVisibleImageEditorAdjustmentLayers(imageEditorLayers.value)
+  if (visibleAdjustmentLayers.length === 0) {
+    appToast.warning('没有可应用的调整图层')
+    return
+  }
+
+  isApplyingImageEditorAdjustments.value = true
+  try {
+    const renderedFile = await renderImageAdjustmentFile(
+      { url: source.url, title: sourceNode.title || 'Image' },
+      visibleAdjustmentLayers,
+    )
+    if (currentBoardId.value !== boardId || flowImageEditorNodeId.value !== nodeId) return
+    const newNodeId = await createImageNodeFromFile(
+      {
+        x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
+        y: Number(sourceNode.y ?? 0) + 18,
+      },
+      renderedFile,
+    )
+    if (!newNodeId) return
+    onConnect({
+      source: nodeId,
+      sourceHandle: 'out:image',
+      target: newNodeId,
+      targetHandle: 'in:image',
+    })
+    exitImageEditorMode()
+    appToast.success('已应用调整并派生新节点')
+  } catch (error) {
+    appToast.warning(error instanceof Error ? error.message : '应用调整失败')
+  } finally {
+    isApplyingImageEditorAdjustments.value = false
+  }
+}
 
 function cancelFlowImageEditorMode() {
   exitImageEditorMode()

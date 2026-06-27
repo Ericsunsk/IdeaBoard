@@ -54,21 +54,11 @@
     </div>
 
     <div v-else-if="adjustmentLayer?.kind === 'curves'" class="image-editor-panel__body">
-      <ImageEditorSlider
-        label="输入"
-        :value="adjustmentLayer.params.input"
-        :min="0"
-        :max="100"
-        unit="%"
-        @update:value="emit('update-param', 'input', $event)"
-      />
-      <ImageEditorSlider
-        label="输出"
-        :value="adjustmentLayer.params.output"
-        :min="0"
-        :max="100"
-        unit="%"
-        @update:value="emit('update-param', 'output', $event)"
+      <ImageEditorCurvesControl
+        :input-value="adjustmentLayer.params.input"
+        :output-value="adjustmentLayer.params.output"
+        @update:input-value="emit('update-param', 'input', $event)"
+        @update:output-value="emit('update-param', 'output', $event)"
       />
     </div>
 
@@ -119,7 +109,8 @@ import type {
   ImageEditorAdjustmentLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
-} from '../../types/imageEditor'
+} from '../types'
+import ImageEditorCurvesControl from './ImageEditorCurvesControl.vue'
 import ImageEditorSlider from './ImageEditorSlider.vue'
 
 defineProps<{
