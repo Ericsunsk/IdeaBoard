@@ -15,7 +15,7 @@ import {
   fetchStorageBucketDomains,
   saveStorageProfile,
   testStorageProfile,
-} from '../../shared/queries/adminActions'
+} from '../../shared/queries/adminStorageActions'
 import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
 import {
   buildPayload,

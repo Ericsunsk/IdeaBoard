@@ -9,7 +9,7 @@ import type {
   MediaUploadSetting,
 } from '../../../../shared/api/generated-query/model'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { updateMediaUploadSetting } from '../queries/adminActions'
+import { updateMediaUploadSetting } from '../queries/adminSettingsActions'
 
 type AdminMediaUploadSettingsMessage = {
   error: (message: string) => void

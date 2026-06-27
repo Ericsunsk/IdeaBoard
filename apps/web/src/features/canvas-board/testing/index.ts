@@ -1,19 +1,10 @@
 import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  DEFAULT_FUSION_BLEND_POINT,
-  DEFAULT_FUSION_NODE_OUTPUT_COUNT,
-  DEFAULT_PROMPT_ASPECT_RATIO,
-  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
-  type CanvasConnection,
   type CanvasViewportState,
-  type FusionNodeItem,
   type ImageNodeItem,
   type ImageNodeOutputItem,
-  type PromptNodeInputImage,
-  type PromptNodeItem,
 } from '../domain'
 
 export function makeCanvasViewport(
@@ -31,17 +22,6 @@ function makeImageOutput(overrides: Partial<ImageNodeOutputItem> = {}): ImageNod
   return {
     url: 'https://example.com/output.png',
     ratio: 1,
-    ...overrides,
-  }
-}
-
-function makeNodeInputImage(overrides: Partial<PromptNodeInputImage> = {}): PromptNodeInputImage {
-  return {
-    id: 'input-1',
-    sourceType: 'node',
-    sourceId: 'image:1',
-    sourceNodeId: 'image-1',
-    ...makeImageOutput({ url: 'https://example.com/input.png' }),
     ...overrides,
   }
 }
@@ -73,52 +53,6 @@ export function makePendingImageNodeSnapshot(
   })
 }
 
-function makePromptNodeSnapshot(overrides: Partial<PromptNodeItem> = {}): PromptNodeItem {
-  return {
-    id: 2,
-    type: 'prompt',
-    x: 0,
-    y: 0,
-    width: 280,
-    text: 'prompt',
-    outputCount: DEFAULT_FUSION_NODE_OUTPUT_COUNT,
-    aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-    inputImages: [],
-    ...overrides,
-  }
-}
-
-function makeFusionNodeSnapshot(overrides: Partial<FusionNodeItem> = {}): FusionNodeItem {
-  return {
-    id: 3,
-    type: 'fusion',
-    x: 0,
-    y: 0,
-    width: 286,
-    prompt: 'fusion prompt',
-    outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-    aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-    blendPoint: { ...DEFAULT_FUSION_BLEND_POINT },
-    inputImages: [],
-    outputStatus: 'idle',
-    outputImages: [],
-    ...overrides,
-  }
-}
-
-function makeCanvasConnection(overrides: Partial<CanvasConnection> = {}): CanvasConnection {
-  return {
-    id: 1,
-    fromNodeType: 'image',
-    fromNodeId: 1,
-    fromPort: 'image',
-    toNodeType: 'fusion',
-    toNodeId: 3,
-    toPort: 'image',
-    ...overrides,
-  }
-}
-
 export function makeCanvasBoardSnapshot(
   overrides: Partial<CanvasBoardSnapshot> = {},
 ): CanvasBoardSnapshot {
@@ -137,28 +71,4 @@ export function makeCanvasBoardState(overrides: Partial<CanvasBoardState> = {}):
     previewSnapshotUpdatedAt: overrides.previewSnapshotUpdatedAt,
     previewSnapshotVersion: overrides.previewSnapshotVersion,
   }
-}
-
-function makePopulatedCanvasBoardState(
-  overrides: Partial<CanvasBoardState> = {},
-): CanvasBoardState {
-  const imageNode = makeImageNodeSnapshot({ id: 2 })
-  const promptNode = makePromptNodeSnapshot({ id: 3, title: 'Custom Prompt' })
-  const fusionNode = makeFusionNodeSnapshot({ id: 8 })
-  const connection = makeCanvasConnection({
-    id: 12,
-    fromNodeId: imageNode.id,
-    toNodeId: fusionNode.id,
-  })
-  return makeCanvasBoardState({
-    imageNodes: [imageNode],
-    promptNodes: [promptNode],
-    fusionNodes: [fusionNode],
-    connections: [connection],
-    previewSnapshotDataUrl: 'data:image/webp;base64,preview',
-    previewSnapshotUpdatedAt: 1,
-    previewSnapshotVersion: 1,
-    updatedAt: 1,
-    ...overrides,
-  })
 }

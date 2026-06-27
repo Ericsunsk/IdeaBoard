@@ -49,15 +49,22 @@ describe('canvasBoardStateSchema', () => {
   })
 
   it('rejects invalid state', () => {
-    const invalid = makeCanvasBoardState() as Record<string, any>
-    invalid.connections = [{ id: 1, fromNodeType: 'image', fromNodeId: 1, fromPort: 'image' }]
-    invalid.connections[0]!.toNodeType = 'unknown'
-    const parsed = v.safeParse(canvasBoardStateSchema, invalid)
+    const parsed = v.safeParse(canvasBoardStateSchema, {
+      ...makeCanvasBoardState(),
+      connections: [
+        {
+          id: 1,
+          fromNodeType: 'image',
+          fromNodeId: 1,
+          fromPort: 'image',
+          toNodeType: 'unknown',
+        },
+      ],
+    })
     expect(parsed.success).toBe(false)
   })
 
   it('applies fusion defaults', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test mutates fields not exposed by the typed interface to simulate partial data
     const state = makeCanvasBoardState({
       fusionNodes: [
         {
@@ -75,11 +82,14 @@ describe('canvasBoardStateSchema', () => {
           outputImages: [],
         },
       ],
-    }) as Record<string, any>
-    state.fusionNodes = [{ ...state.fusionNodes[0] }]
-    delete state.fusionNodes[0].blendPoint
-    delete state.fusionNodes[0].aspectRatio
-    const parsed = v.safeParse(canvasBoardStateSchema, state)
+    })
+    const [fusionNode] = state.fusionNodes
+    const { aspectRatio: _aspectRatio, blendPoint: _blendPoint, ...fusionNodeWithoutDefaults } =
+      fusionNode!
+    const parsed = v.safeParse(canvasBoardStateSchema, {
+      ...state,
+      fusionNodes: [fusionNodeWithoutDefaults],
+    })
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       expect(parsed.output.fusionNodes[0]?.blendPoint.x).toBe(0.5)

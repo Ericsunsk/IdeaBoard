@@ -16,7 +16,7 @@ import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessage
 import {
   updateRateLimitSettings,
   updateRegistrationSetting,
-} from '../queries/adminActions'
+} from '../queries/adminSettingsActions'
 
 type AdminAccessSettingsMessage = {
   error: (message: string) => void

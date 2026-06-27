@@ -26,7 +26,7 @@ import {
   validateSiteBrandingSetting,
   writeSiteBrandingQueryCache,
 } from '../../../../shared/composables/useSiteBranding'
-import { updateBrandingSetting } from '../queries/adminActions'
+import { updateBrandingSetting } from '../queries/adminSettingsActions'
 
 type AdminBrandingSettingsMessage = {
   error: (message: string) => void

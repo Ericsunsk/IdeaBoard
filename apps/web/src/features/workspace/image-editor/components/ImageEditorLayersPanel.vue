@@ -56,7 +56,7 @@ import {
 } from '@iconoir/vue'
 import type { ImageEditorLayer } from '../types'
 
-const props = defineProps<{
+defineProps<{
   layers: ImageEditorLayer[]
   selectedLayerId: string
 }>()

@@ -12,7 +12,7 @@ import {
   revokeAdminUserSessions,
   unbanAdminUser,
   updateAdminUserRole,
-} from '../../shared/queries/adminActions'
+} from '../../shared/queries/adminUserActions'
 import { getUserActionItems, isActiveUser, isAdminUser, type UserActionKey } from './adminUserView'
 
 type AdminUserActionsMessage = {

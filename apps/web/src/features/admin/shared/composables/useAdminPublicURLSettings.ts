@@ -9,7 +9,7 @@ import type {
   PublicURLSetting,
 } from '../../../../shared/api/generated-query/model'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { updatePublicURLSetting } from '../queries/adminActions'
+import { updatePublicURLSetting } from '../queries/adminSettingsActions'
 
 type AdminPublicURLSettingsMessage = {
   error: (message: string) => void

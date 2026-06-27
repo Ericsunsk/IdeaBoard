@@ -196,7 +196,7 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
 } from '../../shared/lib/adminUiClasses'
-import { saveFeaturePrompt } from '../../shared/queries/adminActions'
+import { saveFeaturePrompt } from '../../shared/queries/adminFeaturePromptActions'
 import {
   getListAdminFeaturePromptsQueryKey,
   useListAdminFeaturePrompts,

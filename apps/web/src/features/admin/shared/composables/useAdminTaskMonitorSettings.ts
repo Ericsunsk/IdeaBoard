@@ -9,7 +9,7 @@ import type {
   TaskMonitorSetting,
 } from '../../../../shared/api/generated-query/model'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { updateTaskMonitorSetting } from '../queries/adminActions'
+import { updateTaskMonitorSetting } from '../queries/adminSettingsActions'
 
 type AdminTaskMonitorSettingsMessage = {
   error: (message: string) => void
