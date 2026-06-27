@@ -1,4 +1,4 @@
-import type { CanvasNodeItem } from '../types/canvasNodes'
+import type { CanvasNodeItem } from '../../canvas-board/domain'
 
 type SnapshotMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
 type SnapshotOptions = { history?: boolean }

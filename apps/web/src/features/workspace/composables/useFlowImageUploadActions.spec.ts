@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ImageNodeItem } from '../types/canvasNodes'
+import type { ImageNodeItem } from '../../canvas-board/domain'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
 
 const mocks = vi.hoisted(() => ({

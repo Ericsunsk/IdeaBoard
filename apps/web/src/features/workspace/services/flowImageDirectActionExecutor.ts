@@ -14,12 +14,9 @@ import {
   EXECUTION_META,
   EXECUTION_PARTIAL_EDIT_META,
 } from '../config/executionContract'
-import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
 import { buildExecutionSizeParams, extendExecutionImageSize } from '../utils/executionSizeParams'
-import {
-  buildPromptAspectRatioTaskParams,
-  type PromptAspectRatio,
-} from '../config/promptAspectRatio'
+import { getCanvasNodeImageInputLimit, type PromptAspectRatio } from '../../canvas-board/domain'
+import { buildPromptAspectRatioTaskParams } from './promptAspectRatioTaskParams'
 import { assertTaskSubmitReady } from './flowTaskExecutorUtils'
 import type { ImageDirectActionSource } from '../utils/flowImageDirectActionSource'
 import {

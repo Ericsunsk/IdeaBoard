@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../workspace/utils/flowSnapshotAdapter'
+import { makeCanvasBoardSnapshot } from '../testing'
 import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BLANK_BOARD_PREVIEW_DOT_OFFSET, BLANK_BOARD_PREVIEW_DOT_RADIUS } from './boardPreviewStyle'
 
@@ -30,7 +30,7 @@ describe('renderBoardPreviewDataUrl', () => {
       (mimeType?: string) => `data:${mimeType || 'image/png'};base64,empty`,
     )
 
-    const result = await renderBoardPreviewDataUrl(createEmptyCanvasBoardSnapshot())
+    const result = await renderBoardPreviewDataUrl(makeCanvasBoardSnapshot())
 
     expect(result).toBe('data:image/avif;base64,empty')
     expect(context.fillRect).toHaveBeenCalledWith(0, 0, 760, 490)

@@ -1,7 +1,7 @@
 import { computed } from 'vue'
-import { renderBoardPreviewDataUrl } from '../../canvas/lib/boardPreviewSerializer'
-import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas/lib/boardPreviewVersion'
-import { setCanvasBoardPreviewSnapshot } from '../../canvas/lib/canvasBoardState'
+import { renderBoardPreviewDataUrl } from '../../canvas-board/preview'
+import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas-board/preview'
+import { setCanvasBoardPreviewSnapshot } from '../../canvas-board/persistence'
 import { syncCanvasBoardToServer } from '../../boards/lib/boardSync'
 import { getCanvasBoardById } from '../../boards/lib/canvasBoards'
 import {
@@ -12,12 +12,11 @@ import { saveBoardSnapshotFromFlow } from '../services/flowBoardSnapshotSaver'
 import { createFlowWorkspaceUploadLifecycle } from '../services/flowWorkspaceUploadLifecycle'
 import {
   canvasBoardSnapshotToFlow,
-  createEmptyCanvasBoardSnapshot,
   flowToCanvasBoardSnapshot,
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from '../utils/flowSnapshotAdapter'
-import type { CanvasBoardSnapshot } from '../types/canvasNodes'
+import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 type ValueRef<T> = { value: T }

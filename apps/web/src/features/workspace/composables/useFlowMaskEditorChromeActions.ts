@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { clampImageNodeOutputCount } from '../types/canvasNodes'
+import { clampImageNodeOutputCount } from '../../canvas-board/domain'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 type OutputCountParamPatch = Extract<FlowSnapshotParamPatch, { key: 'outputCount' }>

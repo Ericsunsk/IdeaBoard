@@ -1,7 +1,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
-import type { PromptAspectRatio } from '../../../config/promptAspectRatio'
-import { normalizePromptAspectRatio } from '../../../config/promptAspectRatio'
-import { clampImageNodeOutputCount } from '../../../types/canvasNodes'
+import type { PromptAspectRatio } from '../../../../canvas-board/domain'
+import { normalizePromptAspectRatio } from '../../../../canvas-board/domain'
+import { clampImageNodeOutputCount } from '../../../../canvas-board/domain'
 import { useAutoResizeTextarea } from './useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
 

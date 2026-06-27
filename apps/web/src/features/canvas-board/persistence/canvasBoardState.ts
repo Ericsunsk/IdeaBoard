@@ -1,30 +1,11 @@
+import * as v from 'valibot'
 import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  canvasBoardStateSchema,
   type CanvasBoardSnapshot,
-  type CanvasConnection,
-  type CanvasViewportState,
-  type FusionNodeItem,
-  type ImageNodeItem,
-  type ImageNodeOutputItem,
-  type PromptNodeItem,
-} from '../../workspace/types/canvasNodes'
-import * as v from 'valibot'
+  type CanvasBoardState,
+} from '../domain'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
-import { canvasBoardStateSchema } from './canvasBoardStateSchema'
-
-export type CanvasBoardStatePromptNode = PromptNodeItem
-export type CanvasBoardStateImageNodeOutput = ImageNodeOutputItem
-export type CanvasBoardStateImageNode = ImageNodeItem
-export type CanvasBoardStateFusionNode = FusionNodeItem
-export type CanvasBoardStateConnection = CanvasConnection
-export type CanvasBoardStateViewport = CanvasViewportState
-
-export interface CanvasBoardState extends CanvasBoardSnapshot {
-  previewSnapshotDataUrl?: string
-  previewSnapshotUpdatedAt?: number
-  previewSnapshotVersion?: number
-  updatedAt: number
-}
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boardStates.v2'
 
@@ -74,22 +55,6 @@ function stripPreviewSnapshot(state: CanvasBoardState): CanvasBoardState {
     connections: state.connections,
     viewport: state.viewport,
     updatedAt: state.updatedAt,
-  }
-}
-
-export function createEmptyCanvasBoardState(updatedAt = Date.now()): CanvasBoardState {
-  return {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    imageNodes: [],
-    promptNodes: [],
-    fusionNodes: [],
-    connections: [],
-    viewport: {
-      canvasX: 0,
-      canvasY: 0,
-      zoomLevel: 100,
-    },
-    updatedAt,
   }
 }
 

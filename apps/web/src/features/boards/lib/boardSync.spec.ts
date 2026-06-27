@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserBoardItem } from '../../../shared/api/board'
-import type { CanvasBoardState } from '../../canvas/lib/canvasBoardState'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../workspace/types/canvasNodes'
+import type { CanvasBoardState } from '../../canvas-board/domain'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../canvas-board/domain'
+import { makeCanvasBoardState, makeCanvasViewport } from '../../canvas-board/testing'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
-import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas/lib/canvasBoardState'
+import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas-board/persistence'
 import { listCanvasBoards, replaceCanvasBoards } from './canvasBoards'
 import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from './boardSync'
 
@@ -23,15 +24,7 @@ vi.mock('../../../shared/api/board', () => ({
 }))
 
 function makeState(updatedAt: number, zoomLevel: number): CanvasBoardState {
-  return {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    imageNodes: [],
-    promptNodes: [],
-    fusionNodes: [],
-    connections: [],
-    viewport: { canvasX: 0, canvasY: 0, zoomLevel },
-    updatedAt,
-  }
+  return makeCanvasBoardState({ updatedAt, viewport: makeCanvasViewport({ zoomLevel }) })
 }
 
 function makeRemoteBoard(params: {

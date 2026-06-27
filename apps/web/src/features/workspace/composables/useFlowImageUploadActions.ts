@@ -1,11 +1,10 @@
-import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
-import type { CanvasNodeItem, ImageNodeItem } from '../types/canvasNodes'
+import type { CanvasCreatableNodeKind, CanvasNodeItem, ImageNodeItem } from '../../canvas-board/domain'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
-import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
+import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
 import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 
 type FlowImageUploadResult = { url: string; ratio: number }

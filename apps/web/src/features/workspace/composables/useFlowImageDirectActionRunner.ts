@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { ImageNodeItem } from '../types/canvasNodes'
+import type { ImageNodeItem } from '../../canvas-board/domain'
 import { waitExistingOrLiveTaskImageResults } from '../services/flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from '../utils/imageSize'
 import { readCurrentBoardId } from '../utils/currentBoardId'

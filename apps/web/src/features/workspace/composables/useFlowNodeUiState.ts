@@ -1,13 +1,15 @@
 import { computed, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import {
-  formatCanvasNodePortLabel,
-  getCanvasNodeExecutionActionLabels,
   getCanvasNodePrimaryOutputPort,
   getCanvasNodeRequiredInputPorts,
   getCanvasNodeVisibleInputPorts,
   isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
+} from '../../canvas-board/domain'
+import {
+  formatCanvasNodePortLabel,
+  getCanvasNodeExecutionActionLabels,
 } from '../config/canvasNodeRegistry'
 import {
   resolveWorkflowNodeOutputStatus,
@@ -16,7 +18,7 @@ import {
   type CanvasExecutionOutputNodeItem,
   type CanvasExecutionOutputNodeType,
   type CanvasNodeItem,
-} from '../types/canvasNodes'
+} from '../../canvas-board/domain'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
 

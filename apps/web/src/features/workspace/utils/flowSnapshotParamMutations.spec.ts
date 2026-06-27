@@ -4,8 +4,8 @@ import type {
   ImageNodeItem,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../types/canvasNodes'
-import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
+} from '../../canvas-board/domain'
+import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
 import { patchFlowSnapshotParam } from './flowSnapshotParamMutations'
 
 function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {

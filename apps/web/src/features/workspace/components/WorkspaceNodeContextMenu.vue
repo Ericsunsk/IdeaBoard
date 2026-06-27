@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
+import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 
 const props = defineProps<{
   visible: boolean

@@ -2,13 +2,13 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { watch } from 'vue'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
-import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
 import type {
   CanvasNodeItem,
   FusionNodeItem,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../types/canvasNodes'
+} from '../../canvas-board/domain'
+import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
 
 export type MediaInputImage = {
   id: string

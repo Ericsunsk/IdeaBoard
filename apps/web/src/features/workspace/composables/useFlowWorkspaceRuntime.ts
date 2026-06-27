@@ -4,7 +4,7 @@ import { useFlowHistory } from './useFlowHistory'
 import { useFlowTransactions } from './useFlowTransactions'
 import { useFlowBoardPersistence } from './useFlowBoardPersistence'
 import { useFlowAutosave } from './useFlowAutosave'
-import type { CanvasBoardSnapshot } from '../types/canvasNodes'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 

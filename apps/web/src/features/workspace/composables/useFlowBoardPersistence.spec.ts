@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
+import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
 import { useFlowBoardPersistence } from './useFlowBoardPersistence'
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ vi.mock('../services/flowWorkspaceUploadLifecycle', () => ({
   })),
 }))
 
-vi.mock('../../canvas/lib/boardPreviewSerializer', () => ({
+vi.mock('../../canvas-board/preview', () => ({
   renderBoardPreviewDataUrl: vi.fn(async () => ''),
 }))
 

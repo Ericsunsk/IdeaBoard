@@ -1,12 +1,7 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
-import {
-  getCanvasNodePortInputLimit,
-  getDefaultCanvasNodeTitle,
-  isCanvasExecutionOutputNodeType,
-  type CanvasCreatableNodeKind,
-} from '../config/canvasNodeRegistry'
+import { getDefaultCanvasNodeTitle } from '../config/canvasNodeRegistry'
 import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import {
@@ -16,7 +11,13 @@ import {
 import { useFlowConnectionMutations } from './useFlowConnectionMutations'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransactions'
-import type { CanvasNodeItem, CanvasNodeItemByKind } from '../types/canvasNodes'
+import {
+  getCanvasNodePortInputLimit,
+  isCanvasExecutionOutputNodeType,
+  type CanvasCreatableNodeKind,
+  type CanvasNodeItem,
+  type CanvasNodeItemByKind,
+} from '../../canvas-board/domain'
 
 type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations

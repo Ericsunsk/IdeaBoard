@@ -159,7 +159,7 @@ import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtend
 import type { ImageEditorFilterPreview, ImageEditorMode } from '../image-editor'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
-import type { PromptAspectRatio } from '../config/promptAspectRatio'
+import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 const props = withDefaults(

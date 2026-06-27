@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
+import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import type { DismissTransientWorkspaceUi } from './useFlowTransientUiDismissal'
 
 type FlowTool = 'select' | 'hand' | 'text'

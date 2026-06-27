@@ -5,7 +5,7 @@ import {
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from './flowSnapshotAdapter'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../types/canvasNodes'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../canvas-board/domain'
 
 function makeImageFlowNode(params: {
   flowId: string

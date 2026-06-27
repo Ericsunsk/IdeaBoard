@@ -185,10 +185,10 @@ import {
   duplicateCanvasBoardState,
   getCanvasBoardState,
   setCanvasBoardPreviewSnapshot,
-} from '../../canvas/lib/canvasBoardState'
-import { blankBoardPreviewSurfaceClass } from '../../canvas/lib/boardPreviewStyle'
-import { renderBoardPreviewDataUrl } from '../../canvas/lib/boardPreviewSerializer'
-import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas/lib/boardPreviewVersion'
+} from '../../canvas-board/persistence'
+import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
+import { renderBoardPreviewDataUrl } from '../../canvas-board/preview'
+import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas-board/preview'
 import {
   hydrateCanvasBoardsFromServer,
   isBoardNameConflictError,

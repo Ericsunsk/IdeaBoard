@@ -8,11 +8,10 @@ import {
   type CanvasBoardMeta,
 } from './canvasBoards'
 import {
-  createEmptyCanvasBoardState,
   getCanvasBoardState,
   replaceCanvasBoardStateMap,
-  type CanvasBoardState,
-} from '../../canvas/lib/canvasBoardState'
+} from '../../canvas-board/persistence'
+import { createEmptyCanvasBoardState, type CanvasBoardState } from '../../canvas-board/domain'
 
 export type HydrateCanvasBoardsFromServerResult = { ok: true } | { ok: false; error: unknown }
 

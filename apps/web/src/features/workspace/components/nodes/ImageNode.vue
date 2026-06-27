@@ -94,7 +94,7 @@
 <script setup lang="ts">
 import { computed, ref, watchPostEffect, type ComponentPublicInstance } from 'vue'
 import { MediaImage } from '@iconoir/vue'
-import { clampImageNodeOutputCount, type ImageNodeItem } from '../../types/canvasNodes'
+import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { ImageNodeAction, ImageStrengthAction } from '../../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageEditorFilterPreview, ImageEditorMode } from '../../image-editor'

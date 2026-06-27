@@ -1,15 +1,15 @@
 import type {
   CanvasBoardSnapshot,
   CanvasConnectionNodeType,
-} from '../../workspace/types/canvasNodes'
+} from '../../canvas-board/domain'
 import {
   DEFAULT_FUSION_BLEND_POINT,
   FUSION_SLOT_LAYOUT,
   getFusionLineAnchors,
   getFusionSlotAnchors,
   normalizeFusionBlendPoint,
-} from '../../workspace/utils/fusionBlend'
-import { resolveImageNodeStageHeight } from '../../workspace/utils/imageNodeSizing'
+  resolveImageNodeStageHeight,
+} from '../domain'
 import { resolveApiUrl, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import {
   BLANK_BOARD_PREVIEW_BACKGROUND,

@@ -133,7 +133,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { clampImageNodeOutputCount } from '../../types/canvasNodes'
+import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type {
   ImageEditorChannelLutPreview,

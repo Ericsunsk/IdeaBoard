@@ -1,9 +1,5 @@
-import { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio } from '../config/promptAspectRatio'
-import {
-  DEFAULT_FUSION_BLEND_POINT,
-  normalizeFusionBlendPoint,
-  type FusionBlendPoint,
-} from '../utils/fusionBlend'
+import { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio } from './promptAspectRatio'
+import { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint } from './fusionBlend'
 
 export interface CanvasPoint {
   x: number
@@ -28,7 +24,7 @@ export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 1
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
 export { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint }
 
-export function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
+function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
   return (
     typeof value === 'string' &&
     WORKFLOW_NODE_OUTPUT_STATUSES.includes(value as WorkflowNodeOutputStatus)
@@ -55,10 +51,6 @@ export function clampImageNodeOutputCount(value: unknown): number {
     return DEFAULT_IMAGE_NODE_OUTPUT_COUNT
   }
   return Math.max(MIN_IMAGE_NODE_OUTPUT_COUNT, Math.min(MAX_IMAGE_NODE_OUTPUT_COUNT, count))
-}
-
-export function clampFusionBlendPoint(value: unknown): FusionBlendPoint {
-  return normalizeFusionBlendPoint(value)
 }
 
 export interface PromptNodeItem {
@@ -122,10 +114,6 @@ export type CanvasExecutionOutputNodeType = 'fusion'
 
 export type CanvasExecutionOutputNodeItem = FusionNodeItem
 
-export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
-
-export type CanvasImageOutputNodeItem = ImageNodeItem | CanvasExecutionOutputNodeItem
-
 export type CanvasConnectionNodeType = 'image' | 'prompt' | 'fusion'
 
 export type CanvasConnectionPort = 'image' | 'prompt'
@@ -161,4 +149,33 @@ export interface CanvasBoardSnapshot {
   fusionNodes: FusionNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState
+}
+
+export interface CanvasBoardState extends CanvasBoardSnapshot {
+  previewSnapshotDataUrl?: string
+  previewSnapshotUpdatedAt?: number
+  previewSnapshotVersion?: number
+  updatedAt: number
+}
+
+export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
+  return {
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+    imageNodes: [],
+    promptNodes: [],
+    fusionNodes: [],
+    connections: [],
+    viewport: {
+      canvasX: 0,
+      canvasY: 0,
+      zoomLevel: 100,
+    },
+  }
+}
+
+export function createEmptyCanvasBoardState(updatedAt = Date.now()): CanvasBoardState {
+  return {
+    ...createEmptyCanvasBoardSnapshot(),
+    updatedAt,
+  }
 }

@@ -240,7 +240,7 @@ import type {
   ImageMaskBrushShape,
   ImageMaskDrawMode,
 } from '../../composables/useImageMaskEditorOverlay'
-import { clampImageNodeOutputCount } from '../../types/canvasNodes'
+import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import ImageEditorChromeFrame from './ImageEditorChromeFrame.vue'
 import NodeToolIconButton from './NodeToolIconButton.vue'
 import PromptTextComposer from './PromptTextComposer.vue'

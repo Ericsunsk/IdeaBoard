@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { FlowNodeData } from '../types/flowTypes'
-import type { ImageNodeItem } from '../types/canvasNodes'
+import type { ImageNodeItem } from '../../canvas-board/domain'
 import { useFlowImageDirectActions } from './useFlowImageDirectActions'
 
 const mocks = vi.hoisted(() => ({

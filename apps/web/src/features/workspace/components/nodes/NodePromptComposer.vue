@@ -54,7 +54,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { SendDiagonalSolid } from '@iconoir/vue'
-import type { PromptAspectRatio } from '../../config/promptAspectRatio'
+import type { PromptAspectRatio } from '../../../canvas-board/domain'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import { usePromptComposerControls } from './composables/usePromptComposerControls'

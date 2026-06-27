@@ -1,10 +1,8 @@
 import { taskApi, type SubmitTaskData } from '../../../shared/api/task'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { buildExecutionTaskRequest, EXECUTION_FUSION_META } from '../config/executionContract'
-import {
-  buildPromptAspectRatioTaskParams,
-  type PromptAspectRatio,
-} from '../config/promptAspectRatio'
+import type { PromptAspectRatio } from '../../canvas-board/domain'
+import { buildPromptAspectRatioTaskParams } from './promptAspectRatioTaskParams'
 import {
   IMAGE_ACTION_MODE,
   IMAGE_ACTION_REGISTRY,

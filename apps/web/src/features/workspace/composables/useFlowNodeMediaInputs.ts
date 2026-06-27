@@ -1,6 +1,6 @@
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
-import type { CanvasNodeItem } from '../types/canvasNodes'
-import { IMAGE_NODE_EMPTY_SIZE } from '../utils/imageNodeSizing'
+import type { CanvasNodeItem } from '../../canvas-board/domain'
+import { IMAGE_NODE_EMPTY_SIZE } from '../../canvas-board/domain'
 
 type UseFlowNodeMediaInputsOptions = {
   applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>

@@ -1,8 +1,9 @@
 import {
   createTypedCanvasNodeSnapshot,
   type CanvasCreatableNodeKind,
-} from '../config/canvasNodeRegistry'
-import type { CanvasNodeItemByKind, CanvasPoint } from '../types/canvasNodes'
+  type CanvasNodeItemByKind,
+  type CanvasPoint,
+} from '../../canvas-board/domain'
 
 function createCanvasEntityId(): number {
   return Date.now() + Math.random()

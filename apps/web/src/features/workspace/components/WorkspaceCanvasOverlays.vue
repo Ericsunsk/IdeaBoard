@@ -71,7 +71,7 @@ import type {
   ImageMaskBrushShape,
   ImageMaskDrawMode,
 } from '../composables/useImageMaskEditorOverlay'
-import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
+import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { ImageEditorChrome } from '../image-editor'
 import type {
   ImageAdjustmentKind,

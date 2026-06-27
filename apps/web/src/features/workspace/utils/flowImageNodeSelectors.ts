@@ -1,4 +1,4 @@
-import type { ImageNodeItem, ImageNodeOutputItem } from '../types/canvasNodes'
+import type { ImageNodeItem, ImageNodeOutputItem } from '../../canvas-board/domain'
 
 export type ImageNodeDisplayPayload = {
   url: string

@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
-import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../types/canvasNodes'
+import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../../canvas-board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 
 interface MessageLoadingHandle {

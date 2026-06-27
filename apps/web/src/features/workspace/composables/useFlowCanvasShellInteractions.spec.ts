@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
+import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { useFlowCanvasShellInteractions } from './useFlowCanvasShellInteractions'
 
 function createCanvasElement() {

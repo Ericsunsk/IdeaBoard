@@ -1,5 +1,3 @@
-import type { SubmitTaskParams } from '../../../shared/api/task'
-
 export const PROMPT_ASPECT_RATIO_OPTIONS = ['auto', '1:1', '3:4', '4:3', '9:16', '16:9'] as const
 
 export type PromptAspectRatio = (typeof PROMPT_ASPECT_RATIO_OPTIONS)[number]
@@ -28,11 +26,4 @@ export function resolvePromptAspectRatioValue(ratio: PromptAspectRatio): number 
     default:
       return null
   }
-}
-
-export function buildPromptAspectRatioTaskParams(
-  ratio: PromptAspectRatio,
-): Pick<SubmitTaskParams, 'ratio'> {
-  if (ratio === 'auto') return {}
-  return { ratio }
 }

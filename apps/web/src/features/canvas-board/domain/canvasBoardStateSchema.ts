@@ -1,21 +1,16 @@
 import * as v from 'valibot'
 import {
   DEFAULT_FUSION_BLEND_POINT,
+  DEFAULT_FUSION_NODE_OUTPUT_COUNT,
   DEFAULT_PROMPT_ASPECT_RATIO,
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   MAX_IMAGE_NODE_OUTPUT_COUNT,
   MIN_IMAGE_NODE_OUTPUT_COUNT,
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   type CanvasBoardSnapshot,
-} from '../../workspace/types/canvasNodes'
-import { PROMPT_ASPECT_RATIO_OPTIONS } from '../../workspace/config/promptAspectRatio'
-
-type PersistedCanvasBoardState = CanvasBoardSnapshot & {
-  previewSnapshotDataUrl?: string
-  previewSnapshotUpdatedAt?: number
-  previewSnapshotVersion?: number
-  updatedAt: number
-}
+  type CanvasBoardState,
+} from './canvasNodes'
+import { PROMPT_ASPECT_RATIO_OPTIONS } from './promptAspectRatio'
 
 const finiteNumberSchema = v.pipe(v.number(), v.finite())
 
@@ -86,7 +81,7 @@ const fusionNodeItemSchema = v.strictObject({
   width: finiteNumberSchema,
   title: v.optional(v.string()),
   prompt: v.optional(v.string(), ''),
-  outputCount: v.optional(outputCountSchema, DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  outputCount: v.optional(outputCountSchema, DEFAULT_FUSION_NODE_OUTPUT_COUNT),
   aspectRatio: v.optional(v.picklist(PROMPT_ASPECT_RATIO_OPTIONS), DEFAULT_PROMPT_ASPECT_RATIO),
   blendPoint: v.optional(
     v.strictObject({
@@ -145,5 +140,5 @@ const canvasBoardStateShape = v.strictObject({
 
 export const canvasBoardStateSchema = canvasBoardStateShape satisfies v.GenericSchema<
   unknown,
-  PersistedCanvasBoardState
+  CanvasBoardState
 >

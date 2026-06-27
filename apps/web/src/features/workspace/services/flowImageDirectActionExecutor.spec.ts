@@ -9,7 +9,7 @@ import {
   waitExistingOrLiveTaskImageResults,
 } from './flowImageDirectActionExecutor'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
-import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
+import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),

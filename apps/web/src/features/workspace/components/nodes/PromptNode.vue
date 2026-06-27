@@ -71,14 +71,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChatLines, Plus } from '@iconoir/vue'
-import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
+import { clampImageNodeOutputCount, type PromptNodeItem } from '../../../canvas-board/domain'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import NodeShell from './NodeShell.vue'
 import NodeStageFrame from './NodeStageFrame.vue'
 import PromptTextComposer from './PromptTextComposer.vue'
 import { useImageInputSlots } from './composables/useImageInputSlots'
-import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../config/promptAspectRatio'
+import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../canvas-board/domain'
 
 const props = defineProps<{
   node: PromptNodeItem

@@ -1,5 +1,5 @@
 import { onBeforeUnmount } from 'vue'
-import type { ImageNodeItem, ImageNodeOutputItem } from '../types/canvasNodes'
+import type { ImageNodeItem, ImageNodeOutputItem } from '../../canvas-board/domain'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import 'photoswipe/style.css'
 

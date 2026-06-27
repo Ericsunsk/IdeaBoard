@@ -4,10 +4,14 @@ import { createCanvasBoard } from '../../boards/lib/canvasBoards'
 import {
   getCanvasBoardState,
   replaceCanvasBoardStateMap,
-  type CanvasBoardState,
-} from '../../canvas/lib/canvasBoardState'
-import type { CanvasBoardSnapshot } from '../types/canvasNodes'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../types/canvasNodes'
+} from '../../canvas-board/persistence'
+import type { CanvasBoardState } from '../../canvas-board/domain'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import {
+  makeCanvasBoardSnapshot,
+  makeCanvasBoardState,
+  makeCanvasViewport,
+} from '../../canvas-board/testing'
 import { saveBoardSnapshotFromFlow } from './flowBoardSnapshotSaver'
 
 const mocks = vi.hoisted(() => {
@@ -26,24 +30,17 @@ vi.mock('../../../shared/api/board', () => ({
 }))
 
 function makeSnapshot(zoomLevel: number): CanvasBoardSnapshot {
-  return {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    imageNodes: [],
-    promptNodes: [],
-    fusionNodes: [],
-    connections: [],
-    viewport: { canvasX: 0, canvasY: 0, zoomLevel },
-  }
+  return makeCanvasBoardSnapshot({ viewport: makeCanvasViewport({ zoomLevel }) })
 }
 
 function makeState(updatedAt: number, zoomLevel: number): CanvasBoardState {
-  return {
+  return makeCanvasBoardState({
     ...makeSnapshot(zoomLevel),
     previewSnapshotDataUrl: 'data:image/webp;base64,preview',
     previewSnapshotUpdatedAt: updatedAt,
     previewSnapshotVersion: 1,
     updatedAt,
-  }
+  })
 }
 
 describe('saveBoardSnapshotFromFlow', () => {

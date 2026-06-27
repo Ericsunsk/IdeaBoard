@@ -1,7 +1,7 @@
 import type { LocationQueryValue } from 'vue-router'
-import { getCanvasBoardState } from '../../canvas/lib/canvasBoardState'
+import { getCanvasBoardState } from '../../canvas-board/persistence'
 import { hydrateCanvasBoardsFromServer } from '../../boards/lib/boardSync'
-import type { CanvasBoardSnapshot } from '../types/canvasNodes'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 
 export function resolveBoardIdFromQueryValue(
   raw: LocationQueryValue | LocationQueryValue[] | null | undefined,

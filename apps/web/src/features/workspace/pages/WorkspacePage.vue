@@ -258,14 +258,16 @@ import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcut
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
 import { useFlowNodeMutations } from '../composables/useFlowNodeMutations'
-import type { CanvasCreatableNodeKind } from '../config/canvasNodeRegistry'
 import { useFlowImageDirectActions } from '../composables/useFlowImageDirectActions'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
-import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
-import { type CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
+import {
+  createEmptyCanvasBoardSnapshot,
+  type CanvasBoardSnapshot,
+  type CanvasCreatableNodeKind,
+} from '../../canvas-board/domain'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'

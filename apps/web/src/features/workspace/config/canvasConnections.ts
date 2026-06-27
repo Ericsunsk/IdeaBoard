@@ -1,9 +1,10 @@
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
+  type CanvasConnectionNodeType,
+  type CanvasConnectionPort,
   type CanvasConnectionContractNode,
-} from './canvasNodeRegistry'
-import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
+} from '../../canvas-board/domain'
 
 export type CanvasConnectionTone = 'image' | 'prompt'
 

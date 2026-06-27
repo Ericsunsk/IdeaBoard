@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IMAGE_OUTPUT_COUNT_PRESET_OPTIONS } from '../../types/canvasNodes'
+import { IMAGE_OUTPUT_COUNT_PRESET_OPTIONS } from '../../../canvas-board/domain'
 import NodeToolPopover from './NodeToolPopover.vue'
 
 const props = withDefaults(

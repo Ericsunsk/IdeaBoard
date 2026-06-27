@@ -2,9 +2,9 @@ import {
   collectCanvasBoardImageUrls,
   getCanvasBoardState,
   isImageUrlReferencedInOtherCanvasBoardStates,
-} from '../../canvas/lib/canvasBoardState'
+} from '../../canvas-board/persistence'
 import { uploadApi } from '../../../shared/api/upload'
-import type { CanvasBoardSnapshot } from '../types/canvasNodes'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from './flowMediaIO'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 

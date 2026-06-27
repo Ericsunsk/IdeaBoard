@@ -62,8 +62,8 @@ import { Handle, Position } from '@vue-flow/core'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
-} from '../config/canvasNodeRegistry'
-import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
+} from '../../canvas-board/domain'
+import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../../canvas-board/domain'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 

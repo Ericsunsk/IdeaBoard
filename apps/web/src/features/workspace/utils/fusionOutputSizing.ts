@@ -1,5 +1,5 @@
-import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../config/promptAspectRatio'
-import { computeFusionBlendWeights, type FusionBlendPoint } from './fusionBlend'
+import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../../canvas-board/domain'
+import { computeFusionBlendWeights, type FusionBlendPoint } from '../../canvas-board/domain'
 
 export type FusionOutputImageSize = {
   width: number

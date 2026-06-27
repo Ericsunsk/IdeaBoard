@@ -1,21 +1,19 @@
-import type {
-  CanvasBoardSnapshot,
-  CanvasConnection,
-  CanvasConnectionNodeType,
-  CanvasConnectionPort,
-  CanvasNodeItem,
-  ImageNodeItem,
-} from '../types/canvasNodes'
-import type { FlowNodeData } from '../types/flowTypes'
 import {
   CANVAS_NODE_REGISTRY_LIST,
+  createEmptyCanvasBoardSnapshot,
   getCanvasNodePortInputLimit,
   getCanvasNodeSnapshotCollectionKey,
-  getDefaultCanvasNodeTitle,
   isCanvasConnectionNodeType,
   type CanvasSnapshotNodeCollectionKey,
-} from '../config/canvasNodeRegistry'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../types/canvasNodes'
+  type CanvasBoardSnapshot,
+  type CanvasConnection,
+  type CanvasConnectionNodeType,
+  type CanvasConnectionPort,
+  type CanvasNodeItem,
+  type ImageNodeItem,
+} from '../../canvas-board/domain'
+import type { FlowNodeData } from '../types/flowTypes'
+import { getDefaultCanvasNodeTitle } from '../config/canvasNodeRegistry'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
@@ -44,21 +42,6 @@ function clone<T>(value: T): T {
 
 function cloneSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {
   return clone(snapshot)
-}
-
-export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
-  return {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    imageNodes: [],
-    promptNodes: [],
-    fusionNodes: [],
-    connections: [],
-    viewport: {
-      canvasX: 0,
-      canvasY: 0,
-      zoomLevel: 100,
-    },
-  }
 }
 
 function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {

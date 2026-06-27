@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import { clampImageNodeOutputCount } from '../types/canvasNodes'
+import { clampImageNodeOutputCount } from '../../canvas-board/domain'
 import {
   containImageRect,
   createCanvasExtendRect,

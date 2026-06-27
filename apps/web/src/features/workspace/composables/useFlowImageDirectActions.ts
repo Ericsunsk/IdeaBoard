@@ -2,16 +2,17 @@ import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import {
   clampImageNodeOutputCount,
+  getCanvasNodeImageInputLimit,
+  normalizePromptAspectRatio,
+  resolveImageNodeFrameSize,
   type FusionNodeItem,
   type ImageNodeItem,
-} from '../types/canvasNodes'
-import { normalizePromptAspectRatio, type PromptAspectRatio } from '../config/promptAspectRatio'
+  type PromptAspectRatio,
+} from '../../canvas-board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import { uploadApi } from '../../../shared/api/upload'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { EXECUTION_FUSION_META } from '../config/executionContract'
-import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
-import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
 import { resolveFusionOutputSize } from '../utils/fusionOutputSizing'
 import {
   cleanupFlowLocalInpaintAssets,

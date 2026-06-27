@@ -1,7 +1,7 @@
 import { syncCanvasBoardToServer } from '../../boards/lib/boardSync'
 import { getCanvasBoardById, touchCanvasBoard } from '../../boards/lib/canvasBoards'
-import { setCanvasBoardState } from '../../canvas/lib/canvasBoardState'
-import type { CanvasBoardSnapshot } from '../types/canvasNodes'
+import { setCanvasBoardState } from '../../canvas-board/persistence'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 
 export async function saveBoardSnapshotFromFlow(
   boardId: string,

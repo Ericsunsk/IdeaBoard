@@ -1,20 +1,20 @@
-import type { PromptAspectRatio } from '../config/promptAspectRatio'
-import { getCanvasNodeImageInputLimit } from '../config/canvasNodeRegistry'
-import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
-import { clampImageNodeOutputCount } from '../types/canvasNodes'
 import type {
   CanvasNodeItem,
   FusionNodeItem,
   ImageNodeItem,
+  PromptAspectRatio,
   PromptNodeInputImage,
   PromptNodeItem,
-} from '../types/canvasNodes'
+} from '../../canvas-board/domain'
 import {
   areFusionBlendPointsEqual,
+  clampImageNodeOutputCount,
   constrainFusionBlendPoint,
+  getCanvasNodeImageInputLimit,
+  normalizePromptAspectRatio,
   normalizeFusionBlendPoint,
   type FusionBlendPoint,
-} from './fusionBlend'
+} from '../../canvas-board/domain'
 
 export type FlowSnapshotParamPatch =
   | { key: 'title'; value: string }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import type { FusionNodeItem, ImageNodeItem } from '../types/canvasNodes'
+import type { FusionNodeItem, ImageNodeItem } from '../../canvas-board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useFlowNodeUiState } from './useFlowNodeUiState'
 

@@ -1,5 +1,5 @@
-import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
-import type { PromptAspectRatio } from '../config/promptAspectRatio'
+import { normalizePromptAspectRatio } from '../../canvas-board/domain'
+import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { MediaInputImage } from './useFlowMediaInputImages'
 
 type UseFlowPromptGenerationOrchestratorOptions = {

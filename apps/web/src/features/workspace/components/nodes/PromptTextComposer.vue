@@ -80,7 +80,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Plus, SendDiagonalSolid } from '@iconoir/vue'
-import type { PromptAspectRatio } from '../../config/promptAspectRatio'
+import type { PromptAspectRatio } from '../../../canvas-board/domain'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'

@@ -1,9 +1,14 @@
-import type { CanvasConnectionNodeType, ImageNodeItem, ImageNodeOutputItem } from '../types/canvasNodes'
 import {
   isCanvasConnectionNodeType,
   isCanvasImageInputSourceNodeType,
-} from '../config/canvasNodeRegistry'
-import { taskApi, type SubmitTaskData } from '../../../shared/api/task'
+  type CanvasConnectionNodeType,
+  type ImageNodeItem,
+  type ImageNodeOutputItem,
+} from '../../canvas-board/domain'
+import {
+  taskApi,
+  type SubmitTaskData,
+} from '../../../shared/api/task'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { resolveImageNodeDisplayRatio, resolveImageNodeDisplayUrl } from '../utils/flowImageNodeSelectors'
 

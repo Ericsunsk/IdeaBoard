@@ -1,8 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
-import { clampImageNodeOutputCount } from '../../types/canvasNodes'
-import { getCanvasNodeImageInputLimit } from '../../config/canvasNodeRegistry'
+import { clampImageNodeOutputCount, getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
 import { IMAGE_EDITOR_CHROME_LAYOUT, getImageEditorChromeOutset } from '../config/imageEditorChrome'
 import { waitForNextAnimationFrame } from '../../utils/animationFrame'
 
