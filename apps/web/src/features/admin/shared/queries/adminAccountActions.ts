@@ -11,7 +11,6 @@ import { assertApiOk, requireApiData } from './adminApiResponse'
 
 export {
   FALLBACK_ADMIN_ACCOUNT_LIMITS,
-  normalizeAdminAccountLimits,
   type AdminAccount,
   type AdminAccountLimits,
   type AdminAccountModel,
@@ -21,13 +20,15 @@ export {
 
 export type AdminAccountCreateRequest = Parameters<typeof adminAccountApi.create>[0]
 
+const ADMIN_ACCOUNT_LIST_PAGE_SIZE = 100
+
 export async function fetchAdminAccountLimits(): Promise<AdminAccountLimits> {
   const res = await adminAccountApi.getLimits()
   const data = requireApiData(res, '加载账号限制失败')
   return normalizeAdminAccountLimits(data.limits)
 }
 
-export async function fetchAllAdminAccounts(pageSize: number): Promise<AdminAccount[]> {
+export async function fetchAllAdminAccounts(): Promise<AdminAccount[]> {
   const all: AdminAccount[] = []
   let page = 1
   let total = Number.POSITIVE_INFINITY
@@ -35,7 +36,7 @@ export async function fetchAllAdminAccounts(pageSize: number): Promise<AdminAcco
   while (true) {
     const res = await adminAccountApi.list({
       page,
-      page_size: pageSize,
+      page_size: ADMIN_ACCOUNT_LIST_PAGE_SIZE,
     })
     const data = requireApiData(res, '加载账号失败')
     const list = data.list ?? []

@@ -20,7 +20,6 @@ import {
 import { DEFAULT_ADMIN_CHANNEL_API_TYPE } from './channelApiTypes'
 import { extractApiErrorMessage } from './channelModelUtils'
 
-const ACCOUNT_PAGE_SIZE = 100
 const MAX_DETECTED_MODELS = 100
 
 export type AccountModelRow = {
@@ -100,7 +99,7 @@ export function useChannelAccounts(options: {
 
   async function loadAccounts() {
     const [nextAccounts] = await Promise.all([
-      fetchAllAdminAccounts(ACCOUNT_PAGE_SIZE),
+      fetchAllAdminAccounts(),
       loadAccountLimits(),
     ])
     accounts.value = nextAccounts
