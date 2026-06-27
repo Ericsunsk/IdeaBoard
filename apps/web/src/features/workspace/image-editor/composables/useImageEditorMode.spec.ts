@@ -1,5 +1,6 @@
 import type { Node } from '@vue-flow/core'
-import { createApp, defineComponent, h, nextTick, ref } from 'vue'
+import { createApp, defineComponent, h, nextTick, ref, shallowRef } from 'vue'
+import type { Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useImageEditorMode } from './useImageEditorMode'
 
@@ -15,7 +16,7 @@ function createStageElement() {
 function mountImageEditorMode(options: { nodeKind?: string } = {}) {
   const stage = createStageElement()
   const activeTool = ref('select')
-  const nodes = ref([
+  const nodes: Ref<Node[]> = shallowRef([
     { id: 'node-1', data: { kind: options.nodeKind ?? 'image' } },
   ] as Node[])
   const onBeforeExit = vi.fn()

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
+import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -95,8 +96,8 @@ function makeImageNode(nodeId: string, snapshot: ImageNodeItem): Node<FlowNodeDa
 
 function createHarness(initialNodes: Node<FlowNodeData>[], initialBoardId = 'board-a') {
   const boardId = ref(initialBoardId)
-  const nodes = ref<Node[]>(initialNodes as Node[])
-  const edges = ref<Edge[]>([])
+  const nodes: Ref<Node[]> = shallowRef([...initialNodes] as Node[])
+  const edges: Ref<Edge[]> = shallowRef([])
   const flushAutosave = vi.fn(async () => undefined)
   const onSuccess = vi.fn()
   const onWarning = vi.fn()

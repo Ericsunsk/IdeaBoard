@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
+import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { FusionNodeItem, ImageNodeItem } from '../../canvas-board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -60,7 +61,7 @@ function makeFlowNode(
 
 describe('useFlowNodeUiState', () => {
   it('treats an image node latest output as ready when its source url is empty', () => {
-    const nodes = ref<Node[]>([
+    const nodes: Ref<Node[]> = shallowRef([
       makeFlowNode(
         'image-1',
         'image',
@@ -72,7 +73,7 @@ describe('useFlowNodeUiState', () => {
       ),
       makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot()),
     ] as Node[])
-    const edges = ref<Edge[]>([
+    const edges: Ref<Edge[]> = shallowRef([
       {
         id: 'edge-1',
         source: 'image-1',

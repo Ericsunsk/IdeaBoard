@@ -66,7 +66,17 @@ function isSameOrder(a: string[], b: string[]): boolean {
   return a.every((id, index) => id === b[index])
 }
 
-export function useFlowHistory(options: UseFlowHistoryOptions) {
+export type FlowHistory = {
+  capture: () => FlowHistorySnapshot
+  push: (before: FlowHistorySnapshot, after?: FlowHistorySnapshot) => boolean
+  undo: () => void
+  redo: () => void
+  clearBaseline: () => void
+  onNodeDragStart: () => void
+  onNodeDragStop: (onChanged?: () => void) => void
+}
+
+export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   const maxSteps = Math.max(1, options.maxSteps ?? 10)
   const flowHistoryPast = ref<FlowHistoryEntry[]>([])
   const flowHistoryFuture = ref<FlowHistoryEntry[]>([])

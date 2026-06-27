@@ -263,14 +263,9 @@ import { useFlowImageActionStrengthControl } from '../composables/useFlowImageAc
 import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
-import {
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
-  type CanvasCreatableNodeKind,
-} from '../../canvas-board/domain'
+import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
-import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'
 import { useFlowSelectionController } from '../composables/useFlowSelectionController'
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
@@ -293,18 +288,10 @@ import { useFlowSnapshotNodeUpdater } from '../composables/useFlowSnapshotNodeUp
 import { useFlowImageNodeSnapshots } from '../composables/useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from '../composables/useFlowImageUploadActions'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
-import {
-  flattenVisibleImageEditorAdjustmentLayers,
-  renderImageAdjustmentFile,
-  useImageAdjustmentFilterPreviews,
-  useImageEditorMode,
-  useImageEditorSession,
-  useImageEditorViewportController,
-  type ImageEditorMode,
-} from '../image-editor'
-import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
+import { useImageEditorViewportController } from '../image-editor'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
-import { useFlowWorkspaceRuntime } from '../composables/useFlowWorkspaceRuntime'
+import { useWorkspaceBoardRuntime } from '../composables/useWorkspaceBoardRuntime'
+import { useWorkspaceImageToolRuntime } from '../composables/useWorkspaceImageToolRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
 import WorkspacePageChrome from '../components/WorkspacePageChrome.vue'
@@ -341,19 +328,10 @@ function clearSelectedFlowElementsSync() {
   removeSelectedElements(selectedElements)
 }
 
-const nodes = ref<Node[]>([])
-const edges = ref<Edge[]>([])
 const canvasWrapRef = ref<HTMLElement | null>(null)
-const boardBaseSnapshot = ref<CanvasBoardSnapshot>(createEmptyCanvasBoardSnapshot())
 const flowHandleVisibilityRefreshToken = ref(0)
 
-const isLoadingBoardSnapshot = ref(false)
-const isSavingBoard = ref(false)
-const isDirty = ref(false)
-const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
 const activeTool = ref<'select' | 'hand' | 'text'>('select')
-let hasPendingViewportChange = false
-let isApplyingBoardViewport = false
 
 const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
 
@@ -373,81 +351,14 @@ const { scheduleFlowNodeInternalsRefresh } = useFlowNodeInternalsRefreshQueue({
   updateNodeInternals,
 })
 
-async function onNavigateRequest(path: string) {
-  await flushAutosave()
-  await router.push(path)
-}
-
-async function onLogoutRequest() {
-  await flushAutosave()
-  await logoutAndRedirect('/user/home')
-}
-
-function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
-  closeBoardHeaderEditing()
-  const transform = payload.flowTransform
-  if (!transform) return
-  if (applyFlowTransform(transform)) hasPendingViewportChange = true
-  if (!isImageEditorChromeReady.value) return
-  scheduleImageEditorChromeAnchorUpdate()
-}
-
-function onFlowMoveEnd(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
-  const transform = payload.flowTransform
-  if (transform && applyFlowTransform(transform)) hasPendingViewportChange = true
-  const shouldPersistViewport = hasPendingViewportChange
-  hasPendingViewportChange = false
-  if (!shouldPersistViewport || isApplyingBoardViewport || isLoadingBoardSnapshot.value) return
-  flowTransactions.commitDirty()
-}
-
-function setBoardViewport(viewport: { x: number; y: number; zoom: number }) {
-  isApplyingBoardViewport = true
-  const result = setViewport(viewport)
-  const clearApplyingFlag = () => {
-    window.requestAnimationFrame(() => {
-      isApplyingBoardViewport = false
-    })
-  }
-  void Promise.resolve(result).then(clearApplyingFlag, clearApplyingFlag)
-}
-
 const {
+  nodes,
+  edges,
   currentBoardId,
   loadInitialOrRouteBoard,
   flushAutosave,
   flowHistory,
   flowTransactions,
-  refreshSnapshot,
-} = useFlowWorkspaceRuntime({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
-  boardBaseSnapshot,
-  isDirty,
-  saveStatus,
-  isLoadingBoardSnapshot,
-  isSavingBoard,
-  getBoardIdQuery: () => route.query.boardId,
-  getUserIdentity: () => ({
-    userId: Number(userStore.user?.id),
-    userUid: `${userStore.user?.uid ?? ''}`.trim(),
-  }),
-  getViewport,
-  setViewport: setBoardViewport,
-  setNodes,
-  setEdges,
-  onWarning: (msg) => {
-    appToast.warning(msg)
-  },
-  onSuccess: (msg) => {
-    appToast.success(msg)
-  },
-  onError: (msg) => {
-    appToast.error(msg)
-  },
-})
-
-const {
   isBoardMenuOpen,
   isRenamingBoard,
   boardNameDraft,
@@ -461,17 +372,43 @@ const {
   closeBoardHeaderEditing,
   onConfirmBoardRename,
   onSelectBoard,
-} = useFlowBoardHeaderActions({
-  currentBoardId,
+  onNavigateRequest,
+  onLogoutRequest,
+  markBoardViewportChanged,
+  commitPendingBoardViewportChange,
+} = useWorkspaceBoardRuntime({
+  route,
+  router,
+  getUserIdentity: () => ({
+    userId: Number(userStore.user?.id),
+    userUid: `${userStore.user?.uid ?? ''}`.trim(),
+  }),
+  getViewport,
+  setViewport: (viewport) => setViewport(viewport),
+  setNodes,
+  setEdges,
+  logoutAndRedirect,
   message: {
     warning: (msg: string) => appToast.warning(msg),
     success: (msg: string) => appToast.success(msg),
     error: (msg: string) => appToast.error(msg),
   },
-  router,
-  route,
-  flushAutosave: () => flushAutosave(),
 })
+
+function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
+  closeBoardHeaderEditing()
+  const transform = payload.flowTransform
+  if (!transform) return
+  if (applyFlowTransform(transform)) markBoardViewportChanged()
+  if (!isImageEditorChromeReady.value) return
+  scheduleImageEditorChromeAnchorUpdate()
+}
+
+function onFlowMoveEnd(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
+  const transform = payload.flowTransform
+  if (transform && applyFlowTransform(transform)) markBoardViewportChanged()
+  commitPendingBoardViewportChange()
+}
 
 const flowNodeMutations = useFlowNodeMutations({
   nodes: nodes as Ref<Node[]>,
@@ -670,58 +607,33 @@ useDismissableLayer({
 })
 
 const {
-  imageEditorState,
   imageEditorMode,
-  imageEditorNodeId: flowImageEditorNodeId,
-  enterImageEditorMode: enterFlowImageEditorModeBase,
-  exitImageEditorMode,
-} = useImageEditorMode({
-  nodes: nodes as Ref<Node[]>,
-  activeTool: activeTool as Ref<string>,
-  getImageNodeDisplayPayload,
-  getImageStageElement,
-  onBeforePointerCancel: clearSelectedFlowElementsSync,
-  onBeforeExit: (state) => {
-    if (state.mode === 'inpaint') saveFlowMaskDraft()
-  },
-})
-
-const {
-  maskEditorNodeId: flowMaskEditorNodeId,
-  maskEditorOverlayStyle: flowMaskEditorOverlayStyle,
-  drawMode: flowMaskEditorDrawMode,
-  brushSize: flowMaskEditorBrushSize,
-  brushHardness: flowMaskEditorBrushHardness,
-  brushShape: flowMaskEditorBrushShape,
-  canUndoMask: canUndoFlowMaskEditor,
-  canRedoMask: canRedoFlowMaskEditor,
-  saveMaskDraft: saveFlowMaskDraft,
-  commitMaskDraft: commitFlowMaskDraft,
-  clearMask: clearFlowMaskEditorMask,
-  invertMask: invertFlowMaskEditorMask,
-  featherMask: featherFlowMaskEditorMask,
-  undoMask: undoFlowMaskEditorMask,
-  redoMask: redoFlowMaskEditorMask,
-  clearCommittedMaskData: clearFlowMaskEditorCommittedData,
-  setMaskCanvasRef: setFlowMaskEditorCanvasRef,
-  onCanvasPointerDown: onFlowMaskEditorCanvasPointerDown,
-  setDrawMode: setFlowMaskEditorDrawMode,
-  setBrushSize: setFlowMaskEditorBrushSize,
-  setBrushHardness: setFlowMaskEditorBrushHardness,
-  setBrushShape: setFlowMaskEditorBrushShape,
-  getCommittedMaskData: getFlowMaskEditorCommittedData,
-} = useImageMaskEditorOverlay({
-  imageEditorState,
-  startCanvasInteraction: startFlowInteraction,
-  stopCanvasInteraction: stopFlowInteraction,
-})
-
-const {
+  flowImageEditorNodeId,
+  flowMaskEditorNodeId,
+  flowMaskEditorOverlayStyle,
+  flowMaskEditorDrawMode,
+  flowMaskEditorBrushSize,
+  flowMaskEditorBrushHardness,
+  flowMaskEditorBrushShape,
+  canUndoFlowMaskEditor,
+  canRedoFlowMaskEditor,
+  clearFlowMaskEditorMask,
+  invertFlowMaskEditorMask,
+  featherFlowMaskEditorMask,
+  undoFlowMaskEditorMask,
+  redoFlowMaskEditorMask,
+  clearFlowMaskEditorCommittedData,
+  setFlowMaskEditorCanvasRef,
+  onFlowMaskEditorCanvasPointerDown,
+  setFlowMaskEditorDrawMode,
+  setFlowMaskEditorBrushSize,
+  setFlowMaskEditorBrushHardness,
+  setFlowMaskEditorBrushShape,
+  getFlowMaskEditorCommittedData,
   activeImageEditorTool,
   imageEditorLayers,
   selectedImageEditorLayerId,
   selectedImageEditorAdjustmentLayer,
-  resetImageEditorSession,
   selectImageEditorTool,
   selectImageAdjustmentLayer,
   selectImageEditorLayer,
@@ -731,87 +643,29 @@ const {
   mergeImageEditorLayer,
   removeImageEditorLayer,
   updateSelectedImageEditorLayerParam,
-} = useImageEditorSession()
-
-const isApplyingImageEditorAdjustments = ref(false)
-const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
-const { imageAdjustmentFilterPreviews } =
-  useImageAdjustmentFilterPreviews({
-    isAdjustMode: isImageAdjustmentMode,
-    layers: imageEditorLayers,
-  })
-
-async function onApplyImageEditorAdjustments() {
-  if (isApplyingImageEditorAdjustments.value) return
-
-  const nodeId = flowImageEditorNodeId.value
-  if (!nodeId || imageEditorMode.value !== 'adjust') return
-
-  const boardId = currentBoardId.value
-  const source = getImageNodeDisplayPayload(nodeId)
-  const sourceNode = getImageNodeSnapshot(nodeId)
-  if (!source || !sourceNode) {
-    appToast.warning('当前图片不可调整')
-    return
-  }
-
-  const visibleAdjustmentLayers = flattenVisibleImageEditorAdjustmentLayers(imageEditorLayers.value)
-  if (visibleAdjustmentLayers.length === 0) {
-    appToast.warning('没有可应用的调整图层')
-    return
-  }
-
-  isApplyingImageEditorAdjustments.value = true
-  try {
-    const renderedFile = await renderImageAdjustmentFile(
-      { url: source.url, title: sourceNode.title || 'Image' },
-      visibleAdjustmentLayers,
-    )
-    if (currentBoardId.value !== boardId || flowImageEditorNodeId.value !== nodeId) return
-    const newNodeId = await createImageNodeFromFile(
-      {
-        x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
-        y: Number(sourceNode.y ?? 0) + 18,
-      },
-      renderedFile,
-    )
-    if (!newNodeId) return
-    onConnect({
-      source: nodeId,
-      sourceHandle: 'out:image',
-      target: newNodeId,
-      targetHandle: 'in:image',
-    })
-    exitImageEditorMode()
-    appToast.success('已应用调整并派生新节点')
-  } catch (error) {
-    appToast.warning(error instanceof Error ? error.message : '应用调整失败')
-  } finally {
-    isApplyingImageEditorAdjustments.value = false
-  }
-}
-
-function cancelFlowImageEditorMode() {
-  exitImageEditorMode()
-}
-
-function cancelFlowMaskEditorMode() {
-  cancelFlowImageEditorMode()
-}
-
-function enterFlowImageEditorMode(nodeId: string, mode: ImageEditorMode): boolean {
-  const entered = enterFlowImageEditorModeBase(nodeId, mode)
-  if (!entered) return false
-  if (mode === 'adjust') resetImageEditorSession()
-  return true
-}
-
-function commitFlowMaskEditorMode() {
-  const didCommit = commitFlowMaskDraft()
-  if (!didCommit) return false
-  exitImageEditorMode({ runBeforeExit: false })
-  return true
-}
+  isApplyingImageEditorAdjustments,
+  imageAdjustmentFilterPreviews,
+  onApplyImageEditorAdjustments,
+  cancelFlowMaskEditorMode,
+  enterFlowImageEditorMode,
+  commitFlowMaskEditorMode,
+} = useWorkspaceImageToolRuntime({
+  nodes: nodes as Ref<Node[]>,
+  activeTool: activeTool as Ref<string>,
+  currentBoardId,
+  getImageNodeDisplayPayload,
+  getImageNodeSnapshot,
+  getImageStageElement,
+  createImageNodeFromFile,
+  connectImageNodes: onConnect,
+  clearSelectedFlowElements: clearSelectedFlowElementsSync,
+  startCanvasInteraction: startFlowInteraction,
+  stopCanvasInteraction: stopFlowInteraction,
+  message: {
+    warning: (msg) => appToast.warning(msg),
+    success: (msg) => appToast.success(msg),
+  },
+})
 
 const {
   onFlowImageOpenFile,
@@ -1060,7 +914,6 @@ onMounted(async () => {
   await loadInitialOrRouteBoard()
   void reattachPendingImageResults()
   refreshBoardMetas()
-  refreshSnapshot()
 })
 </script>
 

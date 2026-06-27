@@ -1,6 +1,7 @@
 import type { Node } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
+import type { Ref } from 'vue'
 import { useImageEditorMode } from '../image-editor'
 import { useImageMaskEditorOverlay } from './useImageMaskEditorOverlay'
 
@@ -15,8 +16,9 @@ function createStageElement() {
 
 function createHarness() {
   const stage = createStageElement()
+  const nodes: Ref<Node[]> = shallowRef([{ id: 'node-1', data: { kind: 'image' } }] as Node[])
   const editorMode = useImageEditorMode({
-    nodes: ref([{ id: 'node-1', data: { kind: 'image' } }] as Node[]),
+    nodes,
     activeTool: ref('select'),
     getImageNodeDisplayPayload: (nodeId) =>
       nodeId === 'node-1' ? { url: 'https://example.com/source.png', ratio: 1 } : null,
