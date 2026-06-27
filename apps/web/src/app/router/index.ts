@@ -2,60 +2,16 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { dismissAppToasts } from '../../shared/composables/useAppToast'
+import { ADMIN_DEFAULT_PATH, ADMIN_LOGIN_PATH } from '../../features/admin/app/adminNavigationMeta'
 import { adminRoutes } from '../../features/admin/app/adminRoutes'
+import { USER_DEFAULT_PATH, USER_LOGIN_PATH, userRoutes } from '../../features/user/app/userRoutes'
 
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/user/home',
+    redirect: USER_DEFAULT_PATH,
   },
-  {
-    path: '/share',
-    name: 'ShareJoin',
-    component: () => import('../../features/user/pages/UserShareJoinPage.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/user',
-    component: () => import('../../features/user/pages/UserLayoutPage.vue'),
-    children: [
-      {
-        path: 'home',
-        name: 'UserHome',
-        component: () => import('../../features/user/pages/UserHomePage.vue'),
-      },
-      {
-        path: 'login',
-        name: 'UserLogin',
-        component: () => import('../../features/user/pages/UserHomePage.vue'),
-        meta: { guest: true },
-      },
-      {
-        path: 'register',
-        name: 'UserRegister',
-        component: () => import('../../features/user/pages/UserHomePage.vue'),
-        meta: { guest: true },
-      },
-      {
-        path: 'boards',
-        name: 'UserBoards',
-        component: () => import('../../features/user/pages/UserBoardsPage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'center',
-        name: 'UserCenter',
-        component: () => import('../../features/user/pages/UserCenterPage.vue'),
-        meta: { requiresAuth: true },
-      },
-    ],
-  },
-  {
-    path: '/user/workspace',
-    name: 'UserWorkspace',
-    component: () => import('../../features/user/pages/UserWorkspacePage.vue'),
-    meta: { requiresAuth: true },
-  },
+  ...userRoutes,
   ...adminRoutes,
 ]
 
@@ -81,22 +37,22 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     if (isAdminRoute) {
-      return { path: '/admin/login', query: { redirect: to.fullPath } }
+      return { path: ADMIN_LOGIN_PATH, query: { redirect: to.fullPath } }
     } else {
-      return { path: '/user/login', query: { redirect: to.fullPath } }
+      return { path: USER_LOGIN_PATH, query: { redirect: to.fullPath } }
     }
   }
 
   if (to.meta.guest && isLoggedIn) {
     if (isAdminRoute) {
-      return user?.role === 'admin' ? '/admin/users' : '/user/home'
+      return user?.role === 'admin' ? ADMIN_DEFAULT_PATH : USER_DEFAULT_PATH
     } else {
-      return '/user/home'
+      return USER_DEFAULT_PATH
     }
   }
 
   if (isAdminRoute && user && user.role !== 'admin') {
-    return '/user/home'
+    return USER_DEFAULT_PATH
   }
 
   return true

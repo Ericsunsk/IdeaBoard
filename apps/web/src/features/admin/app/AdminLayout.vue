@@ -410,7 +410,7 @@ function handleAnomalySelect(item: AdminAnomalyItem) {
 
 async function handleUserAction(key: 'profile' | 'logout') {
   if (key === 'logout') {
-    await logoutAndRedirect('/admin/login')
+    await logoutAndRedirect(ADMIN_LOGIN_PATH)
   } else {
     await router.push('/user/center')
   }
