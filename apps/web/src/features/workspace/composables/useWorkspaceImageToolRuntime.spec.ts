@@ -174,7 +174,7 @@ describe('useWorkspaceImageToolRuntime image adjustment final apply', () => {
 
       expect(harness.runtime.isApplyingImageEditorAdjustments.value).toBe(false)
       expect(harness.runtime.imageAdjustmentFinalApplyProgress.value).toBeNull()
-      expect(harness.message.success).toHaveBeenCalledWith('已应用调整并派生新节点')
+      expect(harness.message.success).toHaveBeenCalledWith('已应用编辑并派生新节点')
     } finally {
       harness.unmount()
     }

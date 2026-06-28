@@ -99,8 +99,8 @@ export const IMAGE_ACTION_REGISTRY_LIST = [
   {
     action: IMAGE_NODE_ACTION.localImageEditor,
     mode: IMAGE_ACTION_MODE.localImageEditor,
-    label: '图像调整',
-    title: '图像调整',
+    label: '图像编辑',
+    title: '图像编辑',
     icon: 'adobe-photoshop',
   },
 ] as const satisfies readonly ImageActionRegistryItem[]

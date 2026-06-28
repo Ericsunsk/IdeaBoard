@@ -199,7 +199,7 @@ describe('renderImageAdjustmentFile', () => {
       renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
         { ...invertLayer, visible: false },
       ]),
-    ).rejects.toThrow('没有可应用的调整图层')
+    ).rejects.toThrow('没有可应用的编辑图层')
   })
 
   it('rejects visually neutral adjustment stacks before loading the image', async () => {
@@ -207,7 +207,7 @@ describe('renderImageAdjustmentFile', () => {
       renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
         { ...invertLayer, params: { enabled: false } },
       ]),
-    ).rejects.toThrow('没有可应用的调整图层')
+    ).rejects.toThrow('没有可应用的编辑图层')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -221,7 +221,7 @@ describe('renderImageAdjustmentFile', () => {
 
     await expect(
       renderImageAdjustmentFile({ url: 'https://example.com/source.gif' }, [invertLayer]),
-    ).rejects.toThrow('暂不支持调整动图')
+    ).rejects.toThrow('暂不支持编辑动图')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
 
@@ -235,7 +235,7 @@ describe('renderImageAdjustmentFile', () => {
 
     await expect(
       renderImageAdjustmentFile({ url: 'https://example.com/source.webp' }, [invertLayer]),
-    ).rejects.toThrow('暂不支持调整动图')
+    ).rejects.toThrow('暂不支持编辑动图')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
 })

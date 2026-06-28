@@ -180,7 +180,7 @@ export function useWorkspaceImageToolRuntime(
     const source = options.getImageNodeDisplayPayload(nodeId)
     const sourceNode = options.getImageNodeSnapshot(nodeId)
     if (!source || !sourceNode) {
-      options.message.warning('当前图片不可调整')
+      options.message.warning('当前图片不可编辑')
       return
     }
 
@@ -188,7 +188,7 @@ export function useWorkspaceImageToolRuntime(
       imageEditorSession.imageEditorLayers.value,
     )
     if (!hasEffectiveImageEditorAdjustmentLayers(imageEditorSession.imageEditorLayers.value)) {
-      options.message.warning('没有可应用的调整图层')
+      options.message.warning('没有可应用的编辑图层')
       return
     }
 
@@ -230,7 +230,7 @@ export function useWorkspaceImageToolRuntime(
         targetHandle: 'in:image',
       })
       exitImageEditorMode()
-      options.message.success('已应用调整并派生新节点')
+      options.message.success('已应用编辑并派生新节点')
     } catch (error) {
       if (
         isImageAdjustmentFinalApplyCancelled(error) ||
@@ -240,7 +240,7 @@ export function useWorkspaceImageToolRuntime(
       ) {
         return
       }
-      options.message.warning(error instanceof Error ? error.message : '应用调整失败')
+      options.message.warning(error instanceof Error ? error.message : '应用编辑失败')
     } finally {
       if (activeImageAdjustmentFinalTaskId.value === taskId) {
         activeImageAdjustmentFinalTaskId.value = null

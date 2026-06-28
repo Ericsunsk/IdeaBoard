@@ -112,7 +112,7 @@ describe('ImageSourceCache', () => {
       fullSizeCache.getFullSizeSource('https://example.com/animated.gif'),
     ).rejects.toMatchObject({
       code: 'animated-image',
-      message: '暂不支持调整动图',
+      message: '暂不支持编辑动图',
     })
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })

@@ -105,7 +105,7 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
   }
 
   async renderFinal(input: ImageProcessingBackendFinalInput): Promise<RenderFinalOutput> {
-    if (input.plan.length === 0) throw new Error('没有可应用的调整图层')
+    if (input.plan.length === 0) throw new Error('没有可应用的编辑图层')
     if (input.context.signal.aborted) throw new Error('图像处理已取消')
 
     input.context.reportProgress({ phase: 'decode' })

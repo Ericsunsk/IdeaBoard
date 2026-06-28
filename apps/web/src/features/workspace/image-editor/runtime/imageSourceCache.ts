@@ -286,9 +286,9 @@ function resolveCacheErrorMessage(code: ImageSourceCacheErrorCode) {
     case 'not-image':
       return '读取到的文件不是图片'
     case 'animated-image':
-      return '暂不支持调整动图'
+      return '暂不支持编辑动图'
     case 'too-large':
-      return '图片尺寸过大，暂不支持在浏览器内调整'
+      return '图片尺寸过大，暂不支持在浏览器内编辑'
     case 'unsupported-canvas':
       return '当前浏览器不支持图像处理'
     case 'disposed':

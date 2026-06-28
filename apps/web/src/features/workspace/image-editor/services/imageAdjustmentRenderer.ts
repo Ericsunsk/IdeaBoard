@@ -23,7 +23,7 @@ export async function renderImageAdjustmentFile(
 ): Promise<File> {
   const plan = buildImageAdjustmentPlan(layers)
   if (plan.length === 0) {
-    throw new Error('没有可应用的调整图层')
+    throw new Error('没有可应用的编辑图层')
   }
 
   const renderInput: RenderFinalInput = {

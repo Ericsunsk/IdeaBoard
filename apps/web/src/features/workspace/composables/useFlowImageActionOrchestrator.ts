@@ -105,7 +105,7 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
       if (!entered) {
         options.onWarning(
           actionMode === IMAGE_ACTION_MODE.localImageEditor
-            ? '当前图片不可图像调整'
+            ? '当前图片不可编辑'
             : '当前图片不可局部重绘',
         )
       } else {
