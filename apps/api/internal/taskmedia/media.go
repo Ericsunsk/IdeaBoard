@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/platform/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/tasks"
 )
 
 type Validator interface {
@@ -24,20 +25,38 @@ type UploadReader interface {
 	ReadUploadObject(ctx context.Context, ref string, maxBytes int64) (*StoredObject, error)
 }
 
-type ResultStore interface {
-	UsesObjectStorage(ctx context.Context) bool
-	StoreRemoteResult(ctx context.Context, userID int64, taskID string, remoteURL string, opts StoreOptions) (*StoredRef, error)
-	StoreBytesResult(ctx context.Context, userID int64, taskID string, filename string, data []byte, opts StoreOptions) (*StoredRef, error)
-	DeleteObjectByKey(ctx context.Context, objectKey string) error
+type ResultMaterializer interface {
+	MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts ResultMaterializeOptions) (MaterializedResults, error)
+	MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts ResultMaterializeOptions) (MaterializedResults, error)
 }
 
-type RuntimeMediaStore interface {
-	UploadReader
-	ResultStore
-}
-
-type StoreOptions struct {
+type ResultMaterializeOptions struct {
 	AllowHosts []string
+}
+
+type MaterializedResults struct {
+	Items []MaterializedResult
+}
+
+func (r MaterializedResults) ImageURLs() []string {
+	urls := make([]string, 0, len(r.Items))
+	for _, item := range r.Items {
+		urls = append(urls, item.ImageURL)
+	}
+	return urls
+}
+
+func (r MaterializedResults) Outputs() []tasks.TaskOutput {
+	outputs := make([]tasks.TaskOutput, 0, len(r.Items))
+	for _, item := range r.Items {
+		outputs = append(outputs, item.Output)
+	}
+	return outputs
+}
+
+type MaterializedResult struct {
+	ImageURL string
+	Output   tasks.TaskOutput
 }
 
 type StoredObject struct {
@@ -47,16 +66,6 @@ type StoredObject struct {
 	Data        []byte
 	MIMEType    string
 	Ext         string
-}
-
-type StoredRef struct {
-	URL            string
-	StorageKey     string
-	MIMEType       string
-	Width          int
-	Height         int
-	SizeBytes      int64
-	StorageProfile string
 }
 
 type SubmitMediaValidator struct {

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"ideaboard/api/internal/tasks"
 	"image"
 	"image/color"
 	"image/png"
@@ -18,6 +17,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/taskmedia"
+	"ideaboard/api/internal/tasks"
 )
 
 func mustEncodePNGDataURL(t *testing.T, img image.Image) string {
@@ -283,7 +284,86 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	}
 }
 
-func TestFinalizeLocalRedrawResultRequiresMediaStore(t *testing.T) {
+func TestFinalizeLocalRedrawResultUsesResultMaterializer(t *testing.T) {
+	original := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	mask := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	upstream := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			original.SetNRGBA(x, y, color.NRGBA{B: 255, A: 255})
+			mask.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+			upstream.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+		}
+	}
+
+	outputs := []tasks.TaskOutput{{
+		TaskID:    "task-local-redraw-materializer",
+		Role:      "image",
+		URL:       "/uploads/tasks/42/task-local-redraw-materializer/result.png",
+		SourceURL: "upstream://image",
+		SortIndex: 0,
+	}}
+	materializer := &captureResultMaterializer{
+		bytesResult: taskmedia.MaterializedResults{
+			Items: []taskmedia.MaterializedResult{{
+				ImageURL: "/uploads/tasks/42/task-local-redraw-materializer/result.png",
+				Output:   outputs[0],
+			}},
+		},
+	}
+	c := &ProviderExecutor{resultMaterializer: materializer}
+
+	imageURL, gotOutputs, stored, err := c.finalizeLocalRedrawResult(
+		context.Background(),
+		42,
+		"task-local-redraw-materializer",
+		&localRedrawContext{
+			featureSlug: "partial-edit",
+			original:    original,
+			maskSampler: maskCoverageSampler{
+				mask:         mask,
+				maskBounds:   mask.Bounds(),
+				dstWidth:     2,
+				dstHeight:    2,
+				useLuminance: true,
+			},
+			roi: image.Rect(0, 0, 2, 2),
+		},
+		mustEncodePNGDataURL(t, upstream),
+		0,
+	)
+	if err != nil {
+		t.Fatalf("finalizeLocalRedrawResult returned error: %v", err)
+	}
+	if imageURL != materializer.bytesResult.Items[0].ImageURL {
+		t.Fatalf("imageURL=%q, want %q", imageURL, materializer.bytesResult.Items[0].ImageURL)
+	}
+	if !reflect.DeepEqual(gotOutputs, outputs) {
+		t.Fatalf("outputs=%#v, want %#v", gotOutputs, outputs)
+	}
+	if !stored {
+		t.Fatalf("stored=false, want true")
+	}
+	if materializer.bytesUserID != 42 || materializer.bytesTaskID != "task-local-redraw-materializer" {
+		t.Fatalf("materializer target=%d/%s", materializer.bytesUserID, materializer.bytesTaskID)
+	}
+	if !strings.HasPrefix(materializer.bytesFilename, "local-redraw-partial-edit-") || !strings.HasSuffix(materializer.bytesFilename, ".png") {
+		t.Fatalf("unexpected materialized filename: %q", materializer.bytesFilename)
+	}
+	if !strings.HasPrefix(materializer.bytesSourceURL, "data:image/png;base64,") {
+		t.Fatalf("unexpected source URL passed to materializer: %q", materializer.bytesSourceURL)
+	}
+	finalImage, err := png.Decode(bytes.NewReader(materializer.bytesData))
+	if err != nil {
+		t.Fatalf("decode materialized bytes: %v", err)
+	}
+	gotPixel := color.NRGBAModel.Convert(finalImage.At(0, 0)).(color.NRGBA)
+	if gotPixel.R < 200 || gotPixel.B > 20 {
+		t.Fatalf("materialized bytes should contain composited redraw result, got %#v", gotPixel)
+	}
+}
+
+func TestFinalizeLocalRedrawResultRequiresMaterializer(t *testing.T) {
 	original := image.NewNRGBA(image.Rect(0, 0, 2, 2))
 	mask := image.NewNRGBA(image.Rect(0, 0, 2, 2))
 	upstream := image.NewNRGBA(image.Rect(0, 0, 2, 2))
@@ -316,7 +396,7 @@ func TestFinalizeLocalRedrawResultRequiresMediaStore(t *testing.T) {
 	)
 
 	if err == nil {
-		t.Fatal("expected missing mediaStore to fail local redraw finalization")
+		t.Fatal("expected missing materializer to fail local redraw finalization")
 	}
 	if imageURL != "" {
 		t.Fatalf("imageURL=%q, want empty string", imageURL)

@@ -52,12 +52,12 @@ func newAppTaskRuntime(
 ) (appTaskServices, appWorkerRuntime, error) {
 	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)
-	taskMedia := storage.NewTaskMediaAdapter(
-		services.storageService,
+	taskMediaAuthorizer := storage.NewTaskMediaAuthorizer(
 		uploadBoardAccessResolver{service: services.boardService},
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
-	submitMediaValidator := taskmedia.NewSubmitMediaValidator(services.runtimeSettings, taskMedia)
+	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService)
+	submitMediaValidator := taskmedia.NewSubmitMediaValidator(services.runtimeSettings, taskMediaAuthorizer)
 	taskEventHub := taskservice.NewEventHub()
 	taskEvents, eventBus, err := newTaskStatusEventPublisher(ctx, cfg.Events, taskEventHub)
 	if err != nil {
@@ -76,17 +76,18 @@ func newAppTaskRuntime(
 	}, accounts.AccountServiceOptions{
 		TaskEvents: taskEvents,
 	})
-	riverTaskWorker := worker.NewRiverTaskWorker(
-		repos.accountRepo,
-		repos.channelRepo,
-		repos.taskRepo,
-		riverQueue,
-		postgresAssigner,
-		postgresRuntimeStore,
-		taskMedia,
-		taskEvents,
-		services.runtimeSettings,
-	)
+	riverTaskWorker := worker.NewRiverTaskWorker(worker.RiverTaskWorkerDeps{
+		AccountRepo:        repos.accountRepo,
+		ChannelRepo:        repos.channelRepo,
+		TaskRepo:           repos.taskRepo,
+		Enqueuer:           riverQueue,
+		Assigner:           postgresAssigner,
+		CancelStore:        postgresRuntimeStore,
+		MediaReader:        runtimeTaskMediaStore,
+		ResultMaterializer: runtimeTaskMediaStore,
+		TaskEvents:         taskEvents,
+		PublicURLs:         services.runtimeSettings,
+	})
 	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
@@ -110,7 +111,7 @@ func newAppTaskRuntime(
 		CancelStore:       postgresRuntimeStore,
 		FeaturePrompts:    repos.featurePromptRepo,
 		MediaValidator:    submitMediaValidator,
-		TaskOutputCleaner: taskMedia,
+		TaskOutputCleaner: runtimeTaskMediaStore,
 	}, taskservice.ServiceOptions{
 		EventHub:   taskEventHub,
 		TaskEvents: taskEvents,

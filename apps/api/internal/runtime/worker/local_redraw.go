@@ -212,7 +212,7 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 		)
 	}
 
-	if c.mediaStore == nil {
+	if c.resultMaterializer == nil {
 		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
@@ -220,7 +220,7 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 		)
 	}
 	filename := fmt.Sprintf("local-redraw-%s-%d.png", sanitizeFeatureSlug(redraw.featureSlug), time.Now().UnixNano())
-	storedRef, err := c.mediaStore.StoreBytesResult(ctx, userID, taskID, filename, composedBytes, taskmedia.StoreOptions{})
+	materialized, err := c.resultMaterializer.MaterializeBytesResult(ctx, userID, taskID, filename, upstreamImageRef, composedBytes, taskmedia.ResultMaterializeOptions{})
 	if err != nil {
 		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
@@ -228,7 +228,22 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 			fmt.Errorf("local redraw 持久化失败: feature=%s err=%w", redraw.featureSlug, err),
 		)
 	}
-	return storedRef.URL, []tasks.TaskOutput{taskOutputFromStoredRef(taskID, storedRef, upstreamImageRef, 0)}, true, nil
+	if len(materialized.Items) != 1 {
+		return "", nil, false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("local redraw 持久化失败: feature=%s materializer returned inconsistent result counts: items=%d", redraw.featureSlug, len(materialized.Items)),
+		)
+	}
+	materializedURL := materialized.Items[0].ImageURL
+	if strings.TrimSpace(materializedURL) == "" {
+		return "", nil, false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("local redraw 持久化失败: feature=%s materializer returned empty URL", redraw.featureSlug),
+		)
+	}
+	return materializedURL, []tasks.TaskOutput{materialized.Items[0].Output}, true, nil
 }
 
 func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {

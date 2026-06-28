@@ -66,9 +66,10 @@ func truncateErrorBody(body string) string {
 }
 
 type ProviderExecutor struct {
-	channelRepo *channels.ChannelRepository
-	mediaStore  taskmedia.RuntimeMediaStore
-	publicURLs  settings.PublicURLSettingProvider
+	channelRepo        *channels.ChannelRepository
+	mediaReader        taskmedia.UploadReader
+	resultMaterializer taskmedia.ResultMaterializer
+	publicURLs         settings.PublicURLSettingProvider
 }
 
 func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*taskmedia.StoredObject, bool, error) {
@@ -76,10 +77,10 @@ func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref str
 	if !strings.HasPrefix(trimmed, "/uploads/") {
 		return nil, false, nil
 	}
-	if c == nil || c.mediaStore == nil {
+	if c == nil || c.mediaReader == nil {
 		return nil, true, fmt.Errorf("存储服务未初始化，无法读取上传文件: %q", ref)
 	}
-	obj, err := c.mediaStore.ReadUploadObject(ctx, trimmed, maxBytes)
+	obj, err := c.mediaReader.ReadUploadObject(ctx, trimmed, maxBytes)
 	if err != nil {
 		return nil, true, err
 	}
@@ -326,7 +327,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	if len(imageURLs) == 0 {
 		return imageURLs, nil, nil
 	}
-	if c.mediaStore == nil {
+	if c.resultMaterializer == nil {
 		return nil, nil, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
@@ -334,32 +335,12 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		)
 	}
 
-	slog.Info("provider result storage check", "object_storage", c.mediaStore.UsesObjectStorage(ctx), "image_count", len(imageURLs))
+	slog.Info("provider result materialization started", "image_count", len(imageURLs))
 
-	next := append([]string(nil), imageURLs...)
-	outputs := make([]tasks.TaskOutput, 0, len(next))
-	storedKeys := make([]string, 0, len(next))
-	for index, currentURL := range next {
-		storeOpts := taskmedia.StoreOptions{
-			AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicURLs),
-		}
-		storedRef, storeErr := c.mediaStore.StoreRemoteResult(ctx, userID, taskID, currentURL, storeOpts)
-		if storeErr == nil {
-			slog.Info("provider image materialized", "source_url", redactLogURL(currentURL), "stored_url", redactLogURL(storedRef.URL))
-			next[index] = storedRef.URL
-			outputs = append(outputs, taskOutputFromStoredRef(taskID, storedRef, currentURL, len(outputs)))
-			if strings.TrimSpace(storedRef.StorageKey) != "" {
-				storedKeys = append(storedKeys, storedRef.StorageKey)
-			}
-			continue
-		}
-		if len(storedKeys) > 0 {
-			for _, storageKey := range storedKeys {
-				if delErr := c.mediaStore.DeleteObjectByKey(ctx, storageKey); delErr != nil {
-					slog.Warn("cleanup orphan materialized image failed", "task_id", taskID, "storage_key", storageKey, "err", delErr)
-				}
-			}
-		}
+	materialized, storeErr := c.resultMaterializer.MaterializeRemoteResults(ctx, userID, taskID, imageURLs, taskmedia.ResultMaterializeOptions{
+		AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicURLs),
+	})
+	if storeErr != nil {
 		if errors.Is(storeErr, context.Canceled) {
 			return nil, nil, storeErr
 		}
@@ -369,26 +350,24 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 			fmt.Errorf("持久化上游图片失败: %w", storeErr),
 		)
 	}
-	return next, outputs, nil
-}
-
-func taskOutputFromStoredRef(taskID string, ref *taskmedia.StoredRef, sourceURL string, sortIndex int) tasks.TaskOutput {
-	if ref == nil {
-		return tasks.TaskOutput{TaskID: taskID, Role: "image", SourceURL: sourceURL, SortIndex: sortIndex}
+	if len(materialized.Items) == 0 {
+		return nil, nil, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("持久化上游图片失败: materializer returned no image URLs"),
+		)
 	}
-	return tasks.TaskOutput{
-		TaskID:         taskID,
-		Role:           "image",
-		URL:            ref.URL,
-		StorageKey:     ref.StorageKey,
-		MIMEType:       ref.MIMEType,
-		Width:          ref.Width,
-		Height:         ref.Height,
-		SizeBytes:      ref.SizeBytes,
-		SourceURL:      sourceURL,
-		StorageProfile: ref.StorageProfile,
-		SortIndex:      sortIndex,
+	if len(materialized.Items) != len(imageURLs) {
+		return nil, nil, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("持久化上游图片失败: materializer returned inconsistent result counts: source=%d items=%d", len(imageURLs), len(materialized.Items)),
+		)
 	}
+	for index, sourceURL := range imageURLs {
+		slog.Info("provider image materialized", "source_url", redactLogURL(sourceURL), "stored_url", redactLogURL(materialized.Items[index].ImageURL))
+	}
+	return materialized.ImageURLs(), materialized.Outputs(), nil
 }
 
 func isInlineDataImageURL(raw string) bool {

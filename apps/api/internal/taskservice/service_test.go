@@ -510,15 +510,14 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
-	mediaAdapter := storage.NewTaskMediaAdapter(
-		nil,
+	mediaAuthorizer := storage.NewTaskMediaAuthorizer(
 		testTaskUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
 		testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
 	)
 	svc := NewService(ServiceDeps{
 		MediaValidator: taskmedia.NewSubmitMediaValidator(
 			testPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
-			mediaAdapter,
+			mediaAuthorizer,
 		),
 	}, ServiceOptions{})
 	allowed := "/uploads/workspace/OWNR1A/board-1/content/demo.png"

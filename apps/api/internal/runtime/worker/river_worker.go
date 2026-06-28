@@ -34,26 +34,32 @@ type WorkerAccountStore interface {
 	GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*accounts.ApiAccount, error)
 }
 
+type RiverTaskWorkerDeps struct {
+	AccountRepo        WorkerAccountStore
+	ChannelRepo        *channels.ChannelRepository
+	TaskRepo           taskruntime.TaskStore
+	Enqueuer           taskqueue.TaskEnqueuer
+	Assigner           taskqueue.TaskAssigner
+	CancelStore        taskqueue.TaskCancellationStore
+	MediaReader        taskmedia.UploadReader
+	ResultMaterializer taskmedia.ResultMaterializer
+	TaskEvents         events.TaskStatusPublisher
+	PublicURLs         settings.PublicURLSettingProvider
+}
+
 func NewRiverTaskWorker(
-	accountRepo WorkerAccountStore,
-	channelRepo *channels.ChannelRepository,
-	taskRepo taskruntime.TaskStore,
-	enqueuer taskqueue.TaskEnqueuer,
-	assigner taskqueue.TaskAssigner,
-	cancelStore taskqueue.TaskCancellationStore,
-	mediaStore taskmedia.RuntimeMediaStore,
-	taskEvents events.TaskStatusPublisher,
-	publicURLs settings.PublicURLSettingProvider,
+	deps RiverTaskWorkerDeps,
 ) *RiverTaskWorker {
 	executor := &ProviderExecutor{
-		channelRepo: channelRepo,
-		mediaStore:  mediaStore,
-		publicURLs:  publicURLs,
+		channelRepo:        deps.ChannelRepo,
+		mediaReader:        deps.MediaReader,
+		resultMaterializer: deps.ResultMaterializer,
+		publicURLs:         deps.PublicURLs,
 	}
-	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
-	taskRuntime.SetTaskStatusPublisher(taskEvents)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, enqueuer, taskRuntime, executor.callDrawingAPIWithAssignment)
-	return newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute))
+	taskRuntime := taskruntime.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
+	taskRuntime.SetTaskStatusPublisher(deps.TaskEvents)
+	orchestrator := newTaskExecutionOrchestrator(deps.AccountRepo, deps.Enqueuer, taskRuntime, executor.callDrawingAPIWithAssignment)
+	return newRiverTaskWorkerWithProcessor(newTaskProcessor(deps.Assigner, taskRuntime, orchestrator.execute))
 }
 
 func newRiverTaskWorkerWithProcessor(processor *taskProcessor) *RiverTaskWorker {

@@ -4,48 +4,71 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskmedia"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
 )
 
-func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *testing.T) {
-	executor := newTestProviderExecutorWithLocalStorage(t)
-
+func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 	dataURL := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQBx3Y4ZAAAAAElFTkSuQmCC"
+	materializer := &captureResultMaterializer{
+		remoteResult: taskmedia.MaterializedResults{
+			Items: []taskmedia.MaterializedResult{{
+				ImageURL: "/uploads/tasks/42/task-owned/result.png",
+				Output: tasks.TaskOutput{
+					TaskID:     "task-owned",
+					Role:       "image",
+					URL:        "/uploads/tasks/42/task-owned/result.png",
+					SourceURL:  dataURL,
+					SortIndex:  0,
+					StorageKey: "uploads/tasks/42/task-owned/result.png",
+				},
+			}},
+		},
+	}
+	executor := &ProviderExecutor{
+		resultMaterializer: materializer,
+		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{
+			PublicBaseURL:      "https://app.example.test",
+			PublicAssetBaseURL: "https://assets.example.test",
+		}},
+	}
 
-	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", &accounts.ApiAccount{}, []string{dataURL})
+	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", &accounts.ApiAccount{
+		ProxyURL: "https://provider.example.test/v1",
+	}, []string{dataURL})
 	if err != nil {
 		t.Fatalf("materializeProviderResultImages returned error: %v", err)
 	}
-	if len(urls) != 1 {
-		t.Fatalf("urls len=%d, want 1", len(urls))
+	if !reflect.DeepEqual(urls, materializer.remoteResult.ImageURLs()) {
+		t.Fatalf("urls=%#v, want %#v", urls, materializer.remoteResult.ImageURLs())
 	}
-	if strings.HasPrefix(urls[0], "data:image/") {
-		t.Fatalf("inline data URL should be stored before task result persistence")
+	if !reflect.DeepEqual(outputs, materializer.remoteResult.Outputs()) {
+		t.Fatalf("outputs=%#v, want %#v", outputs, materializer.remoteResult.Outputs())
 	}
-	if !strings.HasPrefix(urls[0], "/uploads/tasks/42/task-owned/") {
-		t.Fatalf("stored URL=%q, want task output path", urls[0])
+	if materializer.remoteUserID != 42 || materializer.remoteTaskID != "task-owned" {
+		t.Fatalf("materializer target=%d/%s", materializer.remoteUserID, materializer.remoteTaskID)
 	}
-	if _, err := os.Stat(filepath.FromSlash(strings.TrimPrefix(urls[0], "/"))); err != nil {
-		t.Fatalf("stored file not found: %v", err)
+	if !reflect.DeepEqual(materializer.remoteSourceURLs, []string{dataURL}) {
+		t.Fatalf("materializer source urls=%#v", materializer.remoteSourceURLs)
 	}
-	if len(outputs) != 1 {
-		t.Fatalf("outputs len=%d, want 1", len(outputs))
-	}
-	if outputs[0].URL != urls[0] || !strings.HasPrefix(outputs[0].StorageKey, "uploads/tasks/42/task-owned/") {
-		t.Fatalf("unexpected output: %+v", outputs[0])
-	}
-	if outputs[0].StorageProfile != "builtin-local" || outputs[0].MIMEType != "image/png" || outputs[0].Width != 1 || outputs[0].Height != 1 {
-		t.Fatalf("unexpected output metadata: %+v", outputs[0])
+	for _, wantHost := range []string{"provider.example.test", "assets.example.test"} {
+		if !containsString(materializer.remoteOpts.AllowHosts, wantHost) {
+			t.Fatalf("AllowHosts=%#v missing %q", materializer.remoteOpts.AllowHosts, wantHost)
+		}
 	}
 }
 
@@ -65,44 +88,11 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 
 	db := testdb.Open(t)
 	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
+	mediaStore := storage.NewRuntimeTaskMediaStore(storageService)
 
 	return &ProviderExecutor{
-		mediaStore: storage.NewTaskMediaAdapter(storageService, nil, nil),
-	}
-}
-
-func TestMaterializeProviderResultImagesStoresRemoteURLToLocalStorage(t *testing.T) {
-	imageBytes := buildTinyPNGBytes(t)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "image/png")
-		_, _ = w.Write(imageBytes)
-	}))
-	defer server.Close()
-
-	executor := newTestProviderExecutorWithLocalStorage(t)
-
-	sourceURL := server.URL + "/image.png?token=secret"
-	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-remote", &accounts.ApiAccount{ProxyURL: server.URL}, []string{sourceURL})
-	if err != nil {
-		t.Fatalf("materializeProviderResultImages returned error: %v", err)
-	}
-	if len(urls) != 1 {
-		t.Fatalf("urls len=%d, want 1", len(urls))
-	}
-	if !strings.HasPrefix(urls[0], "/uploads/tasks/42/task-remote/") {
-		t.Fatalf("stored URL=%q, want task output path", urls[0])
-	}
-	if _, err := os.Stat(filepath.FromSlash(strings.TrimPrefix(urls[0], "/"))); err != nil {
-		t.Fatalf("stored file not found: %v", err)
-	}
-	if len(outputs) != 1 {
-		t.Fatalf("outputs len=%d, want 1", len(outputs))
-	}
-	if outputs[0].URL != urls[0] || outputs[0].SourceURL != sourceURL || !strings.HasPrefix(outputs[0].StorageKey, "uploads/tasks/42/task-remote/") {
-		t.Fatalf("unexpected output: %+v", outputs[0])
-	}
-	if outputs[0].Width != 1 || outputs[0].Height != 1 {
-		t.Fatalf("unexpected output dimensions: %+v", outputs[0])
+		mediaReader:        mediaStore,
+		resultMaterializer: mediaStore,
 	}
 }
 
@@ -176,24 +166,44 @@ func TestOpenAIRejectsHugeRelativeWorkspaceUploadFromStorage(t *testing.T) {
 	}
 }
 
-func TestMaterializeProviderResultImagesFailsWhenRemoteCannotBeStored(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "nope", http.StatusBadGateway)
-	}))
-	defer server.Close()
+func TestMaterializeProviderResultImagesFailsWhenMaterializerMissing(t *testing.T) {
+	executor := &ProviderExecutor{}
 
-	db := testdb.Open(t)
-	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
-	executor := &ProviderExecutor{
-		mediaStore: storage.NewTaskMediaAdapter(storageService, nil, nil),
-	}
-
-	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{ProxyURL: server.URL}, []string{server.URL + "/image.png"})
+	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{}, []string{"data:image/png;base64,abc"})
 	if err == nil {
 		t.Fatal("expected materializeProviderResultImages to fail")
 	}
-	if !strings.Contains(err.Error(), "持久化上游图片失败") {
-		t.Fatalf("unexpected error: %v", err)
+	stage, category, ok := executionFailureDetails(err)
+	if !ok {
+		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
+	}
+	if stage != tasks.ExecutionStageFinalizing || category != tasks.FailureCategoryStorageError {
+		t.Fatalf("details=%s/%s, want %s/%s", stage, category, tasks.ExecutionStageFinalizing, tasks.FailureCategoryStorageError)
+	}
+	if strings.Contains(err.Error(), "data:image/png;base64") {
+		t.Fatalf("error should not include data URL payload: %v", err)
+	}
+}
+
+func TestMaterializeProviderResultImagesWrapsMaterializerFailure(t *testing.T) {
+	storeErr := errors.New("materializer down")
+	executor := &ProviderExecutor{
+		resultMaterializer: &captureResultMaterializer{remoteErr: storeErr},
+	}
+
+	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{}, []string{"https://cdn.example/image.png"})
+	if err == nil {
+		t.Fatal("expected materializeProviderResultImages to fail")
+	}
+	if !errors.Is(err, storeErr) {
+		t.Fatalf("expected wrapped materializer error, got %v", err)
+	}
+	stage, category, ok := executionFailureDetails(err)
+	if !ok {
+		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
+	}
+	if stage != tasks.ExecutionStageFinalizing || category != tasks.FailureCategoryStorageError {
+		t.Fatalf("details=%s/%s, want %s/%s", stage, category, tasks.ExecutionStageFinalizing, tasks.FailureCategoryStorageError)
 	}
 }
 
@@ -206,4 +216,59 @@ func TestRedactLogURLDropsUserinfoQueryFragmentAndDataPayload(t *testing.T) {
 	if got != "data:image/...;base64,[redacted]" {
 		t.Fatalf("unexpected redacted data url: %q", got)
 	}
+}
+
+type captureResultMaterializer struct {
+	remoteUserID     int64
+	remoteTaskID     string
+	remoteSourceURLs []string
+	remoteOpts       taskmedia.ResultMaterializeOptions
+	remoteResult     taskmedia.MaterializedResults
+	remoteErr        error
+
+	bytesUserID    int64
+	bytesTaskID    string
+	bytesFilename  string
+	bytesSourceURL string
+	bytesData      []byte
+	bytesOpts      taskmedia.ResultMaterializeOptions
+	bytesResult    taskmedia.MaterializedResults
+	bytesErr       error
+}
+
+func (m *captureResultMaterializer) MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
+	m.remoteUserID = userID
+	m.remoteTaskID = taskID
+	m.remoteSourceURLs = append([]string(nil), sourceURLs...)
+	m.remoteOpts = opts
+	if m.remoteErr != nil {
+		return taskmedia.MaterializedResults{}, m.remoteErr
+	}
+	return cloneMaterializedResults(m.remoteResult), nil
+}
+
+func (m *captureResultMaterializer) MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
+	m.bytesUserID = userID
+	m.bytesTaskID = taskID
+	m.bytesFilename = filename
+	m.bytesSourceURL = sourceURL
+	m.bytesData = append([]byte(nil), data...)
+	m.bytesOpts = opts
+	if m.bytesErr != nil {
+		return taskmedia.MaterializedResults{}, m.bytesErr
+	}
+	return cloneMaterializedResults(m.bytesResult), nil
+}
+
+func cloneMaterializedResults(result taskmedia.MaterializedResults) taskmedia.MaterializedResults {
+	return taskmedia.MaterializedResults{Items: append([]taskmedia.MaterializedResult(nil), result.Items...)}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
