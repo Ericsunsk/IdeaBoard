@@ -1,0 +1,213 @@
+import type { Connection, Node } from '@vue-flow/core'
+import { createApp, defineComponent, h, nextTick, ref, shallowRef, type Ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ImageNodeItem } from '../../canvas-board/domain'
+import type {
+  ImageEditorAdjustmentLayer,
+  ImageEditorLayer,
+} from '../image-editor'
+import {
+  cancelImageAdjustmentFinalRender,
+  renderImageAdjustmentFile,
+} from '../image-editor'
+import { useWorkspaceImageToolRuntime } from './useWorkspaceImageToolRuntime'
+
+vi.mock('../image-editor', async (importOriginal) => {
+  const { computed } = await import('vue')
+  const actual = await importOriginal<typeof import('../image-editor')>()
+  return {
+    ...actual,
+    cancelImageAdjustmentFinalRender: vi.fn(),
+    renderImageAdjustmentFile: vi.fn(),
+    useImageAdjustmentFilterPreviews: vi.fn(() => ({
+      imageAdjustmentFilterPreviews: computed(() => []),
+    })),
+  }
+})
+
+const cancelFinalRenderMock = vi.mocked(cancelImageAdjustmentFinalRender)
+const renderAdjustmentFileMock = vi.mocked(renderImageAdjustmentFile)
+
+type WorkspaceImageToolRuntime = ReturnType<typeof useWorkspaceImageToolRuntime>
+
+const effectiveInvertLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:invert',
+  type: 'adjustment',
+  kind: 'invert',
+  name: '反相 1',
+  visible: true,
+  params: { enabled: true },
+}
+
+const sourceLayer: ImageEditorLayer = {
+  id: 'source',
+  type: 'source',
+  name: '原图',
+  visible: true,
+}
+
+function createStageElement() {
+  const stage = document.createElement('div')
+  Object.defineProperties(stage, {
+    clientWidth: { value: 320 },
+    clientHeight: { value: 240 },
+  })
+  return stage
+}
+
+function mountWorkspaceImageToolRuntime() {
+  const stage = createStageElement()
+  const activeTool = ref('select')
+  const currentBoardId = ref('board-1')
+  const nodes: Ref<Node[]> = shallowRef([{ id: 'node-1', data: { kind: 'image' } }] as Node[])
+  const connectImageNodes = vi.fn<(connection: Connection) => void>()
+  const createImageNodeFromFile = vi.fn(async () => 'node-2')
+  const message = {
+    warning: vi.fn<(message: string) => void>(),
+    success: vi.fn<(message: string) => void>(),
+  }
+  let runtime!: WorkspaceImageToolRuntime
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const app = createApp(
+    defineComponent({
+      setup() {
+        runtime = useWorkspaceImageToolRuntime({
+          nodes,
+          activeTool,
+          currentBoardId,
+          getImageNodeDisplayPayload: (nodeId) =>
+            nodeId === 'node-1' ? { url: 'https://example.com/source.png', ratio: 1 } : null,
+          getImageNodeSnapshot: (nodeId): ImageNodeItem | null =>
+            nodeId === 'node-1'
+              ? {
+                  id: 1,
+                  type: 'image-node',
+                  title: 'Source',
+                  x: 10,
+                  y: 20,
+                  width: 300,
+                  sourceImageUrl: 'https://example.com/source.png',
+                  sourceImageRatio: 1,
+                  outputStatus: 'ready',
+                  outputImages: [],
+                }
+              : null,
+          getImageStageElement: (nodeId) => (nodeId === 'node-1' ? stage : null),
+          createImageNodeFromFile,
+          connectImageNodes,
+          clearSelectedFlowElements: vi.fn(),
+          startCanvasInteraction: vi.fn(),
+          stopCanvasInteraction: vi.fn(),
+          message,
+        })
+        return () => h('div')
+      },
+    }),
+  )
+  app.mount(host)
+
+  return {
+    activeTool,
+    app,
+    connectImageNodes,
+    createImageNodeFromFile,
+    currentBoardId,
+    host,
+    message,
+    runtime,
+    unmount: () => {
+      app.unmount()
+      host.remove()
+    },
+  }
+}
+
+async function flushPromises() {
+  await Promise.resolve()
+  await nextTick()
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  cancelFinalRenderMock.mockReset()
+  renderAdjustmentFileMock.mockReset()
+})
+
+describe('useWorkspaceImageToolRuntime image adjustment final apply', () => {
+  it('records final render progress while applying and clears it after success', async () => {
+    let resolveRender!: (file: File) => void
+    renderAdjustmentFileMock.mockImplementation(
+      async (_source, _layers, options): Promise<File> =>
+        new Promise((resolve) => {
+          resolveRender = resolve
+          options?.onProgress?.({ phase: 'render', loaded: 24, total: 96 })
+        }),
+    )
+    const harness = mountWorkspaceImageToolRuntime()
+
+    try {
+      harness.runtime.enterFlowImageEditorMode('node-1', 'adjust')
+      harness.runtime.imageEditorLayers.value = [effectiveInvertLayer, sourceLayer]
+
+      const apply = harness.runtime.onApplyImageEditorAdjustments()
+      await flushPromises()
+
+      expect(harness.runtime.isApplyingImageEditorAdjustments.value).toBe(true)
+      expect(harness.runtime.imageAdjustmentFinalApplyProgress.value).toEqual({
+        phase: 'render',
+        loaded: 24,
+        total: 96,
+      })
+      expect(renderAdjustmentFileMock).toHaveBeenCalledWith(
+        { url: 'https://example.com/source.png', title: 'Source' },
+        [effectiveInvertLayer],
+        expect.objectContaining({
+          taskId: 'image-adjustment-final:node-1',
+          latestOnly: true,
+          onProgress: expect.any(Function),
+        }),
+      )
+
+      resolveRender(new File(['rendered'], 'rendered.webp', { type: 'image/webp' }))
+      await apply
+
+      expect(harness.runtime.isApplyingImageEditorAdjustments.value).toBe(false)
+      expect(harness.runtime.imageAdjustmentFinalApplyProgress.value).toBeNull()
+      expect(harness.message.success).toHaveBeenCalledWith('已应用调整并派生新节点')
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('cancels the active final render without showing a warning toast', async () => {
+    renderAdjustmentFileMock.mockImplementation(
+      async (_source, _layers, options): Promise<File> =>
+        new Promise((_resolve, reject) => {
+          options?.onProgress?.({ phase: 'encode' })
+          window.setTimeout(() => reject(new Error('cancelled')), 0)
+        }),
+    )
+    const harness = mountWorkspaceImageToolRuntime()
+
+    try {
+      harness.runtime.enterFlowImageEditorMode('node-1', 'adjust')
+      harness.runtime.imageEditorLayers.value = [effectiveInvertLayer, sourceLayer]
+
+      const apply = harness.runtime.onApplyImageEditorAdjustments()
+      await flushPromises()
+      harness.runtime.cancelImageEditorAdjustmentFinalApply()
+
+      expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-adjustment-final:node-1')
+      expect(harness.runtime.isApplyingImageEditorAdjustments.value).toBe(false)
+      expect(harness.runtime.imageAdjustmentFinalApplyProgress.value).toBeNull()
+
+      await apply
+
+      expect(harness.message.warning).not.toHaveBeenCalled()
+      expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+})

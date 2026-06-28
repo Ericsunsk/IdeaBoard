@@ -3,15 +3,21 @@
     <div
       class="image-editor-layers-panel__list app-scrollbar"
       :class="{ 'is-scrolling': isLayerListScrolling }"
+      role="listbox"
+      aria-label="图层"
       @scroll="onLayerListScroll"
     >
-      <button
+      <div
         v-for="layer in layers"
         :key="layer.id"
-        type="button"
         class="image-editor-layer-row"
         :class="{ active: selectedLayerId === layer.id }"
-        @click="emit('select-layer', layer.id)"
+        role="option"
+        :aria-selected="selectedLayerId === layer.id"
+        tabindex="0"
+        @click="selectLayer(layer.id)"
+        @keydown.enter.prevent="selectLayer(layer.id)"
+        @keydown.space.prevent="selectLayer(layer.id)"
       >
         <span class="image-editor-layer-row__thumb" :class="`kind-${resolveLayerKind(layer)}`">
           <component :is="resolveLayerIcon(layer)" class="image-editor-layer-row__thumb-icon" />
@@ -20,8 +26,9 @@
         <span v-if="layer.type === 'source'" class="image-editor-layer-row__lock">
           <Lock class="image-editor-layer-row__icon" />
         </span>
-        <span
+        <button
           v-else
+          type="button"
           class="image-editor-layer-row__visibility node-tool-tooltip-trigger"
           :aria-label="layer.visible ? '隐藏图层' : '显示图层'"
           @click.stop="onToggleVisibility(layer)"
@@ -31,8 +38,8 @@
           <span class="node-tool-tooltip" aria-hidden="true">
             {{ layer.visible ? '隐藏图层' : '显示图层' }}
           </span>
-        </span>
-      </button>
+        </button>
+      </div>
     </div>
 
   </section>
@@ -87,6 +94,10 @@ function onLayerListScroll() {
 function onToggleVisibility(layer: ImageEditorLayer) {
   if (layer.type === 'source') return
   emit('set-layer-visible', layer.id, !layer.visible)
+}
+
+function selectLayer(layerId: string) {
+  emit('select-layer', layerId)
 }
 
 function resolveLayerKind(layer: ImageEditorLayer) {
@@ -165,13 +176,22 @@ onBeforeUnmount(clearLayerListScrollTimer)
 .image-editor-layer-row__lock {
   width: 18px;
   height: 18px;
+  border: 0;
+  padding: 0;
   display: grid;
   place-items: center;
+  background: transparent;
   color: var(--workspace-text-muted);
 }
 
 .image-editor-layer-row__visibility {
   cursor: pointer;
+}
+
+.image-editor-layer-row:focus-visible,
+.image-editor-layer-row__visibility:focus-visible {
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: 2px;
 }
 
 .image-editor-layer-row__visibility .node-tool-tooltip {

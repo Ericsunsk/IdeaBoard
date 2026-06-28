@@ -2,45 +2,45 @@
   <section class="image-editor-panel image-editor-properties-panel">
     <div v-if="adjustmentLayer?.kind === 'hsl'" class="image-editor-panel__body">
       <ImageEditorSlider
-        label="色相"
+        :label="ranges.hsl.ranges.hue.label"
         :value="adjustmentLayer.params.hue"
-        :min="-180"
-        :max="180"
-        unit="deg"
+        :min="ranges.hsl.ranges.hue.min"
+        :max="ranges.hsl.ranges.hue.max"
+        :unit="ranges.hsl.ranges.hue.unit"
         @update:value="emit('update-param', 'hue', $event)"
       />
       <ImageEditorSlider
-        label="饱和度"
+        :label="ranges.hsl.ranges.saturation.label"
         :value="adjustmentLayer.params.saturation"
-        :min="-100"
-        :max="100"
-        unit="%"
+        :min="ranges.hsl.ranges.saturation.min"
+        :max="ranges.hsl.ranges.saturation.max"
+        :unit="ranges.hsl.ranges.saturation.unit"
         @update:value="emit('update-param', 'saturation', $event)"
       />
       <ImageEditorSlider
-        label="亮度"
+        :label="ranges.hsl.ranges.brightness.label"
         :value="adjustmentLayer.params.brightness"
-        :min="-100"
-        :max="100"
-        unit="%"
+        :min="ranges.hsl.ranges.brightness.min"
+        :max="ranges.hsl.ranges.brightness.max"
+        :unit="ranges.hsl.ranges.brightness.unit"
         @update:value="emit('update-param', 'brightness', $event)"
       />
       <ImageEditorSlider
-        label="对比度"
+        :label="ranges.hsl.ranges.contrast.label"
         :value="adjustmentLayer.params.contrast"
-        :min="-100"
-        :max="100"
-        unit="%"
+        :min="ranges.hsl.ranges.contrast.min"
+        :max="ranges.hsl.ranges.contrast.max"
+        :unit="ranges.hsl.ranges.contrast.unit"
         @update:value="emit('update-param', 'contrast', $event)"
       />
     </div>
 
     <div v-else-if="adjustmentLayer?.kind === 'threshold'" class="image-editor-panel__body">
       <ImageEditorSlider
-        label="阈值"
+        :label="ranges.threshold.ranges.threshold.label"
         :value="adjustmentLayer.params.threshold"
-        :min="0"
-        :max="255"
+        :min="ranges.threshold.ranges.threshold.min"
+        :max="ranges.threshold.ranges.threshold.max"
         @update:value="emit('update-param', 'threshold', $event)"
       />
       <label class="image-editor-toggle-row">
@@ -57,6 +57,7 @@
       <ImageEditorCurvesControl
         :input-value="adjustmentLayer.params.input"
         :output-value="adjustmentLayer.params.output"
+        :ranges="ranges.curves.ranges"
         @update:input-value="emit('update-param', 'input', $event)"
         @update:output-value="emit('update-param', 'output', $event)"
       />
@@ -64,27 +65,27 @@
 
     <div v-else-if="adjustmentLayer?.kind === 'levels'" class="image-editor-panel__body">
       <ImageEditorSlider
-        label="黑场"
+        :label="ranges.levels.ranges.shadows.label"
         :value="adjustmentLayer.params.shadows"
-        :min="0"
-        :max="100"
-        unit="%"
+        :min="ranges.levels.ranges.shadows.min"
+        :max="ranges.levels.ranges.shadows.max"
+        :unit="ranges.levels.ranges.shadows.unit"
         @update:value="emit('update-param', 'shadows', $event)"
       />
       <ImageEditorSlider
-        label="中间"
+        :label="ranges.levels.ranges.midtones.label"
         :value="adjustmentLayer.params.midtones"
-        :min="0"
-        :max="100"
-        unit="%"
+        :min="ranges.levels.ranges.midtones.min"
+        :max="ranges.levels.ranges.midtones.max"
+        :unit="ranges.levels.ranges.midtones.unit"
         @update:value="emit('update-param', 'midtones', $event)"
       />
       <ImageEditorSlider
-        label="白场"
+        :label="ranges.levels.ranges.highlights.label"
         :value="adjustmentLayer.params.highlights"
-        :min="0"
-        :max="100"
-        unit="%"
+        :min="ranges.levels.ranges.highlights.min"
+        :max="ranges.levels.ranges.highlights.max"
+        :unit="ranges.levels.ranges.highlights.unit"
         @update:value="emit('update-param', 'highlights', $event)"
       />
     </div>
@@ -112,6 +113,7 @@ import type {
 } from '../types'
 import ImageEditorCurvesControl from './ImageEditorCurvesControl.vue'
 import ImageEditorSlider from './ImageEditorSlider.vue'
+import { IMAGE_ADJUSTMENT_DEFINITIONS } from '../utils/imageAdjustmentDefinitions'
 
 defineProps<{
   adjustmentLayer: ImageEditorAdjustmentLayer | null
@@ -120,6 +122,8 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'update-param', key: ImageEditorParamKey, value: ImageEditorParamValue): void
 }>()
+
+const ranges = IMAGE_ADJUSTMENT_DEFINITIONS
 
 function onBooleanInput(key: ImageEditorParamKey, event: Event) {
   const target = event.target as HTMLInputElement | null

@@ -1,7 +1,32 @@
-import { ref } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { nextTick, ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageEditorLayer } from '../types'
+import {
+  cancelImageAdjustmentPreviewRender,
+  renderImageAdjustmentPreview,
+} from '../services/imageAdjustmentPreviewRenderer'
 import { useImageAdjustmentFilterPreviews } from './useImageAdjustmentFilterPreviews'
+
+vi.mock('../services/imageAdjustmentPreviewRenderer', () => ({
+  IMAGE_ADJUSTMENT_PREVIEW_TASK_ID: 'image-adjustment-preview',
+  cancelImageAdjustmentPreviewRender: vi.fn(),
+  renderImageAdjustmentPreview: vi.fn(),
+}))
+
+const cancelPreviewRenderMock = vi.mocked(cancelImageAdjustmentPreviewRender)
+const renderPreviewMock = vi.mocked(renderImageAdjustmentPreview)
+const completedPreviewResult = (objectUrl: string | null) => ({
+  status: 'completed' as const,
+  taskId: 'image-adjustment-preview',
+  revision: 1,
+  output: { objectUrl },
+})
+const stalePreviewResult = (revision: number) => ({
+  status: 'stale' as const,
+  taskId: 'image-adjustment-preview',
+  revision,
+  error: { code: 'stale' as const, message: 'stale preview render' },
+})
 
 function createHslLayer(params = { hue: 0, saturation: 0, brightness: 0, contrast: 0 }) {
   return {
@@ -58,128 +83,190 @@ function createInvertLayer(params = { enabled: true }) {
   } satisfies ImageEditorLayer
 }
 
-function lutValues(tableValues: string) {
-  return tableValues.split(' ').map(Number)
+async function flushPreviewPromises() {
+  await vi.runOnlyPendingTimersAsync()
+  await Promise.resolve()
+  await nextTick()
 }
 
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  cancelPreviewRenderMock.mockReset()
+  renderPreviewMock.mockReset()
+})
+
 describe('useImageAdjustmentFilterPreviews', () => {
-  it('builds native filter previews for visible hsl adjustment layers', () => {
+  it('renders effective adjustments through the compiled image adjustment plan', async () => {
+    vi.useFakeTimers()
+    renderPreviewMock.mockResolvedValue(completedPreviewResult('blob:preview'))
     const preview = useImageAdjustmentFilterPreviews({
       isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
       layers: ref([
         createHslLayer({ hue: 90, saturation: 25, brightness: -10, contrast: 15 }),
+        createCurvesLayer(),
+        createLevelsLayer(),
+        createInvertLayer({ enabled: false }),
       ]),
     })
 
+    await flushPreviewPromises()
+
+    expect(renderPreviewMock).toHaveBeenCalledTimes(1)
+    expect(renderPreviewMock).toHaveBeenCalledWith(
+      'https://example.com/source.png',
+      expect.arrayContaining([expect.objectContaining({ kind: 'hsl' })]),
+      { taskId: 'image-adjustment-preview', debounceMs: 80 },
+    )
     expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
-      {
-        type: 'css-filter',
-        value: 'hue-rotate(90deg) saturate(1.25) brightness(0.9) contrast(1.15)',
-      },
+      { type: 'rendered-image', url: 'blob:preview' },
     ])
   })
 
-  it('does not preview hidden layers or inactive adjust mode', () => {
-    const layers = ref<ImageEditorLayer[]>([{ ...createHslLayer(), visible: false }])
+  it('does not render hidden, inactive, or neutral adjustment stacks', async () => {
+    vi.useFakeTimers()
+    const layers = ref<ImageEditorLayer[]>([
+      { ...createHslLayer(), visible: false },
+      createCurvesLayer(),
+      createLevelsLayer(),
+      createInvertLayer({ enabled: false }),
+    ])
     const preview = useImageAdjustmentFilterPreviews({
       isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
       layers,
     })
 
+    await flushPreviewPromises()
+
+    expect(preview.imageAdjustmentPlan.value).toEqual([])
     expect(preview.imageAdjustmentFilterPreviews.value).toEqual([])
+    expect(renderPreviewMock).not.toHaveBeenCalled()
+    expect(cancelPreviewRenderMock).toHaveBeenCalledWith('image-adjustment-preview')
   })
 
-  it('builds threshold lut previews with grayscale conversion', () => {
+  it('normalizes non-finite params before rendering previews', async () => {
+    vi.useFakeTimers()
+    renderPreviewMock.mockResolvedValue(completedPreviewResult('blob:preview'))
     const preview = useImageAdjustmentFilterPreviews({
       isAdjustMode: ref(true),
-      layers: ref([createThresholdLayer({ threshold: 300, invert: true })]),
-    })
-
-    expect(preview.imageAdjustmentFilterPreviews.value[0]).toEqual({
-      type: 'channel-lut',
-      tableValues: expect.any(String),
-      grayscale: true,
-    })
-
-    const tableValues =
-      preview.imageAdjustmentFilterPreviews.value[0]?.type === 'channel-lut'
-        ? preview.imageAdjustmentFilterPreviews.value[0].tableValues
-        : ''
-    const values = lutValues(tableValues)
-    expect(values[0]).toBe(1)
-    expect(values[255]).toBe(0)
-  })
-
-  it('builds curves lut previews from the control point', () => {
-    const preview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      layers: ref([createCurvesLayer({ input: 50, output: 25 })]),
-    })
-
-    const curvesPreview = preview.imageAdjustmentFilterPreviews.value[0]
-    expect(curvesPreview?.type).toBe('channel-lut')
-    expect(curvesPreview?.type === 'channel-lut' ? curvesPreview.grayscale : true).toBe(false)
-
-    const values = lutValues(curvesPreview?.type === 'channel-lut' ? curvesPreview.tableValues : '')
-    expect(values[0]).toBe(0)
-    expect(values[128]).toBeCloseTo(64 / 255, 4)
-    expect(values[192]).toBeCloseTo(160 / 255, 4)
-  })
-
-  it('builds levels lut previews without grayscale conversion', () => {
-    const preview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      layers: ref([createLevelsLayer({ shadows: 25, midtones: 50, highlights: 75 })]),
-    })
-
-    const levelsPreview = preview.imageAdjustmentFilterPreviews.value[0]
-    expect(levelsPreview?.type).toBe('channel-lut')
-    expect(levelsPreview?.type === 'channel-lut' ? levelsPreview.grayscale : true).toBe(false)
-
-    const values = lutValues(levelsPreview?.type === 'channel-lut' ? levelsPreview.tableValues : '')
-    expect(values[0]).toBe(0)
-    expect(values[64]).toBe(0)
-    expect(values[192]).toBe(1)
-  })
-
-  it('builds native invert previews only when enabled', () => {
-    const enabledPreview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      layers: ref([createInvertLayer({ enabled: true })]),
-    })
-    const disabledPreview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      layers: ref([createInvertLayer({ enabled: false })]),
-    })
-
-    expect(enabledPreview.imageAdjustmentFilterPreviews.value).toEqual([
-      { type: 'css-filter', value: 'invert(1)' },
-    ])
-    expect(disabledPreview.imageAdjustmentFilterPreviews.value).toEqual([])
-  })
-
-  it('keeps filter previews in layer order', () => {
-    const preview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
       layers: ref([
-        createLevelsLayer(),
-        createInvertLayer(),
-        createCurvesLayer(),
-        createHslLayer({ hue: -45, saturation: 0, brightness: 0, contrast: 0 }),
-        createThresholdLayer(),
+        createThresholdLayer({ threshold: Number.NaN, invert: false }),
+        createHslLayer({
+          hue: Number.NaN,
+          saturation: Number.POSITIVE_INFINITY,
+          brightness: Number.NEGATIVE_INFINITY,
+          contrast: Number.NaN,
+        }),
       ]),
     })
 
-    expect(preview.imageAdjustmentFilterPreviews.value.map((item) => item.type)).toEqual([
-      'channel-lut',
-      'css-filter',
-      'channel-lut',
-      'css-filter',
-      'channel-lut',
+    await flushPreviewPromises()
+
+    expect(preview.imageAdjustmentPlan.value).toEqual([
+      { kind: 'threshold', threshold: 128, invert: false },
     ])
-    expect(preview.imageAdjustmentFilterPreviews.value[1]).toEqual({
-      type: 'css-filter',
-      value: 'invert(1)',
+    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
+      { type: 'rendered-image', url: 'blob:preview' },
+    ])
+  })
+
+  it('revokes stale rendered preview object URLs', async () => {
+    vi.useFakeTimers()
+    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    renderPreviewMock
+      .mockResolvedValueOnce(completedPreviewResult('blob:first-preview'))
+      .mockResolvedValueOnce(completedPreviewResult('blob:second-preview'))
+    const layers = ref<ImageEditorLayer[]>([createInvertLayer()])
+    const preview = useImageAdjustmentFilterPreviews({
+      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
+      layers,
     })
+
+    await flushPreviewPromises()
+    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
+      { type: 'rendered-image', url: 'blob:first-preview' },
+    ])
+
+    layers.value = [createThresholdLayer()]
+    await nextTick()
+    await flushPreviewPromises()
+
+    expect(revokeSpy).toHaveBeenCalledWith('blob:first-preview')
+    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
+      { type: 'rendered-image', url: 'blob:second-preview' },
+    ])
+  })
+
+  it('delegates rapid adjustment changes to the runtime scheduler and keeps the latest preview', async () => {
+    vi.useFakeTimers()
+    renderPreviewMock
+      .mockResolvedValueOnce(stalePreviewResult(1))
+      .mockResolvedValueOnce(stalePreviewResult(2))
+      .mockResolvedValueOnce(completedPreviewResult('blob:latest-preview'))
+    const layers = ref<ImageEditorLayer[]>([createInvertLayer()])
+    const preview = useImageAdjustmentFilterPreviews({
+      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
+      layers,
+    })
+
+    layers.value = [createThresholdLayer({ threshold: 32, invert: false })]
+    await nextTick()
+    layers.value = [createThresholdLayer({ threshold: 224, invert: true })]
+    await nextTick()
+    await flushPreviewPromises()
+
+    expect(renderPreviewMock).toHaveBeenCalledTimes(3)
+    expect(renderPreviewMock).toHaveBeenLastCalledWith(
+      'https://example.com/source.png',
+      [{ kind: 'threshold', threshold: 224, invert: true }],
+      { taskId: 'image-adjustment-preview', debounceMs: 80 },
+    )
+    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
+      { type: 'rendered-image', url: 'blob:latest-preview' },
+    ])
+  })
+
+  it('clears rendered preview URLs when the stack becomes neutral', async () => {
+    vi.useFakeTimers()
+    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    renderPreviewMock.mockResolvedValue(completedPreviewResult('blob:preview'))
+    const layers = ref<ImageEditorLayer[]>([createInvertLayer()])
+    const preview = useImageAdjustmentFilterPreviews({
+      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
+      layers,
+    })
+
+    await flushPreviewPromises()
+    layers.value = [createInvertLayer({ enabled: false })]
+    await nextTick()
+
+    expect(revokeSpy).toHaveBeenCalledWith('blob:preview')
+    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([])
+    expect(cancelPreviewRenderMock).toHaveBeenCalledWith('image-adjustment-preview')
+  })
+
+  it('keeps preview state empty when async preview rendering fails', async () => {
+    vi.useFakeTimers()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    renderPreviewMock.mockRejectedValue(new Error('preview failed'))
+    const preview = useImageAdjustmentFilterPreviews({
+      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
+      layers: ref([createInvertLayer()]),
+    })
+
+    await flushPreviewPromises()
+
+    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([])
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[image-editor] failed to render adjustment preview',
+      expect.any(Error),
+    )
   })
 })

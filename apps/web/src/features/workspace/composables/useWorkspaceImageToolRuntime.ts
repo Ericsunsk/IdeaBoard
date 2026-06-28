@@ -1,13 +1,18 @@
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, provide, readonly, ref, type ComputedRef, type Ref } from 'vue'
 import type { Connection, Node } from '@vue-flow/core'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import {
+  cancelImageAdjustmentFinalRender,
   flattenVisibleImageEditorAdjustmentLayers,
+  hasEffectiveImageEditorAdjustmentLayers,
+  IMAGE_ADJUSTMENT_FINAL_TASK_ID,
   renderImageAdjustmentFile,
   useImageAdjustmentFilterPreviews,
   useImageEditorMode,
   useImageEditorSession,
+  IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
   type ImageAdjustmentKind,
+  type ImageAdjustmentFinalApplyProgress,
   type ImageEditorAdjustmentLayer,
   type ImageEditorFilterPreview,
   type ImageEditorLayer,
@@ -15,6 +20,7 @@ import {
   type ImageEditorParamKey,
   type ImageEditorParamValue,
   type ImageEditorTool,
+  type WorkspaceImageAdjustmentFinalApplyContext,
 } from '../image-editor'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
@@ -93,8 +99,10 @@ type WorkspaceImageToolRuntime = {
     value: ImageEditorParamValue,
   ) => void
   isApplyingImageEditorAdjustments: Ref<boolean>
+  imageAdjustmentFinalApplyProgress: Ref<ImageAdjustmentFinalApplyProgress | null>
   imageAdjustmentFilterPreviews: ComputedRef<ImageEditorFilterPreview[]>
   onApplyImageEditorAdjustments: () => Promise<void>
+  cancelImageEditorAdjustmentFinalApply: () => void
   cancelFlowMaskEditorMode: () => void
   enterFlowImageEditorMode: (nodeId: string, mode: ImageEditorMode) => boolean
   commitFlowMaskEditorMode: () => boolean
@@ -109,6 +117,7 @@ export function useWorkspaceImageToolRuntime(
     getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
     getImageStageElement: options.getImageStageElement,
     onBeforePointerCancel: options.clearSelectedFlowElements,
+    onBeforeExit: (state) => cancelImageAdjustmentFinalTask(state.nodeId),
   })
 
   const maskEditor = useImageMaskEditorOverlay({
@@ -126,11 +135,40 @@ export function useWorkspaceImageToolRuntime(
 
   const imageEditorSession = useImageEditorSession()
   const isApplyingImageEditorAdjustments = ref(false)
+  const imageAdjustmentFinalApplyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(null)
+  const activeImageAdjustmentFinalTaskId = ref<string | null>(null)
   const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
   const { imageAdjustmentFilterPreviews } = useImageAdjustmentFilterPreviews({
     isAdjustMode: isImageAdjustmentMode,
     layers: imageEditorSession.imageEditorLayers,
+    sourceUrl: () =>
+      flowImageEditorNodeId.value
+        ? options.getImageNodeDisplayPayload(flowImageEditorNodeId.value)?.url
+        : null,
   })
+
+  function getImageAdjustmentFinalTaskId(nodeId: string) {
+    return `${IMAGE_ADJUSTMENT_FINAL_TASK_ID}:${nodeId}`
+  }
+
+  function cancelImageAdjustmentFinalTask(nodeId: string | null = flowImageEditorNodeId.value) {
+    if (!nodeId) return
+    const taskId = getImageAdjustmentFinalTaskId(nodeId)
+    cancelImageAdjustmentFinalRender(taskId)
+    if (activeImageAdjustmentFinalTaskId.value === taskId) {
+      activeImageAdjustmentFinalTaskId.value = null
+      isApplyingImageEditorAdjustments.value = false
+      imageAdjustmentFinalApplyProgress.value = null
+    }
+  }
+
+  provide<WorkspaceImageAdjustmentFinalApplyContext>(
+    IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
+    {
+      progress: readonly(imageAdjustmentFinalApplyProgress),
+      cancel: () => cancelImageAdjustmentFinalTask(),
+    },
+  )
 
   async function onApplyImageEditorAdjustments() {
     if (isApplyingImageEditorAdjustments.value) return
@@ -149,16 +187,31 @@ export function useWorkspaceImageToolRuntime(
     const visibleAdjustmentLayers = flattenVisibleImageEditorAdjustmentLayers(
       imageEditorSession.imageEditorLayers.value,
     )
-    if (visibleAdjustmentLayers.length === 0) {
+    if (!hasEffectiveImageEditorAdjustmentLayers(imageEditorSession.imageEditorLayers.value)) {
       options.message.warning('没有可应用的调整图层')
       return
     }
 
     isApplyingImageEditorAdjustments.value = true
+    imageAdjustmentFinalApplyProgress.value = { phase: 'queued' }
+    const taskId = getImageAdjustmentFinalTaskId(nodeId)
+    activeImageAdjustmentFinalTaskId.value = taskId
     try {
       const renderedFile = await renderImageAdjustmentFile(
         { url: source.url, title: sourceNode.title || 'Image' },
         visibleAdjustmentLayers,
+        {
+          taskId,
+          latestOnly: true,
+          onProgress: (progress) => {
+            if (activeImageAdjustmentFinalTaskId.value !== taskId) return
+            imageAdjustmentFinalApplyProgress.value = {
+              phase: progress.phase,
+              ...(progress.loaded === undefined ? {} : { loaded: progress.loaded }),
+              ...(progress.total === undefined ? {} : { total: progress.total }),
+            }
+          },
+        },
       )
       if (options.currentBoardId.value !== boardId || flowImageEditorNodeId.value !== nodeId)
         return
@@ -179,9 +232,21 @@ export function useWorkspaceImageToolRuntime(
       exitImageEditorMode()
       options.message.success('已应用调整并派生新节点')
     } catch (error) {
+      if (
+        isImageAdjustmentFinalApplyCancelled(error) ||
+        options.currentBoardId.value !== boardId ||
+        flowImageEditorNodeId.value !== nodeId ||
+        activeImageAdjustmentFinalTaskId.value !== taskId
+      ) {
+        return
+      }
       options.message.warning(error instanceof Error ? error.message : '应用调整失败')
     } finally {
-      isApplyingImageEditorAdjustments.value = false
+      if (activeImageAdjustmentFinalTaskId.value === taskId) {
+        activeImageAdjustmentFinalTaskId.value = null
+        isApplyingImageEditorAdjustments.value = false
+        imageAdjustmentFinalApplyProgress.value = null
+      }
     }
   }
 
@@ -199,6 +264,7 @@ export function useWorkspaceImageToolRuntime(
   function commitFlowMaskEditorMode() {
     const didCommit = maskEditor.commitMaskDraft()
     if (!didCommit) return false
+    cancelImageAdjustmentFinalTask()
     exitImageEditorMode({ runBeforeExit: false })
     return true
   }
@@ -241,10 +307,18 @@ export function useWorkspaceImageToolRuntime(
     removeImageEditorLayer: imageEditorSession.removeImageEditorLayer,
     updateSelectedImageEditorLayerParam: imageEditorSession.updateSelectedImageEditorLayerParam,
     isApplyingImageEditorAdjustments,
+    imageAdjustmentFinalApplyProgress,
     imageAdjustmentFilterPreviews,
     onApplyImageEditorAdjustments,
+    cancelImageEditorAdjustmentFinalApply: () => cancelImageAdjustmentFinalTask(),
     cancelFlowMaskEditorMode,
     enterFlowImageEditorMode,
     commitFlowMaskEditorMode,
   }
+}
+
+function isImageAdjustmentFinalApplyCancelled(error: unknown) {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return message === 'cancelled' || message.includes('已取消')
 }

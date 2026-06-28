@@ -63,10 +63,16 @@ function onInput(event: Event) {
   appearance: none;
   width: 100%;
   min-width: 0;
-  height: 22px;
+  height: 26px;
   margin: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.image-editor-slider-row input[type='range']:focus-visible {
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: 3px;
+  border-radius: 999px;
 }
 
 .image-editor-slider-row input[type='range']::-webkit-slider-runnable-track {
@@ -78,9 +84,9 @@ function onInput(event: Event) {
 
 .image-editor-slider-row input[type='range']::-webkit-slider-thumb {
   appearance: none;
-  width: 9px;
-  height: 9px;
-  margin-top: -2.5px;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
   border: 0;
   border-radius: 999px;
   background: var(--workspace-accent);
@@ -94,8 +100,8 @@ function onInput(event: Event) {
 }
 
 .image-editor-slider-row input[type='range']::-moz-range-thumb {
-  width: 9px;
-  height: 9px;
+  width: 20px;
+  height: 20px;
   border: 0;
   border-radius: 999px;
   background: var(--workspace-accent);

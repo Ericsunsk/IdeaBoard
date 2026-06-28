@@ -3,6 +3,7 @@ import type {
   ImageEditorEditableLayer,
   ImageEditorLayer,
 } from '../types'
+import { hasEffectiveImageAdjustments } from './imageAdjustmentEngine'
 
 export function flattenVisibleImageEditorAdjustmentLayers(
   layers: readonly ImageEditorLayer[],
@@ -12,6 +13,10 @@ export function flattenVisibleImageEditorAdjustmentLayers(
     if (layer.type === 'adjustment') return [layer]
     return flattenVisibleEditableAdjustments(layer.children)
   })
+}
+
+export function hasEffectiveImageEditorAdjustmentLayers(layers: readonly ImageEditorLayer[]) {
+  return hasEffectiveImageAdjustments(flattenVisibleImageEditorAdjustmentLayers(layers))
 }
 
 function flattenVisibleEditableAdjustments(

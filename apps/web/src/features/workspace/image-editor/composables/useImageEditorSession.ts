@@ -11,6 +11,7 @@ import type {
   ImageEditorParamValue,
   ImageEditorTool,
 } from '../types'
+import { getImageAdjustmentDefaultParams } from '../utils/imageAdjustmentDefinitions'
 
 const SOURCE_LAYER_ID = 'source'
 let imageEditorLayerIdSeed = 0
@@ -24,12 +25,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     kind: 'hsl',
     name: '色相/饱和度 1',
     visible: true,
-    params: {
-      hue: 0,
-      saturation: 0,
-      brightness: 0,
-      contrast: 0,
-    },
+    params: getImageAdjustmentDefaultParams('hsl'),
   },
   threshold: {
     id: 'adjustment:threshold',
@@ -37,10 +33,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     kind: 'threshold',
     name: '阈值 1',
     visible: true,
-    params: {
-      threshold: 128,
-      invert: false,
-    },
+    params: getImageAdjustmentDefaultParams('threshold'),
   },
   curves: {
     id: 'adjustment:curves',
@@ -48,10 +41,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     kind: 'curves',
     name: '曲线 1',
     visible: true,
-    params: {
-      input: 50,
-      output: 50,
-    },
+    params: getImageAdjustmentDefaultParams('curves'),
   },
   levels: {
     id: 'adjustment:levels',
@@ -59,11 +49,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     kind: 'levels',
     name: '色阶 1',
     visible: true,
-    params: {
-      shadows: 0,
-      midtones: 50,
-      highlights: 100,
-    },
+    params: getImageAdjustmentDefaultParams('levels'),
   },
   invert: {
     id: 'adjustment:invert',
@@ -71,9 +57,7 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     kind: 'invert',
     name: '反相 1',
     visible: true,
-    params: {
-      enabled: true,
-    },
+    params: getImageAdjustmentDefaultParams('invert'),
   },
 }
 

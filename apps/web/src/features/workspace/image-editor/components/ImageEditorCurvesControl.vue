@@ -3,13 +3,13 @@
     <div class="image-editor-curves__toolbar">
       <label class="image-editor-curves__select-label">
         <span>预设</span>
-        <select value="custom" aria-label="曲线预设">
+        <select value="custom" aria-label="曲线预设" disabled>
           <option value="custom">自定</option>
         </select>
       </label>
       <label class="image-editor-curves__select-label">
         <span>通道</span>
-        <select value="rgb" aria-label="曲线通道">
+        <select value="rgb" aria-label="曲线通道" disabled>
           <option value="rgb">RGB</option>
         </select>
       </label>
@@ -22,8 +22,8 @@
       tabindex="0"
       aria-label="曲线控制点"
       :aria-valuetext="`输入 ${inputValue}%，输出 ${outputValue}%`"
-      aria-valuemin="0"
-      aria-valuemax="100"
+      :aria-valuemin="ranges.input.min"
+      :aria-valuemax="ranges.input.max"
       :aria-valuenow="outputValue"
       @pointerdown="onGraphPointerDown"
       @keydown="onGraphKeydown"
@@ -54,8 +54,8 @@
         <span>输入</span>
         <input
           type="number"
-          min="0"
-          max="100"
+          :min="ranges.input.min"
+          :max="ranges.input.max"
           step="1"
           :value="inputValue"
           @input="onInputValueChange"
@@ -65,8 +65,8 @@
         <span>输出</span>
         <input
           type="number"
-          min="0"
-          max="100"
+          :min="ranges.output.min"
+          :max="ranges.output.max"
           step="1"
           :value="outputValue"
           @input="onOutputValueChange"
@@ -78,11 +78,18 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useId } from 'vue'
+import { IMAGE_ADJUSTMENT_DEFINITIONS } from '../utils/imageAdjustmentDefinitions'
 
-const props = defineProps<{
-  inputValue: number
-  outputValue: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    inputValue: number
+    outputValue: number
+    ranges?: typeof IMAGE_ADJUSTMENT_DEFINITIONS.curves.ranges
+  }>(),
+  {
+    ranges: () => IMAGE_ADJUSTMENT_DEFINITIONS.curves.ranges,
+  },
+)
 
 const emit = defineEmits<{
   (e: 'update:input-value', value: number): void
@@ -93,8 +100,9 @@ const graphRef = ref<HTMLElement | null>(null)
 const gradientId = `image-editor-curves-gradient-${useId()}`
 const fineGridPath = createGridPath([25, 50, 75])
 const strongGridPath = createGridPath([0, 100])
-const inputValue = computed(() => clampPercent(props.inputValue))
-const outputValue = computed(() => clampPercent(props.outputValue))
+const ranges = computed(() => props.ranges)
+const inputValue = computed(() => clampToRange(props.inputValue, ranges.value.input))
+const outputValue = computed(() => clampToRange(props.outputValue, ranges.value.output))
 const pointPosition = computed(() => ({
   x: inputValue.value,
   y: 100 - outputValue.value,
@@ -109,9 +117,12 @@ function createGridPath(values: number[]) {
     .join(' ')
 }
 
-function clampPercent(value: number) {
-  if (!Number.isFinite(value)) return 0
-  return Math.min(100, Math.max(0, Math.round(value)))
+function clampToRange(
+  value: number,
+  range: typeof IMAGE_ADJUSTMENT_DEFINITIONS.curves.ranges.input,
+) {
+  if (!Number.isFinite(value)) return range.defaultValue
+  return Math.min(range.max, Math.max(range.min, Math.round(value)))
 }
 
 function updatePointFromEvent(event: PointerEvent) {
@@ -119,8 +130,8 @@ function updatePointFromEvent(event: PointerEvent) {
   if (!rect) return
   const x = ((event.clientX - rect.left) / rect.width) * 100
   const y = ((event.clientY - rect.top) / rect.height) * 100
-  emit('update:input-value', clampPercent(x))
-  emit('update:output-value', clampPercent(100 - y))
+  emit('update:input-value', clampToRange(x, ranges.value.input))
+  emit('update:output-value', clampToRange(100 - y, ranges.value.output))
 }
 
 function stopGraphDrag(pointerId: number) {
@@ -152,27 +163,27 @@ function onGraphKeydown(event: KeyboardEvent) {
   const step = event.shiftKey ? 10 : 1
   if (event.key === 'ArrowLeft') {
     event.preventDefault()
-    emit('update:input-value', clampPercent(inputValue.value - step))
+    emit('update:input-value', clampToRange(inputValue.value - step, ranges.value.input))
   } else if (event.key === 'ArrowRight') {
     event.preventDefault()
-    emit('update:input-value', clampPercent(inputValue.value + step))
+    emit('update:input-value', clampToRange(inputValue.value + step, ranges.value.input))
   } else if (event.key === 'ArrowDown') {
     event.preventDefault()
-    emit('update:output-value', clampPercent(outputValue.value - step))
+    emit('update:output-value', clampToRange(outputValue.value - step, ranges.value.output))
   } else if (event.key === 'ArrowUp') {
     event.preventDefault()
-    emit('update:output-value', clampPercent(outputValue.value + step))
+    emit('update:output-value', clampToRange(outputValue.value + step, ranges.value.output))
   }
 }
 
 function onInputValueChange(event: Event) {
   const target = event.target as HTMLInputElement | null
-  emit('update:input-value', clampPercent(Number(target?.value)))
+  emit('update:input-value', clampToRange(Number(target?.value), ranges.value.input))
 }
 
 function onOutputValueChange(event: Event) {
   const target = event.target as HTMLInputElement | null
-  emit('update:output-value', clampPercent(Number(target?.value)))
+  emit('update:output-value', clampToRange(Number(target?.value), ranges.value.output))
 }
 
 onBeforeUnmount(() => {
@@ -210,6 +221,10 @@ onBeforeUnmount(() => {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
+.image-editor-curves__fields label {
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
 .image-editor-curves__select-label select,
 .image-editor-curves__fields input {
   height: 24px;
@@ -220,11 +235,19 @@ onBeforeUnmount(() => {
   color: var(--workspace-text-body);
   font-size: var(--image-editor-panel-text-size);
   font-weight: 600;
+  padding: 0 7px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
   outline: none;
 }
 
 .image-editor-curves__select-label select {
   padding: 0 8px;
+}
+
+.image-editor-curves__select-label select:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .image-editor-curves__select-label select:focus-visible,
@@ -306,16 +329,6 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-}
-
-.image-editor-curves__fields label {
-  grid-template-columns: 28px minmax(0, 1fr);
-}
-
-.image-editor-curves__fields input {
-  padding: 0 7px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
 .image-editor-curves__fields input::-webkit-outer-spin-button,

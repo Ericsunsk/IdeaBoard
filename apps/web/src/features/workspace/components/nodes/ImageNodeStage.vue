@@ -25,7 +25,7 @@
       <img
         :src="stageDisplayUrl"
         class="image-node-stage-image"
-        :class="{ 'is-dragging': dragging }"
+        :class="{ 'is-dragging': dragging, 'has-rendered-preview': !!renderedImagePreviewUrl }"
         :style="stageImageStyle"
         alt="图片节点预览"
         draggable="false"
@@ -36,30 +36,14 @@
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
       />
-      <svg
-        v-if="channelLutPreviewEntries.length > 0"
-        class="image-node-stage-filter-defs"
-        width="0"
-        height="0"
+      <img
+        v-if="renderedImagePreviewUrl"
+        :src="renderedImagePreviewUrl"
+        class="image-node-stage-image image-node-stage-image--preview"
+        alt=""
+        draggable="false"
         aria-hidden="true"
-        focusable="false"
-      >
-        <defs>
-          <filter
-            v-for="entry in channelLutPreviewEntries"
-            :id="entry.id"
-            :key="entry.id"
-          >
-            <feColorMatrix v-if="entry.preview.grayscale" type="saturate" values="0" />
-            <feComponentTransfer>
-              <feFuncR type="discrete" :tableValues="entry.preview.tableValues" />
-              <feFuncG type="discrete" :tableValues="entry.preview.tableValues" />
-              <feFuncB type="discrete" :tableValues="entry.preview.tableValues" />
-              <feFuncA type="identity" />
-            </feComponentTransfer>
-          </filter>
-        </defs>
-      </svg>
+      />
       <ImageCanvasExtendOverlay
         v-if="expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
@@ -135,11 +119,7 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type {
-  ImageEditorChannelLutPreview,
-  ImageEditorFilterPreview,
-  ImageEditorMode,
-} from '../../image-editor'
+import type { ImageEditorFilterPreview, ImageEditorMode } from '../../image-editor'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import { ImageMaskEditorOverlay } from '../../mask-editor'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
@@ -197,24 +177,16 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
 const isImageEditorActive = computed(() => props.imageEditorMode != null)
 const isMaskEditorActive = computed(() => props.imageEditorMode === 'inpaint')
 const imageEditorFilterPreviews = computed(() => props.imageEditorFilterPreviews ?? [])
-const channelLutPreviewEntries = computed(() =>
-  imageEditorFilterPreviews.value.reduce<
-    { preview: ImageEditorChannelLutPreview; previewIndex: number; id: string }[]
-  >((entries, preview, previewIndex) => {
-    if (preview.type !== 'channel-lut') return entries
-    entries.push({
-      preview,
-      previewIndex,
-      id: `image-channel-lut-preview-${props.flowNodeId ?? props.nodeId}-${previewIndex}`,
-    })
-    return entries
-  }, []),
+const renderedImagePreviewUrl = computed(
+  () =>
+    imageEditorFilterPreviews.value.find((preview) => preview.type === 'rendered-image')?.url ??
+    null,
 )
 const stageImageStyle = computed<Record<string, string> | undefined>(() => {
   const filters = imageEditorFilterPreviews.value
-    .map((preview, previewIndex) => {
+    .map((preview) => {
       if (preview.type === 'css-filter') return preview.value.trim()
-      return `url(#image-channel-lut-preview-${props.flowNodeId ?? props.nodeId}-${previewIndex})`
+      return ''
     })
     .filter(Boolean)
 
@@ -281,6 +253,17 @@ function selectOutputCount(value: number) {
   user-select: none;
 }
 
+.image-node-stage-image--preview {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.image-node-stage-image--preview + .image-node-stage-actions {
+  z-index: 2;
+}
+
 .image-node-stage-image:focus-visible {
   outline: 3px solid rgba(146, 120, 230, 0.36);
   outline-offset: -4px;
@@ -290,11 +273,8 @@ function selectOutputCount(value: number) {
   cursor: grabbing;
 }
 
-.image-node-stage-filter-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  pointer-events: none;
+.image-node-stage-image.has-rendered-preview {
+  visibility: hidden;
 }
 
 .image-node-stage.is-running .image-node-stage-image,

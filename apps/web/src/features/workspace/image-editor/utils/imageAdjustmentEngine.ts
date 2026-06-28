@@ -1,33 +1,131 @@
 import type { ImageEditorAdjustmentLayer } from '../types'
+import {
+  CHANNEL_MAX,
+  CHANNEL_MIN,
+  isNeutralImageAdjustment,
+  normalizeImageAdjustmentLayers,
+  type NormalizedCurvesAdjustment,
+  type NormalizedHslAdjustment,
+  type NormalizedImageAdjustment,
+  type NormalizedLevelsAdjustment,
+} from './imageAdjustmentDefinitions'
 
-const CHANNEL_MIN = 0
-const CHANNEL_MAX = 255
-const PERCENT_SCALE = 100
+export type ImageAdjustmentPlanStep =
+  | { kind: 'hsl'; params: NormalizedHslAdjustment }
+  | { kind: 'threshold'; threshold: number; invert: boolean }
+  | { kind: 'channel-lut'; lut: Uint8ClampedArray }
 
-type Rgb = {
-  r: number
-  g: number
-  b: number
-}
-
-type Hsl = {
-  h: number
-  s: number
-  l: number
-}
+export type ImageAdjustmentPlan = readonly ImageAdjustmentPlanStep[]
 
 export function applyImageAdjustments(
   source: ImageData,
   layers: readonly ImageEditorAdjustmentLayer[],
 ): ImageData {
   const output = createImageDataCopy(source)
-  const visibleLayers = layers.filter((layer) => layer.visible)
-  if (visibleLayers.length === 0) return output
-
-  for (const layer of visibleLayers) {
-    applyAdjustmentLayer(output.data, layer)
-  }
+  applyImageAdjustmentsInPlace(output, layers)
   return output
+}
+
+export function applyImageAdjustmentsInPlace(
+  imageData: ImageData,
+  layers: readonly ImageEditorAdjustmentLayer[],
+): ImageData {
+  executeImageAdjustmentPlan(imageData, compileImageAdjustmentPlan(layers))
+  return imageData
+}
+
+export function hasEffectiveImageAdjustments(layers: readonly ImageEditorAdjustmentLayer[]) {
+  return compileImageAdjustmentPlan(layers).length > 0
+}
+
+export function normalizeImageAdjustmentStack(
+  layers: readonly ImageEditorAdjustmentLayer[],
+): NormalizedImageAdjustment[] {
+  return normalizeImageAdjustmentLayers(layers.filter((layer) => layer.visible))
+}
+
+export function compileImageAdjustmentPlan(
+  layers: readonly ImageEditorAdjustmentLayer[],
+): ImageAdjustmentPlanStep[] {
+  return compileNormalizedImageAdjustmentPlan(normalizeImageAdjustmentStack(layers))
+}
+
+export function compileNormalizedImageAdjustmentPlan(
+  layers: readonly NormalizedImageAdjustment[],
+): ImageAdjustmentPlanStep[] {
+  const steps: ImageAdjustmentPlanStep[] = []
+  let pendingChannelLut: Uint8ClampedArray | null = null
+
+  const flushPendingChannelLut = () => {
+    if (!pendingChannelLut) return
+    steps.push({ kind: 'channel-lut', lut: pendingChannelLut })
+    pendingChannelLut = null
+  }
+
+  for (const layer of layers) {
+    if (isNeutralImageAdjustment(layer)) continue
+
+    switch (layer.kind) {
+      case 'hsl':
+        flushPendingChannelLut()
+        steps.push({ kind: 'hsl', params: layer.params })
+        break
+      case 'threshold':
+        flushPendingChannelLut()
+        steps.push({
+          kind: 'threshold',
+          threshold: layer.params.threshold,
+          invert: layer.params.invert,
+        })
+        break
+      case 'curves':
+        pendingChannelLut = appendChannelLut(pendingChannelLut, createCurvesLut(layer.params))
+        break
+      case 'levels':
+        pendingChannelLut = appendChannelLut(pendingChannelLut, createLevelsLut(layer.params))
+        break
+      case 'invert':
+        pendingChannelLut = appendChannelLut(pendingChannelLut, INVERT_LUT)
+        break
+    }
+  }
+
+  flushPendingChannelLut()
+  return steps
+}
+
+export function executeImageAdjustmentPlan(imageData: ImageData, plan: ImageAdjustmentPlan) {
+  executeImageAdjustmentPlanData(imageData.data, plan)
+  return imageData
+}
+
+function executeImageAdjustmentPlanData(data: Uint8ClampedArray, plan: ImageAdjustmentPlan) {
+  for (const step of plan) {
+    executeImageAdjustmentPlanStepRange(data, step, 0, data.length)
+  }
+}
+
+export function executeImageAdjustmentPlanStepRange(
+  data: Uint8ClampedArray,
+  step: ImageAdjustmentPlanStep,
+  startByte: number,
+  endByte: number,
+) {
+  const start = alignPixelByteOffset(startByte)
+  const end = alignPixelByteOffset(Math.min(endByte, data.length))
+  if (start >= end) return
+
+  switch (step.kind) {
+    case 'hsl':
+      applyHslAdjustment(data, step.params, start, end)
+      break
+    case 'threshold':
+      applyThresholdAdjustment(data, step.threshold, step.invert, start, end)
+      break
+    case 'channel-lut':
+      applyChannelLut(data, step.lut, start, end)
+      break
+  }
 }
 
 function createImageDataCopy(source: ImageData) {
@@ -38,42 +136,35 @@ function createImageDataCopy(source: ImageData) {
   return new ImageDataCtor(data, source.width, source.height)
 }
 
-function applyAdjustmentLayer(data: Uint8ClampedArray, layer: ImageEditorAdjustmentLayer) {
-  switch (layer.kind) {
-    case 'hsl':
-      applyHslAdjustment(data, layer.params)
-      return
-    case 'threshold':
-      applyThresholdAdjustment(data, layer.params.threshold, layer.params.invert)
-      return
-    case 'curves':
-      applyChannelLut(data, createCurvesLut(layer.params.input, layer.params.output))
-      return
-    case 'levels':
-      applyChannelLut(
-        data,
-        createLevelsLut(layer.params.shadows, layer.params.midtones, layer.params.highlights),
-      )
-      return
-    case 'invert':
-      if (layer.params.enabled) applyInvertAdjustment(data)
-      return
-  }
+function appendChannelLut(
+  current: Uint8ClampedArray | null,
+  next: Uint8ClampedArray,
+): Uint8ClampedArray | null {
+  const composed = current ? composeChannelLuts(current, next) : next
+  return isIdentityLut(composed) ? null : composed
 }
 
-function applyInvertAdjustment(data: Uint8ClampedArray) {
-  for (let index = 0; index < data.length; index += 4) {
-    data[index] = CHANNEL_MAX - data[index]
-    data[index + 1] = CHANNEL_MAX - data[index + 1]
-    data[index + 2] = CHANNEL_MAX - data[index + 2]
-  }
+function composeChannelLuts(first: Uint8ClampedArray, second: Uint8ClampedArray) {
+  return createLut((value) => second[first[value]])
 }
 
-function applyThresholdAdjustment(data: Uint8ClampedArray, threshold: number, invert: boolean) {
-  const thresholdValue = clampChannel(threshold)
-  for (let index = 0; index < data.length; index += 4) {
+function isIdentityLut(lut: Uint8ClampedArray) {
+  for (let index = 0; index <= CHANNEL_MAX; index += 1) {
+    if (lut[index] !== index) return false
+  }
+  return true
+}
+
+function applyThresholdAdjustment(
+  data: Uint8ClampedArray,
+  threshold: number,
+  invert: boolean,
+  startByte: number,
+  endByte: number,
+) {
+  for (let index = startByte; index < endByte; index += 4) {
     const luminance = 0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2]
-    const next = luminance >= thresholdValue ? CHANNEL_MAX : CHANNEL_MIN
+    const next = luminance >= threshold ? CHANNEL_MAX : CHANNEL_MIN
     const value = invert ? CHANNEL_MAX - next : next
     data[index] = value
     data[index + 1] = value
@@ -83,28 +174,55 @@ function applyThresholdAdjustment(data: Uint8ClampedArray, threshold: number, in
 
 function applyHslAdjustment(
   data: Uint8ClampedArray,
-  params: { hue: number; saturation: number; brightness: number; contrast: number },
+  params: NormalizedHslAdjustment,
+  startByte: number,
+  endByte: number,
 ) {
-  const hueShift = params.hue / 360
-  const saturationScale = Math.max(0, 1 + params.saturation / PERCENT_SCALE)
-  const lightnessOffset = params.brightness / PERCENT_SCALE
-  const contrastFactor = createContrastFactor(params.contrast)
+  for (let index = startByte; index < endByte; index += 4) {
+    const sourceR = data[index] / CHANNEL_MAX
+    const sourceG = data[index + 1] / CHANNEL_MAX
+    const sourceB = data[index + 2] / CHANNEL_MAX
+    const max = Math.max(sourceR, sourceG, sourceB)
+    const min = Math.min(sourceR, sourceG, sourceB)
+    const sourceLightness = (max + min) / 2
+    let sourceHue = 0
+    let sourceSaturation = 0
 
-  for (let index = 0; index < data.length; index += 4) {
-    const hsl = rgbToHsl({
-      r: data[index] / CHANNEL_MAX,
-      g: data[index + 1] / CHANNEL_MAX,
-      b: data[index + 2] / CHANNEL_MAX,
-    })
-    const rgb = hslToRgb({
-      h: normalizeHueUnit(hsl.h + hueShift),
-      s: clampUnit(hsl.s * saturationScale),
-      l: clampUnit(hsl.l + lightnessOffset),
-    })
+    if (max !== min) {
+      const delta = max - min
+      sourceSaturation =
+        sourceLightness > 0.5 ? delta / (2 - max - min) : delta / (max + min)
+      if (max === sourceR) {
+        sourceHue = (sourceG - sourceB) / delta + (sourceG < sourceB ? 6 : 0)
+      } else if (max === sourceG) {
+        sourceHue = (sourceB - sourceR) / delta + 2
+      } else {
+        sourceHue = (sourceR - sourceG) / delta + 4
+      }
+      sourceHue /= 6
+    }
 
-    data[index] = applyContrast(rgb.r * CHANNEL_MAX, contrastFactor)
-    data[index + 1] = applyContrast(rgb.g * CHANNEL_MAX, contrastFactor)
-    data[index + 2] = applyContrast(rgb.b * CHANNEL_MAX, contrastFactor)
+    const nextHue = normalizeHueUnit(sourceHue + params.hueShift)
+    const nextSaturation = clampUnit(sourceSaturation * params.saturationScale)
+    const nextLightness = clampUnit(sourceLightness + params.lightnessOffset)
+    let nextR = nextLightness
+    let nextG = nextLightness
+    let nextB = nextLightness
+
+    if (nextSaturation !== 0) {
+      const q =
+        nextLightness < 0.5
+          ? nextLightness * (1 + nextSaturation)
+          : nextLightness + nextSaturation - nextLightness * nextSaturation
+      const p = 2 * nextLightness - q
+      nextR = hueToRgb(p, q, nextHue + 1 / 3)
+      nextG = hueToRgb(p, q, nextHue)
+      nextB = hueToRgb(p, q, nextHue - 1 / 3)
+    }
+
+    data[index] = applyContrast(nextR * CHANNEL_MAX, params.contrastFactor)
+    data[index + 1] = applyContrast(nextG * CHANNEL_MAX, params.contrastFactor)
+    data[index + 2] = applyContrast(nextB * CHANNEL_MAX, params.contrastFactor)
   }
 }
 
@@ -112,49 +230,51 @@ function applyContrast(value: number, contrastFactor: number) {
   return clampChannel((value - 128) * contrastFactor + 128)
 }
 
-function createContrastFactor(value: number) {
-  const normalized = clamp(value, -100, 100) * 2.55
-  return (259 * (normalized + 255)) / (255 * (259 - normalized))
-}
-
-export function createCurvesLut(input: number, output: number) {
-  const inputPoint = Math.round((clamp(input, 0, PERCENT_SCALE) / PERCENT_SCALE) * CHANNEL_MAX)
-  const outputPoint = Math.round((clamp(output, 0, PERCENT_SCALE) / PERCENT_SCALE) * CHANNEL_MAX)
+export function createCurvesLut(params: NormalizedCurvesAdjustment) {
+  const { inputPoint, outputPoint } = params
   if (inputPoint <= CHANNEL_MIN) {
-    return createLut((value) => (value === CHANNEL_MIN ? outputPoint : outputPoint + value))
+    return createLut(
+      (value) =>
+        outputPoint + (value / CHANNEL_MAX) * (CHANNEL_MAX - outputPoint),
+    )
   }
   if (inputPoint >= CHANNEL_MAX) {
-    return createLut((value) => (value === CHANNEL_MAX ? outputPoint : value))
+    return createLut((value) => (value / CHANNEL_MAX) * outputPoint)
   }
   return createLut((value) => {
     if (value <= inputPoint) return (value / inputPoint) * outputPoint
-    return outputPoint + ((value - inputPoint) / (CHANNEL_MAX - inputPoint)) * (CHANNEL_MAX - outputPoint)
+    return (
+      outputPoint +
+      ((value - inputPoint) / (CHANNEL_MAX - inputPoint)) * (CHANNEL_MAX - outputPoint)
+    )
   })
 }
 
-export function createLevelsLut(shadows: number, midtones: number, highlights: number) {
-  const black = Math.round((clamp(shadows, 0, PERCENT_SCALE) / PERCENT_SCALE) * CHANNEL_MAX)
-  const white = Math.round((clamp(highlights, 0, PERCENT_SCALE) / PERCENT_SCALE) * CHANNEL_MAX)
-  const gamma = createLevelsGamma(midtones)
-  const range = Math.max(1, white - black)
+export function createLevelsLut(params: NormalizedLevelsAdjustment) {
+  const { blackPoint, whitePoint, gamma } = params
+  const range = Math.max(1, whitePoint - blackPoint)
 
   return createLut((value) => {
-    const normalized = clampUnit((value - black) / range)
+    const normalized = clampUnit((value - blackPoint) / range)
     return Math.pow(normalized, gamma) * CHANNEL_MAX
   })
 }
 
-function createLevelsGamma(midtones: number) {
-  const normalized = clamp(midtones, 1, 99) / PERCENT_SCALE
-  return Math.log(0.5) / Math.log(normalized)
-}
-
-function applyChannelLut(data: Uint8ClampedArray, lut: Uint8ClampedArray) {
-  for (let index = 0; index < data.length; index += 4) {
+function applyChannelLut(
+  data: Uint8ClampedArray,
+  lut: Uint8ClampedArray,
+  startByte: number,
+  endByte: number,
+) {
+  for (let index = startByte; index < endByte; index += 4) {
     data[index] = lut[data[index]]
     data[index + 1] = lut[data[index + 1]]
     data[index + 2] = lut[data[index + 2]]
   }
+}
+
+function alignPixelByteOffset(offset: number) {
+  return Math.max(0, Math.floor(offset / 4) * 4)
 }
 
 function createLut(resolve: (value: number) => number) {
@@ -165,31 +285,7 @@ function createLut(resolve: (value: number) => number) {
   return lut
 }
 
-function rgbToHsl(rgb: Rgb): Hsl {
-  const max = Math.max(rgb.r, rgb.g, rgb.b)
-  const min = Math.min(rgb.r, rgb.g, rgb.b)
-  const l = (max + min) / 2
-  if (max === min) return { h: 0, s: 0, l }
-
-  const delta = max - min
-  const s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min)
-  let h: number
-  if (max === rgb.r) h = (rgb.g - rgb.b) / delta + (rgb.g < rgb.b ? 6 : 0)
-  else if (max === rgb.g) h = (rgb.b - rgb.r) / delta + 2
-  else h = (rgb.r - rgb.g) / delta + 4
-  return { h: h / 6, s, l }
-}
-
-function hslToRgb(hsl: Hsl): Rgb {
-  if (hsl.s === 0) return { r: hsl.l, g: hsl.l, b: hsl.l }
-  const q = hsl.l < 0.5 ? hsl.l * (1 + hsl.s) : hsl.l + hsl.s - hsl.l * hsl.s
-  const p = 2 * hsl.l - q
-  return {
-    r: hueToRgb(p, q, hsl.h + 1 / 3),
-    g: hueToRgb(p, q, hsl.h),
-    b: hueToRgb(p, q, hsl.h - 1 / 3),
-  }
-}
+const INVERT_LUT = createLut((value) => CHANNEL_MAX - value)
 
 function hueToRgb(p: number, q: number, t: number) {
   let value = t
@@ -205,15 +301,15 @@ function normalizeHueUnit(value: number) {
   return ((value % 1) + 1) % 1
 }
 
-function clampUnit(value: number) {
-  return clamp(value, 0, 1)
-}
-
 function clampChannel(value: number) {
-  return Math.round(clamp(value, CHANNEL_MIN, CHANNEL_MAX))
+  return Math.round(clampNumber(value, CHANNEL_MIN, CHANNEL_MAX, CHANNEL_MIN))
 }
 
-function clamp(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) return min
+function clampUnit(value: number) {
+  return clampNumber(value, 0, 1, 0)
+}
+
+function clampNumber(value: number, min: number, max: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback
   return Math.min(max, Math.max(min, value))
 }

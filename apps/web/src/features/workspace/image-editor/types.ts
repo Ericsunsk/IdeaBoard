@@ -143,10 +143,9 @@ export type ImageEditorCssFilterPreview = {
   value: string
 }
 
-export type ImageEditorChannelLutPreview = {
-  type: 'channel-lut'
-  tableValues: string
-  grayscale: boolean
+export type ImageEditorRenderedPreview = {
+  type: 'rendered-image'
+  url: string
 }
 
-export type ImageEditorFilterPreview = ImageEditorCssFilterPreview | ImageEditorChannelLutPreview
+export type ImageEditorFilterPreview = ImageEditorCssFilterPreview | ImageEditorRenderedPreview

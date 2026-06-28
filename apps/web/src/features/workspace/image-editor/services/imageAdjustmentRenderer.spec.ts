@@ -1,9 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageEditorAdjustmentLayer } from '../types'
-import { renderImageAdjustmentFile } from './imageAdjustmentRenderer'
+import type { ImageProcessingRuntime } from '../runtime/types'
+import * as runtimeModule from '../runtime/imageAdjustmentProcessingRuntime'
+import {
+  cancelImageAdjustmentFinalRender,
+  IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+  renderImageAdjustmentFile,
+} from './imageAdjustmentRenderer'
 
 const fetchMock = vi.fn()
 const createImageBitmapMock = vi.fn()
+const ANIMATED_WEBP_BYTES = new Uint8Array([
+  0x52, 0x49, 0x46, 0x46, 0x12, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x41, 0x4e, 0x49,
+  0x4d, 0x00, 0x00, 0x00, 0x00,
+])
 
 const invertLayer: ImageEditorAdjustmentLayer = {
   id: 'adjustment:invert',
@@ -12,6 +22,24 @@ const invertLayer: ImageEditorAdjustmentLayer = {
   name: '反相 1',
   visible: true,
   params: { enabled: true },
+}
+
+function createRuntimeMock(
+  renderFinal: ImageProcessingRuntime['renderFinal'] = vi.fn(async () => ({
+    status: 'completed' as const,
+    taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+    revision: 1,
+    output: {
+      file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+    },
+  })),
+): ImageProcessingRuntime {
+  return {
+    renderPreview: vi.fn<ImageProcessingRuntime['renderPreview']>(),
+    renderFinal,
+    cancel: vi.fn(),
+    dispose: vi.fn(),
+  }
 }
 
 afterEach(() => {
@@ -70,6 +98,74 @@ function installCanvasMocks() {
 }
 
 describe('renderImageAdjustmentFile', () => {
+  it('uses the fixed final task id without overriding the runtime latestOnly default', async () => {
+    const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
+      status: 'completed',
+      taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+      revision: 1,
+      output: {
+        file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+      },
+    }))
+    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+      createRuntimeMock(renderFinal),
+    )
+
+    await renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [invertLayer])
+
+    expect(renderFinal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+      }),
+    )
+    expect(renderFinal.mock.calls[0]?.[0]).not.toHaveProperty('latestOnly')
+  })
+
+  it('passes task runtime options through to final rendering', async () => {
+    const onProgress = vi.fn()
+    const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
+      status: 'completed',
+      taskId: 'custom-final-task',
+      revision: 1,
+      output: {
+        file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+      },
+    }))
+    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+      createRuntimeMock(renderFinal),
+    )
+
+    await renderImageAdjustmentFile(
+      { url: 'https://example.com/source.png', title: 'Sample.png' },
+      [invertLayer],
+      {
+        taskId: 'custom-final-task',
+        latestOnly: true,
+        onProgress,
+      },
+    )
+
+    expect(renderFinal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: { url: 'https://example.com/source.png', title: 'Sample.png' },
+        taskId: 'custom-final-task',
+        latestOnly: true,
+        onProgress,
+      }),
+    )
+  })
+
+  it('cancels final render tasks through the runtime facade', () => {
+    const runtime = createRuntimeMock()
+    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(runtime)
+
+    cancelImageAdjustmentFinalRender()
+    cancelImageAdjustmentFinalRender('custom-final-task')
+
+    expect(runtime.cancel).toHaveBeenNthCalledWith(1, IMAGE_ADJUSTMENT_FINAL_TASK_ID)
+    expect(runtime.cancel).toHaveBeenNthCalledWith(2, 'custom-final-task')
+  })
+
   it('renders visible adjustment layers to an uploadable file', async () => {
     const { contexts } = installCanvasMocks()
     fetchMock.mockResolvedValue({
@@ -104,5 +200,42 @@ describe('renderImageAdjustmentFile', () => {
         { ...invertLayer, visible: false },
       ]),
     ).rejects.toThrow('没有可应用的调整图层')
+  })
+
+  it('rejects visually neutral adjustment stacks before loading the image', async () => {
+    await expect(
+      renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
+        { ...invertLayer, params: { enabled: false } },
+      ]),
+    ).rejects.toThrow('没有可应用的调整图层')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects animated images because adjustment output is a still frame', async () => {
+    installCanvasMocks()
+    fetchMock.mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['source'], { type: 'image/gif' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      renderImageAdjustmentFile({ url: 'https://example.com/source.gif' }, [invertLayer]),
+    ).rejects.toThrow('暂不支持调整动图')
+    expect(createImageBitmapMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects animated webp images instead of exporting only the first frame', async () => {
+    installCanvasMocks()
+    fetchMock.mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob([ANIMATED_WEBP_BYTES], { type: 'image/webp' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      renderImageAdjustmentFile({ url: 'https://example.com/source.webp' }, [invertLayer]),
+    ).rejects.toThrow('暂不支持调整动图')
+    expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
 })
