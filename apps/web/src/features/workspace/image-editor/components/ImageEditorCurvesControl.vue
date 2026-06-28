@@ -98,8 +98,8 @@ const emit = defineEmits<{
 
 const graphRef = ref<HTMLElement | null>(null)
 const gradientId = `image-editor-curves-gradient-${useId()}`
-const fineGridPath = createGridPath([25, 50, 75])
-const strongGridPath = createGridPath([0, 100])
+const fineGridPath = createGridPath([25, 75])
+const strongGridPath = createGridPath([50])
 const ranges = computed(() => props.ranges)
 const inputValue = computed(() => clampToRange(props.inputValue, ranges.value.input))
 const outputValue = computed(() => clampToRange(props.outputValue, ranges.value.output))
@@ -195,6 +195,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .image-editor-curves {
+  --image-editor-curves-frame-border-width: var(--image-editor-panel-border-width);
+  --image-editor-curves-frame-border-color: var(--workspace-accent-outline);
+  --image-editor-curves-frame-radius: 9px;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -229,6 +232,8 @@ onBeforeUnmount(() => {
 .image-editor-curves__fields input {
   height: 24px;
   min-width: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
   border: var(--image-editor-panel-border-width) solid var(--workspace-surface-border-soft);
   border-radius: 7px;
   background: var(--workspace-surface-muted);
@@ -261,8 +266,9 @@ onBeforeUnmount(() => {
   position: relative;
   aspect-ratio: 1;
   width: 100%;
-  border: var(--image-editor-panel-border-width) solid var(--workspace-accent-outline);
-  border-radius: 9px;
+  border: var(--image-editor-curves-frame-border-width) solid
+    var(--image-editor-curves-frame-border-color);
+  border-radius: var(--image-editor-curves-frame-radius);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.92)),
     var(--workspace-surface-muted);
@@ -333,6 +339,8 @@ onBeforeUnmount(() => {
 
 .image-editor-curves__fields input::-webkit-outer-spin-button,
 .image-editor-curves__fields input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
   margin: 0;
 }
 </style>
