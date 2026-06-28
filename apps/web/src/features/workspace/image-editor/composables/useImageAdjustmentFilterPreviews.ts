@@ -1,12 +1,15 @@
-import { computed, onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
-import type { ImageEditorFilterPreview, ImageEditorLayer } from '../types'
 import {
-  cancelImageAdjustmentPreviewRender,
-  IMAGE_ADJUSTMENT_PREVIEW_TASK_ID,
-  renderImageAdjustmentPreview,
-} from '../services/imageAdjustmentPreviewRenderer'
-import { compileImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
-import { flattenVisibleImageEditorAdjustmentLayers } from '../utils/imageEditorLayerAdjustments'
+  computed,
+  onBeforeUnmount,
+  shallowRef,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+  type Ref,
+} from 'vue'
+import type { ImageEditorFilterPreview, ImageEditorLayer } from '../types'
+import { createImageAdjustmentInlinePreviewRenderer } from '../services/imageAdjustmentInlinePreviewRenderer'
+import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
 
 type UseImageAdjustmentFilterPreviewsOptions = {
   isAdjustMode: Ref<boolean>
@@ -14,90 +17,44 @@ type UseImageAdjustmentFilterPreviewsOptions = {
   sourceUrl?: MaybeRefOrGetter<string | null | undefined>
 }
 
-const PREVIEW_RENDER_DEBOUNCE_MS = 80
-
 export function useImageAdjustmentFilterPreviews(options: UseImageAdjustmentFilterPreviewsOptions) {
-  const renderedPreviewUrl = ref<string | null>(null)
-  let previousRenderedPreviewUrl: string | null = null
-  let renderedPreviewSourceUrl: string | null = null
+  const renderedPreview = shallowRef<ImageEditorFilterPreview | null>(null)
 
+  const sourceUrl = computed(() => toValue(options.sourceUrl) ?? null)
   const imageAdjustmentPlan = computed(() => {
     if (!options.isAdjustMode.value) return []
-    return compileImageAdjustmentPlan(
-      flattenVisibleImageEditorAdjustmentLayers(options.layers.value),
-    )
+    return buildImageAdjustmentPlan(options.layers.value)
+  })
+  const previewRenderer = createImageAdjustmentInlinePreviewRenderer({
+    onPreview(preview) {
+      renderedPreview.value = preview
+    },
+    onError(error) {
+      console.warn('[image-editor] failed to load adjustment preview source', error)
+    },
   })
 
   watch(
-    [imageAdjustmentPlan, () => toValue(options.sourceUrl)],
-    ([plan, sourceUrl]) => {
-      if (!sourceUrl || plan.length === 0) {
-        cancelImageAdjustmentPreviewRender(IMAGE_ADJUSTMENT_PREVIEW_TASK_ID)
-        clearRenderedPreviewUrl()
-        return
-      }
-      if (renderedPreviewSourceUrl !== null && renderedPreviewSourceUrl !== sourceUrl) {
-        clearRenderedPreviewUrl()
-      }
-
-      void renderImageAdjustmentPreview(sourceUrl, plan, {
-        taskId: IMAGE_ADJUSTMENT_PREVIEW_TASK_ID,
-        debounceMs: PREVIEW_RENDER_DEBOUNCE_MS,
-      })
-        .then((result) => {
-          if (result.status !== 'completed') {
-            if (result.status === 'failed') {
-              clearRenderedPreviewUrl()
-              console.warn('[image-editor] failed to render adjustment preview', result.error)
-            }
-            return
-          }
-          const previewUrl = result.output.objectUrl
-          if (!previewUrl) {
-            clearRenderedPreviewUrl()
-            return
-          }
-          const stalePreviewUrl = previousRenderedPreviewUrl
-          renderedPreviewUrl.value = previewUrl
-          previousRenderedPreviewUrl = previewUrl
-          renderedPreviewSourceUrl = sourceUrl
-          if (stalePreviewUrl !== previewUrl) revokeObjectUrl(stalePreviewUrl)
-        })
-        .catch((error) => {
-          clearRenderedPreviewUrl()
-          console.warn('[image-editor] failed to render adjustment preview', error)
-        })
+    [sourceUrl, () => options.isAdjustMode.value],
+    ([currentSourceUrl, isAdjustMode]) => {
+      previewRenderer.updateSource(isAdjustMode ? currentSourceUrl : null)
     },
     { immediate: true },
   )
 
+  watch(imageAdjustmentPlan, (plan) => previewRenderer.updatePlan(plan), { immediate: true })
+
   onBeforeUnmount(() => {
-    cancelImageAdjustmentPreviewRender(IMAGE_ADJUSTMENT_PREVIEW_TASK_ID)
-    clearRenderedPreviewUrl()
+    previewRenderer.dispose()
   })
 
   const imageAdjustmentFilterPreviews = computed<ImageEditorFilterPreview[]>(() => {
     if (!options.isAdjustMode.value || imageAdjustmentPlan.value.length === 0) return []
-    if (renderedPreviewUrl.value) {
-      return [{ type: 'rendered-image', url: renderedPreviewUrl.value }]
-    }
-    return []
+    return renderedPreview.value ? [renderedPreview.value] : []
   })
-
-  function clearRenderedPreviewUrl() {
-    revokeObjectUrl(previousRenderedPreviewUrl)
-    previousRenderedPreviewUrl = null
-    renderedPreviewSourceUrl = null
-    renderedPreviewUrl.value = null
-  }
 
   return {
     imageAdjustmentFilterPreviews,
     imageAdjustmentPlan,
   }
-}
-
-function revokeObjectUrl(url: string | null) {
-  if (!url) return
-  URL.revokeObjectURL(url)
 }

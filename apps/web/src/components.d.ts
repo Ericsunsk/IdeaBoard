@@ -53,6 +53,7 @@ declare module 'vue' {
     PromptNode: typeof import('./features/workspace/components/nodes/PromptNode.vue')['default']
     PromptTextComposer: typeof import('./features/workspace/components/nodes/PromptTextComposer.vue')['default']
     RegisterModal: typeof import('./features/auth/components/RegisterModal.vue')['default']
+    RenderedImagePreviewCanvas: typeof import('./features/workspace/components/nodes/RenderedImagePreviewCanvas.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SelectButton: typeof import('primevue/selectbutton')['default']

@@ -1,7 +1,7 @@
 import type { ImageEditorAdjustmentLayer } from '../types'
 import { getImageAdjustmentProcessingRuntime } from '../runtime/imageAdjustmentProcessingRuntime'
 import type { ImageProcessingProgress, RenderFinalInput } from '../runtime/types'
-import { compileImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
+import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
 
 type ImageAdjustmentRenderSource = {
   url: string
@@ -21,8 +21,7 @@ export async function renderImageAdjustmentFile(
   layers: readonly ImageEditorAdjustmentLayer[],
   options: ImageAdjustmentRenderOptions = {},
 ): Promise<File> {
-  const visibleLayers = layers.filter((layer) => layer.visible)
-  const plan = compileImageAdjustmentPlan(visibleLayers)
+  const plan = buildImageAdjustmentPlan(layers)
   if (plan.length === 0) {
     throw new Error('没有可应用的调整图层')
   }

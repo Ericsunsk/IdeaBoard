@@ -1,4 +1,5 @@
 import type { ImageAdjustmentPlan } from '../../utils/imageAdjustmentEngine'
+import { cloneImageData } from '../../utils/imageDataUtils'
 import type {
   WorkerImageProcessingErrorPayload,
   WorkerImageProcessingExecuteRequest,
@@ -215,7 +216,7 @@ function createWorkerExecutePayload(
   imageData: ImageData,
   plan: ImageAdjustmentPlan,
 ): { message: WorkerImageProcessingExecuteRequest; transfer: Transferable[] } {
-  const workerImageData = cloneImageDataForWorker(imageData)
+  const workerImageData = cloneImageData(imageData)
   const imageBuffer = workerImageData.data.buffer
   return {
     message: {
@@ -226,14 +227,6 @@ function createWorkerExecutePayload(
     },
     transfer: imageBuffer instanceof ArrayBuffer ? [imageBuffer] : [],
   }
-}
-
-function cloneImageDataForWorker(source: ImageData) {
-  const data = new Uint8ClampedArray(source.data)
-  const ImageDataCtor = source.constructor as {
-    new (data: Uint8ClampedArray, width: number, height: number): ImageData
-  }
-  return new ImageDataCtor(data, source.width, source.height)
 }
 
 function cloneImageAdjustmentPlanForWorker(plan: ImageAdjustmentPlan): ImageAdjustmentPlan {

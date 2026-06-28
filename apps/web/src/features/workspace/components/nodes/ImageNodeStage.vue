@@ -25,8 +25,7 @@
       <img
         :src="stageDisplayUrl"
         class="image-node-stage-image"
-        :class="{ 'is-dragging': dragging, 'has-rendered-preview': !!renderedImagePreviewUrl }"
-        :style="stageImageStyle"
+        :class="{ 'is-dragging': dragging, 'has-rendered-preview': !!renderedImagePreview }"
         alt="图片节点预览"
         draggable="false"
         role="button"
@@ -36,13 +35,9 @@
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
       />
-      <img
-        v-if="renderedImagePreviewUrl"
-        :src="renderedImagePreviewUrl"
-        class="image-node-stage-image image-node-stage-image--preview"
-        alt=""
-        draggable="false"
-        aria-hidden="true"
+      <RenderedImagePreviewCanvas
+        v-if="renderedImagePreview"
+        :preview="renderedImagePreview"
       />
       <ImageCanvasExtendOverlay
         v-if="expandModeActive && expandOverlayStyle"
@@ -126,6 +121,7 @@ import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeStageFrame from './NodeStageFrame.vue'
+import RenderedImagePreviewCanvas from './RenderedImagePreviewCanvas.vue'
 
 const props = defineProps<{
   nodeId: string | number
@@ -177,21 +173,11 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
 const isImageEditorActive = computed(() => props.imageEditorMode != null)
 const isMaskEditorActive = computed(() => props.imageEditorMode === 'inpaint')
 const imageEditorFilterPreviews = computed(() => props.imageEditorFilterPreviews ?? [])
-const renderedImagePreviewUrl = computed(
+const renderedImagePreview = computed(
   () =>
-    imageEditorFilterPreviews.value.find((preview) => preview.type === 'rendered-image')?.url ??
+    imageEditorFilterPreviews.value.find((preview) => preview.type === 'rendered-image') ??
     null,
 )
-const stageImageStyle = computed<Record<string, string> | undefined>(() => {
-  const filters = imageEditorFilterPreviews.value
-    .map((preview) => {
-      if (preview.type === 'css-filter') return preview.value.trim()
-      return ''
-    })
-    .filter(Boolean)
-
-  return filters.length > 0 ? { filter: filters.join(' ') } : undefined
-})
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )
@@ -257,6 +243,9 @@ function selectOutputCount(value: number) {
   position: absolute;
   inset: 0;
   z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   pointer-events: none;
 }
 

@@ -93,12 +93,35 @@ describe('image processing backend factories', () => {
     })
   })
 
-  it('selects the cpu-worker backend by default', async () => {
+  it('selects the hybrid backend by default and keeps small work on the main thread', async () => {
     const source = createImageSource([10, 20, 30, 255])
     const sourceCache = createSourceCache({ preview: source })
     executeWorkerImageAdjustmentPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
     installCanvasMock()
     const backend = createImageAdjustmentProcessingBackend({ sourceCache })
+
+    await backend.renderPreview({
+      source: { url: 'https://example.com/source.png' },
+      plan: createInvertPlan(),
+      context: createTaskContext(),
+    })
+
+    expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
+    expect(getLastCreatedCanvasContext()?.putImageData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: new Uint8ClampedArray([245, 235, 225, 255]),
+      }),
+      0,
+      0,
+    )
+  })
+
+  it('can still create an explicit cpu-worker backend for heavy image work', async () => {
+    const source = createImageSource([10, 20, 30, 255])
+    const sourceCache = createSourceCache({ preview: source })
+    executeWorkerImageAdjustmentPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
+    installCanvasMock()
+    const backend = createImageAdjustmentProcessingBackend({ backend: 'cpu-worker', sourceCache })
 
     await backend.renderPreview({
       source: { url: 'https://example.com/source.png' },

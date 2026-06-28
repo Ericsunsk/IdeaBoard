@@ -138,14 +138,11 @@ export type ImageEditorLayerByKind<TKind extends ImageAdjustmentKind> = Extract<
   { kind: TKind }
 >
 
-export type ImageEditorCssFilterPreview = {
-  type: 'css-filter'
-  value: string
-}
-
 export type ImageEditorRenderedPreview = {
   type: 'rendered-image'
-  url: string
+  imageData: ImageData
+  width: number
+  height: number
 }
 
-export type ImageEditorFilterPreview = ImageEditorCssFilterPreview | ImageEditorRenderedPreview
+export type ImageEditorFilterPreview = ImageEditorRenderedPreview

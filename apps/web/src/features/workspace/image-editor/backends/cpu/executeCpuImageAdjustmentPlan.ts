@@ -5,6 +5,7 @@ import {
   executeImageAdjustmentPlan,
   type ImageAdjustmentPlan,
 } from '../../utils/imageAdjustmentEngine'
+import { cloneImageData } from '../../utils/imageDataUtils'
 
 export type CpuImageAdjustmentBackendId = 'cpu-main'
 
@@ -51,12 +52,4 @@ export const cpuImageAdjustmentBackend: CpuImageAdjustmentBackend = {
   executeInPlace: executeCpuImageAdjustmentPlanInPlace,
   apply: applyCpuImageAdjustments,
   applyInPlace: applyCpuImageAdjustmentsInPlace,
-}
-
-function cloneImageData(source: ImageData) {
-  const data = new Uint8ClampedArray(source.data)
-  const ImageDataCtor = source.constructor as {
-    new (data: Uint8ClampedArray, width: number, height: number): ImageData
-  }
-  return new ImageDataCtor(data, source.width, source.height)
 }

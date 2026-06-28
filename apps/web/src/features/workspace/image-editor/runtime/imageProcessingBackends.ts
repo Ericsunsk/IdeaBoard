@@ -1,5 +1,6 @@
 import {
   createCpuImageAdjustmentPlanExecutor,
+  createHybridImageAdjustmentPlanExecutor,
   createWorkerImageAdjustmentPlanExecutor,
   type ImageAdjustmentPlanExecutionEventReporter,
 } from './imageAdjustmentPlanExecutor'
@@ -10,7 +11,7 @@ import {
 import type { ImageSourceCache } from './imageSourceCache'
 import type { ImageProcessingBackend } from './types'
 
-export type ImageProcessingBackendId = 'cpu-main' | 'cpu-worker'
+export type ImageProcessingBackendId = 'cpu-main' | 'cpu-worker' | 'hybrid'
 
 export type CreateImageAdjustmentProcessingBackendOptions = {
   backend?: ImageProcessingBackendId
@@ -21,11 +22,13 @@ export type CreateImageAdjustmentProcessingBackendOptions = {
 export function createImageAdjustmentProcessingBackend(
   options: CreateImageAdjustmentProcessingBackendOptions = {},
 ): ImageProcessingBackend {
-  switch (options.backend ?? 'cpu-worker') {
+  switch (options.backend ?? 'hybrid') {
     case 'cpu-main':
       return createCpuMainImageProcessingBackend(options)
     case 'cpu-worker':
       return createCpuWorkerImageProcessingBackend(options)
+    case 'hybrid':
+      return createHybridImageProcessingBackend(options)
   }
 }
 
@@ -46,6 +49,17 @@ export function createCpuWorkerImageProcessingBackend(
   return createMainThreadBackendWithPlanExecutor(
     options,
     createWorkerImageAdjustmentPlanExecutor({
+      onPlanExecutorEvent: options.onPlanExecutorEvent,
+    }),
+  )
+}
+
+export function createHybridImageProcessingBackend(
+  options: Omit<CreateImageAdjustmentProcessingBackendOptions, 'backend'> = {},
+): ImageProcessingBackend {
+  return createMainThreadBackendWithPlanExecutor(
+    options,
+    createHybridImageAdjustmentPlanExecutor({
       onPlanExecutorEvent: options.onPlanExecutorEvent,
     }),
   )

@@ -1,32 +1,10 @@
 import { nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageEditorLayer } from '../types'
-import {
-  cancelImageAdjustmentPreviewRender,
-  renderImageAdjustmentPreview,
-} from '../services/imageAdjustmentPreviewRenderer'
 import { useImageAdjustmentFilterPreviews } from './useImageAdjustmentFilterPreviews'
 
-vi.mock('../services/imageAdjustmentPreviewRenderer', () => ({
-  IMAGE_ADJUSTMENT_PREVIEW_TASK_ID: 'image-adjustment-preview',
-  cancelImageAdjustmentPreviewRender: vi.fn(),
-  renderImageAdjustmentPreview: vi.fn(),
-}))
-
-const cancelPreviewRenderMock = vi.mocked(cancelImageAdjustmentPreviewRender)
-const renderPreviewMock = vi.mocked(renderImageAdjustmentPreview)
-const completedPreviewResult = (objectUrl: string | null) => ({
-  status: 'completed' as const,
-  taskId: 'image-adjustment-preview',
-  revision: 1,
-  output: { objectUrl },
-})
-const stalePreviewResult = (revision: number) => ({
-  status: 'stale' as const,
-  taskId: 'image-adjustment-preview',
-  revision,
-  error: { code: 'stale' as const, message: 'stale preview render' },
-})
+const fetchMock = vi.fn()
+const createImageBitmapMock = vi.fn()
 
 function createHslLayer(params = { hue: 0, saturation: 0, brightness: 0, contrast: 0 }) {
   return {
@@ -83,72 +61,66 @@ function createInvertLayer(params = { enabled: true }) {
   } satisfies ImageEditorLayer
 }
 
-async function flushPreviewPromises() {
-  await vi.runOnlyPendingTimersAsync()
+async function flushPreviewLoad() {
+  await Promise.resolve()
   await Promise.resolve()
   await nextTick()
 }
 
 afterEach(() => {
-  vi.useRealTimers()
   vi.restoreAllMocks()
-  cancelPreviewRenderMock.mockReset()
-  renderPreviewMock.mockReset()
+  vi.unstubAllGlobals()
+  fetchMock.mockReset()
+  createImageBitmapMock.mockReset()
 })
 
 describe('useImageAdjustmentFilterPreviews', () => {
-  it('renders effective adjustments through the compiled image adjustment plan', async () => {
-    vi.useFakeTimers()
-    renderPreviewMock.mockResolvedValue(completedPreviewResult('blob:preview'))
+  it('renders previews through the same adjustment engine used by final apply', async () => {
+    installBrowserImageMocks([10, 20, 30, 255])
+    const preview = useImageAdjustmentFilterPreviews({
+      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
+      layers: ref([createInvertLayer()]),
+    })
+
+    await flushPreviewLoad()
+
+    expect(preview.imageAdjustmentPlan.value).toEqual([expect.objectContaining({ kind: 'channel-lut' })])
+    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
+      {
+        type: 'rendered-image',
+        imageData: expect.objectContaining({
+          data: new Uint8ClampedArray([245, 235, 225, 255]),
+          width: 1,
+          height: 1,
+        }),
+        width: 1,
+        height: 1,
+      },
+    ])
+  })
+
+  it('does not load or render hidden, inactive, or neutral adjustment stacks', async () => {
+    installBrowserImageMocks([10, 20, 30, 255])
     const preview = useImageAdjustmentFilterPreviews({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref([
-        createHslLayer({ hue: 90, saturation: 25, brightness: -10, contrast: 15 }),
+        { ...createHslLayer(), visible: false },
         createCurvesLayer(),
         createLevelsLayer(),
         createInvertLayer({ enabled: false }),
       ]),
     })
 
-    await flushPreviewPromises()
-
-    expect(renderPreviewMock).toHaveBeenCalledTimes(1)
-    expect(renderPreviewMock).toHaveBeenCalledWith(
-      'https://example.com/source.png',
-      expect.arrayContaining([expect.objectContaining({ kind: 'hsl' })]),
-      { taskId: 'image-adjustment-preview', debounceMs: 80 },
-    )
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
-      { type: 'rendered-image', url: 'blob:preview' },
-    ])
-  })
-
-  it('does not render hidden, inactive, or neutral adjustment stacks', async () => {
-    vi.useFakeTimers()
-    const layers = ref<ImageEditorLayer[]>([
-      { ...createHslLayer(), visible: false },
-      createCurvesLayer(),
-      createLevelsLayer(),
-      createInvertLayer({ enabled: false }),
-    ])
-    const preview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      sourceUrl: ref('https://example.com/source.png'),
-      layers,
-    })
-
-    await flushPreviewPromises()
+    await flushPreviewLoad()
 
     expect(preview.imageAdjustmentPlan.value).toEqual([])
     expect(preview.imageAdjustmentFilterPreviews.value).toEqual([])
-    expect(renderPreviewMock).not.toHaveBeenCalled()
-    expect(cancelPreviewRenderMock).toHaveBeenCalledWith('image-adjustment-preview')
   })
 
   it('normalizes non-finite params before rendering previews', async () => {
-    vi.useFakeTimers()
-    renderPreviewMock.mockResolvedValue(completedPreviewResult('blob:preview'))
+    installBrowserImageMocks([120, 120, 120, 255])
     const preview = useImageAdjustmentFilterPreviews({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
@@ -163,110 +135,125 @@ describe('useImageAdjustmentFilterPreviews', () => {
       ]),
     })
 
-    await flushPreviewPromises()
+    await flushPreviewLoad()
 
     expect(preview.imageAdjustmentPlan.value).toEqual([
       { kind: 'threshold', threshold: 128, invert: false },
     ])
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
-      { type: 'rendered-image', url: 'blob:preview' },
-    ])
+    expect(preview.imageAdjustmentFilterPreviews.value[0]).toMatchObject({
+      type: 'rendered-image',
+      width: 1,
+      height: 1,
+    })
   })
 
-  it('revokes stale rendered preview object URLs', async () => {
-    vi.useFakeTimers()
-    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
-    renderPreviewMock
-      .mockResolvedValueOnce(completedPreviewResult('blob:first-preview'))
-      .mockResolvedValueOnce(completedPreviewResult('blob:second-preview'))
-    const layers = ref<ImageEditorLayer[]>([createInvertLayer()])
+  it('coalesces rapid layer changes to the latest animation frame', async () => {
+    const raf = installBrowserImageMocks([120, 120, 120, 255], { autoFlushRaf: false })
+    const layers = ref<ImageEditorLayer[]>([createThresholdLayer({ threshold: 32, invert: false })])
     const preview = useImageAdjustmentFilterPreviews({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers,
     })
 
-    await flushPreviewPromises()
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
-      { type: 'rendered-image', url: 'blob:first-preview' },
-    ])
-
-    layers.value = [createThresholdLayer()]
-    await nextTick()
-    await flushPreviewPromises()
-
-    expect(revokeSpy).toHaveBeenCalledWith('blob:first-preview')
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
-      { type: 'rendered-image', url: 'blob:second-preview' },
-    ])
-  })
-
-  it('delegates rapid adjustment changes to the runtime scheduler and keeps the latest preview', async () => {
-    vi.useFakeTimers()
-    renderPreviewMock
-      .mockResolvedValueOnce(stalePreviewResult(1))
-      .mockResolvedValueOnce(stalePreviewResult(2))
-      .mockResolvedValueOnce(completedPreviewResult('blob:latest-preview'))
-    const layers = ref<ImageEditorLayer[]>([createInvertLayer()])
-    const preview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      sourceUrl: ref('https://example.com/source.png'),
-      layers,
-    })
-
-    layers.value = [createThresholdLayer({ threshold: 32, invert: false })]
-    await nextTick()
+    await flushPreviewLoad()
     layers.value = [createThresholdLayer({ threshold: 224, invert: true })]
     await nextTick()
-    await flushPreviewPromises()
-
-    expect(renderPreviewMock).toHaveBeenCalledTimes(3)
-    expect(renderPreviewMock).toHaveBeenLastCalledWith(
-      'https://example.com/source.png',
-      [{ kind: 'threshold', threshold: 224, invert: true }],
-      { taskId: 'image-adjustment-preview', debounceMs: 80 },
-    )
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
-      { type: 'rendered-image', url: 'blob:latest-preview' },
-    ])
-  })
-
-  it('clears rendered preview URLs when the stack becomes neutral', async () => {
-    vi.useFakeTimers()
-    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
-    renderPreviewMock.mockResolvedValue(completedPreviewResult('blob:preview'))
-    const layers = ref<ImageEditorLayer[]>([createInvertLayer()])
-    const preview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      sourceUrl: ref('https://example.com/source.png'),
-      layers,
-    })
-
-    await flushPreviewPromises()
-    layers.value = [createInvertLayer({ enabled: false })]
+    layers.value = [createThresholdLayer({ threshold: 64, invert: false })]
     await nextTick()
 
-    expect(revokeSpy).toHaveBeenCalledWith('blob:preview')
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([])
-    expect(cancelPreviewRenderMock).toHaveBeenCalledWith('image-adjustment-preview')
-  })
+    raf.flush()
 
-  it('keeps preview state empty when async preview rendering fails', async () => {
-    vi.useFakeTimers()
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    renderPreviewMock.mockRejectedValue(new Error('preview failed'))
-    const preview = useImageAdjustmentFilterPreviews({
-      isAdjustMode: ref(true),
-      sourceUrl: ref('https://example.com/source.png'),
-      layers: ref([createInvertLayer()]),
+    expect(preview.imageAdjustmentPlan.value).toEqual([
+      { kind: 'threshold', threshold: 64, invert: false },
+    ])
+    expect(preview.imageAdjustmentFilterPreviews.value[0]).toMatchObject({
+      type: 'rendered-image',
+      width: 1,
+      height: 1,
     })
-
-    await flushPreviewPromises()
-
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([])
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[image-editor] failed to render adjustment preview',
-      expect.any(Error),
-    )
   })
 })
+
+function installBrowserImageMocks(
+  sourceValues: number[],
+  options: { autoFlushRaf?: boolean } = {},
+) {
+  const autoFlushRaf = options.autoFlushRaf ?? true
+  const rafCallbacks = new Map<number, FrameRequestCallback>()
+  let rafId = 0
+
+  class TestImageDataImpl {
+    data: Uint8ClampedArray
+    width: number
+    height: number
+
+    constructor(data: Uint8ClampedArray, width: number, height: number) {
+      this.data = data
+      this.width = width
+      this.height = height
+    }
+  }
+
+  const sourceImageData = new TestImageDataImpl(
+    new Uint8ClampedArray(sourceValues),
+    sourceValues.length / 4,
+    1,
+  ) as ImageData
+
+  vi.stubGlobal('ImageData', TestImageDataImpl)
+  vi.stubGlobal('fetch', fetchMock)
+  vi.stubGlobal('createImageBitmap', createImageBitmapMock)
+  fetchMock.mockResolvedValue({
+    ok: true,
+    blob: async () => new Blob(['source'], { type: 'image/png' }),
+  })
+  createImageBitmapMock.mockResolvedValue({
+    width: sourceImageData.width,
+    height: sourceImageData.height,
+    close: vi.fn(),
+  })
+
+  vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+    if (tagName.toLowerCase() !== 'canvas') {
+      return document.createElementNS('http://www.w3.org/1999/xhtml', tagName) as HTMLElement
+    }
+
+    const canvas = document.createElementNS(
+      'http://www.w3.org/1999/xhtml',
+      'canvas',
+    ) as HTMLCanvasElement
+    const context = {
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => sourceImageData),
+      putImageData: vi.fn(),
+    }
+    Object.defineProperty(canvas, 'getContext', {
+      value: () => context,
+    })
+    return canvas
+  })
+
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    rafId += 1
+    rafCallbacks.set(rafId, callback)
+    if (autoFlushRaf) {
+      callback(performance.now())
+      rafCallbacks.delete(rafId)
+    }
+    return rafId
+  })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+    rafCallbacks.delete(id)
+  })
+
+  return {
+    flush() {
+      const callbacks = Array.from(rafCallbacks.values())
+      rafCallbacks.clear()
+      for (const callback of callbacks) {
+        callback(performance.now())
+      }
+    },
+  }
+}
