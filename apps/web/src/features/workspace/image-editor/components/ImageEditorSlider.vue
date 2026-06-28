@@ -2,6 +2,7 @@
   <label class="image-editor-slider-row">
     <span class="image-editor-slider-row__label">{{ label }}</span>
     <input
+      class="workspace-range-input"
       type="range"
       :min="min"
       :max="max"
@@ -38,7 +39,7 @@ function onInput(event: Event) {
   grid-template-columns: 38px minmax(0, 1fr) 36px;
   align-items: center;
   gap: 10px;
-  min-height: 22px;
+  min-height: var(--workspace-range-input-height);
   color: var(--workspace-text-body);
   font-size: var(--image-editor-panel-text-size);
   font-weight: 500;
@@ -59,51 +60,4 @@ function onInput(event: Event) {
   white-space: nowrap;
 }
 
-.image-editor-slider-row input[type='range'] {
-  appearance: none;
-  width: 100%;
-  min-width: 0;
-  height: 26px;
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.image-editor-slider-row input[type='range']:focus-visible {
-  outline: 2px solid var(--workspace-accent);
-  outline-offset: 3px;
-  border-radius: 999px;
-}
-
-.image-editor-slider-row input[type='range']::-webkit-slider-runnable-track {
-  height: 4px;
-  border: none;
-  border-radius: 999px;
-  background: var(--workspace-surface-muted);
-}
-
-.image-editor-slider-row input[type='range']::-webkit-slider-thumb {
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  margin-top: -8px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--workspace-accent);
-}
-
-.image-editor-slider-row input[type='range']::-moz-range-track {
-  height: 4px;
-  border: none;
-  border-radius: 999px;
-  background: var(--workspace-surface-muted);
-}
-
-.image-editor-slider-row input[type='range']::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--workspace-accent);
-}
 </style>

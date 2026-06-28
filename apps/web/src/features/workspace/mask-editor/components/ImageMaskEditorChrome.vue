@@ -88,6 +88,7 @@
                 "
               >
                 <input
+                  class="workspace-range-input"
                   type="range"
                   :min="MASK_EDITOR_MIN_BRUSH_SIZE"
                   :max="MASK_EDITOR_MAX_BRUSH_SIZE"
@@ -113,6 +114,7 @@
                 "
               >
                 <input
+                  class="workspace-range-input"
                   type="range"
                   :min="MASK_EDITOR_MIN_BRUSH_HARDNESS"
                   :max="MASK_EDITOR_MAX_BRUSH_HARDNESS"
@@ -140,6 +142,7 @@
                 "
               >
                 <input
+                  class="workspace-range-input"
                   type="range"
                   :min="MASK_EDITOR_MIN_LAYER_OPACITY"
                   :max="MASK_EDITOR_MAX_LAYER_OPACITY"
@@ -599,52 +602,7 @@ onBeforeUnmount(() => {
   align-items: center;
   flex: 1;
   min-width: 0;
-  height: 22px;
-}
-
-.image-mask-editor-range-wrap input[type='range'] {
-  appearance: none;
-  display: block;
-  width: 100%;
-  height: 22px;
-  margin: 0;
-  min-width: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.image-mask-editor-range-wrap input[type='range']::-webkit-slider-runnable-track {
-  height: 4px;
-  border: none;
-  border-radius: 999px;
-  background: var(--workspace-surface-muted);
-}
-
-.image-mask-editor-range-wrap input[type='range']::-webkit-slider-thumb {
-  appearance: none;
-  width: 9px;
-  height: 9px;
-  margin-top: -2.5px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--workspace-accent);
-  box-shadow: none;
-  transition: background-color var(--workspace-motion-fast) ease;
-}
-
-.image-mask-editor-range-wrap input[type='range']::-moz-range-track {
-  height: 4px;
-  border: none;
-  border-radius: 999px;
-  background: var(--workspace-surface-muted);
-}
-
-.image-mask-editor-range-wrap input[type='range']::-moz-range-thumb {
-  width: 9px;
-  height: 9px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--workspace-accent);
+  height: var(--workspace-range-input-height);
 }
 
 .image-mask-editor-range-tooltip {
