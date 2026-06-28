@@ -1,6 +1,8 @@
 import { nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageEditorLayer } from '../types'
+import { executeCpuImageAdjustmentPlanInPlace } from '../backends/cpu/executeCpuImageAdjustmentPlan'
+import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
 import { useImageAdjustmentRenderedPreview } from './useImageAdjustmentRenderedPreview'
 
 const fetchMock = vi.fn()
@@ -95,6 +97,41 @@ describe('useImageAdjustmentRenderedPreview', () => {
       width: 1,
       height: 1,
     })
+  })
+
+  it('keeps inline rendered preview output identical to CPU final plan execution for layered adjustments', async () => {
+    const sourceValues = [
+      16, 48, 112, 255, 80, 140, 220, 240, 196, 88, 24, 192, 240, 240, 96, 128,
+    ]
+    installBrowserImageMocks(sourceValues)
+    const layers = [
+      createHslLayer({ hue: 35, saturation: 22, brightness: 8, contrast: 14 }),
+      createCurvesLayer({ input: 42, output: 70 }),
+      createLevelsLayer({ shadows: 8, midtones: 44, highlights: 92 }),
+      createThresholdLayer({ threshold: 150, invert: true }),
+      createInvertLayer(),
+    ] satisfies ImageEditorLayer[]
+    const finalPlan = buildImageAdjustmentPlan(layers)
+    const expected = executeCpuImageAdjustmentPlanInPlace(
+      makeImageData(sourceValues),
+      finalPlan,
+    )
+    const preview = useImageAdjustmentRenderedPreview({
+      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
+      layers: ref(layers),
+    })
+
+    await flushPreviewLoad()
+
+    expect(preview.imageEditorRenderedPreview.value).toMatchObject({
+      type: 'rendered-image',
+      width: sourceValues.length / 4,
+      height: 1,
+    })
+    expect(pixelValues(preview.imageEditorRenderedPreview.value?.imageData)).toEqual(
+      pixelValues(expected),
+    )
   })
 
   it('does not load or render hidden, inactive, or neutral adjustment stacks', async () => {
@@ -252,4 +289,16 @@ function installBrowserImageMocks(
       }
     },
   }
+}
+
+function makeImageData(sourceValues: number[]): ImageData {
+  return new ImageData(
+    new Uint8ClampedArray(sourceValues),
+    sourceValues.length / 4,
+    1,
+  )
+}
+
+function pixelValues(imageData: ImageData | undefined) {
+  return imageData ? Array.from(imageData.data) : []
 }

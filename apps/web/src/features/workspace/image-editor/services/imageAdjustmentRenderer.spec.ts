@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageEditorAdjustmentLayer } from '../types'
 import type { ImageProcessingRuntime } from '../runtime/types'
 import * as runtimeModule from '../runtime/imageAdjustmentProcessingRuntime'
+import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
 import {
   cancelImageAdjustmentFinalRender,
   IMAGE_ADJUSTMENT_FINAL_TASK_ID,
@@ -22,6 +23,42 @@ const invertLayer: ImageEditorAdjustmentLayer = {
   name: '反相 1',
   visible: true,
   params: { enabled: true },
+}
+
+const hslLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:hsl',
+  type: 'adjustment',
+  kind: 'hsl',
+  name: '色相/饱和度 1',
+  visible: true,
+  params: { hue: 35, saturation: 22, brightness: 8, contrast: 14 },
+}
+
+const thresholdLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:threshold',
+  type: 'adjustment',
+  kind: 'threshold',
+  name: '阈值 1',
+  visible: true,
+  params: { threshold: 150, invert: true },
+}
+
+const curvesLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:curves',
+  type: 'adjustment',
+  kind: 'curves',
+  name: '曲线 1',
+  visible: true,
+  params: { input: 42, output: 70 },
+}
+
+const levelsLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:levels',
+  type: 'adjustment',
+  kind: 'levels',
+  name: '色阶 1',
+  visible: true,
+  params: { shadows: 8, midtones: 44, highlights: 92 },
 }
 
 function createRuntimeMock(
@@ -150,6 +187,29 @@ describe('renderImageAdjustmentFile', () => {
         taskId: 'custom-final-task',
         latestOnly: true,
         onProgress,
+      }),
+    )
+  })
+
+  it('passes the compiled adjustment plan to final rendering without a separate final normalization path', async () => {
+    const layers = [hslLayer, curvesLayer, levelsLayer, thresholdLayer, invertLayer]
+    const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
+      status: 'completed',
+      taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+      revision: 1,
+      output: {
+        file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+      },
+    }))
+    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+      createRuntimeMock(renderFinal),
+    )
+
+    await renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, layers)
+
+    expect(renderFinal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: buildImageAdjustmentPlan(layers),
       }),
     )
   })

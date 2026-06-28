@@ -11,6 +11,7 @@ afterEach(() => {
 })
 
 function installCanvasMocks() {
+  const canvases: HTMLCanvasElement[] = []
   const contexts: Array<{
     drawImage: ReturnType<typeof vi.fn>
     getImageData: ReturnType<typeof vi.fn>
@@ -32,11 +33,12 @@ function installCanvasMocks() {
     Object.defineProperty(canvas, 'getContext', {
       value: () => context,
     })
+    canvases.push(canvas)
     contexts.push(context)
     return canvas
   })
 
-  return { contexts }
+  return { canvases, contexts }
 }
 
 function installImageMocks(width = 4, height = 2) {
@@ -132,4 +134,50 @@ describe('ImageSourceCache', () => {
     expect(disposed?.canvas.width).toBe(0)
     expect(disposed?.canvas.height).toBe(0)
   })
+
+  it('releases a full-size canvas if the cache is disposed while decode is in flight', async () => {
+    const { canvases } = installCanvasMocks()
+    fetchMock.mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['source'], { type: 'image/png' }),
+    })
+    let resolveBitmap!: (bitmap: {
+      width: number
+      height: number
+      close: ReturnType<typeof vi.fn>
+    }) => void
+    createImageBitmapMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveBitmap = resolve
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('createImageBitmap', createImageBitmapMock)
+    const bitmap = { width: 4, height: 2, close: vi.fn() }
+    const cache = new ImageSourceCache({ maxEntries: 2 })
+
+    const source = cache.getFullSizeSource('https://example.com/in-flight.png')
+    await waitForImageBitmapRequest()
+    cache.dispose()
+    resolveBitmap(bitmap)
+
+    await expect(source).rejects.toMatchObject({
+      code: 'disposed',
+      message: '图像源缓存已释放',
+    })
+    expect(bitmap.close).toHaveBeenCalledTimes(1)
+    expect(canvases.at(-1)?.width).toBe(0)
+    expect(canvases.at(-1)?.height).toBe(0)
+    await expect(cache.getFullSizeSource('https://example.com/next.png')).rejects.toMatchObject({
+      code: 'disposed',
+    })
+  })
 })
+
+async function waitForImageBitmapRequest() {
+  for (let attempt = 0; attempt < 10 && createImageBitmapMock.mock.calls.length === 0; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 0))
+  }
+  expect(createImageBitmapMock).toHaveBeenCalledTimes(1)
+}

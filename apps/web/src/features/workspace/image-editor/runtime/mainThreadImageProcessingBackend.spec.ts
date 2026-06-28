@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { WEBP_PREVIEW_QUALITY } from '../../utils/displayImagePreviewEncoding'
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
 import type { ImageSourceCache, ImageSourceCacheEntry } from './imageSourceCache'
+import { releaseImageSourceCanvas } from './imageSourceCache'
+import { createImageProcessingOutputPolicy } from './imageOutputPolicy'
 import { createMainThreadImageProcessingBackend } from './mainThreadImageProcessingBackend'
 import type { ImageAdjustmentPlanExecutor } from './planExecutorTypes'
 import type {
@@ -43,6 +46,107 @@ describe('createMainThreadImageProcessingBackend', () => {
     })
     expect(source.context.putImageData).toHaveBeenCalledWith(adjusted, 0, 0)
     expect(sourceCache.releaseSource).toHaveBeenCalledWith(source)
+  })
+
+  it('exports transparent final output as png and names the file from the output mime', async () => {
+    const { result, source } = await renderFinalWithAdjustedPixels({
+      adjustedPixels: [4, 5, 6, 0],
+      source: { url: 'https://example.com/source.webp', title: 'Transparent.webp' },
+    })
+
+    expect(result.file.name).toBe('Transparent-adjusted.png')
+    expect(result.file.type).toBe('image/png')
+    expect(result.mimeType).toBe('image/png')
+    expect(source.canvas.toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png', undefined)
+  })
+
+  it('exports opaque final output as webp with the configured quality', async () => {
+    const { result, source } = await renderFinalWithAdjustedPixels({
+      adjustedPixels: [4, 5, 6, 255],
+      source: { url: 'https://example.com/source.png', title: 'Opaque.png' },
+    })
+
+    expect(result.file.name).toBe('Opaque-adjusted.webp')
+    expect(result.file.type).toBe('image/webp')
+    expect(result.mimeType).toBe('image/webp')
+    expect(source.canvas.toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      'image/webp',
+      WEBP_PREVIEW_QUALITY,
+    )
+  })
+
+  it('uses the actual encoded blob mime type for the final file name', async () => {
+    const { result, source } = await renderFinalWithAdjustedPixels({
+      adjustedPixels: [4, 5, 6, 255],
+      canvas: { toBlobType: 'image/png' },
+      source: { url: 'https://example.com/source.png', title: 'Actual Mime.png' },
+    })
+
+    expect(source.canvas.toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      'image/webp',
+      WEBP_PREVIEW_QUALITY,
+    )
+    expect(result.file.name).toBe('Actual-Mime-adjusted.png')
+    expect(result.file.type).toBe('image/png')
+    expect(result.mimeType).toBe('image/png')
+  })
+
+  it('releases the full-size source canvas when final encoding fails', async () => {
+    const source = createImageSource('encode-failure-source', [10, 20, 30, 255], {
+      canvas: { toBlobReturnsNull: true },
+    })
+    const sourceCache = createSourceCache({ fullSize: source, releaseCanvas: true })
+    const adjusted = makeImageData([4, 5, 6, 255])
+    const backend = createMainThreadImageProcessingBackend({
+      sourceCache,
+      planExecutor: createPlanExecutor(adjusted),
+    })
+
+    await expect(
+      backend.renderFinal({
+        source: { url: 'https://example.com/source.png', title: 'Encode Failure.png' },
+        plan: createInvertPlan(),
+        context: createTaskContext({ outputPolicy: createImageProcessingOutputPolicy() }),
+      }),
+    ).rejects.toThrow('Canvas toBlob returned null')
+
+    expect(sourceCache.releaseSource).toHaveBeenCalledWith(source)
+    expect(source.canvas.width).toBe(0)
+    expect(source.canvas.height).toBe(0)
+  })
+
+  it('releases the full-size source canvas when final apply is cancelled before writeback', async () => {
+    const source = createImageSource('cancelled-source', [10, 20, 30, 255])
+    const sourceCache = createSourceCache({ fullSize: source, releaseCanvas: true })
+    const controller = new AbortController()
+    const adjusted = makeImageData([4, 5, 6, 255])
+    const planExecutor: ImageAdjustmentPlanExecutor = {
+      execute: vi.fn(() => {
+        controller.abort()
+        return adjusted
+      }),
+      dispose: vi.fn(),
+    }
+    const backend = createMainThreadImageProcessingBackend({ sourceCache, planExecutor })
+
+    await expect(
+      backend.renderFinal({
+        source: { url: 'https://example.com/source.png', title: 'Cancelled.png' },
+        plan: createInvertPlan(),
+        context: createTaskContext({
+          signal: controller.signal,
+          outputPolicy: createImageProcessingOutputPolicy(),
+        }),
+      }),
+    ).rejects.toThrow('图像处理已取消')
+
+    expect(source.context.putImageData).not.toHaveBeenCalled()
+    expect(source.canvas.toBlob).not.toHaveBeenCalled()
+    expect(sourceCache.releaseSource).toHaveBeenCalledWith(source)
+    expect(source.canvas.width).toBe(0)
+    expect(source.canvas.height).toBe(0)
   })
 
   it('uses a CPU plan executor by default', async () => {
@@ -123,32 +227,72 @@ function installCanvasMocks() {
   })
 }
 
-function createSourceCache(input: { fullSize?: TestImageSource | null }): ImageSourceCache {
+function createSourceCache(input: {
+  fullSize?: TestImageSource | null
+  releaseCanvas?: boolean
+}): ImageSourceCache {
   const sourceCache: TestSourceCache = {
     getFullSizeSource: vi.fn(async () => input.fullSize ?? null),
-    releaseSource: vi.fn(),
+    releaseSource: vi.fn((source) => {
+      if (input.releaseCanvas) releaseImageSourceCanvas(source as ImageSourceCacheEntry)
+    }),
     dispose: vi.fn(),
   }
   return sourceCache as ImageSourceCache
 }
 
-function createImageSource(key: string, values: number[]): TestImageSource {
+async function renderFinalWithAdjustedPixels(input: {
+  adjustedPixels: number[]
+  canvas?: TestCanvasOptions
+  source: { url: string; title: string }
+}) {
+  const source = createImageSource('output-policy-source', [10, 20, 30, 255], {
+    canvas: input.canvas,
+  })
+  const sourceCache = createSourceCache({ fullSize: source })
+  const backend = createMainThreadImageProcessingBackend({
+    sourceCache,
+    planExecutor: createPlanExecutor(makeImageData(input.adjustedPixels)),
+  })
+
+  const result = await backend.renderFinal({
+    source: input.source,
+    plan: createInvertPlan(),
+    context: createTaskContext({ outputPolicy: createImageProcessingOutputPolicy() }),
+  })
+
+  return { result, source }
+}
+
+function createImageSource(
+  key: string,
+  values: number[],
+  options: {
+    mimeType?: string
+    canvas?: TestCanvasOptions
+  } = {},
+): TestImageSource {
   const imageData = makeImageData(values)
-  const { canvas, context } = createTestCanvas(imageData)
+  const { canvas, context } = createTestCanvas(imageData, options.canvas)
   return {
     key,
     sourceUrl: 'https://example.com/source.png',
     fetchUrl: 'https://example.com/source.png',
     width: imageData.width,
     height: imageData.height,
-    mimeType: 'image/png',
+    mimeType: options.mimeType ?? 'image/png',
     canvas,
     context: context as CanvasRenderingContext2D & TestCanvasContext,
     imageData,
   }
 }
 
-function createTestCanvas(initialImageData: ImageData) {
+type TestCanvasOptions = {
+  toBlobType?: string
+  toBlobReturnsNull?: boolean
+}
+
+function createTestCanvas(initialImageData: ImageData, options: TestCanvasOptions = {}) {
   let currentImageData = initialImageData
   const canvas = document.createElementNS(
     'http://www.w3.org/1999/xhtml',
@@ -168,7 +312,11 @@ function createTestCanvas(initialImageData: ImageData) {
   })
   Object.defineProperty(canvas, 'toBlob', {
     value: vi.fn((callback: BlobCallback, type?: string) => {
-      callback(new Blob(['rendered'], { type: type || 'image/png' }))
+      if (options.toBlobReturnsNull) {
+        callback(null)
+        return
+      }
+      callback(new Blob(['rendered'], { type: options.toBlobType ?? type ?? 'image/png' }))
     }),
   })
   createdCanvasContexts.push(context)
@@ -176,13 +324,13 @@ function createTestCanvas(initialImageData: ImageData) {
 }
 
 function createTaskContext(
-  input: { signal?: AbortSignal } = {},
+  input: { signal?: AbortSignal; outputPolicy?: ImageProcessingOutputPolicy } = {},
 ): ImageProcessingBackendTaskContext {
   return {
     taskId: 'task:1',
     revision: 1,
     signal: input.signal ?? new AbortController().signal,
-    outputPolicy: createOutputPolicy(),
+    outputPolicy: input.outputPolicy ?? createOutputPolicy(),
     reportProgress: vi.fn<(progress: ImageProcessingProgress) => void>(),
   }
 }
