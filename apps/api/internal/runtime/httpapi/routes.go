@@ -1,28 +1,13 @@
 package httpapi
 
 import (
-	"errors"
-	"fmt"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
 	iofs "io/fs"
-	"log/slog"
-	"mime/multipart"
-	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/assets"
 	"ideaboard/api/internal/auth"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/channels"
-	"ideaboard/api/internal/platform/media"
-	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/storage"
@@ -31,8 +16,6 @@ import (
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
-	_ "golang.org/x/image/bmp"
-	_ "golang.org/x/image/webp"
 )
 
 type Dependencies struct {
@@ -47,10 +30,6 @@ type Dependencies struct {
 
 type FrontendRouteOptions struct {
 	WarnMissingIndex bool
-}
-
-type healthResponse struct {
-	Status string `json:"status"`
 }
 
 type AuthDeps struct {
@@ -109,281 +88,12 @@ const (
 	RouteAdminSettingsTaskMonitor = "/settings/task-monitor"
 )
 
-// validateUploadFileHeader centralises the three-step upload validation:
-// 1. File size limit.
-// 2. Extension allow-list (lowercase, with leading dot).
-// 3. Magic bytes content check (prevents content-type spoofing).
-// On failure it writes an error response to c and returns ("", false).
-func validateUploadFileHeader(c *gin.Context, fh *multipart.FileHeader, maxBytes int64, allowedExts map[string]bool) (ext string, ok bool) {
-	if fh.Size > maxBytes {
-		response.Error(c, 400, fmt.Sprintf("文件大小不能超过 %dMB", maxBytes/1024/1024))
-		return "", false
-	}
-	ext = strings.ToLower(filepath.Ext(fh.Filename))
-	if !allowedExts[ext] {
-		response.Error(c, 400, "仅支持 "+media.SupportedUploadImageLabel()+" 格式")
-		return "", false
-	}
-	if err := media.ValidateImageContent(fh, ext); err != nil {
-		response.Error(c, 400, err.Error())
-		return "", false
-	}
-	return ext, true
-}
-
-func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (uploadImageMetadata, bool) {
-	f, err := fh.Open()
-	if err != nil {
-		return uploadImageMetadata{}, false
-	}
-	defer f.Close()
-	cfg, format, err := image.DecodeConfig(f)
-	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
-		return uploadImageMetadata{}, false
-	}
-	formatExt, ok := media.NormalizeImageExtension(format)
-	if !ok {
-		formatExt = ext
-	}
-	mimeType := media.ImageMIMEFromExtension(formatExt)
-	if mimeType == "" {
-		mimeType = media.ImageMIMEFromExtension(ext)
-	}
-	return uploadImageMetadata{
-		Width:  cfg.Width,
-		Height: cfg.Height,
-		Mime:   mimeType,
-		Ext:    strings.TrimPrefix(formatExt, "."),
-	}, true
-}
-
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
-	r.Use(rateLimitMiddleware(deps.RateLimit))
-	r.Use(deps.CORSMiddleware)
-	r.Use(globalRequestBodyLimitMiddleware())
-
-	r.GET(RouteHealth, func(c *gin.Context) {
-		response.SuccessDTO(c, healthResponse{Status: "ok"})
-	})
-	r.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(deps.Branding))
-
-	os.MkdirAll("uploads", 0700)
-	uploadsHandler := uploadStaticHandler(deps.StaticUploads)
-	r.GET("/uploads/*filepath", uploadsHandler)
-	r.HEAD("/uploads/*filepath", uploadsHandler)
-
-	userAPI := r.Group("/api/user")
-	userAPI.Use(auth.AuthMiddleware(deps.Auth.AuthServiceClient, deps.Auth.UserRepo))
-	registerUserRoutes(userAPI, deps.UserRoutes)
-
-	adminAPI := r.Group("/api/admin")
-	adminAPI.Use(auth.AuthMiddleware(deps.Auth.AuthServiceClient, deps.Auth.UserRepo), auth.AdminMiddleware())
-	registerAdminRoutes(adminAPI, deps.AdminRoutes)
+	registerGlobalMiddleware(r, deps)
+	registerPublicRoutes(r, deps.Branding)
+	registerStaticUploadRoutes(r, deps.StaticUploads)
+	registerAuthenticatedUserRoutes(r, deps.Auth, deps.UserRoutes)
+	registerAuthenticatedAdminRoutes(r, deps.Auth, deps.AdminRoutes)
 
 	RegisterFrontendRoutes(r, frontendFS, frontendOptions)
-}
-
-func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if provider == nil {
-			response.InternalError(c, http.StatusInternalServerError, "系统设置服务未初始化", errors.New("branding settings provider is not initialized"))
-			return
-		}
-		branding, err := provider.GetBranding(c.Request.Context())
-		if err != nil {
-			response.InternalError(c, http.StatusInternalServerError, "读取系统设置失败", err)
-			return
-		}
-		response.SuccessDTO(c, branding)
-	}
-}
-
-func globalRequestBodyLimitMiddleware() gin.HandlerFunc {
-	base := requestBodyLimitMiddleware(globalRequestBodyLimitBytes)
-	return func(c *gin.Context) {
-		if isUploadRequest(c.Request) {
-			c.Next()
-			return
-		}
-		base(c)
-	}
-}
-
-func isUploadRequest(req *http.Request) bool {
-	if req == nil || strings.ToUpper(strings.TrimSpace(req.Method)) != http.MethodPost {
-		return false
-	}
-	requestPath := path.Clean(req.URL.Path)
-	if requestPath == "/api/user/profile/avatar" || requestPath == "/api/admin/upload" {
-		return true
-	}
-	return strings.HasPrefix(requestPath, "/api/user/boards/") &&
-		strings.HasSuffix(requestPath, "/uploads")
-}
-
-func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if c.Request == nil || c.Request.Body == nil || limitBytes <= 0 {
-			c.Next()
-			return
-		}
-
-		method := strings.ToUpper(strings.TrimSpace(c.Request.Method))
-		switch method {
-		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
-			// continue
-		default:
-			c.Next()
-			return
-		}
-
-		if c.Request.ContentLength > limitBytes {
-			response.Error(c, http.StatusRequestEntityTooLarge, "请求体过大")
-			c.Abort()
-			return
-		}
-
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limitBytes)
-		c.Next()
-	}
-}
-
-func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS, opts FrontendRouteOptions) {
-	if frontendFS == nil {
-		return
-	}
-
-	if _, err := iofs.Stat(frontendFS, "index.html"); err != nil {
-		if opts.WarnMissingIndex {
-			slog.Warn("embedded frontend index.html not found; skip SPA routes", "err", err)
-		}
-		return
-	}
-
-	serveIndex := func(c *gin.Context) {
-		c.FileFromFS("/index.html", http.FS(frontendFS))
-	}
-
-	r.GET("/", serveIndex)
-
-	r.NoRoute(func(c *gin.Context) {
-		requestPath := strings.TrimPrefix(path.Clean(c.Request.URL.Path), "/")
-		if requestPath == "." {
-			requestPath = ""
-		}
-
-		if requestPath == "api" || strings.HasPrefix(requestPath, "api/") || requestPath == "uploads" || strings.HasPrefix(requestPath, "uploads/") {
-			c.Status(http.StatusNotFound)
-			return
-		}
-
-		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
-			c.Status(http.StatusNotFound)
-			return
-		}
-
-		if requestPath != "" {
-			if _, err := iofs.Stat(frontendFS, requestPath); err == nil {
-				c.FileFromFS("/"+requestPath, http.FS(frontendFS))
-				return
-			}
-		}
-
-		serveIndex(c)
-	})
-}
-
-func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
-	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
-	userApi.POST("/tasks/submit/readiness", h.TaskHandler.CheckSubmitTaskReadiness)
-	userApi.POST("/tasks/submit", h.TaskHandler.SubmitTask)
-	userApi.GET("/tasks/:task_id/events", h.TaskHandler.StreamUserTask)
-	userApi.GET("/tasks/:task_id", h.TaskHandler.GetUserTask)
-	userApi.DELETE("/tasks/:task_id", h.TaskHandler.DeleteUserTask)
-	userApi.GET("/tasks", h.TaskHandler.GetUserTasks)
-	userApi.GET("/boards", h.BoardHandler.ListBoards)
-	userApi.PUT("/boards/:board_id", h.BoardHandler.UpsertBoard)
-	userApi.DELETE("/boards/:board_id", h.BoardHandler.DeleteBoard)
-	userApi.GET("/boards/:board_id/members", h.BoardHandler.ListMembers)
-	userApi.POST("/boards/:board_id/members/invite", h.BoardHandler.InviteMember)
-	userApi.PUT("/boards/:board_id/members/:member_uid/role", h.BoardHandler.UpdateMemberRole)
-	userApi.DELETE("/boards/:board_id/members/:member_uid", h.BoardHandler.RemoveMember)
-	userApi.GET("/boards/:board_id/share-tokens", h.BoardHandler.ListShareTokens)
-	userApi.POST("/boards/:board_id/share-tokens", h.BoardHandler.CreateShareToken)
-	userApi.POST("/boards/:board_id/share-tokens/:token_id/revoke", h.BoardHandler.RevokeShareToken)
-	userApi.POST("/boards/share-tokens/join", h.BoardHandler.JoinByShareToken)
-
-	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
-
-	userApi.POST(RouteUserProfileAvatar, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadProfileAvatarHandler(h.Uploads))
-	userApi.POST(RouteUserBoardUploads, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadBoardAssetHandler(h.Uploads))
-	userApi.DELETE(RouteUserBoardUploads, deleteBoardUploadHandler(h.Uploads))
-	userApi.GET(RouteUserDownload, downloadImageHandler())
-}
-
-func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
-	adminApi.GET("/settings/registration", h.AdminHandler.GetRegistrationSetting)
-	adminApi.PUT("/settings/registration", h.AdminHandler.UpdateRegistrationSetting)
-	adminApi.GET(RouteAdminSettingsRateLimit, h.AdminHandler.GetRateLimitSettings)
-	adminApi.PUT(RouteAdminSettingsRateLimit, h.AdminHandler.UpdateRateLimitSettings)
-	adminApi.GET(RouteAdminSettingsBranding, h.AdminHandler.GetBrandingSettings)
-	adminApi.PUT(RouteAdminSettingsBranding, h.AdminHandler.UpdateBrandingSettings)
-	adminApi.GET(RouteAdminSettingsMediaUpload, h.AdminHandler.GetMediaUploadSettings)
-	adminApi.PUT(RouteAdminSettingsMediaUpload, h.AdminHandler.UpdateMediaUploadSettings)
-	adminApi.GET(RouteAdminSettingsPublicURLs, h.AdminHandler.GetPublicURLSettings)
-	adminApi.PUT(RouteAdminSettingsPublicURLs, h.AdminHandler.UpdatePublicURLSettings)
-	adminApi.GET(RouteAdminSettingsTaskMonitor, h.AdminHandler.GetTaskMonitorSettings)
-	adminApi.PUT(RouteAdminSettingsTaskMonitor, h.AdminHandler.UpdateTaskMonitorSettings)
-
-	adminApi.GET("/users", h.AdminHandler.ListUsers)
-	adminApi.POST("/users/:id/ban", h.AdminHandler.BanUser)
-	adminApi.POST("/users/:id/unban", h.AdminHandler.UnbanUser)
-	adminApi.POST("/users/:id/revoke-sessions", h.AdminHandler.RevokeUserSessions)
-	adminApi.PUT("/users/:id/role", h.AdminHandler.UpdateUserRole)
-	adminApi.DELETE("/users/:id", h.AdminHandler.DeleteUser)
-
-	adminApi.GET("/accounts", h.AccountHandler.ListAccounts)
-	adminApi.GET("/accounts/limits", h.AccountHandler.GetAccountLimits)
-	adminApi.GET("/accounts/:id", h.AccountHandler.GetAccount)
-	adminApi.POST("/accounts", h.AccountHandler.CreateAccount)
-	adminApi.PUT("/accounts/:id", h.AccountHandler.UpdateAccount)
-	adminApi.DELETE("/accounts/:id", h.AccountHandler.DeleteAccount)
-	adminApi.POST("/accounts/:id/start", h.AccountHandler.StartAccount)
-	adminApi.POST("/accounts/:id/stop", h.AccountHandler.StopAccount)
-	adminApi.GET("/accounts/:id/queue", h.AccountHandler.GetAccountQueue)
-
-	adminApi.POST("/tasks/submit", h.TaskHandler.SubmitTask)
-	adminApi.GET("/tasks/:task_id", h.TaskHandler.GetTask)
-	adminApi.GET("/tasks", h.TaskHandler.ListTasks)
-	adminApi.GET("/monitor", h.TaskStatsHandler.GetMonitor)
-	adminApi.GET("/monitor/stream", h.TaskStatsHandler.StreamMonitor)
-	adminApi.GET("/statistics", h.TaskStatsHandler.GetStatistics)
-	adminApi.POST("/statistics/backfill", h.TaskStatsHandler.BackfillStatistics)
-
-	adminApi.POST(RouteAdminUpload, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), adminUploadHandler(h.StorageService, h.UploadSettings))
-
-	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)
-	adminApi.GET("/storage/profiles", h.StorageHandler.ListProfiles)
-	adminApi.POST("/storage/profiles", h.StorageHandler.CreateProfile)
-	adminApi.PUT("/storage/profiles/:id", h.StorageHandler.UpdateProfile)
-	adminApi.DELETE("/storage/profiles/:id", h.StorageHandler.DeleteProfile)
-	adminApi.POST("/storage/profiles/:id/apply", h.StorageHandler.ApplyProfile)
-	adminApi.POST("/storage/profiles/:id/test", h.StorageHandler.TestProfile)
-	adminApi.GET("/storage/profiles/:id/bucket-info", h.StorageHandler.GetBucketInfo)
-
-	adminApi.GET("/channels", h.ChannelHandler.List)
-	adminApi.POST("/channels", h.ChannelHandler.Create)
-	adminApi.PUT("/channels/:id", h.ChannelHandler.Update)
-	adminApi.DELETE("/channels/:id", h.ChannelHandler.Delete)
-	adminApi.POST("/channels/detect-models", h.ChannelHandler.DetectModels)
-
-	adminApi.GET("/line-draft-modes", h.LineDraftHandler.List)
-	adminApi.POST("/line-draft-modes", h.LineDraftHandler.Create)
-	adminApi.PUT("/line-draft-modes/:id", h.LineDraftHandler.Update)
-	adminApi.DELETE("/line-draft-modes/:id", h.LineDraftHandler.Delete)
-
-	adminApi.GET("/feature-prompts", h.FeaturePromptHandler.ListPrompts)
-	adminApi.GET("/feature-prompts/:slug/revisions", h.FeaturePromptHandler.ListRevisions)
-	adminApi.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)
-	adminApi.PUT("/feature-prompts/:slug", h.FeaturePromptHandler.SetPrompt)
 }

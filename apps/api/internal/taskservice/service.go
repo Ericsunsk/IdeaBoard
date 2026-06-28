@@ -13,10 +13,9 @@ import (
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
-	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskmedia"
 	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
@@ -28,16 +27,10 @@ type Service struct {
 	submissionStore   TaskSubmissionStore
 	cancelStore       taskqueue.TaskCancellationStore
 	featurePrompts    FeaturePromptStore
-	uploadBoards      storage.UploadBoardAccessResolver
-	uploadOwners      storage.UploadOwnerStorageUIDResolver
-	taskOutputCleaner TaskOutputObjectCleaner
+	mediaValidator    taskmedia.Validator
+	taskOutputCleaner taskmedia.TaskOutputCleaner
 	eventHub          *EventHub
 	taskEvents        events.TaskStatusPublisher
-	publicURLs        settings.PublicURLSettingProvider
-}
-
-type TaskOutputObjectCleaner interface {
-	DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error
 }
 
 type AccountStore interface {
@@ -67,10 +60,8 @@ type ServiceDeps struct {
 	SubmissionStore   TaskSubmissionStore
 	CancelStore       taskqueue.TaskCancellationStore
 	FeaturePrompts    FeaturePromptStore
-	UploadBoards      storage.UploadBoardAccessResolver
-	UploadOwners      storage.UploadOwnerStorageUIDResolver
-	TaskOutputCleaner TaskOutputObjectCleaner
-	PublicURLs        settings.PublicURLSettingProvider
+	MediaValidator    taskmedia.Validator
+	TaskOutputCleaner taskmedia.TaskOutputCleaner
 }
 
 type ServiceOptions struct {
@@ -86,7 +77,6 @@ const maxSubmitTaskImageURLs = 16
 const maxSubmitTaskImageURLBytes = 4096
 const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
 const maxSubmitTaskParamsDepth = 24
-const maxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024
 const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加账号"
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
@@ -96,12 +86,10 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		submissionStore:   deps.SubmissionStore,
 		cancelStore:       deps.CancelStore,
 		featurePrompts:    deps.FeaturePrompts,
-		uploadBoards:      deps.UploadBoards,
-		uploadOwners:      deps.UploadOwners,
+		mediaValidator:    deps.MediaValidator,
 		taskOutputCleaner: deps.TaskOutputCleaner,
 		eventHub:          opts.EventHub,
 		taskEvents:        opts.TaskEvents,
-		publicURLs:        deps.PublicURLs,
 	}
 }
 

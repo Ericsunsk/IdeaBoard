@@ -282,3 +282,59 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		t.Fatalf("non-masked pixels inside ROI should stay unchanged, got %#v", outsideMaskInsideROI)
 	}
 }
+
+func TestFinalizeLocalRedrawResultRequiresMediaStore(t *testing.T) {
+	original := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	mask := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	upstream := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			original.SetNRGBA(x, y, color.NRGBA{B: 255, A: 255})
+			mask.SetNRGBA(x, y, color.NRGBA{A: 255})
+			upstream.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+		}
+	}
+
+	c := &ProviderExecutor{}
+	imageURL, outputs, stored, err := c.finalizeLocalRedrawResult(
+		context.Background(),
+		42,
+		"task-local-redraw-no-store",
+		&localRedrawContext{
+			featureSlug: "partial-edit",
+			original:    original,
+			maskSampler: maskCoverageSampler{
+				mask:       mask,
+				maskBounds: mask.Bounds(),
+				dstWidth:   2,
+				dstHeight:  2,
+			},
+			roi: image.Rect(0, 0, 2, 2),
+		},
+		mustEncodePNGDataURL(t, upstream),
+		0,
+	)
+
+	if err == nil {
+		t.Fatal("expected missing mediaStore to fail local redraw finalization")
+	}
+	if imageURL != "" {
+		t.Fatalf("imageURL=%q, want empty string", imageURL)
+	}
+	if len(outputs) != 0 {
+		t.Fatalf("outputs=%#v, want empty", outputs)
+	}
+	if stored {
+		t.Fatalf("stored=true, want false")
+	}
+	stage, category, ok := executionFailureDetails(err)
+	if !ok {
+		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
+	}
+	if stage != tasks.ExecutionStageFinalizing || category != tasks.FailureCategoryStorageError {
+		t.Fatalf("details=%s/%s, want %s/%s", stage, category, tasks.ExecutionStageFinalizing, tasks.FailureCategoryStorageError)
+	}
+	if strings.Contains(err.Error(), "data:image/png;base64") {
+		t.Fatalf("error should not include data URL payload: %v", err)
+	}
+}

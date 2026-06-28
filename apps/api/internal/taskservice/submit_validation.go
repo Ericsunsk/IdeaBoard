@@ -5,15 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"net/url"
-	"path"
 	"strings"
 
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/mediarefs"
-	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskmedia"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
@@ -191,74 +187,14 @@ func validateSubmitTaskContractKeys(params map[string]interface{}) error {
 }
 
 func validateSubmitTaskMediaRef(raw string) error {
-	return mediarefs.ValidateMediaRef(canonicalizeConfiguredPublicUploadRef(raw), outbound.AllowHostsFromEnv(), maxSubmitTaskMediaDataURLBytes)
+	return taskmedia.ValidateSubmitMediaRef(raw)
 }
 
 func (s *Service) validateSubmitTaskMediaRef(ctx context.Context, userID int64, raw string) error {
-	normalized := s.canonicalizeConfiguredPublicUploadRef(ctx, raw)
-	if err := validateSubmitTaskMediaRef(normalized); err != nil {
-		return err
+	if s == nil || s.mediaValidator == nil {
+		return fmt.Errorf("任务媒体校验服务未配置")
 	}
-	trimmed := strings.TrimSpace(normalized)
-	if !strings.HasPrefix(trimmed, "/uploads/") {
-		return nil
-	}
-	resource, err := storage.ParseUploadResource(trimmed)
-	if err != nil {
-		return err
-	}
-	if resource.Kind != storage.UploadResourceKindWorkspace {
-		return fmt.Errorf("仅支持工作区上传资源")
-	}
-	if s.uploadBoards == nil || s.uploadOwners == nil {
-		return fmt.Errorf("无法校验工作区上传资源权限")
-	}
-	if err := storage.AuthorizeUploadResourceRead(
-		ctx,
-		userID,
-		resource,
-		s.uploadBoards,
-		s.uploadOwners,
-	); err != nil {
-		return fmt.Errorf("无权使用该工作区上传资源")
-	}
-	return nil
-}
-
-func canonicalizeConfiguredPublicUploadRef(raw string) string {
-	return canonicalizeConfiguredPublicUploadRefWithProvider(context.Background(), nil, raw)
-}
-
-func (s *Service) canonicalizeConfiguredPublicUploadRef(ctx context.Context, raw string) string {
-	if s == nil {
-		return canonicalizeConfiguredPublicUploadRef(raw)
-	}
-	return canonicalizeConfiguredPublicUploadRefWithProvider(ctx, s.publicURLs, raw)
-}
-
-func canonicalizeConfiguredPublicUploadRefWithProvider(ctx context.Context, provider settings.PublicURLSettingProvider, raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" || strings.HasPrefix(trimmed, "/uploads/") || !strings.Contains(trimmed, "://") {
-		return trimmed
-	}
-	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return trimmed
-	}
-	cleanedPath := path.Clean(parsed.Path)
-	if !strings.HasPrefix(cleanedPath, "/uploads/") {
-		return trimmed
-	}
-	for _, base := range settings.PublicUploadBaseURLs(ctx, provider) {
-		if sameURLOrigin(parsed, base) {
-			return cleanedPath
-		}
-	}
-	return trimmed
-}
-
-func sameURLOrigin(a *url.URL, b *url.URL) bool {
-	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Host, b.Host)
+	return s.mediaValidator.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
 func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {

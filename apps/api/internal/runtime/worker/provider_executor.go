@@ -15,7 +15,7 @@ import (
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskmedia"
 	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
@@ -66,22 +66,25 @@ func truncateErrorBody(body string) string {
 }
 
 type ProviderExecutor struct {
-	channelRepo    *channels.ChannelRepository
-	storageService *storage.StorageService
-	publicURLs     settings.PublicURLSettingProvider
+	channelRepo *channels.ChannelRepository
+	mediaStore  taskmedia.RuntimeMediaStore
+	publicURLs  settings.PublicURLSettingProvider
 }
 
-func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*storage.StoredUploadObject, bool, error) {
+func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*taskmedia.StoredObject, bool, error) {
 	trimmed := strings.TrimSpace(ref)
 	if !strings.HasPrefix(trimmed, "/uploads/") {
 		return nil, false, nil
 	}
-	if c == nil || c.storageService == nil {
+	if c == nil || c.mediaStore == nil {
 		return nil, true, fmt.Errorf("存储服务未初始化，无法读取上传文件: %q", ref)
 	}
-	obj, err := c.storageService.ReadUploadResourceByURL(ctx, trimmed, maxBytes)
+	obj, err := c.mediaStore.ReadUploadObject(ctx, trimmed, maxBytes)
 	if err != nil {
 		return nil, true, err
+	}
+	if obj == nil {
+		return nil, true, fmt.Errorf("存储服务返回空上传文件: %q", ref)
 	}
 	return obj, true, nil
 }
@@ -323,7 +326,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	if len(imageURLs) == 0 {
 		return imageURLs, nil, nil
 	}
-	if c.storageService == nil {
+	if c.mediaStore == nil {
 		return nil, nil, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
@@ -331,19 +334,16 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		)
 	}
 
-	slog.Info("provider result storage check", "object_storage", c.storageService.UsesObjectStorage(ctx), "image_count", len(imageURLs))
+	slog.Info("provider result storage check", "object_storage", c.mediaStore.UsesObjectStorage(ctx), "image_count", len(imageURLs))
 
 	next := append([]string(nil), imageURLs...)
 	outputs := make([]tasks.TaskOutput, 0, len(next))
 	storedKeys := make([]string, 0, len(next))
 	for index, currentURL := range next {
-		storeOpts := storage.StorageStoreOptions{
+		storeOpts := taskmedia.StoreOptions{
 			AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicURLs),
 		}
-		if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
-			storeOpts.DirPrefix = dirPrefix
-		}
-		storedRef, storeErr := c.storageService.StoreRemoteRef(ctx, currentURL, storeOpts)
+		storedRef, storeErr := c.mediaStore.StoreRemoteResult(ctx, userID, taskID, currentURL, storeOpts)
 		if storeErr == nil {
 			slog.Info("provider image materialized", "source_url", redactLogURL(currentURL), "stored_url", redactLogURL(storedRef.URL))
 			next[index] = storedRef.URL
@@ -355,7 +355,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		}
 		if len(storedKeys) > 0 {
 			for _, storageKey := range storedKeys {
-				if delErr := c.storageService.DeleteObjectByKey(ctx, storageKey); delErr != nil {
+				if delErr := c.mediaStore.DeleteObjectByKey(ctx, storageKey); delErr != nil {
 					slog.Warn("cleanup orphan materialized image failed", "task_id", taskID, "storage_key", storageKey, "err", delErr)
 				}
 			}
@@ -372,7 +372,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	return next, outputs, nil
 }
 
-func taskOutputFromStoredRef(taskID string, ref *storage.StoredUploadRef, sourceURL string, sortIndex int) tasks.TaskOutput {
+func taskOutputFromStoredRef(taskID string, ref *taskmedia.StoredRef, sourceURL string, sortIndex int) tasks.TaskOutput {
 	if ref == nil {
 		return tasks.TaskOutput{TaskID: taskID, Role: "image", SourceURL: sourceURL, SortIndex: sortIndex}
 	}

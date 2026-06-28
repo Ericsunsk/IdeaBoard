@@ -1,0 +1,108 @@
+package httpapi
+
+import (
+	"ideaboard/api/internal/auth"
+
+	"github.com/gin-gonic/gin"
+)
+
+func registerAuthenticatedAdminRoutes(r *gin.Engine, authDeps AuthDeps, h AdminRouteDeps) {
+	adminAPI := r.Group("/api/admin")
+	adminAPI.Use(auth.AuthMiddleware(authDeps.AuthServiceClient, authDeps.UserRepo), auth.AdminMiddleware())
+	registerAdminRoutes(adminAPI, h)
+}
+
+func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	registerAdminSettingsRoutes(adminAPI, h)
+	registerAdminUserRoutes(adminAPI, h)
+	registerAdminAccountRoutes(adminAPI, h)
+	registerAdminTaskRoutes(adminAPI, h)
+	registerAdminUploadRoutes(adminAPI, h)
+	registerAdminStorageRoutes(adminAPI, h)
+	registerAdminChannelRoutes(adminAPI, h)
+	registerAdminLineDraftRoutes(adminAPI, h)
+	registerAdminFeaturePromptRoutes(adminAPI, h)
+}
+
+func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/settings/registration", h.AdminHandler.GetRegistrationSetting)
+	adminAPI.PUT("/settings/registration", h.AdminHandler.UpdateRegistrationSetting)
+	adminAPI.GET(RouteAdminSettingsRateLimit, h.AdminHandler.GetRateLimitSettings)
+	adminAPI.PUT(RouteAdminSettingsRateLimit, h.AdminHandler.UpdateRateLimitSettings)
+	adminAPI.GET(RouteAdminSettingsBranding, h.AdminHandler.GetBrandingSettings)
+	adminAPI.PUT(RouteAdminSettingsBranding, h.AdminHandler.UpdateBrandingSettings)
+	adminAPI.GET(RouteAdminSettingsMediaUpload, h.AdminHandler.GetMediaUploadSettings)
+	adminAPI.PUT(RouteAdminSettingsMediaUpload, h.AdminHandler.UpdateMediaUploadSettings)
+	adminAPI.GET(RouteAdminSettingsPublicURLs, h.AdminHandler.GetPublicURLSettings)
+	adminAPI.PUT(RouteAdminSettingsPublicURLs, h.AdminHandler.UpdatePublicURLSettings)
+	adminAPI.GET(RouteAdminSettingsTaskMonitor, h.AdminHandler.GetTaskMonitorSettings)
+	adminAPI.PUT(RouteAdminSettingsTaskMonitor, h.AdminHandler.UpdateTaskMonitorSettings)
+}
+
+func registerAdminUserRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/users", h.AdminHandler.ListUsers)
+	adminAPI.POST("/users/:id/ban", h.AdminHandler.BanUser)
+	adminAPI.POST("/users/:id/unban", h.AdminHandler.UnbanUser)
+	adminAPI.POST("/users/:id/revoke-sessions", h.AdminHandler.RevokeUserSessions)
+	adminAPI.PUT("/users/:id/role", h.AdminHandler.UpdateUserRole)
+	adminAPI.DELETE("/users/:id", h.AdminHandler.DeleteUser)
+}
+
+func registerAdminAccountRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/accounts", h.AccountHandler.ListAccounts)
+	adminAPI.GET("/accounts/limits", h.AccountHandler.GetAccountLimits)
+	adminAPI.GET("/accounts/:id", h.AccountHandler.GetAccount)
+	adminAPI.POST("/accounts", h.AccountHandler.CreateAccount)
+	adminAPI.PUT("/accounts/:id", h.AccountHandler.UpdateAccount)
+	adminAPI.DELETE("/accounts/:id", h.AccountHandler.DeleteAccount)
+	adminAPI.POST("/accounts/:id/start", h.AccountHandler.StartAccount)
+	adminAPI.POST("/accounts/:id/stop", h.AccountHandler.StopAccount)
+	adminAPI.GET("/accounts/:id/queue", h.AccountHandler.GetAccountQueue)
+}
+
+func registerAdminTaskRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.POST("/tasks/submit", h.TaskHandler.SubmitTask)
+	adminAPI.GET("/tasks/:task_id", h.TaskHandler.GetTask)
+	adminAPI.GET("/tasks", h.TaskHandler.ListTasks)
+	adminAPI.GET("/monitor", h.TaskStatsHandler.GetMonitor)
+	adminAPI.GET("/monitor/stream", h.TaskStatsHandler.StreamMonitor)
+	adminAPI.GET("/statistics", h.TaskStatsHandler.GetStatistics)
+	adminAPI.POST("/statistics/backfill", h.TaskStatsHandler.BackfillStatistics)
+}
+
+func registerAdminUploadRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.POST(RouteAdminUpload, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), adminUploadHandler(h.StorageService, h.UploadSettings))
+}
+
+func registerAdminStorageRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/storage/providers", h.StorageHandler.ListProviders)
+	adminAPI.GET("/storage/profiles", h.StorageHandler.ListProfiles)
+	adminAPI.POST("/storage/profiles", h.StorageHandler.CreateProfile)
+	adminAPI.PUT("/storage/profiles/:id", h.StorageHandler.UpdateProfile)
+	adminAPI.DELETE("/storage/profiles/:id", h.StorageHandler.DeleteProfile)
+	adminAPI.POST("/storage/profiles/:id/apply", h.StorageHandler.ApplyProfile)
+	adminAPI.POST("/storage/profiles/:id/test", h.StorageHandler.TestProfile)
+	adminAPI.GET("/storage/profiles/:id/bucket-info", h.StorageHandler.GetBucketInfo)
+}
+
+func registerAdminChannelRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/channels", h.ChannelHandler.List)
+	adminAPI.POST("/channels", h.ChannelHandler.Create)
+	adminAPI.PUT("/channels/:id", h.ChannelHandler.Update)
+	adminAPI.DELETE("/channels/:id", h.ChannelHandler.Delete)
+	adminAPI.POST("/channels/detect-models", h.ChannelHandler.DetectModels)
+}
+
+func registerAdminLineDraftRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/line-draft-modes", h.LineDraftHandler.List)
+	adminAPI.POST("/line-draft-modes", h.LineDraftHandler.Create)
+	adminAPI.PUT("/line-draft-modes/:id", h.LineDraftHandler.Update)
+	adminAPI.DELETE("/line-draft-modes/:id", h.LineDraftHandler.Delete)
+}
+
+func registerAdminFeaturePromptRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/feature-prompts", h.FeaturePromptHandler.ListPrompts)
+	adminAPI.GET("/feature-prompts/:slug/revisions", h.FeaturePromptHandler.ListRevisions)
+	adminAPI.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)
+	adminAPI.PUT("/feature-prompts/:slug", h.FeaturePromptHandler.SetPrompt)
+}

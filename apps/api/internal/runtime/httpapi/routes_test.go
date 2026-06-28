@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -115,6 +116,17 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 		if !found {
 			t.Fatalf("route %s was not registered", key)
 		}
+	}
+}
+
+func TestRegisterStaticUploadRoutesDoesNotCreateUploadsDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+	gin.SetMode(gin.TestMode)
+
+	registerStaticUploadRoutes(gin.New(), StaticUploadDeps{})
+
+	if _, err := os.Stat("uploads"); !os.IsNotExist(err) {
+		t.Fatalf("uploads stat error = %v, want directory to remain absent", err)
 	}
 }
 

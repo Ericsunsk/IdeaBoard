@@ -4,263 +4,60 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
-	"time"
 
-	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/assets"
-	"ideaboard/api/internal/auth"
-	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/channels"
-	"ideaboard/api/internal/db/migrations"
-	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/config"
-	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/secrets"
-	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/prompts"
-	"ideaboard/api/internal/runtime/httpapi"
-	"ideaboard/api/internal/runtime/webdist"
-	"ideaboard/api/internal/runtime/worker"
-	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/taskqueue"
-	"ideaboard/api/internal/taskservice"
-	"ideaboard/api/internal/taskstats"
-	"ideaboard/api/internal/taskstore"
-	"ideaboard/api/internal/tasksubmission"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/riverqueue/river"
 )
 
 type appContainer struct {
 	router *gin.Engine
 
-	db               *sql.DB
-	riverPool        *pgxpool.Pool
-	riverClient      *river.Client[pgx.Tx]
-	eventBus         *events.NATSJetStreamEventBus
-	workerQueueName  string
-	workerConcurrent int
-}
-
-type appDatabases struct {
-	db        *sql.DB
-	riverPool *pgxpool.Pool
-}
-
-type appRepositories struct {
-	userRepo           *users.UserRepository
-	accountRepo        *accounts.AccountRepository
-	taskRepo           *taskstore.Repository
-	channelRepo        *channels.ChannelRepository
-	systemConfigRepo   *settings.SystemConfigRepository
-	featurePromptRepo  *prompts.FeaturePromptRepository
-	storageProfileRepo *storage.StorageProfileRepository
-	lineDraftModeRepo  *assets.LineDraftModeRepository
-	boardRepo          *boards.BoardRepository
-}
-
-func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, error) {
-	db, err := database.NewPostgres(cfg.Database)
-	if err != nil {
-		return appDatabases{}, fmt.Errorf("failed to connect to database: %w", err)
-	}
-	if err := migrations.Up(ctx, db); err != nil {
-		_ = db.Close()
-		return appDatabases{}, fmt.Errorf("failed to migrate database schema: %w", err)
-	}
-	riverPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
-	if err != nil {
-		_ = db.Close()
-		return appDatabases{}, fmt.Errorf("failed to connect River database pool: %w", err)
-	}
-	if err := worker.MigrateRiver(ctx, riverPool); err != nil {
-		riverPool.Close()
-		_ = db.Close()
-		return appDatabases{}, fmt.Errorf("failed to migrate River schema: %w", err)
-	}
-	return appDatabases{db: db, riverPool: riverPool}, nil
-}
-
-func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error) {
-	repos := appRepositories{
-		userRepo:           users.NewUserRepository(db),
-		accountRepo:        accounts.NewAccountRepository(db),
-		taskRepo:           taskstore.NewRepository(db),
-		channelRepo:        channels.NewChannelRepository(db),
-		systemConfigRepo:   settings.NewSystemConfigRepository(db),
-		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),
-		storageProfileRepo: storage.NewStorageProfileRepository(db),
-		lineDraftModeRepo:  assets.NewLineDraftModeRepository(db),
-		boardRepo:          boards.NewBoardRepository(db),
-	}
-	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {
-		return appRepositories{}, err
-	}
-	return repos, nil
-}
-
-func closeStartupResources(db *sql.DB, riverPool *pgxpool.Pool, eventBus *events.NATSJetStreamEventBus) {
-	if eventBus != nil {
-		_ = eventBus.Close()
-	}
-	if riverPool != nil {
-		riverPool.Close()
-	}
-	if db != nil {
-		_ = db.Close()
-	}
+	db            *sql.DB
+	riverPool     *pgxpool.Pool
+	workerRuntime appWorkerRuntime
 }
 
 func newAppContainer(cfg *config.Config) (*appContainer, error) {
-	// encryption
 	if err := secrets.LoadEncryptionKey(); err != nil {
 		return nil, fmt.Errorf("failed to load secrets encryption key: %w", err)
 	}
+	if err := ensureRuntimeUploadDir(); err != nil {
+		return nil, err
+	}
 
-	authServiceClient := auth.NewServiceClient(cfg.Auth)
-	dbs, err := openAppDatabases(context.Background(), cfg)
+	ctx := context.Background()
+	dbs, err := openAppDatabases(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	// repositories
-	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
-	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)
-	repos, err := newAppRepositories(context.Background(), dbs.db)
+	repos, err := newAppRepositories(ctx, dbs.db)
 	if err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool, nil)
+		closeStartupResources(dbs.db, dbs.riverPool)
 		return nil, fmt.Errorf("failed to ensure user storage uid: %w", err)
 	}
 
-	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
-	storageService := storage.NewStorageService(repos.storageProfileRepo, runtimeSettings)
-	if err := storageService.EnsureDefaultProfiles(context.Background()); err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool, nil)
-		return nil, fmt.Errorf("failed to ensure default storage profiles: %w", err)
-	}
-	userService := users.NewUserService(repos.userRepo, storageService)
-	boardService := boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService)
-	taskEventHub := taskservice.NewEventHub()
-	taskEvents, eventBus, err := newTaskStatusEventPublisher(context.Background(), cfg.Events, taskEventHub)
+	services, err := newAppDomainServices(ctx, cfg, repos)
 	if err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool, nil)
-		return nil, fmt.Errorf("failed to initialize task event bus: %w", err)
+		closeStartupResources(dbs.db, dbs.riverPool)
+		return nil, err
 	}
 
-	// services
-	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, postgresRuntimeStore, cfg.Queue.MaxRetry)
-	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
-		AccountRepo:      repos.accountRepo,
-		TaskRepo:         repos.taskRepo,
-		QueueStats:       riverQueue,
-		AccountLoadStore: postgresRuntimeStore,
-		ConcurrencyStore: postgresRuntimeStore,
-		CancelStore:      postgresRuntimeStore,
-		MonitorStore:     riverQueue,
-	}, accounts.AccountServiceOptions{
-		TaskEvents: taskEvents,
-	})
-	riverTaskWorker := worker.NewRiverTaskWorker(
-		repos.accountRepo,
-		repos.channelRepo,
-		repos.taskRepo,
-		riverQueue,
-		postgresAssigner,
-		postgresRuntimeStore,
-		storageService,
-		taskEvents,
-		runtimeSettings,
-	)
-	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
-	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
-		QueueName:   taskqueue.RiverQueueDefault,
-		Concurrency: cfg.Queue.WorkerConcurrency,
-		JobTimeout:  time.Duration(cfg.Queue.TaskTimeoutSeconds) * time.Second,
-		MaxRetry:    cfg.Queue.MaxRetry,
-	})
+	taskServices, workerRuntime, err := newAppTaskRuntime(ctx, cfg, dbs, repos, services)
 	if err != nil {
-		closeStartupResources(dbs.db, dbs.riverPool, eventBus)
-		return nil, fmt.Errorf("failed to initialize River client: %w", err)
+		closeStartupResources(dbs.db, dbs.riverPool)
+		return nil, err
 	}
-	riverQueue.SetClient(riverClient)
-	submissionStore := tasksubmission.NewStore(dbs.riverPool, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry)
-
-	taskService := taskservice.NewService(taskservice.ServiceDeps{
-		AccountRepo:       repos.accountRepo,
-		TaskRepo:          repos.taskRepo,
-		SubmissionStore:   submissionStore,
-		CancelStore:       postgresRuntimeStore,
-		FeaturePrompts:    repos.featurePromptRepo,
-		UploadBoards:      uploadBoardAccessResolver{service: boardService},
-		UploadOwners:      uploadOwnerStorageUIDResolver{repo: repos.userRepo},
-		TaskOutputCleaner: storageService,
-		PublicURLs:        runtimeSettings,
-	}, taskservice.ServiceOptions{
-		EventHub:   taskEventHub,
-		TaskEvents: taskEvents,
-	})
-	taskStatsService := taskstats.NewService(repos.taskRepo)
-	accountHandler := accounts.NewAccountHandler(accountService)
-	taskHandler := taskservice.NewHandler(taskService)
-	taskStatsHandler := taskstats.NewHandler(taskStatsService, accountService)
-
-	authDeps := httpapi.AuthDeps{
-		AuthServiceClient: authServiceClient,
-		UserRepo:          repos.userRepo,
-	}
-	uploadDeps := httpapi.UploadDeps{
-		StorageService: storageService,
-		UserRepo:       repos.userRepo,
-		BoardService:   boardService,
-		UploadSettings: runtimeSettings,
-	}
-	router := gin.New()
-	router.Use(gin.Recovery())
-	registerHTTPRoutes(router, httpapi.Dependencies{
-		Auth: authDeps,
-		UserRoutes: httpapi.UserRouteDeps{
-			AuthHandler:      auth.NewAuthHandler(userService),
-			TaskHandler:      taskHandler,
-			BoardHandler:     boards.NewBoardHandler(boardService, runtimeSettings),
-			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
-			Uploads:          uploadDeps,
-		},
-		AdminRoutes: httpapi.AdminRouteDeps{
-			AdminHandler:         users.NewAdminHandler(userService, runtimeSettings, authServiceClient),
-			AccountHandler:       accountHandler,
-			TaskHandler:          taskHandler,
-			TaskStatsHandler:     taskStatsHandler,
-			ChannelHandler:       channels.NewChannelHandler(repos.channelRepo, cfg.App.Env),
-			StorageHandler:       storage.NewStorageHandler(storageService),
-			LineDraftHandler:     assets.NewLineDraftHandler(repos.lineDraftModeRepo),
-			FeaturePromptHandler: prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
-			StorageService:       storageService,
-			UploadSettings:       runtimeSettings,
-		},
-		StaticUploads: httpapi.StaticUploadDeps{
-			Auth:         authDeps,
-			BoardService: boardService,
-		},
-		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
-		RateLimit:      runtimeSettings,
-		Branding:       runtimeSettings,
-	}, httpapi.FrontendRouteOptions{
-		WarnMissingIndex: isProductionRuntime(cfg.App.Env),
-	})
+	router := newAppRouter(cfg, repos, services, taskServices)
 
 	return &appContainer{
-		router:           router,
-		db:               dbs.db,
-		riverPool:        dbs.riverPool,
-		riverClient:      riverClient,
-		eventBus:         eventBus,
-		workerQueueName:  taskqueue.RiverQueueDefault,
-		workerConcurrent: cfg.Queue.WorkerConcurrency,
+		router:        router,
+		db:            dbs.db,
+		riverPool:     dbs.riverPool,
+		workerRuntime: workerRuntime,
 	}, nil
 }
 
@@ -269,8 +66,8 @@ func (c *appContainer) close() error {
 		return nil
 	}
 	var closeErr error
-	if c.eventBus != nil {
-		closeErr = c.eventBus.Close()
+	if err := c.workerRuntime.close(); err != nil {
+		closeErr = err
 	}
 	if c.riverPool != nil {
 		c.riverPool.Close()
@@ -281,107 +78,4 @@ func (c *appContainer) close() error {
 		}
 	}
 	return closeErr
-}
-
-func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies, frontendOptions httpapi.FrontendRouteOptions) {
-	frontendFS, err := webdist.DistFS()
-	if err != nil {
-		slog.Warn("failed to load embedded frontend dist", "err", err)
-	}
-
-	httpapi.RegisterRoutes(r, deps, frontendFS, frontendOptions)
-}
-
-type taskEventHubPublisher struct {
-	hub *taskservice.EventHub
-}
-
-func (p taskEventHubPublisher) PublishTaskStatus(_ context.Context, event events.TaskStatusEvent) error {
-	if p.hub == nil {
-		return nil
-	}
-	event = events.NormalizeTaskStatusEvent(event)
-	p.hub.Publish(event.TaskID, taskservice.TaskEvent{TaskID: event.TaskID, Status: event.Status})
-	return nil
-}
-
-type compositeTaskStatusPublisher struct {
-	local  events.TaskStatusPublisher
-	remote events.TaskStatusPublisher
-}
-
-func (p compositeTaskStatusPublisher) PublishTaskStatus(ctx context.Context, event events.TaskStatusEvent) error {
-	event = events.NormalizeTaskStatusEvent(event)
-	var firstErr error
-	if p.local != nil {
-		if err := p.local.PublishTaskStatus(ctx, event); err != nil {
-			firstErr = err
-		}
-	}
-	if p.remote != nil {
-		if err := p.remote.PublishTaskStatus(ctx, event); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
-}
-
-func newTaskStatusEventPublisher(
-	ctx context.Context,
-	cfg config.EventBusConfig,
-	hub *taskservice.EventHub,
-) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
-	localPublisher := taskEventHubPublisher{hub: hub}
-	if !cfg.Enabled {
-		return localPublisher, nil, nil
-	}
-	if cfg.NATSURL == "" {
-		return nil, nil, fmt.Errorf("NATS_EVENT_BUS_ENABLED=true requires NATS_URL")
-	}
-
-	bus, err := events.NewNATSJetStreamEventBus(ctx, events.NATSJetStreamConfig{
-		URL:            cfg.NATSURL,
-		StreamName:     cfg.NATSStreamName,
-		SubjectPrefix:  cfg.NATSSubjectPrefix,
-		ConsumerName:   cfg.NATSConsumerName,
-		Retention:      time.Duration(cfg.NATSRetentionDays) * 24 * time.Hour,
-		ConnectTimeout: time.Duration(cfg.NATSConnectTimeout) * time.Second,
-		RequestTimeout: time.Duration(cfg.NATSRequestTimeout) * time.Second,
-		DrainTimeout:   time.Duration(cfg.NATSDrainTimeout) * time.Second,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := bus.SubscribeTaskStatus(ctx, func(ctx context.Context, event events.TaskStatusEvent) error {
-		return localPublisher.PublishTaskStatus(ctx, event)
-	}); err != nil {
-		_ = bus.Close()
-		return nil, nil, err
-	}
-	slog.Info("NATS JetStream task events enabled", "stream", cfg.NATSStreamName, "subject_prefix", cfg.NATSSubjectPrefix)
-	return compositeTaskStatusPublisher{local: localPublisher, remote: bus}, bus, nil
-}
-
-type uploadBoardAccessResolver struct {
-	service *boards.BoardService
-}
-
-func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
-	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
-	if err != nil {
-		return 0, err
-	}
-	return board.UserID, nil
-}
-
-type uploadOwnerStorageUIDResolver struct {
-	repo *users.UserRepository
-}
-
-func (r uploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
-	user, err := r.repo.GetByID(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-	return user.StorageUID, nil
 }

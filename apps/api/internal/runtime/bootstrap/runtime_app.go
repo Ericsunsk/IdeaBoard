@@ -36,8 +36,8 @@ func (a *runtimeApp) start() {
 				fatal("River worker goroutine panicked", "panic", r)
 			}
 		}()
-		slog.Info("River worker starting", "queue", a.container.workerQueueName, "concurrency", a.container.workerConcurrent)
-		if err := a.container.riverClient.Start(context.Background()); err != nil {
+		slog.Info("River worker starting", "queue", a.container.workerRuntime.queueName, "concurrency", a.container.workerRuntime.concurrency)
+		if err := a.container.workerRuntime.riverClient.Start(context.Background()); err != nil {
 			fatal("failed to start River worker", "err", err)
 		}
 	}()
@@ -66,7 +66,7 @@ func (a *runtimeApp) shutdown() error {
 	slog.Info("server shutting down")
 	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stopCancel()
-	if err := a.container.riverClient.Stop(stopCtx); err != nil {
+	if err := a.container.workerRuntime.riverClient.Stop(stopCtx); err != nil {
 		slog.Warn("River worker graceful stop failed", "err", err)
 	}
 

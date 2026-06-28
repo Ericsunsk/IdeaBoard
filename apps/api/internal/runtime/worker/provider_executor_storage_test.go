@@ -64,9 +64,10 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	})
 
 	db := testdb.Open(t)
+	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
 
 	return &ProviderExecutor{
-		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db), nil),
+		mediaStore: storage.NewTaskMediaAdapter(storageService, nil, nil),
 	}
 }
 
@@ -182,8 +183,9 @@ func TestMaterializeProviderResultImagesFailsWhenRemoteCannotBeStored(t *testing
 	defer server.Close()
 
 	db := testdb.Open(t)
+	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
 	executor := &ProviderExecutor{
-		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db), nil),
+		mediaStore: storage.NewTaskMediaAdapter(storageService, nil, nil),
 	}
 
 	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{ProxyURL: server.URL}, []string{server.URL + "/image.png"})

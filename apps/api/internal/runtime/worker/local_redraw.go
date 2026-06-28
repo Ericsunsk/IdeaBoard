@@ -9,7 +9,7 @@ import (
 	"ideaboard/api/internal/platform/media"
 	"ideaboard/api/internal/platform/mediarefs"
 	"ideaboard/api/internal/platform/safehttp"
-	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskmedia"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 	"image"
@@ -212,15 +212,15 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 		)
 	}
 
-	if c.storageService == nil {
-		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(composedBytes), nil, false, nil
+	if c.mediaStore == nil {
+		return "", nil, false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("local redraw 持久化失败: 存储服务未初始化"),
+		)
 	}
 	filename := fmt.Sprintf("local-redraw-%s-%d.png", sanitizeFeatureSlug(redraw.featureSlug), time.Now().UnixNano())
-	storeOpts := storage.StorageStoreOptions{}
-	if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
-		storeOpts.DirPrefix = dirPrefix
-	}
-	storedRef, err := c.storageService.StoreBytesRef(ctx, filename, composedBytes, storeOpts)
+	storedRef, err := c.mediaStore.StoreBytesResult(ctx, userID, taskID, filename, composedBytes, taskmedia.StoreOptions{})
 	if err != nil {
 		return "", nil, false, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,

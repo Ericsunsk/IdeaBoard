@@ -1,6 +1,13 @@
 package workflow
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"slices"
+	"testing"
+)
 
 func TestParseWorkflowFeatureSlug(t *testing.T) {
 	tests := []struct {
@@ -50,6 +57,23 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	}
 }
 
+func TestSupportedFeatureSlugsMatchFrontendWorkflowFeatures(t *testing.T) {
+	repoRoot := findWorkflowRepoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "workflowFeatures.ts"))
+	if err != nil {
+		t.Fatalf("read frontend workflow features: %v", err)
+	}
+
+	frontendSlugs := extractFrontendWorkflowFeatureSlugs(t, string(raw))
+	backendSlugs := SupportedFeatureSlugs()
+	slices.Sort(frontendSlugs)
+	slices.Sort(backendSlugs)
+
+	if !slices.Equal(backendSlugs, frontendSlugs) {
+		t.Fatalf("workflow feature slugs mismatch\nbackend=%v\nfrontend=%v", backendSlugs, frontendSlugs)
+	}
+}
+
 func TestResolveWorkflowFeatureSlug(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -73,6 +97,67 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 			}
 		})
 	}
+}
+
+func findWorkflowRepoRoot(t *testing.T) string {
+	t.Helper()
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(filename)
+	for {
+		if fileExists(filepath.Join(dir, "apps", "api", "internal", "workflow", "features.go")) &&
+			fileExists(filepath.Join(dir, "apps", "web", "src", "shared", "domain", "workflowFeatures.ts")) {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("repo root not found from %s", filename)
+		}
+		dir = parent
+	}
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func extractFrontendWorkflowFeatureSlugs(t *testing.T, source string) []string {
+	t.Helper()
+	if !regexp.MustCompile(`export\s+const\s+WORKFLOW_FEATURE_SLUGS\s*=\s*Object\.values\(WORKFLOW_FEATURE\)\s+as\s+readonly\s+WorkflowFeature\[\]`).MatchString(source) {
+		t.Fatal("WORKFLOW_FEATURE_SLUGS must be derived from Object.values(WORKFLOW_FEATURE)")
+	}
+
+	objectRe := regexp.MustCompile(`(?s)export\s+const\s+WORKFLOW_FEATURE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
+	match := objectRe.FindStringSubmatch(source)
+	if match == nil {
+		t.Fatal("WORKFLOW_FEATURE object not found")
+	}
+	body := match[objectRe.SubexpIndex("body")]
+	entryRe := regexp.MustCompile(`(?m)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*'([^']+)'\s*,?`)
+	matches := entryRe.FindAllStringSubmatch(body, -1)
+	if len(matches) == 0 {
+		t.Fatal("WORKFLOW_FEATURE has no string literal values")
+	}
+	slugs := make([]string, 0, len(matches))
+	seenKeys := make(map[string]struct{}, len(matches))
+	seenSlugs := make(map[string]struct{}, len(matches))
+	for _, match := range matches {
+		key := match[1]
+		slug := match[2]
+		if _, exists := seenKeys[key]; exists {
+			t.Fatalf("duplicate WORKFLOW_FEATURE key %q", key)
+		}
+		if _, exists := seenSlugs[slug]; exists {
+			t.Fatalf("duplicate WORKFLOW_FEATURE slug %q", slug)
+		}
+		seenKeys[key] = struct{}{}
+		seenSlugs[slug] = struct{}{}
+		slugs = append(slugs, slug)
+	}
+	return slugs
 }
 
 func TestValidateProviderAPIType(t *testing.T) {

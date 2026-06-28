@@ -17,6 +17,8 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskmedia"
 	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
@@ -32,6 +34,12 @@ type testPublicURLProvider struct {
 
 func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
 	return p.setting, nil
+}
+
+type testSubmitMediaValidator struct{}
+
+func (testSubmitMediaValidator) ValidateSubmitMediaRef(context.Context, int64, string) error {
+	return nil
 }
 
 func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
@@ -315,7 +323,7 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 	})
 
 	t.Run("reject oversized data url", func(t *testing.T) {
-		tooLarge := "data:image/png;base64," + strings.Repeat("a", maxSubmitTaskMediaDataURLBytes)
+		tooLarge := "data:image/png;base64," + strings.Repeat("a", taskmedia.MaxSubmitTaskMediaDataURLBytes)
 		if err := validateSubmitTaskMediaRef(tooLarge); err == nil {
 			t.Fatal("expected oversized data url to fail")
 		}
@@ -502,10 +510,16 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
+	mediaAdapter := storage.NewTaskMediaAdapter(
+		nil,
+		testTaskUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
+		testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
+	)
 	svc := NewService(ServiceDeps{
-		UploadBoards: testTaskUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
-		UploadOwners: testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
-		PublicURLs:   testPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
+		MediaValidator: taskmedia.NewSubmitMediaValidator(
+			testPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
+			mediaAdapter,
+		),
 	}, ServiceOptions{})
 	allowed := "/uploads/workspace/OWNR1A/board-1/content/demo.png"
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, allowed); err != nil {
@@ -529,6 +543,31 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/profile/MEMB1A/avatar/demo.png"); err == nil {
 		t.Fatalf("expected non-workspace upload path to be rejected")
+	}
+}
+
+func TestSubmitTaskMediaRefValidationFailsClosedWithoutServiceValidator(t *testing.T) {
+	ctx := context.Background()
+	const allowedByFormat = "/uploads/workspace/OWNR1A/board-1/content/demo.png"
+	want := "任务媒体校验服务未配置"
+
+	tests := []struct {
+		name string
+		svc  *Service
+	}{
+		{name: "nil service"},
+		{name: "nil media validator", svc: NewService(ServiceDeps{}, ServiceOptions{})},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.svc.validateSubmitTaskMediaRef(ctx, 42, allowedByFormat)
+			if err == nil {
+				t.Fatalf("expected missing validator to fail closed")
+			}
+			if err.Error() != want {
+				t.Fatalf("error = %q, want %q", err.Error(), want)
+			}
+		})
 	}
 }
 
@@ -591,6 +630,7 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 	svc := NewService(ServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
+		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -690,6 +730,7 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	svc := NewService(ServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
+		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{

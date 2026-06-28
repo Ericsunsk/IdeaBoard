@@ -63,6 +63,7 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 			},
 		}},
 		SubmissionStore: submissionStore,
+		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
 	router := newSubmitHandlerTestRouter(service, 42)
 
@@ -139,6 +140,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 			},
 		}},
 		SubmissionStore: &recordingSubmissionStore{},
+		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
 	router := newSubmitHandlerTestRouter(service, 42)
 

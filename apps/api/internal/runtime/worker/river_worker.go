@@ -12,7 +12,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/runtime/taskruntime"
-	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskmedia"
 	"ideaboard/api/internal/taskqueue"
 
 	"github.com/jackc/pgx/v5"
@@ -41,14 +41,14 @@ func NewRiverTaskWorker(
 	enqueuer taskqueue.TaskEnqueuer,
 	assigner taskqueue.TaskAssigner,
 	cancelStore taskqueue.TaskCancellationStore,
-	storageService *storage.StorageService,
+	mediaStore taskmedia.RuntimeMediaStore,
 	taskEvents events.TaskStatusPublisher,
 	publicURLs settings.PublicURLSettingProvider,
 ) *RiverTaskWorker {
 	executor := &ProviderExecutor{
-		channelRepo:    channelRepo,
-		storageService: storageService,
-		publicURLs:     publicURLs,
+		channelRepo: channelRepo,
+		mediaStore:  mediaStore,
+		publicURLs:  publicURLs,
 	}
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	taskRuntime.SetTaskStatusPublisher(taskEvents)
