@@ -7,18 +7,18 @@ import {
   hasEffectiveImageEditorAdjustmentLayers,
   IMAGE_ADJUSTMENT_FINAL_TASK_ID,
   renderImageAdjustmentFile,
-  useImageAdjustmentFilterPreviews,
+  useImageAdjustmentRenderedPreview,
   useImageEditorMode,
   useImageEditorSession,
   IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
   type ImageAdjustmentKind,
   type ImageAdjustmentFinalApplyProgress,
   type ImageEditorAdjustmentLayer,
-  type ImageEditorFilterPreview,
   type ImageEditorLayer,
   type ImageEditorMode,
   type ImageEditorParamKey,
   type ImageEditorParamValue,
+  type ImageEditorRenderedPreview,
   type ImageEditorTool,
   type WorkspaceImageAdjustmentFinalApplyContext,
 } from '../image-editor'
@@ -100,9 +100,8 @@ type WorkspaceImageToolRuntime = {
   ) => void
   isApplyingImageEditorAdjustments: Ref<boolean>
   imageAdjustmentFinalApplyProgress: Ref<ImageAdjustmentFinalApplyProgress | null>
-  imageAdjustmentFilterPreviews: ComputedRef<ImageEditorFilterPreview[]>
+  imageEditorRenderedPreview: ComputedRef<ImageEditorRenderedPreview | null>
   onApplyImageEditorAdjustments: () => Promise<void>
-  cancelImageEditorAdjustmentFinalApply: () => void
   cancelFlowMaskEditorMode: () => void
   enterFlowImageEditorMode: (nodeId: string, mode: ImageEditorMode) => boolean
   commitFlowMaskEditorMode: () => boolean
@@ -138,7 +137,7 @@ export function useWorkspaceImageToolRuntime(
   const imageAdjustmentFinalApplyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(null)
   const activeImageAdjustmentFinalTaskId = ref<string | null>(null)
   const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
-  const { imageAdjustmentFilterPreviews } = useImageAdjustmentFilterPreviews({
+  const { imageEditorRenderedPreview } = useImageAdjustmentRenderedPreview({
     isAdjustMode: isImageAdjustmentMode,
     layers: imageEditorSession.imageEditorLayers,
     sourceUrl: () =>
@@ -308,9 +307,8 @@ export function useWorkspaceImageToolRuntime(
     updateSelectedImageEditorLayerParam: imageEditorSession.updateSelectedImageEditorLayerParam,
     isApplyingImageEditorAdjustments,
     imageAdjustmentFinalApplyProgress,
-    imageAdjustmentFilterPreviews,
+    imageEditorRenderedPreview,
     onApplyImageEditorAdjustments,
-    cancelImageEditorAdjustmentFinalApply: () => cancelImageAdjustmentFinalTask(),
     cancelFlowMaskEditorMode,
     enterFlowImageEditorMode,
     commitFlowMaskEditorMode,

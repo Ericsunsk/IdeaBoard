@@ -144,5 +144,3 @@ export type ImageEditorRenderedPreview = {
   width: number
   height: number
 }
-
-export type ImageEditorFilterPreview = ImageEditorRenderedPreview

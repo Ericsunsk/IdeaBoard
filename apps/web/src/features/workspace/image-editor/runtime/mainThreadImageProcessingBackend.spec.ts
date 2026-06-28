@@ -1,58 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
 import type { ImageSourceCache, ImageSourceCacheEntry } from './imageSourceCache'
-import {
-  createMainThreadImageProcessingBackend,
-  type ImageAdjustmentPlanExecutor,
-} from './mainThreadImageProcessingBackend'
+import { createMainThreadImageProcessingBackend } from './mainThreadImageProcessingBackend'
+import type { ImageAdjustmentPlanExecutor } from './planExecutorTypes'
 import type {
   ImageProcessingBackendTaskContext,
   ImageProcessingOutputPolicy,
   ImageProcessingProgress,
 } from './types'
 
-const createObjectUrlMock = vi.fn()
-const revokeObjectUrlMock = vi.fn()
-
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
-  createObjectUrlMock.mockReset()
-  revokeObjectUrlMock.mockReset()
 })
 
 describe('createMainThreadImageProcessingBackend', () => {
-  it('uses an injected plan executor for previews and writes its ImageData to the canvas', async () => {
-    const source = createImageSource('preview-source', [10, 20, 30, 255])
-    const sourceCache = createSourceCache({ preview: source })
-    const adjusted = makeImageData([1, 2, 3, 255])
-    const planExecutor = createPlanExecutor(adjusted)
-    installCanvasMocks()
-    installUrlMocks('blob:preview')
-    const backend = createMainThreadImageProcessingBackend({ sourceCache, planExecutor })
-
-    const result = await backend.renderPreview({
-      source: { url: 'https://example.com/source.png' },
-      plan: createInvertPlan(),
-      context: createTaskContext(),
-    })
-
-    expect(result).toMatchObject({
-      objectUrl: 'blob:preview',
-      width: 1,
-      height: 1,
-      mimeType: 'image/webp',
-    })
-    expect(planExecutor.execute).toHaveBeenCalledWith({
-      imageData: source.imageData,
-      plan: createInvertPlan(),
-      signal: expect.any(AbortSignal),
-      onProgress: expect.any(Function),
-    })
-    const renderContext = getLastCreatedCanvasContext()
-    expect(renderContext?.putImageData).toHaveBeenCalledWith(adjusted, 0, 0)
-  })
-
   it('uses an injected plan executor for final renders and writes its ImageData to the source canvas', async () => {
     const source = createImageSource('final-source', [10, 20, 30, 255])
     const sourceCache = createSourceCache({ fullSize: source })
@@ -84,20 +46,19 @@ describe('createMainThreadImageProcessingBackend', () => {
   })
 
   it('uses a CPU plan executor by default', async () => {
-    const source = createImageSource('preview-source', [10, 20, 30, 255])
-    const sourceCache = createSourceCache({ preview: source })
+    const source = createImageSource('final-source', [10, 20, 30, 255])
+    const sourceCache = createSourceCache({ fullSize: source })
     installCanvasMocks()
-    installUrlMocks('blob:preview')
     const backend = createMainThreadImageProcessingBackend({ sourceCache })
 
-    const result = await backend.renderPreview({
+    const result = await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
       plan: createInvertPlan(),
       context: createTaskContext(),
     })
 
-    expect(result.objectUrl).toBe('blob:preview')
-    expect(getLastCreatedCanvasContext()?.putImageData).toHaveBeenCalledWith(
+    expect(result.file.name).toBe('image.png')
+    expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
         data: new Uint8ClampedArray([245, 235, 225, 255]),
       }),
@@ -148,10 +109,7 @@ type TestImageSource = ImageSourceCacheEntry & {
   context: CanvasRenderingContext2D & TestCanvasContext
 }
 
-type TestSourceCache = Pick<
-  ImageSourceCache,
-  'dispose' | 'getFullSizeSource' | 'getPreviewSource' | 'releaseSource'
->
+type TestSourceCache = Pick<ImageSourceCache, 'dispose' | 'getFullSizeSource' | 'releaseSource'>
 
 const createdCanvasContexts: TestCanvasContext[] = []
 
@@ -165,22 +123,8 @@ function installCanvasMocks() {
   })
 }
 
-function installUrlMocks(objectUrl: string) {
-  createObjectUrlMock.mockReturnValue(objectUrl)
-  vi.spyOn(URL, 'createObjectURL').mockImplementation(createObjectUrlMock)
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(revokeObjectUrlMock)
-}
-
-function getLastCreatedCanvasContext() {
-  return createdCanvasContexts.at(-1)
-}
-
-function createSourceCache(input: {
-  preview?: TestImageSource | null
-  fullSize?: TestImageSource | null
-}): ImageSourceCache {
+function createSourceCache(input: { fullSize?: TestImageSource | null }): ImageSourceCache {
   const sourceCache: TestSourceCache = {
-    getPreviewSource: vi.fn(async () => input.preview ?? null),
     getFullSizeSource: vi.fn(async () => input.fullSize ?? null),
     releaseSource: vi.fn(),
     dispose: vi.fn(),
@@ -193,7 +137,6 @@ function createImageSource(key: string, values: number[]): TestImageSource {
   const { canvas, context } = createTestCanvas(imageData)
   return {
     key,
-    purpose: 'preview',
     sourceUrl: 'https://example.com/source.png',
     fetchUrl: 'https://example.com/source.png',
     width: imageData.width,
@@ -232,7 +175,9 @@ function createTestCanvas(initialImageData: ImageData) {
   return { canvas, context }
 }
 
-function createTaskContext(input: { signal?: AbortSignal } = {}): ImageProcessingBackendTaskContext {
+function createTaskContext(
+  input: { signal?: AbortSignal } = {},
+): ImageProcessingBackendTaskContext {
   return {
     taskId: 'task:1',
     revision: 1,
@@ -244,9 +189,7 @@ function createTaskContext(input: { signal?: AbortSignal } = {}): ImageProcessin
 
 function createOutputPolicy(): ImageProcessingOutputPolicy {
   return {
-    resolveEncoding: ({ kind }) => ({
-      mimeType: kind === 'preview' ? 'image/webp' : 'image/png',
-    }),
+    resolveEncoding: () => ({ mimeType: 'image/png' }),
     resolveFileName: ({ title }) => `${title ?? 'image'}.png`,
   }
 }

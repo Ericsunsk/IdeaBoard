@@ -1,11 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
-import {
-  createCpuImageAdjustmentPlanExecutor,
-  createHybridImageAdjustmentPlanExecutor,
-  createWorkerImageAdjustmentPlanExecutor,
-  type ImageAdjustmentPlanExecutionEvent,
-} from './imageAdjustmentPlanExecutor'
+import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
+import { createHybridImageAdjustmentPlanExecutor } from './hybridPlanExecutor'
+import { createWorkerImageAdjustmentPlanExecutor } from './workerPlanExecutor'
+import type { ImageAdjustmentPlanExecutionEvent } from './planExecutorTypes'
 
 const { disposeDefaultWorkerImageProcessingClientMock, executeWorkerImageAdjustmentPlanMock } =
   vi.hoisted(() => ({

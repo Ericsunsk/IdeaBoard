@@ -7,14 +7,13 @@ import type {
   ImageProcessingOutputEncoding,
   ImageProcessingOutputFileNameInput,
   ImageProcessingOutputPolicy,
-  ImageProcessingOutputPolicyInput,
 } from './types'
 
 export const DEFAULT_IMAGE_PROCESSING_OUTPUT_SUFFIX = 'adjusted'
 export const DEFAULT_IMAGE_PROCESSING_OUTPUT_BASENAME = 'image-adjusted'
 
 export function resolveImageProcessingOutputEncoding(
-  input: ImageProcessingOutputPolicyInput,
+  input: Parameters<ImageProcessingOutputPolicy['resolveEncoding']>[0],
 ): ImageProcessingOutputEncoding {
   const mimeType = resolvePreviewMimeType(input.sourceMimeType, input.hasTransparentPixels)
   return {

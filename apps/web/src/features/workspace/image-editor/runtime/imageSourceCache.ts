@@ -2,11 +2,8 @@ import { resolveFetchUrl } from '../../services/flowMediaIO'
 import { isAnimatedImageBlob, releaseCanvas } from '../utils/imageAdjustmentMedia'
 
 export const DEFAULT_IMAGE_SOURCE_CACHE_LIMIT = 12
-export const DEFAULT_PREVIEW_SOURCE_MAX_SIDE = 960
 export const DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS = 24_000_000
 
-export type ImageSourcePurpose = 'preview' | 'full-size'
-export type ImageSourceFailureMode = 'throw' | 'return-null'
 export type ImageSourceCacheErrorCode =
   | 'invalid-url'
   | 'fetch-failed'
@@ -21,7 +18,6 @@ export type ImageSourceResolveOptions = Parameters<typeof resolveFetchUrl>[1]
 
 export type ImageSourceCacheEntry = {
   readonly key: string
-  readonly purpose: ImageSourcePurpose
   readonly sourceUrl: string
   readonly fetchUrl: string
   readonly width: number
@@ -35,23 +31,13 @@ export type ImageSourceCacheOptions = {
   readonly maxEntries?: number
 }
 
-export type ImageSourcePreviewOptions = {
-  readonly maxSide?: number
-  readonly failureMode?: ImageSourceFailureMode
-  readonly resolveOptions?: ImageSourceResolveOptions
-}
-
 export type ImageSourceFullSizeOptions = {
   readonly maxPixels?: number
-  readonly failureMode?: ImageSourceFailureMode
   readonly resolveOptions?: ImageSourceResolveOptions
 }
 
 type LoadImageSourceOptions = {
-  readonly purpose: ImageSourcePurpose
-  readonly maxSide?: number
   readonly maxPixels?: number
-  readonly failureMode: ImageSourceFailureMode
   readonly resolveOptions?: ImageSourceResolveOptions
 }
 
@@ -72,24 +58,14 @@ export class ImageSourceCache {
   private isDisposed = false
 
   constructor(options: ImageSourceCacheOptions = {}) {
-    this.maxEntries = Math.max(0, Math.floor(options.maxEntries ?? DEFAULT_IMAGE_SOURCE_CACHE_LIMIT))
+    this.maxEntries = Math.max(
+      0,
+      Math.floor(options.maxEntries ?? DEFAULT_IMAGE_SOURCE_CACHE_LIMIT),
+    )
   }
 
   get size() {
     return this.entries.size
-  }
-
-  getPreviewSource(
-    sourceUrl: string,
-    options: ImageSourcePreviewOptions = {},
-  ): Promise<ImageSourceCacheEntry | null> {
-    const maxSide = Math.max(1, Math.floor(options.maxSide ?? DEFAULT_PREVIEW_SOURCE_MAX_SIDE))
-    return this.getOrLoad(sourceUrl, {
-      purpose: 'preview',
-      maxSide,
-      failureMode: options.failureMode ?? 'return-null',
-      resolveOptions: options.resolveOptions,
-    })
   }
 
   getFullSizeSource(
@@ -101,9 +77,7 @@ export class ImageSourceCache {
       Math.floor(options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS),
     )
     return this.getOrLoad(sourceUrl, {
-      purpose: 'full-size',
       maxPixels,
-      failureMode: options.failureMode ?? 'throw',
       resolveOptions: options.resolveOptions,
     })
   }
@@ -130,7 +104,7 @@ export class ImageSourceCache {
     sourceUrl: string,
     options: LoadImageSourceOptions,
   ): Promise<ImageSourceCacheEntry | null> {
-    if (this.isDisposed) return handleImageSourceFailure(createCacheError('disposed'), options)
+    if (this.isDisposed) throw createCacheError('disposed')
 
     const cacheKey = createImageSourceCacheKey(sourceUrl, options)
     const cached = this.entries.get(cacheKey)
@@ -148,7 +122,8 @@ export class ImageSourceCache {
         if (!entry) return null
         if (this.isDisposed || this.maxEntries === 0) {
           releaseImageSourceCanvas(entry)
-          return this.isDisposed ? handleImageSourceFailure(createCacheError('disposed'), options) : null
+          if (this.isDisposed) throw createCacheError('disposed')
+          return null
         }
         this.entries.set(cacheKey, entry)
         this.trim()
@@ -212,7 +187,6 @@ async function loadImageSourceCanvas(
         context.drawImage(bitmap, 0, 0, width, height)
         return {
           key: options.cacheKey,
-          purpose: options.purpose,
           sourceUrl,
           fetchUrl,
           width,
@@ -231,41 +205,22 @@ async function loadImageSourceCanvas(
   } catch (error) {
     const normalizedError =
       error instanceof ImageSourceCacheError ? error : createCacheError('decode-failed')
-    return handleImageSourceFailure(normalizedError, options)
+    throw normalizedError
   }
 }
 
 function resolveTargetSize(bitmap: ImageBitmap, options: LoadImageSourceOptions) {
   if (bitmap.width <= 0 || bitmap.height <= 0) throw createCacheError('decode-failed')
 
-  if (options.purpose === 'full-size') {
-    const pixelCount = bitmap.width * bitmap.height
-    if (pixelCount > (options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS)) {
-      throw createCacheError('too-large')
-    }
-    return { width: bitmap.width, height: bitmap.height }
+  const pixelCount = bitmap.width * bitmap.height
+  if (pixelCount > (options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS)) {
+    throw createCacheError('too-large')
   }
-
-  const longestSide = Math.max(bitmap.width, bitmap.height)
-  const scale = Math.min(1, (options.maxSide ?? DEFAULT_PREVIEW_SOURCE_MAX_SIDE) / longestSide)
-  return {
-    width: Math.max(1, Math.round(bitmap.width * scale)),
-    height: Math.max(1, Math.round(bitmap.height * scale)),
-  }
-}
-
-function handleImageSourceFailure(
-  error: ImageSourceCacheError,
-  options: Pick<LoadImageSourceOptions, 'failureMode'>,
-) {
-  if (options.failureMode === 'return-null') return null
-  throw error
+  return { width: bitmap.width, height: bitmap.height }
 }
 
 function createImageSourceCacheKey(sourceUrl: string, options: LoadImageSourceOptions) {
   return [
-    options.purpose,
-    options.maxSide ?? 'full',
     options.maxPixels ?? 'unbounded',
     options.resolveOptions?.allowSameOriginUploads ?? 'default-uploads',
     options.resolveOptions?.blockExternal ?? 'default-external',

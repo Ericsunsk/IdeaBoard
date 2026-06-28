@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageAdjustmentPlan } from '../../utils/imageAdjustmentEngine'
-import { executeCpuImageAdjustmentPlan } from '../cpu/executeCpuImageAdjustmentPlan'
+import { cloneImageData } from '../../utils/imageDataUtils'
+import { executeCpuImageAdjustmentPlanInPlace } from '../cpu/executeCpuImageAdjustmentPlan'
 import { handleWorkerImageProcessingRequest } from './imageProcessing.worker'
 import {
   createWorkerImageProcessingClient,
@@ -99,7 +100,7 @@ describe('worker image adjustment backend', () => {
       },
     ]
     const progress = vi.fn()
-    const expected = executeCpuImageAdjustmentPlan(source, plan)
+    const expected = executeCpuImageAdjustmentPlanInPlace(cloneImageData(source), plan)
 
     const result = await executeWorkerImageAdjustmentPlan(source, plan, {
       requestId: 'request:chunk-parity',

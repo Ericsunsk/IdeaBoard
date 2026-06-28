@@ -9,7 +9,6 @@ describe('imageOutputPolicy', () => {
   it('preserves transparency with png output', () => {
     expect(
       resolveImageProcessingOutputEncoding({
-        kind: 'final',
         sourceMimeType: 'image/webp',
         hasTransparentPixels: true,
       }),
@@ -19,7 +18,6 @@ describe('imageOutputPolicy', () => {
   it('uses webp and explicit quality for opaque output', () => {
     expect(
       resolveImageProcessingOutputEncoding({
-        kind: 'preview',
         sourceMimeType: 'image/png',
         hasTransparentPixels: false,
       }),
@@ -29,7 +27,6 @@ describe('imageOutputPolicy', () => {
   it('falls back conservatively for png when transparency is unknown', () => {
     expect(
       resolveImageProcessingOutputEncoding({
-        kind: 'final',
         sourceMimeType: ' IMAGE/PNG ',
         hasTransparentPixels: null,
       }),

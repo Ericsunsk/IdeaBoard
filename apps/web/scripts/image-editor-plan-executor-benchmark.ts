@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { performance } from 'node:perf_hooks'
-import { createCpuImageAdjustmentPlanExecutor } from '../src/features/workspace/image-editor/runtime/imageAdjustmentPlanExecutor'
+import { createCpuImageAdjustmentPlanExecutor } from '../src/features/workspace/image-editor/runtime/cpuPlanExecutor'
 import type {
   ImageAdjustmentPlan,
   ImageAdjustmentPlanStep,
@@ -43,7 +43,9 @@ async function main() {
   const checksum = checksumImageData(await executePlan(plan, sourcePixels))
 
   console.log('image-editor plan executor benchmark')
-  console.log(`image: ${IMAGE_WIDTH}x${IMAGE_HEIGHT} (${formatNumber(IMAGE_WIDTH * IMAGE_HEIGHT)} px)`)
+  console.log(
+    `image: ${IMAGE_WIDTH}x${IMAGE_HEIGHT} (${formatNumber(IMAGE_WIDTH * IMAGE_HEIGHT)} px)`,
+  )
   console.log(`plan: ${plan.length} steps (${summarizePlan(plan)})`)
   console.log(formatResult(compileResult))
   console.log(`${formatResult(executeResult)} (${formatThroughput(executeResult)} MP/s)`)
@@ -188,7 +190,10 @@ function assertBenchmarkPlan(plan: ImageAdjustmentPlan) {
   if (plan.length === 0) {
     throw new Error('benchmark plan unexpectedly compiled to zero steps')
   }
-  if (!plan.some((step) => step.kind === 'channel-lut') || !plan.some((step) => step.kind === 'hsl')) {
+  if (
+    !plan.some((step) => step.kind === 'channel-lut') ||
+    !plan.some((step) => step.kind === 'hsl')
+  ) {
     throw new Error(`benchmark plan is too narrow: ${summarizePlan(plan)}`)
   }
 }
@@ -263,9 +268,7 @@ function installNodeImageDataPolyfill() {
 
     constructor(data: Uint8ClampedArray, width: number, height: number) {
       if (data.length !== width * height * 4) {
-        throw new Error(
-          `Invalid ImageData size: got ${data.length} bytes for ${width}x${height}`,
-        )
+        throw new Error(`Invalid ImageData size: got ${data.length} bytes for ${width}x${height}`)
       }
       this.data = data
       this.width = width

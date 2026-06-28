@@ -66,7 +66,7 @@
           :expand-overlay-style="props.expandOverlayStyle ?? null"
           :expand-handle-radius="props.expandHandleRadius ?? 4"
           :image-editor-mode="props.imageEditorMode ?? null"
-          :image-editor-filter-previews="props.imageEditorFilterPreviews ?? []"
+          :image-editor-rendered-preview="props.imageEditorRenderedPreview ?? null"
           :mask-editor-overlay-style="props.maskEditorOverlayStyle ?? null"
           :mask-editor-canvas-width="props.maskEditorCanvasWidth ?? 0"
           :mask-editor-canvas-height="props.maskEditorCanvasHeight ?? 0"
@@ -157,7 +157,7 @@ import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
 import type { ImageStrengthAction } from '../execution'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorFilterPreview, ImageEditorMode } from '../image-editor'
+import type { ImageEditorMode, ImageEditorRenderedPreview } from '../image-editor'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
@@ -185,7 +185,7 @@ const props = withDefaults(
     expandOverlayStyle?: Record<string, string> | null
     expandHandleRadius?: number
     imageEditorMode?: ImageEditorMode | null
-    imageEditorFilterPreviews?: ImageEditorFilterPreview[]
+    imageEditorRenderedPreview?: ImageEditorRenderedPreview | null
     maskEditorOverlayStyle?: Record<string, string> | null
     maskEditorCanvasWidth?: number
     maskEditorCanvasHeight?: number
@@ -215,7 +215,7 @@ const props = withDefaults(
     expandOverlayStyle: null,
     expandHandleRadius: 4,
     imageEditorMode: null,
-    imageEditorFilterPreviews: () => [],
+    imageEditorRenderedPreview: null,
     maskEditorOverlayStyle: null,
     maskEditorCanvasWidth: 0,
     maskEditorCanvasHeight: 0,

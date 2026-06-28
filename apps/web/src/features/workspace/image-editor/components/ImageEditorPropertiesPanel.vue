@@ -101,7 +101,7 @@
       </label>
     </div>
 
-    <div v-else class="image-editor-empty-state">选择一个调整图层</div>
+    <div v-else class="image-editor-empty-state">选择一个编辑图层</div>
   </section>
 </template>
 

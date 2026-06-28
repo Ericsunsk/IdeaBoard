@@ -1,6 +1,6 @@
 export { default as ImageEditorChrome } from './components/ImageEditorChrome.vue'
 export { IMAGE_EDITOR_CHROME_LAYOUT, getImageEditorChromeOutset } from './config/imageEditorChrome'
-export { useImageAdjustmentFilterPreviews } from './composables/useImageAdjustmentFilterPreviews'
+export { useImageAdjustmentRenderedPreview } from './composables/useImageAdjustmentRenderedPreview'
 export { useImageEditorMode } from './composables/useImageEditorMode'
 export { useImageEditorSession } from './composables/useImageEditorSession'
 export { useImageEditorViewportController } from './composables/useImageEditorViewportController'
@@ -22,10 +22,10 @@ export type { ImageEditorImageRect, ImageEditorModeState } from './composables/u
 export type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
-  ImageEditorFilterPreview,
   ImageEditorLayer,
   ImageEditorMode,
   ImageEditorParamKey,
   ImageEditorParamValue,
+  ImageEditorRenderedPreview,
   ImageEditorTool,
 } from './types'

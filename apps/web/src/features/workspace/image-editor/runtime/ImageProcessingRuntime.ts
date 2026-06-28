@@ -12,60 +12,26 @@ import type {
   RenderFinalInput,
   RenderFinalOutput,
   RenderFinalResult,
-  RenderPreviewInput,
-  RenderPreviewOutput,
-  RenderPreviewResult,
 } from './types'
 
 export type CreateImageProcessingRuntimeOptions = {
   backend: ImageProcessingBackend
   outputPolicy?: ImageProcessingOutputPolicy
-  previewDebounceMs?: number
   createTaskId?: (revision: number) => string
 }
 
-export class MainThreadImageProcessingRuntime implements ImageProcessingRuntime {
+class MainThreadImageProcessingRuntime implements ImageProcessingRuntime {
   private readonly backend: ImageProcessingBackend
   private readonly outputPolicy: ImageProcessingOutputPolicy
-  private readonly previewScheduler: ImageProcessingScheduler
   private readonly finalScheduler: ImageProcessingScheduler
 
   constructor(options: CreateImageProcessingRuntimeOptions) {
     this.backend = options.backend
     this.outputPolicy = options.outputPolicy ?? createImageProcessingOutputPolicy()
-    this.previewScheduler = new ImageProcessingScheduler({
-      debounceMs: options.previewDebounceMs ?? 0,
-      latestOnly: true,
-      createTaskId: options.createTaskId,
-    })
     this.finalScheduler = new ImageProcessingScheduler({
       latestOnly: false,
       createTaskId: options.createTaskId,
     })
-  }
-
-  async renderPreview(input: RenderPreviewInput): Promise<RenderPreviewResult> {
-    const result = await this.previewScheduler.schedule(
-      (context) =>
-        this.backend.renderPreview({
-          source: input.source,
-          plan: input.plan,
-          maxSide: input.maxSide,
-          context: {
-            taskId: context.taskId,
-            revision: context.revision,
-            signal: context.signal,
-            outputPolicy: this.outputPolicy,
-            reportProgress: input.onProgress ?? ignoreProgress,
-          },
-        }),
-      {
-        taskId: input.taskId,
-        debounceMs: input.debounceMs,
-        latestOnly: true,
-      },
-    )
-    return mapSchedulerResult(result)
   }
 
   async renderFinal(input: RenderFinalInput): Promise<RenderFinalResult> {
@@ -91,13 +57,11 @@ export class MainThreadImageProcessingRuntime implements ImageProcessingRuntime 
   }
 
   cancel(taskId?: string) {
-    this.previewScheduler.cancel(taskId)
     this.finalScheduler.cancel(taskId)
     this.backend.cancel?.(taskId)
   }
 
   dispose() {
-    this.previewScheduler.dispose()
     this.finalScheduler.dispose()
     this.backend.dispose?.()
   }
@@ -185,4 +149,4 @@ function isImageProcessingErrorCode(code: unknown): code is ImageProcessingError
 
 function ignoreProgress() {}
 
-export type { RenderFinalInput, RenderFinalOutput, RenderPreviewInput, RenderPreviewOutput }
+export type { RenderFinalInput, RenderFinalOutput }

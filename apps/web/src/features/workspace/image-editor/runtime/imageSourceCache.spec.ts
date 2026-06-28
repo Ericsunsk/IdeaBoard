@@ -54,25 +54,25 @@ function installImageMocks(width = 4, height = 2) {
 }
 
 describe('ImageSourceCache', () => {
-  it('reuses cached preview sources without fetching or decoding twice', async () => {
+  it('reuses cached full-size sources without fetching or decoding twice', async () => {
     const { contexts } = installCanvasMocks()
     installImageMocks()
     const cache = new ImageSourceCache({ maxEntries: 2 })
 
-    const first = await cache.getPreviewSource('https://example.com/source.png', { maxSide: 2 })
-    const second = await cache.getPreviewSource('https://example.com/source.png', { maxSide: 2 })
+    const first = await cache.getFullSizeSource('https://example.com/source.png')
+    const second = await cache.getFullSizeSource('https://example.com/source.png')
 
     expect(second).toBe(first)
-    expect(first?.width).toBe(2)
-    expect(first?.height).toBe(1)
+    expect(first?.width).toBe(4)
+    expect(first?.height).toBe(2)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(createImageBitmapMock).toHaveBeenCalledTimes(1)
     expect(contexts[0]?.drawImage).toHaveBeenCalledWith(
       expect.objectContaining({ width: 4, height: 2 }),
       0,
       0,
+      4,
       2,
-      1,
     )
   })
 
@@ -81,10 +81,10 @@ describe('ImageSourceCache', () => {
     installImageMocks()
     const cache = new ImageSourceCache({ maxEntries: 2 })
 
-    const first = await cache.getPreviewSource('https://example.com/a.png')
-    const second = await cache.getPreviewSource('https://example.com/b.png')
-    await cache.getPreviewSource('https://example.com/a.png')
-    const third = await cache.getPreviewSource('https://example.com/c.png')
+    const first = await cache.getFullSizeSource('https://example.com/a.png')
+    const second = await cache.getFullSizeSource('https://example.com/b.png')
+    await cache.getFullSizeSource('https://example.com/a.png')
+    const third = await cache.getFullSizeSource('https://example.com/c.png')
 
     expect(cache.size).toBe(2)
     expect(second?.canvas.width).toBe(0)
@@ -93,7 +93,7 @@ describe('ImageSourceCache', () => {
     expect(third?.canvas.width).toBeGreaterThan(0)
   })
 
-  it('returns null for animated preview sources and rejects animated full-size sources', async () => {
+  it('rejects animated images before decoding', async () => {
     installCanvasMocks()
     fetchMock.mockResolvedValue({
       ok: true,
@@ -102,18 +102,14 @@ describe('ImageSourceCache', () => {
     vi.stubGlobal('fetch', fetchMock)
     vi.stubGlobal('createImageBitmap', createImageBitmapMock)
 
-    const previewCache = new ImageSourceCache()
-    const fullSizeCache = new ImageSourceCache()
+    const cache = new ImageSourceCache()
 
-    await expect(
-      previewCache.getPreviewSource('https://example.com/animated.gif'),
-    ).resolves.toBeNull()
-    await expect(
-      fullSizeCache.getFullSizeSource('https://example.com/animated.gif'),
-    ).rejects.toMatchObject({
-      code: 'animated-image',
-      message: '暂不支持编辑动图',
-    })
+    await expect(cache.getFullSizeSource('https://example.com/animated.gif')).rejects.toMatchObject(
+      {
+        code: 'animated-image',
+        message: '暂不支持编辑动图',
+      },
+    )
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
 
@@ -123,7 +119,7 @@ describe('ImageSourceCache', () => {
     const cache = new ImageSourceCache({ maxEntries: 2 })
 
     const released = await cache.getFullSizeSource('https://example.com/full.png')
-    const disposed = await cache.getPreviewSource('https://example.com/preview.png')
+    const disposed = await cache.getFullSizeSource('https://example.com/disposed.png')
 
     expect(released?.canvas.width).toBe(4)
     cache.releaseSource(released)

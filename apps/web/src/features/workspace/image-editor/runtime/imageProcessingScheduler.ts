@@ -251,7 +251,3 @@ export class ImageProcessingScheduler {
     })
   }
 }
-
-export function createImageProcessingScheduler(options?: ImageProcessingSchedulerOptions) {
-  return new ImageProcessingScheduler(options)
-}

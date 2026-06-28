@@ -1,4 +1,4 @@
-import type { ImageEditorFilterPreview } from '../types'
+import type { ImageEditorRenderedPreview } from '../types'
 import { executeImageAdjustmentPlan, type ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
 import { cloneImageData } from '../utils/imageDataUtils'
 import { releaseCanvas } from '../utils/imageAdjustmentMedia'
@@ -14,7 +14,7 @@ type PreviewSource = {
 }
 
 type ImageAdjustmentInlinePreviewRendererOptions = {
-  onPreview: (preview: ImageEditorFilterPreview | null) => void
+  onPreview: (preview: ImageEditorRenderedPreview | null) => void
   onError?: (error: unknown) => void
 }
 

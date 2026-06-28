@@ -5,14 +5,15 @@ import {
   type ImageEditorPlanExecutorBrowserDiagnostic,
   type ImageEditorPlanExecutorDiagnosticsStore,
 } from './imageAdjustmentRuntimeDiagnostics'
-import type { ImageAdjustmentPlanExecutionEventReporter } from './imageAdjustmentPlanExecutor'
+import type { ImageAdjustmentPlanExecutionEventReporter } from './planExecutorTypes'
 import type { ImageProcessingBackend, ImageProcessingRuntime } from './types'
 
-const { createImageAdjustmentProcessingBackendMock, createImageProcessingRuntimeMock } =
-  vi.hoisted(() => ({
+const { createImageAdjustmentProcessingBackendMock, createImageProcessingRuntimeMock } = vi.hoisted(
+  () => ({
     createImageAdjustmentProcessingBackendMock: vi.fn(),
     createImageProcessingRuntimeMock: vi.fn(),
-  }))
+  }),
+)
 
 vi.mock('./ImageProcessingRuntime', () => ({
   createImageProcessingRuntime: createImageProcessingRuntimeMock,
@@ -88,14 +89,12 @@ describe('image adjustment processing runtime', () => {
 
 function createBackendStub(): ImageProcessingBackend {
   return {
-    renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(),
     renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(),
   }
 }
 
 function createRuntimeStub(): ImageProcessingRuntime {
   return {
-    renderPreview: vi.fn<ImageProcessingRuntime['renderPreview']>(),
     renderFinal: vi.fn<ImageProcessingRuntime['renderFinal']>(),
     cancel: vi.fn<ImageProcessingRuntime['cancel']>(),
     dispose: vi.fn<ImageProcessingRuntime['dispose']>(),

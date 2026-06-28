@@ -112,10 +112,10 @@
             :image-editor-mode="
               flowImageEditorNodeId === nodeProps.id ? imageEditorMode : null
             "
-            :image-editor-filter-previews="
+            :image-editor-rendered-preview="
               flowImageEditorNodeId === nodeProps.id && imageEditorMode === 'adjust'
-                ? imageAdjustmentFilterPreviews
-                : []
+                ? imageEditorRenderedPreview
+                : null
             "
             :mask-editor-overlay-style="
               flowMaskEditorNodeId === nodeProps.id ? flowMaskEditorOverlayStyle : null
@@ -590,7 +590,7 @@ const {
   removeImageEditorLayer,
   updateSelectedImageEditorLayerParam,
   isApplyingImageEditorAdjustments,
-  imageAdjustmentFilterPreviews,
+  imageEditorRenderedPreview,
   onApplyImageEditorAdjustments,
   cancelFlowMaskEditorMode,
   enterFlowImageEditorMode,

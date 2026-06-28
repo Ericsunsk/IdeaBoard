@@ -1,5 +1,14 @@
 import type { Connection, Node } from '@vue-flow/core'
-import { createApp, defineComponent, h, nextTick, ref, shallowRef, type Ref } from 'vue'
+import {
+  createApp,
+  defineComponent,
+  h,
+  inject,
+  nextTick,
+  ref,
+  shallowRef,
+  type Ref,
+} from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type {
@@ -8,7 +17,9 @@ import type {
 } from '../image-editor'
 import {
   cancelImageAdjustmentFinalRender,
+  IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
   renderImageAdjustmentFile,
+  type WorkspaceImageAdjustmentFinalApplyContext,
 } from '../image-editor'
 import { useWorkspaceImageToolRuntime } from './useWorkspaceImageToolRuntime'
 
@@ -19,8 +30,8 @@ vi.mock('../image-editor', async (importOriginal) => {
     ...actual,
     cancelImageAdjustmentFinalRender: vi.fn(),
     renderImageAdjustmentFile: vi.fn(),
-    useImageAdjustmentFilterPreviews: vi.fn(() => ({
-      imageAdjustmentFilterPreviews: computed(() => []),
+    useImageAdjustmentRenderedPreview: vi.fn(() => ({
+      imageEditorRenderedPreview: computed(() => null),
     })),
   }
 })
@@ -62,6 +73,7 @@ function mountWorkspaceImageToolRuntime() {
   const nodes: Ref<Node[]> = shallowRef([{ id: 'node-1', data: { kind: 'image' } }] as Node[])
   const connectImageNodes = vi.fn<(connection: Connection) => void>()
   const createImageNodeFromFile = vi.fn(async () => 'node-2')
+  let imageAdjustmentFinalApplyContext: WorkspaceImageAdjustmentFinalApplyContext | null = null
   const message = {
     warning: vi.fn<(message: string) => void>(),
     success: vi.fn<(message: string) => void>(),
@@ -69,6 +81,12 @@ function mountWorkspaceImageToolRuntime() {
   let runtime!: WorkspaceImageToolRuntime
   const host = document.createElement('div')
   document.body.appendChild(host)
+  const ContextProbe = defineComponent({
+    setup() {
+      imageAdjustmentFinalApplyContext = inject(IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY, null)
+      return () => null
+    },
+  })
   const app = createApp(
     defineComponent({
       setup() {
@@ -101,7 +119,7 @@ function mountWorkspaceImageToolRuntime() {
           stopCanvasInteraction: vi.fn(),
           message,
         })
-        return () => h('div')
+        return () => h(ContextProbe)
       },
     }),
   )
@@ -114,6 +132,12 @@ function mountWorkspaceImageToolRuntime() {
     createImageNodeFromFile,
     currentBoardId,
     host,
+    cancelImageAdjustmentFinalApply: () => {
+      if (!imageAdjustmentFinalApplyContext) {
+        throw new Error('Image adjustment final apply context was not provided')
+      }
+      imageAdjustmentFinalApplyContext.cancel()
+    },
     message,
     runtime,
     unmount: () => {
@@ -196,7 +220,7 @@ describe('useWorkspaceImageToolRuntime image adjustment final apply', () => {
 
       const apply = harness.runtime.onApplyImageEditorAdjustments()
       await flushPromises()
-      harness.runtime.cancelImageEditorAdjustmentFinalApply()
+      harness.cancelImageAdjustmentFinalApply()
 
       expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-adjustment-final:node-1')
       expect(harness.runtime.isApplyingImageEditorAdjustments.value).toBe(false)

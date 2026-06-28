@@ -9,6 +9,7 @@ import {
   type NormalizedImageAdjustment,
   type NormalizedLevelsAdjustment,
 } from './imageAdjustmentDefinitions'
+import { cloneImageData } from './imageDataUtils'
 
 export type ImageAdjustmentPlanStep =
   | { kind: 'hsl'; params: NormalizedHslAdjustment }
@@ -21,7 +22,7 @@ export function applyImageAdjustments(
   source: ImageData,
   layers: readonly ImageEditorAdjustmentLayer[],
 ): ImageData {
-  const output = createImageDataCopy(source)
+  const output = cloneImageData(source)
   applyImageAdjustmentsInPlace(output, layers)
   return output
 }
@@ -128,14 +129,6 @@ export function executeImageAdjustmentPlanStepRange(
   }
 }
 
-function createImageDataCopy(source: ImageData) {
-  const data = new Uint8ClampedArray(source.data)
-  const ImageDataCtor = source.constructor as {
-    new (data: Uint8ClampedArray, width: number, height: number): ImageData
-  }
-  return new ImageDataCtor(data, source.width, source.height)
-}
-
 function appendChannelLut(
   current: Uint8ClampedArray | null,
   next: Uint8ClampedArray,
@@ -190,8 +183,7 @@ function applyHslAdjustment(
 
     if (max !== min) {
       const delta = max - min
-      sourceSaturation =
-        sourceLightness > 0.5 ? delta / (2 - max - min) : delta / (max + min)
+      sourceSaturation = sourceLightness > 0.5 ? delta / (2 - max - min) : delta / (max + min)
       if (max === sourceR) {
         sourceHue = (sourceG - sourceB) / delta + (sourceG < sourceB ? 6 : 0)
       } else if (max === sourceG) {
@@ -233,10 +225,7 @@ function applyContrast(value: number, contrastFactor: number) {
 export function createCurvesLut(params: NormalizedCurvesAdjustment) {
   const { inputPoint, outputPoint } = params
   if (inputPoint <= CHANNEL_MIN) {
-    return createLut(
-      (value) =>
-        outputPoint + (value / CHANNEL_MAX) * (CHANNEL_MAX - outputPoint),
-    )
+    return createLut((value) => outputPoint + (value / CHANNEL_MAX) * (CHANNEL_MAX - outputPoint))
   }
   if (inputPoint >= CHANNEL_MAX) {
     return createLut((value) => (value / CHANNEL_MAX) * outputPoint)

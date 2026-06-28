@@ -27,7 +27,7 @@ afterEach(() => {
 describe('image processing backend factories', () => {
   it('creates a cpu-main backend that executes plans on the main-thread CPU executor', async () => {
     const source = createImageSource([10, 20, 30, 255])
-    const sourceCache = createSourceCache({ preview: source })
+    const sourceCache = createSourceCache({ fullSize: source })
     const onPlanExecutorEvent = vi.fn()
     installCanvasMock()
     const backend = createCpuMainImageProcessingBackend({
@@ -35,14 +35,14 @@ describe('image processing backend factories', () => {
       onPlanExecutorEvent,
     })
 
-    await backend.renderPreview({
+    await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
       plan: createInvertPlan(),
       context: createTaskContext(),
     })
 
     expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
-    expect(getLastCreatedCanvasContext()?.putImageData).toHaveBeenCalledWith(
+    expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
         data: new Uint8ClampedArray([245, 235, 225, 255]),
       }),
@@ -60,7 +60,7 @@ describe('image processing backend factories', () => {
   it('creates a cpu-worker backend that uses the worker plan executor and disposes it', async () => {
     const source = createImageSource([10, 20, 30, 255])
     const workerOutput = makeImageData([1, 2, 3, 255])
-    const sourceCache = createSourceCache({ preview: source })
+    const sourceCache = createSourceCache({ fullSize: source })
     const onPlanExecutorEvent = vi.fn()
     executeWorkerImageAdjustmentPlanMock.mockResolvedValue(workerOutput)
     installCanvasMock()
@@ -69,7 +69,7 @@ describe('image processing backend factories', () => {
       onPlanExecutorEvent,
     })
 
-    await backend.renderPreview({
+    await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
       plan: createInvertPlan(),
       context: createTaskContext(),
@@ -77,7 +77,7 @@ describe('image processing backend factories', () => {
     backend.dispose?.()
 
     expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledTimes(1)
-    expect(getLastCreatedCanvasContext()?.putImageData).toHaveBeenCalledWith(workerOutput, 0, 0)
+    expect(source.context.putImageData).toHaveBeenCalledWith(workerOutput, 0, 0)
     expect(disposeDefaultWorkerImageProcessingClientMock).toHaveBeenCalledTimes(1)
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
       kind: 'worker-plan-started',
@@ -95,19 +95,19 @@ describe('image processing backend factories', () => {
 
   it('selects the hybrid backend by default and keeps small work on the main thread', async () => {
     const source = createImageSource([10, 20, 30, 255])
-    const sourceCache = createSourceCache({ preview: source })
+    const sourceCache = createSourceCache({ fullSize: source })
     executeWorkerImageAdjustmentPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
     installCanvasMock()
     const backend = createImageAdjustmentProcessingBackend({ sourceCache })
 
-    await backend.renderPreview({
+    await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
       plan: createInvertPlan(),
       context: createTaskContext(),
     })
 
     expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
-    expect(getLastCreatedCanvasContext()?.putImageData).toHaveBeenCalledWith(
+    expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
         data: new Uint8ClampedArray([245, 235, 225, 255]),
       }),
@@ -118,12 +118,12 @@ describe('image processing backend factories', () => {
 
   it('can still create an explicit cpu-worker backend for heavy image work', async () => {
     const source = createImageSource([10, 20, 30, 255])
-    const sourceCache = createSourceCache({ preview: source })
+    const sourceCache = createSourceCache({ fullSize: source })
     executeWorkerImageAdjustmentPlanMock.mockResolvedValue(makeImageData([4, 5, 6, 255]))
     installCanvasMock()
     const backend = createImageAdjustmentProcessingBackend({ backend: 'cpu-worker', sourceCache })
 
-    await backend.renderPreview({
+    await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
       plan: createInvertPlan(),
       context: createTaskContext(),
@@ -144,10 +144,7 @@ type TestImageSource = ImageSourceCacheEntry & {
   context: CanvasRenderingContext2D & TestCanvasContext
 }
 
-type TestSourceCache = Pick<
-  ImageSourceCache,
-  'dispose' | 'getFullSizeSource' | 'getPreviewSource' | 'releaseSource'
->
+type TestSourceCache = Pick<ImageSourceCache, 'dispose' | 'getFullSizeSource' | 'releaseSource'>
 
 const createdCanvasContexts: TestCanvasContext[] = []
 
@@ -161,14 +158,9 @@ function installCanvasMock() {
   })
 }
 
-function getLastCreatedCanvasContext() {
-  return createdCanvasContexts.at(-1)
-}
-
-function createSourceCache(input: { preview?: TestImageSource | null }): ImageSourceCache {
+function createSourceCache(input: { fullSize?: TestImageSource | null }): ImageSourceCache {
   const sourceCache: TestSourceCache = {
-    getPreviewSource: vi.fn(async () => input.preview ?? null),
-    getFullSizeSource: vi.fn(async () => input.preview ?? null),
+    getFullSizeSource: vi.fn(async () => input.fullSize ?? null),
     releaseSource: vi.fn(),
     dispose: vi.fn(),
   }
@@ -181,7 +173,6 @@ function createImageSource(values: number[]): TestImageSource {
 
   return {
     key: 'test-source',
-    purpose: 'preview',
     sourceUrl: 'https://example.com/source.png',
     fetchUrl: 'https://example.com/source.png',
     width: imageData.width,

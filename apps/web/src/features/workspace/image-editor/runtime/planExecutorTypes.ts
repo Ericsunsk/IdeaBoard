@@ -1,8 +1,7 @@
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
-import type { ImageProcessingBackendPreviewInput } from './types'
+import type { ImageProcessingProgress } from './types'
 
-export type ImageProcessingBackendTaskProgressReporter =
-  ImageProcessingBackendPreviewInput['context']['reportProgress']
+export type ImageProcessingBackendTaskProgressReporter = (progress: ImageProcessingProgress) => void
 
 export type ImageAdjustmentPlanExecutorInput = {
   imageData: ImageData

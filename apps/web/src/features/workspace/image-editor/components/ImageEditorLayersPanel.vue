@@ -206,8 +206,7 @@ onBeforeUnmount(clearLayerListScrollTimer)
   transform: translate(0, -50%);
 }
 
-.image-editor-layer-row__icon,
-.image-editor-layer-add__icon {
+.image-editor-layer-row__icon {
   width: 14px;
   height: 14px;
 }

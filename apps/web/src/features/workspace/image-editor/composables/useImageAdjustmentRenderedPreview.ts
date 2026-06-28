@@ -7,18 +7,18 @@ import {
   type MaybeRefOrGetter,
   type Ref,
 } from 'vue'
-import type { ImageEditorFilterPreview, ImageEditorLayer } from '../types'
+import type { ImageEditorLayer, ImageEditorRenderedPreview } from '../types'
 import { createImageAdjustmentInlinePreviewRenderer } from '../services/imageAdjustmentInlinePreviewRenderer'
 import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
 
-type UseImageAdjustmentFilterPreviewsOptions = {
+type UseImageAdjustmentRenderedPreviewOptions = {
   isAdjustMode: Ref<boolean>
   layers: Ref<readonly ImageEditorLayer[]>
   sourceUrl?: MaybeRefOrGetter<string | null | undefined>
 }
 
-export function useImageAdjustmentFilterPreviews(options: UseImageAdjustmentFilterPreviewsOptions) {
-  const renderedPreview = shallowRef<ImageEditorFilterPreview | null>(null)
+export function useImageAdjustmentRenderedPreview(options: UseImageAdjustmentRenderedPreviewOptions) {
+  const imageEditorRenderedPreview = shallowRef<ImageEditorRenderedPreview | null>(null)
 
   const sourceUrl = computed(() => toValue(options.sourceUrl) ?? null)
   const imageAdjustmentPlan = computed(() => {
@@ -27,7 +27,7 @@ export function useImageAdjustmentFilterPreviews(options: UseImageAdjustmentFilt
   })
   const previewRenderer = createImageAdjustmentInlinePreviewRenderer({
     onPreview(preview) {
-      renderedPreview.value = preview
+      imageEditorRenderedPreview.value = preview
     },
     onError(error) {
       console.warn('[image-editor] failed to load adjustment preview source', error)
@@ -48,13 +48,12 @@ export function useImageAdjustmentFilterPreviews(options: UseImageAdjustmentFilt
     previewRenderer.dispose()
   })
 
-  const imageAdjustmentFilterPreviews = computed<ImageEditorFilterPreview[]>(() => {
-    if (!options.isAdjustMode.value || imageAdjustmentPlan.value.length === 0) return []
-    return renderedPreview.value ? [renderedPreview.value] : []
+  const renderedPreview = computed<ImageEditorRenderedPreview | null>(() => {
+    if (!options.isAdjustMode.value || imageAdjustmentPlan.value.length === 0) return null
+    return imageEditorRenderedPreview.value
   })
 
   return {
-    imageAdjustmentFilterPreviews,
-    imageAdjustmentPlan,
+    imageEditorRenderedPreview: renderedPreview,
   }
 }

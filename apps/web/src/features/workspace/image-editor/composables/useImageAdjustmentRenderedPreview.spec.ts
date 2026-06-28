@@ -1,7 +1,7 @@
 import { nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageEditorLayer } from '../types'
-import { useImageAdjustmentFilterPreviews } from './useImageAdjustmentFilterPreviews'
+import { useImageAdjustmentRenderedPreview } from './useImageAdjustmentRenderedPreview'
 
 const fetchMock = vi.fn()
 const createImageBitmapMock = vi.fn()
@@ -74,10 +74,10 @@ afterEach(() => {
   createImageBitmapMock.mockReset()
 })
 
-describe('useImageAdjustmentFilterPreviews', () => {
+describe('useImageAdjustmentRenderedPreview', () => {
   it('renders previews through the same adjustment engine used by final apply', async () => {
     installBrowserImageMocks([10, 20, 30, 255])
-    const preview = useImageAdjustmentFilterPreviews({
+    const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref([createInvertLayer()]),
@@ -85,24 +85,21 @@ describe('useImageAdjustmentFilterPreviews', () => {
 
     await flushPreviewLoad()
 
-    expect(preview.imageAdjustmentPlan.value).toEqual([expect.objectContaining({ kind: 'channel-lut' })])
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([
-      {
-        type: 'rendered-image',
-        imageData: expect.objectContaining({
-          data: new Uint8ClampedArray([245, 235, 225, 255]),
-          width: 1,
-          height: 1,
-        }),
+    expect(preview.imageEditorRenderedPreview.value).toEqual({
+      type: 'rendered-image',
+      imageData: expect.objectContaining({
+        data: new Uint8ClampedArray([245, 235, 225, 255]),
         width: 1,
         height: 1,
-      },
-    ])
+      }),
+      width: 1,
+      height: 1,
+    })
   })
 
   it('does not load or render hidden, inactive, or neutral adjustment stacks', async () => {
     installBrowserImageMocks([10, 20, 30, 255])
-    const preview = useImageAdjustmentFilterPreviews({
+    const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref([
@@ -115,13 +112,12 @@ describe('useImageAdjustmentFilterPreviews', () => {
 
     await flushPreviewLoad()
 
-    expect(preview.imageAdjustmentPlan.value).toEqual([])
-    expect(preview.imageAdjustmentFilterPreviews.value).toEqual([])
+    expect(preview.imageEditorRenderedPreview.value).toBeNull()
   })
 
   it('normalizes non-finite params before rendering previews', async () => {
     installBrowserImageMocks([120, 120, 120, 255])
-    const preview = useImageAdjustmentFilterPreviews({
+    const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers: ref([
@@ -137,11 +133,11 @@ describe('useImageAdjustmentFilterPreviews', () => {
 
     await flushPreviewLoad()
 
-    expect(preview.imageAdjustmentPlan.value).toEqual([
-      { kind: 'threshold', threshold: 128, invert: false },
-    ])
-    expect(preview.imageAdjustmentFilterPreviews.value[0]).toMatchObject({
+    expect(preview.imageEditorRenderedPreview.value).toMatchObject({
       type: 'rendered-image',
+      imageData: expect.objectContaining({
+        data: new Uint8ClampedArray([0, 0, 0, 255]),
+      }),
       width: 1,
       height: 1,
     })
@@ -150,7 +146,7 @@ describe('useImageAdjustmentFilterPreviews', () => {
   it('coalesces rapid layer changes to the latest animation frame', async () => {
     const raf = installBrowserImageMocks([120, 120, 120, 255], { autoFlushRaf: false })
     const layers = ref<ImageEditorLayer[]>([createThresholdLayer({ threshold: 32, invert: false })])
-    const preview = useImageAdjustmentFilterPreviews({
+    const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
       layers,
@@ -164,11 +160,11 @@ describe('useImageAdjustmentFilterPreviews', () => {
 
     raf.flush()
 
-    expect(preview.imageAdjustmentPlan.value).toEqual([
-      { kind: 'threshold', threshold: 64, invert: false },
-    ])
-    expect(preview.imageAdjustmentFilterPreviews.value[0]).toMatchObject({
+    expect(preview.imageEditorRenderedPreview.value).toMatchObject({
       type: 'rendered-image',
+      imageData: expect.objectContaining({
+        data: new Uint8ClampedArray([255, 255, 255, 255]),
+      }),
       width: 1,
       height: 1,
     })

@@ -114,7 +114,7 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorFilterPreview, ImageEditorMode } from '../../image-editor'
+import type { ImageEditorMode, ImageEditorRenderedPreview } from '../../image-editor'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import { ImageMaskEditorOverlay } from '../../mask-editor'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
@@ -135,7 +135,7 @@ const props = defineProps<{
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
   imageEditorMode?: ImageEditorMode | null
-  imageEditorFilterPreviews?: ImageEditorFilterPreview[]
+  imageEditorRenderedPreview?: ImageEditorRenderedPreview | null
   maskEditorOverlayStyle?: Record<string, string> | null
   maskEditorCanvasWidth?: number
   maskEditorCanvasHeight?: number
@@ -172,12 +172,7 @@ const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
 const isImageEditorActive = computed(() => props.imageEditorMode != null)
 const isMaskEditorActive = computed(() => props.imageEditorMode === 'inpaint')
-const imageEditorFilterPreviews = computed(() => props.imageEditorFilterPreviews ?? [])
-const renderedImagePreview = computed(
-  () =>
-    imageEditorFilterPreviews.value.find((preview) => preview.type === 'rendered-image') ??
-    null,
-)
+const renderedImagePreview = computed(() => props.imageEditorRenderedPreview ?? null)
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )

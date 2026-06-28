@@ -1,7 +1,7 @@
 import type {
   ImageAdjustmentPlanExecutionEvent,
   ImageAdjustmentPlanExecutionEventReporter,
-} from './imageAdjustmentPlanExecutor'
+} from './planExecutorTypes'
 
 export const IMAGE_EDITOR_PLAN_EXECUTOR_DIAGNOSTICS_EVENT =
   'ideaboard:image-editor:plan-executor-diagnostic'
@@ -52,9 +52,7 @@ export function createBrowserPlanExecutorDiagnosticsReporter(
   }
 }
 
-export function getBrowserPlanExecutorDiagnosticsStore():
-  | ImageEditorPlanExecutorDiagnosticsStore
-  | null {
+export function getBrowserPlanExecutorDiagnosticsStore(): ImageEditorPlanExecutorDiagnosticsStore | null {
   const browserWindow = getDiagnosticsWindow()
   if (!browserWindow) return null
   return getOrCreateBrowserPlanExecutorDiagnosticsStore(browserWindow)

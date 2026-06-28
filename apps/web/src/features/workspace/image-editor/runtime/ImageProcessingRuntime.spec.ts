@@ -3,11 +3,11 @@ import { createImageProcessingRuntime } from './ImageProcessingRuntime'
 import type { ImageProcessingBackend } from './types'
 
 describe('ImageProcessingRuntime', () => {
-  it('routes preview work through the injected backend with task context', async () => {
-    const renderPreview = vi.fn<ImageProcessingBackend['renderPreview']>(async ({ context }) => {
+  it('routes final work through the injected backend with task context', async () => {
+    const renderFinal = vi.fn<ImageProcessingBackend['renderFinal']>(async ({ context }) => {
       context.reportProgress({ phase: 'render' })
       return {
-        objectUrl: `blob:${context.revision}`,
+        file: new File(['final'], `final-${context.revision}.webp`, { type: 'image/webp' }),
         width: 10,
         height: 20,
         mimeType: 'image/webp',
@@ -16,29 +16,28 @@ describe('ImageProcessingRuntime', () => {
     const onProgress = vi.fn()
     const runtime = createImageProcessingRuntime({
       backend: {
-        renderPreview,
-        renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(),
+        renderFinal,
       },
     })
 
-    const result = await runtime.renderPreview({
+    const result = await runtime.renderFinal({
       source: { url: 'https://example.com/source.png' },
       plan: [],
-      taskId: 'preview',
+      taskId: 'apply',
       onProgress,
     })
 
     expect(result).toMatchObject({
       status: 'completed',
-      taskId: 'preview',
+      taskId: 'apply',
       revision: 1,
       output: {
-        objectUrl: 'blob:1',
+        file: expect.objectContaining({ name: 'final-1.webp' }),
         width: 10,
         height: 20,
       },
     })
-    expect(renderPreview).toHaveBeenCalledWith(
+    expect(renderFinal).toHaveBeenCalledWith(
       expect.objectContaining({
         source: { url: 'https://example.com/source.png' },
         plan: [],
@@ -53,7 +52,6 @@ describe('ImageProcessingRuntime', () => {
     }))
     const runtime = createImageProcessingRuntime({
       backend: {
-        renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(),
         renderFinal,
       },
     })
@@ -91,7 +89,6 @@ describe('ImageProcessingRuntime', () => {
     )
     const runtime = createImageProcessingRuntime({
       backend: {
-        renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(),
         renderFinal,
       },
     })
@@ -142,7 +139,6 @@ describe('ImageProcessingRuntime', () => {
     )
     const runtime = createImageProcessingRuntime({
       backend: {
-        renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(),
         renderFinal,
         cancel,
       },
@@ -168,15 +164,14 @@ describe('ImageProcessingRuntime', () => {
   it('maps backend failures into structured runtime results', async () => {
     const runtime = createImageProcessingRuntime({
       backend: {
-        renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(async () => {
+        renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(async () => {
           throw new Error('render exploded')
         }),
-        renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(),
       },
     })
 
     await expect(
-      runtime.renderPreview({
+      runtime.renderFinal({
         source: { url: 'https://example.com/source.png' },
         plan: [],
       }),
@@ -192,18 +187,17 @@ describe('ImageProcessingRuntime', () => {
   it('does not pass through unknown structured error codes', async () => {
     const runtime = createImageProcessingRuntime({
       backend: {
-        renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(async () => {
+        renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(async () => {
           throw {
             code: 'legacy-code',
             message: 'legacy failure',
           }
         }),
-        renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(),
       },
     })
 
     await expect(
-      runtime.renderPreview({
+      runtime.renderFinal({
         source: { url: 'https://example.com/source.png' },
         plan: [],
       }),
@@ -214,37 +208,5 @@ describe('ImageProcessingRuntime', () => {
         message: '图像处理失败',
       },
     })
-  })
-
-  it('cancels scheduled runtime work and notifies the backend', async () => {
-    vi.useFakeTimers()
-    try {
-      const cancel = vi.fn()
-      const runtime = createImageProcessingRuntime({
-        previewDebounceMs: 50,
-        backend: {
-          renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(async () => ({
-            objectUrl: 'blob:preview',
-          })),
-          renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(),
-          cancel,
-        },
-      })
-
-      const task = runtime.renderPreview({
-        source: { url: 'https://example.com/source.png' },
-        plan: [],
-        taskId: 'preview',
-      })
-      runtime.cancel('preview')
-
-      await expect(task).resolves.toMatchObject({
-        status: 'cancelled',
-        taskId: 'preview',
-      })
-      expect(cancel).toHaveBeenCalledWith('preview')
-    } finally {
-      vi.useRealTimers()
-    }
   })
 })

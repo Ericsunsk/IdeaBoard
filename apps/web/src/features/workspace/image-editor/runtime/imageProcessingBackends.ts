@@ -1,13 +1,11 @@
-import {
-  createCpuImageAdjustmentPlanExecutor,
-  createHybridImageAdjustmentPlanExecutor,
-  createWorkerImageAdjustmentPlanExecutor,
-  type ImageAdjustmentPlanExecutionEventReporter,
-} from './imageAdjustmentPlanExecutor'
-import {
-  createMainThreadImageProcessingBackend,
-  type ImageAdjustmentPlanExecutor,
-} from './mainThreadImageProcessingBackend'
+import { createCpuImageAdjustmentPlanExecutor } from './cpuPlanExecutor'
+import { createHybridImageAdjustmentPlanExecutor } from './hybridPlanExecutor'
+import { createWorkerImageAdjustmentPlanExecutor } from './workerPlanExecutor'
+import type {
+  ImageAdjustmentPlanExecutionEventReporter,
+  ImageAdjustmentPlanExecutor,
+} from './planExecutorTypes'
+import { createMainThreadImageProcessingBackend } from './mainThreadImageProcessingBackend'
 import type { ImageSourceCache } from './imageSourceCache'
 import type { ImageProcessingBackend } from './types'
 
