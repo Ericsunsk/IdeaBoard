@@ -43,7 +43,7 @@ function makeGeneratedImageData(pixelCount: number) {
 }
 
 function createInvertPlan(): ImageAdjustmentPlan {
-  return [{ kind: 'channel-lut', lut: createInvertLut() }]
+  return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) }]
 }
 
 function createInvertLut() {
@@ -87,7 +87,7 @@ describe('worker image adjustment backend', () => {
   it('matches the CPU executor when worker rendering spans multiple chunks and steps', async () => {
     const source = makeGeneratedImageData(80_000)
     const plan: ImageAdjustmentPlan = [
-      { kind: 'channel-lut', lut: createInvertLut() },
+      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) },
       { kind: 'threshold', threshold: 128, invert: true },
       {
         kind: 'hsl',
@@ -122,7 +122,9 @@ describe('worker image adjustment backend', () => {
     const transfers: Transferable[][] = []
     const requestId = 'request:cancel-during-render'
     const source = makeGeneratedImageData(80_000)
-    const plan: ImageAdjustmentPlan = [{ kind: 'channel-lut', lut: createInvertLut() }]
+    const plan: ImageAdjustmentPlan = [
+      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) },
+    ]
 
     handleWorkerImageProcessingRequest(
       {
@@ -208,7 +210,7 @@ describe('worker image adjustment backend', () => {
     const source = makeImageData([10, 20, 30, 77])
     const plan = createInvertPlan()
     const sourceBuffer = source.data.buffer
-    const lut = plan[0]?.kind === 'channel-lut' ? plan[0].lut : null
+    const luts = plan[0]?.kind === 'channel-lut' ? plan[0].luts : null
     const promise = executeWorkerImageAdjustmentPlan(source, plan, {
       requestId: 'request:transfer',
       workerFactory: () => worker,
@@ -221,15 +223,16 @@ describe('worker image adjustment backend', () => {
     const transfer = worker.transfers[0] ?? []
     expect(transfer).toEqual([executeMessage.imageData.data.buffer])
     expect(transfer).not.toContain(sourceBuffer)
-    expect(transfer).not.toContain(lut?.buffer)
     expect(executeMessage.imageData.data.buffer).not.toBe(sourceBuffer)
     expect(pixelValues(source)).toEqual([10, 20, 30, 77])
     expect(executeMessage.plan[0]?.kind).toBe('channel-lut')
     if (executeMessage.plan[0]?.kind !== 'channel-lut') {
       throw new Error('expected channel LUT step')
     }
-    expect(executeMessage.plan[0].lut).not.toBe(lut)
-    expect(executeMessage.plan[0].lut.buffer).not.toBe(lut?.buffer)
+    expect(executeMessage.plan[0].luts).not.toBe(luts)
+    expect(executeMessage.plan[0].luts.red.buffer).not.toBe(luts?.red.buffer)
+    expect(executeMessage.plan[0].luts.green.buffer).not.toBe(luts?.green.buffer)
+    expect(executeMessage.plan[0].luts.blue.buffer).not.toBe(luts?.blue.buffer)
 
     worker.emit({
       type: 'success',
@@ -445,5 +448,13 @@ class FakeImageProcessingWorker extends ManualImageProcessingWorker {
       }
       this.emit(response)
     })
+  }
+}
+
+function createRgbChannelLutsForTest(lut: Uint8ClampedArray) {
+  return {
+    red: lut,
+    green: lut,
+    blue: lut,
   }
 }

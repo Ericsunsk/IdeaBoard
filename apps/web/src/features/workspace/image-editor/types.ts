@@ -11,7 +11,7 @@ export type ImageEditorTool =
 
 export type ImageAdjustmentKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'invert'
 
-export type ImageEditorParamValue = number | boolean
+export type ImageEditorParamValue = number | boolean | ImageEditorCurvesParams
 
 export type ImageEditorHslParams = {
   hue: number
@@ -25,9 +25,16 @@ export type ImageEditorThresholdParams = {
   invert: boolean
 }
 
-export type ImageEditorCurvesParams = {
+export type ImageEditorCurveChannel = 'rgb' | 'red' | 'green' | 'blue'
+
+export type ImageEditorCurvePoint = {
+  id: string
   input: number
   output: number
+}
+
+export type ImageEditorCurvesParams = {
+  channels: Partial<Record<ImageEditorCurveChannel, ImageEditorCurvePoint[]>>
 }
 
 export type ImageEditorLevelsParams = {

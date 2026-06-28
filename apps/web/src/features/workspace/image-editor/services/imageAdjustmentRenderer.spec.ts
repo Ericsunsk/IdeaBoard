@@ -49,7 +49,11 @@ const curvesLayer: ImageEditorAdjustmentLayer = {
   kind: 'curves',
   name: '曲线 1',
   visible: true,
-  params: { input: 42, output: 70 },
+  params: {
+    channels: {
+      rgb: [{ id: 'point:midtone', input: 42, output: 70 }],
+    },
+  },
 }
 
 const levelsLayer: ImageEditorAdjustmentLayer = {

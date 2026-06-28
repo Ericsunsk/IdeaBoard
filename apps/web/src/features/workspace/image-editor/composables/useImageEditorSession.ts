@@ -2,13 +2,18 @@ import { computed, ref } from 'vue'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
+  ImageEditorCurvesParams,
   ImageEditorEditableLayer,
+  ImageEditorHslParams,
+  ImageEditorInvertParams,
   ImageEditorLayer,
   ImageEditorLayerByKind,
+  ImageEditorLevelsParams,
   ImageEditorMergedLayer,
   ImageEditorPaintLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
+  ImageEditorThresholdParams,
   ImageEditorTool,
 } from '../types'
 import { getImageAdjustmentDefaultParams } from '../utils/imageAdjustmentDefinitions'
@@ -67,7 +72,7 @@ function cloneAdjustmentLayer<TKind extends ImageAdjustmentKind>(
   const layer = DEFAULT_ADJUSTMENT_LAYER_BY_KIND[kind]
   return {
     ...layer,
-    params: { ...layer.params },
+    params: cloneAdjustmentParams(layer.params),
   } as ImageEditorLayerByKind<TKind>
 }
 
@@ -162,7 +167,7 @@ function cloneEditableLayer(
     ...layer,
     id: createLayerId(`adjustment:${layer.kind}`),
     name,
-    params: { ...layer.params },
+    params: cloneAdjustmentParams(layer.params),
   } as ImageEditorAdjustmentLayer
 }
 
@@ -205,8 +210,8 @@ function updateAdjustmentLayerParam(
       }
       return layer
     case 'curves':
-      if (typeof value === 'number' && (key === 'input' || key === 'output')) {
-        return { ...layer, params: { ...layer.params, [key]: value } }
+      if (key === 'channels' && isCurvesParams(value)) {
+        return { ...layer, params: cloneCurvesParams(value) }
       }
       return layer
     case 'levels':
@@ -223,6 +228,33 @@ function updateAdjustmentLayerParam(
       }
       return layer
   }
+}
+
+function cloneAdjustmentParams(
+  params:
+    | ImageEditorHslParams
+    | ImageEditorThresholdParams
+    | ImageEditorCurvesParams
+    | ImageEditorLevelsParams
+    | ImageEditorInvertParams,
+) {
+  if ('channels' in params) return cloneCurvesParams(params)
+  return { ...params }
+}
+
+function cloneCurvesParams(params: ImageEditorCurvesParams): ImageEditorCurvesParams {
+  const channels: ImageEditorCurvesParams['channels'] = {}
+  for (const [channel, points] of Object.entries(params.channels)) {
+    if (!points) continue
+    channels[channel as keyof ImageEditorCurvesParams['channels']] = points.map((point) => ({
+      ...point,
+    }))
+  }
+  return { channels }
+}
+
+function isCurvesParams(value: ImageEditorParamValue): value is ImageEditorCurvesParams {
+  return typeof value === 'object' && value !== null && 'channels' in value
 }
 
 export function useImageEditorSession() {

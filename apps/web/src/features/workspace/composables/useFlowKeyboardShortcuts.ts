@@ -1,5 +1,8 @@
 import { onMounted, onUnmounted } from 'vue'
-import { isEditableEventTarget } from '../utils/domEventTargets'
+import {
+  isEditableEventTarget,
+  isWorkspaceEditingSurfaceEventTarget,
+} from '../utils/domEventTargets'
 
 type UseFlowKeyboardShortcutsOptions = {
   onSave: () => void | Promise<void>
@@ -7,6 +10,7 @@ type UseFlowKeyboardShortcutsOptions = {
   onRedo?: () => void
   onDeleteSelected?: () => void
   onDeleteInlineSelection?: () => boolean
+  isWorkspaceShortcutSuppressed?: (event: KeyboardEvent) => boolean
   onEscape?: () => boolean | void
   onPanViewport?: (delta: { x: number; y: number }) => void
   onToolSelect?: () => void
@@ -35,6 +39,13 @@ function getKeyboardPanDelta(key: string, step: number): { x: number; y: number 
 }
 
 export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOptions) {
+  function isWorkspaceShortcutSuppressed(event: KeyboardEvent): boolean {
+    return (
+      options.isWorkspaceShortcutSuppressed?.(event) === true ||
+      isWorkspaceEditingSurfaceEventTarget(event.target)
+    )
+  }
+
   function handleSelectStart(event: Event) {
     const target = event.target as HTMLElement | null
     if (!target?.closest('.canvas-layout')) return
@@ -63,6 +74,7 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
       return
     }
     if (hasCommand && key === 'z') {
+      if (isWorkspaceShortcutSuppressed(event)) return
       const handler = event.shiftKey ? options.onRedo : options.onUndo
       if (handler) {
         event.preventDefault()
@@ -71,6 +83,7 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
       return
     }
     if (!event.metaKey && event.ctrlKey && key === 'y') {
+      if (isWorkspaceShortcutSuppressed(event)) return
       if (options.onRedo) {
         event.preventDefault()
         options.onRedo()
@@ -83,6 +96,7 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
         event.shiftKey ? KEYBOARD_PAN_FAST_STEP : KEYBOARD_PAN_STEP,
       )
       if (delta) {
+        if (isWorkspaceShortcutSuppressed(event)) return
         event.preventDefault()
         options.onPanViewport?.(delta)
         return
@@ -90,19 +104,23 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
     }
     if (!event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
       if (key === 'v') {
+        if (isWorkspaceShortcutSuppressed(event)) return
         options.onToolSelect?.()
         return
       }
       if (key === 'h') {
+        if (isWorkspaceShortcutSuppressed(event)) return
         options.onToolHand?.()
         return
       }
       if (key === 't') {
+        if (isWorkspaceShortcutSuppressed(event)) return
         options.onToolText?.()
         return
       }
     }
     if (event.code === 'Space') {
+      if (isWorkspaceShortcutSuppressed(event)) return
       options.onSpacePressedChange?.(true)
     }
     if (event.key === 'Alt') {
@@ -111,6 +129,7 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
     if (!options.onDeleteSelected) return
     if (key !== 'delete' && key !== 'backspace') return
     if (event.metaKey || event.ctrlKey || event.altKey) return
+    if (isWorkspaceShortcutSuppressed(event)) return
     event.preventDefault()
     if (options.onDeleteInlineSelection?.()) return
     options.onDeleteSelected()

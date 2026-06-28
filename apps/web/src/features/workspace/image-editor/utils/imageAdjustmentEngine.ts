@@ -4,17 +4,17 @@ import {
   CHANNEL_MIN,
   isNeutralImageAdjustment,
   normalizeImageAdjustmentLayers,
-  type NormalizedCurvesAdjustment,
   type NormalizedHslAdjustment,
   type NormalizedImageAdjustment,
   type NormalizedLevelsAdjustment,
 } from './imageAdjustmentDefinitions'
+import { createCurvesLuts, type ImageEditorCurvesLuts } from './imageEditorCurves'
 import { cloneImageData } from './imageDataUtils'
 
 export type ImageAdjustmentPlanStep =
   | { kind: 'hsl'; params: NormalizedHslAdjustment }
   | { kind: 'threshold'; threshold: number; invert: boolean }
-  | { kind: 'channel-lut'; lut: Uint8ClampedArray }
+  | { kind: 'channel-lut'; luts: ImageEditorCurvesLuts }
 
 export type ImageAdjustmentPlan = readonly ImageAdjustmentPlanStep[]
 
@@ -55,11 +55,11 @@ export function compileNormalizedImageAdjustmentPlan(
   layers: readonly NormalizedImageAdjustment[],
 ): ImageAdjustmentPlanStep[] {
   const steps: ImageAdjustmentPlanStep[] = []
-  let pendingChannelLut: Uint8ClampedArray | null = null
+  let pendingChannelLut: ImageEditorCurvesLuts | null = null
 
   const flushPendingChannelLut = () => {
     if (!pendingChannelLut) return
-    steps.push({ kind: 'channel-lut', lut: pendingChannelLut })
+    steps.push({ kind: 'channel-lut', luts: pendingChannelLut })
     pendingChannelLut = null
   }
 
@@ -80,13 +80,13 @@ export function compileNormalizedImageAdjustmentPlan(
         })
         break
       case 'curves':
-        pendingChannelLut = appendChannelLut(pendingChannelLut, createCurvesLut(layer.params))
+        pendingChannelLut = appendChannelLut(pendingChannelLut, createCurvesLuts(layer.params))
         break
       case 'levels':
-        pendingChannelLut = appendChannelLut(pendingChannelLut, createLevelsLut(layer.params))
+        pendingChannelLut = appendChannelLut(pendingChannelLut, createRgbChannelLuts(createLevelsLut(layer.params)))
         break
       case 'invert':
-        pendingChannelLut = appendChannelLut(pendingChannelLut, INVERT_LUT)
+        pendingChannelLut = appendChannelLut(pendingChannelLut, createRgbChannelLuts(INVERT_LUT))
         break
     }
   }
@@ -124,25 +124,37 @@ export function executeImageAdjustmentPlanStepRange(
       applyThresholdAdjustment(data, step.threshold, step.invert, start, end)
       break
     case 'channel-lut':
-      applyChannelLut(data, step.lut, start, end)
+      applyChannelLut(data, step.luts, start, end)
       break
   }
 }
 
 function appendChannelLut(
-  current: Uint8ClampedArray | null,
-  next: Uint8ClampedArray,
-): Uint8ClampedArray | null {
+  current: ImageEditorCurvesLuts | null,
+  next: ImageEditorCurvesLuts,
+): ImageEditorCurvesLuts | null {
   const composed = current ? composeChannelLuts(current, next) : next
   return isIdentityLut(composed) ? null : composed
 }
 
-function composeChannelLuts(first: Uint8ClampedArray, second: Uint8ClampedArray) {
+function composeChannelLuts(first: ImageEditorCurvesLuts, second: ImageEditorCurvesLuts) {
+  return {
+    red: composeSingleChannelLuts(first.red, second.red),
+    green: composeSingleChannelLuts(first.green, second.green),
+    blue: composeSingleChannelLuts(first.blue, second.blue),
+  }
+}
+
+function composeSingleChannelLuts(first: Uint8ClampedArray, second: Uint8ClampedArray) {
   return createLut((value) => second[first[value]])
 }
 
-function isIdentityLut(lut: Uint8ClampedArray) {
-  for (let index = 0; index <= CHANNEL_MAX; index += 1) {
+function isIdentityLut(luts: ImageEditorCurvesLuts) {
+  return isIdentitySingleLut(luts.red) && isIdentitySingleLut(luts.green) && isIdentitySingleLut(luts.blue)
+}
+
+function isIdentitySingleLut(lut: Uint8ClampedArray) {
+  for (let index = CHANNEL_MIN; index <= CHANNEL_MAX; index += 1) {
     if (lut[index] !== index) return false
   }
   return true
@@ -222,23 +234,6 @@ function applyContrast(value: number, contrastFactor: number) {
   return clampChannel((value - 128) * contrastFactor + 128)
 }
 
-export function createCurvesLut(params: NormalizedCurvesAdjustment) {
-  const { inputPoint, outputPoint } = params
-  if (inputPoint <= CHANNEL_MIN) {
-    return createLut((value) => outputPoint + (value / CHANNEL_MAX) * (CHANNEL_MAX - outputPoint))
-  }
-  if (inputPoint >= CHANNEL_MAX) {
-    return createLut((value) => (value / CHANNEL_MAX) * outputPoint)
-  }
-  return createLut((value) => {
-    if (value <= inputPoint) return (value / inputPoint) * outputPoint
-    return (
-      outputPoint +
-      ((value - inputPoint) / (CHANNEL_MAX - inputPoint)) * (CHANNEL_MAX - outputPoint)
-    )
-  })
-}
-
 export function createLevelsLut(params: NormalizedLevelsAdjustment) {
   const { blackPoint, whitePoint, gamma } = params
   const range = Math.max(1, whitePoint - blackPoint)
@@ -251,14 +246,22 @@ export function createLevelsLut(params: NormalizedLevelsAdjustment) {
 
 function applyChannelLut(
   data: Uint8ClampedArray,
-  lut: Uint8ClampedArray,
+  luts: ImageEditorCurvesLuts,
   startByte: number,
   endByte: number,
 ) {
   for (let index = startByte; index < endByte; index += 4) {
-    data[index] = lut[data[index]]
-    data[index + 1] = lut[data[index + 1]]
-    data[index + 2] = lut[data[index + 2]]
+    data[index] = luts.red[data[index]]
+    data[index + 1] = luts.green[data[index + 1]]
+    data[index + 2] = luts.blue[data[index + 2]]
+  }
+}
+
+function createRgbChannelLuts(lut: Uint8ClampedArray): ImageEditorCurvesLuts {
+  return {
+    red: lut,
+    green: lut,
+    blue: lut,
   }
 }
 

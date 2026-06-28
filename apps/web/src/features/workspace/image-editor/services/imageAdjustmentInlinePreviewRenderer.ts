@@ -6,7 +6,7 @@ import { resolveFetchUrl } from '../../services/flowMediaIO'
 
 const PREVIEW_MAX_SIDE = 960
 
-type PreviewSource = {
+type ImageAdjustmentPreviewSource = {
   sourceUrl: string
   imageData: ImageData
   width: number
@@ -15,6 +15,7 @@ type PreviewSource = {
 
 type ImageAdjustmentInlinePreviewRendererOptions = {
   onPreview: (preview: ImageEditorRenderedPreview | null) => void
+  onSource?: (source: ImageAdjustmentPreviewSource | null) => void
   onError?: (error: unknown) => void
 }
 
@@ -27,7 +28,7 @@ export type ImageAdjustmentInlinePreviewRenderer = {
 export function createImageAdjustmentInlinePreviewRenderer(
   options: ImageAdjustmentInlinePreviewRendererOptions,
 ): ImageAdjustmentInlinePreviewRenderer {
-  let previewSource: PreviewSource | null = null
+  let previewSource: ImageAdjustmentPreviewSource | null = null
   let currentPlan: ImageAdjustmentPlan = []
   let currentSourceUrl: string | null = null
   let sourceRequestToken = 0
@@ -40,6 +41,7 @@ export function createImageAdjustmentInlinePreviewRenderer(
       sourceRequestToken += 1
       previewSource = null
       options.onPreview(null)
+      options.onSource?.(null)
       cancelPreviewFrame()
       if (!sourceUrl) return
 
@@ -48,6 +50,7 @@ export function createImageAdjustmentInlinePreviewRenderer(
         .then((source) => {
           if (token !== sourceRequestToken) return
           previewSource = source
+          options.onSource?.(source)
           scheduleRenderedPreview()
         })
         .catch((error) => {
@@ -65,6 +68,7 @@ export function createImageAdjustmentInlinePreviewRenderer(
       previewSource = null
       currentPlan = []
       options.onPreview(null)
+      options.onSource?.(null)
       cancelPreviewFrame()
     },
   }
@@ -92,7 +96,7 @@ export function createImageAdjustmentInlinePreviewRenderer(
     previewFrameId = null
   }
 
-  function renderLatestPreview(source: PreviewSource | null, plan: ImageAdjustmentPlan) {
+  function renderLatestPreview(source: ImageAdjustmentPreviewSource | null, plan: ImageAdjustmentPlan) {
     if (!source || plan.length === 0) {
       options.onPreview(null)
       return
@@ -108,7 +112,7 @@ export function createImageAdjustmentInlinePreviewRenderer(
   }
 }
 
-async function loadPreviewSource(sourceUrl: string): Promise<PreviewSource> {
+async function loadPreviewSource(sourceUrl: string): Promise<ImageAdjustmentPreviewSource> {
   const fetchUrl = resolveFetchUrl(sourceUrl)
   if (!fetchUrl) throw new Error('图片地址无效')
 

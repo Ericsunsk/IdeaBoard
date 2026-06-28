@@ -334,5 +334,13 @@ function createInvertPlan(): ImageAdjustmentPlan {
   for (let index = 0; index < lut.length; index += 1) {
     lut[index] = 255 - index
   }
-  return [{ kind: 'channel-lut', lut }]
+  return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(lut) }]
+}
+
+function createRgbChannelLutsForTest(lut: Uint8ClampedArray) {
+  return {
+    red: lut,
+    green: lut,
+    blue: lut,
+  }
 }

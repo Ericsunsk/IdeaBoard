@@ -8,6 +8,7 @@ import {
   IMAGE_ADJUSTMENT_FINAL_TASK_ID,
   renderImageAdjustmentFile,
   useImageAdjustmentRenderedPreview,
+  useImageEditorHistogramSource,
   useImageEditorMode,
   useImageEditorSession,
   IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
@@ -101,6 +102,7 @@ type WorkspaceImageToolRuntime = {
   isApplyingImageEditorAdjustments: Ref<boolean>
   imageAdjustmentFinalApplyProgress: Ref<ImageAdjustmentFinalApplyProgress | null>
   imageEditorRenderedPreview: ComputedRef<ImageEditorRenderedPreview | null>
+  imageEditorHistogramSource: ComputedRef<ImageData | null>
   onApplyImageEditorAdjustments: () => Promise<void>
   cancelFlowMaskEditorMode: () => void
   enterFlowImageEditorMode: (nodeId: string, mode: ImageEditorMode) => boolean
@@ -137,13 +139,19 @@ export function useWorkspaceImageToolRuntime(
   const imageAdjustmentFinalApplyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(null)
   const activeImageAdjustmentFinalTaskId = ref<string | null>(null)
   const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
-  const { imageEditorRenderedPreview } = useImageAdjustmentRenderedPreview({
+  const { imageEditorRenderedPreview, imageEditorPreviewSource } = useImageAdjustmentRenderedPreview({
     isAdjustMode: isImageAdjustmentMode,
     layers: imageEditorSession.imageEditorLayers,
     sourceUrl: () =>
       flowImageEditorNodeId.value
         ? options.getImageNodeDisplayPayload(flowImageEditorNodeId.value)?.url
         : null,
+  })
+  const { imageEditorHistogramSource } = useImageEditorHistogramSource({
+    isAdjustMode: isImageAdjustmentMode,
+    layers: imageEditorSession.imageEditorLayers,
+    selectedAdjustmentLayer: imageEditorSession.selectedImageEditorAdjustmentLayer,
+    previewSource: imageEditorPreviewSource,
   })
 
   function getImageAdjustmentFinalTaskId(nodeId: string) {
@@ -308,6 +316,7 @@ export function useWorkspaceImageToolRuntime(
     isApplyingImageEditorAdjustments,
     imageAdjustmentFinalApplyProgress,
     imageEditorRenderedPreview,
+    imageEditorHistogramSource,
     onApplyImageEditorAdjustments,
     cancelFlowMaskEditorMode,
     enterFlowImageEditorMode,

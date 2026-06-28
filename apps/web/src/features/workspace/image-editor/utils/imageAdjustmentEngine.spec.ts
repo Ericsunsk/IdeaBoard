@@ -61,7 +61,7 @@ const curvesLayer: ImageEditorAdjustmentLayer = {
   kind: 'curves',
   name: '曲线 1',
   visible: true,
-  params: { input: 50, output: 50 },
+  params: { channels: {} },
 }
 
 const levelsLayer: ImageEditorAdjustmentLayer = {
@@ -130,9 +130,9 @@ describe('imageAdjustmentEngine', () => {
     const wholeImage = makeImageData(sourceValues)
     const rangedImage = makeImageData(sourceValues)
     const invertPlanStep = compileImageAdjustmentPlan([invertLayer])[0]
-    const invertLut = invertPlanStep?.kind === 'channel-lut' ? invertPlanStep.lut : failLut()
+    const invertLuts = invertPlanStep?.kind === 'channel-lut' ? invertPlanStep.luts : failLuts()
     const plan: ImageAdjustmentPlan = [
-      { kind: 'channel-lut', lut: invertLut },
+      { kind: 'channel-lut', luts: invertLuts },
       { kind: 'threshold', threshold: 128, invert: true },
       {
         kind: 'hsl',
@@ -166,28 +166,67 @@ describe('imageAdjustmentEngine', () => {
     expect(pixelValues(inverted)).toEqual([255, 255, 255, 255, 0, 0, 0, 200])
   })
 
-  it('applies curves with a single control point', () => {
+  it('applies curves with multiple smooth RGB control points', () => {
     const source = makeImageData([64, 128, 192, 255])
 
     const result = applyImageAdjustments(source, [
-      makeLayer(curvesLayer, { params: { input: 50, output: 25 } }),
+      makeLayer(curvesLayer, {
+        params: {
+          channels: {
+            rgb: [
+              { id: 'point:shadow', input: 25, output: 15 },
+              { id: 'point:midtone', input: 50, output: 35 },
+              { id: 'point:highlight', input: 75, output: 78 },
+            ],
+          },
+        },
+      }),
     ])
 
-    expect(pixelValues(result)).toEqual([32, 64, 160, 255])
+    expect(pixelValues(result)).toEqual([38, 89, 200, 255])
   })
 
   it('keeps curves endpoint LUTs monotonic and continuous', () => {
     const source = makeImageData([0, 64, 128, 255, 192, 255, 255, 255])
 
     const inputAtBlack = applyImageAdjustments(source, [
-      makeLayer(curvesLayer, { params: { input: 0, output: 25 } }),
+      makeLayer(curvesLayer, {
+        params: {
+          channels: {
+            rgb: [{ id: 'endpoint:black', input: 0, output: 25 }],
+          },
+        },
+      }),
     ])
     const inputAtWhite = applyImageAdjustments(source, [
-      makeLayer(curvesLayer, { params: { input: 100, output: 75 } }),
+      makeLayer(curvesLayer, {
+        params: {
+          channels: {
+            rgb: [{ id: 'endpoint:white', input: 100, output: 75 }],
+          },
+        },
+      }),
     ])
 
     expect(pixelValues(inputAtBlack)).toEqual([64, 112, 160, 255, 208, 255, 255, 255])
     expect(pixelValues(inputAtWhite)).toEqual([0, 48, 96, 255, 144, 191, 191, 255])
+  })
+
+  it('applies per-channel curves after RGB composite curves', () => {
+    const source = makeImageData([128, 128, 128, 255])
+
+    const result = applyImageAdjustments(source, [
+      makeLayer(curvesLayer, {
+        params: {
+          channels: {
+            rgb: [{ id: 'rgb:mid', input: 50, output: 75 }],
+            red: [{ id: 'red:mid', input: 75, output: 25 }],
+          },
+        },
+      }),
+    ])
+
+    expect(pixelValues(result)).toEqual([64, 191, 191, 255])
   })
 
   it('applies levels with black and white points', () => {
@@ -214,12 +253,16 @@ describe('imageAdjustmentEngine', () => {
     const source = makeImageData([128, 128, 128, 255])
 
     const curvesThenThreshold = applyImageAdjustments(source, [
-      makeLayer(curvesLayer, { params: { input: 50, output: 25 } }),
+      makeLayer(curvesLayer, {
+        params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
+      }),
       thresholdLayer,
     ])
     const thresholdThenCurves = applyImageAdjustments(source, [
       thresholdLayer,
-      makeLayer(curvesLayer, { params: { input: 50, output: 25 } }),
+      makeLayer(curvesLayer, {
+        params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
+      }),
     ])
 
     expect(pixelValues(curvesThenThreshold)).toEqual([0, 0, 0, 255])
@@ -238,7 +281,9 @@ describe('imageAdjustmentEngine', () => {
     expect(plan).toEqual([])
 
     const channelPlan = compileImageAdjustmentPlan([
-      makeLayer(curvesLayer, { params: { input: 50, output: 25 } }),
+      makeLayer(curvesLayer, {
+        params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
+      }),
       invertLayer,
     ])
 
@@ -258,7 +303,13 @@ describe('imageAdjustmentEngine', () => {
           contrast: Number.NaN,
         },
       }),
-      makeLayer(curvesLayer, { params: { input: Number.NaN, output: Number.NaN } }),
+      makeLayer(curvesLayer, {
+        params: {
+          channels: {
+            rgb: [{ id: 'bad', input: Number.NaN, output: Number.NaN }],
+          },
+        },
+      }),
       makeLayer(levelsLayer, {
         params: { shadows: Number.NaN, midtones: Number.NaN, highlights: Number.NaN },
       }),
@@ -295,6 +346,6 @@ describe('imageAdjustmentEngine', () => {
   })
 })
 
-function failLut(): Uint8ClampedArray {
+function failLuts(): NonNullable<Extract<ImageAdjustmentPlan[number], { kind: 'channel-lut' }>['luts']> {
   throw new Error('expected compiled LUT step')
 }

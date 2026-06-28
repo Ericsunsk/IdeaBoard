@@ -1,0 +1,181 @@
+.image-editor-curves {
+  --image-editor-curves-frame-border-width: var(--image-editor-panel-border-width);
+  --image-editor-curves-frame-border-color: var(--workspace-accent-outline);
+  --image-editor-curves-frame-radius: 9px;
+  --image-editor-curves-point-size: 9.333px;
+  --image-editor-curves-point-border-width: var(--image-editor-curves-frame-border-width);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.image-editor-curves__toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(78px, 0.54fr);
+  gap: 8px;
+}
+
+.image-editor-curves__select-label,
+.image-editor-curves__fields label {
+  min-width: 0;
+  display: grid;
+  align-items: center;
+  gap: 5px;
+  color: var(--workspace-text-muted);
+  font-size: var(--image-editor-panel-meta-text-size);
+  font-weight: 600;
+}
+
+.image-editor-curves__select-label {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.image-editor-curves__select-label select,
+.image-editor-curves__fields input {
+  height: calc(var(--image-editor-panel-control-height) - 4px);
+  min-width: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  border: var(--image-editor-panel-border-width) solid
+    var(--image-editor-panel-control-border-color);
+  border-radius: calc(var(--image-editor-panel-control-radius) - 1px);
+  background: var(--image-editor-panel-control-bg);
+  color: var(--workspace-text-body);
+  font-size: var(--image-editor-panel-text-size);
+  font-weight: 600;
+  padding: 0 7px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.image-editor-curves__select-label select {
+  padding: 0 8px;
+}
+
+.image-editor-curves__graph {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border: var(--image-editor-curves-frame-border-width) solid
+    var(--image-editor-curves-frame-border-color);
+  border-radius: var(--image-editor-curves-frame-radius);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.92)),
+    var(--workspace-surface-muted);
+  cursor: crosshair;
+  overflow: visible;
+  touch-action: none;
+}
+
+.image-editor-curves__plot {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.image-editor-curves__plot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+}
+
+.image-editor-curves__histogram {
+  fill: rgba(71, 85, 105, 0.16);
+  pointer-events: none;
+}
+
+.image-editor-curves__grid {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.image-editor-curves__grid--fine {
+  stroke: var(--workspace-surface-border-soft);
+  stroke-width: 0.5;
+}
+
+.image-editor-curves__grid--strong {
+  stroke: var(--workspace-accent-outline);
+  stroke-width: 0.7;
+}
+
+.image-editor-curves__baseline {
+  fill: none;
+  stroke: var(--workspace-text-subtle);
+  stroke-dasharray: 3 3;
+  stroke-width: 0.9;
+  vector-effect: non-scaling-stroke;
+}
+
+.image-editor-curves__ghost-curve {
+  fill: none;
+  opacity: 0.38;
+  shape-rendering: geometricPrecision;
+  stroke: var(--workspace-text-subtle);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.image-editor-curves__curve {
+  fill: none;
+  shape-rendering: geometricPrecision;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+  vector-effect: non-scaling-stroke;
+}
+
+.image-editor-curves__point {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  width: var(--image-editor-curves-point-size);
+  height: var(--image-editor-curves-point-size);
+  padding: 0;
+  border: var(--image-editor-curves-point-border-width) solid var(--workspace-accent);
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: grab;
+  transform: translate(-50%, -50%);
+}
+
+.image-editor-curves__point:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: 2px;
+}
+
+.image-editor-curves__point.active {
+  border: 0;
+  background: var(--workspace-accent);
+}
+
+.image-editor-curves__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.image-editor-curves__fields label {
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.image-editor-curves__fields input {
+  text-align: right;
+}
+
+.image-editor-curves__fields input:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.image-editor-curves__fields input::-webkit-outer-spin-button,
+.image-editor-curves__fields input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}

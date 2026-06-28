@@ -55,11 +55,9 @@
 
     <div v-else-if="adjustmentLayer?.kind === 'curves'" class="image-editor-panel__body">
       <ImageEditorCurvesControl
-        :input-value="adjustmentLayer.params.input"
-        :output-value="adjustmentLayer.params.output"
-        :ranges="ranges.curves.ranges"
-        @update:input-value="emit('update-param', 'input', $event)"
-        @update:output-value="emit('update-param', 'output', $event)"
+        :params="adjustmentLayer.params"
+        :histogram-source="histogramSource"
+        @update:params="emit('update-param', 'channels', $event)"
       />
     </div>
 
@@ -117,6 +115,7 @@ import { IMAGE_ADJUSTMENT_DEFINITIONS } from '../utils/imageAdjustmentDefinition
 
 defineProps<{
   adjustmentLayer: ImageEditorAdjustmentLayer | null
+  histogramSource: ImageData | null
 }>()
 
 const emit = defineEmits<{
@@ -131,7 +130,7 @@ function onBooleanInput(key: ImageEditorParamKey, event: Event) {
 }
 </script>
 
-<style scoped src="./styles/image-editor-panel.css"></style>
+<style src="./styles/image-editor-panel.css"></style>
 <style scoped>
 .image-editor-properties-panel {
   min-height: 0;

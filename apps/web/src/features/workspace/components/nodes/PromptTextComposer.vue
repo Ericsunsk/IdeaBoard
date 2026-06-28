@@ -210,7 +210,7 @@ const {
 
 .prompt-text-composer.variant-floating:focus-within,
 .prompt-text-composer.variant-floating:has(.prompt-text-composer-input:not(:placeholder-shown)) {
-  border-color: #9278e6;
+  border-color: var(--ib-focus-border-color);
 }
 
 .prompt-text-composer.variant-floating .prompt-text-composer-input {

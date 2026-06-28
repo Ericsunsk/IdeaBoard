@@ -66,7 +66,7 @@
 }
 
 .node-tool-output-count:hover:not(:disabled),
-.node-tool-output-count:focus,
+.node-tool-output-count:focus-visible,
 .node-tool-output-count.active {
   background: var(--color-canvas-accent-soft);
   border-color: var(--node-tool-button-accent);
@@ -76,6 +76,12 @@
 .node-tool-output-count:disabled {
   cursor: wait;
   opacity: 0.55;
+}
+
+.node-tool-output-count:focus-visible,
+.node-tool-output-count-option:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
 }
 
 .node-tool-tooltip {
@@ -167,6 +173,7 @@
 }
 
 .node-tool-output-count-option:hover,
+.node-tool-output-count-option:focus-visible,
 .node-tool-output-count-option.active {
   border-color: var(--node-tool-button-accent);
   background: var(--color-canvas-accent-soft);

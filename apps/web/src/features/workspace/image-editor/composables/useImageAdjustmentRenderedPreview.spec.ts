@@ -30,7 +30,7 @@ function createThresholdLayer(params = { threshold: 128, invert: false }) {
   } satisfies ImageEditorLayer
 }
 
-function createCurvesLayer(params = { input: 50, output: 50 }) {
+function createCurvesLayer(params = { channels: {} }) {
   return {
     id: 'adjustment:curves',
     type: 'adjustment',
@@ -99,6 +99,26 @@ describe('useImageAdjustmentRenderedPreview', () => {
     })
   })
 
+  it('exposes the decoded preview source for histogram consumers', async () => {
+    installBrowserImageMocks([10, 20, 30, 255])
+    const preview = useImageAdjustmentRenderedPreview({
+      isAdjustMode: ref(true),
+      sourceUrl: ref('https://example.com/source.png'),
+      layers: ref([createInvertLayer()]),
+    })
+
+    await flushPreviewLoad()
+
+    expect(preview.imageEditorPreviewSource.value).toMatchObject({
+      type: 'rendered-image',
+      imageData: expect.objectContaining({
+        data: new Uint8ClampedArray([10, 20, 30, 255]),
+      }),
+      width: 1,
+      height: 1,
+    })
+  })
+
   it('keeps inline rendered preview output identical to CPU final plan execution for layered adjustments', async () => {
     const sourceValues = [
       16, 48, 112, 255, 80, 140, 220, 240, 196, 88, 24, 192, 240, 240, 96, 128,
@@ -106,7 +126,11 @@ describe('useImageAdjustmentRenderedPreview', () => {
     installBrowserImageMocks(sourceValues)
     const layers = [
       createHslLayer({ hue: 35, saturation: 22, brightness: 8, contrast: 14 }),
-      createCurvesLayer({ input: 42, output: 70 }),
+      createCurvesLayer({
+        channels: {
+          rgb: [{ id: 'point:midtone', input: 42, output: 70 }],
+        },
+      }),
       createLevelsLayer({ shadows: 8, midtones: 44, highlights: 92 }),
       createThresholdLayer({ threshold: 150, invert: true }),
       createInvertLayer(),

@@ -24,7 +24,9 @@ function pixelValues(imageData: ImageData) {
 describe('cpu image adjustment backend', () => {
   it('keeps the in-place execution path available for runtime backends', () => {
     const source = makeImageData([10, 20, 30, 77])
-    const plan: ImageAdjustmentPlan = [{ kind: 'channel-lut', lut: createInvertLut() }]
+    const plan: ImageAdjustmentPlan = [
+      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) },
+    ]
 
     const result = executeCpuImageAdjustmentPlanInPlace(source, plan)
 
@@ -39,4 +41,12 @@ function createInvertLut() {
     lut[index] = 255 - index
   }
   return lut
+}
+
+function createRgbChannelLutsForTest(lut: Uint8ClampedArray) {
+  return {
+    red: lut,
+    green: lut,
+    blue: lut,
+  }
 }

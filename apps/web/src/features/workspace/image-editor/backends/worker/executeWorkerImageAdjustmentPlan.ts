@@ -246,7 +246,11 @@ function cloneImageAdjustmentPlanForWorker(plan: ImageAdjustmentPlan): ImageAdju
       case 'channel-lut':
         return {
           kind: 'channel-lut',
-          lut: new Uint8ClampedArray(step.lut),
+          luts: {
+            red: new Uint8ClampedArray(step.luts.red),
+            green: new Uint8ClampedArray(step.luts.green),
+            blue: new Uint8ClampedArray(step.luts.blue),
+          },
         }
     }
   })

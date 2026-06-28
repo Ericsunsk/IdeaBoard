@@ -249,7 +249,7 @@ function selectOutputCount(value: number) {
 }
 
 .image-node-stage-image:focus-visible {
-  outline: 3px solid rgba(146, 120, 230, 0.36);
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
   outline-offset: -4px;
 }
 
@@ -299,7 +299,8 @@ function selectOutputCount(value: number) {
 
 .image-node-stage-empty:focus-visible {
   color: #6f5ed1;
-  box-shadow: inset 0 0 0 3px rgba(146, 120, 230, 0.28);
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: calc(-1 * var(--ib-focus-outline-width));
 }
 
 .image-node-stage-empty .node-empty-state-icon--image {

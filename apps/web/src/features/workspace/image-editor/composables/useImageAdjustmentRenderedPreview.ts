@@ -19,6 +19,7 @@ type UseImageAdjustmentRenderedPreviewOptions = {
 
 export function useImageAdjustmentRenderedPreview(options: UseImageAdjustmentRenderedPreviewOptions) {
   const imageEditorRenderedPreview = shallowRef<ImageEditorRenderedPreview | null>(null)
+  const imageEditorPreviewSource = shallowRef<ImageEditorRenderedPreview | null>(null)
 
   const sourceUrl = computed(() => toValue(options.sourceUrl) ?? null)
   const imageAdjustmentPlan = computed(() => {
@@ -28,6 +29,16 @@ export function useImageAdjustmentRenderedPreview(options: UseImageAdjustmentRen
   const previewRenderer = createImageAdjustmentInlinePreviewRenderer({
     onPreview(preview) {
       imageEditorRenderedPreview.value = preview
+    },
+    onSource(source) {
+      imageEditorPreviewSource.value = source
+        ? {
+            type: 'rendered-image',
+            imageData: source.imageData,
+            width: source.width,
+            height: source.height,
+          }
+        : null
     },
     onError(error) {
       console.warn('[image-editor] failed to load adjustment preview source', error)
@@ -52,8 +63,13 @@ export function useImageAdjustmentRenderedPreview(options: UseImageAdjustmentRen
     if (!options.isAdjustMode.value || imageAdjustmentPlan.value.length === 0) return null
     return imageEditorRenderedPreview.value
   })
+  const previewSource = computed<ImageEditorRenderedPreview | null>(() => {
+    if (!options.isAdjustMode.value) return null
+    return imageEditorPreviewSource.value
+  })
 
   return {
     imageEditorRenderedPreview: renderedPreview,
+    imageEditorPreviewSource: previewSource,
   }
 }

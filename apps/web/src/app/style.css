@@ -141,6 +141,10 @@
     --ib-control-icon: #5f6368;
     --ib-control-icon-hover: #26364f;
     --ib-control-bg-hover: #e8eaed;
+    --ib-focus-outline-width: 2px;
+    --ib-focus-outline-offset: 2px;
+    --ib-focus-outline-color: var(--color-canvas-accent);
+    --ib-focus-border-color: var(--ib-focus-outline-color);
     --workspace-range-input-height: 22px;
     --workspace-range-track-height: 4px;
     --workspace-range-thumb-size: 9px;
@@ -245,9 +249,9 @@
   }
 
   .workspace-range-input:focus-visible {
-    outline: 2px solid
+    outline: var(--ib-focus-outline-width) solid
       var(--workspace-range-focus-color, var(--workspace-accent, var(--color-canvas-accent)));
-    outline-offset: 3px;
+    outline-offset: var(--ib-focus-outline-offset);
     border-radius: 999px;
   }
 

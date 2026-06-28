@@ -133,8 +133,9 @@ const {
   --node-tool-button-border: #e2e8f0;
 }
 
+.image-node-prompt-composer:focus-within,
 .image-node-prompt-composer.has-text {
-  border-color: #9278e6;
+  border-color: var(--ib-focus-border-color);
 }
 
 .image-node-prompt-composer.count-stacked {

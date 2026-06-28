@@ -7,6 +7,10 @@ import type {
   ImageEditorLevelsParams,
   ImageEditorThresholdParams,
 } from '../types'
+import {
+  normalizeCurvesParams,
+  type NormalizedCurvesAdjustment,
+} from './imageEditorCurves'
 
 export const CHANNEL_MIN = 0
 export const CHANNEL_MAX = 255
@@ -30,11 +34,6 @@ export type NormalizedHslAdjustment = {
 export type NormalizedThresholdAdjustment = {
   threshold: number
   invert: boolean
-}
-
-export type NormalizedCurvesAdjustment = {
-  inputPoint: number
-  outputPoint: number
 }
 
 export type NormalizedLevelsAdjustment = {
@@ -65,7 +64,7 @@ type ImageAdjustmentDefaultsByKind = {
 type ImageAdjustmentRangeByKind = {
   hsl: Record<keyof ImageEditorHslParams, ImageAdjustmentNumberRange>
   threshold: Record<'threshold', ImageAdjustmentNumberRange>
-  curves: Record<keyof ImageEditorCurvesParams, ImageAdjustmentNumberRange>
+  curves: Record<string, never>
   levels: Record<keyof ImageEditorLevelsParams, ImageAdjustmentNumberRange>
   invert: Record<string, never>
 }
@@ -114,11 +113,6 @@ const THRESHOLD_RANGES = {
   threshold: { label: '阈值', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 128 },
 } satisfies ImageAdjustmentRangeByKind['threshold']
 
-const CURVES_RANGES = {
-  input: { label: '输入', min: 0, max: PERCENT_SCALE, defaultValue: 50, unit: '%' },
-  output: { label: '输出', min: 0, max: PERCENT_SCALE, defaultValue: 50, unit: '%' },
-} satisfies ImageAdjustmentRangeByKind['curves']
-
 const LEVELS_RANGES = {
   shadows: { label: '黑场', min: 0, max: PERCENT_SCALE, defaultValue: 0, unit: '%' },
   midtones: { label: '中间', min: 1, max: 99, defaultValue: 50, unit: '%' },
@@ -139,9 +133,9 @@ export const IMAGE_ADJUSTMENT_DEFINITIONS: ImageAdjustmentDefinitionByKind = {
     isNeutral: isNeutralThresholdAdjustment,
   },
   curves: {
-    defaults: { input: 50, output: 50 },
-    ranges: CURVES_RANGES,
-    normalize: normalizeCurvesAdjustment,
+    defaults: { channels: {} },
+    ranges: {},
+    normalize: normalizeCurvesParams,
     isNeutral: isNeutralCurvesAdjustment,
   },
   levels: {
@@ -229,14 +223,6 @@ function normalizeThresholdAdjustment(
   }
 }
 
-function normalizeCurvesAdjustment(params: ImageEditorCurvesParams): NormalizedCurvesAdjustment {
-  const ranges = IMAGE_ADJUSTMENT_DEFINITIONS.curves.ranges
-  return {
-    inputPoint: percentToChannel(params.input, ranges.input),
-    outputPoint: percentToChannel(params.output, ranges.output),
-  }
-}
-
 function normalizeLevelsAdjustment(params: ImageEditorLevelsParams): NormalizedLevelsAdjustment {
   const ranges = IMAGE_ADJUSTMENT_DEFINITIONS.levels.ranges
   const blackPoint = percentToChannel(params.shadows, ranges.shadows)
@@ -269,7 +255,7 @@ function isNeutralThresholdAdjustment(_params: NormalizedThresholdAdjustment) {
 }
 
 function isNeutralCurvesAdjustment(params: NormalizedCurvesAdjustment) {
-  return params.inputPoint === params.outputPoint
+  return Object.keys(params.channels).length === 0
 }
 
 function isNeutralLevelsAdjustment(params: NormalizedLevelsAdjustment) {
@@ -311,7 +297,7 @@ export function getImageAdjustmentDefaultParams<TKind extends ImageAdjustmentKin
       } as ImageAdjustmentDefaultsByKind[TKind]
     case 'curves':
       return {
-        ...IMAGE_ADJUSTMENT_DEFINITIONS.curves.defaults,
+        channels: {},
       } as ImageAdjustmentDefaultsByKind[TKind]
     case 'levels':
       return {

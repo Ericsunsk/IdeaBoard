@@ -209,6 +209,7 @@
         :image-editor-layers="imageEditorLayers"
         :selected-image-editor-layer-id="selectedImageEditorLayerId"
         :selected-image-editor-adjustment-layer="selectedImageEditorAdjustmentLayer"
+        :image-editor-histogram-source="imageEditorHistogramSource"
         :applying-image-editor-adjustments="isApplyingImageEditorAdjustments"
         :node-context-menu="nodeContextMenu"
         :canvas-node-menu-items="canvasNodeMenuItems"
@@ -580,6 +581,7 @@ const {
   imageEditorLayers,
   selectedImageEditorLayerId,
   selectedImageEditorAdjustmentLayer,
+  imageEditorHistogramSource,
   selectImageEditorTool,
   selectImageAdjustmentLayer,
   selectImageEditorLayer,
@@ -813,6 +815,7 @@ useFlowKeyboardShortcuts({
   onUndo: flowHistory.undo,
   onRedo: flowHistory.redo,
   onDeleteSelected: deleteSelectedFlowElements,
+  isWorkspaceShortcutSuppressed: () => !!flowImageEditorNodeId.value,
   onEscape: onEscapeShortcut,
   onPanViewport,
   onToolSelect: () => {
@@ -950,7 +953,6 @@ onMounted(async () => {
 }
 
 .workspace-flow-canvas-wrap :deep(.vue-flow__edge.selected .vue-flow__edge-path),
-.workspace-flow-canvas-wrap :deep(.vue-flow__edge:focus .vue-flow__edge-path),
 .workspace-flow-canvas-wrap :deep(.vue-flow__edge:focus-visible .vue-flow__edge-path) {
   stroke: var(--flow-edge-selected-color);
 }

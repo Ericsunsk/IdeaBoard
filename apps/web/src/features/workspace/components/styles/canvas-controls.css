@@ -37,6 +37,11 @@
   color: var(--ib-control-icon-hover);
 }
 
+.canvas-icon-button:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
+}
+
 .canvas-icon-button.is-active {
   border-color: var(--workspace-surface-border);
   background: #f1f3f9;

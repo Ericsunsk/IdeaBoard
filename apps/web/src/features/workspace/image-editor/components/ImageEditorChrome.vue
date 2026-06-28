@@ -10,6 +10,7 @@
       />
       <ImageEditorPropertiesPanel
         :adjustment-layer="selectedAdjustmentLayer"
+        :histogram-source="histogramSource"
         @update-param="(key, value) => emit('update-param', key, value)"
       />
       <ImageEditorLayersPanel
@@ -66,6 +67,7 @@ const props = defineProps<{
   layers: ImageEditorLayer[]
   selectedLayerId: string
   selectedAdjustmentLayer: ImageEditorAdjustmentLayer | null
+  histogramSource: ImageData | null
   applyingAdjustments: boolean
 }>()
 

@@ -120,7 +120,7 @@ function resolveLayerIcon(layer: ImageEditorLayer): Component {
 onBeforeUnmount(clearLayerListScrollTimer)
 </script>
 
-<style scoped src="./styles/image-editor-panel.css"></style>
+<style src="./styles/image-editor-panel.css"></style>
 <style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-editor-layers-panel {
@@ -190,8 +190,8 @@ onBeforeUnmount(clearLayerListScrollTimer)
 
 .image-editor-layer-row:focus-visible,
 .image-editor-layer-row__visibility:focus-visible {
-  outline: 2px solid var(--workspace-accent);
-  outline-offset: 2px;
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
 }
 
 .image-editor-layer-row__visibility .node-tool-tooltip {

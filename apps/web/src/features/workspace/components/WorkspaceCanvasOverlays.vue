@@ -45,6 +45,7 @@
     :layers="imageEditorLayers"
     :selected-layer-id="selectedImageEditorLayerId"
     :selected-adjustment-layer="selectedImageEditorAdjustmentLayer"
+    :histogram-source="imageEditorHistogramSource"
     :applying-adjustments="applyingImageEditorAdjustments"
     @select-tool="emit('select-image-editor-tool', $event)"
     @select-adjustment="emit('select-image-adjustment-layer', $event)"
@@ -105,6 +106,7 @@ defineProps<{
   imageEditorLayers: ImageEditorLayer[]
   selectedImageEditorLayerId: string
   selectedImageEditorAdjustmentLayer: ImageEditorAdjustmentLayer | null
+  imageEditorHistogramSource: ImageData | null
   applyingImageEditorAdjustments: boolean
   nodeContextMenu: { visible: boolean; x: number; y: number }
   canvasNodeMenuItems: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>

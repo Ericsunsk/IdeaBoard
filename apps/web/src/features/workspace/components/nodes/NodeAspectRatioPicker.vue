@@ -116,21 +116,30 @@ const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
 }
 
 .node-aspect-ratio-trigger:hover:not(:disabled),
-.node-aspect-ratio-trigger:focus,
+.node-aspect-ratio-trigger:focus-visible,
 .node-aspect-ratio-trigger.active {
   background: #f8f7ff;
   border-color: var(--node-tool-button-accent);
   color: #272932;
 }
 
+.node-aspect-ratio-trigger:focus-visible,
+.node-aspect-ratio-option:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
+}
+
 .node-aspect-ratio-option:hover,
+.node-aspect-ratio-option:focus-visible,
 .node-aspect-ratio-option.active {
   color: var(--node-tool-button-accent);
 }
 
 .node-aspect-ratio-option:hover .node-aspect-ratio-icon > span,
+.node-aspect-ratio-option:focus-visible .node-aspect-ratio-icon > span,
 .node-aspect-ratio-option.active .node-aspect-ratio-icon > span,
 .node-aspect-ratio-trigger:hover .node-aspect-ratio-icon > span,
+.node-aspect-ratio-trigger:focus-visible .node-aspect-ratio-icon > span,
 .node-aspect-ratio-trigger.active .node-aspect-ratio-icon > span {
   border-color: var(--node-tool-button-accent);
   color: var(--node-tool-button-accent);

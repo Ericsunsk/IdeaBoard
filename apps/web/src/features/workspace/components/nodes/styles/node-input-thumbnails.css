@@ -65,6 +65,12 @@
   box-shadow: none;
 }
 
+.node-input-thumbnail:focus-visible,
+.node-input-thumbnail-remove:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
+}
+
 .node-input-thumbnail-remove svg {
   display: block;
   width: 8px;
@@ -85,7 +91,7 @@
 }
 
 .node-tool-output-count.node-input-thumbnail-add:hover:not(:disabled),
-.node-tool-output-count.node-input-thumbnail-add:focus,
+.node-tool-output-count.node-input-thumbnail-add:focus-visible,
 .node-tool-output-count.node-input-thumbnail-add:active,
 .node-tool-output-count.node-input-thumbnail-add.is-drag-over {
   border-color: var(--node-tool-button-accent);

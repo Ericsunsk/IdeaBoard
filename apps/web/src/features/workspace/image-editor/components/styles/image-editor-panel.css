@@ -3,6 +3,9 @@
   --image-editor-panel-row-height: 31px;
   --image-editor-panel-control-height: 28px;
   --image-editor-panel-control-radius: 8px;
+  --image-editor-panel-control-border-color: var(--workspace-surface-border-soft);
+  --image-editor-panel-control-focus-border-color: var(--ib-focus-border-color);
+  --image-editor-panel-control-bg: var(--workspace-surface-muted);
   --image-editor-panel-inset: 7px;
   --image-editor-panel-content-gap: var(--workspace-panel-content-gap);
   --image-editor-panel-text-size: 11px;
@@ -12,4 +15,22 @@
   background: var(--workspace-surface-bg);
   box-sizing: border-box;
   overflow: hidden;
+}
+
+.image-editor-panel
+  :where(
+    input:not([type]),
+    input[type='email'],
+    input[type='number'],
+    input[type='password'],
+    input[type='search'],
+    input[type='tel'],
+    input[type='text'],
+    input[type='url'],
+    select,
+    textarea
+  ):focus-visible {
+  border-color: var(--image-editor-panel-control-focus-border-color);
+  box-shadow: none;
+  outline: none;
 }

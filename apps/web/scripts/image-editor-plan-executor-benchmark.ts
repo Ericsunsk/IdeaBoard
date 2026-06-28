@@ -133,8 +133,9 @@ function createBenchmarkLayers(): readonly ImageEditorAdjustmentLayer[] {
       name: 'Benchmark Curves',
       visible: true,
       params: {
-        input: 42,
-        output: 58,
+        channels: {
+          rgb: [{ id: 'point:benchmark:midtone', input: 42, output: 58 }],
+        },
       },
     },
     {

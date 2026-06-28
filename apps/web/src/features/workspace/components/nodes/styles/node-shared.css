@@ -182,8 +182,8 @@
 }
 
 .node-inline-range:focus-visible {
-  outline: 2px solid var(--color-canvas-accent);
-  outline-offset: 3px;
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
   border-radius: 3px;
 }
 
