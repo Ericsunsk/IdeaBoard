@@ -11,9 +11,9 @@ import (
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/runtime/taskruntime"
-	"ideaboard/api/internal/taskmedia"
-	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/taskqueue"
+	"ideaboard/api/internal/tasking/taskruntime"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

@@ -3,7 +3,7 @@ package workflow
 import (
 	"strings"
 
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/tasks"
 )
 
 // BuildProviderTaskParams adapts the canonical task params contract to the

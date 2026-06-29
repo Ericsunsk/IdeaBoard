@@ -15,9 +15,9 @@ import (
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/taskmedia"
-	"ideaboard/api/internal/taskqueue"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/taskqueue"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
 

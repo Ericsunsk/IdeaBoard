@@ -1,0 +1,410 @@
+package taskservice
+
+import (
+	"fmt"
+	"log/slog"
+	"net/http"
+	"strings"
+	"time"
+
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/sse"
+	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/tasking/tasks"
+
+	"github.com/gin-gonic/gin"
+)
+
+type Handler struct {
+	taskService *Service
+}
+
+type adminTaskDTO struct {
+	ID                int64                       `json:"id"`
+	TaskID            string                      `json:"task_id"`
+	UserID            int64                       `json:"user_id"`
+	AssignedChannelID *int64                      `json:"assigned_channel_id"`
+	AccountID         *int64                      `json:"account_id"`
+	Prompt            string                      `json:"prompt"`
+	UserPrompt        string                      `json:"user_prompt"`
+	Params            string                      `json:"params"`
+	FeatureSlug       string                      `json:"feature_slug"`
+	RequestedModel    string                      `json:"requested_model"`
+	ResolvedModel     string                      `json:"resolved_model"`
+	APIType           string                      `json:"api_type"`
+	Status            string                      `json:"status"`
+	RetryCount        int                         `json:"retry_count"`
+	ErrorMsg          string                      `json:"error_msg"`
+	Result            string                      `json:"result"`
+	Outputs           []tasks.TaskOutput          `json:"outputs,omitempty"`
+	ExecutionMetrics  *tasks.TaskExecutionMetrics `json:"execution_metrics,omitempty"`
+	CreatedAt         time.Time                   `json:"created_at"`
+	UpdatedAt         time.Time                   `json:"updated_at"`
+	CompletedAt       *time.Time                  `json:"completed_at"`
+	CancelledAt       *time.Time                  `json:"cancelled_at"`
+	CancelledBy       *int64                      `json:"cancelled_by"`
+	CancelReason      string                      `json:"cancel_reason"`
+}
+
+type submitTaskResponse struct {
+	TaskID string `json:"task_id"`
+}
+
+type submitTaskReadinessResponse struct {
+	Ready   bool   `json:"ready"`
+	Message string `json:"message,omitempty"`
+	Feature string `json:"feature,omitempty"`
+}
+
+type adminTaskResponse struct {
+	Task adminTaskDTO `json:"task"`
+}
+
+type adminTaskListResponse struct {
+	Total          int64          `json:"total"`
+	PendingCount   int64          `json:"pending_count"`
+	RunningCount   int64          `json:"running_count"`
+	CompletedCount int64          `json:"completed_count"`
+	FailedCount    int64          `json:"failed_count"`
+	CancelledCount int64          `json:"cancelled_count"`
+	OtherCount     int64          `json:"other_count"`
+	List           []adminTaskDTO `json:"list"`
+}
+
+type userTaskListResponse struct {
+	Total int64                `json:"total"`
+	List  []tasks.TaskUserView `json:"list"`
+}
+
+type userTaskResponse struct {
+	Task tasks.TaskUserView `json:"task"`
+}
+
+type taskDeleteResponse struct {
+	Message string `json:"message"`
+}
+
+func NewHandler(taskService *Service) *Handler {
+	return &Handler{taskService: taskService}
+}
+
+func requireUserID(c *gin.Context) (int64, bool) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Error(c, http.StatusUnauthorized, "未登录")
+		return 0, false
+	}
+	return userID, true
+}
+
+func (h *Handler) SubmitTask(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	var req tasks.SubmitTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	taskID, err := h.taskService.SubmitTask(c.Request.Context(), userID, &req)
+	if err != nil {
+		response.Error(c, 400, userFacingSubmitError(err))
+		return
+	}
+	response.SuccessDTO(c, submitTaskResponse{TaskID: taskID})
+}
+
+func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	var req tasks.SubmitTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	featureSlug, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
+	if err != nil {
+		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err)})
+		return
+	}
+	response.SuccessDTO(c, submitTaskReadinessResponse{Ready: true, Feature: featureSlug})
+}
+
+func (h *Handler) GetTask(c *gin.Context) {
+	taskID := c.Param("task_id")
+	task, err := h.taskService.GetTask(c.Request.Context(), taskID)
+	if err != nil {
+		response.Error(c, 404, "任务不存在")
+		return
+	}
+	response.SuccessDTO(c, adminTaskResponse{Task: toAdminTaskDTO(task)})
+}
+
+func (h *Handler) ListTasks(c *gin.Context) {
+	var req tasks.TaskListRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	if err := validateTaskListQueryIDs(c, req.UserID, req.AccountID); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	taskItems, counts, err := h.taskService.ListTasks(c.Request.Context(), &req)
+	if err != nil {
+		if validation.Is(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.InternalError(c, 500, "获取任务列表失败", err)
+		return
+	}
+	response.SuccessDTO(c, adminTaskListResponse{
+		Total:          counts.Total,
+		PendingCount:   counts.PendingCount,
+		RunningCount:   counts.RunningCount,
+		CompletedCount: counts.CompletedCount,
+		FailedCount:    counts.FailedCount,
+		CancelledCount: counts.CancelledCount,
+		OtherCount:     counts.OtherCount,
+		List:           toAdminTaskDTOs(taskItems),
+	})
+}
+
+func validateTaskListQueryIDs(c *gin.Context, userID int64, accountID int64) error {
+	if c.Query("user_id") != "" && userID <= 0 {
+		return validation.New("user_id 必须大于 0")
+	}
+	if c.Query("account_id") != "" && accountID <= 0 {
+		return validation.New("account_id 必须大于 0")
+	}
+	return nil
+}
+
+// userFacingSubmitError maps internal errors to user-safe messages.
+// Validation errors and expected user-facing sentinels pass through unchanged.
+func userFacingSubmitError(err error) string {
+	if err == nil {
+		return "未知错误"
+	}
+	msg := err.Error()
+	// Known user-facing messages from the validation layer are safe to expose.
+	if strings.Contains(msg, "提示词") || strings.Contains(msg, "图片") || strings.Contains(msg, "参数") ||
+		strings.Contains(msg, "格式") || strings.Contains(msg, "数量") || strings.Contains(msg, "大小") ||
+		strings.Contains(msg, "feature") || strings.Contains(msg, "API 账号") ||
+		strings.Contains(msg, "任务提交失败") || strings.Contains(msg, "请先添加账号") {
+		return msg
+	}
+	return "任务提交失败，请稍后重试"
+}
+
+func (h *Handler) GetUserTasks(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	var req tasks.TaskListRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	taskItems, total, err := h.taskService.GetUserTasks(c.Request.Context(), userID, req.Page, req.PageSize)
+	if err != nil {
+		response.InternalError(c, 500, "获取任务列表失败", err)
+		return
+	}
+	safeList := make([]tasks.TaskUserView, len(taskItems))
+	for i, t := range taskItems {
+		safeList[i] = t.ToUserView()
+	}
+	response.SuccessDTO(c, userTaskListResponse{Total: total, List: safeList})
+}
+
+func (h *Handler) GetUserTask(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	taskID := c.Param("task_id")
+	task, err := h.taskService.GetUserTask(c.Request.Context(), taskID, userID)
+	if err != nil {
+		response.Error(c, 404, "任务不存在")
+		return
+	}
+	response.SuccessDTO(c, userTaskResponse{Task: task.ToUserView()})
+}
+
+func (h *Handler) StreamUserTask(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	taskID := c.Param("task_id")
+	ctx := c.Request.Context()
+	task, err := h.taskService.GetUserTask(ctx, taskID, userID)
+	if err != nil {
+		response.Error(c, http.StatusNotFound, "任务不存在")
+		return
+	}
+	hub := h.taskService.EventHub()
+	if hub == nil {
+		response.Error(c, http.StatusServiceUnavailable, "任务事件服务未配置")
+		return
+	}
+
+	if tasks.IsTerminalStatus(task.Status) {
+		if err := sse.Prepare(c); err != nil {
+			slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
+		}
+		if !writeTaskSSEvent(c, task) {
+			return
+		}
+		return
+	}
+
+	events, unsubscribe, ok := hub.Subscribe(taskID, userID)
+	if !ok {
+		response.Error(c, http.StatusTooManyRequests, "SSE 连接数已达上限，请稍后重试")
+		return
+	}
+	defer unsubscribe()
+
+	if err := sse.Prepare(c); err != nil {
+		slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
+	}
+
+	task, err = h.taskService.GetUserTask(ctx, taskID, userID)
+	if err != nil {
+		writeTaskStatusFetchErrorSSE(c, taskID, userID, "initial_snapshot", err)
+		return
+	}
+	if !writeTaskSSEvent(c, task) {
+		return
+	}
+	if tasks.IsTerminalStatus(task.Status) {
+		return
+	}
+
+	heartbeat := time.NewTicker(taskStreamHeartbeatInterval)
+	defer heartbeat.Stop()
+	maxConnTimer := time.NewTimer(defaultSSEMaxConnPeriod)
+	defer maxConnTimer.Stop()
+
+	heartbeatTicks := 0
+	const fullRefreshEveryN = 4 // full DB refresh every 4th heartbeat (~60s)
+
+	for {
+		select {
+		case <-maxConnTimer.C:
+			_ = writeSSEvent(c, "close", gin.H{"reason": "max_connection_duration_reached"})
+			return
+		case <-c.Request.Context().Done():
+			return
+		case <-heartbeat.C:
+			heartbeatTicks++
+			if heartbeatTicks%fullRefreshEveryN == 0 {
+				latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
+				if err != nil {
+					writeTaskStatusFetchErrorSSE(c, taskID, userID, "heartbeat", err)
+					return
+				}
+				if !writeTaskSSEvent(c, latest) {
+					return
+				}
+				if tasks.IsTerminalStatus(latest.Status) {
+					return
+				}
+			} else {
+				// Keepalive-only heartbeat: no DB query, just prevent proxy timeout.
+				if _, err := fmt.Fprintf(c.Writer, ":keepalive\n\n"); err != nil {
+					return
+				}
+				c.Writer.Flush()
+			}
+		case <-events:
+			latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
+			if err != nil {
+				writeTaskStatusFetchErrorSSE(c, taskID, userID, "event", err)
+				return
+			}
+			if !writeTaskSSEvent(c, latest) {
+				return
+			}
+			if tasks.IsTerminalStatus(latest.Status) {
+				return
+			}
+		}
+	}
+}
+
+func toAdminTaskDTOs(items []*tasks.Task) []adminTaskDTO {
+	result := make([]adminTaskDTO, 0, len(items))
+	for _, item := range items {
+		result = append(result, toAdminTaskDTO(item))
+	}
+	return result
+}
+
+func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
+	if task == nil {
+		return adminTaskDTO{}
+	}
+	return adminTaskDTO{
+		ID:                task.ID,
+		TaskID:            task.TaskID,
+		UserID:            task.UserID,
+		AssignedChannelID: task.AssignedChannelID,
+		AccountID:         task.AccountID,
+		Prompt:            task.Prompt,
+		UserPrompt:        task.UserPrompt,
+		Params:            task.Params,
+		FeatureSlug:       task.FeatureSlug,
+		RequestedModel:    task.RequestedModel,
+		ResolvedModel:     task.ResolvedModel,
+		APIType:           task.APIType,
+		Status:            task.Status,
+		RetryCount:        task.RetryCount,
+		ErrorMsg:          task.ErrorMsg,
+		Result:            task.Result,
+		Outputs:           task.Outputs,
+		ExecutionMetrics:  task.ExecutionMetrics,
+		CreatedAt:         task.CreatedAt,
+		UpdatedAt:         task.UpdatedAt,
+		CompletedAt:       task.CompletedAt,
+		CancelledAt:       task.CancelledAt,
+		CancelledBy:       task.CancelledBy,
+		CancelReason:      task.CancelReason,
+	}
+}
+
+func writeTaskSSEvent(c *gin.Context, task *tasks.Task) bool {
+	return writeSSEvent(c, "task", task.ToUserView())
+}
+
+func writeTaskStatusFetchErrorSSE(c *gin.Context, taskID string, userID int64, source string, err error) {
+	slog.Warn("fetch SSE task status failed", "task_id", taskID, "user_id", userID, "source", source, "err", err)
+	if writeErr := sse.WriteEvent(c, "error", gin.H{"message": "获取任务状态失败"}); writeErr != nil {
+		slog.Warn("write SSE error event failed", "task_id", taskID, "user_id", userID, "source", source, "err", writeErr)
+	}
+	sse.WriteEvent(c, "close", gin.H{"reason": "fetch_failed"})
+}
+
+func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
+	return sse.WriteEvent(c, event, data) == nil
+}
+
+func (h *Handler) DeleteUserTask(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	taskID := c.Param("task_id")
+	if err := h.taskService.DeleteUserTask(c.Request.Context(), taskID, userID); err != nil {
+		response.Error(c, 500, "删除失败")
+		return
+	}
+	response.SuccessDTO(c, taskDeleteResponse{Message: "删除成功"})
+}

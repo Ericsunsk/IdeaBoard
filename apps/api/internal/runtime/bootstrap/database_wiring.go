@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/taskstore"
+	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/users"
 
 	"github.com/jackc/pgx/v5/pgxpool"

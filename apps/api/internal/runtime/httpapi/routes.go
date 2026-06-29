@@ -11,8 +11,8 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/taskservice"
-	"ideaboard/api/internal/taskstats"
+	"ideaboard/api/internal/tasking/taskservice"
+	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"

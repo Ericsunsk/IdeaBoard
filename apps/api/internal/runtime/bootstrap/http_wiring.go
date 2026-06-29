@@ -13,8 +13,8 @@ import (
 	"ideaboard/api/internal/runtime/httpapi"
 	"ideaboard/api/internal/runtime/webdist"
 	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/taskservice"
-	"ideaboard/api/internal/taskstats"
+	"ideaboard/api/internal/tasking/taskservice"
+	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"

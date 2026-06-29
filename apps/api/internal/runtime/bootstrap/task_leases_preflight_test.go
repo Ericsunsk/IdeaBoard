@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/taskstore"
+	"ideaboard/api/internal/tasking/taskstore"
 )
 
 func TestParseRepairTaskLeasesArgsDefaults(t *testing.T) {

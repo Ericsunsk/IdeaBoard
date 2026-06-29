@@ -7,7 +7,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/accountlimits"
-	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasking/taskqueue"
 )
 
 type AccountTaskStore interface {

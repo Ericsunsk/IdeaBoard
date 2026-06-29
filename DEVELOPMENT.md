@@ -187,9 +187,9 @@ sequenceDiagram
 
 关键代码：
 
-- [service.go](./apps/api/internal/taskservice/service.go)
-- [store.go](./apps/api/internal/tasksubmission/store.go)
-- [river_queue.go](./apps/api/internal/taskqueue/river_queue.go)
+- [service.go](./apps/api/internal/tasking/taskservice/service.go)
+- [store.go](./apps/api/internal/tasking/tasksubmission/store.go)
+- [river_queue.go](./apps/api/internal/tasking/taskqueue/river_queue.go)
 - [engine.go](./apps/api/internal/prompts/engine.go)
 - [river_worker.go](./apps/api/internal/runtime/worker/river_worker.go)
 - [task_processor.go](./apps/api/internal/runtime/worker/task_processor.go)
@@ -466,12 +466,7 @@ apps/api/
 ├── internal/accounts/        # 账号池与任务调度
 ├── internal/boards/          # 画板管理
 ├── internal/channels/        # 渠道管理
-├── internal/tasks/           # 任务模型与状态
-├── internal/taskqueue/       # 队列接口与 River/PostgreSQL 实现
-├── internal/taskservice/     # 任务提交、查询与 SSE handler
-├── internal/taskstore/       # 任务持久化 repository
-├── internal/tasksubmission/  # 任务 + River job 事务提交
-├── internal/taskstats/       # 任务统计与监控 API
+├── internal/tasking/         # Tasking bounded context：任务模型、提交、队列、统计与运行状态
 ├── internal/workflow/        # feature contract
 ├── internal/prompts/         # 提示词模板与装配
 ├── internal/storage/         # 对象存储配置与实现

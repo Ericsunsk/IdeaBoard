@@ -11,7 +11,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
 

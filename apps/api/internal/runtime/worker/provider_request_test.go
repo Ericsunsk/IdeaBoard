@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"ideaboard/api/internal/taskqueue"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/taskqueue"
+	"ideaboard/api/internal/tasking/tasks"
 )
 
 func TestNewProviderRequestCollectsProviderMediaRefs(t *testing.T) {

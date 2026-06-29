@@ -17,8 +17,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/taskmedia"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/tasks"
 )
 
 func mustEncodePNGDataURL(t *testing.T, img image.Image) string {

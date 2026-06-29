@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ideaboard/api/internal/taskmedia"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/tasks"
 )
 
 type RuntimeTaskMediaStore struct {

@@ -17,8 +17,8 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/taskmedia"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testdb"
 )
 

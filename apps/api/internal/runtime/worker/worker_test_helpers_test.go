@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/runtime/taskruntime"
-	"ideaboard/api/internal/taskqueue"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/taskqueue"
+	"ideaboard/api/internal/tasking/taskruntime"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
 

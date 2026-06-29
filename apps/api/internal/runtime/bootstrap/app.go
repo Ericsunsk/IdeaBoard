@@ -11,7 +11,7 @@ import (
 	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"

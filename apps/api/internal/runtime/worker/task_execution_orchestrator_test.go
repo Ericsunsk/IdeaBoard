@@ -6,14 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/tasks"
-	"ideaboard/api/internal/taskstore"
+	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/tasking/taskstore"
 	"strings"
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/runtime/taskruntime"
-	"ideaboard/api/internal/taskqueue"
+	"ideaboard/api/internal/tasking/taskqueue"
+	"ideaboard/api/internal/tasking/taskruntime"
 	"ideaboard/api/internal/testdb"
 )
 

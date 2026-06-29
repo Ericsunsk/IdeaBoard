@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/taskqueue"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/taskqueue"
+	"ideaboard/api/internal/tasking/tasks"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"

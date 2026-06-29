@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/platform/mediarefs"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
 

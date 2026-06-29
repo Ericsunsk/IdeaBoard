@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/tasking/tasks"
 	"testing"
 )
 

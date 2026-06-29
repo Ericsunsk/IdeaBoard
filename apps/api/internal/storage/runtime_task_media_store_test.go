@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/taskmedia"
+	"ideaboard/api/internal/tasking/taskmedia"
 )
 
 func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T) {
