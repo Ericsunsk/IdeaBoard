@@ -4,6 +4,7 @@
   --image-editor-panel-control-height: 28px;
   --image-editor-panel-control-radius: 8px;
   --image-editor-panel-control-border-color: var(--workspace-surface-border-soft);
+  --image-editor-panel-control-hover-border-color: var(--workspace-panel-border);
   --image-editor-panel-control-focus-border-color: var(--ib-focus-border-color);
   --image-editor-panel-control-bg: var(--workspace-surface-muted);
   --image-editor-panel-inset: 7px;

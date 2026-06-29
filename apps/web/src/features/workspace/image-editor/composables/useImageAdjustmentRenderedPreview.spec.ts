@@ -41,7 +41,9 @@ function createCurvesLayer(params = { channels: {} }) {
   } satisfies ImageEditorLayer
 }
 
-function createLevelsLayer(params = { shadows: 0, midtones: 50, highlights: 100 }) {
+function createLevelsLayer(
+  params = { shadows: 0, midtones: 128, highlights: 255, outputBlack: 0, outputWhite: 255 },
+) {
   return {
     id: 'adjustment:levels',
     type: 'adjustment',
@@ -120,9 +122,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
   })
 
   it('keeps inline rendered preview output identical to CPU final plan execution for layered adjustments', async () => {
-    const sourceValues = [
-      16, 48, 112, 255, 80, 140, 220, 240, 196, 88, 24, 192, 240, 240, 96, 128,
-    ]
+    const sourceValues = [16, 48, 112, 255, 80, 140, 220, 240, 196, 88, 24, 192, 240, 240, 96, 128]
     installBrowserImageMocks(sourceValues)
     const layers = [
       createHslLayer({ hue: 35, saturation: 22, brightness: 8, contrast: 14 }),
@@ -131,15 +131,18 @@ describe('useImageAdjustmentRenderedPreview', () => {
           rgb: [{ id: 'point:midtone', input: 42, output: 70 }],
         },
       }),
-      createLevelsLayer({ shadows: 8, midtones: 44, highlights: 92 }),
+      createLevelsLayer({
+        shadows: 20,
+        midtones: 112,
+        highlights: 235,
+        outputBlack: 0,
+        outputWhite: 255,
+      }),
       createThresholdLayer({ threshold: 150, invert: true }),
       createInvertLayer(),
     ] satisfies ImageEditorLayer[]
     const finalPlan = buildImageAdjustmentPlan(layers)
-    const expected = executeCpuImageAdjustmentPlanInPlace(
-      makeImageData(sourceValues),
-      finalPlan,
-    )
+    const expected = executeCpuImageAdjustmentPlanInPlace(makeImageData(sourceValues), finalPlan)
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
@@ -316,11 +319,7 @@ function installBrowserImageMocks(
 }
 
 function makeImageData(sourceValues: number[]): ImageData {
-  return new ImageData(
-    new Uint8ClampedArray(sourceValues),
-    sourceValues.length / 4,
-    1,
-  )
+  return new ImageData(new Uint8ClampedArray(sourceValues), sourceValues.length / 4, 1)
 }
 
 function pixelValues(imageData: ImageData | undefined) {

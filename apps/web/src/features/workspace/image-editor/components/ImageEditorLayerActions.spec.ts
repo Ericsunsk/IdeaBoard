@@ -3,15 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ImageEditorLayerActions from './ImageEditorLayerActions.vue'
 import type { ImageAdjustmentFinalApplyProgress } from '../runtime/imageAdjustmentFinalApplyContext'
 
-function mountLayerActions(options: {
-  applying?: boolean
-  applyProgress?: ImageAdjustmentFinalApplyProgress | null
-  onCancelApply?: () => void
-} = {}) {
+function mountLayerActions(
+  options: {
+    applying?: boolean
+    applyProgress?: ImageAdjustmentFinalApplyProgress | null
+    onCancelApply?: () => void
+  } = {},
+) {
   const applying = ref(options.applying ?? false)
-  const applyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(
-    options.applyProgress ?? null,
-  )
+  const applyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(options.applyProgress ?? null)
   const host = document.createElement('div')
   document.body.appendChild(host)
   const app = createApp(
@@ -73,8 +73,8 @@ describe('ImageEditorLayerActions', () => {
       expect(harness.host.querySelector('[role="status"]')?.textContent).toContain('渲染调整')
       expect(harness.host.querySelector('[role="status"]')?.textContent).toContain('25%')
       expect(
-        harness.host.querySelector<HTMLElement>('.image-editor-layer-actions__progress-bar')
-          ?.style.width,
+        harness.host.querySelector<HTMLElement>('.image-editor-layer-actions__progress-bar')?.style
+          .width,
       ).toBe('25%')
 
       harness.host.querySelector<HTMLButtonElement>('[aria-label="取消应用"]')?.click()
@@ -112,6 +112,22 @@ describe('ImageEditorLayerActions', () => {
     try {
       expect(harness.host.querySelector('[role="status"]')).toBeNull()
       expect(harness.host.querySelector('[aria-label="取消应用"]')).toBeNull()
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('places remove before final apply in the compact action row', () => {
+    const harness = mountLayerActions()
+
+    try {
+      const labels = [
+        ...harness.host.querySelectorAll<HTMLButtonElement>(
+          '.image-editor-layer-actions__buttons button',
+        ),
+      ].map((button) => button.getAttribute('aria-label'))
+
+      expect(labels).toEqual(['添加图层', '复制图层', '合并图层', '删除图层', '应用为新节点'])
     } finally {
       harness.unmount()
     }

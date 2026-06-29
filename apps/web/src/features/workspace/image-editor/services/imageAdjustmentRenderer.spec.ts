@@ -62,7 +62,7 @@ const levelsLayer: ImageEditorAdjustmentLayer = {
   kind: 'levels',
   name: '色阶 1',
   visible: true,
-  params: { shadows: 8, midtones: 44, highlights: 92 },
+  params: { shadows: 20, midtones: 112, highlights: 235, outputBlack: 0, outputWhite: 255 },
 }
 
 function createRuntimeMock(

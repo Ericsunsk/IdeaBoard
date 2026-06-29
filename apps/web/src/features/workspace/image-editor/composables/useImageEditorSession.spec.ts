@@ -15,8 +15,9 @@ describe('useImageEditorSession', () => {
 
     expect(session.activeImageEditorTool.value).toBe('brush')
     expect(session.selectedImageEditorAdjustmentLayer.value?.kind).toBe('threshold')
-    expect(session.imageEditorLayers.value.some((layer) => layer.id === 'adjustment:threshold'))
-      .toBe(true)
+    expect(
+      session.imageEditorLayers.value.some((layer) => layer.id === 'adjustment:threshold'),
+    ).toBe(true)
   })
 
   it('selects source layers without changing the active tool', () => {
@@ -99,9 +100,11 @@ describe('useImageEditorSession', () => {
     expect(mergedLayer?.type).toBe('merged')
     expect(mergedLayer?.name).toBe('合并图层 1')
     expect(session.selectedImageEditorLayerId.value).toBe(mergedLayer?.id)
-    expect(flattenVisibleImageEditorAdjustmentLayers(session.imageEditorLayers.value).map(
-      (layer) => layer.kind,
-    )).toEqual(['hsl', 'threshold'])
+    expect(
+      flattenVisibleImageEditorAdjustmentLayers(session.imageEditorLayers.value).map(
+        (layer) => layer.kind,
+      ),
+    ).toEqual(['hsl', 'threshold'])
   })
 
   it('removes selected editable layers and selects the nearest editable fallback', () => {
@@ -131,5 +134,72 @@ describe('useImageEditorSession', () => {
       'source',
     ])
     expect(session.selectedImageEditorLayerId.value).toBe('source')
+  })
+
+  it('updates selected adjustment layer params through the explicit whole-params API', () => {
+    const session = useImageEditorSession()
+    const curvesParams = {
+      channels: {
+        rgb: [{ id: 'midtone', input: 50, output: 60 }],
+      },
+    }
+
+    session.selectImageAdjustmentLayer('threshold')
+    session.updateSelectedImageEditorAdjustmentParams({ threshold: Number.NaN, invert: true })
+
+    expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
+      kind: 'threshold',
+      params: { threshold: 128, invert: true },
+    })
+
+    session.selectImageAdjustmentLayer('levels')
+    session.updateSelectedImageEditorAdjustmentParams({
+      shadows: 300,
+      midtones: Number.NaN,
+      highlights: 10,
+      outputBlack: 250,
+      outputWhite: 100,
+    })
+
+    expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
+      kind: 'levels',
+      params: {
+        shadows: 9,
+        midtones: 10,
+        highlights: 10,
+        outputBlack: 250,
+        outputWhite: 251,
+      },
+    })
+
+    session.selectImageAdjustmentLayer('curves')
+    session.updateSelectedImageEditorAdjustmentParams(curvesParams)
+    curvesParams.channels.rgb[0]!.output = 10
+
+    expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
+      kind: 'curves',
+      params: {
+        channels: {
+          rgb: [{ id: 'midtone', input: 50, output: 60 }],
+        },
+      },
+    })
+  })
+
+  it('keeps simple adjustment params on the field-level API', () => {
+    const session = useImageEditorSession()
+
+    session.updateSelectedImageEditorLayerParam('brightness', 25)
+    expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
+      kind: 'hsl',
+      params: { brightness: 25 },
+    })
+
+    session.selectImageAdjustmentLayer('invert')
+    session.updateSelectedImageEditorLayerParam('enabled', false)
+    expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
+      kind: 'invert',
+      params: { enabled: false },
+    })
   })
 })

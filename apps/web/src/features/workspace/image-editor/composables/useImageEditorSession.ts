@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
+  ImageEditorAdjustmentWholeParams,
   ImageEditorCurvesParams,
   ImageEditorEditableLayer,
   ImageEditorHslParams,
@@ -17,6 +18,9 @@ import type {
   ImageEditorTool,
 } from '../types'
 import { getImageAdjustmentDefaultParams } from '../utils/imageAdjustmentDefinitions'
+import { normalizeCurvesParams } from '../utils/imageEditorCurves'
+import { clampLevelsHandles } from '../utils/imageEditorLevels'
+import { normalizeThresholdAdjustment } from '../utils/imageEditorThreshold'
 
 const SOURCE_LAYER_ID = 'source'
 let imageEditorLayerIdSeed = 0
@@ -193,38 +197,44 @@ function updateAdjustmentLayerParam(
     case 'hsl':
       if (
         typeof value === 'number' &&
-        (key === 'hue' ||
-          key === 'saturation' ||
-          key === 'brightness' ||
-          key === 'contrast')
+        (key === 'hue' || key === 'saturation' || key === 'brightness' || key === 'contrast')
       ) {
         return { ...layer, params: { ...layer.params, [key]: value } }
       }
       return layer
     case 'threshold':
-      if (key === 'threshold' && typeof value === 'number') {
-        return { ...layer, params: { ...layer.params, threshold: value } }
-      }
-      if (key === 'invert' && typeof value === 'boolean') {
-        return { ...layer, params: { ...layer.params, invert: value } }
-      }
-      return layer
     case 'curves':
-      if (key === 'channels' && isCurvesParams(value)) {
-        return { ...layer, params: cloneCurvesParams(value) }
-      }
-      return layer
     case 'levels':
-      if (
-        typeof value === 'number' &&
-        (key === 'shadows' || key === 'midtones' || key === 'highlights')
-      ) {
-        return { ...layer, params: { ...layer.params, [key]: value } }
-      }
       return layer
     case 'invert':
       if (key === 'enabled' && typeof value === 'boolean') {
         return { ...layer, params: { ...layer.params, enabled: value } }
+      }
+      return layer
+  }
+}
+
+function updateAdjustmentLayerParams(
+  layer: ImageEditorAdjustmentLayer,
+  params: ImageEditorAdjustmentWholeParams,
+): ImageEditorAdjustmentLayer {
+  switch (layer.kind) {
+    case 'hsl':
+    case 'invert':
+      return layer
+    case 'threshold':
+      if (isThresholdParams(params)) {
+        return { ...layer, params: cloneThresholdParams(params) }
+      }
+      return layer
+    case 'curves':
+      if (isCurvesParams(params)) {
+        return { ...layer, params: cloneCurvesParams(params) }
+      }
+      return layer
+    case 'levels':
+      if (isLevelsParams(params)) {
+        return { ...layer, params: cloneLevelsParams(params) }
       }
       return layer
   }
@@ -239,22 +249,54 @@ function cloneAdjustmentParams(
     | ImageEditorInvertParams,
 ) {
   if ('channels' in params) return cloneCurvesParams(params)
+  if ('threshold' in params) return cloneThresholdParams(params)
+  if ('shadows' in params) return cloneLevelsParams(params)
   return { ...params }
 }
 
+function cloneThresholdParams(params: ImageEditorThresholdParams): ImageEditorThresholdParams {
+  return normalizeThresholdAdjustment(params)
+}
+
 function cloneCurvesParams(params: ImageEditorCurvesParams): ImageEditorCurvesParams {
+  const normalized = normalizeCurvesParams(params)
   const channels: ImageEditorCurvesParams['channels'] = {}
-  for (const [channel, points] of Object.entries(params.channels)) {
+  for (const [channel, points] of Object.entries(normalized.channels)) {
     if (!points) continue
-    channels[channel as keyof ImageEditorCurvesParams['channels']] = points.map((point) => ({
-      ...point,
-    }))
+    const denormalizedPoints = points
+      .filter((point) => !(point.endpoint && point.input === point.output))
+      .map((point) => ({
+        id: point.id,
+        input: point.input,
+        output: point.output,
+      }))
+    if (denormalizedPoints.length > 0) {
+      channels[channel as keyof ImageEditorCurvesParams['channels']] = denormalizedPoints
+    }
   }
   return { channels }
 }
 
-function isCurvesParams(value: ImageEditorParamValue): value is ImageEditorCurvesParams {
-  return typeof value === 'object' && value !== null && 'channels' in value
+function cloneLevelsParams(params: ImageEditorLevelsParams): ImageEditorLevelsParams {
+  return clampLevelsHandles(params)
+}
+
+function isThresholdParams(
+  params: ImageEditorAdjustmentWholeParams,
+): params is ImageEditorThresholdParams {
+  return 'threshold' in params
+}
+
+function isCurvesParams(
+  params: ImageEditorAdjustmentWholeParams,
+): params is ImageEditorCurvesParams {
+  return 'channels' in params
+}
+
+function isLevelsParams(
+  params: ImageEditorAdjustmentWholeParams,
+): params is ImageEditorLevelsParams {
+  return 'shadows' in params
 }
 
 export function useImageEditorSession() {
@@ -369,9 +411,10 @@ export function useImageEditorSession() {
     const nextLayers = layers.value.filter((item) => item.id !== layerId)
     layers.value = nextLayers
     if (selectedLayerId.value !== layerId) return
-    const nextSelection = nextLayers
-      .slice(Math.max(0, Math.min(layerIndex, nextLayers.length - 1)))
-      .find((item) => item.type !== 'source') ??
+    const nextSelection =
+      nextLayers
+        .slice(Math.max(0, Math.min(layerIndex, nextLayers.length - 1)))
+        .find((item) => item.type !== 'source') ??
       nextLayers
         .slice(0, Math.max(0, layerIndex))
         .reverse()
@@ -389,6 +432,15 @@ export function useImageEditorSession() {
     })
   }
 
+  function updateSelectedAdjustmentParams(params: ImageEditorAdjustmentWholeParams) {
+    const target = selectedAdjustmentLayer.value
+    if (!target) return
+    layers.value = layers.value.map((layer) => {
+      if (layer.id !== target.id || layer.type !== 'adjustment') return layer
+      return updateAdjustmentLayerParams(layer, params)
+    })
+  }
+
   return {
     activeImageEditorTool: activeTool,
     imageEditorLayers: layers,
@@ -403,6 +455,7 @@ export function useImageEditorSession() {
     mergeImageEditorLayer: mergeLayer,
     removeImageEditorLayer: removeLayer,
     updateSelectedImageEditorLayerParam: updateSelectedLayerParam,
+    updateSelectedImageEditorAdjustmentParams: updateSelectedAdjustmentParams,
     selectImageAdjustmentLayer: selectAdjustmentLayer,
   }
 }

@@ -19,10 +19,7 @@
         :class="{ indeterminate: progressPercent == null }"
         aria-hidden="true"
       >
-        <span
-          class="image-editor-layer-actions__progress-bar"
-          :style="progressBarStyle"
-        />
+        <span class="image-editor-layer-actions__progress-bar" :style="progressBarStyle" />
       </div>
       <NodeToolIconButton
         class="image-editor-layer-actions__cancel"
@@ -61,6 +58,15 @@
         <VerticalMerge />
       </NodeToolIconButton>
       <NodeToolIconButton
+        class="image-editor-layer-actions__button"
+        :disabled="!canRemoveLayer"
+        aria-label-value="删除图层"
+        tooltip="删除图层"
+        @click="emit('remove-layer')"
+      >
+        <Trash />
+      </NodeToolIconButton>
+      <NodeToolIconButton
         class="image-editor-layer-actions__button image-editor-layer-actions__button--apply"
         primary
         :disabled="applyDisabled"
@@ -69,15 +75,6 @@
         @click="emit('apply-adjustments')"
       >
         <SendDiagonalSolid />
-      </NodeToolIconButton>
-      <NodeToolIconButton
-        class="image-editor-layer-actions__button"
-        :disabled="!canRemoveLayer"
-        aria-label-value="删除图层"
-        tooltip="删除图层"
-        @click="emit('remove-layer')"
-      >
-        <Trash />
       </NodeToolIconButton>
     </div>
   </div>
@@ -88,8 +85,6 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Copy, EmptyPage, SendDiagonalSolid, Trash, VerticalMerge, Xmark } from '@iconoir/vue'
 import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 import type { ImageAdjustmentFinalApplyProgress } from '../runtime/imageAdjustmentFinalApplyContext'
-
-const APPLY_PROGRESS_DISCLOSURE_DELAY_MS = 200
 
 const props = defineProps<{
   canCopyLayer: boolean
@@ -109,6 +104,8 @@ const emit = defineEmits<{
   (e: 'cancel-apply'): void
 }>()
 
+const APPLY_PROGRESS_DISCLOSURE_DELAY_MS = 200
+
 const progressPhaseLabels: Record<ImageAdjustmentFinalApplyProgress['phase'], string> = {
   queued: '准备应用',
   decode: '读取图像',
@@ -124,9 +121,7 @@ const progressPercent = computed(() => {
   }
   return Math.min(100, Math.max(0, Math.round((progress.loaded / progress.total) * 100)))
 })
-const progressLabel = computed(
-  () => progressPhaseLabels[props.applyProgress?.phase ?? 'queued'],
-)
+const progressLabel = computed(() => progressPhaseLabels[props.applyProgress?.phase ?? 'queued'])
 const progressValueLabel = computed(() =>
   progressPercent.value == null ? '处理中' : `${progressPercent.value}%`,
 )
@@ -250,7 +245,8 @@ onBeforeUnmount(clearProgressPanelDelay)
   transition: width var(--workspace-motion-fast) ease;
 }
 
-.image-editor-layer-actions__progress-track.indeterminate .image-editor-layer-actions__progress-bar {
+.image-editor-layer-actions__progress-track.indeterminate
+  .image-editor-layer-actions__progress-bar {
   width: 42%;
   animation: image-editor-final-apply-progress 1.1s ease-in-out infinite;
 }
@@ -281,7 +277,8 @@ onBeforeUnmount(clearProgressPanelDelay)
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .image-editor-layer-actions__progress-track.indeterminate .image-editor-layer-actions__progress-bar {
+  .image-editor-layer-actions__progress-track.indeterminate
+    .image-editor-layer-actions__progress-bar {
     animation: none;
     transform: translateX(70%);
   }

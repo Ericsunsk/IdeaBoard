@@ -23,6 +23,8 @@ export type { ImageEditorImageRect, ImageEditorModeState } from './composables/u
 export type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
+  ImageEditorAdjustmentWholeParams,
+  ImageEditorCurvesParams,
   ImageEditorLayer,
   ImageEditorMode,
   ImageEditorParamKey,

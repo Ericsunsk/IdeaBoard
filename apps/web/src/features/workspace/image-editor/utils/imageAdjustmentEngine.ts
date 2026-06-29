@@ -6,9 +6,9 @@ import {
   normalizeImageAdjustmentLayers,
   type NormalizedHslAdjustment,
   type NormalizedImageAdjustment,
-  type NormalizedLevelsAdjustment,
 } from './imageAdjustmentDefinitions'
 import { createCurvesLuts, type ImageEditorCurvesLuts } from './imageEditorCurves'
+import { createLevelsLut } from './imageEditorLevels'
 import { cloneImageData } from './imageDataUtils'
 
 export type ImageAdjustmentPlanStep =
@@ -83,7 +83,10 @@ export function compileNormalizedImageAdjustmentPlan(
         pendingChannelLut = appendChannelLut(pendingChannelLut, createCurvesLuts(layer.params))
         break
       case 'levels':
-        pendingChannelLut = appendChannelLut(pendingChannelLut, createRgbChannelLuts(createLevelsLut(layer.params)))
+        pendingChannelLut = appendChannelLut(
+          pendingChannelLut,
+          createRgbChannelLuts(createLevelsLut(layer.params)),
+        )
         break
       case 'invert':
         pendingChannelLut = appendChannelLut(pendingChannelLut, createRgbChannelLuts(INVERT_LUT))
@@ -150,7 +153,11 @@ function composeSingleChannelLuts(first: Uint8ClampedArray, second: Uint8Clamped
 }
 
 function isIdentityLut(luts: ImageEditorCurvesLuts) {
-  return isIdentitySingleLut(luts.red) && isIdentitySingleLut(luts.green) && isIdentitySingleLut(luts.blue)
+  return (
+    isIdentitySingleLut(luts.red) &&
+    isIdentitySingleLut(luts.green) &&
+    isIdentitySingleLut(luts.blue)
+  )
 }
 
 function isIdentitySingleLut(lut: Uint8ClampedArray) {
@@ -232,16 +239,6 @@ function applyHslAdjustment(
 
 function applyContrast(value: number, contrastFactor: number) {
   return clampChannel((value - 128) * contrastFactor + 128)
-}
-
-export function createLevelsLut(params: NormalizedLevelsAdjustment) {
-  const { blackPoint, whitePoint, gamma } = params
-  const range = Math.max(1, whitePoint - blackPoint)
-
-  return createLut((value) => {
-    const normalized = clampUnit((value - blackPoint) / range)
-    return Math.pow(normalized, gamma) * CHANNEL_MAX
-  })
 }
 
 function applyChannelLut(

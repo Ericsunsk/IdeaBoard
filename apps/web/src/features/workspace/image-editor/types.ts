@@ -11,7 +11,7 @@ export type ImageEditorTool =
 
 export type ImageAdjustmentKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'invert'
 
-export type ImageEditorParamValue = number | boolean | ImageEditorCurvesParams
+export type ImageEditorParamValue = number | boolean
 
 export type ImageEditorHslParams = {
   hue: number
@@ -41,18 +41,20 @@ export type ImageEditorLevelsParams = {
   shadows: number
   midtones: number
   highlights: number
+  outputBlack: number
+  outputWhite: number
 }
 
 export type ImageEditorInvertParams = {
   enabled: boolean
 }
 
-export type ImageEditorParamKey =
-  | keyof ImageEditorHslParams
-  | keyof ImageEditorThresholdParams
-  | keyof ImageEditorCurvesParams
-  | keyof ImageEditorLevelsParams
-  | keyof ImageEditorInvertParams
+export type ImageEditorParamKey = keyof ImageEditorHslParams | keyof ImageEditorInvertParams
+
+export type ImageEditorAdjustmentWholeParams =
+  | ImageEditorThresholdParams
+  | ImageEditorCurvesParams
+  | ImageEditorLevelsParams
 
 export type ImageEditorSourceLayer = {
   id: string

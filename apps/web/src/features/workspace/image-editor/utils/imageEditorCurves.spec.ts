@@ -58,18 +58,21 @@ describe('imageEditorCurves', () => {
       },
     } as unknown as ImageEditorCurvesParams
 
-    expect(normalizeCurvesParams(malformedParams).channels.rgb)
-      .toContainEqual(expect.objectContaining({
+    expect(normalizeCurvesParams(malformedParams).channels.rgb).toContainEqual(
+      expect.objectContaining({
         id: 'valid',
         input: 40,
         output: 45,
         endpoint: false,
-      }))
-    expect(normalizeCurvesParams({
-      channels: {
-        rgb: true as unknown as ImageEditorCurvesParams['channels']['rgb'],
-      },
-    })).toEqual({ channels: {} })
+      }),
+    )
+    expect(
+      normalizeCurvesParams({
+        channels: {
+          rgb: true as unknown as ImageEditorCurvesParams['channels']['rgb'],
+        },
+      }),
+    ).toEqual({ channels: {} })
   })
 
   it('normalizes endpoints, out-of-range values, duplicate inputs, and blank ids', () => {
@@ -81,13 +84,14 @@ describe('imageEditorCurves', () => {
       { id: '   ', input: 50.1, output: Number.POSITIVE_INFINITY },
     ])
 
-    expect(normalized.map(({ id, input, output, endpoint }) => ({ id, input, output, endpoint })))
-      .toEqual([
-        { id: IMAGE_EDITOR_CURVE_ENDPOINT_BLACK_ID, input: 0, output: 12, endpoint: true },
-        { id: 'replacement', input: 25, output: 60, endpoint: false },
-        { id: 'point:50', input: 50, output: 50, endpoint: false },
-        { id: WHITE_ENDPOINT_ID, input: 100, output: 89, endpoint: true },
-      ])
+    expect(
+      normalized.map(({ id, input, output, endpoint }) => ({ id, input, output, endpoint })),
+    ).toEqual([
+      { id: IMAGE_EDITOR_CURVE_ENDPOINT_BLACK_ID, input: 0, output: 12, endpoint: true },
+      { id: 'replacement', input: 25, output: 60, endpoint: false },
+      { id: 'point:50', input: 50, output: 50, endpoint: false },
+      { id: WHITE_ENDPOINT_ID, input: 100, output: 89, endpoint: true },
+    ])
   })
 
   it('normalizes user points away from reserved endpoint ids', () => {
@@ -96,18 +100,46 @@ describe('imageEditorCurves', () => {
       { id: WHITE_ENDPOINT_ID, input: 60, output: 65 },
     ])
 
-    expect(normalized).toContainEqual(expect.objectContaining({
-      id: 'point:40',
-      input: 40,
-      output: 45,
-      endpoint: false,
-    }))
-    expect(normalized).toContainEqual(expect.objectContaining({
-      id: 'point:60',
-      input: 60,
-      output: 65,
-      endpoint: false,
-    }))
+    expect(normalized).toContainEqual(
+      expect.objectContaining({
+        id: 'point:40',
+        input: 40,
+        output: 45,
+        endpoint: false,
+      }),
+    )
+    expect(normalized).toContainEqual(
+      expect.objectContaining({
+        id: 'point:60',
+        input: 60,
+        output: 65,
+        endpoint: false,
+      }),
+    )
+  })
+
+  it('normalizes missing and non-string point ids to stable input-derived ids', () => {
+    const normalized = normalizeCurveChannelPoints([
+      { input: 35, output: 40 },
+      { id: 123, input: 65, output: 70 },
+    ] as unknown as Parameters<typeof normalizeCurveChannelPoints>[0])
+
+    expect(normalized).toContainEqual(
+      expect.objectContaining({
+        id: 'point:35',
+        input: 35,
+        output: 40,
+        endpoint: false,
+      }),
+    )
+    expect(normalized).toContainEqual(
+      expect.objectContaining({
+        id: 'point:65',
+        input: 65,
+        output: 70,
+        endpoint: false,
+      }),
+    )
   })
 
   it('falls back invalid point and endpoint outputs to their neutral input output', () => {
@@ -117,12 +149,11 @@ describe('imageEditorCurves', () => {
       { id: 'white', input: 100, output: 'invalid' as unknown as number },
     ])
 
-    expect(normalized.map(({ input, output, endpoint }) => ({ input, output, endpoint })))
-      .toEqual([
-        { input: 0, output: 0, endpoint: true },
-        { input: 42, output: 42, endpoint: false },
-        { input: 100, output: 100, endpoint: true },
-      ])
+    expect(normalized.map(({ input, output, endpoint }) => ({ input, output, endpoint }))).toEqual([
+      { input: 0, output: 0, endpoint: true },
+      { input: 42, output: 42, endpoint: false },
+      { input: 100, output: 100, endpoint: true },
+    ])
   })
 
   it('keeps only the maximum supported dense user points', () => {
@@ -193,8 +224,9 @@ describe('imageEditorCurves', () => {
     expect(resolveCurvePresetId({ channels: {} })).toBe('linear')
     expect(resolveCurvePresetId(brighten)).toBe('brighten')
     expect(resolveCurvePresetId(unknown)).toBe('linear')
-    expect(resolveCurvePresetId({ channels: { red: [{ id: 'custom', input: 50, output: 40 }] } }))
-      .toBe('custom')
+    expect(
+      resolveCurvePresetId({ channels: { red: [{ id: 'custom', input: 50, output: 40 }] } }),
+    ).toBe('custom')
   })
 
   it('adds, moves, and removes points while locking endpoints', () => {
@@ -227,8 +259,9 @@ describe('imageEditorCurves', () => {
       output: 20,
     })
 
-    expect(removeCurvePoint(movedBlackEndpoint, 'rgb', IMAGE_EDITOR_CURVE_ENDPOINT_BLACK_ID))
-      .toBe(movedBlackEndpoint)
+    expect(removeCurvePoint(movedBlackEndpoint, 'rgb', IMAGE_EDITOR_CURVE_ENDPOINT_BLACK_ID)).toBe(
+      movedBlackEndpoint,
+    )
     expect(removeCurvePoint(movedBlackEndpoint, 'rgb', 'mid').channels.rgb).toEqual([
       { id: IMAGE_EDITOR_CURVE_ENDPOINT_BLACK_ID, input: 0, output: 20 },
       { id: 'shadow', input: 25, output: 25 },

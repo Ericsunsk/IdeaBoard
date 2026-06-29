@@ -3,10 +3,15 @@ import type {
   ImageEditorCurvePoint,
   ImageEditorCurvesParams,
 } from '../types'
-
-const CHANNEL_MIN = 0
-const CHANNEL_MAX = 255
-const PERCENT_SCALE = 100
+import {
+  IMAGE_EDITOR_CHANNEL_MAX,
+  IMAGE_EDITOR_CHANNEL_MIN,
+  IMAGE_EDITOR_PLOT_PERCENT_MAX,
+  clampImageEditorChannel,
+  clampImageEditorRoundedPlotPercent,
+  imageEditorChannelToPlotPercent,
+  imageEditorPlotPercentToChannel,
+} from './imageEditorChannelScale'
 
 export const IMAGE_EDITOR_CURVE_CHANNELS: readonly ImageEditorCurveChannel[] = [
   'rgb',
@@ -112,7 +117,7 @@ export function normalizeCurveChannelPoints(
 ): NormalizedCurveChannelPoint[] {
   const pointByInput = new Map<number, ImageEditorCurvePoint>()
   let blackEndpointOutput = 0
-  let whiteEndpointOutput = PERCENT_SCALE
+  let whiteEndpointOutput = IMAGE_EDITOR_PLOT_PERCENT_MAX
 
   for (const point of points) {
     if (!isCurvePointRecord(point)) continue
@@ -122,7 +127,7 @@ export function normalizeCurveChannelPoints(
       blackEndpointOutput = output
       continue
     }
-    if (input === PERCENT_SCALE) {
+    if (input === IMAGE_EDITOR_PLOT_PERCENT_MAX) {
       whiteEndpointOutput = output
       continue
     }
@@ -146,7 +151,7 @@ export function normalizeCurveChannelPoints(
     ...userPoints.map((point) => createNormalizedPoint(point.id, point.input, point.output, false)),
     createNormalizedPoint(
       IMAGE_EDITOR_CURVE_ENDPOINT_WHITE_ID,
-      PERCENT_SCALE,
+      IMAGE_EDITOR_PLOT_PERCENT_MAX,
       whiteEndpointOutput,
       true,
     ),
@@ -186,9 +191,7 @@ function createCurveChannelLut(
   )
 }
 
-export function sampleCurvePointsPath(
-  points: readonly NormalizedCurveChannelPoint[] | undefined,
-) {
+export function sampleCurvePointsPath(points: readonly NormalizedCurveChannelPoint[] | undefined) {
   return createCurveTransferPath(createCurveChannelTransfer(points))
 }
 
@@ -250,8 +253,7 @@ export function addCurvePoint(
     input,
     output: clampPercent(point.output, input),
   }
-  const nextPoints = normalized
-    .map(({ id, input, output }) => ({ id, input, output }))
+  const nextPoints = normalized.map(({ id, input, output }) => ({ id, input, output }))
   nextPoints.push(nextPoint)
   return setCurveChannelPoints(params, channel, nextPoints)
 }
@@ -274,7 +276,7 @@ export function moveCurvePoint(
     : (previous?.input ?? 0) + IMAGE_EDITOR_CURVE_MIN_INPUT_SPACING
   const maxInput = point.endpoint
     ? point.input
-    : (next?.input ?? PERCENT_SCALE) - IMAGE_EDITOR_CURVE_MIN_INPUT_SPACING
+    : (next?.input ?? IMAGE_EDITOR_PLOT_PERCENT_MAX) - IMAGE_EDITOR_CURVE_MIN_INPUT_SPACING
   const input = clampNumber(nextValue.input, minInput, maxInput, point.input)
   const updated = {
     id: point.id,
@@ -310,8 +312,8 @@ function isIdentityCurveChannel(points: readonly NormalizedCurveChannelPoint[]) 
     points.length === 2 &&
     points[0]?.input === 0 &&
     points[0].output === 0 &&
-    points[1]?.input === PERCENT_SCALE &&
-    points[1].output === PERCENT_SCALE
+    points[1]?.input === IMAGE_EDITOR_PLOT_PERCENT_MAX &&
+    points[1].output === IMAGE_EDITOR_PLOT_PERCENT_MAX
   )
 }
 
@@ -347,13 +349,13 @@ function createNormalizedPoint(
     id,
     input,
     output,
-    inputChannel: percentToChannel(input),
-    outputChannel: percentToChannel(output),
+    inputChannel: imageEditorPlotPercentToChannel(input),
+    outputChannel: imageEditorPlotPercentToChannel(output),
     endpoint,
   }
 }
 
-function normalizePointId(id: string, input: number) {
+function normalizePointId(id: unknown, input: number) {
   const trimmed = typeof id === 'string' ? id.trim() : ''
   if (
     trimmed &&
@@ -365,12 +367,8 @@ function normalizePointId(id: string, input: number) {
   return `point:${input}`
 }
 
-function percentToChannel(value: number) {
-  return Math.round((clampPercent(value) / PERCENT_SCALE) * CHANNEL_MAX)
-}
-
 function clampPercent(value: number, fallback = 0) {
-  return Math.round(clampNumber(value, 0, PERCENT_SCALE, fallback))
+  return clampImageEditorRoundedPlotPercent(value, fallback)
 }
 
 function isCurveChannelsRecord(
@@ -393,7 +391,9 @@ function composeCurveChannelLuts(first: Uint8ClampedArray, second: Uint8ClampedA
 }
 
 function createCurveChannelTransfer(points: readonly NormalizedCurveChannelPoint[] | undefined) {
-  const normalized = points?.length ? normalizeCurveChannelPoints(points) : createIdentityCurvePoints()
+  const normalized = points?.length
+    ? normalizeCurveChannelPoints(points)
+    : createIdentityCurvePoints()
   const inputs = normalized.map((point) => point.inputChannel)
   const outputs = normalized.map((point) => point.outputChannel)
   return {
@@ -406,14 +406,10 @@ function createCurveChannelTransfer(points: readonly NormalizedCurveChannelPoint
 
 function createLut(resolve: (value: number) => number) {
   const lut = new Uint8ClampedArray(256)
-  for (let index = CHANNEL_MIN; index <= CHANNEL_MAX; index += 1) {
-    lut[index] = clampChannel(resolve(index))
+  for (let index = IMAGE_EDITOR_CHANNEL_MIN; index <= IMAGE_EDITOR_CHANNEL_MAX; index += 1) {
+    lut[index] = clampImageEditorChannel(resolve(index))
   }
   return lut
-}
-
-function clampChannel(value: number) {
-  return Math.round(clampNumber(value, CHANNEL_MIN, CHANNEL_MAX, CHANNEL_MIN))
 }
 
 function createMonotoneSlopes(inputs: readonly number[], outputs: readonly number[]) {
@@ -434,7 +430,11 @@ function createMonotoneSlopes(inputs: readonly number[], outputs: readonly numbe
   for (let index = 1; index < pointCount - 1; index += 1) {
     const previousDelta = deltas[index - 1]
     const nextDelta = deltas[index]
-    if (previousDelta === 0 || nextDelta === 0 || Math.sign(previousDelta) !== Math.sign(nextDelta)) {
+    if (
+      previousDelta === 0 ||
+      nextDelta === 0 ||
+      Math.sign(previousDelta) !== Math.sign(nextDelta)
+    ) {
       slopes[index] = 0
       continue
     }
@@ -443,8 +443,7 @@ function createMonotoneSlopes(inputs: readonly number[], outputs: readonly numbe
     const firstWeight = 2 * nextInterval + previousInterval
     const secondWeight = nextInterval + 2 * previousInterval
     slopes[index] =
-      (firstWeight + secondWeight) /
-      (firstWeight / previousDelta + secondWeight / nextDelta)
+      (firstWeight + secondWeight) / (firstWeight / previousDelta + secondWeight / nextDelta)
   }
 
   return slopes
@@ -499,8 +498,8 @@ function serializeNormalizedCurvesParams(params: NormalizedCurvesAdjustment) {
 
 function createTransferPathPoint(input: number, output: number) {
   return {
-    x: (input / CHANNEL_MAX) * PERCENT_SCALE,
-    y: PERCENT_SCALE - (output / CHANNEL_MAX) * PERCENT_SCALE,
+    x: imageEditorChannelToPlotPercent(input),
+    y: IMAGE_EDITOR_PLOT_PERCENT_MAX - imageEditorChannelToPlotPercent(output),
   }
 }
 

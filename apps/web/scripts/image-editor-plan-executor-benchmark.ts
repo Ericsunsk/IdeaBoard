@@ -148,6 +148,8 @@ function createBenchmarkLayers(): readonly ImageEditorAdjustmentLayer[] {
         shadows: 8,
         midtones: 45,
         highlights: 94,
+        outputBlack: 0,
+        outputWhite: 255,
       },
     },
     {

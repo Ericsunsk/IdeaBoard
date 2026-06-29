@@ -88,4 +88,35 @@ describe('ImageEditorCurvesControl', () => {
       harness.unmount()
     }
   })
+
+  it('ignores cleared selected point number inputs instead of moving the point to zero', async () => {
+    const harness = mountCurvesControl({
+      channels: {
+        rgb: [{ id: 'midtone', input: 50, output: 55 }],
+      },
+    })
+
+    try {
+      await nextTick()
+      harness.host.querySelector<HTMLButtonElement>('[data-point-id="midtone"]')?.click()
+      await nextTick()
+
+      const [inputField, outputField] =
+        harness.host.querySelectorAll<HTMLInputElement>('input[type="number"]')
+
+      inputField.value = ''
+      inputField.dispatchEvent(new Event('input', { bubbles: true }))
+      await nextTick()
+
+      outputField.value = ''
+      outputField.dispatchEvent(new Event('input', { bubbles: true }))
+      await nextTick()
+
+      expect(harness.params.value.channels.rgb).toEqual([
+        { id: 'midtone', input: 50, output: 55 },
+      ])
+    } finally {
+      harness.unmount()
+    }
+  })
 })

@@ -70,7 +70,7 @@ const levelsLayer: ImageEditorAdjustmentLayer = {
   kind: 'levels',
   name: '色阶 1',
   visible: true,
-  params: { shadows: 0, midtones: 50, highlights: 100 },
+  params: { shadows: 0, midtones: 128, highlights: 255, outputBlack: 0, outputWhite: 255 },
 }
 
 const invertLayer: ImageEditorAdjustmentLayer = {
@@ -124,9 +124,7 @@ describe('imageAdjustmentEngine', () => {
   })
 
   it('keeps ranged plan-step execution identical to whole-image execution', () => {
-    const sourceValues = [
-      10, 20, 30, 77, 120, 80, 40, 88, 200, 210, 220, 99, 32, 96, 160, 111,
-    ]
+    const sourceValues = [10, 20, 30, 77, 120, 80, 40, 88, 200, 210, 220, 99, 32, 96, 160, 111]
     const wholeImage = makeImageData(sourceValues)
     const rangedImage = makeImageData(sourceValues)
     const invertPlanStep = compileImageAdjustmentPlan([invertLayer])[0]
@@ -233,7 +231,9 @@ describe('imageAdjustmentEngine', () => {
     const source = makeImageData([0, 64, 192, 255])
 
     const result = applyImageAdjustments(source, [
-      makeLayer(levelsLayer, { params: { shadows: 25, midtones: 50, highlights: 75 } }),
+      makeLayer(levelsLayer, {
+        params: { shadows: 64, midtones: 128, highlights: 191, outputBlack: 0, outputWhite: 255 },
+      }),
     ])
 
     expect(pixelValues(result)).toEqual([0, 0, 255, 255])
@@ -311,7 +311,13 @@ describe('imageAdjustmentEngine', () => {
         },
       }),
       makeLayer(levelsLayer, {
-        params: { shadows: Number.NaN, midtones: Number.NaN, highlights: Number.NaN },
+        params: {
+          shadows: Number.NaN,
+          midtones: Number.NaN,
+          highlights: Number.NaN,
+          outputBlack: Number.NaN,
+          outputWhite: Number.NaN,
+        },
       }),
       makeLayer(thresholdLayer, { params: { threshold: Number.NaN, invert: false } }),
     ])
@@ -346,6 +352,8 @@ describe('imageAdjustmentEngine', () => {
   })
 })
 
-function failLuts(): NonNullable<Extract<ImageAdjustmentPlan[number], { kind: 'channel-lut' }>['luts']> {
+function failLuts(): NonNullable<
+  Extract<ImageAdjustmentPlan[number], { kind: 'channel-lut' }>['luts']
+> {
   throw new Error('expected compiled LUT step')
 }

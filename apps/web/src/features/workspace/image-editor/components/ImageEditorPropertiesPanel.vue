@@ -36,55 +36,26 @@
     </div>
 
     <div v-else-if="adjustmentLayer?.kind === 'threshold'" class="image-editor-panel__body">
-      <ImageEditorSlider
-        :label="ranges.threshold.ranges.threshold.label"
-        :value="adjustmentLayer.params.threshold"
-        :min="ranges.threshold.ranges.threshold.min"
-        :max="ranges.threshold.ranges.threshold.max"
-        @update:value="emit('update-param', 'threshold', $event)"
+      <ImageEditorThresholdControl
+        :params="adjustmentLayer.params"
+        :histogram-source="histogramSource"
+        @update:params="emit('update-params', $event)"
       />
-      <label class="image-editor-toggle-row">
-        <span>反相</span>
-        <input
-          type="checkbox"
-          :checked="adjustmentLayer.params.invert"
-          @change="onBooleanInput('invert', $event)"
-        />
-      </label>
     </div>
 
     <div v-else-if="adjustmentLayer?.kind === 'curves'" class="image-editor-panel__body">
       <ImageEditorCurvesControl
         :params="adjustmentLayer.params"
         :histogram-source="histogramSource"
-        @update:params="emit('update-param', 'channels', $event)"
+        @update:params="emit('update-params', $event)"
       />
     </div>
 
     <div v-else-if="adjustmentLayer?.kind === 'levels'" class="image-editor-panel__body">
-      <ImageEditorSlider
-        :label="ranges.levels.ranges.shadows.label"
-        :value="adjustmentLayer.params.shadows"
-        :min="ranges.levels.ranges.shadows.min"
-        :max="ranges.levels.ranges.shadows.max"
-        :unit="ranges.levels.ranges.shadows.unit"
-        @update:value="emit('update-param', 'shadows', $event)"
-      />
-      <ImageEditorSlider
-        :label="ranges.levels.ranges.midtones.label"
-        :value="adjustmentLayer.params.midtones"
-        :min="ranges.levels.ranges.midtones.min"
-        :max="ranges.levels.ranges.midtones.max"
-        :unit="ranges.levels.ranges.midtones.unit"
-        @update:value="emit('update-param', 'midtones', $event)"
-      />
-      <ImageEditorSlider
-        :label="ranges.levels.ranges.highlights.label"
-        :value="adjustmentLayer.params.highlights"
-        :min="ranges.levels.ranges.highlights.min"
-        :max="ranges.levels.ranges.highlights.max"
-        :unit="ranges.levels.ranges.highlights.unit"
-        @update:value="emit('update-param', 'highlights', $event)"
+      <ImageEditorLevelsControl
+        :params="adjustmentLayer.params"
+        :histogram-source="histogramSource"
+        @update:params="emit('update-params', $event)"
       />
     </div>
 
@@ -105,12 +76,15 @@
 
 <script setup lang="ts">
 import type {
+  ImageEditorAdjustmentWholeParams,
   ImageEditorAdjustmentLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
 } from '../types'
 import ImageEditorCurvesControl from './ImageEditorCurvesControl.vue'
+import ImageEditorLevelsControl from './ImageEditorLevelsControl.vue'
 import ImageEditorSlider from './ImageEditorSlider.vue'
+import ImageEditorThresholdControl from './ImageEditorThresholdControl.vue'
 import { IMAGE_ADJUSTMENT_DEFINITIONS } from '../utils/imageAdjustmentDefinitions'
 
 defineProps<{
@@ -120,6 +94,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update-param', key: ImageEditorParamKey, value: ImageEditorParamValue): void
+  (e: 'update-params', value: ImageEditorAdjustmentWholeParams): void
 }>()
 
 const ranges = IMAGE_ADJUSTMENT_DEFINITIONS

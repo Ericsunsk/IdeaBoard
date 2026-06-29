@@ -1,9 +1,10 @@
+@import './image-editor-control-points.css';
+
 .image-editor-curves {
   --image-editor-curves-frame-border-width: var(--image-editor-panel-border-width);
   --image-editor-curves-frame-border-color: var(--workspace-accent-outline);
   --image-editor-curves-frame-radius: 9px;
-  --image-editor-curves-point-size: 9.333px;
-  --image-editor-curves-point-border-width: var(--image-editor-curves-frame-border-width);
+  --image-editor-control-point-border-width: var(--image-editor-curves-frame-border-width);
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -134,12 +135,13 @@
   position: absolute;
   z-index: 1;
   box-sizing: border-box;
-  width: var(--image-editor-curves-point-size);
-  height: var(--image-editor-curves-point-size);
+  width: var(--image-editor-control-point-size);
+  height: var(--image-editor-control-point-size);
   padding: 0;
-  border: var(--image-editor-curves-point-border-width) solid var(--workspace-accent);
+  border: var(--image-editor-control-point-border-width) solid
+    var(--image-editor-control-point-border-color);
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--image-editor-control-point-bg);
   cursor: grab;
   transform: translate(-50%, -50%);
 }
@@ -151,7 +153,7 @@
 
 .image-editor-curves__point.active {
   border: 0;
-  background: var(--workspace-accent);
+  background: var(--image-editor-control-point-active-bg);
 }
 
 .image-editor-curves__fields {

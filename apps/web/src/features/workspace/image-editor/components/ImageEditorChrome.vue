@@ -12,6 +12,7 @@
         :adjustment-layer="selectedAdjustmentLayer"
         :histogram-source="histogramSource"
         @update-param="(key, value) => emit('update-param', key, value)"
+        @update-params="emit('update-params', $event)"
       />
       <ImageEditorLayersPanel
         :layers="layers"
@@ -42,6 +43,7 @@ import { computed, inject } from 'vue'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
+  ImageEditorAdjustmentWholeParams,
   ImageEditorLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
@@ -81,6 +83,7 @@ const emit = defineEmits<{
   (e: 'merge-layer'): void
   (e: 'remove-layer', layerId: string): void
   (e: 'update-param', key: ImageEditorParamKey, value: ImageEditorParamValue): void
+  (e: 'update-params', params: ImageEditorAdjustmentWholeParams): void
   (e: 'apply-adjustments'): void
 }>()
 
@@ -100,9 +103,7 @@ const canMergeSelectedLayer = computed(() => {
 const canRemoveSelectedLayer = computed(
   () => selectedLayer.value != null && selectedLayer.value.type !== 'source',
 )
-const canApplyAdjustments = computed(
-  () => hasEffectiveImageEditorAdjustmentLayers(props.layers),
-)
+const canApplyAdjustments = computed(() => hasEffectiveImageEditorAdjustmentLayers(props.layers))
 const imageAdjustmentFinalApplyContext = inject(IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY, null)
 const imageAdjustmentFinalApplyProgress = computed(
   () => imageAdjustmentFinalApplyContext?.progress.value ?? null,

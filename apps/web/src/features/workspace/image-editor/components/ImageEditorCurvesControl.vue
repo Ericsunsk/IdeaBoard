@@ -63,10 +63,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type {
-  ImageEditorCurveChannel,
-  ImageEditorCurvesParams,
-} from '../types'
+import type { ImageEditorCurveChannel, ImageEditorCurvesParams } from '../types'
 import {
   addCurvePoint,
   applyCurvePreset,
@@ -82,6 +79,7 @@ import {
   sampleCurvePointsPath,
 } from '../utils/imageEditorCurves'
 import { createImageEditorHistogram, sampleHistogramPath } from '../utils/imageEditorHistogram'
+import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
 import ImageEditorCurveGraph from './ImageEditorCurveGraph.vue'
 
 const props = defineProps<{
@@ -112,9 +110,7 @@ const selectedPoint = computed(
   () => activePoints.value.find((point) => point.id === selectedPointId.value) ?? null,
 )
 const selectedPresetId = computed(() => resolveCurvePresetId(props.params))
-const activeCurvePath = computed(() =>
-  sampleCurvePointsPath(activePoints.value),
-)
+const activeCurvePath = computed(() => sampleCurvePointsPath(activePoints.value))
 const ghostCurvePaths = computed(() =>
   IMAGE_EDITOR_CURVE_CHANNELS.filter((channel) => channel !== activeChannel.value)
     .map((channel) => ({
@@ -197,19 +193,21 @@ function moveSelectedPoint(point: { input: number; output: number }) {
 
 function onSelectedPointInputChange(event: Event) {
   if (!selectedPoint.value || selectedPoint.value.endpoint) return
-  const target = event.target as HTMLInputElement | null
+  const input = readFiniteNumberInputValue(event)
+  if (input == null) return
   moveSelectedPoint({
-    input: Number(target?.value),
+    input,
     output: selectedPoint.value.output,
   })
 }
 
 function onSelectedPointOutputChange(event: Event) {
   if (!selectedPoint.value) return
-  const target = event.target as HTMLInputElement | null
+  const output = readFiniteNumberInputValue(event)
+  if (output == null) return
   moveSelectedPoint({
     input: selectedPoint.value.input,
-    output: Number(target?.value),
+    output,
   })
 }
 

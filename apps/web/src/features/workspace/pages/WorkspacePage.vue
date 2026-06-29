@@ -1,10 +1,7 @@
 <template>
   <div
     class="canvas-layout"
-    :class="[
-      `tool-${activeTool}`,
-      { 'interaction-lite': isFlowInteractionActive },
-    ]"
+    :class="[`tool-${activeTool}`, { 'interaction-lite': isFlowInteractionActive }]"
     @mousedown.self="closeBoardHeaderEditing"
   >
     <WorkspacePageChrome
@@ -109,9 +106,7 @@
               flowExpandNodeId === nodeProps.id ? flowExpandOverlayStyle : null
             "
             :expand-handle-radius="flowExpandHandleRadius"
-            :image-editor-mode="
-              flowImageEditorNodeId === nodeProps.id ? imageEditorMode : null
-            "
+            :image-editor-mode="flowImageEditorNodeId === nodeProps.id ? imageEditorMode : null"
             :image-editor-rendered-preview="
               flowImageEditorNodeId === nodeProps.id && imageEditorMode === 'adjust'
                 ? imageEditorRenderedPreview
@@ -236,6 +231,7 @@
         @merge-image-editor-layer="mergeImageEditorLayer"
         @remove-image-editor-layer="removeImageEditorLayer"
         @update-image-editor-param="updateSelectedImageEditorLayerParam"
+        @update-image-editor-adjustment-params="updateSelectedImageEditorAdjustmentParams"
         @apply-image-editor-adjustments="onApplyImageEditorAdjustments"
         @submit="onMaskEditorChromeSubmit"
         @create-node="handleNodeContextMenuCreate"
@@ -591,6 +587,7 @@ const {
   mergeImageEditorLayer,
   removeImageEditorLayer,
   updateSelectedImageEditorLayerParam,
+  updateSelectedImageEditorAdjustmentParams,
   isApplyingImageEditorAdjustments,
   imageEditorRenderedPreview,
   onApplyImageEditorAdjustments,

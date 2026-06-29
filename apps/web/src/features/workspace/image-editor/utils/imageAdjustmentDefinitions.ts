@@ -7,10 +7,12 @@ import type {
   ImageEditorLevelsParams,
   ImageEditorThresholdParams,
 } from '../types'
+import { normalizeCurvesParams, type NormalizedCurvesAdjustment } from './imageEditorCurves'
+import { normalizeLevelsAdjustment, type NormalizedLevelsAdjustment } from './imageEditorLevels'
 import {
-  normalizeCurvesParams,
-  type NormalizedCurvesAdjustment,
-} from './imageEditorCurves'
+  normalizeThresholdAdjustment,
+  type NormalizedThresholdAdjustment,
+} from './imageEditorThreshold'
 
 export const CHANNEL_MIN = 0
 export const CHANNEL_MAX = 255
@@ -29,17 +31,6 @@ export type NormalizedHslAdjustment = {
   saturationScale: number
   lightnessOffset: number
   contrastFactor: number
-}
-
-export type NormalizedThresholdAdjustment = {
-  threshold: number
-  invert: boolean
-}
-
-export type NormalizedLevelsAdjustment = {
-  blackPoint: number
-  whitePoint: number
-  gamma: number
 }
 
 export type NormalizedInvertAdjustment = {
@@ -114,9 +105,11 @@ const THRESHOLD_RANGES = {
 } satisfies ImageAdjustmentRangeByKind['threshold']
 
 const LEVELS_RANGES = {
-  shadows: { label: '黑场', min: 0, max: PERCENT_SCALE, defaultValue: 0, unit: '%' },
-  midtones: { label: '中间', min: 1, max: 99, defaultValue: 50, unit: '%' },
-  highlights: { label: '白场', min: 0, max: PERCENT_SCALE, defaultValue: 100, unit: '%' },
+  shadows: { label: '黑场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 0 },
+  midtones: { label: '中点', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 128 },
+  highlights: { label: '白场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 255 },
+  outputBlack: { label: '输出黑场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 0 },
+  outputWhite: { label: '输出白场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 255 },
 } satisfies ImageAdjustmentRangeByKind['levels']
 
 export const IMAGE_ADJUSTMENT_DEFINITIONS: ImageAdjustmentDefinitionByKind = {
@@ -139,7 +132,7 @@ export const IMAGE_ADJUSTMENT_DEFINITIONS: ImageAdjustmentDefinitionByKind = {
     isNeutral: isNeutralCurvesAdjustment,
   },
   levels: {
-    defaults: { shadows: 0, midtones: 50, highlights: 100 },
+    defaults: { shadows: 0, midtones: 128, highlights: 255, outputBlack: 0, outputWhite: 255 },
     ranges: LEVELS_RANGES,
     normalize: normalizeLevelsAdjustment,
     isNeutral: isNeutralLevelsAdjustment,
@@ -212,29 +205,6 @@ function normalizeHslAdjustment(params: ImageEditorHslParams): NormalizedHslAdju
   }
 }
 
-function normalizeThresholdAdjustment(
-  params: ImageEditorThresholdParams,
-): NormalizedThresholdAdjustment {
-  return {
-    threshold: Math.round(
-      clampToRange(params.threshold, IMAGE_ADJUSTMENT_DEFINITIONS.threshold.ranges.threshold),
-    ),
-    invert: params.invert === true,
-  }
-}
-
-function normalizeLevelsAdjustment(params: ImageEditorLevelsParams): NormalizedLevelsAdjustment {
-  const ranges = IMAGE_ADJUSTMENT_DEFINITIONS.levels.ranges
-  const blackPoint = percentToChannel(params.shadows, ranges.shadows)
-  const whitePoint = percentToChannel(params.highlights, ranges.highlights)
-  const midtones = clampToRange(params.midtones, ranges.midtones) / PERCENT_SCALE
-  return {
-    blackPoint,
-    whitePoint,
-    gamma: createLevelsGamma(midtones),
-  }
-}
-
 function normalizeInvertAdjustment(params: ImageEditorInvertParams): NormalizedInvertAdjustment {
   return {
     enabled: params.enabled === true,
@@ -259,7 +229,13 @@ function isNeutralCurvesAdjustment(params: NormalizedCurvesAdjustment) {
 }
 
 function isNeutralLevelsAdjustment(params: NormalizedLevelsAdjustment) {
-  return params.blackPoint === CHANNEL_MIN && params.whitePoint === CHANNEL_MAX && params.gamma === 1
+  return (
+    params.blackPoint === CHANNEL_MIN &&
+    params.whitePoint === CHANNEL_MAX &&
+    params.gamma === 1 &&
+    params.outputBlack === CHANNEL_MIN &&
+    params.outputWhite === CHANNEL_MAX
+  )
 }
 
 function isNeutralInvertAdjustment(params: NormalizedInvertAdjustment) {
@@ -269,15 +245,6 @@ function isNeutralInvertAdjustment(params: NormalizedInvertAdjustment) {
 function createContrastFactor(value: number) {
   const normalized = value * 2.55
   return (259 * (normalized + 255)) / (255 * (259 - normalized))
-}
-
-function createLevelsGamma(midtones: number) {
-  if (!Number.isFinite(midtones) || midtones <= 0 || midtones >= 1) return 1
-  return Math.log(0.5) / Math.log(midtones)
-}
-
-function percentToChannel(value: number, range: ImageAdjustmentNumberRange) {
-  return Math.round((clampToRange(value, range) / PERCENT_SCALE) * CHANNEL_MAX)
 }
 
 function clampToRange(value: number, range: ImageAdjustmentNumberRange) {
@@ -290,7 +257,9 @@ export function getImageAdjustmentDefaultParams<TKind extends ImageAdjustmentKin
 ): ImageAdjustmentDefaultsByKind[TKind] {
   switch (kind) {
     case 'hsl':
-      return { ...IMAGE_ADJUSTMENT_DEFINITIONS.hsl.defaults } as ImageAdjustmentDefaultsByKind[TKind]
+      return {
+        ...IMAGE_ADJUSTMENT_DEFINITIONS.hsl.defaults,
+      } as ImageAdjustmentDefaultsByKind[TKind]
     case 'threshold':
       return {
         ...IMAGE_ADJUSTMENT_DEFINITIONS.threshold.defaults,

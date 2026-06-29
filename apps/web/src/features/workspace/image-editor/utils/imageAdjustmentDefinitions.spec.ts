@@ -18,7 +18,7 @@ describe('imageAdjustmentDefinitions', () => {
     })
   })
 
-  it('keeps levels gamma finite for programmatic boundary input', () => {
+  it('normalizes levels layers through the definition registry', () => {
     const layer: ImageEditorAdjustmentLayer = {
       id: 'adjustment:levels',
       type: 'adjustment',
@@ -26,9 +26,11 @@ describe('imageAdjustmentDefinitions', () => {
       name: '色阶',
       visible: true,
       params: {
-        shadows: 0,
-        midtones: 100,
-        highlights: 100,
+        shadows: 64,
+        midtones: 128,
+        highlights: 191,
+        outputBlack: 0,
+        outputWhite: 255,
       },
     }
 
@@ -36,27 +38,11 @@ describe('imageAdjustmentDefinitions', () => {
 
     expect(normalized.kind).toBe('levels')
     if (normalized.kind !== 'levels') return
-    expect(Number.isFinite(normalized.params.gamma)).toBe(true)
-  })
-
-  it('uses the default levels gamma for non-finite midtones', () => {
-    const layer: ImageEditorAdjustmentLayer = {
-      id: 'adjustment:levels',
-      type: 'adjustment',
-      kind: 'levels',
-      name: '色阶',
-      visible: true,
-      params: {
-        shadows: 0,
-        midtones: Number.NaN,
-        highlights: 100,
-      },
-    }
-
-    const normalized = normalizeImageAdjustmentLayer(layer)
-
-    expect(normalized.kind).toBe('levels')
-    if (normalized.kind !== 'levels') return
-    expect(normalized.params.gamma).toBe(1)
+    expect(normalized.params).toMatchObject({
+      blackPoint: 64,
+      whitePoint: 191,
+      outputBlack: 0,
+      outputWhite: 255,
+    })
   })
 })

@@ -50,12 +50,15 @@
     @select-tool="emit('select-image-editor-tool', $event)"
     @select-adjustment="emit('select-image-adjustment-layer', $event)"
     @select-layer="emit('select-image-editor-layer', $event)"
-    @set-layer-visible="(layerId, visible) => emit('set-image-editor-layer-visible', layerId, visible)"
+    @set-layer-visible="
+      (layerId, visible) => emit('set-image-editor-layer-visible', layerId, visible)
+    "
     @add-layer="emit('add-image-editor-layer')"
     @copy-layer="emit('copy-image-editor-layer')"
     @merge-layer="emit('merge-image-editor-layer')"
     @remove-layer="emit('remove-image-editor-layer', $event)"
     @update-param="(key, value) => emit('update-image-editor-param', key, value)"
+    @update-params="emit('update-image-editor-adjustment-params', $event)"
     @apply-adjustments="emit('apply-image-editor-adjustments')"
   />
   <WorkspaceNodeContextMenu
@@ -79,6 +82,7 @@ import { ImageMaskEditorChrome } from '../mask-editor'
 import type {
   ImageAdjustmentKind,
   ImageEditorAdjustmentLayer,
+  ImageEditorAdjustmentWholeParams,
   ImageEditorLayer,
   ImageEditorMode,
   ImageEditorParamKey,
@@ -136,6 +140,7 @@ const emit = defineEmits<{
   'merge-image-editor-layer': []
   'remove-image-editor-layer': [layerId: string]
   'update-image-editor-param': [key: ImageEditorParamKey, value: ImageEditorParamValue]
+  'update-image-editor-adjustment-params': [params: ImageEditorAdjustmentWholeParams]
   'apply-image-editor-adjustments': []
   submit: [prompt: string, outputCount: number]
   'create-node': [kind: CanvasCreatableNodeKind]

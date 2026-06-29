@@ -15,6 +15,7 @@ import {
   type ImageAdjustmentKind,
   type ImageAdjustmentFinalApplyProgress,
   type ImageEditorAdjustmentLayer,
+  type ImageEditorAdjustmentWholeParams,
   type ImageEditorLayer,
   type ImageEditorMode,
   type ImageEditorParamKey,
@@ -48,10 +49,7 @@ type UseWorkspaceImageToolRuntimeOptions = {
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
-  createImageNodeFromFile: (
-    point: { x: number; y: number },
-    file: File,
-  ) => Promise<string | null>
+  createImageNodeFromFile: (point: { x: number; y: number }, file: File) => Promise<string | null>
   connectImageNodes: (connection: Connection) => void
   clearSelectedFlowElements: () => void
   startCanvasInteraction: (key: CanvasInteractionKey) => void
@@ -99,6 +97,7 @@ type WorkspaceImageToolRuntime = {
     key: ImageEditorParamKey,
     value: ImageEditorParamValue,
   ) => void
+  updateSelectedImageEditorAdjustmentParams: (params: ImageEditorAdjustmentWholeParams) => void
   isApplyingImageEditorAdjustments: Ref<boolean>
   imageAdjustmentFinalApplyProgress: Ref<ImageAdjustmentFinalApplyProgress | null>
   imageEditorRenderedPreview: ComputedRef<ImageEditorRenderedPreview | null>
@@ -139,14 +138,15 @@ export function useWorkspaceImageToolRuntime(
   const imageAdjustmentFinalApplyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(null)
   const activeImageAdjustmentFinalTaskId = ref<string | null>(null)
   const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
-  const { imageEditorRenderedPreview, imageEditorPreviewSource } = useImageAdjustmentRenderedPreview({
-    isAdjustMode: isImageAdjustmentMode,
-    layers: imageEditorSession.imageEditorLayers,
-    sourceUrl: () =>
-      flowImageEditorNodeId.value
-        ? options.getImageNodeDisplayPayload(flowImageEditorNodeId.value)?.url
-        : null,
-  })
+  const { imageEditorRenderedPreview, imageEditorPreviewSource } =
+    useImageAdjustmentRenderedPreview({
+      isAdjustMode: isImageAdjustmentMode,
+      layers: imageEditorSession.imageEditorLayers,
+      sourceUrl: () =>
+        flowImageEditorNodeId.value
+          ? options.getImageNodeDisplayPayload(flowImageEditorNodeId.value)?.url
+          : null,
+    })
   const { imageEditorHistogramSource } = useImageEditorHistogramSource({
     isAdjustMode: isImageAdjustmentMode,
     layers: imageEditorSession.imageEditorLayers,
@@ -169,13 +169,10 @@ export function useWorkspaceImageToolRuntime(
     }
   }
 
-  provide<WorkspaceImageAdjustmentFinalApplyContext>(
-    IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
-    {
-      progress: readonly(imageAdjustmentFinalApplyProgress),
-      cancel: () => cancelImageAdjustmentFinalTask(),
-    },
-  )
+  provide<WorkspaceImageAdjustmentFinalApplyContext>(IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY, {
+    progress: readonly(imageAdjustmentFinalApplyProgress),
+    cancel: () => cancelImageAdjustmentFinalTask(),
+  })
 
   async function onApplyImageEditorAdjustments() {
     if (isApplyingImageEditorAdjustments.value) return
@@ -220,8 +217,7 @@ export function useWorkspaceImageToolRuntime(
           },
         },
       )
-      if (options.currentBoardId.value !== boardId || flowImageEditorNodeId.value !== nodeId)
-        return
+      if (options.currentBoardId.value !== boardId || flowImageEditorNodeId.value !== nodeId) return
       const newNodeId = await options.createImageNodeFromFile(
         {
           x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
@@ -313,6 +309,8 @@ export function useWorkspaceImageToolRuntime(
     mergeImageEditorLayer: imageEditorSession.mergeImageEditorLayer,
     removeImageEditorLayer: imageEditorSession.removeImageEditorLayer,
     updateSelectedImageEditorLayerParam: imageEditorSession.updateSelectedImageEditorLayerParam,
+    updateSelectedImageEditorAdjustmentParams:
+      imageEditorSession.updateSelectedImageEditorAdjustmentParams,
     isApplyingImageEditorAdjustments,
     imageAdjustmentFinalApplyProgress,
     imageEditorRenderedPreview,

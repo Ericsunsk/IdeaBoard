@@ -1,0 +1,261 @@
+@import './image-editor-control-points.css';
+
+.image-editor-histogram-control {
+  --image-editor-histogram-frame-border-color: var(--workspace-accent-outline);
+  --image-editor-histogram-frame-radius: 9px;
+  --image-editor-histogram-marker-size: 12px;
+  --image-editor-levels-output-range-gradient: linear-gradient(
+    90deg,
+    var(--workspace-accent-strong, var(--color-canvas-accent-pressed)) 0%,
+    var(--workspace-accent, var(--color-canvas-accent)) 52%,
+    var(--workspace-accent-wash, var(--color-canvas-accent-soft)) 100%
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.image-editor-threshold-control .image-editor-histogram-plot,
+.image-editor-levels-control .image-editor-histogram-plot {
+  background: transparent;
+}
+
+.image-editor-threshold-control .image-editor-histogram-plot__grid,
+.image-editor-levels-control .image-editor-histogram-plot__grid {
+  display: none;
+}
+
+.image-editor-threshold-control .image-editor-histogram-plot__guide-line.is-threshold,
+.image-editor-levels-control .image-editor-histogram-plot__guide-line {
+  stroke: var(--image-editor-histogram-frame-border-color);
+  opacity: 1;
+}
+
+.image-editor-histogram-control__fields {
+  display: grid;
+  gap: 8px;
+}
+
+.image-editor-threshold-fields {
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+
+.image-editor-levels-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.image-editor-histogram-control__field {
+  min-width: 0;
+  display: grid;
+  align-items: center;
+  gap: 7px;
+  color: var(--workspace-text-muted);
+  font-size: var(--image-editor-panel-meta-text-size);
+  font-weight: 600;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.image-editor-levels-fields .image-editor-histogram-control__field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.image-editor-histogram-control__field input[type='number'] {
+  height: calc(var(--image-editor-panel-control-height) - 4px);
+  min-width: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  border: var(--image-editor-panel-border-width) solid
+    var(--image-editor-panel-control-border-color);
+  border-radius: calc(var(--image-editor-panel-control-radius) - 1px);
+  background: var(--image-editor-panel-control-bg);
+  color: var(--workspace-text-body);
+  font-size: var(--image-editor-panel-text-size);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 0 7px;
+  outline: none;
+  transition:
+    background-color var(--workspace-motion-fast) ease,
+    border-color var(--workspace-motion-fast) ease,
+    color var(--workspace-motion-fast) ease,
+    opacity var(--workspace-motion-fast) ease;
+}
+
+.image-editor-histogram-control__field input[type='number']:hover:not(:disabled) {
+  border-color: var(--image-editor-panel-control-hover-border-color);
+}
+
+.image-editor-histogram-control__field input[type='number']:focus-visible {
+  border-color: var(--image-editor-panel-control-focus-border-color);
+  box-shadow: none;
+}
+
+.image-editor-histogram-control__field input[type='number']:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.image-editor-histogram-control__field input::-webkit-outer-spin-button,
+.image-editor-histogram-control__field input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.image-editor-levels-output {
+  display: grid;
+  gap: 5px;
+}
+
+.image-editor-levels-output__header {
+  color: var(--workspace-text-muted);
+  font-size: var(--image-editor-panel-meta-text-size);
+  font-weight: 600;
+}
+
+.image-editor-levels-output__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 56px));
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.image-editor-levels-output__field {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.image-editor-histogram-control__toggle-button {
+  --node-tool-border-width: var(--image-editor-panel-border-width);
+  --node-tool-tooltip-delay: 200ms;
+  width: 24px;
+  height: calc(var(--image-editor-panel-control-height) - 4px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: var(--image-editor-panel-border-width) solid
+    var(--image-editor-panel-control-border-color);
+  border-radius: calc(var(--image-editor-panel-control-radius) - 1px);
+  background: var(--image-editor-panel-control-bg);
+  color: var(--workspace-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--workspace-motion-fast) ease,
+    border-color var(--workspace-motion-fast) ease,
+    color var(--workspace-motion-fast) ease;
+}
+
+.image-editor-histogram-control__toggle-button:hover {
+  border-color: var(--image-editor-panel-control-hover-border-color);
+  color: var(--workspace-accent-strong);
+}
+
+.image-editor-histogram-control__toggle-button:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
+}
+
+.image-editor-histogram-control__toggle-button[aria-pressed='true'] {
+  border-color: var(--workspace-accent);
+  background: var(--workspace-accent);
+  color: #ffffff;
+}
+
+.image-editor-histogram-control__toggle-button svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+.image-editor-levels-output__slider {
+  position: relative;
+  height: var(--workspace-range-input-height);
+  --workspace-range-fill-color: var(--workspace-accent);
+  --workspace-range-thumb-color: var(--workspace-accent);
+}
+
+.image-editor-levels-output__slider::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: var(--workspace-range-track-height);
+  border-radius: 999px;
+  background: var(--image-editor-levels-output-range-gradient);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.image-editor-levels-output__range {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --workspace-range-track-background: transparent;
+}
+
+.image-editor-levels-output__range::-webkit-slider-thumb {
+  pointer-events: auto;
+}
+
+.image-editor-levels-output__range::-moz-range-thumb {
+  pointer-events: auto;
+}
+
+.image-editor-threshold-control .image-editor-histogram-plot__marker.is-threshold,
+.image-editor-levels-control .image-editor-histogram-plot__marker {
+  bottom: 0;
+  width: var(--image-editor-control-point-size);
+}
+
+.image-editor-threshold-control .image-editor-histogram-plot__marker.is-threshold::before,
+.image-editor-levels-control .image-editor-histogram-plot__marker::before {
+  display: none;
+}
+
+.image-editor-threshold-control .image-editor-histogram-plot__marker.is-threshold::after,
+.image-editor-levels-control .image-editor-histogram-plot__marker::after {
+  bottom: 0;
+  width: var(--image-editor-control-point-size);
+  height: var(--image-editor-control-point-size);
+  border: var(--image-editor-control-point-border-width) solid
+    var(--image-editor-control-point-border-color);
+  background: var(--image-editor-control-point-bg);
+  transform: translate(-50%, 50%);
+}
+
+.image-editor-threshold-control .image-editor-histogram-plot__marker.is-threshold.active::after,
+.image-editor-levels-control .image-editor-histogram-plot__marker.active::after {
+  border: 0;
+  background: var(--image-editor-control-point-active-bg);
+}
+
+.image-editor-histogram-plot__marker.is-shadows::after {
+  border-color: var(--workspace-text-subtle);
+}
+
+.image-editor-histogram-plot__marker.is-shadows::before {
+  background: var(--workspace-text-subtle);
+}
+
+.image-editor-histogram-plot__marker.is-midtones::after {
+  border-color: var(--workspace-accent-strong);
+}
+
+.image-editor-histogram-plot__marker.is-midtones::before {
+  background: var(--workspace-accent-strong);
+}
+
+.image-editor-histogram-plot__marker.is-highlights::after {
+  border-color: var(--workspace-accent);
+}
+
+.image-editor-histogram-plot__marker.is-highlights::before {
+  background: var(--workspace-accent);
+}
+
+.image-editor-levels-control .image-editor-histogram-plot__marker.is-shadows::after,
+.image-editor-levels-control .image-editor-histogram-plot__marker.is-midtones::after,
+.image-editor-levels-control .image-editor-histogram-plot__marker.is-highlights::after {
+  border-color: var(--image-editor-control-point-border-color);
+}
