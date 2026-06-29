@@ -215,16 +215,17 @@ async function loadImageSourceCanvas(
 function resolveTargetSize(bitmap: ImageBitmap, options: LoadImageSourceOptions) {
   if (bitmap.width <= 0 || bitmap.height <= 0) throw createCacheError('decode-failed')
 
-  const pixelCount = bitmap.width * bitmap.height
-  if (pixelCount > (options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS)) {
-    throw createCacheError('too-large')
-  }
   const maxSide = Math.max(1, Math.floor(options.maxSide ?? Number.POSITIVE_INFINITY))
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
-  return {
+  const targetSize = {
     width: Math.max(1, Math.round(bitmap.width * scale)),
     height: Math.max(1, Math.round(bitmap.height * scale)),
   }
+  const pixelCount = targetSize.width * targetSize.height
+  if (pixelCount > (options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS)) {
+    throw createCacheError('too-large')
+  }
+  return targetSize
 }
 
 function createImageSourceCacheKey(sourceUrl: string, options: LoadImageSourceOptions) {

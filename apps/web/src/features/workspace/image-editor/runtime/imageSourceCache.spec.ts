@@ -105,6 +105,29 @@ describe('ImageSourceCache', () => {
     )
   })
 
+  it('allows maxSide previews for images whose original pixels exceed the full-size limit', async () => {
+    installCanvasMocks()
+    installImageMocks(8000, 4000)
+    const cache = new ImageSourceCache({ maxEntries: 2 })
+
+    const preview = await cache.getFullSizeSource('https://example.com/large.png', {
+      maxSide: 1000,
+    })
+
+    expect(preview).toMatchObject({ width: 1000, height: 500 })
+  })
+
+  it('rejects full-size sources whose original pixels exceed the default limit', async () => {
+    installCanvasMocks()
+    installImageMocks(8000, 4000)
+    const cache = new ImageSourceCache({ maxEntries: 2 })
+
+    await expect(cache.getFullSizeSource('https://example.com/large.png')).rejects.toMatchObject({
+      code: 'too-large',
+      message: '图片尺寸过大，暂不支持在浏览器内编辑',
+    })
+  })
+
   it('trims least-recently-used canvases when the cache reaches its limit', async () => {
     installCanvasMocks()
     installImageMocks()

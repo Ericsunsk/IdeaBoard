@@ -184,22 +184,6 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 	events.PublishTaskStatusLogWarn(ctx, s.taskEvents, taskID, status)
 }
 
-func (s *Service) MarkTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string) error {
-	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result})
-}
-
-func (s *Service) MarkTaskCompletedWithAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, result string, finish tasks.TaskAttemptFinish) error {
-	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result, AttemptFinish: &finish})
-}
-
-func (s *Service) MarkTaskCompletedWithOutputs(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput) error {
-	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result, Outputs: outputs})
-}
-
-func (s *Service) MarkTaskCompletedWithOutputsAndAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, finish tasks.TaskAttemptFinish) error {
-	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result, Outputs: outputs, AttemptFinish: &finish})
-}
-
 func (s *Service) CompleteTask(ctx context.Context, input CompleteTaskInput) error {
 	assignment := input.Assignment
 	if !assignment.HasLeaseIdentity() {
@@ -229,22 +213,6 @@ func (s *Service) CompleteTask(ctx context.Context, input CompleteTaskInput) err
 		return ErrTaskTerminal
 	}
 	return ErrTaskStateConflict
-}
-
-func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason string) error {
-	return s.FailTask(ctx, FailTaskInput{TaskID: taskID, Reason: reason})
-}
-
-func (s *Service) MarkTaskFailedWithAttempt(ctx context.Context, taskID string, reason string, finish tasks.TaskAttemptFinish) error {
-	return s.FailTask(ctx, FailTaskInput{TaskID: taskID, Reason: reason, AttemptFinish: &finish})
-}
-
-func (s *Service) MarkTaskFailedWithLease(ctx context.Context, assignment taskqueue.TaskAssignment, reason string) error {
-	return s.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: reason})
-}
-
-func (s *Service) MarkTaskFailedWithLeaseAndAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, finish tasks.TaskAttemptFinish) error {
-	return s.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: reason, AttemptFinish: &finish})
 }
 
 func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error {
@@ -284,13 +252,16 @@ func (s *Service) FailTask(ctx context.Context, input FailTaskInput) error {
 	if input.Assignment.HasLeaseIdentity() {
 		return s.failRunningTaskWithLease(ctx, input)
 	}
+	if input.Assignment.TaskID != "" {
+		return ErrTaskStateConflict
+	}
 	return s.failPendingTask(ctx, input)
 }
 
 func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) error {
 	taskID := input.TaskID
 	if taskID == "" {
-		taskID = input.Assignment.TaskID
+		return ErrTaskStateConflict
 	}
 	now := taskTerminalTime(input.AttemptFinish)
 	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, pendingOnly(), input.Reason, formatTaskFailureResult(taskID, input.Reason), now, input.AttemptFinish)
@@ -349,14 +320,6 @@ func (s *Service) failRunningTaskWithLease(ctx context.Context, input FailTaskIn
 	return ErrTaskStateConflict
 }
 
-func (s *Service) ResetTaskRunningToPending(ctx context.Context, assignment taskqueue.TaskAssignment, reason string) error {
-	return s.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: assignment, Reason: reason})
-}
-
-func (s *Service) ResetTaskRunningToPendingWithAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, finish tasks.TaskAttemptFinish) error {
-	return s.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: assignment, Reason: reason, AttemptFinish: &finish})
-}
-
 func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskInput) error {
 	assignment := input.Assignment
 	if !assignment.HasLeaseIdentity() {
@@ -391,14 +354,6 @@ func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskIn
 		return ErrTaskTerminal
 	}
 	return ErrTaskStateConflict
-}
-
-func (s *Service) RequeueTaskForFailoverWithFinalAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, finish tasks.TaskAttemptFinish) (bool, error) {
-	return s.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: assignment, Reason: errMsg, FinalFailAttemptFinish: &finish})
-}
-
-func (s *Service) RequeueTaskForFailoverWithAttempts(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, requeuedFinish tasks.TaskAttemptFinish, finalFinish tasks.TaskAttemptFinish) (bool, error) {
-	return s.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: assignment, Reason: errMsg, RequeuedAttemptFinish: &requeuedFinish, FinalFailAttemptFinish: &finalFinish})
 }
 
 func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFailoverInput) (bool, error) {

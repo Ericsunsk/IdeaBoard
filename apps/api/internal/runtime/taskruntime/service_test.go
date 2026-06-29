@@ -33,7 +33,7 @@ func (p *recordingTaskStatusPublisher) PublishTaskStatus(ctx context.Context, ev
 	}
 }
 
-func TestResetTaskRunningToPendingResetsState(t *testing.T) {
+func TestResetRunningTaskResetsState(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
@@ -53,7 +53,7 @@ func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 	}
 
 	if err := service.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: taskRuntimeAssignment(task), Reason: "worker context interrupted"}); err != nil {
-		t.Fatalf("ResetTaskRunningToPending returned error: %v", err)
+		t.Fatalf("ResetRunningTask returned error: %v", err)
 	}
 
 	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
@@ -74,7 +74,7 @@ func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 	}
 }
 
-func TestResetTaskRunningToPendingRejectsTerminalTask(t *testing.T) {
+func TestResetRunningTaskRejectsTerminalTask(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
@@ -431,6 +431,38 @@ func TestConvergeTaskAfterRiverFinalFailureRejectsRunningTaskWithDifferentRiverL
 	}
 }
 
+func TestFailTaskRejectsPartialAssignment(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID: "task-fail-partial-assignment",
+		UserID: 1,
+		Status: tasks.StatusPending,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	err := service.FailTask(ctx, FailTaskInput{
+		Assignment: taskqueue.TaskAssignment{TaskID: task.TaskID},
+		Reason:     "provider failed",
+	})
+	if !errors.Is(err, ErrTaskStateConflict) {
+		t.Fatalf("expected ErrTaskStateConflict, got %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+}
+
 func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
@@ -471,7 +503,7 @@ func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 	}
 }
 
-func TestMarkTaskCompletedRejectsLeaseTokenMismatch(t *testing.T) {
+func TestCompleteTaskRejectsLeaseTokenMismatch(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
@@ -634,7 +666,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	}
 }
 
-func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
+func TestCompleteTaskUpsertsDailyStat(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
@@ -656,7 +688,7 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 
 	result := `{"model":"gpt-image-1","username":"alice"}`
 	if err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskRuntimeAssignment(task), Result: result}); err != nil {
-		t.Fatalf("MarkTaskCompleted returned error: %v", err)
+		t.Fatalf("CompleteTask returned error: %v", err)
 	}
 
 	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
@@ -684,7 +716,7 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	}
 }
 
-func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
+func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
@@ -724,7 +756,7 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 		Result:     result,
 		Outputs:    taskOutputs,
 	}); err != nil {
-		t.Fatalf("MarkTaskCompletedWithOutputs returned error: %v", err)
+		t.Fatalf("CompleteTask returned error: %v", err)
 	}
 
 	outputsByTaskID, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
@@ -762,7 +794,7 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 	}
 }
 
-func TestMarkTaskCompletedDoesNotInferOutputsFromResultURL(t *testing.T) {
+func TestCompleteTaskDoesNotInferOutputsFromResultURL(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
@@ -782,7 +814,7 @@ func TestMarkTaskCompletedDoesNotInferOutputsFromResultURL(t *testing.T) {
 	}
 
 	if err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskRuntimeAssignment(task), Result: `{"status":"success","image_url":"https://evil.example.com/uploads/tasks/7/task-foreign-origin/out-a.png"}`}); err != nil {
-		t.Fatalf("MarkTaskCompleted returned error: %v", err)
+		t.Fatalf("CompleteTask returned error: %v", err)
 	}
 	outputsByTaskID, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
 	if err != nil {
@@ -793,7 +825,7 @@ func TestMarkTaskCompletedDoesNotInferOutputsFromResultURL(t *testing.T) {
 	}
 }
 
-func TestMarkTaskCompletedRejectsOutputWithoutStorageKey(t *testing.T) {
+func TestCompleteTaskRejectsOutputWithoutStorageKey(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := taskstore.NewRepository(db)
