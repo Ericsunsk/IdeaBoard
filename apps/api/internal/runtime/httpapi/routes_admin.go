@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"ideaboard/api/internal/auth"
+	"ideaboard/api/internal/identity/auth"
 
 	"github.com/gin-gonic/gin"
 )

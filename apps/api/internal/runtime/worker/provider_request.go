@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )

@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ideaboard/api/internal/auth"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

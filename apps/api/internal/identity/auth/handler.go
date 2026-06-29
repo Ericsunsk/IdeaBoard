@@ -1,8 +1,8 @@
 package auth
 
 import (
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

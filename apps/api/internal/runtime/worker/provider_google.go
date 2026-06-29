@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/platform/media"
-	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/workflow"
@@ -298,7 +298,7 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 		if err != nil {
 			return "", nil, fmt.Errorf("解析 data URL 失败: %w", err)
 		}
-		if err := media.ValidateImageDimensions(parsed.Data); err != nil {
+		if err := imageformat.ValidateImageDimensions(parsed.Data); err != nil {
 			return "", nil, err
 		}
 		return parsed.MIMEType, parsed.Data, nil
@@ -308,7 +308,7 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 		if err != nil {
 			return "", nil, fmt.Errorf("读取上传图像失败: %w", err)
 		}
-		if err := media.ValidateImageDimensions(obj.Data); err != nil {
+		if err := imageformat.ValidateImageDimensions(obj.Data); err != nil {
 			return "", nil, err
 		}
 		mimeType := strings.TrimSpace(obj.ContentType)
@@ -345,7 +345,7 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 	if len(body) == 0 {
 		return "", nil, fmt.Errorf("拉取图像为空: %q", ref)
 	}
-	if err := media.ValidateImageDimensions(body); err != nil {
+	if err := imageformat.ValidateImageDimensions(body); err != nil {
 		return "", nil, err
 	}
 	mimeType := strings.TrimSpace(resp.Header.Get("Content-Type"))

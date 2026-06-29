@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"ideaboard/api/internal/auth"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/storage"
-	"ideaboard/api/internal/users"
 )
 
 type appDomainServices struct {

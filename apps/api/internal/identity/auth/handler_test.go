@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

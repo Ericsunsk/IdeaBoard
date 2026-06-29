@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/autherrors"
+	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/platform/config"
 )
 

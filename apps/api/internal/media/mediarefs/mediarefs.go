@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/outbound"
 )
 
@@ -230,5 +230,5 @@ func CollectUniqueParamRefs(params map[string]interface{}, keys []string) []stri
 }
 
 func imageExtensionFromMIME(mimeType string) string {
-	return media.ImageExtensionFromMIME(mimeType)
+	return imageformat.ImageExtensionFromMIME(mimeType)
 }

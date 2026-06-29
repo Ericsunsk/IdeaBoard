@@ -10,10 +10,10 @@ import (
 	"sync"
 
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -97,7 +97,7 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, media.UploadAllowedImageExtensions())
+		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions())
 		if !ok {
 			return
 		}
@@ -152,7 +152,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, media.UploadAllowedImageExtensions())
+		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, imageformat.UploadAllowedImageExtensions())
 		if !ok {
 			return
 		}
@@ -261,7 +261,7 @@ func adminUploadHandler(storageService *storage.StorageService, uploadSettings s
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		ext, ok := validateUploadFileHeader(c, file, 50*1024*1024, media.UploadAllowedImageExtensions())
+		ext, ok := validateUploadFileHeader(c, file, 50*1024*1024, imageformat.UploadAllowedImageExtensions())
 		if !ok {
 			return
 		}

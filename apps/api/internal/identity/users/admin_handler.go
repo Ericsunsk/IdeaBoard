@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ideaboard/api/internal/autherrors"
+	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"

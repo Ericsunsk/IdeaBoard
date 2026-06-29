@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"ideaboard/api/internal/platform/media"
-	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
 )
@@ -392,7 +392,7 @@ func (s *StorageService) saveBytesLocalRef(ctx context.Context, filename string,
 	if err != nil {
 		return nil, err
 	}
-	ref.Width, ref.Height, _ = media.ImageDimensions(data)
+	ref.Width, ref.Height, _ = imageformat.ImageDimensions(data)
 	return ref, nil
 }
 
@@ -664,10 +664,10 @@ func readStorageObject(src io.Reader, maxBytes int64) ([]byte, error) {
 }
 
 func inferStoredUploadContentType(filename string, data []byte) string {
-	if ext := media.DetectImageExtensionFromBytes(data); ext != "" {
-		return media.ImageMIMEFromExtension(ext)
+	if ext := imageformat.DetectImageExtensionFromBytes(data); ext != "" {
+		return imageformat.ImageMIMEFromExtension(ext)
 	}
-	return media.ImageMIMEFromExtension(filepath.Ext(filename))
+	return imageformat.ImageMIMEFromExtension(filepath.Ext(filename))
 }
 
 type remoteImageFile struct {
@@ -744,13 +744,13 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 	}
 
 	ext := strings.ToLower(path.Ext(strings.Split(remoteURL, "?")[0]))
-	if normalized, ok := media.NormalizeImageExtension(ext); ok {
+	if normalized, ok := imageformat.NormalizeImageExtension(ext); ok {
 		ext = normalized
 	} else {
-		ext = media.ImageExtensionFromMIME(resp.Header.Get("Content-Type"))
+		ext = imageformat.ImageExtensionFromMIME(resp.Header.Get("Content-Type"))
 	}
 	if ext == "" {
-		return nil, fmt.Errorf("仅支持 %s 图片", media.SupportedUploadImageLabel())
+		return nil, fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
 	}
 	if err := validateRemoteImageFile(tmpFile, ext); err != nil {
 		return nil, err
@@ -770,7 +770,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 	cleanupTemp = false
 	return &remoteImageFile{
 		Filename:    filename,
-		ContentType: media.ImageMIMEFromExtension(ext),
+		ContentType: imageformat.ImageMIMEFromExtension(ext),
 		Width:       width,
 		Height:      height,
 		Size:        size,
@@ -787,7 +787,7 @@ func imageReaderDimensions(file *os.File) (int, int, error) {
 	if err != nil {
 		return 0, 0, fmt.Errorf("读取图片尺寸失败: %w", err)
 	}
-	width, height, err := media.ImageDimensions(data)
+	width, height, err := imageformat.ImageDimensions(data)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -798,24 +798,24 @@ func validateRemoteImageFile(file *os.File, ext string) error {
 	if file == nil {
 		return fmt.Errorf("远程文件校验失败: 文件为空")
 	}
-	if _, ok := media.NormalizeImageExtension(ext); !ok {
-		return fmt.Errorf("仅支持 %s 图片", media.SupportedUploadImageLabel())
+	if _, ok := imageformat.NormalizeImageExtension(ext); !ok {
+		return fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf("读取临时文件失败: %w", err)
 	}
-	if err := media.ValidateImageReader(file, ext); err != nil {
+	if err := imageformat.ValidateImageReader(file, ext); err != nil {
 		return fmt.Errorf("远程文件校验失败: %w", err)
 	}
 	return nil
 }
 
 func validateRemoteImageBytes(filename string, data []byte) error {
-	ext, ok := media.NormalizeImageExtension(filepath.Ext(filename))
+	ext, ok := imageformat.NormalizeImageExtension(filepath.Ext(filename))
 	if !ok {
-		return fmt.Errorf("仅支持 %s 图片", media.SupportedUploadImageLabel())
+		return fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
 	}
-	if err := media.ValidateImageBytes(data, ext); err != nil {
+	if err := imageformat.ValidateImageBytes(data, ext); err != nil {
 		return fmt.Errorf("远程文件校验失败: %w", err)
 	}
 	return nil

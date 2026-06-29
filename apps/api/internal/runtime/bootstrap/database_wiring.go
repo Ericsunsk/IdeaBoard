@@ -6,18 +6,18 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/assets"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/db/migrations"
+	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/assets"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/worker"
-	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/tasking/taskstore"
-	"ideaboard/api/internal/users"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

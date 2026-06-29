@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/tasks"

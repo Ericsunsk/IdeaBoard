@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"ideaboard/api/internal/auth"
 	"ideaboard/api/internal/db/migrations"
+	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

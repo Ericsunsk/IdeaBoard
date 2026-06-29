@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/platform/media"
-	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
@@ -297,7 +297,7 @@ func (c *ProviderExecutor) loadImageFromRef(ctx context.Context, ref string, tim
 	if err != nil {
 		return nil, err
 	}
-	if err := media.ValidateImageDimensions(data); err != nil {
+	if err := imageformat.ValidateImageDimensions(data); err != nil {
 		return nil, err
 	}
 	decoded, _, err := image.Decode(bytes.NewReader(data))

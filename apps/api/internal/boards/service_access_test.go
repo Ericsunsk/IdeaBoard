@@ -6,8 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/users"
 )
 
 func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {

@@ -15,16 +15,16 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
-	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
-	"ideaboard/api/internal/users"
 	"ideaboard/api/internal/workflow"
 )
 

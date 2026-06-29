@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/safehttp"
 
@@ -35,9 +35,9 @@ func downloadImageHandler() gin.HandlerFunc {
 			response.Error(c, 400, "仅支持下载图片类型文件")
 			return
 		}
-		magicExt := media.ImageExtensionFromMIME(contentType)
+		magicExt := imageformat.ImageExtensionFromMIME(contentType)
 		if magicExt == "" {
-			response.Error(c, 400, "仅支持 "+media.SupportedUploadImageLabel()+" 图片")
+			response.Error(c, 400, "仅支持 "+imageformat.SupportedUploadImageLabel()+" 图片")
 			return
 		}
 
@@ -70,7 +70,7 @@ func downloadImageHandler() gin.HandlerFunc {
 
 		header := make([]byte, 16)
 		if n, readErr := tmpFile.Read(header); readErr == nil && n > 0 {
-			if validateErr := media.ValidateImageBytes(header[:n], magicExt); validateErr != nil {
+			if validateErr := imageformat.ValidateImageBytes(header[:n], magicExt); validateErr != nil {
 				response.Error(c, 400, "文件内容与类型不匹配")
 				return
 			}

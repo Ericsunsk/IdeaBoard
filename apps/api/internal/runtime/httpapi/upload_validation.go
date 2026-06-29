@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -30,10 +30,10 @@ func validateUploadFileHeader(c *gin.Context, fh *multipart.FileHeader, maxBytes
 	}
 	ext = strings.ToLower(filepath.Ext(fh.Filename))
 	if !allowedExts[ext] {
-		response.Error(c, 400, "仅支持 "+media.SupportedUploadImageLabel()+" 格式")
+		response.Error(c, 400, "仅支持 "+imageformat.SupportedUploadImageLabel()+" 格式")
 		return "", false
 	}
-	if err := media.ValidateImageContent(fh, ext); err != nil {
+	if err := imageformat.ValidateImageContent(fh, ext); err != nil {
 		response.Error(c, 400, err.Error())
 		return "", false
 	}
@@ -50,13 +50,13 @@ func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (uploadImag
 	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
 		return uploadImageMetadata{}, false
 	}
-	formatExt, ok := media.NormalizeImageExtension(format)
+	formatExt, ok := imageformat.NormalizeImageExtension(format)
 	if !ok {
 		formatExt = ext
 	}
-	mimeType := media.ImageMIMEFromExtension(formatExt)
+	mimeType := imageformat.ImageMIMEFromExtension(formatExt)
 	if mimeType == "" {
-		mimeType = media.ImageMIMEFromExtension(ext)
+		mimeType = imageformat.ImageMIMEFromExtension(ext)
 	}
 	return uploadImageMetadata{
 		Width:  cfg.Width,

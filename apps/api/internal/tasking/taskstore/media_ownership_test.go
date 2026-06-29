@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/users"
 )
 
 func TestUpsertMediaAssetRejectsOwnerTakeover(t *testing.T) {

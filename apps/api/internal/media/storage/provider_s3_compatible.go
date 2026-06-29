@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/outbound"
 
 	"github.com/minio/minio-go/v7"
@@ -140,7 +140,7 @@ func (s *S3CompatibleService) uploadBytesWithConfigRef(ctx context.Context, file
 	if err != nil {
 		return nil, err
 	}
-	ref.Width, ref.Height, _ = media.ImageDimensions(data)
+	ref.Width, ref.Height, _ = imageformat.ImageDimensions(data)
 	return ref, nil
 }
 

@@ -4,18 +4,18 @@ import (
 	"log/slog"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/assets"
-	"ideaboard/api/internal/auth"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/channels"
+	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/assets"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/httpapi"
 	"ideaboard/api/internal/runtime/webdist"
-	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

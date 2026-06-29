@@ -244,8 +244,8 @@ sequenceDiagram
 
 关键代码：
 
-- [middleware.go](./apps/api/internal/auth/middleware.go)
-- [service_client.go](./apps/api/internal/auth/service_client.go)
+- [middleware.go](./apps/api/internal/identity/auth/middleware.go)
+- [service_client.go](./apps/api/internal/identity/auth/service_client.go)
 - [index.ts](./apps/auth/src/index.ts)
 - [client.ts](./apps/web/src/shared/auth/client.ts)
 - [user.ts](./apps/web/src/app/stores/user.ts)
@@ -461,16 +461,14 @@ apps/api/
 ├── cmd/                      # 服务入口
 ├── internal/platform/        # 基础设施：config、database、response、safehttp
 ├── internal/runtime/         # 启动、HTTP 路由、worker 与 embedded dist
-├── internal/auth/            # 鉴权中间件与 auth service client
-├── internal/users/           # 用户管理
+├── internal/identity/        # Auth、auth errors、users 与用户管理
+├── internal/media/           # Storage、assets、image format validation 与 media refs
 ├── internal/accounts/        # 账号池与任务调度
 ├── internal/boards/          # 画板管理
 ├── internal/channels/        # 渠道管理
 ├── internal/tasking/         # Tasking bounded context：任务模型、提交、队列、统计与运行状态
 ├── internal/workflow/        # feature contract
-├── internal/prompts/         # 提示词模板与装配
-├── internal/storage/         # 对象存储配置与实现
-└── internal/assets/          # 线稿模式等业务模板
+└── internal/prompts/         # 提示词模板与装配
 
 apps/auth/
 ├── src/auth.ts               # Better Auth 配置

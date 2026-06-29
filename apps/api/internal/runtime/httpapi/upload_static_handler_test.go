@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/auth"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

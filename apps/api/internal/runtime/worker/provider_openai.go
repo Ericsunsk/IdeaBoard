@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/platform/media"
-	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/platform/settings"
@@ -430,7 +430,7 @@ func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref stri
 		if readErr != nil {
 			return "", "", nil, fmt.Errorf("读取上传图像失败: %w", readErr)
 		}
-		if err := media.ValidateImageDimensions(obj.Data); err != nil {
+		if err := imageformat.ValidateImageDimensions(obj.Data); err != nil {
 			return "", "", nil, err
 		}
 		mimeType = strings.TrimSpace(obj.ContentType)
@@ -495,7 +495,7 @@ func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref stri
 }
 
 func inferOpenAIImageFileExtension(mimeType string) string {
-	if ext := media.ImageExtensionFromMIME(mimeType); ext != "" {
+	if ext := imageformat.ImageExtensionFromMIME(mimeType); ext != "" {
 		return strings.TrimPrefix(ext, ".")
 	}
 	return "png"

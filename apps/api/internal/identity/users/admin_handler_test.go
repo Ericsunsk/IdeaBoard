@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/autherrors"
+	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/settings"
 

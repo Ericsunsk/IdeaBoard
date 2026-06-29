@@ -3,7 +3,7 @@ package worker
 import (
 	"bytes"
 	"fmt"
-	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/media/imageformat"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -17,7 +17,7 @@ import (
 )
 
 func normalizeOpenAIEditMultipartImage(filename, mimeType string, data []byte) (string, string, []byte, error) {
-	if err := media.ValidateImageDimensions(data); err != nil {
+	if err := imageformat.ValidateImageDimensions(data); err != nil {
 		return "", "", nil, err
 	}
 	normalizedMimeType := normalizeImageMIMEType(mimeType, data)
@@ -39,12 +39,12 @@ func normalizeOpenAIEditMultipartImage(filename, mimeType string, data []byte) (
 
 func normalizeImageMIMEType(mimeType string, data []byte) string {
 	if parsed, _, err := mime.ParseMediaType(strings.TrimSpace(mimeType)); err == nil && strings.HasPrefix(parsed, "image/") {
-		if normalized, ok := media.NormalizeImageMIME(parsed); ok {
+		if normalized, ok := imageformat.NormalizeImageMIME(parsed); ok {
 			return normalized
 		}
 	}
-	if ext := media.DetectImageExtensionFromBytes(data); ext != "" {
-		if normalized := media.ImageMIMEFromExtension(ext); normalized != "" {
+	if ext := imageformat.DetectImageExtensionFromBytes(data); ext != "" {
+		if normalized := imageformat.ImageMIMEFromExtension(ext); normalized != "" {
 			return normalized
 		}
 	}

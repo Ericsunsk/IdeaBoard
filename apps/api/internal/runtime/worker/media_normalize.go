@@ -8,23 +8,23 @@ import (
 	"sort"
 	"strings"
 
-	"ideaboard/api/internal/platform/media"
-	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/media/mediarefs"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/settings"
-	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/workflow"
 )
 
 func inferLocalAssetMimeType(filename string, data []byte) string {
 	if len(data) > 0 {
-		if ext := media.DetectImageExtensionFromBytes(data); ext != "" {
-			if mimeType := media.ImageMIMEFromExtension(ext); mimeType != "" {
+		if ext := imageformat.DetectImageExtensionFromBytes(data); ext != "" {
+			if mimeType := imageformat.ImageMIMEFromExtension(ext); mimeType != "" {
 				return mimeType
 			}
 		}
 	}
-	if ext, ok := media.NormalizeImageExtFromFilename(filename); ok {
-		if mimeType := media.ImageMIMEFromExtension(ext); mimeType != "" {
+	if ext, ok := imageformat.NormalizeImageExtFromFilename(filename); ok {
+		if mimeType := imageformat.ImageMIMEFromExtension(ext); mimeType != "" {
 			return mimeType
 		}
 	}
