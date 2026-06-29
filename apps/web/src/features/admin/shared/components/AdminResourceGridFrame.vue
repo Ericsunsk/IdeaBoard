@@ -4,11 +4,15 @@
     :is-scrolling="isScrolling"
     @scroll="$emit('scroll')"
   >
-    <template #toolbar-start>
+    <template v-if="$slots.toolbar" #toolbar>
+      <slot name="toolbar" />
+    </template>
+
+    <template v-if="$slots['toolbar-start']" #toolbar-start>
       <slot name="toolbar-start" />
     </template>
 
-    <template #toolbar-end>
+    <template v-if="$slots['toolbar-end']" #toolbar-end>
       <slot name="toolbar-end" />
     </template>
 

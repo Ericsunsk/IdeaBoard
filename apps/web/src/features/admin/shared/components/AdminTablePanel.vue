@@ -1,7 +1,8 @@
 <template>
   <div :class="rootClass">
     <div :class="panelClass">
-      <div :class="adminSurfaceToolbarClass">
+      <slot v-if="slots.toolbar" name="toolbar" />
+      <div v-else-if="hasToolbar" :class="adminSurfaceToolbarClass">
         <div class="flex flex-wrap items-center gap-3">
           <slot name="toolbar-start" />
         </div>
@@ -18,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useSlots } from 'vue'
 import {
   adminSurfacePanelClass,
   adminSurfacePanelViewportClass,
@@ -30,11 +31,15 @@ const props = defineProps<{
   contentClass?: string
   viewportHeight?: boolean
 }>()
+const slots = useSlots()
+const hasToolbar = computed(() =>
+  Boolean(slots.toolbar || slots['toolbar-start'] || slots['toolbar-end']),
+)
 
 const rootClass = computed(() => (props.viewportHeight ? adminSurfaceRootViewportClass : 'min-w-0'))
 const panelClass = computed(() => [
   adminSurfacePanelClass,
   props.viewportHeight && adminSurfacePanelViewportClass,
 ])
-const resolvedContentClass = computed(() => props.contentClass || 'px-6 pb-6')
+const resolvedContentClass = computed(() => props.contentClass || (hasToolbar.value ? 'px-6 pb-6' : 'p-6'))
 </script>

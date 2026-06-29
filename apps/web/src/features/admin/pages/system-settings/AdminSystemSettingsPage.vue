@@ -73,8 +73,7 @@
             </div>
 
             <div class="grid content-start gap-4">
-              <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">站点名称</span>
+              <AdminFormField label="站点名称">
                 <InputText
                   v-model="brandingForm.project_name"
                   autocomplete="off"
@@ -83,10 +82,9 @@
                   :disabled="brandingLoading || brandingSaving"
                   @keyup.enter="handleSaveBranding()"
                 />
-              </label>
+              </AdminFormField>
 
-              <label :class="settingFieldClass">
-                <span class="text-admin-meta font-[680] text-admin-text-2">Logo 地址</span>
+              <AdminFormField label="Logo 地址">
                 <InputText
                   v-model="brandingForm.logo_url"
                   autocomplete="off"
@@ -95,7 +93,7 @@
                   :disabled="brandingLoading || brandingSaving || uploading"
                   @keyup.enter="handleSaveBranding()"
                 />
-              </label>
+              </AdminFormField>
             </div>
           </div>
 
@@ -149,8 +147,7 @@
           </div>
 
           <div class="grid gap-4 md:grid-cols-2">
-            <label :class="settingFieldClass">
-              <span class="text-admin-meta font-[680] text-admin-text-2">最大请求 (次)</span>
+            <AdminFormField label="最大请求 (次)">
               <InputNumber
                 v-model="rateLimitForm.max_requests"
                 :min="1"
@@ -158,10 +155,9 @@
                 fluid
                 :disabled="rateLimitLoading || rateLimitSaving"
               />
-            </label>
+            </AdminFormField>
 
-            <label :class="settingFieldClass">
-              <span class="text-admin-meta font-[680] text-admin-text-2">窗口周期 (秒)</span>
+            <AdminFormField label="窗口周期 (秒)">
               <InputNumber
                 v-model="rateLimitForm.window_seconds"
                 :min="1"
@@ -169,7 +165,7 @@
                 fluid
                 :disabled="rateLimitLoading || rateLimitSaving"
               />
-            </label>
+            </AdminFormField>
           </div>
 
           <div :class="settingActionRowClass">
@@ -212,8 +208,7 @@
       <template #content>
         <div :class="settingCardBodyClass">
           <div class="grid gap-4 sm:grid-cols-2">
-            <label :class="settingFieldClass">
-              <span class="text-admin-meta font-[680] text-admin-text-2">任务列表每页数量</span>
+            <AdminFormField label="任务列表每页数量">
               <InputNumber
                 v-model="taskMonitorForm.list_page_size"
                 :min="TASK_MONITOR_MIN_PAGE_SIZE"
@@ -221,10 +216,9 @@
                 fluid
                 :disabled="taskMonitorLoading || taskMonitorSaving"
               />
-            </label>
+            </AdminFormField>
 
-            <label :class="settingFieldClass">
-              <span class="text-admin-meta font-[680] text-admin-text-2">刷新间隔 (秒)</span>
+            <AdminFormField label="刷新间隔 (秒)">
               <InputNumber
                 v-model="taskMonitorForm.refresh_interval_seconds"
                 :min="TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS"
@@ -232,7 +226,7 @@
                 fluid
                 :disabled="taskMonitorLoading || taskMonitorSaving"
               />
-            </label>
+            </AdminFormField>
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
@@ -290,8 +284,7 @@
       <template #content>
         <div :class="settingCardBodyClass">
           <div class="grid gap-4">
-            <label :class="settingFieldClass">
-              <span class="text-admin-meta font-[680] text-admin-text-2">前端访问地址</span>
+            <AdminFormField label="前端访问地址">
               <InputText
                 v-model="publicURLForm.public_base_url"
                 autocomplete="off"
@@ -300,10 +293,9 @@
                 :disabled="publicURLLoading || publicURLSaving"
                 @keyup.enter="handleSavePublicURLSettings()"
               />
-            </label>
+            </AdminFormField>
 
-            <label :class="settingFieldClass">
-              <span class="text-admin-meta font-[680] text-admin-text-2">素材访问地址</span>
+            <AdminFormField label="素材访问地址">
               <InputText
                 v-model="publicURLForm.public_asset_base_url"
                 autocomplete="off"
@@ -312,7 +304,7 @@
                 :disabled="publicURLLoading || publicURLSaving"
                 @keyup.enter="handleSavePublicURLSettings()"
               />
-            </label>
+            </AdminFormField>
           </div>
 
           <div :class="settingActionRowClass">
@@ -354,8 +346,7 @@
 
       <template #content>
         <div :class="settingCardBodyClass">
-          <label :class="settingFieldClass">
-            <span class="text-admin-meta font-[680] text-admin-text-2">上传并发上限</span>
+          <AdminFormField label="上传并发上限">
             <InputNumber
               v-model="mediaUploadForm.upload_max_concurrent"
               :min="MEDIA_UPLOAD_MIN_CONCURRENT"
@@ -363,7 +354,7 @@
               fluid
               :disabled="mediaUploadLoading || mediaUploadSaving"
             />
-          </label>
+          </AdminFormField>
 
           <div :class="settingActionRowClass">
             <Button
@@ -410,6 +401,7 @@ import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
 } from '../../../../shared/utils/imageUploadSupport'
+import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import {
@@ -442,7 +434,6 @@ import {
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
-const settingFieldClass = 'flex min-w-0 flex-col gap-1.5'
 const settingActionRowClass = 'flex flex-wrap items-center gap-2 pt-1'
 const settingToggleRowClass =
   'flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border bg-admin-surface-muted px-3.5 py-3'

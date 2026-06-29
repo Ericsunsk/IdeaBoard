@@ -1,7 +1,8 @@
 <template>
   <div :class="adminSurfaceRootViewportClass">
     <div :class="[adminSurfacePanelClass, adminSurfacePanelViewportClass]">
-      <div v-if="hasToolbar" :class="adminSurfaceToolbarClass">
+      <slot v-if="slots.toolbar" name="toolbar" />
+      <div v-else-if="hasToolbar" :class="adminSurfaceToolbarClass">
         <div class="flex flex-wrap items-center gap-3">
           <slot name="toolbar-start" />
         </div>
@@ -34,7 +35,9 @@ const props = defineProps<{
 defineEmits<{ scroll: [] }>()
 
 const slots = useSlots()
-const hasToolbar = computed(() => Boolean(slots['toolbar-start'] || slots['toolbar-end']))
+const hasToolbar = computed(() =>
+  Boolean(slots.toolbar || slots['toolbar-start'] || slots['toolbar-end']),
+)
 const frameContentClass = computed(() => [
   adminSurfaceScrollContentClass,
   props.contentClass || (hasToolbar.value ? 'px-6 pb-6' : 'p-6'),

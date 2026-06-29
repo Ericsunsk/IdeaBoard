@@ -83,98 +83,111 @@
     </Message>
 
     <AdminTablePanel v-else>
-      <template #toolbar-start>
-        <AdminToolbarSearch
-          v-model="searchKeyword"
-          @enter="handleTaskSearch"
-          @clear="clearSearch"
-        />
-        <Tag :value="`${total} 任务`" severity="secondary" rounded />
-        <Tag
-          v-if="taskStats.pending > 0"
-          :value="`${taskStats.pending} 等待中`"
-          severity="secondary"
-          rounded
-        />
-        <Tag
-          v-if="taskStats.running > 0"
-          :value="`${taskStats.running} 执行中`"
-          severity="warn"
-          rounded
-        />
-        <Tag
-          v-if="taskStats.failed > 0"
-          :value="`${taskStats.failed} 失败`"
-          severity="danger"
-          rounded
-        />
-        <Tag
-          v-if="taskStats.completed > 0"
-          :value="`${taskStats.completed} 已完成`"
-          severity="success"
-          rounded
-        />
-        <Tag
-          v-if="taskStats.cancelled > 0"
-          :value="`${taskStats.cancelled} 已取消`"
-          severity="secondary"
-          rounded
-        />
-        <Tag v-if="selectedTasks.length > 0" :value="`已选 ${selectedTasks.length}`" rounded />
-      </template>
-
-      <template #toolbar-end>
-        <AdminFilterPopover
-          :active="hasTaskFilter"
-          filter-label="筛选任务"
-          @reset="resetTaskFilters"
-        >
-          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-            <span>状态</span>
-            <Select
-              v-model="filterStatus"
-              :options="taskStatusSelectOptions"
-              option-label="label"
-              option-value="value"
-              size="small"
-              fluid
+      <template #toolbar>
+        <AdminResourceToolbar>
+          <template #search>
+            <AdminToolbarSearch
+              v-model="searchKeyword"
+              @enter="handleTaskSearch"
+              @clear="clearSearch"
             />
-          </label>
-
-          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-            <span>账号 ID</span>
-            <InputNumber
-              v-model="accountIdFilter"
-              :min="1"
-              :use-grouping="false"
-              placeholder="Account ID"
-              size="small"
-              fluid
-            />
-          </label>
-        </AdminFilterPopover>
-
-        <div class="h-5 w-[1px] bg-admin-border-soft"></div>
-
-        <Button
-          text
-          :class="adminToolbarIconButtonClass"
-          aria-label="刷新任务列表"
-          @click="loadTasks"
-        >
-          <template #icon>
-            <Refresh class="size-4 text-admin-text-2" />
           </template>
-        </Button>
 
-        <AdminPagerControls
-          :current-page="page"
-          :total-pages="totalPages"
-          :prev-disabled="page === 1 || loading"
-          :next-disabled="page === totalPages || loading"
-          @prev="handlePrevTaskPage"
-          @next="handleNextTaskPage"
-        />
+          <template #metrics>
+            <Tag :value="`${total} 任务`" severity="secondary" rounded />
+            <Tag
+              v-if="taskStats.pending > 0"
+              :value="`${taskStats.pending} 等待中`"
+              severity="secondary"
+              rounded
+            />
+            <Tag
+              v-if="taskStats.running > 0"
+              :value="`${taskStats.running} 执行中`"
+              severity="warn"
+              rounded
+            />
+            <Tag
+              v-if="taskStats.failed > 0"
+              :value="`${taskStats.failed} 失败`"
+              severity="danger"
+              rounded
+            />
+            <Tag
+              v-if="taskStats.completed > 0"
+              :value="`${taskStats.completed} 已完成`"
+              severity="success"
+              rounded
+            />
+            <Tag
+              v-if="taskStats.cancelled > 0"
+              :value="`${taskStats.cancelled} 已取消`"
+              severity="secondary"
+              rounded
+            />
+            <Tag v-if="selectedTasks.length > 0" :value="`已选 ${selectedTasks.length}`" rounded />
+          </template>
+
+          <template #filters>
+            <AdminFilterPopover
+              :active="hasTaskFilter"
+              filter-label="筛选任务"
+              @reset="resetTaskFilters"
+            >
+              <label
+                class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+              >
+                <span>状态</span>
+                <Select
+                  v-model="filterStatus"
+                  :options="taskStatusSelectOptions"
+                  option-label="label"
+                  option-value="value"
+                  size="small"
+                  fluid
+                />
+              </label>
+
+              <label
+                class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+              >
+                <span>账号 ID</span>
+                <InputNumber
+                  v-model="accountIdFilter"
+                  :min="1"
+                  :use-grouping="false"
+                  placeholder="Account ID"
+                  size="small"
+                  fluid
+                />
+              </label>
+            </AdminFilterPopover>
+          </template>
+
+          <template #actions="{ iconButtonClass }">
+            <Button
+              text
+              :class="iconButtonClass"
+              aria-label="刷新任务列表"
+              @click="loadTasks"
+            >
+              <template #icon>
+                <Refresh class="size-4 text-admin-text-2" />
+              </template>
+            </Button>
+          </template>
+
+          <template #pager>
+            <AdminPagerControls
+              :current-page="page"
+              :total-pages="totalPages"
+              :prev-disabled="page === 1 || loading"
+              :next-disabled="page === totalPages || loading"
+              @prev="handlePrevTaskPage"
+              @next="handleNextTaskPage"
+            />
+          </template>
+        </AdminResourceToolbar>
       </template>
 
       <AdminTableFrame>
@@ -609,6 +622,7 @@ import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessage
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
+import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
@@ -622,7 +636,6 @@ import {
   adminChartGridClass,
   adminDashboardRootClass,
   adminSummaryGridClass,
-  adminToolbarIconButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {

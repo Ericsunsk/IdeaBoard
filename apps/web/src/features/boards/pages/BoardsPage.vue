@@ -1,15 +1,15 @@
 <template>
   <div
-    :class="[pageClass, { 'is-scrolling': isBoardsPageScrolling }]"
+    :class="[boardCatalogClasses.page, { 'is-scrolling': isBoardsPageScrolling }]"
     @scroll.passive="handleBoardsPageScroll"
   >
-    <div :class="pageBackgroundClass"></div>
+    <div :class="boardCatalogClasses.pageBackground"></div>
 
-    <header :class="headerClass">
-      <div :class="brandClass">
-        <span :class="brandNameClass">{{ projectName }}</span>
+    <header :class="boardCatalogClasses.header">
+      <div :class="boardCatalogClasses.brand">
+        <span :class="boardCatalogClasses.brandName">{{ projectName }}</span>
       </div>
-      <div :class="userMenuWrapClass" @pointerdown.stop @mousedown.stop @click.stop>
+      <div :class="boardCatalogClasses.userMenuWrap" @pointerdown.stop @mousedown.stop @click.stop>
         <Button
           unstyled
           type="button"
@@ -17,17 +17,17 @@
           aria-label="账户菜单"
           aria-haspopup="menu"
           :aria-expanded="isUserMenuOpen"
-          :class="userAvatarButtonClass"
+          :class="boardCatalogClasses.userAvatarButton"
           @click="toggleUserMenu"
         >
           <img
             v-if="userStore.user?.avatar"
             :src="userStore.user.avatar"
-            :class="userAvatarClass"
+            :class="boardCatalogClasses.userAvatar"
             alt="用户头像"
           />
-          <div v-else :class="userAvatarPlaceholderClass">
-            <User :class="avatarIconClass" />
+          <div v-else :class="boardCatalogClasses.userAvatarPlaceholder">
+            <User :class="boardCatalogClasses.avatarIcon" />
           </div>
         </Button>
         <Menu
@@ -51,25 +51,25 @@
       </div>
     </header>
 
-    <main :class="mainClass">
-      <h1 :class="pageTitleClass">Welcome to {{ projectName }}!</h1>
-      <p :class="pageSubtitleClass">Explore, expand, and refine your ideas</p>
+    <main :class="boardCatalogClasses.main">
+      <h1 :class="boardCatalogClasses.pageTitle">Welcome to {{ projectName }}!</h1>
+      <p :class="boardCatalogClasses.pageSubtitle">Explore, expand, and refine your ideas</p>
 
-      <section :class="toolbarClass">
+      <section :class="boardCatalogClasses.toolbar">
         <Button
           type="button"
           label="New Canvas"
-          :class="createButtonClass"
+          :class="boardCatalogClasses.createButton"
           @click="createAndOpenBoard"
         />
-        <label :class="searchWrapClass">
-          <Search :class="searchIconClass" />
+        <label :class="boardCatalogClasses.searchWrap">
+          <Search :class="boardCatalogClasses.searchIcon" />
           <InputText
             :model-value="searchKeyword"
             unstyled
             type="text"
             placeholder="Search canvases..."
-            :class="searchInputClass"
+            :class="boardCatalogClasses.searchInput"
             @update:model-value="onSearchInput"
           />
         </label>
@@ -78,24 +78,29 @@
           :options="sortOptions"
           option-label="label"
           option-value="value"
-          :class="sortSelectClass"
-          :pt="sortSelectPt"
+          :class="boardCatalogClasses.sortSelect"
+          :pt="boardCatalogSortSelectPt"
           aria-label="Sort canvases"
         />
       </section>
 
-      <section v-if="isBoardsLoading" :class="loadingStateClass" aria-live="polite">
-        <ProgressSpinner class="!h-9 !w-9 text-[#7a6bd5]" stroke-width="4" />
+      <section v-if="isBoardsLoading" :class="boardCatalogClasses.loadingState" aria-live="polite">
+        <ProgressSpinner :class="boardCatalogClasses.loadingSpinner" stroke-width="4" />
       </section>
 
-      <section v-else :class="boardsGridClass">
-        <Button unstyled type="button" :class="createCardClass" @click="createAndOpenBoard">
-          <div :class="createPreviewClass">
-            <div :class="createPreviewIconClass" aria-hidden="true"></div>
+      <section v-else :class="boardCatalogClasses.boardsGrid">
+        <Button
+          unstyled
+          type="button"
+          :class="boardCatalogClasses.createCard"
+          @click="createAndOpenBoard"
+        >
+          <div :class="boardCatalogClasses.createPreview">
+            <div :class="boardCatalogClasses.createPreviewIcon" aria-hidden="true"></div>
           </div>
-          <div :class="createMetaClass">
-            <div :class="createTitleClass">Create New Canvas</div>
-            <div :class="createDateClass">Start from an empty board</div>
+          <div :class="boardCatalogClasses.createMeta">
+            <div :class="boardCatalogClasses.createTitle">Create New Canvas</div>
+            <div :class="boardCatalogClasses.createDate">Start from an empty board</div>
           </div>
         </Button>
 
@@ -122,7 +127,7 @@
 
       <p
         v-if="!isBoardsLoading && visibleBoards.length === 0 && searchKeyword"
-        :class="emptyTipClass"
+        :class="boardCatalogClasses.emptyTip"
       >
         No matching canvas
       </p>
@@ -135,24 +140,26 @@
       :closable="!isDeleteBoardPending"
       :draggable="false"
       :show-header="false"
-      :style="{ width: '360px', maxWidth: 'calc(100vw - 28px)' }"
-      :pt="deleteDialogPt"
+      :style="boardCatalogDeleteDialogStyle"
+      :pt="boardCatalogDeleteDialogPt"
       aria-labelledby="board-delete-dialog-title"
       @hide="handleDeleteDialogHide"
     >
-      <div :class="deleteDialogShellClass">
-        <h2 id="board-delete-dialog-title" :class="deleteDialogTitleClass">删除画布</h2>
-        <p :class="deleteDialogDescriptionClass">
+      <div :class="boardCatalogClasses.deleteDialogShell">
+        <h2 id="board-delete-dialog-title" :class="boardCatalogClasses.deleteDialogTitle">
+          删除画布
+        </h2>
+        <p :class="boardCatalogClasses.deleteDialogDescription">
           确认删除「{{ pendingDeleteBoard?.name || 'Untitled' }}」？此操作不可撤销。
         </p>
 
-        <div :class="deleteDialogFooterClass">
+        <div :class="boardCatalogClasses.deleteDialogFooter">
           <Button
             unstyled
             type="button"
             label="取消"
             :disabled="isDeleteBoardPending"
-            :class="deleteCancelButtonClass"
+            :class="boardCatalogClasses.deleteCancelButton"
             @click="closeDeleteDialog"
           />
           <Button
@@ -160,7 +167,7 @@
             type="button"
             :label="isDeleteBoardPending ? '删除中...' : '删除'"
             :disabled="isDeleteBoardPending"
-            :class="deleteConfirmButtonClass"
+            :class="boardCatalogClasses.deleteConfirmButton"
             @click="confirmDeleteBoard"
           />
         </div>
@@ -175,10 +182,15 @@ import {
   touchCanvasBoard,
   type CanvasBoardMeta,
 } from '../../canvas-board/catalog/canvasBoards'
-import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
 import { hydrateCanvasBoardsFromServer } from '../../canvas-board/catalog/boardSync'
 import { createCanvasBoardCommands } from '../lib/canvasBoardCommands'
 import { createBoardPreviewRefreshQueue } from '../lib/boardPreviewRefreshQueue'
+import {
+  boardCatalogClasses,
+  boardCatalogDeleteDialogPt,
+  boardCatalogDeleteDialogStyle,
+  boardCatalogSortSelectPt,
+} from '../lib/boardCatalogSkin'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
@@ -232,73 +244,6 @@ const sortOptions = [
   { label: 'Recent', value: 'recent' },
   { label: 'Name', value: 'name' },
 ]
-
-const pageClass =
-  'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-[#f8f9fd] px-7 pt-4 pb-16 text-[#1f2430] [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:px-3.5 max-[860px]:pt-3.5 max-[860px]:pb-10'
-const pageBackgroundClass =
-  'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,rgba(150,120,230,0.24)_0%,rgba(150,120,230,0)_100%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-position:center_center,center_center] [background-size:100%_100%,12px_12px]'
-const headerClass = 'relative z-[1] flex items-center justify-between'
-const brandClass = 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center'
-const brandNameClass = 'min-w-0 truncate text-[32px] font-bold tracking-normal'
-const userMenuWrapClass = 'relative'
-const userAvatarButtonClass = 'ib-user-avatar-button'
-const userAvatarClass = 'ib-user-avatar-button__image'
-const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
-const avatarIconClass = 'size-5'
-const mainClass = 'relative z-[1] mx-auto mt-[46px] max-w-[1080px]'
-const pageTitleClass =
-  'm-0 break-words text-center text-[62px] leading-[1.05] font-bold tracking-normal max-[860px]:text-[40px]'
-const pageSubtitleClass =
-  'mt-4 mb-[34px] text-center text-[19px] tracking-normal text-[#6e7487] max-[860px]:text-[15px]'
-const toolbarClass =
-  'mb-6 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 max-[860px]:grid-cols-1'
-const createButtonClass =
-  '!h-[42px] !rounded-full !border-0 !bg-[#7a6bd5] !px-5 !text-sm !font-bold !tracking-normal !text-white !shadow-none hover:!bg-[#6d5fd0] focus-visible:!shadow-[0_0_0_3px_rgba(122,107,213,0.18)] max-[860px]:!w-full'
-const searchWrapClass =
-  'flex h-[42px] min-w-0 items-center gap-2 rounded-full border border-[#d9dfec] bg-white/90 px-3'
-const searchIconClass = 'size-3.5 shrink-0 text-[#8a90a3]'
-const searchInputClass = 'min-w-0 flex-1 bg-transparent text-[13px] text-[#2f3446] outline-none'
-const sortSelectClass =
-  '!inline-flex !h-[42px] !w-[108px] !min-w-[108px] !items-center !justify-center !gap-2 !rounded-full !border-[#d9dfec] !bg-white/90 !text-[13px] !font-semibold !text-[#3e4457] !shadow-none max-[860px]:!w-full'
-const boardsGridClass = 'grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5'
-const loadingStateClass =
-  'flex min-h-[244px] items-center justify-center rounded-xl border border-dashed border-[#d9dfec] bg-white/60'
-const createCardClass =
-  'relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-[#d9dfec] bg-white/90 p-0 text-left transition-colors hover:border-[#cdd4e6] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(122,107,213,0.16)]'
-const createPreviewClass = `flex h-[186px] items-center justify-center border-b border-[#e7ebf3] ${blankBoardPreviewSurfaceClass}`
-const createPreviewIconClass =
-  "relative flex size-[54px] items-center justify-center rounded-[14px] border border-[#cfd7ea] bg-white before:absolute before:top-1/2 before:left-1/2 before:h-[25px] before:w-[2.5px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-[#cfd7ea] before:content-[''] after:absolute after:top-1/2 after:left-1/2 after:h-[2.5px] after:w-[25px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-[#cfd7ea] after:content-['']"
-const createMetaClass = 'px-3 pt-2.5 pb-3'
-const createTitleClass = 'text-sm font-bold text-[#394054]'
-const createDateClass = 'mt-[3px] text-xs text-[#7b8297]'
-const emptyTipClass = 'mt-[18px] text-[13px] text-[#7b8297]'
-const sortSelectPt = {
-  label: { class: '!w-auto !flex-none !py-0 !pr-0 !pl-0 !leading-[40px]' },
-  dropdown: { class: '!w-auto !flex-none' },
-  overlay: {
-    class:
-      '!rounded-xl !border !border-[#d8ddea] !bg-white !shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
-  },
-  list: { class: '!p-1.5' },
-  option: { class: '!rounded-lg !px-3 !py-2 !text-[13px] !font-semibold' },
-} as const
-const deleteDialogPt = {
-  mask: { class: '!bg-[rgba(31,36,48,0.34)]' },
-  root: {
-    class:
-      '!overflow-hidden !rounded-[20px] !border !border-[#d8ddea] !bg-white !shadow-[0_22px_58px_rgba(30,39,60,0.18)]',
-  },
-  content: { class: '!bg-transparent !p-0' },
-} as const
-const deleteDialogShellClass = 'p-5'
-const deleteDialogTitleClass =
-  'm-0 text-[18px] leading-[1.2] font-bold tracking-normal text-[#2f3446]'
-const deleteDialogDescriptionClass = 'mt-3 mb-0 text-[13px] leading-6 text-[#6e7487]'
-const deleteDialogFooterClass = 'mt-6 flex justify-end gap-2'
-const deleteCancelButtonClass =
-  'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-3.5 text-sm font-bold text-[#6e7487] transition-colors hover:bg-[#f1f4fb] disabled:cursor-not-allowed disabled:opacity-60'
-const deleteConfirmButtonClass =
-  'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-[#d14343] px-3.5 text-sm font-bold text-white transition-colors hover:bg-[#bd333a] disabled:cursor-not-allowed disabled:opacity-70'
 
 const userMenuItems = computed<MenuItem[]>(() => [
   {

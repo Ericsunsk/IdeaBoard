@@ -9,43 +9,54 @@
     :is-scrolling="isStoragePanelScrolling"
     @scroll="handleStoragePanelScroll"
   >
-    <template #toolbar-start>
-      <AdminToolbarSearch v-model="searchKeyword" />
-      <span :class="adminToolbarMetricClass">
-        <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
-        <span>{{ storageCountLabel }}</span>
-      </span>
-      <Tag
-        v-if="currentStorage"
-        :value="`当前 ${currentStorage.name}`"
-        severity="success"
-        rounded
-      />
-      <Tag :value="`${configuredStorageCount}/${storages.length} 已配置`" severity="info" rounded />
-    </template>
+    <template #toolbar>
+      <AdminResourceToolbar>
+        <template #search>
+          <AdminToolbarSearch v-model="searchKeyword" />
+        </template>
 
-    <template #toolbar-end>
-      <Button
-        text
-        :class="adminToolbarIconButtonClass"
-        aria-label="刷新存储"
-        :loading="loading"
-        @click="loadData"
-      >
-        <template #icon>
-          <Refresh class="size-4 text-admin-text-2" />
+        <template #metrics="{ metricClass }">
+          <span :class="metricClass">
+            <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
+            <span>{{ storageCountLabel }}</span>
+          </span>
+          <Tag
+            v-if="currentStorage"
+            :value="`当前 ${currentStorage.name}`"
+            severity="success"
+            rounded
+          />
+          <Tag
+            :value="`${configuredStorageCount}/${storages.length} 已配置`"
+            severity="info"
+            rounded
+          />
         </template>
-      </Button>
-      <Button
-        label="新增存储"
-        class="!h-9 !rounded-lg"
-        :disabled="creatableProviders.length === 0"
-        @click="openCreate"
-      >
-        <template #icon>
-          <Plus class="size-4" />
+
+        <template #actions="{ iconButtonClass }">
+          <Button
+            text
+            :class="iconButtonClass"
+            aria-label="刷新存储"
+            :loading="loading"
+            @click="loadData"
+          >
+            <template #icon>
+              <Refresh class="size-4 text-admin-text-2" />
+            </template>
+          </Button>
+          <Button
+            label="新增存储"
+            class="!h-9 !rounded-lg"
+            :disabled="creatableProviders.length === 0"
+            @click="openCreate"
+          >
+            <template #icon>
+              <Plus class="size-4" />
+            </template>
+          </Button>
         </template>
-      </Button>
+      </AdminResourceToolbar>
     </template>
 
     <Card
@@ -406,6 +417,7 @@ import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
+import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -417,8 +429,6 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
   adminMasonryCardClass,
-  adminToolbarIconButtonClass,
-  adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
 import { storageVendorIcon, storageVendorLogo } from '../../storage/storageMeta'
 import { storageStatusSeverity, type StorageCard } from '../../storage/storageHelpers'

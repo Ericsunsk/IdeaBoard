@@ -1,63 +1,82 @@
 <template>
   <AdminTablePanel viewport-height content-class="min-h-0 flex-1 overflow-hidden px-6 pb-6">
-    <template #toolbar-start>
-      <AdminToolbarSearch v-model="searchKeyword" @enter="loadUsers" @clear="clearSearch" />
-      <span :class="adminToolbarMetricClass">
-        <span class="h-2.5 w-2.5 rounded-full bg-admin-success"></span>
-        <span>{{ totalUsersLabel }}</span>
-      </span>
-      <Tag :value="`${activeUserCount} 正常`" severity="success" rounded />
-      <Tag
-        v-if="bannedUserCount > 0"
-        :value="`${bannedUserCount} 封禁`"
-        severity="danger"
-        rounded
-      />
-      <Tag :value="`${adminUserCount} 管理员`" severity="info" rounded />
-      <Tag v-if="selectedUsers.length > 0" :value="`已选 ${selectedUsers.length}`" rounded />
-    </template>
-
-    <template #toolbar-end>
-      <AdminFilterPopover :active="hasUserFilter" filter-label="筛选用户" @reset="resetUserFilters">
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-          <span>角色</span>
-          <Select
-            v-model="userRoleFilter"
-            :options="userRoleFilterOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            fluid
-          />
-        </label>
-
-        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-          <span>状态</span>
-          <Select
-            v-model="userStatusFilter"
-            :options="userStatusFilterOptions"
-            option-label="label"
-            option-value="value"
-            size="small"
-            fluid
-          />
-        </label>
-      </AdminFilterPopover>
-
-      <Button text :class="adminToolbarIconButtonClass" aria-label="刷新用户" @click="loadUsers">
-        <template #icon>
-          <Refresh class="size-4 text-admin-text-2" />
+    <template #toolbar>
+      <AdminResourceToolbar>
+        <template #search>
+          <AdminToolbarSearch v-model="searchKeyword" @enter="loadUsers" @clear="clearSearch" />
         </template>
-      </Button>
 
-      <AdminPagerControls
-        :current-page="currentPage"
-        :total-pages="totalPages"
-        :prev-disabled="currentPage === 1 || loading"
-        :next-disabled="currentPage === totalPages || loading"
-        @prev="handlePrevPage"
-        @next="handleNextPage"
-      />
+        <template #metrics="{ metricClass }">
+          <span :class="metricClass">
+            <span class="h-2.5 w-2.5 rounded-full bg-admin-success"></span>
+            <span>{{ totalUsersLabel }}</span>
+          </span>
+          <Tag :value="`${activeUserCount} 正常`" severity="success" rounded />
+          <Tag
+            v-if="bannedUserCount > 0"
+            :value="`${bannedUserCount} 封禁`"
+            severity="danger"
+            rounded
+          />
+          <Tag :value="`${adminUserCount} 管理员`" severity="info" rounded />
+          <Tag v-if="selectedUsers.length > 0" :value="`已选 ${selectedUsers.length}`" rounded />
+        </template>
+
+        <template #filters>
+          <AdminFilterPopover
+            :active="hasUserFilter"
+            filter-label="筛选用户"
+            @reset="resetUserFilters"
+          >
+            <label
+              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+            >
+              <span>角色</span>
+              <Select
+                v-model="userRoleFilter"
+                :options="userRoleFilterOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                fluid
+              />
+            </label>
+
+            <label
+              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+            >
+              <span>状态</span>
+              <Select
+                v-model="userStatusFilter"
+                :options="userStatusFilterOptions"
+                option-label="label"
+                option-value="value"
+                size="small"
+                fluid
+              />
+            </label>
+          </AdminFilterPopover>
+        </template>
+
+        <template #actions="{ iconButtonClass }">
+          <Button text :class="iconButtonClass" aria-label="刷新用户" @click="loadUsers">
+            <template #icon>
+              <Refresh class="size-4 text-admin-text-2" />
+            </template>
+          </Button>
+        </template>
+
+        <template #pager>
+          <AdminPagerControls
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :prev-disabled="currentPage === 1 || loading"
+            :next-disabled="currentPage === totalPages || loading"
+            @prev="handlePrevPage"
+            @next="handleNextPage"
+          />
+        </template>
+      </AdminResourceToolbar>
     </template>
 
     <AdminTableFrame class="h-full">
@@ -230,17 +249,14 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../shared/components/AdminPagerControls.vue'
+import AdminResourceToolbar from '../shared/components/AdminResourceToolbar.vue'
 import AdminTableFrame from '../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../shared/composables/useTransientScrolling'
 import { adminDenseDataTablePt } from '../shared/lib/adminDataTablePt'
 import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
-import {
-  adminRoundIconButtonClass,
-  adminToolbarIconButtonClass,
-  adminToolbarMetricClass,
-} from '../shared/lib/adminUiClasses'
+import { adminRoundIconButtonClass } from '../shared/lib/adminUiClasses'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'

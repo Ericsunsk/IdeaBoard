@@ -10,32 +10,39 @@
       :is-scrolling="isChannelPanelScrolling"
       @scroll="handleChannelPanelScroll"
     >
-      <template #toolbar-start>
-        <AdminToolbarSearch v-model="searchKeyword" />
-        <span :class="adminToolbarMetricClass">
-          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
-          <span>{{ totalChannelsLabel }}</span>
-        </span>
-        <Tag :value="accountRunningLabel" severity="success" rounded />
-        <Tag :value="`${activeModelCount} 模型`" severity="info" rounded />
-      </template>
+      <template #toolbar>
+        <AdminResourceToolbar>
+          <template #search>
+            <AdminToolbarSearch v-model="searchKeyword" />
+          </template>
 
-      <template #toolbar-end>
-        <Button
-          text
-          :class="adminToolbarIconButtonClass"
-          aria-label="刷新渠道商"
-          @click="commands.loadData"
-        >
-          <template #icon>
-            <Refresh class="size-4 text-admin-text-2" />
+          <template #metrics="{ metricClass }">
+            <span :class="metricClass">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
+              <span>{{ totalChannelsLabel }}</span>
+            </span>
+            <Tag :value="accountRunningLabel" severity="success" rounded />
+            <Tag :value="`${activeModelCount} 模型`" severity="info" rounded />
           </template>
-        </Button>
-        <Button label="新增渠道商" class="!h-9 !rounded-lg" @click="channelEditor.openCreate">
-          <template #icon>
-            <Plus class="size-4" />
+
+          <template #actions="{ iconButtonClass }">
+            <Button
+              text
+              :class="iconButtonClass"
+              aria-label="刷新渠道商"
+              @click="commands.loadData"
+            >
+              <template #icon>
+                <Refresh class="size-4 text-admin-text-2" />
+              </template>
+            </Button>
+            <Button label="新增渠道商" class="!h-9 !rounded-lg" @click="channelEditor.openCreate">
+              <template #icon>
+                <Plus class="size-4" />
+              </template>
+            </Button>
           </template>
-        </Button>
+        </AdminResourceToolbar>
       </template>
 
       <Card
@@ -220,35 +227,28 @@
       :style="{ width: 'min(480px, calc(100vw - 24px))' }"
     >
       <div :class="adminDialogFormBodyClass">
-        <label
-          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
+          label="渠道商名称"
           for="admin-channel-name"
+          :error="channelFormErrors.name"
         >
-          <span>渠道商名称</span>
           <InputText
             id="admin-channel-name"
             v-model="channelForm.name"
             class="w-full"
             placeholder="例如：Nano Banana 官方"
-            :invalid="Boolean(channelFormErrors.name)"
-            aria-describedby="admin-channel-name-error"
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
             @update:model-value="clearChannelFormError('name')"
           />
-          <Message
-            v-if="channelFormErrors.name"
-            id="admin-channel-name-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ channelFormErrors.name }}
-          </Message>
-        </label>
-        <label
-          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        </AdminFormField>
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
+          label="接口类型"
           for="admin-channel-type"
+          :error="channelFormErrors.apiType"
         >
-          <span>接口类型</span>
           <Select
             v-model="channelForm.apiType"
             input-id="admin-channel-type"
@@ -257,45 +257,28 @@
             option-label="label"
             option-value="value"
             placeholder="选择接口协议"
-            :invalid="Boolean(channelFormErrors.apiType)"
-            aria-describedby="admin-channel-type-error"
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
             @update:model-value="clearChannelFormError('apiType')"
           />
-          <Message
-            v-if="channelFormErrors.apiType"
-            id="admin-channel-type-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ channelFormErrors.apiType }}
-          </Message>
-        </label>
-        <label
-          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        </AdminFormField>
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
+          label="Base URL地址"
           for="admin-channel-api-url"
+          :error="channelFormErrors.baseUrl"
         >
-          <span>Base URL地址</span>
           <InputText
             id="admin-channel-api-url"
             v-model="channelForm.baseUrl"
             class="w-full"
             placeholder="例如：https://api.example.com/v1"
-            :invalid="Boolean(channelFormErrors.baseUrl)"
-            aria-describedby="admin-channel-api-url-error"
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
             @blur="channelEditor.handleApiUrlBlur"
             @update:model-value="clearChannelFormError('baseUrl')"
           />
-          <Message
-            v-if="channelFormErrors.baseUrl"
-            id="admin-channel-api-url-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ channelFormErrors.baseUrl }}
-          </Message>
-        </label>
+        </AdminFormField>
       </div>
       <template #footer>
         <div :class="adminDialogCompactFooterActionsClass">
@@ -321,37 +304,30 @@
           <code class="font-semibold text-admin-text-1">{{ selectedChannelForAccount.name }}</code>
         </div>
 
-        <label
-          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
+          :label="isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)'"
           for="admin-account-secret"
+          :error="accountFormErrors.secret"
         >
-          <span>{{ isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)' }}</span>
           <InputText
             id="admin-account-secret"
             v-model="accountForm.secret"
             class="w-full"
             type="password"
             :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此渠道商的 API Key'"
-            :invalid="Boolean(accountFormErrors.secret)"
-            aria-describedby="admin-account-secret-error"
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
             @update:model-value="clearAccountFormError('secret')"
           />
-          <Message
-            v-if="accountFormErrors.secret"
-            id="admin-account-secret-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ accountFormErrors.secret }}
-          </Message>
-        </label>
+        </AdminFormField>
 
-        <label
-          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
+          label="分配模型"
           for="admin-account-models"
+          :error="accountFormErrors.modelValues"
         >
-          <span>分配模型</span>
           <AutoComplete
             v-model="accountForm.modelValues"
             input-id="admin-account-models"
@@ -361,74 +337,49 @@
             :loading="detectModelsLoading"
             placeholder="选择或输入分配给该 APIKey 的模型"
             :pt="modelSelectPt"
-            :invalid="Boolean(accountFormErrors.modelValues)"
-            aria-describedby="admin-account-models-error"
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
             @focus="accountEditor.handleModelSelectShow(true)"
             @complete="searchModelSuggestions"
             @update:model-value="clearAccountFormError('modelValues')"
           />
-          <Message
-            v-if="accountFormErrors.modelValues"
-            id="admin-account-models-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ accountFormErrors.modelValues }}
-          </Message>
-        </label>
+        </AdminFormField>
 
         <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <label
-            class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          <AdminFormField
+            v-slot="{ describedbyId, invalid }"
+            label="最大并发数"
             for="admin-account-max-concurrent"
+            :error="accountFormErrors.maxConcurrent"
           >
-            <span>最大并发数</span>
             <InputNumber
               v-model="accountForm.maxConcurrent"
               input-id="admin-account-max-concurrent"
               :min="accountLimits.maxConcurrent.min"
               :max="accountLimits.maxConcurrent.max"
               fluid
-              :invalid="Boolean(accountFormErrors.maxConcurrent)"
-              aria-describedby="admin-account-max-concurrent-error"
+              :invalid="invalid"
+              :aria-describedby="describedbyId"
               @update:model-value="clearAccountFormError('maxConcurrent')"
             />
-            <Message
-              v-if="accountFormErrors.maxConcurrent"
-              id="admin-account-max-concurrent-error"
-              severity="error"
-              size="small"
-              :closable="false"
-            >
-              {{ accountFormErrors.maxConcurrent }}
-            </Message>
-          </label>
-          <label
-            class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          </AdminFormField>
+          <AdminFormField
+            v-slot="{ describedbyId, invalid }"
+            label="超时时间(秒)"
             for="admin-account-timeout"
+            :error="accountFormErrors.timeoutSeconds"
           >
-            <span>超时时间(秒)</span>
             <InputNumber
               v-model="accountForm.timeoutSeconds"
               input-id="admin-account-timeout"
               :min="accountLimits.timeoutSeconds.min"
               :max="accountLimits.timeoutSeconds.max"
               fluid
-              :invalid="Boolean(accountFormErrors.timeoutSeconds)"
-              aria-describedby="admin-account-timeout-error"
+              :invalid="invalid"
+              :aria-describedby="describedbyId"
               @update:model-value="clearAccountFormError('timeoutSeconds')"
             />
-            <Message
-              v-if="accountFormErrors.timeoutSeconds"
-              id="admin-account-timeout-error"
-              severity="error"
-              size="small"
-              :closable="false"
-            >
-              {{ accountFormErrors.timeoutSeconds }}
-            </Message>
-          </label>
+          </AdminFormField>
         </div>
       </div>
       <template #footer>
@@ -459,7 +410,9 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
 import { EditPencil, Plus, Refresh, Trash } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
+import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
+import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -470,8 +423,6 @@ import {
   adminDialogFormBodyClass,
   adminFramedIconButtonClass,
   adminMasonryCardClass,
-  adminToolbarIconButtonClass,
-  adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
 
