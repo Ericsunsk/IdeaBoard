@@ -5,18 +5,18 @@ import {
   getGetAdminRegistrationSettingQueryKey,
   useGetAdminRateLimitSettings,
   useGetAdminRegistrationSetting,
-} from '../../../../shared/api/generated-query/admin-settings/admin-settings'
+} from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type {
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
   ApiResponseRegistrationSettingData,
   RateLimitSetting,
-} from '../../../../shared/api/generated-query/model'
-import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
+} from '../../../shared/api/generated-query/model'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   updateRateLimitSettings,
   updateRegistrationSetting,
-} from '../queries/adminSettingsActions'
+} from './systemSettingsCommands'
 
 type AdminAccessSettingsMessage = {
   error: (message: string) => void

@@ -257,8 +257,7 @@ describe('useWorkspaceImageTools image adjustment final apply', () => {
         { url: 'https://example.com/source.png', title: 'Source' },
         [effectiveInvertLayer],
         expect.objectContaining({
-          taskId: 'image-adjustment-final:node-1',
-          latestOnly: true,
+          scopeId: 'node-1',
           onProgress: expect.any(Function),
         }),
       )
@@ -298,7 +297,7 @@ describe('useWorkspaceImageTools image adjustment final apply', () => {
       await flushPromises()
       harness.cancelImageAdjustmentFinalApply()
 
-      expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-adjustment-final:node-1')
+      expect(cancelFinalRenderMock).toHaveBeenCalledWith('node-1')
       expect(harness.runtime.isApplyingAdjustments.value).toBe(false)
       expect(harness.runtime.adjustmentFinalApplyProgress.value).toBeNull()
 
@@ -331,7 +330,7 @@ describe('useWorkspaceImageTools image adjustment final apply', () => {
 
       expect(harness.runtime.isApplyingAdjustments.value).toBe(true)
       expect(harness.runtime.enter('node-2', 'adjust')).toBe(true)
-      expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-adjustment-final:node-1')
+      expect(cancelFinalRenderMock).toHaveBeenCalledWith('node-1')
       expect(harness.runtime.activeNodeId.value).toBe('node-2')
       expect(harness.runtime.isApplyingAdjustments.value).toBe(false)
 

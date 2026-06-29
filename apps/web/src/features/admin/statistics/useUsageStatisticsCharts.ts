@@ -2,7 +2,7 @@ import { computed, type Ref } from 'vue'
 import type {
   AdminStatistics,
   GetAdminStatisticsRangeValue,
-} from '../../statistics/statisticsResource'
+} from './statisticsResource'
 import {
   adminChartLegend,
   adminChartStrokeWidth,
@@ -23,11 +23,11 @@ import {
   type AdminChartOptions,
   type AdminTooltipItem,
   withAlpha,
-} from '../../shared/lib/adminChart'
+} from '../shared/lib/adminChart'
 import {
   buildAdminTimeRangeBuckets,
   shouldShowAdminTimeRangeTick,
-} from '../../shared/lib/adminTimeRange'
+} from '../shared/lib/adminTimeRange'
 
 type ModelRiskPoint = {
   x: number

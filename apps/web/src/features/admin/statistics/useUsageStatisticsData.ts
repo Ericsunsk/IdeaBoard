@@ -4,11 +4,11 @@ import {
   type AdminStatistics,
   type GetAdminStatisticsRangeValue,
   useGetAdminStatistics,
-} from '../../statistics/statisticsResource'
+} from './statisticsResource'
 import {
   pickAdminTimeRangeOptions,
   type AdminTimeRangeOption,
-} from '../../shared/lib/adminTimeRange'
+} from '../shared/lib/adminTimeRange'
 
 const usageTrendRanges: readonly GetAdminStatisticsRangeValue[] = [
   GetAdminStatisticsRange['7d'],

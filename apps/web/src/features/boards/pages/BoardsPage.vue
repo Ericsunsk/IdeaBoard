@@ -171,30 +171,14 @@
 
 <script setup lang="ts">
 import {
-  createCanvasBoard,
-  deleteCanvasBoard,
-  duplicateCanvasBoard,
-  isCanvasBoardNameTaken,
   listCanvasBoards,
-  renameCanvasBoard,
   touchCanvasBoard,
   type CanvasBoardMeta,
 } from '../lib/canvasBoards'
-import {
-  deleteCanvasBoardState,
-  duplicateCanvasBoardState,
-  getCanvasBoardState,
-  setCanvasBoardPreviewSnapshot,
-} from '../../canvas-board/persistence'
 import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
-import { renderBoardPreviewDataUrl } from '../../canvas-board/preview'
-import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas-board/preview'
-import {
-  hydrateCanvasBoardsFromServer,
-  isBoardNameConflictError,
-  syncCanvasBoardToServer,
-  syncDeleteCanvasBoardToServer,
-} from '../lib/boardSync'
+import { hydrateCanvasBoardsFromServer } from '../lib/boardSync'
+import { createCanvasBoardCommands } from '../lib/canvasBoardCommands'
+import { createBoardPreviewRefreshQueue } from '../lib/boardPreviewRefreshQueue'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
@@ -224,6 +208,8 @@ const appToast = useAppToast()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 const { projectName } = useSiteBranding()
+const boardCommands = createCanvasBoardCommands()
+const boardPreviewRefresh = createBoardPreviewRefreshQueue()
 
 const boards = ref<CanvasBoardMeta[]>([])
 const isBoardsLoading = ref(true)
@@ -239,11 +225,7 @@ const deleteDialogVisible = ref(false)
 const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
 const isDeleteBoardPending = ref(false)
 const isBoardsPageScrolling = ref(false)
-
-const boardPreviewMap = ref<Record<string, string>>({})
-const previewRefreshQueue: string[] = []
-const queuedPreviewBoardIds = new Set<string>()
-let previewRefreshInFlight = false
+const boardPreviewMap = boardPreviewRefresh.previewMap
 let boardsPageScrollTimer: number | undefined
 
 const sortOptions = [
@@ -356,8 +338,8 @@ const visibleBoards = computed(() => {
 
 function reloadBoards() {
   boards.value = listCanvasBoards()
-  refreshBoardPreviews()
-  scheduleBoardPreviewRefresh()
+  boardPreviewRefresh.reloadFromLocal(boards.value)
+  boardPreviewRefresh.schedule(boards.value)
 }
 
 function formatDate(ts: number): string {
@@ -382,137 +364,22 @@ function handleBoardsPageScroll() {
   }, 700)
 }
 
-function refreshBoardPreviews() {
-  const nextMap: Record<string, string> = {}
-  boards.value.forEach((board) => {
-    nextMap[board.id] = getCanvasBoardState(board.id)?.previewSnapshotDataUrl || ''
-  })
-  boardPreviewMap.value = nextMap
-}
-
-function isBoardPreviewStale(boardId: string): boolean {
-  const state = getCanvasBoardState(boardId)
-  if (!state) return false
-  if (!state.previewSnapshotDataUrl) return true
-  if (!Number.isFinite(state.previewSnapshotUpdatedAt)) return true
-  if (state.previewSnapshotVersion !== BOARD_PREVIEW_RENDERER_VERSION) return true
-  return (state.previewSnapshotUpdatedAt || 0) < state.updatedAt
-}
-
-function enqueueBoardPreviewRefresh(boardId: string) {
-  if (!boardId || queuedPreviewBoardIds.has(boardId)) return
-  queuedPreviewBoardIds.add(boardId)
-  previewRefreshQueue.push(boardId)
-}
-
-async function refreshBoardPreviewInBackground(boardId: string) {
-  const startState = getCanvasBoardState(boardId)
-  if (!startState || !isBoardPreviewStale(boardId)) return
-  const baseUpdatedAt = startState.updatedAt
-  let snapshotDataUrl: string | undefined
-  let snapshotUpdatedAt: number | undefined
-  try {
-    const renderedDataUrl = await renderBoardPreviewDataUrl(startState)
-    snapshotDataUrl = renderedDataUrl || undefined
-    snapshotUpdatedAt = renderedDataUrl ? Date.now() : undefined
-  } catch (error) {
-    console.warn('[boards] failed to render board preview', boardId, error)
-    return
-  }
-  const latestState = getCanvasBoardState(boardId)
-  if (!latestState) return
-  if (latestState.updatedAt !== baseUpdatedAt) {
-    enqueueBoardPreviewRefresh(boardId)
-    return
-  }
-  const updatedState = setCanvasBoardPreviewSnapshot(
-    boardId,
-    snapshotDataUrl,
-    snapshotUpdatedAt,
-    snapshotDataUrl ? BOARD_PREVIEW_RENDERER_VERSION : undefined,
-  )
-  if (!updatedState) return
-  boardPreviewMap.value = {
-    ...boardPreviewMap.value,
-    [boardId]: updatedState.previewSnapshotDataUrl || '',
-  }
-  void syncCanvasBoardToServer(boardId).catch((error) => {
-    if (isBoardNameConflictError(error)) return
-    console.warn('[boards] failed to sync refreshed preview', boardId, error)
-  })
-}
-
-async function runBoardPreviewRefreshQueue() {
-  if (previewRefreshInFlight) return
-  previewRefreshInFlight = true
-  try {
-    while (previewRefreshQueue.length > 0) {
-      const boardId = previewRefreshQueue.shift()
-      if (!boardId) continue
-      queuedPreviewBoardIds.delete(boardId)
-      if (!isBoardPreviewStale(boardId)) continue
-      await refreshBoardPreviewInBackground(boardId)
-    }
-  } finally {
-    previewRefreshInFlight = false
-    if (previewRefreshQueue.length > 0) {
-      void runBoardPreviewRefreshQueue()
-    }
-  }
-}
-
-function scheduleBoardPreviewRefresh() {
-  boards.value.forEach((board) => {
-    if (isBoardPreviewStale(board.id)) {
-      enqueueBoardPreviewRefresh(board.id)
-    }
-  })
-  void runBoardPreviewRefreshQueue()
-}
-
 async function createAndOpenBoard() {
   activeMenuBoardId.value = null
-  const board = createCanvasBoard('Untitled')
-  try {
-    await syncCanvasBoardToServer(board.id)
-  } catch (error) {
-    if (isBoardNameConflictError(error)) {
-      deleteCanvasBoard(board.id)
-      deleteCanvasBoardState(board.id)
-      await hydrateCanvasBoardsFromServer()
-      reloadBoards()
-      appToast.error('画布名称已存在，请重试')
-      return
-    }
-    console.warn('[boards] failed to sync new board', error)
-    deleteCanvasBoard(board.id)
+  const result = await boardCommands.create()
+  if (!result.ok) {
     reloadBoards()
-    appToast.error('创建同步失败，请稍后重试')
+    appToast.error(result.reason === 'name-conflict' ? '画布名称已存在，请重试' : '创建同步失败，请稍后重试')
+    console.warn('[boards] failed to sync new board', result.error)
     return
   }
   reloadBoards()
-  router.push({ path: USER_WORKSPACE_PATH, query: { boardId: board.id } })
+  router.push({ path: USER_WORKSPACE_PATH, query: { boardId: result.board.id } })
 }
 
 function openBoard(board: CanvasBoardMeta) {
   touchCanvasBoard(board.id)
   router.push({ path: USER_WORKSPACE_PATH, query: { boardId: board.id } })
-}
-
-function isNotFoundError(error: unknown): boolean {
-  if (typeof error !== 'object' || !error) return false
-  const status = 'status' in error ? (error as { status?: unknown }).status : undefined
-  if (status === 404) return true
-  const code = 'code' in error ? (error as { code?: unknown }).code : undefined
-  if (code === 404) return true
-  const msg = 'msg' in error ? (error as { msg?: unknown }).msg : undefined
-  if (
-    typeof msg === 'string' &&
-    (msg.includes('画布不存在') || msg.toLowerCase().includes('not found'))
-  ) {
-    return true
-  }
-  return false
 }
 
 function onBoardCardClick(board: CanvasBoardMeta) {
@@ -540,32 +407,29 @@ function onRenameInput(nextName: string) {
 async function commitRename() {
   const boardId = renamingBoardId.value
   if (!boardId) return
-  if (isCanvasBoardNameTaken(renameDraft.value, boardId)) {
-    appToast.warning('名称已存在')
-    return
-  }
-  const renamed = renameCanvasBoard(boardId, renameDraft.value)
-  renamingBoardId.value = null
-  suppressNextBoardOpen.value = true
-  if (!renamed) {
-    appToast.warning('画布名称不能为空')
-    return
-  }
-  try {
-    await syncCanvasBoardToServer(boardId)
-  } catch (error) {
-    await hydrateCanvasBoardsFromServer(
-      isBoardNameConflictError(error)
-        ? { preserveLocalNewer: false, rollbackBoardIds: [boardId] }
-        : undefined,
-    )
+  const result = await boardCommands.rename({ boardId, nextName: renameDraft.value })
+  if (!result.ok) {
+    if (result.reason === 'local-name-conflict') {
+      appToast.warning('名称已存在')
+      return
+    }
+    renamingBoardId.value = null
+    suppressNextBoardOpen.value = true
+    if (result.reason === 'invalid-name') {
+      appToast.warning('画布名称不能为空')
+      return
+    }
     reloadBoards()
     appToast.error(
-      isBoardNameConflictError(error) ? '名称已存在，请更换后再试' : '重命名同步失败，请稍后重试',
+      result.reason === 'remote-name-conflict'
+        ? '名称已存在，请更换后再试'
+        : '重命名同步失败，请稍后重试',
     )
-    console.warn('[boards] failed to sync renamed board', error)
+    console.warn('[boards] failed to sync renamed board', result.error)
     return
   }
+  renamingBoardId.value = null
+  suppressNextBoardOpen.value = true
   reloadBoards()
   appToast.success('画布已重命名')
 }
@@ -595,28 +459,19 @@ function handleRenameAction(board: CanvasBoardMeta) {
 
 async function handleDuplicateAction(board: CanvasBoardMeta) {
   activeMenuBoardId.value = null
-  const copy = duplicateCanvasBoard(board.id)
-  if (!copy) {
-    appToast.error('复制失败')
-    return
-  }
-  duplicateCanvasBoardState(board.id, copy.id)
-  try {
-    await syncCanvasBoardToServer(copy.id)
-  } catch (error) {
-    if (isBoardNameConflictError(error)) {
-      deleteCanvasBoard(copy.id)
-      deleteCanvasBoardState(copy.id)
-      await hydrateCanvasBoardsFromServer()
-      reloadBoards()
-      appToast.error('复制后的画布名称已存在，请重试')
+  const result = await boardCommands.duplicate({ sourceBoardId: board.id })
+  if (!result.ok) {
+    reloadBoards()
+    if (result.reason === 'source-missing') {
+      appToast.error('复制失败')
       return
     }
-    console.warn('[boards] failed to sync duplicated board', error)
-    deleteCanvasBoard(copy.id)
-    deleteCanvasBoardState(copy.id)
-    reloadBoards()
-    appToast.error('复制同步失败，请稍后重试')
+    appToast.error(
+      result.reason === 'name-conflict'
+        ? '复制后的画布名称已存在，请重试'
+        : '复制同步失败，请稍后重试',
+    )
+    console.warn('[boards] failed to sync duplicated board', result.error)
     return
   }
   reloadBoards()
@@ -644,25 +499,15 @@ async function confirmDeleteBoard() {
   const board = pendingDeleteBoard.value
   if (!board || isDeleteBoardPending.value) return
   isDeleteBoardPending.value = true
-  try {
-    await syncDeleteCanvasBoardToServer(board.id)
-  } catch (error) {
-    if (isNotFoundError(error)) {
-      // remote already deleted, continue cleaning local state
-    } else {
-      appToast.error('删除失败，请稍后重试')
-      console.warn('[boards] failed to sync deleted board', error)
-      isDeleteBoardPending.value = false
-      return
+  const result = await boardCommands.delete({ boardId: board.id })
+  if (!result.ok) {
+    appToast.error(result.reason === 'sync-failed' ? '删除失败，请稍后重试' : '删除失败')
+    if (result.reason === 'sync-failed') {
+      console.warn('[boards] failed to sync deleted board', result.error)
     }
-  }
-  const ok = deleteCanvasBoard(board.id)
-  if (!ok) {
-    appToast.error('删除失败')
     isDeleteBoardPending.value = false
     return
   }
-  deleteCanvasBoardState(board.id)
   if (renamingBoardId.value === board.id) {
     cancelRename()
   }
@@ -718,6 +563,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  boardPreviewRefresh.dispose()
   if (boardsPageScrollTimer) {
     window.clearTimeout(boardsPageScrollTimer)
     boardsPageScrollTimer = undefined

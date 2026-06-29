@@ -34,17 +34,16 @@ export function createImageToolCommands(session: ImageToolSession) {
 
     session.isApplyingImageEditorAdjustments.value = true
     session.imageAdjustmentFinalApplyProgress.value = { phase: 'queued' }
-    const taskId = session.getImageAdjustmentFinalTaskId(nodeId)
-    session.activeImageAdjustmentFinalTaskId.value = taskId
+    const scopeId = nodeId
+    session.activeImageAdjustmentFinalScopeId.value = scopeId
     try {
       const renderedFile = await renderImageAdjustmentFile(
         { url: source.url, title: sourceNode.title || 'Image' },
         visibleAdjustmentLayers,
         {
-          taskId,
-          latestOnly: true,
+          scopeId,
           onProgress: (progress) => {
-            if (session.activeImageAdjustmentFinalTaskId.value !== taskId) return
+            if (session.activeImageAdjustmentFinalScopeId.value !== scopeId) return
             session.imageAdjustmentFinalApplyProgress.value = {
               phase: progress.phase,
               ...(progress.loaded === undefined ? {} : { loaded: progress.loaded }),
@@ -77,14 +76,14 @@ export function createImageToolCommands(session: ImageToolSession) {
         isImageAdjustmentFinalApplyCancelled(error) ||
         options.currentBoardId.value !== boardId ||
         session.imageEditorNodeId.value !== nodeId ||
-        session.activeImageAdjustmentFinalTaskId.value !== taskId
+        session.activeImageAdjustmentFinalScopeId.value !== scopeId
       ) {
         return
       }
       options.message.warning(error instanceof Error ? error.message : '应用编辑失败')
     } finally {
-      if (session.activeImageAdjustmentFinalTaskId.value === taskId) {
-        session.activeImageAdjustmentFinalTaskId.value = null
+      if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
+        session.activeImageAdjustmentFinalScopeId.value = null
         session.isApplyingImageEditorAdjustments.value = false
         session.imageAdjustmentFinalApplyProgress.value = null
       }

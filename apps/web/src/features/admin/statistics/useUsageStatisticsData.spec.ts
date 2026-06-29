@@ -6,8 +6,8 @@ const mockState = vi.hoisted(() => ({
   statisticsReturns: [] as unknown[],
 }))
 
-vi.mock('../../statistics/statisticsResource', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../statistics/statisticsResource')>()),
+vi.mock('./statisticsResource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./statisticsResource')>()),
   useGetAdminStatistics: vi.fn(() => mockState.statisticsReturns.shift()),
 }))
 

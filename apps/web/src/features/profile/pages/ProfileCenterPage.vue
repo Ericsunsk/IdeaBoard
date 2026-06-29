@@ -366,22 +366,15 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import {
   ADMIN_USERS_PATH,
   USER_HOME_PATH,
-  USER_LOGIN_PATH,
 } from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
-import { uploadApi } from '../../../shared/api/upload'
-import {
-  isRequiredErrorMessage,
-  markRequiredError,
-  displayErrorMessage,
-} from '../../../shared/utils/formValidation'
+import { useAvatarUploadWorkflow } from '../useAvatarUploadWorkflow'
+import { usePasswordChangeWorkflow } from '../usePasswordChangeWorkflow'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
@@ -397,8 +390,6 @@ type NavItem = {
   icon: Component
 }
 
-type PasswordField = 'oldPassword' | 'newPassword' | 'confirmPassword'
-type PasswordForm = Record<PasswordField, string>
 type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
 type ProfileField = {
   label: string
@@ -411,15 +402,28 @@ type ProfileField = {
 
 const router = useRouter()
 const userStore = useUserStore()
-const appToast = useAppToast()
-const { runAsyncAction } = useAsyncAction()
 const { logoutAndRedirect } = useLogoutRedirect()
 const { logoURL, projectName } = useSiteBranding()
+const {
+  form: pwdForm,
+  errors: pwdErrors,
+  loading: pwdLoading,
+  validateField: validatePasswordField,
+  clearFieldError: clearPasswordFieldError,
+  handleNewPasswordInput,
+  submit: handleUpdatePassword,
+  isInlineError: isPasswordInlineError,
+  shouldShowMessage: shouldShowPasswordMessage,
+  getDescribedby: getPasswordDescribedby,
+  displayErrorMessage,
+} = usePasswordChangeWorkflow()
+const {
+  uploading: avatarUploading,
+  handleFileChange: onAvatarFileChange,
+} = useAvatarUploadWorkflow()
 
 const activeTab = ref<NavItem['key']>('profile')
 const avatarInputRef = ref<HTMLInputElement | null>(null)
-const avatarUploading = ref(false)
-const pwdLoading = ref(false)
 const isProfileMainScrolling = ref(false)
 let profileMainScrollTimer: number | undefined
 
@@ -459,14 +463,6 @@ const passwordInputClass =
 const passwordInputErrorClass =
   '!border-rose-300 !bg-rose-50/50 placeholder:!text-rose-400 enabled:focus:!border-rose-400'
 
-const emptyPasswordForm = (): PasswordForm => ({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-})
-
-const pwdForm = ref<PasswordForm>(emptyPasswordForm())
-const pwdErrors = ref<Record<PasswordField, string>>(emptyPasswordForm())
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))
 const userStatusLabel = computed(() => (userStore.user?.status === 1 ? '正常使用中' : '已封禁'))
@@ -527,117 +523,12 @@ function formatDateWithDots(value?: string) {
   return `${year}.${month}.${day}`
 }
 
-function resolvePasswordFieldError(field: PasswordField) {
-  const value = pwdForm.value[field]
-
-  if (field === 'oldPassword' && !value.trim()) {
-    return markRequiredError('请输入当前原密码')
-  }
-  if (field === 'newPassword') {
-    if (!value.trim()) return markRequiredError('请输入新密码')
-    if (value.length < 6) return '密码至少6个字符'
-  }
-  if (field === 'confirmPassword') {
-    if (!value.trim()) return markRequiredError('请确认新密码')
-    if (value !== pwdForm.value.newPassword) return '两次输入密码不一致'
-  }
-  return ''
-}
-
-function validatePasswordField(field: PasswordField) {
-  pwdErrors.value[field] = resolvePasswordFieldError(field)
-  return !pwdErrors.value[field]
-}
-
-function validatePasswordForm() {
-  const fields: PasswordField[] = ['oldPassword', 'newPassword', 'confirmPassword']
-  return fields.map((field) => validatePasswordField(field)).every(Boolean)
-}
-
-function isPasswordInlineError(field: PasswordField) {
-  return isRequiredErrorMessage(pwdErrors.value[field])
-}
-
-function shouldShowPasswordMessage(field: PasswordField) {
-  return Boolean(pwdErrors.value[field]) && !isPasswordInlineError(field)
-}
-
-function getPasswordDescribedby(field: PasswordField, errorId: string) {
-  return shouldShowPasswordMessage(field) ? errorId : undefined
-}
-
-function clearPasswordFieldError(field: PasswordField) {
-  if (pwdErrors.value[field]) {
-    pwdErrors.value[field] = ''
-  }
-}
-
-function handleNewPasswordInput() {
-  clearPasswordFieldError('newPassword')
-  if (pwdForm.value.confirmPassword && pwdErrors.value.confirmPassword) {
-    validatePasswordField('confirmPassword')
-  }
-}
-
-function resetPasswordForm() {
-  pwdForm.value = emptyPasswordForm()
-  pwdErrors.value = emptyPasswordForm()
-}
-
-async function handleUpdatePassword() {
-  if (!validatePasswordForm()) return
-
-  await runAsyncAction(
-    async () => {
-      await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
-      resetPasswordForm()
-      const isLoggedOut = await userStore.logout()
-      if (!isLoggedOut) {
-        throw new Error('密码已更新，但退出登录失败，请手动退出后重新登录')
-      }
-      appToast.success('密码更新成功，请重新登录')
-      await router.replace(USER_LOGIN_PATH)
-    },
-    {
-      loading: pwdLoading,
-      errorMessage: (error) =>
-        error instanceof Error && error.message ? error.message : '密码更新失败',
-    },
-  )
-}
-
 async function handleLogout() {
   await logoutAndRedirect(USER_HOME_PATH)
 }
 
 function openAvatarPicker() {
   avatarInputRef.value?.click()
-}
-
-async function onAvatarFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-  if (!file.type.startsWith('image/')) {
-    appToast.warning('仅支持上传图片文件')
-    return
-  }
-  await runAsyncAction(
-    async () => {
-      const uploadRes = await uploadApi.uploadAvatar(file)
-      const avatarUrl = uploadRes.data?.avatar?.trim()
-      if (!avatarUrl) {
-        throw new Error('头像上传失败，请稍后重试')
-      }
-      userStore.setAvatarLocal(avatarUrl)
-      appToast.success('头像已更新')
-    },
-    {
-      loading: avatarUploading,
-      errorMessage: '头像更新失败',
-    },
-  )
 }
 
 function handleProfileMainScroll() {

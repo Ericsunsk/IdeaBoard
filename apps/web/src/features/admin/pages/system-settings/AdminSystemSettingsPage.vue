@@ -416,21 +416,23 @@ import {
   RATE_LIMIT_MAX_REQUESTS,
   RATE_LIMIT_MAX_WINDOW_SECONDS,
   useAdminAccessSettings,
-} from '../../shared/composables/useAdminAccessSettings'
-import { useAdminBrandingSettings } from '../../shared/composables/useAdminBrandingSettings'
+} from '../../system-settings/useAdminAccessSettings'
+import { useAdminBrandingSettings } from '../../system-settings/useAdminBrandingSettings'
 import {
   MEDIA_UPLOAD_MAX_CONCURRENT,
   MEDIA_UPLOAD_MIN_CONCURRENT,
   useAdminMediaUploadSettings,
-} from '../../shared/composables/useAdminMediaUploadSettings'
+} from '../../system-settings/useAdminMediaUploadSettings'
 import {
   TASK_MONITOR_MAX_PAGE_SIZE,
   TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS,
   TASK_MONITOR_MIN_PAGE_SIZE,
   TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
+} from '../../task-monitor/taskMonitorSettingsResource'
+import {
   useAdminTaskMonitorSettings,
-} from '../../shared/composables/useAdminTaskMonitorSettings'
-import { useAdminPublicURLSettings } from '../../shared/composables/useAdminPublicURLSettings'
+} from '../../system-settings/useAdminTaskMonitorSettings'
+import { useAdminPublicURLSettings } from '../../system-settings/useAdminPublicURLSettings'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {

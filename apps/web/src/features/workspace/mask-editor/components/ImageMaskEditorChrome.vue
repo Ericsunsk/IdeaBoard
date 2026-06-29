@@ -242,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref } from 'vue'
+import { ref } from 'vue'
 import {
   Circle,
   CircleSpark,
@@ -266,9 +266,7 @@ import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import {
   clampMaskBrushHardness,
   clampMaskBrushSize,
-  clampMaskFeatherStrength,
   clampMaskLayerOpacity,
-  MASK_EDITOR_DEFAULT_FEATHER_STRENGTH,
   MASK_EDITOR_MAX_BRUSH_HARDNESS,
   MASK_EDITOR_MAX_BRUSH_SIZE,
   MASK_EDITOR_MAX_FEATHER_STRENGTH,
@@ -279,6 +277,7 @@ import {
   MASK_EDITOR_MIN_LAYER_OPACITY,
   MASK_EDITOR_REFERENCE_IMAGE_LIMIT,
 } from '../config/maskEditorConstants'
+import { useMaskFeatherStrengthControl } from '../composables/useMaskFeatherStrengthControl'
 import ImageEditorChromeFrame from '../../components/nodes/ImageEditorChromeFrame.vue'
 import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 import PromptTextComposer from '../../components/nodes/PromptTextComposer.vue'
@@ -321,14 +320,16 @@ const emit = defineEmits<{
 }>()
 
 const promptDraft = ref('')
-const FEATHER_LONG_PRESS_MS = 260
-const featherStrength = ref(MASK_EDITOR_DEFAULT_FEATHER_STRENGTH)
-const featherStrengthVisible = ref(false)
-const featherStrengthTrackRef = ref<HTMLElement | null>(null)
-let featherLongPressTimer: number | null = null
-let featherDragging = false
-let featherPointerX = 0
-let suppressNextFeatherClick = false
+const {
+  strength: featherStrength,
+  visible: featherStrengthVisible,
+  trackRef: featherStrengthTrackRef,
+  onButtonMouseDown: onFeatherButtonMouseDown,
+  onButtonClick: onFeatherButtonClick,
+  onTrackMouseDown: onFeatherTrackMouseDown,
+} = useMaskFeatherStrengthControl({
+  onApply: (strength) => emit('feather-mask', strength),
+})
 
 function onBrushSizeInput(event: Event) {
   const target = event.target as HTMLInputElement | null
@@ -345,82 +346,6 @@ function onMaskOpacityInput(event: Event) {
   emit('set-mask-layer-opacity', clampMaskLayerOpacity(Number(target?.value)))
 }
 
-function clearFeatherLongPressTimer() {
-  if (!featherLongPressTimer) return
-  clearTimeout(featherLongPressTimer)
-  featherLongPressTimer = null
-}
-
-function updateFeatherStrengthFromClientX(clientX: number) {
-  const track = featherStrengthTrackRef.value
-  if (!track) return
-  const rect = track.getBoundingClientRect()
-  if (rect.width <= 0) return
-  const ratio = (clientX - rect.left) / rect.width
-  featherStrength.value = clampMaskFeatherStrength(ratio * 100)
-}
-
-function addFeatherGlobalListeners() {
-  window.addEventListener('mousemove', onFeatherGlobalMouseMove, true)
-  window.addEventListener('mouseup', onFeatherGlobalMouseUp, true)
-}
-
-function removeFeatherGlobalListeners() {
-  window.removeEventListener('mousemove', onFeatherGlobalMouseMove, true)
-  window.removeEventListener('mouseup', onFeatherGlobalMouseUp, true)
-}
-
-function beginFeatherDragging(clientX: number) {
-  featherStrengthVisible.value = true
-  featherDragging = true
-  featherPointerX = clientX
-  addFeatherGlobalListeners()
-  void nextTick(() => updateFeatherStrengthFromClientX(featherPointerX))
-}
-
-function onFeatherButtonMouseDown(event: MouseEvent) {
-  if (event.button !== 0) return
-  clearFeatherLongPressTimer()
-  removeFeatherGlobalListeners()
-  featherDragging = false
-  suppressNextFeatherClick = false
-  featherPointerX = event.clientX
-  featherLongPressTimer = window.setTimeout(() => {
-    suppressNextFeatherClick = true
-    beginFeatherDragging(featherPointerX)
-  }, FEATHER_LONG_PRESS_MS)
-  addFeatherGlobalListeners()
-}
-
-function onFeatherButtonClick() {
-  if (suppressNextFeatherClick) {
-    suppressNextFeatherClick = false
-    return
-  }
-  emit('feather-mask', featherStrength.value)
-}
-
-function onFeatherTrackMouseDown(event: MouseEvent) {
-  clearFeatherLongPressTimer()
-  suppressNextFeatherClick = true
-  beginFeatherDragging(event.clientX)
-}
-
-function onFeatherGlobalMouseMove(event: MouseEvent) {
-  featherPointerX = event.clientX
-  if (!featherDragging) return
-  updateFeatherStrengthFromClientX(event.clientX)
-}
-
-function onFeatherGlobalMouseUp() {
-  clearFeatherLongPressTimer()
-  removeFeatherGlobalListeners()
-  if (!featherDragging) return
-  featherDragging = false
-  featherStrengthVisible.value = false
-  emit('feather-mask', featherStrength.value)
-}
-
 function rangeTooltipStyle(value: number, min: number, max: number) {
   const ratio = max === min ? 0 : (value - min) / (max - min)
   const percent = Math.min(1, Math.max(0, ratio)) * 100
@@ -431,11 +356,6 @@ function onSubmit(prompt: string, outputCount: number) {
   emit('submit', prompt, clampImageNodeOutputCount(outputCount))
   promptDraft.value = ''
 }
-
-onBeforeUnmount(() => {
-  clearFeatherLongPressTimer()
-  removeFeatherGlobalListeners()
-})
 </script>
 
 <style scoped>

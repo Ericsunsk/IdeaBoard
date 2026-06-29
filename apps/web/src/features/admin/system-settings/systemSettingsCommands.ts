@@ -5,7 +5,7 @@ import {
   updateAdminRateLimitSettings,
   updateAdminRegistrationSetting,
   updateAdminTaskMonitorSetting,
-} from '../../../../shared/api/generated-query/admin-settings/admin-settings'
+} from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type {
   ApiResponseRegistrationSettingData,
   BrandingSetting,
@@ -14,8 +14,8 @@ import type {
   RateLimitSetting,
   TaskMonitorSetting,
   UpdateAdminRegistrationSettingBody,
-} from '../../../../shared/api/generated-query/model'
-import { requireApiData } from './adminApiResponse'
+} from '../../../shared/api/generated-query/model'
+import { requireApiData } from '../shared/queries/adminApiResponse'
 
 export async function updateRateLimitSettings(data: RateLimitSetting): Promise<RateLimitSetting> {
   const res = await updateAdminRateLimitSettings(data)

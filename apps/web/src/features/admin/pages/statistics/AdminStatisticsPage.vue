@@ -128,8 +128,8 @@ import {
   adminDashboardRootClass,
   adminSummaryGridClass,
 } from '../../shared/lib/adminUiClasses'
-import { useUsageStatisticsData } from './useUsageStatisticsData'
-import { useUsageStatisticsCharts } from './useUsageStatisticsCharts'
+import { useUsageStatisticsCharts } from '../../statistics/useUsageStatisticsCharts'
+import { useUsageStatisticsData } from '../../statistics/useUsageStatisticsData'
 
 const usageCards = adminCards.usageStatistics
 const {

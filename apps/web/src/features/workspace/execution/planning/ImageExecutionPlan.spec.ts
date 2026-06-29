@@ -3,9 +3,11 @@ import type { ImageNodeItem } from '../../../canvas-board/domain'
 import {
   createImageExecutionPlanner,
   prepareFusionExecutionPlan,
+} from './ImageExecutionPlan'
+import {
   resolveFlowSourceImageRatio,
   resolveSourceImageFromNode,
-} from './ImageExecutionPlan'
+} from '../../utils/flowNodeSourceResolution'
 
 function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {

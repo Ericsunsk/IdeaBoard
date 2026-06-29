@@ -3,13 +3,13 @@ import { computed, ref, watch } from 'vue'
 import {
   getGetAdminMediaUploadSettingQueryKey,
   useGetAdminMediaUploadSetting,
-} from '../../../../shared/api/generated-query/admin-settings/admin-settings'
+} from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type {
   ApiResponseMediaUploadSetting,
   MediaUploadSetting,
-} from '../../../../shared/api/generated-query/model'
-import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { updateMediaUploadSetting } from '../queries/adminSettingsActions'
+} from '../../../shared/api/generated-query/model'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import { updateMediaUploadSetting } from './systemSettingsCommands'
 
 type AdminMediaUploadSettingsMessage = {
   error: (message: string) => void

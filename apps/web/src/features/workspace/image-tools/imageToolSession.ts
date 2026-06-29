@@ -6,7 +6,6 @@ import type { CanvasInteractionKey } from '../composables/useFlowCanvasInteracti
 import type { ImageStrengthAction } from '../execution'
 import {
   cancelImageAdjustmentFinalRender,
-  IMAGE_ADJUSTMENT_FINAL_TASK_ID,
   type ImageAdjustmentFinalApplyProgress,
   type ImageEditorMode,
   useImageEditorMode,
@@ -113,7 +112,7 @@ export function createImageToolSession(options: UseWorkspaceImageToolsOptions) {
   const imageEditorSession = useImageEditorSession()
   const isApplyingImageEditorAdjustments = ref(false)
   const imageAdjustmentFinalApplyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(null)
-  const activeImageAdjustmentFinalTaskId = ref<string | null>(null)
+  const activeImageAdjustmentFinalScopeId = ref<string | null>(null)
   const isImageAdjustmentMode = computed(() => imageEditorMode.value === 'adjust')
 
   const maskChromeState = useMaskEditorChromeState({
@@ -138,16 +137,11 @@ export function createImageToolSession(options: UseWorkspaceImageToolsOptions) {
     onViewportTransform: options.onViewportTransform,
   })
 
-  function getImageAdjustmentFinalTaskId(nodeId: string) {
-    return `${IMAGE_ADJUSTMENT_FINAL_TASK_ID}:${nodeId}`
-  }
-
   function cancelImageAdjustmentFinalTask(nodeId: string | null = imageEditorNodeId.value) {
     if (!nodeId) return
-    const taskId = getImageAdjustmentFinalTaskId(nodeId)
-    cancelImageAdjustmentFinalRender(taskId)
-    if (activeImageAdjustmentFinalTaskId.value === taskId) {
-      activeImageAdjustmentFinalTaskId.value = null
+    cancelImageAdjustmentFinalRender(nodeId)
+    if (activeImageAdjustmentFinalScopeId.value === nodeId) {
+      activeImageAdjustmentFinalScopeId.value = null
       isApplyingImageEditorAdjustments.value = false
       imageAdjustmentFinalApplyProgress.value = null
     }
@@ -184,7 +178,7 @@ export function createImageToolSession(options: UseWorkspaceImageToolsOptions) {
     isImageAdjustmentMode,
     isApplyingImageEditorAdjustments,
     imageAdjustmentFinalApplyProgress,
-    activeImageAdjustmentFinalTaskId,
+    activeImageAdjustmentFinalScopeId,
     maskEditor,
     maskChromeState,
     viewport,
@@ -192,7 +186,6 @@ export function createImageToolSession(options: UseWorkspaceImageToolsOptions) {
     cancel,
     commitMask,
     exitImageEditorMode,
-    getImageAdjustmentFinalTaskId,
     cancelImageAdjustmentFinalTask,
     discardNodeEdits,
   }

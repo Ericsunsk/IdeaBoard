@@ -1,22 +1,22 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
-import { uploadAdminAsset } from '../../../../shared/api/generated-query/admin-assets/admin-assets'
+import { uploadAdminAsset } from '../../../shared/api/generated-query/admin-assets/admin-assets'
 import {
   getGetAdminBrandingSettingQueryKey,
   useGetAdminBrandingSetting,
-} from '../../../../shared/api/generated-query/admin-settings/admin-settings'
+} from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type {
   ApiResponseBrandingSetting,
   BrandingSetting,
-} from '../../../../shared/api/generated-query/model'
+} from '../../../shared/api/generated-query/model'
 import {
   sanitizeApiErrorMessage,
   formatDisplayErrorMessage,
-} from '../../../../shared/utils/errorMessages'
+} from '../../../shared/utils/errorMessages'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
-} from '../../../../shared/utils/imageUploadSupport'
+} from '../../../shared/utils/imageUploadSupport'
 import {
   DEFAULT_SITE_BRANDING_SETTING,
   SITE_BRANDING_QUERY_KEY,
@@ -25,8 +25,8 @@ import {
   resolveSiteBrandingLogoURL,
   validateSiteBrandingSetting,
   writeSiteBrandingQueryCache,
-} from '../../../../shared/composables/useSiteBranding'
-import { updateBrandingSetting } from '../queries/adminSettingsActions'
+} from '../../../shared/composables/useSiteBranding'
+import { updateBrandingSetting } from './systemSettingsCommands'
 
 type AdminBrandingSettingsMessage = {
   error: (message: string) => void

@@ -5,9 +5,10 @@ import * as runtimeModule from '../runtime/imageAdjustmentProcessingRuntime'
 import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
 import {
   cancelImageAdjustmentFinalRender,
-  IMAGE_ADJUSTMENT_FINAL_TASK_ID,
   renderImageAdjustmentFile,
 } from './imageAdjustmentRenderer'
+
+const IMAGE_ADJUSTMENT_FINAL_TASK_ID = 'image-adjustment-final'
 
 const fetchMock = vi.fn()
 const createImageBitmapMock = vi.fn()
@@ -139,7 +140,7 @@ function installCanvasMocks() {
 }
 
 describe('renderImageAdjustmentFile', () => {
-  it('uses the fixed final task id without overriding the runtime latestOnly default', async () => {
+  it('uses the default final task id and internal latest-only scheduling', async () => {
     const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
       status: 'completed',
       taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
@@ -157,16 +158,16 @@ describe('renderImageAdjustmentFile', () => {
     expect(renderFinal).toHaveBeenCalledWith(
       expect.objectContaining({
         taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+        latestOnly: true,
       }),
     )
-    expect(renderFinal.mock.calls[0]?.[0]).not.toHaveProperty('latestOnly')
   })
 
-  it('passes task runtime options through to final rendering', async () => {
+  it('uses scoped final task ids while keeping runtime options internal', async () => {
     const onProgress = vi.fn()
     const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
       status: 'completed',
-      taskId: 'custom-final-task',
+      taskId: 'image-adjustment-final:node-1',
       revision: 1,
       output: {
         file: new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
@@ -180,8 +181,7 @@ describe('renderImageAdjustmentFile', () => {
       { url: 'https://example.com/source.png', title: 'Sample.png' },
       [invertLayer],
       {
-        taskId: 'custom-final-task',
-        latestOnly: true,
+        scopeId: 'node-1',
         onProgress,
       },
     )
@@ -189,7 +189,7 @@ describe('renderImageAdjustmentFile', () => {
     expect(renderFinal).toHaveBeenCalledWith(
       expect.objectContaining({
         source: { url: 'https://example.com/source.png', title: 'Sample.png' },
-        taskId: 'custom-final-task',
+        taskId: 'image-adjustment-final:node-1',
         latestOnly: true,
         onProgress,
       }),
@@ -224,10 +224,10 @@ describe('renderImageAdjustmentFile', () => {
     vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(runtime)
 
     cancelImageAdjustmentFinalRender()
-    cancelImageAdjustmentFinalRender('custom-final-task')
+    cancelImageAdjustmentFinalRender('node-1')
 
     expect(runtime.cancel).toHaveBeenNthCalledWith(1, IMAGE_ADJUSTMENT_FINAL_TASK_ID)
-    expect(runtime.cancel).toHaveBeenNthCalledWith(2, 'custom-final-task')
+    expect(runtime.cancel).toHaveBeenNthCalledWith(2, 'image-adjustment-final:node-1')
   })
 
   it('renders visible adjustment layers to an uploadable file', async () => {
@@ -273,6 +273,25 @@ describe('renderImageAdjustmentFile', () => {
       ]),
     ).rejects.toThrow('没有可应用的编辑图层')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects runtime final rendering failures with the runtime message', async () => {
+    const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
+      status: 'failed',
+      taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+      revision: 1,
+      error: {
+        code: 'backend-failed',
+        message: '渲染服务暂不可用',
+      },
+    }))
+    vi.spyOn(runtimeModule, 'getImageAdjustmentProcessingRuntime').mockReturnValue(
+      createRuntimeMock(renderFinal),
+    )
+
+    await expect(
+      renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [invertLayer]),
+    ).rejects.toThrow('渲染服务暂不可用')
   })
 
   it('rejects animated images because adjustment output is a still frame', async () => {

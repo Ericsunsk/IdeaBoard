@@ -49,7 +49,7 @@ vi.mock('../shared/composables/useAdminQueryPolling', () => ({
   ),
 }))
 
-vi.mock('../shared/composables/useAdminTaskMonitorSettings', () => ({
+vi.mock('./taskMonitorSettingsResource', () => ({
   useAdminTaskMonitorSettingQuery: vi.fn(() => ({
     settings: mockState.taskMonitorSettings,
   })),

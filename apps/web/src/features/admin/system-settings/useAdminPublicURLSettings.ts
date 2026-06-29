@@ -3,13 +3,13 @@ import { computed, ref, watch } from 'vue'
 import {
   getGetAdminPublicURLSettingQueryKey,
   useGetAdminPublicURLSetting,
-} from '../../../../shared/api/generated-query/admin-settings/admin-settings'
+} from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type {
   ApiResponsePublicURLSetting,
   PublicURLSetting,
-} from '../../../../shared/api/generated-query/model'
-import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { updatePublicURLSetting } from '../queries/adminSettingsActions'
+} from '../../../shared/api/generated-query/model'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import { updatePublicURLSetting } from './systemSettingsCommands'
 
 type AdminPublicURLSettingsMessage = {
   error: (message: string) => void

@@ -8,11 +8,10 @@ type ImageAdjustmentRenderSource = {
   title?: string
 }
 
-export const IMAGE_ADJUSTMENT_FINAL_TASK_ID = 'image-adjustment-final'
+const IMAGE_ADJUSTMENT_FINAL_TASK_ID = 'image-adjustment-final'
 
 type ImageAdjustmentRenderOptions = {
-  taskId?: string
-  latestOnly?: boolean
+  scopeId?: string
   onProgress?: (progress: ImageProcessingProgress) => void
 }
 
@@ -29,9 +28,9 @@ export async function renderImageAdjustmentFile(
   const renderInput: RenderFinalInput = {
     source,
     plan,
-    taskId: options.taskId ?? IMAGE_ADJUSTMENT_FINAL_TASK_ID,
+    taskId: getImageAdjustmentFinalTaskId(options.scopeId),
+    latestOnly: true,
   }
-  if (options.latestOnly !== undefined) renderInput.latestOnly = options.latestOnly
   if (options.onProgress !== undefined) renderInput.onProgress = options.onProgress
 
   const result = await getImageAdjustmentProcessingRuntime().renderFinal(renderInput)
@@ -40,6 +39,10 @@ export async function renderImageAdjustmentFile(
   throw new Error(result.error.message)
 }
 
-export function cancelImageAdjustmentFinalRender(taskId = IMAGE_ADJUSTMENT_FINAL_TASK_ID) {
-  getImageAdjustmentProcessingRuntime().cancel(taskId)
+export function cancelImageAdjustmentFinalRender(scopeId?: string) {
+  getImageAdjustmentProcessingRuntime().cancel(getImageAdjustmentFinalTaskId(scopeId))
+}
+
+function getImageAdjustmentFinalTaskId(scopeId?: string) {
+  return scopeId ? `${IMAGE_ADJUSTMENT_FINAL_TASK_ID}:${scopeId}` : IMAGE_ADJUSTMENT_FINAL_TASK_ID
 }

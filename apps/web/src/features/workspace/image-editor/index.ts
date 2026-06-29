@@ -7,7 +7,6 @@ export { useImageEditorSession } from './composables/useImageEditorSession'
 export { useImageEditorViewportController } from './composables/useImageEditorViewportController'
 export {
   cancelImageAdjustmentFinalRender,
-  IMAGE_ADJUSTMENT_FINAL_TASK_ID,
   renderImageAdjustmentFile,
 } from './services/imageAdjustmentRenderer'
 export { IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY } from './runtime/imageAdjustmentFinalApplyContext'

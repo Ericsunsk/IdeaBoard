@@ -20,7 +20,7 @@ import {
   type CanvasNodeItem,
 } from '../../canvas-board/domain'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
-import { parseHandlePort, resolveSourceImageFromNode } from '../execution'
+import { parseHandlePort, resolveSourceImageFromNode } from '../utils/flowNodeSourceResolution'
 
 type FlowEdgeLike = {
   source: string
