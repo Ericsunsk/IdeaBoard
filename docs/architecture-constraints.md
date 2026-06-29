@@ -31,6 +31,7 @@
 - `apps/api/internal/tasking` 收拢 Tasking bounded context；内部保留 `tasks` 模型、`taskservice` 应用服务、`taskstore` 持久化、`tasksubmission` 事务提交、`taskstats` 统计监控、`taskmedia` 媒体引用、`taskqueue` 队列接口和 `taskruntime` 执行状态服务等小包。
 - `apps/api/internal/identity` 收拢 Auth middleware/client、auth errors、users 和 admin/user 管理。
 - `apps/api/internal/media` 收拢 storage、assets、image format validation 和 media references。
+- `apps/api/internal/accountpool` 收拢 accounts、channels、account load 和 task scheduling visibility。
 - `apps/api/internal/runtime/worker` 仍是 runtime execution adapter，可依赖 `tasking` 下的任务队列和运行时服务；业务领域包不得依赖 `internal/runtime` 下的 worker 实现细节。
 - 后端 context、依赖方向和无 legacy 迁移策略记录在 `docs/backend-context-map.md`。
 - 其他领域包在同一包内收口自己的 handler、service、repository 和 model。

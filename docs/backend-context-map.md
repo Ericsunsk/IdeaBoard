@@ -13,11 +13,11 @@
 
 | Context | 目录 | 职责 | 主要接口 | 协作者 |
 | --- | --- | --- | --- | --- |
-| Runtime | `internal/runtime`, `cmd` | 启动 API 进程、装配 HTTP routes、持有 worker adapter，并服务 embedded frontend dist。 | `bootstrap` wiring, `httpapi.RegisterRoutes`, `worker.RiverTaskWorker` | Platform, Tasking, Accounts, Boards, Channels, Prompts, Media, Identity |
+| Runtime | `internal/runtime`, `cmd` | 启动 API 进程、装配 HTTP routes、持有 worker adapter，并服务 embedded frontend dist。 | `bootstrap` wiring, `httpapi.RegisterRoutes`, `worker.RiverTaskWorker` | Platform, Tasking, AccountPool, Boards, Prompts, Media, Identity |
 | Platform | `internal/platform`, `internal/db`, `internal/events` | 基础设施 adapter 和横切运行时能力，包括 config、database、HTTP safety、response helper、settings、event bus 和 generated SQL。 | `config.Config`, database pools, sqlc queries, event publishers, safe HTTP helpers | Runtime 和各业务 context |
-| Tasking | `internal/tasking` | task model、提交、排队、媒体校验、task runtime lifecycle、持久化和统计。 | `taskservice.Service`, `tasksubmission.Store`, `taskqueue.TaskAssigner`, `taskruntime.Service`, `taskstats.Service`, `taskstore.Repository` | Runtime worker/bootstrap, Accounts, Media, Workflow, Prompts |
+| Tasking | `internal/tasking` | task model、提交、排队、媒体校验、task runtime lifecycle、持久化和统计。 | `taskservice.Service`, `tasksubmission.Store`, `taskqueue.TaskAssigner`, `taskruntime.Service`, `taskstats.Service`, `taskstore.Repository` | Runtime worker/bootstrap, AccountPool, Media, Workflow, Prompts |
 | Identity | `internal/identity/auth`, `internal/identity/autherrors`, `internal/identity/users` | Auth middleware/client、用户持久化、用户与管理员管理。 | Auth handlers/middleware, `users.UserRepository`, `users.UserService` | Runtime HTTP wiring, Media, Boards |
-| Accounts | `internal/accounts`, `internal/channels` | account pool、channel config、account load 和 task scheduling 可见性。 | `accounts.AccountService`, account/channel handlers and repositories | Tasking queue/store, Runtime HTTP wiring |
+| AccountPool | `internal/accountpool/accounts`, `internal/accountpool/channels` | account pool、channel config、account load 和 task scheduling 可见性。 | `accounts.AccountService`, account/channel handlers and repositories | Tasking queue/store, Runtime HTTP wiring |
 | Boards | `internal/boards` | board ownership、访问检查和 board 管理 API。 | `boards.BoardService`, board handler/repository | Runtime HTTP wiring, Media upload authorization |
 | Media | `internal/media/storage`, `internal/media/assets`, `internal/media/imageformat`, `internal/media/mediarefs` | object storage、upload serving、upload authorization、media references、image format validation primitives 和 bundled business assets。 | `storage.Service`, media stores/authorizers, media reference helpers, asset handlers | Runtime HTTP wiring, Boards, Identity, Tasking |
 | Workflow | `internal/workflow`, `internal/prompts` | 可执行 workflow feature contract、task 参数整形、prompt templates 和 prompt assembly。 | Workflow helpers, prompt engine/repository/handler | Tasking submission/service, Runtime HTTP wiring |
@@ -60,4 +60,5 @@
 
 - Identity 已收口到 `internal/identity`。后续只有当 auth、auth errors、users、roles 和 admin session policy 需要更小的共享 interface 时，才继续深化。
 - Media 已收口到 `internal/media`。后续只有当其子包 interface 还能明显变深时，才继续拆改。
+- AccountPool 已收口到 `internal/accountpool`。后续只有当 account selection、channel config 和调度负载规则需要更小的共享 interface 时，才继续深化。
 - Workflow 和 Prompts 暂时保持分离：workflow 持有可执行 feature contract，prompts 持有 template storage 和 rendering。只有 prompt contract 开始跨两边泄漏时再复访。

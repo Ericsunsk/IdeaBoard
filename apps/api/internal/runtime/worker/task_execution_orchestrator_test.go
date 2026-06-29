@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"strings"

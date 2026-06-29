@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/workflow"
 )

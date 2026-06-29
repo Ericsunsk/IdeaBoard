@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"

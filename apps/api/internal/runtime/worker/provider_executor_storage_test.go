@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/taskmedia"

@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/channels"
+	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/accountpool/channels"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/taskmedia"

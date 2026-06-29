@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 )

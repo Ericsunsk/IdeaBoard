@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/outbound"

@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/accountpool/channels"
 	"ideaboard/api/internal/boards"
-	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"

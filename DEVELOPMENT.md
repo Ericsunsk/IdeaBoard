@@ -461,11 +461,10 @@ apps/api/
 ├── cmd/                      # 服务入口
 ├── internal/platform/        # 基础设施：config、database、response、safehttp
 ├── internal/runtime/         # 启动、HTTP 路由、worker 与 embedded dist
+├── internal/accountpool/     # Accounts、channels、账号池负载与调度可见性
 ├── internal/identity/        # Auth、auth errors、users 与用户管理
 ├── internal/media/           # Storage、assets、image format validation 与 media refs
-├── internal/accounts/        # 账号池与任务调度
 ├── internal/boards/          # 画板管理
-├── internal/channels/        # 渠道管理
 ├── internal/tasking/         # Tasking bounded context：任务模型、提交、队列、统计与运行状态
 ├── internal/workflow/        # feature contract
 └── internal/prompts/         # 提示词模板与装配

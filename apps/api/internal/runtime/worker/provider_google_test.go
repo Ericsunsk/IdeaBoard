@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )

@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/safehttp"

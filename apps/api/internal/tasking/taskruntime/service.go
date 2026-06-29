@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/taskqueue"
