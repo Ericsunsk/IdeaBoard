@@ -33,20 +33,11 @@
         :display-image="displayImage"
         :input-locked="inputLocked"
         :empty-icon-variant="emptyIconVariant"
-        :direct-generating="directGenerating"
+        :direct-generating="actionBinding.directGenerating"
         :expand-mode-active="expandModeActive"
         :expand-overlay-style="expandOverlayStyle"
         :expand-handle-radius="expandHandleRadius"
-        :image-editor-mode="imageEditorMode"
-        :image-editor-rendered-preview="imageEditorRenderedPreview"
-        :mask-editor-overlay-style="maskEditorOverlayStyle"
-        :mask-editor-canvas-width="maskEditorCanvasWidth"
-        :mask-editor-canvas-height="maskEditorCanvasHeight"
-        :mask-layer-opacity="maskLayerOpacity"
-        :image-layer-visible="imageLayerVisible"
-        :mask-editor-brush-size="maskEditorBrushSize"
-        :mask-editor-brush-shape="maskEditorBrushShape"
-        :set-mask-canvas-ref="setMaskCanvasRef"
+        :image-tool-stage-binding="imageToolStageBinding"
         :output-count="node.outputCount"
         :active="active"
         :dragging="dragging"
@@ -62,15 +53,14 @@
         @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
         @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
         @expand-frame-pointerdown="emit('expand-frame-pointerdown', $event)"
-        @mask-canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
       />
 
       <HomeCanvasImageActionMenu
         v-if="showImageActionMenu"
-        :show-strength-control="!!showStrengthControl"
-        :direct-generating="!!directGenerating"
-        :strength-pct="strengthPct ?? 50"
-        :set-strength-track-ref="setStrengthTrackRef"
+        :show-strength-control="actionBinding.showStrengthControl"
+        :direct-generating="actionBinding.directGenerating"
+        :strength-pct="actionBinding.strengthPct"
+        :set-strength-track-ref="actionBinding.setStrengthTrackRef"
         @action="emit('action', $event)"
         @strength-action-mousedown="
           (action, event) => emit('strength-action-mousedown', action, event)
@@ -81,8 +71,8 @@
         v-if="showPromptComposer"
         v-model="promptDraft"
         offset="52px"
-        :placeholder="props.promptPlaceholder ?? ''"
-        :disabled="!!directGenerating"
+        :placeholder="actionBinding.promptPlaceholder"
+        :disabled="actionBinding.directGenerating"
         :output-count="outputCountValue"
         @update:output-count="selectOutputCount"
         @submit="submitPrompt"
@@ -92,13 +82,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchPostEffect, type ComponentPublicInstance } from 'vue'
+import { computed, ref, watchPostEffect } from 'vue'
 import { MediaImage } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
 import type { ImageStrengthAction } from '../../execution'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorMode, ImageEditorRenderedPreview } from '../../image-editor'
+import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import NodeShell from './NodeShell.vue'
@@ -115,26 +105,11 @@ const props = defineProps<{
   displayImage: { url: string } | null
   emptyIconVariant?: 'image' | 'fusion'
   inputLocked?: boolean
-  actionMenuVisible?: boolean
-  promptComposerVisible?: boolean
-  promptPlaceholder?: string
-  directGenerating?: boolean
-  showStrengthControl?: boolean
-  strengthPct?: number
-  setStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
+  actionBinding: ImageActionBinding
   expandModeActive?: boolean
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
-  imageEditorMode?: ImageEditorMode | null
-  imageEditorRenderedPreview?: ImageEditorRenderedPreview | null
-  maskEditorOverlayStyle?: Record<string, string> | null
-  maskEditorCanvasWidth?: number
-  maskEditorCanvasHeight?: number
-  maskLayerOpacity?: number
-  imageLayerVisible?: boolean
-  maskEditorBrushSize?: number
-  maskEditorBrushShape?: 'round' | 'square'
-  setMaskCanvasRef?: (element: Element | null) => void
+  imageToolStageBinding?: ImageToolStageBinding | null
 }>()
 
 const emit = defineEmits<{
@@ -160,17 +135,16 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
-  (e: 'mask-canvas-pointerdown', event: PointerEvent): void
 }>()
 
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
-const isImageEditorActive = computed(() => props.imageEditorMode != null)
+const isImageEditorActive = computed(() => props.imageToolStageBinding?.mode != null)
 
 const showImageActionMenu = computed(
-  () => !!props.actionMenuVisible && !!props.displayImage && !isImageEditorActive.value,
+  () => props.actionBinding.actionMenuVisible && !!props.displayImage && !isImageEditorActive.value,
 )
 const showPromptComposer = computed(
-  () => !!props.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
+  () => props.actionBinding.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
 )
 type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)
@@ -189,13 +163,13 @@ watchPostEffect((onCleanup) => {
 })
 
 function submitPrompt(prompt: string, outputCount: number) {
-  if (!prompt || props.directGenerating) return
+  if (!prompt || props.actionBinding.directGenerating) return
   emit('prompt-generate', prompt, outputCount)
   promptDraft.value = ''
 }
 
 function submitExpand(prompt: string, outputCount: number) {
-  if (props.directGenerating) return
+  if (props.actionBinding.directGenerating) return
   emit('expand-submit', prompt, outputCount)
 }
 

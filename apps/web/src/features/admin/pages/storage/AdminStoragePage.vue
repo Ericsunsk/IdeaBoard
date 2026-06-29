@@ -420,9 +420,9 @@ import {
   adminToolbarIconButtonClass,
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
-import { storageVendorIcon, storageVendorLogo } from './storageMeta'
-import { storageStatusSeverity, type StorageCard } from './storageHelpers'
-import { useStorageManager } from './useStorageManager'
+import { storageVendorIcon, storageVendorLogo } from '../../storage/storageMeta'
+import { storageStatusSeverity, type StorageCard } from '../../storage/storageHelpers'
+import { useAdminStorageContext } from '../../storage/useAdminStorageContext'
 
 const {
   saving,
@@ -465,7 +465,7 @@ const {
   fetchBucketDomains,
   removeProfile,
   loadData,
-} = useStorageManager()
+} = useAdminStorageContext()
 const confirm = useConfirm()
 const { isScrolling: isStoragePanelScrolling, handleScroll: handleStoragePanelScroll } =
   useTransientScrolling()

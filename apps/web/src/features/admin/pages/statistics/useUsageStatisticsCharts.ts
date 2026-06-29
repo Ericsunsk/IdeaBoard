@@ -1,8 +1,8 @@
 import { computed, type Ref } from 'vue'
 import type {
   AdminStatistics,
-  GetAdminStatisticsRange,
-} from '../../../../shared/api/generated-query/model'
+  GetAdminStatisticsRangeValue,
+} from '../../statistics/statisticsResource'
 import {
   adminChartLegend,
   adminChartStrokeWidth,
@@ -61,8 +61,8 @@ const defaultModelColors = [
 export function useUsageStatisticsCharts(options: {
   adminStatistics: Ref<AdminStatistics | null>
   qualityStatistics?: Ref<AdminStatistics | null>
-  timeRange: Ref<GetAdminStatisticsRange>
-  qualityTimeRange?: Ref<GetAdminStatisticsRange>
+  timeRange: Ref<GetAdminStatisticsRangeValue>
+  qualityTimeRange?: Ref<GetAdminStatisticsRangeValue>
 }) {
   function getModelColorByName(name: string) {
     const key = normalizeModelName(name)

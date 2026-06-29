@@ -37,19 +37,10 @@ type UseFlowImageActionOrchestratorOptions = {
     action: ImageTaskAction,
     options?: { strength?: number },
   ) => Promise<void> | void
-  runImagePromptGeneration: (
+  runImagePromptAction: (
     nodeId: string,
     prompt: string,
     outputCount: number,
-  ) => Promise<void> | void
-  runImageInpaintAction: (
-    nodeId: string,
-    options: {
-      prompt: string
-      outputCount: number
-      maskDataUrl: string
-      referenceImageUrls?: string[]
-    },
   ) => Promise<void> | void
   runFusionPromptGeneration: (
     nodeId: string,
@@ -57,9 +48,6 @@ type UseFlowImageActionOrchestratorOptions = {
     outputCount: number,
     aspectRatio: PromptAspectRatio,
   ) => Promise<void> | void
-  getFlowMaskEditorCommittedData: (
-    nodeId: string,
-  ) => { executionMaskDataUrl?: string | null } | null | undefined
   onFlowNodeParamUpdate: (nodeId: string, patch: FusionPromptParamPatch) => void
   onWarning: (message: string) => void
   getActionStrength: (action: ImageStrengthAction) => number
@@ -136,16 +124,7 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
     options.cancelFlowMaskEditorMode()
     options.clearActiveNodePanel()
     options.hideStrengthControl()
-    const committedMaskData = options.getFlowMaskEditorCommittedData(nodeId)
-    if (committedMaskData?.executionMaskDataUrl) {
-      void options.runImageInpaintAction(nodeId, {
-        prompt,
-        outputCount,
-        maskDataUrl: committedMaskData.executionMaskDataUrl,
-      })
-      return
-    }
-    void options.runImagePromptGeneration(nodeId, prompt, outputCount)
+    void options.runImagePromptAction(nodeId, prompt, outputCount)
   }
 
   function onFlowFusionPromptGenerate(

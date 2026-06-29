@@ -1,6 +1,6 @@
 import type { Node } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 import { useImageEditorMode } from '../../image-editor'
 import { useImageMaskEditorOverlay } from './useImageMaskEditorOverlay'
@@ -25,7 +25,10 @@ function createHarness() {
     getImageStageElement: (nodeId) => (nodeId === 'node-1' ? stage : null),
   })
   const overlay = useImageMaskEditorOverlay({
-    imageEditorState: editorMode.imageEditorState,
+    inpaintEditorState: computed(() => {
+      const state = editorMode.imageEditorState.value
+      return state?.mode === 'inpaint' ? state : null
+    }),
   })
 
   return { editorMode, overlay }

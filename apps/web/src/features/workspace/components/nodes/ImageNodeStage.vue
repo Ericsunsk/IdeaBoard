@@ -4,17 +4,17 @@
     class="image-node-stage"
     :data-image-node-id="nodeId"
     :data-flow-node-id="flowNodeId || undefined"
-    :data-image-editor="isImageEditorActive ? '' : undefined"
+    :data-image-editor="isImageToolActive ? '' : undefined"
     :class="{
       'is-expand-mode': !!expandModeActive,
-      'is-image-editor-active': isImageEditorActive,
+      'is-image-editor-active': isImageToolActive,
     }"
     layout="center"
     :height="stageHeight"
     :active="active && !expandModeActive"
     :loading="!!directGenerating && !displayImage"
     :running="!!directGenerating"
-    :transparent="!!expandModeActive || isImageEditorActive"
+    :transparent="!!expandModeActive || isImageToolActive"
     :aria-busy="!!directGenerating"
     aria-label="图片节点输入与预览区域"
     @dragover.stop="onStageDragOver"
@@ -53,16 +53,16 @@
         @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
       />
       <ImageMaskEditorOverlay
-        v-if="isMaskEditorActive && maskEditorOverlayStyle"
-        :style="maskEditorOverlayStyle"
-        :canvas-width="maskEditorCanvasWidth ?? 0"
-        :canvas-height="maskEditorCanvasHeight ?? 0"
-        :mask-layer-opacity="maskLayerOpacity ?? 72"
-        :image-layer-visible="imageLayerVisible ?? true"
-        :brush-size="maskEditorBrushSize ?? 18"
-        :brush-shape="maskEditorBrushShape ?? 'round'"
-        :set-canvas-ref="setMaskCanvasRef ?? (() => {})"
-        @canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
+        v-if="isMaskEditorActive && imageToolStageBinding?.maskOverlayStyle"
+        :style="imageToolStageBinding.maskOverlayStyle"
+        :canvas-width="imageToolStageBinding.maskCanvasWidth"
+        :canvas-height="imageToolStageBinding.maskCanvasHeight"
+        :mask-layer-opacity="imageToolStageBinding.maskLayerOpacity"
+        :image-layer-visible="imageToolStageBinding.imageLayerVisible"
+        :brush-size="imageToolStageBinding.maskBrushSize"
+        :brush-shape="imageToolStageBinding.maskBrushShape"
+        :set-canvas-ref="imageToolStageBinding.setMaskCanvasRef"
+        @canvas-pointerdown="imageToolStageBinding.onMaskCanvasPointerDown"
       />
       <div class="image-node-stage-actions">
         <NodeActionButton
@@ -114,7 +114,7 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorMode, ImageEditorRenderedPreview } from '../../image-editor'
+import type { ImageToolStageBinding } from '../../image-tools'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import { ImageMaskEditorOverlay } from '../../mask-editor'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
@@ -134,16 +134,7 @@ const props = defineProps<{
   expandModeActive?: boolean
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
-  imageEditorMode?: ImageEditorMode | null
-  imageEditorRenderedPreview?: ImageEditorRenderedPreview | null
-  maskEditorOverlayStyle?: Record<string, string> | null
-  maskEditorCanvasWidth?: number
-  maskEditorCanvasHeight?: number
-  maskLayerOpacity?: number
-  imageLayerVisible?: boolean
-  maskEditorBrushSize?: number
-  maskEditorBrushShape?: 'round' | 'square'
-  setMaskCanvasRef?: (element: Element | null) => void
+  imageToolStageBinding?: ImageToolStageBinding | null
   outputCount?: number
   active: boolean
   dragging: boolean
@@ -165,14 +156,13 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
-  (e: 'mask-canvas-pointerdown', event: PointerEvent): void
 }>()
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
-const isImageEditorActive = computed(() => props.imageEditorMode != null)
-const isMaskEditorActive = computed(() => props.imageEditorMode === 'inpaint')
-const renderedImagePreview = computed(() => props.imageEditorRenderedPreview ?? null)
+const isImageToolActive = computed(() => props.imageToolStageBinding?.mode != null)
+const isMaskEditorActive = computed(() => props.imageToolStageBinding?.mode === 'inpaint')
+const renderedImagePreview = computed(() => props.imageToolStageBinding?.renderedPreview ?? null)
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )

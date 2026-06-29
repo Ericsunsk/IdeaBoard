@@ -78,27 +78,10 @@
             :dragging="!!nodeProps.dragging"
             :copy-mode="duplicateModifierPressed"
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
-            :image-action-visible="
-              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeProps.id)
-            "
-            :image-prompt-composer-visible="
-              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeProps.id)
-            "
-            :image-prompt-placeholder="
-              getFlowMaskEditorCommittedData(nodeProps.id)
-                ? '描述如何重绘选区'
-                : '输入提示词改造这张图'
-            "
+            :image-action-binding="imageToolActionBindingFor(nodeProps.id)"
             :fusion-prompt-composer-visible="
               isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeProps.id)
             "
-            :image-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
-            :show-strength-control="
-              !!activeStrengthAction &&
-              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeProps.id)
-            "
-            :strength-pct="activeStrengthValue"
-            :set-strength-track-ref="setStrengthTrackRef"
             :set-image-stage-ref="setImageStageRef"
             :clear-image-stage-ref="clearImageStageRef"
             :expand-mode-active="flowExpandNodeId === nodeProps.id"
@@ -106,41 +89,8 @@
               flowExpandNodeId === nodeProps.id ? flowExpandOverlayStyle : null
             "
             :expand-handle-radius="flowExpandHandleRadius"
-            :image-editor-mode="flowImageEditorNodeId === nodeProps.id ? imageEditorMode : null"
-            :image-editor-rendered-preview="
-              flowImageEditorNodeId === nodeProps.id && imageEditorMode === 'adjust'
-                ? imageEditorRenderedPreview
-                : null
-            "
-            :mask-editor-overlay-style="
-              flowMaskEditorNodeId === nodeProps.id ? flowMaskEditorOverlayStyle : null
-            "
-            :mask-editor-canvas-width="
-              Math.max(
-                1,
-                Math.round(
-                  flowMaskEditorOverlayStyle?.width
-                    ? parseFloat(flowMaskEditorOverlayStyle.width)
-                    : 0,
-                ),
-              )
-            "
-            :mask-editor-canvas-height="
-              Math.max(
-                1,
-                Math.round(
-                  flowMaskEditorOverlayStyle?.height
-                    ? parseFloat(flowMaskEditorOverlayStyle.height)
-                    : 0,
-                ),
-              )
-            "
-            :mask-layer-opacity="maskEditorLayerOpacity"
-            :image-layer-visible="true"
-            :mask-editor-brush-size="flowMaskEditorBrushSize"
-            :mask-editor-brush-shape="flowMaskEditorBrushShape"
+            :image-tool-stage-binding="imageToolStageBindingFor(nodeProps.id)"
             :handle-visibility-refresh-token="flowHandleVisibilityRefreshToken"
-            :set-mask-canvas-ref="setFlowMaskEditorCanvasRef"
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
             @delete-node="() => onFlowDeleteNode(nodeProps.id)"
@@ -181,59 +131,14 @@
             @expand-handle-pointermove="onFlowExpandHandlePointerMove"
             @expand-handle-pointerup="onFlowExpandHandlePointerUp"
             @expand-frame-pointerdown="(event) => onFlowExpandFramePointerDown(nodeProps.id, event)"
-            @mask-canvas-pointerdown="onFlowMaskEditorCanvasPointerDown"
           />
         </template>
       </VueFlow>
       <WorkspaceCanvasOverlays
-        :image-editor-node-id="flowImageEditorNodeId"
-        :image-editor-mode="imageEditorMode"
-        :image-editor-chrome-anchor-rect="imageEditorChromeAnchorRect"
-        :is-image-editor-chrome-ready="isImageEditorChromeReady"
-        :flow-mask-editor-draw-mode="flowMaskEditorDrawMode"
-        :flow-mask-editor-brush-shape="flowMaskEditorBrushShape"
-        :flow-mask-editor-brush-size="flowMaskEditorBrushSize"
-        :flow-mask-editor-brush-hardness="flowMaskEditorBrushHardness"
-        :mask-editor-layer-opacity="maskEditorLayerOpacity"
-        :active-mask-editor-output-count="activeMaskEditorOutputCount"
-        :mask-editor-reference-images="maskEditorReferenceImages"
-        :is-node-direct-action-running="isNodeDirectActionRunning"
-        :can-undo-flow-mask-editor="canUndoFlowMaskEditor"
-        :can-redo-flow-mask-editor="canRedoFlowMaskEditor"
-        :active-image-editor-tool="activeImageEditorTool"
-        :image-editor-layers="imageEditorLayers"
-        :selected-image-editor-layer-id="selectedImageEditorLayerId"
-        :selected-image-editor-adjustment-layer="selectedImageEditorAdjustmentLayer"
-        :image-editor-histogram-source="imageEditorHistogramSource"
-        :applying-image-editor-adjustments="isApplyingImageEditorAdjustments"
+        :chrome-model="imageToolChromeModel"
+        :chrome-commands="imageToolChromeCommands"
         :node-context-menu="nodeContextMenu"
         :canvas-node-menu-items="canvasNodeMenuItems"
-        @set-draw-mode="setFlowMaskEditorDrawMode"
-        @set-brush-shape="setFlowMaskEditorBrushShape"
-        @set-brush-size="setFlowMaskEditorBrushSize"
-        @set-brush-hardness="setFlowMaskEditorBrushHardness"
-        @set-mask-layer-opacity="setMaskEditorLayerOpacity"
-        @clear-mask="clearFlowMaskEditorMask"
-        @invert-mask="invertFlowMaskEditorMask"
-        @feather-mask="featherFlowMaskEditorMask"
-        @undo-mask="undoFlowMaskEditorMask"
-        @redo-mask="redoFlowMaskEditorMask"
-        @update:output-count="onMaskEditorChromeOutputCountUpdate"
-        @image-input-open="onMaskEditorReferenceImageOpen"
-        @reference-image-remove="onMaskEditorReferenceImageRemove"
-        @reference-image-preview="onMaskEditorReferenceImagePreview"
-        @select-image-editor-tool="selectImageEditorTool"
-        @select-image-adjustment-layer="selectImageAdjustmentLayer"
-        @select-image-editor-layer="selectImageEditorLayer"
-        @set-image-editor-layer-visible="setImageEditorLayerVisible"
-        @add-image-editor-layer="addImageEditorLayer"
-        @copy-image-editor-layer="copyImageEditorLayer"
-        @merge-image-editor-layer="mergeImageEditorLayer"
-        @remove-image-editor-layer="removeImageEditorLayer"
-        @update-image-editor-param="updateSelectedImageEditorLayerParam"
-        @update-image-editor-adjustment-params="updateSelectedImageEditorAdjustmentParams"
-        @apply-image-editor-adjustments="onApplyImageEditorAdjustments"
-        @submit="onMaskEditorChromeSubmit"
         @create-node="handleNodeContextMenuCreate"
       />
     </div>
@@ -269,15 +174,13 @@ import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShel
 import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
 import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
-import { useMaskEditorChromeActions, useMaskEditorChromeState } from '../mask-editor'
 import { useFlowWorkspaceNodeHandlers } from '../composables/useFlowWorkspaceNodeHandlers'
 import { useFlowTransientUiDismissal } from '../composables/useFlowTransientUiDismissal'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
-import { useImageEditorViewportController } from '../image-editor'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useWorkspaceBoardRuntime } from '../composables/useWorkspaceBoardRuntime'
 import { useWorkspaceGraphRuntime } from '../composables/useWorkspaceGraphRuntime'
-import { useWorkspaceImageToolRuntime } from '../composables/useWorkspaceImageToolRuntime'
+import { useWorkspaceImageTools } from '../image-tools'
 import { useWorkspaceTaskRuntime } from '../composables/useWorkspaceTaskRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
@@ -436,7 +339,7 @@ function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: 
   const transform = payload.flowTransform
   if (!transform) return
   if (applyFlowTransform(transform)) markBoardViewportChanged()
-  if (!isImageEditorChromeReady.value) return
+  if (!imageToolChromeModel.value.isReady) return
   scheduleImageEditorChromeAnchorUpdate()
 }
 
@@ -526,6 +429,68 @@ const {
   },
 })
 
+const imageTools = useWorkspaceImageTools({
+  nodes: nodes as Ref<Node[]>,
+  activeTool: activeTool as Ref<string>,
+  canvasWrapRef,
+  isFlowInteractionActive,
+  currentBoardId,
+  getImageNodeDisplayPayload,
+  getImageNodeSnapshot,
+  getImageStageElement,
+  screenToFlowCoordinate,
+  getViewport,
+  setViewport: (viewport, options) => setViewport(viewport, options),
+  setCenter: (x, y, options) => setCenter(x, y, options),
+  onViewportTransform: (viewport) => {
+    applyFlowTransform(viewport)
+  },
+  createImageNodeFromFile,
+  connectImageNodes: onConnect,
+  uploadImageToBoard,
+  openImageUrlPreview,
+  clearActiveNodePanel,
+  hideStrengthControl,
+  updateOutputCount: (nodeId, payload) => {
+    _onFlowNodeParamUpdate(nodeId, payload)
+    markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
+  },
+  runInpaintAction: runImageInpaintAction,
+  runPromptGeneration: runImagePromptGeneration,
+  isImageActionPanelVisible: (nodeId) =>
+    isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
+  isImagePromptComposerVisible: (nodeId) =>
+    isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
+  isDirectActionRunning: isNodeDirectActionRunning,
+  activeStrengthAction,
+  strengthPct: activeStrengthValue,
+  getStrengthTrackRefSetter: () => setStrengthTrackRef,
+  clearSelectedFlowElements: clearSelectedFlowElementsSync,
+  startCanvasInteraction: startFlowInteraction,
+  stopCanvasInteraction: stopFlowInteraction,
+  message: {
+    warning: (msg) => appToast.warning(msg),
+    success: (msg) => appToast.success(msg),
+  },
+})
+
+const {
+  activeNodeId: flowImageEditorNodeId,
+  chromeModel: imageToolChromeModel,
+  chromeCommands: imageToolChromeCommands,
+  isChromeHidden: isImageEditorChromeHidden,
+  isCanvasLocked: isFlowCanvasLocked,
+  enter: enterFlowImageEditorMode,
+  cancel: cancelFlowMaskEditorMode,
+  stageBindingFor: imageToolStageBindingFor,
+  actionBindingFor: imageToolActionBindingFor,
+  discardNodeEdits: discardFlowImageToolNodeEdits,
+  runPromptAction: runFlowImageToolPromptAction,
+  onCanvasWheel,
+  focusAndShowChrome: focusImageEditorAndShowChrome,
+  scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
+} = imageTools
+
 const { dismissTransientWorkspaceUi } = useFlowTransientUiDismissal({
   cancelFlowExpandMode,
   closeBoardHeaderEditing,
@@ -550,76 +515,13 @@ useDismissableLayer({
 })
 
 const {
-  imageEditorMode,
-  flowImageEditorNodeId,
-  flowMaskEditorNodeId,
-  flowMaskEditorOverlayStyle,
-  flowMaskEditorDrawMode,
-  flowMaskEditorBrushSize,
-  flowMaskEditorBrushHardness,
-  flowMaskEditorBrushShape,
-  canUndoFlowMaskEditor,
-  canRedoFlowMaskEditor,
-  clearFlowMaskEditorMask,
-  invertFlowMaskEditorMask,
-  featherFlowMaskEditorMask,
-  undoFlowMaskEditorMask,
-  redoFlowMaskEditorMask,
-  clearFlowMaskEditorCommittedData,
-  setFlowMaskEditorCanvasRef,
-  onFlowMaskEditorCanvasPointerDown,
-  setFlowMaskEditorDrawMode,
-  setFlowMaskEditorBrushSize,
-  setFlowMaskEditorBrushHardness,
-  setFlowMaskEditorBrushShape,
-  getFlowMaskEditorCommittedData,
-  activeImageEditorTool,
-  imageEditorLayers,
-  selectedImageEditorLayerId,
-  selectedImageEditorAdjustmentLayer,
-  imageEditorHistogramSource,
-  selectImageEditorTool,
-  selectImageAdjustmentLayer,
-  selectImageEditorLayer,
-  setImageEditorLayerVisible,
-  addImageEditorLayer,
-  copyImageEditorLayer,
-  mergeImageEditorLayer,
-  removeImageEditorLayer,
-  updateSelectedImageEditorLayerParam,
-  updateSelectedImageEditorAdjustmentParams,
-  isApplyingImageEditorAdjustments,
-  imageEditorRenderedPreview,
-  onApplyImageEditorAdjustments,
-  cancelFlowMaskEditorMode,
-  enterFlowImageEditorMode,
-  commitFlowMaskEditorMode,
-} = useWorkspaceImageToolRuntime({
-  nodes: nodes as Ref<Node[]>,
-  activeTool: activeTool as Ref<string>,
-  currentBoardId,
-  getImageNodeDisplayPayload,
-  getImageNodeSnapshot,
-  getImageStageElement,
-  createImageNodeFromFile,
-  connectImageNodes: onConnect,
-  clearSelectedFlowElements: clearSelectedFlowElementsSync,
-  startCanvasInteraction: startFlowInteraction,
-  stopCanvasInteraction: stopFlowInteraction,
-  message: {
-    warning: (msg) => appToast.warning(msg),
-    success: (msg) => appToast.success(msg),
-  },
-})
-
-const {
   onFlowImageOpenFile,
   onFlowImageReset: onFlowImageResetBase,
   onFlowImageStageDrop,
 } = useFlowNodeMediaInputs({
   applyImageFileToImageNode: async (nodeId, file): Promise<boolean> => {
     const updated = await applyImageFileToImageNode(nodeId, file)
-    if (updated) clearFlowMaskEditorCommittedData(nodeId)
+    if (updated) discardFlowImageToolNodeEdits(nodeId)
     return updated
   },
   updateSnapshotNode,
@@ -629,7 +531,7 @@ const {
 const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, onFlowImageReset } =
   useFlowWorkspaceNodeHandlers({
     dismissTransientWorkspaceUi,
-    clearFlowMaskEditorCommittedData,
+    discardFlowImageToolNodeEdits,
     _onFlowDeleteNode,
     _onFlowPromptTextUpdate,
     _onFlowNodeParamUpdate,
@@ -645,66 +547,6 @@ const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFram
     commitFlowExpandMode,
     beginFlowExpandHandleResize,
     beginFlowExpandFrameDrag,
-  })
-
-const {
-  imageEditorChromeAnchorRect,
-  isImageEditorChromeReady,
-  onCanvasWheel,
-  focusImageEditorAndShowChrome,
-  scheduleImageEditorChromeAnchorUpdate,
-} = useImageEditorViewportController({
-  nodes: nodes as Ref<Node[]>,
-  canvasWrapRef,
-  imageEditorNodeId: flowImageEditorNodeId,
-  getImageStageElement,
-  screenToFlowCoordinate,
-  getViewport,
-  setViewport: (viewport, options) => setViewport(viewport, options),
-  setCenter: (x, y, options) => setCenter(x, y, options),
-  onViewportTransform: (viewport) => {
-    applyFlowTransform(viewport)
-  },
-})
-
-const {
-  maskEditorLayerOpacity,
-  maskEditorReferenceImages,
-  activeMaskEditorOutputCount,
-  setMaskEditorLayerOpacity,
-  onMaskEditorReferenceImageOpen,
-  onMaskEditorReferenceImageRemove,
-  onMaskEditorReferenceImagePreview,
-} = useMaskEditorChromeState({
-  imageEditorNodeId: flowImageEditorNodeId,
-  getImageNodeSnapshot,
-  uploadImageToBoard,
-  onWarning: (msg) => appToast.warning(msg),
-  onReferenceImagePreview: (image) => {
-    void openImageUrlPreview(image.url, image.ratio)
-  },
-})
-const isImageEditorChromeHidden = computed(() => !!flowImageEditorNodeId.value)
-const isFlowCanvasLocked = computed(
-  () => isFlowInteractionActive.value || !!flowImageEditorNodeId.value,
-)
-
-const { onMaskEditorChromeSubmit, onMaskEditorChromeOutputCountUpdate } =
-  useMaskEditorChromeActions({
-    maskEditorNodeId: flowMaskEditorNodeId,
-    referenceImages: maskEditorReferenceImages,
-    commitMaskEditorMode: commitFlowMaskEditorMode,
-    getCommittedMaskData: getFlowMaskEditorCommittedData,
-    clearActiveNodePanel,
-    hideStrengthControl,
-    runInpaintAction: runImageInpaintAction,
-    updateOutputCount: (nodeId, outputCount) => {
-      onFlowNodeParamUpdate(nodeId, {
-        key: 'outputCount',
-        value: outputCount,
-      })
-    },
-    onWarning: (message) => appToast.warning(message),
   })
 
 const { onFlowPromptGenerate } = useFlowPromptGenerationOrchestrator({
@@ -787,10 +629,8 @@ const {
   enterFlowImageEditorMode,
   focusImageEditorAndShowChrome,
   runImageDirectAction,
-  runImagePromptGeneration,
-  runImageInpaintAction,
+  runImagePromptAction: runFlowImageToolPromptAction,
   runFusionPromptGeneration,
-  getFlowMaskEditorCommittedData,
   onFlowNodeParamUpdate,
   onWarning: (message) => appToast.warning(message),
   getActionStrength,

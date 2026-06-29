@@ -5,8 +5,8 @@
         hasChannelSearch ? '调整搜索关键词后重试。' : '点击右上角新增渠道商开始配置。'
       "
       :empty-title="emptyChannelMessage"
-      :is-empty="filteredChannels.length === 0"
-      :is-loading="loading && channels.length === 0"
+      :is-empty="channelCards.length === 0"
+      :is-loading="isChannelLoading"
       :is-scrolling="isChannelPanelScrolling"
       @scroll="handleChannelPanelScroll"
     >
@@ -21,12 +21,17 @@
       </template>
 
       <template #toolbar-end>
-        <Button text :class="adminToolbarIconButtonClass" aria-label="刷新渠道商" @click="loadData">
+        <Button
+          text
+          :class="adminToolbarIconButtonClass"
+          aria-label="刷新渠道商"
+          @click="commands.loadData"
+        >
           <template #icon>
             <Refresh class="size-4 text-admin-text-2" />
           </template>
         </Button>
-        <Button label="新增渠道商" class="!h-9 !rounded-lg" @click="openAddChannelModal">
+        <Button label="新增渠道商" class="!h-9 !rounded-lg" @click="channelEditor.openCreate">
           <template #icon>
             <Plus class="size-4" />
           </template>
@@ -34,7 +39,7 @@
       </template>
 
       <Card
-        v-for="card in filteredChannelCards"
+        v-for="card in channelCards"
         :key="card.channel.id"
         :class="adminMasonryCardClass"
         :pt="adminCardPt"
@@ -52,7 +57,7 @@
                   {{ card.channel.name }}
                 </div>
                 <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
-                  {{ card.channel.api_url }}
+                  {{ card.channel.baseUrl }}
                 </div>
               </div>
             </div>
@@ -63,7 +68,7 @@
           <div class="flex flex-col gap-3.5">
             <div class="flex flex-wrap items-center gap-1.5">
               <Tag
-                :value="getApiTypeLabel(card.channel.type)"
+                :value="card.channel.apiTypeLabel"
                 severity="info"
                 :class="adminCompactTagClass"
                 rounded
@@ -92,7 +97,7 @@
                   rounded
                   size="small"
                   aria-label="添加 APIKey"
-                  @click="handleOpenAddAccountModal(card.channel)"
+                  @click="accountEditor.openCreate(card.channel.commandTarget)"
                 >
                   <template #icon>
                     <Plus />
@@ -107,7 +112,7 @@
                       <div class="flex min-w-0 items-center gap-2">
                         <div
                           class="h-1.5 w-1.5 shrink-0 rounded-full"
-                          :class="getAccountStatusDotClass(account)"
+                          :class="commands.getAccountStatusDotClass(account)"
                         ></div>
                         <span class="truncate text-admin-meta font-semibold text-admin-title-color">
                           {{ account.name || 'APIKey' }}
@@ -115,7 +120,7 @@
                         <span
                           class="shrink-0 font-mono text-admin-caption font-bold text-admin-text-3"
                         >
-                          {{ account.current_concurrent || 0 }}/{{ account.max_concurrent }}
+                          {{ account.concurrencyLabel }}
                         </span>
                       </div>
                       <div class="flex shrink-0 items-center gap-1">
@@ -125,7 +130,7 @@
                           :class="adminFramedIconButtonClass"
                           aria-label="编辑 APIKey"
                           title="编辑 APIKey"
-                          @click="handleOpenEditAccountModal(account)"
+                          @click="accountEditor.openEdit(account.commandTarget)"
                         >
                           <template #icon>
                             <EditPencil class="size-4 text-admin-text-2" />
@@ -137,7 +142,7 @@
                           :class="adminFramedIconButtonClass"
                           aria-label="删除 APIKey"
                           title="删除 APIKey"
-                          @click="handleDeleteAccount(account)"
+                          @click="commands.deleteAccount(account.commandTarget)"
                         >
                           <template #icon>
                             <Trash class="size-4 text-admin-text-2" />
@@ -149,17 +154,15 @@
 
                   <div class="flex flex-col gap-2">
                     <ProgressBar
-                      :value="
-                        ((account.current_concurrent || 0) / (account.max_concurrent || 1)) * 100
-                      "
+                      :value="account.concurrencyPercent"
                       :show-value="false"
                       class="!h-[3px] !rounded-full !bg-admin-border-soft"
-                      :pt="getAccountProgressPt(account)"
+                      :pt="commands.getAccountProgressPt(account)"
                     />
 
                     <div class="flex flex-col gap-1.5">
                       <div
-                        v-for="model in getAccountModelRows(account)"
+                        v-for="model in commands.getAccountModelRows(account)"
                         :key="`${account.id}:${model.name}`"
                         class="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-admin-border-soft bg-white px-2 py-1.5"
                       >
@@ -176,7 +179,9 @@
                           size="small"
                           class="!shrink-0"
                           :aria-label="`${model.name} 模型启用状态`"
-                          @update:model-value="toggleAccountModelStatus(account, model.name)"
+                          @update:model-value="
+                            commands.toggleAccountModelStatus(account.commandTarget, model.name)
+                          "
                         />
                       </div>
                     </div>
@@ -192,14 +197,14 @@
                 size="small"
                 label="编辑"
                 severity="contrast"
-                @click="openEditChannelModal(card.channel)"
+                @click="channelEditor.openEdit(card.channel.commandTarget)"
               />
               <Button
                 size="small"
                 label="删除"
                 severity="contrast"
                 outlined
-                @click="handleDeleteChannel(card.channel)"
+                @click="commands.deleteChannel(card.channel.commandTarget)"
               />
             </div>
           </div>
@@ -245,25 +250,25 @@
         >
           <span>接口类型</span>
           <Select
-            v-model="channelForm.type"
+            v-model="channelForm.apiType"
             input-id="admin-channel-type"
             class="w-full"
-            :options="apiTypeOptions"
+            :options="channelEditor.apiTypeOptions"
             option-label="label"
             option-value="value"
             placeholder="选择接口协议"
-            :invalid="Boolean(channelFormErrors.type)"
+            :invalid="Boolean(channelFormErrors.apiType)"
             aria-describedby="admin-channel-type-error"
-            @update:model-value="clearChannelFormError('type')"
+            @update:model-value="clearChannelFormError('apiType')"
           />
           <Message
-            v-if="channelFormErrors.type"
+            v-if="channelFormErrors.apiType"
             id="admin-channel-type-error"
             severity="error"
             size="small"
             :closable="false"
           >
-            {{ channelFormErrors.type }}
+            {{ channelFormErrors.apiType }}
           </Message>
         </label>
         <label
@@ -273,22 +278,22 @@
           <span>Base URL地址</span>
           <InputText
             id="admin-channel-api-url"
-            v-model="channelForm.api_url"
+            v-model="channelForm.baseUrl"
             class="w-full"
             placeholder="例如：https://api.example.com/v1"
-            :invalid="Boolean(channelFormErrors.api_url)"
+            :invalid="Boolean(channelFormErrors.baseUrl)"
             aria-describedby="admin-channel-api-url-error"
-            @blur="handleChannelApiUrlBlur"
-            @update:model-value="clearChannelFormError('api_url')"
+            @blur="channelEditor.handleApiUrlBlur"
+            @update:model-value="clearChannelFormError('baseUrl')"
           />
           <Message
-            v-if="channelFormErrors.api_url"
+            v-if="channelFormErrors.baseUrl"
             id="admin-channel-api-url-error"
             severity="error"
             size="small"
             :closable="false"
           >
-            {{ channelFormErrors.api_url }}
+            {{ channelFormErrors.baseUrl }}
           </Message>
         </label>
       </div>
@@ -348,7 +353,7 @@
         >
           <span>分配模型</span>
           <AutoComplete
-            v-model="accountForm.model_values"
+            v-model="accountForm.modelValues"
             input-id="admin-account-models"
             multiple
             fluid
@@ -356,20 +361,20 @@
             :loading="detectModelsLoading"
             placeholder="选择或输入分配给该 APIKey 的模型"
             :pt="modelSelectPt"
-            :invalid="Boolean(accountFormErrors.model_values)"
+            :invalid="Boolean(accountFormErrors.modelValues)"
             aria-describedby="admin-account-models-error"
-            @focus="handleAccountModelSelectShow(true)"
+            @focus="accountEditor.handleModelSelectShow(true)"
             @complete="searchModelSuggestions"
-            @update:model-value="clearAccountFormError('model_values')"
+            @update:model-value="clearAccountFormError('modelValues')"
           />
           <Message
-            v-if="accountFormErrors.model_values"
+            v-if="accountFormErrors.modelValues"
             id="admin-account-models-error"
             severity="error"
             size="small"
             :closable="false"
           >
-            {{ accountFormErrors.model_values }}
+            {{ accountFormErrors.modelValues }}
           </Message>
         </label>
 
@@ -380,23 +385,23 @@
           >
             <span>最大并发数</span>
             <InputNumber
-              v-model="accountForm.max_concurrent"
+              v-model="accountForm.maxConcurrent"
               input-id="admin-account-max-concurrent"
-              :min="accountLimits.max_concurrent.min"
-              :max="accountLimits.max_concurrent.max"
+              :min="accountLimits.maxConcurrent.min"
+              :max="accountLimits.maxConcurrent.max"
               fluid
-              :invalid="Boolean(accountFormErrors.max_concurrent)"
+              :invalid="Boolean(accountFormErrors.maxConcurrent)"
               aria-describedby="admin-account-max-concurrent-error"
-              @update:model-value="clearAccountFormError('max_concurrent')"
+              @update:model-value="clearAccountFormError('maxConcurrent')"
             />
             <Message
-              v-if="accountFormErrors.max_concurrent"
+              v-if="accountFormErrors.maxConcurrent"
               id="admin-account-max-concurrent-error"
               severity="error"
               size="small"
               :closable="false"
             >
-              {{ accountFormErrors.max_concurrent }}
+              {{ accountFormErrors.maxConcurrent }}
             </Message>
           </label>
           <label
@@ -405,23 +410,23 @@
           >
             <span>超时时间(秒)</span>
             <InputNumber
-              v-model="accountForm.timeout"
+              v-model="accountForm.timeoutSeconds"
               input-id="admin-account-timeout"
-              :min="accountLimits.timeout_seconds.min"
-              :max="accountLimits.timeout_seconds.max"
+              :min="accountLimits.timeoutSeconds.min"
+              :max="accountLimits.timeoutSeconds.max"
               fluid
-              :invalid="Boolean(accountFormErrors.timeout)"
+              :invalid="Boolean(accountFormErrors.timeoutSeconds)"
               aria-describedby="admin-account-timeout-error"
-              @update:model-value="clearAccountFormError('timeout')"
+              @update:model-value="clearAccountFormError('timeoutSeconds')"
             />
             <Message
-              v-if="accountFormErrors.timeout"
+              v-if="accountFormErrors.timeoutSeconds"
               id="admin-account-timeout-error"
               severity="error"
               size="small"
               :closable="false"
             >
-              {{ accountFormErrors.timeout }}
+              {{ accountFormErrors.timeoutSeconds }}
             </Message>
           </label>
         </div>
@@ -429,11 +434,7 @@
       <template #footer>
         <div :class="adminDialogCompactFooterActionsClass">
           <Button label="取消" severity="secondary" outlined @click="closeAccountModal" />
-          <Button
-            label="确定"
-            :loading="accountSaveLoading"
-            @click="handleSaveAccountWithValidation"
-          />
+          <Button label="确定" :loading="accountSaveLoading" @click="accountEditor.save" />
         </div>
       </template>
     </Dialog>
@@ -441,14 +442,6 @@
 </template>
 
 <script setup lang="ts">
-import type { AdminAccount } from '../../shared/queries/adminAccountActions'
-import {
-  deleteAdminChannel,
-  fetchAdminChannels,
-  saveAdminChannel,
-  type Channel,
-  type ChannelFormData,
-} from '../../shared/queries/adminChannelActions'
 import AutoComplete from 'primevue/autocomplete'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -466,7 +459,6 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
 import { EditPencil, Plus, Refresh, Trash } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
-import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
@@ -481,88 +473,42 @@ import {
   adminToolbarIconButtonClass,
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
-import {
-  ADMIN_CHANNEL_API_TYPE_OPTIONS,
-  DEFAULT_ADMIN_CHANNEL_API_TYPE,
-  GOOGLE_ADMIN_CHANNEL_API_TYPE,
-  getAdminChannelApiTypeLabel,
-} from './channelApiTypes'
-import { extractApiErrorMessage } from './channelModelUtils'
-import { useChannelAccounts } from './useChannelAccounts'
+import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
 
 const appToast = useAppToast()
-const { runAsyncAction } = useAsyncAction()
 const confirm = useConfirm()
 
-// State
-const loading = ref(false)
-const channels = ref<Channel[]>([])
-const searchKeyword = ref('')
 const { isScrolling: isChannelPanelScrolling, handleScroll: handleChannelPanelScroll } =
   useTransientScrolling()
 
-const filteredChannels = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  if (!keyword) return channels.value
-  return channels.value.filter((item) => (item.name || '').toLowerCase().includes(keyword))
+const { cards, channelEditor, accountEditor, commands } = useAdminProviderConfig({
+  message: appToast,
+  confirm: {
+    danger: ({ title, content, acceptLabel, onConfirm }) =>
+      requireAdminConfirm({
+        header: title,
+        message: content,
+        acceptLabel,
+        accept: onConfirm,
+      }),
+  },
 })
-const filteredChannelCards = computed(() =>
-  filteredChannels.value.map((channel) => {
-    const channelAccounts = getChannelAccounts(channel.id)
-    const models = new Set<string>()
-    channelAccounts.forEach((account) => {
-      getAccountModelRows(account).forEach((model) => models.add(model.name))
-    })
 
-    return {
-      channel,
-      accounts: channelAccounts,
-      modelCount: models.size,
-    }
-  }),
-)
-const hasChannelSearch = computed(() => Boolean(searchKeyword.value.trim()))
-const totalChannelsLabel = computed(() =>
-  hasChannelSearch.value
-    ? `${filteredChannels.value.length} 匹配渠道`
-    : `${channels.value.length} 渠道`,
-)
-const emptyChannelMessage = computed(() => (hasChannelSearch.value ? '无匹配渠道商' : '暂无渠道商'))
+const searchKeyword = cards.searchKeyword
+const channelCards = cards.items
+const isChannelLoading = cards.isLoading
+const hasChannelSearch = cards.hasSearch
+const totalChannelsLabel = cards.totalChannelsLabel
+const emptyChannelMessage = cards.emptyMessage
+const accountRunningLabel = cards.accountRunningLabel
+const activeModelCount = cards.activeModelCount
 
-// Data Loading
-async function loadData() {
-  await runAsyncAction(
-    async () => {
-      channels.value = await fetchAdminChannels()
-      await loadAccounts()
-    },
-    {
-      loading,
-      onError: (error) => showChannelActionError(error, '加载数据失败'),
-    },
-  )
-}
+const showChannelModal = channelEditor.visible
+const isEditChannel = channelEditor.isEditing
+const channelSaveLoading = channelEditor.saveLoading
+const channelForm = channelEditor.form
+const channelFormErrors = channelEditor.errors
 
-// Helpers
-// --- Channel Form ---
-const showChannelModal = ref(false)
-const isEditChannel = ref(false)
-const channelSaveLoading = ref(false)
-const currentChannelId = ref(0)
-const createEmptyChannelForm = (): ChannelFormData => ({
-  type: DEFAULT_ADMIN_CHANNEL_API_TYPE,
-  name: '',
-  api_url: '',
-})
-const channelForm = ref<ChannelFormData>(createEmptyChannelForm())
-type ChannelFormField = keyof ChannelFormData
-const createEmptyChannelFormErrors = (): Record<ChannelFormField, string> => ({
-  type: '',
-  name: '',
-  api_url: '',
-})
-const channelFormErrors = ref<Record<ChannelFormField, string>>(createEmptyChannelFormErrors())
-const apiTypeOptions = ADMIN_CHANNEL_API_TYPE_OPTIONS
 const modelSelectPt = {
   root: { class: 'w-full' },
   inputMultiple: { class: '!min-h-[42px] !w-full !rounded-xl' },
@@ -578,147 +524,17 @@ const modelChipPt = {
   root: { class: '!inline-flex !min-w-0' },
   label: { class: 'min-w-0 truncate' },
 } as const
-const activeProgressPt = { value: { class: '!bg-admin-success' } } as const
-const mutedProgressPt = { value: { class: '!bg-admin-text-3' } } as const
-
-function getApiTypeLabel(value: string) {
-  return getAdminChannelApiTypeLabel(value)
-}
-
-function getAccountStatusDotClass(account: AdminAccount) {
-  if (account.status === 0) return 'bg-admin-warning'
-  if (account.fail_count >= 5) return 'bg-admin-danger'
-  return 'bg-admin-success'
-}
-
-function getAccountProgressPt(account: AdminAccount) {
-  return account.status === 1 ? activeProgressPt : mutedProgressPt
-}
-
-function inferChannelApiTypeFromUrl() {
-  const apiUrl = channelForm.value.api_url.trim().toLowerCase()
-  if (!apiUrl) return
-  if (apiUrl.includes('generativelanguage.googleapis.com')) {
-    channelForm.value.type = GOOGLE_ADMIN_CHANNEL_API_TYPE
-    return
-  }
-  if (apiUrl.includes('api.openai.com')) {
-    channelForm.value.type = DEFAULT_ADMIN_CHANNEL_API_TYPE
-  }
-}
-
-function handleChannelApiUrlBlur() {
-  inferChannelApiTypeFromUrl()
-  validateChannelField('api_url')
-}
-
-function openAddChannelModal() {
-  isEditChannel.value = false
-  channelForm.value = createEmptyChannelForm()
-  resetChannelFormErrors()
-  showChannelModal.value = true
-}
-
-function openEditChannelModal(row: Channel) {
-  isEditChannel.value = true
-  currentChannelId.value = row.id
-  channelForm.value = { type: row.type, name: row.name, api_url: row.api_url }
-  resetChannelFormErrors()
-  showChannelModal.value = true
-}
 
 function closeChannelModal() {
-  showChannelModal.value = false
-  resetChannelFormErrors()
+  channelEditor.close()
 }
 
 async function handleSaveChannel() {
-  if (!validateChannelForm()) {
-    appToast.warning('请修正渠道商表单错误')
-    return
-  }
-
-  await runAsyncAction(
-    async () => {
-      const submitData = { ...channelForm.value }
-
-      await saveAdminChannel({
-        id: isEditChannel.value ? currentChannelId.value : undefined,
-        data: submitData,
-      })
-      appToast.success(isEditChannel.value ? '渠道商已更新' : '渠道商已创建')
-      showChannelModal.value = false
-      resetChannelFormErrors()
-      loadData()
-    },
-    {
-      loading: channelSaveLoading,
-      onError: (error) => showChannelActionError(error, '保存渠道商失败'),
-    },
-  )
+  await channelEditor.save()
 }
 
-function showChannelActionError(error: unknown, fallback: string) {
-  appToast.error(extractApiErrorMessage(error, fallback))
-}
-
-function validateChannelForm() {
-  const nextErrors = createEmptyChannelFormErrors()
-  ;(['name', 'type', 'api_url'] as ChannelFormField[]).forEach((field) => {
-    nextErrors[field] = resolveChannelFieldError(field)
-  })
-  channelFormErrors.value = nextErrors
-  return !Object.values(nextErrors).some(Boolean)
-}
-
-function validateChannelField(field: ChannelFormField) {
-  channelFormErrors.value[field] = resolveChannelFieldError(field)
-  return !channelFormErrors.value[field]
-}
-
-function resolveChannelFieldError(field: ChannelFormField) {
-  if (field === 'name' && !channelForm.value.name.trim()) return '请输入渠道商名称'
-  if (field === 'type' && !channelForm.value.type) return '请选择接口类型'
-  if (field === 'api_url') {
-    const apiUrl = channelForm.value.api_url.trim()
-    if (!apiUrl) return '请输入 Base URL地址'
-    try {
-      const parsed = new URL(apiUrl)
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return 'Base URL 需使用 http 或 https'
-      }
-    } catch {
-      return '请输入有效的 Base URL'
-    }
-  }
-  return ''
-}
-
-function clearChannelFormError(field: ChannelFormField) {
-  if (channelFormErrors.value[field]) {
-    channelFormErrors.value[field] = ''
-  }
-}
-
-function resetChannelFormErrors() {
-  channelFormErrors.value = createEmptyChannelFormErrors()
-}
-
-function handleDeleteChannel(row: Channel) {
-  requireAdminConfirm({
-    header: '确认删除',
-    message: `确定删除渠道商「${row.name}」吗？此操作不可恢复。`,
-    acceptLabel: '确定',
-    accept: async () => {
-      try {
-        await deleteAdminChannel(row.id)
-        appToast.success('删除成功')
-        await loadData()
-      } catch (error) {
-        appToast.error(extractApiErrorMessage(error, '删除渠道商失败'))
-      }
-    },
-  })
+function clearChannelFormError(field: keyof typeof channelForm.value) {
+  channelEditor.clearError(field)
 }
 
 function requireAdminConfirm(options: {
@@ -745,141 +561,26 @@ function requireAdminConfirm(options: {
   })
 }
 
-const {
-  accounts,
-  showAccountModal,
-  isEditAccount,
-  accountSaveLoading,
-  accountLimits,
-  selectedChannelForAccount,
-  accountForm,
-  detectModelsLoading,
-  modelSuggestions,
-  loadAccounts,
-  getChannelAccounts,
-  getAccountModelRows,
-  openAddAccountModal,
-  openEditAccountModal,
-  handleDetectModelsOnSelectOpen,
-  searchModelSuggestions,
-  handleSaveAccount,
-  toggleAccountModelStatus,
-  handleDeleteAccount,
-} = useChannelAccounts({
-  channels,
-  message: appToast,
-  dialog: {
-    warning: ({ title, content, onConfirm }) =>
-      requireAdminConfirm({
-        header: title,
-        message: content,
-        acceptLabel: '确定',
-        accept: onConfirm,
-      }),
-  },
-  onAfterMutation: loadData,
-})
-
-type AccountFormField = 'secret' | 'model_values' | 'max_concurrent' | 'timeout'
-const createEmptyAccountFormErrors = (): Record<AccountFormField, string> => ({
-  secret: '',
-  model_values: '',
-  max_concurrent: '',
-  timeout: '',
-})
-const accountFormErrors = ref<Record<AccountFormField, string>>(createEmptyAccountFormErrors())
-
-function handleOpenAddAccountModal(channel: Channel) {
-  resetAccountFormErrors()
-  openAddAccountModal(channel)
-}
-
-function handleOpenEditAccountModal(account: AdminAccount) {
-  resetAccountFormErrors()
-  openEditAccountModal(account)
-}
+const showAccountModal = accountEditor.visible
+const isEditAccount = accountEditor.isEditing
+const accountSaveLoading = accountEditor.saveLoading
+const accountLimits = accountEditor.accountLimits
+const selectedChannelForAccount = accountEditor.selectedChannel
+const accountForm = accountEditor.form
+const accountFormErrors = accountEditor.errors
+const detectModelsLoading = accountEditor.detectModelsLoading
+const modelSuggestions = accountEditor.modelSuggestions
+const searchModelSuggestions = accountEditor.searchModelSuggestions
 
 function closeAccountModal() {
-  showAccountModal.value = false
-  resetAccountFormErrors()
+  accountEditor.close()
 }
 
-async function handleSaveAccountWithValidation() {
-  if (!validateAccountForm()) {
-    appToast.warning('请修正 APIKey 表单错误')
-    return
-  }
-  await handleSaveAccount()
-}
-
-function validateAccountForm() {
-  const nextErrors = createEmptyAccountFormErrors()
-  const selectedModels = accountForm.value.model_values.map((item) => item.trim()).filter(Boolean)
-  if (selectedModels.length === 0) {
-    nextErrors.model_values = '请至少选择或输入一个模型'
-  }
-  if (!isEditAccount.value && !accountForm.value.secret.trim()) {
-    nextErrors.secret = '新增账号必须输入 API 密钥'
-  }
-  nextErrors.max_concurrent = resolveNumberRangeError(
-    accountForm.value.max_concurrent,
-    accountLimits.value.max_concurrent.min,
-    accountLimits.value.max_concurrent.max,
-    '最大并发数',
-  )
-  nextErrors.timeout = resolveNumberRangeError(
-    accountForm.value.timeout,
-    accountLimits.value.timeout_seconds.min,
-    accountLimits.value.timeout_seconds.max,
-    '超时时间',
-  )
-  accountFormErrors.value = nextErrors
-  return !Object.values(nextErrors).some(Boolean)
-}
-
-function resolveNumberRangeError(value: number, min: number, max: number, label: string) {
-  if (!Number.isFinite(value)) return `请输入${label}`
-  if (value < min || value > max) return `${label}需在 ${min}-${max} 之间`
-  return ''
-}
-
-function clearAccountFormError(field: AccountFormField) {
-  if (accountFormErrors.value[field]) {
-    accountFormErrors.value[field] = ''
-  }
-}
-
-function resetAccountFormErrors() {
-  accountFormErrors.value = createEmptyAccountFormErrors()
-}
-
-watch(showAccountModal, (visible) => {
-  if (!visible) resetAccountFormErrors()
-})
-
-const totalAccountCount = computed(() => accounts.value.length)
-const runningAccountCount = computed(
-  () => accounts.value.filter((account) => account.status === 1 && account.fail_count < 5).length,
-)
-const accountRunningLabel = computed(() =>
-  totalAccountCount.value > 0
-    ? `${runningAccountCount.value}/${totalAccountCount.value} 运行中`
-    : '0 APIKey',
-)
-const activeModelCount = computed(() => {
-  const models = new Set<string>()
-  accounts.value.forEach((account) => {
-    account.models.forEach((model) => models.add(model.name))
-  })
-  return models.size
-})
-
-function handleAccountModelSelectShow(show: boolean) {
-  if (!show) return
-  void handleDetectModelsOnSelectOpen()
+function clearAccountFormError(field: Parameters<typeof accountEditor.clearError>[0]) {
+  accountEditor.clearError(field)
 }
 
 onMounted(() => {
-  loadData()
+  commands.loadData()
 })
 </script>

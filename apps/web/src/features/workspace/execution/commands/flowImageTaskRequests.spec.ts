@@ -8,21 +8,28 @@ import {
   resolveHdClarityStrength,
 } from '../contracts/imageActionExecution'
 import { EXECUTION_FEATURE } from '../contracts/executionContract'
+import type {
+  CanvasExtendExecutionPlan,
+  ImageActionExecutionPlan,
+  ImageInpaintExecutionPlan,
+  ImagePromptExecutionPlan,
+  PreparedFusionExecutionPlan,
+  TextPromptExecutionPlan,
+} from '../planning/ImageExecutionPlan'
 import {
   buildCanvasExtendTaskRequest,
   buildDirectActionTaskRequest,
   buildFusionTaskRequest,
   buildHdUpscaleTaskRequest,
+  buildImageExecutionTaskRequest,
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
+  buildPreparedImageInpaintTaskRequest,
 } from './flowImageTaskRequests'
 
 const source = {
   url: 'https://assets.example.com/source.png',
-  width: 280,
   ratio: 1,
-  x: 0,
-  y: 0,
 }
 
 describe('flowImageTaskRequests', () => {
@@ -70,6 +77,16 @@ describe('flowImageTaskRequests', () => {
       },
     })
     expect(request.params).not.toHaveProperty('variation_strength')
+  })
+
+  it('rejects direct action requests without an image URL', () => {
+    expect(() =>
+      buildDirectActionTaskRequest({
+        source: { url: '   ', ratio: 1 },
+        action: IMAGE_NODE_ACTION.removeBg,
+        imageSize: null,
+      }),
+    ).toThrow('图片缺少 URL')
   })
 
   it('keeps remove-bg submit params limited to image sizing', () => {
@@ -227,5 +244,174 @@ describe('flowImageTaskRequests', () => {
     })
 
     expect((request as SubmitTaskData).params).toBeDefined()
+  })
+
+  it('adapts a prepared Fusion execution plan to the backend request contract', () => {
+    const plan = {
+      kind: 'fusion',
+      sourceNodeId: 'fusion-1',
+      source,
+      taskPrompt: '[style-fusion] blend references',
+      outputCount: 2,
+      aspectRatio: '4:3',
+      inputImages: [],
+      imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      blendPoint: { x: 0.5, y: 0.5 },
+      stageWidth: 280,
+      inputWeights: [0.25, 0.75],
+      sizeSource: { width: 900, height: 600 },
+      targetSize: { width: 1200, height: 900 },
+      targetRatio: 0.75,
+      resultOptions: {
+        anchor: {
+          x: 0,
+          y: 0,
+          width: 280,
+          outputAnchorNodeId: 'fusion-1',
+        },
+        targetRatio: 0.75,
+        targetWidth: 300,
+      },
+    } satisfies PreparedFusionExecutionPlan
+
+    expect(buildImageExecutionTaskRequest(plan)).toMatchObject({
+      prompt: '[style-fusion] blend references',
+      feature: EXECUTION_FEATURE.styleFusion,
+      image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      params: {
+        custom_width: 1200,
+        custom_height: 900,
+        original_image_width: 900,
+        original_image_height: 600,
+        ratio: '4:3',
+        fusion: {
+          mode: 'weighted_reference',
+          input_weights: [0.25, 0.75],
+        },
+      },
+    })
+  })
+
+  it('builds image execution task requests for direct action, prompt, text, extend, and fusion branches', () => {
+    const actionPlan: ImageActionExecutionPlan = {
+      kind: 'image-action',
+      sourceNodeId: 'image-1',
+      source,
+      action: IMAGE_NODE_ACTION.removeBg,
+      resultOptions: {},
+    }
+    const promptPlan: ImagePromptExecutionPlan = {
+      kind: 'image-prompt',
+      sourceNodeId: 'image-1',
+      source,
+      prompt: 'make it cinematic',
+      outputCount: 1,
+      aspectRatio: '3:4',
+      resultOptions: {},
+    }
+    const textPlan: TextPromptExecutionPlan = {
+      kind: 'text-prompt',
+      sourceNodeId: 'prompt-1',
+      source: { url: '', ratio: 1 },
+      prompt: 'make a pattern',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      resultOptions: {},
+    }
+    const extendPlan: CanvasExtendExecutionPlan = {
+      kind: 'canvas-extend',
+      sourceNodeId: 'image-1',
+      source,
+      prompt: 'extend horizon',
+      outputCount: 1,
+      extendPercent: { top: 0, right: 10, bottom: 0, left: 0 },
+      targetRatio: 1,
+      targetWidth: 300,
+      resultOptions: {},
+    }
+    const fusionPlan: PreparedFusionExecutionPlan = {
+      kind: 'fusion',
+      sourceNodeId: 'fusion-1',
+      source,
+      taskPrompt: '[style-fusion] blend',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      inputImages: [],
+      imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      blendPoint: { x: 0.5, y: 0.5 },
+      stageWidth: 320,
+      inputWeights: [0.5, 0.5],
+      sizeSource: null,
+      targetSize: null,
+      targetRatio: 1,
+      resultOptions: {},
+    }
+
+    expect(buildImageExecutionTaskRequest(actionPlan).feature).toBe(EXECUTION_FEATURE.removeBg)
+    expect(buildImageExecutionTaskRequest(promptPlan)).toMatchObject({
+      feature: EXECUTION_FEATURE.partialEdit,
+      image_urls: [source.url],
+      params: {
+        original_image_url: source.url,
+        ratio: '3:4',
+      },
+    })
+    expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({
+      feature: EXECUTION_FEATURE.patternGen,
+    })
+    expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('image_urls')
+    expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('params')
+    expect(buildImageExecutionTaskRequest(extendPlan)).toMatchObject({
+      feature: EXECUTION_FEATURE.imageExtend,
+      image_urls: [source.url],
+      params: {
+        extend: {
+          right_percent: 10,
+        },
+      },
+    })
+    expect(buildImageExecutionTaskRequest(fusionPlan)).toMatchObject({
+      feature: EXECUTION_FEATURE.styleFusion,
+      image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
+      params: {
+        fusion: {
+          input_weights: [0.5, 0.5],
+        },
+      },
+    })
+  })
+
+  it('requires image inpaint plans to use the prepared inpaint request builder', () => {
+    const plan: ImageInpaintExecutionPlan = {
+      kind: 'image-inpaint',
+      sourceNodeId: 'image-1',
+      source,
+      prompt: 'replace object',
+      rawMaskDataUrl: 'data:image/png;base64,mask',
+      outputCount: 1,
+      referenceImageUrls: [' https://assets.example.com/ref.png '],
+      resultOptions: {},
+    }
+
+    expect(() => buildImageExecutionTaskRequest(plan)).toThrow(
+      'Image inpaint plan must be prepared before building task request',
+    )
+    expect(
+      buildPreparedImageInpaintTaskRequest({
+        plan,
+        croppedImageUrl: 'https://assets.example.com/crop.png',
+        croppedMaskUrl: 'https://assets.example.com/mask.png',
+        cropSize: { width: 512, height: 512 },
+      }),
+    ).toMatchObject({
+      feature: EXECUTION_FEATURE.partialEdit,
+      image_urls: ['https://assets.example.com/crop.png'],
+      params: {
+        original_image_url: 'https://assets.example.com/crop.png',
+        mask_image_url: 'https://assets.example.com/mask.png',
+        reference_image_urls: ['https://assets.example.com/ref.png'],
+        use_mask: true,
+      },
+    })
   })
 })

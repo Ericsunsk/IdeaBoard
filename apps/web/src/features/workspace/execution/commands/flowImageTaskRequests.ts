@@ -1,4 +1,13 @@
 import type { SubmitTaskData } from '../../../../shared/api/task'
+import type {
+  CanvasExtendExecutionPlan,
+  ImageActionExecutionPlan,
+  ImageInpaintExecutionPlan,
+  ImagePromptExecutionPlan,
+  ImageExecutionInput,
+  PreparedFusionExecutionPlan,
+  TextPromptExecutionPlan,
+} from '../planning/ImageExecutionPlan'
 import {
   buildExecutionTaskRequest,
   EXECUTION_FEATURE,
@@ -9,7 +18,6 @@ import {
 import { buildExecutionSizeParams, extendExecutionImageSize } from '../contracts/executionSizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
 import { getCanvasNodeImageInputLimit, type PromptAspectRatio } from '../../../canvas-board/domain'
-import type { ImageDirectActionSource } from '../media/flowImageDirectActionSource'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
   IMAGE_ACTION_EXECUTION_REGISTRY,
@@ -26,6 +34,12 @@ import {
 type ImageSize = {
   width: number
   height: number
+}
+
+function requireImageExecutionInputUrl(source: ImageExecutionInput): string {
+  const url = `${source.url ?? ''}`.trim()
+  if (!url) throw new Error('图片缺少 URL')
+  return url
 }
 
 export type CanvasExtendPercent = {
@@ -124,11 +138,12 @@ export function buildTextPromptTaskRequest(input: {
 }
 
 export function buildDirectActionTaskRequest(input: {
-  source: ImageDirectActionSource
+  source: ImageExecutionInput
   action: ImageDirectTaskAction
   imageSize: ImageSize | null
   strength?: number
 }): SubmitTaskData {
+  const sourceUrl = requireImageExecutionInputUrl(input.source)
   const actionMeta = IMAGE_ACTION_EXECUTION_REGISTRY[input.action]
   const execution = requireImageActionExecution(input.action)
   const sizeParams = buildExecutionSizeParams(input.imageSize)
@@ -137,7 +152,7 @@ export function buildDirectActionTaskRequest(input: {
     return buildExecutionTaskRequest({
       prompt: '',
       feature: execution.feature,
-      imageUrls: [input.source.url],
+      imageUrls: [sourceUrl],
       params: {
         ...sizeParams,
         variation: {
@@ -152,13 +167,13 @@ export function buildDirectActionTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
-    imageUrls: [input.source.url],
+    imageUrls: [sourceUrl],
     params: sizeParams,
   })
 }
 
 export function buildImageTaskRequest(input: {
-  source: ImageDirectActionSource
+  source: ImageExecutionInput
   action: ImageTaskAction
   imageSize: ImageSize | null
   strength?: number
@@ -178,17 +193,18 @@ export function buildImageTaskRequest(input: {
 }
 
 export function buildPromptImageTaskRequest(input: {
-  source: ImageDirectActionSource
+  source: ImageExecutionInput
   prompt: string
   imageSize: ImageSize | null
   aspectRatio: PromptAspectRatio
 }): SubmitTaskData {
+  const sourceUrl = requireImageExecutionInputUrl(input.source)
   return buildExecutionTaskRequest({
     prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
     feature: EXECUTION_PARTIAL_EDIT_META.feature,
-    imageUrls: [input.source.url],
+    imageUrls: [sourceUrl],
     params: {
-      original_image_url: input.source.url,
+      original_image_url: sourceUrl,
       ...buildExecutionSizeParams(input.imageSize),
       ...buildPromptAspectRatioTaskParams(input.aspectRatio),
     },
@@ -218,11 +234,12 @@ export function buildImageInpaintTaskRequest(
 }
 
 export function buildCanvasExtendTaskRequest(input: {
-  source: ImageDirectActionSource
+  source: ImageExecutionInput
   imageSize: ImageSize | null
   extendPercent: CanvasExtendPercent
   prompt?: string
 }): SubmitTaskData {
+  const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
   const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
   const executionPrompt =
@@ -230,7 +247,7 @@ export function buildCanvasExtendTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt: executionPrompt,
     feature: execution.feature,
-    imageUrls: [input.source.url],
+    imageUrls: [sourceUrl],
     params: {
       ...buildExecutionSizeParams(
         input.imageSize,
@@ -247,10 +264,11 @@ export function buildCanvasExtendTaskRequest(input: {
 }
 
 export function buildHdUpscaleTaskRequest(input: {
-  source: ImageDirectActionSource
+  source: ImageExecutionInput
   imageSize: ImageSize | null
   strength?: number
 }): SubmitTaskData {
+  const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
   if (!execution.prompt) {
     throw new Error('HD action execution prompt is not configured')
@@ -258,7 +276,7 @@ export function buildHdUpscaleTaskRequest(input: {
   return buildExecutionTaskRequest({
     prompt: execution.prompt,
     feature: execution.feature,
-    imageUrls: [input.source.url],
+    imageUrls: [sourceUrl],
     params: {
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       hd: {
@@ -281,5 +299,73 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
         input_weights: input.inputWeights,
       },
     },
+  })
+}
+
+type ImageExecutionTaskRequestPlan =
+  | ImageActionExecutionPlan
+  | CanvasExtendExecutionPlan
+  | ImageInpaintExecutionPlan
+  | ImagePromptExecutionPlan
+  | TextPromptExecutionPlan
+  | PreparedFusionExecutionPlan
+
+export function buildImageExecutionTaskRequest(
+  plan: ImageExecutionTaskRequestPlan,
+  imageSize: ImageSize | null = null,
+): SubmitTaskData {
+  switch (plan.kind) {
+    case 'image-action':
+      return buildImageTaskRequest({
+        source: plan.source,
+        action: plan.action,
+        imageSize,
+        strength: plan.strength,
+      })
+    case 'canvas-extend':
+      return buildCanvasExtendTaskRequest({
+        source: plan.source,
+        imageSize,
+        extendPercent: plan.extendPercent,
+        prompt: plan.prompt,
+      })
+    case 'image-inpaint':
+      throw new Error('Image inpaint plan must be prepared before building task request')
+    case 'image-prompt':
+      return buildPromptImageTaskRequest({
+        source: plan.source,
+        prompt: plan.prompt,
+        imageSize,
+        aspectRatio: plan.aspectRatio,
+      })
+    case 'text-prompt':
+      return buildTextPromptTaskRequest({
+        prompt: plan.prompt,
+        aspectRatio: plan.aspectRatio,
+      })
+    case 'fusion':
+      return buildFusionTaskRequest({
+        prompt: plan.taskPrompt,
+        imageUrls: plan.imageUrls,
+        inputWeights: plan.inputWeights,
+        sizeSource: plan.sizeSource,
+        targetSize: plan.targetSize,
+        aspectRatio: plan.aspectRatio,
+      })
+  }
+}
+
+export function buildPreparedImageInpaintTaskRequest(input: {
+  plan: ImageInpaintExecutionPlan
+  croppedImageUrl: string
+  croppedMaskUrl: string
+  cropSize: ImageSize | null
+}): SubmitTaskData {
+  return buildImageInpaintTaskRequest({
+    prompt: input.plan.prompt,
+    croppedImageUrl: input.croppedImageUrl,
+    croppedMaskUrl: input.croppedMaskUrl,
+    referenceImageUrls: input.plan.referenceImageUrls,
+    cropSize: input.cropSize,
   })
 }

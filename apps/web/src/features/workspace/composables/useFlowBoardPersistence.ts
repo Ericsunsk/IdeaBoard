@@ -1,15 +1,4 @@
 import { computed } from 'vue'
-import { renderBoardPreviewDataUrl } from '../../canvas-board/preview'
-import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas-board/preview'
-import { setCanvasBoardPreviewSnapshot } from '../../canvas-board/persistence'
-import { syncCanvasBoardToServer } from '../../boards/lib/boardSync'
-import { getCanvasBoardById } from '../../boards/lib/canvasBoards'
-import {
-  loadBoardSnapshotForFlow,
-  resolveBoardIdFromQueryValue,
-} from '../services/flowBoardSnapshotLoader'
-import { saveBoardSnapshotFromFlow } from '../services/flowBoardSnapshotSaver'
-import { createFlowWorkspaceUploadLifecycle } from '../services/flowWorkspaceUploadLifecycle'
 import {
   canvasBoardSnapshotToFlow,
   flowToCanvasBoardSnapshot,
@@ -17,6 +6,7 @@ import {
   type FlowAdapterNode,
 } from '../utils/flowSnapshotAdapter'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { WorkspaceBoardSession } from '../board-session'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 type ValueRef<T> = { value: T }
@@ -46,7 +36,7 @@ export type UseFlowBoardPersistenceOptions = {
   saveStatus: ValueRef<SaveStatus>
   isLoadingBoardSnapshot: ValueRef<boolean>
   isSavingBoard: ValueRef<boolean>
-  getBoardIdQuery: () => unknown
+  boardSession: WorkspaceBoardSession
   getViewport: () => { x: number; y: number; zoom: number }
   setViewport: (viewport: { x: number; y: number; zoom: number }) => void
   onWarning: (text: string) => void
@@ -54,7 +44,6 @@ export type UseFlowBoardPersistenceOptions = {
   onError: (text: string) => void
   refreshSnapshot: () => void
   clearFlowHistoryBaseline: () => void
-  getUserIdentity: () => { userId: number; userUid: string }
   commitNodes: (nodes: unknown[]) => void
   commitEdges: (edges: unknown[]) => void
   onGraphCommitted?: () => void
@@ -85,16 +74,14 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
   }
 
   function readBoardIdFromQuery() {
-    return resolveBoardIdFromQueryValue(
-      options.getBoardIdQuery() as string | string[] | null | undefined,
-    )
+    return options.boardSession.currentBoardId.value
   }
 
-  const currentBoardId = computed(() => readBoardIdFromQuery())
+  const currentBoardId = options.boardSession.currentBoardId
   const currentBoardExists = computed(() => {
     const boardId = currentBoardId.value
     if (!boardId) return false
-    return !!getCanvasBoardById(boardId)
+    return options.boardSession.exists(boardId)
   })
   const canSaveBoard = computed(
     () =>
@@ -148,7 +135,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     const isLoadStillCurrent = () => loadToken === loadSequence && currentBoardId.value === boardId
     options.isLoadingBoardSnapshot.value = true
     try {
-      const snapshot = await loadBoardSnapshotForFlow(boardId)
+      const snapshot = await options.boardSession.load(boardId)
       if (!isLoadStillCurrent()) return
       if (!snapshot) {
         importEmptyBoardSnapshot()
@@ -192,22 +179,6 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     return snapshot
   }
 
-  async function refreshBoardPreviewAfterSave(
-    boardId: string,
-    stabilizedSnapshot: CanvasBoardSnapshot,
-  ) {
-    const snapshotDataUrl = await renderBoardPreviewDataUrl(stabilizedSnapshot)
-    setCanvasBoardPreviewSnapshot(
-      boardId,
-      snapshotDataUrl || undefined,
-      snapshotDataUrl ? Date.now() : undefined,
-      snapshotDataUrl ? BOARD_PREVIEW_RENDERER_VERSION : undefined,
-    )
-    void syncCanvasBoardToServer(boardId).catch((error) => {
-      console.warn('[workspace] sync board preview after save failed', boardId, error)
-    })
-  }
-
   async function saveCurrentBoardSnapshot(
     saveOptions: SaveCurrentBoardSnapshotOptions = {},
   ): Promise<boolean> {
@@ -220,22 +191,10 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     const isSaveStillCurrent = () => currentBoardId.value === boardId
     options.isSavingBoard.value = true
     try {
-      const { userId, userUid } = options.getUserIdentity()
-      if (!Number.isFinite(userId) || userId <= 0 || !userUid) {
-        throw new Error('保存失败：缺少用户信息，请刷新后重试')
-      }
-      const uploadLifecycle = createFlowWorkspaceUploadLifecycle({
-        userId,
-        userUid,
-        boardId,
-        warning: (text) => {
-          options.onWarning(text)
-        },
-      })
-      const previousSnapshot = uploadLifecycle.readPreviousSnapshot()
       const snapshot = buildCurrentBoardSnapshot()
-      const stabilizedSnapshot = await uploadLifecycle.stabilizeSnapshotForSave(snapshot)
-      await saveBoardSnapshotFromFlow(boardId, stabilizedSnapshot)
+      const { snapshot: stabilizedSnapshot } = await options.boardSession.save(snapshot, {
+        waitForPreview: saveOptions.waitForPreview,
+      })
       const shouldCommitToCurrentGraph = isSaveStillCurrent()
       if (shouldCommitToCurrentGraph) {
         options.boardBaseSnapshot.value = stabilizedSnapshot
@@ -251,15 +210,6 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
           options.onSuccess('已保存')
         }
       }
-      const previewRefreshTask = refreshBoardPreviewAfterSave(boardId, stabilizedSnapshot).catch(
-        (error) => {
-          console.warn('[workspace] refresh board preview after save failed', boardId, error)
-        },
-      )
-      if (saveOptions.waitForPreview) {
-        await previewRefreshTask
-      }
-      await uploadLifecycle.recycleRemovedUploadsAfterSave(previousSnapshot, stabilizedSnapshot)
       if (isSaveStillCurrent()) {
         options.refreshSnapshot()
         options.onGraphCommitted?.()

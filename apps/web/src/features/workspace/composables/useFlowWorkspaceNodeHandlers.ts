@@ -3,7 +3,7 @@ import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations
 
 type UseFlowWorkspaceNodeHandlersOptions = {
   dismissTransientWorkspaceUi: DismissTransientWorkspaceUi
-  clearFlowMaskEditorCommittedData: (nodeId: string) => void
+  discardFlowImageToolNodeEdits: (nodeId: string) => void
   _onFlowDeleteNode: (nodeId: string) => void
   _onFlowPromptTextUpdate: (nodeId: string, value: string) => void
   _onFlowNodeParamUpdate: (nodeId: string, payload: FlowSnapshotParamPatch) => void
@@ -14,7 +14,7 @@ type UseFlowWorkspaceNodeHandlersOptions = {
 export function useFlowWorkspaceNodeHandlers(options: UseFlowWorkspaceNodeHandlersOptions) {
   function onFlowDeleteNode(nodeId: string) {
     options.dismissTransientWorkspaceUi({ closeContextMenu: true })
-    options.clearFlowMaskEditorCommittedData(nodeId)
+    options.discardFlowImageToolNodeEdits(nodeId)
     options._onFlowDeleteNode(nodeId)
   }
 
@@ -29,7 +29,7 @@ export function useFlowWorkspaceNodeHandlers(options: UseFlowWorkspaceNodeHandle
   }
 
   function onFlowImageReset(nodeId: string) {
-    options.clearFlowMaskEditorCommittedData(nodeId)
+    options.discardFlowImageToolNodeEdits(nodeId)
     options._onFlowImageReset(nodeId)
   }
 

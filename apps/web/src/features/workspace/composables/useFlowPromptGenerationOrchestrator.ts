@@ -21,7 +21,7 @@ type UseFlowPromptGenerationOrchestratorOptions = {
     options?: { outputAnchorNodeId?: string },
   ) => Promise<void> | void
   runImagePromptGenerationFromSource: (
-    sourceImage: { url: string; ratio: number; x: number; y: number; width: number },
+    sourceImage: { url: string; ratio: number },
     sourceKey: string,
     prompt: string,
     outputCount: number,
@@ -63,9 +63,6 @@ export function useFlowPromptGenerationOrchestrator(
         {
           url: item.url,
           ratio: item.ratio,
-          x: 0,
-          y: 0,
-          width: 280,
         },
         item.id,
         prompt,

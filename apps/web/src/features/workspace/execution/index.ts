@@ -37,16 +37,24 @@ export {
 } from './contracts/executionSizeParams'
 export { buildPromptAspectRatioTaskParams } from './contracts/promptAspectRatioTaskParams'
 export {
+  createImageExecutionPlanner,
+  isImageExecutionPlanError,
   parseHandlePort,
+  prepareFusionExecutionPlan,
   resolveConnectedImageInputs,
   resolveConnectedInput,
   resolveConnectedPromptText,
   resolveFlowSourceImageRatio,
+  resolveImageExecutionInput,
   resolveSourceImageFromNode,
   type FlowConnectedInput,
   type FlowConnectedInputPort,
   type FlowExecutionGraphOptions,
   type FlowSnapshotNodeLike,
+  type ImageExecutionInput,
+  type ImageExecutionPlan,
+  type ImageExecutionResultOptions,
+  type ImageResultAnchor,
   type ResolvedFlowInputImage,
-} from './media/flowExecutionInputs'
+} from './planning/ImageExecutionPlan'
 export { useFlowImageDirectActions } from './runtime/useFlowImageDirectActions'

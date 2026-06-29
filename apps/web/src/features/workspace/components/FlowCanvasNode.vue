@@ -55,28 +55,11 @@
           :display-image="displayImage"
           :empty-icon-variant="imageEmptyIconVariant"
           :input-locked="imageInputLocked"
-          :action-menu-visible="!!props.imageActionVisible"
-          :prompt-composer-visible="!!props.imagePromptComposerVisible"
-          :prompt-placeholder="props.imagePromptPlaceholder"
-          :direct-generating="imageGenerating"
-          :show-strength-control="!!props.showStrengthControl"
-          :strength-pct="props.strengthPct ?? 50"
-          :set-strength-track-ref="props.setStrengthTrackRef ?? (() => {})"
+          :action-binding="resolvedActionBinding"
           :expand-mode-active="!!props.expandModeActive"
           :expand-overlay-style="props.expandOverlayStyle ?? null"
           :expand-handle-radius="props.expandHandleRadius ?? 4"
-          :image-editor-mode="props.imageEditorMode ?? null"
-          :image-editor-rendered-preview="props.imageEditorRenderedPreview ?? null"
-          :mask-editor-overlay-style="props.maskEditorOverlayStyle ?? null"
-          :mask-editor-canvas-width="props.maskEditorCanvasWidth ?? 0"
-          :mask-editor-canvas-height="props.maskEditorCanvasHeight ?? 0"
-          :mask-layer-opacity="props.maskLayerOpacity ?? 72"
-          :image-layer-visible="props.imageLayerVisible ?? true"
-          :mask-editor-brush-size="props.maskEditorBrushSize ?? 18"
-          :mask-editor-brush-shape="props.maskEditorBrushShape ?? 'round'"
-          :set-mask-canvas-ref="
-            (element) => (props.setMaskCanvasRef ?? (() => {}))(props.nodeId, element)
-          "
+          :image-tool-stage-binding="resolvedStageBinding"
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
           @update:output-count="emitNodeParam('outputCount', $event)"
@@ -96,7 +79,6 @@
           @expand-handle-pointermove="onImageExpandHandlePointerMove"
           @expand-handle-pointerup="onImageExpandHandlePointerUp"
           @expand-frame-pointerdown="onImageExpandFramePointerDown"
-          @mask-canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
         />
       </div>
     </template>
@@ -150,14 +132,13 @@
 </template>
 
 <script setup lang="ts">
-import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
 import type { ImageStrengthAction } from '../execution'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
-import type { ImageEditorMode, ImageEditorRenderedPreview } from '../image-editor'
+import type { ImageActionBinding, ImageToolStageBinding } from '../image-tools'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
@@ -171,29 +152,14 @@ const props = withDefaults(
     dragging?: boolean
     copyMode?: boolean
     uiState?: NodeUiState | PromptNodeUiState
-    imageActionVisible?: boolean
-    imagePromptComposerVisible?: boolean
-    imagePromptPlaceholder?: string
     fusionPromptComposerVisible?: boolean
-    imageDirectGenerating?: boolean
-    showStrengthControl?: boolean
-    strengthPct?: number
-    setStrengthTrackRef?: (el: Element | ComponentPublicInstance | null) => void
+    imageActionBinding: ImageActionBinding
     setImageStageRef?: (nodeId: string, element: Element | null) => void
     clearImageStageRef?: (nodeId: string, element?: Element | null) => void
     expandModeActive?: boolean
     expandOverlayStyle?: Record<string, string> | null
     expandHandleRadius?: number
-    imageEditorMode?: ImageEditorMode | null
-    imageEditorRenderedPreview?: ImageEditorRenderedPreview | null
-    maskEditorOverlayStyle?: Record<string, string> | null
-    maskEditorCanvasWidth?: number
-    maskEditorCanvasHeight?: number
-    maskLayerOpacity?: number
-    imageLayerVisible?: boolean
-    maskEditorBrushSize?: number
-    maskEditorBrushShape?: 'round' | 'square'
-    setMaskCanvasRef?: (nodeId: string, element: Element | null) => void
+    imageToolStageBinding?: ImageToolStageBinding | null
     handleVisibilityRefreshToken?: number
   }>(),
   {
@@ -201,29 +167,13 @@ const props = withDefaults(
     dragging: false,
     copyMode: false,
     uiState: undefined,
-    imageActionVisible: false,
-    imagePromptComposerVisible: false,
-    imagePromptPlaceholder: '输入提示词改造这张图',
     fusionPromptComposerVisible: false,
-    imageDirectGenerating: false,
-    showStrengthControl: false,
-    strengthPct: 50,
-    setStrengthTrackRef: () => undefined,
     setImageStageRef: () => undefined,
     clearImageStageRef: () => undefined,
     expandModeActive: false,
     expandOverlayStyle: null,
     expandHandleRadius: 4,
-    imageEditorMode: null,
-    imageEditorRenderedPreview: null,
-    maskEditorOverlayStyle: null,
-    maskEditorCanvasWidth: 0,
-    maskEditorCanvasHeight: 0,
-    maskLayerOpacity: 72,
-    imageLayerVisible: true,
-    maskEditorBrushSize: 18,
-    maskEditorBrushShape: 'round',
-    setMaskCanvasRef: () => undefined,
+    imageToolStageBinding: null,
     handleVisibilityRefreshToken: 0,
   },
 )
@@ -263,20 +213,22 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
-  (e: 'mask-canvas-pointerdown', event: PointerEvent): void
   (e: 'request-internals-update'): void
 }>()
 
 const showDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
-const isImageEditorActive = computed(() => props.imageEditorMode != null)
+const isImageEditorActive = computed(() => props.imageToolStageBinding?.mode != null)
+const resolvedActionBinding = computed(() => props.imageActionBinding)
+const resolvedStageBinding = computed<ImageToolStageBinding | null>(
+  () => props.imageToolStageBinding ?? null,
+)
 
 const {
   disableHandleRailInteraction,
   displayImage,
   fusionSnapshot,
   imageEmptyIconVariant,
-  imageGenerating,
   imageInputLocked,
   imageSnapshot,
   isFusionNode,
@@ -289,7 +241,7 @@ const {
 } = useFlowCanvasNodeAdapter({
   data: () => props.data,
   uiState: () => props.uiState,
-  imageDirectGenerating: () => !!props.imageDirectGenerating,
+  imageDirectGenerating: () => resolvedActionBinding.value.directGenerating,
   expandModeActive: () => !!props.expandModeActive,
   isImageEditorActive: () => isImageEditorActive.value,
 })

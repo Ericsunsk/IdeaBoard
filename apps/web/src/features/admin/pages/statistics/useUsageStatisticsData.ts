@@ -1,10 +1,10 @@
 import { computed, ref } from 'vue'
-import { useGetAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
 import {
   GetAdminStatisticsRange,
   type AdminStatistics,
-  type GetAdminStatisticsRange as GetAdminStatisticsRangeValue,
-} from '../../../../shared/api/generated-query/model'
+  type GetAdminStatisticsRangeValue,
+  useGetAdminStatistics,
+} from '../../statistics/statisticsResource'
 import {
   pickAdminTimeRangeOptions,
   type AdminTimeRangeOption,

@@ -14,13 +14,38 @@
 - 路由级页面放在对应 `apps/web/src/features/*/pages` 下。
 - `apps/web/src/features` 负责业务逻辑、路由页和 feature 内部 UI。
 - `apps/web/src/features/user` 负责用户侧 layout、路由壳层与跨用户页的状态提示。
-- `apps/web/src/features/workspace/components/nodes` 只保留节点 Vue 组件及组件私有实现；跨节点配置、工具和服务放在 `features/workspace/config`、`utils` 或 `services`。
+- `apps/web/src/features/workspace/components/nodes` 只保留节点 Vue 组件及组件私有实现；跨节点配置、工具和服务放在 `features/workspace/config`、`utils`、`services` 或明确业务 context 下。
+- `apps/web/src/features/workspace/image-tools` 收拢 workspace 图像工具入口；页面和节点组件只消费 image tool chrome/stage/action binding，不直接串联 image-editor 与 mask-editor 的内部状态。
+- `apps/web/src/features/workspace/execution` 收拢任务执行 context；graph/source planning、backend request adapter、task runner、pending result node materialization 分别放在 `planning`、`commands`、`task-runner`、`result-nodes` 下。
+- `apps/web/src/features/workspace/board-session` 收拢 workspace board load/save/exists/preview/upload lifecycle；`features/canvas-board/domain` 继续作为共享 snapshot schema/core module。
+- `apps/web/src/features/admin/users` 收拢 admin users list、view model、user commands 和 impersonation/session side effects。
+- `apps/web/src/features/admin/provider-config` 收拢 channel/account/provider configuration；channels route page 不直接处理 provider payload mapping。
+- `apps/web/src/features/admin/prompt-config` 收拢 feature prompt resource、query key、save command 和 generated prompt types；prompt-config route page 不直接依赖 Orval 生成入口。
+- `apps/web/src/features/admin/statistics` 收拢 statistics resource 和 generated statistics contract；statistics route page、charts 和 data composable 不直接依赖 Orval 生成入口。
+- `apps/web/src/features/admin/storage` 收拢 storage resource 与 editor workflow；generated-query 只在 resource module 内使用。
+- `apps/web/src/features/admin/task-monitor` 收拢 task list、runtime snapshot、stream/polling fallback 和 result detail。
+- Admin vertical context 可以自带 route component，例如 `features/admin/users/AdminUsersPage.vue`；也可以保留 `features/admin/pages/*` 下的 route component 作为薄壳或组合层。两种形状都必须通过对应 vertical context/resource 访问 generated API、payload mapping 和 side effect command。
 - `apps/web/src/shared` 负责复用 API helper、auth、types、utils 和 assets。
 - `apps/web/src/shared/api/generated-query` 是 Orval 生成代码，不手动编辑。
-- 手写 API 补充层用于聚合、补齐未生成接口或适配业务返回类型；新增文件优先沿用现有 `shared/api/*.ts` 扁平 wrapper，只有明确需要分组时再放入子目录。
+- 手写 API 补充层用于聚合、补齐未生成接口或适配业务返回类型；业务特定 API adapter 优先放在对应 feature context 内，只有跨 feature 共享时才放入 `shared/api`。
+- 路由页和 Vue 组件不得直接依赖 `shared/api/generated-query`；generated-query 依赖应收口在 feature context、shared composable 或明确的 API adapter 内。
+- 本轮前端 context 重排不保留旧兼容 alias 或旧路径 re-export；移动后直接更新 import 并删除旧入口。
 
 > [!IMPORTANT]
 > `shared` 不得依赖任何具体 feature。
+
+## 前后端 Ownership 映射
+
+| Frontend context | Generated endpoint surface | Backend context | Ownership / contract 边界 |
+|----|----|----|----|
+| `features/admin/users` | `admin-users` | `internal/identity/users` | Identity 拥有 admin user list、role/status mutation、session revoke 和 impersonation 语义；前端 context 负责 view model、command sequencing 和 cache invalidation。 |
+| `features/admin/provider-config` | `admin-accounts`, `admin-channels` | `internal/accountpool/accounts`, `internal/accountpool/channels` | AccountPool 拥有 channel/account/provider payload、model detection 和 scheduling visibility；前端 context 负责 editor state、payload defaults、model options 和 cards。 |
+| `features/admin/prompt-config` | `admin-feature-prompts` | `internal/prompts`, `internal/workflow` | Workflow/Prompts 拥有 feature slug validation、prompt template storage、variables 和 revisions；前端 context 负责 resource access、save command 和 workflow registry presentation。 |
+| `features/admin/storage` | `admin-storage` | `internal/media/storage` | Media 拥有 object storage provider/profile、secret masking、bucket test/apply 和 upload object semantics；前端 context 负责 profiles resource、editor workflow 和 provider-specific form helpers。 |
+| `features/admin/task-monitor` | `admin-tasks`, `admin-monitor` | `internal/tasking/taskservice`, `internal/tasking/taskstats` | Tasking 拥有 task list/detail、runtime monitor、stream/poll fallback contract 和 result detail；前端 context 负责 list params、snapshot merge、charts 和 result image presentation。 |
+| `features/admin/statistics` | `admin-statistics` | `internal/tasking/taskstats` | Tasking 拥有 statistics aggregation、backfill status 和 range contract；前端 context 负责 statistics resource、time-range selection 和 chart view models。 |
+
+Frontend context 名称不要求与 backend context 同名；唯一硬约束是 generated endpoint 和 backend payload ownership 不泄漏到 route component 或无关 `shared` module。
 
 
 ## 后端边界
@@ -44,7 +69,7 @@
 |----|------|------|
 | 目录 | `kebab-case` | `image-processing/` |
 | Vue SFC | `PascalCase` | `WorkspacePage.vue` |
-| TS helper / composable | `camelCase.ts` | `useChannelAccounts.ts` |
+| TS helper / composable | `camelCase.ts` | `useWorkspaceImageTools.ts` |
 | Go 文件 | `snake_case.go` | `task_runtime_service.go` |
 
 Go package 目录例外：保持 Go 生态习惯，使用小写无分隔符命名，例如 `autherrors/`、`webdist/`；不要为了匹配前端目录风格改成 `kebab-case`。

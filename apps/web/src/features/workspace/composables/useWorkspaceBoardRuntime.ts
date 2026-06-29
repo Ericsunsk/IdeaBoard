@@ -6,6 +6,7 @@ import {
   type CanvasBoardSnapshot,
 } from '../../canvas-board/domain'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { useWorkspaceBoardSession } from '../board-session'
 import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
 import type { FlowHistory } from './useFlowHistory'
 import type { FlowTransactions } from './useFlowTransactions'
@@ -90,6 +91,14 @@ export function useWorkspaceBoardRuntime(
     void Promise.resolve(result).then(clearApplyingFlag, clearApplyingFlag)
   }
 
+  const boardSession = useWorkspaceBoardSession({
+    getBoardIdQuery: () => options.route.query.boardId,
+    getUserIdentity: options.getUserIdentity,
+    message: {
+      warning: options.message.warning,
+    },
+  })
+
   const {
     currentBoardId,
     loadInitialOrRouteBoard,
@@ -104,8 +113,7 @@ export function useWorkspaceBoardRuntime(
     saveStatus,
     isLoadingBoardSnapshot,
     isSavingBoard,
-    getBoardIdQuery: () => options.route.query.boardId,
-    getUserIdentity: options.getUserIdentity,
+    boardSession,
     getViewport: options.getViewport,
     setViewport: setBoardViewport,
     setNodes: options.setNodes,

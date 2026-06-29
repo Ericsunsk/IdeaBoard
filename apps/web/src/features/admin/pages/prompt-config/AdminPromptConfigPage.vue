@@ -196,16 +196,16 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
 } from '../../shared/lib/adminUiClasses'
-import { saveFeaturePrompt } from '../../shared/queries/adminFeaturePromptActions'
 import {
   getListAdminFeaturePromptsQueryKey,
+  saveFeaturePrompt,
   useListAdminFeaturePrompts,
-} from '../../../../shared/api/generated-query/admin-feature-prompts/admin-feature-prompts'
+} from '../../prompt-config/promptConfigResource'
 import type {
   FeaturePrompt,
   FeaturePromptVariable,
   FeaturePromptVariableTone,
-} from '../../../../shared/api/generated-query/model'
+} from '../../prompt-config/promptConfigResource'
 import {
   featureMap,
   groupedFeatureGroups,

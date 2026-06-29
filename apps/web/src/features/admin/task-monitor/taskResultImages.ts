@@ -1,0 +1,88 @@
+import { PUBLIC_ASSET_BASE_URL, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+
+const HTTP_URL_RE = /^https?:\/\//i
+const UPLOAD_ASSET_PATH_PREFIX = '/uploads/'
+const ENCODED_BACKSLASH_RE = /%5c/i
+
+function getCurrentOrigin(): string {
+  if (typeof window !== 'undefined' && window.location.origin) return window.location.origin
+  return 'http://ideaboard.local'
+}
+
+function parseResultImageUrl(rawUrl: string): URL | null {
+  try {
+    return new URL(rawUrl, getCurrentOrigin())
+  } catch {
+    return null
+  }
+}
+
+function getTrustedAssetBaseUrl(): URL | null {
+  if (!PUBLIC_ASSET_BASE_URL) return null
+  return parseResultImageUrl(PUBLIC_ASSET_BASE_URL)
+}
+
+function hasUploadAssetPath(pathname: string, basePathname = ''): boolean {
+  const normalizedBase = basePathname.replace(/\/+$/, '')
+  const uploadPath = `${normalizedBase}${UPLOAD_ASSET_PATH_PREFIX}`
+  return pathname.startsWith(uploadPath)
+}
+
+function isTrustedUploadUrl(url: URL): boolean {
+  const currentOrigin = getCurrentOrigin()
+  if (url.origin === currentOrigin && hasUploadAssetPath(url.pathname)) return true
+
+  const trustedAssetBase = getTrustedAssetBaseUrl()
+  return (
+    !!trustedAssetBase &&
+    url.origin === trustedAssetBase.origin &&
+    hasUploadAssetPath(url.pathname, trustedAssetBase.pathname)
+  )
+}
+
+export function getSafeResultImageUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim()
+  if (
+    !trimmed ||
+    trimmed.startsWith('//') ||
+    trimmed.includes('\\') ||
+    ENCODED_BACKSLASH_RE.test(trimmed)
+  ) {
+    return ''
+  }
+
+  if (!trimmed.startsWith('/') && !HTTP_URL_RE.test(trimmed)) return ''
+
+  const resolved = resolveAssetUrl(trimmed)
+  const parsed = parseResultImageUrl(resolved)
+  if (!parsed || !isTrustedUploadUrl(parsed)) return ''
+
+  return resolved
+}
+
+export function isAllowedResultImageUrl(rawUrl: string): boolean {
+  return getSafeResultImageUrl(rawUrl) !== ''
+}
+
+export function getSafeTaskResultImageUrl(result: string): string {
+  try {
+    const parsed = JSON.parse(result)
+    if (parsed && typeof parsed === 'object') {
+      const imageUrl = (parsed as Record<string, unknown>).image_url
+      const safeImageUrl = typeof imageUrl === 'string' ? getSafeResultImageUrl(imageUrl) : ''
+      if (safeImageUrl) return safeImageUrl
+
+      const imageUrls = (parsed as Record<string, unknown>).image_urls
+      if (Array.isArray(imageUrls)) {
+        for (const candidate of imageUrls) {
+          if (typeof candidate !== 'string') continue
+          const safeCandidate = getSafeResultImageUrl(candidate)
+          if (safeCandidate) return safeCandidate
+        }
+      }
+    }
+  } catch {
+    return ''
+  }
+  return ''
+}

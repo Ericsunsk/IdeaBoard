@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   cleanupFlowLocalInpaintMedia: vi.fn(),
 }))
 
-vi.mock('./flowImageDirectActionExecutor', () => ({
+vi.mock('../task-runner/flowImageDirectActionExecutor', () => ({
   assertTaskRequestReady: mocks.assertTaskRequestReady,
   submitTaskRequest: mocks.submitTaskRequest,
   waitExistingOrLiveTaskImageResults: mocks.waitExistingOrLiveTaskImageResults,
@@ -33,11 +33,11 @@ vi.mock('../media/flowLocalInpaint', () => ({
   cleanupFlowLocalInpaintMedia: mocks.cleanupFlowLocalInpaintMedia,
 }))
 
-vi.mock('../results/flowLocalInpaintTaskResult', () => ({
+vi.mock('../result-nodes/flowLocalInpaintTaskResult', () => ({
   composeFlowLocalInpaintTaskResult: mocks.composeFlowLocalInpaintTaskResult,
 }))
 
-vi.mock('../results/flowImageDirectActionTaskResult', () => ({
+vi.mock('../result-nodes/flowImageDirectActionTaskResult', () => ({
   resolveFirstTaskImageResultDisplay: async (
     results: Array<{ url: string; width?: number; height?: number }>,
     fallback: number,
@@ -220,6 +220,54 @@ describe('useFlowImageDirectActions pending task recovery', () => {
         return snapshot?.outputStatus === 'running'
       }),
     ).toBe(false)
+  })
+
+  it('warns without submission when a direct action image has no URL', async () => {
+    const harness = createHarness([
+      makeImageNode(
+        'image-1',
+        makeImageSnapshot({
+          sourceImageUrl: '',
+          outputImages: [],
+        }),
+      ),
+    ])
+
+    await expect(
+      harness.actions.runImageDirectAction('image-1', IMAGE_NODE_ACTION.removeBg),
+    ).resolves.toBeUndefined()
+
+    expect(harness.onWarning).toHaveBeenCalledWith('图片节点不存在或缺少 URL')
+    expect(mocks.assertTaskRequestReady).not.toHaveBeenCalled()
+    expect(mocks.submitTaskRequest).not.toHaveBeenCalled()
+    expect(harness.nodes.value).toHaveLength(1)
+    expect(
+      harness.nodes.value.some((node) => {
+        const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
+        return snapshot?.outputStatus === 'running'
+      }),
+    ).toBe(false)
+  })
+
+  it('warns without preparing inpaint media when prompt or mask is empty', async () => {
+    const harness = createHarness([makeImageNode('image-1', makeImageSnapshot())])
+
+    await harness.actions.runImageInpaintAction('image-1', {
+      prompt: '   ',
+      maskDataUrl: 'data:image/png;base64,mask',
+      outputCount: 1,
+    })
+    await harness.actions.runImageInpaintAction('image-1', {
+      prompt: 'replace selected area',
+      maskDataUrl: '   ',
+      outputCount: 1,
+    })
+
+    expect(harness.onWarning).toHaveBeenCalledWith('请输入 Prompt')
+    expect(harness.onWarning).toHaveBeenCalledWith('请先标记局部重绘区域')
+    expect(mocks.prepareFlowLocalInpaintMedia).not.toHaveBeenCalled()
+    expect(mocks.submitTaskRequest).not.toHaveBeenCalled()
+    expect(harness.nodes.value).toHaveLength(1)
   })
 
   it('persists task id after submit and clears it after completion', async () => {

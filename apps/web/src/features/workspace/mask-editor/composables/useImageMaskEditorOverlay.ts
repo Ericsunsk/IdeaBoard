@@ -14,7 +14,6 @@ import {
 } from '../lib/maskPaintingCanvas'
 import { drawMaskStrokeSegment } from '../lib/maskBrushEngine'
 import { getMaskCanvasPoint } from '../lib/maskCanvasGeometry'
-import type { ImageEditorModeState } from '../../image-editor'
 import {
   clampMaskBrushHardness,
   clampMaskBrushSize,
@@ -32,8 +31,18 @@ type MaskHistoryEntry = {
   imageData: ImageData
 }
 
+type ImageMaskEditorModeState = {
+  nodeId: string
+  imageRect: {
+    left: number
+    top: number
+    width: number
+    height: number
+  }
+}
+
 type UseImageMaskEditorOverlayOptions = {
-  imageEditorState: Ref<ImageEditorModeState | null>
+  inpaintEditorState: Ref<ImageMaskEditorModeState | null>
   startCanvasInteraction?: (key: MaskEditorInteractionKey) => void
   stopCanvasInteraction?: (key: MaskEditorInteractionKey) => void
 }
@@ -58,13 +67,9 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   let paintingBeforeEntry: MaskHistoryEntry | null = null
   let interactionActive = false
 
-  const inpaintEditorState = computed(() => {
-    const state = options.imageEditorState.value
-    return state?.mode === 'inpaint' ? state : null
-  })
-  const maskEditorNodeId = computed(() => inpaintEditorState.value?.nodeId ?? null)
+  const maskEditorNodeId = computed(() => options.inpaintEditorState.value?.nodeId ?? null)
   const maskEditorOverlayStyle = computed<Record<string, string> | null>(() => {
-    const rect = inpaintEditorState.value?.imageRect
+    const rect = options.inpaintEditorState.value?.imageRect
     if (!rect) return null
     return {
       left: `${rect.left}px`,
@@ -262,7 +267,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function onCanvasPointerDown(event: PointerEvent) {
-    const editorState = inpaintEditorState.value
+    const editorState = options.inpaintEditorState.value
     if (!editorState) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
     const canvas = canvasRefs.get(editorState.nodeId)

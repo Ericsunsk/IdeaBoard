@@ -1,50 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+import { computed, ref } from 'vue'
+import type { WorkspaceBoardSession } from '../board-session'
+import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { useFlowBoardPersistence } from './useFlowBoardPersistence'
 
 const mocks = vi.hoisted(() => ({
-  loadBoardSnapshotForFlow: vi.fn(),
-  saveBoardSnapshotFromFlow: vi.fn(),
-  syncCanvasBoardToServer: vi.fn(),
+  load: vi.fn(),
+  save: vi.fn(),
   resolveSave: undefined as undefined | (() => void),
-}))
-
-vi.mock('../services/flowBoardSnapshotLoader', () => ({
-  resolveBoardIdFromQueryValue: (raw: string | string[] | null | undefined) => {
-    const value = Array.isArray(raw) ? raw[0] : raw
-    return typeof value === 'string' && value.trim() ? value.trim() : null
-  },
-  loadBoardSnapshotForFlow: mocks.loadBoardSnapshotForFlow,
-}))
-
-vi.mock('../services/flowBoardSnapshotSaver', () => ({
-  saveBoardSnapshotFromFlow: mocks.saveBoardSnapshotFromFlow,
-}))
-
-vi.mock('../services/flowWorkspaceUploadLifecycle', () => ({
-  createFlowWorkspaceUploadLifecycle: vi.fn(() => ({
-    readPreviousSnapshot: vi.fn(() => null),
-    stabilizeSnapshotForSave: vi.fn(async (snapshot) => snapshot),
-    recycleRemovedUploadsAfterSave: vi.fn(async () => undefined),
-  })),
-}))
-
-vi.mock('../../canvas-board/preview', () => ({
-  renderBoardPreviewDataUrl: vi.fn(async () => ''),
-}))
-
-vi.mock('../../boards/lib/boardSync', () => ({
-  syncCanvasBoardToServer: mocks.syncCanvasBoardToServer,
-}))
-
-vi.mock('../../boards/lib/canvasBoards', () => ({
-  getCanvasBoardById: vi.fn((boardId: string) => ({
-    id: boardId,
-    name: 'Board',
-    createdAt: 1,
-    updatedAt: 1,
-  })),
 }))
 
 function createPersistenceHarness(initialBoardId = 'board-a') {
@@ -63,6 +26,16 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
   const commitEdges = vi.fn((nextEdges: unknown[]) => {
     edges.value = nextEdges
   })
+  const boardSession: WorkspaceBoardSession = {
+    currentBoardId: computed(() => {
+      const boardId = routeBoardId.value.trim()
+      return boardId || null
+    }),
+    exists: vi.fn((boardId?: string | null) => !!boardId),
+    load: mocks.load,
+    save: mocks.save,
+    refreshPreview: vi.fn(),
+  }
 
   const persistence = useFlowBoardPersistence({
     nodes,
@@ -72,7 +45,7 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     saveStatus,
     isLoadingBoardSnapshot,
     isSavingBoard,
-    getBoardIdQuery: () => routeBoardId.value,
+    boardSession,
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     setViewport,
     onWarning: vi.fn(),
@@ -80,7 +53,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     onError: vi.fn(),
     refreshSnapshot: vi.fn(),
     clearFlowHistoryBaseline: vi.fn(),
-    getUserIdentity: () => ({ userId: 1, userUid: 'ABC123' }),
     commitNodes,
     commitEdges,
   })
@@ -95,6 +67,7 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     commitNodes,
     commitEdges,
     setViewport,
+    boardSession,
   }
 }
 
@@ -110,14 +83,13 @@ describe('useFlowBoardPersistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.resolveSave = undefined
-    mocks.loadBoardSnapshotForFlow.mockResolvedValue(createEmptyCanvasBoardSnapshot())
-    mocks.saveBoardSnapshotFromFlow.mockImplementation(
-      () =>
+    mocks.load.mockResolvedValue(createEmptyCanvasBoardSnapshot())
+    mocks.save.mockImplementation(
+      (snapshot: CanvasBoardSnapshot) =>
         new Promise<void>((resolve) => {
           mocks.resolveSave = resolve
-        }),
+        }).then(() => ({ snapshot })),
     )
-    mocks.syncCanvasBoardToServer.mockResolvedValue(undefined)
   })
 
   it('does not commit graph or status when the current board changes during save', async () => {
@@ -155,7 +127,7 @@ describe('useFlowBoardPersistence', () => {
       string,
       (snapshot: ReturnType<typeof createEmptyCanvasBoardSnapshot>) => void
     >()
-    mocks.loadBoardSnapshotForFlow.mockImplementation(
+    mocks.load.mockImplementation(
       (boardId: string) =>
         new Promise<ReturnType<typeof createEmptyCanvasBoardSnapshot>>((resolve) => {
           resolvers.set(boardId, resolve)

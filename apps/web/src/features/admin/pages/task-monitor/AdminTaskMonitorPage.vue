@@ -333,11 +333,11 @@
               class="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[14px] border border-admin-border-soft bg-admin-surface-muted"
               :style="{ color: getTaskStatusDefinition(detailTask?.status || '').color }"
             >
-              <CheckCircle v-if="detailTask?.status === ListAdminTasksStatus.completed" />
+              <CheckCircle v-if="detailTask?.status === adminTaskStatuses.completed" />
               <XmarkCircle
                 v-else-if="
-                  detailTask?.status === ListAdminTasksStatus.failed ||
-                  detailTask?.status === ListAdminTasksStatus.cancelled
+                  detailTask?.status === adminTaskStatuses.failed ||
+                  detailTask?.status === adminTaskStatuses.cancelled
                 "
               />
               <Clock v-else />
@@ -386,7 +386,7 @@
             </span>
           </div>
           <div
-            v-if="detailTask.status === ListAdminTasksStatus.failed"
+            v-if="detailTask.status === adminTaskStatuses.failed"
             class="flex items-start gap-2.5 rounded-xl border border-admin-danger/20 bg-admin-danger/10 px-3 py-2.5 text-admin-body leading-[1.55] text-admin-danger"
           >
             <WarningTriangle class="mt-0.5 shrink-0" />
@@ -605,9 +605,7 @@ import {
   XmarkCircle,
 } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
-import type { Task } from '../../../../shared/api/task'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { ListAdminTasksStatus } from '../../../../shared/api/generated-query/model'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
@@ -634,15 +632,16 @@ import {
   getTaskResultImageUrl,
   getTaskSanitizedError,
   getTaskUserIdentifier,
-} from './taskMonitorColumns'
+} from '../../task-monitor/taskMonitorColumns'
 import {
+  adminTaskStatuses,
   getTaskStatusDefinition,
   taskStatusSelectOptions,
-} from './taskMonitorStatus'
-import { useTaskResultDetail } from './useTaskResultDetail'
-import { useTaskMonitorCharts } from './useTaskMonitorCharts'
-import { useTaskMonitor } from './useTaskMonitor'
-import { useTaskRuntimeMonitor } from './useTaskRuntimeMonitor'
+} from '../../task-monitor/taskMonitorStatus'
+import { useTaskResultDetail } from '../../task-monitor/useTaskResultDetail'
+import { useTaskMonitorCharts } from '../../task-monitor/useTaskMonitorCharts'
+import { type AdminTaskRow, useAdminTaskList } from '../../task-monitor/useAdminTaskList'
+import { useAdminTaskRuntimeSnapshot } from '../../task-monitor/useAdminTaskRuntimeSnapshot'
 
 const appToast = useAppToast()
 const taskCards = adminCards.taskMonitor
@@ -690,16 +689,16 @@ const {
   searchKeyword,
   loadTasks,
   handleSearch: applyTaskSearch,
-} = useTaskMonitor()
+} = useAdminTaskList()
 const {
   monitorData,
   monitorStats,
   monitorStreamStatus,
   isError: isMonitorError,
   error: monitorError,
-} = useTaskRuntimeMonitor()
+} = useAdminTaskRuntimeSnapshot()
 
-const selectedTasks = ref<Task[]>([])
+const selectedTasks = ref<AdminTaskRow[]>([])
 const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
   useTransientScrolling()
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
@@ -711,7 +710,10 @@ const monitorErrorMessage = computed(() =>
   formatDisplayErrorMessage(monitorError.value, '加载任务运行监控失败'),
 )
 const taskMonitorSettingsErrorMessage = computed(() =>
-  formatDisplayErrorMessage(taskMonitorSettingsError.value, '加载任务监控设置失败，当前使用默认展示配置'),
+  formatDisplayErrorMessage(
+    taskMonitorSettingsError.value,
+    '加载任务监控设置失败，当前使用默认展示配置',
+  ),
 )
 
 watch(totalPages, (newTotal) => {
@@ -766,7 +768,7 @@ const {
   executionPressureChartOptions,
 } = useTaskMonitorCharts({ monitorData, monitorStats })
 const liveRunningCount = computed(() => monitorData.value?.running_attempts ?? 0)
-const liveFailedCount = computed(() => taskStatusSnapshot.value[ListAdminTasksStatus.failed])
+const liveFailedCount = computed(() => taskStatusSnapshot.value[adminTaskStatuses.failed])
 const globalQueueLength = computed(() => monitorData.value?.global_queue_len || 0)
 const waitQueueLength = computed(() => monitorData.value?.wait_queue_len || 0)
 const liveQueueTotal = computed(() => globalQueueLength.value + waitQueueLength.value)

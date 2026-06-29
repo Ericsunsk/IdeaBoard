@@ -5,6 +5,7 @@ import { useFlowTransactions } from './useFlowTransactions'
 import { useFlowBoardPersistence } from './useFlowBoardPersistence'
 import { useFlowAutosave } from './useFlowAutosave'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { WorkspaceBoardSession } from '../board-session'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 
@@ -22,8 +23,7 @@ type UseFlowWorkspaceRuntimeOptions = {
   saveStatus: Ref<SaveStatus>
   isLoadingBoardSnapshot: Ref<boolean>
   isSavingBoard: Ref<boolean>
-  getBoardIdQuery: () => unknown
-  getUserIdentity: () => { userId: number; userUid: string }
+  boardSession: WorkspaceBoardSession
   getViewport: () => ViewportState
   setViewport: (viewport: ViewportState) => void
   setNodes: (nodes: Node[]) => void
@@ -69,13 +69,12 @@ export function useFlowWorkspaceRuntime(options: UseFlowWorkspaceRuntimeOptions)
     saveStatus: options.saveStatus,
     isLoadingBoardSnapshot: options.isLoadingBoardSnapshot,
     isSavingBoard: options.isSavingBoard,
-    getBoardIdQuery: options.getBoardIdQuery,
+    boardSession: options.boardSession,
     onWarning: options.onWarning,
     onSuccess: options.onSuccess,
     onError: options.onError,
     refreshSnapshot,
     clearFlowHistoryBaseline: flowHistory.clearBaseline,
-    getUserIdentity: options.getUserIdentity,
     getViewport: options.getViewport,
     setViewport: options.setViewport,
     commitNodes: (nodes) => commitFlowNodes(nodes as Node[]),
