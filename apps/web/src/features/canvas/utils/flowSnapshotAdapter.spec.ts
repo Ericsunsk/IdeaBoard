@@ -371,4 +371,23 @@ describe('flowSnapshotAdapter', () => {
     expect(restored.fusionNodes[0]?.blendPoint.x).toBe(0.62)
     expect(restored.fusionNodes[0]?.blendPoint.y).toBe(0.41)
   })
+
+  it('creates save-owned snapshot nodes without sharing nested flow node data', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source.png',
+        outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
+      }),
+    ]
+    const sourceSnapshotNode = (nodes[0]?.data as { snapshotNode: { outputImages: Array<{ url: string }> } })
+      .snapshotNode
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges: [] })
+    snapshot.imageNodes[0]!.outputImages[0]!.url = 'https://example.com/stabilized.png'
+
+    expect(sourceSnapshotNode.outputImages[0]?.url).toBe('https://example.com/output.png')
+  })
 })

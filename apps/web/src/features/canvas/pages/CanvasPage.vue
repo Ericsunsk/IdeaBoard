@@ -207,7 +207,7 @@ const activeTool = ref<'select' | 'hand' | 'text'>('select')
 const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
 
 const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING =
-  import.meta.env.VITE_CANVAS_FLOW_ENABLE_CULLING === 'true'
+  import.meta.env.VITE_CANVAS_FLOW_ENABLE_CULLING !== 'false'
 
 const {
   activeNodePanel,

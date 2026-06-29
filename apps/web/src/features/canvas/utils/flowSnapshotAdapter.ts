@@ -189,7 +189,7 @@ export function flowToCanvasBoardSnapshot(
     const snapshotNode = data.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode || typeof snapshotNode !== 'object') return
     const positionedNode = {
-      ...snapshotNode,
+      ...clone(snapshotNode),
       x: node.position.x,
       y: node.position.y,
     } as CanvasNodeItem

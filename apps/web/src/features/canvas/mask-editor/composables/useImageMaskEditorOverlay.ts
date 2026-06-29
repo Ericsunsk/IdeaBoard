@@ -13,7 +13,10 @@ import {
   invertMaskPreviewCanvas,
 } from '../lib/maskPaintingCanvas'
 import { drawMaskStrokeSegment } from '../lib/maskBrushEngine'
-import { getMaskCanvasPoint } from '../lib/maskCanvasGeometry'
+import {
+  createMaskCanvasPointerProjection,
+  type MaskCanvasPointerProjection,
+} from '../lib/maskCanvasGeometry'
 import {
   clampMaskBrushHardness,
   clampMaskBrushSize,
@@ -65,6 +68,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   let paintingLastX = 0
   let paintingLastY = 0
   let paintingBeforeEntry: MaskHistoryEntry | null = null
+  let paintingPointProjection: MaskCanvasPointerProjection | null = null
   let interactionActive = false
 
   const maskEditorNodeId = computed(() => options.inpaintEditorState.value?.nodeId ?? null)
@@ -210,6 +214,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingCanvas = null
     paintingPointerId = null
     paintingBeforeEntry = null
+    paintingPointProjection = null
   }
 
   function saveMaskDraftForNode(nodeId: string): boolean {
@@ -233,7 +238,8 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   function onPointerMove(event: PointerEvent) {
     if (!paintingNodeId || !paintingCanvas) return
     if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
-    const point = getMaskCanvasPoint(event.clientX, event.clientY, paintingCanvas)
+    if (!paintingPointProjection) return
+    const point = paintingPointProjection(event.clientX, event.clientY)
     drawMaskStrokeSegment(
       {
         brushSize: brushSize.value,
@@ -275,11 +281,13 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     event.preventDefault()
     event.stopPropagation()
     stopPainting()
-    const point = getMaskCanvasPoint(event.clientX, event.clientY, canvas)
+    const pointProjection = createMaskCanvasPointerProjection(canvas)
+    const point = pointProjection(event.clientX, event.clientY)
     paintingNodeId = editorState.nodeId
     paintingCanvas = canvas
     paintingPointerId = event.pointerId
     paintingBeforeEntry = captureMaskHistoryEntry(canvas)
+    paintingPointProjection = pointProjection
     startInteraction()
     if (!canvas.hasPointerCapture(event.pointerId)) {
       canvas.setPointerCapture(event.pointerId)

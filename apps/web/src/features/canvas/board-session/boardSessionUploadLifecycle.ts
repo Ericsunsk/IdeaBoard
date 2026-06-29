@@ -161,8 +161,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
   async function stabilizeSnapshotForSave(
     snapshot: CanvasBoardSnapshot,
   ): Promise<CanvasBoardSnapshot> {
-    const next = JSON.parse(JSON.stringify(snapshot)) as CanvasBoardSnapshot
-    const refs = collectStableRefs(next)
+    const refs = collectStableRefs(snapshot)
     const tasks = new Map<string, Promise<string>>()
     for (const ref of refs) {
       const current = ref.get()
@@ -183,7 +182,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
         throw new Error(`保存失败：${ref.path} 使用了不稳定图片链接，${reason}`, { cause: error })
       }
     }
-    return next
+    return snapshot
   }
 
   function resolveRecyclableUrl(url: string): string | null {

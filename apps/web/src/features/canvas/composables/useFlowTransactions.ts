@@ -52,11 +52,13 @@ export function useFlowTransactions(options: UseFlowTransactionsOptions): FlowTr
     options.refreshSnapshot()
   }
 
-  function recordHistory(
-    historyBefore: FlowHistorySnapshot,
-    commitOptions?: CommitMutationOptions,
-  ) {
-    if (commitOptions?.recordHistory !== false) {
+  function captureHistoryBeforeCommit(commitOptions?: CommitMutationOptions) {
+    if (commitOptions?.recordHistory === false) return null
+    return commitOptions?.historyBefore ?? options.captureHistory()
+  }
+
+  function recordHistory(historyBefore: FlowHistorySnapshot | null) {
+    if (historyBefore) {
       options.pushHistory(historyBefore)
     }
   }
@@ -65,12 +67,12 @@ export function useFlowTransactions(options: UseFlowTransactionsOptions): FlowTr
     mutator: (nodes: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[] },
     commitOptions?: CommitMutationOptions,
   ) {
-    const historyBefore = commitOptions?.historyBefore ?? options.captureHistory()
     const { nodes: nextNodes, edges: nextEdges } = mutator(options.nodes.value, options.edges.value)
     if (nextNodes === options.nodes.value && nextEdges === options.edges.value) return
+    const resolvedHistoryBefore = captureHistoryBeforeCommit(commitOptions)
     options.commitNodes(nextNodes)
     options.commitEdges(nextEdges)
-    recordHistory(historyBefore, commitOptions)
+    recordHistory(resolvedHistoryBefore)
     commitDirty(commitOptions)
   }
 
@@ -78,11 +80,11 @@ export function useFlowTransactions(options: UseFlowTransactionsOptions): FlowTr
     mutator: (nodes: Node[]) => Node[],
     commitOptions?: CommitMutationOptions,
   ) {
-    const historyBefore = commitOptions?.historyBefore ?? options.captureHistory()
     const nextNodes = mutator(options.nodes.value)
     if (nextNodes === options.nodes.value) return
+    const resolvedHistoryBefore = captureHistoryBeforeCommit(commitOptions)
     options.commitNodes(nextNodes)
-    recordHistory(historyBefore, commitOptions)
+    recordHistory(resolvedHistoryBefore)
     commitDirty(commitOptions)
   }
 
@@ -90,11 +92,11 @@ export function useFlowTransactions(options: UseFlowTransactionsOptions): FlowTr
     mutator: (edges: Edge[]) => Edge[],
     commitOptions?: CommitMutationOptions,
   ) {
-    const historyBefore = commitOptions?.historyBefore ?? options.captureHistory()
     const nextEdges = mutator(options.edges.value)
     if (nextEdges === options.edges.value) return
+    const resolvedHistoryBefore = captureHistoryBeforeCommit(commitOptions)
     options.commitEdges(nextEdges)
-    recordHistory(historyBefore, commitOptions)
+    recordHistory(resolvedHistoryBefore)
     commitDirty(commitOptions)
   }
 
