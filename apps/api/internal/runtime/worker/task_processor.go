@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 
+	"ideaboard/api/internal/runtime/taskruntime"
 	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 )
 
 type consumerTaskRuntime interface {
 	RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error
-	MarkTaskFailed(ctx context.Context, taskID string, reason string) error
+	FailTask(ctx context.Context, input taskruntime.FailTaskInput) error
 }
 
 type taskProcessor struct {
@@ -78,7 +79,7 @@ func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) er
 }
 
 func (p *taskProcessor) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
-	if err := p.taskRuntime.MarkTaskFailed(ctx, task.TaskID, reason); err != nil {
+	if err := p.taskRuntime.FailTask(ctx, taskruntime.FailTaskInput{TaskID: task.TaskID, Reason: reason}); err != nil {
 		slog.Warn("mark task failed failed", "task_id", task.TaskID, "err", err)
 	}
 	slog.Warn("task failed", "task_id", task.TaskID, "reason", reason)

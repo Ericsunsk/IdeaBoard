@@ -10,8 +10,12 @@ import type { ImageAdjustmentPlanExecutor } from './planExecutorTypes'
 import type {
   ImageProcessingBackend,
   ImageProcessingBackendFinalInput,
+  ImageProcessingBackendPreviewInput,
+  RenderPreviewOutput,
   RenderFinalOutput,
 } from './types'
+
+const DEFAULT_PREVIEW_MAX_SIDE = 960
 
 export type MainThreadImageProcessingBackendOptions = {
   sourceCache?: ImageSourceCache
@@ -81,8 +85,47 @@ class MainThreadImageProcessingBackend implements ImageProcessingBackend {
     }
   }
 
+  async renderPreview(input: ImageProcessingBackendPreviewInput): Promise<RenderPreviewOutput> {
+    if (input.context.signal.aborted) throw new Error('图像处理已取消')
+
+    input.context.reportProgress({ phase: 'decode' })
+    const source = await this.sourceCache.getFullSizeSource(input.source.url, {
+      maxSide: resolvePreviewMaxSide(input.sizeStrategy),
+    })
+    if (!source) throw new Error('读取图片失败')
+
+    input.context.reportProgress({ phase: 'render' })
+    const sourceImageData = readImageSourceImageData(source)
+    const previewImageData =
+      input.plan.length > 0
+        ? await this.planExecutor.execute({
+            imageData: cloneImageDataForPreview(sourceImageData),
+            plan: input.plan,
+            signal: input.context.signal,
+            onProgress: input.context.reportProgress,
+          })
+        : cloneImageDataForPreview(sourceImageData)
+    if (input.context.signal.aborted) throw new Error('图像处理已取消')
+
+    input.context.reportProgress({ phase: 'complete' })
+    return {
+      sourceImageData,
+      previewImageData,
+      width: source.width,
+      height: source.height,
+    }
+  }
+
   dispose() {
     this.sourceCache.dispose()
     this.planExecutor.dispose?.()
   }
+}
+
+function resolvePreviewMaxSide(input: ImageProcessingBackendPreviewInput['sizeStrategy']) {
+  return Math.max(1, Math.floor(input?.maxSide ?? DEFAULT_PREVIEW_MAX_SIDE))
+}
+
+function cloneImageDataForPreview(imageData: ImageData): ImageData {
+  return new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
 }

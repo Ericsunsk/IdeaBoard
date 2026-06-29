@@ -52,7 +52,7 @@ func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.ResetTaskRunningToPending(ctx, taskRuntimeAssignment(task), "worker context interrupted"); err != nil {
+	if err := service.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: taskRuntimeAssignment(task), Reason: "worker context interrupted"}); err != nil {
 		t.Fatalf("ResetTaskRunningToPending returned error: %v", err)
 	}
 
@@ -93,7 +93,7 @@ func TestResetTaskRunningToPendingRejectsTerminalTask(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.ResetTaskRunningToPending(ctx, taskRuntimeAssignmentWithLease(task, "lease-terminal"), "worker context interrupted")
+	err := service.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: taskRuntimeAssignmentWithLease(task, "lease-terminal"), Reason: "worker context interrupted"})
 	if !errors.Is(err, ErrTaskTerminal) {
 		t.Fatalf("expected ErrTaskTerminal, got %v", err)
 	}
@@ -186,7 +186,7 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	requeued, err := service.RequeueTaskForFailover(ctx, taskRuntimeAssignment(task), "retryable error")
+	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(task), Reason: "retryable error"})
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
 	}
@@ -490,7 +490,7 @@ func TestMarkTaskCompletedRejectsLeaseTokenMismatch(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.MarkTaskCompleted(ctx, taskRuntimeAssignmentWithLease(task, "stale-lease-token"), `{"status":"success"}`)
+	err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskRuntimeAssignmentWithLease(task, "stale-lease-token"), Result: `{"status":"success"}`})
 	if !errors.Is(err, ErrTaskStateConflict) {
 		t.Fatalf("expected ErrTaskStateConflict, got %v", err)
 	}
@@ -524,7 +524,7 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	requeued, err := service.RequeueTaskForFailover(ctx, taskRuntimeAssignment(task), "retry limit reached")
+	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(task), Reason: "retry limit reached"})
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
 	}
@@ -589,7 +589,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	if err := taskRepo.Create(ctx, requeueTask); err != nil {
 		t.Fatalf("seed requeue task failed: %v", err)
 	}
-	requeued, err := service.RequeueTaskForFailover(ctx, taskRuntimeAssignment(requeueTask), "retry")
+	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(requeueTask), Reason: "retry"})
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover pending returned error: %v", err)
 	}
@@ -617,7 +617,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	if err := taskRepo.Create(ctx, finalTask); err != nil {
 		t.Fatalf("seed final requeue task failed: %v", err)
 	}
-	requeued, err = service.RequeueTaskForFailover(ctx, taskRuntimeAssignment(finalTask), "stop retry")
+	requeued, err = service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(finalTask), Reason: "stop retry"})
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover failed returned error: %v", err)
 	}
@@ -655,7 +655,7 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	}
 
 	result := `{"model":"gpt-image-1","username":"alice"}`
-	if err := service.MarkTaskCompleted(ctx, taskRuntimeAssignment(task), result); err != nil {
+	if err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskRuntimeAssignment(task), Result: result}); err != nil {
 		t.Fatalf("MarkTaskCompleted returned error: %v", err)
 	}
 
@@ -719,7 +719,11 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 			StorageProfile: "builtin-local",
 		},
 	}
-	if err := service.MarkTaskCompletedWithOutputs(ctx, taskRuntimeAssignment(task), result, taskOutputs); err != nil {
+	if err := service.CompleteTask(ctx, CompleteTaskInput{
+		Assignment: taskRuntimeAssignment(task),
+		Result:     result,
+		Outputs:    taskOutputs,
+	}); err != nil {
 		t.Fatalf("MarkTaskCompletedWithOutputs returned error: %v", err)
 	}
 
@@ -777,7 +781,7 @@ func TestMarkTaskCompletedDoesNotInferOutputsFromResultURL(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.MarkTaskCompleted(ctx, taskRuntimeAssignment(task), `{"status":"success","image_url":"https://evil.example.com/uploads/tasks/7/task-foreign-origin/out-a.png"}`); err != nil {
+	if err := service.CompleteTask(ctx, CompleteTaskInput{Assignment: taskRuntimeAssignment(task), Result: `{"status":"success","image_url":"https://evil.example.com/uploads/tasks/7/task-foreign-origin/out-a.png"}`}); err != nil {
 		t.Fatalf("MarkTaskCompleted returned error: %v", err)
 	}
 	outputsByTaskID, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
@@ -808,8 +812,12 @@ func TestMarkTaskCompletedRejectsOutputWithoutStorageKey(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.MarkTaskCompletedWithOutputs(ctx, taskRuntimeAssignment(task), `{"status":"success","image_url":"/uploads/tasks/7/task-inline-result/out-a.png"}`, []tasks.TaskOutput{
-		{URL: "/uploads/tasks/7/task-inline-result/out-a.png"},
+	err := service.CompleteTask(ctx, CompleteTaskInput{
+		Assignment: taskRuntimeAssignment(task),
+		Result:     `{"status":"success","image_url":"/uploads/tasks/7/task-inline-result/out-a.png"}`,
+		Outputs: []tasks.TaskOutput{
+			{URL: "/uploads/tasks/7/task-inline-result/out-a.png"},
+		},
 	})
 	if err == nil {
 		t.Fatal("expected missing storage_key to be rejected")

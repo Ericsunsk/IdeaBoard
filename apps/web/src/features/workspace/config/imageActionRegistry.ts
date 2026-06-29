@@ -1,5 +1,5 @@
 import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
-import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../shared/domain/workflowFeatureRegistry'
+import { getWorkflowFeatureImageActionText } from '../../../shared/domain/workflowFeatureRegistry'
 import type { WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 import {
   IMAGE_EXECUTION_MODE,
@@ -44,22 +44,11 @@ export type ImageActionRegistryItem = {
   icon: ImageActionMenuIcon
 }
 
-function getWorkflowImageActionText(action: WorkflowImageNodeAction): {
-  label: string
-  title: string
-} {
-  const meta = WORKFLOW_FEATURE_REGISTRY_MAP[action]
-  return {
-    label: meta.imageActionLabel ?? meta.adminTitle,
-    title: meta.imageActionTitle ?? meta.imageActionLabel ?? meta.adminTitle,
-  }
-}
-
 function createWorkflowImageAction<
   TAction extends WorkflowImageNodeAction,
   TConfig extends Omit<ImageActionRegistryItem, 'action' | 'label' | 'title'>,
 >(action: TAction, config: TConfig): { action: TAction; label: string; title: string } & TConfig {
-  const text = getWorkflowImageActionText(action)
+  const text = getWorkflowFeatureImageActionText(action)
   return {
     action,
     label: text.label,

@@ -15,9 +15,7 @@ describe('ImageProcessingRuntime', () => {
     })
     const onProgress = vi.fn()
     const runtime = createImageProcessingRuntime({
-      backend: {
-        renderFinal,
-      },
+      backend: createBackend({ renderFinal }),
     })
 
     const result = await runtime.renderFinal({
@@ -51,9 +49,7 @@ describe('ImageProcessingRuntime', () => {
       file: new File(['final'], `final-${context.revision}.webp`, { type: 'image/webp' }),
     }))
     const runtime = createImageProcessingRuntime({
-      backend: {
-        renderFinal,
-      },
+      backend: createBackend({ renderFinal }),
     })
 
     const first = runtime.renderFinal({
@@ -88,9 +84,7 @@ describe('ImageProcessingRuntime', () => {
         }),
     )
     const runtime = createImageProcessingRuntime({
-      backend: {
-        renderFinal,
-      },
+      backend: createBackend({ renderFinal }),
     })
 
     const first = runtime.renderFinal({
@@ -138,10 +132,7 @@ describe('ImageProcessingRuntime', () => {
         }),
     )
     const runtime = createImageProcessingRuntime({
-      backend: {
-        renderFinal,
-        cancel,
-      },
+      backend: createBackend({ renderFinal, cancel }),
     })
 
     const task = runtime.renderFinal({
@@ -163,11 +154,11 @@ describe('ImageProcessingRuntime', () => {
 
   it('maps backend failures into structured runtime results', async () => {
     const runtime = createImageProcessingRuntime({
-      backend: {
+      backend: createBackend({
         renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(async () => {
           throw new Error('render exploded')
         }),
-      },
+      }),
     })
 
     await expect(
@@ -186,14 +177,14 @@ describe('ImageProcessingRuntime', () => {
 
   it('does not pass through unknown structured error codes', async () => {
     const runtime = createImageProcessingRuntime({
-      backend: {
+      backend: createBackend({
         renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(async () => {
           throw {
             code: 'legacy-code',
             message: 'legacy failure',
           }
         }),
-      },
+      }),
     })
 
     await expect(
@@ -209,4 +200,82 @@ describe('ImageProcessingRuntime', () => {
       },
     })
   })
+
+  it('routes preview work through the injected backend as latest-only by default', async () => {
+    const renderPreview = vi.fn<ImageProcessingBackend['renderPreview']>(
+      async ({ sizeStrategy }) => ({
+        sourceImageData: makeImageData([10, 20, 30, 255]),
+        previewImageData: makeImageData([245, 235, 225, 255]),
+        width: sizeStrategy?.maxSide ?? 1,
+        height: 1,
+      }),
+    )
+    const runtime = createImageProcessingRuntime({
+      backend: createBackend({ renderPreview }),
+    })
+
+    const result = await runtime.renderPreview({
+      source: { url: 'https://example.com/source.png' },
+      plan: [],
+      taskId: 'preview',
+      sizeStrategy: { maxSide: 960 },
+    })
+
+    expect(result).toMatchObject({
+      status: 'completed',
+      taskId: 'preview',
+      output: {
+        sourceImageData: expect.objectContaining({
+          data: new Uint8ClampedArray([10, 20, 30, 255]),
+        }),
+        previewImageData: expect.objectContaining({
+          data: new Uint8ClampedArray([245, 235, 225, 255]),
+        }),
+        width: 960,
+        height: 1,
+      },
+    })
+    expect(renderPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: { url: 'https://example.com/source.png' },
+        plan: [],
+        sizeStrategy: { maxSide: 960 },
+      }),
+    )
+  })
 })
+
+function createBackend(input: Partial<ImageProcessingBackend> = {}): ImageProcessingBackend {
+  return {
+    renderFinal:
+      input.renderFinal ??
+      vi.fn<ImageProcessingBackend['renderFinal']>(async () => ({
+        file: new File(['final'], 'final.webp', { type: 'image/webp' }),
+      })),
+    renderPreview:
+      input.renderPreview ??
+      vi.fn<ImageProcessingBackend['renderPreview']>(async () => ({
+        sourceImageData: makeImageData([0, 0, 0, 255]),
+        previewImageData: makeImageData([0, 0, 0, 255]),
+        width: 1,
+        height: 1,
+      })),
+    cancel: input.cancel,
+    dispose: input.dispose,
+  }
+}
+
+function makeImageData(values: number[]): ImageData {
+  class TestImageDataImpl {
+    data: Uint8ClampedArray
+    width: number
+    height: number
+
+    constructor(data: Uint8ClampedArray, width: number, height: number) {
+      this.data = data
+      this.width = width
+      this.height = height
+    }
+  }
+  return new TestImageDataImpl(new Uint8ClampedArray(values), values.length / 4, 1) as ImageData
+}

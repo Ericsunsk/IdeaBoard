@@ -12,6 +12,9 @@ import type {
   RenderFinalInput,
   RenderFinalOutput,
   RenderFinalResult,
+  RenderPreviewInput,
+  RenderPreviewOutput,
+  RenderPreviewResult,
 } from './types'
 
 export type CreateImageProcessingRuntimeOptions = {
@@ -24,12 +27,17 @@ class MainThreadImageProcessingRuntime implements ImageProcessingRuntime {
   private readonly backend: ImageProcessingBackend
   private readonly outputPolicy: ImageProcessingOutputPolicy
   private readonly finalScheduler: ImageProcessingScheduler
+  private readonly previewScheduler: ImageProcessingScheduler
 
   constructor(options: CreateImageProcessingRuntimeOptions) {
     this.backend = options.backend
     this.outputPolicy = options.outputPolicy ?? createImageProcessingOutputPolicy()
     this.finalScheduler = new ImageProcessingScheduler({
       latestOnly: false,
+      createTaskId: options.createTaskId,
+    })
+    this.previewScheduler = new ImageProcessingScheduler({
+      latestOnly: true,
       createTaskId: options.createTaskId,
     })
   }
@@ -56,13 +64,38 @@ class MainThreadImageProcessingRuntime implements ImageProcessingRuntime {
     return mapSchedulerResult(result)
   }
 
+  async renderPreview(input: RenderPreviewInput): Promise<RenderPreviewResult> {
+    const result = await this.previewScheduler.schedule(
+      (context) =>
+        this.backend.renderPreview({
+          source: input.source,
+          plan: input.plan,
+          sizeStrategy: input.sizeStrategy,
+          context: {
+            taskId: context.taskId,
+            revision: context.revision,
+            signal: context.signal,
+            outputPolicy: this.outputPolicy,
+            reportProgress: input.onProgress ?? ignoreProgress,
+          },
+        }),
+      {
+        taskId: input.taskId,
+        latestOnly: input.latestOnly ?? true,
+      },
+    )
+    return mapSchedulerResult(result)
+  }
+
   cancel(taskId?: string) {
     this.finalScheduler.cancel(taskId)
+    this.previewScheduler.cancel(taskId)
     this.backend.cancel?.(taskId)
   }
 
   dispose() {
     this.finalScheduler.dispose()
+    this.previewScheduler.dispose()
     this.backend.dispose?.()
   }
 }
@@ -149,4 +182,4 @@ function isImageProcessingErrorCode(code: unknown): code is ImageProcessingError
 
 function ignoreProgress() {}
 
-export type { RenderFinalInput, RenderFinalOutput }
+export type { RenderFinalInput, RenderFinalOutput, RenderPreviewInput, RenderPreviewOutput }

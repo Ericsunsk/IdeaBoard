@@ -1,12 +1,17 @@
 import { nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ImageProcessingRuntime } from '../runtime/types'
 import type { ImageEditorLayer } from '../types'
-import { executeCpuImageAdjustmentPlanInPlace } from '../backends/cpu/executeCpuImageAdjustmentPlan'
 import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
 import { useImageAdjustmentRenderedPreview } from './useImageAdjustmentRenderedPreview'
 
-const fetchMock = vi.fn()
-const createImageBitmapMock = vi.fn()
+const { getImageAdjustmentProcessingRuntimeMock } = vi.hoisted(() => ({
+  getImageAdjustmentProcessingRuntimeMock: vi.fn(),
+}))
+
+vi.mock('../runtime/imageAdjustmentProcessingRuntime', () => ({
+  getImageAdjustmentProcessingRuntime: getImageAdjustmentProcessingRuntimeMock,
+}))
 
 function createHslLayer(params = { hue: 0, saturation: 0, brightness: 0, contrast: 0 }) {
   return {
@@ -74,13 +79,15 @@ async function flushPreviewLoad() {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
-  fetchMock.mockReset()
-  createImageBitmapMock.mockReset()
+  getImageAdjustmentProcessingRuntimeMock.mockReset()
 })
 
 describe('useImageAdjustmentRenderedPreview', () => {
-  it('renders previews through the same adjustment engine used by final apply', async () => {
-    installBrowserImageMocks([10, 20, 30, 255])
+  it('routes inline preview rendering through the shared image processing runtime', async () => {
+    const runtime = installPreviewRuntimeMock({
+      sourceValues: [10, 20, 30, 255],
+      previewValues: [245, 235, 225, 255],
+    })
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
@@ -89,6 +96,15 @@ describe('useImageAdjustmentRenderedPreview', () => {
 
     await flushPreviewLoad()
 
+    expect(runtime.renderPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: { url: 'https://example.com/source.png' },
+        plan: buildImageAdjustmentPlan([createInvertLayer()]),
+        taskId: 'image-adjustment:inline-preview',
+        latestOnly: true,
+        sizeStrategy: { maxSide: 960 },
+      }),
+    )
     expect(preview.imageEditorRenderedPreview.value).toEqual({
       type: 'rendered-image',
       imageData: expect.objectContaining({
@@ -102,7 +118,10 @@ describe('useImageAdjustmentRenderedPreview', () => {
   })
 
   it('exposes the decoded preview source for histogram consumers', async () => {
-    installBrowserImageMocks([10, 20, 30, 255])
+    installPreviewRuntimeMock({
+      sourceValues: [10, 20, 30, 255],
+      previewValues: [245, 235, 225, 255],
+    })
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
@@ -121,9 +140,12 @@ describe('useImageAdjustmentRenderedPreview', () => {
     })
   })
 
-  it('keeps inline rendered preview output identical to CPU final plan execution for layered adjustments', async () => {
+  it('passes the compiled layered adjustment plan to preview rendering', async () => {
     const sourceValues = [16, 48, 112, 255, 80, 140, 220, 240, 196, 88, 24, 192, 240, 240, 96, 128]
-    installBrowserImageMocks(sourceValues)
+    const runtime = installPreviewRuntimeMock({
+      sourceValues,
+      previewValues: [255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255],
+    })
     const layers = [
       createHslLayer({ hue: 35, saturation: 22, brightness: 8, contrast: 14 }),
       createCurvesLayer({
@@ -142,7 +164,6 @@ describe('useImageAdjustmentRenderedPreview', () => {
       createInvertLayer(),
     ] satisfies ImageEditorLayer[]
     const finalPlan = buildImageAdjustmentPlan(layers)
-    const expected = executeCpuImageAdjustmentPlanInPlace(makeImageData(sourceValues), finalPlan)
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
@@ -151,18 +172,23 @@ describe('useImageAdjustmentRenderedPreview', () => {
 
     await flushPreviewLoad()
 
+    expect(runtime.renderPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: finalPlan,
+      }),
+    )
     expect(preview.imageEditorRenderedPreview.value).toMatchObject({
       type: 'rendered-image',
       width: sourceValues.length / 4,
       height: 1,
     })
-    expect(pixelValues(preview.imageEditorRenderedPreview.value?.imageData)).toEqual(
-      pixelValues(expected),
-    )
   })
 
-  it('does not load or render hidden, inactive, or neutral adjustment stacks', async () => {
-    installBrowserImageMocks([10, 20, 30, 255])
+  it('loads the preview source but does not expose rendered output for neutral adjustment stacks', async () => {
+    const runtime = installPreviewRuntimeMock({
+      sourceValues: [10, 20, 30, 255],
+      previewValues: [10, 20, 30, 255],
+    })
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
@@ -176,27 +202,47 @@ describe('useImageAdjustmentRenderedPreview', () => {
 
     await flushPreviewLoad()
 
+    expect(runtime.renderPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: [],
+      }),
+    )
     expect(preview.imageEditorRenderedPreview.value).toBeNull()
+    expect(preview.imageEditorPreviewSource.value).toMatchObject({
+      type: 'rendered-image',
+      imageData: expect.objectContaining({
+        data: new Uint8ClampedArray([10, 20, 30, 255]),
+      }),
+    })
   })
 
   it('normalizes non-finite params before rendering previews', async () => {
-    installBrowserImageMocks([120, 120, 120, 255])
+    const runtime = installPreviewRuntimeMock({
+      sourceValues: [120, 120, 120, 255],
+      previewValues: [0, 0, 0, 255],
+    })
+    const layers = [
+      createThresholdLayer({ threshold: Number.NaN, invert: false }),
+      createHslLayer({
+        hue: Number.NaN,
+        saturation: Number.POSITIVE_INFINITY,
+        brightness: Number.NEGATIVE_INFINITY,
+        contrast: Number.NaN,
+      }),
+    ] satisfies ImageEditorLayer[]
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
-      layers: ref([
-        createThresholdLayer({ threshold: Number.NaN, invert: false }),
-        createHslLayer({
-          hue: Number.NaN,
-          saturation: Number.POSITIVE_INFINITY,
-          brightness: Number.NEGATIVE_INFINITY,
-          contrast: Number.NaN,
-        }),
-      ]),
+      layers: ref(layers),
     })
 
     await flushPreviewLoad()
 
+    expect(runtime.renderPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: buildImageAdjustmentPlan(layers),
+      }),
+    )
     expect(preview.imageEditorRenderedPreview.value).toMatchObject({
       type: 'rendered-image',
       imageData: expect.objectContaining({
@@ -208,7 +254,12 @@ describe('useImageAdjustmentRenderedPreview', () => {
   })
 
   it('coalesces rapid layer changes to the latest animation frame', async () => {
-    const raf = installBrowserImageMocks([120, 120, 120, 255], { autoFlushRaf: false })
+    const raf = installAnimationFrameMock({ autoFlushRaf: false })
+    const runtime = installPreviewRuntimeMock({
+      sourceValues: [120, 120, 120, 255],
+      previewValues: [255, 255, 255, 255],
+      installRaf: false,
+    })
     const layers = ref<ImageEditorLayer[]>([createThresholdLayer({ threshold: 32, invert: false })])
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
@@ -223,7 +274,14 @@ describe('useImageAdjustmentRenderedPreview', () => {
     await nextTick()
 
     raf.flush()
+    await flushPreviewLoad()
 
+    expect(runtime.renderPreview).toHaveBeenCalledTimes(1)
+    expect(runtime.renderPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: buildImageAdjustmentPlan([createThresholdLayer({ threshold: 64, invert: false })]),
+      }),
+    )
     expect(preview.imageEditorRenderedPreview.value).toMatchObject({
       type: 'rendered-image',
       imageData: expect.objectContaining({
@@ -235,64 +293,40 @@ describe('useImageAdjustmentRenderedPreview', () => {
   })
 })
 
-function installBrowserImageMocks(
-  sourceValues: number[],
-  options: { autoFlushRaf?: boolean } = {},
-) {
+function installPreviewRuntimeMock(input: {
+  sourceValues: number[]
+  previewValues: number[]
+  installRaf?: boolean
+}) {
+  installImageDataMock()
+  if (input.installRaf ?? true) installAnimationFrameMock()
+  const sourceImageData = makeImageData(input.sourceValues)
+  const previewImageData = makeImageData(input.previewValues)
+  const renderPreview = vi.fn<ImageProcessingRuntime['renderPreview']>(async () => ({
+    status: 'completed',
+    taskId: 'image-adjustment:inline-preview',
+    revision: 1,
+    output: {
+      sourceImageData,
+      previewImageData,
+      width: sourceImageData.width,
+      height: sourceImageData.height,
+    },
+  }))
+  const runtime: ImageProcessingRuntime = {
+    renderFinal: vi.fn<ImageProcessingRuntime['renderFinal']>(),
+    renderPreview,
+    cancel: vi.fn<ImageProcessingRuntime['cancel']>(),
+    dispose: vi.fn<ImageProcessingRuntime['dispose']>(),
+  }
+  getImageAdjustmentProcessingRuntimeMock.mockReturnValue(runtime)
+  return runtime
+}
+
+function installAnimationFrameMock(options: { autoFlushRaf?: boolean } = {}) {
   const autoFlushRaf = options.autoFlushRaf ?? true
   const rafCallbacks = new Map<number, FrameRequestCallback>()
   let rafId = 0
-
-  class TestImageDataImpl {
-    data: Uint8ClampedArray
-    width: number
-    height: number
-
-    constructor(data: Uint8ClampedArray, width: number, height: number) {
-      this.data = data
-      this.width = width
-      this.height = height
-    }
-  }
-
-  const sourceImageData = new TestImageDataImpl(
-    new Uint8ClampedArray(sourceValues),
-    sourceValues.length / 4,
-    1,
-  ) as ImageData
-
-  vi.stubGlobal('ImageData', TestImageDataImpl)
-  vi.stubGlobal('fetch', fetchMock)
-  vi.stubGlobal('createImageBitmap', createImageBitmapMock)
-  fetchMock.mockResolvedValue({
-    ok: true,
-    blob: async () => new Blob(['source'], { type: 'image/png' }),
-  })
-  createImageBitmapMock.mockResolvedValue({
-    width: sourceImageData.width,
-    height: sourceImageData.height,
-    close: vi.fn(),
-  })
-
-  vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-    if (tagName.toLowerCase() !== 'canvas') {
-      return document.createElementNS('http://www.w3.org/1999/xhtml', tagName) as HTMLElement
-    }
-
-    const canvas = document.createElementNS(
-      'http://www.w3.org/1999/xhtml',
-      'canvas',
-    ) as HTMLCanvasElement
-    const context = {
-      drawImage: vi.fn(),
-      getImageData: vi.fn(() => sourceImageData),
-      putImageData: vi.fn(),
-    }
-    Object.defineProperty(canvas, 'getContext', {
-      value: () => context,
-    })
-    return canvas
-  })
 
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
     rafId += 1
@@ -318,10 +352,23 @@ function installBrowserImageMocks(
   }
 }
 
-function makeImageData(sourceValues: number[]): ImageData {
-  return new ImageData(new Uint8ClampedArray(sourceValues), sourceValues.length / 4, 1)
+function installImageDataMock() {
+  vi.stubGlobal('ImageData', TestImageDataImpl)
 }
 
-function pixelValues(imageData: ImageData | undefined) {
-  return imageData ? Array.from(imageData.data) : []
+function makeImageData(values: number[]): ImageData {
+  installImageDataMock()
+  return new ImageData(new Uint8ClampedArray(values), values.length / 4, 1)
+}
+
+class TestImageDataImpl {
+  data: Uint8ClampedArray
+  width: number
+  height: number
+
+  constructor(data: Uint8ClampedArray, width: number, height: number) {
+    this.data = data
+    this.width = width
+    this.height = height
+  }
 }

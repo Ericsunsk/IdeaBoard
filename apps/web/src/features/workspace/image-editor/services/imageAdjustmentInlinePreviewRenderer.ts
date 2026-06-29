@@ -1,10 +1,10 @@
 import type { ImageEditorRenderedPreview } from '../types'
-import { executeImageAdjustmentPlan, type ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
-import { cloneImageData } from '../utils/imageDataUtils'
-import { releaseCanvas } from '../utils/imageAdjustmentMedia'
-import { resolveFetchUrl } from '../../services/flowMediaIO'
+import type { ImageProcessingRuntime } from '../runtime/types'
+import { getImageAdjustmentProcessingRuntime } from '../runtime/imageAdjustmentProcessingRuntime'
+import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
 
 const PREVIEW_MAX_SIDE = 960
+const INLINE_PREVIEW_TASK_ID = 'image-adjustment:inline-preview'
 
 type ImageAdjustmentPreviewSource = {
   sourceUrl: string
@@ -17,6 +17,7 @@ type ImageAdjustmentInlinePreviewRendererOptions = {
   onPreview: (preview: ImageEditorRenderedPreview | null) => void
   onSource?: (source: ImageAdjustmentPreviewSource | null) => void
   onError?: (error: unknown) => void
+  runtime?: ImageProcessingRuntime
 }
 
 export type ImageAdjustmentInlinePreviewRenderer = {
@@ -28,35 +29,23 @@ export type ImageAdjustmentInlinePreviewRenderer = {
 export function createImageAdjustmentInlinePreviewRenderer(
   options: ImageAdjustmentInlinePreviewRendererOptions,
 ): ImageAdjustmentInlinePreviewRenderer {
-  let previewSource: ImageAdjustmentPreviewSource | null = null
   let currentPlan: ImageAdjustmentPlan = []
   let currentSourceUrl: string | null = null
   let sourceRequestToken = 0
   let previewFrameId: number | null = null
+  const runtime = options.runtime ?? getImageAdjustmentProcessingRuntime()
 
   return {
     updateSource(sourceUrl) {
       if (sourceUrl === currentSourceUrl) return
       currentSourceUrl = sourceUrl
       sourceRequestToken += 1
-      previewSource = null
       options.onPreview(null)
       options.onSource?.(null)
       cancelPreviewFrame()
       if (!sourceUrl) return
 
-      const token = sourceRequestToken
-      void loadPreviewSource(sourceUrl)
-        .then((source) => {
-          if (token !== sourceRequestToken) return
-          previewSource = source
-          options.onSource?.(source)
-          scheduleRenderedPreview()
-        })
-        .catch((error) => {
-          if (token !== sourceRequestToken) return
-          options.onError?.(error)
-        })
+      scheduleRenderedPreview()
     },
     updatePlan(plan) {
       currentPlan = plan
@@ -65,27 +54,23 @@ export function createImageAdjustmentInlinePreviewRenderer(
     dispose() {
       sourceRequestToken += 1
       currentSourceUrl = null
-      previewSource = null
       currentPlan = []
       options.onPreview(null)
       options.onSource?.(null)
       cancelPreviewFrame()
+      runtime.cancel(INLINE_PREVIEW_TASK_ID)
     },
   }
 
   function scheduleRenderedPreview() {
     cancelPreviewFrame()
-    if (currentPlan.length === 0) {
-      options.onPreview(null)
-      return
-    }
-    if (!previewSource) return
+    if (!currentSourceUrl) return
 
     let didRunSynchronously = false
     const frameId = window.requestAnimationFrame(() => {
       didRunSynchronously = true
       previewFrameId = null
-      renderLatestPreview(previewSource, currentPlan)
+      renderLatestPreview(currentSourceUrl, currentPlan, sourceRequestToken)
     })
     previewFrameId = didRunSynchronously ? null : frameId
   }
@@ -96,60 +81,51 @@ export function createImageAdjustmentInlinePreviewRenderer(
     previewFrameId = null
   }
 
-  function renderLatestPreview(source: ImageAdjustmentPreviewSource | null, plan: ImageAdjustmentPlan) {
-    if (!source || plan.length === 0) {
+  function renderLatestPreview(
+    sourceUrl: string | null,
+    plan: ImageAdjustmentPlan,
+    requestToken: number,
+  ) {
+    if (!sourceUrl) {
       options.onPreview(null)
       return
     }
-    const imageData = cloneImageData(source.imageData)
-    executeImageAdjustmentPlan(imageData, plan)
-    options.onPreview({
-      type: 'rendered-image',
-      imageData,
-      width: source.width,
-      height: source.height,
-    })
-  }
-}
 
-async function loadPreviewSource(sourceUrl: string): Promise<ImageAdjustmentPreviewSource> {
-  const fetchUrl = resolveFetchUrl(sourceUrl)
-  if (!fetchUrl) throw new Error('图片地址无效')
-
-  const response = await fetch(fetchUrl, { credentials: 'include' })
-  if (!response.ok) throw new Error('读取图片失败')
-
-  const blob = await response.blob()
-  if (!blob.type.startsWith('image/')) throw new Error('读取到的文件不是图片')
-
-  const bitmap = await createImageBitmap(blob)
-  let canvas: HTMLCanvasElement | null = null
-  try {
-    const { width, height } = resolvePreviewSize(bitmap.width, bitmap.height)
-    canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const context = canvas.getContext('2d')
-    if (!context) throw new Error('当前浏览器不支持图像处理')
-    context.drawImage(bitmap, 0, 0, width, height)
-    return {
-      sourceUrl,
-      imageData: context.getImageData(0, 0, width, height),
-      width,
-      height,
-    }
-  } finally {
-    bitmap.close()
-    releaseCanvas(canvas)
-  }
-}
-
-function resolvePreviewSize(width: number, height: number) {
-  const longestSide = Math.max(width, height)
-  if (longestSide <= 0) throw new Error('图片解码失败')
-  const scale = Math.min(1, PREVIEW_MAX_SIDE / longestSide)
-  return {
-    width: Math.max(1, Math.round(width * scale)),
-    height: Math.max(1, Math.round(height * scale)),
+    void runtime
+      .renderPreview({
+        source: { url: sourceUrl },
+        plan,
+        taskId: INLINE_PREVIEW_TASK_ID,
+        latestOnly: true,
+        sizeStrategy: { maxSide: PREVIEW_MAX_SIDE },
+      })
+      .then((result) => {
+        if (requestToken !== sourceRequestToken) return
+        if (result.status !== 'completed') {
+          if (result.status === 'failed') options.onError?.(result.error)
+          return
+        }
+        const source = {
+          sourceUrl,
+          imageData: result.output.sourceImageData,
+          width: result.output.width,
+          height: result.output.height,
+        }
+        options.onSource?.(source)
+        options.onPreview(
+          plan.length > 0
+            ? {
+                type: 'rendered-image',
+                imageData: result.output.previewImageData,
+                width: result.output.width,
+                height: result.output.height,
+              }
+            : null,
+        )
+      })
+      .catch((error: unknown) => {
+        if (requestToken !== sourceRequestToken) return
+        options.onError?.(error)
+      })
   }
 }

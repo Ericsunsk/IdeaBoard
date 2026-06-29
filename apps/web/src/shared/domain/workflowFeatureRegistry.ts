@@ -54,6 +54,24 @@ export interface WorkflowFeatureRegistryItem {
   imageActionTitle?: string
 }
 
+export interface WorkflowFeaturePromptConfigItem {
+  slug: WorkflowFeature
+  title: string
+  label: string
+}
+
+export interface WorkflowFeaturePromptConfigGroup {
+  key: string
+  title: string
+  order: number
+  items: readonly WorkflowFeaturePromptConfigItem[]
+}
+
+export interface WorkflowFeatureImageActionText {
+  label: string
+  title: string
+}
+
 type WorkflowFeatureRegistryBaseItem = Omit<WorkflowFeatureRegistryItem, 'title' | 'adminTitle'>
 
 const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[] = [
@@ -130,3 +148,83 @@ export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
 export const WORKFLOW_FEATURE_REGISTRY_MAP = Object.fromEntries(
   WORKFLOW_FEATURE_REGISTRY.map((item) => [item.slug, item]),
 ) as Record<WorkflowFeature, WorkflowFeatureRegistryItem>
+
+const WORKFLOW_FEATURE_PROMPT_CONFIG_GROUP_DEFS = [
+  {
+    key: 'image',
+    title: 'Image',
+    order: 10,
+    slugs: [
+      WORKFLOW_FEATURE.sketchToImage,
+      WORKFLOW_FEATURE.styleVariation,
+      WORKFLOW_FEATURE.removeBg,
+      WORKFLOW_FEATURE.partialEdit,
+      WORKFLOW_FEATURE.hdUpscale,
+      WORKFLOW_FEATURE.imageExtend,
+    ],
+  },
+  {
+    key: 'prompt',
+    title: 'Prompt',
+    order: 20,
+    slugs: [WORKFLOW_FEATURE.patternGen],
+  },
+  {
+    key: 'fusion',
+    title: 'Fusion',
+    order: 30,
+    slugs: [WORKFLOW_FEATURE.styleFusion],
+  },
+] as const satisfies readonly {
+  key: string
+  title: string
+  order: number
+  slugs: readonly WorkflowFeature[]
+}[]
+
+function toWorkflowFeaturePromptConfigItem(
+  slug: WorkflowFeature,
+  groupTitle: string,
+): WorkflowFeaturePromptConfigItem {
+  const feature = WORKFLOW_FEATURE_REGISTRY_MAP[slug]
+  return {
+    slug,
+    title: `${groupTitle} · ${feature.label}`,
+    label: feature.label,
+  }
+}
+
+export const WORKFLOW_FEATURE_PROMPT_CONFIG_ITEMS =
+  WORKFLOW_FEATURE_PROMPT_CONFIG_GROUP_DEFS.flatMap((group) =>
+    group.slugs.map((slug) => toWorkflowFeaturePromptConfigItem(slug, group.title)),
+  )
+
+export const WORKFLOW_FEATURE_PROMPT_CONFIG_ITEM_MAP = Object.fromEntries(
+  WORKFLOW_FEATURE_PROMPT_CONFIG_ITEMS.map((item) => [item.slug, item]),
+) as Record<WorkflowFeature, WorkflowFeaturePromptConfigItem>
+
+export const WORKFLOW_FEATURE_PROMPT_CONFIG_GROUPS =
+  WORKFLOW_FEATURE_PROMPT_CONFIG_GROUP_DEFS.filter((group) => group.slugs.length > 0)
+    .sort((a, b) => a.order - b.order)
+    .map((group) => ({
+      key: group.key,
+      title: group.title,
+      order: group.order,
+      items: group.slugs.map((slug) => WORKFLOW_FEATURE_PROMPT_CONFIG_ITEM_MAP[slug]),
+    })) satisfies readonly WorkflowFeaturePromptConfigGroup[]
+
+export const WORKFLOW_FEATURE_IMAGE_ACTION_TEXT_MAP = Object.fromEntries(
+  WORKFLOW_FEATURE_REGISTRY.map((item) => [
+    item.slug,
+    {
+      label: item.imageActionLabel ?? item.adminTitle,
+      title: item.imageActionTitle ?? item.imageActionLabel ?? item.adminTitle,
+    },
+  ]),
+) as Record<WorkflowFeature, WorkflowFeatureImageActionText>
+
+export function getWorkflowFeatureImageActionText(
+  slug: WorkflowFeature,
+): WorkflowFeatureImageActionText {
+  return WORKFLOW_FEATURE_IMAGE_ACTION_TEXT_MAP[slug]
+}

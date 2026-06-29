@@ -33,11 +33,13 @@ export type ImageSourceCacheOptions = {
 
 export type ImageSourceFullSizeOptions = {
   readonly maxPixels?: number
+  readonly maxSide?: number
   readonly resolveOptions?: ImageSourceResolveOptions
 }
 
 type LoadImageSourceOptions = {
   readonly maxPixels?: number
+  readonly maxSide?: number
   readonly resolveOptions?: ImageSourceResolveOptions
 }
 
@@ -78,6 +80,7 @@ export class ImageSourceCache {
     )
     return this.getOrLoad(sourceUrl, {
       maxPixels,
+      maxSide: options.maxSide,
       resolveOptions: options.resolveOptions,
     })
   }
@@ -216,12 +219,18 @@ function resolveTargetSize(bitmap: ImageBitmap, options: LoadImageSourceOptions)
   if (pixelCount > (options.maxPixels ?? DEFAULT_FULL_SIZE_SOURCE_MAX_PIXELS)) {
     throw createCacheError('too-large')
   }
-  return { width: bitmap.width, height: bitmap.height }
+  const maxSide = Math.max(1, Math.floor(options.maxSide ?? Number.POSITIVE_INFINITY))
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+  return {
+    width: Math.max(1, Math.round(bitmap.width * scale)),
+    height: Math.max(1, Math.round(bitmap.height * scale)),
+  }
 }
 
 function createImageSourceCacheKey(sourceUrl: string, options: LoadImageSourceOptions) {
   return [
     options.maxPixels ?? 'unbounded',
+    options.maxSide ?? 'full-side',
     options.resolveOptions?.allowSameOriginUploads ?? 'default-uploads',
     options.resolveOptions?.blockExternal ?? 'default-external',
     sourceUrl,

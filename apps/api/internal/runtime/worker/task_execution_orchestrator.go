@@ -87,7 +87,10 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
-		if resetErr := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, "确认任务运行租约失败"); resetErr != nil {
+		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
+			Assignment: assignment,
+			Reason:     "确认任务运行租约失败",
+		}); resetErr != nil {
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return nil
@@ -109,7 +112,10 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 		slog.Warn("start task attempt failed", "task_id", task.TaskID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
-		if resetErr := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, "记录任务执行尝试失败"); resetErr != nil {
+		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
+			Assignment: assignment,
+			Reason:     "记录任务执行尝试失败",
+		}); resetErr != nil {
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return nil
@@ -231,7 +237,12 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 		return nil
 	}
 
-	requeued, requeueErr := o.taskRuntime.RequeueTaskForFailoverWithAttempts(ctx, assignment, reason, requeueFinish, finalFailFinish)
+	requeued, requeueErr := o.taskRuntime.RequeueTaskForFailover(ctx, taskruntime.RequeueForFailoverInput{
+		Assignment:             assignment,
+		Reason:                 reason,
+		RequeuedAttemptFinish:  &requeueFinish,
+		FinalFailAttemptFinish: &finalFailFinish,
+	})
 	if requeueErr != nil {
 		if errors.Is(requeueErr, taskruntime.ErrTaskNotFound) || errors.Is(requeueErr, taskruntime.ErrTaskTerminal) || errors.Is(requeueErr, taskruntime.ErrTaskStateConflict) {
 			o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
@@ -275,7 +286,10 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks
 		return nil
 	}
 	if assignment.AccountID != 0 && assignment.LeaseToken != "" {
-		if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, reason); err != nil && !isTaskConvergedError(err) {
+		if err := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
+			Assignment: assignment,
+			Reason:     reason,
+		}); err != nil && !isTaskConvergedError(err) {
 			slog.Warn("reset task running to pending failed", "task_id", task.TaskID, "account_id", assignment.AccountID, "err", err)
 		}
 	}
@@ -303,18 +317,22 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 	defer cleanupCancel()
 
 	var err error
-	if attemptFinish != nil {
-		err = o.taskRuntime.MarkTaskCompletedWithOutputsAndAttempt(cleanupCtx, assignment, result, outputs, *attemptFinish)
-	} else {
-		err = o.taskRuntime.MarkTaskCompletedWithOutputs(cleanupCtx, assignment, result, outputs)
-	}
+	err = o.taskRuntime.CompleteTask(cleanupCtx, taskruntime.CompleteTaskInput{
+		Assignment:    assignment,
+		Result:        result,
+		Outputs:       outputs,
+		AttemptFinish: attemptFinish,
+	})
 	if err != nil {
 		if isTaskConvergedError(err) {
 			slog.Info("task converged before completion writeback", "task_id", task.TaskID, "err", err)
 			return false, nil
 		}
 		slog.Warn("mark task completed failed", "task_id", task.TaskID, "err", err)
-		if failErr := o.taskRuntime.MarkTaskFailedWithLease(cleanupCtx, assignment, "任务结果保存失败，请稍后重试"); failErr != nil {
+		if failErr := o.taskRuntime.FailTask(cleanupCtx, taskruntime.FailTaskInput{
+			Assignment: assignment,
+			Reason:     "任务结果保存失败，请稍后重试",
+		}); failErr != nil {
 			slog.Warn("mark task failed after completion writeback failed", "task_id", task.TaskID, "err", failErr)
 		}
 		return false, err
@@ -352,18 +370,12 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	var err error
-	if assignment.HasLeaseIdentity() {
-		if attemptFinish != nil {
-			err = o.taskRuntime.MarkTaskFailedWithLeaseAndAttempt(cleanupCtx, assignment, reason, *attemptFinish)
-		} else {
-			err = o.taskRuntime.MarkTaskFailedWithLease(cleanupCtx, assignment, reason)
-		}
-	} else if attemptFinish != nil {
-		err = o.taskRuntime.MarkTaskFailedWithAttempt(cleanupCtx, task.TaskID, reason, *attemptFinish)
-	} else {
-		err = o.taskRuntime.MarkTaskFailed(cleanupCtx, task.TaskID, reason)
-	}
+	err := o.taskRuntime.FailTask(cleanupCtx, taskruntime.FailTaskInput{
+		TaskID:        task.TaskID,
+		Assignment:    assignment,
+		Reason:        reason,
+		AttemptFinish: attemptFinish,
+	})
 	if err != nil {
 		if isTaskConvergedError(err) {
 			slog.Info("task converged before failure writeback", "task_id", task.TaskID, "err", err)
@@ -421,12 +433,11 @@ func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Conte
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	var err error
-	if attemptFinish != nil {
-		err = o.taskRuntime.ResetTaskRunningToPendingWithAttempt(cleanupCtx, assignment, "worker context interrupted, waiting retry", *attemptFinish)
-	} else {
-		err = o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, "worker context interrupted, waiting retry")
-	}
+	err := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
+		Assignment:    assignment,
+		Reason:        "worker context interrupted, waiting retry",
+		AttemptFinish: attemptFinish,
+	})
 	if err != nil {
 		if errors.Is(err, taskruntime.ErrTaskNotFound) || errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskStateConflict) {
 			slog.Info("interrupted task already converged", "task_id", task.TaskID, "err", err)

@@ -77,6 +77,7 @@ function createRuntimeMock(
 ): ImageProcessingRuntime {
   return {
     renderFinal,
+    renderPreview: vi.fn<ImageProcessingRuntime['renderPreview']>(),
     cancel: vi.fn(),
     dispose: vi.fn(),
   }

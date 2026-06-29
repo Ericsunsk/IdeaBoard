@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/runtime/taskruntime"
 	"ideaboard/api/internal/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -82,10 +83,10 @@ func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *tasks.TaskP
 	return nil
 }
 
-func (f *fakeRuntime) MarkTaskFailed(_ context.Context, taskID string, reason string) error {
+func (f *fakeRuntime) FailTask(_ context.Context, input taskruntime.FailTaskInput) error {
 	f.failedCalls++
-	f.lastFailedTask = taskID
-	f.lastFailedCause = reason
+	f.lastFailedTask = input.TaskID
+	f.lastFailedCause = input.Reason
 	return nil
 }
 

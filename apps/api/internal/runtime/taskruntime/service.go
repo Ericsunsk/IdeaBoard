@@ -58,6 +58,33 @@ type Service struct {
 	taskEvents  events.TaskStatusPublisher
 }
 
+type CompleteTaskInput struct {
+	Assignment    taskqueue.TaskAssignment
+	Result        string
+	Outputs       []tasks.TaskOutput
+	AttemptFinish *tasks.TaskAttemptFinish
+}
+
+type FailTaskInput struct {
+	TaskID        string
+	Assignment    taskqueue.TaskAssignment
+	Reason        string
+	AttemptFinish *tasks.TaskAttemptFinish
+}
+
+type ResetRunningTaskInput struct {
+	Assignment    taskqueue.TaskAssignment
+	Reason        string
+	AttemptFinish *tasks.TaskAttemptFinish
+}
+
+type RequeueForFailoverInput struct {
+	Assignment             taskqueue.TaskAssignment
+	Reason                 string
+	RequeuedAttemptFinish  *tasks.TaskAttemptFinish
+	FinalFailAttemptFinish *tasks.TaskAttemptFinish
+}
+
 func NewService(
 	accountRepo AccountStore,
 	taskRepo TaskStore,
@@ -158,30 +185,31 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 }
 
 func (s *Service) MarkTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string) error {
-	return s.markTaskCompleted(ctx, assignment, result, nil, nil)
+	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result})
 }
 
 func (s *Service) MarkTaskCompletedWithAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, result string, finish tasks.TaskAttemptFinish) error {
-	return s.markTaskCompleted(ctx, assignment, result, nil, &finish)
+	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result, AttemptFinish: &finish})
 }
 
 func (s *Service) MarkTaskCompletedWithOutputs(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput) error {
-	return s.markTaskCompleted(ctx, assignment, result, outputs, nil)
+	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result, Outputs: outputs})
 }
 
 func (s *Service) MarkTaskCompletedWithOutputsAndAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, finish tasks.TaskAttemptFinish) error {
-	return s.markTaskCompleted(ctx, assignment, result, outputs, &finish)
+	return s.CompleteTask(ctx, CompleteTaskInput{Assignment: assignment, Result: result, Outputs: outputs, AttemptFinish: &finish})
 }
 
-func (s *Service) markTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) error {
+func (s *Service) CompleteTask(ctx context.Context, input CompleteTaskInput) error {
+	assignment := input.Assignment
 	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
-	now := taskTerminalTime(attemptFinish)
-	if err := validateTaskOutputs(assignment.TaskID, outputs); err != nil {
+	now := taskTerminalTime(input.AttemptFinish)
+	if err := validateTaskOutputs(assignment.TaskID, input.Outputs); err != nil {
 		return err
 	}
-	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, result, now, outputs, attemptFinish)
+	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Result, now, input.Outputs, input.AttemptFinish)
 	if err != nil {
 		return err
 	}
@@ -204,25 +232,19 @@ func (s *Service) markTaskCompleted(ctx context.Context, assignment taskqueue.Ta
 }
 
 func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason string) error {
-	return s.markTaskFailed(ctx, taskID, reason, nil)
+	return s.FailTask(ctx, FailTaskInput{TaskID: taskID, Reason: reason})
 }
 
 func (s *Service) MarkTaskFailedWithAttempt(ctx context.Context, taskID string, reason string, finish tasks.TaskAttemptFinish) error {
-	return s.markTaskFailed(ctx, taskID, reason, &finish)
+	return s.FailTask(ctx, FailTaskInput{TaskID: taskID, Reason: reason, AttemptFinish: &finish})
 }
 
 func (s *Service) MarkTaskFailedWithLease(ctx context.Context, assignment taskqueue.TaskAssignment, reason string) error {
-	if !assignment.HasLeaseIdentity() {
-		return ErrTaskStateConflict
-	}
-	return s.markTaskFailedWithAssignment(ctx, assignment, reason, nil)
+	return s.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: reason})
 }
 
 func (s *Service) MarkTaskFailedWithLeaseAndAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, finish tasks.TaskAttemptFinish) error {
-	if !assignment.HasLeaseIdentity() {
-		return ErrTaskStateConflict
-	}
-	return s.markTaskFailedWithAssignment(ctx, assignment, reason, &finish)
+	return s.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: reason, AttemptFinish: &finish})
 }
 
 func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error {
@@ -240,7 +262,7 @@ func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID
 		return ErrTaskTerminal
 	}
 	if task.Status == tasks.StatusPending {
-		return s.MarkTaskFailed(ctx, taskID, reason)
+		return s.FailTask(ctx, FailTaskInput{TaskID: taskID, Reason: reason})
 	}
 	if task.Status != tasks.StatusRunning {
 		return ErrTaskStateConflict
@@ -255,12 +277,23 @@ func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID
 	if !assignment.HasLeaseIdentity() || !taskqueue.LeaseBelongsToRiverJob(task.LeaseToken, riverJobID) {
 		return ErrTaskStateConflict
 	}
-	return s.MarkTaskFailedWithLease(ctx, assignment, reason)
+	return s.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: reason})
 }
 
-func (s *Service) markTaskFailed(ctx context.Context, taskID string, reason string, attemptFinish *tasks.TaskAttemptFinish) error {
-	now := taskTerminalTime(attemptFinish)
-	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, []string{tasks.StatusPending}, reason, formatTaskFailureResult(taskID, reason), now, attemptFinish)
+func (s *Service) FailTask(ctx context.Context, input FailTaskInput) error {
+	if input.Assignment.HasLeaseIdentity() {
+		return s.failRunningTaskWithLease(ctx, input)
+	}
+	return s.failPendingTask(ctx, input)
+}
+
+func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) error {
+	taskID := input.TaskID
+	if taskID == "" {
+		taskID = input.Assignment.TaskID
+	}
+	now := taskTerminalTime(input.AttemptFinish)
+	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, pendingOnly(), input.Reason, formatTaskFailureResult(taskID, input.Reason), now, input.AttemptFinish)
 	if err != nil {
 		return err
 	}
@@ -285,12 +318,13 @@ func (s *Service) markTaskFailed(ctx context.Context, taskID string, reason stri
 	return ErrTaskStateConflict
 }
 
-func (s *Service) markTaskFailedWithAssignment(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, attemptFinish *tasks.TaskAttemptFinish) error {
+func (s *Service) failRunningTaskWithLease(ctx context.Context, input FailTaskInput) error {
+	assignment := input.Assignment
 	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
-	now := taskTerminalTime(attemptFinish)
-	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, reason, formatTaskFailureResult(assignment.TaskID, reason), now, attemptFinish)
+	now := taskTerminalTime(input.AttemptFinish)
+	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.AttemptFinish)
 	if err != nil {
 		return err
 	}
@@ -316,24 +350,25 @@ func (s *Service) markTaskFailedWithAssignment(ctx context.Context, assignment t
 }
 
 func (s *Service) ResetTaskRunningToPending(ctx context.Context, assignment taskqueue.TaskAssignment, reason string) error {
-	return s.resetTaskRunningToPending(ctx, assignment, reason, nil)
+	return s.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: assignment, Reason: reason})
 }
 
 func (s *Service) ResetTaskRunningToPendingWithAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, finish tasks.TaskAttemptFinish) error {
-	return s.resetTaskRunningToPending(ctx, assignment, reason, &finish)
+	return s.ResetRunningTask(ctx, ResetRunningTaskInput{Assignment: assignment, Reason: reason, AttemptFinish: &finish})
 }
 
-func (s *Service) resetTaskRunningToPending(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, attemptFinish *tasks.TaskAttemptFinish) error {
+func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskInput) error {
+	assignment := input.Assignment
 	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
 
 	errMsg := ""
-	if reason != "" {
-		errMsg = reason
+	if input.Reason != "" {
+		errMsg = input.Reason
 	}
 
-	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, attemptFinish)
+	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, input.AttemptFinish)
 	if err != nil {
 		return err
 	}
@@ -358,19 +393,16 @@ func (s *Service) resetTaskRunningToPending(ctx context.Context, assignment task
 	return ErrTaskStateConflict
 }
 
-func (s *Service) RequeueTaskForFailover(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string) (bool, error) {
-	return s.requeueTaskForFailover(ctx, assignment, errMsg, nil, nil)
-}
-
 func (s *Service) RequeueTaskForFailoverWithFinalAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, finish tasks.TaskAttemptFinish) (bool, error) {
-	return s.requeueTaskForFailover(ctx, assignment, errMsg, nil, &finish)
+	return s.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: assignment, Reason: errMsg, FinalFailAttemptFinish: &finish})
 }
 
 func (s *Service) RequeueTaskForFailoverWithAttempts(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, requeuedFinish tasks.TaskAttemptFinish, finalFinish tasks.TaskAttemptFinish) (bool, error) {
-	return s.requeueTaskForFailover(ctx, assignment, errMsg, &requeuedFinish, &finalFinish)
+	return s.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: assignment, Reason: errMsg, RequeuedAttemptFinish: &requeuedFinish, FinalFailAttemptFinish: &finalFinish})
 }
 
-func (s *Service) requeueTaskForFailover(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, requeuedAttemptFinish *tasks.TaskAttemptFinish, finalAttemptFinish *tasks.TaskAttemptFinish) (bool, error) {
+func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFailoverInput) (bool, error) {
+	assignment := input.Assignment
 	if !assignment.HasLeaseIdentity() {
 		return false, ErrTaskStateConflict
 	}
@@ -395,7 +427,7 @@ func (s *Service) requeueTaskForFailover(ctx context.Context, assignment taskque
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, requeuedAttemptFinish)
+		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Reason, input.RequeuedAttemptFinish)
 		if err != nil {
 			return false, err
 		}
@@ -406,8 +438,8 @@ func (s *Service) requeueTaskForFailover(ctx context.Context, assignment taskque
 		return false, ErrTaskStateConflict
 	}
 
-	now := taskTerminalTime(finalAttemptFinish)
-	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, formatTaskFailureResult(assignment.TaskID, errMsg), now, finalAttemptFinish)
+	now := taskTerminalTime(input.FinalFailAttemptFinish)
+	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.FinalFailAttemptFinish)
 	if err != nil {
 		return false, err
 	}
@@ -430,6 +462,14 @@ func (s *Service) requeueTaskForFailover(ctx context.Context, assignment taskque
 		return false, ErrTaskTerminal
 	}
 	return false, ErrTaskStateConflict
+}
+
+func pendingOnly() []string {
+	return []string{tasks.StatusPending}
+}
+
+func runningOnly() []string {
+	return []string{tasks.StatusRunning}
 }
 
 func taskTerminalTime(attemptFinish *tasks.TaskAttemptFinish) time.Time {

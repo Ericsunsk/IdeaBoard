@@ -90,12 +90,14 @@ describe('image adjustment processing runtime', () => {
 function createBackendStub(): ImageProcessingBackend {
   return {
     renderFinal: vi.fn<ImageProcessingBackend['renderFinal']>(),
+    renderPreview: vi.fn<ImageProcessingBackend['renderPreview']>(),
   }
 }
 
 function createRuntimeStub(): ImageProcessingRuntime {
   return {
     renderFinal: vi.fn<ImageProcessingRuntime['renderFinal']>(),
+    renderPreview: vi.fn<ImageProcessingRuntime['renderPreview']>(),
     cancel: vi.fn<ImageProcessingRuntime['cancel']>(),
     dispose: vi.fn<ImageProcessingRuntime['dispose']>(),
   }

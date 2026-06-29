@@ -171,6 +171,62 @@ describe('createMainThreadImageProcessingBackend', () => {
     )
   })
 
+  it('renders preview output through the injected plan executor and returns the decoded source', async () => {
+    const source = createImageSource('preview-source', [10, 20, 30, 255])
+    const sourceCache = createSourceCache({ fullSize: source })
+    const adjusted = makeImageData([245, 235, 225, 255])
+    const planExecutor = createPlanExecutor(adjusted)
+    const backend = createMainThreadImageProcessingBackend({ sourceCache, planExecutor })
+
+    const result = await backend.renderPreview({
+      source: { url: 'https://example.com/source.png' },
+      plan: createInvertPlan(),
+      sizeStrategy: { maxSide: 960 },
+      context: createTaskContext(),
+    })
+
+    expect(sourceCache.getFullSizeSource).toHaveBeenCalledWith('https://example.com/source.png', {
+      maxSide: 960,
+    })
+    expect(planExecutor.execute).toHaveBeenCalledWith({
+      imageData: expect.objectContaining({
+        data: new Uint8ClampedArray([10, 20, 30, 255]),
+      }),
+      plan: createInvertPlan(),
+      signal: expect.any(AbortSignal),
+      onProgress: expect.any(Function),
+    })
+    expect(result).toMatchObject({
+      sourceImageData: source.imageData,
+      previewImageData: adjusted,
+      width: 1,
+      height: 1,
+    })
+    expect(source.context.putImageData).not.toHaveBeenCalled()
+    expect(sourceCache.releaseSource).not.toHaveBeenCalled()
+  })
+
+  it('decodes preview source without executing a neutral plan', async () => {
+    const source = createImageSource('preview-source', [10, 20, 30, 255])
+    const sourceCache = createSourceCache({ fullSize: source })
+    const planExecutor = createPlanExecutor(makeImageData([245, 235, 225, 255]))
+    const backend = createMainThreadImageProcessingBackend({ sourceCache, planExecutor })
+
+    const result = await backend.renderPreview({
+      source: { url: 'https://example.com/source.png' },
+      plan: [],
+      context: createTaskContext(),
+    })
+
+    expect(planExecutor.execute).not.toHaveBeenCalled()
+    expect(result.sourceImageData).toBe(source.imageData)
+    expect(result.previewImageData).toMatchObject({
+      data: new Uint8ClampedArray([10, 20, 30, 255]),
+    })
+    expect(result.previewImageData).not.toBe(source.imageData)
+    expect(sourceCache.releaseSource).not.toHaveBeenCalled()
+  })
+
   it('disposes the source cache with the default CPU executor', () => {
     const sourceCache = createSourceCache({})
     const backend = createMainThreadImageProcessingBackend({ sourceCache })
@@ -350,18 +406,20 @@ function createPlanExecutor(output: ImageData): ImageAdjustmentPlanExecutor {
 }
 
 function makeImageData(values: number[]): ImageData {
-  class TestImageDataImpl {
-    data: Uint8ClampedArray
-    width: number
-    height: number
-
-    constructor(data: Uint8ClampedArray, width: number, height: number) {
-      this.data = data
-      this.width = width
-      this.height = height
-    }
-  }
+  vi.stubGlobal('ImageData', TestImageDataImpl)
   return new TestImageDataImpl(new Uint8ClampedArray(values), values.length / 4, 1) as TestImageData
+}
+
+class TestImageDataImpl {
+  data: Uint8ClampedArray
+  width: number
+  height: number
+
+  constructor(data: Uint8ClampedArray, width: number, height: number) {
+    this.data = data
+    this.width = width
+    this.height = height
+  }
 }
 
 function createInvertPlan(): ImageAdjustmentPlan {

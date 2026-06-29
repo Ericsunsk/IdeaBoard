@@ -60,6 +60,26 @@ export type RenderFinalInput = {
   onProgress?: (progress: ImageProcessingProgress) => void
 }
 
+export type ImageProcessingPreviewSizeStrategy = {
+  maxSide: number
+}
+
+export type RenderPreviewInput = {
+  source: ImageProcessingSource
+  plan: ImageProcessingPlan
+  taskId?: string
+  latestOnly?: boolean
+  sizeStrategy?: ImageProcessingPreviewSizeStrategy
+  onProgress?: (progress: ImageProcessingProgress) => void
+}
+
+export type RenderPreviewOutput = {
+  sourceImageData: ImageData
+  previewImageData: ImageData
+  width: number
+  height: number
+}
+
 export type RenderFinalOutput = {
   file: File
   width?: number
@@ -94,6 +114,7 @@ export type ImageProcessingTaskResult<TOutput> =
   | ImageProcessingFailedResult
 
 export type RenderFinalResult = ImageProcessingTaskResult<RenderFinalOutput>
+export type RenderPreviewResult = ImageProcessingTaskResult<RenderPreviewOutput>
 
 export type ImageProcessingBackendTaskContext = {
   taskId: string
@@ -110,14 +131,23 @@ export type ImageProcessingBackendFinalInput = Omit<
   context: ImageProcessingBackendTaskContext
 }
 
+export type ImageProcessingBackendPreviewInput = Omit<
+  RenderPreviewInput,
+  'latestOnly' | 'onProgress' | 'taskId'
+> & {
+  context: ImageProcessingBackendTaskContext
+}
+
 export type ImageProcessingBackend = {
   renderFinal(input: ImageProcessingBackendFinalInput): Promise<RenderFinalOutput>
+  renderPreview(input: ImageProcessingBackendPreviewInput): Promise<RenderPreviewOutput>
   cancel?(taskId?: string): void
   dispose?(): void
 }
 
 export type ImageProcessingRuntime = {
   renderFinal(input: RenderFinalInput): Promise<RenderFinalResult>
+  renderPreview(input: RenderPreviewInput): Promise<RenderPreviewResult>
   cancel(taskId?: string): void
   dispose(): void
 }
