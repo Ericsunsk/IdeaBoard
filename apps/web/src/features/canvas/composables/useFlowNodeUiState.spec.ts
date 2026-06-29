@@ -92,4 +92,53 @@ describe('useFlowNodeUiState', () => {
     expect(pendingInputs?.image).toBe(false)
     expect(fusionState.primaryAction).toEqual({ label: '融合', disabled: false })
   })
+
+  it('marks a multi-image input as pending when any connected image is still running', () => {
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode(
+        'image-ready',
+        'image',
+        makeImageSnapshot({
+          id: 1,
+          sourceImageUrl: 'https://example.com/ready.png',
+          outputStatus: 'ready',
+        }),
+      ),
+      makeFlowNode(
+        'image-running',
+        'image',
+        makeImageSnapshot({
+          id: 2,
+          sourceImageUrl: 'https://example.com/running.png',
+          outputStatus: 'running',
+        }),
+      ),
+      makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot()),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([
+      {
+        id: 'edge-ready',
+        source: 'image-ready',
+        sourceHandle: 'out:image',
+        target: 'fusion-1',
+        targetHandle: 'in:image',
+      },
+      {
+        id: 'edge-running',
+        source: 'image-running',
+        sourceHandle: 'out:image',
+        target: 'fusion-1',
+        targetHandle: 'in:image',
+      },
+    ] as Edge[])
+
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const fusionState = getFlowNodeUiStateCached('fusion-1')
+    const pendingInputs = fusionState.connection.pending as
+      | Record<string, boolean | undefined>
+      | undefined
+
+    expect(pendingInputs?.image).toBe(true)
+    expect(fusionState.primaryAction).toEqual({ label: '等待 Image', disabled: true })
+  })
 })

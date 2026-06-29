@@ -29,6 +29,10 @@ type FlowEdgeLike = {
   targetHandle?: string | null
 }
 type FlowNodeLike = { id: string; data?: { kind?: string; snapshotNode?: unknown } }
+type IndexedFlowEdge = FlowEdgeLike & {
+  sourcePort: string
+  targetPort: string
+}
 
 type UseFlowNodeUiStateOptions = {
   nodes: Ref<Node[]>
@@ -44,12 +48,48 @@ type FlowNodeConnectionStatus = {
   outgoing: Partial<Record<CanvasConnectionPort, boolean>>
 }
 
+type FlowConnectionIndex = {
+  incomingByNodeId: Map<string, IndexedFlowEdge[]>
+  outgoingByNodeId: Map<string, IndexedFlowEdge[]>
+}
+
+function appendIndexedEdge(
+  edgeMap: Map<string, IndexedFlowEdge[]>,
+  nodeId: string,
+  edge: IndexedFlowEdge,
+) {
+  const existing = edgeMap.get(nodeId)
+  if (existing) {
+    existing.push(edge)
+    return
+  }
+  edgeMap.set(nodeId, [edge])
+}
+
+function createFlowConnectionIndex(flowEdges: FlowEdgeLike[]): FlowConnectionIndex {
+  const incomingByNodeId = new Map<string, IndexedFlowEdge[]>()
+  const outgoingByNodeId = new Map<string, IndexedFlowEdge[]>()
+
+  flowEdges.forEach((edge) => {
+    const indexedEdge: IndexedFlowEdge = {
+      ...edge,
+      sourcePort: parseHandlePort(edge.sourceHandle),
+      targetPort: parseHandlePort(edge.targetHandle),
+    }
+    appendIndexedEdge(incomingByNodeId, edge.target, indexedEdge)
+    appendIndexedEdge(outgoingByNodeId, edge.source, indexedEdge)
+  })
+
+  return { incomingByNodeId, outgoingByNodeId }
+}
+
 export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
   const flowNodeUiStateCache = computed(() => {
     const result: Record<string, NodeUiState | PromptNodeUiState> = {}
     const flowNodes = options.nodes.value as FlowNodeLike[]
     const flowEdges = options.edges.value as FlowEdgeLike[]
     const nodeMap = new Map(flowNodes.map((node) => [node.id, node]))
+    const connectionIndex = createFlowConnectionIndex(flowEdges)
 
     function getSnapshotNode(nodeId: string): CanvasNodeItem | null {
       const node = nodeMap.get(nodeId)
@@ -94,36 +134,33 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
       const incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>> = {}
       const outgoing: Partial<Record<CanvasConnectionPort, boolean>> = {}
+      const incomingEdges = connectionIndex.incomingByNodeId.get(nodeId) ?? []
+      const outgoingEdges = connectionIndex.outgoingByNodeId.get(nodeId) ?? []
 
       getCanvasNodeVisibleInputPorts(nodeType).forEach((portContract) => {
-        const matchedEdge = flowEdges.find(
-          (edge) =>
-            edge.target === nodeId && parseHandlePort(edge.targetHandle) === portContract.port,
-        )
-        const connected = !!matchedEdge
+        const matchedEdges = incomingEdges.filter((edge) => edge.targetPort === portContract.port)
+        const connected = matchedEdges.length > 0
         incoming[portContract.port] = connected
-        if (!connected || !matchedEdge) {
+        if (!connected) {
           pendingIncoming[portContract.port] = false
           return
         }
-        const sourceType = getNodeType(matchedEdge.source)
+        const sourceType = getNodeType(matchedEdges[0].source)
         if (sourceType) incomingSourceKind[portContract.port] = sourceType
         if (portContract.port === 'image') {
-          pendingIncoming[portContract.port] = !resolveConnectedImageReady(matchedEdge.source)
+          pendingIncoming[portContract.port] = matchedEdges.some(
+            (edge) => !resolveConnectedImageReady(edge.source),
+          )
           return
         }
         pendingIncoming[portContract.port] = false
       })
 
       const outputPort = getCanvasNodePrimaryOutputPort(nodeType)
-      outgoing[outputPort] = flowEdges.some(
-        (edge) => edge.source === nodeId && parseHandlePort(edge.sourceHandle) === outputPort,
-      )
+      outgoing[outputPort] = outgoingEdges.some((edge) => edge.sourcePort === outputPort)
 
       return {
-        hasAnyConnection: flowEdges.some(
-          (edge) => edge.source === nodeId || edge.target === nodeId,
-        ),
+        hasAnyConnection: incomingEdges.length > 0 || outgoingEdges.length > 0,
         incoming,
         pendingIncoming,
         incomingSourceKind,

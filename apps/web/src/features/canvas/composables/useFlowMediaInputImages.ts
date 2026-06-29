@@ -1,14 +1,16 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import type {
   CanvasNodeItem,
   FusionNodeItem,
+  ImageNodeItem,
   PromptNodeInputImage,
   PromptNodeItem,
 } from '../../canvas-board/domain'
 import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
+import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 
 export type MediaInputImage = {
   id: string
@@ -48,6 +50,12 @@ type LinkedNodePreviewImage = {
 
 type MediaInputSnapshotNode = PromptNodeItem | FusionNodeItem
 type MediaInputNodeKind = MediaInputSnapshotNode['type']
+type FlowMediaInputNode = Node & {
+  data?: {
+    kind?: string
+    snapshotNode?: unknown
+  }
+}
 
 function isMediaInputSnapshotNode(
   snapshotNode: CanvasNodeItem,
@@ -59,64 +67,171 @@ function isMediaInputNodeKind(value: unknown): value is MediaInputNodeKind {
   return value === 'prompt' || value === 'fusion'
 }
 
+function isMediaInputFlowNode(node: FlowMediaInputNode): boolean {
+  return node.data?.kind === 'prompt' || node.data?.kind === 'fusion'
+}
+
+function isImageInputHandle(handle: string | null | undefined) {
+  return String(handle ?? '') === 'in:image'
+}
+
+function createNodeById(nodes: FlowMediaInputNode[]) {
+  return new Map(nodes.map((node) => [node.id, node]))
+}
+
+function createImageInputEdgesByTargetId(edges: Edge[]) {
+  const result = new Map<string, Edge[]>()
+  edges.forEach((edge) => {
+    if (!isImageInputHandle(edge.targetHandle)) return
+    const existing = result.get(edge.target)
+    if (existing) {
+      existing.push(edge)
+      return
+    }
+    result.set(edge.target, [edge])
+  })
+  return result
+}
+
+function createMediaInputSnapshotSignature(snapshotNode: unknown) {
+  if (!snapshotNode || typeof snapshotNode !== 'object') return ''
+  const record = snapshotNode as { inputImages?: unknown }
+  if (!Array.isArray(record.inputImages)) return ''
+  return record.inputImages
+    .map((item) => {
+      const input = item as {
+        id?: unknown
+        sourceType?: unknown
+        sourceId?: unknown
+        url?: unknown
+        ratio?: unknown
+      }
+      return [input.id, input.sourceType, input.sourceId, input.url, input.ratio].join(',')
+    })
+    .join(';')
+}
+
+function createSourceImageSignature(node: FlowMediaInputNode) {
+  const kind = node.data?.kind
+  const snapshot = node.data?.snapshotNode
+  if (!snapshot || typeof snapshot !== 'object') return ''
+  if (kind === 'image') {
+    const display = resolveImageNodeDisplayPayload(snapshot as ImageNodeItem)
+    return display ? `${display.url},${display.ratio}` : ''
+  }
+  const outputImages = Array.isArray((snapshot as { outputImages?: unknown }).outputImages)
+    ? ((snapshot as { outputImages: Array<{ url?: unknown; ratio?: unknown }> }).outputImages)
+    : []
+  const latest = outputImages[outputImages.length - 1]
+  return latest ? `${latest.url ?? ''},${latest.ratio ?? ''}` : ''
+}
+
+function areMediaInputImagesEqual(current: MediaInputImage[], next: MediaInputImage[]) {
+  return (
+    current.length === next.length &&
+    current.every(
+      (item, idx) =>
+        item.id === next[idx]?.id &&
+        item.sourceType === next[idx]?.sourceType &&
+        item.sourceId === next[idx]?.sourceId &&
+        item.url === next[idx]?.url &&
+        item.ratio === next[idx]?.ratio,
+    )
+  )
+}
+
+function createSyncedMediaInputImages(
+  current: MediaInputImage[],
+  linkedImages: LinkedNodePreviewImage[],
+  nodeType: MediaInputNodeKind,
+) {
+  const linkedBySourceId = new Map(linkedImages.map((item) => [item.sourceId, item]))
+  const nextImages = current
+    .map((item) => {
+      const sourceType = item.sourceType
+      if (sourceType === 'external') return item
+      const sourceId = item.sourceId
+      return sourceId ? linkedBySourceId.get(sourceId) : null
+    })
+    .filter((item): item is MediaInputImage => !!item)
+  const nextNodeSourceIds = new Set(
+    nextImages.filter((item) => item.sourceType === 'node').map((item) => item.sourceId),
+  )
+  nextImages.push(...linkedImages.filter((item) => !nextNodeSourceIds.has(item.sourceId)))
+  const inputLimit = getCanvasNodeImageInputLimit(nodeType)
+  return nextImages.slice(0, inputLimit)
+}
+
 export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions) {
-  watch(
-    [options.nodes, options.edges],
-    () => {
-      const flowNodes = options.nodes.value
-      const flowEdges = options.edges.value
-      flowNodes
-        .filter((node) => node.data?.kind === 'prompt' || node.data?.kind === 'fusion')
-        .forEach((mediaInputNode) => {
-          const linkedImages = flowEdges
-            .filter((edge) => edge.target === mediaInputNode.id && edge.targetHandle === 'in:image')
-            .map((edge) => resolveNodePreviewImageById(edge.source))
-            .filter((item): item is LinkedNodePreviewImage => !!item && !!item.url)
-          const linkedBySourceId = new Map(linkedImages.map((item) => [item.sourceId, item]))
-          options.updateSnapshotNodeBase(
-            mediaInputNode.id,
-            (snapshotNode) => {
-              if (!isMediaInputSnapshotNode(snapshotNode)) return snapshotNode
-              const current = snapshotNode.inputImages
-              const nextImages = current
-                .map((item) => {
-                  const sourceType = item.sourceType
-                  if (sourceType === 'external') return item
-                  const sourceId = item.sourceId
-                  return sourceId ? linkedBySourceId.get(sourceId) : null
-                })
-                .filter((item): item is MediaInputImage => !!item)
-              const nextNodeSourceIds = new Set(
-                nextImages
-                  .filter((item) => item.sourceType === 'node')
-                  .map((item) => item.sourceId),
-              )
-              nextImages.push(
-                ...linkedImages.filter((item) => !nextNodeSourceIds.has(item.sourceId)),
-              )
-              const inputLimit = getCanvasNodeImageInputLimit(snapshotNode.type)
-              const limitedNextImages = nextImages.slice(0, inputLimit)
-              const same =
-                current.length === limitedNextImages.length &&
-                current.every(
-                  (item, idx) =>
-                    item.id === limitedNextImages[idx]?.id &&
-                    item.sourceType === limitedNextImages[idx]?.sourceType &&
-                    item.sourceId === limitedNextImages[idx]?.sourceId &&
-                    item.url === limitedNextImages[idx]?.url &&
-                    item.ratio === limitedNextImages[idx]?.ratio,
-                )
-              return same ? snapshotNode : { ...snapshotNode, inputImages: limitedNextImages }
-            },
-            { history: false, dirty: true },
-          )
-        })
-    },
-    { deep: true },
+  const nodeById = computed(() => createNodeById(options.nodes.value as FlowMediaInputNode[]))
+  const imageInputEdgesByTargetId = computed(() =>
+    createImageInputEdgesByTargetId(options.edges.value),
   )
 
+  watch(createMediaInputSyncSignature, syncLinkedMediaInputs)
+
+  function createMediaInputSyncSignature() {
+    const flowNodes = options.nodes.value as FlowMediaInputNode[]
+    const sourceIds = new Set<string>()
+    const parts: string[] = []
+
+    options.edges.value.forEach((edge) => {
+      if (!isImageInputHandle(edge.targetHandle)) return
+      sourceIds.add(edge.source)
+      parts.push(`edge:${edge.source}>${edge.target}`)
+    })
+
+    flowNodes.forEach((node) => {
+      if (isMediaInputFlowNode(node)) {
+        parts.push(`target:${node.id}:${createMediaInputSnapshotSignature(node.data?.snapshotNode)}`)
+        return
+      }
+      if (sourceIds.has(node.id)) {
+        parts.push(`source:${node.id}:${createSourceImageSignature(node)}`)
+      }
+    })
+
+    return parts.sort().join('|')
+  }
+
+  function syncLinkedMediaInputs() {
+    const flowNodes = options.nodes.value as FlowMediaInputNode[]
+    flowNodes.filter(isMediaInputFlowNode).forEach((mediaInputNode) => {
+      const currentSnapshotNode = mediaInputNode.data?.snapshotNode
+      if (!currentSnapshotNode || typeof currentSnapshotNode !== 'object') return
+      if (!isMediaInputSnapshotNode(currentSnapshotNode as CanvasNodeItem)) return
+      const linkedImages = resolveLinkedImagesForTarget(mediaInputNode.id)
+      const current = currentSnapshotNode.inputImages
+      const nextImages = createSyncedMediaInputImages(
+        current,
+        linkedImages,
+        currentSnapshotNode.type,
+      )
+      if (areMediaInputImagesEqual(current, nextImages)) return
+
+      options.updateSnapshotNodeBase(
+        mediaInputNode.id,
+        (snapshotNode) => {
+          if (!isMediaInputSnapshotNode(snapshotNode)) return snapshotNode
+          const current = snapshotNode.inputImages
+          const nextImages = createSyncedMediaInputImages(current, linkedImages, snapshotNode.type)
+          return areMediaInputImagesEqual(current, nextImages)
+            ? snapshotNode
+            : { ...snapshotNode, inputImages: nextImages }
+        },
+        { history: false, dirty: true },
+      )
+    })
+  }
+
+  function resolveLinkedImagesForTarget(targetNodeId: string): LinkedNodePreviewImage[] {
+    return (imageInputEdgesByTargetId.value.get(targetNodeId) ?? [])
+      .map((edge) => resolveNodePreviewImageById(edge.source))
+      .filter((item): item is LinkedNodePreviewImage => !!item && !!item.url)
+  }
+
   function resolveNodePreviewImageById(nodeId: string): LinkedNodePreviewImage | null {
-    const node = options.nodes.value.find((item) => item.id === nodeId)
+    const node = nodeById.value.get(nodeId)
     const kind = node?.data?.kind
     const snapshot = node?.data?.snapshotNode as Record<string, unknown> | undefined
     if (!kind || !snapshot) return null
@@ -150,7 +265,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
   }
 
   function resolveMediaInputNodeKind(nodeId: string): MediaInputNodeKind | null {
-    const kind = options.nodes.value.find((node) => node.id === nodeId)?.data?.kind
+    const kind = nodeById.value.get(nodeId)?.data?.kind
     return isMediaInputNodeKind(kind) ? kind : null
   }
 
@@ -262,12 +377,8 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
   }
 
-  function isImageInputHandle(handle: string | null | undefined) {
-    return String(handle ?? '') === 'in:image'
-  }
-
   function getMediaInputImages(nodeId: string): MediaInputImage[] {
-    const mediaInputNode = options.nodes.value.find((node) => node.id === nodeId)
+    const mediaInputNode = nodeById.value.get(nodeId)
     const snapshot = mediaInputNode?.data?.snapshotNode as
       | {
           inputImages?: Array<{
@@ -301,9 +412,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       .filter((item) => item.sourceType === 'node')
       .map((item) => item.sourceId)
     const linked = new Set(
-      options.edges.value
-        .filter((edge) => edge.target === promptNodeId && isImageInputHandle(edge.targetHandle))
-        .map((edge) => edge.source),
+      (imageInputEdgesByTargetId.value.get(promptNodeId) ?? []).map((edge) => edge.source),
     )
     return ordered.length
       ? ordered.filter((sourceNodeId) => linked.has(sourceNodeId))
