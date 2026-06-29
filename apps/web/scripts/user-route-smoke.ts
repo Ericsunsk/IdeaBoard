@@ -27,9 +27,9 @@ const MOCK_USER = {
 } satisfies User
 
 const MOCK_BOARD_ID = 'mock-board-1'
-const MOCK_BOARD_NAME = 'Mock Workspace Board'
+const MOCK_BOARD_NAME = 'Mock Canvas Board'
 const MOCK_UPDATED_AT = 1_764_000_000_000
-const MOCK_WORKSPACE_UPLOAD_URL = `/uploads/workspace/${MOCK_USER.uid}/${MOCK_BOARD_ID}/content/mock-upload.png`
+const MOCK_CANVAS_UPLOAD_URL = `/uploads/canvas/${MOCK_USER.uid}/${MOCK_BOARD_ID}/content/mock-upload.png`
 const MOCK_AVATAR_URL = `/uploads/profile/${MOCK_USER.uid}/avatar/mock-avatar.png`
 
 const AUTH_SESSION = {
@@ -106,7 +106,7 @@ const BOARD_UPLOAD = {
   code: 0,
   msg: 'ok',
   data: {
-    url: MOCK_WORKSPACE_UPLOAD_URL,
+    url: MOCK_CANVAS_UPLOAD_URL,
     width: 512,
     height: 512,
     size: 1024,
@@ -153,8 +153,8 @@ const pages: SmokePage[] = [
     expectedText: [MOCK_USER.username, MOCK_USER.uid, '个人基本资料'],
   },
   {
-    label: 'workspace',
-    path: `/user/workspace?boardId=${MOCK_BOARD_ID}`,
+    label: 'canvas',
+    path: `/user/canvas?boardId=${MOCK_BOARD_ID}`,
     expectedText: [MOCK_BOARD_NAME, '100%'],
   },
 ]
@@ -248,7 +248,7 @@ function assertExpectedUserApiRequests(output: string, page: SmokePage) {
   }
 }
 
-function assertWorkspaceDom(playwrightCli: CommandSpec, page: SmokePage) {
+function assertCanvasDom(playwrightCli: CommandSpec, page: SmokePage) {
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
@@ -314,14 +314,14 @@ function assertCenterAvatarUpload(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertWorkspaceInteractions(playwrightCli: CommandSpec) {
+function assertCanvasInteractions(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
       'const pane = page.locator(".vue-flow__pane").first()',
       'await pane.waitFor({ state: "visible", timeout: 10000 })',
       'const paneBox = await pane.boundingBox()',
-      'if (!paneBox) throw new Error("Workspace pane has no bounding box")',
+      'if (!paneBox) throw new Error("Canvas pane has no bounding box")',
       'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
       'await accountButton.click()',
       'const userMenu = page.getByRole("menu").filter({ hasText: "个人中心" })',
@@ -335,7 +335,7 @@ function assertWorkspaceInteractions(playwrightCli: CommandSpec) {
       '    y: Math.min(Math.max(220, paneBox.height / 2), paneBox.height - 80),',
       '  },',
       '})',
-      'const contextMenu = page.locator(".workspace-node-context-menu")',
+      'const contextMenu = page.locator(".canvas-node-context-menu")',
       'await contextMenu.waitFor({ state: "visible", timeout: 10000 })',
       'await page.mouse.click(paneBox.x + paneBox.width - 24, paneBox.y + paneBox.height - 24)',
       'await contextMenu.waitFor({ state: "hidden", timeout: 10000 })',
@@ -366,9 +366,9 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
     assertCenterAvatarUpload(playwrightCli)
   }
 
-  if (page.label === 'workspace') {
-    assertWorkspaceDom(playwrightCli, page)
-    assertWorkspaceInteractions(playwrightCli)
+  if (page.label === 'canvas') {
+    assertCanvasDom(playwrightCli, page)
+    assertCanvasInteractions(playwrightCli)
   }
 
   const consoleOutput = smoke.runCommand(playwrightCli, ['console', 'error']).stdout

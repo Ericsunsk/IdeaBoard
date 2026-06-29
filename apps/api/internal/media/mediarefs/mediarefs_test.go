@@ -6,7 +6,7 @@ import (
 )
 
 func TestValidateUploadPath(t *testing.T) {
-	if _, err := ValidateUploadPath("/uploads/workspace/OWNR1A/board-1/content/a.png"); err != nil {
+	if _, err := ValidateUploadPath("/uploads/canvas/OWNR1A/board-1/content/a.png"); err != nil {
 		t.Fatalf("expected valid upload path, got %v", err)
 	}
 	if _, err := ValidateUploadPath("/uploads/2026/05/13/a.png"); err == nil {

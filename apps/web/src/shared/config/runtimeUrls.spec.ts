@@ -12,16 +12,16 @@ describe('runtime URL helpers', () => {
 
     const { canonicalizeRuntimeUploadRef, resolveAssetUrl } = await import('./runtimeUrls')
 
-    expect(resolveAssetUrl('/uploads/workspace/U123/board/content/a.png')).toBe(
-      'https://assets.example.com/uploads/workspace/U123/board/content/a.png',
+    expect(resolveAssetUrl('/uploads/canvas/U123/board/content/a.png')).toBe(
+      'https://assets.example.com/uploads/canvas/U123/board/content/a.png',
     )
     expect(
       canonicalizeRuntimeUploadRef(
-        'https://assets.example.com/uploads/workspace/U123/board/content/a.png',
+        'https://assets.example.com/uploads/canvas/U123/board/content/a.png',
       ),
-    ).toBe('/uploads/workspace/U123/board/content/a.png')
+    ).toBe('/uploads/canvas/U123/board/content/a.png')
     expect(
-      canonicalizeRuntimeUploadRef('https://cdn.example.com/uploads/workspace/U123/a.png'),
-    ).toBe('https://cdn.example.com/uploads/workspace/U123/a.png')
+      canonicalizeRuntimeUploadRef('https://cdn.example.com/uploads/canvas/U123/a.png'),
+    ).toBe('https://cdn.example.com/uploads/canvas/U123/a.png')
   })
 })

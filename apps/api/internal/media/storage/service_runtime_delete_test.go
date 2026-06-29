@@ -43,7 +43,7 @@ func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
 	withTempWorkingDir(t)
 
 	service := &StorageService{}
-	objectKey := filepath.ToSlash(filepath.Join("uploads", "workspace", "AB12C3", "2026", "04", "24", "demo.png"))
+	objectKey := filepath.ToSlash(filepath.Join("uploads", "canvas", "AB12C3", "2026", "04", "24", "demo.png"))
 	localPath := filepath.FromSlash(objectKey)
 
 	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
@@ -54,7 +54,7 @@ func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		_ = os.Remove(localPath)
-		_ = os.RemoveAll(filepath.FromSlash(filepath.Join("uploads", "workspace", "AB12C3")))
+		_ = os.RemoveAll(filepath.FromSlash(filepath.Join("uploads", "canvas", "AB12C3")))
 	})
 
 	if err := service.deleteLocalByObjectKey(objectKey); err != nil {
@@ -72,9 +72,9 @@ func TestPublicUploadURLUsesAssetBaseURL(t *testing.T) {
 			PublicBaseURL:      "https://app.example.com",
 			PublicAssetBaseURL: "https://api.example.com",
 		}},
-		"uploads/workspace/U123/board/content/demo.png",
+		"uploads/canvas/U123/board/content/demo.png",
 	)
-	want := "https://api.example.com/uploads/workspace/U123/board/content/demo.png"
+	want := "https://api.example.com/uploads/canvas/U123/board/content/demo.png"
 	if got != want {
 		t.Fatalf("publicUploadURL = %q, want %q", got, want)
 	}
@@ -86,17 +86,17 @@ func TestPublicUploadURLPreservesAssetBaseURLPath(t *testing.T) {
 		testPublicURLProvider{setting: settings.PublicURLSetting{
 			PublicAssetBaseURL: "https://cdn.example.com/media",
 		}},
-		"uploads/workspace/U123/board/content/demo.png",
+		"uploads/canvas/U123/board/content/demo.png",
 	)
-	want := "https://cdn.example.com/media/uploads/workspace/U123/board/content/demo.png"
+	want := "https://cdn.example.com/media/uploads/canvas/U123/board/content/demo.png"
 	if got != want {
 		t.Fatalf("publicUploadURL = %q, want %q", got, want)
 	}
 }
 
 func TestPublicUploadURLFallsBackToRelativePath(t *testing.T) {
-	got := publicUploadURL(context.Background(), "uploads/workspace/U123/board/content/demo.png")
-	want := "/uploads/workspace/U123/board/content/demo.png"
+	got := publicUploadURL(context.Background(), "uploads/canvas/U123/board/content/demo.png")
+	want := "/uploads/canvas/U123/board/content/demo.png"
 	if got != want {
 		t.Fatalf("publicUploadURL = %q, want %q", got, want)
 	}
@@ -206,12 +206,12 @@ func TestDownloadRemoteFileCleansTempFileOnOversize(t *testing.T) {
 	assertDirEmpty(t, tmpDir)
 }
 
-func TestDeleteLocalByPrefixRemovesWorkspaceTree(t *testing.T) {
+func TestDeleteLocalByPrefixRemovesCanvasTree(t *testing.T) {
 	withTempWorkingDir(t)
 
 	service := &StorageService{}
-	targetFile := filepath.FromSlash(filepath.Join("uploads", "workspace", "AB12C3", "board1", "content", "demo.png"))
-	otherFile := filepath.FromSlash(filepath.Join("uploads", "workspace", "XY89ZT", "board2", "content", "keep.png"))
+	targetFile := filepath.FromSlash(filepath.Join("uploads", "canvas", "AB12C3", "board1", "content", "demo.png"))
+	otherFile := filepath.FromSlash(filepath.Join("uploads", "canvas", "XY89ZT", "board2", "content", "keep.png"))
 
 	for _, file := range []string{targetFile, otherFile} {
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
@@ -222,15 +222,15 @@ func TestDeleteLocalByPrefixRemovesWorkspaceTree(t *testing.T) {
 		}
 	}
 
-	if err := service.deleteLocalByPrefix(filepath.ToSlash(filepath.Join("uploads", "workspace", "AB12C3")) + "/"); err != nil {
+	if err := service.deleteLocalByPrefix(filepath.ToSlash(filepath.Join("uploads", "canvas", "AB12C3")) + "/"); err != nil {
 		t.Fatalf("deleteLocalByPrefix returned error: %v", err)
 	}
 
 	if _, err := os.Stat(filepath.Dir(targetFile)); !os.IsNotExist(err) {
-		t.Fatalf("expected workspace AB12C3 to be removed, stat err = %v", err)
+		t.Fatalf("expected canvas AB12C3 to be removed, stat err = %v", err)
 	}
 	if _, err := os.Stat(otherFile); err != nil {
-		t.Fatalf("expected unrelated workspace file to exist, stat err = %v", err)
+		t.Fatalf("expected unrelated canvas file to exist, stat err = %v", err)
 	}
 }
 
@@ -239,12 +239,12 @@ func TestDeleteLocalByPrefixRemovesUserUploadTrees(t *testing.T) {
 
 	service := &StorageService{}
 	targetFiles := []string{
-		filepath.FromSlash(filepath.Join("uploads", "workspace", "CLN123", "board1", "content", "demo.png")),
+		filepath.FromSlash(filepath.Join("uploads", "canvas", "CLN123", "board1", "content", "demo.png")),
 		filepath.FromSlash(filepath.Join("uploads", "profile", "CLN123", "avatar", "avatar.png")),
 		filepath.FromSlash(filepath.Join("uploads", "tasks", "42", "task-owned", "result.png")),
 	}
 	otherFiles := []string{
-		filepath.FromSlash(filepath.Join("uploads", "workspace", "OTHER1", "board1", "content", "keep.png")),
+		filepath.FromSlash(filepath.Join("uploads", "canvas", "OTHER1", "board1", "content", "keep.png")),
 		filepath.FromSlash(filepath.Join("uploads", "profile", "OTHER1", "avatar", "keep.png")),
 		filepath.FromSlash(filepath.Join("uploads", "tasks", "43", "task-owned", "keep.png")),
 	}
@@ -282,7 +282,7 @@ func TestDeleteLocalByPrefixRemovesUserUploadTrees(t *testing.T) {
 
 func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 	t.Run("virtual host style", func(t *testing.T) {
-		parsed, err := url.Parse("https://img.example.com/uploads/workspace/AB12C3/2026/04/24/demo.png")
+		parsed, err := url.Parse("https://img.example.com/uploads/canvas/AB12C3/2026/04/24/demo.png")
 		if err != nil {
 			t.Fatalf("parse url failed: %v", err)
 		}
@@ -291,14 +291,14 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
 		}
-		want := "uploads/workspace/AB12C3/2026/04/24/demo.png"
+		want := "uploads/canvas/AB12C3/2026/04/24/demo.png"
 		if got != want {
 			t.Fatalf("object key = %q, want %q", got, want)
 		}
 	})
 
 	t.Run("path style strips bucket prefix once", func(t *testing.T) {
-		parsed, err := url.Parse("https://minio.example.com/feng-assets/uploads/workspace/AB12C3/2026/04/24/demo.png")
+		parsed, err := url.Parse("https://minio.example.com/feng-assets/uploads/canvas/AB12C3/2026/04/24/demo.png")
 		if err != nil {
 			t.Fatalf("parse url failed: %v", err)
 		}
@@ -312,14 +312,14 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
 		}
-		want := "uploads/workspace/AB12C3/2026/04/24/demo.png"
+		want := "uploads/canvas/AB12C3/2026/04/24/demo.png"
 		if got != want {
 			t.Fatalf("object key = %q, want %q", got, want)
 		}
 	})
 
 	t.Run("rejects mismatched host", func(t *testing.T) {
-		parsed, err := url.Parse("https://evil.example.com/uploads/workspace/AB12C3/2026/04/24/demo.png")
+		parsed, err := url.Parse("https://evil.example.com/uploads/canvas/AB12C3/2026/04/24/demo.png")
 		if err != nil {
 			t.Fatalf("parse url failed: %v", err)
 		}

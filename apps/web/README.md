@@ -65,7 +65,7 @@ apps/web/
 ├── src/app/                  # 入口、router、store 装配
 ├── src/features/             # 领域功能模块
 │   ├── user/pages/           # 用户侧路由级页面容器
-│   └── workspace/            # 画布、节点与执行链路
+│   └── canvas/            # 画布、节点与执行链路
 ├── src/shared/               # 共享 API、auth、composables、types、utils、assets
 │   └── api/generated-query/  # Orval 生成代码，不手动编辑
 └── vite.config.ts            # 开发代理

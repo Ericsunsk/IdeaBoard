@@ -197,7 +197,7 @@ import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import {
   USER_CENTER_PATH,
   USER_HOME_PATH,
-  USER_WORKSPACE_PATH,
+  USER_CANVAS_PATH,
 } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../../app/stores/user'
 import { Search, User } from '@iconoir/vue'
@@ -319,12 +319,12 @@ async function createAndOpenBoard() {
     return
   }
   reloadBoards()
-  router.push({ path: USER_WORKSPACE_PATH, query: { boardId: result.board.id } })
+  router.push({ path: USER_CANVAS_PATH, query: { boardId: result.board.id } })
 }
 
 function openBoard(board: CanvasBoardMeta) {
   touchCanvasBoard(board.id)
-  router.push({ path: USER_WORKSPACE_PATH, query: { boardId: board.id } })
+  router.push({ path: USER_CANVAS_PATH, query: { boardId: board.id } })
 }
 
 function onBoardCardClick(board: CanvasBoardMeta) {

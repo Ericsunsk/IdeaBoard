@@ -27,7 +27,7 @@ var ErrBoardPermissionDenied = errors.New("board permission denied")
 var ErrBoardMemberNotFound = errors.New("board member not found")
 var ErrBoardMemberInvalidRole = errors.New("board member invalid role")
 var ErrBoardMemberInviteSelf = errors.New("board member invite self")
-var ErrBoardWorkspaceCleanupFailed = errors.New("board workspace cleanup failed")
+var ErrBoardCanvasCleanupFailed = errors.New("board canvas cleanup failed")
 var ErrShareTokenNotFound = errors.New("share token not found")
 var ErrShareTokenInvalid = errors.New("share token invalid")
 var ErrShareTokenExpired = errors.New("share token expired")
@@ -41,19 +41,19 @@ const maxBoardStateDepth = 32
 type BoardService struct {
 	repo             *BoardRepository
 	userRepo         *users.UserRepository
-	workspaceCleaner BoardWorkspaceCleaner
+	canvasCleaner BoardCanvasCleaner
 }
 
-type BoardWorkspaceCleaner interface {
-	DeleteWorkspaceBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error
+type BoardCanvasCleaner interface {
+	DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error
 }
 
-func NewBoardService(repo *BoardRepository, userRepo *users.UserRepository, workspaceCleaner ...BoardWorkspaceCleaner) *BoardService {
-	var cleaner BoardWorkspaceCleaner
-	if len(workspaceCleaner) > 0 {
-		cleaner = workspaceCleaner[0]
+func NewBoardService(repo *BoardRepository, userRepo *users.UserRepository, canvasCleaner ...BoardCanvasCleaner) *BoardService {
+	var cleaner BoardCanvasCleaner
+	if len(canvasCleaner) > 0 {
+		cleaner = canvasCleaner[0]
 	}
-	return &BoardService{repo: repo, userRepo: userRepo, workspaceCleaner: cleaner}
+	return &BoardService{repo: repo, userRepo: userRepo, canvasCleaner: cleaner}
 }
 
 func (s *BoardService) ListBoards(ctx context.Context, userID int64) ([]BoardWithRole, error) {
@@ -153,13 +153,13 @@ func (s *BoardService) DeleteBoard(ctx context.Context, userID int64, boardID st
 	if err != nil {
 		return err
 	}
-	if s.workspaceCleaner != nil {
+	if s.canvasCleaner != nil {
 		owner, err := s.userRepo.GetByID(ctx, board.UserID)
 		if err != nil {
 			return err
 		}
-		if err := s.workspaceCleaner.DeleteWorkspaceBoardByStorageUID(ctx, owner.StorageUID, board.BoardID); err != nil {
-			return fmt.Errorf("%w: %w", ErrBoardWorkspaceCleanupFailed, err)
+		if err := s.canvasCleaner.DeleteCanvasBoardByStorageUID(ctx, owner.StorageUID, board.BoardID); err != nil {
+			return fmt.Errorf("%w: %w", ErrBoardCanvasCleanupFailed, err)
 		}
 	}
 	return s.repo.DeleteBoardCascade(ctx, board.UserID, board.BoardID)

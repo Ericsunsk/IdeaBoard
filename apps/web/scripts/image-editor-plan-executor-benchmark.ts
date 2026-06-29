@@ -1,13 +1,13 @@
 /// <reference lib="dom" />
 
 import { performance } from 'node:perf_hooks'
-import { createCpuImageAdjustmentPlanExecutor } from '../src/features/workspace/image-editor/runtime/cpuPlanExecutor'
+import { createCpuImageAdjustmentPlanExecutor } from '../src/features/canvas/image-editor/runtime/cpuPlanExecutor'
 import type {
   ImageAdjustmentPlan,
   ImageAdjustmentPlanStep,
-} from '../src/features/workspace/image-editor/utils/imageAdjustmentEngine'
-import { compileImageAdjustmentPlan } from '../src/features/workspace/image-editor/utils/imageAdjustmentEngine'
-import type { ImageEditorAdjustmentLayer } from '../src/features/workspace/image-editor/types'
+} from '../src/features/canvas/image-editor/utils/imageAdjustmentEngine'
+import { compileImageAdjustmentPlan } from '../src/features/canvas/image-editor/utils/imageAdjustmentEngine'
+import type { ImageEditorAdjustmentLayer } from '../src/features/canvas/image-editor/types'
 
 type ImageDataCtor = new (data: Uint8ClampedArray, width: number, height: number) => ImageData
 

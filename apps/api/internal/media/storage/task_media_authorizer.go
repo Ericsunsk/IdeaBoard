@@ -24,7 +24,7 @@ func NewTaskMediaAuthorizer(
 	}
 }
 
-func (a *TaskMediaAuthorizer) AuthorizeWorkspaceUpload(ctx context.Context, userID int64, rawPath string) error {
+func (a *TaskMediaAuthorizer) AuthorizeCanvasUpload(ctx context.Context, userID int64, rawPath string) error {
 	if a == nil {
 		return fmt.Errorf("task media authorizer is not configured")
 	}
@@ -32,8 +32,8 @@ func (a *TaskMediaAuthorizer) AuthorizeWorkspaceUpload(ctx context.Context, user
 	if err != nil {
 		return err
 	}
-	if resource.Kind != UploadResourceKindWorkspace {
-		return fmt.Errorf("仅支持工作区上传资源")
+	if resource.Kind != UploadResourceKindCanvas {
+		return fmt.Errorf("仅支持画布上传资源")
 	}
 	return AuthorizeUploadResourceRead(ctx, userID, resource, a.boardAccess, a.ownerStorage)
 }

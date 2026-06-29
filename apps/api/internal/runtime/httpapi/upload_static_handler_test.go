@@ -27,53 +27,53 @@ type uploadStaticTestEnv struct {
 	taskOutputURL string
 }
 
-func TestUploadStaticHandlerWorkspaceRequiresLogin(t *testing.T) {
+func TestUploadStaticHandlerCanvasRequiresLogin(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/workspace/OWNR1A/board-1/content/demo.txt", "")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/demo.txt", "")
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusUnauthorized, rec.Body.String())
 	}
 }
 
-func TestUploadStaticHandlerWorkspaceRejectsNonMember(t *testing.T) {
+func TestUploadStaticHandlerCanvasRejectsNonMember(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/workspace/OWNR1A/board-1/content/demo.txt", "session=outsider")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/demo.txt", "session=outsider")
 
 	if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d or %d; body=%s", rec.Code, http.StatusForbidden, http.StatusNotFound, rec.Body.String())
 	}
 }
 
-func TestUploadStaticHandlerWorkspaceAllowsMember(t *testing.T) {
+func TestUploadStaticHandlerCanvasAllowsMember(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/workspace/OWNR1A/board-1/content/demo.txt", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/demo.txt", "session=member")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if strings.TrimSpace(rec.Body.String()) != "workspace content" {
-		t.Fatalf("body = %q, want workspace content", rec.Body.String())
+	if strings.TrimSpace(rec.Body.String()) != "canvas content" {
+		t.Fatalf("body = %q, want canvas content", rec.Body.String())
 	}
 }
 
-func TestUploadStaticHandlerWorkspaceRejectsOwnerSegmentMismatch(t *testing.T) {
+func TestUploadStaticHandlerCanvasRejectsOwnerSegmentMismatch(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/workspace/WRONG1/board-1/content/demo.txt", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/WRONG1/board-1/content/demo.txt", "session=member")
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
 	}
 }
 
-func TestUploadStaticHandlerWorkspaceNonContentRejectsNonMember(t *testing.T) {
+func TestUploadStaticHandlerCanvasNonContentRejectsNonMember(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/workspace/OWNR1A/board-1/thumb/demo.txt", "session=outsider")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/thumb/demo.txt", "session=outsider")
 
 	if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d or %d; body=%s", rec.Code, http.StatusForbidden, http.StatusNotFound, rec.Body.String())
@@ -83,7 +83,7 @@ func TestUploadStaticHandlerWorkspaceNonContentRejectsNonMember(t *testing.T) {
 func TestUploadStaticHandlerDoesNotListDirectories(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/workspace/OWNR1A/board-1/content/", "session=member")
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/canvas/OWNR1A/board-1/content/", "session=member")
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
@@ -182,13 +182,13 @@ func TestUploadStaticHandlerProfileAvatarHeadAllowsOwnerOnly(t *testing.T) {
 	}
 }
 
-func TestUploadStaticHandlerWorkspaceTraversalStillRequiresAuth(t *testing.T) {
+func TestUploadStaticHandlerCanvasTraversalStillRequiresAuth(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
 	rec := performUploadStaticRequest(
 		env.router,
 		http.MethodGet,
-		"/uploads/workspace/OWNR1A/board-1/content/public/../../content/demo.txt",
+		"/uploads/canvas/OWNR1A/board-1/content/public/../../content/demo.txt",
 		"session=outsider",
 	)
 
@@ -204,8 +204,8 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	tmpDir := t.TempDir()
 	t.Chdir(tmpDir)
 
-	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "demo.txt"), "workspace content")
-	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "thumb", "demo.txt"), "workspace thumb")
+	mustWriteTestFile(t, filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "demo.txt"), "canvas content")
+	mustWriteTestFile(t, filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "thumb", "demo.txt"), "canvas thumb")
 	mustWriteTestFile(t, filepath.Join("uploads", "site", "assets", "logo.txt"), "site logo")
 	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "avatar", "avatar.txt"), "profile avatar")
 	mustWriteTestFile(t, filepath.Join("uploads", "2026", "05", "13", "legacy.txt"), "legacy upload")

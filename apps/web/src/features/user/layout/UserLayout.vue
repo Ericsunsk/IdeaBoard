@@ -30,7 +30,7 @@
       </Button>
     </div>
     <div class="min-h-0 flex-1 overflow-hidden bg-transparent">
-      <router-view :key="route.path === USER_WORKSPACE_PATH ? route.path : route.fullPath" />
+      <router-view :key="route.path === USER_CANVAS_PATH ? route.path : route.fullPath" />
     </div>
 
     <UserAuthModals v-if="authMode" :mode="authMode" />
@@ -47,7 +47,7 @@ import {
   ADMIN_USERS_PATH,
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
-  USER_WORKSPACE_PATH,
+  USER_CANVAS_PATH,
 } from '../../../shared/constants/routePaths'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 

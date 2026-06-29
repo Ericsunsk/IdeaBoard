@@ -7,7 +7,7 @@ import {
   USER_LOGIN_PATH as USER_LOGIN_ROUTE_PATH,
   USER_REGISTER_PATH,
   USER_ROOT_PATH,
-  USER_WORKSPACE_PATH,
+  USER_CANVAS_PATH,
 } from '../../../shared/constants/routePaths'
 
 export {
@@ -15,7 +15,7 @@ export {
   USER_CENTER_PATH,
   USER_HOME_PATH,
   USER_REGISTER_PATH,
-  USER_WORKSPACE_PATH,
+  USER_CANVAS_PATH,
 }
 export const USER_DEFAULT_PATH = USER_HOME_PATH
 export const USER_LOGIN_PATH = USER_LOGIN_ROUTE_PATH
@@ -63,9 +63,9 @@ export const userRoutes: RouteRecordRaw[] = [
     ],
   },
   {
-    path: USER_WORKSPACE_PATH,
-    name: 'UserWorkspace',
-    component: () => import('../pages/UserWorkspacePage.vue'),
+    path: USER_CANVAS_PATH,
+    name: 'UserCanvas',
+    component: () => import('../pages/UserCanvasPage.vue'),
     meta: { requiresAuth: true },
   },
 ]

@@ -5,7 +5,7 @@ import type { Task } from '../../../shared/api/task'
 
 describe('task result image URL validation', () => {
   it.each([
-    '/uploads/workspace/user/board/content/image.webp',
+    '/uploads/canvas/user/board/content/image.webp',
     '/uploads/tasks/1/task/output.png?version=1',
     new URL('/uploads/tasks/1/task/output.png', window.location.origin).toString(),
   ])('allows %s', (url) => {
@@ -20,7 +20,7 @@ describe('task result image URL validation', () => {
     'blob:https://example.com/id',
     '//example.com/image.png',
     'ftp://example.com/image.png',
-    'uploads/workspace/image.png',
+    'uploads/canvas/image.png',
     '/assets/admin-preview.png',
     '/api/user/download?url=https://example.com/image.png',
     '/uploads/../admin-secret.png',

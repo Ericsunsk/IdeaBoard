@@ -1,0 +1,37 @@
+.image-editor-panel {
+  --image-editor-panel-border-width: var(--node-tool-border-width);
+  --image-editor-panel-row-height: 31px;
+  --image-editor-panel-control-height: 28px;
+  --image-editor-panel-control-radius: 8px;
+  --image-editor-panel-control-border-color: var(--canvas-surface-border-soft);
+  --image-editor-panel-control-hover-border-color: var(--canvas-panel-border);
+  --image-editor-panel-control-focus-border-color: var(--ib-focus-border-color);
+  --image-editor-panel-control-bg: var(--canvas-surface-muted);
+  --image-editor-panel-inset: 7px;
+  --image-editor-panel-content-gap: var(--canvas-panel-content-gap);
+  --image-editor-panel-text-size: 11px;
+  --image-editor-panel-meta-text-size: 10px;
+  border: var(--image-editor-panel-border-width) solid var(--canvas-accent-outline);
+  border-radius: var(--canvas-floating-radius);
+  background: var(--canvas-surface-bg);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.image-editor-panel
+  :where(
+    input:not([type]),
+    input[type='email'],
+    input[type='number'],
+    input[type='password'],
+    input[type='search'],
+    input[type='tel'],
+    input[type='text'],
+    input[type='url'],
+    select,
+    textarea
+  ):focus-visible {
+  border-color: var(--image-editor-panel-control-focus-border-color);
+  box-shadow: none;
+  outline: none;
+}

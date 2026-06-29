@@ -14,10 +14,10 @@
 - 路由级页面放在对应 `apps/web/src/features/*/pages` 下。
 - `apps/web/src/features` 负责业务逻辑、路由页和 feature 内部 UI。
 - `apps/web/src/features/user` 负责用户侧 layout、路由壳层与跨用户页的状态提示。
-- `apps/web/src/features/workspace/components/nodes` 只保留节点 Vue 组件及组件私有实现；跨节点配置、工具和服务放在 `features/workspace/config`、`utils`、`services` 或明确业务 context 下。
-- `apps/web/src/features/workspace/image-tools` 收拢 workspace 图像工具入口；页面和节点组件只消费 image tool chrome/stage/action binding，不直接串联 image-editor 与 mask-editor 的内部状态。
-- `apps/web/src/features/workspace/execution` 收拢任务执行 context；graph/source planning、backend request adapter、task runner、pending result node materialization 分别放在 `planning`、`commands`、`task-runner`、`result-nodes` 下。
-- `apps/web/src/features/workspace/board-session` 收拢 workspace board load/save/exists/preview/upload lifecycle；`features/canvas-board/domain` 继续作为共享 snapshot schema/core module。
+- `apps/web/src/features/canvas/components/nodes` 只保留节点 Vue 组件及组件私有实现；跨节点配置、工具和服务放在 `features/canvas/config`、`utils`、`services` 或明确业务 context 下。
+- `apps/web/src/features/canvas/image-tools` 收拢 canvas 图像工具入口；页面和节点组件只消费 image tool chrome/stage/action binding，不直接串联 image-editor 与 mask-editor 的内部状态。
+- `apps/web/src/features/canvas/execution` 收拢任务执行 context；graph/source planning、backend request adapter、task runner、pending result node materialization 分别放在 `planning`、`commands`、`task-runner`、`result-nodes` 下。
+- `apps/web/src/features/canvas/board-session` 收拢 canvas board load/save/exists/preview/upload lifecycle；`features/canvas-board/domain` 继续作为共享 snapshot schema/core module。
 - `apps/web/src/features/admin/users` 收拢 admin users list、view model、user commands 和 impersonation/session side effects。
 - `apps/web/src/features/admin/provider-config` 收拢 channel/account/provider configuration；channels route page 不直接处理 provider payload mapping。
 - `apps/web/src/features/admin/prompt-config` 收拢 feature prompt resource、query key、save command 和 generated prompt types；prompt-config route page 不直接依赖 Orval 生成入口。
@@ -68,8 +68,8 @@ Frontend context 名称不要求与 backend context 同名；唯一硬约束是 
 | 层 | 规范 | 示例 |
 |----|------|------|
 | 目录 | `kebab-case` | `image-processing/` |
-| Vue SFC | `PascalCase` | `WorkspacePage.vue` |
-| TS helper / composable | `camelCase.ts` | `useWorkspaceImageTools.ts` |
+| Vue SFC | `PascalCase` | `CanvasPage.vue` |
+| TS helper / composable | `camelCase.ts` | `useCanvasImageTools.ts` |
 | Go 文件 | `snake_case.go` | `task_runtime_service.go` |
 
 Go package 目录例外：保持 Go 生态习惯，使用小写无分隔符命名，例如 `autherrors/`、`webdist/`；不要为了匹配前端目录风格改成 `kebab-case`。

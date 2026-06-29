@@ -1,0 +1,110 @@
+.image-editor-histogram-plot {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  border: var(--image-editor-panel-border-width, 1px) solid
+    var(--image-editor-histogram-frame-border-color, var(--canvas-accent-outline));
+  border-radius: var(--image-editor-histogram-frame-radius, 9px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.92)),
+    var(--canvas-surface-muted, #f4f7fb);
+  cursor: crosshair;
+  overflow: visible;
+  touch-action: none;
+}
+
+.image-editor-histogram-plot__canvas {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.image-editor-histogram-plot__canvas svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+}
+
+.image-editor-histogram-plot__histogram {
+  fill: rgba(71, 85, 105, 0.18);
+  pointer-events: none;
+}
+
+.image-editor-histogram-plot__grid {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.image-editor-histogram-plot__grid--fine {
+  stroke: var(--canvas-surface-border-soft, rgba(34, 42, 54, 0.08));
+  stroke-width: 0.5;
+}
+
+.image-editor-histogram-plot__grid--strong {
+  stroke: var(--canvas-accent-outline, rgba(122, 107, 213, 0.22));
+  stroke-width: 0.7;
+}
+
+.image-editor-histogram-plot__guide-line {
+  stroke: var(--canvas-accent-strong, #6757c8);
+  stroke-width: var(--image-editor-panel-border-width, 1px);
+  opacity: 0.66;
+  shape-rendering: crispEdges;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.image-editor-histogram-plot__marker {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: calc(var(--image-editor-histogram-marker-size, 12px) * -0.36);
+  box-sizing: border-box;
+  width: var(--image-editor-histogram-marker-size, 12px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  transform: translateX(-50%);
+}
+
+.image-editor-histogram-plot__marker::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: var(--image-editor-histogram-marker-size, 12px);
+  width: var(--image-editor-panel-border-width, 1px);
+  background: var(--canvas-accent-strong, #6757c8);
+  opacity: 0.66;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.image-editor-histogram-plot__marker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  box-sizing: border-box;
+  width: var(--image-editor-histogram-marker-size, 12px);
+  height: var(--image-editor-histogram-marker-size, 12px);
+  border: var(--image-editor-panel-border-width, 1px) solid var(--canvas-accent-strong, #6757c8);
+  border-radius: 50%;
+  background: #ffffff;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.image-editor-histogram-plot__marker:focus-visible {
+  outline: none;
+}
+
+.image-editor-histogram-plot__marker:focus-visible::after {
+  outline: var(--ib-focus-outline-width, 2px) solid
+    var(--ib-focus-outline-color, var(--canvas-accent, #9278e6));
+  outline-offset: 2px;
+}

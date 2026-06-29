@@ -32,11 +32,11 @@ func AuthorizeUploadResourceRead(
 	switch resource.Kind {
 	case UploadResourceKindSiteAsset:
 		return nil
-	case UploadResourceKindWorkspace:
+	case UploadResourceKindCanvas:
 		if userID == 0 {
 			return ErrUploadAccessDenied
 		}
-		return authorizeWorkspaceUploadResourceRead(ctx, userID, resource, boardAccess, ownerStorage)
+		return authorizeCanvasUploadResourceRead(ctx, userID, resource, boardAccess, ownerStorage)
 	case UploadResourceKindProfileAvatar:
 		if userID == 0 {
 			return ErrUploadAccessDenied
@@ -65,21 +65,21 @@ func AuthorizeUploadResourceRead(
 	}
 }
 
-func authorizeWorkspaceUploadResourceRead(
+func authorizeCanvasUploadResourceRead(
 	ctx context.Context,
 	userID int64,
 	resource UploadResource,
 	boardAccess UploadBoardAccessResolver,
 	ownerStorage UploadOwnerStorageUIDResolver,
 ) error {
-	if resource.Workspace == nil {
+	if resource.Canvas == nil {
 		return ErrUploadAccessInvalidPath
 	}
 	if boardAccess == nil || ownerStorage == nil {
 		return ErrUploadAccessDependencyMissing
 	}
 
-	ownerUserID, err := boardAccess.ResolveUploadBoardAccess(ctx, userID, resource.Workspace.BoardSegment)
+	ownerUserID, err := boardAccess.ResolveUploadBoardAccess(ctx, userID, resource.Canvas.BoardSegment)
 	if err != nil {
 		return err
 	}
@@ -87,11 +87,11 @@ func authorizeWorkspaceUploadResourceRead(
 	if err != nil {
 		return err
 	}
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
 	if err != nil {
 		return err
 	}
-	if ownerSegment != resource.Workspace.OwnerSegment {
+	if ownerSegment != resource.Canvas.OwnerSegment {
 		return ErrUploadAccessOwnerMismatch
 	}
 	return nil

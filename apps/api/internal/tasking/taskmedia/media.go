@@ -74,10 +74,10 @@ type SubmitMediaValidator struct {
 }
 
 type UploadAuthorizer interface {
-	AuthorizeWorkspaceUpload(ctx context.Context, userID int64, rawPath string) error
+	AuthorizeCanvasUpload(ctx context.Context, userID int64, rawPath string) error
 }
 
-const workspaceUploadPrefix = "/uploads/workspace/"
+const canvasUploadPrefix = "/uploads/canvas/"
 
 func NewSubmitMediaValidator(publicURLs settings.PublicURLSettingProvider, authorizer UploadAuthorizer) *SubmitMediaValidator {
 	return &SubmitMediaValidator{
@@ -95,14 +95,14 @@ func (v *SubmitMediaValidator) ValidateSubmitMediaRef(ctx context.Context, userI
 	if !strings.HasPrefix(trimmed, "/uploads/") {
 		return nil
 	}
-	if !strings.HasPrefix(trimmed, workspaceUploadPrefix) {
-		return fmt.Errorf("仅支持工作区上传资源")
+	if !strings.HasPrefix(trimmed, canvasUploadPrefix) {
+		return fmt.Errorf("仅支持画布上传资源")
 	}
 	if v == nil || v.authorizer == nil {
-		return fmt.Errorf("无法校验工作区上传资源权限")
+		return fmt.Errorf("无法校验画布上传资源权限")
 	}
-	if err := v.authorizer.AuthorizeWorkspaceUpload(ctx, userID, trimmed); err != nil {
-		return fmt.Errorf("无权使用该工作区上传资源")
+	if err := v.authorizer.AuthorizeCanvasUpload(ctx, userID, trimmed); err != nil {
+		return fmt.Errorf("无权使用该画布上传资源")
 	}
 	return nil
 }

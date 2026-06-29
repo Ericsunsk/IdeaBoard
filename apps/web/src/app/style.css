@@ -145,10 +145,10 @@
     --ib-focus-outline-offset: 2px;
     --ib-focus-outline-color: var(--color-canvas-accent);
     --ib-focus-border-color: var(--ib-focus-outline-color);
-    --workspace-range-input-height: 22px;
-    --workspace-range-track-height: 4px;
-    --workspace-range-thumb-size: 9px;
-    --workspace-range-thumb-offset: -2.5px;
+    --canvas-range-input-height: 22px;
+    --canvas-range-track-height: 4px;
+    --canvas-range-thumb-size: 9px;
+    --canvas-range-thumb-offset: -2.5px;
   }
 
   /* 全局链接样式 */
@@ -184,78 +184,78 @@
 }
 
 @layer components {
-  .workspace-range-input {
+  .canvas-range-input {
     appearance: none;
     -webkit-appearance: none;
     display: block;
     width: 100%;
     min-width: 0;
-    height: var(--workspace-range-input-height, 22px);
+    height: var(--canvas-range-input-height, 22px);
     margin: 0;
     background: transparent;
     cursor: pointer;
     accent-color: var(
-      --workspace-range-fill-color,
-      var(--workspace-accent, var(--color-canvas-accent))
+      --canvas-range-fill-color,
+      var(--canvas-accent, var(--color-canvas-accent))
     );
   }
 
-  .workspace-range-input::-webkit-slider-runnable-track {
-    height: var(--workspace-range-track-height, 4px);
+  .canvas-range-input::-webkit-slider-runnable-track {
+    height: var(--canvas-range-track-height, 4px);
     border: none;
     border-radius: 999px;
     background: var(
-      --workspace-range-track-background,
-      var(--workspace-range-track-color, var(--workspace-surface-muted, var(--color-canvas-track-bg)))
+      --canvas-range-track-background,
+      var(--canvas-range-track-color, var(--canvas-surface-muted, var(--color-canvas-track-bg)))
     );
   }
 
-  .workspace-range-input::-webkit-slider-thumb {
+  .canvas-range-input::-webkit-slider-thumb {
     appearance: none;
     -webkit-appearance: none;
-    width: var(--workspace-range-thumb-size, 9px);
-    height: var(--workspace-range-thumb-size, 9px);
-    margin-top: var(--workspace-range-thumb-offset, -2.5px);
+    width: var(--canvas-range-thumb-size, 9px);
+    height: var(--canvas-range-thumb-size, 9px);
+    margin-top: var(--canvas-range-thumb-offset, -2.5px);
     border: 0;
     border-radius: 999px;
     background: var(
-      --workspace-range-thumb-color,
-      var(--workspace-range-fill-color, var(--workspace-accent, var(--color-canvas-accent)))
+      --canvas-range-thumb-color,
+      var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
     );
     box-shadow: none;
-    transition: background-color var(--workspace-motion-fast, 160ms) ease;
+    transition: background-color var(--canvas-motion-fast, 160ms) ease;
   }
 
-  .workspace-range-input::-moz-range-track {
-    height: var(--workspace-range-track-height, 4px);
+  .canvas-range-input::-moz-range-track {
+    height: var(--canvas-range-track-height, 4px);
     border: none;
     border-radius: 999px;
     background: var(
-      --workspace-range-track-background,
-      var(--workspace-range-track-color, var(--workspace-surface-muted, var(--color-canvas-track-bg)))
+      --canvas-range-track-background,
+      var(--canvas-range-track-color, var(--canvas-surface-muted, var(--color-canvas-track-bg)))
     );
   }
 
-  .workspace-range-input::-moz-range-thumb {
-    width: var(--workspace-range-thumb-size, 9px);
-    height: var(--workspace-range-thumb-size, 9px);
+  .canvas-range-input::-moz-range-thumb {
+    width: var(--canvas-range-thumb-size, 9px);
+    height: var(--canvas-range-thumb-size, 9px);
     border: 0;
     border-radius: 999px;
     background: var(
-      --workspace-range-thumb-color,
-      var(--workspace-range-fill-color, var(--workspace-accent, var(--color-canvas-accent)))
+      --canvas-range-thumb-color,
+      var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
     );
     box-shadow: none;
   }
 
-  .workspace-range-input:focus-visible {
+  .canvas-range-input:focus-visible {
     outline: var(--ib-focus-outline-width) solid
-      var(--workspace-range-focus-color, var(--workspace-accent, var(--color-canvas-accent)));
+      var(--canvas-range-focus-color, var(--canvas-accent, var(--color-canvas-accent)));
     outline-offset: var(--ib-focus-outline-offset);
     border-radius: 999px;
   }
 
-  .workspace-range-input:disabled {
+  .canvas-range-input:disabled {
     cursor: not-allowed;
     opacity: 0.45;
   }
@@ -333,7 +333,7 @@
     --ib-user-avatar-button-focus-ring: var(--color-admin-focus-ring);
   }
 
-  .workspace-user-avatar-button {
+  .canvas-user-avatar-button {
     --ib-user-avatar-button-bg: #f1f3f9;
   }
 

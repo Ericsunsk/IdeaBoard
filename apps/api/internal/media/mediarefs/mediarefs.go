@@ -40,7 +40,7 @@ func ValidateUploadPath(raw string) (string, error) {
 	if len(parts) < 1 || parts[0] == "" {
 		return "", fmt.Errorf("文件路径不能为空")
 	}
-	if parts[0] == "workspace" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
+	if parts[0] == "canvas" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
 		return cleaned, nil
 	}
 	if parts[0] == "profile" && len(parts) >= 4 && parts[1] != "" && (parts[2] == "avatar" || parts[2] == "vector") && strings.Join(parts[3:], "") != "" {

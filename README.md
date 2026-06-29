@@ -322,7 +322,7 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 IdeaBoard/
 ├── apps/
 │   ├── web/                  # Vue 3 前端与管理后台
-│   │   └── src/features/     # 业务模块（workspace、admin、user、profile 等）
+│   │   └── src/features/     # 业务模块（canvas、admin、user、profile 等）
 │   ├── auth/                 # Better Auth 服务（登录/注册/session）
 │   └── api/                  # Go API、任务、Worker、服务逻辑
 │       └── internal/         # 领域包（accounts、channels、users、workflow 等）

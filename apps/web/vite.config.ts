@@ -27,7 +27,7 @@ export default defineConfig({
         'src/features/admin/shared/components',
         'src/features/auth/components',
         'src/features/boards/components',
-        'src/features/workspace/components',
+        'src/features/canvas/components',
       ],
       deep: true,
       dts: 'src/components.d.ts',

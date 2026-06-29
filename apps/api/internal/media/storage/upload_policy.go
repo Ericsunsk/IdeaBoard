@@ -13,13 +13,13 @@ const (
 type UploadResourceKind string
 
 const (
-	UploadResourceKindWorkspace     UploadResourceKind = "workspace"
+	UploadResourceKindCanvas     UploadResourceKind = "canvas"
 	UploadResourceKindProfileAvatar UploadResourceKind = "profile_avatar"
 	UploadResourceKindTaskOutput    UploadResourceKind = "task_output"
 	UploadResourceKindSiteAsset     UploadResourceKind = "site_asset"
 )
 
-type UploadWorkspaceResource struct {
+type UploadCanvasResource struct {
 	OwnerSegment string
 	BoardSegment string
 	RelativePath string
@@ -43,46 +43,46 @@ type UploadSiteAssetResource struct {
 type UploadResource struct {
 	Kind          UploadResourceKind
 	ObjectKey     string
-	Workspace     *UploadWorkspaceResource
+	Canvas     *UploadCanvasResource
 	ProfileAvatar *UploadProfileAvatarResource
 	TaskOutput    *UploadTaskOutputResource
 	SiteAsset     *UploadSiteAssetResource
 }
 
-func WorkspaceContentUploadDirPrefix(storageUID string, boardID string) (string, error) {
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+func CanvasContentUploadDirPrefix(storageUID string, boardID string) (string, error) {
+	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
 	if err != nil {
 		return "", err
 	}
-	boardSegment, err := NormalizeWorkspaceBoardSegment(boardID)
+	boardSegment, err := NormalizeCanvasBoardSegment(boardID)
 	if err != nil {
 		return "", err
 	}
-	return path.Join("workspace", ownerSegment, boardSegment, "content"), nil
+	return path.Join("canvas", ownerSegment, boardSegment, "content"), nil
 }
 
-func WorkspaceUserUploadObjectPrefix(storageUID string) (string, error) {
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+func CanvasUserUploadObjectPrefix(storageUID string) (string, error) {
+	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
 	if err != nil {
 		return "", err
 	}
-	return path.Join(uploadObjectRoot, "workspace", ownerSegment) + "/", nil
+	return path.Join(uploadObjectRoot, "canvas", ownerSegment) + "/", nil
 }
 
-func WorkspaceBoardUploadObjectPrefix(storageUID string, boardID string) (string, error) {
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+func CanvasBoardUploadObjectPrefix(storageUID string, boardID string) (string, error) {
+	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
 	if err != nil {
 		return "", err
 	}
-	boardSegment, err := NormalizeWorkspaceBoardSegment(boardID)
+	boardSegment, err := NormalizeCanvasBoardSegment(boardID)
 	if err != nil {
 		return "", err
 	}
-	return path.Join(uploadObjectRoot, "workspace", ownerSegment, boardSegment) + "/", nil
+	return path.Join(uploadObjectRoot, "canvas", ownerSegment, boardSegment) + "/", nil
 }
 
 func ProfileAvatarUploadDirPrefix(storageUID string) (string, error) {
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
 	if err != nil {
 		return "", err
 	}
@@ -90,7 +90,7 @@ func ProfileAvatarUploadDirPrefix(storageUID string) (string, error) {
 }
 
 func ProfileAvatarUploadObjectPrefix(storageUID string) (string, error) {
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	ownerSegment, err := NormalizeCanvasStorageUserSegment(storageUID)
 	if err != nil {
 		return "", err
 	}
@@ -108,7 +108,7 @@ func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	if userID <= 0 {
 		return "", fmt.Errorf("用户ID无效")
 	}
-	taskSegment, err := NormalizeWorkspaceBoardSegment(taskID)
+	taskSegment, err := NormalizeCanvasBoardSegment(taskID)
 	if err != nil {
 		return "", err
 	}
@@ -132,7 +132,7 @@ func SiteAssetUploadObjectPrefix() string {
 }
 
 func userUploadObjectPrefixes(userID int64, storageUID string) ([]string, error) {
-	workspacePrefix, err := WorkspaceUserUploadObjectPrefix(storageUID)
+	canvasPrefix, err := CanvasUserUploadObjectPrefix(storageUID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func userUploadObjectPrefixes(userID int64, storageUID string) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	return []string{workspacePrefix, profileAvatarPrefix, taskOutputPrefix}, nil
+	return []string{canvasPrefix, profileAvatarPrefix, taskOutputPrefix}, nil
 }
 
 func ParseUploadResource(rawPath string) (UploadResource, error) {
@@ -163,9 +163,9 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 		return UploadResource{}, fmt.Errorf("文件路径不能为空")
 	}
 
-	if parts[0] == "workspace" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
-		resource.Kind = UploadResourceKindWorkspace
-		resource.Workspace = &UploadWorkspaceResource{
+	if parts[0] == "canvas" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
+		resource.Kind = UploadResourceKindCanvas
+		resource.Canvas = &UploadCanvasResource{
 			OwnerSegment: parts[1],
 			BoardSegment: parts[2],
 			RelativePath: strings.Join(parts[3:], "/"),

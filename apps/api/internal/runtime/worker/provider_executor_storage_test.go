@@ -96,10 +96,10 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	}
 }
 
-func TestGoogleGeminiReadsRelativeWorkspaceUploadFromStorage(t *testing.T) {
+func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 	executor := newTestProviderExecutorWithLocalStorage(t)
 	source := buildTinyPNGBytes(t)
-	sourcePath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "source.png")
+	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "source.png")
 	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 		t.Fatalf("mkdir upload dir: %v", err)
 	}
@@ -119,8 +119,8 @@ func TestGoogleGeminiReadsRelativeWorkspaceUploadFromStorage(t *testing.T) {
 
 	params := map[string]interface{}{
 		"feature":            "style-variation",
-		"image_urls":         []interface{}{"/uploads/workspace/OWNR1A/board-1/content/source.png"},
-		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
+		"image_urls":         []interface{}{"/uploads/canvas/OWNR1A/board-1/content/source.png"},
+		"original_image_url": "/uploads/canvas/OWNR1A/board-1/content/source.png",
 	}
 	providerReq := newProviderRequest("prompt", 64, 64, params, "gemini-3.1-flash-image-preview")
 	_, err := executor.callGoogleGeminiGenerateContent(context.Background(), &accounts.ApiAccount{ApiKey: "key"}, server.URL, providerReq, 5*time.Second, readGoogleProviderParams(providerReq))
@@ -147,9 +147,9 @@ func TestGoogleGeminiReadsRelativeWorkspaceUploadFromStorage(t *testing.T) {
 	}
 }
 
-func TestOpenAIRejectsHugeRelativeWorkspaceUploadFromStorage(t *testing.T) {
+func TestOpenAIRejectsHugeRelativeCanvasUploadFromStorage(t *testing.T) {
 	executor := newTestProviderExecutorWithLocalStorage(t)
-	sourcePath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "huge.png")
+	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "huge.png")
 	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 		t.Fatalf("mkdir upload dir: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestOpenAIRejectsHugeRelativeWorkspaceUploadFromStorage(t *testing.T) {
 		t.Fatalf("write source upload: %v", err)
 	}
 
-	_, _, _, err := executor.resolveOpenAIImageBytes(context.Background(), "/uploads/workspace/OWNR1A/board-1/content/huge.png", 0, time.Second)
+	_, _, _, err := executor.resolveOpenAIImageBytes(context.Background(), "/uploads/canvas/OWNR1A/board-1/content/huge.png", 0, time.Second)
 	if err == nil {
 		t.Fatal("expected huge local upload to be rejected")
 	}

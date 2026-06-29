@@ -431,7 +431,7 @@ func TestReadUploadResourceByURLLocalInfersContentType(t *testing.T) {
 		_ = os.Chdir(oldWd)
 	})
 
-	uploadPath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "image.png")
+	uploadPath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "image.png")
 	if err := os.MkdirAll(filepath.Dir(uploadPath), 0o755); err != nil {
 		t.Fatalf("mkdir upload dir: %v", err)
 	}
@@ -439,7 +439,7 @@ func TestReadUploadResourceByURLLocalInfersContentType(t *testing.T) {
 		t.Fatalf("write upload: %v", err)
 	}
 
-	obj, err := service.ReadUploadResourceByURL(context.Background(), "/uploads/workspace/OWNR1A/board-1/content/image.png", 1024)
+	obj, err := service.ReadUploadResourceByURL(context.Background(), "/uploads/canvas/OWNR1A/board-1/content/image.png", 1024)
 	if err != nil {
 		t.Fatalf("ReadUploadResourceByURL returned error: %v", err)
 	}

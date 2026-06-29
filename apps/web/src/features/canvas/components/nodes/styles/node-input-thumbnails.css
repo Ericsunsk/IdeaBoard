@@ -1,0 +1,100 @@
+.node-input-thumbnail-contract {
+  --node-input-thumbnail-size-standard: 52px;
+  --node-input-thumbnail-size: var(--node-input-thumbnail-size-standard);
+}
+
+.node-input-thumbnail-contract.variant-standard {
+  --node-input-thumbnail-size: var(--node-input-thumbnail-size-standard);
+}
+
+.node-input-thumbnail {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  transition:
+    background-color var(--canvas-motion-fast) ease,
+    color var(--canvas-motion-fast) ease,
+    opacity var(--canvas-motion-fast) ease;
+}
+
+.node-input-thumbnail img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 7px;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.node-input-thumbnail.is-sortable-chosen,
+.node-input-thumbnail.is-sortable-drag {
+  cursor: grabbing;
+}
+
+.node-input-thumbnail.is-sortable-ghost {
+  opacity: 0.45;
+}
+
+.node-input-thumbnail-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #475569;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  opacity: 0;
+  line-height: 0;
+  transition: opacity 0.14s ease;
+}
+
+.node-input-thumbnail-remove:hover,
+.node-input-thumbnail-remove:focus-visible,
+.node-input-thumbnail-remove:active {
+  background: rgba(255, 255, 255, 0.88);
+  color: #475569;
+  box-shadow: none;
+}
+
+.node-input-thumbnail:focus-visible,
+.node-input-thumbnail-remove:focus-visible {
+  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+  outline-offset: var(--ib-focus-outline-offset);
+}
+
+.node-input-thumbnail-remove svg {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+
+.node-input-thumbnail:hover .node-input-thumbnail-remove,
+.node-input-thumbnail:focus-within .node-input-thumbnail-remove {
+  opacity: 1;
+}
+
+.node-tool-button.node-input-thumbnail-add {
+  width: var(--node-input-thumbnail-size);
+  height: var(--node-input-thumbnail-size);
+  border-style: dashed;
+  color: #64748b;
+  cursor: copy;
+}
+
+.node-tool-output-count.node-input-thumbnail-add:hover:not(:disabled),
+.node-tool-output-count.node-input-thumbnail-add:focus-visible,
+.node-tool-output-count.node-input-thumbnail-add:active,
+.node-tool-output-count.node-input-thumbnail-add.is-drag-over {
+  border-color: var(--node-tool-button-accent);
+  background: #f8f7ff;
+  color: var(--node-tool-button-accent);
+}

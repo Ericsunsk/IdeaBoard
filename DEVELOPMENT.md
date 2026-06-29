@@ -79,7 +79,7 @@ graph LR
 | 路径 | 说明 |
 |------|------|
 | `/user/home` | 用户首页与工作台入口 |
-| `/user/workspace` | 画布工作台主页面 |
+| `/user/canvas` | 画布工作台主页面 |
 | `/user/boards` | 画板列表 |
 | `/user/center` | 用户中心 |
 | `/admin/*` | 管理后台 |
@@ -125,7 +125,7 @@ graph LR
 
 对应实现：
 
-- [executionContract.ts](./apps/web/src/features/workspace/config/executionContract.ts)
+- [executionContract.ts](./apps/web/src/features/canvas/config/executionContract.ts)
 - [features.go](./apps/api/internal/workflow/features.go)
 
 <a id="task-lifecycle"></a>
@@ -151,10 +151,10 @@ graph LR
 
 ### 前端入口
 
-- [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/workspace/composables/useFlowPromptGenerationOrchestrator.ts)
-- [useFlowImageDirectActions.ts](./apps/web/src/features/workspace/composables/useFlowImageDirectActions.ts)
+- [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowPromptGenerationOrchestrator.ts)
+- [useFlowImageDirectActions.ts](./apps/web/src/features/canvas/composables/useFlowImageDirectActions.ts)
 - [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)
-- [WorkspacePage.vue](./apps/web/src/features/workspace/pages/WorkspacePage.vue)
+- [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue)
 
 ### 后端流程
 
@@ -446,7 +446,7 @@ scripts/                     # 打包、部署与发布脚本
 apps/web/src/
 ├── app/                      # 入口、router、store 装配
 ├── features/                 # 领域模块
-│   ├── workspace/            # 画布、节点与执行链路
+│   ├── canvas/            # 画布、节点与执行链路
 │   │   ├── pages/            # 路由级页面
 │   │   └── components/nodes/ # 节点组件，内部按 config/utils/styles/composables 拆分
 │   ├── boards/               # 画板列表、预览与同步

@@ -139,15 +139,15 @@ func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL str
 	return adapter.Read(ctx, profile, key, maxBytes)
 }
 
-func (s *StorageService) DeleteWorkspaceUploadByURL(ctx context.Context, storageUID string, boardID string, rawURL string) error {
-	expectedPrefix, err := WorkspaceBoardUploadObjectPrefix(storageUID, boardID)
+func (s *StorageService) DeleteCanvasUploadByURL(ctx context.Context, storageUID string, boardID string, rawURL string) error {
+	expectedPrefix, err := CanvasBoardUploadObjectPrefix(storageUID, boardID)
 	if err != nil {
 		return err
 	}
 
 	return s.deleteUserUploadByURL(ctx, rawURL, func(resource UploadResource) error {
-		if resource.Kind != UploadResourceKindWorkspace || resource.Workspace == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
-			return fmt.Errorf("仅允许删除当前画布工作区上传文件")
+		if resource.Kind != UploadResourceKindCanvas || resource.Canvas == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
+			return fmt.Errorf("仅允许删除当前画布上传文件")
 		}
 		return nil
 	})
@@ -191,8 +191,8 @@ func (s *StorageService) deleteUserUploadByURL(ctx context.Context, rawURL strin
 	return adapter.Delete(ctx, profile, key)
 }
 
-func (s *StorageService) DeleteWorkspaceByStorageUID(ctx context.Context, storageUID string) error {
-	prefix, err := WorkspaceUserUploadObjectPrefix(storageUID)
+func (s *StorageService) DeleteCanvasByStorageUID(ctx context.Context, storageUID string) error {
+	prefix, err := CanvasUserUploadObjectPrefix(storageUID)
 	if err != nil {
 		return err
 	}
@@ -253,8 +253,8 @@ func (s *StorageService) deleteUploadObjectPrefixes(ctx context.Context, prefixe
 	return nil
 }
 
-func (s *StorageService) DeleteWorkspaceBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
-	prefix, err := WorkspaceBoardUploadObjectPrefix(storageUID, boardID)
+func (s *StorageService) DeleteCanvasBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
+	prefix, err := CanvasBoardUploadObjectPrefix(storageUID, boardID)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,7 @@
 <template>
-  <WorkspaceLandingPage />
+  <CanvasLandingPage />
 </template>
 
 <script setup lang="ts">
-import WorkspaceLandingPage from '../../workspace/pages/WorkspaceLandingPage.vue'
+import CanvasLandingPage from '../../canvas/pages/CanvasLandingPage.vue'
 </script>

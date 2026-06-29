@@ -57,7 +57,7 @@ describe('workflowFeatureRegistry projections', () => {
     })
   })
 
-  it('exposes workspace image action text without feature modules rebuilding it', () => {
+  it('exposes canvas image action text without feature modules rebuilding it', () => {
     expect(getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.removeBg)).toEqual({
       label: '抠图',
       title: '抠图',

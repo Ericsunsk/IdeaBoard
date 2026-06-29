@@ -1004,9 +1004,9 @@ func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing.T) {
 	params := map[string]interface{}{
 		"feature":            "style-variation",
-		"image_urls":         []interface{}{"/uploads/workspace/OWNR1A/board-1/content/source.png"},
-		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
-		"mask_image_url":     "/uploads/workspace/OWNR1A/board-1/content/mask.png",
+		"image_urls":         []interface{}{"/uploads/canvas/OWNR1A/board-1/content/source.png"},
+		"original_image_url": "/uploads/canvas/OWNR1A/board-1/content/source.png",
+		"mask_image_url":     "/uploads/canvas/OWNR1A/board-1/content/mask.png",
 		"variation_strength": 5,
 	}
 
@@ -1019,13 +1019,13 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 	if !ok || len(imageURLs) != 1 {
 		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
 	}
-	if imageURLs[0] != "https://app.example.com/uploads/workspace/OWNR1A/board-1/content/source.png" {
+	if imageURLs[0] != "https://app.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized image_urls[0]: %#v", imageURLs[0])
 	}
-	if got := params["original_image_url"]; got != "https://app.example.com/uploads/workspace/OWNR1A/board-1/content/source.png" {
+	if got := params["original_image_url"]; got != "https://app.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
 	}
-	if got := params["mask_image_url"]; got != "https://app.example.com/uploads/workspace/OWNR1A/board-1/content/mask.png" {
+	if got := params["mask_image_url"]; got != "https://app.example.com/uploads/canvas/OWNR1A/board-1/content/mask.png" {
 		t.Fatalf("unexpected normalized mask_image_url: %#v", got)
 	}
 	if got := params["variation_strength"]; got != 5 {
@@ -1036,7 +1036,7 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURLForStructuredUploadPaths(t *testing.T) {
 	params := map[string]interface{}{
 		"feature":            "style-variation",
-		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
+		"original_image_url": "/uploads/canvas/OWNR1A/board-1/content/source.png",
 	}
 
 	c := &ProviderExecutor{
@@ -1047,7 +1047,7 @@ func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURLForStructuredUploadPaths
 	}
 	c.normalizeUpstreamMediaParams(context.Background(), params)
 
-	if got := params["original_image_url"]; got != "https://api.example.com/uploads/workspace/OWNR1A/board-1/content/source.png" {
+	if got := params["original_image_url"]; got != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
 	}
 }
@@ -1124,7 +1124,7 @@ func TestNormalizeUpstreamMediaParamsDoesNotInlineUploadPathsWithoutPublicBaseUR
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsDoesNotInlineWorkspaceUploadWithoutPublicBaseURL(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsDoesNotInlineCanvasUploadWithoutPublicBaseURL(t *testing.T) {
 	tempDir := t.TempDir()
 	previousWD, err := os.Getwd()
 	if err != nil {
@@ -1137,15 +1137,15 @@ func TestNormalizeUpstreamMediaParamsDoesNotInlineWorkspaceUploadWithoutPublicBa
 		_ = os.Chdir(previousWD)
 	})
 
-	filePath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "source.png")
+	filePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "source.png")
 	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
 		t.Fatalf("mkdir uploads dir: %v", err)
 	}
-	if err := os.WriteFile(filePath, []byte("workspace image"), 0o644); err != nil {
+	if err := os.WriteFile(filePath, []byte("canvas image"), 0o644); err != nil {
 		t.Fatalf("write upload: %v", err)
 	}
 
-	ref := "/uploads/workspace/OWNR1A/board-1/content/source.png"
+	ref := "/uploads/canvas/OWNR1A/board-1/content/source.png"
 	params := map[string]interface{}{
 		"feature":            "style-variation",
 		"image_urls":         []interface{}{ref},
@@ -1160,9 +1160,9 @@ func TestNormalizeUpstreamMediaParamsDoesNotInlineWorkspaceUploadWithoutPublicBa
 		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
 	}
 	if got := imageURLs[0]; got != ref {
-		t.Fatalf("expected workspace upload to remain relative, got %#v", got)
+		t.Fatalf("expected canvas upload to remain relative, got %#v", got)
 	}
 	if got := params["original_image_url"]; got != ref {
-		t.Fatalf("expected workspace upload to remain relative, got %#v", got)
+		t.Fatalf("expected canvas upload to remain relative, got %#v", got)
 	}
 }

@@ -185,7 +185,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		dirPrefix, err := storage.WorkspaceContentUploadDirPrefix(owner.StorageUID, board.BoardID)
+		dirPrefix, err := storage.CanvasContentUploadDirPrefix(owner.StorageUID, board.BoardID)
 		if err != nil {
 			response.Error(c, 400, err.Error())
 			return
@@ -239,7 +239,7 @@ func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "删除失败", err)
 			return
 		}
-		if err := h.StorageService.DeleteWorkspaceUploadByURL(c.Request.Context(), owner.StorageUID, board.BoardID, req.URL); err != nil {
+		if err := h.StorageService.DeleteCanvasUploadByURL(c.Request.Context(), owner.StorageUID, board.BoardID, req.URL); err != nil {
 			response.Error(c, 400, err.Error())
 			return
 		}

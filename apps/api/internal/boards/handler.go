@@ -163,7 +163,7 @@ func (h *BoardHandler) DeleteBoard(c *gin.Context) {
 			response.Error(c, 403, "无权删除该画布")
 			return
 		}
-		if errors.Is(err, ErrBoardWorkspaceCleanupFailed) {
+		if errors.Is(err, ErrBoardCanvasCleanupFailed) {
 			response.InternalError(c, 500, "删除画布失败：文件清理失败", err)
 			return
 		}

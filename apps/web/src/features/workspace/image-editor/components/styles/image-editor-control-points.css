@@ -1,7 +1,0 @@
-:where(.image-editor-curves, .image-editor-histogram-control) {
-  --image-editor-control-point-size: var(--workspace-range-thumb-size);
-  --image-editor-control-point-border-width: var(--image-editor-panel-border-width, 1px);
-  --image-editor-control-point-border-color: var(--workspace-accent);
-  --image-editor-control-point-bg: #ffffff;
-  --image-editor-control-point-active-bg: var(--workspace-accent);
-}

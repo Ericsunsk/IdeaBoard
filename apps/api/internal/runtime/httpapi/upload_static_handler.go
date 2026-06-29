@@ -36,8 +36,8 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 		}
 
 		switch resource.Kind {
-		case storage.UploadResourceKindWorkspace:
-			if resource.Workspace == nil || !authorizeWorkspaceUploadRead(c, deps, *resource.Workspace) {
+		case storage.UploadResourceKindCanvas:
+			if resource.Canvas == nil || !authorizeCanvasUploadRead(c, deps, *resource.Canvas) {
 				return
 			}
 		case storage.UploadResourceKindProfileAvatar:
@@ -93,15 +93,15 @@ func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Co
 	return board.UserID, nil
 }
 
-func authorizeWorkspaceUploadRead(c *gin.Context, deps StaticUploadDeps, uploadPath storage.UploadWorkspaceResource) bool {
+func authorizeCanvasUploadRead(c *gin.Context, deps StaticUploadDeps, uploadPath storage.UploadCanvasResource) bool {
 	userID := c.GetInt64("user_id")
 	if deps.BoardService == nil || deps.Auth.UserRepo == nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("workspace upload dependencies not configured"))
+		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("canvas upload dependencies not configured"))
 		return false
 	}
 	resource := storage.UploadResource{
-		Kind: storage.UploadResourceKindWorkspace,
-		Workspace: &storage.UploadWorkspaceResource{
+		Kind: storage.UploadResourceKindCanvas,
+		Canvas: &storage.UploadCanvasResource{
 			OwnerSegment: uploadPath.OwnerSegment,
 			BoardSegment: uploadPath.BoardSegment,
 			RelativePath: uploadPath.RelativePath,

@@ -305,7 +305,7 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 	})
 
 	t.Run("allow structured uploads relative path", func(t *testing.T) {
-		if err := validateSubmitTaskMediaRef("/uploads/workspace/OWNR1A/board-1/content/a.png"); err != nil {
+		if err := validateSubmitTaskMediaRef("/uploads/canvas/OWNR1A/board-1/content/a.png"); err != nil {
 			t.Fatalf("expected structured upload path to pass: %v", err)
 		}
 	})
@@ -494,7 +494,7 @@ func TestWorkflowTaskParamsFromMapPreservesExtraAndFusionContract(t *testing.T) 
 	}
 }
 
-func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
+func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	userRepo := users.NewUserRepository(db)
@@ -520,34 +520,34 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 			mediaAuthorizer,
 		),
 	}, ServiceOptions{})
-	allowed := "/uploads/workspace/OWNR1A/board-1/content/demo.png"
+	allowed := "/uploads/canvas/OWNR1A/board-1/content/demo.png"
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, allowed); err != nil {
-		t.Fatalf("expected member to use workspace upload: %v", err)
+		t.Fatalf("expected member to use canvas upload: %v", err)
 	}
-	absoluteAllowed := "https://assets.example.com/uploads/workspace/OWNR1A/board-1/content/demo.png"
+	absoluteAllowed := "https://assets.example.com/uploads/canvas/OWNR1A/board-1/content/demo.png"
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, absoluteAllowed); err != nil {
-		t.Fatalf("expected member to use public workspace upload URL: %v", err)
+		t.Fatalf("expected member to use public canvas upload URL: %v", err)
 	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, outsider.ID, absoluteAllowed); err == nil {
-		t.Fatalf("expected outsider to be rejected for public workspace upload URL")
+		t.Fatalf("expected outsider to be rejected for public canvas upload URL")
 	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, outsider.ID, allowed); err == nil {
 		t.Fatalf("expected outsider to be rejected")
 	}
-	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/workspace/WRONG1/board-1/content/demo.png"); err == nil {
+	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/canvas/WRONG1/board-1/content/demo.png"); err == nil {
 		t.Fatalf("expected owner segment mismatch to be rejected")
 	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/2026/05/13/demo.png"); err == nil {
 		t.Fatalf("expected generic upload path to be rejected")
 	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/profile/MEMB1A/avatar/demo.png"); err == nil {
-		t.Fatalf("expected non-workspace upload path to be rejected")
+		t.Fatalf("expected non-canvas upload path to be rejected")
 	}
 }
 
 func TestSubmitTaskMediaRefValidationFailsClosedWithoutServiceValidator(t *testing.T) {
 	ctx := context.Background()
-	const allowedByFormat = "/uploads/workspace/OWNR1A/board-1/content/demo.png"
+	const allowedByFormat = "/uploads/canvas/OWNR1A/board-1/content/demo.png"
 	want := "任务媒体校验服务未配置"
 
 	tests := []struct {
