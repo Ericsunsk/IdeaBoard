@@ -100,7 +100,7 @@ import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
-import type { CanvasBoardMeta } from '../lib/canvasBoards'
+import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
 import {
   boardMenuPt,
   popupMenuDangerItemClass,

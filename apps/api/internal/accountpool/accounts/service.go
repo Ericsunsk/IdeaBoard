@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/tasking/taskqueue"
@@ -12,7 +11,6 @@ import (
 
 type AccountTaskStore interface {
 	ListTaskIDsByAccountIDAndStatuses(ctx context.Context, accountID int64, statuses ...string) ([]string, error)
-	FailRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Queries, accountID int64, errMsg string, completedAt time.Time) ([]string, error)
 }
 
 type AccountService struct {

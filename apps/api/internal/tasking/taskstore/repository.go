@@ -13,6 +13,8 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/tasking/tasks"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type Repository struct {
@@ -89,11 +91,71 @@ const (
 	defaultStorageProfileID = "builtin-local"
 )
 
+const createTaskPGXSQL = `
+INSERT INTO tasks (
+  task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
+  feature_slug, requested_model, resolved_model, api_type,
+  status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
+  cancelled_at, cancelled_by, cancel_reason
+) VALUES (
+  $1, $2, $3, $4,
+  $5, $6, $7,
+  $8, $9, $10, $11,
+  $12, $13, $14, $15, $16, $17, $18, $19,
+  $20, $21, $22
+)
+RETURNING id`
+
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
 func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
+	params := createTaskParams(task)
+	id, err := r.q.CreateTask(ctx, params)
+	if err != nil {
+		return err
+	}
+	task.ID = int64(id)
+	return nil
+}
+
+func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) error {
+	if tx == nil {
+		return fmt.Errorf("taskstore: pgx tx is nil")
+	}
+	params := createTaskParams(task)
+	err := tx.QueryRow(ctx, createTaskPGXSQL,
+		params.TaskID,
+		params.UserID,
+		nullableInt64(params.AssignedChannelID),
+		nullableInt64(params.AccountID),
+		params.Prompt,
+		params.UserPrompt,
+		params.Params,
+		params.FeatureSlug,
+		params.RequestedModel,
+		params.ResolvedModel,
+		params.ApiType,
+		params.Status,
+		params.LeaseToken,
+		params.RetryCount,
+		params.ErrorMsg,
+		params.Result,
+		params.CreatedAt,
+		params.UpdatedAt,
+		nullableTime(params.CompletedAt),
+		nullableTime(params.CancelledAt),
+		nullableInt64(params.CancelledBy),
+		params.CancelReason,
+	).Scan(&task.ID)
+	if err != nil {
+		return fmt.Errorf("taskstore: create task with pgx tx: %w", err)
+	}
+	return nil
+}
+
+func createTaskParams(task *tasks.Task) dbsqlc.CreateTaskParams {
 	now := time.Now()
 	if task.CreatedAt.IsZero() {
 		task.CreatedAt = now
@@ -101,7 +163,7 @@ func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
 	if task.UpdatedAt.IsZero() {
 		task.UpdatedAt = task.CreatedAt
 	}
-	id, err := r.q.CreateTask(ctx, dbsqlc.CreateTaskParams{
+	return dbsqlc.CreateTaskParams{
 		TaskID:            task.TaskID,
 		UserID:            task.UserID,
 		AssignedChannelID: dbutil.NullInt64(task.AssignedChannelID),
@@ -124,12 +186,21 @@ func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
 		CancelledAt:       dbutil.NullTime(task.CancelledAt),
 		CancelledBy:       dbutil.NullInt64(task.CancelledBy),
 		CancelReason:      task.CancelReason,
-	})
-	if err != nil {
-		return err
 	}
-	task.ID = int64(id)
-	return nil
+}
+
+func nullableInt64(value sql.NullInt64) interface{} {
+	if !value.Valid {
+		return nil
+	}
+	return value.Int64
+}
+
+func nullableTime(value sql.NullTime) interface{} {
+	if !value.Valid {
+		return nil
+	}
+	return value.Time
 }
 
 func (r *Repository) GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error) {

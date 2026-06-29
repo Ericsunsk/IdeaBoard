@@ -10,8 +10,8 @@ import {
 import {
   getCanvasBoardState,
   replaceCanvasBoardStateMap,
-} from '../../canvas-board/persistence'
-import { createEmptyCanvasBoardState, type CanvasBoardState } from '../../canvas-board/domain'
+} from '../persistence'
+import { createEmptyCanvasBoardState, type CanvasBoardState } from '../domain'
 
 export type HydrateCanvasBoardsFromServerResult = { ok: true } | { ok: false; error: unknown }
 

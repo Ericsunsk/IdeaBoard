@@ -8,8 +8,11 @@ import {
   BOARD_PREVIEW_RENDERER_VERSION,
   renderBoardPreviewDataUrl,
 } from '../../canvas-board/preview'
-import { isBoardNameConflictError, syncCanvasBoardToServer } from './boardSync'
-import type { CanvasBoardMeta } from './canvasBoards'
+import {
+  isBoardNameConflictError,
+  syncCanvasBoardToServer,
+} from '../../canvas-board/catalog/boardSync'
+import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
 
 export interface BoardPreviewRefreshQueueDependencies {
   getBoardState: (boardId: string) => CanvasBoardState | null

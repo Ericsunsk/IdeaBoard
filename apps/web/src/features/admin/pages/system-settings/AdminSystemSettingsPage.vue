@@ -428,7 +428,7 @@ import {
   TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS,
   TASK_MONITOR_MIN_PAGE_SIZE,
   TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
-} from '../../task-monitor/taskMonitorSettingsResource'
+} from '../../system-settings/taskMonitorSettingsResource'
 import {
   useAdminTaskMonitorSettings,
 } from '../../system-settings/useAdminTaskMonitorSettings'

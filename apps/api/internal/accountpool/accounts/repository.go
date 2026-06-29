@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,15 +16,24 @@ import (
 	"ideaboard/api/internal/platform/secrets"
 )
 
+var errRunningTaskFinalizerNotConfigured = errors.New("running task finalizer is not configured")
+
 type AccountRepository struct {
-	db *sql.DB
-	q  *dbsqlc.Queries
+	db                   *sql.DB
+	q                    *dbsqlc.Queries
+	runningTaskFinalizer RunningTaskFinalizer
 }
 
-type RunningTaskFinalizerTx func(ctx context.Context, q *dbsqlc.Queries, completedAt time.Time) ([]string, error)
+type RunningTaskFinalizer interface {
+	FailRunningByAccountIDWithDBTX(ctx context.Context, tx dbutil.DBTX, accountID int64, errMsg string, completedAt time.Time) ([]string, error)
+}
 
 func NewAccountRepository(db *sql.DB) *AccountRepository {
 	return &AccountRepository{db: db, q: dbsqlc.New(db)}
+}
+
+func NewAccountRepositoryWithRunningTaskFinalizer(db *sql.DB, finalizer RunningTaskFinalizer) *AccountRepository {
+	return &AccountRepository{db: db, q: dbsqlc.New(db), runningTaskFinalizer: finalizer}
 }
 
 func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) error {
@@ -179,9 +189,9 @@ func (r *AccountRepository) Delete(ctx context.Context, id int64) error {
 	})
 }
 
-func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Context, id int64, finalizer RunningTaskFinalizerTx) ([]string, error) {
+func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Context, id int64, reason string) ([]string, error) {
 	var failedTaskIDs []string
-	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx dbutil.DBTX) error {
 		updated, err := q.ArchiveAccount(ctx, id)
 		if err != nil {
 			return err
@@ -192,10 +202,10 @@ func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Co
 		if err := q.RevokeAccountSecretsForArchive(ctx, id); err != nil {
 			return err
 		}
-		if finalizer == nil {
-			return nil
+		if r.runningTaskFinalizer == nil {
+			return errRunningTaskFinalizerNotConfigured
 		}
-		failedTaskIDs, err = finalizer(ctx, q, time.Now())
+		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithDBTX(ctx, tx, id, reason, time.Now())
 		return err
 	})
 	return failedTaskIDs, err
@@ -212,9 +222,9 @@ func (r *AccountRepository) UpdateStatus(ctx context.Context, id int64, status i
 	return nil
 }
 
-func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Context, id int64, finalizer RunningTaskFinalizerTx) ([]string, error) {
+func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Context, id int64, reason string) ([]string, error) {
 	var failedTaskIDs []string
-	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx dbutil.DBTX) error {
 		updated, err := q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: 0, ID: id})
 		if err != nil {
 			return err
@@ -222,10 +232,10 @@ func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Conte
 		if updated == 0 {
 			return database.ErrNotFound
 		}
-		if finalizer == nil {
-			return nil
+		if r.runningTaskFinalizer == nil {
+			return errRunningTaskFinalizerNotConfigured
 		}
-		failedTaskIDs, err = finalizer(ctx, q, time.Now())
+		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithDBTX(ctx, tx, id, reason, time.Now())
 		return err
 	})
 	return failedTaskIDs, err

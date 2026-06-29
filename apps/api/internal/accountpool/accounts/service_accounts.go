@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/tasking/tasks"
@@ -242,7 +240,7 @@ func normalizeFeatureSlugs(slugs []string) ([]string, error) {
 }
 
 func (s *AccountService) DeleteAccount(ctx context.Context, id int64) error {
-	failedTaskIDs, err := s.accountRepo.ArchiveAccountAndFinalizeRunningTasks(ctx, id, s.makeRunningTaskFinalizer(id, "账号已删除"))
+	failedTaskIDs, err := s.accountRepo.ArchiveAccountAndFinalizeRunningTasks(ctx, id, "账号已删除")
 	if err != nil {
 		if database.IsNotFound(err) {
 			return fmt.Errorf("%w", ErrAccountNotFound)
@@ -271,7 +269,7 @@ func (s *AccountService) StartAccount(ctx context.Context, id int64) error {
 }
 
 func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
-	failedTaskIDs, err := s.accountRepo.StopAccountAndFinalizeRunningTasks(ctx, id, s.makeRunningTaskFinalizer(id, "账号已停用"))
+	failedTaskIDs, err := s.accountRepo.StopAccountAndFinalizeRunningTasks(ctx, id, "账号已停用")
 	if err != nil {
 		if database.IsNotFound(err) {
 			return fmt.Errorf("%w", ErrAccountNotFound)
@@ -280,15 +278,6 @@ func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
 	}
 	s.handleAccountTaskSideEffects(ctx, id, failedTaskIDs)
 	return nil
-}
-
-func (s *AccountService) makeRunningTaskFinalizer(accountID int64, reason string) RunningTaskFinalizerTx {
-	return func(ctx context.Context, q *dbsqlc.Queries, completedAt time.Time) ([]string, error) {
-		if s.taskRepo == nil {
-			return nil, nil
-		}
-		return s.taskRepo.FailRunningByAccountIDTx(ctx, q, accountID, reason, completedAt)
-	}
 }
 
 func (s *AccountService) handleAccountTaskSideEffects(ctx context.Context, accountID int64, failedTaskIDs []string) {

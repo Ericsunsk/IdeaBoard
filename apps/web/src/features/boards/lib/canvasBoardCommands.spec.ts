@@ -7,7 +7,7 @@ import type {
   CanvasBoardRenameResult,
 } from './canvasBoardCommands'
 import { createCanvasBoardCommands } from './canvasBoardCommands'
-import type { CanvasBoardMeta } from './canvasBoards'
+import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
 
 function makeBoard(id: string, name = 'Board'): CanvasBoardMeta {
   return {

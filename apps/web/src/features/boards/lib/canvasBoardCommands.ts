@@ -5,7 +5,7 @@ import {
   isCanvasBoardNameTaken,
   renameCanvasBoard,
   type CanvasBoardMeta,
-} from './canvasBoards'
+} from '../../canvas-board/catalog/canvasBoards'
 import {
   hydrateCanvasBoardsFromServer,
   isBoardNameConflictError,
@@ -13,7 +13,7 @@ import {
   syncDeleteCanvasBoardToServer,
   type HydrateCanvasBoardsFromServerOptions,
   type HydrateCanvasBoardsFromServerResult,
-} from './boardSync'
+} from '../../canvas-board/catalog/boardSync'
 import {
   deleteCanvasBoardState,
   duplicateCanvasBoardState,

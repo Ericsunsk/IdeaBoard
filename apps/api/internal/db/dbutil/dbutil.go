@@ -9,7 +9,20 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
+type DBTX interface {
+	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+	PrepareContext(context.Context, string) (*sql.Stmt, error)
+	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+}
+
 func WithTx(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries) error) error {
+	return WithTxDBTX(ctx, db, func(q *dbsqlc.Queries, _ DBTX) error {
+		return fn(q)
+	})
+}
+
+func WithTxDBTX(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries, DBTX) error) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -21,7 +34,7 @@ func WithTx(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries) error) err
 		}
 	}()
 
-	if err := fn(dbsqlc.New(db).WithTx(tx)); err != nil {
+	if err := fn(dbsqlc.New(db).WithTx(tx), tx); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {

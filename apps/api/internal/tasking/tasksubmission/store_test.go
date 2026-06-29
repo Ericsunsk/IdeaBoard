@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -32,7 +33,7 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 		Params:     task.Params,
 		AccountIDs: []int64{101},
 	}
-	store := NewStore(pool, failingRiverTxClient{err: errors.New("river insert failed")}, "drawing_default", 3)
+	store := NewStore(pool, taskstore.NewRepository(db), failingRiverTxClient{err: errors.New("river insert failed")}, "drawing_default", 3)
 
 	if err := store.SubmitTask(ctx, task, queueTask); err == nil {
 		t.Fatalf("expected submit to fail")
@@ -53,29 +54,4 @@ type failingRiverTxClient struct {
 
 func (c failingRiverTxClient) InsertTx(context.Context, pgx.Tx, river.JobArgs, *river.InsertOpts) (*rivertype.JobInsertResult, error) {
 	return nil, c.err
-}
-
-func TestInsertTaskSQLMatchesSchemaColumns(t *testing.T) {
-	ctx := context.Background()
-	_, pool := testdb.OpenWithPool(t)
-
-	task := &tasks.Task{
-		TaskID:     "task_schema_drift_test",
-		UserID:     42,
-		Prompt:     "draw a chair",
-		UserPrompt: "draw a chair",
-		Params:     `{"size":"1024x1024"}`,
-		Status:     tasks.StatusPending,
-	}
-
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		t.Fatalf("begin tx: %v", err)
-	}
-	defer tx.Rollback(ctx)
-
-	if err := insertTask(ctx, tx, task); err != nil {
-		t.Fatalf("insertTask: %v", err)
-	}
-	_ = tx.Rollback(ctx)
 }

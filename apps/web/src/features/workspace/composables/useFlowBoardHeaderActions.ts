@@ -5,12 +5,12 @@ import {
   listCanvasBoards,
   normalizeCanvasBoardName,
   renameCanvasBoard,
-} from '../../boards/lib/canvasBoards'
+} from '../../canvas-board/catalog/canvasBoards'
 import {
   hydrateCanvasBoardsFromServer,
   isBoardNameConflictError,
   syncCanvasBoardToServer,
-} from '../../boards/lib/boardSync'
+} from '../../canvas-board/catalog/boardSync'
 import { USER_WORKSPACE_PATH } from '../../../shared/constants/routePaths'
 
 type BoardMeta = { id: string; name: string }

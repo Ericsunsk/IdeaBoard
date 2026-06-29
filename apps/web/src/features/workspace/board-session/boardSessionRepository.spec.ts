@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
-import { createCanvasBoard } from '../../boards/lib/canvasBoards'
+import { createCanvasBoard } from '../../canvas-board/catalog/canvasBoards'
 import {
   getCanvasBoardState,
   replaceCanvasBoardStateMap,

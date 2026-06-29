@@ -103,7 +103,7 @@ func newAppTaskRuntime(
 	}
 	riverQueue.SetClient(riverClient)
 
-	submissionStore := tasksubmission.NewStore(dbs.riverPool, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry)
+	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		AccountRepo:       repos.accountRepo,
 		TaskRepo:          repos.taskRepo,

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   TASK_MONITOR_MAX_PAGE_SIZE,
   TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
-} from '../task-monitor/taskMonitorSettingsResource'
+} from './taskMonitorSettingsResource'
 import {
   validateTaskMonitorSetting,
 } from './useAdminTaskMonitorSettings'

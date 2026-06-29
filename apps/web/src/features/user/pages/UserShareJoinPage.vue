@@ -30,9 +30,8 @@
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
-import boardApi from '../../../shared/api/board'
 import { USER_BOARDS_PATH, USER_WORKSPACE_PATH } from '../../../shared/constants/routePaths'
-import { hydrateCanvasBoardsFromServer } from '../../boards/lib/boardSync'
+import { joinSharedCanvasBoardByToken } from '../../canvas-board/catalog/joinSharedBoardWorkflow'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,18 +65,7 @@ function goBoards() {
 }
 
 async function joinSharedBoard() {
-  const token = getTokenFromQuery()
-  if (!token) {
-    throw new Error('缺少分享令牌')
-  }
-
-  const res = await boardApi.joinByShareToken(token)
-  const boardId = String(res.data?.board?.board_id || '').trim()
-  if (!boardId) {
-    throw new Error('服务端未返回可用画布 ID')
-  }
-
-  await hydrateCanvasBoardsFromServer()
+  const { boardId } = await joinSharedCanvasBoardByToken(getTokenFromQuery())
   await router.replace({
     path: USER_WORKSPACE_PATH,
     query: { boardId },
@@ -87,9 +75,9 @@ async function joinSharedBoard() {
 onMounted(async () => {
   try {
     await joinSharedBoard()
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     failed.value = true
-    errorMessage.value = error instanceof Error ? error.message : '加入画布失败，请稍后再试'
+    errorMessage.value = '加入共享画布失败，请确认链接是否有效'
   } finally {
     loading.value = false
   }

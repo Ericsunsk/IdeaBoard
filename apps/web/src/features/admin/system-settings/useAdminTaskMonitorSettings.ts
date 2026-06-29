@@ -16,7 +16,7 @@ import {
   TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
   normalizeTaskMonitorSetting,
   useAdminTaskMonitorSettingQuery,
-} from '../task-monitor/taskMonitorSettingsResource'
+} from './taskMonitorSettingsResource'
 import { updateTaskMonitorSetting } from './systemSettingsCommands'
 
 type AdminTaskMonitorSettingsMessage = {

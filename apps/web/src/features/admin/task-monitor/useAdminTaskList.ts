@@ -5,7 +5,7 @@ import {
   type ListAdminTasksParams,
   type ListAdminTasksStatus as ListAdminTasksStatusValue,
 } from '../../../shared/api/generated-query/model'
-import { useAdminTaskMonitorSettingQuery } from './taskMonitorSettingsResource'
+import { useAdminTaskMonitorSettingQuery } from '../system-settings/taskMonitorSettingsResource'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
 
 type TaskStatusStats = {

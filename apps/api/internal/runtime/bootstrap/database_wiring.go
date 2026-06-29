@@ -62,10 +62,11 @@ func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, er
 }
 
 func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error) {
+	taskRepo := taskstore.NewRepository(db)
 	repos := appRepositories{
 		userRepo:           users.NewUserRepository(db),
-		accountRepo:        accounts.NewAccountRepository(db),
-		taskRepo:           taskstore.NewRepository(db),
+		accountRepo:        accounts.NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo),
+		taskRepo:           taskRepo,
 		channelRepo:        channels.NewChannelRepository(db),
 		systemConfigRepo:   settings.NewSystemConfigRepository(db),
 		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),

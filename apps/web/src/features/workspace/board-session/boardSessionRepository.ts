@@ -1,5 +1,8 @@
-import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from '../../boards/lib/boardSync'
-import { getCanvasBoardById, touchCanvasBoard } from '../../boards/lib/canvasBoards'
+import {
+  hydrateCanvasBoardsFromServer,
+  syncCanvasBoardToServer,
+} from '../../canvas-board/catalog/boardSync'
+import { getCanvasBoardById, touchCanvasBoard } from '../../canvas-board/catalog/canvasBoards'
 import {
   getCanvasBoardState,
   setCanvasBoardPreviewSnapshot,

@@ -174,9 +174,9 @@ import {
   listCanvasBoards,
   touchCanvasBoard,
   type CanvasBoardMeta,
-} from '../lib/canvasBoards'
+} from '../../canvas-board/catalog/canvasBoards'
 import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
-import { hydrateCanvasBoardsFromServer } from '../lib/boardSync'
+import { hydrateCanvasBoardsFromServer } from '../../canvas-board/catalog/boardSync'
 import { createCanvasBoardCommands } from '../lib/canvasBoardCommands'
 import { createBoardPreviewRefreshQueue } from '../lib/boardPreviewRefreshQueue'
 import { useAppToast } from '../../../shared/composables/useAppToast'

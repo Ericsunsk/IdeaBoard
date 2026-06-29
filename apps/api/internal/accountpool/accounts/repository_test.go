@@ -2,13 +2,44 @@ package accounts
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/db/dbutil"
 )
+
+type stubRunningTaskFinalizer struct {
+	err error
+}
+
+func (f stubRunningTaskFinalizer) FailRunningByAccountIDWithDBTX(context.Context, dbutil.DBTX, int64, string, time.Time) ([]string, error) {
+	return nil, f.err
+}
+
+func seedRepositoryTestAccount(t *testing.T, ctx context.Context, repo *AccountRepository, db *sql.DB, suffix string) *ApiAccount {
+	t.Helper()
+	channelID := createAccountTestChannel(t, db, suffix)
+	account := &ApiAccount{
+		Name:          suffix,
+		ChannelID:     channelID,
+		Platform:      "openai-compatible",
+		ApiType:       "openai-compatible",
+		Models:        []AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:        "runtime-secret",
+		ProxyURL:      "https://example.com/" + suffix,
+		MaxConcurrent: 1,
+		Timeout:       30,
+		Weight:        1,
+		Status:        1,
+	}
+	if err := repo.Create(ctx, account); err != nil {
+		t.Fatalf("create account failed: %v", err)
+	}
+	return account
+}
 
 func TestAccountSecretBoundarySeparatesAdminAndRuntimeReads(t *testing.T) {
 	ctx := context.Background()
@@ -191,7 +222,8 @@ func TestRuntimeAccountReadRequiresActiveNonArchivedAccount(t *testing.T) {
 func TestStopAccountAndFinalizeRunningTasksRollsBackAccountStatusWhenFinalizerFails(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	sentinel := errors.New("finalizer failed")
+	repo := NewAccountRepositoryWithRunningTaskFinalizer(db, stubRunningTaskFinalizer{err: sentinel})
 	channelID := createAccountTestChannel(t, db, "stop-rollback")
 	account := &ApiAccount{
 		Name:          "stop-rollback",
@@ -210,10 +242,7 @@ func TestStopAccountAndFinalizeRunningTasksRollsBackAccountStatusWhenFinalizerFa
 		t.Fatalf("create account failed: %v", err)
 	}
 
-	sentinel := errors.New("finalizer failed")
-	_, err := repo.StopAccountAndFinalizeRunningTasks(ctx, account.ID, func(context.Context, *dbsqlc.Queries, time.Time) ([]string, error) {
-		return nil, sentinel
-	})
+	_, err := repo.StopAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已停用")
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("StopAccountAndFinalizeRunningTasks err=%v, want sentinel", err)
 	}
@@ -230,7 +259,8 @@ func TestStopAccountAndFinalizeRunningTasksRollsBackAccountStatusWhenFinalizerFa
 func TestArchiveAccountAndFinalizeRunningTasksRollsBackArchiveAndSecretWhenFinalizerFails(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
+	sentinel := errors.New("finalizer failed")
+	repo := NewAccountRepositoryWithRunningTaskFinalizer(db, stubRunningTaskFinalizer{err: sentinel})
 	channelID := createAccountTestChannel(t, db, "archive-rollback")
 	account := &ApiAccount{
 		Name:          "archive-rollback",
@@ -249,10 +279,7 @@ func TestArchiveAccountAndFinalizeRunningTasksRollsBackArchiveAndSecretWhenFinal
 		t.Fatalf("create account failed: %v", err)
 	}
 
-	sentinel := errors.New("finalizer failed")
-	_, err := repo.ArchiveAccountAndFinalizeRunningTasks(ctx, account.ID, func(context.Context, *dbsqlc.Queries, time.Time) ([]string, error) {
-		return nil, sentinel
-	})
+	_, err := repo.ArchiveAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已删除")
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("ArchiveAccountAndFinalizeRunningTasks err=%v, want sentinel", err)
 	}
@@ -267,4 +294,47 @@ func TestArchiveAccountAndFinalizeRunningTasksRollsBackArchiveAndSecretWhenFinal
 	if _, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID); err != nil {
 		t.Fatalf("active secret should survive rolled-back archive: %v", err)
 	}
+}
+
+func TestFinalizeRunningTasksMethodsRequireFinalizer(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("stop", func(t *testing.T) {
+		db := newAccountServiceTestDB(t)
+		repo := NewAccountRepository(db)
+		account := seedRepositoryTestAccount(t, ctx, repo, db, "stop-missing-finalizer")
+
+		_, err := repo.StopAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已停用")
+		if !errors.Is(err, errRunningTaskFinalizerNotConfigured) {
+			t.Fatalf("StopAccountAndFinalizeRunningTasks err=%v, want missing finalizer", err)
+		}
+		got, err := repo.GetByID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("GetByID after rollback failed: %v", err)
+		}
+		if got.Status != 1 {
+			t.Fatalf("account status after rollback=%d, want active", got.Status)
+		}
+	})
+
+	t.Run("archive", func(t *testing.T) {
+		db := newAccountServiceTestDB(t)
+		repo := NewAccountRepository(db)
+		account := seedRepositoryTestAccount(t, ctx, repo, db, "archive-missing-finalizer")
+
+		_, err := repo.ArchiveAccountAndFinalizeRunningTasks(ctx, account.ID, "账号已删除")
+		if !errors.Is(err, errRunningTaskFinalizerNotConfigured) {
+			t.Fatalf("ArchiveAccountAndFinalizeRunningTasks err=%v, want missing finalizer", err)
+		}
+		got, err := repo.GetByID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("GetByID after rollback failed: %v", err)
+		}
+		if got.Status != 1 {
+			t.Fatalf("account status after rollback=%d, want active", got.Status)
+		}
+		if _, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID); err != nil {
+			t.Fatalf("active secret should survive rolled-back archive: %v", err)
+		}
+	})
 }

@@ -422,3 +422,10 @@ func (r *Repository) FailRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Que
 	}
 	return taskIDs, nil
 }
+
+func (r *Repository) FailRunningByAccountIDWithDBTX(ctx context.Context, tx dbutil.DBTX, accountID int64, errMsg string, completedAt time.Time) ([]string, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("tx is nil")
+	}
+	return r.FailRunningByAccountIDTx(ctx, dbsqlc.New(tx), accountID, errMsg, completedAt)
+}
