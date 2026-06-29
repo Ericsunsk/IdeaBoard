@@ -40,11 +40,11 @@ type UseFlowImageUploadActionsOptions = {
 }
 
 export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOptions) {
-  const uploadCache = new Map<string, Promise<FlowImageUploadResult>>()
+  const inFlightUploads = new Map<string, Promise<FlowImageUploadResult>>()
   const nodeUploadRequests = new Map<string, number>()
   let uploadRequestSequence = 0
 
-  function buildUploadCacheKey(boardId: string, file: File): string {
+  function buildInFlightUploadKey(boardId: string, file: File): string {
     return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
   }
 
@@ -76,8 +76,8 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     if (!boardId) {
       throw new Error('缺少 boardId，无法上传图片')
     }
-    const cacheKey = buildUploadCacheKey(boardId, file)
-    const cached = uploadCache.get(cacheKey)
+    const cacheKey = buildInFlightUploadKey(boardId, file)
+    const cached = inFlightUploads.get(cacheKey)
     if (cached) return cached
     const uploadTask = (async () => {
       try {
@@ -97,12 +97,11 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const resolvedRatio =
           preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
         return { url: uploadRes.data.url, ratio: resolvedRatio }
-      } catch (error) {
-        uploadCache.delete(cacheKey)
-        throw error
+      } finally {
+        inFlightUploads.delete(cacheKey)
       }
     })()
-    uploadCache.set(cacheKey, uploadTask)
+    inFlightUploads.set(cacheKey, uploadTask)
     return uploadTask
   }
 

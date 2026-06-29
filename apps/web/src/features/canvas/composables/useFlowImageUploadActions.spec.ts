@@ -166,6 +166,47 @@ describe('useFlowImageUploadActions', () => {
     expect(createNodeAtPosition).not.toHaveBeenCalled()
   })
 
+  it('reuploads the same file when it is inserted again after a previous node was deleted', async () => {
+    const currentBoardId = { value: 'board-a' }
+    const createdUrls: string[] = []
+    const uploadApi = {
+      upload: vi
+        .fn()
+        .mockResolvedValueOnce({
+          code: 0,
+          data: { url: '/uploads/canvas/user/board-a/content/first.png', width: 100, height: 100 },
+        })
+        .mockResolvedValueOnce({
+          code: 0,
+          data: { url: '/uploads/canvas/user/board-a/content/second.png', width: 100, height: 100 },
+        }),
+    }
+    const actions = useFlowImageUploadActions({
+      currentBoardId,
+      createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
+        createdUrls.push(patch?.sourceImageUrl ?? '')
+        return `node-${createdUrls.length}`
+      }),
+      updateSnapshotNode: vi.fn(),
+      getImageNodeSnapshot: vi.fn(),
+      uploadApi,
+      sanitizeApiErrorMessage: (msg, fallback) => msg || fallback,
+      onWarning: vi.fn(),
+      onSuccess: vi.fn(),
+    })
+    const file = makeFile('same.png')
+
+    await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, file)).resolves.toBe('node-1')
+    // The first node can now be deleted and its uploaded URL recycled by autosave.
+    await expect(actions.createImageNodeFromFile({ x: 30, y: 40 }, file)).resolves.toBe('node-2')
+
+    expect(uploadApi.upload).toHaveBeenCalledTimes(2)
+    expect(createdUrls).toEqual([
+      '/uploads/canvas/user/board-a/content/first.png',
+      '/uploads/canvas/user/board-a/content/second.png',
+    ])
+  })
+
   it('rejects shared upload results that complete after switching boards', async () => {
     const currentBoardId = { value: 'board-a' }
     const upload = createDeferred<{
