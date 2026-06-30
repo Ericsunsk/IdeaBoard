@@ -153,6 +153,7 @@ import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
 import { useFlowViewportControls } from '../composables/useFlowViewportControls'
+import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
 import { useCanvasViewportRuntime } from '../composables/useCanvasViewportRuntime'
 import {
   ACTIVE_NODE_PANEL_KIND,
@@ -199,6 +200,7 @@ const { zoomLevel, applyFlowTransform } = useFlowViewportControls({
   getViewport,
   setViewport: (viewport) => setViewport(viewport),
 })
+provideCanvasViewportContext({ zoomLevel })
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const canvasViewportSize = ref({ width: 0, height: 0 })

@@ -1,4 +1,12 @@
-import { computed, onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
+import {
+  computed,
+  getCurrentScope,
+  onScopeDispose,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+} from 'vue'
 import { canvasToBlob, resolveFetchUrl } from '../services/flowMediaIO'
 import {
   detectCanvasTransparency,
@@ -8,7 +16,7 @@ import {
 } from '../utils/displayImagePreviewEncoding'
 
 interface PreviewOptions {
-  maxSide?: number
+  maxSide?: MaybeRefOrGetter<number | null | undefined>
 }
 
 const DEFAULT_MAX_SIDE = 1280
@@ -22,6 +30,14 @@ let activePreviewTasks = 0
 
 function buildPreviewCacheKey(sourceUrl: string, maxSide: number) {
   return `${maxSide}::${sourceUrl}`
+}
+
+function resolvePreviewMaxSide(value: unknown): number | null {
+  // null is the explicit full-quality tier: keep the original URL and skip canvas work.
+  if (value === null) return null
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : DEFAULT_MAX_SIDE
 }
 
 function touchCache(cacheKey: string, previewObjectUrl: string) {
@@ -138,18 +154,19 @@ export function useDisplayImagePreview(
   sourceUrl: MaybeRefOrGetter<string | null | undefined>,
   options: PreviewOptions = {},
 ) {
-  const maxSide = options.maxSide ?? DEFAULT_MAX_SIDE
+  const readMaxSide = () => resolvePreviewMaxSide(toValue(options.maxSide))
   const previewUrl = ref<string | null>(null)
   let requestToken = 0
 
   watch(
-    () => toValue(sourceUrl),
-    (currentSource) => {
+    [() => toValue(sourceUrl), readMaxSide],
+    ([currentSource, maxSide]) => {
       requestToken += 1
       const token = requestToken
       previewUrl.value = null
 
       if (!currentSource) return
+      if (maxSide === null) return
 
       const cacheKey = buildPreviewCacheKey(currentSource, maxSide)
       const cached = getCachedPreviewUrl(cacheKey)
@@ -166,9 +183,11 @@ export function useDisplayImagePreview(
     { immediate: true },
   )
 
-  onBeforeUnmount(() => {
-    requestToken += 1
-  })
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      requestToken += 1
+    })
+  }
 
   const displayUrl = computed(() => previewUrl.value || toValue(sourceUrl) || '')
 

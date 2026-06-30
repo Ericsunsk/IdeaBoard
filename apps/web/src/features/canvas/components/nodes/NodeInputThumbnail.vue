@@ -50,7 +50,7 @@ const emit = defineEmits<{
 }>()
 
 const { displayUrl } = useDisplayImagePreview(() => props.src, {
-  maxSide: props.previewMaxSide,
+  maxSide: () => props.previewMaxSide,
 })
 
 defineOptions({

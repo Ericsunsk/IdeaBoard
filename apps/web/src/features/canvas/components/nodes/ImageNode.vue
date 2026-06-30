@@ -29,6 +29,7 @@
         ref="imageStageRef"
         :node-id="node.id"
         :flow-node-id="flowNodeId"
+        :stage-width="node.width"
         :stage-height="stageHeight"
         :display-image="displayImage"
         :input-locked="inputLocked"

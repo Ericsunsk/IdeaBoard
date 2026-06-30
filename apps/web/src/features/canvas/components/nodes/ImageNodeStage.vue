@@ -113,8 +113,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
+import { useCanvasViewportContext } from '../../composables/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageToolStageBinding } from '../../image-tools'
+import { useCanvasImagePreviewQuality } from '../../composables/useCanvasImagePreviewQuality'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import { ImageMaskEditorOverlay } from '../../mask-editor'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
@@ -126,6 +128,7 @@ import RenderedImagePreviewCanvas from './RenderedImagePreviewCanvas.vue'
 const props = defineProps<{
   nodeId: string | number
   flowNodeId?: string
+  stageWidth: number
   stageHeight: number
   displayImage: { url: string } | null
   inputLocked?: boolean
@@ -159,9 +162,19 @@ const emit = defineEmits<{
 }>()
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
-const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
 const isImageToolActive = computed(() => props.imageToolStageBinding?.mode != null)
 const isMaskEditorActive = computed(() => props.imageToolStageBinding?.mode === 'inpaint')
+const forceFullPreviewQuality = computed(() => !!props.expandModeActive || isImageToolActive.value)
+const canvasViewport = useCanvasViewportContext()
+const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
+  stageWidth: () => props.stageWidth,
+  stageHeight: () => props.stageHeight,
+  zoomLevel: canvasViewport.zoomLevel,
+  forceFullQuality: forceFullPreviewQuality,
+})
+const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
+  maxSide: previewMaxSide,
+})
 const renderedImagePreview = computed(() => props.imageToolStageBinding?.renderedPreview ?? null)
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
