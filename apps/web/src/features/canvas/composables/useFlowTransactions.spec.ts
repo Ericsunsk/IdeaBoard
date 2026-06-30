@@ -1,15 +1,23 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
+import { useFlowHistory } from './useFlowHistory'
 import { useFlowTransactions } from './useFlowTransactions'
 
 function createTransactionsHarness() {
   const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
   const edges = shallowRef<Edge[]>([])
-  const captureHistory = vi.fn(() => ({
-    nodes: nodes.value,
-    edges: edges.value,
-  }))
+  const flowHistory = useFlowHistory({
+    nodes,
+    edges,
+    commitNodes: (nextNodes) => {
+      nodes.value = nextNodes as Node[]
+    },
+    commitEdges: (nextEdges) => {
+      edges.value = nextEdges as Edge[]
+    },
+  })
+  const captureHistory = vi.fn(flowHistory.capture)
   const pushHistory = vi.fn()
   const markDirty = vi.fn()
   const refreshSnapshot = vi.fn()
@@ -73,10 +81,7 @@ describe('useFlowTransactions', () => {
     const { captureHistory, pushHistory, transactions } = createTransactionsHarness()
 
     transactions.commitNodeMutation(
-      (currentNodes) => [
-        ...currentNodes,
-        { id: 'node-2', position: { x: 10, y: 0 }, data: {} },
-      ],
+      (currentNodes) => [...currentNodes, { id: 'node-2', position: { x: 10, y: 0 }, data: {} }],
       { recordHistory: false },
     )
 

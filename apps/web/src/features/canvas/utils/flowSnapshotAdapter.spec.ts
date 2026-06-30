@@ -5,7 +5,10 @@ import {
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from './flowSnapshotAdapter'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../canvas-board/domain'
+import {
+  CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  createEmptyCanvasBoardSnapshot,
+} from '../../canvas-board/domain'
 
 function makeImageFlowNode(params: {
   flowId: string
@@ -343,6 +346,114 @@ describe('flowSnapshotAdapter', () => {
     expect(fusionImageInputs.length).toBe(2)
   })
 
+  it('allocates new connection ids after base ids when restored ids collide', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-1.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-2.png',
+      }),
+      makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
+    ]
+    const base = createEmptyCanvasBoardSnapshot()
+    base.connections.push({
+      id: 42,
+      fromNodeType: 'image',
+      fromNodeId: 99,
+      fromPort: 'image',
+      toNodeType: 'prompt',
+      toNodeId: 100,
+      toPort: 'image',
+    })
+
+    const snapshot = flowToCanvasBoardSnapshot(
+      {
+        nodes,
+        edges: [
+          {
+            id: 'edge-restored',
+            source: 'image-1',
+            sourceHandle: 'out:image',
+            target: 'prompt-3',
+            targetHandle: 'in:image',
+            data: { connectionSnapshot: { id: 7 } },
+          },
+          {
+            id: 'edge-colliding',
+            source: 'image-2',
+            sourceHandle: 'out:image',
+            target: 'prompt-3',
+            targetHandle: 'in:image',
+            data: { connectionSnapshot: { id: 7 } },
+          },
+        ],
+      },
+      base,
+    )
+
+    expect(snapshot.connections.map((connection) => connection.id)).toEqual([7, 43])
+  })
+
+  it('keeps the last edge for single-input target ports', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-1.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-2.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-3',
+        id: 3,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/target.png',
+      }),
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot({
+      nodes,
+      edges: [
+        {
+          id: 'edge-first',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'image-3',
+          targetHandle: 'in:image',
+          data: { connectionSnapshot: { id: 11 } },
+        },
+        {
+          id: 'edge-last',
+          source: 'image-2',
+          sourceHandle: 'out:image',
+          target: 'image-3',
+          targetHandle: 'in:image',
+          data: { connectionSnapshot: { id: 12 } },
+        },
+      ],
+    })
+
+    expect(snapshot.connections).toHaveLength(1)
+    expect(snapshot.connections[0]).toMatchObject({
+      id: 12,
+      fromNodeId: 2,
+      toNodeId: 3,
+      toPort: 'image',
+    })
+  })
+
   it('preserves fusion blend points across round trips', () => {
     const flow = canvasBoardSnapshotToFlow({
       schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
@@ -382,8 +493,9 @@ describe('flowSnapshotAdapter', () => {
         outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
       }),
     ]
-    const sourceSnapshotNode = (nodes[0]?.data as { snapshotNode: { outputImages: Array<{ url: string }> } })
-      .snapshotNode
+    const sourceSnapshotNode = (
+      nodes[0]?.data as { snapshotNode: { outputImages: Array<{ url: string }> } }
+    ).snapshotNode
 
     const snapshot = flowToCanvasBoardSnapshot({ nodes, edges: [] })
     snapshot.imageNodes[0]!.outputImages[0]!.url = 'https://example.com/stabilized.png'

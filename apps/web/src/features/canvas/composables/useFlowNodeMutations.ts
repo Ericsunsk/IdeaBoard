@@ -39,6 +39,116 @@ type UpdateSnapshotNodeOptions = {
 
 type InitialSnapshotPatch<T extends CanvasCreatableNodeKind> = Partial<CanvasNodeItemByKind[T]>
 
+type FlowNodeDataSource = {
+  id: string
+  data?: unknown
+}
+
+function buildOutgoingEdgesBySource(edges: Edge[]): Map<string, Edge[]> {
+  const outgoingEdgesBySource = new Map<string, Edge[]>()
+  for (const edge of edges) {
+    const existingEdges = outgoingEdgesBySource.get(edge.source)
+    if (existingEdges) {
+      existingEdges.push(edge)
+    } else {
+      outgoingEdgesBySource.set(edge.source, [edge])
+    }
+  }
+  return outgoingEdgesBySource
+}
+
+function buildNodeDataById(nodes: FlowNodeDataSource[]): Map<string, FlowNodeData> {
+  const nodeDataById = new Map<string, FlowNodeData>()
+  for (const node of nodes) {
+    if (node.data) nodeDataById.set(node.id, node.data as FlowNodeData)
+  }
+  return nodeDataById
+}
+
+function isReadyExecutionOutputNode(data: FlowNodeData | undefined): boolean {
+  if (!data || !isCanvasExecutionOutputNodeType(data.kind)) return false
+  const snapshotNode = data.snapshotNode
+  return (
+    !!snapshotNode &&
+    typeof snapshotNode === 'object' &&
+    'outputStatus' in snapshotNode &&
+    snapshotNode.outputStatus === 'ready'
+  )
+}
+
+function collectReadyExecutionOutputNodeIds(params: {
+  nodeId: string
+  includeSelf: boolean
+  outgoingEdgesBySource: Map<string, Edge[]>
+  nodeDataById: Map<string, FlowNodeData>
+}): Set<string> {
+  const staleNodeIds = new Set<string>()
+  const visited = new Set<string>()
+  const queue: string[] = []
+
+  const collectIfReady = (targetNodeId: string) => {
+    if (isReadyExecutionOutputNode(params.nodeDataById.get(targetNodeId))) {
+      staleNodeIds.add(targetNodeId)
+    }
+  }
+
+  const enqueueOutgoingTargets = (sourceNodeId: string) => {
+    for (const edge of params.outgoingEdgesBySource.get(sourceNodeId) ?? []) {
+      if (visited.has(edge.target)) continue
+      queue.push(edge.target)
+      visited.add(edge.target)
+    }
+  }
+
+  if (params.includeSelf) collectIfReady(params.nodeId)
+
+  visited.add(params.nodeId)
+  enqueueOutgoingTargets(params.nodeId)
+
+  for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+    const currentId = queue[queueIndex]!
+    collectIfReady(currentId)
+    enqueueOutgoingTargets(currentId)
+  }
+
+  return staleNodeIds
+}
+
+function markReadyExecutionOutputNodesStale(items: Node[], staleNodeIds: Set<string>): Node[] {
+  let nextNodes: Node[] | null = null
+  for (let index = 0; index < items.length; index += 1) {
+    const node = items[index]!
+    if (!staleNodeIds.has(node.id)) continue
+    const data = (node.data ?? {}) as { snapshotNode?: unknown; title?: string }
+    const snapshotNode = data.snapshotNode
+    if (
+      !snapshotNode ||
+      typeof snapshotNode !== 'object' ||
+      !('outputStatus' in snapshotNode) ||
+      snapshotNode.outputStatus !== 'ready'
+    ) {
+      continue
+    }
+    const nextSnapshotNode = {
+      ...(snapshotNode as CanvasNodeItem),
+      outputStatus: 'stale',
+    }
+    if (!nextNodes) nextNodes = [...items]
+    nextNodes[index] = {
+      ...node,
+      data: {
+        ...data,
+        title:
+          typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()
+            ? nextSnapshotNode.title.trim()
+            : data.title,
+        snapshotNode: nextSnapshotNode,
+      },
+    }
+  }
+  return nextNodes ?? items
+}
+
 export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   function resolveNodePosition(baseX = 120, baseY = 100) {
     if (options.nodes.value.length === 0) return { x: baseX, y: baseY }
@@ -240,52 +350,18 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     nodeId: string,
     { includeSelf = false }: { includeSelf?: boolean } = {},
   ) {
-    const visited = new Set<string>()
-    const queue: string[] = []
-    if (includeSelf) {
-      const selfData = lookupData(nodeId)
-      if (selfData && isCanvasExecutionOutputNodeType(selfData.kind)) {
-        updateSnapshotNode(
-          nodeId,
-          (snapshotNode) => {
-            if ('outputStatus' in snapshotNode && snapshotNode.outputStatus === 'ready')
-              return { ...snapshotNode, outputStatus: 'stale' }
-            return snapshotNode
-          },
-          { history: false },
-        )
-      }
-    }
-    visited.add(nodeId)
-    for (const edge of options.edges.value as unknown as Edge[]) {
-      if (edge.source === nodeId) {
-        if (!visited.has(edge.target)) {
-          queue.push(edge.target)
-          visited.add(edge.target)
-        }
-      }
-    }
-    while (queue.length > 0) {
-      const currentId = queue.shift()!
-      const data = lookupData(currentId)
-      if (data && isCanvasExecutionOutputNodeType(data.kind)) {
-        updateSnapshotNode(
-          currentId,
-          (snapshotNode) => {
-            if ('outputStatus' in snapshotNode && snapshotNode.outputStatus === 'ready')
-              return { ...snapshotNode, outputStatus: 'stale' }
-            return snapshotNode
-          },
-          { history: false },
-        )
-      }
-      for (const edge of options.edges.value as unknown as Edge[]) {
-        if (edge.source === currentId && !visited.has(edge.target)) {
-          queue.push(edge.target)
-          visited.add(edge.target)
-        }
-      }
-    }
+    const staleNodeIds = collectReadyExecutionOutputNodeIds({
+      nodeId,
+      includeSelf,
+      outgoingEdgesBySource: buildOutgoingEdgesBySource(options.edges.value as unknown as Edge[]),
+      nodeDataById: buildNodeDataById(options.nodes.value as FlowNodeDataSource[]),
+    })
+
+    if (staleNodeIds.size === 0) return
+
+    options.commitNodeMutation((items) => markReadyExecutionOutputNodesStale(items, staleNodeIds), {
+      recordHistory: false,
+    })
   }
 
   return {

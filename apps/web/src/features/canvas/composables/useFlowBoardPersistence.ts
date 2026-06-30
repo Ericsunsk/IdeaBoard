@@ -7,6 +7,7 @@ import {
 } from '../utils/flowSnapshotAdapter'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
+import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 type ValueRef<T> = { value: T }
@@ -163,20 +164,29 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
   }
 
   function buildCurrentBoardSnapshot(): CanvasBoardSnapshot {
-    const snapshot = flowToCanvasBoardSnapshot(
-      {
-        nodes: options.nodes.value as unknown as FlowAdapterNode[],
-        edges: options.edges.value as unknown as FlowAdapterEdge[],
+    return measureCanvasPerf(
+      'board.save.buildSnapshot',
+      () => ({
+        nodes: options.nodes.value.length,
+        edges: options.edges.value.length,
+      }),
+      () => {
+        const snapshot = flowToCanvasBoardSnapshot(
+          {
+            nodes: options.nodes.value as unknown as FlowAdapterNode[],
+            edges: options.edges.value as unknown as FlowAdapterEdge[],
+          },
+          options.boardBaseSnapshot.value,
+        )
+        const vp = options.getViewport()
+        snapshot.viewport = {
+          canvasX: vp.x,
+          canvasY: vp.y,
+          zoomLevel: Math.round(vp.zoom * 100),
+        }
+        return snapshot
       },
-      options.boardBaseSnapshot.value,
     )
-    const vp = options.getViewport()
-    snapshot.viewport = {
-      canvasX: vp.x,
-      canvasY: vp.y,
-      zoomLevel: Math.round(vp.zoom * 100),
-    }
-    return snapshot
   }
 
   async function saveCurrentBoardSnapshot(
@@ -192,9 +202,21 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     options.isSavingBoard.value = true
     try {
       const snapshot = buildCurrentBoardSnapshot()
-      const { snapshot: stabilizedSnapshot } = await options.boardSession.save(snapshot, {
-        waitForPreview: saveOptions.waitForPreview,
-      })
+      const { snapshot: stabilizedSnapshot } = await measureCanvasPerfAsync(
+        'board.save.session',
+        () => ({
+          imageNodes: snapshot.imageNodes.length,
+          promptNodes: snapshot.promptNodes.length,
+          fusionNodes: snapshot.fusionNodes.length,
+          connections: snapshot.connections.length,
+          waitForPreview: !!saveOptions.waitForPreview,
+        }),
+        () =>
+          options.boardSession.save(snapshot, {
+            waitForPreview: saveOptions.waitForPreview,
+          }),
+        50,
+      )
       const shouldCommitToCurrentGraph = isSaveStillCurrent()
       if (shouldCommitToCurrentGraph) {
         options.boardBaseSnapshot.value = stabilizedSnapshot

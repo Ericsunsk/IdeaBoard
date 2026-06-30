@@ -2,7 +2,6 @@ import {
   CANVAS_NODE_REGISTRY_LIST,
   createEmptyCanvasBoardSnapshot,
   getCanvasNodePortInputLimit,
-  getCanvasNodeSnapshotCollectionKey,
   isCanvasConnectionNodeType,
   type CanvasSnapshotNodeCollectionKey,
   type CanvasBoardSnapshot,
@@ -40,8 +39,12 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function cloneSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {
-  return clone(snapshot)
+function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  if (base) {
+    snapshot.viewport = { ...base.viewport }
+  }
+  return snapshot
 }
 
 function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
@@ -84,10 +87,12 @@ function getSnapshotNodeCollection(
   return snapshot[key] as CanvasNodeItem[]
 }
 
-function resetSnapshotNodeCollections(snapshot: CanvasBoardSnapshot) {
-  CANVAS_NODE_REGISTRY_LIST.forEach(({ snapshotCollection }) => {
-    getSnapshotNodeCollection(snapshot, snapshotCollection).length = 0
+function getSnapshotNodeCollectionsByType(snapshot: CanvasBoardSnapshot) {
+  const collections = new Map<CanvasConnectionNodeType, CanvasNodeItem[]>()
+  CANVAS_NODE_REGISTRY_LIST.forEach(({ kind, snapshotCollection }) => {
+    collections.set(kind, getSnapshotNodeCollection(snapshot, snapshotCollection))
   })
+  return collections
 }
 
 function toFlowDataFromCanvasNode(
@@ -162,86 +167,147 @@ function hasRenderableImageSource(node: CanvasNodeItem): boolean {
   return true
 }
 
+function getRestoredConnectionId(edge: FlowAdapterEdge): number | null {
+  const data = edge.data
+  if (!data || typeof data !== 'object') return null
+  const restoredId = (data as { connectionSnapshot?: { id?: unknown } }).connectionSnapshot?.id
+  return typeof restoredId === 'number' && Number.isFinite(restoredId) ? restoredId : null
+}
+
+function getInitialConnectionId(
+  base: CanvasBoardSnapshot | undefined,
+  edges: readonly FlowAdapterEdge[],
+) {
+  let maxConnectionId = 0
+  if (base) {
+    for (const connection of base.connections) {
+      if (Number.isFinite(connection.id) && connection.id > maxConnectionId) {
+        maxConnectionId = connection.id
+      }
+    }
+  }
+  for (const edge of edges) {
+    const restoredId = getRestoredConnectionId(edge)
+    if (restoredId !== null && restoredId > maxConnectionId) {
+      maxConnectionId = restoredId
+    }
+  }
+  return maxConnectionId + 1
+}
+
+function getTargetPortKey(
+  nodeType: CanvasConnectionNodeType,
+  nodeId: number,
+  port: CanvasConnectionPort,
+) {
+  return `${nodeType}:${nodeId}:${port}`
+}
+
+function getInputLimitKey(nodeType: CanvasConnectionNodeType, port: CanvasConnectionPort) {
+  return `${nodeType}:${port}`
+}
+
 export function flowToCanvasBoardSnapshot(
   input: { nodes: FlowAdapterNode[]; edges: FlowAdapterEdge[] },
   base?: CanvasBoardSnapshot,
 ): CanvasBoardSnapshot {
-  const snapshot = base ? cloneSnapshot(base) : createEmptyCanvasBoardSnapshot()
+  const snapshot = createSnapshotShell(base)
 
-  resetSnapshotNodeCollections(snapshot)
-  snapshot.connections = []
+  const snapshotNodeCollections = getSnapshotNodeCollectionsByType(snapshot)
   const usedConnectionIds = new Set<number>()
-  const persistedFlowNodeIds = new Set<string>()
+  const persistedFlowNodeRefs = new Map<
+    string,
+    { nodeType: CanvasConnectionNodeType; id: number }
+  >()
   const flowNodeDataMap = new Map<string, FlowNodeData>()
-  const normalizedEdgesForResolution: FlowAdapterEdge[] = []
+  type NormalizedFlowEdgeForResolution = Pick<FlowAdapterEdge, 'id' | 'target' | 'targetHandle'>
+  const normalizedEdgesByTarget = new Map<string, NormalizedFlowEdgeForResolution[]>()
+  const emptyNormalizedEdges: readonly NormalizedFlowEdgeForResolution[] = []
+  const singleInputConnectionIndex = new Map<string, number>()
+  const inputLimitCache = new Map<string, number>()
+  const connections: Array<CanvasConnection | null> = []
+  let nextGeneratedConnectionId = getInitialConnectionId(base, input.edges)
 
-  const nextConnectionId = () => {
-    const existingIds = snapshot.connections.map((connection) => connection.id)
-    const maxId = existingIds.length ? Math.max(...existingIds) : 0
-    return maxId + 1
+  const nextConnectionId = (edge: FlowAdapterEdge) => {
+    const restoredId = getRestoredConnectionId(edge)
+    if (restoredId !== null && !usedConnectionIds.has(restoredId)) {
+      usedConnectionIds.add(restoredId)
+      return restoredId
+    }
+
+    while (usedConnectionIds.has(nextGeneratedConnectionId)) {
+      nextGeneratedConnectionId += 1
+    }
+    const connectionId = nextGeneratedConnectionId
+    usedConnectionIds.add(connectionId)
+    nextGeneratedConnectionId += 1
+    return connectionId
+  }
+
+  const allowsMultipleInputs = (nodeType: CanvasConnectionNodeType, port: CanvasConnectionPort) => {
+    const key = getInputLimitKey(nodeType, port)
+    const cachedLimit = inputLimitCache.get(key)
+    if (cachedLimit !== undefined) return cachedLimit > 1
+    const limit = getCanvasNodePortInputLimit(nodeType, port)
+    inputLimitCache.set(key, limit)
+    return limit > 1
   }
 
   input.nodes.forEach((node) => {
     const ref = parseFlowNodeId(node.id)
     if (!ref) return
     const data = (node.data ?? {}) as FlowNodeData
-    flowNodeDataMap.set(node.id, data)
     const snapshotNode = data.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode || typeof snapshotNode !== 'object') return
-    const positionedNode = {
-      ...clone(snapshotNode),
-      x: node.position.x,
-      y: node.position.y,
-    } as CanvasNodeItem
-    if (!hasRenderableImageSource(positionedNode)) return
+    if (!hasRenderableImageSource(snapshotNode)) return
 
-    const collectionKey = getCanvasNodeSnapshotCollectionKey(ref.nodeType)
-    getSnapshotNodeCollection(snapshot, collectionKey).push(positionedNode)
-    persistedFlowNodeIds.add(node.id)
+    const positionedNode = clone(snapshotNode) as CanvasNodeItem
+    positionedNode.x = node.position.x
+    positionedNode.y = node.position.y
+
+    snapshotNodeCollections.get(ref.nodeType)?.push(positionedNode)
+    persistedFlowNodeRefs.set(node.id, ref)
+    flowNodeDataMap.set(node.id, data)
   })
 
   input.edges.forEach((edge) => {
-    if (!persistedFlowNodeIds.has(edge.source) || !persistedFlowNodeIds.has(edge.target)) return
-    const fromRef = parseFlowNodeId(edge.source)
-    const toRef = parseFlowNodeId(edge.target)
+    const fromRef = persistedFlowNodeRefs.get(edge.source)
+    const toRef = persistedFlowNodeRefs.get(edge.target)
     if (!fromRef || !toRef) return
     const normalizedEdge = normalizeFlowConnection(
       edge,
       (nodeId) => flowNodeDataMap.get(nodeId),
-      normalizedEdgesForResolution,
+      normalizedEdgesByTarget.get(edge.target) ?? emptyNormalizedEdges,
     )
     const sourceHandle = normalizedEdge?.sourceHandle ?? edge.sourceHandle
     const targetHandle = normalizedEdge?.targetHandle ?? edge.targetHandle
     const fromPort = parsePortFromHandle(sourceHandle ?? null, 'out')
     const toPort = parsePortFromHandle(targetHandle ?? null, 'in')
     if (!fromPort || !toPort) return
-    normalizedEdgesForResolution.push({
-      ...edge,
-      sourceHandle: `out:${fromPort}`,
-      targetHandle: `in:${toPort}`,
-    })
 
-    const existingConnection = (edge.data as { connectionSnapshot?: CanvasConnection } | undefined)
-      ?.connectionSnapshot
-    const restoredId = existingConnection?.id
-    const connectionId =
-      typeof restoredId === 'number' &&
-      Number.isFinite(restoredId) &&
-      !usedConnectionIds.has(restoredId)
-        ? restoredId
-        : nextConnectionId()
-    usedConnectionIds.add(connectionId)
-    const allowsMultipleInputs = getCanvasNodePortInputLimit(toRef.nodeType, toPort) > 1
-    if (!allowsMultipleInputs) {
-      // Remove any existing connection targeting the same input port (last-write wins).
-      const dupIndex = snapshot.connections.findIndex(
-        (c) => c.toNodeType === toRef.nodeType && c.toNodeId === toRef.id && c.toPort === toPort,
-      )
-      if (dupIndex >= 0) {
-        snapshot.connections.splice(dupIndex, 1)
-      }
+    const targetEdges = normalizedEdgesByTarget.get(edge.target)
+    const edgeForResolution: NormalizedFlowEdgeForResolution = {
+      id: edge.id,
+      target: edge.target,
+      targetHandle: `in:${toPort}`,
     }
-    snapshot.connections.push({
+    if (targetEdges) {
+      targetEdges.push(edgeForResolution)
+    } else {
+      normalizedEdgesByTarget.set(edge.target, [edgeForResolution])
+    }
+
+    const connectionId = nextConnectionId(edge)
+    if (!allowsMultipleInputs(toRef.nodeType, toPort)) {
+      // Remove any existing connection targeting the same input port (last-write wins).
+      const targetKey = getTargetPortKey(toRef.nodeType, toRef.id, toPort)
+      const duplicateIndex = singleInputConnectionIndex.get(targetKey)
+      if (duplicateIndex !== undefined) {
+        connections[duplicateIndex] = null
+      }
+      singleInputConnectionIndex.set(targetKey, connections.length)
+    }
+    connections.push({
       id: connectionId,
       fromNodeType: fromRef.nodeType,
       fromNodeId: fromRef.id,
@@ -252,5 +318,8 @@ export function flowToCanvasBoardSnapshot(
     })
   })
 
+  snapshot.connections = connections.filter(
+    (connection): connection is CanvasConnection => connection !== null,
+  )
   return snapshot
 }

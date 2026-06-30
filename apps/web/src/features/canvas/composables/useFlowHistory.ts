@@ -1,8 +1,25 @@
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 
-type FlowHistorySnapshot = {
-  nodes: unknown[]
-  edges: unknown[]
+type FlowHistoryItemIndex = {
+  itemsById: Map<string, FlowHistoryIndexedItem>
+  order: string[]
+}
+
+type FlowHistoryIndexedItem = {
+  value: unknown
+  json: string
+}
+
+declare const flowHistorySnapshotBrand: unique symbol
+
+export type FlowHistorySnapshot = {
+  readonly [flowHistorySnapshotBrand]: 'FlowHistorySnapshot'
+}
+
+type FlowHistorySnapshotState = {
+  nodeIndex: FlowHistoryItemIndex
+  edgeIndex: FlowHistoryItemIndex
 }
 
 type FlowHistoryPatch = {
@@ -31,8 +48,18 @@ type UseFlowHistoryOptions = {
   commitEdges: (edges: unknown[]) => void
 }
 
+const snapshotStates = new WeakMap<FlowHistorySnapshot, FlowHistorySnapshotState>()
+
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
+}
+
+function stringifyJson(value: unknown): string {
+  return JSON.stringify(value) ?? 'null'
+}
+
+function parseJson<T = unknown>(json: string): T {
+  return JSON.parse(json) as T
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -44,26 +71,78 @@ function getHistoryItemId(item: unknown): string | null {
   return item.id
 }
 
-function createHistoryItemMap(items: unknown[]): Map<string, unknown> {
-  const result = new Map<string, unknown>()
+function createHistoryItemIndex(items: unknown[]): FlowHistoryItemIndex {
+  const itemsById = new Map<string, FlowHistoryIndexedItem>()
+  const order: string[] = []
   for (const item of items) {
     const id = getHistoryItemId(item)
-    if (id) result.set(id, item)
+    if (!id) continue
+    itemsById.set(id, {
+      value: item,
+      json: stringifyJson(item),
+    })
+    order.push(id)
   }
-  return result
+  return { itemsById, order }
 }
 
-function createHistoryItemOrder(items: unknown[]): string[] {
-  return items.map((item) => getHistoryItemId(item)).filter((id): id is string => !!id)
+function createFlowHistorySnapshot(nodes: unknown[], edges: unknown[]): FlowHistorySnapshot {
+  const snapshot = Object.freeze({}) as FlowHistorySnapshot
+  snapshotStates.set(snapshot, {
+    nodeIndex: createHistoryItemIndex(nodes),
+    edgeIndex: createHistoryItemIndex(edges),
+  })
+  return snapshot
 }
 
-function isSameJson(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b)
+function readFlowHistorySnapshotState(snapshot: FlowHistorySnapshot): FlowHistorySnapshotState {
+  const state = snapshotStates.get(snapshot)
+  if (!state) {
+    throw new Error('Invalid flow history snapshot')
+  }
+  return state
 }
 
 function isSameOrder(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false
   return a.every((id, index) => id === b[index])
+}
+
+function createChangedItemPatch(
+  id: string,
+  beforeItem: FlowHistoryIndexedItem,
+  afterItem: FlowHistoryIndexedItem,
+): FlowHistoryPatch | null {
+  const beforeJson = beforeItem.json
+  const afterJson = afterItem.json
+  if (beforeJson === afterJson) return null
+  return {
+    id,
+    before: parseJson(beforeJson),
+    after: parseJson(afterJson),
+  }
+}
+
+function createCollectionPatches(
+  beforeIndex: FlowHistoryItemIndex,
+  afterIndex: FlowHistoryItemIndex,
+): FlowHistoryPatch[] {
+  const patches: FlowHistoryPatch[] = []
+  for (const [id, beforeItem] of beforeIndex.itemsById) {
+    if (!afterIndex.itemsById.has(id)) {
+      patches.push({ id, before: parseJson(beforeItem.json) })
+      continue
+    }
+    const afterItem = afterIndex.itemsById.get(id)
+    if (!afterItem) continue
+    const patch = createChangedItemPatch(id, beforeItem, afterItem)
+    if (patch) patches.push(patch)
+  }
+  for (const [id, afterItem] of afterIndex.itemsById) {
+    if (beforeIndex.itemsById.has(id)) continue
+    patches.push({ id, after: parseJson(afterItem.json) })
+  }
+  return patches
 }
 
 export type FlowHistory = {
@@ -78,19 +157,49 @@ export type FlowHistory = {
 
 export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   const maxSteps = Math.max(1, options.maxSteps ?? 10)
-  const flowHistoryPast = ref<FlowHistoryEntry[]>([])
-  const flowHistoryFuture = ref<FlowHistoryEntry[]>([])
-  const dragBeforeSnapshot = ref<FlowHistorySnapshot | null>(null)
+  const flowHistoryPast = shallowRef<FlowHistoryEntry[]>([])
+  const flowHistoryFuture = shallowRef<FlowHistoryEntry[]>([])
+  const dragBeforeSnapshot = shallowRef<FlowHistorySnapshot | null>(null)
 
   function capture(): FlowHistorySnapshot {
-    const serialized = JSON.stringify({
-      nodes: options.nodes.value as unknown[],
-      edges: options.edges.value as unknown[],
-    })
-    const snapshot = JSON.parse(serialized) as FlowHistorySnapshot
+    return measureCanvasPerf(
+      'history.capture',
+      () => ({
+        nodes: options.nodes.value.length,
+        edges: options.edges.value.length,
+      }),
+      () => {
+        const nodes = options.nodes.value as unknown[]
+        const edges = options.edges.value as unknown[]
+        return createFlowHistorySnapshot(nodes, edges)
+      },
+    )
+  }
+
+  function createHistoryPatches(
+    before: FlowHistorySnapshot,
+    after: FlowHistorySnapshot,
+  ): FlowHistoryEntry | null {
+    const beforeState = readFlowHistorySnapshotState(before)
+    const afterState = readFlowHistorySnapshotState(after)
+    const beforeNodeIndex = beforeState.nodeIndex
+    const afterNodeIndex = afterState.nodeIndex
+    const beforeEdgeIndex = beforeState.edgeIndex
+    const afterEdgeIndex = afterState.edgeIndex
+    const nodePatches = createCollectionPatches(beforeNodeIndex, afterNodeIndex)
+    const edgePatches = createCollectionPatches(beforeEdgeIndex, afterEdgeIndex)
+    const hasOrderChange =
+      !isSameOrder(beforeNodeIndex.order, afterNodeIndex.order) ||
+      !isSameOrder(beforeEdgeIndex.order, afterEdgeIndex.order)
+
+    if (nodePatches.length === 0 && edgePatches.length === 0 && !hasOrderChange) return null
     return {
-      nodes: snapshot.nodes,
-      edges: snapshot.edges,
+      nodePatches,
+      edgePatches,
+      beforeNodeOrder: beforeNodeIndex.order,
+      afterNodeOrder: afterNodeIndex.order,
+      beforeEdgeOrder: beforeEdgeIndex.order,
+      afterEdgeOrder: afterEdgeIndex.order,
     }
   }
 
@@ -100,54 +209,6 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
     return next.slice(-maxSteps)
   }
 
-  function createHistoryPatches(
-    before: FlowHistorySnapshot,
-    after: FlowHistorySnapshot,
-  ): FlowHistoryEntry | null {
-    const nodePatches: FlowHistoryPatch[] = []
-    const edgePatches: FlowHistoryPatch[] = []
-    const beforeNodesById = createHistoryItemMap(before.nodes)
-    const afterNodesById = createHistoryItemMap(after.nodes)
-    const beforeEdgesById = createHistoryItemMap(before.edges)
-    const afterEdgesById = createHistoryItemMap(after.edges)
-    const beforeNodeOrder = createHistoryItemOrder(before.nodes)
-    const afterNodeOrder = createHistoryItemOrder(after.nodes)
-    const beforeEdgeOrder = createHistoryItemOrder(before.edges)
-    const afterEdgeOrder = createHistoryItemOrder(after.edges)
-
-    for (const id of new Set([...beforeNodesById.keys(), ...afterNodesById.keys()])) {
-      const beforeNode = beforeNodesById.get(id)
-      const afterNode = afterNodesById.get(id)
-      if (isSameJson(beforeNode, afterNode)) continue
-      nodePatches.push({
-        id,
-        before: beforeNode === undefined ? undefined : cloneJson(beforeNode),
-        after: afterNode === undefined ? undefined : cloneJson(afterNode),
-      })
-    }
-    for (const id of new Set([...beforeEdgesById.keys(), ...afterEdgesById.keys()])) {
-      const beforeEdge = beforeEdgesById.get(id)
-      const afterEdge = afterEdgesById.get(id)
-      if (isSameJson(beforeEdge, afterEdge)) continue
-      edgePatches.push({
-        id,
-        before: beforeEdge === undefined ? undefined : cloneJson(beforeEdge),
-        after: afterEdge === undefined ? undefined : cloneJson(afterEdge),
-      })
-    }
-    const hasOrderChange =
-      !isSameOrder(beforeNodeOrder, afterNodeOrder) || !isSameOrder(beforeEdgeOrder, afterEdgeOrder)
-    if (nodePatches.length === 0 && edgePatches.length === 0 && !hasOrderChange) return null
-    return {
-      nodePatches,
-      edgePatches,
-      beforeNodeOrder,
-      afterNodeOrder,
-      beforeEdgeOrder,
-      afterEdgeOrder,
-    }
-  }
-
   function clearBaseline() {
     flowHistoryPast.value = []
     flowHistoryFuture.value = []
@@ -155,11 +216,22 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   }
 
   function push(before: FlowHistorySnapshot, after = capture()): boolean {
-    const entry = createHistoryPatches(before, after)
-    if (!entry) return false
-    flowHistoryPast.value = pushBoundedStack(flowHistoryPast.value, entry)
-    flowHistoryFuture.value = []
-    return true
+    return measureCanvasPerf(
+      'history.push',
+      () => ({
+        beforeNodes: readFlowHistorySnapshotState(before).nodeIndex.order.length,
+        afterNodes: readFlowHistorySnapshotState(after).nodeIndex.order.length,
+        beforeEdges: readFlowHistorySnapshotState(before).edgeIndex.order.length,
+        afterEdges: readFlowHistorySnapshotState(after).edgeIndex.order.length,
+      }),
+      () => {
+        const entry = createHistoryPatches(before, after)
+        if (!entry) return false
+        flowHistoryPast.value = pushBoundedStack(flowHistoryPast.value, entry)
+        flowHistoryFuture.value = []
+        return true
+      },
+    )
   }
 
   function applyCollectionPatches(
@@ -168,22 +240,25 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
     order: string[],
     direction: 'forward' | 'backward',
   ): unknown[] {
-    const itemsById = createHistoryItemMap(currentItems)
+    const itemsById = createHistoryItemIndex(currentItems).itemsById
     for (const patch of patches) {
       const nextValue = direction === 'forward' ? patch.after : patch.before
       if (nextValue === undefined) {
         itemsById.delete(patch.id)
         continue
       }
-      itemsById.set(patch.id, cloneJson(nextValue))
+      itemsById.set(patch.id, {
+        value: cloneJson(nextValue),
+        json: stringifyJson(nextValue),
+      })
     }
     const orderedItems: unknown[] = []
     for (const id of order) {
       const item = itemsById.get(id)
-      if (item !== undefined) orderedItems.push(item)
+      if (item !== undefined) orderedItems.push(item.value)
       itemsById.delete(id)
     }
-    orderedItems.push(...itemsById.values())
+    orderedItems.push(...Array.from(itemsById.values(), (item) => item.value))
     return orderedItems
   }
 

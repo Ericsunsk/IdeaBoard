@@ -1,10 +1,7 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-
-export type FlowHistorySnapshot = {
-  nodes: unknown[]
-  edges: unknown[]
-}
+export type { FlowHistorySnapshot } from './useFlowHistory'
+import type { FlowHistorySnapshot } from './useFlowHistory'
 
 export type CommitMutationOptions = {
   recordHistory?: boolean

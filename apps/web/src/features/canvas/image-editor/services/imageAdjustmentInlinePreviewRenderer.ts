@@ -2,6 +2,7 @@ import type { ImageEditorRenderedPreview } from '../types'
 import type { ImageProcessingRuntime } from '../runtime/types'
 import { getImageAdjustmentProcessingRuntime } from '../runtime/imageAdjustmentProcessingRuntime'
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
+import { measureCanvasPerfAsync } from '../../utils/canvasPerfProbe'
 
 const PREVIEW_MAX_SIDE = 960
 const INLINE_PREVIEW_TASK_ID = 'image-adjustment:inline-preview'
@@ -91,14 +92,23 @@ export function createImageAdjustmentInlinePreviewRenderer(
       return
     }
 
-    void runtime
-      .renderPreview({
-        source: { url: sourceUrl },
-        plan,
-        taskId: INLINE_PREVIEW_TASK_ID,
+    void measureCanvasPerfAsync(
+      'image.preview.render',
+      () => ({
+        adjustments: plan.length,
         latestOnly: true,
-        sizeStrategy: { maxSide: PREVIEW_MAX_SIDE },
-      })
+        stale: requestToken !== sourceRequestToken,
+      }),
+      () =>
+        runtime.renderPreview({
+          source: { url: sourceUrl },
+          plan,
+          taskId: INLINE_PREVIEW_TASK_ID,
+          latestOnly: true,
+          sizeStrategy: { maxSide: PREVIEW_MAX_SIDE },
+        }),
+      50,
+    )
       .then((result) => {
         if (requestToken !== sourceRequestToken) return
         if (result.status !== 'completed') {

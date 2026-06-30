@@ -7,6 +7,7 @@ import { uploadApi } from '../../../shared/api/upload'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from '../services/flowMediaIO'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
+import { measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
 interface StableRef {
   path: string
@@ -161,28 +162,44 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
   async function stabilizeSnapshotForSave(
     snapshot: CanvasBoardSnapshot,
   ): Promise<CanvasBoardSnapshot> {
-    const refs = collectStableRefs(snapshot)
-    const tasks = new Map<string, Promise<string>>()
-    for (const ref of refs) {
-      const current = ref.get()
-      const normalized = current.trim()
-      if (!normalized) continue
-      if (normalized !== current) ref.set(normalized)
-      if (isStableCanvasUrl(normalized)) continue
-      const taskKey = `default::${normalized}`
-      let task = tasks.get(taskKey)
-      if (!task) {
-        task = fetchAndUploadStable(normalized)
-        tasks.set(taskKey, task)
-      }
-      try {
-        ref.set(await task)
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : '未知错误'
-        throw new Error(`保存失败：${ref.path} 使用了不稳定图片链接，${reason}`, { cause: error })
-      }
-    }
-    return snapshot
+    let unstableRefCount = 0
+    return measureCanvasPerfAsync(
+      'board.save.stabilizeSnapshot',
+      () => ({
+        imageNodes: snapshot.imageNodes.length,
+        promptNodes: snapshot.promptNodes.length,
+        fusionNodes: snapshot.fusionNodes.length,
+        unstableRefs: unstableRefCount,
+      }),
+      async () => {
+        const refs = collectStableRefs(snapshot)
+        const tasks = new Map<string, Promise<string>>()
+        for (const ref of refs) {
+          const current = ref.get()
+          const normalized = current.trim()
+          if (!normalized) continue
+          if (normalized !== current) ref.set(normalized)
+          if (isStableCanvasUrl(normalized)) continue
+          unstableRefCount += 1
+          const taskKey = `default::${normalized}`
+          let task = tasks.get(taskKey)
+          if (!task) {
+            task = fetchAndUploadStable(normalized)
+            tasks.set(taskKey, task)
+          }
+          try {
+            ref.set(await task)
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : '未知错误'
+            throw new Error(`保存失败：${ref.path} 使用了不稳定图片链接，${reason}`, {
+              cause: error,
+            })
+          }
+        }
+        return snapshot
+      },
+      50,
+    )
   }
 
   function resolveRecyclableUrl(url: string): string | null {

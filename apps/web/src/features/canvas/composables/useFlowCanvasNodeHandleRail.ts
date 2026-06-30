@@ -1,6 +1,10 @@
 import type { Ref } from 'vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, reactive, ref } from 'vue'
 
+const HANDLE_FRAME_SELECTOR = '[data-flow-handle-frame]'
+const WORKFLOW_NODE_SELECTOR = '.workflow-node'
+const WORKFLOW_NODE_HEADER_CLASS = 'workflow-node-header'
+
 /**
  * Manages the floating handle rail that overlays a canvas node.
  * Tracks the bounding box of the node's draggable frame element via
@@ -21,6 +25,9 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
   let resizeObserver: ResizeObserver | null = null
   let observedRoot: HTMLElement | null = null
   let observedFrame: HTMLElement | null = null
+  let cachedRoot: HTMLElement | null = null
+  let cachedFrame: HTMLElement | null = null
+  let isHandleFrameCacheDirty = true
 
   // Style and visibility.
 
@@ -38,20 +45,54 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
 
   // DOM helpers.
 
-  function getHandleFrameElement(): HTMLElement | null {
-    const root = flowNodeRef.value
-    const explicit = root?.querySelector<HTMLElement>('[data-flow-handle-frame]')
+  function findHandleFrameElement(root: HTMLElement): HTMLElement | null {
+    const explicit = root.querySelector<HTMLElement>(HANDLE_FRAME_SELECTOR)
     if (explicit) return explicit
 
-    const workflowNode = root?.querySelector<HTMLElement>('.workflow-node')
+    const workflowNode = root.querySelector<HTMLElement>(WORKFLOW_NODE_SELECTOR)
     if (!workflowNode) return null
 
-    for (const child of Array.from(workflowNode.children)) {
+    const { children } = workflowNode
+    for (let index = 0; index < children.length; index += 1) {
+      const child = children.item(index)
       if (!(child instanceof HTMLElement)) continue
-      if (child.classList.contains('workflow-node-header')) continue
+      if (child.classList.contains(WORKFLOW_NODE_HEADER_CLASS)) continue
       return child
     }
     return null
+  }
+
+  function getHandleFrameElement(root: HTMLElement | null = flowNodeRef.value): HTMLElement | null {
+    if (!root) {
+      cachedRoot = null
+      cachedFrame = null
+      isHandleFrameCacheDirty = true
+      return null
+    }
+
+    const canUseCachedFrame =
+      cachedRoot === root && !isHandleFrameCacheDirty && !!cachedFrame && root.contains(cachedFrame)
+
+    if (canUseCachedFrame) {
+      return cachedFrame
+    }
+
+    const frame = findHandleFrameElement(root)
+    if (!frame) {
+      cachedRoot = null
+      cachedFrame = null
+      isHandleFrameCacheDirty = true
+      return null
+    }
+
+    cachedRoot = root
+    cachedFrame = frame
+    isHandleFrameCacheDirty = false
+    return frame
+  }
+
+  function invalidateHandleFrameCache() {
+    isHandleFrameCacheDirty = true
   }
 
   function getLayoutOffsetWithinRoot(
@@ -86,9 +127,10 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
   function updateHandleRailBounds() {
     measureFrame = 0
     const root = flowNodeRef.value
-    const frame = getHandleFrameElement()
 
     if (!root) return
+
+    const frame = getHandleFrameElement(root)
 
     if (!frame) {
       setHandleRailBounds({
@@ -119,7 +161,7 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
     }
 
     const root = flowNodeRef.value
-    const frame = getHandleFrameElement()
+    const frame = getHandleFrameElement(root)
 
     if (observedRoot !== root) {
       if (observedRoot) resizeObserver.unobserve(observedRoot)
@@ -224,6 +266,7 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
   })
 
   onUpdated(() => {
+    invalidateHandleFrameCache()
     requestMeasure()
   })
 
@@ -231,6 +274,12 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
     if (measureFrame) cancelAnimationFrame(measureFrame)
     if (touchHintTimer) clearTimeout(touchHintTimer)
     resizeObserver?.disconnect()
+    resizeObserver = null
+    observedRoot = null
+    observedFrame = null
+    cachedRoot = null
+    cachedFrame = null
+    isHandleFrameCacheDirty = true
   })
 
   return {
