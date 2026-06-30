@@ -16,6 +16,7 @@
       :set-board-name-input-ref="setBoardNameInputRef"
       :export-disabled="!hasSelectedFlowNodes"
       :avatar-url="userStore.user?.avatar ?? undefined"
+      :minimap-enabled="isCanvasMinimapEnabled"
       :zoom-level="zoomLevel"
       @update:board-name-draft="boardNameDraft = $event"
       @toggle-board-menu="toggleBoardMenu"
@@ -28,6 +29,7 @@
       @logout="onLogoutRequest"
       @navigate-back="onNavigateRequest(USER_BOARDS_PATH)"
       @select-tool="setActiveTool"
+      @toggle-minimap="toggleCanvasMinimap"
       @zoom-out="onZoomOut"
       @zoom-in="onZoomIn"
     />
@@ -56,7 +58,7 @@
         :pan-on-scroll="!isFlowCanvasLocked"
         :zoom-on-pinch="!isFlowCanvasLocked"
         :pan-on-scroll-mode="PanOnScrollMode.Free"
-        :only-render-visible-elements="FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING"
+        :only-render-visible-elements="true"
         :is-valid-connection="isValidConnection"
         @connect="onConnect"
         @connect-end="onFlowConnectEnd"
@@ -120,6 +122,12 @@
             @expand-frame-pointerdown="onFlowExpandFramePointerDown"
           />
         </template>
+        <CanvasMiniMap
+          v-if="isCanvasMinimapEnabled"
+          @viewport-drag-start="onMiniMapViewportDragStart"
+          @viewport-drag="onMiniMapViewportDrag"
+          @viewport-drag-end="onMiniMapViewportDragEnd"
+        />
       </VueFlow>
       <CanvasOverlays
         :chrome-model="imageToolChromeModel"
@@ -172,7 +180,7 @@ import { useCanvasGraphRuntime } from '../composables/useCanvasGraphRuntime'
 import { useCanvasImageTools } from '../image-tools'
 import { useCanvasTaskRuntime } from '../composables/useCanvasTaskRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
-import { isCanvasFlowCullingEnabled } from '../utils/flowViewportCulling'
+import CanvasMiniMap from '../components/CanvasMiniMap.vue'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
 import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 
@@ -206,11 +214,10 @@ const canvasWrapRef = ref<HTMLElement | null>(null)
 const canvasViewportSize = ref({ width: 0, height: 0 })
 const flowHandleVisibilityRefreshToken = ref(0)
 
-const activeTool = ref<'select' | 'hand' | 'text'>('select')
+const activeTool = ref<'select' | 'hand'>('select')
+const isCanvasMinimapEnabled = ref(false)
 
 const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
-
-const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING = isCanvasFlowCullingEnabled()
 
 const {
   activeNodePanel,
@@ -249,8 +256,6 @@ const {
   onLogoutRequest,
   markBoardViewportChanged,
   commitPendingBoardViewportChange,
-  scheduleMountedGraphRefresh,
-  flushMountedGraphRefresh,
 } = useCanvasBoardRuntime({
   route,
   router,
@@ -259,7 +264,6 @@ const {
     userUid: `${userStore.user?.uid ?? ''}`.trim(),
   }),
   getViewport,
-  getViewportSize: () => canvasViewportSize.value,
   setViewport: (viewport) => setViewport(viewport),
   setNodes,
   setEdges,
@@ -279,6 +283,9 @@ const {
   onFlowMoveStart,
   onFlowMove: syncFlowMove,
   onFlowMoveEnd,
+  onMiniMapViewportDragStart,
+  onMiniMapViewportDrag,
+  onMiniMapViewportDragEnd,
   onNodeDragStart,
   onNodeDragStop,
   loadCanvasBoardAndProbe,
@@ -297,8 +304,6 @@ const {
   applyFlowTransform,
   markBoardViewportChanged,
   commitPendingBoardViewportChange,
-  scheduleMountedGraphRefresh,
-  flushMountedGraphRefresh,
   loadInitialOrRouteBoard,
   closeBoardHeaderEditing,
   startCanvasInteraction: (key) => startFlowInteraction(key),
@@ -471,7 +476,7 @@ const imageTools = useCanvasImageTools({
   setViewport: (viewport, options) => setViewport(viewport, options),
   setCenter: (x, y, options) => setCenter(x, y, options),
   onViewportTransform: (viewport) => {
-    syncCanvasViewport(viewport, { cull: 'flush' })
+    syncCanvasViewport(viewport, {})
   },
   createImageNodeFromFile,
   connectImageNodes: onConnect,
@@ -504,6 +509,7 @@ const imageTools = useCanvasImageTools({
 
 const {
   activeNodeId: flowImageEditorNodeId,
+  activeMaskNodeId: flowMaskEditorNodeId,
   chromeModel: imageToolChromeModel,
   chromeCommands: imageToolChromeCommands,
   isChromeHidden: isImageEditorChromeHidden,
@@ -518,6 +524,10 @@ const {
   focusAndShowChrome: focusImageEditorAndShowChrome,
   scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
 } = imageTools
+
+function toggleCanvasMinimap() {
+  isCanvasMinimapEnabled.value = !isCanvasMinimapEnabled.value
+}
 
 const { dismissTransientCanvasUi } = useFlowTransientUiDismissal({
   cancelFlowExpandMode,
@@ -627,7 +637,6 @@ const {
   createNodeAtPosition,
   dismissTransientCanvasUi,
   clearFlowSelection,
-  toastInfo: (message) => appToast.info(message),
   onCanvasDropDragOver: onFlowCanvasDropDragOver,
   isFlowExpandActive: () => !!flowExpandNodeId.value,
   isBoardHeaderEditingActive: () => isBoardMenuOpen.value || isRenamingBoard.value,
@@ -675,7 +684,7 @@ useFlowKeyboardShortcuts({
   onUndo: flowHistory.undo,
   onRedo: flowHistory.redo,
   onDeleteSelected: deleteSelectedFlowElements,
-  isCanvasShortcutSuppressed: () => !!flowImageEditorNodeId.value,
+  isCanvasShortcutSuppressed: () => !!flowImageEditorNodeId.value || !!flowMaskEditorNodeId.value,
   onEscape: onEscapeShortcut,
   onPanViewport,
   onToolSelect: () => {
@@ -683,9 +692,6 @@ useFlowKeyboardShortcuts({
   },
   onToolHand: () => {
     setActiveTool('hand')
-  },
-  onToolText: () => {
-    setActiveTool('text')
   },
   onDuplicateModifierChange: (pressed) => {
     duplicateModifierPressed.value = pressed
@@ -723,6 +729,9 @@ onMounted(async () => {
   --canvas-surface-muted: #f4f7fb;
   --canvas-surface-border: #d8ddea;
   --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
+  --canvas-minimap-node: #c9ced8;
+  --canvas-minimap-viewport: #c9ced8;
+  --canvas-minimap-viewport-fill: rgb(201 206 216 / 0.38);
   --canvas-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
   --canvas-surface-blur: 10px;
   --canvas-surface-radius: 10px;
@@ -858,9 +867,6 @@ onMounted(async () => {
   cursor: grabbing;
 }
 
-.canvas-layout.tool-text .canvas-flow-wrap :deep(.vue-flow__pane) {
-  cursor: text;
-}
 </style>
 
 <style>

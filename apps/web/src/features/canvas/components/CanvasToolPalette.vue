@@ -27,28 +27,29 @@
     <button
       type="button"
       class="canvas-icon-button"
-      :class="{ 'is-active': activeTool === 'text' }"
-      aria-label="文本工具稍后接入"
-      :aria-pressed="activeTool === 'text'"
-      title="文本工具稍后接入"
-      disabled
-      @click="emit('select-tool', 'text')"
+      :class="{ 'is-active': minimapEnabled }"
+      aria-label="小地图"
+      :aria-pressed="minimapEnabled"
+      title="小地图"
+      @click="emit('toggle-minimap')"
     >
-      <Text class="canvas-control-icon" />
+      <Map class="canvas-control-icon" />
     </button>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { OneFingerSelectHandGesture, SpockHandGesture, Text } from '@iconoir/vue'
+import { Map, OneFingerSelectHandGesture, SpockHandGesture } from '@iconoir/vue'
 
 defineProps<{
-  activeTool: 'select' | 'hand' | 'text'
+  activeTool: 'select' | 'hand'
+  minimapEnabled: boolean
   inert?: boolean
 }>()
 
 const emit = defineEmits<{
-  (event: 'select-tool', tool: 'select' | 'hand' | 'text'): void
+  (event: 'select-tool', tool: 'select' | 'hand'): void
+  (event: 'toggle-minimap'): void
 }>()
 </script>
 

@@ -31,7 +31,6 @@ type UseCanvasBoardRuntimeOptions = {
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
   getViewport: () => FlowViewport
-  getViewportSize?: () => { width: number; height: number }
   setViewport: (viewport: FlowViewport) => Promise<unknown> | unknown
   setNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
@@ -55,8 +54,6 @@ type CanvasBoardRuntime = {
   onLogoutRequest: () => Promise<void>
   markBoardViewportChanged: () => void
   commitPendingBoardViewportChange: () => void
-  scheduleMountedGraphRefresh: (viewport?: FlowViewport) => void
-  flushMountedGraphRefresh: (viewport?: FlowViewport) => void
   isBoardMenuOpen: Ref<boolean>
   isRenamingBoard: Ref<boolean>
   boardNameDraft: Ref<string>
@@ -112,8 +109,6 @@ export function useCanvasBoardRuntime(
     flushAutosave,
     flowHistory,
     flowTransactions,
-    scheduleMountedGraphRefresh,
-    flushMountedGraphRefresh,
   } = useFlowCanvasRuntime({
     nodes,
     edges,
@@ -126,7 +121,6 @@ export function useCanvasBoardRuntime(
     isSavingBoard,
     boardSession,
     getViewport: options.getViewport,
-    getViewportSize: options.getViewportSize,
     setViewport: setBoardViewport,
     setNodes: options.setNodes,
     setEdges: options.setEdges,
@@ -184,8 +178,6 @@ export function useCanvasBoardRuntime(
     onLogoutRequest,
     markBoardViewportChanged,
     commitPendingBoardViewportChange,
-    scheduleMountedGraphRefresh,
-    flushMountedGraphRefresh,
     isBoardMenuOpen: boardHeader.isBoardMenuOpen,
     isRenamingBoard: boardHeader.isRenamingBoard,
     boardNameDraft: boardHeader.boardNameDraft,

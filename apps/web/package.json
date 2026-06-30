@@ -25,6 +25,7 @@
     "@primeuix/themes": "^2.0.3",
     "@tanstack/vue-query": "^5.100.9",
     "@vue-flow/core": "^1.48.2",
+    "@vue-flow/minimap": "^1.5.4",
     "@vueuse/core": "^14.3.0",
     "@vueuse/integrations": "^14.3.0",
     "@vueuse/motion": "^3.0.3",

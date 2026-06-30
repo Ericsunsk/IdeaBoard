@@ -3,6 +3,7 @@ import {
   createEmptyCanvasBoardSnapshot,
   getCanvasNodePortInputLimit,
   isCanvasConnectionNodeType,
+  resolveImageNodeStageHeight,
   type CanvasSnapshotNodeCollectionKey,
   type CanvasBoardSnapshot,
   type CanvasConnection,
@@ -14,6 +15,7 @@ import {
 import type { FlowNodeData } from '../types/flowTypes'
 import { getDefaultCanvasNodeTitle } from '../config/canvasNodeRegistry'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
+import { resolveImageNodeDisplayRatio } from './flowImageNodeSelectors'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
 export interface FlowAdapterNode {
@@ -21,6 +23,7 @@ export interface FlowAdapterNode {
   type?: 'canvas' | string
   dragHandle?: string
   position: { x: number; y: number }
+  dimensions?: { width: number; height: number }
   data?: unknown
 }
 
@@ -108,6 +111,36 @@ function toFlowDataFromCanvasNode(
   }
 }
 
+// Vue Flow replaces this after render; the estimate gives the minimap stable initial geometry.
+const PRE_RENDER_MINIMAP_NODE_HEADER_HEIGHT_ESTIMATE = 22
+
+function hasDisplayableImageSource(node: ImageNodeItem): boolean {
+  const sourceUrl = node.sourceImageUrl.trim()
+  if (sourceUrl) return true
+  return Array.isArray(node.outputImages)
+    ? node.outputImages.some((item) => item.url.trim().length > 0)
+    : false
+}
+
+function resolveEstimatedFlowNodeDimensionsForPreRenderMiniMap(
+  nodeType: CanvasConnectionNodeType,
+  node: CanvasNodeItem,
+): { width: number; height: number } {
+  const width = Math.max(1, Math.round(node.width))
+  const bodyHeight =
+    nodeType === 'image'
+      ? resolveImageNodeStageHeight(
+          width,
+          resolveImageNodeDisplayRatio(node as ImageNodeItem),
+          hasDisplayableImageSource(node as ImageNodeItem),
+        )
+      : width
+  return {
+    width,
+    height: Math.max(1, Math.round(PRE_RENDER_MINIMAP_NODE_HEADER_HEIGHT_ESTIMATE + bodyHeight)),
+  }
+}
+
 export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   nodes: FlowAdapterNode[]
   edges: FlowAdapterEdge[]
@@ -124,6 +157,7 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
         type: 'canvas',
         dragHandle: resolveFlowNodeDragHandle(kind),
         position: { x: node.x, y: node.y },
+        dimensions: resolveEstimatedFlowNodeDimensionsForPreRenderMiniMap(kind, node),
         data: toFlowDataFromCanvasNode(kind, node),
       })
       flowNodeIds.add(id)

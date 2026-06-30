@@ -25,7 +25,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     fullNodes.value = nextGraph.nodes
     fullEdges.value = nextGraph.edges
   })
-  const syncMountedGraph = vi.fn()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => {
       const boardId = routeBoardId.value.trim()
@@ -53,7 +52,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     onError: vi.fn(),
     refreshSnapshot: vi.fn(),
     clearFlowHistoryBaseline: vi.fn(),
-    syncMountedGraph,
     commitGraph,
   })
 
@@ -67,7 +65,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     saveStatus,
     isLoadingBoardSnapshot,
     commitGraph,
-    syncMountedGraph,
     setViewport,
     boardSession,
   }
@@ -167,6 +164,13 @@ describe('useFlowBoardPersistence', () => {
     await savePromise
 
     expect(harness.commitGraph).toHaveBeenCalledOnce()
+    expect(harness.commitGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodes: expect.any(Array),
+        edges: expect.any(Array),
+      }),
+      { preserveSelection: true },
+    )
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
   })
@@ -194,12 +198,8 @@ describe('useFlowBoardPersistence', () => {
         },
       },
     }
-    harness.fullNodes.value = [firstNode]
-    harness.fullEdges.value = []
-    harness.syncMountedGraph.mockImplementation(() => {
-      harness.fullNodes.value = [firstNode, hiddenImageNode, hiddenPromptNode]
-      harness.fullEdges.value = [hiddenEdge]
-    })
+    harness.fullNodes.value = [firstNode, hiddenImageNode, hiddenPromptNode]
+    harness.fullEdges.value = [hiddenEdge]
 
     const savePromise = harness.persistence.saveCurrentBoardSnapshot()
     await waitForPendingSave()
@@ -207,7 +207,6 @@ describe('useFlowBoardPersistence', () => {
     await savePromise
 
     const savedSnapshot = mocks.save.mock.calls[0]?.[0] as CanvasBoardSnapshot
-    expect(harness.syncMountedGraph).toHaveBeenCalled()
     expect(savedSnapshot.imageNodes.map((node) => node.id)).toEqual([2])
     expect(savedSnapshot.promptNodes.map((node) => node.id)).toEqual([1, 2])
     expect(savedSnapshot.connections.map((connection) => connection.id)).toEqual([9])
@@ -244,5 +243,34 @@ describe('useFlowBoardPersistence', () => {
     expect(harness.boardBaseSnapshot.value.viewport?.zoomLevel).toBe(222)
     expect(harness.setViewport).toHaveBeenLastCalledWith({ x: 20, y: 20, zoom: 2.22 })
     expect(harness.isLoadingBoardSnapshot.value).toBe(false)
+  })
+
+  it('treats loaded board snapshots as graph replacements without carrying selection', async () => {
+    const harness = createPersistenceHarness('board-a')
+    const snapshot = createEmptyCanvasBoardSnapshot()
+    snapshot.promptNodes = [
+      {
+        id: 1,
+        type: 'prompt',
+        x: 40,
+        y: 40,
+        width: 280,
+        text: 'loaded',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    ]
+    mocks.load.mockResolvedValue(snapshot)
+
+    await harness.persistence.loadInitialOrRouteBoard()
+
+    expect(harness.commitGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodes: expect.any(Array),
+        edges: expect.any(Array),
+      }),
+      { preserveSelection: false },
+    )
   })
 })

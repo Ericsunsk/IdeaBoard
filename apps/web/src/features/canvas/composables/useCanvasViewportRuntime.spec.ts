@@ -40,8 +40,8 @@ function createViewportRuntimeHarness() {
   const viewport = ref<CanvasFlowViewport>({ x: 0, y: 0, zoom: 1 })
   const startCanvasInteraction = vi.fn()
   const stopCanvasInteraction = vi.fn()
-  const scheduleMountedGraphRefresh = vi.fn()
-  const flushMountedGraphRefresh = vi.fn()
+  const markBoardViewportChanged = vi.fn()
+  const commitPendingBoardViewportChange = vi.fn()
   const applyFlowTransform = vi.fn((nextViewport: CanvasFlowViewport) => {
     const didChange =
       viewport.value.x !== nextViewport.x ||
@@ -73,10 +73,8 @@ function createViewportRuntimeHarness() {
         viewport.value = { ...viewport.value, zoom: viewport.value.zoom - 0.25 }
       }),
       applyFlowTransform,
-      markBoardViewportChanged: vi.fn(),
-      commitPendingBoardViewportChange: vi.fn(),
-      scheduleMountedGraphRefresh,
-      flushMountedGraphRefresh,
+      markBoardViewportChanged,
+      commitPendingBoardViewportChange,
       loadInitialOrRouteBoard,
       closeBoardHeaderEditing: vi.fn(),
       startCanvasInteraction,
@@ -95,8 +93,8 @@ function createViewportRuntimeHarness() {
     canvasViewportSize,
     viewport,
     applyFlowTransform,
-    scheduleMountedGraphRefresh,
-    flushMountedGraphRefresh,
+    markBoardViewportChanged,
+    commitPendingBoardViewportChange,
     loadInitialOrRouteBoard,
     startCanvasInteraction,
     stopCanvasInteraction,
@@ -114,47 +112,57 @@ describe('useCanvasViewportRuntime', () => {
     vi.unstubAllGlobals()
   })
 
-  it('schedules mounted graph refresh while the flow viewport is moving', () => {
+  it('syncs the flow viewport while the flow viewport is moving', () => {
     const harness = createViewportRuntimeHarness()
 
     harness.runtime.onFlowMove({ flowTransform: { x: 24, y: 32, zoom: 1.5 } })
 
     expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 24, y: 32, zoom: 1.5 })
-    expect(harness.scheduleMountedGraphRefresh).toHaveBeenCalledWith({ x: 24, y: 32, zoom: 1.5 })
-    expect(harness.flushMountedGraphRefresh).not.toHaveBeenCalled()
     harness.scope.stop()
   })
 
-  it('flushes mounted graph refresh and commits viewport persistence on move end', () => {
+  it('commits viewport persistence on move end', () => {
     const harness = createViewportRuntimeHarness()
 
     harness.runtime.onFlowMoveStart()
     harness.runtime.onFlowMoveEnd({ flowTransform: { x: 48, y: 64, zoom: 2 } })
 
     expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
-    expect(harness.flushMountedGraphRefresh).toHaveBeenCalledWith({ x: 48, y: 64, zoom: 2 })
+    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 48, y: 64, zoom: 2 })
     expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
     harness.scope.stop()
   })
 
-  it('flushes mounted graph refresh after zooming', async () => {
+  it('syncs and commits viewport changes from minimap dragging', () => {
+    const harness = createViewportRuntimeHarness()
+
+    harness.runtime.onMiniMapViewportDragStart()
+    harness.runtime.onMiniMapViewportDrag({ x: -120, y: -80, zoom: 1 })
+    harness.runtime.onMiniMapViewportDragEnd()
+
+    expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: -120, y: -80, zoom: 1 })
+    expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    harness.scope.stop()
+  })
+
+  it('syncs the viewport after zooming', async () => {
     const harness = createViewportRuntimeHarness()
 
     harness.runtime.onZoomIn()
     await Promise.resolve()
 
-    expect(harness.flushMountedGraphRefresh).toHaveBeenCalledWith({ x: 0, y: 0, zoom: 1.25 })
+    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 0, y: 0, zoom: 1.25 })
     harness.scope.stop()
   })
 
-  it('flushes mounted graph refresh and stops interaction after node drag', () => {
+  it('stops interaction after node drag', () => {
     const harness = createViewportRuntimeHarness()
 
     harness.runtime.onNodeDragStart()
     harness.runtime.onNodeDragStop()
 
     expect(harness.startCanvasInteraction).toHaveBeenCalledWith('node-drag')
-    expect(harness.flushMountedGraphRefresh).toHaveBeenCalledWith()
     expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('node-drag')
     harness.scope.stop()
   })
@@ -170,7 +178,7 @@ describe('useCanvasViewportRuntime', () => {
     harness.scope.stop()
   })
 
-  it('updates viewport size and refreshes mounted graph when the canvas wrapper resizes', async () => {
+  it('updates viewport size when the canvas wrapper resizes', async () => {
     installResizeObserverMock()
     const harness = createViewportRuntimeHarness()
     const element = {
@@ -182,7 +190,6 @@ describe('useCanvasViewportRuntime', () => {
     await nextTick()
 
     expect(harness.canvasViewportSize.value).toEqual({ width: 1024, height: 768 })
-    expect(harness.flushMountedGraphRefresh).toHaveBeenCalledOnce()
     expect(TestResizeObserver.instances.at(-1)?.observe).toHaveBeenCalledWith(element)
     harness.scope.stop()
     expect(TestResizeObserver.instances.at(-1)?.disconnect).toHaveBeenCalled()

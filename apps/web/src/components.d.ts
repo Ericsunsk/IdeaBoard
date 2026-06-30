@@ -28,6 +28,7 @@ declare module 'vue' {
     AuthFormField: typeof import('./features/auth/components/AuthFormField.vue')['default']
     AuthModalCloseButton: typeof import('./features/auth/components/AuthModalCloseButton.vue')['default']
     BoardCard: typeof import('./features/boards/components/BoardCard.vue')['default']
+    CanvasMiniMap: typeof import('./features/canvas/components/CanvasMiniMap.vue')['default']
     CanvasNodeContextMenu: typeof import('./features/canvas/components/CanvasNodeContextMenu.vue')['default']
     CanvasOverlays: typeof import('./features/canvas/components/CanvasOverlays.vue')['default']
     CanvasPageChrome: typeof import('./features/canvas/components/CanvasPageChrome.vue')['default']

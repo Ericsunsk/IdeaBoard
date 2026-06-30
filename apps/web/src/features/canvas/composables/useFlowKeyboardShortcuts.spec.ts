@@ -80,7 +80,6 @@ describe('useFlowKeyboardShortcuts', () => {
     const onPanViewport = vi.fn()
     const onToolSelect = vi.fn()
     const onToolHand = vi.fn()
-    const onToolText = vi.fn()
     const onSpacePressedChange = vi.fn()
     const harness = mountKeyboardShortcuts({
       onSave: vi.fn(),
@@ -91,7 +90,6 @@ describe('useFlowKeyboardShortcuts', () => {
       onPanViewport,
       onToolSelect,
       onToolHand,
-      onToolText,
       onSpacePressedChange,
     })
 
@@ -114,7 +112,6 @@ describe('useFlowKeyboardShortcuts', () => {
       expect(onPanViewport).not.toHaveBeenCalled()
       expect(onToolSelect).not.toHaveBeenCalled()
       expect(onToolHand).not.toHaveBeenCalled()
-      expect(onToolText).not.toHaveBeenCalled()
       expect(onSpacePressedChange).not.toHaveBeenCalled()
     } finally {
       harness.unmount()

@@ -1,11 +1,5 @@
-import { getCurrentScope, onScopeDispose, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import {
-  cullFlowGraphForViewport,
-  FALLBACK_FLOW_VIEWPORT_SIZE,
-  FLOW_GRAPH_VIEWPORT_OVERSCAN_PX,
-  isCanvasFlowCullingEnabled,
-} from '../utils/flowViewportCulling'
 import { useFlowHistory } from './useFlowHistory'
 import { useFlowTransactions } from './useFlowTransactions'
 import { useFlowBoardPersistence } from './useFlowBoardPersistence'
@@ -21,13 +15,13 @@ type ViewportState = {
   zoom: number
 }
 
-type ViewportSize = {
-  width: number
-  height: number
+type SelectableFlowItem = {
+  id: string
+  selected?: boolean
 }
 
 type FlowGraphCommitOptions = {
-  viewport?: ViewportState
+  preserveSelection?: boolean
 }
 
 export type UseFlowCanvasRuntimeOptions = {
@@ -42,7 +36,6 @@ export type UseFlowCanvasRuntimeOptions = {
   isSavingBoard: Ref<boolean>
   boardSession: CanvasBoardSession
   getViewport: () => ViewportState
-  getViewportSize?: () => ViewportSize
   setViewport: (viewport: ViewportState) => void
   setNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
@@ -53,23 +46,55 @@ export type UseFlowCanvasRuntimeOptions = {
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   let isNodeDragActive = false
-  let scheduledMountedGraphViewport: ViewportState | undefined
-  let scheduledMountedGraphRefreshId: number | null = null
-  let scheduledMountedGraphRefreshToken = 0
-
-  function getMountedGraphViewport(override?: ViewportState) {
-    return override ?? options.getViewport()
-  }
-
-  function getMountedGraphViewportSize() {
-    return options.getViewportSize?.() ?? FALLBACK_FLOW_VIEWPORT_SIZE
-  }
 
   function hasSameItemsByReference<T>(current: T[], next: T[]): boolean {
     return current.length === next.length && current.every((item, index) => item === next[index])
   }
 
-  function commitMountedGraph(nextGraph: { nodes: Node[]; edges: Edge[] }) {
+  function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
+    const ids = new Set<string>()
+    for (const items of itemGroups) {
+      for (const item of items) {
+        if (item.selected === true) ids.add(item.id)
+      }
+    }
+    return ids
+  }
+
+  function preserveSelectedItems<T extends SelectableFlowItem>(
+    nextItems: T[],
+    selectedIds: Set<string>,
+  ): T[] {
+    let resolvedItems: T[] | null = null
+    nextItems.forEach((item, index) => {
+      const shouldSelect = selectedIds.has(item.id)
+      if (item.selected === shouldSelect) return
+      if (!resolvedItems) resolvedItems = [...nextItems]
+      resolvedItems[index] = { ...item, selected: shouldSelect }
+    })
+    return resolvedItems ?? nextItems
+  }
+
+  function preserveCurrentSelection(nextGraph: { nodes: Node[]; edges: Edge[] }) {
+    const selectedNodeIds = collectSelectedItemIds(options.nodes.value, options.fullNodes.value)
+    const selectedEdgeIds = collectSelectedItemIds(options.edges.value, options.fullEdges.value)
+    return {
+      nodes: preserveSelectedItems(nextGraph.nodes, selectedNodeIds),
+      edges: preserveSelectedItems(nextGraph.edges, selectedEdgeIds),
+    }
+  }
+
+  function syncVueFlowItemIntoFullGraph<T extends SelectableFlowItem>(
+    fullItem: T,
+    vueFlowItem: T,
+  ): T {
+    if (fullItem.selected === true && vueFlowItem.selected === undefined) {
+      return { ...vueFlowItem, selected: true }
+    }
+    return vueFlowItem
+  }
+
+  function commitVueFlowGraph(nextGraph: { nodes: Node[]; edges: Edge[] }) {
     if (!hasSameItemsByReference(options.nodes.value, nextGraph.nodes)) {
       options.nodes.value = nextGraph.nodes
       options.setNodes(nextGraph.nodes)
@@ -80,84 +105,16 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     }
   }
 
-  function updateMountedGraph(viewport?: ViewportState) {
-    if (!isCanvasFlowCullingEnabled()) {
-      commitMountedGraph({
-        nodes: options.fullNodes.value,
-        edges: options.fullEdges.value,
-      })
-      return
-    }
-
-    const visibleGraph = cullFlowGraphForViewport(
-      {
-        nodes: options.fullNodes.value,
-        edges: options.fullEdges.value,
-      },
-      {
-        viewport: getMountedGraphViewport(viewport),
-        viewportSize: getMountedGraphViewportSize(),
-        overscanPx: FLOW_GRAPH_VIEWPORT_OVERSCAN_PX,
-      },
-    )
-    commitMountedGraph(visibleGraph)
-  }
-
-  function cancelScheduledMountedGraphRefresh() {
-    if (scheduledMountedGraphRefreshId === null) return
-    const frameId = scheduledMountedGraphRefreshId
-    scheduledMountedGraphRefreshId = null
-    scheduledMountedGraphRefreshToken += 1
-    if (typeof globalThis.cancelAnimationFrame === 'function') {
-      globalThis.cancelAnimationFrame(frameId)
-    }
-  }
-
-  function flushMountedGraphRefresh(viewport?: ViewportState) {
-    const viewportForRefresh = viewport ?? scheduledMountedGraphViewport
-    cancelScheduledMountedGraphRefresh()
-    scheduledMountedGraphViewport = undefined
-    updateMountedGraph(viewportForRefresh)
-  }
-
-  function scheduleMountedGraphRefresh(viewport?: ViewportState) {
-    if (!isCanvasFlowCullingEnabled()) return
-    scheduledMountedGraphViewport = viewport
-    if (typeof globalThis.requestAnimationFrame !== 'function') {
-      flushMountedGraphRefresh()
-      return
-    }
-    if (scheduledMountedGraphRefreshId !== null) return
-
-    const refreshToken = ++scheduledMountedGraphRefreshToken
-    scheduledMountedGraphRefreshId = globalThis.requestAnimationFrame(() => {
-      if (
-        scheduledMountedGraphRefreshId === null ||
-        refreshToken !== scheduledMountedGraphRefreshToken
-      ) {
-        return
-      }
-      scheduledMountedGraphRefreshId = null
-      const viewportForRefresh = scheduledMountedGraphViewport
-      scheduledMountedGraphViewport = undefined
-      updateMountedGraph(viewportForRefresh)
-    })
-  }
-
-  if (getCurrentScope()) {
-    onScopeDispose(() => {
-      cancelScheduledMountedGraphRefresh()
-      scheduledMountedGraphViewport = undefined
-    })
-  }
-
   function commitFlowGraph(
     nextGraph: { nodes: Node[]; edges: Edge[] },
-    commitOptions?: FlowGraphCommitOptions,
+    commitOptions: FlowGraphCommitOptions = {},
   ) {
-    options.fullNodes.value = nextGraph.nodes
-    options.fullEdges.value = nextGraph.edges
-    flushMountedGraphRefresh(commitOptions?.viewport)
+    const resolvedGraph = commitOptions.preserveSelection
+      ? preserveCurrentSelection(nextGraph)
+      : nextGraph
+    options.fullNodes.value = resolvedGraph.nodes
+    options.fullEdges.value = resolvedGraph.edges
+    commitVueFlowGraph(resolvedGraph)
   }
 
   function commitFlowNodes(nextNodes: Node[]) {
@@ -168,26 +125,26 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     commitFlowGraph({ nodes: options.fullNodes.value, edges: nextEdges })
   }
 
-  function mergeMountedGraphIntoFullGraph() {
+  function syncVueFlowGraphIntoFullGraph() {
     if (options.nodes.value.length === 0 && options.edges.value.length === 0) return
 
-    const mountedNodesById = new Map(options.nodes.value.map((node) => [node.id, node]))
-    const mountedEdgesById = new Map(options.edges.value.map((edge) => [edge.id, edge]))
+    const vueFlowNodesById = new Map(options.nodes.value.map((node) => [node.id, node]))
+    const vueFlowEdgesById = new Map(options.edges.value.map((edge) => [edge.id, edge]))
     let nextNodes: Node[] | null = null
     let nextEdges: Edge[] | null = null
 
     options.fullNodes.value.forEach((node, index) => {
-      const mounted = mountedNodesById.get(node.id)
-      if (!mounted || mounted === node) return
+      const vueFlowNode = vueFlowNodesById.get(node.id)
+      if (!vueFlowNode || vueFlowNode === node) return
       if (!nextNodes) nextNodes = [...options.fullNodes.value]
-      nextNodes[index] = mounted
+      nextNodes[index] = syncVueFlowItemIntoFullGraph(node, vueFlowNode)
     })
 
     options.fullEdges.value.forEach((edge, index) => {
-      const mounted = mountedEdgesById.get(edge.id)
-      if (!mounted || mounted === edge) return
+      const vueFlowEdge = vueFlowEdgesById.get(edge.id)
+      if (!vueFlowEdge || vueFlowEdge === edge) return
       if (!nextEdges) nextEdges = [...options.fullEdges.value]
-      nextEdges[index] = mounted
+      nextEdges[index] = syncVueFlowItemIntoFullGraph(edge, vueFlowEdge)
     })
 
     if (nextNodes) options.fullNodes.value = nextNodes
@@ -195,7 +152,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function captureFullGraphHistory() {
-    mergeMountedGraphIntoFullGraph()
+    syncVueFlowGraphIntoFullGraph()
     return flowHistory.capture()
   }
 
@@ -228,11 +185,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onError: options.onError,
     refreshSnapshot,
     clearFlowHistoryBaseline: flowHistory.clearBaseline,
-    syncMountedGraph: mergeMountedGraphIntoFullGraph,
-    getMountedGraphStats: () => ({
-      nodes: options.nodes.value.length,
-      edges: options.edges.value.length,
-    }),
     getViewport: options.getViewport,
     setViewport: options.setViewport,
     commitGraph: (graph, commitOptions) =>
@@ -266,14 +218,14 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function beginNodeDragTransaction() {
-    mergeMountedGraphIntoFullGraph()
+    syncVueFlowGraphIntoFullGraph()
     isNodeDragActive = true
     flowHistory.onNodeDragStart()
   }
 
   function commitNodeDragTransaction() {
     try {
-      mergeMountedGraphIntoFullGraph()
+      syncVueFlowGraphIntoFullGraph()
       flowHistory.onNodeDragStop(() => {
         markDirty()
       })
@@ -294,7 +246,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     commitDragHistory: commitNodeDragTransaction,
     markDirty,
     refreshSnapshot: () => {
-      mergeMountedGraphIntoFullGraph()
+      syncVueFlowGraphIntoFullGraph()
       refreshSnapshot()
     },
     commitGraph: commitFlowGraph,
@@ -311,7 +263,5 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     fullNodes: options.fullNodes,
     fullEdges: options.fullEdges,
     refreshSnapshot,
-    scheduleMountedGraphRefresh,
-    flushMountedGraphRefresh,
   }
 }

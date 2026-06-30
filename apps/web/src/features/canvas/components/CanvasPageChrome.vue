@@ -27,8 +27,10 @@
     class="canvas-page-chrome canvas-page-chrome--left"
     :class="{ 'is-hidden': chromeHidden }"
     :active-tool="activeTool"
+    :minimap-enabled="minimapEnabled"
     :inert="inert"
     @select-tool="emit('select-tool', $event)"
+    @toggle-minimap="emit('toggle-minimap')"
   />
 
   <CanvasZoomControls
@@ -57,7 +59,8 @@ defineProps<{
   setBoardNameInputRef: (el: HTMLElement | null) => void
   exportDisabled: boolean
   avatarUrl?: string
-  activeTool: 'select' | 'hand' | 'text'
+  activeTool: 'select' | 'hand'
+  minimapEnabled: boolean
   zoomLevel: number
 }>()
 
@@ -72,7 +75,8 @@ const emit = defineEmits<{
   'open-center': []
   logout: []
   'navigate-back': []
-  'select-tool': [tool: 'select' | 'hand' | 'text']
+  'select-tool': [tool: 'select' | 'hand']
+  'toggle-minimap': []
   'zoom-out': []
   'zoom-in': []
 }>()

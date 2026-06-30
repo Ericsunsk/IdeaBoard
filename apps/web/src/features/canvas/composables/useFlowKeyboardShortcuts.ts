@@ -15,7 +15,6 @@ type UseFlowKeyboardShortcutsOptions = {
   onPanViewport?: (delta: { x: number; y: number }) => void
   onToolSelect?: () => void
   onToolHand?: () => void
-  onToolText?: () => void
   onSpacePressedChange?: (pressed: boolean) => void
   onDuplicateModifierChange?: (pressed: boolean) => void
 }
@@ -111,11 +110,6 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
       if (key === 'h') {
         if (isCanvasShortcutSuppressed(event)) return
         options.onToolHand?.()
-        return
-      }
-      if (key === 't') {
-        if (isCanvasShortcutSuppressed(event)) return
-        options.onToolText?.()
         return
       }
     }

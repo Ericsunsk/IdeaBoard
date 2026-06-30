@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import type { DismissTransientCanvasUi } from './useFlowTransientUiDismissal'
 
-type FlowTool = 'select' | 'hand' | 'text'
+type FlowTool = 'select' | 'hand'
 
 type UseFlowCanvasShellInteractionsOptions = {
   canvasWrapRef: Ref<HTMLElement | null>
@@ -13,7 +13,6 @@ type UseFlowCanvasShellInteractionsOptions = {
   createNodeAtPosition: (kind: CanvasCreatableNodeKind, flowX: number, flowY: number) => void
   dismissTransientCanvasUi: DismissTransientCanvasUi
   clearFlowSelection: () => boolean
-  toastInfo: (message: string) => void
   onCanvasDropDragOver: (event: DragEvent) => void
   isFlowExpandActive: () => boolean
   isBoardHeaderEditingActive: () => boolean
@@ -43,10 +42,6 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
   function setActiveTool(tool: FlowTool) {
     options.dismissTransientCanvasUi({ closeExpand: true, closeBoardHeader: true })
     options.clearFlowSelection()
-    if (tool === 'text') {
-      options.toastInfo('文本工具稍后接入')
-      return
-    }
     options.activeTool.value = tool
   }
 

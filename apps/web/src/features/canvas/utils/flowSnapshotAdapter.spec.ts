@@ -483,6 +483,50 @@ describe('flowSnapshotAdapter', () => {
     expect(restored.fusionNodes[0]?.blendPoint.y).toBe(0.41)
   })
 
+  it('adds stable node dimensions for minimap geometry before nodes are rendered', () => {
+    const flow = canvasBoardSnapshotToFlow({
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 20,
+          y: 30,
+          width: 320,
+          sourceImageUrl: 'https://example.com/source.png',
+          sourceImageRatio: 0.5,
+          outputStatus: 'ready',
+          outputImages: [],
+        },
+      ],
+      promptNodes: [
+        {
+          id: 2,
+          type: 'prompt',
+          x: 480,
+          y: 30,
+          width: 280,
+          text: 'prompt',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          inputImages: [],
+        },
+      ],
+      fusionNodes: [],
+      connections: [],
+      viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
+    })
+
+    expect(flow.nodes.find((node) => node.id === 'image-1')?.dimensions).toEqual({
+      width: 320,
+      height: 182,
+    })
+    expect(flow.nodes.find((node) => node.id === 'prompt-2')?.dimensions).toEqual({
+      width: 280,
+      height: 302,
+    })
+  })
+
   it('creates save-owned snapshot nodes without sharing nested flow node data', () => {
     const nodes: FlowAdapterNode[] = [
       makeImageFlowNode({

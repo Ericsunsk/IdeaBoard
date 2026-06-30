@@ -12,12 +12,11 @@ function createCanvasElement() {
 function createHarness(options: { expandActive?: boolean; boardHeaderActive?: boolean } = {}) {
   const canvasWrapRef = ref<HTMLElement | null>(createCanvasElement())
   const nodeContextMenu = ref({ visible: false, x: 0, y: 0, flowX: 0, flowY: 0 })
-  const activeTool = ref<'select' | 'hand' | 'text'>('select')
+  const activeTool = ref<'select' | 'hand'>('select')
   const dismissTransientCanvasUi = vi.fn()
   const clearFlowSelection = vi.fn(() => false)
   const openNodeContextMenu = vi.fn()
   const createNodeAtPosition = vi.fn()
-  const toastInfo = vi.fn()
   const onCanvasDropDragOver = vi.fn()
 
   const shell = useFlowCanvasShellInteractions({
@@ -29,7 +28,6 @@ function createHarness(options: { expandActive?: boolean; boardHeaderActive?: bo
     createNodeAtPosition,
     dismissTransientCanvasUi,
     clearFlowSelection,
-    toastInfo,
     onCanvasDropDragOver,
     isFlowExpandActive: () => options.expandActive ?? false,
     isBoardHeaderEditingActive: () => options.boardHeaderActive ?? false,
@@ -43,7 +41,6 @@ function createHarness(options: { expandActive?: boolean; boardHeaderActive?: bo
     clearFlowSelection,
     openNodeContextMenu,
     createNodeAtPosition,
-    toastInfo,
     onCanvasDropDragOver,
   }
 }
@@ -104,20 +101,6 @@ describe('useFlowCanvasShellInteractions', () => {
     expect(harness.shell.onEscapeShortcut()).toBe(true)
 
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith()
-    expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
-  })
-
-  it('keeps the active tool unchanged for the placeholder text tool', () => {
-    const harness = createHarness()
-
-    harness.shell.setActiveTool('text')
-
-    expect(harness.activeTool.value).toBe('select')
-    expect(harness.toastInfo).toHaveBeenCalledWith('文本工具稍后接入')
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeExpand: true,
-      closeBoardHeader: true,
-    })
     expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
   })
 

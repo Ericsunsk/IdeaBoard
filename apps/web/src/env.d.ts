@@ -12,7 +12,6 @@ declare global {
     readonly VITE_API_BASE_URL?: string
     readonly VITE_AUTH_BASE_URL?: string
     readonly VITE_PUBLIC_ASSET_BASE_URL?: string
-    readonly VITE_CANVAS_FLOW_ENABLE_CULLING?: string
     readonly VITE_CANVAS_PERF_PROBE?: string
   }
 }
