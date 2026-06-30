@@ -27,6 +27,10 @@ function createTransactionsHarness() {
   const commitEdges = vi.fn((nextEdges: Edge[]) => {
     edges.value = nextEdges
   })
+  const commitGraph = vi.fn((nextGraph: { nodes: Node[]; edges: Edge[] }) => {
+    nodes.value = nextGraph.nodes
+    edges.value = nextGraph.edges
+  })
   const transactions = useFlowTransactions({
     nodes,
     edges,
@@ -36,6 +40,7 @@ function createTransactionsHarness() {
     commitDragHistory: vi.fn(),
     markDirty,
     refreshSnapshot,
+    commitGraph,
     commitNodes,
     commitEdges,
   })
@@ -47,6 +52,7 @@ function createTransactionsHarness() {
     pushHistory,
     markDirty,
     refreshSnapshot,
+    commitGraph,
     commitNodes,
     commitEdges,
     transactions,
@@ -87,5 +93,38 @@ describe('useFlowTransactions', () => {
 
     expect(captureHistory).not.toHaveBeenCalled()
     expect(pushHistory).not.toHaveBeenCalled()
+  })
+
+  it('commits graph mutations atomically without separate node or edge commits', () => {
+    const {
+      nodes,
+      edges,
+      captureHistory,
+      pushHistory,
+      markDirty,
+      refreshSnapshot,
+      commitGraph,
+      commitNodes,
+      commitEdges,
+      transactions,
+    } = createTransactionsHarness()
+    const nextNode = { id: 'node-2', position: { x: 10, y: 0 }, data: {} }
+    const nextEdge = { id: 'edge-1', source: 'node-1', target: 'node-2' }
+
+    transactions.commitGraphMutation((currentNodes) => ({
+      nodes: [...currentNodes, nextNode],
+      edges: [nextEdge],
+    }))
+
+    expect(commitGraph).toHaveBeenCalledTimes(1)
+    expect(commitGraph).toHaveBeenCalledWith({ nodes: nodes.value, edges: edges.value })
+    expect(commitNodes).not.toHaveBeenCalled()
+    expect(commitEdges).not.toHaveBeenCalled()
+    expect(captureHistory).toHaveBeenCalledTimes(1)
+    expect(pushHistory).toHaveBeenCalledTimes(1)
+    expect(markDirty).toHaveBeenCalledTimes(1)
+    expect(refreshSnapshot).toHaveBeenCalledTimes(1)
+    expect(nodes.value).toEqual([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }, nextNode])
+    expect(edges.value).toEqual([nextEdge])
   })
 })

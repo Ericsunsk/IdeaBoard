@@ -32,7 +32,7 @@ export type UseCanvasImageToolsOptions = {
   nodes: Ref<Node[]>
   activeTool: Ref<string>
   canvasWrapRef: Ref<HTMLElement | null>
-  isFlowInteractionActive: ValueRef<boolean>
+  isCanvasInteractionLocked: ValueRef<boolean>
   currentBoardId: ValueRef<string | null | undefined>
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null

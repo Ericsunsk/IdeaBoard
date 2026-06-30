@@ -12,6 +12,8 @@ import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfPr
 type SaveStatus = 'idle' | 'saved' | 'failed'
 type ValueRef<T> = { value: T }
 type ArrayRef = { value: unknown[] }
+type ViewportState = { x: number; y: number; zoom: number }
+type MountedGraphStats = { nodes: number; edges: number }
 type FlowNodeLike = {
   data?: {
     snapshotNode?: {
@@ -30,23 +32,27 @@ export type SaveCurrentBoardSnapshotOptions = {
 }
 
 export type UseFlowBoardPersistenceOptions = {
-  nodes: ArrayRef
-  edges: ArrayRef
+  fullNodes: ArrayRef
+  fullEdges: ArrayRef
   boardBaseSnapshot: ValueRef<CanvasBoardSnapshot>
   isDirty: ValueRef<boolean>
   saveStatus: ValueRef<SaveStatus>
   isLoadingBoardSnapshot: ValueRef<boolean>
   isSavingBoard: ValueRef<boolean>
   boardSession: CanvasBoardSession
-  getViewport: () => { x: number; y: number; zoom: number }
-  setViewport: (viewport: { x: number; y: number; zoom: number }) => void
+  getViewport: () => ViewportState
+  setViewport: (viewport: ViewportState) => void
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
   onError: (text: string) => void
   refreshSnapshot: () => void
   clearFlowHistoryBaseline: () => void
-  commitNodes: (nodes: unknown[]) => void
-  commitEdges: (edges: unknown[]) => void
+  syncMountedGraph?: () => void
+  getMountedGraphStats?: () => MountedGraphStats
+  commitGraph: (
+    graph: { nodes: unknown[]; edges: unknown[] },
+    options?: { viewport?: ViewportState },
+  ) => void
   onGraphCommitted?: () => void
 }
 
@@ -96,10 +102,22 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
 
   function applyBoardSnapshot(snapshot: CanvasBoardSnapshot) {
     const flow = canvasBoardSnapshotToFlow(snapshot)
-    options.commitNodes(flow.nodes as unknown[])
-    options.commitEdges(flow.edges as unknown[])
     options.boardBaseSnapshot.value = snapshot
     const vp = snapshot.viewport
+    const importedViewport =
+      vp &&
+      typeof vp.canvasX === 'number' &&
+      typeof vp.canvasY === 'number' &&
+      typeof vp.zoomLevel === 'number'
+        ? {
+            x: vp.canvasX,
+            y: vp.canvasY,
+            zoom: Math.max(0.1, vp.zoomLevel / 100),
+          }
+        : undefined
+    options.commitGraph(flow as { nodes: unknown[]; edges: unknown[] }, {
+      viewport: importedViewport,
+    })
     if (
       vp &&
       typeof vp.canvasX === 'number' &&
@@ -107,11 +125,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       typeof vp.zoomLevel === 'number'
     ) {
       void Promise.resolve().then(() => {
-        options.setViewport({
-          x: vp.canvasX,
-          y: vp.canvasY,
-          zoom: Math.max(0.1, vp.zoomLevel / 100),
-        })
+        options.setViewport(importedViewport!)
       })
     }
     clearDirtyAfterImport()
@@ -164,17 +178,27 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
   }
 
   function buildCurrentBoardSnapshot(): CanvasBoardSnapshot {
+    options.syncMountedGraph?.()
     return measureCanvasPerf(
       'board.save.buildSnapshot',
-      () => ({
-        nodes: options.nodes.value.length,
-        edges: options.edges.value.length,
-      }),
+      () => {
+        const mountedStats = options.getMountedGraphStats?.()
+        return {
+          fullNodes: options.fullNodes.value.length,
+          fullEdges: options.fullEdges.value.length,
+          ...(mountedStats
+            ? {
+                mountedNodes: mountedStats.nodes,
+                mountedEdges: mountedStats.edges,
+              }
+            : {}),
+        }
+      },
       () => {
         const snapshot = flowToCanvasBoardSnapshot(
           {
-            nodes: options.nodes.value as unknown as FlowAdapterNode[],
-            edges: options.edges.value as unknown as FlowAdapterEdge[],
+            nodes: options.fullNodes.value as unknown as FlowAdapterNode[],
+            edges: options.fullEdges.value as unknown as FlowAdapterEdge[],
           },
           options.boardBaseSnapshot.value,
         )
@@ -221,9 +245,8 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       if (shouldCommitToCurrentGraph) {
         options.boardBaseSnapshot.value = stabilizedSnapshot
         const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
-        if (!hasPendingImageResultNode(options.nodes.value)) {
-          options.commitNodes(nextFlow.nodes as unknown[])
-          options.commitEdges(nextFlow.edges as unknown[])
+        if (!hasPendingImageResultNode(options.fullNodes.value)) {
+          options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] })
           options.clearFlowHistoryBaseline()
         }
         options.isDirty.value = false

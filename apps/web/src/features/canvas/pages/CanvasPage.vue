@@ -61,7 +61,7 @@
         @connect="onConnect"
         @connect-end="onFlowConnectEnd"
         @edge-update="onEdgeUpdate"
-        @move-start="closeBoardHeaderEditing"
+        @move-start="onFlowMoveStart"
         @move="onFlowMove"
         @move-end="onFlowMoveEnd"
         @node-click="onFlowNodeClick"
@@ -153,6 +153,7 @@ import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
 import { useFlowViewportControls } from '../composables/useFlowViewportControls'
+import { useCanvasViewportRuntime } from '../composables/useCanvasViewportRuntime'
 import {
   ACTIVE_NODE_PANEL_KIND,
   useFlowActiveNodePanels,
@@ -170,6 +171,7 @@ import { useCanvasGraphRuntime } from '../composables/useCanvasGraphRuntime'
 import { useCanvasImageTools } from '../image-tools'
 import { useCanvasTaskRuntime } from '../composables/useCanvasTaskRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { isCanvasFlowCullingEnabled } from '../utils/flowViewportCulling'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
 import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 
@@ -191,23 +193,22 @@ const {
   getSelectedElements,
   removeSelectedElements,
 } = useVueFlow()
-const { zoomLevel, onZoomIn, onZoomOut, applyFlowTransform, onPanViewport } =
-  useFlowViewportControls({
-    zoomIn,
-    zoomOut,
-    getViewport,
-    setViewport: (viewport) => setViewport(viewport),
-  })
+const { zoomLevel, applyFlowTransform } = useFlowViewportControls({
+  zoomIn,
+  zoomOut,
+  getViewport,
+  setViewport: (viewport) => setViewport(viewport),
+})
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
+const canvasViewportSize = ref({ width: 0, height: 0 })
 const flowHandleVisibilityRefreshToken = ref(0)
 
 const activeTool = ref<'select' | 'hand' | 'text'>('select')
 
 const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
 
-const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING =
-  import.meta.env.VITE_CANVAS_FLOW_ENABLE_CULLING !== 'false'
+const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING = isCanvasFlowCullingEnabled()
 
 const {
   activeNodePanel,
@@ -222,6 +223,8 @@ const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageS
 const {
   nodes,
   edges,
+  fullNodes,
+  fullEdges,
   currentBoardId,
   loadInitialOrRouteBoard,
   flushAutosave,
@@ -244,6 +247,8 @@ const {
   onLogoutRequest,
   markBoardViewportChanged,
   commitPendingBoardViewportChange,
+  scheduleMountedGraphRefresh,
+  flushMountedGraphRefresh,
 } = useCanvasBoardRuntime({
   route,
   router,
@@ -252,6 +257,7 @@ const {
     userUid: `${userStore.user?.uid ?? ''}`.trim(),
   }),
   getViewport,
+  getViewportSize: () => canvasViewportSize.value,
   setViewport: (viewport) => setViewport(viewport),
   setNodes,
   setEdges,
@@ -261,6 +267,43 @@ const {
     success: (msg: string) => appToast.success(msg),
     error: (msg: string) => appToast.error(msg),
   },
+})
+
+const {
+  syncCanvasViewport,
+  onZoomIn,
+  onZoomOut,
+  onPanViewport,
+  onFlowMoveStart,
+  onFlowMove: syncFlowMove,
+  onFlowMoveEnd,
+  onNodeDragStart,
+  onNodeDragStop,
+  loadCanvasBoardAndProbe,
+} = useCanvasViewportRuntime({
+  canvasWrapRef,
+  canvasViewportSize,
+  nodes,
+  edges,
+  fullNodes,
+  fullEdges,
+  currentBoardId,
+  getViewport,
+  setViewport: (viewport) => setViewport(viewport),
+  zoomIn,
+  zoomOut,
+  applyFlowTransform,
+  markBoardViewportChanged,
+  commitPendingBoardViewportChange,
+  scheduleMountedGraphRefresh,
+  flushMountedGraphRefresh,
+  loadInitialOrRouteBoard,
+  closeBoardHeaderEditing,
+  startCanvasInteraction: (key) => startFlowInteraction(key),
+  stopCanvasInteraction: (key) => stopFlowInteraction(key),
+  startNodeDragInteraction: () => startNodeDragInteraction(),
+  stopNodeDragInteraction: () => stopNodeDragInteraction(),
+  refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
 })
 
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
@@ -280,6 +323,7 @@ const {
   hasSelectedFlowNodes,
   onExportSelectedImages,
   isFlowInteractionActive,
+  isFlowInteractionLocked,
   startFlowInteraction,
   stopFlowInteraction,
   nodeContextMenu,
@@ -305,8 +349,8 @@ const {
   finishFlowNodeDragDuplicateTracking,
   getFlowNodeUiStateCached,
 } = useCanvasGraphRuntime({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
+  nodes: fullNodes as Ref<Node[]>,
+  edges: fullEdges as Ref<Edge[]>,
   currentBoardId,
   createNodeKind,
   flowTransactions,
@@ -321,23 +365,14 @@ const {
   message: appToast,
 })
 
-function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
-  closeBoardHeaderEditing()
-  const transform = payload.flowTransform
-  if (!transform) return
-  if (applyFlowTransform(transform)) markBoardViewportChanged()
-  if (!imageToolChromeModel.value.isReady) return
-  scheduleImageEditorChromeAnchorUpdate()
-}
-
-function onFlowMoveEnd(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
-  const transform = payload.flowTransform
-  if (transform && applyFlowTransform(transform)) markBoardViewportChanged()
-  commitPendingBoardViewportChange()
-}
-
 function onFlowConnectEnd() {
   refreshFlowHandleVisibility()
+}
+
+function onFlowMove(payload: Parameters<typeof syncFlowMove>[0]) {
+  syncFlowMove(payload)
+  if (!payload.flowTransform || !imageToolChromeModel.value.isReady) return
+  scheduleImageEditorChromeAnchorUpdate()
 }
 
 function refreshFlowHandleVisibility() {
@@ -363,8 +398,8 @@ const {
   runFusionPromptGeneration,
   runTextPromptGeneration,
 } = useCanvasTaskRuntime({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
+  nodes: fullNodes as Ref<Node[]>,
+  edges: fullEdges as Ref<Edge[]>,
   flowTransactions,
   flushAutosave,
   currentBoardId,
@@ -424,7 +459,7 @@ const imageTools = useCanvasImageTools({
   nodes: nodes as Ref<Node[]>,
   activeTool: activeTool as Ref<string>,
   canvasWrapRef,
-  isFlowInteractionActive,
+  isCanvasInteractionLocked: isFlowInteractionLocked,
   currentBoardId,
   getImageNodeDisplayPayload,
   getImageNodeSnapshot,
@@ -434,7 +469,7 @@ const imageTools = useCanvasImageTools({
   setViewport: (viewport, options) => setViewport(viewport, options),
   setCenter: (x, y, options) => setCenter(x, y, options),
   onViewportTransform: (viewport) => {
-    applyFlowTransform(viewport)
+    syncCanvasViewport(viewport, { cull: 'flush' })
   },
   createImageNodeFromFile,
   connectImageNodes: onConnect,
@@ -559,26 +594,21 @@ const {
   deleteSelectedFlowElements,
 } = useFlowSelectionController({
   activeTool: activeTool as Ref<string>,
+  fullNodes,
+  fullEdges,
   dismissTransientCanvasUi,
   _deleteSelectedFlowElements: deleteSelectedFlowElementsBase,
 })
 
-const { onNodeDragStart, onNodeDragStop: stopNodeDragInteraction } = useFlowNodeDragInteractions({
-  beginNodeDragTransaction: flowTransactions.beginNodeDragTransaction,
-  commitNodeDragTransaction: flowTransactions.commitNodeDragTransaction,
-  duplicateModifierPressed,
-  beginFlowNodeDragDuplicateTracking,
-  finishFlowNodeDragDuplicateTracking,
-  dismissTransientCanvasUi,
-})
-
-function onNodeDragStop() {
-  try {
-    stopNodeDragInteraction()
-  } finally {
-    refreshFlowHandleVisibility()
-  }
-}
+const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
+  useFlowNodeDragInteractions({
+    beginNodeDragTransaction: flowTransactions.beginNodeDragTransaction,
+    commitNodeDragTransaction: flowTransactions.commitNodeDragTransaction,
+    duplicateModifierPressed,
+    beginFlowNodeDragDuplicateTracking,
+    finishFlowNodeDragDuplicateTracking,
+    dismissTransientCanvasUi,
+  })
 
 const {
   onPaneContextMenu,
@@ -630,7 +660,7 @@ const {
 watch(
   () => route.query.boardId,
   async () => {
-    await loadInitialOrRouteBoard()
+    await loadCanvasBoardAndProbe()
     void reattachPendingImageResults()
     refreshBoardMetas()
   },
@@ -665,7 +695,7 @@ useFlowLeaveGuard({
 })
 
 onMounted(async () => {
-  await loadInitialOrRouteBoard()
+  await loadCanvasBoardAndProbe()
   void reattachPendingImageResults()
   refreshBoardMetas()
 })

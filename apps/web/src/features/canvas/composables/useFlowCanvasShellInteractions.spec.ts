@@ -118,5 +118,15 @@ describe('useFlowCanvasShellInteractions', () => {
       closeExpand: true,
       closeBoardHeader: true,
     })
+    expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears selection when switching tools', () => {
+    const harness = createHarness()
+
+    harness.shell.setActiveTool('hand')
+
+    expect(harness.activeTool.value).toBe('hand')
+    expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
   })
 })

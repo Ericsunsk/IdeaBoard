@@ -27,7 +27,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
 
   const isChromeHidden = computed(() => !!session.imageEditorNodeId.value)
   const isCanvasLocked = computed(
-    () => options.isFlowInteractionActive.value || !!session.imageEditorNodeId.value,
+    () => options.isCanvasInteractionLocked.value || !!session.imageEditorNodeId.value,
   )
 
   return {

@@ -120,7 +120,7 @@ function mountCanvasImageTools() {
   const stage = createStageElement()
   const activeTool = ref('select')
   const canvasWrapRef = ref<HTMLElement | null>(null)
-  const isFlowInteractionActive = ref(false)
+  const isCanvasInteractionLocked = ref(false)
   const currentBoardId = ref('board-1')
   const nodes: Ref<Node[]> = shallowRef(
     Object.keys(imageNodeFixtures).map((id) => ({ id, data: { kind: 'image' } })) as Node[],
@@ -156,7 +156,7 @@ function mountCanvasImageTools() {
           nodes,
           activeTool,
           canvasWrapRef,
-          isFlowInteractionActive,
+          isCanvasInteractionLocked,
           currentBoardId,
           getImageNodeDisplayPayload: (nodeId) => imageNodeFixtures[nodeId]?.display ?? null,
           getImageNodeSnapshot: (nodeId): ImageNodeItem | null =>
@@ -199,6 +199,7 @@ function mountCanvasImageTools() {
     createImageNodeFromFile,
     currentBoardId,
     host,
+    isCanvasInteractionLocked,
     runInpaintAction,
     runPromptGeneration,
     updateOutputCount,
@@ -229,6 +230,26 @@ afterEach(() => {
 })
 
 describe('useCanvasImageTools image adjustment final apply', () => {
+  it('locks canvas only when a lock-level interaction or editor session is active', () => {
+    const harness = mountCanvasImageTools()
+
+    try {
+      expect(harness.runtime.isCanvasLocked.value).toBe(false)
+
+      harness.isCanvasInteractionLocked.value = true
+      expect(harness.runtime.isCanvasLocked.value).toBe(true)
+
+      harness.isCanvasInteractionLocked.value = false
+      expect(harness.runtime.isCanvasLocked.value).toBe(false)
+
+      expect(harness.runtime.enter('node-1', 'adjust')).toBe(true)
+
+      expect(harness.runtime.isCanvasLocked.value).toBe(true)
+    } finally {
+      harness.unmount()
+    }
+  })
+
   it('records final render progress while applying and clears it after success', async () => {
     let resolveRender!: (file: File) => void
     renderAdjustmentFileMock.mockImplementation(

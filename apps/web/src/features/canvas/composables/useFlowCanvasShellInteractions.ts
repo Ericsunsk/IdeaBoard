@@ -42,6 +42,7 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
 
   function setActiveTool(tool: FlowTool) {
     options.dismissTransientCanvasUi({ closeExpand: true, closeBoardHeader: true })
+    options.clearFlowSelection()
     if (tool === 'text') {
       options.toastInfo('文本工具稍后接入')
       return

@@ -9,13 +9,18 @@ export type CommitMutationOptions = {
   markDirty?: boolean
 }
 
+type FlowGraph = {
+  nodes: Node[]
+  edges: Edge[]
+}
+
 export type FlowTransactions = {
   captureHistory: () => FlowHistorySnapshot
   beginNodeDragTransaction: () => void
   commitNodeDragTransaction: () => void
   commitDirty: (commitOptions?: Pick<CommitMutationOptions, 'markDirty'>) => void
   commitGraphMutation: (
-    mutator: (nodes: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[] },
+    mutator: (nodes: Node[], edges: Edge[]) => FlowGraph,
     commitOptions?: CommitMutationOptions,
   ) => void
   commitNodeMutation: (
@@ -37,6 +42,7 @@ type UseFlowTransactionsOptions = {
   commitDragHistory: (onCommit: () => void) => void
   markDirty: () => void
   refreshSnapshot: () => void
+  commitGraph: (nextGraph: FlowGraph) => void
   commitNodes: (nextNodes: Node[]) => void
   commitEdges: (nextEdges: Edge[]) => void
 }
@@ -61,14 +67,13 @@ export function useFlowTransactions(options: UseFlowTransactionsOptions): FlowTr
   }
 
   function commitGraphMutation(
-    mutator: (nodes: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[] },
+    mutator: (nodes: Node[], edges: Edge[]) => FlowGraph,
     commitOptions?: CommitMutationOptions,
   ) {
     const { nodes: nextNodes, edges: nextEdges } = mutator(options.nodes.value, options.edges.value)
     if (nextNodes === options.nodes.value && nextEdges === options.edges.value) return
     const resolvedHistoryBefore = captureHistoryBeforeCommit(commitOptions)
-    options.commitNodes(nextNodes)
-    options.commitEdges(nextEdges)
+    options.commitGraph({ nodes: nextNodes, edges: nextEdges })
     recordHistory(resolvedHistoryBefore)
     commitDirty(commitOptions)
   }

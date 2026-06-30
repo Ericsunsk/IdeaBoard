@@ -31,6 +31,7 @@ type UseCanvasBoardRuntimeOptions = {
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
   getViewport: () => FlowViewport
+  getViewportSize?: () => { width: number; height: number }
   setViewport: (viewport: FlowViewport) => Promise<unknown> | unknown
   setNodes: (nodes: Node[]) => void
   setEdges: (edges: Edge[]) => void
@@ -43,6 +44,8 @@ type BoardOption = { id: string; name: string }
 type CanvasBoardRuntime = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
+  fullNodes: Ref<Node[]>
+  fullEdges: Ref<Edge[]>
   currentBoardId: ComputedRef<string | null>
   loadInitialOrRouteBoard: () => Promise<void>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
@@ -52,6 +55,8 @@ type CanvasBoardRuntime = {
   onLogoutRequest: () => Promise<void>
   markBoardViewportChanged: () => void
   commitPendingBoardViewportChange: () => void
+  scheduleMountedGraphRefresh: (viewport?: FlowViewport) => void
+  flushMountedGraphRefresh: (viewport?: FlowViewport) => void
   isBoardMenuOpen: Ref<boolean>
   isRenamingBoard: Ref<boolean>
   boardNameDraft: Ref<string>
@@ -72,6 +77,8 @@ export function useCanvasBoardRuntime(
 ): CanvasBoardRuntime {
   const nodes: Ref<Node[]> = ref([])
   const edges: Ref<Edge[]> = ref([])
+  const fullNodes: Ref<Node[]> = ref([])
+  const fullEdges: Ref<Edge[]> = ref([])
   const boardBaseSnapshot: Ref<CanvasBoardSnapshot> = ref(createEmptyCanvasBoardSnapshot())
   const isLoadingBoardSnapshot: Ref<boolean> = ref(false)
   const isSavingBoard: Ref<boolean> = ref(false)
@@ -105,9 +112,13 @@ export function useCanvasBoardRuntime(
     flushAutosave,
     flowHistory,
     flowTransactions,
+    scheduleMountedGraphRefresh,
+    flushMountedGraphRefresh,
   } = useFlowCanvasRuntime({
     nodes,
     edges,
+    fullNodes,
+    fullEdges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,
@@ -115,6 +126,7 @@ export function useCanvasBoardRuntime(
     isSavingBoard,
     boardSession,
     getViewport: options.getViewport,
+    getViewportSize: options.getViewportSize,
     setViewport: setBoardViewport,
     setNodes: options.setNodes,
     setEdges: options.setEdges,
@@ -161,6 +173,8 @@ export function useCanvasBoardRuntime(
   return {
     nodes,
     edges,
+    fullNodes,
+    fullEdges,
     currentBoardId,
     loadInitialOrRouteBoard,
     flushAutosave,
@@ -170,6 +184,8 @@ export function useCanvasBoardRuntime(
     onLogoutRequest,
     markBoardViewportChanged,
     commitPendingBoardViewportChange,
+    scheduleMountedGraphRefresh,
+    flushMountedGraphRefresh,
     isBoardMenuOpen: boardHeader.isBoardMenuOpen,
     isRenamingBoard: boardHeader.isRenamingBoard,
     boardNameDraft: boardHeader.boardNameDraft,

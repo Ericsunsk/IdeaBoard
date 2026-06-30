@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import type { CanvasBoardSession } from '../board-session'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { FlowAdapterEdge, FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import { useFlowBoardPersistence } from './useFlowBoardPersistence'
 
 const mocks = vi.hoisted(() => ({
@@ -12,20 +13,19 @@ const mocks = vi.hoisted(() => ({
 
 function createPersistenceHarness(initialBoardId = 'board-a') {
   const routeBoardId = ref(initialBoardId)
-  const nodes = ref<unknown[]>([])
-  const edges = ref<unknown[]>([])
+  const fullNodes = ref<unknown[]>([])
+  const fullEdges = ref<unknown[]>([])
   const boardBaseSnapshot = ref(createEmptyCanvasBoardSnapshot())
   const isDirty = ref(true)
   const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
   const isLoadingBoardSnapshot = ref(false)
   const isSavingBoard = ref(false)
   const setViewport = vi.fn()
-  const commitNodes = vi.fn((nextNodes: unknown[]) => {
-    nodes.value = nextNodes
+  const commitGraph = vi.fn((nextGraph: { nodes: unknown[]; edges: unknown[] }) => {
+    fullNodes.value = nextGraph.nodes
+    fullEdges.value = nextGraph.edges
   })
-  const commitEdges = vi.fn((nextEdges: unknown[]) => {
-    edges.value = nextEdges
-  })
+  const syncMountedGraph = vi.fn()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => {
       const boardId = routeBoardId.value.trim()
@@ -38,8 +38,8 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
   }
 
   const persistence = useFlowBoardPersistence({
-    nodes,
-    edges,
+    fullNodes,
+    fullEdges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,
@@ -53,21 +53,73 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     onError: vi.fn(),
     refreshSnapshot: vi.fn(),
     clearFlowHistoryBaseline: vi.fn(),
-    commitNodes,
-    commitEdges,
+    syncMountedGraph,
+    commitGraph,
   })
 
   return {
     persistence,
     routeBoardId,
+    fullNodes,
+    fullEdges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,
     isLoadingBoardSnapshot,
-    commitNodes,
-    commitEdges,
+    commitGraph,
+    syncMountedGraph,
     setViewport,
     boardSession,
+  }
+}
+
+function makePromptFlowNode(flowId: string, id: number, x: number): FlowAdapterNode {
+  return {
+    id: flowId,
+    type: 'canvas',
+    position: { x, y: 40 },
+    data: {
+      kind: 'prompt',
+      nodeType: 'prompt',
+      title: `Prompt #${id}`,
+      summary: 'Canvas prompt node',
+      snapshotNode: {
+        id,
+        type: 'prompt',
+        x,
+        y: 40,
+        width: 280,
+        text: `prompt ${id}`,
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    },
+  }
+}
+
+function makeImageFlowNode(flowId: string, id: number, x: number): FlowAdapterNode {
+  return {
+    id: flowId,
+    type: 'canvas',
+    position: { x, y: 40 },
+    data: {
+      kind: 'image',
+      nodeType: 'image',
+      title: `Image #${id}`,
+      summary: 'Canvas image node',
+      snapshotNode: {
+        id,
+        type: 'image-node',
+        x,
+        y: 40,
+        width: 280,
+        sourceImageUrl: `https://example.com/source-${id}.png`,
+        sourceImageRatio: 1,
+        outputStatus: 'ready',
+        outputImages: [{ url: `https://example.com/output-${id}.png`, ratio: 1 }],
+      },
+    },
   }
 }
 
@@ -101,8 +153,7 @@ describe('useFlowBoardPersistence', () => {
     mocks.resolveSave?.()
     await savePromise
 
-    expect(harness.commitNodes).not.toHaveBeenCalled()
-    expect(harness.commitEdges).not.toHaveBeenCalled()
+    expect(harness.commitGraph).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('idle')
   })
@@ -115,10 +166,51 @@ describe('useFlowBoardPersistence', () => {
     mocks.resolveSave?.()
     await savePromise
 
-    expect(harness.commitNodes).toHaveBeenCalledOnce()
-    expect(harness.commitEdges).toHaveBeenCalledOnce()
+    expect(harness.commitGraph).toHaveBeenCalledOnce()
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
+  })
+
+  it('saves from the full graph without dropping hidden nodes or edges', async () => {
+    const harness = createPersistenceHarness()
+    const firstNode = makePromptFlowNode('prompt-1', 1, 40)
+    const hiddenImageNode = makeImageFlowNode('image-2', 2, 700)
+    const hiddenPromptNode = makePromptFlowNode('prompt-2', 2, 900)
+    const hiddenEdge: FlowAdapterEdge = {
+      id: 'connection-9',
+      source: 'image-2',
+      sourceHandle: 'out:image',
+      target: 'prompt-2',
+      targetHandle: 'in:image',
+      data: {
+        connectionSnapshot: {
+          id: 9,
+          fromNodeType: 'image',
+          fromNodeId: 2,
+          fromPort: 'image',
+          toNodeType: 'prompt',
+          toNodeId: 2,
+          toPort: 'image',
+        },
+      },
+    }
+    harness.fullNodes.value = [firstNode]
+    harness.fullEdges.value = []
+    harness.syncMountedGraph.mockImplementation(() => {
+      harness.fullNodes.value = [firstNode, hiddenImageNode, hiddenPromptNode]
+      harness.fullEdges.value = [hiddenEdge]
+    })
+
+    const savePromise = harness.persistence.saveCurrentBoardSnapshot()
+    await waitForPendingSave()
+    mocks.resolveSave?.()
+    await savePromise
+
+    const savedSnapshot = mocks.save.mock.calls[0]?.[0] as CanvasBoardSnapshot
+    expect(harness.syncMountedGraph).toHaveBeenCalled()
+    expect(savedSnapshot.imageNodes.map((node) => node.id)).toEqual([2])
+    expect(savedSnapshot.promptNodes.map((node) => node.id)).toEqual([1, 2])
+    expect(savedSnapshot.connections.map((connection) => connection.id)).toEqual([9])
   })
 
   it('ignores stale board snapshot loads when the current board changes', async () => {
