@@ -16,6 +16,7 @@
 </template>
 
 <script setup lang="ts">
+import Card from 'primevue/card'
 import AdminCardHeader from './AdminCardHeader.vue'
 import AdminChartPanel from './AdminChartPanel.vue'
 import { adminCardPt } from '../lib/adminCardPt'

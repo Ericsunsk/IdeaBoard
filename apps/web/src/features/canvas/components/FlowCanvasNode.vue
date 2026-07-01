@@ -171,6 +171,10 @@ import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapte
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
+import FlowNodeHandles from './FlowNodeHandles.vue'
+import FusionNode from './nodes/FusionNode.vue'
+import ImageNode from './nodes/ImageNode.vue'
+import PromptNode from './nodes/PromptNode.vue'
 
 const props = withDefaults(
   defineProps<{

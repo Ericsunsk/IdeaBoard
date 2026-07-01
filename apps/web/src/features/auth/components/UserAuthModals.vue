@@ -23,6 +23,8 @@ import {
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
 } from '../../../shared/constants/routePaths'
+import LoginModal from './LoginModal.vue'
+import RegisterModal from './RegisterModal.vue'
 
 const props = defineProps<{
   mode: 'login' | 'register'

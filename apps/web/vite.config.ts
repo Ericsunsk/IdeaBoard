@@ -2,8 +2,6 @@ import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { PrimeVueResolver } from '@primevue/auto-import-resolver'
 
 export default defineConfig({
   plugins: [
@@ -20,18 +18,6 @@ export default defineConfig({
       ],
       dts: 'src/auto-imports.d.ts',
       vueTemplate: true,
-    }),
-    Components({
-      include: [/\.vue$/, /\.vue\?vue/],
-      dirs: [
-        'src/features/admin/shared/components',
-        'src/features/auth/components',
-        'src/features/boards/components',
-        'src/features/canvas/components',
-      ],
-      deep: true,
-      dts: 'src/components.d.ts',
-      resolvers: [PrimeVueResolver()],
     }),
   ],
   test: {
