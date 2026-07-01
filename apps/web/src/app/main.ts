@@ -1,5 +1,4 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
@@ -13,8 +12,6 @@ import './style.css'
 import 'vue-sonner/style.css'
 
 const app = createApp(App)
-const pinia = createPinia()
-app.use(pinia)
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
 app.use(PrimeVue, {
@@ -34,7 +31,7 @@ app.use(PrimeVue, {
 })
 app.use(ConfirmationService)
 
-const userStore = useUserStore(pinia)
+const userStore = useUserStore()
 void userStore.fetchUserInfo()
 
 app.mount('#app')

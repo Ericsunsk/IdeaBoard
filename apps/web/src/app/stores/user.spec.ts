@@ -1,31 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
-import { useUserStore } from './user'
-import { queryClient } from '../../shared/query/queryClient'
 import type { User } from '../../shared/api/generated-query/model'
-import { getUserInfo } from '../../shared/api/generated-query/user/user'
-import { authClient } from '../../shared/auth/client'
-
-vi.mock('../../shared/api/generated-query/user/user', () => ({
-  getUserInfo: vi.fn(),
-}))
-
-vi.mock('../../shared/auth/client', () => ({
-  authClient: {
-    signIn: {
-      username: vi.fn(),
-    },
-    signUp: {
-      email: vi.fn(),
-    },
-    signOut: vi.fn(),
-    getSession: vi.fn(),
-  },
-  extractBetterAuthErrorMessage: (error: unknown, fallback: string) =>
-    error && typeof error === 'object' && 'message' in error
-      ? String((error as { message?: unknown }).message || fallback)
-      : fallback,
-}))
 
 function makeUser(overrides: Partial<User> = {}): User {
   const id = overrides.id ?? 1
@@ -42,16 +16,96 @@ function makeUser(overrides: Partial<User> = {}): User {
   }
 }
 
+async function getFreshUserStore() {
+  vi.resetModules()
+  const getUserInfo = vi.fn()
+  const authClient = {
+    signIn: {
+      username: vi.fn(),
+    },
+    signUp: {
+      email: vi.fn(),
+    },
+    signOut: vi.fn(),
+    getSession: vi.fn(),
+  }
+
+  vi.doMock('../../shared/api/generated-query/user/user', () => ({
+    getUserInfo,
+  }))
+  vi.doMock('../../shared/auth/client', () => ({
+    authClient,
+    extractBetterAuthErrorMessage: (error: unknown, fallback: string) =>
+      error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: unknown }).message || fallback)
+        : fallback,
+  }))
+
+  const [{ useUserStore }, { queryClient }] = await Promise.all([
+    import('./user'),
+    import('../../shared/query/queryClient'),
+  ])
+  return {
+    store: useUserStore(),
+    queryClient,
+    getUserInfo,
+    authClient,
+  }
+}
+
 describe('useUserStore auth cache handling', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    queryClient.clear()
     localStorage.clear()
-    setActivePinia(createPinia())
   })
 
-  it('clears Vue Query cache when auth is reset', () => {
-    const store = useUserStore()
+  it('restores a stored session user on module creation', async () => {
+    const storedUser = makeUser({ id: 7, role: 'admin' })
+    localStorage.setItem('user', JSON.stringify(storedUser))
+
+    const { store } = await getFreshUserStore()
+
+    expect(store.user).toEqual(storedUser)
+    expect(store.isAdmin).toBe(true)
+    expect(store.sessionValidatedAt).toBe(0)
+  })
+
+  it('logs in and stores the fetched session user', async () => {
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
+    const loggedInUser = makeUser({ id: 4, uid: 'USER04' })
+    vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
+    vi.mocked(getUserInfo).mockResolvedValue({
+      code: 0,
+      msg: 'ok',
+      data: { user: loggedInUser },
+    } as never)
+
+    await expect(store.login('alice', 'secret-password')).resolves.toBe(true)
+
+    expect(authClient.signIn.username).toHaveBeenCalledWith({
+      username: 'alice',
+      password: 'secret-password',
+    })
+    expect(store.user).toEqual(loggedInUser)
+    expect(localStorage.getItem('user')).toBe(JSON.stringify(loggedInUser))
+    expect(store.sessionValidatedAt).toBeGreaterThan(0)
+  })
+
+  it('clears auth state and Vue Query cache after logout succeeds', async () => {
+    const { store, queryClient, authClient } = await getFreshUserStore()
+    store.setAuth(makeUser())
+    queryClient.setQueryData(['user', 'boards'], { owner: 1 })
+    vi.mocked(authClient.signOut).mockResolvedValue({} as never)
+
+    await expect(store.logout()).resolves.toBe(true)
+
+    expect(store.user).toBeNull()
+    expect(localStorage.getItem('user')).toBeNull()
+    expect(queryClient.getQueryData(['user', 'boards'])).toBeUndefined()
+  })
+
+  it('clears Vue Query cache when auth is reset', async () => {
+    const { store, queryClient } = await getFreshUserStore()
     store.setAuth(makeUser())
     queryClient.setQueryData(['user', 'boards'], { owner: 1 })
 
@@ -60,8 +114,8 @@ describe('useUserStore auth cache handling', () => {
     expect(queryClient.getQueryData(['user', 'boards'])).toBeUndefined()
   })
 
-  it('clears Vue Query cache when the active identity changes', () => {
-    const store = useUserStore()
+  it('clears Vue Query cache when the active identity changes', async () => {
+    const { store, queryClient } = await getFreshUserStore()
     store.setAuth(makeUser({ id: 1, uid: 'USER01', auth_user_id: 'auth-1' }))
     queryClient.setQueryData(['admin', 'users'], [{ id: 1 }])
 
@@ -70,8 +124,8 @@ describe('useUserStore auth cache handling', () => {
     expect(queryClient.getQueryData(['admin', 'users'])).toBeUndefined()
   })
 
-  it('keeps Vue Query cache when the same identity is refreshed', () => {
-    const store = useUserStore()
+  it('keeps Vue Query cache when the same identity is refreshed', async () => {
+    const { store, queryClient } = await getFreshUserStore()
     store.setAuth(makeUser({ id: 1, uid: 'USER01', auth_user_id: 'auth-1' }))
     queryClient.setQueryData(['user', 'boards'], { owner: 1 })
 
@@ -80,8 +134,19 @@ describe('useUserStore auth cache handling', () => {
     expect(queryClient.getQueryData(['user', 'boards'])).toEqual({ owner: 1 })
   })
 
+  it('reuses a recently validated session without probing the server', async () => {
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
+    const currentUser = makeUser({ id: 5 })
+    store.setAuth(currentUser)
+
+    await expect(store.ensureSession()).resolves.toEqual(currentUser)
+
+    expect(authClient.getSession).not.toHaveBeenCalled()
+    expect(getUserInfo).not.toHaveBeenCalled()
+  })
+
   it('fails closed for fresh session probes when user info returns a server error', async () => {
-    const store = useUserStore()
+    const { store, queryClient, getUserInfo, authClient } = await getFreshUserStore()
     store.setAuth(makeUser({ id: 1, role: 'admin' }))
     queryClient.setQueryData(['admin', 'users'], [{ id: 1 }])
     vi.mocked(authClient.getSession).mockResolvedValue({
@@ -97,7 +162,7 @@ describe('useUserStore auth cache handling', () => {
   })
 
   it('registers and stores the created session user', async () => {
-    const store = useUserStore()
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
     const registeredUser = makeUser({ id: 2, uid: 'USER02', username: 'alice' })
     vi.mocked(authClient.signUp.email).mockResolvedValue({} as never)
     vi.mocked(getUserInfo).mockResolvedValue({
@@ -119,7 +184,7 @@ describe('useUserStore auth cache handling', () => {
   })
 
   it('falls back to username login when sign up does not restore user info', async () => {
-    const store = useUserStore()
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
     const registeredUser = makeUser({ id: 3, uid: 'USER03', username: 'bob' })
     vi.mocked(authClient.signUp.email).mockResolvedValue({} as never)
     vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)

@@ -1,5 +1,4 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import type { User } from '../../shared/api/generated-query/model'
 import { getUserInfo } from '../../shared/api/generated-query/user/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/client'
@@ -8,6 +7,24 @@ import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
 import { resolveAuthUrl } from '../../shared/config/runtimeUrls'
 
 const SESSION_CACHE_TTL_MS = 30_000
+
+export type UserSessionStore = {
+  user: User | null
+  readonly isAdmin: boolean
+  sessionValidatedAt: number
+  setAuth: (newUser: User) => void
+  clearAuth: () => void
+  login: (username: string, password: string) => Promise<boolean>
+  register: (username: string, password: string) => Promise<boolean>
+  logout: () => Promise<boolean>
+  fetchUserInfo: (
+    force?: boolean,
+    options?: { failClosedOnError?: boolean },
+  ) => Promise<User | null>
+  ensureSession: (options?: { fresh?: boolean }) => Promise<User | null>
+  updatePassword: (oldPassword: string, newPassword: string) => Promise<boolean>
+  setAvatarLocal: (avatar: string) => void
+}
 
 function getUserIdentity(authUser: User | null): string | null {
   if (!authUser) return null
@@ -34,7 +51,10 @@ function getErrorStatusCode(error: unknown): number {
   return Number(errorRecord?.status ?? errorRecord?.code)
 }
 
-export const useUserStore = defineStore('user', () => {
+let userStore: UserSessionStore | null = null
+let restoreStoredUserIfAvailable: (() => void) | null = null
+
+function createUserSessionStore(): UserSessionStore {
   const storedUser = getStoredUser()
 
   const user = ref<User | null>(storedUser)
@@ -42,6 +62,14 @@ export const useUserStore = defineStore('user', () => {
   const sessionValidatedAt = ref(0)
 
   const isAdmin = computed(() => user.value?.role === 'admin')
+
+  function restoreStoredUser() {
+    if (user.value || userInfoLoaded.value) return
+    const storedUser = getStoredUser()
+    if (storedUser) {
+      user.value = storedUser
+    }
+  }
 
   function updateAuth(newUser: User) {
     if (getUserIdentity(user.value) !== getUserIdentity(newUser)) {
@@ -204,7 +232,7 @@ export const useUserStore = defineStore('user', () => {
     updateAuth({ ...user.value, avatar: nextAvatar })
   }
 
-  return {
+  const store = reactive({
     user,
     isAdmin,
     sessionValidatedAt,
@@ -217,5 +245,18 @@ export const useUserStore = defineStore('user', () => {
     ensureSession,
     updatePassword,
     setAvatarLocal,
+  })
+
+  restoreStoredUserIfAvailable = restoreStoredUser
+  return store
+}
+
+export function useUserStore() {
+  if (!userStore) {
+    userStore = createUserSessionStore()
+    return userStore
   }
-})
+
+  restoreStoredUserIfAvailable?.()
+  return userStore
+}
