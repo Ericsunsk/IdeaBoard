@@ -6,7 +6,7 @@ export const baseDialogPt = {
   pcCloseButton: {
     root: {
       class:
-        '!h-8 !w-8 !rounded-lg !border-0 !bg-transparent !p-0 !text-admin-text-3 !shadow-none hover:!bg-admin-surface-muted hover:!text-admin-text-1 focus:!shadow-none focus-visible:!outline-none focus-visible:!ring-0',
+        '!h-8 !w-8 !rounded-lg !border-0 !bg-transparent !p-0 !text-ib-text-subtle !shadow-none hover:!bg-ib-surface-muted hover:!text-ib-text focus:!shadow-none focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] focus-visible:!ring-0',
     },
     icon: { class: '!h-4 !w-4' },
   },

@@ -10,13 +10,17 @@ function joinOverlayClasses(...classes: OverlayClass[]) {
 
 export const adminOverlayMenuListClass = '!m-0 !p-1.5'
 
-export const adminOverlayMenuItemContentClass = 'rounded-[10px] hover:!bg-admin-surface-hover'
+export const adminOverlayMenuRootClass =
+  'min-w-[180px] overflow-hidden rounded-[var(--radius-ib-overlay)] border border-ib-border bg-ib-surface shadow-[var(--shadow-ib-overlay)]'
+
+export const adminOverlayMenuItemContentClass =
+  'rounded-[var(--radius-ib-control)] hover:!bg-ib-surface-hover'
 
 export const adminOverlayMenuItemLinkClass =
-  '!px-3 !py-2.5 !text-admin-body !font-[650] !text-admin-text-2 hover:!text-admin-text-1'
+  '!px-3 !py-2.5 !text-admin-body !font-[650] !text-ib-text-muted hover:!text-ib-text'
 
 export const adminOverlayPopoverRootClass =
-  '!rounded-lg !border-admin-border !bg-admin-card !shadow-none'
+  '!rounded-lg !border-ib-border !bg-ib-surface !shadow-none'
 
 export function createAdminMenuPt(input: {
   rootClass: string

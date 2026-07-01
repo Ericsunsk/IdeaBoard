@@ -2,7 +2,7 @@ export const adminSurfaceRootViewportClass =
   'flex max-w-full min-w-0 flex-col gap-4 p-0 min-[1081px]:-mb-[17px]'
 
 export const adminSurfacePanelClass =
-  'min-w-0 overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0'
+  'min-w-0 overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-0'
 
 export const adminSurfacePanelViewportClass = 'flex flex-col min-[1081px]:h-[calc(100dvh-117px)]'
 
@@ -16,7 +16,7 @@ export const adminLoadingStateClass =
   'flex min-h-[260px] items-center justify-center text-admin-content text-admin-text-3'
 
 export const adminEmptyStateClass =
-  'flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2'
+  'flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-ib-border-soft bg-ib-surface text-center text-ib-text-muted'
 
 export const adminDashboardRootClass = 'flex max-w-full min-w-0 flex-col gap-4 p-0'
 
@@ -33,13 +33,13 @@ export const adminTwoColumnMasonryGridClass = 'columns-1 gap-3.5 md:columns-2'
 export const adminMasonryCardClass = 'mb-3.5 break-inside-avoid !rounded-lg'
 
 export const adminToolbarSearchInputClass =
-  '!h-[38px] !w-full !rounded-lg !bg-white !text-admin-title-sm !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-admin-text-2'
+  '!h-[38px] !w-full !rounded-lg !bg-ib-surface !text-admin-title-sm !text-ib-text !shadow-[var(--shadow-ib-control)] placeholder:!text-ib-text-muted'
 
 export const adminToolbarMetricClass =
   'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-admin-body font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]'
 
 export const adminFramedIconButtonBaseClass =
-  '!h-9 !w-9 !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0'
+  '!h-9 !w-9 !border !border-ib-border !bg-ib-surface hover:!bg-ib-surface-muted transition-colors flex items-center justify-center p-0'
 
 export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-lg`
 
@@ -50,16 +50,16 @@ export const adminToolbarIconButtonClass = adminFramedIconButtonClass
 export const adminToolbarPagerButtonClass = `${adminToolbarIconButtonClass} disabled:!opacity-40`
 
 export const adminToolbarPageLabelClass =
-  'flex h-9 items-center justify-center rounded-lg !border !border-admin-border !bg-white px-3 text-admin-meta font-semibold text-admin-text-2'
+  'flex h-9 items-center justify-center rounded-lg !border !border-ib-border !bg-ib-surface px-3 text-admin-meta font-semibold text-ib-text-muted'
 
 export const adminFilterPopoverClass =
-  'flex w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4'
+  'flex w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-ib-surface p-4'
 
 export const adminConfigPopoverClass =
-  'flex w-[280px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4'
+  'flex w-[280px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-ib-surface p-4'
 
 export const adminAnomalyPopoverClass =
-  'flex max-h-[calc(100dvh_-_24px)] w-[340px] max-w-[calc(100vw_-_28px)] flex-col overflow-hidden bg-white'
+  'flex max-h-[calc(100dvh_-_24px)] w-[340px] max-w-[calc(100vw_-_28px)] flex-col overflow-hidden bg-ib-surface'
 
 export const adminPopoverSectionHeaderClass = 'border-b border-admin-border pb-2'
 

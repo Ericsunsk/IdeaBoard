@@ -251,7 +251,11 @@ import { USER_CENTER_PATH } from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
-import { createAdminMenuPt, createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
+import {
+  adminOverlayMenuRootClass,
+  createAdminMenuPt,
+  createAdminPopoverPt,
+} from '../shared/lib/adminOverlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
 
 const vTooltip = Tooltip
@@ -285,13 +289,13 @@ const { fallbackText, logoURL, projectName } = useSiteBranding({
 const brandAriaLabel = computed(() => `${projectName.value} Admin`)
 
 const layoutShellClass =
-  'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-white text-admin-text-1 max-[1080px]:grid-cols-1'
+  'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-ib-surface text-ib-text max-[1080px]:grid-cols-1'
 const siderClass =
-  "sticky top-0 flex h-screen self-start flex-col items-start bg-white py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[14px] before:bg-admin-control-bg before:content-['']"
+  "sticky top-0 flex h-screen self-start flex-col items-start bg-ib-surface py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[var(--radius-ib-overlay)] before:bg-admin-control-bg before:content-['']"
 const railItemSizeClass = 'size-10 min-w-[40px]'
 const railButtonSizeClass = '!size-10 !min-w-[40px]'
 const brandMarkBaseClass = [
-  'relative z-[1] ml-[42px] inline-flex flex-none items-center justify-center overflow-hidden rounded-xl border bg-white text-admin-accent-pressed no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]',
+  'relative z-[1] ml-[42px] inline-flex flex-none items-center justify-center overflow-hidden rounded-xl border bg-ib-surface text-ib-accent-pressed no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]',
   railItemSizeClass,
 ].join(' ')
 const brandMarkClass = computed(() =>
@@ -301,22 +305,22 @@ const navRailClass =
   'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
 const focusRingClass =
-  'focus-visible:!outline-none focus-visible:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
+  'focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]'
 const railButtonClass = [
-  '!inline-flex !items-center !justify-center !rounded-[10px] !border !border-transparent !text-admin-text-2 !no-underline !shadow-none !transition-colors !duration-200',
+  '!inline-flex !items-center !justify-center !rounded-[var(--radius-ib-control)] !border !border-transparent !text-ib-text-muted !no-underline !shadow-none !transition-colors !duration-[var(--duration-ib-standard)]',
   railButtonSizeClass,
   focusRingClass,
 ].join(' ')
-const railButtonIdleClass = '!bg-transparent hover:!bg-admin-surface-hover hover:!text-admin-text-1'
+const railButtonIdleClass = '!bg-transparent hover:!bg-ib-surface-hover hover:!text-ib-text'
 const railButtonActiveClass =
-  '!bg-admin-accent-pressed !text-admin-text-inverse !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
+  '!bg-ib-accent-pressed !text-ib-text-inverse !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
 const userAvatarButtonClass = 'ib-user-avatar-button admin-user-avatar-button'
 const userAvatarImageClass = 'ib-user-avatar-button__image'
 const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
 const userAvatarIconClass = 'size-[17px]'
 const shellButtonSkinClass = [
-  '!size-[42px] !items-center !justify-center !rounded-[9px] !text-admin-text-2 !transition-colors !duration-200',
-  'hover:!border-admin-border hover:!bg-admin-surface-hover hover:!text-admin-text-1',
+  '!size-[42px] !items-center !justify-center !rounded-[9px] !text-ib-text-muted !transition-colors !duration-[var(--duration-ib-standard)]',
+  'hover:!border-ib-border hover:!bg-ib-surface-hover hover:!text-ib-text',
   focusRingClass,
 ].join(' ')
 const shellButtonClass = [
@@ -324,31 +328,30 @@ const shellButtonClass = [
   shellButtonSkinClass,
 ].join(' ')
 const mobileMenuButtonClass = [
-  '!hidden max-[1080px]:!inline-flex !bg-white !border !border-admin-border !shadow-none',
+  '!hidden max-[1080px]:!inline-flex !bg-ib-surface !border !border-ib-border !shadow-none',
   shellButtonSkinClass,
 ].join(' ')
 const notificationButtonClass = [
-  '!inline-flex !bg-white !border !border-admin-border !shadow-[0_3px_10px_rgba(45,64,89,0.05)]',
+  '!inline-flex !bg-ib-surface !border !border-ib-border !shadow-[var(--shadow-ib-control)]',
   shellButtonSkinClass,
   'relative',
 ].join(' ')
 const navIconClass = 'size-[17px]'
 const shellIconClass = 'size-[19px]'
-const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
+const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-ib-surface'
 const headerClass =
-  'flex min-h-[88px] items-start justify-between gap-6 bg-white py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
+  'flex min-h-[88px] items-start justify-between gap-6 bg-ib-surface py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
 const contentClass =
-  'min-h-0 flex-1 overflow-visible bg-white pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
+  'min-h-0 flex-1 overflow-visible bg-ib-surface pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
 const mobileNavButtonClass = [
-  'flex min-h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 text-sm font-bold no-underline transition-colors duration-200',
+  'flex min-h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 text-sm font-bold no-underline transition-colors duration-[var(--duration-ib-standard)]',
   focusRingClass,
 ].join(' ')
 const mobileNavButtonIdleClass =
-  'bg-transparent text-admin-text-2 hover:border-admin-border hover:bg-white hover:text-admin-text-1'
-const mobileNavButtonActiveClass = 'bg-admin-accent-pressed text-admin-text-inverse'
+  'bg-transparent text-ib-text-muted hover:border-ib-border hover:bg-ib-surface hover:text-ib-text'
+const mobileNavButtonActiveClass = 'bg-ib-accent-pressed text-ib-text-inverse'
 const userMenuPt = createAdminMenuPt({
-  rootClass:
-    'min-w-[180px] overflow-hidden rounded-[14px] border border-admin-border bg-white shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
+  rootClass: adminOverlayMenuRootClass,
 })
 const anomalyRadarPopoverPt = createAdminPopoverPt({
   rootClass: '!max-h-[calc(100dvh-24px)] !overflow-hidden',

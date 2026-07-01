@@ -1,9 +1,9 @@
 <template>
   <div
-    class="grid min-h-screen place-items-center bg-admin-bg p-6 text-admin-text-1 max-[520px]:p-4"
+    class="grid min-h-screen place-items-center bg-ib-page p-6 text-ib-text max-[520px]:p-4"
   >
     <Card
-      class="admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-admin-border shadow-[0_24px_70px_rgba(45,64,89,0.12)]"
+      :class="loginCardClass"
       :pt="loginCardPt"
     >
       <template #header>
@@ -102,10 +102,12 @@ const appToast = useAppToast()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const brandMarkClass = computed(() =>
   [
-    'inline-flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-[15px] border bg-white text-sm font-black text-admin-accent-pressed shadow-[0_10px_22px_rgba(45,64,89,0.08)]',
-    logoURL.value ? 'border-transparent' : 'border-admin-accent-pressed',
+    'inline-flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-[15px] border bg-ib-surface text-sm font-black text-ib-accent-pressed shadow-[0_10px_22px_rgba(45,64,89,0.08)]',
+    logoURL.value ? 'border-transparent' : 'border-ib-accent-pressed',
   ].join(' '),
 )
+const loginCardClass =
+  'admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-ib-border bg-ib-surface shadow-[0_24px_70px_rgba(45,64,89,0.12)]'
 
 const loading = ref(false)
 const formError = ref('')

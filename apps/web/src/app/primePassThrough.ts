@@ -1,7 +1,13 @@
 import type { PrimeVueConfiguration } from 'primevue/config'
 import { baseDialogPt } from '../shared/theme/baseDialogPt'
 
-const adminRouteMutedTextClass = '[body.admin-route_&]:!text-[#718096]'
+const adminRouteMutedTextClass = '[body.admin-route_&]:!text-ib-text-muted'
+const adminRouteDataTableRootClass =
+  '[body.admin-route_&]:overflow-hidden [body.admin-route_&]:rounded-[var(--radius-ib-panel)]'
+const adminRouteDataTableHeaderCellClass =
+  '[body.admin-route_&]:!border-ib-border-soft [body.admin-route_&]:!bg-ib-surface-muted [body.admin-route_&]:!text-admin-meta [body.admin-route_&]:!font-[720] [body.admin-route_&]:!tracking-normal [body.admin-route_&]:!normal-case [body.admin-route_&]:!text-ib-text-muted'
+const adminRouteDataTableBodyCellClass =
+  '[body.admin-route_&]:!border-ib-border-soft [body.admin-route_&]:!bg-white/70 [body.admin-route_&]:!text-ib-text'
 
 function classValueContains(value: unknown, needle: string): boolean {
   if (!value) return false
@@ -30,14 +36,13 @@ export const ideaBoardPrimePt = {
   },
   dialog: baseDialogPt,
   datatable: {
-    root: { class: 'overflow-hidden rounded-2xl' },
+    root: { class: adminRouteDataTableRootClass },
     column: {
       headerCell: {
-        class:
-          '!border-admin-border-soft !bg-admin-surface-muted !text-admin-meta !font-[720] !tracking-normal !normal-case !text-admin-text-2',
+        class: adminRouteDataTableHeaderCellClass,
       },
       bodyCell: {
-        class: '!border-admin-border-soft !bg-white/70 !text-admin-text-1',
+        class: adminRouteDataTableBodyCellClass,
       },
     },
   },

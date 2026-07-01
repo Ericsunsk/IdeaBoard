@@ -11,7 +11,7 @@ export const ideaBoardPrimePreset = definePreset(Aura, {
       300: adminThemeTokens.borderStrong,
       400: adminThemeTokens.textSecondaryStrong,
       500: adminThemeTokens.accentPressed,
-      600: '#111827',
+      600: adminThemeTokens.accentPressed,
       700: adminThemeTokens.textPrimary,
       800: adminThemeTokens.accent,
       900: '#344054',
@@ -20,7 +20,7 @@ export const ideaBoardPrimePreset = definePreset(Aura, {
     colorScheme: {
       light: {
         surface: {
-          0: '#ffffff',
+          0: adminThemeTokens.card,
           50: adminThemeTokens.controlBg,
           100: adminThemeTokens.surfaceHover,
           200: adminThemeTokens.borderSoft,
@@ -31,12 +31,12 @@ export const ideaBoardPrimePreset = definePreset(Aura, {
           700: adminThemeTokens.textSecondaryStrong,
           800: '#344054',
           900: adminThemeTokens.textPrimary,
-          950: '#111827',
+          950: adminThemeTokens.accentPressed,
         },
         formField: {
           borderColor: adminThemeTokens.controlBorder,
           hoverBorderColor: adminThemeTokens.textTertiary,
-          focusBorderColor: '#000000',
+          focusBorderColor: adminThemeTokens.accentPressed,
         },
       },
     },
