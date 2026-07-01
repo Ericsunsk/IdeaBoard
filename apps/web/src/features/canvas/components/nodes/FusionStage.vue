@@ -160,7 +160,6 @@ const {
   maxImages: maxInputImages,
   draggableSelector: '.node-input-thumbnail-item',
   filterSelector: '.node-input-thumbnail-remove',
-  fallbackClass: 'fusion-node-sortable-fallback',
   onUpdate: (next) => emit('update:input-images', next),
   onDrop: (event) => emit('input-image-drop', event),
   onRemove: (item) => emit('input-image-remove', item),
@@ -356,10 +355,6 @@ function getBlendWeightBadgeStyle(index: number) {
 
 .fusion-node-slot-item {
   cursor: grab;
-}
-
-:global(.fusion-node-sortable-fallback) {
-  opacity: 0 !important;
 }
 
 .fusion-node-slot-placeholder {

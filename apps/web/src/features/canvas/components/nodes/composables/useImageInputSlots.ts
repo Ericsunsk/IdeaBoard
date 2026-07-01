@@ -11,7 +11,6 @@ interface UseImageInputSlotsOptions<T extends ImageInputSlotItem> {
   maxImages: number
   draggableSelector: string
   filterSelector?: string
-  fallbackClass: string
   onUpdate: (items: T[]) => void
   onDrop: (event: DragEvent) => void
   onRemove: (item: T) => void
@@ -23,7 +22,6 @@ export function useImageInputSlots<T extends ImageInputSlotItem>({
   maxImages,
   draggableSelector,
   filterSelector,
-  fallbackClass,
   onUpdate,
   onDrop,
   onRemove,
@@ -36,7 +34,6 @@ export function useImageInputSlots<T extends ImageInputSlotItem>({
     sourceItems: visibleInputImages,
     draggableSelector,
     filterSelector,
-    fallbackClass,
     onUpdate,
   })
 

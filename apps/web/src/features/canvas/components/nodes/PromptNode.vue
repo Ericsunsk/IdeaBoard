@@ -126,7 +126,6 @@ const {
   maxImages: maxInputImages,
   draggableSelector: '.node-input-thumbnail-item',
   filterSelector: '.prompt-node-thumb-add, .node-input-thumbnail-remove',
-  fallbackClass: 'prompt-node-sortable-fallback',
   onUpdate: (next) => emit('update:input-images', next),
   onDrop: (event) => emit('input-image-drop', event),
   onRemove: (item) => emit('input-image-remove', item),
@@ -139,9 +138,5 @@ const {
 .node-stage-handle-wrap {
   position: relative;
   overflow: visible;
-}
-
-:global(.prompt-node-sortable-fallback) {
-  opacity: 0 !important;
 }
 </style>

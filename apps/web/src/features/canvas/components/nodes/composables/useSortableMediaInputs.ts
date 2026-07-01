@@ -1,5 +1,5 @@
 import { nextTick, ref, toValue, watch, type Ref, type WatchSource } from 'vue'
-import { useSortable } from '@vueuse/integrations/useSortable'
+import { usePointerDragSession } from '../../../composables'
 
 export interface SortableMediaInput {
   id: string
@@ -10,31 +10,26 @@ interface UseSortableMediaInputsOptions<T extends SortableMediaInput> {
   sourceItems: WatchSource<readonly T[]>
   draggableSelector: string
   filterSelector?: string
-  fallbackClass: string
   onUpdate: (items: T[]) => void
 }
 
 type SortableReorderEvent = {
-  oldDraggableIndex?: number | null
-  newDraggableIndex?: number | null
-  oldIndex?: number | null
-  newIndex?: number | null
+  itemId: string
+  element: HTMLElement
+  startX: number
+  startY: number
+  active: boolean
+  hoverElement: HTMLElement | null
+  hoverItemId: string | null
 }
+
+const SORTABLE_DRAG_TOLERANCE_PX = 4
 
 function areItemsInSameOrder<T extends SortableMediaInput>(
   left: readonly T[],
   right: readonly T[],
 ): boolean {
   return left.length === right.length && left.every((item, index) => item.id === right[index]?.id)
-}
-
-function resolveSortableIndex(
-  primary: number | null | undefined,
-  fallback: number | null | undefined,
-): number | null {
-  const index = primary ?? fallback
-  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) return null
-  return index
 }
 
 function moveSortableItem<T>(items: readonly T[], from: number, to: number) {
@@ -48,12 +43,26 @@ function moveSortableItem<T>(items: readonly T[], from: number, to: number) {
   return next
 }
 
+function resolveElementTarget(target: EventTarget | null): Element | null {
+  return target instanceof Element ? target : null
+}
+
+function findClosestInside(
+  target: Element,
+  selector: string,
+  container: HTMLElement,
+): HTMLElement | null {
+  const matched = target.closest(selector)
+  if (!(matched instanceof HTMLElement)) return null
+  if (!container.contains(matched)) return null
+  return matched
+}
+
 export function useSortableMediaInputs<T extends SortableMediaInput>({
   containerRef,
   sourceItems,
   draggableSelector,
   filterSelector,
-  fallbackClass,
   onUpdate,
 }: UseSortableMediaInputsOptions<T>) {
   const sortableItems = ref<T[]>([]) as Ref<T[]>
@@ -70,11 +79,77 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
     })
   }
 
+  function clearHoverTarget(event: SortableReorderEvent) {
+    event.hoverElement?.classList.remove('is-sortable-ghost')
+    event.hoverElement = null
+    event.hoverItemId = null
+  }
+
+  function clearDragClasses(event: SortableReorderEvent) {
+    event.element.classList.remove('is-sortable-chosen', 'is-sortable-drag')
+    clearHoverTarget(event)
+  }
+
+  function activateReorder(event: SortableReorderEvent) {
+    if (event.active) return
+    event.active = true
+    isReordering.value = true
+    event.element.classList.add('is-sortable-chosen', 'is-sortable-drag')
+  }
+
+  function getDraggableElements(container: HTMLElement): HTMLElement[] {
+    return Array.from(container.querySelectorAll<HTMLElement>(draggableSelector))
+  }
+
+  function resolveDraggableIndex(container: HTMLElement, element: HTMLElement): number | null {
+    const index = getDraggableElements(container).indexOf(element)
+    return index >= 0 ? index : null
+  }
+
+  function resolveItemIdAtIndex(index: number | null): string | null {
+    if (index === null) return null
+    return sortableItems.value[index]?.id ?? null
+  }
+
+  function resolveHoveredDraggable(event: PointerEvent): HTMLElement | null {
+    const container = containerRef.value
+    if (!container) return null
+    const hitTarget = document.elementFromPoint?.(event.clientX, event.clientY)
+    if (!hitTarget) return null
+    return findClosestInside(hitTarget, draggableSelector, container)
+  }
+
+  function updateHoverTarget(event: PointerEvent, reorderEvent: SortableReorderEvent) {
+    const container = containerRef.value
+    const nextHoverElement = container ? resolveHoveredDraggable(event) : null
+    const nextHoverIndex =
+      container && nextHoverElement ? resolveDraggableIndex(container, nextHoverElement) : null
+    const nextHoverItemId = resolveItemIdAtIndex(nextHoverIndex)
+
+    if (nextHoverItemId === reorderEvent.hoverItemId) return
+    clearHoverTarget(reorderEvent)
+    if (!nextHoverElement || !nextHoverItemId || nextHoverItemId === reorderEvent.itemId) return
+
+    nextHoverElement.classList.add('is-sortable-ghost')
+    reorderEvent.hoverElement = nextHoverElement
+    reorderEvent.hoverItemId = nextHoverItemId
+  }
+
+  function updateHoverTargetIfPointerIsOverDraggable(
+    event: PointerEvent,
+    reorderEvent: SortableReorderEvent,
+  ) {
+    if (!resolveHoveredDraggable(event)) return
+    updateHoverTarget(event, reorderEvent)
+  }
+
   function commitSortableUpdate(event: SortableReorderEvent) {
     const currentItems = getSourceItems()
-    const from = resolveSortableIndex(event.oldDraggableIndex, event.oldIndex)
-    const to = resolveSortableIndex(event.newDraggableIndex, event.newIndex)
-    if (from === null || to === null) {
+    const from = currentItems.findIndex((item) => item.id === event.itemId)
+    const to = event.hoverItemId
+      ? currentItems.findIndex((item) => item.id === event.hoverItemId)
+      : -1
+    if (from < 0 || to < 0) {
       finishReorder()
       return
     }
@@ -89,6 +164,64 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
     onUpdate(next)
   }
 
+  const pointerDragSession = usePointerDragSession<SortableReorderEvent>({
+    onMove({ event, payload }) {
+      if (!payload.active) {
+        const deltaX = event.clientX - payload.startX
+        const deltaY = event.clientY - payload.startY
+        if (Math.hypot(deltaX, deltaY) < SORTABLE_DRAG_TOLERANCE_PX) return
+        activateReorder(payload)
+      }
+      updateHoverTarget(event, payload)
+    },
+    onEnd({ event, payload }) {
+      if (payload.active) {
+        updateHoverTargetIfPointerIsOverDraggable(event, payload)
+        commitSortableUpdate(payload)
+      }
+      clearDragClasses(payload)
+      finishReorder()
+    },
+    onCancel({ payload }) {
+      clearDragClasses(payload)
+      finishReorder()
+    },
+  })
+
+  function shouldIgnorePointerDown(event: PointerEvent) {
+    return event.button !== 0 || event.isPrimary === false
+  }
+
+  function onContainerPointerDown(event: PointerEvent) {
+    if (shouldIgnorePointerDown(event)) return
+    const container = containerRef.value
+    const target = resolveElementTarget(event.target)
+    if (!container || !target) return
+
+    if (filterSelector && findClosestInside(target, filterSelector, container)) return
+
+    const draggableElement = findClosestInside(target, draggableSelector, container)
+    if (!draggableElement) return
+
+    const itemId = resolveItemIdAtIndex(resolveDraggableIndex(container, draggableElement))
+    if (!itemId) return
+
+    event.preventDefault()
+    pointerDragSession.beginDrag(
+      event,
+      {
+        itemId,
+        element: draggableElement,
+        startX: event.clientX,
+        startY: event.clientY,
+        active: false,
+        hoverElement: null,
+        hoverItemId: null,
+      },
+      { target: draggableElement },
+    )
+  }
+
   watch(
     sourceItems,
     (items) => {
@@ -99,28 +232,17 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
     { immediate: true },
   )
 
-  useSortable(() => containerRef.value, sortableItems, {
-    animation: 150,
-    draggable: draggableSelector,
-    filter: filterSelector,
-    ghostClass: 'is-sortable-ghost',
-    chosenClass: 'is-sortable-chosen',
-    dragClass: 'is-sortable-drag',
-    fallbackClass,
-    forceFallback: true,
-    fallbackOnBody: true,
-    fallbackTolerance: 4,
-    preventOnFilter: false,
-    onStart() {
-      isReordering.value = true
+  watch(
+    containerRef,
+    (container, _previousContainer, onCleanup) => {
+      if (!container) return
+      container.addEventListener('pointerdown', onContainerPointerDown)
+      onCleanup(() => {
+        container.removeEventListener('pointerdown', onContainerPointerDown)
+      })
     },
-    onUpdate(event: SortableReorderEvent) {
-      commitSortableUpdate(event)
-    },
-    onEnd() {
-      finishReorder()
-    },
-  } as Parameters<typeof useSortable<T>>[2])
+    { immediate: true },
+  )
 
   return {
     isReordering,

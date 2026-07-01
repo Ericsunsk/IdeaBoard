@@ -1,34 +1,23 @@
 import { createApp, defineComponent, h, nextTick, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSortableMediaInputs } from './useSortableMediaInputs'
 
-type CapturedSortableOptions = {
-  onStart?: (event: unknown) => void
-  onUpdate?: (event: {
-    oldDraggableIndex?: number
-    newDraggableIndex?: number
-    oldIndex?: number
-    newIndex?: number
-  }) => void
-  onEnd?: (event: unknown) => void
-}
-
-const sortableMock = vi.hoisted(() => ({
-  options: null as CapturedSortableOptions | null,
-}))
-
-vi.mock('@vueuse/integrations/useSortable', () => ({
-  useSortable: vi.fn((_el: unknown, _list: unknown, options: CapturedSortableOptions) => {
-    sortableMock.options = options
-    return {
-      option: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-    }
-  }),
-}))
-
 type Item = { id: string }
+
+const elementFromPointMock = vi.fn<() => Element | null>()
+let originalElementFromPoint: Document['elementFromPoint']
+
+function createPointerEvent(type: string, init: Partial<PointerEventInit> = {}) {
+  const event = new Event(type, { bubbles: true, cancelable: true }) as PointerEvent
+  Object.defineProperties(event, {
+    button: { value: init.button ?? 0 },
+    clientX: { value: init.clientX ?? 0 },
+    clientY: { value: init.clientY ?? 0 },
+    isPrimary: { value: init.isPrimary ?? true },
+    pointerId: { value: init.pointerId ?? 1 },
+  })
+  return event
+}
 
 function mountSortableHarness(initialItems: Item[]) {
   const host = document.createElement('div')
@@ -48,10 +37,19 @@ function mountSortableHarness(initialItems: Item[]) {
           sourceItems,
           draggableSelector: '.item',
           filterSelector: '.filtered',
-          fallbackClass: 'fallback',
           onUpdate,
         })
-        return () => h('div', { ref: containerRef })
+        return () =>
+          h(
+            'div',
+            { ref: containerRef },
+            state.sortableItems.value.map((item) =>
+              h('div', { class: 'item', 'data-id': item.id }, [
+                h('span', item.id),
+                h('button', { class: 'filtered', type: 'button' }, 'remove'),
+              ]),
+            ),
+          )
       },
     }),
   )
@@ -62,6 +60,12 @@ function mountSortableHarness(initialItems: Item[]) {
     host,
     onUpdate,
     sourceItems,
+    get items() {
+      return Array.from(host.querySelectorAll<HTMLElement>('.item'))
+    },
+    get removeButtons() {
+      return Array.from(host.querySelectorAll<HTMLElement>('.filtered'))
+    },
     get state() {
       return state
     },
@@ -74,20 +78,39 @@ function mountSortableHarness(initialItems: Item[]) {
 
 describe('useSortableMediaInputs', () => {
   beforeEach(() => {
-    sortableMock.options = null
+    originalElementFromPoint = document.elementFromPoint
+    elementFromPointMock.mockReset()
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: elementFromPointMock,
+    })
   })
 
-  it('commits reorder from draggable indexes without reading DOM dataset order', async () => {
+  afterEach(() => {
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: originalElementFromPoint,
+    })
+    vi.restoreAllMocks()
+  })
+
+  it('commits reorder when a dragged thumbnail is released over another draggable item', async () => {
     const harness = mountSortableHarness([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
     await nextTick()
 
     try {
-      sortableMock.options?.onStart?.({})
-      sortableMock.options?.onUpdate?.({
-        oldDraggableIndex: 0,
-        newDraggableIndex: 2,
-      })
-      sortableMock.options?.onEnd?.({})
+      harness.items[0]?.dispatchEvent(createPointerEvent('pointerdown'))
+      expect(harness.state.isReordering.value).toBe(false)
+
+      elementFromPointMock.mockReturnValue(harness.items[2] ?? null)
+      window.dispatchEvent(createPointerEvent('pointermove', { clientX: 8 }))
+      expect(harness.state.isReordering.value).toBe(true)
+      expect(harness.items[0]?.classList.contains('is-sortable-chosen')).toBe(true)
+      expect(harness.items[0]?.classList.contains('is-sortable-drag')).toBe(true)
+
+      expect(harness.items[2]?.classList.contains('is-sortable-ghost')).toBe(true)
+
+      window.dispatchEvent(createPointerEvent('pointerup'))
 
       expect(harness.onUpdate).toHaveBeenCalledWith([{ id: 'b' }, { id: 'c' }, { id: 'a' }])
 
@@ -99,21 +122,104 @@ describe('useSortableMediaInputs', () => {
     }
   })
 
-  it('uses oldIndex/newIndex fallback when draggable indexes are unavailable', async () => {
+  it('does not reorder on a click or sub-threshold pointer move', async () => {
     const harness = mountSortableHarness([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
     await nextTick()
 
     try {
-      sortableMock.options?.onStart?.({})
-      sortableMock.options?.onUpdate?.({
-        oldIndex: 2,
-        newIndex: 0,
-      })
-      sortableMock.options?.onEnd?.({})
+      harness.items[0]?.dispatchEvent(createPointerEvent('pointerdown'))
+      elementFromPointMock.mockReturnValue(harness.items[2] ?? null)
+      window.dispatchEvent(createPointerEvent('pointermove', { clientX: 3, clientY: 0 }))
+      window.dispatchEvent(createPointerEvent('pointerup', { clientX: 3, clientY: 0 }))
 
-      expect(harness.onUpdate).toHaveBeenCalledWith([{ id: 'c' }, { id: 'a' }, { id: 'b' }])
+      expect(harness.state.isReordering.value).toBe(false)
+      expect(harness.items[0]?.classList.contains('is-sortable-chosen')).toBe(false)
+      expect(harness.onUpdate).not.toHaveBeenCalled()
     } finally {
       harness.unmount()
+    }
+  })
+
+  it('commits to the last hovered item when pointerup lands in empty space', async () => {
+    const harness = mountSortableHarness([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
+    await nextTick()
+
+    try {
+      harness.items[0]?.dispatchEvent(createPointerEvent('pointerdown'))
+      elementFromPointMock.mockReturnValue(harness.items[2] ?? null)
+      window.dispatchEvent(createPointerEvent('pointermove', { clientX: 8 }))
+
+      elementFromPointMock.mockReturnValue(null)
+      window.dispatchEvent(createPointerEvent('pointerup', { clientX: 20 }))
+
+      expect(harness.onUpdate).toHaveBeenCalledWith([{ id: 'b' }, { id: 'c' }, { id: 'a' }])
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('does not start reorder from filtered or non-draggable elements', async () => {
+    const harness = mountSortableHarness([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
+    await nextTick()
+
+    try {
+      harness.removeButtons[0]?.dispatchEvent(createPointerEvent('pointerdown'))
+      expect(harness.state.isReordering.value).toBe(false)
+
+      harness.host.dispatchEvent(createPointerEvent('pointerdown'))
+      expect(harness.state.isReordering.value).toBe(false)
+
+      elementFromPointMock.mockReturnValue(harness.items[2] ?? null)
+      window.dispatchEvent(createPointerEvent('pointerup'))
+      expect(harness.onUpdate).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('keeps source items as the source of truth around a cancelled reorder', async () => {
+    const harness = mountSortableHarness([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
+    await nextTick()
+
+    try {
+      harness.sourceItems.value = [{ id: 'b' }, { id: 'a' }, { id: 'c' }]
+      await nextTick()
+      expect(harness.state.sortableItems.value).toEqual([{ id: 'b' }, { id: 'a' }, { id: 'c' }])
+
+      harness.items[0]?.dispatchEvent(createPointerEvent('pointerdown'))
+      window.dispatchEvent(createPointerEvent('pointermove', { clientX: 8 }))
+      harness.sourceItems.value = [{ id: 'c' }, { id: 'b' }, { id: 'a' }]
+      await nextTick()
+      expect(harness.state.sortableItems.value).toEqual([{ id: 'b' }, { id: 'a' }, { id: 'c' }])
+
+      elementFromPointMock.mockReturnValue(null)
+      window.dispatchEvent(createPointerEvent('pointerup'))
+      expect(harness.onUpdate).not.toHaveBeenCalled()
+
+      await nextTick()
+      expect(harness.state.isReordering.value).toBe(false)
+      expect(harness.state.sortableItems.value).toEqual([{ id: 'c' }, { id: 'b' }, { id: 'a' }])
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('cleans up active pointer listeners on unmount', async () => {
+    const harness = mountSortableHarness([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
+    await nextTick()
+
+    try {
+      harness.items[0]?.dispatchEvent(createPointerEvent('pointerdown'))
+      window.dispatchEvent(createPointerEvent('pointermove', { clientX: 8 }))
+      harness.unmount()
+
+      elementFromPointMock.mockReturnValue(harness.items[2] ?? null)
+      window.dispatchEvent(createPointerEvent('pointermove'))
+      window.dispatchEvent(createPointerEvent('pointerup'))
+
+      expect(harness.onUpdate).not.toHaveBeenCalled()
+    } finally {
+      if (document.body.contains(harness.host)) harness.unmount()
     }
   })
 })
