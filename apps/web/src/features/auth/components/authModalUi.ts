@@ -1,6 +1,6 @@
 export const authDialogPt = {
   mask: {
-    class: 'bg-[#0f111a]/40 backdrop-blur-[8px] transition-all duration-300',
+    class: 'bg-[var(--color-ib-auth-mask)] backdrop-blur-[8px] transition-all duration-300',
   },
   root: {
     class: 'm-5 w-[min(420px,calc(100vw-32px))] overflow-visible bg-transparent p-0',
@@ -13,7 +13,7 @@ export const authDialogPt = {
 export const authErrorMessagePt = {
   root: {
     class:
-      'm-0 border-0 bg-transparent p-0 text-[12px] font-semibold text-rose-500 tracking-wide mt-1.5',
+      'm-0 border-0 bg-transparent p-0 text-[12px] font-semibold text-[var(--color-ib-auth-error)] tracking-wide mt-1.5',
   },
   contentWrapper: { class: 'contents' },
   content: { class: 'contents' },
@@ -34,53 +34,55 @@ export const authPasswordPt = {
   },
   maskIcon: {
     class:
-      'absolute top-1/2 right-4 size-5 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors duration-200 hover:text-slate-700',
+      'absolute top-1/2 right-4 size-5 -translate-y-1/2 cursor-pointer text-[var(--color-ib-auth-input-icon)] transition-colors duration-200 hover:text-[var(--color-ib-auth-text)]',
   },
   unmaskIcon: {
     class:
-      'absolute top-1/2 right-4 size-5 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors duration-200 hover:text-slate-700',
+      'absolute top-1/2 right-4 size-5 -translate-y-1/2 cursor-pointer text-[var(--color-ib-auth-input-icon)] transition-colors duration-200 hover:text-[var(--color-ib-auth-text)]',
   },
 } as const
 
 const authModalShellBaseClass =
-  'relative overflow-hidden rounded-[24px] border border-white/40 bg-white/75 backdrop-blur-xl px-11 text-slate-800 shadow-[0_24px_50px_-15px_var(--color-canvas-accent-glow),inset_0_1px_1px_rgba(255,255,255,0.6)] max-[520px]:px-7 max-[520px]:py-8 transition-all duration-300'
+  'relative overflow-hidden rounded-[24px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] backdrop-blur-xl px-11 text-[var(--color-ib-auth-text)] shadow-[var(--shadow-ib-auth-shell)] max-[520px]:px-7 max-[520px]:py-8 transition-all duration-300'
 
 export const authModalShellClass = `${authModalShellBaseClass} py-11`
 
 export const authCompactModalShellClass = `${authModalShellBaseClass} py-9`
 
 export const authModalBackdropClass =
-  'pointer-events-none absolute inset-0 bg-gradient-to-tr from-white/30 via-white/70 to-white/90'
+  'pointer-events-none absolute inset-0 bg-gradient-to-tr from-[var(--color-ib-auth-backdrop-from)] via-[var(--color-ib-auth-backdrop-via)] to-[var(--color-ib-auth-backdrop-to)]'
 
 export const authModalHeaderClass = 'relative z-[1] mb-8 text-center'
 
 export const authModalKickerClass =
-  "mb-2 text-[12px] font-normal uppercase tracking-[0.16em] text-canvas-accent [font-family:'Caveat',cursive,sans-serif]"
+  "mb-2 text-[12px] font-normal uppercase tracking-[0.16em] text-[var(--color-ib-auth-link)] [font-family:'Caveat',cursive,sans-serif]"
 
 export const authModalTitleClass =
-  "m-0 text-[32px] font-bold leading-tight tracking-tight text-slate-900 [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif] max-[520px]:text-[28px]"
+  "m-0 text-[32px] font-bold leading-tight tracking-tight text-[var(--color-ib-auth-title)] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif] max-[520px]:text-[28px]"
 
-export const authModalSubtitleClass = 'mt-2 mb-0 text-[14px] leading-relaxed text-slate-500'
+export const authModalSubtitleClass =
+  'mt-2 mb-0 text-[14px] leading-relaxed text-[var(--color-ib-auth-muted)]'
 
 export const authFieldClass =
-  'relative z-[1] flex min-w-0 flex-col gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400'
+  'relative z-[1] flex min-w-0 flex-col gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--color-ib-auth-subtle)]'
 
 export const authInputIconClass =
-  'pointer-events-none absolute top-1/2 left-3.5 z-10 flex -translate-y-1/2 items-center justify-center text-slate-400'
+  'pointer-events-none absolute top-1/2 left-3.5 z-10 flex -translate-y-1/2 items-center justify-center text-[var(--color-ib-auth-input-icon)]'
 
 export const authInputClass =
-  'h-[50px] w-full rounded-[12px] border border-slate-200 bg-white/60 px-4 text-[15px] text-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-canvas-accent focus:bg-white focus:ring-4 focus:ring-canvas-accent-ring'
+  'h-[50px] w-full rounded-[12px] border border-[var(--color-ib-auth-input-border)] bg-[var(--color-ib-auth-input)] px-4 text-[15px] text-[var(--color-ib-auth-text)] shadow-[var(--shadow-ib-auth-input)] outline-none transition-all duration-200 placeholder:text-[var(--color-ib-auth-input-placeholder)] hover:border-[var(--color-ib-auth-input-border-hover)] focus:border-[var(--color-ib-auth-focus)] focus:bg-[var(--color-ib-auth-input-focus)] focus:ring-4 focus:ring-[var(--color-ib-auth-focus-ring)]'
 
 export const authInputErrorClass =
-  'border-rose-300 bg-rose-50/50 placeholder:text-rose-400 focus:border-rose-400 focus:ring-4 focus:ring-rose-400/10'
+  'border-[var(--color-ib-auth-error-border)] bg-[var(--color-ib-auth-error-bg)] placeholder:text-[var(--color-ib-auth-error-placeholder)] focus:border-[var(--color-ib-auth-error)] focus:ring-4 focus:ring-[var(--color-ib-auth-error-ring)]'
 
 export const authPrimaryButtonClass =
-  'mt-2 inline-flex h-[50px] w-full items-center justify-center rounded-[12px] border-0 bg-gradient-to-r from-canvas-accent to-canvas-accent-hover px-8 text-[15px] font-semibold text-white shadow-[0_4px_14px_var(--color-canvas-accent-shadow)] transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_6px_20px_var(--color-canvas-accent-shadow-hover)] active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-70'
+  'mt-2 inline-flex h-[50px] w-full items-center justify-center rounded-[12px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-8 text-[15px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-all duration-300 hover:scale-[1.01] hover:shadow-[var(--shadow-ib-auth-primary-hover)] active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-70'
 
-export const authFooterClass = 'relative z-[1] text-center text-[13px] text-slate-500'
+export const authFooterClass =
+  'relative z-[1] text-center text-[13px] text-[var(--color-ib-auth-muted)]'
 
 export const authSwitchButtonClass =
-  'ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-[inherit] font-semibold text-canvas-accent transition-colors duration-200 hover:text-canvas-accent-hover hover:underline underline-offset-4'
+  'ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-[inherit] font-semibold text-[var(--color-ib-auth-link)] transition-colors duration-200 hover:text-[var(--color-ib-auth-link-hover)] hover:underline underline-offset-4'
 
 export const authCloseButtonClass =
-  'absolute top-5 right-5 z-[2] inline-flex size-8 items-center justify-center border-0 bg-transparent p-0 text-slate-500 shadow-none transition-colors duration-200 hover:text-slate-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50'
+  'absolute top-5 right-5 z-[2] inline-flex size-8 items-center justify-center border-0 bg-transparent p-0 text-[var(--color-ib-auth-close)] shadow-none transition-colors duration-200 hover:text-[var(--color-ib-auth-close-hover)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50'
