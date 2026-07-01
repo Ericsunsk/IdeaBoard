@@ -24,7 +24,7 @@
 
 ### 依赖与构建
 
-- 前端升级到 ECharts 6、vue-echarts 8、Vue Router 5 与 TypeScript 6，图表注册仅保留当前使用的 `line/bar/scatter`。
+- 前端图表统一使用 PrimeVue Chart / Chart.js，依赖升级覆盖 Vue Router 5 与 TypeScript 6。
 - 前端 AutoImport 收敛到 Vue SFC/template；普通 `.ts/.tsx` 文件改为显式 import，并通过 ESLint 禁止依赖 auto-import 全局。
 - Auth 服务升级到 Fastify 5、Better Auth、dotenv 17 与 TypeScript 6。
 - Auth Docker 镜像固定升级到 npm 11.16.0，避免 `ideaboard update` 执行 migration 时由容器内旧 npm 触发 major update notice。

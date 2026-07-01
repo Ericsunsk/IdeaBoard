@@ -1,10 +1,11 @@
-package dbsqlc
+package querytests
 
 import (
 	"context"
 	"database/sql"
 	"testing"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -13,11 +14,11 @@ type testTaskAccount struct {
 	channelID int64
 }
 
-func seedTestAccount(t *testing.T, q *Queries) testTaskAccount {
+func seedTestAccount(t *testing.T, q *dbsqlc.Queries) testTaskAccount {
 	t.Helper()
 	ctx := context.Background()
 
-	channelID, err := q.CreateChannel(ctx, CreateChannelParams{
+	channelID, err := q.CreateChannel(ctx, dbsqlc.CreateChannelParams{
 		Type:   "openai-compatible",
 		Name:   "test-channel",
 		ApiUrl: "https://example.invalid/v1",
@@ -27,7 +28,7 @@ func seedTestAccount(t *testing.T, q *Queries) testTaskAccount {
 		t.Fatalf("seed channel: %v", err)
 	}
 
-	id, err := q.CreateAccount(context.Background(), CreateAccountParams{
+	id, err := q.CreateAccount(context.Background(), dbsqlc.CreateAccountParams{
 		Name:          "test-account",
 		ChannelID:     channelID,
 		Platform:      "openai",
@@ -47,11 +48,11 @@ func seedTestAccount(t *testing.T, q *Queries) testTaskAccount {
 
 func TestCreateAndGetTaskByID(t *testing.T) {
 	db := testdb.Open(t)
-	q := New(db)
+	q := dbsqlc.New(db)
 
 	taskID := "task-create-get-1"
 
-	createdID, err := q.CreateTask(context.Background(), CreateTaskParams{
+	createdID, err := q.CreateTask(context.Background(), dbsqlc.CreateTaskParams{
 		TaskID:     taskID,
 		UserID:     1,
 		UserPrompt: "test prompt",
@@ -76,9 +77,9 @@ func TestCreateAndGetTaskByID(t *testing.T) {
 
 func TestGetTaskByTaskIDAndUserIDFiltersUser(t *testing.T) {
 	db := testdb.Open(t)
-	q := New(db)
+	q := dbsqlc.New(db)
 
-	_, err := q.CreateTask(context.Background(), CreateTaskParams{
+	_, err := q.CreateTask(context.Background(), dbsqlc.CreateTaskParams{
 		TaskID:     "task-user-filter-1",
 		UserID:     3,
 		UserPrompt: "user 3 task",
@@ -89,7 +90,7 @@ func TestGetTaskByTaskIDAndUserIDFiltersUser(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
-	_, err = q.GetTaskByTaskIDAndUserID(context.Background(), GetTaskByTaskIDAndUserIDParams{
+	_, err = q.GetTaskByTaskIDAndUserID(context.Background(), dbsqlc.GetTaskByTaskIDAndUserIDParams{
 		TaskID: "task-user-filter-1",
 		UserID: 1, // wrong user
 	})
@@ -100,12 +101,12 @@ func TestGetTaskByTaskIDAndUserIDFiltersUser(t *testing.T) {
 
 func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 	db := testdb.Open(t)
-	q := New(db)
+	q := dbsqlc.New(db)
 
 	account := seedTestAccount(t, q)
 	taskID := "task-complete-lease-1"
 
-	_, err := q.CreateTask(context.Background(), CreateTaskParams{
+	_, err := q.CreateTask(context.Background(), dbsqlc.CreateTaskParams{
 		TaskID:            taskID,
 		UserID:            1,
 		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
@@ -120,7 +121,7 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 	}
 
 	// Wrong lease token should return 0 rows updated
-	updated, err := q.CompleteTaskWithLease(context.Background(), CompleteTaskWithLeaseParams{
+	updated, err := q.CompleteTaskWithLease(context.Background(), dbsqlc.CompleteTaskWithLeaseParams{
 		TaskID:            taskID,
 		Statuses:          []string{"running"},
 		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
@@ -135,7 +136,7 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 	}
 
 	// Correct lease token should succeed
-	updated, err = q.CompleteTaskWithLease(context.Background(), CompleteTaskWithLeaseParams{
+	updated, err = q.CompleteTaskWithLease(context.Background(), dbsqlc.CompleteTaskWithLeaseParams{
 		TaskID:            taskID,
 		Statuses:          []string{"running"},
 		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
@@ -159,12 +160,12 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 
 func TestMarkTaskFailedWithLease(t *testing.T) {
 	db := testdb.Open(t)
-	q := New(db)
+	q := dbsqlc.New(db)
 
 	account := seedTestAccount(t, q)
 	taskID := "task-fail-lease-1"
 
-	_, err := q.CreateTask(context.Background(), CreateTaskParams{
+	_, err := q.CreateTask(context.Background(), dbsqlc.CreateTaskParams{
 		TaskID:            taskID,
 		UserID:            1,
 		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
@@ -178,7 +179,7 @@ func TestMarkTaskFailedWithLease(t *testing.T) {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
-	updated, err := q.MarkTaskFailedWithLease(context.Background(), MarkTaskFailedWithLeaseParams{
+	updated, err := q.MarkTaskFailedWithLease(context.Background(), dbsqlc.MarkTaskFailedWithLeaseParams{
 		TaskID:            taskID,
 		Statuses:          []string{"running"},
 		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},
@@ -203,9 +204,9 @@ func TestMarkTaskFailedWithLease(t *testing.T) {
 
 func TestCountTasksByStatus(t *testing.T) {
 	db := testdb.Open(t)
-	q := New(db)
+	q := dbsqlc.New(db)
 
-	_, err := q.CreateTask(context.Background(), CreateTaskParams{
+	_, err := q.CreateTask(context.Background(), dbsqlc.CreateTaskParams{
 		TaskID:     "task-count-1",
 		UserID:     1,
 		UserPrompt: "count me",
@@ -227,9 +228,9 @@ func TestCountTasksByStatus(t *testing.T) {
 
 func TestCountAllTasks(t *testing.T) {
 	db := testdb.Open(t)
-	q := New(db)
+	q := dbsqlc.New(db)
 
-	_, err := q.CreateTask(context.Background(), CreateTaskParams{
+	_, err := q.CreateTask(context.Background(), dbsqlc.CreateTaskParams{
 		TaskID:     "task-count-all-1",
 		UserID:     1,
 		UserPrompt: "count all",
@@ -251,11 +252,11 @@ func TestCountAllTasks(t *testing.T) {
 
 func TestListRunningTasksMissingLeaseToken(t *testing.T) {
 	db := testdb.Open(t)
-	q := New(db)
+	q := dbsqlc.New(db)
 
 	account := seedTestAccount(t, q)
 
-	_, err := q.CreateTask(context.Background(), CreateTaskParams{
+	_, err := q.CreateTask(context.Background(), dbsqlc.CreateTaskParams{
 		TaskID:            "running-no-lease-1",
 		UserID:            1,
 		AccountID:         sql.NullInt64{Int64: account.accountID, Valid: true},

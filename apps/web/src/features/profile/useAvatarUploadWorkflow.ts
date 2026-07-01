@@ -1,9 +1,8 @@
 import { ref, type Ref } from 'vue'
 import { useUserStore } from '../../app/stores/user'
-import { uploadApi, type UploadAvatarResponse } from '../../shared/api/upload'
+import { uploadApi } from '../../shared/api/upload'
 import { useAsyncAction } from '../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../shared/composables/useAppToast'
-import type { ApiResponse } from '../../shared/types'
 
 type RunAsyncAction = <T>(
   action: () => T | Promise<T>,
@@ -23,7 +22,7 @@ type AvatarUploadToast = {
 }
 
 export type AvatarUploadWorkflowDependencies = {
-  uploadAvatar?: (file: File) => Promise<ApiResponse<UploadAvatarResponse>>
+  uploadAvatar?: typeof uploadApi.uploadAvatar
   userStore?: AvatarUploadUserStore
   appToast?: AvatarUploadToast
   runAsyncAction?: RunAsyncAction

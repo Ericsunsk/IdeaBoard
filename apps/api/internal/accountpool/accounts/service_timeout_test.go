@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -60,30 +61,30 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload account failed: %v", err)
 	}
-	if updated.Timeout != defaultAccountTimeoutSeconds {
-		t.Fatalf("timeout = %d, want %d", updated.Timeout, defaultAccountTimeoutSeconds)
+	if updated.Timeout != accountlimits.DefaultTimeoutSeconds {
+		t.Fatalf("timeout = %d, want %d", updated.Timeout, accountlimits.DefaultTimeoutSeconds)
 	}
 	if updated.Status != account.Status {
 		t.Fatalf("status = %d, want unchanged %d", updated.Status, account.Status)
 	}
 }
 
-func TestNormalizeAccountTimeout(t *testing.T) {
+func TestNormalizeTimeoutSeconds(t *testing.T) {
 	tests := []struct {
 		name  string
 		input int
 		want  int
 	}{
-		{name: "negative fallback", input: -1, want: defaultAccountTimeoutSeconds},
-		{name: "zero fallback", input: 0, want: defaultAccountTimeoutSeconds},
+		{name: "negative fallback", input: -1, want: accountlimits.DefaultTimeoutSeconds},
+		{name: "zero fallback", input: 0, want: accountlimits.DefaultTimeoutSeconds},
 		{name: "positive keep", input: 35, want: 35},
-		{name: "enforce upper bound", input: maxAccountTimeoutSeconds + 99, want: maxAccountTimeoutSeconds},
+		{name: "enforce upper bound", input: accountlimits.MaxTimeoutSeconds + 99, want: accountlimits.MaxTimeoutSeconds},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NormalizeAccountTimeout(tt.input); got != tt.want {
-				t.Fatalf("NormalizeAccountTimeout(%d) = %d, want %d", tt.input, got, tt.want)
+			if got := accountlimits.NormalizeTimeoutSeconds(tt.input); got != tt.want {
+				t.Fatalf("NormalizeTimeoutSeconds(%d) = %d, want %d", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -92,22 +93,22 @@ func TestNormalizeAccountTimeout(t *testing.T) {
 func TestCurrentAccountLimits(t *testing.T) {
 	limits := CurrentAccountLimits()
 
-	if limits.MaxConcurrent.Min != minAccountMaxConcurrent {
-		t.Fatalf("max concurrent min = %d, want %d", limits.MaxConcurrent.Min, minAccountMaxConcurrent)
+	if limits.MaxConcurrent.Min != accountlimits.MinMaxConcurrent {
+		t.Fatalf("max concurrent min = %d, want %d", limits.MaxConcurrent.Min, accountlimits.MinMaxConcurrent)
 	}
-	if limits.MaxConcurrent.Default != defaultAccountMaxConcurrent {
-		t.Fatalf("max concurrent default = %d, want %d", limits.MaxConcurrent.Default, defaultAccountMaxConcurrent)
+	if limits.MaxConcurrent.Default != accountlimits.DefaultMaxConcurrent {
+		t.Fatalf("max concurrent default = %d, want %d", limits.MaxConcurrent.Default, accountlimits.DefaultMaxConcurrent)
 	}
-	if limits.MaxConcurrent.Max != maxAccountMaxConcurrent {
-		t.Fatalf("max concurrent max = %d, want %d", limits.MaxConcurrent.Max, maxAccountMaxConcurrent)
+	if limits.MaxConcurrent.Max != accountlimits.MaxMaxConcurrent {
+		t.Fatalf("max concurrent max = %d, want %d", limits.MaxConcurrent.Max, accountlimits.MaxMaxConcurrent)
 	}
-	if limits.TimeoutSeconds.Min != minAccountTimeoutSeconds {
-		t.Fatalf("timeout min = %d, want %d", limits.TimeoutSeconds.Min, minAccountTimeoutSeconds)
+	if limits.TimeoutSeconds.Min != accountlimits.MinTimeoutSeconds {
+		t.Fatalf("timeout min = %d, want %d", limits.TimeoutSeconds.Min, accountlimits.MinTimeoutSeconds)
 	}
-	if limits.TimeoutSeconds.Default != defaultAccountTimeoutSeconds {
-		t.Fatalf("timeout default = %d, want %d", limits.TimeoutSeconds.Default, defaultAccountTimeoutSeconds)
+	if limits.TimeoutSeconds.Default != accountlimits.DefaultTimeoutSeconds {
+		t.Fatalf("timeout default = %d, want %d", limits.TimeoutSeconds.Default, accountlimits.DefaultTimeoutSeconds)
 	}
-	if limits.TimeoutSeconds.Max != maxAccountTimeoutSeconds {
-		t.Fatalf("timeout max = %d, want %d", limits.TimeoutSeconds.Max, maxAccountTimeoutSeconds)
+	if limits.TimeoutSeconds.Max != accountlimits.MaxTimeoutSeconds {
+		t.Fatalf("timeout max = %d, want %d", limits.TimeoutSeconds.Max, accountlimits.MaxTimeoutSeconds)
 	}
 }

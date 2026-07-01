@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useUserStore } from './user'
 import { queryClient } from '../../shared/query/queryClient'
-import type { User } from '../../shared/types'
-import { getUserInfoApi } from '../../shared/api/user'
+import type { User } from '../../shared/api/generated-query/model'
+import { getUserInfo } from '../../shared/api/generated-query/user/user'
 import { authClient } from '../../shared/auth/client'
 
-vi.mock('../../shared/api/user', () => ({
-  getUserInfoApi: vi.fn(),
+vi.mock('../../shared/api/generated-query/user/user', () => ({
+  getUserInfo: vi.fn(),
 }))
 
 vi.mock('../../shared/auth/client', () => ({
@@ -87,7 +87,7 @@ describe('useUserStore auth cache handling', () => {
     vi.mocked(authClient.getSession).mockResolvedValue({
       data: { session: { id: 'session-1' } },
     } as never)
-    vi.mocked(getUserInfoApi).mockRejectedValue({ status: 500 })
+    vi.mocked(getUserInfo).mockRejectedValue({ status: 500 })
 
     await expect(store.ensureSession({ fresh: true })).resolves.toBeNull()
 
@@ -100,7 +100,7 @@ describe('useUserStore auth cache handling', () => {
     const store = useUserStore()
     const registeredUser = makeUser({ id: 2, uid: 'USER02', username: 'alice' })
     vi.mocked(authClient.signUp.email).mockResolvedValue({} as never)
-    vi.mocked(getUserInfoApi).mockResolvedValue({
+    vi.mocked(getUserInfo).mockResolvedValue({
       code: 0,
       msg: 'ok',
       data: { user: registeredUser },
@@ -123,7 +123,7 @@ describe('useUserStore auth cache handling', () => {
     const registeredUser = makeUser({ id: 3, uid: 'USER03', username: 'bob' })
     vi.mocked(authClient.signUp.email).mockResolvedValue({} as never)
     vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
-    vi.mocked(getUserInfoApi)
+    vi.mocked(getUserInfo)
       .mockResolvedValueOnce({ code: 0, msg: 'ok', data: {} } as never)
       .mockResolvedValueOnce({
         code: 0,

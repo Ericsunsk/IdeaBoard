@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { User } from '../../../shared/types'
+import type { User } from '../../../shared/api/generated-query/model'
 import {
   createAdminUserRowView,
   getUserActionItems,

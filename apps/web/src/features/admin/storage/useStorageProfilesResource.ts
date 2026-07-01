@@ -12,15 +12,12 @@ import {
   useListAdminStorageProviders,
 } from '../../../shared/api/generated-query/admin-storage/admin-storage'
 import type {
-  ApiResponseBase,
   StorageProfile as GeneratedStorageProfile,
   StorageProfilePayload as GeneratedStorageProfilePayload,
 } from '../../../shared/api/generated-query/model'
 import { useAppToast } from '../../../shared/composables/useAppToast'
-import {
-  formatDisplayErrorMessage,
-  sanitizeApiErrorMessage,
-} from '../../../shared/utils/errorMessages'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import { requireApiData } from '../shared/queries/adminApiResponse'
 import {
   normalizeProfile,
   toProviderMetaMap,
@@ -145,11 +142,4 @@ function normalizeGeneratedProfile(profile: GeneratedStorageProfile): StoragePro
     secret_configured: profile.secret_configured ?? false,
     config: profile.config as Record<string, unknown>,
   }
-}
-
-function requireApiData<T>(response: ApiResponseBase & { data?: T }, fallback: string): T {
-  if (response.code !== 0 || response.data == null) {
-    throw new Error(sanitizeApiErrorMessage(response.msg, fallback))
-  }
-  return response.data
 }

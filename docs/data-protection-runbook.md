@@ -4,7 +4,7 @@
 
 ## PostgreSQL Backup 安全基线
 
-`ideaboard update` 生成的 `postgres-*.sql` 会包含完整业务库数据，其中包括：
+`ideaboard update` 生成的 `postgres-*.dump` 会包含完整业务库数据，其中包括：
 
 - `api_account_secrets`：上游模型/API 渠道的 API key、token 或外部 secret 引用。
 - `storage_profile_secrets`：S3-compatible 存储的 access key、secret key 等对象存储凭据。
@@ -17,7 +17,7 @@
 
 - 建议对 backup 加密落盘，并把密钥交给既有 secret 管理流程。
 - 限制下载、传输、复制与共享范围，只允许最小必要运维人员访问。
-- 不要把 `postgres-*.sql` 上传到工单、聊天工具、未加密对象存储或个人网盘。
+- 不要把 `postgres-*.dump` 上传到工单、聊天工具、未加密对象存储或个人网盘。
 - 排障完成后清理临时副本、本地解压文件与一次性传输位置。
 - 记录 restore 操作人、时间、来源 backup、目标环境与后续 rotation 结果。
 

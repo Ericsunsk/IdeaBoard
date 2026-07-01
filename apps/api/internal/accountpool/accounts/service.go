@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/tasking/taskqueue"
 )
 
@@ -38,11 +37,7 @@ type AccountServiceOptions struct {
 	TaskEvents events.TaskStatusPublisher
 }
 
-const defaultAccountMaxConcurrent = accountlimits.DefaultMaxConcurrent
 const taskCancelTTL = 24 * time.Hour
-const defaultAccountTimeoutSeconds = 120
-const maxAccountMaxConcurrent = accountlimits.MaxMaxConcurrent
-const maxAccountTimeoutSeconds = 600
 
 func NewAccountService(deps AccountServiceDeps, opts AccountServiceOptions) *AccountService {
 	return &AccountService{

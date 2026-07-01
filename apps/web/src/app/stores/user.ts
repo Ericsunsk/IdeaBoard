@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { User } from '../../shared/types'
-import { getUserInfoApi } from '../../shared/api/user'
+import type { User } from '../../shared/api/generated-query/model'
+import { getUserInfo } from '../../shared/api/generated-query/user/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/client'
 import { getStoredUser, setStoredAuth, clearStoredAuthState } from '../../shared/utils/auth'
 import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
@@ -123,7 +123,7 @@ export const useUserStore = defineStore('user', () => {
   async function fetchUserInfo(force = false, options: { failClosedOnError?: boolean } = {}) {
     if (userInfoLoaded.value && !force) return user.value
     try {
-      const res = await getUserInfoApi()
+      const res = await getUserInfo()
       if (res.code === 0 && res.data?.user) {
         updateAuth(res.data.user)
         return user.value

@@ -469,9 +469,7 @@ func accountForWrite(account *ApiAccount) *ApiAccount {
 	}
 	normalized := *account
 	normalized.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(normalized.MaxConcurrent)
-	if normalized.Timeout <= 0 {
-		normalized.Timeout = 120
-	}
+	normalized.Timeout = accountlimits.NormalizeTimeoutSeconds(normalized.Timeout)
 	if normalized.Weight <= 0 {
 		normalized.Weight = 1
 	}

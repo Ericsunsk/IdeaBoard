@@ -1,4 +1,4 @@
-import type { User } from '../../../shared/types'
+import type { User } from '../../../shared/api/generated-query/model'
 import { formatDateOnly } from '../../../shared/utils/dateTime'
 
 export type AdminUserRole = 'admin' | 'user'

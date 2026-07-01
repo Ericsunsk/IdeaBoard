@@ -5,7 +5,7 @@ import {
   handleAuthFailure,
   setStoredAuth,
 } from './auth'
-import type { User } from '../types'
+import type { User } from '../api/generated-query/model'
 
 const adminUser: User = {
   id: 1,

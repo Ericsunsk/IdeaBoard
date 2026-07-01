@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/tasking/tasks"
@@ -20,8 +21,8 @@ func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRe
 	if err != nil {
 		return nil, fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
 	}
-	req.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
-	req.Timeout = NormalizeAccountTimeout(req.Timeout)
+	req.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(req.MaxConcurrent)
+	req.Timeout = accountlimits.NormalizeTimeoutSeconds(req.Timeout)
 	if req.Weight <= 0 {
 		req.Weight = 1
 	}
@@ -153,8 +154,8 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 	}
 	account.Models = models
 	account.ProxyURL = proxyURL
-	account.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
-	account.Timeout = NormalizeAccountTimeout(req.Timeout)
+	account.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(req.MaxConcurrent)
+	account.Timeout = accountlimits.NormalizeTimeoutSeconds(req.Timeout)
 	account.ExtraConfig = req.ExtraConfig
 	if req.Weight <= 0 {
 		account.Weight = 1
@@ -257,7 +258,7 @@ func (s *AccountService) StartAccount(ctx context.Context, id int64) error {
 		return fmt.Errorf("%w", ErrAccountNotFound)
 	}
 
-	account.MaxConcurrent = normalizeMaxConcurrent(account.MaxConcurrent)
+	account.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(account.MaxConcurrent)
 	if err := s.accountRepo.UpdateStatus(ctx, id, 1); err != nil {
 		if database.IsNotFound(err) {
 			return fmt.Errorf("%w", ErrAccountNotFound)

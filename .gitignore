@@ -18,6 +18,8 @@ apps/api/test_upload.png
 apps/api/bin/
 apps/api/web/dist/*
 !apps/api/web/dist/.placeholder
+apps/api/internal/runtime/webdist/dist/*
+!apps/api/internal/runtime/webdist/dist/.placeholder
 
 # ===== Go Specific =====
 apps/api/coverage.out
@@ -49,6 +51,7 @@ release/
 release-temp/
 docker/releases/
 .cache/
+.codebase-memory/
 
 # ===== Temp Files =====
 other review.md

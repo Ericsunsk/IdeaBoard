@@ -13,6 +13,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/channels"
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -413,8 +414,8 @@ func normalizeProviderResultImageURLs(result providerCallResult) []string {
 
 func resolveAccountTimeout(account *accounts.ApiAccount) time.Duration {
 	if account == nil {
-		return time.Duration(accounts.NormalizeAccountTimeout(0)) * time.Second
+		return time.Duration(accountlimits.NormalizeTimeoutSeconds(0)) * time.Second
 	}
-	timeoutSeconds := accounts.NormalizeAccountTimeout(account.Timeout)
+	timeoutSeconds := accountlimits.NormalizeTimeoutSeconds(account.Timeout)
 	return time.Duration(timeoutSeconds) * time.Second
 }
