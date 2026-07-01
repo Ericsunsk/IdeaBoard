@@ -17,6 +17,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import Message from 'primevue/message'
 import { isRequiredErrorMessage, displayErrorMessage } from '../../../shared/utils/formValidation'
 import { authErrorMessagePt, authFieldClass } from './authModalUi'

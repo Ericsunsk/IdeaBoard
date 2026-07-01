@@ -137,7 +137,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Ref } from 'vue'
+import { computed, onMounted, ref, watch, type Ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'

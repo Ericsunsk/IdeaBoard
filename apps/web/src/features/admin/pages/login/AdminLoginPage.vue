@@ -72,6 +72,8 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../../app/stores/user'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ADMIN_LOGIN_PATH,
   ADMIN_ROOT_PATH,

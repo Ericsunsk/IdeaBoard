@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ComponentPublicInstance } from 'vue'
+import { onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import {
   ArrowLeft,
   Download,

@@ -10,7 +10,6 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       'output/**',
-      'src/auto-imports.d.ts',
       'src/shared/api/generated-query/**',
     ],
   },
@@ -91,7 +90,7 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/auto-imports.d.ts', 'src/shared/api/generated-query/**'],
+    ignores: ['src/shared/api/generated-query/**'],
     rules: {
       'no-restricted-globals': [
         'error',

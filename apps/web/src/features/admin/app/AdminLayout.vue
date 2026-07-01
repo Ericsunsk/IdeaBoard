@@ -227,6 +227,8 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Drawer from 'primevue/drawer'

@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import bootsAsset from '../assets/home/boots.svg'
 import portraitAsset from '../assets/home/portrait.svg'
 import socksAsset from '../assets/home/socks.svg'

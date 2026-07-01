@@ -32,6 +32,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, ref, watch } from 'vue'
+
 const props = defineProps<{
   title: string
   rounded?: boolean

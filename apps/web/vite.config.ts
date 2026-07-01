@@ -1,24 +1,11 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
-import AutoImport from 'unplugin-auto-import/vite'
 
 export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
-    AutoImport({
-      include: [/\.vue$/, /\.vue\?vue/],
-      imports: [
-        'vue',
-        'vue-router',
-        {
-          '@tanstack/vue-query': ['useMutation', 'useQuery', 'useQueryClient'],
-        },
-      ],
-      dts: 'src/auto-imports.d.ts',
-      vueTemplate: true,
-    }),
   ],
   test: {
     environment: 'happy-dom',

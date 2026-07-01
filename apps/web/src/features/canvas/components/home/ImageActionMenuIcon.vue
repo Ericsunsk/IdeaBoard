@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import type { ImageActionMenuIcon } from '../../config/imageActionRegistry'
-import type { Component } from 'vue'
+import { computed, type Component } from 'vue'
 import {
   AdobePhotoshop,
   BorderInner,

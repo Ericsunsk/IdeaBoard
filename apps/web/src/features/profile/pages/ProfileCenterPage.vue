@@ -366,6 +366,8 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
+import { computed, onMounted, onUnmounted, ref, type Component } from 'vue'
+import { useRouter } from 'vue-router'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import {
@@ -381,7 +383,6 @@ import Card from 'primevue/card'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import Tag from 'primevue/tag'
-import type { Component } from 'vue'
 import { Camera, Lock, LogOut, NavArrowLeft, Shield, User } from '@iconoir/vue'
 
 type NavItem = {

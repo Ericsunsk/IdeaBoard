@@ -18,6 +18,7 @@
 
 <script setup lang="ts">
 import { IconoirProvider } from '@iconoir/vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import { useSiteBranding } from '../shared/composables/useSiteBranding'
 

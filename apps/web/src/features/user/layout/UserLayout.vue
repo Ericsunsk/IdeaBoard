@@ -39,6 +39,8 @@
 
 <script setup lang="ts">
 import { Shield, Xmark } from '@iconoir/vue'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useUserStore } from '../../../app/stores/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'

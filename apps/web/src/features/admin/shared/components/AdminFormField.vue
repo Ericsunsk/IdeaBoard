@@ -24,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed, useId } from 'vue'
 import Message from 'primevue/message'
 
 interface AdminFormFieldSlotProps {
