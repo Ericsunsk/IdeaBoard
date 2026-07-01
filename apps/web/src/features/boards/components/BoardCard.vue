@@ -1,7 +1,7 @@
 <template>
   <Transition name="board-card" appear>
     <article
-      class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-white/90 text-left transition-colors hover:border-board-card-border-hover"
+      class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg text-left transition-colors hover:border-board-card-border-hover"
       role="button"
       tabindex="0"
       @keydown.enter.self.prevent="emit('click-board')"
@@ -34,7 +34,7 @@
           ref="renameInputEl"
           :value="renameDraft"
           unstyled
-          class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-white/80 px-2 text-[13px] text-board-card-action-hover outline-none"
+          class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-board-card-input-bg px-2 text-[13px] text-board-card-action-hover outline-none"
           maxlength="60"
           @click.stop
           @input="onRenameInput"
