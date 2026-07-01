@@ -114,6 +114,61 @@
   --color-board-menu-item: #4b5565;
   --color-board-menu-danger: #d14343;
   --color-board-menu-danger-hover-bg: rgba(209, 67, 67, 0.1);
+
+  /*
+   * App semantic aliases.
+   * Keep these additive: colors map to existing Admin/Canvas/Boards tokens so
+   * current surfaces keep their visual contract until each ticket migrates call sites.
+   */
+  --color-ib-page: var(--color-admin-bg);
+  --color-ib-surface: var(--color-admin-card-strong);
+  --color-ib-surface-raised: var(--color-admin-card);
+  --color-ib-surface-muted: var(--color-admin-surface-muted);
+  --color-ib-surface-hover: var(--color-admin-surface-hover);
+  --color-ib-surface-pressed: var(--color-admin-surface-pressed);
+  --color-ib-surface-disabled: var(--color-admin-surface-disabled);
+  --color-ib-border: var(--color-admin-border);
+  --color-ib-border-soft: var(--color-admin-border-soft);
+  --color-ib-border-hover: var(--color-admin-border-hover);
+  --color-ib-border-pressed: var(--color-admin-border-pressed);
+  --color-ib-border-strong: var(--color-admin-border-strong);
+  --color-ib-text: var(--color-admin-text-1);
+  --color-ib-text-muted: var(--color-admin-text-2);
+  --color-ib-text-subtle: var(--color-admin-text-3);
+  --color-ib-text-disabled: var(--color-admin-text-disabled);
+  --color-ib-text-inverse: var(--color-admin-text-inverse);
+  --color-ib-accent: var(--color-admin-accent);
+  --color-ib-accent-hover: var(--color-admin-accent-hover);
+  --color-ib-accent-pressed: var(--color-admin-accent-pressed);
+  --color-ib-accent-soft: var(--color-admin-accent-soft);
+  --color-ib-creative-accent: var(--color-canvas-accent);
+  --color-ib-creative-accent-hover: var(--color-canvas-accent-hover);
+  --color-ib-creative-accent-pressed: var(--color-canvas-accent-pressed);
+  --color-ib-creative-accent-soft: var(--color-canvas-accent-soft);
+  --color-ib-focus-ring: var(--color-admin-focus-ring);
+  --color-ib-focus-accent: var(--color-canvas-accent);
+  --color-ib-success: var(--color-admin-success);
+  --color-ib-warning: var(--color-admin-warning);
+  --color-ib-danger: var(--color-admin-danger);
+  --color-ib-danger-hover: var(--color-admin-danger-hover);
+  --color-ib-danger-pressed: var(--color-admin-danger-pressed);
+  --color-ib-info: var(--color-admin-info);
+  --color-ib-board-border: var(--color-board-card-border);
+  --color-ib-board-border-hover: var(--color-board-card-border-hover);
+
+  --radius-ib-control: 10px;
+  --radius-ib-panel: 14px;
+  --radius-ib-overlay: 14px;
+  --radius-ib-pill: 999px;
+
+  --shadow-ib-control: 0 3px 10px rgba(45, 64, 89, 0.05);
+  --shadow-ib-panel: 0 4px 20px -2px rgba(45, 64, 89, 0.02),
+    0 2px 6px -1px rgba(45, 64, 89, 0.01);
+  --shadow-ib-overlay: 0 18px 42px rgba(45, 64, 89, 0.14);
+  --shadow-ib-focus: 0 0 0 3px var(--color-ib-focus-ring);
+
+  --duration-ib-fast: 160ms;
+  --duration-ib-standard: 200ms;
 }
 
 @layer base {
