@@ -45,4 +45,9 @@ export {
   type ImageExecutionResultOptions,
   type ImageResultAnchor,
 } from './planning/ImageExecutionPlan'
+export {
+  useFlowImageWorkflowExecution,
+  type FlowImageWorkflowExecutionPlan,
+  type UseFlowImageWorkflowExecutionOptions,
+} from './runtime/flowImageWorkflowExecution'
 export { useFlowImageDirectActions } from './runtime/useFlowImageDirectActions'
