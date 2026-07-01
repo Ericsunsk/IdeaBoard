@@ -188,6 +188,7 @@ import {
   type CanvasBoardMeta,
 } from '../../canvas-board/catalog/canvasBoards'
 import { hydrateCanvasBoardsFromServer } from '../../canvas-board/catalog/boardSync'
+import BoardCard from '../components/BoardCard.vue'
 import { createCanvasBoardCommands } from '../lib/canvasBoardCommands'
 import { createBoardPreviewRefreshQueue } from '../lib/boardPreviewRefreshQueue'
 import {
