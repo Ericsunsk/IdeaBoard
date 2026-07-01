@@ -1,4 +1,4 @@
-import { getCurrentScope, onScopeDispose } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, type Ref } from 'vue'
 import {
   beginCanvasFrameProbe,
   isCanvasFrameProbeEnabled,
@@ -20,11 +20,6 @@ export type CanvasFlowMovePayload = {
   }
 }
 
-export type CanvasViewportSyncOptions = {
-  persist?: boolean
-  forcePersist?: boolean
-}
-
 export type CanvasViewportRuntimeInteraction = 'flow-viewport' | 'node-drag'
 
 export type CanvasMiniMapCenterRequestPayload = {
@@ -44,8 +39,8 @@ export type UseCanvasViewportRuntimeOptions = {
   fullNodes: ReadonlyValueRef<readonly unknown[]>
   fullEdges: ReadonlyValueRef<readonly unknown[]>
   currentBoardId: ReadonlyValueRef<string | null>
+  viewport: Readonly<Ref<CanvasFlowViewport>>
   getViewport: () => CanvasFlowViewport
-  setViewport: (viewport: CanvasFlowViewport) => Promise<unknown> | unknown
   setCenter: (
     x: number,
     y: number,
@@ -53,7 +48,7 @@ export type UseCanvasViewportRuntimeOptions = {
   ) => Promise<unknown> | unknown
   zoomIn: () => Promise<unknown> | unknown
   zoomOut: () => Promise<unknown> | unknown
-  applyFlowTransform: (viewport: CanvasFlowViewport) => boolean
+  panBy: (delta: { x: number; y: number }) => boolean
   markBoardViewportChanged: () => void
   commitPendingBoardViewportChange: () => void
   loadInitialOrRouteBoard: () => Promise<void>
@@ -65,12 +60,23 @@ export type UseCanvasViewportRuntimeOptions = {
   refreshFlowHandleVisibility: () => void
 }
 
+function viewportKey(viewport: CanvasFlowViewport) {
+  return `${viewport.x}:${viewport.y}:${viewport.zoom}`
+}
+
 export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOptions) {
   let activeViewportFrameProbe: CanvasFrameProbeSession | null = null
   let activeNodeDragFrameProbe: CanvasFrameProbeSession | null = null
+  let lastCommittedViewportKey: string | null = null
+  let programmaticViewportCommitDepth = 0
+
+  const zoomLevel = computed(() => {
+    const zoom = options.viewport.value.zoom
+    return Math.max(10, Math.round((Number.isFinite(zoom) && zoom > 0 ? zoom : 1) * 100))
+  })
 
   function getCanvasFrameProbeMetadata() {
-    const viewport = options.getViewport()
+    const viewport = options.viewport.value
     return {
       boardId: options.currentBoardId.value,
       nodes: options.nodes.value.length,
@@ -83,43 +89,24 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     }
   }
 
-  function resolveFlowViewportFromTransform(
-    transform: CanvasFlowMovePayload['flowTransform'] | CanvasFlowViewport | undefined,
-  ): CanvasFlowViewport {
-    const viewport = options.getViewport()
-    return {
-      x: typeof transform?.x === 'number' ? transform.x : viewport.x,
-      y: typeof transform?.y === 'number' ? transform.y : viewport.y,
-      zoom: typeof transform?.zoom === 'number' ? transform.zoom : viewport.zoom,
-    }
-  }
-
-  function syncCanvasViewport(
-    transform: CanvasFlowMovePayload['flowTransform'] | CanvasFlowViewport | undefined,
-    syncOptions: CanvasViewportSyncOptions = {},
-  ) {
-    const viewport = resolveFlowViewportFromTransform(transform)
-    const didChange = options.applyFlowTransform(viewport)
-
-    if (syncOptions.persist && (didChange || syncOptions.forcePersist)) {
-      options.markBoardViewportChanged()
-    }
-
-    return didChange
+  function commitViewportPersistence() {
+    lastCommittedViewportKey = viewportKey(options.viewport.value)
+    options.markBoardViewportChanged()
+    options.commitPendingBoardViewportChange()
   }
 
   async function runAndPersistViewportCommand(
     run: () => Promise<unknown> | unknown,
-    resolveViewport: () => CanvasFlowViewport = options.getViewport,
   ) {
-    const result = await run()
-    if (result === false) return
+    programmaticViewportCommitDepth += 1
+    try {
+      const result = await run()
+      if (result === false) return
 
-    syncCanvasViewport(resolveViewport(), {
-      persist: true,
-      forcePersist: true,
-    })
-    options.commitPendingBoardViewportChange()
+      commitViewportPersistence()
+    } finally {
+      programmaticViewportCommitDepth -= 1
+    }
   }
 
   function onZoomIn() {
@@ -131,16 +118,13 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function onPanViewport(delta: { x: number; y: number }) {
-    const viewport = options.getViewport()
-    const nextViewport = {
-      x: viewport.x + delta.x,
-      y: viewport.y + delta.y,
-      zoom: viewport.zoom,
+    programmaticViewportCommitDepth += 1
+    try {
+      if (!options.panBy(delta)) return
+      commitViewportPersistence()
+    } finally {
+      programmaticViewportCommitDepth -= 1
     }
-
-    void runAndPersistViewportCommand(() => options.setViewport(nextViewport), () => {
-      return nextViewport
-    })
   }
 
   function onMiniMapCenterRequested(payload: CanvasMiniMapCenterRequestPayload) {
@@ -150,19 +134,19 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     )
   }
 
-  function syncViewportAndCommit(transform: CanvasFlowMovePayload['flowTransform']) {
-    if (transform) {
-      syncCanvasViewport(transform, { persist: true })
-    } else {
-      syncCanvasViewport(options.getViewport())
+  function onViewportChangeEnd(viewport = options.viewport.value) {
+    const key = viewportKey(viewport)
+    if (programmaticViewportCommitDepth > 0) {
+      lastCommittedViewportKey = key
+      return
     }
-    options.commitPendingBoardViewportChange()
+    if (key === lastCommittedViewportKey) return
+    commitViewportPersistence()
   }
 
-  function syncViewportAndProbe(transform: CanvasFlowMovePayload['flowTransform']) {
+  function observeViewportMove(transform: CanvasFlowMovePayload['flowTransform']) {
     if (!transform) return
     beginViewportFrameProbe(transform)
-    syncCanvasViewport(transform, { persist: true })
   }
 
   function beginViewportFrameProbe(transform: CanvasFlowMovePayload['flowTransform']) {
@@ -207,14 +191,13 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function onFlowMove(payload: CanvasFlowMovePayload) {
-    syncViewportAndProbe(payload.flowTransform)
+    observeViewportMove(payload.flowTransform)
   }
 
   function onFlowMoveEnd(payload: CanvasFlowMovePayload) {
     try {
       const transform = payload.flowTransform
       if (transform) beginViewportFrameProbe(transform)
-      syncViewportAndCommit(transform)
     } finally {
       endViewportFrameProbe('move-end')
       options.stopCanvasInteraction('flow-viewport')
@@ -263,11 +246,12 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   return {
-    syncCanvasViewport,
+    zoomLevel,
     onZoomIn,
     onZoomOut,
     onPanViewport,
     onMiniMapCenterRequested,
+    onViewportChangeEnd,
     onFlowMoveStart,
     onFlowMove,
     onFlowMoveEnd,

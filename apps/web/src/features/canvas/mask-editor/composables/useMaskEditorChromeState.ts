@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue'
+import { useFileDialog } from '@vueuse/core'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import {
@@ -23,6 +24,11 @@ type UseMaskEditorChromeStateOptions = {
 export function useMaskEditorChromeState(options: UseMaskEditorChromeStateOptions) {
   const maskEditorLayerOpacity = ref(MASK_EDITOR_DEFAULT_LAYER_OPACITY)
   const maskEditorReferenceImages = ref<MaskEditorReferenceImage[]>([])
+  const referenceImageDialog = useFileDialog({
+    accept: IMAGE_UPLOAD_ACCEPT,
+    multiple: false,
+    reset: true,
+  })
 
   const activeMaskEditorOutputCount = computed(() => {
     const nodeId = options.imageEditorNodeId.value
@@ -40,16 +46,14 @@ export function useMaskEditorChromeState(options: UseMaskEditorChromeStateOption
       options.onWarning(`局部重绘最多添加 ${MASK_EDITOR_REFERENCE_IMAGE_LIMIT} 张参考图`)
       return
     }
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = IMAGE_UPLOAD_ACCEPT
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return
-      void addMaskEditorReferenceImage(file)
-    }
-    input.click()
+    referenceImageDialog.open()
   }
+
+  referenceImageDialog.onChange((files) => {
+    const file = files?.[0]
+    if (!file) return
+    void addMaskEditorReferenceImage(file)
+  })
 
   async function addMaskEditorReferenceImage(file: File) {
     if (maskEditorReferenceImages.value.length >= MASK_EDITOR_REFERENCE_IMAGE_LIMIT) {

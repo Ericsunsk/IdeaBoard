@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { useMaskEditorChromeState } from './useMaskEditorChromeState'
 
@@ -18,10 +18,21 @@ function createHarness() {
     onReferenceImagePreview,
   })
 
-  return { imageEditorNodeId, getImageNodeSnapshot, onReferenceImagePreview, state }
+  return {
+    imageEditorNodeId,
+    getImageNodeSnapshot,
+    onReferenceImagePreview,
+    uploadImageToBoard,
+    onWarning,
+    state,
+  }
 }
 
 describe('useMaskEditorChromeState', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('normalizes active output count from the current image node', () => {
     const { state } = createHarness()
 
@@ -67,5 +78,37 @@ describe('useMaskEditorChromeState', () => {
       url: 'https://example.com/a.png',
       ratio: 1,
     })
+  })
+
+  it('opens a single-image file dialog and uploads the selected reference image', async () => {
+    const input = document.createElement('input')
+    const click = vi.spyOn(input, 'click').mockImplementation(() => {})
+    vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      if (tagName === 'input') return input
+      return Document.prototype.createElement.call(document, tagName, options)
+    })
+    const { state, uploadImageToBoard } = createHarness()
+    const file = new File(['image'], 'reference.png', { type: 'image/png' })
+    uploadImageToBoard.mockResolvedValue({ url: 'https://example.com/ref.png', ratio: 1.25 })
+
+    state.onMaskEditorReferenceImageOpen()
+
+    expect(input.type).toBe('file')
+    expect(input.accept).toContain('image/')
+    expect(input.multiple).toBe(false)
+    expect(click).toHaveBeenCalledTimes(1)
+
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [file],
+    })
+    input.dispatchEvent(new Event('change'))
+    await nextTick()
+    await Promise.resolve()
+
+    expect(uploadImageToBoard).toHaveBeenCalledWith(file)
+    expect(state.maskEditorReferenceImages.value).toMatchObject([
+      { url: 'https://example.com/ref.png', ratio: 1.25 },
+    ])
   })
 })

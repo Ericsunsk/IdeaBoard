@@ -76,18 +76,39 @@ function updateBrushCursor(event: PointerEvent) {
 
   const canvas = canvasRef.value
   if (!canvas) return
-  const rect = canvas.getBoundingClientRect()
-  if (!rect.width || !rect.height) return
-
   const localWidth = canvas.offsetWidth || props.canvasWidth
   const localHeight = canvas.offsetHeight || props.canvasHeight
-  brushCursorX.value = ((event.clientX - rect.left) / rect.width) * localWidth
-  brushCursorY.value = ((event.clientY - rect.top) / rect.height) * localHeight
+  const cursorPoint = resolveBrushCursorPoint(event, canvas, localWidth, localHeight)
+  if (!cursorPoint) return
+
+  brushCursorX.value = cursorPoint.x
+  brushCursorY.value = cursorPoint.y
   brushCursorVisible.value =
     brushCursorX.value >= 0 &&
     brushCursorY.value >= 0 &&
     brushCursorX.value <= localWidth &&
     brushCursorY.value <= localHeight
+}
+
+function resolveBrushCursorPoint(
+  event: PointerEvent,
+  canvas: HTMLCanvasElement,
+  localWidth: number,
+  localHeight: number,
+) {
+  if (Number.isFinite(event.offsetX) && Number.isFinite(event.offsetY)) {
+    return {
+      x: event.offsetX,
+      y: event.offsetY,
+    }
+  }
+
+  const rect = canvas.getBoundingClientRect()
+  if (!rect.width || !rect.height) return null
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * localWidth,
+    y: ((event.clientY - rect.top) / rect.height) * localHeight,
+  }
 }
 
 function hideBrushCursor() {

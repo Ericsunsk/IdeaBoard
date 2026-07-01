@@ -23,16 +23,17 @@ function createViewportRuntimeHarness() {
   const stopCanvasInteraction = vi.fn()
   const markBoardViewportChanged = vi.fn()
   const commitPendingBoardViewportChange = vi.fn()
+  const panBy = vi.fn((delta: { x: number; y: number }) => {
+    if (!delta.x && !delta.y) return false
+    viewport.value = {
+      x: viewport.value.x + delta.x,
+      y: viewport.value.y + delta.y,
+      zoom: viewport.value.zoom,
+    }
+    return true
+  })
   const setCenter = vi.fn((x: number, y: number, _options?: { duration?: number; zoom?: number }) => {
     viewport.value = { x: -x, y: -y, zoom: viewport.value.zoom }
-  })
-  const applyFlowTransform = vi.fn((nextViewport: CanvasFlowViewport) => {
-    const didChange =
-      viewport.value.x !== nextViewport.x ||
-      viewport.value.y !== nextViewport.y ||
-      viewport.value.zoom !== nextViewport.zoom
-    viewport.value = nextViewport
-    return didChange
   })
   const loadInitialOrRouteBoard = vi.fn(async () => undefined)
 
@@ -44,10 +45,8 @@ function createViewportRuntimeHarness() {
       fullNodes: ref([]),
       fullEdges: ref([]),
       currentBoardId: ref('board-a') as Ref<string | null>,
+      viewport,
       getViewport: () => viewport.value,
-      setViewport: (nextViewport) => {
-        viewport.value = nextViewport
-      },
       setCenter,
       zoomIn: vi.fn(() => {
         viewport.value = { ...viewport.value, zoom: viewport.value.zoom + 0.25 }
@@ -55,7 +54,7 @@ function createViewportRuntimeHarness() {
       zoomOut: vi.fn(() => {
         viewport.value = { ...viewport.value, zoom: viewport.value.zoom - 0.25 }
       }),
-      applyFlowTransform,
+      panBy,
       markBoardViewportChanged,
       commitPendingBoardViewportChange,
       loadInitialOrRouteBoard,
@@ -73,7 +72,7 @@ function createViewportRuntimeHarness() {
     runtime,
     scope,
     viewport,
-    applyFlowTransform,
+    panBy,
     setCenter,
     markBoardViewportChanged,
     commitPendingBoardViewportChange,
@@ -94,24 +93,23 @@ describe('useCanvasViewportRuntime', () => {
     vi.unstubAllGlobals()
   })
 
-  it('syncs the flow viewport while the flow viewport is moving', () => {
+  it('observes flow viewport movement without committing persistence during move frames', () => {
     const harness = createViewportRuntimeHarness()
 
     harness.runtime.onFlowMove({ flowTransform: { x: 24, y: 32, zoom: 1.5 } })
 
-    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 24, y: 32, zoom: 1.5 })
-    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
     harness.scope.stop()
   })
 
-  it('commits viewport persistence on move end', () => {
+  it('commits viewport persistence on viewport change end', () => {
     const harness = createViewportRuntimeHarness()
 
     harness.runtime.onFlowMoveStart()
+    harness.runtime.onViewportChangeEnd()
     harness.runtime.onFlowMoveEnd({ flowTransform: { x: 48, y: 64, zoom: 2 } })
 
     expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
-    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 48, y: 64, zoom: 2 })
     expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
     expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
@@ -123,8 +121,8 @@ describe('useCanvasViewportRuntime', () => {
 
     harness.runtime.onZoomIn()
     await Promise.resolve()
+    harness.runtime.onViewportChangeEnd(harness.viewport.value)
 
-    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 0, y: 0, zoom: 1.25 })
     expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
     harness.scope.stop()
@@ -140,7 +138,43 @@ describe('useCanvasViewportRuntime', () => {
       duration: 0,
       zoom: 1,
     })
-    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: -240, y: -180, zoom: 1 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('uses panBy for keyboard panning and commits only when the viewport moves', () => {
+    const harness = createViewportRuntimeHarness()
+
+    harness.runtime.onPanViewport({ x: 16, y: -8 })
+    harness.runtime.onViewportChangeEnd(harness.viewport.value)
+
+    expect(harness.panBy).toHaveBeenCalledWith({ x: 16, y: -8 })
+    expect(harness.viewport.value).toEqual({ x: 16, y: -8, zoom: 1 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('does not commit dirty persistence when panBy is constrained or uninitialized', () => {
+    const harness = createViewportRuntimeHarness()
+    harness.panBy.mockReturnValueOnce(false)
+
+    harness.runtime.onPanViewport({ x: 16, y: -8 })
+
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
+    expect(harness.commitPendingBoardViewportChange).not.toHaveBeenCalled()
+    harness.scope.stop()
+  })
+
+  it('commits a later user viewport change after a constrained keyboard pan', () => {
+    const harness = createViewportRuntimeHarness()
+    harness.panBy.mockReturnValueOnce(false)
+
+    harness.runtime.onPanViewport({ x: 16, y: -8 })
+    harness.viewport.value = { x: 24, y: 32, zoom: 1.5 }
+    harness.runtime.onViewportChangeEnd(harness.viewport.value)
+
     expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
     harness.scope.stop()

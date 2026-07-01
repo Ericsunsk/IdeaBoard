@@ -10,6 +10,78 @@ export type MaskCommitResult = {
   maskDataUrl: string
 }
 
+type MaskRgbColor = {
+  r: number
+  g: number
+  b: number
+}
+
+const MASK_EXECUTION_RGB = {
+  r: 255,
+  g: 255,
+  b: 255,
+} as const
+
+function createMaskCanvas(width: number, height: number) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  return canvas
+}
+
+function maskColorToRgba(color: MaskRgbColor, alpha = 1) {
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`
+}
+
+function releaseTemporaryCanvas(canvas: HTMLCanvasElement) {
+  canvas.width = 0
+  canvas.height = 0
+}
+
+function copyCanvasToTemporaryCanvas(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement | null {
+  const width = sourceCanvas.width
+  const height = sourceCanvas.height
+  if (!width || !height) return null
+  const copyCanvas = createMaskCanvas(width, height)
+  const copyCtx = copyCanvas.getContext('2d')
+  if (!copyCtx) {
+    releaseTemporaryCanvas(copyCanvas)
+    return null
+  }
+  copyCtx.drawImage(sourceCanvas, 0, 0, width, height)
+  return copyCanvas
+}
+
+function tintCurrentAlpha(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  color: MaskRgbColor,
+  alpha = 1,
+) {
+  ctx.save()
+  ctx.globalCompositeOperation = 'source-in'
+  ctx.fillStyle = maskColorToRgba(color, alpha)
+  ctx.fillRect(0, 0, width, height)
+  ctx.restore()
+}
+
+function drawTintedMaskToCanvas(
+  targetCanvas: HTMLCanvasElement,
+  sourceCanvas: HTMLCanvasElement,
+  color: MaskRgbColor,
+  alpha = 1,
+) {
+  const width = targetCanvas.width
+  const height = targetCanvas.height
+  if (!width || !height) return
+  const ctx = targetCanvas.getContext('2d')
+  if (!ctx) return
+  ctx.clearRect(0, 0, width, height)
+  ctx.drawImage(sourceCanvas, 0, 0, width, height)
+  tintCurrentAlpha(ctx, width, height, color, alpha)
+}
+
 export function drawMaskRasterPreviewToCanvas(
   image: CanvasImageSource,
   targetCanvas: HTMLCanvasElement,
@@ -17,12 +89,13 @@ export function drawMaskRasterPreviewToCanvas(
   const width = targetCanvas.width
   const height = targetCanvas.height
   if (!width || !height) return
-  const tempCanvas = document.createElement('canvas')
-  tempCanvas.width = width
-  tempCanvas.height = height
+  const tempCanvas = createMaskCanvas(width, height)
   const tempCtx = tempCanvas.getContext('2d')
   const targetCtx = targetCanvas.getContext('2d')
-  if (!tempCtx || !targetCtx) return
+  if (!tempCtx || !targetCtx) {
+    releaseTemporaryCanvas(tempCanvas)
+    return
+  }
 
   tempCtx.clearRect(0, 0, width, height)
   tempCtx.drawImage(image, 0, 0, width, height)
@@ -41,20 +114,27 @@ export function drawMaskRasterPreviewToCanvas(
 
   targetCtx.clearRect(0, 0, width, height)
   targetCtx.putImageData(imageData, 0, 0)
+  releaseTemporaryCanvas(tempCanvas)
 }
 
 export function invertMaskPreviewCanvas(canvas: HTMLCanvasElement) {
+  const width = canvas.width
+  const height = canvas.height
+  if (!width || !height) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const data = imageData.data
-  for (let idx = 0; idx < data.length; idx += 4) {
-    data[idx] = MASK_EDITOR_PAINT_RGB.r
-    data[idx + 1] = MASK_EDITOR_PAINT_RGB.g
-    data[idx + 2] = MASK_EDITOR_PAINT_RGB.b
-    data[idx + 3] = 255 - data[idx + 3]
-  }
-  ctx.putImageData(imageData, 0, 0)
+  const sourceCanvas = copyCanvasToTemporaryCanvas(canvas)
+  if (!sourceCanvas) return
+
+  ctx.save()
+  ctx.clearRect(0, 0, width, height)
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.fillStyle = maskColorToRgba(MASK_EDITOR_PAINT_RGB)
+  ctx.fillRect(0, 0, width, height)
+  ctx.globalCompositeOperation = 'destination-out'
+  ctx.drawImage(sourceCanvas, 0, 0, width, height)
+  ctx.restore()
+  releaseTemporaryCanvas(sourceCanvas)
 }
 
 function blurAlphaHorizontal(
@@ -133,96 +213,42 @@ export function featherMaskPreviewCanvas(
   blurAlphaVertical(alphaTemp, alphaBlurred, width, height, blurRadius)
 
   let changed = false
+  const blurredImageData = ctx.createImageData(width, height)
   for (let i = 0; i < total; i += 1) {
     const base = i * 4
-    source[base] = MASK_EDITOR_PAINT_RGB.r
-    source[base + 1] = MASK_EDITOR_PAINT_RGB.g
-    source[base + 2] = MASK_EDITOR_PAINT_RGB.b
     const nextAlpha = alphaBlurred[i]
-    if (source[base + 3] !== nextAlpha) changed = true
-    source[base + 3] = nextAlpha
+    if (alphaSource[i] !== nextAlpha) changed = true
+    blurredImageData.data[base + 3] = nextAlpha
   }
   if (!changed) return false
-  ctx.putImageData(imageData, 0, 0)
+  ctx.putImageData(blurredImageData, 0, 0)
+  tintCurrentAlpha(ctx, width, height, MASK_EDITOR_PAINT_RGB)
   return true
 }
 
-function extractMaskIntensity(data: Uint8ClampedArray): Float32Array {
-  const total = data.length / 4
-  const values = new Float32Array(total)
-  for (let i = 0; i < total; i += 1) {
-    const base = i * 4
-    const alpha = data[base + 3] / 255
-    values[i] = alpha > 0 ? alpha : 0
-  }
-  return values
-}
-
-function hasMaskPaint(values: Float32Array): boolean {
-  for (const value of values) {
-    if (value > MASK_EDITOR_EMPTY_ALPHA_THRESHOLD) return true
+function hasMaskPaint(data: Uint8ClampedArray): boolean {
+  const alphaThreshold = MASK_EDITOR_EMPTY_ALPHA_THRESHOLD * 255
+  for (let idx = 3; idx < data.length; idx += 4) {
+    if (data[idx] > alphaThreshold) return true
   }
   return false
-}
-
-function paintExecutionMaskValuesToCanvas(
-  targetCanvas: HTMLCanvasElement,
-  values: Float32Array,
-  width: number,
-  height: number,
-) {
-  const ctx = targetCanvas.getContext('2d')
-  if (!ctx) return
-  const imageData = ctx.createImageData(width, height)
-  for (let i = 0; i < values.length; i += 1) {
-    const base = i * 4
-    const alpha = Math.max(0, Math.min(1, values[i]))
-    imageData.data[base] = 255
-    imageData.data[base + 1] = 255
-    imageData.data[base + 2] = 255
-    imageData.data[base + 3] = Math.round(alpha * 255)
-  }
-  ctx.clearRect(0, 0, width, height)
-  ctx.putImageData(imageData, 0, 0)
-}
-
-function paintPreviewMaskValuesToCanvas(
-  targetCanvas: HTMLCanvasElement,
-  values: Float32Array,
-  width: number,
-  height: number,
-) {
-  const ctx = targetCanvas.getContext('2d')
-  if (!ctx) return
-  const imageData = ctx.createImageData(width, height)
-  for (let i = 0; i < values.length; i += 1) {
-    const base = i * 4
-    const alpha = Math.max(0, Math.min(1, values[i])) * MASK_EDITOR_PREVIEW_ALPHA
-    imageData.data[base] = MASK_EDITOR_PAINT_RGB.r
-    imageData.data[base + 1] = MASK_EDITOR_PAINT_RGB.g
-    imageData.data[base + 2] = MASK_EDITOR_PAINT_RGB.b
-    imageData.data[base + 3] = Math.round(alpha * 255)
-  }
-  ctx.clearRect(0, 0, width, height)
-  ctx.putImageData(imageData, 0, 0)
 }
 
 export function buildMaskCommitResult(canvas: HTMLCanvasElement): MaskCommitResult | null {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
   const source = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const values = extractMaskIntensity(source.data)
-  if (!hasMaskPaint(values)) return null
-  const executionCanvas = document.createElement('canvas')
-  executionCanvas.width = canvas.width
-  executionCanvas.height = canvas.height
-  paintExecutionMaskValuesToCanvas(executionCanvas, values, canvas.width, canvas.height)
-  const previewCanvas = document.createElement('canvas')
-  previewCanvas.width = canvas.width
-  previewCanvas.height = canvas.height
-  paintPreviewMaskValuesToCanvas(previewCanvas, values, canvas.width, canvas.height)
+  if (!hasMaskPaint(source.data)) return null
+  const executionCanvas = createMaskCanvas(canvas.width, canvas.height)
+  drawTintedMaskToCanvas(executionCanvas, canvas, MASK_EXECUTION_RGB)
+  const previewCanvas = createMaskCanvas(canvas.width, canvas.height)
+  drawTintedMaskToCanvas(previewCanvas, canvas, MASK_EDITOR_PAINT_RGB, MASK_EDITOR_PREVIEW_ALPHA)
+  const executionMaskDataUrl = executionCanvas.toDataURL('image/png')
+  const maskDataUrl = previewCanvas.toDataURL('image/png')
+  releaseTemporaryCanvas(executionCanvas)
+  releaseTemporaryCanvas(previewCanvas)
   return {
-    executionMaskDataUrl: executionCanvas.toDataURL('image/png'),
-    maskDataUrl: previewCanvas.toDataURL('image/png'),
+    executionMaskDataUrl,
+    maskDataUrl,
   }
 }

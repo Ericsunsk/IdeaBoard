@@ -3,6 +3,7 @@
     <ImageEditorHistogramPlot
       aria-label="阈值直方图"
       :histogram-path="histogramPath"
+      marker-mode="range"
       :markers="plotMarkers"
       @update-marker="onMarkerUpdate"
     />

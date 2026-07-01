@@ -59,4 +59,15 @@ describe('useFlowNodeDragInteractions', () => {
 
     expect(harness.commitNodeDragTransaction).toHaveBeenCalledTimes(1)
   })
+
+  it('only commits the latest queued drag stop', async () => {
+    const harness = createHarness(false)
+
+    harness.interactions.onNodeDragStop()
+    harness.interactions.onNodeDragStop()
+
+    await Promise.resolve()
+
+    expect(harness.commitNodeDragTransaction).toHaveBeenCalledTimes(1)
+  })
 })

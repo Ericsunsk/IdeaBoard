@@ -11,7 +11,7 @@ type UseFlowNodeDragInteractionsOptions = {
 }
 
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
-  let pendingDragStopCommit: Promise<void> | null = null
+  let pendingDragStopCommit: object | null = null
 
   function onNodeDragStart() {
     pendingDragStopCommit = null
@@ -27,12 +27,13 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
       hideStrength: false,
     })
     options.finishFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
-    const commitTask = Promise.resolve().then(() => {
-      if (pendingDragStopCommit !== commitTask) return
+    const commitToken = {}
+    queueMicrotask(() => {
+      if (pendingDragStopCommit !== commitToken) return
       pendingDragStopCommit = null
       options.commitNodeDragTransaction()
     })
-    pendingDragStopCommit = commitTask
+    pendingDragStopCommit = commitToken
   }
 
   return {

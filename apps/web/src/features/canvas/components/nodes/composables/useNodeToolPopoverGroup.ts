@@ -1,4 +1,5 @@
-import { computed, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
+import { computed, ref, watchEffect, type Ref } from 'vue'
+import { useDismissableLayer } from '../../../../../shared/composables/useDismissableLayer'
 
 type PopoverRootRef = Ref<HTMLElement | null | undefined>
 
@@ -8,10 +9,14 @@ interface NodeToolPopoverGroupOptions<T extends string> {
   closeOnEscape?: boolean
 }
 
+const POPOVER_GROUP_ATTR = 'data-node-tool-popover-group'
+let popoverGroupId = 0
+
 export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopoverGroupOptions<T>) {
   const activeKey = ref<T | null>(null)
   const keySet = new Set(options.keys)
   const closeOnEscape = options.closeOnEscape ?? true
+  const groupToken = `node-tool-popover-group-${++popoverGroupId}`
 
   function isOpen(key: T) {
     return computed(() => activeKey.value === key)
@@ -35,35 +40,31 @@ export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopov
     activeKey.value = activeKey.value === key ? null : key
   }
 
-  function containsTarget(target: Node) {
-    for (const rootRef of options.rootRefs) {
-      const root = rootRef.value
-      if (root?.contains(target)) return true
+  watchEffect((onCleanup) => {
+    const roots = options.rootRefs
+      .map((rootRef) => rootRef.value)
+      .filter((root): root is HTMLElement => !!root)
+
+    for (const root of roots) {
+      root.setAttribute(POPOVER_GROUP_ATTR, groupToken)
     }
-    return false
-  }
 
-  function onGlobalPointerDown(event: PointerEvent) {
-    const target = event.target
-    if (!(target instanceof Node)) return
-    if (containsTarget(target)) return
-    close()
-  }
-
-  function onGlobalKeydown(event: KeyboardEvent) {
-    if (!closeOnEscape) return
-    if (event.key !== 'Escape') return
-    close()
-  }
-
-  onMounted(() => {
-    window.addEventListener('pointerdown', onGlobalPointerDown, true)
-    window.addEventListener('keydown', onGlobalKeydown, true)
+    onCleanup(() => {
+      for (const root of roots) {
+        if (root.getAttribute(POPOVER_GROUP_ATTR) === groupToken) {
+          root.removeAttribute(POPOVER_GROUP_ATTR)
+        }
+      }
+    })
   })
 
-  onBeforeUnmount(() => {
-    window.removeEventListener('pointerdown', onGlobalPointerDown, true)
-    window.removeEventListener('keydown', onGlobalKeydown, true)
+  useDismissableLayer({
+    enabled: computed(() => activeKey.value !== null),
+    ignore: [`[${POPOVER_GROUP_ATTR}="${groupToken}"]`],
+    onDismiss: (event) => {
+      if (event instanceof KeyboardEvent && !closeOnEscape) return
+      close()
+    },
   })
 
   return {

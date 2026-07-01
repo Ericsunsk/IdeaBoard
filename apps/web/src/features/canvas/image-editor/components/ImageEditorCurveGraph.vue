@@ -37,6 +37,7 @@
     <button
       v-for="point in points"
       :key="point.id"
+      :ref="(element) => setPointButtonRef(point.id, element)"
       type="button"
       class="image-editor-curves__point"
       :class="{ active: selectedPointId === point.id }"
@@ -52,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, useId, watch } from 'vue'
+import { nextTick, ref, useId, watch, type ComponentPublicInstance } from 'vue'
 import { usePointerDragSession } from '../../composables/usePointerDragSession'
 import type { ImageEditorCurveChannel } from '../types'
 import type { NormalizedCurveChannelPoint } from '../utils/imageEditorCurves'
@@ -80,6 +81,7 @@ const USER_POINT_MIN_INPUT = 1
 const USER_POINT_MAX_INPUT = 99
 
 const graphRef = ref<HTMLElement | null>(null)
+const pointButtonRefs = new Map<string, HTMLButtonElement>()
 const activeDragPointId = ref<string | null>(null)
 const pendingCreatedPointDrag = ref<{
   latestPosition: PointerPosition
@@ -239,12 +241,16 @@ function clampUserPointInput(value: number) {
   return Math.min(USER_POINT_MAX_INPUT, Math.max(USER_POINT_MIN_INPUT, value))
 }
 
+function setPointButtonRef(pointId: string, element: Element | ComponentPublicInstance | null) {
+  if (element instanceof HTMLButtonElement) {
+    pointButtonRefs.set(pointId, element)
+    return
+  }
+  pointButtonRefs.delete(pointId)
+}
+
 function focusPointButton(pointId: string) {
-  const buttons = graphRef.value?.querySelectorAll<HTMLButtonElement>(
-    '.image-editor-curves__point',
-  )
-  const pointButton = Array.from(buttons ?? []).find((button) => button.dataset.pointId === pointId)
-  pointButton?.focus({ preventScroll: true })
+  pointButtonRefs.get(pointId)?.focus({ preventScroll: true })
 }
 
 watch(
@@ -262,6 +268,17 @@ watch(
     pendingCreatedPointDrag.value = null
     if (pendingDrag.hasMoved) updatePointFromPointerPosition(point.id, pendingDrag.latestPosition)
     void nextTick(() => focusPointButton(point.id))
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => props.points.map((point) => point.id),
+  (pointIds) => {
+    const activePointIds = new Set(pointIds)
+    for (const pointId of pointButtonRefs.keys()) {
+      if (!activePointIds.has(pointId)) pointButtonRefs.delete(pointId)
+    }
   },
   { flush: 'post' },
 )

@@ -48,7 +48,6 @@ export type UseCanvasImageToolsOptions = {
     y: number,
     options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
   ) => Promise<unknown> | unknown
-  onViewportTransform?: (viewport: FlowViewport) => void
   createImageNodeFromFile: (point: { x: number; y: number }, file: File) => Promise<string | null>
   connectImageNodes: (connection: Connection) => void
   uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
@@ -138,7 +137,6 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     getViewport: options.getViewport,
     setViewport: options.setViewport,
     setCenter: options.setCenter,
-    onViewportTransform: options.onViewportTransform,
   })
 
   function cancelImageAdjustmentFinalTask(nodeId: string | null = imageEditorNodeId.value) {

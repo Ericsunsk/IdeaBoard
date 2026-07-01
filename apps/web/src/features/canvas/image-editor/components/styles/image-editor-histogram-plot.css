@@ -71,6 +71,18 @@
   transform: translateX(-50%);
 }
 
+.image-editor-histogram-plot__range-input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
 .image-editor-histogram-plot__marker::before {
   content: '';
   position: absolute;
@@ -104,6 +116,13 @@
 }
 
 .image-editor-histogram-plot__marker:focus-visible::after {
+  outline: var(--ib-focus-outline-width, 2px) solid
+    var(--ib-focus-outline-color, var(--canvas-accent, #9278e6));
+  outline-offset: 2px;
+}
+
+.image-editor-histogram-plot__range-input:focus-visible
+  + .image-editor-histogram-plot__marker--range::after {
   outline: var(--ib-focus-outline-width, 2px) solid
     var(--ib-focus-outline-color, var(--canvas-accent, #9278e6));
   outline-offset: 2px;

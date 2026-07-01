@@ -1,7 +1,9 @@
-import { nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
+import { useEventListener, useResizeObserver } from '@vueuse/core'
 import { IMAGE_EDITOR_CHROME_LAYOUT, getImageEditorChromeOutset } from '../config/imageEditorChrome'
 import { waitForNextAnimationFrame } from '../../utils/animationFrame'
+import { useRafScheduler } from '../../composables/useRafScheduler'
 
 type FlowViewport = { x: number; y: number; zoom: number }
 
@@ -28,7 +30,6 @@ type UseImageEditorViewportControllerOptions = {
     y: number,
     options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
   ) => Promise<unknown> | unknown
-  onViewportTransform?: (viewport: FlowViewport) => void
 }
 
 const IMAGE_MASK_EDITOR_OVERLAY_SELECTOR = '[data-image-mask-editor]'
@@ -47,10 +48,16 @@ function setCanvasOverscrollGuard(enabled: boolean) {
 export function useImageEditorViewportController(options: UseImageEditorViewportControllerOptions) {
   const imageEditorChromeAnchorRect = ref<ImageEditorAnchorRect | null>(null)
   const isImageEditorChromeReady = ref(false)
+  const chromeAnchorScheduler = useRafScheduler()
+  const windowTarget = typeof window === 'undefined' ? null : window
+  const chromeResizeTarget = computed(() => {
+    const nodeId = options.imageEditorNodeId.value
+    const stage = nodeId ? options.getImageStageElement(nodeId) : null
+    return stage ? resolveImageEditorChromeTarget(stage) : null
+  })
 
   let imageEditorReturnViewport: FlowViewport | null = null
   let imageEditorFocusRequestId = 0
-  let imageEditorChromeAnchorFrame = 0
 
   function resolveFlowNodeCenter(nodeId: string): { x: number; y: number } | null {
     const stage = options.getImageStageElement(nodeId)
@@ -81,8 +88,8 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
   function getViewportRect() {
     const viewportRect = options.canvasWrapRef.value?.getBoundingClientRect()
     return {
-      width: viewportRect?.width ?? window.innerWidth,
-      height: viewportRect?.height ?? window.innerHeight,
+      width: viewportRect?.width ?? windowTarget?.innerWidth ?? 0,
+      height: viewportRect?.height ?? windowTarget?.innerHeight ?? 0,
     }
   }
 
@@ -158,32 +165,31 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
       duration: 220,
       interpolate: 'smooth',
     })
-    if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
-    options.onViewportTransform?.(options.getViewport())
   }
 
-  function updateImageEditorChromeAnchorRect() {
-    imageEditorChromeAnchorFrame = 0
-    const nodeId = options.imageEditorNodeId.value
-    imageEditorChromeAnchorRect.value = nodeId ? resolveImageEditorChromeAnchorRect(nodeId) : null
-  }
-
-  function resolveImageEditorChromeAnchorRect(nodeId: string): ImageEditorAnchorRect | null {
+  function measureImageEditorChromeAnchor(nodeId: string): ImageEditorAnchorRect | null {
     const wrap = options.canvasWrapRef.value
     const stage = options.getImageStageElement(nodeId)
     if (!wrap || !stage) return null
+
     const target = resolveImageEditorChromeTarget(stage)
     if (!target) return null
 
     const wrapRect = wrap.getBoundingClientRect()
     const targetRect = target.getBoundingClientRect()
     if (targetRect.width <= 0 || targetRect.height <= 0) return null
+
     return {
       top: targetRect.top - wrapRect.top,
       left: targetRect.left - wrapRect.left,
       width: targetRect.width,
       height: targetRect.height,
     }
+  }
+
+  function updateImageEditorChromeAnchorRect() {
+    const nodeId = options.imageEditorNodeId.value
+    imageEditorChromeAnchorRect.value = nodeId ? measureImageEditorChromeAnchor(nodeId) : null
   }
 
   function resolveImageEditorChromeTarget(stage: HTMLElement): HTMLElement | null {
@@ -193,12 +199,7 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
   }
 
   function scheduleImageEditorChromeAnchorUpdate() {
-    if (typeof requestAnimationFrame === 'undefined') {
-      updateImageEditorChromeAnchorRect()
-      return
-    }
-    if (imageEditorChromeAnchorFrame) cancelAnimationFrame(imageEditorChromeAnchorFrame)
-    imageEditorChromeAnchorFrame = requestAnimationFrame(updateImageEditorChromeAnchorRect)
+    chromeAnchorScheduler.schedule(updateImageEditorChromeAnchorRect)
   }
 
   function restoreImageEditorReturnViewport() {
@@ -207,7 +208,6 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
     if (!viewport) return
     imageEditorReturnViewport = null
     void options.setViewport({ ...viewport }, { duration: 220, interpolate: 'smooth' })
-    options.onViewportTransform?.(viewport)
     scheduleImageEditorChromeAnchorUpdate()
   }
 
@@ -249,18 +249,16 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
   )
 
   onMounted(() => {
-    if (typeof window === 'undefined') return
     setCanvasOverscrollGuard(true)
-    window.addEventListener('resize', scheduleImageEditorChromeAnchorUpdate)
   })
 
   onBeforeUnmount(() => {
-    if (imageEditorChromeAnchorFrame) cancelAnimationFrame(imageEditorChromeAnchorFrame)
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('resize', scheduleImageEditorChromeAnchorUpdate)
-      setCanvasOverscrollGuard(false)
-    }
+    setCanvasOverscrollGuard(false)
   })
+
+  useEventListener(windowTarget, 'resize', scheduleImageEditorChromeAnchorUpdate)
+  useResizeObserver(options.canvasWrapRef, scheduleImageEditorChromeAnchorUpdate)
+  useResizeObserver(chromeResizeTarget, scheduleImageEditorChromeAnchorUpdate)
 
   return {
     imageEditorChromeAnchorRect,

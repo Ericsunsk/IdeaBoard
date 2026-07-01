@@ -76,18 +76,6 @@ function mountThresholdControl(
   }
 }
 
-function dispatchPointerEvent(target: EventTarget, type: string, init: Partial<PointerEvent> = {}) {
-  target.dispatchEvent(
-    new PointerEvent(type, {
-      bubbles: true,
-      pointerId: 1,
-      clientX: 127,
-      clientY: 40,
-      ...init,
-    }),
-  )
-}
-
 describe('ImageEditorThresholdControl', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -104,7 +92,7 @@ describe('ImageEditorThresholdControl', () => {
       const histogram = harness.host.querySelector<SVGPathElement>(
         '.image-editor-histogram-plot__histogram',
       )
-      const marker = harness.host.querySelector<HTMLButtonElement>(
+      const marker = harness.host.querySelector<HTMLElement>(
         '.image-editor-histogram-plot__marker',
       )
       const slider = harness.host.querySelector<HTMLInputElement>('input[type="range"]')
@@ -114,26 +102,28 @@ describe('ImageEditorThresholdControl', () => {
 
       expect(histogram?.getAttribute('d')).toContain('L 0 0')
       expect(marker?.style.left).toBe(`${(64 / 255) * 100}%`)
-      expect(marker?.getAttribute('aria-label')).toBe('阈值 64')
-      expect(marker?.getAttribute('aria-valuenow')).toBe('64')
       expect(marker?.classList.contains('is-threshold')).toBe(true)
+      expect(marker?.getAttribute('aria-hidden')).toBe('true')
+      expect(slider?.getAttribute('aria-label')).toBe('阈值 64')
+      expect(slider?.getAttribute('aria-valuenow')).toBe('64')
+      expect(slider?.min).toBe('0')
+      expect(slider?.max).toBe('255')
+      expect(slider?.step).toBe('1')
       expect(guideLine?.getAttribute('x1')).toBe(`${(64 / 255) * 100}`)
       expect(guideLine?.getAttribute('x2')).toBe(`${(64 / 255) * 100}`)
       expect(guideLine?.classList.contains('is-threshold')).toBe(true)
-      expect(slider).toBeNull()
     } finally {
       harness.unmount()
     }
   })
 
-  it('updates threshold params from histogram handle and numeric input', async () => {
+  it('updates threshold params from native histogram range and numeric input', async () => {
     const harness = mountThresholdControl({ threshold: 64, invert: true })
 
     try {
-      const marker = harness.host.querySelector<HTMLButtonElement>(
-        '.image-editor-histogram-plot__marker',
-      )
-      dispatchPointerEvent(marker!, 'pointerdown', { clientX: 192 })
+      const slider = harness.host.querySelector<HTMLInputElement>('input[type="range"]')
+      slider!.value = '192'
+      slider?.dispatchEvent(new Event('input', { bubbles: true }))
 
       expect(harness.events.updateParams).toHaveBeenCalledWith({
         threshold: 192,
@@ -155,40 +145,27 @@ describe('ImageEditorThresholdControl', () => {
     }
   })
 
-  it('updates threshold params from marker keyboard input in channel units', async () => {
+  it('updates threshold params from native range input in channel units', async () => {
     const harness = mountThresholdControl({ threshold: 64, invert: false })
 
     try {
       await nextTick()
-      const marker = harness.host.querySelector<HTMLButtonElement>(
-        '.image-editor-histogram-plot__marker',
-      )
-      const arrowEvent = new KeyboardEvent('keydown', {
-        key: 'ArrowRight',
-        bubbles: true,
-        cancelable: true,
-      })
-      const shiftArrowEvent = new KeyboardEvent('keydown', {
-        key: 'ArrowLeft',
-        shiftKey: true,
-        bubbles: true,
-        cancelable: true,
-      })
+      const slider = harness.host.querySelector<HTMLInputElement>('input[type="range"]')
 
-      marker?.dispatchEvent(arrowEvent)
+      slider!.value = '65'
+      slider?.dispatchEvent(new Event('input', { bubbles: true }))
       expect(harness.events.updateParams).toHaveBeenCalledWith({
         threshold: 65,
         invert: false,
       })
 
       await nextTick()
-      marker?.dispatchEvent(shiftArrowEvent)
+      slider!.value = '55'
+      slider?.dispatchEvent(new Event('input', { bubbles: true }))
       expect(harness.events.updateParams).toHaveBeenCalledWith({
         threshold: 55,
         invert: false,
       })
-      expect(arrowEvent.defaultPrevented).toBe(true)
-      expect(shiftArrowEvent.defaultPrevented).toBe(true)
     } finally {
       harness.unmount()
     }

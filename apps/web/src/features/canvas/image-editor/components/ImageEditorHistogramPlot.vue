@@ -34,8 +34,33 @@
       </svg>
     </div>
 
+    <template v-if="rangeMarker">
+      <input
+        class="image-editor-histogram-plot__range-input"
+        type="range"
+        :min="resolveRangeMin(rangeMarker)"
+        :max="resolveRangeMax(rangeMarker)"
+        :step="resolveRangeStep(rangeMarker)"
+        :value="resolveRangeValue(rangeMarker)"
+        :aria-label="rangeMarker.ariaLabel"
+        :aria-valuemin="resolveRangeMin(rangeMarker)"
+        :aria-valuemax="resolveRangeMax(rangeMarker)"
+        :aria-valuenow="resolveRangeValue(rangeMarker)"
+        :aria-valuetext="rangeMarker.ariaValueText"
+        @input="onRangeMarkerInput(rangeMarker, $event)"
+        @focus="selectMarker(rangeMarker.id)"
+        @pointerdown.stop="selectMarker(rangeMarker.id)"
+      />
+      <span
+        class="image-editor-histogram-plot__marker image-editor-histogram-plot__marker--range"
+        :class="[rangeMarker.className, { active: isMarkerActive(rangeMarker) }]"
+        :style="{ left: `${resolveMarkerPosition(rangeMarker)}%` }"
+        aria-hidden="true"
+      />
+    </template>
+
     <button
-      v-for="marker in markers"
+      v-for="marker in buttonMarkers"
       :key="marker.id"
       :ref="(element) => setMarkerHandleRef(marker.id, element)"
       type="button"
@@ -76,16 +101,19 @@ export type ImageEditorHistogramPlotMarker = {
   guideLineClassName?: string
 }
 
+type MarkerMode = 'button' | 'range'
 type PointerPosition = Pick<PointerEvent, 'clientX'>
 
 const props = withDefaults(
   defineProps<{
     histogramPath: string
     markers: readonly ImageEditorHistogramPlotMarker[]
+    markerMode?: MarkerMode
     ariaLabel?: string
   }>(),
   {
     ariaLabel: '直方图控制',
+    markerMode: 'button',
   },
 )
 
@@ -102,6 +130,10 @@ const pointerDragSession = usePointerDragSession<void>({
   onEnd: clearMarkerDrag,
   onCancel: clearMarkerDrag,
 })
+const rangeMarker = computed(() =>
+  props.markerMode === 'range' && props.markers.length === 1 ? props.markers[0] : null,
+)
+const buttonMarkers = computed(() => (rangeMarker.value ? [] : props.markers))
 const guideLineMarkers = computed(() => props.markers.filter((marker) => marker.guideLine === true))
 const fineGridPath = createGridPath([25, 75])
 const strongGridPath = createGridPath([50])
@@ -113,6 +145,7 @@ function createGridPath(values: number[]) {
 }
 
 function onPlotPointerDown(event: PointerEvent) {
+  if (rangeMarker.value) return
   const nearestMarker = resolveNearestMarker(event)
   if (!nearestMarker) return
   startMarkerDrag(nearestMarker.id, event)
@@ -155,6 +188,15 @@ function onMarkerKeydown(marker: ImageEditorHistogramPlotMarker, event: Keyboard
   emit('update-marker', marker.id, nextPosition)
 }
 
+function onRangeMarkerInput(marker: ImageEditorHistogramPlotMarker, event: Event) {
+  const input = event.currentTarget
+  if (!(input instanceof HTMLInputElement)) return
+  const rangeValue = Number(input.value)
+  if (!Number.isFinite(rangeValue)) return
+  selectMarker(marker.id)
+  emit('update-marker', marker.id, resolveRangeValuePosition(marker, rangeValue))
+}
+
 function setMarkerHandleRef(markerId: string, element: unknown) {
   if (element instanceof HTMLButtonElement) {
     markerHandleRefs.set(markerId, element)
@@ -183,6 +225,50 @@ function resolveMarkerPosition(marker: ImageEditorHistogramPlotMarker) {
 
 function resolveMarkerAriaValue(marker: ImageEditorHistogramPlotMarker) {
   return marker.ariaValueNow ?? resolveMarkerPosition(marker)
+}
+
+function resolveRangeMin(marker: ImageEditorHistogramPlotMarker) {
+  return marker.ariaValueMin ?? 0
+}
+
+function resolveRangeMax(marker: ImageEditorHistogramPlotMarker) {
+  return marker.ariaValueMax ?? 100
+}
+
+function resolveRangeValue(marker: ImageEditorHistogramPlotMarker) {
+  return resolveMarkerAriaValue(marker)
+}
+
+function resolveRangeStep(marker: ImageEditorHistogramPlotMarker) {
+  if (
+    isFiniteNumber(marker.ariaValueMin) &&
+    isFiniteNumber(marker.ariaValueMax) &&
+    isFiniteNumber(marker.ariaValueNow)
+  ) {
+    return 1
+  }
+
+  return marker.keyboardStep ?? 1
+}
+
+function resolveRangeValuePosition(marker: ImageEditorHistogramPlotMarker, value: number) {
+  const currentValue = marker.ariaValueNow
+  const unitStep = marker.keyboardStep
+  if (isFiniteNumber(currentValue) && isFiniteNumber(unitStep)) {
+    return clampNumber(
+      marker.position + (value - currentValue) * unitStep,
+      resolveMarkerPositionBounds(marker).min,
+      resolveMarkerPositionBounds(marker).max,
+    )
+  }
+
+  const minValue = marker.ariaValueMin
+  const maxValue = marker.ariaValueMax
+  if (isFiniteNumber(minValue) && isFiniteNumber(maxValue) && maxValue > minValue) {
+    return clampPercent(((value - minValue) / (maxValue - minValue)) * 100)
+  }
+
+  return clampPercent(value)
 }
 
 function resolveKeyboardPosition(marker: ImageEditorHistogramPlotMarker, event: KeyboardEvent) {

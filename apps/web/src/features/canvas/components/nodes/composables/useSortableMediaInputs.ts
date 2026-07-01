@@ -14,11 +14,38 @@ interface UseSortableMediaInputsOptions<T extends SortableMediaInput> {
   onUpdate: (items: T[]) => void
 }
 
+type SortableReorderEvent = {
+  oldDraggableIndex?: number | null
+  newDraggableIndex?: number | null
+  oldIndex?: number | null
+  newIndex?: number | null
+}
+
 function areItemsInSameOrder<T extends SortableMediaInput>(
   left: readonly T[],
   right: readonly T[],
 ): boolean {
   return left.length === right.length && left.every((item, index) => item.id === right[index]?.id)
+}
+
+function resolveSortableIndex(
+  primary: number | null | undefined,
+  fallback: number | null | undefined,
+): number | null {
+  const index = primary ?? fallback
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) return null
+  return index
+}
+
+function moveSortableItem<T>(items: readonly T[], from: number, to: number) {
+  if (from === to) return [...items]
+  if (from < 0 || to < 0 || from >= items.length || to >= items.length) return null
+
+  const next = [...items]
+  const [item] = next.splice(from, 1)
+  if (item === undefined) return null
+  next.splice(to, 0, item)
+  return next
 }
 
 export function useSortableMediaInputs<T extends SortableMediaInput>({
@@ -41,6 +68,25 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
       isReordering.value = false
       sortableItems.value = getSourceItems()
     })
+  }
+
+  function commitSortableUpdate(event: SortableReorderEvent) {
+    const currentItems = getSourceItems()
+    const from = resolveSortableIndex(event.oldDraggableIndex, event.oldIndex)
+    const to = resolveSortableIndex(event.newDraggableIndex, event.newIndex)
+    if (from === null || to === null) {
+      finishReorder()
+      return
+    }
+
+    const next = moveSortableItem(currentItems, from, to)
+    if (!next || next.length !== currentItems.length || areItemsInSameOrder(next, currentItems)) {
+      finishReorder()
+      return
+    }
+
+    sortableItems.value = next
+    onUpdate(next)
   }
 
   watch(
@@ -68,31 +114,10 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
     onStart() {
       isReordering.value = true
     },
+    onUpdate(event: SortableReorderEvent) {
+      commitSortableUpdate(event)
+    },
     onEnd() {
-      const currentItems = getSourceItems()
-      const imageIds = Array.from(
-        containerRef.value?.querySelectorAll<HTMLElement>(draggableSelector) ?? [],
-      )
-        .map((item) => item.dataset.imageId ?? '')
-        .filter(Boolean)
-      if (imageIds.length !== currentItems.length) {
-        finishReorder()
-        return
-      }
-
-      const byId = new Map(currentItems.map((item) => [item.id, item]))
-      const next = imageIds.map((imageId) => byId.get(imageId)).filter((item): item is T => !!item)
-      if (next.length !== currentItems.length) {
-        finishReorder()
-        return
-      }
-      if (areItemsInSameOrder(next, currentItems)) {
-        finishReorder()
-        return
-      }
-
-      sortableItems.value = next
-      onUpdate(next)
       finishReorder()
     },
   } as Parameters<typeof useSortable<T>>[2])

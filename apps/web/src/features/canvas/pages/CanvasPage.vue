@@ -68,6 +68,7 @@
         @move-start="onFlowMoveStart"
         @move="onFlowMove"
         @move-end="onFlowMoveEnd"
+        @viewport-change-end="onViewportChangeEnd"
         @node-click="onFlowNodeClick"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
@@ -155,7 +156,6 @@ import { useFlowSelectionController } from '../composables/useFlowSelectionContr
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
-import { useFlowViewportControls } from '../composables/useFlowViewportControls'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
 import { useCanvasViewportRuntime } from '../composables/useCanvasViewportRuntime'
 import {
@@ -192,19 +192,14 @@ const {
   updateNodeInternals,
   zoomIn,
   zoomOut,
+  viewport,
+  panBy,
   getViewport,
   setViewport,
   setCenter,
   getSelectedElements,
   removeSelectedElements,
 } = useVueFlow()
-const { zoomLevel, applyFlowTransform } = useFlowViewportControls({
-  zoomIn,
-  zoomOut,
-  getViewport,
-  setViewport: (viewport) => setViewport(viewport),
-})
-provideCanvasViewportContext({ zoomLevel })
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const flowHandleVisibilityRefreshToken = ref(0)
@@ -275,13 +270,14 @@ const {
 })
 
 const {
-  syncCanvasViewport,
+  zoomLevel,
   onZoomIn,
   onZoomOut,
   onPanViewport,
   onFlowMoveStart,
   onFlowMove: syncFlowMove,
   onFlowMoveEnd,
+  onViewportChangeEnd,
   onMiniMapCenterRequested,
   onNodeDragStart,
   onNodeDragStop,
@@ -292,12 +288,12 @@ const {
   fullNodes,
   fullEdges,
   currentBoardId,
+  viewport,
   getViewport,
-  setViewport: (viewport) => setViewport(viewport),
   setCenter: (x, y, options) => setCenter(x, y, options),
   zoomIn,
   zoomOut,
-  applyFlowTransform,
+  panBy,
   markBoardViewportChanged,
   commitPendingBoardViewportChange,
   loadInitialOrRouteBoard,
@@ -308,6 +304,7 @@ const {
   stopNodeDragInteraction: () => stopNodeDragInteraction(),
   refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
 })
+provideCanvasViewportContext({ zoomLevel })
 
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const {
@@ -472,9 +469,6 @@ const imageTools = useCanvasImageTools({
   getViewport,
   setViewport: (viewport, options) => setViewport(viewport, options),
   setCenter: (x, y, options) => setCenter(x, y, options),
-  onViewportTransform: (viewport) => {
-    syncCanvasViewport(viewport, {})
-  },
   createImageNodeFromFile,
   connectImageNodes: onConnect,
   uploadImageToBoard,
