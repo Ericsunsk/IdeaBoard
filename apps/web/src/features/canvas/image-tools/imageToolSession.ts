@@ -68,17 +68,21 @@ export type UseCanvasImageToolsOptions = {
       referenceImageUrls?: string[]
     },
   ) => Promise<void> | void
-  runPromptGeneration: (
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-  ) => Promise<void> | void
+  runPromptGeneration: (nodeId: string, prompt: string, outputCount: number) => Promise<void> | void
   isImageActionPanelVisible: (nodeId: string) => boolean
   isImagePromptComposerVisible: (nodeId: string) => boolean
   isDirectActionRunning: (nodeId: string) => boolean
   activeStrengthAction: ValueRef<ImageStrengthAction | null>
-  strengthPct: ValueRef<number>
-  getStrengthTrackRefSetter: () => (el: Element | ComponentPublicInstance | null) => void
+  getActionStrength: (action: ImageStrengthAction) => number
+  setStrengthRangeRef: (
+    action: ImageStrengthAction,
+    el: Element | ComponentPublicInstance | null,
+  ) => void
+  onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
+  onStrengthInput: (action: ImageStrengthAction, event: Event) => void
+  onStrengthChange: (action: ImageStrengthAction, event: Event) => void
+  onStrengthPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
+  onStrengthClick: (action: ImageStrengthAction, event: MouseEvent) => void
   clearSelectedFlowElements: () => void
   startCanvasInteraction: (key: CanvasInteractionKey) => void
   stopCanvasInteraction: (key: CanvasInteractionKey) => void

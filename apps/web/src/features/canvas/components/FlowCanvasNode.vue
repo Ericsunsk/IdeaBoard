@@ -33,7 +33,22 @@
         @delete="onDeleteRequest"
         @focus="noop"
         @generate="onPromptGenerate"
-      />
+      >
+        <template #handle-rail>
+          <div
+            class="flow-canvas-node__handle-rail"
+            :class="{ 'is-disabled': disableHandleRailInteraction }"
+          >
+            <FlowNodeHandles
+              :kind="data.kind"
+              :snapshot-node="data.snapshotNode"
+              :ui-state="props.uiState"
+              :show-handles="showHandleControlsGated"
+              @request-internals-update="requestNodeInternalsUpdate"
+            />
+          </div>
+        </template>
+      </PromptNode>
     </template>
     <template v-else-if="isImageNode && imageSnapshot">
       <div
@@ -73,13 +88,26 @@
           @prompt-generate="onImagePromptGenerate"
           @expand-submit="onImageExpandSubmit"
           @action="onImageAction"
-          @strength-action-mousedown="onStrengthActionMouseDown"
-          @strength-track-mousedown="onStrengthTrackMouseDown"
           @expand-handle-pointerdown="onImageExpandHandlePointerDown"
           @expand-handle-pointermove="onImageExpandHandlePointerMove"
           @expand-handle-pointerup="onImageExpandHandlePointerUp"
           @expand-frame-pointerdown="onImageExpandFramePointerDown"
-        />
+        >
+          <template #handle-rail>
+            <div
+              class="flow-canvas-node__handle-rail"
+              :class="{ 'is-disabled': disableHandleRailInteraction }"
+            >
+              <FlowNodeHandles
+                :kind="data.kind"
+                :snapshot-node="data.snapshotNode"
+                :ui-state="props.uiState"
+                :show-handles="showHandleControlsGated"
+                @request-internals-update="requestNodeInternalsUpdate"
+              />
+            </div>
+          </template>
+        </ImageNode>
       </div>
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
@@ -108,35 +136,35 @@
           @input-image-remove="onMediaInputImageRemove"
           @contextmenu="onFusionContextMenu"
           @prompt-generate="onFusionPromptGenerate"
-        />
+        >
+          <template #handle-rail>
+            <div
+              class="flow-canvas-node__handle-rail"
+              :class="{ 'is-disabled': disableHandleRailInteraction }"
+            >
+              <FlowNodeHandles
+                :kind="data.kind"
+                :snapshot-node="data.snapshotNode"
+                :ui-state="props.uiState"
+                :show-handles="showHandleControlsGated"
+                @request-internals-update="requestNodeInternalsUpdate"
+              />
+            </div>
+          </template>
+        </FusionNode>
       </div>
     </template>
     <template v-else>
       <div class="flow-canvas-node__unsupported">Unsupported node</div>
     </template>
-
-    <div
-      class="flow-canvas-node__handle-rail"
-      :class="{ 'is-disabled': disableHandleRailInteraction }"
-      :style="handleRailStyle"
-    >
-      <FlowNodeHandles
-        :kind="data.kind"
-        :snapshot-node="data.snapshotNode"
-        :ui-state="props.uiState"
-        :show-handles="showHandleControlsGated"
-        @request-internals-update="requestNodeInternalsUpdate"
-      />
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { ImageStrengthAction } from '../execution'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../image-tools'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
@@ -211,8 +239,6 @@ const emit = defineEmits<{
     aspectRatio: PromptAspectRatio,
   ): void
   (e: 'image-action', nodeId: string, action: ImageNodeAction): void
-  (e: 'strength-action-mousedown', action: ImageStrengthAction, event: MouseEvent): void
-  (e: 'strength-track-mousedown', event: MouseEvent): void
   (
     e: 'expand-handle-pointerdown',
     nodeId: string,
@@ -256,7 +282,6 @@ const {
 })
 
 const {
-  handleRailStyle,
   showHandleControls,
   refreshTransientHandleVisibility,
   onNodeMouseEnter,
@@ -265,11 +290,6 @@ const {
   onNodeFocusOut,
   onNodePointerDown,
 } = useFlowCanvasNodeHandleRail(flowCanvasNodeRef)
-
-// Notify parent when the handle rail geometry changes (was in setHandleRailBounds)
-watch(handleRailStyle, () => {
-  void nextTick(requestNodeInternalsUpdate)
-})
 
 watch(
   () => props.handleVisibilityRefreshToken,
@@ -294,11 +314,10 @@ function emitNodeParam<Key extends FlowSnapshotParamPatch['key']>(
   key: Key,
   value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
 ) {
-  emit(
-    'update-node-param',
-    props.nodeId,
-    { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
-  )
+  emit('update-node-param', props.nodeId, { key, value } as Extract<
+    FlowSnapshotParamPatch,
+    { key: Key }
+  >)
 }
 
 function onDeleteRequest() {
@@ -379,14 +398,6 @@ function onPromptGenerate() {
 function onImageAction(action: ImageNodeAction) {
   emit('image-action', props.nodeId, action)
 }
-function onStrengthActionMouseDown(action: ImageStrengthAction, event: MouseEvent) {
-  emit('strength-action-mousedown', action, event)
-}
-
-function onStrengthTrackMouseDown(event: MouseEvent) {
-  emit('strength-track-mousedown', event)
-}
-
 function onImageExpandHandlePointerDown(payload: {
   anchor: CanvasExtendDragAnchor
   event: PointerEvent
@@ -462,6 +473,7 @@ function noopMouse() {}
 
 .flow-canvas-node__handle-rail {
   position: absolute;
+  inset: 0;
   z-index: 24;
   pointer-events: none;
   overflow: visible;

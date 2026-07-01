@@ -1,10 +1,13 @@
-import { getCurrentInstance, nextTick, onBeforeUnmount, ref } from 'vue'
+import { onLongPress } from '@vueuse/core'
+import { getCurrentInstance, onBeforeUnmount, ref, type ComponentPublicInstance } from 'vue'
 import {
   clampMaskFeatherStrength,
   MASK_EDITOR_DEFAULT_FEATHER_STRENGTH,
 } from '../config/maskEditorConstants'
 
 const DEFAULT_LONG_PRESS_MS = 260
+
+type FeatherRangeRefTarget = Element | ComponentPublicInstance | null
 
 type UseMaskFeatherStrengthControlOptions = {
   onApply: (strength: number) => void
@@ -14,94 +17,117 @@ type UseMaskFeatherStrengthControlOptions = {
 export function useMaskFeatherStrengthControl(options: UseMaskFeatherStrengthControlOptions) {
   const strength = ref(MASK_EDITOR_DEFAULT_FEATHER_STRENGTH)
   const visible = ref(false)
-  const trackRef = ref<HTMLElement | null>(null)
+  const rangeRef = ref<HTMLInputElement | null>(null)
   const longPressMs = options.longPressMs ?? DEFAULT_LONG_PRESS_MS
 
-  let longPressTimer: number | null = null
-  let isDragging = false
-  let pointerX = 0
+  let stopLongPress: (() => void) | null = null
+  let isEditing = false
   let shouldSuppressNextClick = false
+  let longPressGeneration = 0
 
-  function clearLongPressTimer() {
-    if (!longPressTimer) return
-    clearTimeout(longPressTimer)
-    longPressTimer = null
+  function getRangeInput(event: Event): HTMLInputElement | null {
+    return event.currentTarget instanceof HTMLInputElement ? event.currentTarget : null
   }
 
-  function updateStrengthFromClientX(clientX: number) {
-    const track = trackRef.value
-    if (!track) return
-    const rect = track.getBoundingClientRect()
-    if (rect.width <= 0) return
-    strength.value = clampMaskFeatherStrength(((clientX - rect.left) / rect.width) * 100)
+  function syncStrengthFromRange(input: HTMLInputElement) {
+    strength.value = clampMaskFeatherStrength(input.valueAsNumber)
   }
 
-  function addGlobalListeners() {
-    window.addEventListener('mousemove', onGlobalMouseMove, true)
-    window.addEventListener('mouseup', onGlobalMouseUp, true)
-  }
-
-  function removeGlobalListeners() {
-    window.removeEventListener('mousemove', onGlobalMouseMove, true)
-    window.removeEventListener('mouseup', onGlobalMouseUp, true)
-  }
-
-  function beginDragging(clientX: number) {
+  function beginStrengthEdit(input: HTMLInputElement, options: { syncInitial: boolean }) {
+    if (!options.syncInitial) input.value = `${strength.value}`
     visible.value = true
-    isDragging = true
-    pointerX = clientX
-    addGlobalListeners()
-    void nextTick(() => updateStrengthFromClientX(pointerX))
+    isEditing = true
+    shouldSuppressNextClick = true
+    if (options.syncInitial) syncStrengthFromRange(input)
+    input.focus({ preventScroll: true })
   }
 
-  function onButtonMouseDown(event: MouseEvent) {
+  function finishStrengthEdit() {
+    if (!isEditing) return
+    isEditing = false
+    visible.value = false
+    rangeRef.value?.blur()
+    options.onApply(strength.value)
+  }
+
+  function disposeLongPress() {
+    stopLongPress?.()
+    stopLongPress = null
+  }
+
+  function setRangeRef(el: FeatherRangeRefTarget) {
+    const input =
+      el instanceof HTMLInputElement
+        ? el
+        : el && '$el' in el && el.$el instanceof HTMLInputElement
+          ? el.$el
+          : null
+    if (rangeRef.value === input) return
+    disposeLongPress()
+    rangeRef.value = input
+    if (!input) return
+    const generation = longPressGeneration
+    stopLongPress = onLongPress(
+      input,
+      () => {
+        if (generation !== longPressGeneration) return
+        beginStrengthEdit(input, { syncInitial: false })
+      },
+      {
+        delay: longPressMs,
+        distanceThreshold: false,
+      },
+    )
+  }
+
+  function onButtonPointerDown(event: PointerEvent) {
     if (event.button !== 0) return
-    clearLongPressTimer()
-    removeGlobalListeners()
-    isDragging = false
-    shouldSuppressNextClick = false
-    pointerX = event.clientX
-    longPressTimer = window.setTimeout(() => {
-      shouldSuppressNextClick = true
-      beginDragging(pointerX)
-    }, longPressMs)
-    addGlobalListeners()
-  }
-
-  function onButtonClick() {
-    if (shouldSuppressNextClick) {
-      shouldSuppressNextClick = false
+    const input = getRangeInput(event)
+    if (!input) return
+    if (visible.value) {
+      beginStrengthEdit(input, { syncInitial: true })
       return
     }
+    isEditing = false
+    shouldSuppressNextClick = false
+  }
+
+  function onButtonClick(event?: MouseEvent) {
+    const input = event?.currentTarget instanceof HTMLInputElement ? event.currentTarget : null
+    if (shouldSuppressNextClick) {
+      shouldSuppressNextClick = false
+      input?.blur()
+      return
+    }
+    input?.blur()
     options.onApply(strength.value)
   }
 
-  function onTrackMouseDown(event: MouseEvent) {
-    clearLongPressTimer()
-    shouldSuppressNextClick = true
-    beginDragging(event.clientX)
+  function onStrengthInput(event: Event) {
+    const input = getRangeInput(event)
+    if (!input || !isEditing) return
+    syncStrengthFromRange(input)
   }
 
-  function onGlobalMouseMove(event: MouseEvent) {
-    pointerX = event.clientX
-    if (!isDragging) return
-    updateStrengthFromClientX(event.clientX)
+  function onStrengthChange(event: Event) {
+    const input = getRangeInput(event)
+    if (!input || !isEditing) return
+    syncStrengthFromRange(input)
+    finishStrengthEdit()
   }
 
-  function onGlobalMouseUp() {
-    clearLongPressTimer()
-    removeGlobalListeners()
-    if (!isDragging) return
-    isDragging = false
-    visible.value = false
-    options.onApply(strength.value)
+  function onStrengthPointerUp(event: PointerEvent) {
+    const input = getRangeInput(event)
+    if (input && isEditing) syncStrengthFromRange(input)
+    finishStrengthEdit()
   }
 
   function dispose() {
-    clearLongPressTimer()
-    removeGlobalListeners()
-    isDragging = false
+    longPressGeneration += 1
+    disposeLongPress()
+    isEditing = false
     visible.value = false
+    rangeRef.value = null
   }
 
   if (getCurrentInstance()) {
@@ -111,10 +137,12 @@ export function useMaskFeatherStrengthControl(options: UseMaskFeatherStrengthCon
   return {
     strength,
     visible,
-    trackRef,
-    onButtonMouseDown,
+    setRangeRef,
+    onButtonPointerDown,
     onButtonClick,
-    onTrackMouseDown,
+    onStrengthInput,
+    onStrengthChange,
+    onStrengthPointerUp,
     dispose,
   }
 }

@@ -58,7 +58,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
+import { usePointerDragSession } from '../../composables/usePointerDragSession'
 
 export type ImageEditorHistogramPlotMarker = {
   id: string
@@ -93,10 +94,14 @@ const emit = defineEmits<{
 }>()
 
 const plotRef = ref<HTMLElement | null>(null)
-const activePointerId = ref<number | null>(null)
 const activeMarkerId = ref<string | null>(null)
 const selectedMarkerId = ref<string | null>(null)
 const markerHandleRefs = new Map<string, HTMLButtonElement>()
+const pointerDragSession = usePointerDragSession<void>({
+  onMove: ({ event }) => onDragPointerMove(event),
+  onEnd: clearMarkerDrag,
+  onCancel: clearMarkerDrag,
+})
 const guideLineMarkers = computed(() => props.markers.filter((marker) => marker.guideLine === true))
 const fineGridPath = createGridPath([25, 75])
 const strongGridPath = createGridPath([50])
@@ -121,36 +126,18 @@ function startMarkerDrag(markerId: string, event: PointerEvent) {
   event.preventDefault()
   selectMarker(markerId)
   focusMarkerHandle(markerId)
-  activePointerId.value = event.pointerId
+  pointerDragSession.beginDrag(event, undefined, { target: plotRef.value })
   activeMarkerId.value = markerId
-  plotRef.value?.setPointerCapture(event.pointerId)
-  window.addEventListener('pointermove', onWindowPointerMove)
-  window.addEventListener('pointerup', onWindowPointerUp)
-  window.addEventListener('pointercancel', onWindowPointerCancel)
   updateMarkerFromPointerPosition(markerId, event)
 }
 
-function onWindowPointerMove(event: PointerEvent) {
-  if (activePointerId.value !== event.pointerId || !activeMarkerId.value) return
+function onDragPointerMove(event: PointerEvent) {
+  if (!activeMarkerId.value) return
   updateMarkerFromPointerPosition(activeMarkerId.value, event)
 }
 
-function onWindowPointerUp(event: PointerEvent) {
-  stopMarkerDrag(event.pointerId)
-}
-
-function onWindowPointerCancel(event: PointerEvent) {
-  stopMarkerDrag(event.pointerId)
-}
-
-function stopMarkerDrag(pointerId: number) {
-  if (activePointerId.value !== pointerId) return
-  if (plotRef.value?.hasPointerCapture(pointerId)) plotRef.value.releasePointerCapture(pointerId)
-  activePointerId.value = null
+function clearMarkerDrag() {
   activeMarkerId.value = null
-  window.removeEventListener('pointermove', onWindowPointerMove)
-  window.removeEventListener('pointerup', onWindowPointerUp)
-  window.removeEventListener('pointercancel', onWindowPointerCancel)
 }
 
 function updateMarkerFromPointerPosition(markerId: string, position: PointerPosition) {
@@ -291,10 +278,6 @@ function clampNumber(value: number, min: number, max: number) {
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
-
-onBeforeUnmount(() => {
-  if (activePointerId.value != null) stopMarkerDrag(activePointerId.value)
-})
 </script>
 
 <style src="./styles/image-editor-histogram-plot.css"></style>

@@ -160,65 +160,71 @@
         class="image-mask-editor-right-actions node-tool-surface"
         :class="{ 'is-feather-strength-mode': featherStrengthVisible }"
       >
-        <template v-if="!featherStrengthVisible">
+        <NodeToolIconButton
+          v-show="!featherStrengthVisible"
+          class="image-mask-editor-tool-btn"
+          aria-label-value="清空蒙版"
+          tooltip="清空蒙版"
+          @click="emit('clear-mask')"
+        >
+          <XmarkCircle />
+        </NodeToolIconButton>
+        <NodeToolIconButton
+          v-show="!featherStrengthVisible"
+          class="image-mask-editor-tool-btn"
+          aria-label-value="反选蒙版"
+          tooltip="反选蒙版"
+          @click="emit('invert-mask')"
+        >
+          <PlusSquareDashed />
+        </NodeToolIconButton>
+        <div class="image-mask-editor-feather-control">
           <NodeToolIconButton
-            class="image-mask-editor-tool-btn"
-            aria-label-value="清空蒙版"
-            tooltip="清空蒙版"
-            @click="emit('clear-mask')"
-          >
-            <XmarkCircle />
-          </NodeToolIconButton>
-          <NodeToolIconButton
-            class="image-mask-editor-tool-btn"
-            aria-label-value="反选蒙版"
-            tooltip="反选蒙版"
-            @click="emit('invert-mask')"
-          >
-            <PlusSquareDashed />
-          </NodeToolIconButton>
-          <NodeToolIconButton
+            v-show="!featherStrengthVisible"
             class="image-mask-editor-tool-btn"
             aria-label-value="羽化边缘"
             tooltip="羽化边缘"
-            @mousedown.stop="onFeatherButtonMouseDown"
             @click="onFeatherButtonClick"
           >
             <CenterAlign />
           </NodeToolIconButton>
-          <NodeToolIconButton
-            class="image-mask-editor-tool-btn"
-            :disabled="!canUndo"
-            aria-label-value="回退"
-            tooltip="回退"
-            @click="emit('undo-mask')"
-          >
-            <Undo />
-          </NodeToolIconButton>
-          <NodeToolIconButton
-            class="image-mask-editor-tool-btn"
-            :disabled="!canRedo"
-            aria-label-value="前进"
-            tooltip="前进"
-            @click="emit('redo-mask')"
-          >
-            <Redo />
-          </NodeToolIconButton>
-        </template>
-        <div v-else class="image-mask-editor-feather-pop" @mousedown.stop>
-          <div
-            ref="featherStrengthTrackRef"
-            class="image-mask-editor-feather-track"
-            role="slider"
+          <input
+            :ref="setFeatherStrengthRangeRef"
+            class="image-mask-editor-feather-range canvas-range-input"
+            type="range"
+            :min="MASK_EDITOR_MIN_FEATHER_STRENGTH"
+            :max="MASK_EDITOR_MAX_FEATHER_STRENGTH"
+            step="1"
+            :value="featherStrength"
+            :tabindex="featherStrengthVisible ? 0 : -1"
             aria-label="羽化强度"
-            :aria-valuenow="featherStrength"
-            :aria-valuemin="MASK_EDITOR_MIN_FEATHER_STRENGTH"
-            :aria-valuemax="MASK_EDITOR_MAX_FEATHER_STRENGTH"
-            @mousedown.stop.prevent="onFeatherTrackMouseDown"
-          >
-            <div class="image-mask-editor-feather-fill" :style="{ width: `${featherStrength}%` }" />
-          </div>
+            @pointerdown.stop="onFeatherButtonPointerDown"
+            @input="onFeatherStrengthInput"
+            @change="onFeatherStrengthChange"
+            @pointerup="onFeatherStrengthPointerUp"
+            @click.stop="onFeatherButtonClick"
+          />
         </div>
+        <NodeToolIconButton
+          v-show="!featherStrengthVisible"
+          class="image-mask-editor-tool-btn"
+          :disabled="!canUndo"
+          aria-label-value="回退"
+          tooltip="回退"
+          @click="emit('undo-mask')"
+        >
+          <Undo />
+        </NodeToolIconButton>
+        <NodeToolIconButton
+          v-show="!featherStrengthVisible"
+          class="image-mask-editor-tool-btn"
+          :disabled="!canRedo"
+          aria-label-value="前进"
+          tooltip="前进"
+          @click="emit('redo-mask')"
+        >
+          <Redo />
+        </NodeToolIconButton>
       </div>
       <PromptTextComposer
         v-model="promptDraft"
@@ -257,11 +263,7 @@ import {
   Square,
   Undo,
 } from '@iconoir/vue'
-import type {
-  ImageMaskBrushShape,
-  ImageMaskDrawMode,
-  MaskEditorReferenceImage,
-} from '../types'
+import type { ImageMaskBrushShape, ImageMaskDrawMode, MaskEditorReferenceImage } from '../types'
 import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
 import {
   clampMaskBrushHardness,
@@ -323,10 +325,12 @@ const promptDraft = ref('')
 const {
   strength: featherStrength,
   visible: featherStrengthVisible,
-  trackRef: featherStrengthTrackRef,
-  onButtonMouseDown: onFeatherButtonMouseDown,
+  setRangeRef: setFeatherStrengthRangeRef,
+  onButtonPointerDown: onFeatherButtonPointerDown,
   onButtonClick: onFeatherButtonClick,
-  onTrackMouseDown: onFeatherTrackMouseDown,
+  onStrengthInput: onFeatherStrengthInput,
+  onStrengthChange: onFeatherStrengthChange,
+  onStrengthPointerUp: onFeatherStrengthPointerUp,
 } = useMaskFeatherStrengthControl({
   onApply: (strength) => emit('feather-mask', strength),
 })
@@ -388,14 +392,21 @@ function onSubmit(prompt: string, outputCount: number) {
 }
 
 .image-mask-editor-right-actions {
+  position: relative;
   display: flex;
   justify-content: flex-end;
   gap: var(--node-tool-button-gap);
 }
 
-.image-mask-editor-right-actions .image-mask-editor-tool-btn {
+.image-mask-editor-right-actions .image-mask-editor-tool-btn,
+.image-mask-editor-feather-control {
   width: var(--node-tool-button-size);
   flex: 0 0 var(--node-tool-button-size);
+}
+
+.image-mask-editor-feather-control {
+  position: relative;
+  height: var(--node-tool-button-size);
 }
 
 .image-mask-editor-right-actions.is-feather-strength-mode {
@@ -404,34 +415,27 @@ function onSubmit(prompt: string, outputCount: number) {
   gap: 0;
 }
 
-.image-mask-editor-feather-pop {
-  position: relative;
-  width: 100%;
-  height: var(--node-tool-button-size);
-  display: flex;
-  align-items: center;
-  padding: 0;
-}
-
-.image-mask-editor-feather-track {
-  position: relative;
-  width: 100%;
-  height: 6px;
-  border: none;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--canvas-accent-outline);
-  cursor: ew-resize;
-}
-
-.image-mask-editor-feather-fill {
+.image-mask-editor-feather-range {
+  --canvas-range-track-height: 6px;
+  --canvas-range-thumb-size: 14px;
+  --canvas-range-thumb-offset: -4px;
+  --canvas-range-fill-color: var(--canvas-accent-hover);
+  --canvas-range-track-background: var(--canvas-accent-outline);
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: inherit;
-  background: var(--canvas-accent-hover);
-  transition: width 0.06s linear;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.image-mask-editor-right-actions.is-feather-strength-mode .image-mask-editor-feather-control {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.image-mask-editor-right-actions.is-feather-strength-mode .image-mask-editor-feather-range {
+  position: relative;
+  opacity: 1;
 }
 
 .image-mask-editor-composer {

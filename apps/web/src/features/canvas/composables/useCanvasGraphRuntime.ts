@@ -203,7 +203,6 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     onConnect: flowNodeMutations.onConnect,
     onEdgeUpdate: flowNodeMutations.onEdgeUpdate,
     createNodeAtPosition: flowNodeMutations.createNodeAtPosition,
-    deleteSelectedFlowElements: flowNodeMutations.deleteSelectedFlowElements,
     _onFlowDeleteNode: flowNodeMutations.onFlowDeleteNode,
     _onFlowPromptTextUpdate: flowNodeMutations.onFlowPromptTextUpdate,
     _onFlowNodeParamUpdate: flowNodeMutations.onFlowNodeParamUpdate,

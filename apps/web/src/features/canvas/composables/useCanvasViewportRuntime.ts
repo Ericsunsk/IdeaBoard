@@ -1,4 +1,4 @@
-import { getCurrentScope, onScopeDispose, watch } from 'vue'
+import { getCurrentScope, onScopeDispose } from 'vue'
 import {
   beginCanvasFrameProbe,
   isCanvasFrameProbeEnabled,
@@ -22,26 +22,23 @@ export type CanvasFlowMovePayload = {
 
 export type CanvasViewportSyncOptions = {
   persist?: boolean
+  forcePersist?: boolean
 }
 
 export type CanvasViewportRuntimeInteraction = 'flow-viewport' | 'node-drag'
 
-export type CanvasViewportSize = {
-  width: number
-  height: number
+export type CanvasMiniMapCenterRequestPayload = {
+  position: {
+    x: number
+    y: number
+  }
 }
 
 type ReadonlyValueRef<T> = {
   readonly value: T
 }
 
-type WritableValueRef<T> = {
-  value: T
-}
-
 export type UseCanvasViewportRuntimeOptions = {
-  canvasWrapRef: ReadonlyValueRef<HTMLElement | null>
-  canvasViewportSize: WritableValueRef<CanvasViewportSize>
   nodes: ReadonlyValueRef<readonly unknown[]>
   edges: ReadonlyValueRef<readonly unknown[]>
   fullNodes: ReadonlyValueRef<readonly unknown[]>
@@ -49,6 +46,11 @@ export type UseCanvasViewportRuntimeOptions = {
   currentBoardId: ReadonlyValueRef<string | null>
   getViewport: () => CanvasFlowViewport
   setViewport: (viewport: CanvasFlowViewport) => Promise<unknown> | unknown
+  setCenter: (
+    x: number,
+    y: number,
+    options?: { duration?: number; zoom?: number },
+  ) => Promise<unknown> | unknown
   zoomIn: () => Promise<unknown> | unknown
   zoomOut: () => Promise<unknown> | unknown
   applyFlowTransform: (viewport: CanvasFlowViewport) => boolean
@@ -82,7 +84,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function resolveFlowViewportFromTransform(
-    transform: CanvasFlowMovePayload['flowTransform'],
+    transform: CanvasFlowMovePayload['flowTransform'] | CanvasFlowViewport | undefined,
   ): CanvasFlowViewport {
     const viewport = options.getViewport()
     return {
@@ -93,29 +95,39 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function syncCanvasViewport(
-    transform: CanvasFlowMovePayload['flowTransform'],
-    syncOptions: CanvasViewportSyncOptions,
+    transform: CanvasFlowMovePayload['flowTransform'] | CanvasFlowViewport | undefined,
+    syncOptions: CanvasViewportSyncOptions = {},
   ) {
     const viewport = resolveFlowViewportFromTransform(transform)
     const didChange = options.applyFlowTransform(viewport)
-    if (didChange && syncOptions.persist) options.markBoardViewportChanged()
+
+    if (syncOptions.persist && (didChange || syncOptions.forcePersist)) {
+      options.markBoardViewportChanged()
+    }
+
     return didChange
   }
 
-  function onZoomIn() {
-    const result = options.zoomIn()
-    void Promise.resolve(result).then(() => {
-      syncCanvasViewport(options.getViewport(), { persist: true })
-      options.commitPendingBoardViewportChange()
+  async function runAndPersistViewportCommand(
+    run: () => Promise<unknown> | unknown,
+    resolveViewport: () => CanvasFlowViewport = options.getViewport,
+  ) {
+    const result = await run()
+    if (result === false) return
+
+    syncCanvasViewport(resolveViewport(), {
+      persist: true,
+      forcePersist: true,
     })
+    options.commitPendingBoardViewportChange()
+  }
+
+  function onZoomIn() {
+    void runAndPersistViewportCommand(options.zoomIn)
   }
 
   function onZoomOut() {
-    const result = options.zoomOut()
-    void Promise.resolve(result).then(() => {
-      syncCanvasViewport(options.getViewport(), { persist: true })
-      options.commitPendingBoardViewportChange()
-    })
+    void runAndPersistViewportCommand(options.zoomOut)
   }
 
   function onPanViewport(delta: { x: number; y: number }) {
@@ -125,9 +137,32 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       y: viewport.y + delta.y,
       zoom: viewport.zoom,
     }
-    void options.setViewport(nextViewport)
-    syncCanvasViewport(nextViewport, { persist: true })
+
+    void runAndPersistViewportCommand(() => options.setViewport(nextViewport), () => {
+      return nextViewport
+    })
+  }
+
+  function onMiniMapCenterRequested(payload: CanvasMiniMapCenterRequestPayload) {
+    const zoom = options.getViewport().zoom
+    void runAndPersistViewportCommand(() =>
+      options.setCenter(payload.position.x, payload.position.y, { duration: 0, zoom }),
+    )
+  }
+
+  function syncViewportAndCommit(transform: CanvasFlowMovePayload['flowTransform']) {
+    if (transform) {
+      syncCanvasViewport(transform, { persist: true })
+    } else {
+      syncCanvasViewport(options.getViewport())
+    }
     options.commitPendingBoardViewportChange()
+  }
+
+  function syncViewportAndProbe(transform: CanvasFlowMovePayload['flowTransform']) {
+    if (!transform) return
+    beginViewportFrameProbe(transform)
+    syncCanvasViewport(transform, { persist: true })
   }
 
   function beginViewportFrameProbe(transform: CanvasFlowMovePayload['flowTransform']) {
@@ -172,42 +207,16 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function onFlowMove(payload: CanvasFlowMovePayload) {
-    const transform = payload.flowTransform
-    if (!transform) return
-    beginViewportFrameProbe(transform)
-    syncCanvasViewport(transform, { persist: true })
+    syncViewportAndProbe(payload.flowTransform)
   }
 
   function onFlowMoveEnd(payload: CanvasFlowMovePayload) {
     try {
       const transform = payload.flowTransform
-      if (transform) {
-        beginViewportFrameProbe(transform)
-        syncCanvasViewport(transform, { persist: true })
-      } else {
-        syncCanvasViewport(options.getViewport(), {})
-      }
-      options.commitPendingBoardViewportChange()
+      if (transform) beginViewportFrameProbe(transform)
+      syncViewportAndCommit(transform)
     } finally {
       endViewportFrameProbe('move-end')
-      options.stopCanvasInteraction('flow-viewport')
-    }
-  }
-
-  function onMiniMapViewportDragStart() {
-    options.closeBoardHeaderEditing()
-    options.startCanvasInteraction('flow-viewport')
-  }
-
-  function onMiniMapViewportDrag(viewport: CanvasFlowViewport) {
-    syncCanvasViewport(viewport, { persist: true })
-  }
-
-  function onMiniMapViewportDragEnd(viewport?: CanvasFlowViewport | null) {
-    try {
-      syncCanvasViewport(viewport ?? options.getViewport(), { persist: true })
-      options.commitPendingBoardViewportChange()
-    } finally {
       options.stopCanvasInteraction('flow-viewport')
     }
   }
@@ -249,29 +258,6 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     activeNodeDragFrameProbe = null
   }
 
-  watch(
-    () => options.canvasWrapRef.value,
-    (element, _previous, onCleanup) => {
-      if (!element || typeof ResizeObserver === 'undefined') return
-      const updateSize = () => {
-        const width = element.clientWidth
-        const height = element.clientHeight
-        if (
-          options.canvasViewportSize.value.width === width &&
-          options.canvasViewportSize.value.height === height
-        ) {
-          return
-        }
-        options.canvasViewportSize.value = { width, height }
-      }
-      updateSize()
-      const observer = new ResizeObserver(updateSize)
-      observer.observe(element)
-      onCleanup(() => observer.disconnect())
-    },
-    { immediate: true },
-  )
-
   if (getCurrentScope()) {
     onScopeDispose(cleanupFrameProbes)
   }
@@ -281,12 +267,10 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     onZoomIn,
     onZoomOut,
     onPanViewport,
+    onMiniMapCenterRequested,
     onFlowMoveStart,
     onFlowMove,
     onFlowMoveEnd,
-    onMiniMapViewportDragStart,
-    onMiniMapViewportDrag,
-    onMiniMapViewportDragEnd,
     onNodeDragStart,
     onNodeDragStop,
     loadCanvasBoardAndProbe,

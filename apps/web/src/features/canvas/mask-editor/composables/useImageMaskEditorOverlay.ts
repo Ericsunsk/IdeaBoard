@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { usePointerDragSession } from '../../composables/usePointerDragSession'
 import { MASK_EDITOR_INTERACTION_KEY } from '../types'
 import type {
   ImageMaskBrushShape,
@@ -70,6 +71,12 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   let paintingBeforeEntry: MaskHistoryEntry | null = null
   let paintingPointProjection: MaskCanvasPointerProjection | null = null
   let interactionActive = false
+
+  const pointerDragSession = usePointerDragSession<void>({
+    onMove: ({ event }) => onPointerMove(event),
+    onEnd: finishPainting,
+    onCancel: finishPainting,
+  })
 
   const maskEditorNodeId = computed(() => options.inpaintEditorState.value?.nodeId ?? null)
   const maskEditorOverlayStyle = computed<Record<string, string> | null>(() => {
@@ -192,18 +199,9 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     image.src = committed.maskDataUrl
   }
 
-  function stopPainting() {
+  function finishPainting() {
     const nodeId = paintingNodeId
     const canvas = paintingCanvas
-    window.removeEventListener('pointermove', onPointerMove, true)
-    window.removeEventListener('pointerup', onPointerUp, true)
-    window.removeEventListener('pointercancel', onPointerCancel, true)
-    if (canvas) {
-      canvas.removeEventListener('lostpointercapture', onLostPointerCapture)
-    }
-    if (canvas && paintingPointerId != null && canvas.hasPointerCapture(paintingPointerId)) {
-      canvas.releasePointerCapture(paintingPointerId)
-    }
     stopInteraction()
     if (nodeId && canvas && paintingBeforeEntry) {
       commitUndoHistoryIfChanged(nodeId, paintingBeforeEntry, canvas)
@@ -215,6 +213,11 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingPointerId = null
     paintingBeforeEntry = null
     paintingPointProjection = null
+  }
+
+  function stopPainting() {
+    const stoppedDragSession = pointerDragSession.endDrag()
+    if (!stoppedDragSession) finishPainting()
   }
 
   function saveMaskDraftForNode(nodeId: string): boolean {
@@ -257,21 +260,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingLastY = point.y
   }
 
-  function onPointerUp(event: PointerEvent) {
-    if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
-    stopPainting()
-  }
-
-  function onPointerCancel(event: PointerEvent) {
-    if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
-    stopPainting()
-  }
-
-  function onLostPointerCapture(event: PointerEvent) {
-    if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
-    stopPainting()
-  }
-
   function onCanvasPointerDown(event: PointerEvent) {
     const editorState = options.inpaintEditorState.value
     if (!editorState) return
@@ -289,9 +277,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingBeforeEntry = captureMaskHistoryEntry(canvas)
     paintingPointProjection = pointProjection
     startInteraction()
-    if (!canvas.hasPointerCapture(event.pointerId)) {
-      canvas.setPointerCapture(event.pointerId)
-    }
+    pointerDragSession.beginDrag(event, undefined, { target: canvas })
     paintingLastX = point.x
     paintingLastY = point.y
     drawMaskStrokeSegment(
@@ -307,10 +293,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
       point.x + 0.001,
       point.y + 0.001,
     )
-    window.addEventListener('pointermove', onPointerMove, true)
-    window.addEventListener('pointerup', onPointerUp, true)
-    window.addEventListener('pointercancel', onPointerCancel, true)
-    canvas.addEventListener('lostpointercapture', onLostPointerCapture)
   }
 
   function setMaskCanvasRef(nodeId: string, element: Element | null) {

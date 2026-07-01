@@ -1,16 +1,22 @@
 import {
-  computed,
-  nextTick,
+  getCurrentInstance,
   onBeforeUnmount,
   reactive,
   ref,
   type ComponentPublicInstance,
 } from 'vue'
+import { onLongPress } from '@vueuse/core'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
   DEFAULT_IMAGE_ACTION_STRENGTHS,
   type ImageStrengthAction,
 } from '../execution'
+
+const LONG_PRESS_MS = 260
+const MIN_STRENGTH = 0
+const MAX_STRENGTH = 100
+
+type StrengthRangeRefTarget = Element | ComponentPublicInstance | null
 
 export function useFlowImageActionStrengthControl(options: {
   onCommit: (action: ImageStrengthAction, strength: number) => void
@@ -20,126 +26,170 @@ export function useFlowImageActionStrengthControl(options: {
   const strengths = reactive<Record<ImageStrengthAction, number>>({
     ...DEFAULT_IMAGE_ACTION_STRENGTHS,
   })
-  const strengthTrackRef = ref<HTMLElement | HTMLElement[] | null>(null)
   const suppressClickAction = ref<ImageStrengthAction | null>(null)
 
-  let longPressTimer: number | null = null
-  let draggingAction: ImageStrengthAction | null = null
-  let pointerX = 0
+  const strengthRangeElements = new Map<ImageStrengthAction, HTMLInputElement>()
+  const stopLongPressByAction = new Map<ImageStrengthAction, () => void>()
+  let editingAction: ImageStrengthAction | null = null
+  let longPressGeneration = 0
 
-  const activeStrengthValue = computed(() =>
-    activeStrengthAction.value
-      ? strengths[activeStrengthAction.value]
-      : DEFAULT_IMAGE_ACTION_STRENGTH,
-  )
-
-  function clearLongPressTimer() {
-    if (!longPressTimer) return
-    clearTimeout(longPressTimer)
-    longPressTimer = null
+  function clampStrength(value: number): number {
+    if (!Number.isFinite(value)) return DEFAULT_IMAGE_ACTION_STRENGTH
+    return Math.max(MIN_STRENGTH, Math.min(MAX_STRENGTH, Math.round(value)))
   }
 
-  function getTrackEl(): HTMLElement | null {
-    if (Array.isArray(strengthTrackRef.value)) return strengthTrackRef.value[0] ?? null
-    return strengthTrackRef.value
+  function getRangeInput(el: StrengthRangeRefTarget): HTMLInputElement | null {
+    if (el instanceof HTMLInputElement) return el
+    if (el && '$el' in el && el.$el instanceof HTMLInputElement) return el.$el
+    return null
   }
 
-  function setStrengthTrackRef(el: Element | ComponentPublicInstance | null) {
-    const targetEl =
-      el instanceof HTMLElement
-        ? el
-        : el && '$el' in el && (el as ComponentPublicInstance).$el instanceof HTMLElement
-          ? (el as ComponentPublicInstance).$el
-          : null
-    strengthTrackRef.value = targetEl
+  function getEventRangeInput(event: Event): HTMLInputElement | null {
+    return event.currentTarget instanceof HTMLInputElement ? event.currentTarget : null
   }
 
-  function updateStrengthFromClientX(action: ImageStrengthAction, clientX: number) {
-    const track = getTrackEl()
-    if (!track) return
-    const rect = track.getBoundingClientRect()
-    if (rect.width <= 0) return
-    const ratio = (clientX - rect.left) / rect.width
-    const clamped = Math.max(0, Math.min(1, ratio))
-    strengths[action] = Math.max(0, Math.min(100, Math.round(clamped * 100)))
+  function syncStrengthFromRange(action: ImageStrengthAction, input: HTMLInputElement) {
+    strengths[action] = clampStrength(input.valueAsNumber)
   }
 
-  function removeGlobalListeners() {
-    window.removeEventListener('mousemove', onMouseMove, true)
-    window.removeEventListener('mouseup', onMouseUp, true)
+  function focusRange(input: HTMLInputElement) {
+    input.focus({ preventScroll: true })
   }
 
-  function addGlobalListeners() {
-    window.addEventListener('mousemove', onMouseMove, true)
-    window.addEventListener('mouseup', onMouseUp, true)
+  function blurRange(action: ImageStrengthAction) {
+    strengthRangeElements.get(action)?.blur()
   }
 
-  function beginDragging(action: ImageStrengthAction, clientX: number) {
+  function beginStrengthEdit(
+    action: ImageStrengthAction,
+    input: HTMLInputElement,
+    options: { syncInitial: boolean },
+  ) {
+    if (!options.syncInitial) input.value = `${strengths[action]}`
     activeStrengthAction.value = action
-    draggingAction = action
-    pointerX = clientX
-    addGlobalListeners()
-    void nextTick(() => updateStrengthFromClientX(action, pointerX))
+    editingAction = action
+    suppressClickAction.value = action
+    if (options.syncInitial) syncStrengthFromRange(action, input)
+    focusRange(input)
   }
 
-  function hideStrengthControl() {
+  function finishStrengthEdit(action: ImageStrengthAction) {
+    if (editingAction !== action) return
+    editingAction = null
     activeStrengthAction.value = null
-    draggingAction = null
-    suppressClickAction.value = null
-    clearLongPressTimer()
-    removeGlobalListeners()
-  }
-
-  function onActionMouseDown(action: ImageStrengthAction, e: MouseEvent) {
-    clearLongPressTimer()
-    suppressClickAction.value = null
-    draggingAction = null
-    pointerX = e.clientX
-    longPressTimer = window.setTimeout(() => {
-      suppressClickAction.value = action
-      beginDragging(action, pointerX)
-    }, 260)
-    addGlobalListeners()
-  }
-
-  function onMouseMove(e: MouseEvent) {
-    pointerX = e.clientX
-    if (!draggingAction || activeStrengthAction.value !== draggingAction) return
-    updateStrengthFromClientX(draggingAction, e.clientX)
-  }
-
-  function onMouseUp() {
-    clearLongPressTimer()
-    removeGlobalListeners()
-    if (!draggingAction) return
-    const action = draggingAction
-    draggingAction = null
-    activeStrengthAction.value = null
+    blurRange(action)
     onCommit(action, strengths[action])
   }
 
-  function onStrengthTrackMouseDown(e: MouseEvent) {
-    const action = activeStrengthAction.value
-    if (!action) return
-    beginDragging(action, e.clientX)
+  function disposeLongPress(action: ImageStrengthAction) {
+    stopLongPressByAction.get(action)?.()
+    stopLongPressByAction.delete(action)
+    strengthRangeElements.delete(action)
+  }
+
+  function attachLongPress(action: ImageStrengthAction, input: HTMLInputElement) {
+    const generation = longPressGeneration
+    stopLongPressByAction.get(action)?.()
+    stopLongPressByAction.set(
+      action,
+      onLongPress(
+        input,
+        () => {
+          if (generation !== longPressGeneration) return
+          if (input.disabled) return
+          beginStrengthEdit(action, input, { syncInitial: false })
+        },
+        {
+          delay: LONG_PRESS_MS,
+          distanceThreshold: false,
+        },
+      ),
+    )
+  }
+
+  function setStrengthRangeRef(action: ImageStrengthAction, el: StrengthRangeRefTarget) {
+    const input = getRangeInput(el)
+    const current = strengthRangeElements.get(action)
+    if (current === input) return
+
+    disposeLongPress(action)
+    if (!input) return
+
+    strengthRangeElements.set(action, input)
+    attachLongPress(action, input)
+  }
+
+  function hideStrengthControl() {
+    longPressGeneration += 1
+    activeStrengthAction.value = null
+    if (editingAction) blurRange(editingAction)
+    editingAction = null
+    suppressClickAction.value = null
+    strengthRangeElements.forEach((input, action) => attachLongPress(action, input))
+  }
+
+  function onStrengthRangePointerDown(action: ImageStrengthAction, event: PointerEvent) {
+    if (event.button !== 0) return
+    const input = getEventRangeInput(event)
+    if (!input) return
+    if (activeStrengthAction.value === action) {
+      beginStrengthEdit(action, input, { syncInitial: true })
+      return
+    }
+    suppressClickAction.value = null
+    editingAction = null
+  }
+
+  function onStrengthInput(action: ImageStrengthAction, event: Event) {
+    const input = getEventRangeInput(event)
+    if (!input || editingAction !== action || activeStrengthAction.value !== action) return
+    syncStrengthFromRange(action, input)
+  }
+
+  function onStrengthChange(action: ImageStrengthAction, event: Event) {
+    const input = getEventRangeInput(event)
+    if (!input || editingAction !== action || activeStrengthAction.value !== action) return
+    syncStrengthFromRange(action, input)
+    finishStrengthEdit(action)
+  }
+
+  function onStrengthPointerUp(action: ImageStrengthAction, event: PointerEvent) {
+    const input = getEventRangeInput(event)
+    if (input && editingAction === action && activeStrengthAction.value === action) {
+      syncStrengthFromRange(action, input)
+    }
+    finishStrengthEdit(action)
+  }
+
+  function onStrengthClick(_action: ImageStrengthAction, event: MouseEvent) {
+    const input = getEventRangeInput(event)
+    if (input) input.blur()
   }
 
   function getActionStrength(action: ImageStrengthAction): number {
     return strengths[action]
   }
 
-  onBeforeUnmount(() => {
+  function dispose() {
     hideStrengthControl()
-  })
+    Array.from(stopLongPressByAction.keys()).forEach(disposeLongPress)
+  }
+
+  if (getCurrentInstance()) {
+    onBeforeUnmount(dispose)
+  }
 
   return {
     activeStrengthAction,
-    activeStrengthValue,
     suppressClickAction,
-    setStrengthTrackRef,
+    setStrengthRangeRef,
     hideStrengthControl,
     getActionStrength,
-    onActionMouseDown,
-    onStrengthTrackMouseDown,
+    onStrengthRangePointerDown,
+    onStrengthInput,
+    onStrengthChange,
+    onStrengthPointerUp,
+    onStrengthClick,
+    dispose,
   }
 }

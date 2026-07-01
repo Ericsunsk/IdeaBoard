@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { type Ref, ref } from 'vue'
+import { ref } from 'vue'
 import { useFlowSelectionController } from './useFlowSelectionController'
 
 type TestFlowItem = {
@@ -25,27 +25,17 @@ vi.mock('@vue-flow/core', () => ({
 
 function createHarness(
   activeTool = ref<string>('select'),
-  graph: { fullNodes?: TestFlowItem[]; fullEdges?: TestFlowItem[] } = {},
 ) {
   const dismissTransientCanvasUi = vi.fn()
-  const deleteSelected = vi.fn()
-  const fullNodes = ref(graph.fullNodes ?? []) as Ref<TestFlowItem[]>
-  const fullEdges = ref(graph.fullEdges ?? []) as Ref<TestFlowItem[]>
   const controller = useFlowSelectionController({
     activeTool,
-    fullNodes,
-    fullEdges,
     dismissTransientCanvasUi,
-    _deleteSelectedFlowElements: deleteSelected,
   })
 
   return {
     activeTool,
     controller,
-    fullNodes,
-    fullEdges,
     dismissTransientCanvasUi,
-    deleteSelected,
   }
 }
 
@@ -69,80 +59,58 @@ describe('useFlowSelectionController', () => {
     })
   })
 
-  it('clears selected full graph nodes that are not mounted', () => {
-    const harness = createHarness(ref('select'), {
-      fullNodes: [
-        { id: 'node-a', selected: true },
-        { id: 'node-b', selected: false },
-      ],
-    })
+  it('leaves selection cleanup to Vue Flow when nothing is selected', () => {
+    const harness = createHarness()
 
-    expect(harness.controller.clearFlowSelection()).toBe(true)
+    expect(harness.controller.clearFlowSelection()).toBe(false)
 
-    expect(harness.fullNodes.value.find((node) => node.id === 'node-a')?.selected).toBe(false)
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
   })
 
-  it('selects a clicked node and dismisses node panels without clearing selection directly', () => {
+  it('lets Vue Flow own regular node selection while dismissing node panels', () => {
     const harness = createHarness()
     const node = { id: 'node-a' }
     vueFlowMocks.findNode.mockReturnValue(node)
 
     harness.controller.onFlowNodeMouseDown('node-a', new MouseEvent('mousedown', { button: 0 }))
 
-    expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([node])
+    expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
+    expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeExpand: true })
   })
 
-  it('clears hidden full graph selection before selecting a non-shift clicked node', () => {
-    const harness = createHarness(ref('select'), {
-      fullNodes: [
-        { id: 'node-a', selected: true },
-        { id: 'node-b', selected: false },
-      ],
-    })
-    const mountedNode = harness.fullNodes.value[1]
+  it('clears existing Vue Flow selection before selecting a context-menu target', () => {
+    const harness = createHarness()
+    const previousNode: TestFlowItem = { id: 'node-a' }
+    const mountedNode: TestFlowItem = { id: 'node-b' }
+    vueFlowMocks.selectedElements.push(previousNode)
     vueFlowMocks.findNode.mockReturnValue(mountedNode)
 
-    harness.controller.onFlowNodeMouseDown(
-      'node-b',
-      new MouseEvent('mousedown', { button: 0 }),
-    )
+    harness.controller.selectFlowNodeForContextMenu('node-b')
 
-    expect(harness.fullNodes.value.find((node) => node.id === 'node-a')?.selected).toBe(false)
+    expect(vueFlowMocks.removeSelectedElements).toHaveBeenCalledWith([previousNode])
     expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([mountedNode])
   })
 
-  it('writes the newly selected node back to the full graph', () => {
-    const harness = createHarness(ref('select'), {
-      fullNodes: [
-        { id: 'node-a', selected: false },
-        { id: 'node-b', selected: false },
-      ],
-    })
-    const mountedNode = harness.fullNodes.value[1]
+  it('selects a context-menu target through Vue Flow', () => {
+    const harness = createHarness()
+    const mountedNode: TestFlowItem = { id: 'node-b' }
     vueFlowMocks.findNode.mockReturnValue(mountedNode)
 
-    harness.controller.onFlowNodeMouseDown(
-      'node-b',
-      new MouseEvent('mousedown', { button: 0 }),
-    )
+    harness.controller.selectFlowNodeForContextMenu('node-b')
 
-    expect(harness.fullNodes.value.find((node) => node.id === 'node-b')?.selected).toBe(true)
+    expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([mountedNode])
   })
 
-  it('repairs full graph selection when Vue Flow already has the node selected', () => {
-    const harness = createHarness(ref('select'), {
-      fullNodes: [{ id: 'node-a', selected: false }],
-    })
-    const mountedNode = harness.fullNodes.value[0]
+  it('keeps native selection stable when the context-menu target is already selected', () => {
+    const harness = createHarness()
+    const mountedNode: TestFlowItem = { id: 'node-a' }
     vueFlowMocks.selectedElements.push(mountedNode)
     vueFlowMocks.findNode.mockReturnValue(mountedNode)
 
-    harness.controller.onFlowNodeMouseDown('node-a', new MouseEvent('mousedown', { button: 0 }))
+    harness.controller.selectFlowNodeForContextMenu('node-a')
 
-    expect(harness.fullNodes.value.find((node) => node.id === 'node-a')?.selected).toBe(true)
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
   })
@@ -156,17 +124,5 @@ describe('useFlowSelectionController', () => {
     expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeExpand: true })
-  })
-
-  it('dismisses transient UI before deleting selected elements', () => {
-    const harness = createHarness()
-
-    harness.controller.deleteSelectedFlowElements()
-
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeExpand: true,
-      closeContextMenu: true,
-    })
-    expect(harness.deleteSelected).toHaveBeenCalledTimes(1)
   })
 })

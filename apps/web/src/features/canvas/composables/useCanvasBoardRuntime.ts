@@ -1,10 +1,8 @@
 import { ref, type ComputedRef, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
+import type { EdgeChange, NodeChange } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import {
-  createEmptyCanvasBoardSnapshot,
-  type CanvasBoardSnapshot,
-} from '../../canvas-board/domain'
+import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardSession } from '../board-session'
 import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
@@ -32,10 +30,9 @@ type UseCanvasBoardRuntimeOptions = {
   getUserIdentity: () => { userId: number; userUid: string }
   getViewport: () => FlowViewport
   setViewport: (viewport: FlowViewport) => Promise<unknown> | unknown
-  setNodes: (nodes: Node[]) => void
-  setEdges: (edges: Edge[]) => void
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   message: CanvasBoardRuntimeMessage
+  onNativeRemove?: () => void
 }
 
 type BoardOption = { id: string; name: string }
@@ -50,6 +47,8 @@ type CanvasBoardRuntime = {
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   flowHistory: FlowHistory
   flowTransactions: FlowTransactions
+  onNodesChange: (changes: NodeChange[]) => void
+  onEdgesChange: (changes: EdgeChange[]) => void
   onNavigateRequest: (path: string) => Promise<void>
   onLogoutRequest: () => Promise<void>
   markBoardViewportChanged: () => void
@@ -69,13 +68,11 @@ type CanvasBoardRuntime = {
   onSelectBoard: (boardId: string) => void
 }
 
-export function useCanvasBoardRuntime(
-  options: UseCanvasBoardRuntimeOptions,
-): CanvasBoardRuntime {
-  const nodes: Ref<Node[]> = ref([])
-  const edges: Ref<Edge[]> = ref([])
+export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): CanvasBoardRuntime {
   const fullNodes: Ref<Node[]> = ref([])
   const fullEdges: Ref<Edge[]> = ref([])
+  const nodes = fullNodes
+  const edges = fullEdges
   const boardBaseSnapshot: Ref<CanvasBoardSnapshot> = ref(createEmptyCanvasBoardSnapshot())
   const isLoadingBoardSnapshot: Ref<boolean> = ref(false)
   const isSavingBoard: Ref<boolean> = ref(false)
@@ -109,11 +106,11 @@ export function useCanvasBoardRuntime(
     flushAutosave,
     flowHistory,
     flowTransactions,
+    onNodesChange,
+    onEdgesChange,
   } = useFlowCanvasRuntime({
     nodes,
     edges,
-    fullNodes,
-    fullEdges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,
@@ -122,11 +119,10 @@ export function useCanvasBoardRuntime(
     boardSession,
     getViewport: options.getViewport,
     setViewport: setBoardViewport,
-    setNodes: options.setNodes,
-    setEdges: options.setEdges,
     onWarning: options.message.warning,
     onSuccess: options.message.success,
     onError: options.message.error,
+    onNativeRemove: options.onNativeRemove,
   })
 
   const boardHeader = useFlowBoardHeaderActions({
@@ -154,11 +150,7 @@ export function useCanvasBoardRuntime(
   function commitPendingBoardViewportChange() {
     const shouldPersistViewport = hasPendingViewportChange.value
     hasPendingViewportChange.value = false
-    if (
-      !shouldPersistViewport ||
-      isApplyingBoardViewport.value ||
-      isLoadingBoardSnapshot.value
-    ) {
+    if (!shouldPersistViewport || isApplyingBoardViewport.value || isLoadingBoardSnapshot.value) {
       return
     }
     flowTransactions.commitDirty()
@@ -174,6 +166,8 @@ export function useCanvasBoardRuntime(
     flushAutosave,
     flowHistory,
     flowTransactions,
+    onNodesChange,
+    onEdgesChange,
     onNavigateRequest,
     onLogoutRequest,
     markBoardViewportChanged,

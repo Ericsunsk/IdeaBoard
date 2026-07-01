@@ -1,78 +1,81 @@
 <template>
-  <NodeStageFrame
-    ref="stageFrameRef"
-    class="fusion-node-stage node-tool-surface node-input-thumbnail-contract variant-standard"
-    variant="square"
-    :active="active"
-    :drop-target="addSlotDragOver"
-    :class="{
-      'is-blend-dragging': blendDragging,
-    }"
-    @dragenter.stop.prevent="onAddSlotDragOver"
-    @dragover.stop.prevent="onAddSlotDragOver"
-    @dragleave.stop="onAddSlotDragLeave"
-    @drop.stop.prevent="onAddSlotDrop"
-    @contextmenu.prevent.stop="emit('contextmenu', $event)"
-  >
-    <div v-if="fusionRays.length" class="fusion-node-connection-layer" aria-hidden="true">
-      <span
-        v-for="ray in fusionRays"
-        :key="ray.key"
-        v-motion="fusionRayMotion"
-        class="fusion-node-ray"
-        :style="ray.style"
-      />
-    </div>
-    <NodeEmptyStateIcon v-if="showEmptyFusionMark" class="fusion-empty-mark" variant="fusion" />
-    <div ref="thumbsRef" class="fusion-node-slots">
-      <template v-for="(slot, index) in fusionSlotItems" :key="slot.key">
-        <NodeInputThumbnail
-          v-if="slot.image"
-          v-motion="fusionSlotMotion"
-          class="fusion-node-slot fusion-node-slot-item"
-          :src="slot.image.url"
-          removable
-          :style="getSlotStyle(index)"
-          :data-image-id="slot.image.id"
-          @mousedown.stop
-          @remove="removeInputImage(slot.image.id)"
+  <div class="node-stage-handle-wrap">
+    <NodeStageFrame
+      ref="stageFrameRef"
+      class="fusion-node-stage node-tool-surface node-input-thumbnail-contract variant-standard"
+      variant="square"
+      :active="active"
+      :drop-target="addSlotDragOver"
+      :class="{
+        'is-blend-dragging': blendDragging,
+      }"
+      @dragenter.stop.prevent="onAddSlotDragOver"
+      @dragover.stop.prevent="onAddSlotDragOver"
+      @dragleave.stop="onAddSlotDragLeave"
+      @drop.stop.prevent="onAddSlotDrop"
+      @contextmenu.prevent.stop="emit('contextmenu', $event)"
+    >
+      <div v-if="fusionRays.length" class="fusion-node-connection-layer" aria-hidden="true">
+        <span
+          v-for="ray in fusionRays"
+          :key="ray.key"
+          v-motion="fusionRayMotion"
+          class="fusion-node-ray"
+          :style="ray.style"
         />
-        <div
-          v-else
-          class="fusion-node-slot fusion-node-slot-placeholder"
-          :style="getSlotStyle(index)"
-          aria-hidden="true"
-        />
-      </template>
-    </div>
-    <div v-if="showBlendPad" class="fusion-blend-layer" aria-label="融合权重控制">
-      <button
-        v-motion="fusionHandleMotion"
-        class="fusion-blend-handle"
-        :class="{ 'is-hover': blendHandleHover, 'is-dragging': blendDragging }"
-        type="button"
-        :style="blendHandleStyle"
-        aria-label="拖动调整融合权重，双击重置"
-        @pointerdown.stop.prevent="onBlendHandlePointerDown"
-        @pointerenter="onBlendHandlePointerEnter"
-        @pointerleave="onBlendHandlePointerLeave"
-        @dblclick.stop.prevent="onBlendHandleDoubleClick"
-      >
-        <span class="fusion-blend-handle-dot" />
-      </button>
-      <div v-if="showBlendWeightBadges" class="fusion-blend-weight-layer">
-        <div
-          v-for="badge in blendWeightBadges"
-          :key="badge.key"
-          v-motion="fusionBadgeMotion"
-          class="fusion-blend-weight-badge"
-          :style="getBlendWeightBadgeStyle(badge.index)"
+      </div>
+      <NodeEmptyStateIcon v-if="showEmptyFusionMark" class="fusion-empty-mark" variant="fusion" />
+      <div ref="thumbsRef" class="fusion-node-slots">
+        <template v-for="(slot, index) in fusionSlotItems" :key="slot.key">
+          <NodeInputThumbnail
+            v-if="slot.image"
+            v-motion="fusionSlotMotion"
+            class="fusion-node-slot fusion-node-slot-item"
+            :src="slot.image.url"
+            removable
+            :style="getSlotStyle(index)"
+            :data-image-id="slot.image.id"
+            @mousedown.stop
+            @remove="removeInputImage(slot.image.id)"
+          />
+          <div
+            v-else
+            class="fusion-node-slot fusion-node-slot-placeholder"
+            :style="getSlotStyle(index)"
+            aria-hidden="true"
+          />
+        </template>
+      </div>
+      <div v-if="showBlendPad" class="fusion-blend-layer" aria-label="融合权重控制">
+        <button
+          v-motion="fusionHandleMotion"
+          class="fusion-blend-handle"
+          :class="{ 'is-hover': blendHandleHover, 'is-dragging': blendDragging }"
+          type="button"
+          :style="blendHandleStyle"
+          aria-label="拖动调整融合权重，双击重置"
+          @pointerdown.stop.prevent="onBlendHandlePointerDown"
+          @pointerenter="onBlendHandlePointerEnter"
+          @pointerleave="onBlendHandlePointerLeave"
+          @dblclick.stop.prevent="onBlendHandleDoubleClick"
         >
-          {{ badge.percent }}%
+          <span class="fusion-blend-handle-dot" />
+        </button>
+        <div v-if="showBlendWeightBadges" class="fusion-blend-weight-layer">
+          <div
+            v-for="badge in blendWeightBadges"
+            :key="badge.key"
+            v-motion="fusionBadgeMotion"
+            class="fusion-blend-weight-badge"
+            :style="getBlendWeightBadgeStyle(badge.index)"
+          >
+            {{ badge.percent }}%
+          </div>
         </div>
       </div>
-    </div>
-  </NodeStageFrame>
+    </NodeStageFrame>
+    <slot name="handle-rail" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -267,6 +270,11 @@ function getBlendWeightBadgeStyle(index: number) {
 
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
+.node-stage-handle-wrap {
+  position: relative;
+  overflow: visible;
+}
+
 .fusion-node-stage {
   --fusion-slot-size: var(--node-input-thumbnail-size);
 }

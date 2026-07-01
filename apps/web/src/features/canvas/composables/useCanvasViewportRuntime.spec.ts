@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope, nextTick, ref, shallowRef, type Ref } from 'vue'
+import { effectScope, ref, type Ref } from 'vue'
 import { useCanvasViewportRuntime, type CanvasFlowViewport } from './useCanvasViewportRuntime'
 
 const frameProbeMocks = vi.hoisted(() => ({
@@ -17,31 +17,15 @@ vi.mock('../utils/animationFrame', () => ({
   waitForNextRenderFrame: frameProbeMocks.waitForNextRenderFrame,
 }))
 
-class TestResizeObserver {
-  static instances: TestResizeObserver[] = []
-  readonly callback: ResizeObserverCallback
-  readonly observe = vi.fn()
-  readonly disconnect = vi.fn()
-
-  constructor(callback: ResizeObserverCallback) {
-    this.callback = callback
-    TestResizeObserver.instances.push(this)
-  }
-}
-
-function installResizeObserverMock() {
-  TestResizeObserver.instances = []
-  vi.stubGlobal('ResizeObserver', TestResizeObserver)
-}
-
 function createViewportRuntimeHarness() {
-  const canvasWrapRef = shallowRef<HTMLElement | null>(null)
-  const canvasViewportSize = ref({ width: 0, height: 0 })
   const viewport = ref<CanvasFlowViewport>({ x: 0, y: 0, zoom: 1 })
   const startCanvasInteraction = vi.fn()
   const stopCanvasInteraction = vi.fn()
   const markBoardViewportChanged = vi.fn()
   const commitPendingBoardViewportChange = vi.fn()
+  const setCenter = vi.fn((x: number, y: number, _options?: { duration?: number; zoom?: number }) => {
+    viewport.value = { x: -x, y: -y, zoom: viewport.value.zoom }
+  })
   const applyFlowTransform = vi.fn((nextViewport: CanvasFlowViewport) => {
     const didChange =
       viewport.value.x !== nextViewport.x ||
@@ -55,8 +39,6 @@ function createViewportRuntimeHarness() {
   const scope = effectScope()
   const runtime = scope.run(() =>
     useCanvasViewportRuntime({
-      canvasWrapRef,
-      canvasViewportSize,
       nodes: ref([]),
       edges: ref([]),
       fullNodes: ref([]),
@@ -66,6 +48,7 @@ function createViewportRuntimeHarness() {
       setViewport: (nextViewport) => {
         viewport.value = nextViewport
       },
+      setCenter,
       zoomIn: vi.fn(() => {
         viewport.value = { ...viewport.value, zoom: viewport.value.zoom + 0.25 }
       }),
@@ -89,10 +72,9 @@ function createViewportRuntimeHarness() {
   return {
     runtime,
     scope,
-    canvasWrapRef,
-    canvasViewportSize,
     viewport,
     applyFlowTransform,
+    setCenter,
     markBoardViewportChanged,
     commitPendingBoardViewportChange,
     loadInitialOrRouteBoard,
@@ -118,6 +100,7 @@ describe('useCanvasViewportRuntime', () => {
     harness.runtime.onFlowMove({ flowTransform: { x: 24, y: 32, zoom: 1.5 } })
 
     expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 24, y: 32, zoom: 1.5 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     harness.scope.stop()
   })
 
@@ -129,19 +112,8 @@ describe('useCanvasViewportRuntime', () => {
 
     expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
     expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 48, y: 64, zoom: 2 })
-    expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
-    harness.scope.stop()
-  })
-
-  it('syncs and commits viewport changes from minimap dragging', () => {
-    const harness = createViewportRuntimeHarness()
-
-    harness.runtime.onMiniMapViewportDragStart()
-    harness.runtime.onMiniMapViewportDrag({ x: -120, y: -80, zoom: 1 })
-    harness.runtime.onMiniMapViewportDragEnd()
-
-    expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
-    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: -120, y: -80, zoom: 1 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
     expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
     harness.scope.stop()
   })
@@ -153,6 +125,24 @@ describe('useCanvasViewportRuntime', () => {
     await Promise.resolve()
 
     expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: 0, y: 0, zoom: 1.25 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('centers the viewport and commits persistence when the minimap requests centering', async () => {
+    const harness = createViewportRuntimeHarness()
+
+    harness.runtime.onMiniMapCenterRequested({ position: { x: 240, y: 180 } })
+    await Promise.resolve()
+
+    expect(harness.setCenter).toHaveBeenCalledWith(240, 180, {
+      duration: 0,
+      zoom: 1,
+    })
+    expect(harness.applyFlowTransform).toHaveBeenCalledWith({ x: -240, y: -180, zoom: 1 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
     harness.scope.stop()
   })
 
@@ -176,22 +166,5 @@ describe('useCanvasViewportRuntime', () => {
     expect(frameProbeMocks.begin).not.toHaveBeenCalled()
     expect(frameProbeMocks.waitForNextRenderFrame).not.toHaveBeenCalled()
     harness.scope.stop()
-  })
-
-  it('updates viewport size when the canvas wrapper resizes', async () => {
-    installResizeObserverMock()
-    const harness = createViewportRuntimeHarness()
-    const element = {
-      clientWidth: 1024,
-      clientHeight: 768,
-    } as HTMLElement
-
-    harness.canvasWrapRef.value = element
-    await nextTick()
-
-    expect(harness.canvasViewportSize.value).toEqual({ width: 1024, height: 768 })
-    expect(TestResizeObserver.instances.at(-1)?.observe).toHaveBeenCalledWith(element)
-    harness.scope.stop()
-    expect(TestResizeObserver.instances.at(-1)?.disconnect).toHaveBeenCalled()
   })
 })

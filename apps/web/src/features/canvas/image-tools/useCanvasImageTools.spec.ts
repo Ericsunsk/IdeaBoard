@@ -1,21 +1,9 @@
 /* eslint-disable vue/one-component-per-file */
 import type { Connection, Node } from '@vue-flow/core'
-import {
-  createApp,
-  defineComponent,
-  h,
-  inject,
-  nextTick,
-  ref,
-  shallowRef,
-  type Ref,
-} from 'vue'
+import { createApp, defineComponent, h, inject, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
-import type {
-  ImageEditorAdjustmentLayer,
-  ImageEditorLayer,
-} from '../image-editor'
+import type { ImageEditorAdjustmentLayer, ImageEditorLayer } from '../image-editor'
 import {
   cancelImageAdjustmentFinalRender,
   IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
@@ -133,7 +121,6 @@ function mountCanvasImageTools() {
   const runPromptGeneration = vi.fn()
   const updateOutputCount = vi.fn()
   const activeStrengthAction = ref(null)
-  const strengthPct = ref(50)
   let imageAdjustmentFinalApplyContext: CanvasImageAdjustmentFinalApplyContext | null = null
   const message = {
     warning: vi.fn<(message: string) => void>(),
@@ -179,8 +166,13 @@ function mountCanvasImageTools() {
           isImagePromptComposerVisible: (nodeId) => nodeId === 'node-1',
           isDirectActionRunning: () => false,
           activeStrengthAction,
-          strengthPct,
-          getStrengthTrackRefSetter: () => vi.fn(),
+          getActionStrength: () => 50,
+          setStrengthRangeRef: vi.fn(),
+          onStrengthRangePointerDown: vi.fn(),
+          onStrengthInput: vi.fn(),
+          onStrengthChange: vi.fn(),
+          onStrengthPointerUp: vi.fn(),
+          onStrengthClick: vi.fn(),
           clearSelectedFlowElements: vi.fn(),
           startCanvasInteraction: vi.fn(),
           stopCanvasInteraction: vi.fn(),

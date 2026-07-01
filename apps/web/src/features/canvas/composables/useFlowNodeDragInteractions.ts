@@ -11,7 +11,10 @@ type UseFlowNodeDragInteractionsOptions = {
 }
 
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
+  let pendingDragStopCommit: Promise<void> | null = null
+
   function onNodeDragStart() {
+    pendingDragStopCommit = null
     options.dismissTransientCanvasUi({ closeExpand: true })
     options.beginNodeDragTransaction()
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
@@ -24,7 +27,12 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
       hideStrength: false,
     })
     options.finishFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
-    options.commitNodeDragTransaction()
+    const commitTask = Promise.resolve().then(() => {
+      if (pendingDragStopCommit !== commitTask) return
+      pendingDragStopCommit = null
+      options.commitNodeDragTransaction()
+    })
+    pendingDragStopCommit = commitTask
   }
 
   return {

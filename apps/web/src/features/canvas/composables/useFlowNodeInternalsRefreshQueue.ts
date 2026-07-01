@@ -1,4 +1,5 @@
 import { nextTick } from 'vue'
+import { useRafScheduler } from './useRafScheduler'
 
 type UpdateNodeInternals = (nodeIds: string[]) => void
 
@@ -6,15 +7,8 @@ type UseFlowNodeInternalsRefreshQueueOptions = {
   updateNodeInternals: UpdateNodeInternals
 }
 
-function runNextFrame(callback: () => void) {
-  if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(callback)
-    return
-  }
-  setTimeout(callback, 0)
-}
-
 export function useFlowNodeInternalsRefreshQueue(options: UseFlowNodeInternalsRefreshQueueOptions) {
+  const rafScheduler = useRafScheduler()
   let pendingNodeInternalsRefresh = false
   let queuedNodeInternalsIds: Set<string> | null = null
 
@@ -32,7 +26,7 @@ export function useFlowNodeInternalsRefreshQueue(options: UseFlowNodeInternalsRe
     if (pendingNodeInternalsRefresh) return
     pendingNodeInternalsRefresh = true
     void nextTick(() => {
-      runNextFrame(() => {
+      rafScheduler.schedule(() => {
         const ids = readQueuedNodeInternalsRefreshIds()
         if (ids.length > 0) {
           options.updateNodeInternals(ids)

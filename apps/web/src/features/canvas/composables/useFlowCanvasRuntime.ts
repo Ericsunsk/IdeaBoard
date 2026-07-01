@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
-import type { Edge, Node } from '@vue-flow/core'
-import { useFlowHistory } from './useFlowHistory'
+import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
+import { useFlowHistory, type FlowHistorySnapshot } from './useFlowHistory'
 import { useFlowTransactions } from './useFlowTransactions'
 import { useFlowBoardPersistence } from './useFlowBoardPersistence'
 import { useFlowAutosave } from './useFlowAutosave'
@@ -27,8 +27,6 @@ type FlowGraphCommitOptions = {
 export type UseFlowCanvasRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  fullNodes: Ref<Node[]>
-  fullEdges: Ref<Edge[]>
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   isDirty: Ref<boolean>
   saveStatus: Ref<SaveStatus>
@@ -37,19 +35,19 @@ export type UseFlowCanvasRuntimeOptions = {
   boardSession: CanvasBoardSession
   getViewport: () => ViewportState
   setViewport: (viewport: ViewportState) => void
-  setNodes: (nodes: Node[]) => void
-  setEdges: (edges: Edge[]) => void
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
+  onNativeRemove?: () => void
+  scheduleMicrotask?: (callback: () => void) => void
 }
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   let isNodeDragActive = false
-
-  function hasSameItemsByReference<T>(current: T[], next: T[]): boolean {
-    return current.length === next.length && current.every((item, index) => item === next[index])
-  }
+  let nativeRemoveHistoryBefore: FlowHistorySnapshot | null = null
+  let isNativeRemoveCommitScheduled = false
+  const scheduleMicrotask =
+    options.scheduleMicrotask ?? ((callback: () => void) => void Promise.resolve().then(callback))
 
   function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
     const ids = new Set<string>()
@@ -76,32 +74,11 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function preserveCurrentSelection(nextGraph: { nodes: Node[]; edges: Edge[] }) {
-    const selectedNodeIds = collectSelectedItemIds(options.nodes.value, options.fullNodes.value)
-    const selectedEdgeIds = collectSelectedItemIds(options.edges.value, options.fullEdges.value)
+    const selectedNodeIds = collectSelectedItemIds(options.nodes.value)
+    const selectedEdgeIds = collectSelectedItemIds(options.edges.value)
     return {
       nodes: preserveSelectedItems(nextGraph.nodes, selectedNodeIds),
       edges: preserveSelectedItems(nextGraph.edges, selectedEdgeIds),
-    }
-  }
-
-  function syncVueFlowItemIntoFullGraph<T extends SelectableFlowItem>(
-    fullItem: T,
-    vueFlowItem: T,
-  ): T {
-    if (fullItem.selected === true && vueFlowItem.selected === undefined) {
-      return { ...vueFlowItem, selected: true }
-    }
-    return vueFlowItem
-  }
-
-  function commitVueFlowGraph(nextGraph: { nodes: Node[]; edges: Edge[] }) {
-    if (!hasSameItemsByReference(options.nodes.value, nextGraph.nodes)) {
-      options.nodes.value = nextGraph.nodes
-      options.setNodes(nextGraph.nodes)
-    }
-    if (!hasSameItemsByReference(options.edges.value, nextGraph.edges)) {
-      options.edges.value = nextGraph.edges
-      options.setEdges(nextGraph.edges)
     }
   }
 
@@ -112,47 +89,19 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     const resolvedGraph = commitOptions.preserveSelection
       ? preserveCurrentSelection(nextGraph)
       : nextGraph
-    options.fullNodes.value = resolvedGraph.nodes
-    options.fullEdges.value = resolvedGraph.edges
-    commitVueFlowGraph(resolvedGraph)
+    options.nodes.value = resolvedGraph.nodes
+    options.edges.value = resolvedGraph.edges
   }
 
   function commitFlowNodes(nextNodes: Node[]) {
-    commitFlowGraph({ nodes: nextNodes, edges: options.fullEdges.value })
+    commitFlowGraph({ nodes: nextNodes, edges: options.edges.value })
   }
 
   function commitFlowEdges(nextEdges: Edge[]) {
-    commitFlowGraph({ nodes: options.fullNodes.value, edges: nextEdges })
-  }
-
-  function syncVueFlowGraphIntoFullGraph() {
-    if (options.nodes.value.length === 0 && options.edges.value.length === 0) return
-
-    const vueFlowNodesById = new Map(options.nodes.value.map((node) => [node.id, node]))
-    const vueFlowEdgesById = new Map(options.edges.value.map((edge) => [edge.id, edge]))
-    let nextNodes: Node[] | null = null
-    let nextEdges: Edge[] | null = null
-
-    options.fullNodes.value.forEach((node, index) => {
-      const vueFlowNode = vueFlowNodesById.get(node.id)
-      if (!vueFlowNode || vueFlowNode === node) return
-      if (!nextNodes) nextNodes = [...options.fullNodes.value]
-      nextNodes[index] = syncVueFlowItemIntoFullGraph(node, vueFlowNode)
-    })
-
-    options.fullEdges.value.forEach((edge, index) => {
-      const vueFlowEdge = vueFlowEdgesById.get(edge.id)
-      if (!vueFlowEdge || vueFlowEdge === edge) return
-      if (!nextEdges) nextEdges = [...options.fullEdges.value]
-      nextEdges[index] = syncVueFlowItemIntoFullGraph(edge, vueFlowEdge)
-    })
-
-    if (nextNodes) options.fullNodes.value = nextNodes
-    if (nextEdges) options.fullEdges.value = nextEdges
+    commitFlowGraph({ nodes: options.nodes.value, edges: nextEdges })
   }
 
   function captureFullGraphHistory() {
-    syncVueFlowGraphIntoFullGraph()
     return flowHistory.capture()
   }
 
@@ -161,8 +110,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   const flowHistory = useFlowHistory({
-    nodes: options.fullNodes,
-    edges: options.fullEdges,
+    nodes: options.nodes,
+    edges: options.edges,
     maxSteps: 10,
     onRestore: () => {
       markDirty()
@@ -172,8 +121,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   })
 
   const boardPersistence = useFlowBoardPersistence({
-    fullNodes: options.fullNodes,
-    fullEdges: options.fullEdges,
+    fullNodes: options.nodes,
+    fullEdges: options.edges,
     boardBaseSnapshot: options.boardBaseSnapshot,
     isDirty: options.isDirty,
     saveStatus: options.saveStatus,
@@ -218,14 +167,12 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function beginNodeDragTransaction() {
-    syncVueFlowGraphIntoFullGraph()
     isNodeDragActive = true
     flowHistory.onNodeDragStart()
   }
 
   function commitNodeDragTransaction() {
     try {
-      syncVueFlowGraphIntoFullGraph()
       flowHistory.onNodeDragStop(() => {
         markDirty()
       })
@@ -238,15 +185,14 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   const flowTransactions = useFlowTransactions({
-    nodes: options.fullNodes,
-    edges: options.fullEdges,
+    nodes: options.nodes,
+    edges: options.edges,
     captureHistory: captureFullGraphHistory,
     pushHistory: flowHistory.push,
     beginDragHistory: beginNodeDragTransaction,
     commitDragHistory: commitNodeDragTransaction,
     markDirty,
     refreshSnapshot: () => {
-      syncVueFlowGraphIntoFullGraph()
       refreshSnapshot()
     },
     commitGraph: commitFlowGraph,
@@ -254,14 +200,48 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     commitEdges: commitFlowEdges,
   })
 
+  function commitNativeRemoveOperation() {
+    isNativeRemoveCommitScheduled = false
+    const historyBefore = nativeRemoveHistoryBefore
+    nativeRemoveHistoryBefore = null
+    if (!historyBefore) return
+    const didChange = flowHistory.push(historyBefore)
+    if (!didChange) return
+    options.onNativeRemove?.()
+    markDirty()
+  }
+
+  function scheduleNativeRemoveCommit() {
+    if (!nativeRemoveHistoryBefore) {
+      nativeRemoveHistoryBefore = flowHistory.capture()
+    }
+    if (isNativeRemoveCommitScheduled) return
+    isNativeRemoveCommitScheduled = true
+    scheduleMicrotask(() => {
+      scheduleMicrotask(commitNativeRemoveOperation)
+    })
+  }
+
+  function onNodesChange(changes: NodeChange[]) {
+    if (changes.length === 0) return
+    if (changes.some((change) => change.type === 'remove')) scheduleNativeRemoveCommit()
+  }
+
+  function onEdgesChange(changes: EdgeChange[]) {
+    if (changes.length === 0) return
+    if (changes.some((change) => change.type === 'remove')) scheduleNativeRemoveCommit()
+  }
+
   return {
     currentBoardId,
     loadInitialOrRouteBoard,
     flushAutosave,
     flowHistory,
     flowTransactions,
-    fullNodes: options.fullNodes,
-    fullEdges: options.fullEdges,
+    onNodesChange,
+    onEdgesChange,
+    fullNodes: options.nodes,
+    fullEdges: options.edges,
     refreshSnapshot,
   }
 }

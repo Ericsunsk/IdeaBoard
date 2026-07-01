@@ -1,4 +1,5 @@
-import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { useEventListener } from '@vueuse/core'
+import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { clampImageNodeOutputCount } from '../../canvas-board/domain'
 import {
@@ -9,6 +10,9 @@ import {
   type CanvasExtendRect,
 } from '../utils/canvasExtendGeometry'
 import { isEditableEventTarget } from '../utils/domEventTargets'
+import { usePointerDragSession } from './usePointerDragSession'
+
+const windowTarget = () => (typeof window === 'undefined' ? null : window)
 
 type ImageDisplayPayload = {
   url: string
@@ -65,6 +69,11 @@ const HANDLE_RADIUS = 4
 export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlayOptions) {
   const state = ref<ExtendOverlayState | null>(null)
   const dragSession = ref<DragSession | null>(null)
+  const pointerDragSession = usePointerDragSession<void>({
+    onMove: ({ event }) => onHandlePointerMove(event),
+    onEnd: clearDragSession,
+    onCancel: clearDragSession,
+  })
 
   const isExpandMode = computed(() => !!state.value)
   const activeExpandNodeKind = computed(() => {
@@ -87,8 +96,13 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     dragSession.value = null
   }
 
+  function stopDragSession() {
+    const stoppedDragSession = pointerDragSession.endDrag()
+    if (!stoppedDragSession) clearDragSession()
+  }
+
   function cancelExpandMode() {
-    clearDragSession()
+    stopDragSession()
     state.value = null
   }
 
@@ -110,6 +124,8 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     if (!(event.target instanceof HTMLElement)) return
     event.preventDefault()
     event.stopPropagation()
+    stopDragSession()
+    pointerDragSession.beginDrag(event, undefined, { target: event.target })
     dragSession.value = {
       mode: 'resize',
       pointerId: event.pointerId,
@@ -119,7 +135,6 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
       initialFrame: { ...state.value.frameRect },
       imageRect: { ...state.value.imageRect },
     }
-    event.target.setPointerCapture(event.pointerId)
   }
 
   function beginFrameDrag(event: PointerEvent) {
@@ -127,6 +142,8 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     if (!(event.target instanceof HTMLElement)) return
     event.preventDefault()
     event.stopPropagation()
+    stopDragSession()
+    pointerDragSession.beginDrag(event, undefined, { target: event.target })
     dragSession.value = {
       mode: 'move',
       pointerId: event.pointerId,
@@ -135,7 +152,6 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
       initialFrame: { ...state.value.frameRect },
       imageRect: { ...state.value.imageRect },
     }
-    event.target.setPointerCapture(event.pointerId)
   }
 
   function resizeFromDrag(session: ResizeDragSession, clientX: number, clientY: number) {
@@ -190,7 +206,7 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
   function onHandlePointerUp(event: PointerEvent) {
     const session = dragSession.value
     if (!session || session.pointerId !== event.pointerId) return
-    clearDragSession()
+    stopDragSession()
   }
 
   async function commitExpandMode(prompt = '', outputCount = 1) {
@@ -258,17 +274,8 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     if (kind !== 'image') cancelExpandMode()
   })
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('keydown', onGlobalKeydown, true)
-    window.addEventListener('pointerdown', onGlobalPointerDown, true)
-  }
-
-  onBeforeUnmount(() => {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('keydown', onGlobalKeydown, true)
-      window.removeEventListener('pointerdown', onGlobalPointerDown, true)
-    }
-  })
+  useEventListener<KeyboardEvent>(windowTarget, 'keydown', onGlobalKeydown, true)
+  useEventListener<PointerEvent>(windowTarget, 'pointerdown', onGlobalPointerDown, true)
 
   return {
     isExpandMode,

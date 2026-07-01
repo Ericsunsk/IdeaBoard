@@ -1,8 +1,11 @@
-import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { useEventListener } from '@vueuse/core'
+import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { ImageEditorMode } from '../types'
 import { containImageRect } from '../../utils/canvasExtendGeometry'
 import { isEditableEventTarget } from '../../utils/domEventTargets'
+
+const windowTarget = () => (typeof window === 'undefined' ? null : window)
 
 type ImageDisplayPayload = {
   url: string
@@ -106,16 +109,8 @@ export function useImageEditorMode(options: UseImageEditorModeOptions) {
     if (kind !== 'image') exitImageEditorMode()
   })
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('pointerdown', onGlobalPointerDown, true)
-    window.addEventListener('keydown', onGlobalKeydown, true)
-  }
-
-  onBeforeUnmount(() => {
-    if (typeof window === 'undefined') return
-    window.removeEventListener('pointerdown', onGlobalPointerDown, true)
-    window.removeEventListener('keydown', onGlobalKeydown, true)
-  })
+  useEventListener<PointerEvent>(windowTarget, 'pointerdown', onGlobalPointerDown, true)
+  useEventListener<KeyboardEvent>(windowTarget, 'keydown', onGlobalKeydown, true)
 
   return {
     imageEditorState: state,

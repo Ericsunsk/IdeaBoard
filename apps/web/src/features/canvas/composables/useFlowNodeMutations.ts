@@ -308,32 +308,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     )
   }
 
-  function deleteSelectedFlowElements() {
-    const flowNodes = options.nodes.value as Array<{ id: string; selected?: boolean }>
-    const flowEdges = options.edges.value as Array<{
-      id: string
-      selected?: boolean
-      source: string
-      target: string
-    }>
-    const selectedNodeIds = new Set(
-      flowNodes.filter((node) => !!node.selected).map((node) => node.id),
-    )
-    const selectedEdgeIds = new Set(
-      flowEdges.filter((edge) => !!edge.selected).map((edge) => edge.id),
-    )
-    if (selectedNodeIds.size === 0 && selectedEdgeIds.size === 0) return
-    options.commitGraphMutation((items, currentEdges) => ({
-      nodes: items.filter((node) => !selectedNodeIds.has(node.id)),
-      edges: currentEdges.filter(
-        (edge) =>
-          !selectedEdgeIds.has(edge.id) &&
-          !selectedNodeIds.has(edge.source) &&
-          !selectedNodeIds.has(edge.target),
-      ),
-    }))
-  }
-
   function onFlowPromptTextUpdate(nodeId: string, value: string) {
     updateSnapshotNode(nodeId, (snapshotNode) => {
       if (snapshotNode.type !== 'prompt') return snapshotNode
@@ -374,7 +348,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     createNodeAtPosition,
     onFlowDeleteNode,
     updateSnapshotNode,
-    deleteSelectedFlowElements,
     onFlowPromptTextUpdate,
     onFlowNodeParamUpdate,
     markFlowExecutionNodeDirty,

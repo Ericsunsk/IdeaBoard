@@ -45,8 +45,14 @@ export function createImageToolNodeBindings(
       directGenerating: options.isDirectActionRunning(nodeId),
       showStrengthControl:
         !!options.activeStrengthAction.value && options.isImageActionPanelVisible(nodeId),
-      strengthPct: options.strengthPct.value,
-      setStrengthTrackRef: options.getStrengthTrackRefSetter(),
+      activeStrengthAction: options.activeStrengthAction.value,
+      getStrengthValue: options.getActionStrength,
+      setStrengthRangeRef: options.setStrengthRangeRef,
+      onStrengthRangePointerDown: options.onStrengthRangePointerDown,
+      onStrengthInput: options.onStrengthInput,
+      onStrengthChange: options.onStrengthChange,
+      onStrengthPointerUp: options.onStrengthPointerUp,
+      onStrengthClick: options.onStrengthClick,
     }
   }
 

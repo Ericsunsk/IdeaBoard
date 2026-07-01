@@ -183,6 +183,40 @@ describe('ImageEditorHistogramPlot', () => {
     }
   })
 
+  it('captures the active pointer and stops dragging after pointer cancel', () => {
+    const harness = mountHistogramPlot()
+
+    try {
+      dispatchPointerEvent(harness.plot, 'pointerdown', { clientX: 120 })
+      expect(harness.plot.setPointerCapture).toHaveBeenCalledWith(1)
+
+      harness.events.updateMarker.mockClear()
+      dispatchPointerEvent(window, 'pointercancel')
+      dispatchPointerEvent(window, 'pointermove', { clientX: 160 })
+
+      expect(harness.plot.releasePointerCapture).toHaveBeenCalledWith(1)
+      expect(harness.events.updateMarker).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('stops dragging when pointer capture is lost', () => {
+    const harness = mountHistogramPlot()
+
+    try {
+      dispatchPointerEvent(harness.plot, 'pointerdown', { clientX: 120 })
+      harness.events.updateMarker.mockClear()
+
+      dispatchPointerEvent(harness.plot, 'lostpointercapture')
+      dispatchPointerEvent(window, 'pointermove', { clientX: 160 })
+
+      expect(harness.events.updateMarker).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+
   it('moves focused markers with horizontal keyboard input', async () => {
     const harness = mountHistogramPlot()
 

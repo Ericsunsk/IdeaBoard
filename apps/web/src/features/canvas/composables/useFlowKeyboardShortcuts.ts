@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import {
   isEditableEventTarget,
   isCanvasEditingSurfaceEventTarget,
@@ -8,7 +8,6 @@ type UseFlowKeyboardShortcutsOptions = {
   onSave: () => void | Promise<void>
   onUndo?: () => void
   onRedo?: () => void
-  onDeleteSelected?: () => void
   onDeleteInlineSelection?: () => boolean
   isCanvasShortcutSuppressed?: (event: KeyboardEvent) => boolean
   onEscape?: () => boolean | void
@@ -21,6 +20,7 @@ type UseFlowKeyboardShortcutsOptions = {
 
 const KEYBOARD_PAN_STEP = 48
 const KEYBOARD_PAN_FAST_STEP = 120
+const windowTarget = () => (typeof window === 'undefined' ? null : window)
 
 function getKeyboardPanDelta(key: string, step: number): { x: number; y: number } | null {
   switch (key) {
@@ -120,13 +120,13 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
     if (event.key === 'Alt') {
       options.onDuplicateModifierChange?.(true)
     }
-    if (!options.onDeleteSelected) return
     if (key !== 'delete' && key !== 'backspace') return
     if (event.metaKey || event.ctrlKey || event.altKey) return
+    if (!options.onDeleteInlineSelection) return
     if (isCanvasShortcutSuppressed(event)) return
-    event.preventDefault()
-    if (options.onDeleteInlineSelection?.()) return
-    options.onDeleteSelected()
+    if (options.onDeleteInlineSelection()) {
+      event.preventDefault()
+    }
   }
 
   function onWindowKeyup(event: KeyboardEvent) {
@@ -138,17 +138,8 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
     }
   }
 
-  onMounted(() => {
-    window.addEventListener('keydown', onWindowKeydown)
-    window.addEventListener('keyup', onWindowKeyup)
-    window.addEventListener('selectstart', handleSelectStart)
-    window.addEventListener('blur', handleWindowBlur)
-  })
-
-  onUnmounted(() => {
-    window.removeEventListener('keydown', onWindowKeydown)
-    window.removeEventListener('keyup', onWindowKeyup)
-    window.removeEventListener('selectstart', handleSelectStart)
-    window.removeEventListener('blur', handleWindowBlur)
-  })
+  useEventListener<KeyboardEvent>(windowTarget, 'keydown', onWindowKeydown)
+  useEventListener<KeyboardEvent>(windowTarget, 'keyup', onWindowKeyup)
+  useEventListener<Event>(windowTarget, 'selectstart', handleSelectStart)
+  useEventListener<Event>(windowTarget, 'blur', handleWindowBlur)
 }

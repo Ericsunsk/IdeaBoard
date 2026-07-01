@@ -54,17 +54,25 @@
         @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
         @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
         @expand-frame-pointerdown="emit('expand-frame-pointerdown', $event)"
-      />
+      >
+        <template #handle-rail>
+          <slot name="handle-rail" />
+        </template>
+      </ImageNodeStage>
 
       <HomeCanvasImageActionMenu
         v-if="showImageActionMenu"
         :show-strength-control="actionBinding.showStrengthControl"
         :direct-generating="actionBinding.directGenerating"
-        :strength-pct="actionBinding.strengthPct"
-        :set-strength-track-ref="actionBinding.setStrengthTrackRef"
+        :active-strength-action="actionBinding.activeStrengthAction"
+        :get-strength-value="actionBinding.getStrengthValue"
+        :set-strength-range-ref="actionBinding.setStrengthRangeRef"
+        :on-strength-range-pointer-down="actionBinding.onStrengthRangePointerDown"
+        :on-strength-input="actionBinding.onStrengthInput"
+        :on-strength-change="actionBinding.onStrengthChange"
+        :on-strength-pointer-up="actionBinding.onStrengthPointerUp"
+        :on-strength-click="actionBinding.onStrengthClick"
         @action="emit('action', $event)"
-        @strength-action-mousedown="onStrengthActionMouseDown"
-        @strength-track-mousedown="emit('strength-track-mousedown', $event)"
       />
       <NodePromptComposer
         v-if="showPromptComposer"
@@ -85,7 +93,6 @@ import { computed, ref, watchPostEffect } from 'vue'
 import { MediaImage } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
-import type { ImageStrengthAction } from '../../execution'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
 import NodePromptComposer from './NodePromptComposer.vue'
@@ -125,8 +132,6 @@ const emit = defineEmits<{
   (e: 'prompt-generate', prompt: string, outputCount: number): void
   (e: 'expand-submit', prompt: string, outputCount: number): void
   (e: 'action', action: ImageNodeAction): void
-  (e: 'strength-action-mousedown', action: ImageStrengthAction, event: MouseEvent): void
-  (e: 'strength-track-mousedown', event: MouseEvent): void
   (
     e: 'expand-handle-pointerdown',
     payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },
@@ -143,7 +148,8 @@ const showImageActionMenu = computed(
   () => props.actionBinding.actionMenuVisible && !!props.displayImage && !isImageEditorActive.value,
 )
 const showPromptComposer = computed(
-  () => props.actionBinding.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
+  () =>
+    props.actionBinding.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
 )
 type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)
@@ -183,9 +189,5 @@ function onImageStageContextMenu(event: MouseEvent) {
     return
   }
   emit('contextmenu', event)
-}
-
-function onStrengthActionMouseDown(action: ImageStrengthAction, event: MouseEvent) {
-  emit('strength-action-mousedown', action, event)
 }
 </script>

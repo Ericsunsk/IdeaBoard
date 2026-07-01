@@ -42,7 +42,7 @@ describe('useFlowNodeDragInteractions', () => {
     )
   })
 
-  it('only closes expand mode when a node drag stops', () => {
+  it('only closes expand mode when a node drag stops', async () => {
     const harness = createHarness(false)
 
     harness.interactions.onNodeDragStop()
@@ -53,6 +53,10 @@ describe('useFlowNodeDragInteractions', () => {
       hideStrength: false,
     })
     expect(harness.finishFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(false)
+    expect(harness.commitNodeDragTransaction).not.toHaveBeenCalled()
+
+    await Promise.resolve()
+
     expect(harness.commitNodeDragTransaction).toHaveBeenCalledTimes(1)
   })
 })

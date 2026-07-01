@@ -13,7 +13,7 @@ function createStageElement() {
   return stage
 }
 
-function mountImageEditorMode(options: { nodeKind?: string } = {}) {
+function mountImageEditorMode(options: { nodeKind?: string; onBeforePointerCancel?: () => void } = {}) {
   const stage = createStageElement()
   const activeTool = ref('select')
   const nodes: Ref<Node[]> = shallowRef([
@@ -32,6 +32,7 @@ function mountImageEditorMode(options: { nodeKind?: string } = {}) {
           getImageNodeDisplayPayload: (nodeId) =>
             nodeId === 'node-1' ? { url: 'https://example.com/source.png', ratio: 1 } : null,
           getImageStageElement: (nodeId) => (nodeId === 'node-1' ? stage : null),
+          onBeforePointerCancel: options.onBeforePointerCancel,
           onBeforeExit,
         })
         return () => h('div')
@@ -97,5 +98,18 @@ describe('useImageEditorMode', () => {
     } finally {
       harness.unmount()
     }
+  })
+
+  it('removes global listeners after unmount', async () => {
+    const onBeforePointerCancel = vi.fn()
+    const harness = mountImageEditorMode({ onBeforePointerCancel })
+
+    expect(harness.editor.enterImageEditorMode('node-1', 'inpaint')).toBe(true)
+    await nextTick()
+    harness.unmount()
+
+    window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+
+    expect(onBeforePointerCancel).not.toHaveBeenCalled()
   })
 })

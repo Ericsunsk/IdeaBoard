@@ -18,28 +18,43 @@
       }"
       class="image-action-menu-inner"
     >
-      <template v-if="!showStrengthControl">
+      <div
+        v-for="item in IMAGE_ACTION_MENU_ITEMS"
+        :key="item.title"
+        class="image-action-control"
+        :class="{
+          'has-strength-range': !!item.strengthAction,
+          'is-strength-active': isStrengthActive(item),
+          'is-strength-hidden': isStrengthHidden(item),
+        }"
+      >
         <NodeToolIconButton
-          v-for="item in IMAGE_ACTION_MENU_ITEMS"
-          :key="item.title"
           class="image-action-icon-btn"
           :aria-label-value="item.title"
           :disabled="directGenerating"
           :tooltip="item.label"
-          @mousedown.stop="onActionMouseDown(item, $event)"
           @click="onActionClick(item)"
         >
           <ImageActionMenuIcon :icon="item.icon" />
         </NodeToolIconButton>
-      </template>
-      <div v-else class="style-strength-pop" @mousedown.stop>
-        <div
-          :ref="setStrengthTrackRef"
-          class="style-strength-track"
-          @mousedown.stop.prevent="emit('strength-track-mousedown', $event)"
-        >
-          <div class="style-strength-fill" :style="{ width: `${strengthPct}%` }"></div>
-        </div>
+        <input
+          v-if="item.strengthAction"
+          :ref="(el) => setItemStrengthRangeRef(item, el)"
+          class="image-action-strength-range canvas-range-input"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          :value="getItemStrengthValue(item)"
+          :disabled="directGenerating"
+          :tabindex="isStrengthActive(item) ? 0 : -1"
+          :aria-label="`${item.label}强度`"
+          @pointerdown.stop="onItemStrengthRangePointerDown(item, $event)"
+          @input="onItemStrengthInput(item, $event)"
+          @change="onItemStrengthChange(item, $event)"
+          @pointerup="onItemStrengthPointerUp(item, $event)"
+          @click="onStrengthRangeClick(item, $event)"
+        />
       </div>
     </div>
   </div>
@@ -56,26 +71,87 @@ import type { ImageStrengthAction } from '../../execution'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
 
-defineProps<{
+const props = defineProps<{
   showStrengthControl: boolean
   strengthMenuStyle?: string | Record<string, string>
   directGenerating: boolean
-  strengthPct: number
-  setStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
+  activeStrengthAction: ImageStrengthAction | null
+  getStrengthValue: (action: ImageStrengthAction) => number
+  setStrengthRangeRef: (
+    action: ImageStrengthAction,
+    el: Element | ComponentPublicInstance | null,
+  ) => void
+  onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
+  onStrengthInput: (action: ImageStrengthAction, event: Event) => void
+  onStrengthChange: (action: ImageStrengthAction, event: Event) => void
+  onStrengthPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
+  onStrengthClick: (action: ImageStrengthAction, event: MouseEvent) => void
 }>()
 
 const emit = defineEmits<{
   (event: 'action', action: ImageNodeAction): void
-  (event: 'strength-action-mousedown', action: ImageStrengthAction, value: MouseEvent): void
-  (event: 'strength-track-mousedown', value: MouseEvent): void
 }>()
 
-function onActionMouseDown(item: ImageActionMenuItem, event: MouseEvent) {
-  if (!('strengthAction' in item) || !item.strengthAction) return
-  emit('strength-action-mousedown', item.strengthAction, event)
+function onActionClick(item: ImageActionMenuItem) {
+  emit('action', item.action)
 }
 
-function onActionClick(item: ImageActionMenuItem) {
+function getStrengthAction(item: ImageActionMenuItem): ImageStrengthAction | null {
+  return item.strengthAction ?? null
+}
+
+function isStrengthActive(item: ImageActionMenuItem) {
+  const action = getStrengthAction(item)
+  return !!action && props.showStrengthControl && props.activeStrengthAction === action
+}
+
+function isStrengthHidden(item: ImageActionMenuItem) {
+  const action = getStrengthAction(item)
+  return props.showStrengthControl && props.activeStrengthAction !== action
+}
+
+function getItemStrengthValue(item: ImageActionMenuItem) {
+  const action = getStrengthAction(item)
+  return action ? props.getStrengthValue(action) : 0
+}
+
+function setItemStrengthRangeRef(
+  item: ImageActionMenuItem,
+  el: Element | ComponentPublicInstance | null,
+) {
+  const action = getStrengthAction(item)
+  if (!action) return
+  props.setStrengthRangeRef(action, el)
+}
+
+function onItemStrengthRangePointerDown(item: ImageActionMenuItem, event: PointerEvent) {
+  const action = getStrengthAction(item)
+  if (!action) return
+  props.onStrengthRangePointerDown(action, event)
+}
+
+function onItemStrengthInput(item: ImageActionMenuItem, event: Event) {
+  const action = getStrengthAction(item)
+  if (!action) return
+  props.onStrengthInput(action, event)
+}
+
+function onItemStrengthChange(item: ImageActionMenuItem, event: Event) {
+  const action = getStrengthAction(item)
+  if (!action) return
+  props.onStrengthChange(action, event)
+}
+
+function onItemStrengthPointerUp(item: ImageActionMenuItem, event: PointerEvent) {
+  const action = getStrengthAction(item)
+  if (!action) return
+  props.onStrengthPointerUp(action, event)
+}
+
+function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
+  const action = getStrengthAction(item)
+  if (!action) return
+  props.onStrengthClick(action, event)
   emit('action', item.action)
 }
 </script>
@@ -122,6 +198,22 @@ function onActionClick(item: ImageActionMenuItem) {
   width: 100%;
 }
 
+.image-action-control {
+  position: relative;
+  flex: 0 0 var(--node-tool-button-size);
+  width: var(--node-tool-button-size);
+  height: var(--node-tool-button-size);
+}
+
+.image-action-control.is-strength-active {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.image-action-control.is-strength-hidden {
+  display: none;
+}
+
 .image-action-icon-btn {
   flex: 0 0 var(--node-tool-button-size);
   --node-tool-icon-button-size: var(--node-tool-button-size);
@@ -147,33 +239,28 @@ function onActionClick(item: ImageActionMenuItem) {
   opacity: 0.45;
 }
 
-.style-strength-pop {
-  position: relative;
-  width: 100%;
-  height: var(--node-tool-button-size);
-  display: flex;
-  align-items: center;
-  padding: 0;
-}
-
-.style-strength-track {
-  position: relative;
-  width: 100%;
-  height: 6px;
-  border-radius: 999px;
-  overflow: hidden;
-  border: none;
-  background: rgba(122, 107, 213, 0.2);
-  cursor: ew-resize;
-}
-
-.style-strength-fill {
+.image-action-strength-range {
+  --canvas-range-track-height: 6px;
+  --canvas-range-thumb-size: 14px;
+  --canvas-range-thumb-offset: -4px;
+  --canvas-range-fill-color: #7a6bd5;
+  --canvas-range-track-background: rgba(122, 107, 213, 0.2);
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  background: #7a6bd5;
-  border-radius: inherit;
-  transition: width 0.06s linear;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+}
+
+.image-action-control.has-strength-range .image-action-icon-btn {
+  pointer-events: none;
+}
+
+.image-action-control.is-strength-active .image-action-icon-btn {
+  display: none;
+}
+
+.image-action-control.is-strength-active .image-action-strength-range {
+  position: relative;
+  opacity: 1;
 }
 </style>

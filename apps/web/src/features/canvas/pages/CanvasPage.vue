@@ -51,7 +51,7 @@
         :select-nodes-on-drag="!isFlowCanvasLocked && activeTool === 'select'"
         :selection-key-code="!isFlowCanvasLocked && activeTool === 'select'"
         :multi-selection-key-code="!isFlowCanvasLocked && activeTool === 'select' ? 'Shift' : null"
-        :delete-key-code="null"
+        :delete-key-code="nativeDeleteKeyCode"
         :default-edge-options="{ animated: false, updatable: true }"
         :min-zoom="0.1"
         :zoom-on-scroll="false"
@@ -60,6 +60,8 @@
         :pan-on-scroll-mode="PanOnScrollMode.Free"
         :only-render-visible-elements="true"
         :is-valid-connection="isValidConnection"
+        @nodes-change="onNodesChange"
+        @edges-change="onEdgesChange"
         @connect="onConnect"
         @connect-end="onFlowConnectEnd"
         @edge-update="onEdgeUpdate"
@@ -114,20 +116,13 @@
             @fusion-prompt-generate="onFlowFusionPromptGenerate"
             @prompt-generate="onFlowPromptGenerate"
             @image-action="onFlowImageDirectAction"
-            @strength-action-mousedown="onFlowImageStrengthActionMouseDown"
-            @strength-track-mousedown="onFlowImageStrengthTrackMouseDown"
             @expand-handle-pointerdown="onFlowExpandHandlePointerDown"
             @expand-handle-pointermove="onFlowExpandHandlePointerMove"
             @expand-handle-pointerup="onFlowExpandHandlePointerUp"
             @expand-frame-pointerdown="onFlowExpandFramePointerDown"
           />
         </template>
-        <CanvasMiniMap
-          v-if="isCanvasMinimapEnabled"
-          @viewport-drag-start="onMiniMapViewportDragStart"
-          @viewport-drag="onMiniMapViewportDrag"
-          @viewport-drag-end="onMiniMapViewportDragEnd"
-        />
+        <CanvasMiniMap v-if="isCanvasMinimapEnabled" @center-requested="onMiniMapCenterRequested" />
       </VueFlow>
       <CanvasOverlays
         :chrome-model="imageToolChromeModel"
@@ -172,7 +167,10 @@ import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActio
 import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import { useFlowCanvasNodeHandlers } from '../composables/useFlowCanvasNodeHandlers'
-import { useFlowTransientUiDismissal } from '../composables/useFlowTransientUiDismissal'
+import {
+  useFlowTransientUiDismissal,
+  type DismissTransientCanvasUi,
+} from '../composables/useFlowTransientUiDismissal'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useCanvasBoardRuntime } from '../composables/useCanvasBoardRuntime'
@@ -197,8 +195,6 @@ const {
   getViewport,
   setViewport,
   setCenter,
-  setNodes,
-  setEdges,
   getSelectedElements,
   removeSelectedElements,
 } = useVueFlow()
@@ -211,11 +207,11 @@ const { zoomLevel, applyFlowTransform } = useFlowViewportControls({
 provideCanvasViewportContext({ zoomLevel })
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
-const canvasViewportSize = ref({ width: 0, height: 0 })
 const flowHandleVisibilityRefreshToken = ref(0)
 
 const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
+let dismissTransientCanvasUi: DismissTransientCanvasUi = () => {}
 
 const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
 
@@ -239,6 +235,8 @@ const {
   flushAutosave,
   flowHistory,
   flowTransactions,
+  onNodesChange,
+  onEdgesChange,
   isBoardMenuOpen,
   isRenamingBoard,
   boardNameDraft,
@@ -265,13 +263,14 @@ const {
   }),
   getViewport,
   setViewport: (viewport) => setViewport(viewport),
-  setNodes,
-  setEdges,
   logoutAndRedirect,
   message: {
     warning: (msg: string) => appToast.warning(msg),
     success: (msg: string) => appToast.success(msg),
     error: (msg: string) => appToast.error(msg),
+  },
+  onNativeRemove: () => {
+    dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
   },
 })
 
@@ -283,15 +282,11 @@ const {
   onFlowMoveStart,
   onFlowMove: syncFlowMove,
   onFlowMoveEnd,
-  onMiniMapViewportDragStart,
-  onMiniMapViewportDrag,
-  onMiniMapViewportDragEnd,
+  onMiniMapCenterRequested,
   onNodeDragStart,
   onNodeDragStop,
   loadCanvasBoardAndProbe,
 } = useCanvasViewportRuntime({
-  canvasWrapRef,
-  canvasViewportSize,
   nodes,
   edges,
   fullNodes,
@@ -299,6 +294,7 @@ const {
   currentBoardId,
   getViewport,
   setViewport: (viewport) => setViewport(viewport),
+  setCenter: (x, y, options) => setCenter(x, y, options),
   zoomIn,
   zoomOut,
   applyFlowTransform,
@@ -321,7 +317,6 @@ const {
   onConnect,
   onEdgeUpdate,
   createNodeAtPosition,
-  deleteSelectedFlowElements: deleteSelectedFlowElementsBase,
   _onFlowDeleteNode,
   _onFlowPromptTextUpdate,
   _onFlowNodeParamUpdate,
@@ -419,13 +414,15 @@ const {
 
 const {
   activeStrengthAction,
-  activeStrengthValue,
   suppressClickAction,
-  setStrengthTrackRef,
+  setStrengthRangeRef,
   hideStrengthControl,
   getActionStrength,
-  onActionMouseDown: onFlowImageStrengthActionMouseDown,
-  onStrengthTrackMouseDown: onFlowImageStrengthTrackMouseDown,
+  onStrengthRangePointerDown,
+  onStrengthInput,
+  onStrengthChange,
+  onStrengthPointerUp,
+  onStrengthClick,
 } = useFlowImageActionStrengthControl({
   onCommit: (action, strength) => {
     const targetNodeId = getActiveNodePanelNodeId(ACTIVE_NODE_PANEL_KIND.imageTools)
@@ -496,8 +493,13 @@ const imageTools = useCanvasImageTools({
     isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
   isDirectActionRunning: isNodeDirectActionRunning,
   activeStrengthAction,
-  strengthPct: activeStrengthValue,
-  getStrengthTrackRefSetter: () => setStrengthTrackRef,
+  getActionStrength,
+  setStrengthRangeRef,
+  onStrengthRangePointerDown,
+  onStrengthInput,
+  onStrengthChange,
+  onStrengthPointerUp,
+  onStrengthClick,
   clearSelectedFlowElements: clearSelectedFlowElementsSync,
   startCanvasInteraction: startFlowInteraction,
   stopCanvasInteraction: stopFlowInteraction,
@@ -525,17 +527,24 @@ const {
   scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
 } = imageTools
 
+const isCanvasShortcutSuppressed = computed(
+  () => !!flowImageEditorNodeId.value || !!flowMaskEditorNodeId.value,
+)
+const nativeDeleteKeyCode = computed(() =>
+  isFlowCanvasLocked.value || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
+)
+
 function toggleCanvasMinimap() {
   isCanvasMinimapEnabled.value = !isCanvasMinimapEnabled.value
 }
 
-const { dismissTransientCanvasUi } = useFlowTransientUiDismissal({
+dismissTransientCanvasUi = useFlowTransientUiDismissal({
   cancelFlowExpandMode,
   closeBoardHeaderEditing,
   closeNodeContextMenu,
   clearActiveNodePanel,
   hideStrengthControl,
-})
+}).dismissTransientCanvasUi
 
 useDismissableLayer({
   enabled: hasCanvasDismissableLayer,
@@ -603,13 +612,9 @@ const {
   onPaneClick,
   onFlowNodeClick,
   onFlowNodeMouseDown,
-  deleteSelectedFlowElements,
 } = useFlowSelectionController({
   activeTool: activeTool as Ref<string>,
-  fullNodes,
-  fullEdges,
   dismissTransientCanvasUi,
-  _deleteSelectedFlowElements: deleteSelectedFlowElementsBase,
 })
 
 const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
@@ -683,8 +688,7 @@ useFlowKeyboardShortcuts({
   },
   onUndo: flowHistory.undo,
   onRedo: flowHistory.redo,
-  onDeleteSelected: deleteSelectedFlowElements,
-  isCanvasShortcutSuppressed: () => !!flowImageEditorNodeId.value || !!flowMaskEditorNodeId.value,
+  isCanvasShortcutSuppressed: () => isCanvasShortcutSuppressed.value,
   onEscape: onEscapeShortcut,
   onPanViewport,
   onToolSelect: () => {
@@ -731,7 +735,7 @@ onMounted(async () => {
   --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
   --canvas-minimap-node: #c9ced8;
   --canvas-minimap-viewport: #c9ced8;
-  --canvas-minimap-viewport-fill: rgb(201 206 216 / 0.38);
+  --canvas-minimap-mask: rgb(201 206 216 / 0.18);
   --canvas-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
   --canvas-surface-blur: 10px;
   --canvas-surface-radius: 10px;
@@ -774,6 +778,7 @@ onMounted(async () => {
   overscroll-behavior-x: none;
 }
 
+.canvas-layout.interaction-lite :deep(.vue-flow__node),
 .canvas-layout.interaction-lite :deep(.workflow-node),
 .canvas-layout.interaction-lite :deep(.vue-flow__edge-path),
 .canvas-layout.interaction-lite :deep(.fusion-node-connection-layer) {
@@ -840,6 +845,7 @@ onMounted(async () => {
   box-shadow: none;
   padding: 0;
   cursor: default;
+  transition: none;
 }
 
 .canvas-flow-wrap :deep(.vue-flow__node:hover),
@@ -866,7 +872,6 @@ onMounted(async () => {
 .canvas-layout.tool-hand .canvas-flow-wrap :deep(.vue-flow__pane.dragging) {
   cursor: grabbing;
 }
-
 </style>
 
 <style>

@@ -192,6 +192,40 @@ describe('ImageEditorCurveGraph', () => {
     }
   })
 
+  it('captures the active pointer and stops dragging after pointer cancel', () => {
+    const harness = mountCurveGraph()
+
+    try {
+      dispatchPointerEvent(harness.graph, 'pointerdown', { clientX: 0, clientY: 100 })
+      expect(harness.graph.setPointerCapture).toHaveBeenCalledWith(1)
+
+      harness.events.movePoint.mockClear()
+      dispatchPointerEvent(window, 'pointercancel')
+      dispatchPointerEvent(window, 'pointermove', { clientX: 40, clientY: 40 })
+
+      expect(harness.graph.releasePointerCapture).toHaveBeenCalledWith(1)
+      expect(harness.events.movePoint).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('stops dragging when pointer capture is lost', () => {
+    const harness = mountCurveGraph()
+
+    try {
+      dispatchPointerEvent(harness.graph, 'pointerdown', { clientX: 0, clientY: 100 })
+      harness.events.movePoint.mockClear()
+
+      dispatchPointerEvent(harness.graph, 'lostpointercapture')
+      dispatchPointerEvent(window, 'pointermove', { clientX: 40, clientY: 40 })
+
+      expect(harness.events.movePoint).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+
   it('emits keyboard move and remove events for focused user points', async () => {
     const harness = mountCurveGraph({
       points: normalizeCurveChannelPoints([{ id: 'mid', input: 50, output: 50 }]),

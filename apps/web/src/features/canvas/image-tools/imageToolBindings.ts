@@ -16,6 +16,7 @@ import type {
   ImageMaskDrawMode,
   MaskEditorReferenceImage,
 } from '../mask-editor'
+import type { ImageStrengthAction } from '../execution'
 
 export type ImageToolAnchorRect = {
   top: number
@@ -44,8 +45,17 @@ export type ImageActionBinding = {
   promptPlaceholder: string
   directGenerating: boolean
   showStrengthControl: boolean
-  strengthPct: number
-  setStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
+  activeStrengthAction: ImageStrengthAction | null
+  getStrengthValue: (action: ImageStrengthAction) => number
+  setStrengthRangeRef: (
+    action: ImageStrengthAction,
+    el: Element | ComponentPublicInstance | null,
+  ) => void
+  onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
+  onStrengthInput: (action: ImageStrengthAction, event: Event) => void
+  onStrengthChange: (action: ImageStrengthAction, event: Event) => void
+  onStrengthPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
+  onStrengthClick: (action: ImageStrengthAction, event: MouseEvent) => void
 }
 
 export type ImageToolChromeModel = {

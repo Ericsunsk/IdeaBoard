@@ -13,7 +13,6 @@
         'is-transparent': transparent,
       },
     ]"
-    data-flow-handle-frame
     :style="frameStyle"
     :aria-busy="ariaBusy ? 'true' : undefined"
     :aria-label="ariaLabel"

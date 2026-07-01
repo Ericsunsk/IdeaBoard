@@ -52,7 +52,8 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { nextTick, ref, useId, watch } from 'vue'
+import { usePointerDragSession } from '../../composables/usePointerDragSession'
 import type { ImageEditorCurveChannel } from '../types'
 import type { NormalizedCurveChannelPoint } from '../utils/imageEditorCurves'
 
@@ -79,12 +80,16 @@ const USER_POINT_MIN_INPUT = 1
 const USER_POINT_MAX_INPUT = 99
 
 const graphRef = ref<HTMLElement | null>(null)
-const activePointerId = ref<number | null>(null)
 const activeDragPointId = ref<string | null>(null)
 const pendingCreatedPointDrag = ref<{
   latestPosition: PointerPosition
   hasMoved: boolean
 } | null>(null)
+const pointerDragSession = usePointerDragSession<void>({
+  onMove: ({ event }) => onDragPointerMove(event),
+  onEnd: clearPointDrag,
+  onCancel: clearPointDrag,
+})
 const gradientId = `image-editor-curves-gradient-${useId()}`
 const fineGridPath = createGridPath([25, 75])
 const strongGridPath = createGridPath([50])
@@ -122,31 +127,22 @@ function onPointPointerDown(pointId: string, event: PointerEvent) {
 function startPointDrag(pointId: string, event: PointerEvent) {
   emit('select-point', pointId)
   focusPointButton(pointId)
-  activePointerId.value = event.pointerId
+  pointerDragSession.beginDrag(event, undefined, { target: graphRef.value })
   activeDragPointId.value = pointId
   pendingCreatedPointDrag.value = null
-  graphRef.value?.setPointerCapture(event.pointerId)
-  window.addEventListener('pointermove', onWindowPointerMove)
-  window.addEventListener('pointerup', onWindowPointerUp)
-  window.addEventListener('pointercancel', onWindowPointerCancel)
   updatePointFromPointerPosition(pointId, event)
 }
 
 function startPendingCreatedPointDrag(event: PointerEvent) {
-  activePointerId.value = event.pointerId
+  pointerDragSession.beginDrag(event, undefined, { target: graphRef.value })
   activeDragPointId.value = null
   pendingCreatedPointDrag.value = {
     latestPosition: event,
     hasMoved: false,
   }
-  graphRef.value?.setPointerCapture(event.pointerId)
-  window.addEventListener('pointermove', onWindowPointerMove)
-  window.addEventListener('pointerup', onWindowPointerUp)
-  window.addEventListener('pointercancel', onWindowPointerCancel)
 }
 
-function onWindowPointerMove(event: PointerEvent) {
-  if (activePointerId.value !== event.pointerId) return
+function onDragPointerMove(event: PointerEvent) {
   if (activeDragPointId.value) {
     updatePointFromPointerPosition(activeDragPointId.value, event)
     return
@@ -159,23 +155,9 @@ function onWindowPointerMove(event: PointerEvent) {
   }
 }
 
-function onWindowPointerUp(event: PointerEvent) {
-  stopPointDrag(event.pointerId)
-}
-
-function onWindowPointerCancel(event: PointerEvent) {
-  stopPointDrag(event.pointerId)
-}
-
-function stopPointDrag(pointerId: number) {
-  if (activePointerId.value !== pointerId) return
-  if (graphRef.value?.hasPointerCapture(pointerId)) graphRef.value.releasePointerCapture(pointerId)
-  activePointerId.value = null
+function clearPointDrag() {
   activeDragPointId.value = null
   pendingCreatedPointDrag.value = null
-  window.removeEventListener('pointermove', onWindowPointerMove)
-  window.removeEventListener('pointerup', onWindowPointerUp)
-  window.removeEventListener('pointercancel', onWindowPointerCancel)
 }
 
 function updatePointFromPointerPosition(pointId: string, position: PointerPosition) {
@@ -291,8 +273,4 @@ watch(
   },
   { flush: 'post' },
 )
-
-onBeforeUnmount(() => {
-  if (activePointerId.value != null) stopPointDrag(activePointerId.value)
-})
 </script>
