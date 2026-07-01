@@ -1,5 +1,5 @@
 <template>
-  <ImageEditorChromeFrame mode="adjust" :anchor-rect="anchorRect">
+  <ImageToolChromeFrame mode="adjust" :anchor-rect="anchorRect">
     <template #tools>
       <ImageEditorToolRail :active-tool="activeTool" @select-tool="emit('select-tool', $event)" />
     </template>
@@ -35,7 +35,7 @@
         @cancel-apply="imageAdjustmentFinalApplyContext?.cancel()"
       />
     </template>
-  </ImageEditorChromeFrame>
+  </ImageToolChromeFrame>
 </template>
 
 <script setup lang="ts">
@@ -50,7 +50,7 @@ import type {
   ImageEditorTool,
 } from '../types'
 import ImageEditorAdjustmentActions from './ImageEditorAdjustmentActions.vue'
-import ImageEditorChromeFrame from '../../components/nodes/ImageEditorChromeFrame.vue'
+import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
 import ImageEditorLayerActions from './ImageEditorLayerActions.vue'
 import ImageEditorLayersPanel from './ImageEditorLayersPanel.vue'
 import ImageEditorPropertiesPanel from './ImageEditorPropertiesPanel.vue'

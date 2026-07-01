@@ -5,7 +5,7 @@ import {
   IMAGE_EXECUTION_MODE,
   isImageStrengthAction,
   type ImageStrengthAction,
-} from '../execution/contracts/imageActionExecution'
+} from '../execution'
 
 export const IMAGE_NODE_ACTION = {
   ...WORKFLOW_IMAGE_NODE_ACTION,

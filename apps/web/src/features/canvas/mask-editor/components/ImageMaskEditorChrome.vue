@@ -1,5 +1,5 @@
 <template>
-  <ImageEditorChromeFrame mode="inpaint" :anchor-rect="anchorRect">
+  <ImageToolChromeFrame mode="inpaint" :anchor-rect="anchorRect">
     <template #tools>
       <NodeToolIconButton
         class="image-mask-editor-tool-btn"
@@ -244,7 +244,7 @@
         @submit="onSubmit"
       />
     </template>
-  </ImageEditorChromeFrame>
+  </ImageToolChromeFrame>
 </template>
 
 <script setup lang="ts">
@@ -280,7 +280,7 @@ import {
   MASK_EDITOR_REFERENCE_IMAGE_LIMIT,
 } from '../config/maskEditorConstants'
 import { useMaskFeatherStrengthControl } from '../composables/useMaskFeatherStrengthControl'
-import ImageEditorChromeFrame from '../../components/nodes/ImageEditorChromeFrame.vue'
+import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
 import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 import PromptTextComposer from '../../components/nodes/PromptTextComposer.vue'
 
@@ -440,7 +440,7 @@ function onSubmit(prompt: string, outputCount: number) {
 
 .image-mask-editor-composer {
   width: 100%;
-  min-height: var(--image-editor-right-panel-width);
+  min-height: var(--image-tool-right-panel-width);
   aspect-ratio: 1 / 1;
 }
 

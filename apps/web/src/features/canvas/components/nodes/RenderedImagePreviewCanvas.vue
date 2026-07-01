@@ -8,10 +8,15 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import type { ImageEditorRenderedPreview } from '../../image-editor/types'
+
+type RenderedImagePreview = {
+  width: number
+  height: number
+  imageData: ImageData
+}
 
 const props = defineProps<{
-  preview: ImageEditorRenderedPreview
+  preview: RenderedImagePreview
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)

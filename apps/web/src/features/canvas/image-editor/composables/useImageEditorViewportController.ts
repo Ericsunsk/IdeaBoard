@@ -1,7 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
-import { IMAGE_EDITOR_CHROME_LAYOUT, getImageEditorChromeOutset } from '../config/imageEditorChrome'
+import { IMAGE_TOOL_CHROME_LAYOUT } from '../../config/imageToolChrome'
 import { waitForNextAnimationFrame } from '../../utils/animationFrame'
 import { useRafScheduler } from '../../composables/useRafScheduler'
 
@@ -112,7 +112,10 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
       return center ? { ...center, zoom: IMAGE_EDITOR_FOCUS_MAX_ZOOM } : null
     }
 
-    const chromeOutset = getImageEditorChromeOutset()
+    const chromeOutset = {
+      left: IMAGE_TOOL_CHROME_LAYOUT.toolButtonSize + IMAGE_TOOL_CHROME_LAYOUT.imageGap,
+      right: IMAGE_TOOL_CHROME_LAYOUT.rightPanelWidth + IMAGE_TOOL_CHROME_LAYOUT.imageGap,
+    }
     const viewport = options.getViewport()
     const currentZoom = Number.isFinite(viewport.zoom) && viewport.zoom > 0 ? viewport.zoom : 1
     const flowImageWidth = rect.width / currentZoom
@@ -120,11 +123,11 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
     const viewportRect = getViewportRect()
     const availableWidth = Math.max(
       1,
-      viewportRect.width - IMAGE_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
+      viewportRect.width - IMAGE_TOOL_CHROME_LAYOUT.viewportPadding * 2,
     )
     const availableHeight = Math.max(
       1,
-      viewportRect.height - IMAGE_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
+      viewportRect.height - IMAGE_TOOL_CHROME_LAYOUT.viewportPadding * 2,
     )
     const availableImageWidth = Math.max(1, availableWidth - chromeOutset.left - chromeOutset.right)
     const fitZoom = Math.min(

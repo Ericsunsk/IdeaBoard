@@ -6,4 +6,3 @@ export type {
   ImageToolStageBinding,
   CanvasImageTools,
 } from './imageToolBindings'
-

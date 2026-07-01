@@ -18,6 +18,8 @@
 - `apps/web/src/features/canvas/image-tools` 收拢 canvas 图像工具入口；页面和节点组件只消费 image tool chrome/stage/action binding，不直接串联 image-editor 与 mask-editor 的内部状态。
 - `apps/web/src/features/canvas/execution` 收拢任务执行 context；graph/source planning、backend request adapter、task runner、pending result node materialization 分别放在 `planning`、`commands`、`task-runner`、`result-nodes` 下。
 - `apps/web/src/features/canvas/board-session` 收拢 canvas board load/save/exists/preview/upload lifecycle；`features/canvas-board/domain` 继续作为共享 snapshot schema/core module。
+- Canvas 保持轻量 context map，不按默认 DDD 分成 `domain/application/infrastructure`。只有能缩小 module interface、提升 locality 的子域才独立成 deep module；`components/**`、route page、viewport/pointer/RAF utilities 保持 UI/runtime 辅助角色。
+- Canvas 子模块之间优先通过各自 `index.ts` public seam 依赖；同一子模块内部可以使用相对 deep import。新增跨子模块调用前，先判断是否应收口到既有 interface。
 - `apps/web/src/features/admin/users` 收拢 admin users list、view model、user commands 和 impersonation/session side effects。
 - `apps/web/src/features/admin/provider-config` 收拢 channel/account/provider configuration；channels route page 不直接处理 provider payload mapping。
 - `apps/web/src/features/admin/prompt-config` 收拢 feature prompt resource、query key、save command 和 generated prompt types；prompt-config route page 不直接依赖 Orval 生成入口。
