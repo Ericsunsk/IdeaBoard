@@ -55,7 +55,6 @@
         class="flow-canvas-node__drag-surface relative overflow-visible"
         :class="{ 'is-running': nodeRunning }"
         @mousedown="onNodeMouseDown"
-        @click.stop
         @contextmenu.stop
       >
         <ImageNode
@@ -115,7 +114,6 @@
         class="flow-canvas-node__drag-surface relative overflow-visible"
         :class="{ 'is-running': nodeRunning }"
         @mousedown="onNodeMouseDown"
-        @click.stop
         @contextmenu.stop
       >
         <FusionNode
