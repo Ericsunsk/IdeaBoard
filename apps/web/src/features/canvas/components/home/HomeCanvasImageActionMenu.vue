@@ -38,6 +38,7 @@
             :value="getItemStrengthValue(item)"
             :disabled="directGenerating"
             :tabindex="isStrengthActive(item) ? 0 : -1"
+            :aria-hidden="isStrengthActive(item) ? undefined : 'true'"
             :aria-label="`${item.label}强度`"
             @pointerdown.stop="onItemStrengthRangePointerDown(item, $event)"
             @input="onItemStrengthInput(item, $event)"
@@ -240,9 +241,6 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   inset: 0;
   z-index: 2;
   opacity: 0;
-}
-
-.image-action-control.has-strength-range .image-action-icon-btn {
   pointer-events: none;
 }
 
@@ -253,6 +251,7 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
 .image-action-control.is-strength-active .image-action-strength-range {
   position: relative;
   opacity: 1;
+  pointer-events: auto;
 }
 
 .image-action-menu-enter-active,

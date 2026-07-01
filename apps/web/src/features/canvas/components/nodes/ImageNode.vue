@@ -95,6 +95,7 @@ import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-b
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
+import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import NodeShell from './NodeShell.vue'
