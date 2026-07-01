@@ -23,7 +23,7 @@
             activeKey === item.key ? railButtonActiveClass : railButtonIdleClass,
           ]"
         >
-          <component :is="item.icon" :class="navIconClass" />
+          <component :is="item.icon" :class="navIconClassFor(activeKey === item.key)" />
         </router-link>
       </nav>
 
@@ -215,7 +215,7 @@
               ]"
               @click="closeCallback"
             >
-              <component :is="item.icon" :class="navIconClass" />
+              <component :is="item.icon" :class="navIconClassFor(activeKey === item.key)" />
               <span>{{ item.label }}</span>
             </router-link>
           </nav>
@@ -336,7 +336,8 @@ const notificationButtonClass = [
   shellButtonSkinClass,
   'relative',
 ].join(' ')
-const navIconClass = 'size-[17px]'
+const navIconIdleClass = 'size-[17px]'
+const navIconActiveClass = 'size-[17px] !text-ib-text-inverse'
 const shellIconClass = 'size-[19px]'
 const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-ib-surface'
 const headerClass =
@@ -379,6 +380,10 @@ const activeKey = computed(() => activeItem.value.key)
 const currentMeta = computed(() => {
   return activeItem.value || { title: '管理后台' }
 })
+
+function navIconClassFor(isActive: boolean) {
+  return isActive ? navIconActiveClass : navIconIdleClass
+}
 
 const userMenuItems = computed<MenuItem[]>(() => [
   {
