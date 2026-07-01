@@ -6,57 +6,48 @@
     @mousedown.stop
     @click.stop
   >
-    <div
-      v-motion="{
-        initial: { opacity: 0, y: 6, scale: 0.985 },
-        enter: {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          transition: { duration: 160, easing: 'ease-out' },
-        },
-      }"
-      class="image-action-menu-inner"
-    >
-      <div
-        v-for="item in IMAGE_ACTION_MENU_ITEMS"
-        :key="item.title"
-        class="image-action-control"
-        :class="{
-          'has-strength-range': !!item.strengthAction,
-          'is-strength-active': isStrengthActive(item),
-          'is-strength-hidden': isStrengthHidden(item),
-        }"
-      >
-        <NodeToolIconButton
-          class="image-action-icon-btn"
-          :aria-label-value="item.title"
-          :disabled="directGenerating"
-          :tooltip="item.label"
-          @click="onActionClick(item)"
+    <Transition name="image-action-menu" appear>
+      <div class="image-action-menu-inner">
+        <div
+          v-for="item in IMAGE_ACTION_MENU_ITEMS"
+          :key="item.title"
+          class="image-action-control"
+          :class="{
+            'has-strength-range': !!item.strengthAction,
+            'is-strength-active': isStrengthActive(item),
+            'is-strength-hidden': isStrengthHidden(item),
+          }"
         >
-          <ImageActionMenuIcon :icon="item.icon" />
-        </NodeToolIconButton>
-        <input
-          v-if="item.strengthAction"
-          :ref="(el) => setItemStrengthRangeRef(item, el)"
-          class="image-action-strength-range canvas-range-input"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          :value="getItemStrengthValue(item)"
-          :disabled="directGenerating"
-          :tabindex="isStrengthActive(item) ? 0 : -1"
-          :aria-label="`${item.label}强度`"
-          @pointerdown.stop="onItemStrengthRangePointerDown(item, $event)"
-          @input="onItemStrengthInput(item, $event)"
-          @change="onItemStrengthChange(item, $event)"
-          @pointerup="onItemStrengthPointerUp(item, $event)"
-          @click="onStrengthRangeClick(item, $event)"
-        />
+          <NodeToolIconButton
+            class="image-action-icon-btn"
+            :aria-label-value="item.title"
+            :disabled="directGenerating"
+            :tooltip="item.label"
+            @click="onActionClick(item)"
+          >
+            <ImageActionMenuIcon :icon="item.icon" />
+          </NodeToolIconButton>
+          <input
+            v-if="item.strengthAction"
+            :ref="(el) => setItemStrengthRangeRef(item, el)"
+            class="image-action-strength-range canvas-range-input"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            :value="getItemStrengthValue(item)"
+            :disabled="directGenerating"
+            :tabindex="isStrengthActive(item) ? 0 : -1"
+            :aria-label="`${item.label}强度`"
+            @pointerdown.stop="onItemStrengthRangePointerDown(item, $event)"
+            @input="onItemStrengthInput(item, $event)"
+            @change="onItemStrengthChange(item, $event)"
+            @pointerup="onItemStrengthPointerUp(item, $event)"
+            @click="onStrengthRangeClick(item, $event)"
+          />
+        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -262,5 +253,31 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
 .image-action-control.is-strength-active .image-action-strength-range {
   position: relative;
   opacity: 1;
+}
+
+.image-action-menu-enter-active,
+.image-action-menu-appear-active {
+  transition:
+    opacity var(--canvas-motion-fast, 160ms) ease-out,
+    transform var(--canvas-motion-fast, 160ms) ease-out;
+}
+
+.image-action-menu-enter-from,
+.image-action-menu-appear-from {
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+}
+
+.image-action-menu-enter-to,
+.image-action-menu-appear-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-action-menu-enter-active,
+  .image-action-menu-appear-active {
+    transition: none;
+  }
 }
 </style>

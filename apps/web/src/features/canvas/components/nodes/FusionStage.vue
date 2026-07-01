@@ -15,63 +15,76 @@
       @drop.stop.prevent="onAddSlotDrop"
       @contextmenu.prevent.stop="emit('contextmenu', $event)"
     >
-      <div v-if="fusionRays.length" class="fusion-node-connection-layer" aria-hidden="true">
+      <TransitionGroup
+        v-if="fusionRays.length"
+        name="fusion-node-ray"
+        tag="div"
+        class="fusion-node-connection-layer"
+        aria-hidden="true"
+      >
         <span
           v-for="ray in fusionRays"
           :key="ray.key"
-          v-motion="fusionRayMotion"
           class="fusion-node-ray"
           :style="ray.style"
         />
-      </div>
+      </TransitionGroup>
       <NodeEmptyStateIcon v-if="showEmptyFusionMark" class="fusion-empty-mark" variant="fusion" />
       <div ref="thumbsRef" class="fusion-node-slots">
-        <template v-for="(slot, index) in fusionSlotItems" :key="slot.key">
-          <NodeInputThumbnail
-            v-if="slot.image"
-            v-motion="fusionSlotMotion"
-            class="fusion-node-slot fusion-node-slot-item"
-            :src="slot.image.url"
-            removable
-            :style="getSlotStyle(index)"
-            :data-image-id="slot.image.id"
-            @mousedown.stop
-            @remove="removeInputImage(slot.image.id)"
-          />
-          <div
-            v-else
-            class="fusion-node-slot fusion-node-slot-placeholder"
-            :style="getSlotStyle(index)"
-            aria-hidden="true"
-          />
-        </template>
+        <TransitionGroup name="fusion-node-slot">
+          <template v-for="(slot, index) in fusionSlotItems">
+            <NodeInputThumbnail
+              v-if="slot.image"
+              :key="slot.key"
+              class="fusion-node-slot fusion-node-slot-item"
+              :src="slot.image.url"
+              removable
+              :style="getSlotStyle(index)"
+              :data-image-id="slot.image.id"
+              @mousedown.stop
+              @remove="removeInputImage(slot.image.id)"
+            />
+            <div
+              v-else
+              :key="slot.key"
+              class="fusion-node-slot fusion-node-slot-placeholder"
+              :style="getSlotStyle(index)"
+              aria-hidden="true"
+            />
+          </template>
+        </TransitionGroup>
       </div>
       <div v-if="showBlendPad" class="fusion-blend-layer" aria-label="融合权重控制">
-        <button
-          v-motion="fusionHandleMotion"
-          class="fusion-blend-handle"
-          :class="{ 'is-hover': blendHandleHover, 'is-dragging': blendDragging }"
-          type="button"
-          :style="blendHandleStyle"
-          aria-label="拖动调整融合权重，双击重置"
-          @pointerdown.stop.prevent="onBlendHandlePointerDown"
-          @pointerenter="onBlendHandlePointerEnter"
-          @pointerleave="onBlendHandlePointerLeave"
-          @dblclick.stop.prevent="onBlendHandleDoubleClick"
+        <Transition name="fusion-blend-handle" appear>
+          <button
+            class="fusion-blend-handle"
+            :class="{ 'is-hover': blendHandleHover, 'is-dragging': blendDragging }"
+            type="button"
+            :style="blendHandleStyle"
+            aria-label="拖动调整融合权重，双击重置"
+            @pointerdown.stop.prevent="onBlendHandlePointerDown"
+            @pointerenter="onBlendHandlePointerEnter"
+            @pointerleave="onBlendHandlePointerLeave"
+            @dblclick.stop.prevent="onBlendHandleDoubleClick"
+          >
+            <span class="fusion-blend-handle-dot" />
+          </button>
+        </Transition>
+        <TransitionGroup
+          v-if="showBlendWeightBadges"
+          name="fusion-blend-weight-badge"
+          tag="div"
+          class="fusion-blend-weight-layer"
         >
-          <span class="fusion-blend-handle-dot" />
-        </button>
-        <div v-if="showBlendWeightBadges" class="fusion-blend-weight-layer">
           <div
             v-for="badge in blendWeightBadges"
             :key="badge.key"
-            v-motion="fusionBadgeMotion"
             class="fusion-blend-weight-badge"
             :style="getBlendWeightBadgeStyle(badge.index)"
           >
             {{ badge.percent }}%
           </div>
-        </div>
+        </TransitionGroup>
       </div>
     </NodeStageFrame>
     <slot name="handle-rail" />
@@ -116,35 +129,6 @@ type NodeStageFrameExpose = { stageElement: HTMLElement | null }
 const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
 const maxInputImages = FUSION_SLOT_LAYOUT.maxSlots
-const fusionSlotMotion = {
-  initial: { opacity: 0 },
-  enter: {
-    opacity: 1,
-    transition: { duration: 140, easing: 'ease-out' },
-  },
-}
-const fusionRayMotion = {
-  initial: { opacity: 0 },
-  enter: {
-    opacity: 1,
-    transition: { duration: 160, easing: 'ease-out' },
-  },
-}
-const fusionBadgeMotion = {
-  initial: { opacity: 0, scale: 0.92 },
-  enter: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 140, easing: 'ease-out' },
-  },
-}
-const fusionHandleMotion = {
-  initial: { opacity: 0 },
-  enter: {
-    opacity: 1,
-    transition: { duration: 140, easing: 'ease-out' },
-  },
-}
 
 const {
   addSlotDragOver,
@@ -453,6 +437,66 @@ function getBlendWeightBadgeStyle(index: number) {
 @keyframes fusion-node-ray-flow {
   to {
     background-position: 10px 0;
+  }
+}
+
+.fusion-node-ray-enter-active,
+.fusion-node-ray-leave-active,
+.fusion-node-slot-enter-active,
+.fusion-node-slot-leave-active,
+.fusion-blend-handle-enter-active,
+.fusion-blend-handle-leave-active,
+.fusion-blend-handle-appear-active,
+.fusion-blend-weight-badge-enter-active,
+.fusion-blend-weight-badge-leave-active {
+  transition:
+    opacity var(--canvas-motion-fast, 160ms) ease-out,
+    scale var(--canvas-motion-fast, 160ms) ease-out;
+}
+
+.fusion-node-ray-enter-from,
+.fusion-node-ray-leave-to,
+.fusion-node-slot-enter-from,
+.fusion-node-slot-leave-to,
+.fusion-blend-handle-enter-from,
+.fusion-blend-handle-leave-to,
+.fusion-blend-handle-appear-from {
+  opacity: 0;
+}
+
+.fusion-node-ray-enter-to,
+.fusion-node-ray-leave-from,
+.fusion-node-slot-enter-to,
+.fusion-node-slot-leave-from,
+.fusion-blend-handle-enter-to,
+.fusion-blend-handle-leave-from,
+.fusion-blend-handle-appear-to {
+  opacity: 1;
+}
+
+.fusion-blend-weight-badge-enter-from,
+.fusion-blend-weight-badge-leave-to {
+  opacity: 0;
+  scale: 0.92;
+}
+
+.fusion-blend-weight-badge-enter-to,
+.fusion-blend-weight-badge-leave-from {
+  opacity: 1;
+  scale: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fusion-node-ray-enter-active,
+  .fusion-node-ray-leave-active,
+  .fusion-node-slot-enter-active,
+  .fusion-node-slot-leave-active,
+  .fusion-blend-handle-enter-active,
+  .fusion-blend-handle-leave-active,
+  .fusion-blend-handle-appear-active,
+  .fusion-blend-weight-badge-enter-active,
+  .fusion-blend-weight-badge-leave-active {
+    transition: none;
   }
 }
 </style>

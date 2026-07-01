@@ -11,98 +11,104 @@
     :pt="authDialogPt"
     @update:visible="handleVisibleChange"
   >
-    <div v-motion="authModalMotion" class="relative">
-      <div :class="authModalShellClass">
-        <div :class="authModalBackdropClass" aria-hidden="true"></div>
-        <AuthModalCloseButton :disabled="loading" @click="handleClose" />
+    <Transition name="auth-modal" appear>
+      <div v-if="show" class="relative">
+        <div :class="authModalShellClass">
+          <div :class="authModalBackdropClass" aria-hidden="true"></div>
+          <AuthModalCloseButton :disabled="loading" @click="handleClose" />
 
-        <div :class="authModalHeaderClass">
-          <p :class="authModalKickerClass">WELCOME BACK</p>
-          <h2 :class="authModalTitleClass">欢迎回来</h2>
-          <p :class="authModalSubtitleClass">登录 {{ projectName }}，继续你的创作</p>
-        </div>
+          <div :class="authModalHeaderClass">
+            <p :class="authModalKickerClass">WELCOME BACK</p>
+            <h2 :class="authModalTitleClass">欢迎回来</h2>
+            <p :class="authModalSubtitleClass">登录 {{ projectName }}，继续你的创作</p>
+          </div>
 
-        <form class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
-          <AuthFormField
-            v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
-            label="账号"
-            :error="errors.username"
-            error-id="login-username-error"
+          <form
+            class="relative z-[1] flex flex-col gap-5"
+            novalidate
+            @submit.prevent="handleLogin"
           >
-            <div class="relative w-full">
-              <span :class="authInputIconClass">
-                <UserIcon class="size-5" />
-              </span>
-              <InputText
-                v-model="formValue.username"
-                unstyled
-                autocomplete="username"
-                :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
-                :invalid="invalid"
-                :placeholder="inlineError ? inlineErrorText : '请输入账号'"
-                :aria-describedby="describedbyId"
-                @blur="validateField('username')"
-                @update:model-value="clearFieldError('username')"
-              />
-            </div>
-          </AuthFormField>
+            <AuthFormField
+              v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+              label="账号"
+              :error="errors.username"
+              error-id="login-username-error"
+            >
+              <div class="relative w-full">
+                <span :class="authInputIconClass">
+                  <UserIcon class="size-5" />
+                </span>
+                <InputText
+                  v-model="formValue.username"
+                  unstyled
+                  autocomplete="username"
+                  :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
+                  :invalid="invalid"
+                  :placeholder="inlineError ? inlineErrorText : '请输入账号'"
+                  :aria-describedby="describedbyId"
+                  @blur="validateField('username')"
+                  @update:model-value="clearFieldError('username')"
+                />
+              </div>
+            </AuthFormField>
 
-          <AuthFormField
-            v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
-            label="密码"
-            :error="errors.password"
-            error-id="login-password-error"
-          >
-            <div class="relative w-full">
-              <span :class="authInputIconClass">
-                <LockIcon class="size-5" />
-              </span>
-              <Password
-                v-model="formValue.password"
-                unstyled
-                autocomplete="current-password"
-                :feedback="false"
-                fluid
-                :pt="authPasswordPt"
-                :input-props="{
-                  autocomplete: 'current-password',
-                  'aria-describedby': describedbyId,
-                }"
-                :invalid="invalid"
-                :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
-                :placeholder="inlineError ? inlineErrorText : '请输入密码'"
-                toggle-mask
-                @blur="validateField('password')"
-                @update:model-value="clearFieldError('password')"
-              />
-            </div>
-          </AuthFormField>
+            <AuthFormField
+              v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+              label="密码"
+              :error="errors.password"
+              error-id="login-password-error"
+            >
+              <div class="relative w-full">
+                <span :class="authInputIconClass">
+                  <LockIcon class="size-5" />
+                </span>
+                <Password
+                  v-model="formValue.password"
+                  unstyled
+                  autocomplete="current-password"
+                  :feedback="false"
+                  fluid
+                  :pt="authPasswordPt"
+                  :input-props="{
+                    autocomplete: 'current-password',
+                    'aria-describedby': describedbyId,
+                  }"
+                  :invalid="invalid"
+                  :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
+                  :placeholder="inlineError ? inlineErrorText : '请输入密码'"
+                  toggle-mask
+                  @blur="validateField('password')"
+                  @update:model-value="clearFieldError('password')"
+                />
+              </div>
+            </AuthFormField>
 
-          <Button
-            unstyled
-            :class="authPrimaryButtonClass"
-            :pt="authButtonPt"
-            type="submit"
-            :label="loading ? '登录中...' : '登录'"
-            :loading="loading"
-            :disabled="loading"
-            fluid
-          />
-        </form>
+            <Button
+              unstyled
+              :class="authPrimaryButtonClass"
+              :pt="authButtonPt"
+              type="submit"
+              :label="loading ? '登录中...' : '登录'"
+              :loading="loading"
+              :disabled="loading"
+              fluid
+            />
+          </form>
 
-        <div :class="['mt-8', authFooterClass]">
-          <span>还没有账号？</span>
-          <button
-            type="button"
-            :class="authSwitchButtonClass"
-            :disabled="loading"
-            @click="handleSwitchToRegister"
-          >
-            立即注册
-          </button>
+          <div :class="['mt-8', authFooterClass]">
+            <span>还没有账号？</span>
+            <button
+              type="button"
+              :class="authSwitchButtonClass"
+              :disabled="loading"
+              @click="handleSwitchToRegister"
+            >
+              立即注册
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </Dialog>
 </template>
 
@@ -128,7 +134,6 @@ import {
   authModalBackdropClass,
   authModalHeaderClass,
   authModalKickerClass,
-  authModalMotion,
   authModalShellClass,
   authModalSubtitleClass,
   authModalTitleClass,
@@ -241,3 +246,35 @@ async function handleLogin() {
   }
 }
 </script>
+
+<style scoped>
+.auth-modal-enter-active,
+.auth-modal-leave-active,
+.auth-modal-appear-active {
+  transition:
+    opacity var(--canvas-motion-dock, 240ms) var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
+    transform var(--canvas-motion-dock, 240ms) var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+}
+
+.auth-modal-enter-from,
+.auth-modal-leave-to,
+.auth-modal-appear-from {
+  opacity: 0;
+  transform: translateY(24px) scale(0.96);
+}
+
+.auth-modal-enter-to,
+.auth-modal-leave-from,
+.auth-modal-appear-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-modal-enter-active,
+  .auth-modal-leave-active,
+  .auth-modal-appear-active {
+    transition: none;
+  }
+}
+</style>

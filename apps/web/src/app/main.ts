@@ -1,7 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
-import { MotionPlugin } from '@vueuse/motion'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import { queryClient } from '../shared/query/queryClient'
@@ -18,7 +17,6 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
-app.use(MotionPlugin)
 app.use(PrimeVue, {
   pt: ideaBoardPrimePt,
   ptOptions: {

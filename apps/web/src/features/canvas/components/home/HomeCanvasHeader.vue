@@ -44,41 +44,34 @@
         >
           <SquareCursor class="size-4" />
         </button>
-        <div
-          v-if="isBoardMenuOpen"
-          v-motion="{
-            initial: { opacity: 0, y: 6, scale: 0.98 },
-            enter: {
-              opacity: 1,
-              y: 0,
-              scale: 1,
-              transition: { duration: 160, easing: 'ease-out' },
-            },
-          }"
-          class="absolute top-[calc(100%+10px)] left-0 z-[140] max-h-[280px] min-w-[220px] max-w-[280px] overflow-y-auto rounded-[var(--canvas-surface-radius)] bg-[var(--canvas-surface-bg)] p-1.5 backdrop-blur-[var(--canvas-surface-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-surface-border)]"
-          @mousedown.stop
-          @click.stop
-        >
-          <button
-            v-for="board in boardOptions"
-            :key="board.id"
-            type="button"
-            class="h-[34px] w-full cursor-pointer overflow-hidden rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-ellipsis whitespace-nowrap text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)] hover:text-[var(--canvas-accent-strong)]"
-            :class="{
-              '!bg-[var(--canvas-accent-soft-strong)] !text-[var(--canvas-accent-strong)]':
-                board.id === currentBoardId,
-            }"
-            @click="emit('select-board', board.id)"
-          >
-            {{ board.name }}
-          </button>
+        <Transition name="home-canvas-menu">
           <div
-            v-if="boardOptions.length === 0"
-            class="flex h-[34px] items-center px-2.5 text-xs text-[var(--canvas-text-subtle)]"
+            v-if="isBoardMenuOpen"
+            class="home-canvas-board-menu absolute top-[calc(100%+10px)] left-0 z-[140] max-h-[280px] min-w-[220px] max-w-[280px] overflow-y-auto rounded-[var(--canvas-surface-radius)] bg-[var(--canvas-surface-bg)] p-1.5 backdrop-blur-[var(--canvas-surface-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-surface-border)]"
+            @mousedown.stop
+            @click.stop
           >
-            No canvas
+            <button
+              v-for="board in boardOptions"
+              :key="board.id"
+              type="button"
+              class="h-[34px] w-full cursor-pointer overflow-hidden rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-ellipsis whitespace-nowrap text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)] hover:text-[var(--canvas-accent-strong)]"
+              :class="{
+                '!bg-[var(--canvas-accent-soft-strong)] !text-[var(--canvas-accent-strong)]':
+                  board.id === currentBoardId,
+              }"
+              @click="emit('select-board', board.id)"
+            >
+              {{ board.name }}
+            </button>
+            <div
+              v-if="boardOptions.length === 0"
+              class="flex h-[34px] items-center px-2.5 text-xs text-[var(--canvas-text-subtle)]"
+            >
+              No canvas
+            </div>
           </div>
-        </div>
+        </Transition>
       </div>
     </div>
     <div class="canvas-control-group pointer-events-auto">
@@ -125,36 +118,29 @@
             <User class="size-5" />
           </div>
         </button>
-        <div
-          v-if="isUserMenuOpen"
-          id="canvas-user-menu"
-          v-motion="{
-            initial: { opacity: 0, y: 6, scale: 0.98 },
-            enter: {
-              opacity: 1,
-              y: 0,
-              scale: 1,
-              transition: { duration: 160, easing: 'ease-out' },
-            },
-          }"
-          role="menu"
-          class="absolute top-[calc(100%+8px)] right-0 z-[140] flex w-32 flex-col gap-0.5 rounded-[var(--canvas-surface-radius)] bg-[var(--canvas-surface-bg)] p-1.5 backdrop-blur-[var(--canvas-surface-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-surface-border)]"
-        >
-          <button
-            class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)]"
-            role="menuitem"
-            @click="onOpenCenter"
+        <Transition name="home-canvas-menu">
+          <div
+            v-if="isUserMenuOpen"
+            id="canvas-user-menu"
+            role="menu"
+            class="home-canvas-user-menu absolute top-[calc(100%+8px)] right-0 z-[140] flex w-32 flex-col gap-0.5 rounded-[var(--canvas-surface-radius)] bg-[var(--canvas-surface-bg)] p-1.5 backdrop-blur-[var(--canvas-surface-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-surface-border)]"
           >
-            个人中心
-          </button>
-          <button
-            class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[#d14343] hover:bg-[rgba(209,67,67,0.1)]"
-            role="menuitem"
-            @click="onLogout"
-          >
-            退出登录
-          </button>
-        </div>
+            <button
+              class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)]"
+              role="menuitem"
+              @click="onOpenCenter"
+            >
+              个人中心
+            </button>
+            <button
+              class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[#d14343] hover:bg-[rgba(209,67,67,0.1)]"
+              role="menuitem"
+              @click="onLogout"
+            >
+              退出登录
+            </button>
+          </div>
+        </Transition>
       </div>
     </div>
   </header>
@@ -234,4 +220,38 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 
 <style scoped>
 @import '../styles/canvas-controls.css';
+
+.home-canvas-menu-enter-active,
+.home-canvas-menu-leave-active {
+  transition:
+    opacity var(--canvas-motion-fast) ease-out,
+    transform var(--canvas-motion-fast) ease-out;
+}
+
+.home-canvas-board-menu {
+  transform-origin: top left;
+}
+
+.home-canvas-user-menu {
+  transform-origin: top right;
+}
+
+.home-canvas-menu-enter-from,
+.home-canvas-menu-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+}
+
+.home-canvas-menu-enter-to,
+.home-canvas-menu-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-canvas-menu-enter-active,
+  .home-canvas-menu-leave-active {
+    transition: none;
+  }
+}
 </style>

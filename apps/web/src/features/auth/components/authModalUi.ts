@@ -42,20 +42,6 @@ export const authPasswordPt = {
   },
 } as const
 
-export const authModalMotion = {
-  initial: { opacity: 0, y: 24, scale: 0.96 },
-  enter: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      type: 'spring',
-      stiffness: 150,
-      damping: 18,
-    },
-  },
-} as const
-
 const authModalShellBaseClass =
   'relative overflow-hidden rounded-[24px] border border-white/40 bg-white/75 backdrop-blur-xl px-11 text-slate-800 shadow-[0_24px_50px_-15px_var(--color-canvas-accent-glow),inset_0_1px_1px_rgba(255,255,255,0.6)] max-[520px]:px-7 max-[520px]:py-8 transition-all duration-300'
 

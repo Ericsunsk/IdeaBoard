@@ -1,96 +1,86 @@
 <template>
-  <article
-    v-motion="{
-      initial: { opacity: 0, y: 12, scale: 0.985 },
-      enter: {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        transition: { duration: 220, easing: 'ease-out' },
-      },
-      hovered: {
-        y: -2,
-        scale: 1.006,
-        transition: { duration: 160, easing: 'ease-out' },
-      },
-    }"
-    class="relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-white/90 text-left transition-colors hover:border-board-card-border-hover"
-    role="button"
-    tabindex="0"
-    @keydown.enter.self.prevent="emit('click-board')"
-    @keydown.space.self.prevent="emit('click-board')"
-    @click="emit('click-board')"
-  >
-    <div
-      class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
+  <Transition name="board-card" appear>
+    <article
+      class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-white/90 text-left transition-colors hover:border-board-card-border-hover"
+      role="button"
+      tabindex="0"
+      @keydown.enter.self.prevent="emit('click-board')"
+      @keydown.space.self.prevent="emit('click-board')"
+      @click="emit('click-board')"
     >
-      <img
-        v-if="previewSnapshotDataUrl"
-        :src="previewSnapshotDataUrl"
-        class="block h-full w-full object-cover"
-        alt=""
-      />
       <div
-        v-else
-        class="h-full w-full"
-        :class="blankBoardPreviewSurfaceClass"
-        aria-hidden="true"
-      ></div>
-      <div
-        class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,var(--color-board-card-preview-fade)_0%,var(--color-board-card-preview-fade-clear)_100%)]"
-      ></div>
-    </div>
-
-    <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-[2]">
-      <InputText
-        v-if="isRenaming"
-        ref="renameInputEl"
-        :value="renameDraft"
-        unstyled
-        class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-white/80 px-2 text-[13px] text-board-card-action-hover outline-none"
-        maxlength="60"
-        @click.stop
-        @input="onRenameInput"
-        @blur="emit('commit-rename')"
-        @keyup.enter.stop.prevent="emit('commit-rename')"
-        @keyup.esc.stop.prevent="emit('cancel-rename')"
-      />
-      <div v-else class="truncate text-sm font-[650] text-board-card-title">{{ board.name }}</div>
-      <div class="mt-[3px] text-xs text-board-card-text">Edited {{ displayDate }}</div>
-    </div>
-
-    <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
-      <Button
-        unstyled
-        type="button"
-        title="More actions"
-        aria-label="More actions"
-        aria-haspopup="menu"
-        :aria-expanded="isMenuOpen"
-        class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
-        @click="toggleMenu"
+        class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
       >
-        <MoreHoriz class="size-[18px]" />
-      </Button>
-      <Menu
-        ref="menuRef"
-        :model="menuItems"
-        popup
-        append-to="body"
-        :pt="menuPt"
-        @hide="handleMenuHidden"
-      >
-        <template #item="{ item, props: itemProps }">
-          <a
-            v-bind="itemProps.action"
-            :class="[popupMenuItemClass, item.key === 'delete' ? popupMenuDangerItemClass : '']"
-          >
-            {{ item.label }}
-          </a>
-        </template>
-      </Menu>
-    </div>
-  </article>
+        <img
+          v-if="previewSnapshotDataUrl"
+          :src="previewSnapshotDataUrl"
+          class="block h-full w-full object-cover"
+          alt=""
+        />
+        <div
+          v-else
+          class="h-full w-full"
+          :class="blankBoardPreviewSurfaceClass"
+          aria-hidden="true"
+        ></div>
+        <div
+          class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,var(--color-board-card-preview-fade)_0%,var(--color-board-card-preview-fade-clear)_100%)]"
+        ></div>
+      </div>
+
+      <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-[2]">
+        <InputText
+          v-if="isRenaming"
+          ref="renameInputEl"
+          :value="renameDraft"
+          unstyled
+          class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-white/80 px-2 text-[13px] text-board-card-action-hover outline-none"
+          maxlength="60"
+          @click.stop
+          @input="onRenameInput"
+          @blur="emit('commit-rename')"
+          @keyup.enter.stop.prevent="emit('commit-rename')"
+          @keyup.esc.stop.prevent="emit('cancel-rename')"
+        />
+        <div v-else class="truncate text-sm font-[650] text-board-card-title">
+          {{ board.name }}
+        </div>
+        <div class="mt-[3px] text-xs text-board-card-text">Edited {{ displayDate }}</div>
+      </div>
+
+      <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
+        <Button
+          unstyled
+          type="button"
+          title="More actions"
+          aria-label="More actions"
+          aria-haspopup="menu"
+          :aria-expanded="isMenuOpen"
+          class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
+          @click="toggleMenu"
+        >
+          <MoreHoriz class="size-[18px]" />
+        </Button>
+        <Menu
+          ref="menuRef"
+          :model="menuItems"
+          popup
+          append-to="body"
+          :pt="menuPt"
+          @hide="handleMenuHidden"
+        >
+          <template #item="{ item, props: itemProps }">
+            <a
+              v-bind="itemProps.action"
+              :class="[popupMenuItemClass, item.key === 'delete' ? popupMenuDangerItemClass : '']"
+            >
+              {{ item.label }}
+            </a>
+          </template>
+        </Menu>
+      </div>
+    </article>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -190,3 +180,51 @@ watch(
   },
 )
 </script>
+
+<style scoped>
+.board-card {
+  transition:
+    border-color var(--canvas-motion-fast, 160ms) ease-out,
+    transform var(--canvas-motion-fast, 160ms) ease-out;
+}
+
+.board-card:hover,
+.board-card:focus-visible {
+  transform: translateY(-2px) scale(1.006);
+}
+
+.board-card-enter-active,
+.board-card-appear-active {
+  transition:
+    opacity var(--canvas-motion-panel, 220ms) ease-out,
+    transform var(--canvas-motion-panel, 220ms) ease-out;
+}
+
+.board-card-enter-from,
+.board-card-appear-from {
+  opacity: 0;
+  transform: translateY(12px) scale(0.985);
+}
+
+.board-card-enter-to,
+.board-card-appear-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card {
+    transition: border-color var(--canvas-motion-fast, 160ms) ease-out;
+  }
+
+  .board-card:hover,
+  .board-card:focus-visible {
+    transform: none;
+  }
+
+  .board-card-enter-active,
+  .board-card-appear-active {
+    transition: none;
+  }
+}
+</style>

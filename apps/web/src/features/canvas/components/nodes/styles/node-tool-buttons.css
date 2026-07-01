@@ -147,6 +147,26 @@
   backdrop-filter: blur(var(--canvas-surface-blur));
 }
 
+.node-tool-popover-enter-active,
+.node-tool-popover-leave-active {
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
+  transform-origin: bottom right;
+}
+
+.node-tool-popover-enter-from,
+.node-tool-popover-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+}
+
+.node-tool-popover-enter-to,
+.node-tool-popover-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
 .node-tool-popover-grid {
   display: grid;
   grid-template-columns: repeat(2, var(--node-tool-button-size));
@@ -178,4 +198,11 @@
   border-color: var(--node-tool-button-accent);
   background: var(--color-canvas-accent-soft);
   color: var(--node-tool-button-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-tool-popover-enter-active,
+  .node-tool-popover-leave-active {
+    transition: none;
+  }
 }
