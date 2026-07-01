@@ -72,7 +72,10 @@
           <template #item="{ item, props: itemProps }">
             <a
               v-bind="itemProps.action"
-              :class="[popupMenuItemClass, item.key === 'delete' ? popupMenuDangerItemClass : '']"
+              :class="[
+                appOverlayMenuItemClass,
+                item.key === 'delete' ? appOverlayMenuDangerItemClass : '',
+              ]"
             >
               {{ item.label }}
             </a>
@@ -90,14 +93,13 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
+import {
+  appOverlayMenuDangerItemClass,
+  appOverlayMenuItemClass,
+} from '../../../shared/theme/appOverlayMenu'
 import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
 import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
-import {
-  boardMenuPt,
-  popupMenuDangerItemClass,
-  popupMenuItemClass,
-  type PrimePopupMenuRef,
-} from '../lib/menuStyles'
+import { boardMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
 
 type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 

@@ -13,13 +13,10 @@ function createBoardPopupMenuPt(rootClass: string, itemLinkClass = '!p-0') {
   } as const
 }
 
-const boardsDropdownRootClass =
-  '!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !rounded-[var(--radius-ib-control)] !border !border-board-menu-border !bg-board-overlay-bg !p-0 !shadow-none backdrop-blur-[10px]'
+const boardPopupMenuThemeClass =
+  '[--app-overlay-menu-item-color:var(--color-board-menu-item)] [--app-overlay-menu-item-hover-bg:var(--color-board-menu-item-hover-bg)] [--app-overlay-menu-item-hover-color:var(--color-board-menu-item)] [--app-overlay-menu-danger-color:var(--color-board-menu-danger)] [--app-overlay-menu-danger-hover-bg:var(--color-board-menu-danger-hover-bg)] [--app-overlay-menu-danger-hover-color:var(--color-board-menu-danger)]'
+
+const boardsDropdownRootClass = `!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !rounded-[var(--radius-ib-control)] !border !border-board-menu-border !bg-board-overlay-bg !p-0 !shadow-none backdrop-blur-[10px] ${boardPopupMenuThemeClass}`
 
 export const userMenuPt = createBoardPopupMenuPt(boardsDropdownRootClass, '')
 export const boardMenuPt = userMenuPt
-
-export const popupMenuItemClass =
-  'flex w-full items-center rounded-lg px-2.5 py-2 text-[13px] font-semibold text-board-menu-item no-underline transition-colors hover:bg-board-menu-item-hover-bg'
-export const popupMenuDangerItemClass =
-  '!text-board-menu-danger hover:!bg-board-menu-danger-hover-bg'

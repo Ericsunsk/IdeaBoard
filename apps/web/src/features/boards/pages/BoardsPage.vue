@@ -42,7 +42,10 @@
           <template #item="{ item, props }">
             <a
               v-bind="props.action"
-              :class="[popupMenuItemClass, item.key === 'logout' ? popupMenuDangerItemClass : '']"
+              :class="[
+                appOverlayMenuItemClass,
+                item.key === 'logout' ? appOverlayMenuDangerItemClass : '',
+              ]"
             >
               <span>{{ item.label }}</span>
             </a>
@@ -197,6 +200,10 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import {
+  appOverlayMenuDangerItemClass,
+  appOverlayMenuItemClass,
+} from '../../../shared/theme/appOverlayMenu'
+import {
   USER_CENTER_PATH,
   USER_HOME_PATH,
   USER_CANVAS_PATH,
@@ -210,12 +217,7 @@ import Menu from 'primevue/menu'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import type { MenuItem } from 'primevue/menuitem'
-import {
-  popupMenuDangerItemClass,
-  popupMenuItemClass,
-  userMenuPt,
-  type PrimePopupMenuRef,
-} from '../lib/menuStyles'
+import { userMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
 
 const router = useRouter()
 const appToast = useAppToast()
