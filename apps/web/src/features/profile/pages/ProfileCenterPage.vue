@@ -1,21 +1,21 @@
 <template>
-  <div class="relative h-screen w-full overflow-hidden bg-[#f8f9fd] text-[#1f2430]">
+  <div class="relative h-screen w-full overflow-hidden bg-ib-page text-ib-text">
     <div :class="profileGridBgClass"></div>
 
     <div
-      class="relative z-[1] mx-auto my-[5vh] flex h-[90vh] max-w-[1200px] overflow-hidden rounded-[24px] border border-[#d9dfec] bg-white/[0.82] shadow-[0_24px_80px_rgba(50,62,96,0.08)] backdrop-blur-[16px] max-[900px]:my-0 max-[900px]:h-screen max-[900px]:max-w-none max-[900px]:rounded-none"
+      class="relative z-[1] mx-auto my-[5vh] flex h-[90vh] max-w-[1200px] overflow-hidden rounded-[var(--radius-ib-overlay)] border border-ib-border bg-ib-surface-raised shadow-[var(--shadow-ib-overlay)] backdrop-blur-[16px] max-[900px]:my-0 max-[900px]:h-screen max-[900px]:max-w-none max-[900px]:rounded-none"
     >
       <aside
-        class="flex w-[260px] shrink-0 flex-col border-r border-black/5 px-6 py-10 max-[760px]:w-[220px] max-[640px]:hidden"
+        class="flex w-[260px] shrink-0 flex-col border-r border-ib-border-soft px-6 py-10 max-[760px]:w-[220px] max-[640px]:hidden"
       >
         <div class="mb-12 flex justify-center">
           <Button
             type="button"
             text
-            class="!inline-flex !max-w-full !items-center !gap-2 !border-0 !bg-transparent !p-0 !text-[33px] !leading-none !font-bold !text-[#1d1d1f] !shadow-none hover:!bg-transparent hover:!text-[#1d1d1f]"
+            class="!inline-flex !max-w-full !items-center !gap-2 !border-0 !bg-transparent !p-0 !text-[33px] !leading-none !font-bold !text-ib-text !shadow-none hover:!bg-transparent hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
             @click="router.push(USER_HOME_PATH)"
           >
-            <SiteBrandLogo :src="logoURL" class="h-8 w-8 rounded-lg" />
+            <SiteBrandLogo :src="logoURL" class="h-8 w-8 rounded-[var(--radius-ib-control)]" />
             <span class="min-w-0 truncate">{{ projectName }}</span>
           </Button>
         </div>
@@ -26,11 +26,11 @@
             :key="item.key"
             type="button"
             text
-            class="!flex !w-full !justify-start !gap-3 !rounded-[14px] !border-0 !px-4 !py-3 !text-left !text-[15px] !font-medium !shadow-none !transition !duration-200"
+            class="!flex !w-full !justify-start !gap-3 !rounded-[var(--radius-ib-panel)] !border-0 !px-4 !py-3 !text-left !text-[15px] !font-medium !shadow-none !transition !duration-[var(--duration-ib-standard)] focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
             :class="
               activeTab === item.key
-                ? '!bg-canvas-accent-hover !text-white'
-                : '!bg-transparent !text-[#86868b] hover:!bg-[#eef1fa] hover:!text-[#2c3448]'
+                ? '!bg-ib-creative-accent-hover !text-ib-text-inverse'
+                : '!bg-transparent !text-ib-text-subtle hover:!bg-ib-surface-hover hover:!text-ib-text'
             "
             :aria-current="activeTab === item.key ? 'page' : undefined"
             @click="activeTab = item.key"
@@ -46,7 +46,7 @@
           <Button
             v-if="userStore.user?.role === 'admin'"
             type="button"
-            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[linear-gradient(135deg,var(--color-canvas-accent-hover),var(--color-canvas-accent))] !px-4 !py-3 !text-[15px] !font-semibold !text-white !shadow-none !transition !duration-200 hover:!bg-[linear-gradient(135deg,var(--color-canvas-accent-pressed),var(--color-canvas-accent-hover))]"
+            class="!flex !w-full !justify-start !gap-2.5 !rounded-[var(--radius-ib-control)] !border-0 !bg-[linear-gradient(135deg,var(--color-ib-creative-accent-hover),var(--color-ib-creative-accent))] !px-4 !py-3 !text-[15px] !font-semibold !text-ib-text-inverse !shadow-none !transition !duration-[var(--duration-ib-standard)] hover:!bg-[linear-gradient(135deg,var(--color-ib-creative-accent-pressed),var(--color-ib-creative-accent-hover))] focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
             @click="router.push(ADMIN_USERS_PATH)"
           >
             <Shield class="h-[18px] w-[18px]" />
@@ -55,7 +55,7 @@
 
           <Button
             type="button"
-            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[#f1f3f9] !px-4 !py-3 !text-[15px] !font-semibold !text-[#4d556a] !shadow-none !transition !duration-200 hover:!bg-[#e8ecf7] hover:!text-[#2a3142]"
+            class="!flex !w-full !justify-start !gap-2.5 !rounded-[var(--radius-ib-control)] !border-0 !bg-ib-surface-muted !px-4 !py-3 !text-[15px] !font-semibold !text-ib-text-muted !shadow-none !transition !duration-[var(--duration-ib-standard)] hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
             @click="router.back()"
           >
             <NavArrowLeft class="h-[18px] w-[18px]" />
@@ -65,7 +65,7 @@
           <Button
             type="button"
             text
-            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-transparent !px-4 !py-3 !text-[15px] !font-semibold !text-[#ff3b30] !shadow-none !transition !duration-200 hover:!bg-[rgba(255,59,48,0.05)]"
+            class="!flex !w-full !justify-start !gap-2.5 !rounded-[var(--radius-ib-control)] !border-0 !bg-transparent !px-4 !py-3 !text-[15px] !font-semibold !text-ib-danger !shadow-none !transition !duration-[var(--duration-ib-standard)] hover:!bg-ib-danger/5 focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
             @click="handleLogout"
           >
             <LogOut class="h-[18px] w-[18px]" />
@@ -79,7 +79,7 @@
         @scroll.passive="handleProfileMainScroll"
       >
         <nav
-          class="mb-6 hidden grid-cols-2 gap-2 rounded-2xl border border-[#e2e7f3] bg-white/80 p-1.5 max-[640px]:grid"
+          class="mb-6 hidden grid-cols-2 gap-2 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface-raised p-1.5 max-[640px]:grid"
           aria-label="个人中心导航"
         >
           <Button
@@ -87,11 +87,11 @@
             :key="`mobile-${item.key}`"
             type="button"
             text
-            class="!flex !h-10 !justify-center !gap-2 !rounded-xl !border-0 !px-3 !text-[14px] !font-semibold !shadow-none"
+            class="!flex !h-10 !justify-center !gap-2 !rounded-[var(--radius-ib-control)] !border-0 !px-3 !text-[14px] !font-semibold !shadow-none focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
             :class="
               activeTab === item.key
-                ? '!bg-canvas-accent-hover !text-white'
-                : '!bg-transparent !text-[#6b7280] hover:!bg-[#eef1fa] hover:!text-[#2c3448]'
+                ? '!bg-ib-creative-accent-hover !text-ib-text-inverse'
+                : '!bg-transparent !text-ib-text-muted hover:!bg-ib-surface-hover hover:!text-ib-text'
             "
             :aria-current="activeTab === item.key ? 'page' : undefined"
             @click="activeTab = item.key"
@@ -106,7 +106,7 @@
         >
           <div class="flex items-center gap-5">
             <div
-              class="relative h-20 w-20 overflow-visible rounded-full bg-white shadow-[0_10px_26px_rgba(71,82,118,0.1)] max-[520px]:h-[72px] max-[520px]:w-[72px]"
+              class="relative h-20 w-20 overflow-visible rounded-[var(--radius-ib-pill)] bg-ib-surface shadow-[var(--shadow-ib-control)] max-[520px]:h-[72px] max-[520px]:w-[72px]"
             >
               <Avatar
                 v-if="userStore.user?.avatar"
@@ -118,13 +118,13 @@
                 v-else
                 :label="userInitial"
                 shape="circle"
-                class="!h-full !w-full !bg-[linear-gradient(135deg,var(--color-canvas-accent),var(--color-canvas-accent-secondary))] !text-[32px] !font-bold !text-white"
+                class="!h-full !w-full !bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-canvas-accent-secondary))] !text-[32px] !font-bold !text-ib-text-inverse"
               />
               <Button
                 type="button"
                 text
                 rounded
-                class="!absolute !right-[-4px] !bottom-[-4px] !flex !h-7 !w-7 !min-w-7 !items-center !justify-center !rounded-full !border !border-[#d9dfec] !bg-white/[0.98] !p-0 !text-[#6b7290] !shadow-none !transition !duration-200 hover:!border-[#c8d0e2] hover:!bg-[#f8faff] hover:!text-[#4a5169] disabled:!cursor-not-allowed disabled:!opacity-60"
+                class="!absolute !right-[-4px] !bottom-[-4px] !flex !h-7 !w-7 !min-w-7 !items-center !justify-center !rounded-[var(--radius-ib-pill)] !border !border-ib-border !bg-ib-surface !p-0 !text-ib-text-muted !shadow-none !transition !duration-[var(--duration-ib-standard)] hover:!border-ib-border-hover hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-60"
                 :disabled="avatarUploading"
                 aria-label="更换头像"
                 title="更换头像"
@@ -143,11 +143,11 @@
             </div>
             <div class="min-w-0">
               <h1
-                class="m-0 truncate text-[28px] leading-tight font-bold tracking-normal text-[#1d1d1f]"
+                class="m-0 truncate text-[28px] leading-tight font-bold tracking-normal text-ib-text"
               >
                 {{ userStore.user?.username }}
               </h1>
-              <p class="mt-1 mb-0 text-[15px] text-[#86868b]">
+              <p class="mt-1 mb-0 text-[15px] text-ib-text-subtle">
                 {{ userRoleLabel }}
               </p>
             </div>
@@ -155,10 +155,10 @@
 
           <div class="flex gap-6">
             <div
-              class="flex min-w-[100px] flex-col rounded-2xl border border-white/80 bg-white/50 px-5 py-3"
+              class="flex min-w-[100px] flex-col rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface-raised px-5 py-3"
             >
-              <span class="text-xl font-bold text-[#1d1d1f]">{{ userStore.user?.uid || '-' }}</span>
-              <span class="text-[13px] text-[#86868b]">会员编号</span>
+              <span class="text-xl font-bold text-ib-text">{{ userStore.user?.uid || '-' }}</span>
+              <span class="text-[13px] text-ib-text-subtle">会员编号</span>
             </div>
           </div>
         </div>
@@ -176,15 +176,15 @@
             <div v-if="activeTab === 'profile'" key="profile">
               <Card :pt="profileCardPt">
                 <template #content>
-                  <h2 class="m-0 mb-8 text-xl font-semibold text-[#1d1d1f]">个人基本资料</h2>
+                  <h2 class="m-0 mb-8 text-xl font-semibold text-ib-text">个人基本资料</h2>
                   <dl class="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
                     <div
                       v-for="field in profileFields"
                       :key="field.label"
-                      class="min-w-0 rounded-2xl border border-[#edf1f7] bg-[#fbfcff] px-4 py-3.5"
+                      class="min-w-0 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface-muted px-4 py-3.5"
                       :class="field.full ? 'col-span-2 max-[720px]:col-span-1' : ''"
                     >
-                      <dt class="mb-2 block text-[13px] font-medium text-[#86868b]">
+                      <dt class="mb-2 block text-[13px] font-medium text-ib-text-subtle">
                         {{ field.label }}
                       </dt>
                       <dd class="m-0 min-w-0">
@@ -193,11 +193,11 @@
                           :value="field.value"
                           :severity="field.severity"
                           rounded
-                          class="!bg-white"
+                          class="!bg-ib-surface"
                         />
                         <span
                           v-else
-                          class="block truncate text-base font-medium text-[#1d1d1f]"
+                          class="block truncate text-base font-medium text-ib-text"
                           :class="field.mono ? 'font-mono text-[15px]' : ''"
                           :title="field.value"
                         >
@@ -213,7 +213,7 @@
             <div v-else-if="activeTab === 'security'" key="security">
               <Card :pt="profileCardPt">
                 <template #content>
-                  <h2 class="m-0 mb-8 text-xl font-semibold text-[#1d1d1f]">账号安全设置</h2>
+                  <h2 class="m-0 mb-8 text-xl font-semibold text-ib-text">账号安全设置</h2>
                   <form
                     class="flex flex-col gap-8"
                     novalidate
@@ -351,7 +351,7 @@
                       :loading="pwdLoading"
                       :disabled="pwdLoading"
                       fluid
-                      class="!h-12 !rounded-[14px] !border-0 !bg-canvas-accent-hover !text-[15px] !font-semibold !text-white !shadow-[0_8px_24px_var(--color-canvas-accent-shadow)] transition hover:!-translate-y-0.5 hover:!bg-canvas-accent-pressed hover:!shadow-[0_12px_32px_var(--color-canvas-accent-shadow-hover)] active:!translate-y-0"
+                      class="!h-12 !rounded-[var(--radius-ib-panel)] !border-0 !bg-ib-creative-accent-hover !text-[15px] !font-semibold !text-ib-text-inverse !shadow-[var(--shadow-ib-control)] transition hover:!-translate-y-0.5 hover:!bg-ib-creative-accent-pressed hover:!shadow-[var(--shadow-ib-panel)] active:!translate-y-0 focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-70"
                     />
                   </form>
                 </template>
@@ -443,7 +443,8 @@ const navItems = [
 
 const profileCardPt = {
   root: {
-    class: 'overflow-hidden rounded-[18px] border border-[#e2e7f3] bg-white shadow-none',
+    class:
+      'overflow-hidden rounded-[var(--radius-ib-overlay)] border border-ib-border-soft bg-ib-surface shadow-none',
   },
   body: {
     class: '!p-[34px] max-[640px]:!p-6',
@@ -454,15 +455,15 @@ const profileCardPt = {
 } as const
 
 const profileGridBgClass =
-  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,var(--color-canvas-accent-wash)_0%,var(--color-canvas-accent-clear)_42%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
+  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,var(--color-canvas-accent-wash)_0%,var(--color-canvas-accent-clear)_42%),radial-gradient(circle,var(--color-ib-border-soft)_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
 
 const mainContentClass =
   'app-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6'
-const passwordFieldClass = 'flex min-w-0 flex-col gap-2 text-sm font-medium text-[#1d1d1f]'
+const passwordFieldClass = 'flex min-w-0 flex-col gap-2 text-sm font-medium text-ib-text'
 const passwordInputClass =
-  '!h-12 !w-full !rounded-xl !border-[#d2d2d7] !bg-white/90 !px-3 !text-[15px] !text-[#1d1d1f] !shadow-none placeholder:!text-[#86868b] enabled:hover:!border-canvas-accent enabled:focus:!border-canvas-accent'
+  '!h-12 !w-full !rounded-[var(--radius-ib-control)] !border-ib-border !bg-ib-surface-raised !px-3 !text-[15px] !text-ib-text !shadow-none placeholder:!text-ib-text-subtle enabled:hover:!border-ib-border-hover enabled:focus:!border-ib-creative-accent enabled:focus:!shadow-[var(--shadow-ib-focus)]'
 const passwordInputErrorClass =
-  '!border-rose-300 !bg-rose-50/50 placeholder:!text-rose-400 enabled:focus:!border-rose-400'
+  '!border-ib-danger !bg-ib-danger/5 placeholder:!text-ib-danger/75 enabled:focus:!border-ib-danger'
 
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))

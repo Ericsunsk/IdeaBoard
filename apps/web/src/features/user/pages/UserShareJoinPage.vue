@@ -1,7 +1,7 @@
 <template>
-  <div class="grid min-h-screen place-items-center bg-surface-50 p-6">
+  <div class="grid min-h-screen place-items-center bg-ib-page p-6 text-ib-text">
     <Card
-      class="w-[min(520px,100%)] rounded-2xl border border-surface-200 bg-surface-0 shadow-[0_12px_24px_rgba(18,30,54,0.08)]"
+      class="w-[min(520px,100%)] rounded-[var(--radius-ib-overlay)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-panel)]"
     >
       <template #content>
         <div class="flex flex-col items-start gap-4">
@@ -11,13 +11,14 @@
             stroke-width="4"
             aria-label="正在加入共享画布"
           />
-          <h1 class="m-0 text-[22px] font-bold text-surface-900">{{ titleText }}</h1>
-          <p class="m-0 text-[15px] leading-7 text-surface-600">{{ statusText }}</p>
+          <h1 class="m-0 text-[22px] font-bold text-ib-text">{{ titleText }}</h1>
+          <p class="m-0 text-[15px] leading-7 text-ib-text-muted">{{ statusText }}</p>
           <Button
             v-if="failed"
             label="返回画布列表"
             severity="secondary"
             outlined
+            class="!rounded-[var(--radius-ib-control)] !border-ib-border !bg-ib-surface !text-ib-text-muted !shadow-none hover:!border-ib-border-hover hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
             @click="goBoards"
           />
         </div>
