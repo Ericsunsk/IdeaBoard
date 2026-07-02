@@ -1,8 +1,9 @@
 <template>
-  <div class="image-editor-histogram-control__fields image-editor-threshold-fields">
-    <label class="image-editor-histogram-control__field">
-      <span>阈值</span>
+  <div class="editing-controls-fields image-editor-threshold-fields">
+    <label class="editing-controls-field">
+      <span class="editing-controls-label">阈值</span>
       <input
+        class="editing-controls-control editing-controls-number-input"
         type="number"
         min="0"
         max="255"
@@ -13,7 +14,7 @@
       />
     </label>
     <button
-      class="image-editor-histogram-control__toggle-button node-tool-tooltip-trigger"
+      class="editing-controls-toggle-button node-tool-tooltip-trigger"
       type="button"
       :aria-pressed="invert ? 'true' : 'false'"
       aria-label="反转阈值输出"

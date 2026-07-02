@@ -92,9 +92,7 @@ describe('ImageEditorThresholdControl', () => {
       const histogram = harness.host.querySelector<SVGPathElement>(
         '.image-editor-histogram-plot__histogram',
       )
-      const marker = harness.host.querySelector<HTMLElement>(
-        '.image-editor-histogram-plot__marker',
-      )
+      const marker = harness.host.querySelector<HTMLElement>('.image-editor-histogram-plot__marker')
       const slider = harness.host.querySelector<HTMLInputElement>('input[type="range"]')
       const guideLine = harness.host.querySelector<SVGLineElement>(
         '.image-editor-histogram-plot__guide-line',
@@ -133,6 +131,7 @@ describe('ImageEditorThresholdControl', () => {
       await nextTick()
       const numberInput = harness.host.querySelector<HTMLInputElement>('input[type="number"]')
       expect(numberInput?.getAttribute('inputmode')).toBe('numeric')
+      expect(numberInput?.classList.contains('editing-controls-number-input')).toBe(true)
       numberInput!.value = '300'
       numberInput?.dispatchEvent(new Event('input', { bubbles: true }))
 
@@ -177,11 +176,12 @@ describe('ImageEditorThresholdControl', () => {
     try {
       await nextTick()
       const invertButton = harness.host.querySelector<HTMLButtonElement>(
-        '.image-editor-histogram-control__toggle-button',
+        '.editing-controls-toggle-button',
       )
 
       expect(invertButton?.getAttribute('aria-pressed')).toBe('false')
       expect(invertButton?.getAttribute('aria-label')).toBe('反转阈值输出')
+      expect(invertButton?.classList.contains('editing-controls-toggle-button')).toBe(true)
       expect(invertButton?.querySelector('.node-tool-tooltip')?.textContent?.trim()).toBe('反转')
       invertButton?.click()
 

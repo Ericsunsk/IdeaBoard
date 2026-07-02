@@ -1,11 +1,12 @@
 <template>
-  <div class="image-editor-histogram-control__fields image-editor-levels-fields">
+  <div class="editing-controls-fields image-editor-levels-fields">
     <label
       v-for="field in levelFields"
       :key="field.key"
-      class="image-editor-histogram-control__field image-editor-levels-fields__field"
+      class="editing-controls-field editing-controls-field--compact image-editor-levels-fields__field"
     >
       <input
+        class="editing-controls-control editing-controls-number-input"
         type="number"
         :min="constraints[field.key].min"
         :max="constraints[field.key].max"

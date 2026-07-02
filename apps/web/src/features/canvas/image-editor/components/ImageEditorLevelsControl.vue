@@ -1,5 +1,5 @@
 <template>
-  <div class="image-editor-histogram-control image-editor-levels-control">
+  <div class="editing-controls-stack image-editor-levels-control">
     <ImageEditorHistogramPlot
       :aria-label="plotAriaLabel"
       :histogram-path="histogramPath"

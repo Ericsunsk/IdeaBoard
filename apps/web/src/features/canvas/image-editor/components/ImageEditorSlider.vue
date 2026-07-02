@@ -1,6 +1,6 @@
 <template>
-  <label class="image-editor-slider-row">
-    <span class="image-editor-slider-row__label">{{ label }}</span>
+  <label class="editing-controls-slider-row">
+    <span class="editing-controls-slider-row__label">{{ label }}</span>
     <input
       class="canvas-range-input"
       type="range"
@@ -10,7 +10,7 @@
       :value="value"
       @input="onInput"
     />
-    <span class="image-editor-slider-row__value">{{ value }}{{ unit }}</span>
+    <span class="editing-controls-slider-row__value">{{ value }}{{ unit }}</span>
   </label>
 </template>
 
@@ -33,31 +33,4 @@ function onInput(event: Event) {
 }
 </script>
 
-<style scoped>
-.image-editor-slider-row {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 36px;
-  align-items: center;
-  gap: 10px;
-  min-height: var(--canvas-range-input-height);
-  color: var(--canvas-text-body);
-  font-size: var(--image-editor-panel-text-size);
-  font-weight: 500;
-}
-
-.image-editor-slider-row__label {
-  line-height: 1.1;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.image-editor-slider-row__value {
-  color: var(--canvas-text-muted);
-  font-size: var(--image-editor-panel-meta-text-size);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-
-</style>
+<style src="../../components/styles/editing-controls.css"></style>

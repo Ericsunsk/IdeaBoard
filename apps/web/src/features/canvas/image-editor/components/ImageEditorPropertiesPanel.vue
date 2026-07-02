@@ -1,6 +1,6 @@
 <template>
-  <section class="image-editor-panel image-editor-properties-panel">
-    <div v-if="adjustmentLayer?.kind === 'hsl'" class="image-editor-panel__body">
+  <section class="editing-controls-panel image-editor-properties-panel">
+    <div v-if="adjustmentLayer?.kind === 'hsl'" class="editing-controls-panel__body">
       <ImageEditorSlider
         :label="ranges.hsl.ranges.hue.label"
         :value="adjustmentLayer.params.hue"
@@ -35,7 +35,7 @@
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'threshold'" class="image-editor-panel__body">
+    <div v-else-if="adjustmentLayer?.kind === 'threshold'" class="editing-controls-panel__body">
       <ImageEditorThresholdControl
         :params="adjustmentLayer.params"
         :histogram-source="histogramSource"
@@ -43,7 +43,7 @@
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'curves'" class="image-editor-panel__body">
+    <div v-else-if="adjustmentLayer?.kind === 'curves'" class="editing-controls-panel__body">
       <ImageEditorCurvesControl
         :params="adjustmentLayer.params"
         :histogram-source="histogramSource"
@@ -51,7 +51,7 @@
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'levels'" class="image-editor-panel__body">
+    <div v-else-if="adjustmentLayer?.kind === 'levels'" class="editing-controls-panel__body">
       <ImageEditorLevelsControl
         :params="adjustmentLayer.params"
         :histogram-source="histogramSource"
@@ -59,8 +59,8 @@
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'invert'" class="image-editor-panel__body">
-      <label class="image-editor-toggle-row">
+    <div v-else-if="adjustmentLayer?.kind === 'invert'" class="editing-controls-panel__body">
+      <label class="editing-controls-toggle-row">
         <span>启用反相</span>
         <input
           type="checkbox"
@@ -70,7 +70,7 @@
       </label>
     </div>
 
-    <div v-else class="image-editor-empty-state">选择一个编辑图层</div>
+    <div v-else class="editing-controls-empty-state">选择一个编辑图层</div>
   </section>
 </template>
 
@@ -105,41 +105,9 @@ function onBooleanInput(key: ImageEditorParamKey, event: Event) {
 }
 </script>
 
-<style src="./styles/image-editor-panel.css"></style>
+<style src="../../components/styles/editing-controls.css"></style>
 <style scoped>
 .image-editor-properties-panel {
   min-height: 0;
-}
-
-.image-editor-panel__body {
-  padding: var(--image-editor-panel-content-gap) 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.image-editor-toggle-row {
-  min-height: var(--image-editor-panel-control-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--canvas-text-body);
-  font-size: var(--image-editor-panel-text-size);
-  font-weight: 500;
-}
-
-.image-editor-toggle-row input[type='checkbox'] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--canvas-accent);
-}
-
-.image-editor-empty-state {
-  min-height: 100px;
-  display: grid;
-  place-items: center;
-  color: var(--canvas-text-subtle);
-  font-size: var(--image-editor-panel-text-size);
 }
 </style>

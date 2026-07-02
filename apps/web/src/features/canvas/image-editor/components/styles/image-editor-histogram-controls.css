@@ -1,6 +1,8 @@
+@import '../../../components/styles/editing-controls.css';
 @import './image-editor-control-points.css';
 
-.image-editor-histogram-control {
+.image-editor-threshold-control,
+.image-editor-levels-control {
   --image-editor-histogram-frame-border-color: var(--canvas-accent-outline);
   --image-editor-histogram-frame-radius: 9px;
   --image-editor-histogram-marker-size: 12px;
@@ -10,9 +12,6 @@
     var(--canvas-accent, var(--color-canvas-accent)) 52%,
     var(--canvas-accent-wash, var(--color-canvas-accent-soft)) 100%
   );
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
 }
 
 .image-editor-threshold-control .image-editor-histogram-plot,
@@ -31,11 +30,6 @@
   opacity: 1;
 }
 
-.image-editor-histogram-control__fields {
-  display: grid;
-  gap: 8px;
-}
-
 .image-editor-threshold-fields {
   grid-template-columns: minmax(0, 1fr) 24px;
 }
@@ -44,63 +38,8 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.image-editor-histogram-control__field {
-  min-width: 0;
-  display: grid;
-  align-items: center;
-  gap: 7px;
-  color: var(--canvas-text-muted);
-  font-size: var(--image-editor-panel-meta-text-size);
-  font-weight: 600;
-  grid-template-columns: 34px minmax(0, 1fr);
-}
-
-.image-editor-levels-fields .image-editor-histogram-control__field {
+.image-editor-levels-fields .editing-controls-field {
   grid-template-columns: minmax(0, 1fr);
-}
-
-.image-editor-histogram-control__field input[type='number'] {
-  height: calc(var(--image-editor-panel-control-height) - 4px);
-  min-width: 0;
-  appearance: textfield;
-  -moz-appearance: textfield;
-  border: var(--image-editor-panel-border-width) solid
-    var(--image-editor-panel-control-border-color);
-  border-radius: calc(var(--image-editor-panel-control-radius) - 1px);
-  background: var(--image-editor-panel-control-bg);
-  color: var(--canvas-text-body);
-  font-size: var(--image-editor-panel-text-size);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  padding: 0 7px;
-  outline: none;
-  transition:
-    background-color var(--canvas-motion-fast) ease,
-    border-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease,
-    opacity var(--canvas-motion-fast) ease;
-}
-
-.image-editor-histogram-control__field input[type='number']:hover:not(:disabled) {
-  border-color: var(--image-editor-panel-control-hover-border-color);
-}
-
-.image-editor-histogram-control__field input[type='number']:focus-visible {
-  border-color: var(--image-editor-panel-control-focus-border-color);
-  box-shadow: none;
-}
-
-.image-editor-histogram-control__field input[type='number']:disabled {
-  cursor: not-allowed;
-  opacity: 0.72;
-}
-
-.image-editor-histogram-control__field input::-webkit-outer-spin-button,
-.image-editor-histogram-control__field input::-webkit-inner-spin-button {
-  appearance: none;
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .image-editor-levels-output {
@@ -109,13 +48,10 @@
 }
 
 .image-editor-levels-output__header {
-  color: var(--canvas-text-muted);
-  font-size: var(--image-editor-panel-meta-text-size);
-  font-weight: 600;
+  display: block;
 }
 
 .image-editor-levels-output__fields {
-  display: grid;
   grid-template-columns: repeat(2, minmax(0, 56px));
   justify-content: space-between;
   gap: 8px;
@@ -123,49 +59,6 @@
 
 .image-editor-levels-output__field {
   grid-template-columns: minmax(0, 1fr);
-}
-
-.image-editor-histogram-control__toggle-button {
-  --node-tool-border-width: var(--image-editor-panel-border-width);
-  --node-tool-tooltip-delay: 200ms;
-  width: 24px;
-  height: calc(var(--image-editor-panel-control-height) - 4px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: var(--image-editor-panel-border-width) solid
-    var(--image-editor-panel-control-border-color);
-  border-radius: calc(var(--image-editor-panel-control-radius) - 1px);
-  background: var(--image-editor-panel-control-bg);
-  color: var(--canvas-text-muted);
-  cursor: pointer;
-  transition:
-    background-color var(--canvas-motion-fast) ease,
-    border-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease;
-}
-
-.image-editor-histogram-control__toggle-button:hover {
-  border-color: var(--image-editor-panel-control-hover-border-color);
-  color: var(--canvas-accent-strong);
-}
-
-.image-editor-histogram-control__toggle-button:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
-}
-
-.image-editor-histogram-control__toggle-button[aria-pressed='true'] {
-  border-color: var(--canvas-accent);
-  background: var(--canvas-accent);
-  color: #ffffff;
-}
-
-.image-editor-histogram-control__toggle-button svg {
-  width: 14px;
-  height: 14px;
-  stroke-width: 2;
 }
 
 .image-editor-levels-output__slider {

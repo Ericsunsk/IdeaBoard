@@ -45,40 +45,42 @@
       </NodeToolIconButton>
     </template>
     <template #dock>
-      <div class="image-mask-editor-panel image-mask-editor-right-panel">
-        <section class="image-mask-editor-section">
-          <div class="image-mask-editor-field">
-            <span class="image-mask-editor-field-label">笔刷</span>
-            <div class="image-mask-editor-segmented">
+      <div
+        class="editing-controls-panel editing-controls-panel--padded image-mask-editor-right-panel"
+      >
+        <section class="editing-controls-section">
+          <div class="editing-controls-field image-mask-editor-field">
+            <span class="editing-controls-label image-mask-editor-field-label">笔刷</span>
+            <div class="editing-controls-segmented">
               <button
                 type="button"
-                class="image-mask-editor-segmented-btn node-tool-tooltip-trigger"
-                :class="{ active: brushShape === 'round' }"
+                class="editing-controls-segmented-button node-tool-tooltip-trigger"
+                :class="{ 'is-active': brushShape === 'round' }"
                 :aria-pressed="brushShape === 'round'"
                 aria-label="圆形笔尖"
                 @click="emit('set-brush-shape', 'round')"
               >
-                <Circle class="image-mask-editor-segmented-icon" />
+                <Circle class="editing-controls-segmented-icon" />
                 <span class="node-tool-tooltip" aria-hidden="true">圆形笔尖</span>
               </button>
               <button
                 type="button"
-                class="image-mask-editor-segmented-btn node-tool-tooltip-trigger"
-                :class="{ active: brushShape === 'square' }"
+                class="editing-controls-segmented-button node-tool-tooltip-trigger"
+                :class="{ 'is-active': brushShape === 'square' }"
                 :aria-pressed="brushShape === 'square'"
                 aria-label="方形笔尖"
                 @click="emit('set-brush-shape', 'square')"
               >
-                <Square class="image-mask-editor-segmented-icon" />
+                <Square class="editing-controls-segmented-icon" />
                 <span class="node-tool-tooltip" aria-hidden="true">方形笔尖</span>
               </button>
             </div>
           </div>
-          <label class="image-mask-editor-field">
-            <span class="image-mask-editor-field-label">粗细</span>
-            <div class="image-mask-editor-size-input-row">
+          <label class="editing-controls-field image-mask-editor-field">
+            <span class="editing-controls-label image-mask-editor-field-label">粗细</span>
+            <div class="editing-controls-range-row">
               <div
-                class="image-mask-editor-range-wrap"
+                class="editing-controls-range-wrap"
                 :style="
                   rangeTooltipStyle(
                     brushSize,
@@ -96,15 +98,15 @@
                   :value="brushSize"
                   @input="onBrushSizeInput"
                 />
-                <span class="image-mask-editor-range-tooltip">{{ brushSize }}</span>
+                <span class="editing-controls-range-tooltip">{{ brushSize }}</span>
               </div>
             </div>
           </label>
-          <label class="image-mask-editor-field">
-            <span class="image-mask-editor-field-label">硬度</span>
-            <div class="image-mask-editor-size-input-row">
+          <label class="editing-controls-field image-mask-editor-field">
+            <span class="editing-controls-label image-mask-editor-field-label">硬度</span>
+            <div class="editing-controls-range-row">
               <div
-                class="image-mask-editor-range-wrap"
+                class="editing-controls-range-wrap"
                 :style="
                   rangeTooltipStyle(
                     brushHardness,
@@ -122,17 +124,17 @@
                   :value="brushHardness"
                   @input="onBrushHardnessInput"
                 />
-                <span class="image-mask-editor-range-tooltip">{{ brushHardness }}</span>
+                <span class="editing-controls-range-tooltip">{{ brushHardness }}</span>
               </div>
             </div>
           </label>
         </section>
-        <section class="image-mask-editor-section">
-          <label class="image-mask-editor-field">
-            <span class="image-mask-editor-field-label">蒙版</span>
-            <div class="image-mask-editor-size-input-row">
+        <section class="editing-controls-section">
+          <label class="editing-controls-field image-mask-editor-field">
+            <span class="editing-controls-label image-mask-editor-field-label">蒙版</span>
+            <div class="editing-controls-range-row">
               <div
-                class="image-mask-editor-range-wrap"
+                class="editing-controls-range-wrap"
                 :style="
                   rangeTooltipStyle(
                     maskLayerOpacity,
@@ -150,7 +152,7 @@
                   :value="maskLayerOpacity"
                   @input="onMaskOpacityInput"
                 />
-                <span class="image-mask-editor-range-tooltip">{{ maskLayerOpacity }}</span>
+                <span class="editing-controls-range-tooltip">{{ maskLayerOpacity }}</span>
               </div>
             </div>
           </label>
@@ -353,7 +355,7 @@ function onMaskOpacityInput(event: Event) {
 function rangeTooltipStyle(value: number, min: number, max: number) {
   const ratio = max === min ? 0 : (value - min) / (max - min)
   const percent = Math.min(1, Math.max(0, ratio)) * 100
-  return { '--mask-editor-range-value': `${percent}%` }
+  return { '--editing-controls-range-value': `${percent}%` }
 }
 
 function onSubmit(prompt: string, outputCount: number) {
@@ -364,22 +366,11 @@ function onSubmit(prompt: string, outputCount: number) {
 
 <style scoped>
 @import '../../components/nodes/styles/node-tool-buttons.css';
-
-.image-mask-editor-panel {
-  border: var(--node-tool-border-width) solid var(--canvas-accent-outline);
-  border-radius: var(--canvas-floating-radius);
-  background: var(--canvas-surface-bg);
-  box-sizing: border-box;
-}
+@import '../../components/styles/editing-controls.css';
 
 .image-mask-editor-right-panel {
   width: 100%;
   min-height: 0;
-  overflow: visible;
-  padding: var(--canvas-panel-content-gap) 12px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--canvas-panel-content-gap);
 }
 
 .image-mask-editor-tool-btn {
@@ -444,18 +435,7 @@ function onSubmit(prompt: string, outputCount: number) {
   aspect-ratio: 1 / 1;
 }
 
-.image-mask-editor-section {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
 .image-mask-editor-field {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
   min-height: 22px;
 }
 
@@ -464,97 +444,8 @@ function onSubmit(prompt: string, outputCount: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
   font-weight: 500;
   color: var(--color-canvas-text-option);
-  line-height: 1;
   text-align: center;
-  white-space: nowrap;
-}
-
-.image-mask-editor-segmented {
-  display: flex;
-  gap: 6px;
-}
-
-.image-mask-editor-segmented-btn {
-  height: 28px;
-  width: 28px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--canvas-surface-bg);
-  color: var(--color-canvas-text-option);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition:
-    background-color var(--canvas-motion-standard) ease,
-    color var(--canvas-motion-standard) ease,
-    opacity var(--canvas-motion-standard) ease;
-}
-
-.image-mask-editor-segmented-btn:hover:not(:disabled):not(.active) {
-  color: var(--canvas-text-strong);
-}
-
-.image-mask-editor-segmented-btn.active {
-  background: var(--canvas-accent-wash);
-  color: var(--canvas-accent);
-}
-
-.image-mask-editor-segmented-btn:disabled {
-  opacity: 0.46;
-  cursor: not-allowed;
-}
-
-.image-mask-editor-segmented-icon {
-  width: 15px;
-  height: 15px;
-}
-
-.image-mask-editor-size-input-row {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  flex: 1;
-  height: 22px;
-}
-
-.image-mask-editor-range-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  height: var(--canvas-range-input-height);
-}
-
-.image-mask-editor-range-tooltip {
-  --mask-editor-range-value: 0%;
-  position: absolute;
-  left: var(--mask-editor-range-value);
-  bottom: calc(100% - 2px);
-  transform: translate(-50%, 2px);
-  min-width: 18px;
-  padding: 3px 5px;
-  border-radius: 5px;
-  background: var(--color-canvas-tooltip-bg);
-  color: var(--color-canvas-tooltip-text);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 0.14s ease,
-    transform 0.14s ease;
-}
-
-.image-mask-editor-range-wrap:hover .image-mask-editor-range-tooltip,
-.image-mask-editor-range-wrap:focus-within .image-mask-editor-range-tooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
 }
 </style>

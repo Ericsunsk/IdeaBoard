@@ -1,18 +1,28 @@
 <template>
-  <div class="image-editor-curves">
-    <div class="image-editor-curves__toolbar">
-      <label class="image-editor-curves__select-label">
-        <span>预设</span>
-        <select :value="selectedPresetId" aria-label="曲线预设" @change="onPresetChange">
+  <div class="editing-controls-stack image-editor-curves">
+    <div class="editing-controls-toolbar image-editor-curves__toolbar">
+      <label class="editing-controls-field image-editor-curves__select-label">
+        <span class="editing-controls-label">预设</span>
+        <select
+          class="editing-controls-control editing-controls-select"
+          :value="selectedPresetId"
+          aria-label="曲线预设"
+          @change="onPresetChange"
+        >
           <option value="custom">自定</option>
           <option v-for="preset in curvePresets" :key="preset.id" :value="preset.id">
             {{ preset.label }}
           </option>
         </select>
       </label>
-      <label class="image-editor-curves__select-label">
-        <span>通道</span>
-        <select :value="activeChannel" aria-label="曲线通道" @change="onChannelChange">
+      <label class="editing-controls-field image-editor-curves__select-label">
+        <span class="editing-controls-label">通道</span>
+        <select
+          class="editing-controls-control editing-controls-select"
+          :value="activeChannel"
+          aria-label="曲线通道"
+          @change="onChannelChange"
+        >
           <option v-for="channel in curveChannels" :key="channel.id" :value="channel.id">
             {{ channel.label }}
           </option>
@@ -33,10 +43,11 @@
       @select-point="selectPoint"
     />
 
-    <div class="image-editor-curves__fields">
-      <label>
-        <span>输入</span>
+    <div class="editing-controls-fields image-editor-curves__fields">
+      <label class="editing-controls-field image-editor-curves__field">
+        <span class="editing-controls-label">输入</span>
         <input
+          class="editing-controls-control editing-controls-number-input"
           type="number"
           min="0"
           max="100"
@@ -46,9 +57,10 @@
           @input="onSelectedPointInputChange"
         />
       </label>
-      <label>
-        <span>输出</span>
+      <label class="editing-controls-field image-editor-curves__field">
+        <span class="editing-controls-label">输出</span>
         <input
+          class="editing-controls-control editing-controls-number-input"
           type="number"
           min="0"
           max="100"

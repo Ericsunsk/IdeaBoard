@@ -1,6 +1,6 @@
 <template>
   <div class="image-editor-levels-output" aria-label="输出色阶">
-    <div class="image-editor-levels-output__header">
+    <div class="editing-controls-label image-editor-levels-output__header">
       <span>输出色阶</span>
     </div>
     <div
@@ -33,9 +33,12 @@
         @input="onOutputInput('outputWhite', $event)"
       />
     </div>
-    <div class="image-editor-levels-output__fields">
-      <label class="image-editor-histogram-control__field image-editor-levels-output__field">
+    <div class="editing-controls-fields image-editor-levels-output__fields">
+      <label
+        class="editing-controls-field editing-controls-field--compact image-editor-levels-output__field"
+      >
         <input
+          class="editing-controls-control editing-controls-number-input"
           type="number"
           :min="constraints.outputBlack.min"
           :max="constraints.outputBlack.max"
@@ -48,8 +51,11 @@
           @input="onOutputInput('outputBlack', $event)"
         />
       </label>
-      <label class="image-editor-histogram-control__field image-editor-levels-output__field">
+      <label
+        class="editing-controls-field editing-controls-field--compact image-editor-levels-output__field"
+      >
         <input
+          class="editing-controls-control editing-controls-number-input"
           type="number"
           :min="constraints.outputWhite.min"
           :max="constraints.outputWhite.max"

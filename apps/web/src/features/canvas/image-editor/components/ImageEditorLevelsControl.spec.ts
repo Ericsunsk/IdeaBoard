@@ -155,6 +155,11 @@ describe('ImageEditorLevelsControl', () => {
       )
 
       expect(fields).toHaveLength(0)
+      expect(
+        [...numberInputs].every((input) =>
+          input.classList.contains('editing-controls-number-input'),
+        ),
+      ).toBe(true)
       expect([...numberInputs].map((input) => input.getAttribute('aria-label'))).toEqual([
         '黑场',
         '中点',
@@ -282,6 +287,11 @@ describe('ImageEditorLevelsControl', () => {
       expect(outputNumbers).toHaveLength(2)
       expect(outputRanges[0]?.classList.contains('canvas-range-input')).toBe(true)
       expect(outputRanges[1]?.classList.contains('canvas-range-input')).toBe(true)
+      expect(
+        [...outputNumbers].every((input) =>
+          input.classList.contains('editing-controls-number-input'),
+        ),
+      ).toBe(true)
       expect(outputNumbers[0]?.value).toBe('20')
       expect(outputNumbers[0]?.getAttribute('aria-label')).toBe('输出黑场')
       expect(outputNumbers[1]?.value).toBe('220')

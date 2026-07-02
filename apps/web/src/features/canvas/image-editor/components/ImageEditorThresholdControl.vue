@@ -1,5 +1,5 @@
 <template>
-  <div class="image-editor-histogram-control image-editor-threshold-control">
+  <div class="editing-controls-stack image-editor-threshold-control">
     <ImageEditorHistogramPlot
       aria-label="阈值直方图"
       :histogram-path="histogramPath"

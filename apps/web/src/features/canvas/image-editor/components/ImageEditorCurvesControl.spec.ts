@@ -104,6 +104,9 @@ describe('ImageEditorCurvesControl', () => {
       const [inputField, outputField] =
         harness.host.querySelectorAll<HTMLInputElement>('input[type="number"]')
 
+      expect(inputField?.classList.contains('editing-controls-number-input')).toBe(true)
+      expect(outputField?.classList.contains('editing-controls-number-input')).toBe(true)
+
       inputField.value = ''
       inputField.dispatchEvent(new Event('input', { bubbles: true }))
       await nextTick()
@@ -112,9 +115,7 @@ describe('ImageEditorCurvesControl', () => {
       outputField.dispatchEvent(new Event('input', { bubbles: true }))
       await nextTick()
 
-      expect(harness.params.value.channels.rgb).toEqual([
-        { id: 'midtone', input: 50, output: 55 },
-      ])
+      expect(harness.params.value.channels.rgb).toEqual([{ id: 'midtone', input: 50, output: 55 }])
     } finally {
       harness.unmount()
     }
