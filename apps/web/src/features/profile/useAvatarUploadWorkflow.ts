@@ -1,14 +1,14 @@
 import { ref, type Ref } from 'vue'
 import { useUserStore } from '../../app/stores/user'
 import { uploadApi } from '../../shared/api/upload'
-import { useAsyncAction } from '../../shared/composables/useAsyncAction'
-import { useAppToast } from '../../shared/composables/useAppToast'
+import { type AsyncActionFeedback, useAsyncAction } from '../../shared/composables/useAsyncAction'
+import { type ProfileFeedback, useProfileFeedback } from './useProfileFeedback'
 
 type RunAsyncAction = <T>(
   action: () => T | Promise<T>,
   options?: {
     loading?: Ref<boolean>
-    errorMessage?: string | ((error: unknown) => string)
+    feedback?: AsyncActionFeedback<T>
   },
 ) => Promise<T | undefined>
 
@@ -16,22 +16,17 @@ type AvatarUploadUserStore = {
   setAvatarLocal: (avatar: string) => void
 }
 
-type AvatarUploadToast = {
-  success: (message: string) => void
-  warning: (message: string) => void
-}
-
 export type AvatarUploadWorkflowDependencies = {
   uploadAvatar?: typeof uploadApi.uploadAvatar
   userStore?: AvatarUploadUserStore
-  appToast?: AvatarUploadToast
+  profileFeedback?: Pick<ProfileFeedback, 'invalidAvatarFile' | 'avatarUpload'>
   runAsyncAction?: RunAsyncAction
 }
 
 export function useAvatarUploadWorkflow(deps: AvatarUploadWorkflowDependencies = {}) {
   const uploadAvatar = deps.uploadAvatar ?? uploadApi.uploadAvatar
   const userStore = deps.userStore ?? useUserStore()
-  const appToast = deps.appToast ?? useAppToast()
+  const profileFeedback = deps.profileFeedback ?? useProfileFeedback()
   const runAsyncAction = deps.runAsyncAction ?? useAsyncAction().runAsyncAction
 
   const uploading = ref(false)
@@ -39,7 +34,7 @@ export function useAvatarUploadWorkflow(deps: AvatarUploadWorkflowDependencies =
   async function selectFile(file?: File | null) {
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      appToast.warning('仅支持上传图片文件')
+      profileFeedback.invalidAvatarFile()
       return
     }
 
@@ -51,11 +46,10 @@ export function useAvatarUploadWorkflow(deps: AvatarUploadWorkflowDependencies =
           throw new Error('头像上传失败，请稍后重试')
         }
         userStore.setAvatarLocal(avatarUrl)
-        appToast.success('头像已更新')
       },
       {
         loading: uploading,
-        errorMessage: '头像更新失败',
+        feedback: profileFeedback.avatarUpload,
       },
     )
   }

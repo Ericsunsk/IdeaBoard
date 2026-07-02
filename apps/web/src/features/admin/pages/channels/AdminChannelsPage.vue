@@ -410,7 +410,6 @@ import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
 import { EditPencil, Plus, Refresh, Trash } from '@iconoir/vue'
-import { useAppToast } from '../../../../shared/composables/useAppToast'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
@@ -426,15 +425,16 @@ import {
   adminMasonryCardClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
+import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 
-const appToast = useAppToast()
+const adminFeedback = useAdminFeedback()
 const confirm = useConfirm()
 
 const { isScrolling: isChannelPanelScrolling, handleScroll: handleChannelPanelScroll } =
   useTransientScrolling()
 
 const { cards, channelEditor, accountEditor, commands } = useAdminProviderConfig({
-  message: appToast,
+  message: adminFeedback.channels.providerConfig,
   confirm: {
     danger: ({ title, content, acceptLabel, onConfirm }) =>
       requireAdminConfirm({

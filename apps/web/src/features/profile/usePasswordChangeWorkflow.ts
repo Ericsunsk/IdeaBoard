@@ -2,14 +2,14 @@ import { ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../app/stores/user'
-import { useAsyncAction } from '../../shared/composables/useAsyncAction'
-import { useAppToast } from '../../shared/composables/useAppToast'
+import { type AsyncActionFeedback, useAsyncAction } from '../../shared/composables/useAsyncAction'
 import { USER_LOGIN_PATH } from '../../shared/constants/routePaths'
 import {
   displayErrorMessage,
   isRequiredErrorMessage,
   markRequiredError,
 } from '../../shared/utils/formValidation'
+import { type ProfileFeedback, useProfileFeedback } from './useProfileFeedback'
 
 export type PasswordField = 'oldPassword' | 'newPassword' | 'confirmPassword'
 export type PasswordForm = Record<PasswordField, string>
@@ -18,7 +18,7 @@ type RunAsyncAction = <T>(
   action: () => T | Promise<T>,
   options?: {
     loading?: Ref<boolean>
-    errorMessage?: string | ((error: unknown) => string)
+    feedback?: AsyncActionFeedback<T>
   },
 ) => Promise<T | undefined>
 
@@ -27,14 +27,10 @@ type PasswordChangeUserStore = {
   logout: () => Promise<boolean>
 }
 
-type PasswordChangeToast = {
-  success: (message: string) => void
-}
-
 export type PasswordChangeWorkflowDependencies = {
   userStore?: PasswordChangeUserStore
   router?: Pick<Router, 'replace'>
-  appToast?: PasswordChangeToast
+  profileFeedback?: Pick<ProfileFeedback, 'passwordChange'>
   runAsyncAction?: RunAsyncAction
 }
 
@@ -51,7 +47,7 @@ function emptyPasswordForm(): PasswordForm {
 export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependencies = {}) {
   const userStore = deps.userStore ?? useUserStore()
   const router = deps.router ?? useRouter()
-  const appToast = deps.appToast ?? useAppToast()
+  const profileFeedback = deps.profileFeedback ?? useProfileFeedback()
   const runAsyncAction = deps.runAsyncAction ?? useAsyncAction().runAsyncAction
 
   const form = ref<PasswordForm>(emptyPasswordForm())
@@ -125,13 +121,12 @@ export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependenci
         if (!isLoggedOut) {
           throw new Error('密码已更新，但退出登录失败，请手动退出后重新登录')
         }
-        appToast.success('密码更新成功，请重新登录')
         await router.replace(USER_LOGIN_PATH)
+        return true
       },
       {
         loading,
-        errorMessage: (error) =>
-          error instanceof Error && error.message ? error.message : '密码更新失败',
+        feedback: profileFeedback.passwordChange,
       },
     )
   }

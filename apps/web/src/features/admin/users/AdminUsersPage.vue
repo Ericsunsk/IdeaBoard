@@ -247,7 +247,6 @@ import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import { useConfirm } from 'primevue/useconfirm'
-import { useAppToast } from '../../../shared/composables/useAppToast'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../shared/components/AdminResourceToolbar.vue'
@@ -262,6 +261,7 @@ import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'
 import type { AdminUserRowView, UserActionKey } from './adminUserView'
+import { useAdminFeedback } from '../feedback/useAdminFeedback'
 
 const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
 const userActionPopoverPt = createAdminPopoverPt({ contentClass: '!p-1.5' })
@@ -271,14 +271,14 @@ type PrimePopupPanel = {
   hide?: () => void
 }
 
-const appToast = useAppToast()
+const adminFeedback = useAdminFeedback()
 const confirm = useConfirm()
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
 const { isScrolling: isUserTableScrolling, handleScroll: handleUserTableScroll } =
   useTransientScrolling()
 
 const adminUsers = useAdminUsersContext({
-  message: appToast,
+  message: adminFeedback.users.management,
   confirm: { require: requireAdminConfirm },
 })
 

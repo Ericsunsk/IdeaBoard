@@ -23,11 +23,7 @@
             <p :class="authModalSubtitleClass">登录 {{ projectName }}，继续你的创作</p>
           </div>
 
-          <form
-            class="relative z-[1] flex flex-col gap-5"
-            novalidate
-            @submit.prevent="handleLogin"
-          >
+          <form class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
             <AuthFormField
               v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
               label="账号"
@@ -120,8 +116,9 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { User as UserIcon, Lock as LockIcon } from '@iconoir/vue'
-import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { useAuthFeedback } from '../useAuthFeedback'
 import AuthFormField from './AuthFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
@@ -158,7 +155,8 @@ const { projectName } = useSiteBranding()
 type LoginField = 'username' | 'password'
 
 const userStore = useUserStore()
-const appToast = useAppToast()
+const authFeedback = useAuthFeedback()
+const { runAsyncAction } = useAsyncAction()
 const loginFieldLabels: Record<LoginField, string> = {
   username: '账号',
   password: '密码',
@@ -233,18 +231,20 @@ watch(
 async function handleLogin() {
   if (!validateForm()) return
 
-  try {
-    loading.value = true
-    await userStore.login(formValue.value.username.trim(), formValue.value.password)
-    appToast.success('登录成功')
-    resetForm()
-    emit('login-success')
-    emit('update:show', false)
-  } catch (error: unknown) {
-    appToast.error(error instanceof Error && error.message ? error.message : '登录失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
+  const loggedIn = await runAsyncAction(
+    async () => {
+      await userStore.login(formValue.value.username.trim(), formValue.value.password)
+      return true
+    },
+    {
+      loading,
+      feedback: authFeedback.login,
+    },
+  )
+  if (!loggedIn) return
+  resetForm()
+  emit('login-success')
+  emit('update:show', false)
 }
 </script>
 
@@ -253,8 +253,10 @@ async function handleLogin() {
 .auth-modal-leave-active,
 .auth-modal-appear-active {
   transition:
-    opacity var(--canvas-motion-dock, 240ms) var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
-    transform var(--canvas-motion-dock, 240ms) var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+    opacity var(--canvas-motion-dock, 240ms)
+      var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
+    transform var(--canvas-motion-dock, 240ms)
+      var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
 }
 
 .auth-modal-enter-from,

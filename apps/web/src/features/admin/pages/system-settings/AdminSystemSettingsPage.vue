@@ -397,11 +397,8 @@ import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
-import { useAppToast } from '../../../../shared/composables/useAppToast'
-import {
-  isSupportedUploadImageFile,
-  unsupportedUploadImageMessage,
-} from '../../../../shared/utils/imageUploadSupport'
+import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
+import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
@@ -422,9 +419,7 @@ import {
   TASK_MONITOR_MIN_PAGE_SIZE,
   TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
 } from '../../system-settings/taskMonitorSettingsResource'
-import {
-  useAdminTaskMonitorSettings,
-} from '../../system-settings/useAdminTaskMonitorSettings'
+import { useAdminTaskMonitorSettings } from '../../system-settings/useAdminTaskMonitorSettings'
 import { useAdminPublicURLSettings } from '../../system-settings/useAdminPublicURLSettings'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -439,7 +434,7 @@ const settingActionRowClass = 'flex flex-wrap items-center gap-2 pt-1'
 const settingToggleRowClass =
   'flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border bg-admin-surface-muted px-3.5 py-3'
 
-const appToast = useAppToast()
+const adminFeedback = useAdminFeedback()
 const {
   isScrolling: isSystemSettingsPanelScrolling,
   handleScroll: handleSystemSettingsPanelScroll,
@@ -458,7 +453,7 @@ const {
   resetBrandingForm,
   saving: brandingSaving,
   uploading,
-} = useAdminBrandingSettings({ message: appToast })
+} = useAdminBrandingSettings({ message: adminFeedback.systemSettings.branding })
 const {
   handleSaveRateLimit,
   handleToggleRegistration,
@@ -468,28 +463,28 @@ const {
   registrationEnabled,
   registrationSettingLoading,
   resetRateLimitForm,
-} = useAdminAccessSettings({ message: appToast })
+} = useAdminAccessSettings({ message: adminFeedback.systemSettings.access })
 const {
   form: taskMonitorForm,
   handleSaveTaskMonitorSettings,
   loading: taskMonitorLoading,
   resetTaskMonitorForm,
   saving: taskMonitorSaving,
-} = useAdminTaskMonitorSettings({ message: appToast })
+} = useAdminTaskMonitorSettings({ message: adminFeedback.systemSettings.taskMonitor })
 const {
   form: publicURLForm,
   handleSavePublicURLSettings,
   loading: publicURLLoading,
   resetPublicURLForm,
   saving: publicURLSaving,
-} = useAdminPublicURLSettings({ message: appToast })
+} = useAdminPublicURLSettings({ message: adminFeedback.systemSettings.publicURL })
 const {
   form: mediaUploadForm,
   handleSaveMediaUploadSettings,
   loading: mediaUploadLoading,
   resetMediaUploadForm,
   saving: mediaUploadSaving,
-} = useAdminMediaUploadSettings({ message: appToast })
+} = useAdminMediaUploadSettings({ message: adminFeedback.systemSettings.mediaUpload })
 
 const publicURLStatusLabel = computed(() => {
   const hasPublicBaseURL = Boolean(publicURLForm.value.public_base_url.trim())
@@ -515,7 +510,7 @@ async function handleLogoInputChange(event: Event) {
   input.value = ''
   if (!file) return
   if (!isSupportedUploadImageFile(file)) {
-    appToast.error(unsupportedUploadImageMessage())
+    adminFeedback.systemSettings.unsupportedLogoFile()
     return
   }
   pendingLogoFile.value = file

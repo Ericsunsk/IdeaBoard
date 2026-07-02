@@ -1,9 +1,11 @@
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { useAdminStorageFeedback } from './useAdminStorageFeedback'
 import { useStorageProfileEditor } from './useStorageProfileEditor'
 import { useStorageProfilesResource } from './useStorageProfilesResource'
 
 export function useAdminStorageContext() {
   const { runAsyncAction } = useAsyncAction()
+  const storageFeedback = useAdminStorageFeedback()
   const resource = useStorageProfilesResource()
   const editor = useStorageProfileEditor({
     creatableProviders: resource.creatableProviders,
@@ -18,7 +20,9 @@ export function useAdminStorageContext() {
 
   async function loadData() {
     await runAsyncAction(resource.loadData, {
-      errorMessage: '刷新存储配置失败',
+      feedback: {
+        error: storageFeedback.refreshFailed,
+      },
     })
   }
 

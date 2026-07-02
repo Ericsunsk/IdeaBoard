@@ -190,13 +190,13 @@ import { useCanvasBoardRuntime } from '../composables/useCanvasBoardRuntime'
 import { useCanvasGraphRuntime } from '../composables/useCanvasGraphRuntime'
 import { useCanvasImageTools } from '../image-tools'
 import { useCanvasTaskRuntime } from '../composables/useCanvasTaskRuntime'
-import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useCanvasFeedback } from '../feedback/useCanvasFeedback'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import CanvasMiniMap from '../components/CanvasMiniMap.vue'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
 import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 
-const appToast = useAppToast()
+const canvasFeedback = useCanvasFeedback()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -273,11 +273,7 @@ const {
   getViewport,
   setViewport: (viewport) => setViewport(viewport),
   logoutAndRedirect,
-  message: {
-    warning: (msg: string) => appToast.warning(msg),
-    success: (msg: string) => appToast.success(msg),
-    error: (msg: string) => appToast.error(msg),
-  },
+  message: canvasFeedback.boardSession.runtimeMessage,
   onNativeRemove: () => {
     dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
   },
@@ -380,7 +376,7 @@ const {
   sanitizeApiErrorMessage,
   openNodeImagePreview,
   openImageUrlPreview,
-  message: appToast,
+  message: canvasFeedback.graph.runtimeMessage,
 })
 
 function onFlowConnectEnd() {
@@ -426,10 +422,7 @@ const {
   flushAutosave,
   currentBoardId,
   refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
-  message: {
-    success: (text) => appToast.success(text),
-    warning: (text) => appToast.warning(text),
-  },
+  message: canvasFeedback.taskExecution.runtimeMessage,
 })
 
 const {
@@ -520,10 +513,7 @@ const imageTools = useCanvasImageTools({
   clearSelectedFlowElements: clearSelectedFlowElementsSync,
   startCanvasInteraction: startFlowInteraction,
   stopCanvasInteraction: stopFlowInteraction,
-  message: {
-    warning: (msg) => appToast.warning(msg),
-    success: (msg) => appToast.success(msg),
-  },
+  message: canvasFeedback.imageTools.runtimeMessage,
 })
 
 const {
@@ -686,7 +676,7 @@ const {
   runImagePromptAction: runFlowImageToolPromptAction,
   runFusionPromptGeneration,
   onFlowNodeParamUpdate,
-  onWarning: (message) => appToast.warning(message),
+  onWarning: canvasFeedback.imageTools.actionUnavailable,
   getActionStrength,
 })
 

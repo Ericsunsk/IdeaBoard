@@ -189,6 +189,7 @@ import {
 } from '../../canvas-board/catalog/canvasBoards'
 import { hydrateCanvasBoardsFromServer } from '../../canvas-board/catalog/boardSync'
 import BoardCard from '../components/BoardCard.vue'
+import { useBoardFeedback } from '../feedback/useBoardFeedback'
 import { createCanvasBoardCommands } from '../lib/canvasBoardCommands'
 import { createBoardPreviewRefreshQueue } from '../lib/boardPreviewRefreshQueue'
 import {
@@ -197,7 +198,6 @@ import {
   boardCatalogDeleteDialogStyle,
   boardCatalogSortSelectPt,
 } from '../lib/boardCatalogSkin'
-import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import {
@@ -221,7 +221,7 @@ import type { MenuItem } from 'primevue/menuitem'
 import { userMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
 
 const router = useRouter()
-const appToast = useAppToast()
+const boardFeedback = useBoardFeedback()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 const { projectName } = useSiteBranding()
@@ -319,7 +319,7 @@ async function createAndOpenBoard() {
   const result = await boardCommands.create()
   if (!result.ok) {
     reloadBoards()
-    appToast.error(result.reason === 'name-conflict' ? '画布名称已存在，请重试' : '创建同步失败，请稍后重试')
+    boardFeedback.createFailed(result)
     console.warn('[boards] failed to sync new board', result.error)
     return
   }
@@ -359,29 +359,29 @@ async function commitRename() {
   if (!boardId) return
   const result = await boardCommands.rename({ boardId, nextName: renameDraft.value })
   if (!result.ok) {
-    if (result.reason === 'local-name-conflict') {
-      appToast.warning('名称已存在')
-      return
+    switch (result.reason) {
+      case 'local-name-conflict':
+        boardFeedback.renameValidationFailed(result)
+        return
+      case 'invalid-name':
+        renamingBoardId.value = null
+        suppressNextBoardOpen.value = true
+        boardFeedback.renameValidationFailed(result)
+        return
+      case 'remote-name-conflict':
+      case 'sync-failed':
+        renamingBoardId.value = null
+        suppressNextBoardOpen.value = true
+        reloadBoards()
+        boardFeedback.renameSyncFailed(result)
+        console.warn('[boards] failed to sync renamed board', result.error)
+        return
     }
-    renamingBoardId.value = null
-    suppressNextBoardOpen.value = true
-    if (result.reason === 'invalid-name') {
-      appToast.warning('画布名称不能为空')
-      return
-    }
-    reloadBoards()
-    appToast.error(
-      result.reason === 'remote-name-conflict'
-        ? '名称已存在，请更换后再试'
-        : '重命名同步失败，请稍后重试',
-    )
-    console.warn('[boards] failed to sync renamed board', result.error)
-    return
   }
   renamingBoardId.value = null
   suppressNextBoardOpen.value = true
   reloadBoards()
-  appToast.success('画布已重命名')
+  boardFeedback.renamed()
 }
 
 function cancelRename() {
@@ -412,20 +412,14 @@ async function handleDuplicateAction(board: CanvasBoardMeta) {
   const result = await boardCommands.duplicate({ sourceBoardId: board.id })
   if (!result.ok) {
     reloadBoards()
-    if (result.reason === 'source-missing') {
-      appToast.error('复制失败')
-      return
+    boardFeedback.copyFailed(result)
+    if (result.reason !== 'source-missing') {
+      console.warn('[boards] failed to sync duplicated board', result.error)
     }
-    appToast.error(
-      result.reason === 'name-conflict'
-        ? '复制后的画布名称已存在，请重试'
-        : '复制同步失败，请稍后重试',
-    )
-    console.warn('[boards] failed to sync duplicated board', result.error)
     return
   }
   reloadBoards()
-  appToast.success('已复制画布')
+  boardFeedback.copied()
 }
 
 function handleDeleteAction(board: CanvasBoardMeta) {
@@ -451,7 +445,7 @@ async function confirmDeleteBoard() {
   isDeleteBoardPending.value = true
   const result = await boardCommands.delete({ boardId: board.id })
   if (!result.ok) {
-    appToast.error(result.reason === 'sync-failed' ? '删除失败，请稍后重试' : '删除失败')
+    boardFeedback.deleteFailed(result)
     if (result.reason === 'sync-failed') {
       console.warn('[boards] failed to sync deleted board', result.error)
     }
@@ -465,7 +459,7 @@ async function confirmDeleteBoard() {
   deleteDialogVisible.value = false
   pendingDeleteBoard.value = null
   isDeleteBoardPending.value = false
-  appToast.success('已删除画布')
+  boardFeedback.deleted()
 }
 
 function handleUserMenuShow() {
@@ -504,7 +498,7 @@ onMounted(async () => {
   try {
     const hydrateResult = await hydrateCanvasBoardsFromServer()
     if (!hydrateResult.ok) {
-      appToast.error('画布同步失败，请稍后重试')
+      boardFeedback.catalogSyncFailed()
     }
     reloadBoards()
   } finally {

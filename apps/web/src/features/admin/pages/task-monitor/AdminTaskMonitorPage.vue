@@ -165,12 +165,7 @@
           </template>
 
           <template #actions="{ iconButtonClass }">
-            <Button
-              text
-              :class="iconButtonClass"
-              aria-label="刷新任务列表"
-              @click="loadTasks"
-            >
+            <Button text :class="iconButtonClass" aria-label="刷新任务列表" @click="loadTasks">
               <template #icon>
                 <Refresh class="size-4 text-admin-text-2" />
               </template>
@@ -618,8 +613,8 @@ import {
   WarningTriangle,
   XmarkCircle,
 } from '@iconoir/vue'
-import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
+import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
@@ -657,7 +652,7 @@ import { useTaskMonitorCharts } from '../../task-monitor/useTaskMonitorCharts'
 import { type AdminTaskRow, useAdminTaskList } from '../../task-monitor/useAdminTaskList'
 import { useAdminTaskRuntimeSnapshot } from '../../task-monitor/useAdminTaskRuntimeSnapshot'
 
-const appToast = useAppToast()
+const adminFeedback = useAdminFeedback()
 const taskCards = adminCards.taskMonitor
 const taskDetailDialogPt = createAdminDialogPt({
   rootClass:
@@ -685,7 +680,7 @@ const {
   showDetail,
   getErrorReason,
   calcDuration,
-} = useTaskResultDetail({ message: appToast })
+} = useTaskResultDetail({ message: adminFeedback.taskMonitor.resultDetail })
 
 const {
   tasks,

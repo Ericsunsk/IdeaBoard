@@ -42,7 +42,7 @@ describe('usePasswordChangeWorkflow', () => {
     expect(workflow.errors.value.confirmPassword).toBe('')
   })
 
-  it('updates password, resets form, logs out, shows success, and redirects in order', async () => {
+  it('updates password, resets form, logs out, redirects, and then shows success', async () => {
     const calls: string[] = []
     const deps = createDeps({
       updatePassword: vi.fn(async () => {
@@ -52,7 +52,7 @@ describe('usePasswordChangeWorkflow', () => {
         calls.push('logout')
         return true
       }),
-      success: vi.fn(() => {
+      passwordChangeSuccess: vi.fn(() => {
         calls.push('success')
       }),
       replace: vi.fn(async () => {
@@ -74,25 +74,28 @@ describe('usePasswordChangeWorkflow', () => {
       newPassword: '',
       confirmPassword: '',
     })
-    expect(deps.appToast.success).toHaveBeenCalledWith('密码更新成功，请重新登录')
+    expect(deps.profileFeedback.passwordChange.success).toHaveBeenCalledWith(true)
     expect(deps.router.replace).toHaveBeenCalledWith(USER_LOGIN_PATH)
-    expect(calls).toEqual(['updatePassword', 'logout', 'success', 'replace'])
+    expect(calls).toEqual(['updatePassword', 'logout', 'replace', 'success'])
   })
 
-  it('uses the logout failure message through runAsyncAction errorMessage', async () => {
+  it('uses the logout failure message through password feedback', async () => {
     const capturedErrors: string[] = []
     const deps = createDeps({
       logout: vi.fn(async () => false),
       runAsyncAction: async (action, options = {}) => {
         try {
-          return await action()
+          const result = await action()
+          options.feedback?.success?.(result)
+          return result
         } catch (error) {
-          if (typeof options.errorMessage === 'function') {
-            capturedErrors.push(options.errorMessage(error))
-          }
+          options.feedback?.error?.(error)
           return undefined
         }
       },
+      passwordChangeError: vi.fn((error) => {
+        capturedErrors.push(error instanceof Error ? error.message : String(error))
+      }),
     })
     const workflow = usePasswordChangeWorkflow(deps)
     workflow.form.value = {
@@ -106,27 +109,56 @@ describe('usePasswordChangeWorkflow', () => {
     expect(capturedErrors).toEqual(['密码已更新，但退出登录失败，请手动退出后重新登录'])
     expect(deps.router.replace).not.toHaveBeenCalled()
   })
+
+  it('routes redirect failures through password feedback', async () => {
+    const redirectError = new Error('redirect failed')
+    const deps = createDeps({
+      replace: vi.fn(async () => {
+        throw redirectError
+      }),
+      passwordChangeError: vi.fn(),
+    })
+    const workflow = usePasswordChangeWorkflow(deps)
+    workflow.form.value = {
+      oldPassword: 'old-pass',
+      newPassword: 'new-pass',
+      confirmPassword: 'new-pass',
+    }
+
+    await workflow.submit()
+
+    expect(deps.profileFeedback.passwordChange.error).toHaveBeenCalledWith(redirectError)
+    expect(deps.profileFeedback.passwordChange.success).not.toHaveBeenCalled()
+  })
 })
 
 type TestDeps = PasswordChangeWorkflowDependencies
 type TestUserStore = NonNullable<TestDeps['userStore']>
 type TestRouter = NonNullable<TestDeps['router']>
-type TestToast = NonNullable<TestDeps['appToast']>
+type TestProfileFeedback = NonNullable<TestDeps['profileFeedback']>
 
-function createDeps(overrides: Partial<{
-  updatePassword: TestUserStore['updatePassword']
-  logout: TestUserStore['logout']
-  success: TestToast['success']
-  replace: TestRouter['replace']
-  runAsyncAction: NonNullable<TestDeps['runAsyncAction']>
-}> = {}): Required<TestDeps> {
+function createDeps(
+  overrides: Partial<{
+    updatePassword: TestUserStore['updatePassword']
+    logout: TestUserStore['logout']
+    passwordChangeSuccess: NonNullable<TestProfileFeedback['passwordChange']['success']>
+    passwordChangeError: NonNullable<TestProfileFeedback['passwordChange']['error']>
+    replace: TestRouter['replace']
+    runAsyncAction: NonNullable<TestDeps['runAsyncAction']>
+  }> = {},
+): Required<TestDeps> {
   const defaultRunAsyncAction: NonNullable<TestDeps['runAsyncAction']> = async (
     action,
     options = {},
   ) => {
     if (options.loading) options.loading.value = true
     try {
-      return await action()
+      const result = await action()
+      options.feedback?.success?.(result)
+      return result
+    } catch (error) {
+      options.feedback?.error?.(error)
+      return undefined
     } finally {
       if (options.loading) options.loading.value = false
     }
@@ -140,8 +172,11 @@ function createDeps(overrides: Partial<{
     router: {
       replace: overrides.replace ?? vi.fn(async () => undefined),
     },
-    appToast: {
-      success: overrides.success ?? vi.fn(),
+    profileFeedback: {
+      passwordChange: {
+        success: overrides.passwordChangeSuccess ?? vi.fn(),
+        error: overrides.passwordChangeError ?? vi.fn(),
+      },
     },
     runAsyncAction: overrides.runAsyncAction ?? defaultRunAsyncAction,
   }

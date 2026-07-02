@@ -43,19 +43,21 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useUserStore } from '../../../app/stores/user'
-import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
-import { useAppToast } from '../../../shared/composables/useAppToast'
+import { authClient } from '../../../shared/auth/client'
+import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import {
   ADMIN_USERS_PATH,
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
   USER_CANVAS_PATH,
 } from '../../../shared/constants/routePaths'
+import { useAuthFeedback } from '../../auth/useAuthFeedback'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 
 const router = useRouter()
 const route = useRoute()
-const appToast = useAppToast()
+const authFeedback = useAuthFeedback()
+const { runAsyncAction } = useAsyncAction()
 const userStore = useUserStore()
 
 const stopImpersonatingLoading = ref(false)
@@ -75,18 +77,19 @@ const authMode = computed<'login' | 'register' | null>(() => {
 })
 
 async function handleStopImpersonating() {
-  stopImpersonatingLoading.value = true
-  try {
-    const { error } = await authClient.admin.stopImpersonating()
-    if (error) throw error
-    await userStore.fetchUserInfo(true)
-    await authSession.value?.refetch?.()
-    appToast.success('已退出伪装身份')
-    await router.push(ADMIN_USERS_PATH)
-  } catch (err: unknown) {
-    appToast.error(extractBetterAuthErrorMessage(err, '退出伪装失败，请重新登录管理员账号'))
-  } finally {
-    stopImpersonatingLoading.value = false
-  }
+  await runAsyncAction(
+    async () => {
+      const { error } = await authClient.admin.stopImpersonating()
+      if (error) throw error
+      await userStore.fetchUserInfo(true)
+      await authSession.value?.refetch?.()
+      await router.push(ADMIN_USERS_PATH)
+      return true
+    },
+    {
+      loading: stopImpersonatingLoading,
+      feedback: authFeedback.stopImpersonating,
+    },
+  )
 }
 </script>

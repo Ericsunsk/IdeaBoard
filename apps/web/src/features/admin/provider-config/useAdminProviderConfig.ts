@@ -109,8 +109,8 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
     hasChannelSearch.value ? '无匹配渠道商' : '暂无渠道商',
   )
   const totalAccountCount = computed(() => accounts.value.length)
-  const runningAccountCount = computed(() =>
-    accounts.value.filter((account) => account.status === 1 && account.failCount < 5).length,
+  const runningAccountCount = computed(
+    () => accounts.value.filter((account) => account.status === 1 && account.failCount < 5).length,
   )
   const accountRunningLabel = computed(() =>
     totalAccountCount.value > 0
@@ -154,7 +154,9 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
       },
       {
         loading,
-        onError: (error) => showActionError(options.message, error, '加载数据失败'),
+        feedback: {
+          error: (error) => showActionError(options.message, error, '加载数据失败'),
+        },
       },
     )
   }
@@ -205,7 +207,10 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
     })
   }
 
-  async function toggleAccountModelStatus(commandTarget: ProviderAccountCommandTarget, model: string) {
+  async function toggleAccountModelStatus(
+    commandTarget: ProviderAccountCommandTarget,
+    model: string,
+  ) {
     const account = findAccountByTarget(accounts.value, commandTarget)
     if (!account) {
       options.message.warning('账号已刷新，请重新选择')
@@ -240,7 +245,9 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
         options.message.success(nextEnabled ? '模型已启动' : '模型已停止')
       },
       {
-        onError: (error) => showActionError(options.message, error, '模型状态修改失败'),
+        feedback: {
+          error: (error) => showActionError(options.message, error, '模型状态修改失败'),
+        },
       },
     )
   }
@@ -330,7 +337,9 @@ function createChannelEditor(options: {
       },
       {
         loading: saveLoading,
-        onError: (error) => showActionError(options.message, error, '保存渠道商失败'),
+        feedback: {
+          error: (error) => showActionError(options.message, error, '保存渠道商失败'),
+        },
       },
     )
   }
@@ -530,7 +539,9 @@ function createAccountEditor(options: {
       },
       {
         loading: saveLoading,
-        onError: (error) => showActionError(options.message, error, '保存账号失败'),
+        feedback: {
+          error: (error) => showActionError(options.message, error, '保存账号失败'),
+        },
       },
     )
   }
@@ -582,8 +593,10 @@ function createAccountEditor(options: {
       },
       {
         loading: detectModelsLoading,
-        onError: (error) => {
-          options.message.warning(extractApiErrorMessage(error, '自动检测模型失败'))
+        feedback: {
+          error: (error) => {
+            options.message.warning(extractApiErrorMessage(error, '自动检测模型失败'))
+          },
         },
       },
     )

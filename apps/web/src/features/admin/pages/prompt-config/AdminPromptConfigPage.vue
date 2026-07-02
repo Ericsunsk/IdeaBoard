@@ -184,8 +184,7 @@ import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { useAppToast } from '../../../../shared/composables/useAppToast'
-import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
+import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -215,7 +214,7 @@ import {
   type FeatureSlug,
 } from './featurePromptMeta'
 
-const appToast = useAppToast()
+const adminFeedback = useAdminFeedback()
 const queryClient = useQueryClient()
 const { isScrolling: isPromptPanelScrolling, handleScroll: handlePromptPanelScroll } =
   useTransientScrolling()
@@ -327,7 +326,7 @@ watch(
   () => promptsQuery.error.value,
   (error) => {
     if (error) {
-      appToast.error(formatDisplayErrorMessage(error, '加载提示词失败'))
+      adminFeedback.promptConfig.loadPromptsFailed(error)
     }
   },
 )
@@ -368,9 +367,9 @@ async function savePrompt(slug: FeatureSlug) {
       prompt: promptMap[slug] || '',
       enabled: enabledMap[slug] ?? true,
     })
-    appToast.success(`「${featureMap[slug].title}」提示词已保存`)
+    adminFeedback.promptConfig.promptSaved(featureMap[slug].title)
   } catch (error) {
-    appToast.error(formatDisplayErrorMessage(error, '保存失败'))
+    adminFeedback.promptConfig.savePromptFailed(error)
   } finally {
     saving[slug] = false
   }

@@ -22,7 +22,7 @@ describe('useAvatarUploadWorkflow', () => {
 
     await workflow.selectFile(new File(['x'], 'note.txt', { type: 'text/plain' }))
 
-    expect(deps.appToast.warning).toHaveBeenCalledWith('仅支持上传图片文件')
+    expect(deps.profileFeedback.invalidAvatarFile).toHaveBeenCalled()
     expect(deps.uploadAvatar).not.toHaveBeenCalled()
   })
 
@@ -62,29 +62,37 @@ describe('useAvatarUploadWorkflow', () => {
 
     expect(deps.uploadAvatar).toHaveBeenCalledWith(file)
     expect(deps.userStore.setAvatarLocal).toHaveBeenCalledWith('https://cdn.example/avatar.png')
-    expect(deps.appToast.success).toHaveBeenCalledWith('头像已更新')
+    expect(deps.profileFeedback.avatarUpload.success).toHaveBeenCalled()
     expect(workflow.uploading.value).toBe(false)
   })
 })
 
 type TestDeps = AvatarUploadWorkflowDependencies
 type TestUserStore = NonNullable<TestDeps['userStore']>
-type TestToast = NonNullable<TestDeps['appToast']>
+type TestProfileFeedback = NonNullable<TestDeps['profileFeedback']>
 
-function createDeps(overrides: Partial<{
-  uploadAvatar: NonNullable<TestDeps['uploadAvatar']>
-  setAvatarLocal: TestUserStore['setAvatarLocal']
-  success: TestToast['success']
-  warning: TestToast['warning']
-  runAsyncAction: NonNullable<TestDeps['runAsyncAction']>
-}> = {}): Required<TestDeps> {
+function createDeps(
+  overrides: Partial<{
+    uploadAvatar: NonNullable<TestDeps['uploadAvatar']>
+    setAvatarLocal: TestUserStore['setAvatarLocal']
+    avatarUploadSuccess: NonNullable<TestProfileFeedback['avatarUpload']['success']>
+    avatarUploadError: NonNullable<TestProfileFeedback['avatarUpload']['error']>
+    invalidAvatarFile: TestProfileFeedback['invalidAvatarFile']
+    runAsyncAction: NonNullable<TestDeps['runAsyncAction']>
+  }> = {},
+): Required<TestDeps> {
   const defaultRunAsyncAction: NonNullable<TestDeps['runAsyncAction']> = async (
     action,
     options = {},
   ) => {
     if (options.loading) options.loading.value = true
     try {
-      return await action()
+      const result = await action()
+      options.feedback?.success?.(result)
+      return result
+    } catch (error) {
+      options.feedback?.error?.(error)
+      return undefined
     } finally {
       if (options.loading) options.loading.value = false
     }
@@ -97,9 +105,12 @@ function createDeps(overrides: Partial<{
     userStore: {
       setAvatarLocal: overrides.setAvatarLocal ?? vi.fn(),
     },
-    appToast: {
-      success: overrides.success ?? vi.fn(),
-      warning: overrides.warning ?? vi.fn(),
+    profileFeedback: {
+      invalidAvatarFile: overrides.invalidAvatarFile ?? vi.fn(),
+      avatarUpload: {
+        success: overrides.avatarUploadSuccess ?? vi.fn(),
+        error: overrides.avatarUploadError ?? vi.fn(),
+      },
     },
     runAsyncAction: overrides.runAsyncAction ?? defaultRunAsyncAction,
   }

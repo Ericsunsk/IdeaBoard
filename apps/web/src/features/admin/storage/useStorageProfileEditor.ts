@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
-import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { useAdminStorageFeedback } from './useAdminStorageFeedback'
 import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
 import {
   buildPayload,
@@ -40,7 +40,7 @@ export function useStorageProfileEditor(options: {
   deleteProfile: (id: string) => Promise<{ message: string }>
   fetchBucketDomains: (id: string) => Promise<string[]>
 }) {
-  const appToast = useAppToast()
+  const storageFeedback = useAdminStorageFeedback()
   const { runAsyncAction } = useAsyncAction()
   const saving = ref(false)
   const savingAndApplying = ref(false)
@@ -144,7 +144,7 @@ export function useStorageProfileEditor(options: {
     const target = vendorPresets.value.find((item) => item.key === nextKey)
     if (!target) return
     if (!target.supported) {
-      appToast.info(`${target.label} 暂未接入后端，当前先作为预设展示`)
+      storageFeedback.unsupportedVendorPreset(target.label)
       return
     }
     selectedVendorKey.value = target.key
@@ -155,7 +155,7 @@ export function useStorageProfileEditor(options: {
   function openCreate() {
     const firstVendor = vendorPresets.value.find((vendor) => vendor.supported)
     if (!firstVendor) {
-      appToast.warning('当前没有可新增的存储类型')
+      storageFeedback.noCreatableProviders()
       return
     }
     editorMode.value = 'create'
@@ -190,7 +190,7 @@ export function useStorageProfileEditor(options: {
     const payload = buildPayload(form.value, options.providerMap.value)
     const editId = editorMode.value === 'edit' ? editingId.value : undefined
     if (editorMode.value === 'edit' && !editId) {
-      appToast.error('未找到可编辑的存储配置')
+      storageFeedback.missingEditableTarget()
       return null
     }
 
@@ -207,7 +207,7 @@ export function useStorageProfileEditor(options: {
       config: { ...saved.config },
     }
 
-    if (showSuccess) appToast.success(response.message || '保存成功')
+    if (showSuccess) storageFeedback.saveDraftSucceeded(response.message)
     return saved
   }
 
@@ -220,7 +220,9 @@ export function useStorageProfileEditor(options: {
       },
       {
         loading: saving,
-        errorMessage: '保存失败',
+        feedback: {
+          error: storageFeedback.saveDraftFailed,
+        },
       },
     )
   }
@@ -230,12 +232,14 @@ export function useStorageProfileEditor(options: {
       async () => {
         const saved = await persistForm(false, true)
         if (!saved) return
-        appToast.success('已保存并设为当前存储')
+        storageFeedback.saveAndApplySucceeded()
         closeEditor()
       },
       {
         loading: savingAndApplying,
-        errorMessage: '设为当前失败',
+        feedback: {
+          error: storageFeedback.saveAndApplyFailed,
+        },
       },
     )
   }
@@ -244,7 +248,7 @@ export function useStorageProfileEditor(options: {
     await runAsyncAction(
       async () => {
         const response = await options.applyProfile(id)
-        appToast.success(response.message || '已设为当前存储')
+        storageFeedback.applyCurrentSucceeded(response.message)
       },
       {
         before: () => {
@@ -253,7 +257,9 @@ export function useStorageProfileEditor(options: {
         after: () => {
           applyingId.value = null
         },
-        errorMessage: '设为当前失败',
+        feedback: {
+          error: storageFeedback.applyCurrentFailed,
+        },
       },
     )
   }
@@ -262,7 +268,7 @@ export function useStorageProfileEditor(options: {
     await runAsyncAction(
       async () => {
         const response = await options.testProfile(storage.id)
-        appToast.success(response.message || '连接成功')
+        storageFeedback.testConnectionSucceeded(response.message)
       },
       {
         before: () => {
@@ -271,7 +277,9 @@ export function useStorageProfileEditor(options: {
         after: () => {
           testingId.value = null
         },
-        errorMessage: '连接失败',
+        feedback: {
+          error: storageFeedback.testConnectionFailed,
+        },
       },
     )
   }
@@ -287,14 +295,16 @@ export function useStorageProfileEditor(options: {
         const domains = await options.fetchBucketDomains(saved.id)
         if (domains.length > 0) {
           bucketDomains.value = domains
-          appToast.success(`检测到 ${bucketDomains.value.length} 个域名`)
+          storageFeedback.bucketDomainsDetected(bucketDomains.value.length)
         } else {
-          appToast.warning('未检测到绑定域名')
+          storageFeedback.bucketDomainsEmpty()
         }
       },
       {
         loading: fetching,
-        errorMessage: '获取失败',
+        feedback: {
+          error: storageFeedback.fetchBucketDomainsFailed,
+        },
       },
     )
   }
@@ -303,11 +313,13 @@ export function useStorageProfileEditor(options: {
     await runAsyncAction(
       async () => {
         const response = await options.deleteProfile(id)
-        appToast.success(response.message || '删除成功')
+        storageFeedback.profileDeleted(response.message)
         if (editingId.value === id) closeEditor()
       },
       {
-        errorMessage: '删除失败',
+        feedback: {
+          error: storageFeedback.deleteProfileFailed,
+        },
       },
     )
   }

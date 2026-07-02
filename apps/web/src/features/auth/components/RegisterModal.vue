@@ -151,8 +151,9 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { User as UserIcon, Lock as LockIcon, Shield as ShieldIcon } from '@iconoir/vue'
-import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { useAuthFeedback } from '../useAuthFeedback'
 import AuthFormField from './AuthFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
@@ -194,7 +195,8 @@ const { projectName } = useSiteBranding()
 type RegisterField = 'username' | 'password' | 'confirmPassword'
 
 const userStore = useUserStore()
-const appToast = useAppToast()
+const authFeedback = useAuthFeedback()
+const { runAsyncAction } = useAsyncAction()
 
 const loading = ref(false)
 const formValue = ref({
@@ -300,18 +302,20 @@ watch(
 async function handleRegister() {
   if (!validateForm()) return
 
-  try {
-    loading.value = true
-    await userStore.register(formValue.value.username.trim(), formValue.value.password)
-    appToast.success('注册成功')
-    resetForm()
-    emit('register-success')
-    emit('update:show', false)
-  } catch (error: unknown) {
-    appToast.error(error instanceof Error && error.message ? error.message : '注册失败，请稍后重试')
-  } finally {
-    loading.value = false
-  }
+  const registered = await runAsyncAction(
+    async () => {
+      await userStore.register(formValue.value.username.trim(), formValue.value.password)
+      return true
+    },
+    {
+      loading,
+      feedback: authFeedback.register,
+    },
+  )
+  if (!registered) return
+  resetForm()
+  emit('register-success')
+  emit('update:show', false)
 }
 </script>
 
@@ -320,8 +324,10 @@ async function handleRegister() {
 .auth-modal-leave-active,
 .auth-modal-appear-active {
   transition:
-    opacity var(--canvas-motion-dock, 240ms) var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
-    transform var(--canvas-motion-dock, 240ms) var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+    opacity var(--canvas-motion-dock, 240ms)
+      var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
+    transform var(--canvas-motion-dock, 240ms)
+      var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
 }
 
 .auth-modal-enter-from,

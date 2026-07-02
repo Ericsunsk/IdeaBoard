@@ -1,17 +1,8 @@
 <template>
-  <div
-    class="grid min-h-screen place-items-center bg-ib-page p-6 text-ib-text max-[520px]:p-4"
-  >
-    <Card
-      :class="loginCardClass"
-      :pt="loginCardPt"
-    >
+  <div class="grid min-h-screen place-items-center bg-ib-page p-6 text-ib-text max-[520px]:p-4">
+    <Card :class="loginCardClass" :pt="loginCardPt">
       <template #header>
-        <router-link
-          :class="brandMarkClass"
-          to="/"
-          :aria-label="projectName"
-        >
+        <router-link :class="brandMarkClass" to="/" :aria-label="projectName">
           <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
         </router-link>
       </template>
@@ -89,16 +80,16 @@ import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
-import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
+import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
-const appToast = useAppToast()
+const adminFeedback = useAdminFeedback()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const brandMarkClass = computed(() =>
   [
@@ -163,19 +154,17 @@ async function handleLogin() {
     loading.value = true
     await userStore.login(username, password)
     if (userStore.isAdmin) {
-      appToast.success('管理员登录成功')
+      adminFeedback.login.succeeded()
       await router.replace(resolveAdminRedirectPath())
     } else {
       const logoutSuccess = await logoutAndRedirect(ADMIN_LOGIN_PATH, { replace: true })
       if (!logoutSuccess) {
-        appToast.warning('会话撤销失败，请稍后重试')
+        adminFeedback.login.sessionRevokeFailed()
       }
-      appToast.error('该账号不是管理员')
+      adminFeedback.login.nonAdminAccount()
     }
   } catch (error: unknown) {
-    if (error instanceof Error && error.message) {
-      appToast.error(error.message)
-    }
+    adminFeedback.login.failed(error)
   } finally {
     loading.value = false
   }

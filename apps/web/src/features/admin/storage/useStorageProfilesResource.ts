@@ -15,9 +15,8 @@ import type {
   StorageProfile as GeneratedStorageProfile,
   StorageProfilePayload as GeneratedStorageProfilePayload,
 } from '../../../shared/api/generated-query/model'
-import { useAppToast } from '../../../shared/composables/useAppToast'
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import { requireApiData } from '../shared/queries/adminApiResponse'
+import { useAdminStorageFeedback } from './useAdminStorageFeedback'
 import {
   normalizeProfile,
   toProviderMetaMap,
@@ -40,7 +39,7 @@ type SaveStorageProfileInput =
     }
 
 export function useStorageProfilesResource() {
-  const appToast = useAppToast()
+  const storageFeedback = useAdminStorageFeedback()
   const queryClient = useQueryClient()
   const providersQuery = useListAdminStorageProviders()
   const profilesQuery = useListAdminStorageProfiles()
@@ -108,7 +107,7 @@ export function useStorageProfilesResource() {
   watch(
     () => providersQuery.error.value || profilesQuery.error.value,
     (error) => {
-      if (error) appToast.error(formatDisplayErrorMessage(error, '加载存储配置失败'))
+      if (error) storageFeedback.loadProfilesFailed(error)
     },
   )
 
