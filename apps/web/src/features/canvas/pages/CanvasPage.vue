@@ -382,6 +382,9 @@ const {
     clearActiveNodePanel()
     void runImageDirectAction(targetNodeId, action, { strength })
   },
+  onCancel: () => {
+    clearActiveNodePanel()
+  },
 })
 
 const {

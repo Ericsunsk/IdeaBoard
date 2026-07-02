@@ -20,8 +20,9 @@ type StrengthRefTarget = Element | ComponentPublicInstance | null
 
 export function useFlowImageActionStrengthControl(options: {
   onCommit: (action: ImageStrengthAction, strength: number) => void
+  onCancel?: (action: ImageStrengthAction) => void
 }) {
-  const { onCommit } = options
+  const { onCommit, onCancel } = options
   const activeStrengthAction = ref<ImageStrengthAction | null>(null)
   const strengths = reactive<Record<ImageStrengthAction, number>>({
     ...DEFAULT_IMAGE_ACTION_STRENGTHS,
@@ -33,6 +34,8 @@ export function useFlowImageActionStrengthControl(options: {
   const stopTriggerBindingByAction = new Map<ImageStrengthAction, () => void>()
   let editingAction: ImageStrengthAction | null = null
   let longPressGeneration = 0
+  let dragSession: { action: ImageStrengthAction; pointerId: number; stop: () => void } | null =
+    null
 
   function clampStrength(value: number): number {
     if (!Number.isFinite(value)) return DEFAULT_IMAGE_ACTION_STRENGTH
@@ -61,8 +64,18 @@ export function useFlowImageActionStrengthControl(options: {
     return event.currentTarget instanceof HTMLInputElement ? event.currentTarget : null
   }
 
+  function writeStrengthToRange(
+    action: ImageStrengthAction,
+    input: HTMLInputElement,
+    value: number,
+  ) {
+    const strength = clampStrength(value)
+    strengths[action] = strength
+    input.value = `${strength}`
+  }
+
   function syncStrengthFromRange(action: ImageStrengthAction, input: HTMLInputElement) {
-    strengths[action] = clampStrength(input.valueAsNumber)
+    writeStrengthToRange(action, input, input.valueAsNumber)
   }
 
   function focusRange(input: HTMLInputElement) {
@@ -76,9 +89,11 @@ export function useFlowImageActionStrengthControl(options: {
   function beginStrengthEdit(
     action: ImageStrengthAction,
     input: HTMLInputElement,
-    options: { syncInitial: boolean },
+    options: { syncInitial: boolean; initialStrength?: number },
   ) {
-    if (!options.syncInitial) input.value = `${strengths[action]}`
+    if (!options.syncInitial) {
+      writeStrengthToRange(action, input, options.initialStrength ?? strengths[action])
+    }
     activeStrengthAction.value = action
     editingAction = action
     suppressClickAction.value = action
@@ -88,10 +103,21 @@ export function useFlowImageActionStrengthControl(options: {
 
   function finishStrengthEdit(action: ImageStrengthAction) {
     if (editingAction !== action) return
+    const committedStrength = strengths[action]
     editingAction = null
     activeStrengthAction.value = null
     blurRange(action)
-    onCommit(action, strengths[action])
+    onCommit(action, committedStrength)
+    strengths[action] = DEFAULT_IMAGE_ACTION_STRENGTH
+  }
+
+  function cancelStrengthEdit(action: ImageStrengthAction) {
+    if (editingAction !== action) return
+    editingAction = null
+    activeStrengthAction.value = null
+    blurRange(action)
+    strengths[action] = DEFAULT_IMAGE_ACTION_STRENGTH
+    onCancel?.(action)
   }
 
   function isTriggerDisabled(trigger: HTMLElement) {
@@ -113,6 +139,69 @@ export function useFlowImageActionStrengthControl(options: {
     stopTriggerBindingByAction.delete(action)
   }
 
+  function stopDragSession() {
+    dragSession?.stop()
+    dragSession = null
+  }
+
+  function getStrengthFromPointer(input: HTMLInputElement, event: PointerEvent): number {
+    const rect = input.getBoundingClientRect()
+    if (rect.width <= 0) return DEFAULT_IMAGE_ACTION_STRENGTH
+    return clampStrength(((event.clientX - rect.left) / rect.width) * MAX_STRENGTH)
+  }
+
+  function startDragSession(
+    action: ImageStrengthAction,
+    input: HTMLInputElement,
+    startEvent: PointerEvent,
+  ) {
+    stopDragSession()
+    beginStrengthEdit(action, input, {
+      syncInitial: false,
+      initialStrength: DEFAULT_IMAGE_ACTION_STRENGTH,
+    })
+
+    const ownerDocument = input.ownerDocument
+    const pointerId = startEvent.pointerId
+    let hasEffectiveDrag = false
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return
+      const nextStrength = getStrengthFromPointer(input, event)
+      writeStrengthToRange(action, input, nextStrength)
+      if (Math.abs(nextStrength - DEFAULT_IMAGE_ACTION_STRENGTH) >= 1) {
+        hasEffectiveDrag = true
+      }
+    }
+    const onPointerEnd = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return
+      stopDragSession()
+      if (hasEffectiveDrag) {
+        finishStrengthEdit(action)
+        return
+      }
+      cancelStrengthEdit(action)
+    }
+    const onPointerCancel = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return
+      stopDragSession()
+      cancelStrengthEdit(action)
+    }
+
+    ownerDocument.addEventListener('pointermove', onPointerMove)
+    ownerDocument.addEventListener('pointerup', onPointerEnd)
+    ownerDocument.addEventListener('pointercancel', onPointerCancel)
+    dragSession = {
+      action,
+      pointerId,
+      stop: () => {
+        ownerDocument.removeEventListener('pointermove', onPointerMove)
+        ownerDocument.removeEventListener('pointerup', onPointerEnd)
+        ownerDocument.removeEventListener('pointercancel', onPointerCancel)
+      },
+    }
+  }
+
   function attachTriggerBinding(action: ImageStrengthAction, trigger: HTMLElement) {
     const generation = longPressGeneration
     disposeTriggerBinding(action)
@@ -125,13 +214,13 @@ export function useFlowImageActionStrengthControl(options: {
 
     const stopLongPress = onLongPress(
       trigger,
-      () => {
+      (event) => {
         if (generation !== longPressGeneration) return
         if (isTriggerDisabled(trigger)) return
         const input = strengthRangeElements.get(action)
         if (!input) return
         if (input.disabled) return
-        beginStrengthEdit(action, input, { syncInitial: false })
+        startDragSession(action, input, event)
       },
       {
         delay: LONG_PRESS_MS,
@@ -173,6 +262,7 @@ export function useFlowImageActionStrengthControl(options: {
 
   function hideStrengthControl() {
     longPressGeneration += 1
+    stopDragSession()
     activeStrengthAction.value = null
     if (editingAction) blurRange(editingAction)
     editingAction = null
@@ -181,6 +271,7 @@ export function useFlowImageActionStrengthControl(options: {
   }
 
   function onStrengthRangePointerDown(action: ImageStrengthAction, event: PointerEvent) {
+    if (dragSession?.action === action) return
     if (event.button !== 0) return
     const input = getEventRangeInput(event)
     if (!input) return
@@ -193,12 +284,14 @@ export function useFlowImageActionStrengthControl(options: {
   }
 
   function onStrengthInput(action: ImageStrengthAction, event: Event) {
+    if (dragSession?.action === action) return
     const input = getEventRangeInput(event)
     if (!input || editingAction !== action || activeStrengthAction.value !== action) return
     syncStrengthFromRange(action, input)
   }
 
   function onStrengthChange(action: ImageStrengthAction, event: Event) {
+    if (dragSession?.action === action) return
     const input = getEventRangeInput(event)
     if (!input || editingAction !== action || activeStrengthAction.value !== action) return
     syncStrengthFromRange(action, input)
@@ -206,6 +299,7 @@ export function useFlowImageActionStrengthControl(options: {
   }
 
   function onStrengthPointerUp(action: ImageStrengthAction, event: PointerEvent) {
+    if (dragSession?.action === action) return
     const input = getEventRangeInput(event)
     if (input && editingAction === action && activeStrengthAction.value === action) {
       syncStrengthFromRange(action, input)

@@ -24,9 +24,21 @@ function createRange(value = 35) {
   return input
 }
 
-function dispatchRangeInput(input: HTMLInputElement, value: number) {
-  input.value = `${value}`
-  input.dispatchEvent(new Event('input', { bubbles: true }))
+function stubRangeBounds(input: HTMLInputElement, bounds: { left: number; width: number }) {
+  input.getBoundingClientRect = vi.fn(
+    () =>
+      ({
+        left: bounds.left,
+        right: bounds.left + bounds.width,
+        width: bounds.width,
+        top: 0,
+        bottom: 20,
+        height: 20,
+        x: bounds.left,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect,
+  )
 }
 
 function bindRange(control: StrengthControl, action: ImageStrengthAction, value = 35) {
@@ -70,25 +82,70 @@ describe('useFlowImageActionStrengthControl', () => {
     control.dispose()
   })
 
-  it('updates strength with the native range and commits on pointerup', () => {
+  it('clamps same-gesture strength drags to the native range bounds', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
     const action = IMAGE_NODE_ACTION.styleVariation
     const { input, trigger } = bindRange(control, action)
+    stubRangeBounds(input, { left: 100, width: 200 })
 
-    trigger.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 7, clientX: 150 }))
     vi.advanceTimersByTime(260)
     expect(control.activeStrengthAction.value).toBe(action)
 
-    dispatchRangeInput(input, 80)
-    input.dispatchEvent(createPointerEvent('pointerup'))
+    document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 350 }))
+    document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 350 }))
 
     expect(control.activeStrengthAction.value).toBeNull()
-    expect(control.getActionStrength(action)).toBe(80)
+    expect(control.getActionStrength(action)).toBe(50)
     expect(control.consumeSuppressedStrengthClick(action)).toBe(true)
-    expect(control.consumeSuppressedStrengthClick(action)).toBe(false)
-    expect(onCommit).toHaveBeenCalledWith(action, 80)
+    expect(onCommit).toHaveBeenCalledWith(action, 100)
     expect(onCommit).toHaveBeenCalledTimes(1)
+
+    control.dispose()
+  })
+
+  it('drags the visible strength range during the same long-press gesture', () => {
+    const onCommit = vi.fn()
+    const control = useFlowImageActionStrengthControl({ onCommit })
+    const action = IMAGE_NODE_ACTION.styleVariation
+    const { input, trigger } = bindRange(control, action, 35)
+    stubRangeBounds(input, { left: 100, width: 200 })
+
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 7, clientX: 150 }))
+    vi.advanceTimersByTime(260)
+
+    expect(control.activeStrengthAction.value).toBe(action)
+    expect(control.getActionStrength(action)).toBe(50)
+    expect(input.value).toBe('50')
+
+    document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 280 }))
+    document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 280 }))
+
+    expect(onCommit).toHaveBeenCalledWith(action, 90)
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(control.activeStrengthAction.value).toBeNull()
+    expect(control.getActionStrength(action)).toBe(50)
+    expect(control.consumeSuppressedStrengthClick(action)).toBe(true)
+
+    control.dispose()
+  })
+
+  it('closes without committing when a long press ends before strength changes', () => {
+    const onCommit = vi.fn()
+    const onCancel = vi.fn()
+    const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
+    const action = IMAGE_NODE_ACTION.hdUpscale
+    const { input, trigger } = bindRange(control, action, 35)
+    stubRangeBounds(input, { left: 100, width: 200 })
+
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 8, clientX: 150 }))
+    vi.advanceTimersByTime(260)
+    document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 8, clientX: 150 }))
+
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(control.activeStrengthAction.value).toBeNull()
 
     control.dispose()
   })
@@ -98,33 +155,59 @@ describe('useFlowImageActionStrengthControl', () => {
     const control = useFlowImageActionStrengthControl({ onCommit })
     const action = IMAGE_NODE_ACTION.styleVariation
     const { input, trigger } = bindRange(control, action)
+    stubRangeBounds(input, { left: 100, width: 200 })
 
-    trigger.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 7, clientX: 150 }))
     vi.advanceTimersByTime(260)
-    dispatchRangeInput(input, 80)
-    input.dispatchEvent(createPointerEvent('pointerup'))
+    document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 280 }))
+    document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 280 }))
 
-    trigger.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 8, clientX: 150 }))
 
+    expect(onCommit).toHaveBeenCalledWith(action, 90)
     expect(control.consumeSuppressedStrengthClick(action)).toBe(false)
 
     control.dispose()
   })
 
-  it('commits keyboard range edits through change', () => {
+  it('ignores drag movement from a different pointer gesture', () => {
     const onCommit = vi.fn()
-    const control = useFlowImageActionStrengthControl({ onCommit })
+    const onCancel = vi.fn()
+    const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
     const action = IMAGE_NODE_ACTION.hdUpscale
     const { input, trigger } = bindRange(control, action, 35)
+    stubRangeBounds(input, { left: 100, width: 200 })
 
-    trigger.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 8, clientX: 150 }))
     vi.advanceTimersByTime(260)
-    dispatchRangeInput(input, 62)
-    input.dispatchEvent(new Event('change', { bubbles: true }))
+    document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 99, clientX: 280 }))
+    document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 8, clientX: 150 }))
 
     expect(control.activeStrengthAction.value).toBeNull()
-    expect(control.getActionStrength(action)).toBe(62)
-    expect(onCommit).toHaveBeenCalledWith(action, 62)
+    expect(control.getActionStrength(action)).toBe(50)
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+
+    control.dispose()
+  })
+
+  it('cancels an interrupted strength drag without committing', () => {
+    const onCommit = vi.fn()
+    const onCancel = vi.fn()
+    const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
+    const action = IMAGE_NODE_ACTION.styleVariation
+    const { input, trigger } = bindRange(control, action, 35)
+    stubRangeBounds(input, { left: 100, width: 200 })
+
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 7, clientX: 150 }))
+    vi.advanceTimersByTime(260)
+    document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 280 }))
+    document.dispatchEvent(createPointerEvent('pointercancel', { pointerId: 7, clientX: 280 }))
+
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(control.activeStrengthAction.value).toBeNull()
+    expect(control.getActionStrength(action)).toBe(50)
 
     control.dispose()
   })
