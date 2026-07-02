@@ -156,9 +156,10 @@ export function useFlowImageActionStrengthControl(options: {
     startEvent: PointerEvent,
   ) {
     stopDragSession()
+    const initialStrength = getStrengthFromPointer(input, startEvent)
     beginStrengthEdit(action, input, {
       syncInitial: false,
-      initialStrength: DEFAULT_IMAGE_ACTION_STRENGTH,
+      initialStrength,
     })
 
     const ownerDocument = input.ownerDocument
@@ -169,7 +170,7 @@ export function useFlowImageActionStrengthControl(options: {
       if (event.pointerId !== pointerId) return
       const nextStrength = getStrengthFromPointer(input, event)
       writeStrengthToRange(action, input, nextStrength)
-      if (Math.abs(nextStrength - DEFAULT_IMAGE_ACTION_STRENGTH) >= 1) {
+      if (Math.abs(nextStrength - initialStrength) >= 1) {
         hasEffectiveDrag = true
       }
     }

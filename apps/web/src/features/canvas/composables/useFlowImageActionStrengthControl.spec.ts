@@ -116,8 +116,8 @@ describe('useFlowImageActionStrengthControl', () => {
     vi.advanceTimersByTime(260)
 
     expect(control.activeStrengthAction.value).toBe(action)
-    expect(control.getActionStrength(action)).toBe(50)
-    expect(input.value).toBe('50')
+    expect(control.getActionStrength(action)).toBe(25)
+    expect(input.value).toBe('25')
 
     document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 280 }))
     document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 280 }))
@@ -127,6 +127,32 @@ describe('useFlowImageActionStrengthControl', () => {
     expect(control.activeStrengthAction.value).toBeNull()
     expect(control.getActionStrength(action)).toBe(50)
     expect(control.consumeSuppressedStrengthClick(action)).toBe(true)
+
+    control.dispose()
+  })
+
+  it('uses the long-press pointer position as the initial drag strength', () => {
+    const onCommit = vi.fn()
+    const onCancel = vi.fn()
+    const control = useFlowImageActionStrengthControl({ onCommit, onCancel })
+    const action = IMAGE_NODE_ACTION.styleVariation
+    const { input, trigger } = bindRange(control, action, 35)
+    stubRangeBounds(input, { left: 100, width: 200 })
+
+    trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 7, clientX: 280 }))
+    vi.advanceTimersByTime(260)
+
+    expect(control.activeStrengthAction.value).toBe(action)
+    expect(control.getActionStrength(action)).toBe(90)
+    expect(input.value).toBe('90')
+
+    document.dispatchEvent(createPointerEvent('pointermove', { pointerId: 7, clientX: 280 }))
+    document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 7, clientX: 280 }))
+
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(control.activeStrengthAction.value).toBeNull()
+    expect(control.getActionStrength(action)).toBe(50)
 
     control.dispose()
   })

@@ -37,8 +37,9 @@
             max="100"
             step="1"
             :value="getItemStrengthValue(item)"
+            :style="getItemStrengthRangeStyle(item)"
             :disabled="directGenerating"
-            :tabindex="isStrengthActive(item) ? 0 : -1"
+            tabindex="-1"
             :aria-hidden="isStrengthActive(item) ? undefined : 'true'"
             :aria-label="`${item.label}强度`"
             @pointerdown.stop="onItemStrengthRangePointerDown(item, $event)"
@@ -110,6 +111,14 @@ function isStrengthHidden(item: ImageActionMenuItem) {
 function getItemStrengthValue(item: ImageActionMenuItem) {
   const action = getStrengthAction(item)
   return action ? props.getStrengthValue(action) : 0
+}
+
+function getItemStrengthRangeStyle(item: ImageActionMenuItem) {
+  const strength = getItemStrengthValue(item)
+  const progress = Math.max(0, Math.min(100, strength))
+  return {
+    '--image-action-strength-progress': `${progress}%`,
+  }
 }
 
 function setItemStrengthRangeRef(
@@ -249,13 +258,66 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   --canvas-range-track-height: 6px;
   --canvas-range-thumb-size: 14px;
   --canvas-range-thumb-offset: -4px;
-  --canvas-range-fill-color: #7a6bd5;
+  --canvas-range-fill-color: var(--image-action-strength-fill);
+  --image-action-strength-fill: #7a6bd5;
   --canvas-range-track-background: rgba(122, 107, 213, 0.2);
   position: absolute;
   inset: 0;
   z-index: 2;
   opacity: 0;
   pointer-events: none;
+}
+
+.image-action-strength-range::-webkit-slider-runnable-track {
+  height: var(--canvas-range-track-height);
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--image-action-strength-fill) 0%,
+    var(--image-action-strength-fill) var(--image-action-strength-progress, 0%),
+    var(--canvas-range-track-background) var(--image-action-strength-progress, 0%),
+    var(--canvas-range-track-background) 100%
+  );
+}
+
+.image-action-strength-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0;
+  height: 0;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.image-action-strength-range::-moz-range-track {
+  height: var(--canvas-range-track-height);
+  border: 0;
+  border-radius: 999px;
+  background: var(--canvas-range-track-background);
+}
+
+.image-action-strength-range::-moz-range-progress {
+  height: var(--canvas-range-track-height);
+  border: 0;
+  border-radius: 999px;
+  background: var(--image-action-strength-fill);
+}
+
+.image-action-strength-range::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  border: 0;
+  opacity: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.image-action-strength-range:focus-visible {
+  outline: none;
 }
 
 .image-action-control.is-strength-active .image-action-icon-btn {
