@@ -48,6 +48,9 @@ describe('ImageEditorSharpenControl', () => {
 
     try {
       const amountRange = harness.host.querySelector<HTMLInputElement>('input[aria-label="数量滑块"]')
+      expect(amountRange?.classList.contains('editing-controls-slider-row__range--tonal-reverse')).toBe(
+        true,
+      )
       amountRange!.value = '120'
       amountRange?.dispatchEvent(new Event('input', { bubbles: true }))
 

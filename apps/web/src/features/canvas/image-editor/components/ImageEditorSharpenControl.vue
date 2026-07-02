@@ -5,7 +5,7 @@
       :value="normalizedParams.amount"
       :min="ranges.amount.min"
       :max="ranges.amount.max"
-      track-variant="tonal"
+      track-variant="tonal-reverse"
       @update:value="updateNumberParam('amount', $event)"
     />
     <ImageEditorSlider
