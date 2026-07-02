@@ -278,7 +278,7 @@ const { isScrolling: isUserTableScrolling, handleScroll: handleUserTableScroll }
   useTransientScrolling()
 
 const adminUsers = useAdminUsersContext({
-  message: adminFeedback.users.management,
+  feedback: adminFeedback.users.management,
   confirm: { require: requireAdminConfirm },
 })
 

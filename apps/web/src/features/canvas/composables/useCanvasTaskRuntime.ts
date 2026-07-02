@@ -1,16 +1,19 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import { useFlowImageDirectActions } from '../execution'
+import { createImageExecutionPlanner } from '../execution'
+import { useFlowImageWorkflowExecution } from '../execution/runtime/flowImageWorkflowExecution'
+import {
+  createImageWorkflowCommands,
+  type ImageWorkflowCommands,
+} from '../execution/runtime/imageWorkflowCommandRuntime'
+import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { FlowTransactions } from './useFlowTransactions'
 
 type ValueRef<T> = {
   readonly value: T
 }
 
-type CanvasTaskRuntimeMessage = {
-  success: (message: string) => void
-  warning: (message: string) => void
-}
+type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
 type UseCanvasTaskRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -22,21 +25,32 @@ type UseCanvasTaskRuntimeOptions = {
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   currentBoardId: ValueRef<string | null | undefined>
   refreshNodeInternals: (nodeIds: string[]) => void
-  message: CanvasTaskRuntimeMessage
+  feedback: CanvasTaskExecutionFeedback
 }
 
-export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions) {
-  return useFlowImageDirectActions({
+export type CanvasTaskRuntime = ImageWorkflowCommands
+
+export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): CanvasTaskRuntime {
+  const planner = createImageExecutionPlanner(() => ({
+    nodes: options.nodes.value,
+    edges: options.edges.value,
+  }))
+  const workflow = useFlowImageWorkflowExecution({
     nodes: options.nodes,
     edges: options.edges,
     commitGraphMutation: options.flowTransactions.commitGraphMutation,
     commitNodeMutation: options.flowTransactions.commitNodeMutation,
     commitEdgeMutation: options.flowTransactions.commitEdgeMutation,
-    commitDirty: options.flowTransactions.commitDirty,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
     getCurrentBoardId: () => options.currentBoardId.value ?? '',
-    onSuccess: options.message.success,
-    onWarning: options.message.warning,
+    onSuccess: options.feedback.succeeded,
+    onWarning: options.feedback.warning,
+  })
+
+  return createImageWorkflowCommands({
+    planner,
+    workflow,
+    onWarning: options.feedback.warning,
   })
 }

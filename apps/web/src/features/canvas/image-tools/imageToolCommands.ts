@@ -20,15 +20,17 @@ export function createImageToolCommands(session: ImageToolSession) {
     const source = options.getImageNodeDisplayPayload(nodeId)
     const sourceNode = options.getImageNodeSnapshot(nodeId)
     if (!source || !sourceNode) {
-      options.message.warning('当前图片不可编辑')
+      options.feedback.warning('当前图片不可编辑')
       return
     }
 
     const visibleAdjustmentLayers = flattenVisibleImageEditorAdjustmentLayers(
       session.imageEditorSession.imageEditorLayers.value,
     )
-    if (!hasEffectiveImageEditorAdjustmentLayers(session.imageEditorSession.imageEditorLayers.value)) {
-      options.message.warning('没有可应用的编辑图层')
+    if (
+      !hasEffectiveImageEditorAdjustmentLayers(session.imageEditorSession.imageEditorLayers.value)
+    ) {
+      options.feedback.warning('没有可应用的编辑图层')
       return
     }
 
@@ -70,7 +72,7 @@ export function createImageToolCommands(session: ImageToolSession) {
         targetHandle: 'in:image',
       })
       session.exitImageEditorMode()
-      options.message.success('已应用编辑并派生新节点')
+      options.feedback.succeeded('已应用编辑并派生新节点')
     } catch (error) {
       if (
         isImageAdjustmentFinalApplyCancelled(error) ||
@@ -80,7 +82,7 @@ export function createImageToolCommands(session: ImageToolSession) {
       ) {
         return
       }
-      options.message.warning(error instanceof Error ? error.message : '应用编辑失败')
+      options.feedback.warning(error instanceof Error ? error.message : '应用编辑失败')
     } finally {
       if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
         session.activeImageAdjustmentFinalScopeId.value = null
@@ -117,7 +119,7 @@ export function createImageToolCommands(session: ImageToolSession) {
         value: outputCount,
       })
     },
-    onWarning: options.message.warning,
+    onWarning: options.feedback.warning,
   })
 
   const chromeCommands: ImageToolChromeCommands = {

@@ -41,18 +41,19 @@ afterEach(() => {
 describe('useAdminProviderConfig', () => {
   it('warns and exposes fallback account limits when limits loading fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const message = createMessagePort()
-    mockApi.fetchAdminAccountLimits.mockRejectedValueOnce(new Error('limits failed'))
+    const feedback = createProviderConfigFeedback()
+    const error = new Error('limits failed')
+    mockApi.fetchAdminAccountLimits.mockRejectedValueOnce(error)
 
     const context = useAdminProviderConfig({
-      message,
+      feedback,
       confirm: { danger: vi.fn() },
     })
 
     await context.commands.loadData()
 
     expect(context.accountEditor.accountLimits.value).toEqual(FALLBACK_ADMIN_ACCOUNT_LIMITS)
-    expect(message.warning).toHaveBeenCalledWith('账号限制加载失败，已使用默认限制')
+    expect(feedback.accountLimitsFallback).toHaveBeenCalledWith(error)
     expect(warnSpy).toHaveBeenCalledWith(
       '[provider-config] failed to load account limits, using fallback',
       expect.any(Error),
@@ -60,10 +61,26 @@ describe('useAdminProviderConfig', () => {
   })
 })
 
-function createMessagePort() {
+function createProviderConfigFeedback() {
   return {
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
+    accountLimitsFallback: vi.fn(),
+    loadFailed: vi.fn(),
+    staleChannel: vi.fn(),
+    staleAccount: vi.fn(),
+    staleModel: vi.fn(),
+    channelFormInvalid: vi.fn(),
+    accountFormInvalid: vi.fn(),
+    channelSaved: vi.fn(),
+    channelSaveFailed: vi.fn(),
+    channelDeleted: vi.fn(),
+    channelDeleteFailed: vi.fn(),
+    accountSaved: vi.fn(),
+    accountSaveFailed: vi.fn(),
+    accountDeleted: vi.fn(),
+    accountDeleteFailed: vi.fn(),
+    modelStatusChanged: vi.fn(),
+    modelStatusChangeFailed: vi.fn(),
+    missingApiKeyForModelDetection: vi.fn(),
+    modelDetectionFailed: vi.fn(),
   }
 }

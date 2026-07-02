@@ -122,9 +122,10 @@ function mountCanvasImageTools() {
   const updateOutputCount = vi.fn()
   const activeStrengthAction = ref(null)
   let imageAdjustmentFinalApplyContext: CanvasImageAdjustmentFinalApplyContext | null = null
-  const message = {
+  const feedback = {
     warning: vi.fn<(message: string) => void>(),
-    success: vi.fn<(message: string) => void>(),
+    succeeded: vi.fn<(message: string) => void>(),
+    actionUnavailable: vi.fn<(message: string) => void>(),
   }
   let runtime!: CanvasImageTools
   const host = document.createElement('div')
@@ -176,7 +177,7 @@ function mountCanvasImageTools() {
           clearSelectedFlowElements: vi.fn(),
           startCanvasInteraction: vi.fn(),
           stopCanvasInteraction: vi.fn(),
-          message,
+          feedback,
         })
         return () => h(ContextProbe)
       },
@@ -201,7 +202,7 @@ function mountCanvasImageTools() {
       }
       imageAdjustmentFinalApplyContext.cancel()
     },
-    message,
+    feedback,
     runtime,
     unmount: () => {
       app.unmount()
@@ -280,7 +281,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(harness.runtime.isApplyingAdjustments.value).toBe(false)
       expect(harness.runtime.adjustmentFinalApplyProgress.value).toBeNull()
-      expect(harness.message.success).toHaveBeenCalledWith('已应用编辑并派生新节点')
+      expect(harness.feedback.succeeded).toHaveBeenCalledWith('已应用编辑并派生新节点')
       expect(harness.connectImageNodes).toHaveBeenCalledWith({
         source: 'node-1',
         sourceHandle: 'out:image',
@@ -316,7 +317,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       await apply
 
-      expect(harness.message.warning).not.toHaveBeenCalled()
+      expect(harness.feedback.warning).not.toHaveBeenCalled()
       expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
     } finally {
       harness.unmount()
@@ -352,8 +353,8 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
       expect(harness.connectImageNodes).not.toHaveBeenCalled()
-      expect(harness.message.success).not.toHaveBeenCalled()
-      expect(harness.message.warning).not.toHaveBeenCalled()
+      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+      expect(harness.feedback.warning).not.toHaveBeenCalled()
       expect(harness.runtime.activeNodeId.value).toBe('node-2')
     } finally {
       harness.unmount()

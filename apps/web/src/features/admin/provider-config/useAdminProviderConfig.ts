@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import { extractSafeApiErrorMessage as extractApiErrorMessage } from '../../../shared/utils/errorMessages'
+import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
 import {
   createAdminAccountRecord,
   deleteAdminAccountRecord,
@@ -49,12 +49,6 @@ import type {
   ProviderChannelRecord,
 } from './providerConfigTypes'
 
-type AdminProviderMessagePort = {
-  success: (content: string) => void
-  error: (content: string) => void
-  warning: (content: string) => void
-}
-
 type AdminProviderConfirmPort = {
   danger: (options: {
     title: string
@@ -65,7 +59,7 @@ type AdminProviderConfirmPort = {
 }
 
 export type UseAdminProviderConfigOptions = {
-  message: AdminProviderMessagePort
+  feedback: AdminProviderConfigFeedback
   confirm: AdminProviderConfirmPort
 }
 
@@ -78,14 +72,14 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
 
   const channelEditor = createChannelEditor({
     channels,
-    message: options.message,
+    feedback: options.feedback,
     reload: loadData,
     runAsyncAction,
   })
   const accountEditor = createAccountEditor({
     accounts,
     channels,
-    message: options.message,
+    feedback: options.feedback,
     reload: loadData,
     runAsyncAction,
   })
@@ -135,8 +129,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
       accountEditor.accountLimits.value = await fetchAdminAccountLimits()
     } catch (error) {
       accountEditor.accountLimits.value = FALLBACK_ADMIN_ACCOUNT_LIMITS
-      const message = extractApiErrorMessage(error, '账号限制加载失败，已使用默认限制')
-      options.message.warning(message)
+      options.feedback.accountLimitsFallback(error)
       console.warn('[provider-config] failed to load account limits, using fallback', error)
     }
   }
@@ -155,7 +148,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
       {
         loading,
         feedback: {
-          error: (error) => showActionError(options.message, error, '加载数据失败'),
+          error: options.feedback.loadFailed,
         },
       },
     )
@@ -164,7 +157,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
   function deleteChannel(target: ProviderChannelCommandTarget) {
     const channel = findChannelByTarget(channels.value, target)
     if (!channel) {
-      options.message.warning('渠道商已刷新，请重新选择')
+      options.feedback.staleChannel()
       return
     }
 
@@ -175,10 +168,10 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
       onConfirm: async () => {
         try {
           await deleteAdminChannel(channel.id)
-          options.message.success('删除成功')
+          options.feedback.channelDeleted()
           await loadData()
         } catch (error) {
-          options.message.error(extractApiErrorMessage(error, '删除渠道商失败'))
+          options.feedback.channelDeleteFailed(error)
         }
       },
     })
@@ -187,7 +180,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
   function deleteAccount(target: ProviderAccountCommandTarget) {
     const account = findAccountByTarget(accounts.value, target)
     if (!account) {
-      options.message.warning('账号已刷新，请重新选择')
+      options.feedback.staleAccount()
       return
     }
 
@@ -198,10 +191,10 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
       onConfirm: async () => {
         try {
           await deleteAdminAccountRecord(account.id)
-          options.message.success('账号已删除')
+          options.feedback.accountDeleted()
           await loadData()
         } catch (error) {
-          options.message.error(extractApiErrorMessage(error, '删除账号失败'))
+          options.feedback.accountDeleteFailed(error)
         }
       },
     })
@@ -213,14 +206,14 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
   ) {
     const account = findAccountByTarget(accounts.value, commandTarget)
     if (!account) {
-      options.message.warning('账号已刷新，请重新选择')
+      options.feedback.staleAccount()
       return
     }
 
     const modelKey = normalizeModelKey(model)
     const targetModel = account.models.find((item) => normalizeModelKey(item.name) === modelKey)
     if (!targetModel) {
-      options.message.warning('模型已刷新，请重新选择')
+      options.feedback.staleModel()
       return
     }
     const nextEnabled = !targetModel.enabled
@@ -242,11 +235,11 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
           createAccountUpdatePayloadFromAccount(nextAccount),
         )
         accounts.value = accounts.value.map((item) => (item.id === account.id ? nextAccount : item))
-        options.message.success(nextEnabled ? '模型已启动' : '模型已停止')
+        options.feedback.modelStatusChanged(nextEnabled)
       },
       {
         feedback: {
-          error: (error) => showActionError(options.message, error, '模型状态修改失败'),
+          error: options.feedback.modelStatusChangeFailed,
         },
       },
     )
@@ -271,7 +264,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
 
 function createChannelEditor(options: {
   channels: Readonly<{ value: ProviderChannelRecord[] }>
-  message: AdminProviderMessagePort
+  feedback: AdminProviderConfigFeedback
   reload: () => Promise<void> | void
   runAsyncAction: ReturnType<typeof useAsyncAction>['runAsyncAction']
 }) {
@@ -293,7 +286,7 @@ function createChannelEditor(options: {
   function openEdit(target: ProviderChannelCommandTarget) {
     const row = findChannelByTarget(options.channels.value, target)
     if (!row) {
-      options.message.warning('渠道商已刷新，请重新选择')
+      options.feedback.staleChannel()
       return
     }
 
@@ -320,7 +313,7 @@ function createChannelEditor(options: {
 
   async function save() {
     if (!validate()) {
-      options.message.warning('请修正渠道商表单错误')
+      options.feedback.channelFormInvalid()
       return
     }
 
@@ -330,7 +323,7 @@ function createChannelEditor(options: {
           id: isEditing.value ? currentChannelId.value : undefined,
           data: { ...form.value },
         })
-        options.message.success(isEditing.value ? '渠道商已更新' : '渠道商已创建')
+        options.feedback.channelSaved(isEditing.value)
         visible.value = false
         resetErrors()
         await options.reload()
@@ -338,7 +331,7 @@ function createChannelEditor(options: {
       {
         loading: saveLoading,
         feedback: {
-          error: (error) => showActionError(options.message, error, '保存渠道商失败'),
+          error: options.feedback.channelSaveFailed,
         },
       },
     )
@@ -387,7 +380,7 @@ function createChannelEditor(options: {
 function createAccountEditor(options: {
   accounts: Readonly<{ value: ProviderAccountRecord[] }>
   channels: Readonly<{ value: ProviderChannelRecord[] }>
-  message: AdminProviderMessagePort
+  feedback: AdminProviderConfigFeedback
   reload: () => Promise<void> | void
   runAsyncAction: ReturnType<typeof useAsyncAction>['runAsyncAction']
 }) {
@@ -411,7 +404,7 @@ function createAccountEditor(options: {
   function openCreate(target: ProviderChannelCommandTarget) {
     const channel = findChannelByTarget(options.channels.value, target)
     if (!channel) {
-      options.message.warning('渠道商已刷新，请重新选择')
+      options.feedback.staleChannel()
       return
     }
 
@@ -430,7 +423,7 @@ function createAccountEditor(options: {
   function openEdit(target: ProviderAccountCommandTarget) {
     const account = findAccountByTarget(options.accounts.value, target)
     if (!account) {
-      options.message.warning('账号已刷新，请重新选择')
+      options.feedback.staleAccount()
       return
     }
 
@@ -495,7 +488,7 @@ function createAccountEditor(options: {
 
   async function save() {
     if (!validate()) {
-      options.message.warning('请修正 APIKey 表单错误')
+      options.feedback.accountFormInvalid()
       return
     }
 
@@ -520,7 +513,7 @@ function createAccountEditor(options: {
               secret,
             }),
           )
-          options.message.success('账号已更新')
+          options.feedback.accountSaved(true)
         } else {
           await createAdminAccountRecord(
             createAccountCreatePayload({
@@ -530,7 +523,7 @@ function createAccountEditor(options: {
               secret,
             }),
           )
-          options.message.success('账号已创建')
+          options.feedback.accountSaved(false)
         }
 
         visible.value = false
@@ -540,7 +533,7 @@ function createAccountEditor(options: {
       {
         loading: saveLoading,
         feedback: {
-          error: (error) => showActionError(options.message, error, '保存账号失败'),
+          error: options.feedback.accountSaveFailed,
         },
       },
     )
@@ -563,7 +556,7 @@ function createAccountEditor(options: {
     if (!secret) {
       if (!hasShownApiKeyHint.value) {
         hasShownApiKeyHint.value = true
-        options.message.warning('请输入 API 密钥后再检测模型')
+        options.feedback.missingApiKeyForModelDetection()
       }
       return
     }
@@ -594,9 +587,7 @@ function createAccountEditor(options: {
       {
         loading: detectModelsLoading,
         feedback: {
-          error: (error) => {
-            options.message.warning(extractApiErrorMessage(error, '自动检测模型失败'))
-          },
+          error: options.feedback.modelDetectionFailed,
         },
       },
     )
@@ -711,10 +702,6 @@ function findAccountByTarget(
   target: ProviderAccountCommandTarget,
 ) {
   return accounts.find((account) => account.id === target.id)
-}
-
-function showActionError(message: AdminProviderMessagePort, error: unknown, fallback: string) {
-  message.error(extractApiErrorMessage(error, fallback))
 }
 
 export type AdminProviderConfigContext = ReturnType<typeof useAdminProviderConfig>

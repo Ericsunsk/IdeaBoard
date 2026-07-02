@@ -15,16 +15,14 @@ import {
 import { useImageMaskEditorOverlay, useMaskEditorChromeState } from '../mask-editor'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
+import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
 
 type ValueRef<T> = {
   readonly value: T
 }
 
-type CanvasImageToolsMessage = {
-  warning: (message: string) => void
-  success: (message: string) => void
-}
+type CanvasImageToolsFeedback = CanvasFeedback['imageTools']
 
 export type FlowViewport = { x: number; y: number; zoom: number }
 
@@ -85,7 +83,7 @@ export type UseCanvasImageToolsOptions = {
   clearSelectedFlowElements: () => void
   startCanvasInteraction: (key: CanvasInteractionKey) => void
   stopCanvasInteraction: (key: CanvasInteractionKey) => void
-  message: CanvasImageToolsMessage
+  feedback: CanvasImageToolsFeedback
 }
 
 export type ImageToolSession = ReturnType<typeof createImageToolSession>
@@ -122,7 +120,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     imageEditorNodeId,
     getImageNodeSnapshot: options.getImageNodeSnapshot,
     uploadImageToBoard: options.uploadImageToBoard,
-    onWarning: options.message.warning,
+    onWarning: options.feedback.warning,
     onReferenceImagePreview: (image) => {
       void options.openImageUrlPreview(image.url, image.ratio)
     },

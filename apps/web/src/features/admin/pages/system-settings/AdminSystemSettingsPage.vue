@@ -453,7 +453,7 @@ const {
   resetBrandingForm,
   saving: brandingSaving,
   uploading,
-} = useAdminBrandingSettings({ message: adminFeedback.systemSettings.branding })
+} = useAdminBrandingSettings({ feedback: adminFeedback.systemSettings.branding })
 const {
   handleSaveRateLimit,
   handleToggleRegistration,
@@ -463,28 +463,28 @@ const {
   registrationEnabled,
   registrationSettingLoading,
   resetRateLimitForm,
-} = useAdminAccessSettings({ message: adminFeedback.systemSettings.access })
+} = useAdminAccessSettings({ feedback: adminFeedback.systemSettings.access })
 const {
   form: taskMonitorForm,
   handleSaveTaskMonitorSettings,
   loading: taskMonitorLoading,
   resetTaskMonitorForm,
   saving: taskMonitorSaving,
-} = useAdminTaskMonitorSettings({ message: adminFeedback.systemSettings.taskMonitor })
+} = useAdminTaskMonitorSettings({ feedback: adminFeedback.systemSettings.taskMonitor })
 const {
   form: publicURLForm,
   handleSavePublicURLSettings,
   loading: publicURLLoading,
   resetPublicURLForm,
   saving: publicURLSaving,
-} = useAdminPublicURLSettings({ message: adminFeedback.systemSettings.publicURL })
+} = useAdminPublicURLSettings({ feedback: adminFeedback.systemSettings.publicURL })
 const {
   form: mediaUploadForm,
   handleSaveMediaUploadSettings,
   loading: mediaUploadLoading,
   resetMediaUploadForm,
   saving: mediaUploadSaving,
-} = useAdminMediaUploadSettings({ message: adminFeedback.systemSettings.mediaUpload })
+} = useAdminMediaUploadSettings({ feedback: adminFeedback.systemSettings.mediaUpload })
 
 const publicURLStatusLabel = computed(() => {
   const hasPublicBaseURL = Boolean(publicURLForm.value.public_base_url.trim())

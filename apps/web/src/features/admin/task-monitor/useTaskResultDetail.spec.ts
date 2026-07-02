@@ -39,7 +39,7 @@ describe('task result image URL validation', () => {
   })
 
   it('does not expose unsafe detail image URLs for rendering', () => {
-    const detail = useTaskResultDetail({ message: { success: vi.fn(), error: vi.fn() } })
+    const detail = useTaskResultDetail({ feedback: createTaskResultFeedback() })
 
     detail.showDetail({
       result: '{"image_url":"https://example.com/unsafe.png"}',
@@ -50,14 +50,22 @@ describe('task result image URL validation', () => {
 
   it('does not open rejected URLs', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
-    const error = vi.fn()
-    const detail = useTaskResultDetail({ message: { success: vi.fn(), error } })
+    const feedback = createTaskResultFeedback()
+    const detail = useTaskResultDetail({ feedback })
 
     detail.openResultImage('javascript:alert(1)')
 
     expect(openSpy).not.toHaveBeenCalled()
-    expect(error).toHaveBeenCalledWith('图片链接不安全，已拒绝打开')
+    expect(feedback.unsafeImageUrlRejected).toHaveBeenCalled()
 
     openSpy.mockRestore()
   })
 })
+
+function createTaskResultFeedback() {
+  return {
+    unsafeImageUrlRejected: vi.fn(),
+    copiedToClipboard: vi.fn(),
+    copyFailed: vi.fn(),
+  }
+}

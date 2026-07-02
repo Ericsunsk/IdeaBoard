@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue'
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import type { AdminUsersFeedback } from '../feedback/useAdminFeedback'
 import { useAdminUserCommands } from './adminUserCommands'
 import type { AdminUserSessionCommands } from './adminUserSessionCommands'
 import { useAdminUsersResource, type AdminUsersQueryParams } from './adminUsersResource'
@@ -13,12 +13,6 @@ import {
   userRoleFilterOptions,
   userStatusFilterOptions,
 } from './adminUserView'
-
-type AdminUsersMessage = {
-  error: (message: string) => void
-  success: (message: string) => void
-  warning: (message: string) => void
-}
 
 type AdminConfirmOptions = {
   header: string
@@ -38,7 +32,7 @@ type AdminUsersContextDependencies = {
 
 export function useAdminUsersContext(
   options: {
-    message: AdminUsersMessage
+    feedback: AdminUsersFeedback
     confirm: AdminUsersConfirm
   },
   dependencies: AdminUsersContextDependencies = {},
@@ -112,7 +106,7 @@ export function useAdminUsersContext(
   watch(
     () => usersQuery.error.value,
     (error) => {
-      if (error) options.message.error(formatDisplayErrorMessage(error, '加载用户失败'))
+      if (error) options.feedback.loadFailed(error)
     },
   )
 
@@ -179,7 +173,7 @@ export function useAdminUsersContext(
   }
   const commands = useAdminUserCommands(
     {
-      message: options.message,
+      feedback: options.feedback,
       confirm: options.confirm,
     },
     {

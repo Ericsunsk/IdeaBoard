@@ -434,7 +434,7 @@ const { isScrolling: isChannelPanelScrolling, handleScroll: handleChannelPanelSc
   useTransientScrolling()
 
 const { cards, channelEditor, accountEditor, commands } = useAdminProviderConfig({
-  message: adminFeedback.channels.providerConfig,
+  feedback: adminFeedback.channels.providerConfig,
   confirm: {
     danger: ({ title, content, acceptLabel, onConfirm }) =>
       requireAdminConfirm({

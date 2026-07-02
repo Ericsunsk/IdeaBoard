@@ -27,7 +27,7 @@ describe('admin user commands', () => {
       reason: 'abuse',
       expires_in_days: 7,
     })
-    expect(harness.message.success).toHaveBeenCalledWith('已高级封禁用户 alice')
+    expect(harness.feedback.banSucceeded).toHaveBeenCalledWith('alice')
   })
 
   it('blocks status changes for admins before calling mutations', () => {
@@ -37,7 +37,7 @@ describe('admin user commands', () => {
     commands.openUserActionMenu(makeUser({ role: 'admin', status: 1 }))
     commands.handleActionSelect('status')
 
-    expect(harness.message.warning).toHaveBeenCalledWith('管理员账号不可封禁或解封')
+    expect(harness.feedback.adminStatusChangeForbidden).toHaveBeenCalled()
     expect(harness.mutations.banUser.mutateAsync).not.toHaveBeenCalled()
   })
 
@@ -54,7 +54,7 @@ describe('admin user commands', () => {
       expect.objectContaining({ header: '确认解除封禁', acceptLabel: '确认解封' }),
     )
     expect(harness.mutations.unbanUser.mutateAsync).toHaveBeenCalledWith(3)
-    expect(harness.message.error).toHaveBeenCalledWith('backend denied')
+    expect(harness.feedback.unbanFailed).toHaveBeenCalledWith(expect.any(Error))
   })
 
   it('confirms role toggles with the next role payload', async () => {
@@ -72,7 +72,7 @@ describe('admin user commands', () => {
       id: 4,
       role: 'admin',
     })
-    expect(harness.message.success).toHaveBeenCalledWith('已设为管理员')
+    expect(harness.feedback.roleUpdated).toHaveBeenCalledWith('admin')
   })
 
   it('confirms session revoke only when the user has an auth identity', async () => {
@@ -85,9 +85,9 @@ describe('admin user commands', () => {
     commands.handleActionSelect('revoke')
     await harness.acceptLastConfirm()
 
-    expect(harness.message.warning).toHaveBeenCalledWith('目标用户缺少 Auth 标识，无法吊销会话')
+    expect(harness.feedback.missingAuthUserForSessionRevoke).toHaveBeenCalled()
     expect(harness.mutations.revokeSessions.mutateAsync).toHaveBeenCalledWith(5)
-    expect(harness.message.success).toHaveBeenCalledWith('已强制吊销所有会话')
+    expect(harness.feedback.revokeSessionsSucceeded).toHaveBeenCalled()
   })
 
   it('delegates impersonation side effects to the session command adapter', async () => {
@@ -99,7 +99,7 @@ describe('admin user commands', () => {
     await Promise.resolve()
 
     expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('auth-6')
-    expect(harness.message.success).toHaveBeenCalledWith('正在以 erin 的身份登录...')
+    expect(harness.feedback.impersonationStarted).toHaveBeenCalledWith('erin')
   })
 
   it('shows an impersonation error before adapter work when auth identity is missing', async () => {
@@ -111,16 +111,12 @@ describe('admin user commands', () => {
     await Promise.resolve()
 
     expect(harness.sessionCommands.startImpersonation).not.toHaveBeenCalled()
-    expect(harness.message.error).toHaveBeenCalledWith('目标用户缺少 Auth 标识，无法伪装登录')
+    expect(harness.feedback.missingAuthUserForImpersonation).toHaveBeenCalled()
   })
 })
 
 function createHarness() {
-  const message = {
-    error: vi.fn(),
-    success: vi.fn(),
-    warning: vi.fn(),
-  }
+  const feedback = createAdminUsersFeedback()
   const confirmRequests: ConfirmRequest[] = []
   const confirm = {
     require: vi.fn((request: ConfirmRequest) => confirmRequests.push(request)),
@@ -137,13 +133,13 @@ function createHarness() {
   }
 
   return {
-    message,
+    feedback,
     confirm,
     mutations,
     sessionCommands,
     createCommands: () =>
       useAdminUserCommands(
-        { message, confirm },
+        { feedback, confirm },
         {
           mutations,
           sessionCommands,
@@ -154,6 +150,27 @@ function createHarness() {
       expect(request).toBeTruthy()
       await request?.accept()
     },
+  }
+}
+
+function createAdminUsersFeedback() {
+  return {
+    loadFailed: vi.fn(),
+    adminStatusChangeForbidden: vi.fn(),
+    unbanSucceeded: vi.fn(),
+    unbanFailed: vi.fn(),
+    banSucceeded: vi.fn(),
+    banFailed: vi.fn(),
+    missingAuthUserForSessionRevoke: vi.fn(),
+    revokeSessionsSucceeded: vi.fn(),
+    revokeSessionsFailed: vi.fn(),
+    missingAuthUserForImpersonation: vi.fn(),
+    impersonationStarted: vi.fn(),
+    impersonationFailed: vi.fn(),
+    userDeleted: vi.fn(),
+    userDeleteFailed: vi.fn(),
+    roleUpdated: vi.fn(),
+    roleUpdateFailed: vi.fn(),
   }
 }
 

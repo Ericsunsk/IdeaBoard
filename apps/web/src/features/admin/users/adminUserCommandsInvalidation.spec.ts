@@ -102,13 +102,9 @@ function createHarness() {
   const confirm = {
     require: vi.fn((request: ConfirmRequest) => confirmRequests.push(request)),
   }
-  const message = {
-    error: vi.fn(),
-    success: vi.fn(),
-    warning: vi.fn(),
-  }
+  const feedback = createAdminUsersFeedback()
   const commands = useAdminUserCommands(
-    { message, confirm },
+    { feedback, confirm },
     {
       sessionCommands: {
         startImpersonation: vi.fn().mockResolvedValue(undefined),
@@ -123,6 +119,27 @@ function createHarness() {
       expect(request).toBeTruthy()
       await request?.accept()
     },
+  }
+}
+
+function createAdminUsersFeedback() {
+  return {
+    loadFailed: vi.fn(),
+    adminStatusChangeForbidden: vi.fn(),
+    unbanSucceeded: vi.fn(),
+    unbanFailed: vi.fn(),
+    banSucceeded: vi.fn(),
+    banFailed: vi.fn(),
+    missingAuthUserForSessionRevoke: vi.fn(),
+    revokeSessionsSucceeded: vi.fn(),
+    revokeSessionsFailed: vi.fn(),
+    missingAuthUserForImpersonation: vi.fn(),
+    impersonationStarted: vi.fn(),
+    impersonationFailed: vi.fn(),
+    userDeleted: vi.fn(),
+    userDeleteFailed: vi.fn(),
+    roleUpdated: vi.fn(),
+    roleUpdateFailed: vi.fn(),
   }
 }
 

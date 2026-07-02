@@ -14,21 +14,13 @@ import { useFlowNodeUiState } from './useFlowNodeUiState'
 import { useFlowSelectionExport } from './useFlowSelectionExport'
 import { useFlowSnapshotNodeUpdater } from './useFlowSnapshotNodeUpdater'
 import type { FlowTransactions } from './useFlowTransactions'
+import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
 type ValueRef<T> = {
   readonly value: T
 }
 
-type CanvasGraphRuntimeMessage = {
-  success: (message: string) => unknown
-  warning: (message: string) => unknown
-  loading: (
-    message: string,
-    options?: { duration?: number },
-  ) => {
-    destroy: () => void
-  }
-}
+type CanvasGraphRuntimeFeedback = CanvasFeedback['graph']
 
 type CanvasGraphUploadApi = {
   upload: (
@@ -64,10 +56,15 @@ type UseCanvasGraphRuntimeOptions = {
   sanitizeApiErrorMessage: (message: string | null | undefined, fallback: string) => string
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
-  message: CanvasGraphRuntimeMessage
+  feedback: CanvasGraphRuntimeFeedback
 }
 
 export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
+  const message = {
+    success: options.feedback.operationSucceeded,
+    warning: options.feedback.operationWarning,
+    loading: options.feedback.operationLoading,
+  }
   const { scheduleFlowNodeInternalsRefresh } = useFlowNodeInternalsRefreshQueue({
     updateNodeInternals: options.updateNodeInternals,
   })
@@ -86,7 +83,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     commitNodeMutation: options.flowTransactions.commitNodeMutation,
     commitEdgeMutation: options.flowTransactions.commitEdgeMutation,
     onWarning: (text) => {
-      options.message.warning(text)
+      options.feedback.operationWarning(text)
     },
   })
 
@@ -97,7 +94,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
 
   const selectionExport = useFlowSelectionExport({
     nodes: options.nodes,
-    message: options.message,
+    message,
   })
   const hasSelectedFlowNodes: ComputedRef<boolean> = computed(() =>
     selectionExport.hasSelectedNodes(),
@@ -130,8 +127,8 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
       getImageNodeSnapshot,
       uploadApi: options.uploadApi,
       sanitizeApiErrorMessage: options.sanitizeApiErrorMessage,
-      onWarning: (msg) => options.message.warning(msg),
-      onSuccess: (msg) => options.message.success(msg),
+      onWarning: (msg) => options.feedback.operationWarning(msg),
+      onSuccess: (msg) => options.feedback.operationSucceeded(msg),
       onNodeMutated: (nodeId) => flowNodeMutations.markFlowExecutionNodeDirty(nodeId),
     })
 
@@ -152,13 +149,13 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     getImageNodeDisplayPayload,
     openImageUrlPreview: options.openImageUrlPreview,
     onWarning: (message) => {
-      options.message.warning(message)
+      options.feedback.operationWarning(message)
     },
   })
 
   const canvasDrop = useFlowCanvasDrop({
     screenToFlowCoordinate: options.screenToFlowCoordinate,
-    onWarning: (msg) => options.message.warning(msg),
+    onWarning: (msg) => options.feedback.operationWarning(msg),
     createImageNodeFromFile,
   })
 

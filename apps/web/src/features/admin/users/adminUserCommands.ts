@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import type { AdminUsersFeedback } from '../feedback/useAdminFeedback'
 import {
   banAdminUser,
   deleteAdminUser,
@@ -21,12 +21,6 @@ import {
 
 type AsyncMutation<TInput> = {
   mutateAsync: (input: TInput) => Promise<void>
-}
-
-type AdminUserActionsMessage = {
-  error: (message: string) => void
-  success: (message: string) => void
-  warning: (message: string) => void
 }
 
 type AdminConfirmOptions = {
@@ -74,7 +68,7 @@ export const banDurationOptions: Array<{ label: string; value: number }> = [
 
 export function useAdminUserCommands(
   options: {
-    message: AdminUserActionsMessage
+    feedback: AdminUsersFeedback
     confirm: AdminUserActionsConfirm
   },
   dependencies: AdminUserCommandDependencies = {},
@@ -187,7 +181,7 @@ export function useAdminUserCommands(
 
   function handleToggleStatus(row: AdminUserCommandTarget) {
     if (isAdminUser(row)) {
-      options.message.warning('管理员账号不可封禁或解封')
+      options.feedback.adminStatusChangeForbidden()
       return
     }
 
@@ -206,9 +200,9 @@ export function useAdminUserCommands(
       accept: async () => {
         try {
           await unbanUserMutation.mutateAsync(row.id)
-          options.message.success('已解除封禁')
+          options.feedback.unbanSucceeded()
         } catch (error) {
-          options.message.error(formatDisplayErrorMessage(error, '解封失败'))
+          options.feedback.unbanFailed(error)
         }
       },
     })
@@ -224,11 +218,11 @@ export function useAdminUserCommands(
         reason: banForm.value.reason || undefined,
         expires_in_days: banForm.value.expiresInDays || undefined,
       })
-      options.message.success(`已高级封禁用户 ${row.username}`)
+      options.feedback.banSucceeded(row.username)
       showBanModal.value = false
       banUserContext.value = null
     } catch (error) {
-      options.message.error(formatDisplayErrorMessage(error, '封禁失败'))
+      options.feedback.banFailed(error)
     } finally {
       banFormLoading.value = false
     }
@@ -236,7 +230,7 @@ export function useAdminUserCommands(
 
   function handleRevokeSessions(row: AdminUserCommandTarget) {
     if (!row.authUserId) {
-      options.message.warning('目标用户缺少 Auth 标识，无法吊销会话')
+      options.feedback.missingAuthUserForSessionRevoke()
       return
     }
     options.confirm.require({
@@ -247,9 +241,9 @@ export function useAdminUserCommands(
       accept: async () => {
         try {
           await revokeUserSessionsMutation.mutateAsync(row.id)
-          options.message.success('已强制吊销所有会话')
+          options.feedback.revokeSessionsSucceeded()
         } catch (error) {
-          options.message.error(formatDisplayErrorMessage(error, '操作失败'))
+          options.feedback.revokeSessionsFailed(error)
         }
       },
     })
@@ -257,14 +251,14 @@ export function useAdminUserCommands(
 
   async function handleImpersonate(row: AdminUserCommandTarget) {
     if (!row.authUserId) {
-      options.message.error('目标用户缺少 Auth 标识，无法伪装登录')
+      options.feedback.missingAuthUserForImpersonation()
       return
     }
     try {
       await sessionCommands.startImpersonation(row.authUserId)
-      options.message.success(`正在以 ${row.username} 的身份登录...`)
+      options.feedback.impersonationStarted(row.username)
     } catch (error: unknown) {
-      options.message.error(formatDisplayErrorMessage(error, '伪装失败'))
+      options.feedback.impersonationFailed(error)
     }
   }
 
@@ -277,9 +271,9 @@ export function useAdminUserCommands(
       accept: async () => {
         try {
           await deleteUserMutation.mutateAsync(row.id)
-          options.message.success('用户已受控彻底注销')
+          options.feedback.userDeleted()
         } catch (error: unknown) {
-          options.message.error(formatDisplayErrorMessage(error, '注销失败'))
+          options.feedback.userDeleteFailed(error)
         }
       },
     })
@@ -298,9 +292,9 @@ export function useAdminUserCommands(
       accept: async () => {
         try {
           await updateUserRoleMutation.mutateAsync({ id: row.id, role: nextRole })
-          options.message.success(nextRole === 'admin' ? '已设为管理员' : '已取消管理员')
+          options.feedback.roleUpdated(nextRole)
         } catch (error: unknown) {
-          options.message.error(formatDisplayErrorMessage(error, '角色更新失败'))
+          options.feedback.roleUpdateFailed(error)
         }
       },
     })

@@ -680,7 +680,7 @@ const {
   showDetail,
   getErrorReason,
   calcDuration,
-} = useTaskResultDetail({ message: adminFeedback.taskMonitor.resultDetail })
+} = useTaskResultDetail({ feedback: adminFeedback.taskMonitor.resultDetail })
 
 const {
   tasks,

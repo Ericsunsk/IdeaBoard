@@ -1,27 +1,12 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import type { PromptAspectRatio } from '../../../canvas-board/domain'
 import type { FlowTransactions } from '../../composables/useFlowTransactions'
-import type { CanvasExtendRect } from '../../utils/canvasExtendGeometry'
-import {
-  createImageExecutionPlanner,
-  isImageExecutionPlanError,
-  type ImageExecutionInput,
-  type ImageResultAnchor,
-} from '../planning/ImageExecutionPlan'
-import type { ImageTaskAction } from '../contracts/imageActionExecution'
+import { createImageExecutionPlanner } from '../planning/ImageExecutionPlan'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
-
-type RunImageDirectActionOptions = {
-  strength?: number
-}
-
-type RunImageInpaintActionOptions = {
-  prompt: string
-  maskDataUrl: string
-  outputCount: number
-  referenceImageUrls?: string[]
-}
+import {
+  createImageWorkflowCommands,
+  type ImageWorkflowCommands,
+} from './imageWorkflowCommandRuntime'
 
 type UseFlowImageDirectActionsOptions = {
   nodes: Ref<Node[]>
@@ -37,20 +22,11 @@ type UseFlowImageDirectActionsOptions = {
   getCurrentBoardId?: () => string
 }
 
-type CanvasExtendRectIntent = {
-  frameRect: CanvasExtendRect
-  originalImageRect: CanvasExtendRect
-  prompt?: string
-  outputCount?: number
-}
+export type FlowImageDirectActions = ImageWorkflowCommands
 
-function warnPlanningError(error: unknown, onWarning: (message: string) => void): boolean {
-  if (!isImageExecutionPlanError(error)) return false
-  onWarning(error.message)
-  return true
-}
-
-export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOptions) {
+export function useFlowImageDirectActions(
+  options: UseFlowImageDirectActionsOptions,
+): FlowImageDirectActions {
   const planner = createImageExecutionPlanner(() => ({
     nodes: options.nodes.value,
     edges: options.edges.value,
@@ -69,124 +45,13 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       onWarning: options.onWarning,
     })
 
-  async function runImageDirectAction(
-    nodeId: string,
-    action: ImageTaskAction,
-    runOptions?: RunImageDirectActionOptions,
-  ) {
-    try {
-      const plan = planner.planImageDirectAction(nodeId, action, runOptions)
-      await executeImageWorkflow(plan)
-    } catch (error) {
-      if (!warnPlanningError(error, options.onWarning)) throw error
-    }
-  }
-
-  async function runCanvasExtendAction(nodeId: string, intent: CanvasExtendRectIntent) {
-    try {
-      const plan = planner.planCanvasExtendAction(nodeId, intent)
-      await executeImageWorkflow(plan)
-    } catch (error) {
-      if (!warnPlanningError(error, options.onWarning)) throw error
-    }
-  }
-
-  async function runImageInpaintAction(nodeId: string, inpaint: RunImageInpaintActionOptions) {
-    try {
-      const plan = planner.planImageInpaintAction(nodeId, inpaint)
-      await executeImageWorkflow(plan)
-    } catch (error) {
-      if (!warnPlanningError(error, options.onWarning)) throw error
-    }
-  }
-
-  async function runImagePromptGeneration(
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio = 'auto',
-    optionsOverride: { outputAnchorNodeId?: string } = {},
-  ) {
-    try {
-      const plan = planner.planImagePromptGeneration(
-        nodeId,
-        prompt,
-        outputCount,
-        aspectRatio,
-        optionsOverride,
-      )
-      await runImagePromptGenerationPlan(plan)
-    } catch (error) {
-      if (!warnPlanningError(error, options.onWarning)) throw error
-    }
-  }
-
-  async function runImagePromptGenerationFromSource(
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-    optionsOverride: { outputAnchorNodeId?: string; anchor?: ImageResultAnchor } = {},
-  ) {
-    try {
-      const plan = planner.planImagePromptGenerationFromSource(
-        source,
-        sourceNodeId,
-        prompt,
-        outputCount,
-        aspectRatio,
-        optionsOverride,
-      )
-      await runImagePromptGenerationPlan(plan)
-    } catch (error) {
-      if (!warnPlanningError(error, options.onWarning)) throw error
-    }
-  }
-
-  async function runImagePromptGenerationPlan(
-    plan: ReturnType<typeof planner.planImagePromptGenerationFromSource>,
-  ) {
-    await executeImageWorkflow(plan)
-  }
-
-  async function runTextPromptGeneration(
-    anchorNodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-  ) {
-    try {
-      const plan = planner.planTextPromptGeneration(anchorNodeId, prompt, outputCount, aspectRatio)
-      await executeImageWorkflow(plan)
-    } catch (error) {
-      if (!warnPlanningError(error, options.onWarning)) throw error
-    }
-  }
-
-  async function runFusionPromptGeneration(
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-  ) {
-    try {
-      const plan = planner.planFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio)
-      await executeImageWorkflow(plan)
-    } catch (error) {
-      if (!warnPlanningError(error, options.onWarning)) throw error
-    }
-  }
-
-  return {
-    isNodeDirectActionRunning,
-    reattachPendingImageResults,
-    runImageDirectAction,
-    runCanvasExtendAction,
-    runImagePromptGeneration,
-    runImagePromptGenerationFromSource,
-    runImageInpaintAction,
-    runFusionPromptGeneration,
-    runTextPromptGeneration,
-  }
+  return createImageWorkflowCommands({
+    planner,
+    workflow: {
+      executeImageWorkflow,
+      isNodeDirectActionRunning,
+      reattachPendingImageResults,
+    },
+    onWarning: options.onWarning,
+  })
 }

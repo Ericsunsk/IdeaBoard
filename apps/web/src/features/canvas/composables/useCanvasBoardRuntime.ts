@@ -9,6 +9,7 @@ import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
 import type { FlowHistory } from './useFlowHistory'
 import type { FlowTransactions } from './useFlowTransactions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
+import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 
@@ -18,11 +19,7 @@ type FlowViewport = {
   zoom: number
 }
 
-type CanvasBoardRuntimeMessage = {
-  warning: (message: string) => void
-  success: (message: string) => void
-  error: (message: string) => void
-}
+type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 
 type UseCanvasBoardRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
@@ -31,7 +28,7 @@ type UseCanvasBoardRuntimeOptions = {
   getViewport: () => FlowViewport
   setViewport: (viewport: FlowViewport) => Promise<unknown> | unknown
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
-  message: CanvasBoardRuntimeMessage
+  feedback: CanvasBoardRuntimeFeedback
   onNativeRemove?: () => void
 }
 
@@ -69,6 +66,11 @@ type CanvasBoardRuntime = {
 }
 
 export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): CanvasBoardRuntime {
+  const message = {
+    warning: options.feedback.warning,
+    success: options.feedback.saveSucceeded,
+    error: options.feedback.saveFailed,
+  }
   const fullNodes: Ref<Node[]> = ref([])
   const fullEdges: Ref<Edge[]> = ref([])
   const nodes = fullNodes
@@ -96,7 +98,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     getBoardIdQuery: () => options.route.query.boardId,
     getUserIdentity: options.getUserIdentity,
     message: {
-      warning: options.message.warning,
+      warning: options.feedback.warning,
     },
   })
 
@@ -119,15 +121,15 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     boardSession,
     getViewport: options.getViewport,
     setViewport: setBoardViewport,
-    onWarning: options.message.warning,
-    onSuccess: options.message.success,
-    onError: options.message.error,
+    onWarning: options.feedback.warning,
+    onSuccess: options.feedback.saveSucceeded,
+    onError: options.feedback.saveFailed,
     onNativeRemove: options.onNativeRemove,
   })
 
   const boardHeader = useFlowBoardHeaderActions({
     currentBoardId,
-    message: options.message,
+    message,
     router: options.router,
     route: options.route,
     flushAutosave: () => flushAutosave(),

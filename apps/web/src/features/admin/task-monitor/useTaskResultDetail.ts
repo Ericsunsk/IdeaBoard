@@ -5,6 +5,7 @@ import {
 } from '../../../shared/utils/errorMessages'
 import { formatAdminDateTime, formatDurationSeconds } from '../../../shared/utils/dateTime'
 import type { Task } from '../../../shared/api/task'
+import type { AdminTaskResultFeedback } from '../feedback/useAdminFeedback'
 import { adminTaskStatuses } from './taskMonitorStatus'
 import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from './taskResultImages'
 
@@ -15,9 +16,7 @@ const RESULT_ARRAY_PREVIEW_LENGTH = 5
 const SENSITIVE_KEY_PATTERN =
   /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
 
-export function useTaskResultDetail(options: {
-  message: { success: (content: string) => void; error: (content: string) => void }
-}) {
+export function useTaskResultDetail(options: { feedback: AdminTaskResultFeedback }) {
   const detailModalVisible = ref(false)
   const detailTask = ref<Task | null>(null)
   const showDebugResult = ref(false)
@@ -76,7 +75,7 @@ export function useTaskResultDetail(options: {
     if (!url.trim()) return
     const normalizedUrl = getSafeResultImageUrl(url)
     if (!normalizedUrl) {
-      options.message.error('图片链接不安全，已拒绝打开')
+      options.feedback.unsafeImageUrlRejected()
       return
     }
     window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
@@ -86,9 +85,9 @@ export function useTaskResultDetail(options: {
     if (!text) return
     navigator.clipboard
       .writeText(text)
-      .then(() => options.message.success('已复制到剪贴板'))
+      .then(() => options.feedback.copiedToClipboard())
       .catch(() => {
-        options.message.error('复制失败')
+        options.feedback.copyFailed()
       })
   }
 

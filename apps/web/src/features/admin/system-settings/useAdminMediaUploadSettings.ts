@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import {
   getGetAdminMediaUploadSettingQueryKey,
   useGetAdminMediaUploadSetting,
@@ -8,13 +8,9 @@ import type {
   ApiResponseMediaUploadSetting,
   MediaUploadSetting,
 } from '../../../shared/api/generated-query/model'
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import type { AdminMediaUploadSettingsFeedback } from '../feedback/useAdminFeedback'
 import { updateMediaUploadSetting } from './systemSettingsCommands'
-
-type AdminMediaUploadSettingsMessage = {
-  error: (message: string) => void
-  success: (message: string) => void
-}
+import { useSettingFormLifecycle } from './useSettingFormLifecycle'
 
 export const DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING: MediaUploadSetting = {
   upload_max_concurrent: 8,
@@ -23,9 +19,7 @@ export const DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING: MediaUploadSetting = {
 export const MEDIA_UPLOAD_MIN_CONCURRENT = 1
 export const MEDIA_UPLOAD_MAX_CONCURRENT = 64
 
-export function useAdminMediaUploadSettings(options: {
-  message: AdminMediaUploadSettingsMessage
-}) {
+export function useAdminMediaUploadSettings(options: { feedback: AdminMediaUploadSettingsFeedback }) {
   const queryClient = useQueryClient()
   const query = useGetAdminMediaUploadSetting()
   const form = ref<MediaUploadSetting>({ ...DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING })
@@ -57,41 +51,27 @@ export function useAdminMediaUploadSettings(options: {
 
   const loading = computed(() => query.isLoading.value || query.isFetching.value)
   const saving = computed(() => saveMutation.isPending.value)
-  const formDirty = computed(
-    () => form.value.upload_max_concurrent !== lastSyncedForm.value.upload_max_concurrent,
-  )
+  const sourceSetting = computed(() => query.data.value?.data)
 
-  watch(
-    () => query.error.value,
-    (error) => {
-      if (error) {
-        options.message.error(formatDisplayErrorMessage(error, '加载上传设置失败'))
-      }
+  const formLifecycle = useSettingFormLifecycle<Partial<MediaUploadSetting>, MediaUploadSetting>({
+    error: query.error,
+    source: sourceSetting,
+    current: form,
+    synced: lastSyncedForm,
+    isSaving: saveMutation.isPending,
+    feedback: options.feedback,
+    hydrate: hydrateMediaUploadForm,
+    isSame: isSameMediaUploadSetting,
+    reset: (synced) => {
+      form.value = { ...synced }
     },
-  )
-
-  watch(
-    () => query.data.value,
-    (response) => {
-      if (!response?.data || saveMutation.isPending.value || formDirty.value) return
-      hydrateMediaUploadForm(response.data)
-    },
-    { immediate: true },
-  )
+  })
 
   async function handleSaveMediaUploadSettings() {
-    const validationError = validateMediaUploadSetting(form.value)
-    if (validationError) {
-      options.message.error(validationError)
-      return
-    }
-
-    try {
-      await saveMutation.mutateAsync(normalizeMediaUploadSetting(form.value))
-      options.message.success('上传设置已保存')
-    } catch (error) {
-      options.message.error(formatDisplayErrorMessage(error, '保存上传设置失败'))
-    }
+    await formLifecycle.save({
+      validate: () => validateMediaUploadSetting(form.value),
+      run: () => saveMutation.mutateAsync(normalizeMediaUploadSetting(form.value)),
+    })
   }
 
   function hydrateMediaUploadForm(setting: Partial<MediaUploadSetting> | null | undefined) {
@@ -102,7 +82,7 @@ export function useAdminMediaUploadSettings(options: {
   }
 
   function resetMediaUploadForm() {
-    form.value = { ...lastSyncedForm.value }
+    formLifecycle.reset()
   }
 
   return {
@@ -135,6 +115,10 @@ export function validateMediaUploadSetting(setting: MediaUploadSetting): string 
     return `上传并发上限必须在 ${MEDIA_UPLOAD_MIN_CONCURRENT} 到 ${MEDIA_UPLOAD_MAX_CONCURRENT} 之间`
   }
   return ''
+}
+
+function isSameMediaUploadSetting(current: MediaUploadSetting, synced: MediaUploadSetting): boolean {
+  return current.upload_max_concurrent === synced.upload_max_concurrent
 }
 
 function normalizeConcurrentValue(value: unknown, fallback: number): number {

@@ -50,4 +50,8 @@ export {
   type FlowImageWorkflowExecutionPlan,
   type UseFlowImageWorkflowExecutionOptions,
 } from './runtime/flowImageWorkflowExecution'
+export {
+  createImageWorkflowCommands,
+  type ImageWorkflowCommands,
+} from './runtime/imageWorkflowCommandRuntime'
 export { useFlowImageDirectActions } from './runtime/useFlowImageDirectActions'

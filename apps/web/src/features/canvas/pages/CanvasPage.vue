@@ -157,7 +157,6 @@ import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
 import { USER_BOARDS_PATH, USER_CENTER_PATH } from '../../../shared/constants/routePaths'
-import type { Edge, Node } from '@vue-flow/core'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -166,37 +165,26 @@ import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { useFlowSelectionController } from '../composables/useFlowSelectionController'
-import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
-import { useCanvasViewportRuntime } from '../composables/useCanvasViewportRuntime'
 import {
   ACTIVE_NODE_PANEL_KIND,
   useFlowActiveNodePanels,
 } from '../composables/useFlowActiveNodePanels'
 import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
-import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
-import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
-import { useFlowCanvasNodeHandlers } from '../composables/useFlowCanvasNodeHandlers'
 import {
   useFlowTransientUiDismissal,
   type DismissTransientCanvasUi,
 } from '../composables/useFlowTransientUiDismissal'
-import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
-import { useCanvasBoardRuntime } from '../composables/useCanvasBoardRuntime'
-import { useCanvasGraphRuntime } from '../composables/useCanvasGraphRuntime'
-import { useCanvasImageTools } from '../image-tools'
-import { useCanvasTaskRuntime } from '../composables/useCanvasTaskRuntime'
-import { useCanvasFeedback } from '../feedback/useCanvasFeedback'
+import { useCanvasWorkspaceRuntime } from '../composables/useCanvasWorkspaceRuntime'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import CanvasMiniMap from '../components/CanvasMiniMap.vue'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
 import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 
-const canvasFeedback = useCanvasFeedback()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -233,19 +221,53 @@ const {
 } = useFlowActiveNodePanels()
 const duplicateModifierPressed = ref(false)
 const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
+const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
+
+const canvasWorkspace = useCanvasWorkspaceRuntime({
+  route,
+  router,
+  getUserIdentity: () => ({
+    userId: Number(userStore.user?.id),
+    userUid: `${userStore.user?.uid ?? ''}`.trim(),
+  }),
+  createNodeKind,
+  viewport,
+  getViewport,
+  setViewport: (nextViewport, options) => setViewport(nextViewport, options),
+  setCenter: (x, y, options) => setCenter(x, y, options),
+  zoomIn,
+  zoomOut,
+  panBy,
+  updateNodeInternals,
+  screenToFlowCoordinate,
+  getSelectedElements,
+  removeSelectedElements,
+  uploadApi,
+  sanitizeApiErrorMessage,
+  openNodeImagePreview,
+  openImageUrlPreview,
+  logoutAndRedirect,
+  startNodeDragInteraction: () => startNodeDragInteraction(),
+  stopNodeDragInteraction: () => stopNodeDragInteraction(),
+  refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
+  onNativeRemove: () => {
+    dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
+  },
+})
 
 const {
   nodes,
   edges,
-  fullNodes,
-  fullEdges,
-  currentBoardId,
-  loadInitialOrRouteBoard,
-  flushAutosave,
-  flowHistory,
-  flowTransactions,
   onNodesChange,
   onEdgesChange,
+  isValidConnection,
+  onConnect,
+  onEdgeUpdate,
+  nodeDragTransactions,
+} = canvasWorkspace.flowPane
+
+const {
+  currentBoardId,
   isBoardMenuOpen,
   isRenamingBoard,
   boardNameDraft,
@@ -261,23 +283,14 @@ const {
   onSelectBoard,
   onNavigateRequest,
   onLogoutRequest,
-  markBoardViewportChanged,
-  commitPendingBoardViewportChange,
-} = useCanvasBoardRuntime({
-  route,
-  router,
-  getUserIdentity: () => ({
-    userId: Number(userStore.user?.id),
-    userUid: `${userStore.user?.uid ?? ''}`.trim(),
-  }),
-  getViewport,
-  setViewport: (viewport) => setViewport(viewport),
-  logoutAndRedirect,
-  message: canvasFeedback.boardSession.runtimeMessage,
-  onNativeRemove: () => {
-    dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
-  },
-})
+} = canvasWorkspace.boardChrome
+
+const {
+  flushAutosave,
+  history: flowHistory,
+  loadCanvasBoardAndProbe,
+  reattachPendingImageResults,
+} = canvasWorkspace.persistence
 
 const {
   zoomLevel,
@@ -294,67 +307,25 @@ const {
   onMiniMapDragEnd,
   onNodeDragStart,
   onNodeDragStop,
-  loadCanvasBoardAndProbe,
-} = useCanvasViewportRuntime({
-  nodes,
-  edges,
-  fullNodes,
-  fullEdges,
-  currentBoardId,
-  viewport,
-  getViewport,
-  setViewport: (nextViewport, options) => setViewport(nextViewport, options),
-  setCenter: (x, y, options) => setCenter(x, y, options),
-  zoomIn,
-  zoomOut,
-  panBy,
-  markBoardViewportChanged,
-  commitPendingBoardViewportChange,
-  loadInitialOrRouteBoard,
-  closeBoardHeaderEditing,
-  startCanvasInteraction: (key) => startFlowInteraction(key),
-  stopCanvasInteraction: (key) => stopFlowInteraction(key),
-  startNodeDragInteraction: () => startNodeDragInteraction(),
-  stopNodeDragInteraction: () => stopNodeDragInteraction(),
-  refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
-})
+} = canvasWorkspace.viewportControls
 provideCanvasViewportContext({ zoomLevel })
 
-const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const {
   scheduleFlowNodeInternalsRefresh,
-  clearSelectedFlowElementsSync,
-  isValidConnection,
-  onConnect,
-  onEdgeUpdate,
   createNodeAtPosition,
-  _onFlowDeleteNode,
-  _onFlowPromptTextUpdate,
-  _onFlowNodeParamUpdate,
-  markFlowExecutionNodeDirty,
-  updateSnapshotNode,
   hasSelectedFlowNodes,
   onExportSelectedImages,
   isFlowInteractionActive,
   isFlowViewportPanInteractionActive,
   isFlowInteractionLocked,
-  startFlowInteraction,
-  stopFlowInteraction,
   nodeContextMenu,
   canvasNodeMenuItems,
   closeNodeContextMenu,
   openNodeContextMenu,
-  getImageNodeSnapshot,
-  getImageNodeDisplayPayload,
-  uploadImageToBoard,
-  applyImageFileToImageNode,
-  createImageNodeFromFile,
   onFlowMediaInputImageDrop,
   onFlowMediaInputImageOpen,
   onFlowMediaInputImagePreview,
   onFlowMediaInputImageRemove,
-  getMediaInputImages,
-  resolvePromptInputImageNodeIds,
   onCanvasDrop,
   onCanvasDragOver: onFlowCanvasDropDragOver,
   onFlowImageOpenPreview,
@@ -362,22 +333,7 @@ const {
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
   getFlowNodeUiStateCached,
-} = useCanvasGraphRuntime({
-  nodes: fullNodes as Ref<Node[]>,
-  edges: fullEdges as Ref<Edge[]>,
-  currentBoardId,
-  createNodeKind,
-  flowTransactions,
-  updateNodeInternals,
-  screenToFlowCoordinate,
-  getSelectedElements,
-  removeSelectedElements,
-  uploadApi,
-  sanitizeApiErrorMessage,
-  openNodeImagePreview,
-  openImageUrlPreview,
-  message: canvasFeedback.graph.runtimeMessage,
-})
+} = canvasWorkspace.graphEditing
 
 function onFlowConnectEnd() {
   refreshFlowHandleVisibility()
@@ -405,25 +361,7 @@ const hasCanvasDismissableLayer = computed(
   () => nodeContextMenu.value.visible || activeNodePanel.value !== null,
 )
 
-const {
-  isNodeDirectActionRunning,
-  reattachPendingImageResults,
-  runImageDirectAction,
-  runCanvasExtendAction,
-  runImageInpaintAction,
-  runImagePromptGeneration,
-  runImagePromptGenerationFromSource,
-  runFusionPromptGeneration,
-  runTextPromptGeneration,
-} = useCanvasTaskRuntime({
-  nodes: fullNodes as Ref<Node[]>,
-  edges: fullEdges as Ref<Edge[]>,
-  flowTransactions,
-  flushAutosave,
-  currentBoardId,
-  refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
-  message: canvasFeedback.taskExecution.runtimeMessage,
-})
+const { runImageDirectAction } = canvasWorkspace.imageWorkflow
 
 const {
   activeStrengthAction,
@@ -456,52 +394,22 @@ const {
   onHandlePointerUp: onFlowExpandHandlePointerUp,
   commitExpandMode: commitFlowExpandMode,
   handleRadius: flowExpandHandleRadius,
-} = useImageCanvasExtendOverlay({
-  nodes: nodes as Ref<Node[]>,
+} = canvasWorkspace.createCanvasExtendOverlay({
   activeTool: activeTool as Ref<string>,
-  getImageNodeDisplayPayload,
   getImageStageElement,
-  onBeforePointerCancel: clearSelectedFlowElementsSync,
-  onCommit: async (payload) => {
-    await runCanvasExtendAction(payload.nodeId, {
-      frameRect: payload.frameRect,
-      originalImageRect: payload.originalImageRect,
-      prompt: payload.prompt,
-      outputCount: payload.outputCount,
-    })
-  },
 })
 
-const imageTools = useCanvasImageTools({
-  nodes: nodes as Ref<Node[]>,
+const imageTools = canvasWorkspace.createImageTools({
   activeTool: activeTool as Ref<string>,
   canvasWrapRef,
   isCanvasInteractionLocked: isFlowInteractionLocked,
-  currentBoardId,
-  getImageNodeDisplayPayload,
-  getImageNodeSnapshot,
   getImageStageElement,
-  screenToFlowCoordinate,
-  getViewport,
-  setViewport: (viewport, options) => setViewport(viewport, options),
-  setCenter: (x, y, options) => setCenter(x, y, options),
-  createImageNodeFromFile,
-  connectImageNodes: onConnect,
-  uploadImageToBoard,
-  openImageUrlPreview,
   clearActiveNodePanel,
   hideStrengthControl,
-  updateOutputCount: (nodeId, payload) => {
-    _onFlowNodeParamUpdate(nodeId, payload)
-    markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-  },
-  runInpaintAction: runImageInpaintAction,
-  runPromptGeneration: runImagePromptGeneration,
   isImageActionPanelVisible: (nodeId) =>
     isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
   isImagePromptComposerVisible: (nodeId) =>
     isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
-  isDirectActionRunning: isNodeDirectActionRunning,
   activeStrengthAction,
   getActionStrength,
   setStrengthRangeRef,
@@ -510,10 +418,6 @@ const imageTools = useCanvasImageTools({
   onStrengthChange,
   onStrengthPointerUp,
   onStrengthClick,
-  clearSelectedFlowElements: clearSelectedFlowElementsSync,
-  startCanvasInteraction: startFlowInteraction,
-  stopCanvasInteraction: stopFlowInteraction,
-  message: canvasFeedback.imageTools.runtimeMessage,
 })
 
 const {
@@ -572,25 +476,15 @@ const {
   onFlowImageOpenFile,
   onFlowImageReset: onFlowImageResetBase,
   onFlowImageStageDrop,
-} = useFlowNodeMediaInputs({
-  applyImageFileToImageNode: async (nodeId, file): Promise<boolean> => {
-    const updated = await applyImageFileToImageNode(nodeId, file)
-    if (updated) discardFlowImageToolNodeEdits(nodeId)
-    return updated
-  },
-  updateSnapshotNode,
-  markFlowExecutionNodeDirty,
+} = canvasWorkspace.createNodeMediaInputs({
+  discardNodeEdits: discardFlowImageToolNodeEdits,
 })
 
 const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, onFlowImageReset } =
-  useFlowCanvasNodeHandlers({
+  canvasWorkspace.createNodeHandlers({
     dismissTransientCanvasUi,
     discardFlowImageToolNodeEdits,
-    _onFlowDeleteNode,
-    _onFlowPromptTextUpdate,
-    _onFlowNodeParamUpdate,
     _onFlowImageReset: onFlowImageResetBase,
-    markFlowExecutionNodeDirty,
   })
 
 const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFramePointerDown } =
@@ -603,14 +497,9 @@ const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFram
     beginFlowExpandFrameDrag,
   })
 
-const { onFlowPromptGenerate } = useFlowPromptGenerationOrchestrator({
+const { onFlowPromptGenerate } = canvasWorkspace.createPromptGenerationHandlers({
   cancelFlowExpandMode,
   cancelFlowMaskEditorMode,
-  getMediaInputImages,
-  resolvePromptInputImageNodeIds,
-  runTextPromptGeneration,
-  runImagePromptGeneration,
-  runImagePromptGenerationFromSource,
 })
 
 const {
@@ -626,8 +515,8 @@ const {
 
 const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
   useFlowNodeDragInteractions({
-    beginNodeDragTransaction: flowTransactions.beginNodeDragTransaction,
-    commitNodeDragTransaction: flowTransactions.commitNodeDragTransaction,
+    beginNodeDragTransaction: nodeDragTransactions.begin,
+    commitNodeDragTransaction: nodeDragTransactions.commit,
     duplicateModifierPressed,
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
@@ -660,7 +549,7 @@ const {
   onFlowImageDirectAction,
   onFlowImagePromptGenerate,
   onFlowFusionPromptGenerate,
-} = useFlowImageActionOrchestrator({
+} = canvasWorkspace.createImageActionHandlers({
   flowImageEditorNodeId,
   suppressClickAction,
   openActiveNodePanel,
@@ -672,11 +561,7 @@ const {
   enterFlowExpandMode,
   enterFlowImageEditorMode,
   focusImageEditorAndShowChrome,
-  runImageDirectAction,
   runImagePromptAction: runFlowImageToolPromptAction,
-  runFusionPromptGeneration,
-  onFlowNodeParamUpdate,
-  onWarning: canvasFeedback.imageTools.actionUnavailable,
   getActionStrength,
 })
 

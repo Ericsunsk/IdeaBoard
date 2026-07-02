@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import {
   getGetAdminTaskMonitorSettingQueryKey,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
@@ -7,7 +7,7 @@ import type {
   ApiResponseTaskMonitorSetting,
   TaskMonitorSetting,
 } from '../../../shared/api/generated-query/model'
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import type { AdminTaskMonitorSettingsFeedback } from '../feedback/useAdminFeedback'
 import {
   DEFAULT_ADMIN_TASK_MONITOR_SETTING,
   TASK_MONITOR_MAX_PAGE_SIZE,
@@ -18,14 +18,10 @@ import {
   useAdminTaskMonitorSettingQuery,
 } from './taskMonitorSettingsResource'
 import { updateTaskMonitorSetting } from './systemSettingsCommands'
-
-type AdminTaskMonitorSettingsMessage = {
-  error: (message: string) => void
-  success: (message: string) => void
-}
+import { useSettingFormLifecycle } from './useSettingFormLifecycle'
 
 export function useAdminTaskMonitorSettings(options: {
-  message: AdminTaskMonitorSettingsMessage
+  feedback: AdminTaskMonitorSettingsFeedback
 }) {
   const queryClient = useQueryClient()
   const { query, settings } = useAdminTaskMonitorSettingQuery()
@@ -58,39 +54,26 @@ export function useAdminTaskMonitorSettings(options: {
 
   const loading = computed(() => query.isLoading.value || query.isFetching.value)
   const saving = computed(() => saveTaskMonitorMutation.isPending.value)
-  const formDirty = computed(() => !isSameTaskMonitorSetting(form.value, lastSyncedForm.value))
 
-  watch(
-    () => query.error.value,
-    (error) => {
-      if (error) {
-        options.message.error(formatDisplayErrorMessage(error, '加载任务监控设置失败'))
-      }
+  const formLifecycle = useSettingFormLifecycle<Partial<TaskMonitorSetting>, TaskMonitorSetting>({
+    error: query.error,
+    source: settings,
+    current: form,
+    synced: lastSyncedForm,
+    isSaving: saveTaskMonitorMutation.isPending,
+    feedback: options.feedback,
+    hydrate: hydrateTaskMonitorForm,
+    isSame: isSameTaskMonitorSetting,
+    reset: (synced) => {
+      form.value = { ...synced }
     },
-  )
-
-  watch(
-    settings,
-    (nextSettings) => {
-      if (saveTaskMonitorMutation.isPending.value || formDirty.value) return
-      hydrateTaskMonitorForm(nextSettings)
-    },
-    { immediate: true },
-  )
+  })
 
   async function handleSaveTaskMonitorSettings() {
-    const validationError = validateTaskMonitorSetting(form.value)
-    if (validationError) {
-      options.message.error(validationError)
-      return
-    }
-
-    try {
-      await saveTaskMonitorMutation.mutateAsync(normalizeTaskMonitorSetting(form.value))
-      options.message.success('任务监控设置已保存')
-    } catch (error) {
-      options.message.error(formatDisplayErrorMessage(error, '保存任务监控设置失败'))
-    }
+    await formLifecycle.save({
+      validate: () => validateTaskMonitorSetting(form.value),
+      run: () => saveTaskMonitorMutation.mutateAsync(normalizeTaskMonitorSetting(form.value)),
+    })
   }
 
   function hydrateTaskMonitorForm(setting: Partial<TaskMonitorSetting> | null | undefined) {
@@ -101,7 +84,7 @@ export function useAdminTaskMonitorSettings(options: {
   }
 
   function resetTaskMonitorForm() {
-    form.value = { ...lastSyncedForm.value }
+    formLifecycle.reset()
   }
 
   return {

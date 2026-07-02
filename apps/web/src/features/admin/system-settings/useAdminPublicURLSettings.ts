@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import {
   getGetAdminPublicURLSettingQueryKey,
   useGetAdminPublicURLSetting,
@@ -8,13 +8,9 @@ import type {
   ApiResponsePublicURLSetting,
   PublicURLSetting,
 } from '../../../shared/api/generated-query/model'
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import type { AdminPublicURLSettingsFeedback } from '../feedback/useAdminFeedback'
 import { updatePublicURLSetting } from './systemSettingsCommands'
-
-type AdminPublicURLSettingsMessage = {
-  error: (message: string) => void
-  success: (message: string) => void
-}
+import { useSettingFormLifecycle } from './useSettingFormLifecycle'
 
 export const ADMIN_PUBLIC_URL_MAX_LENGTH = 2048
 
@@ -23,9 +19,7 @@ export const DEFAULT_ADMIN_PUBLIC_URL_SETTING: PublicURLSetting = {
   public_asset_base_url: '',
 }
 
-export function useAdminPublicURLSettings(options: {
-  message: AdminPublicURLSettingsMessage
-}) {
+export function useAdminPublicURLSettings(options: { feedback: AdminPublicURLSettingsFeedback }) {
   const queryClient = useQueryClient()
   const query = useGetAdminPublicURLSetting()
   const form = ref<PublicURLSetting>({ ...DEFAULT_ADMIN_PUBLIC_URL_SETTING })
@@ -57,39 +51,27 @@ export function useAdminPublicURLSettings(options: {
 
   const loading = computed(() => query.isLoading.value || query.isFetching.value)
   const saving = computed(() => saveMutation.isPending.value)
-  const formDirty = computed(() => !isSamePublicURLSetting(form.value, lastSyncedForm.value))
+  const sourceSetting = computed(() => query.data.value?.data)
 
-  watch(
-    () => query.error.value,
-    (error) => {
-      if (error) {
-        options.message.error(formatDisplayErrorMessage(error, '加载链接与域名失败'))
-      }
+  const formLifecycle = useSettingFormLifecycle<Partial<PublicURLSetting>, PublicURLSetting>({
+    error: query.error,
+    source: sourceSetting,
+    current: form,
+    synced: lastSyncedForm,
+    isSaving: saveMutation.isPending,
+    feedback: options.feedback,
+    hydrate: hydratePublicURLForm,
+    isSame: isSamePublicURLSetting,
+    reset: (synced) => {
+      form.value = { ...synced }
     },
-  )
-
-  watch(
-    () => query.data.value,
-    (response) => {
-      if (!response?.data || saveMutation.isPending.value || formDirty.value) return
-      hydratePublicURLForm(response.data)
-    },
-    { immediate: true },
-  )
+  })
 
   async function handleSavePublicURLSettings() {
-    const validationError = validateAdminPublicURLSetting(form.value)
-    if (validationError) {
-      options.message.error(validationError)
-      return
-    }
-
-    try {
-      await saveMutation.mutateAsync(normalizeAdminPublicURLSetting(form.value))
-      options.message.success('链接与域名已保存')
-    } catch (error) {
-      options.message.error(formatDisplayErrorMessage(error, '保存链接与域名失败'))
-    }
+    await formLifecycle.save({
+      validate: () => validateAdminPublicURLSetting(form.value),
+      run: () => saveMutation.mutateAsync(normalizeAdminPublicURLSetting(form.value)),
+    })
   }
 
   function hydratePublicURLForm(setting: Partial<PublicURLSetting> | null | undefined) {
@@ -100,7 +82,7 @@ export function useAdminPublicURLSettings(options: {
   }
 
   function resetPublicURLForm() {
-    form.value = { ...lastSyncedForm.value }
+    formLifecycle.reset()
   }
 
   return {

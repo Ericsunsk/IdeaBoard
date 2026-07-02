@@ -12,12 +12,12 @@ describe('createCanvasFeedback', () => {
     }
     const feedback = createCanvasFeedback(appToast)
 
-    feedback.boardSession.runtimeMessage.success('画布已保存')
-    feedback.boardSession.runtimeMessage.error('保存失败')
-    feedback.graph.runtimeMessage.warning('连接被拒绝')
-    const handle = feedback.graph.runtimeMessage.loading('导出中', { duration: 1000 })
-    feedback.taskExecution.runtimeMessage.success('任务完成')
-    feedback.imageTools.runtimeMessage.warning('当前图片不可编辑')
+    feedback.boardSession.saveSucceeded('画布已保存')
+    feedback.boardSession.saveFailed('保存失败')
+    feedback.graph.operationWarning('连接被拒绝')
+    const handle = feedback.graph.operationLoading('导出中', { duration: 1000 })
+    feedback.taskExecution.succeeded('任务完成')
+    feedback.imageTools.warning('当前图片不可编辑')
     feedback.imageTools.actionUnavailable('工具不可执行')
 
     expect(appToast.success).toHaveBeenNthCalledWith(1, '画布已保存')

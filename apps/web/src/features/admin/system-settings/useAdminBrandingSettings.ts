@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { uploadAdminAsset } from '../../../shared/api/generated-query/admin-assets/admin-assets'
 import {
   getGetAdminBrandingSettingQueryKey,
@@ -9,10 +9,8 @@ import type {
   ApiResponseBrandingSetting,
   BrandingSetting,
 } from '../../../shared/api/generated-query/model'
-import {
-  sanitizeApiErrorMessage,
-  formatDisplayErrorMessage,
-} from '../../../shared/utils/errorMessages'
+import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import type { AdminBrandingSettingsFeedback } from '../feedback/useAdminFeedback'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
@@ -27,13 +25,9 @@ import {
   writeSiteBrandingQueryCache,
 } from '../../../shared/composables/useSiteBranding'
 import { updateBrandingSetting } from './systemSettingsCommands'
+import { useSettingFormLifecycle } from './useSettingFormLifecycle'
 
-type AdminBrandingSettingsMessage = {
-  error: (message: string) => void
-  success: (message: string) => void
-}
-
-export function useAdminBrandingSettings(options: { message: AdminBrandingSettingsMessage }) {
+export function useAdminBrandingSettings(options: { feedback: AdminBrandingSettingsFeedback }) {
   const queryClient = useQueryClient()
   const brandingQuery = useGetAdminBrandingSetting()
   const form = ref<BrandingSetting>({ ...DEFAULT_SITE_BRANDING_SETTING })
@@ -82,49 +76,37 @@ export function useAdminBrandingSettings(options: { message: AdminBrandingSettin
   const uploading = computed(() => uploadLogoMutation.isPending.value)
   const fallbackText = computed(() => getSiteBrandFallbackText(form.value.project_name))
   const logoPreviewURL = computed(() => resolveSiteBrandingLogoURL(form.value.logo_url))
-  const formDirty = computed(() => !isSameBrandingSetting(form.value, lastSyncedForm.value))
+  const sourceSetting = computed(() => brandingQuery.data.value?.data)
 
-  watch(
-    () => brandingQuery.error.value,
-    (error) => {
-      if (error) {
-        options.message.error(formatDisplayErrorMessage(error, '加载系统设置失败'))
-      }
+  const formLifecycle = useSettingFormLifecycle<Partial<BrandingSetting>, BrandingSetting>({
+    error: brandingQuery.error,
+    source: sourceSetting,
+    current: form,
+    synced: lastSyncedForm,
+    isSaving: saveBrandingMutation.isPending,
+    feedback: options.feedback,
+    hydrate: hydrateBrandingForm,
+    isSame: isSameBrandingSetting,
+    reset: (synced) => {
+      form.value = { ...synced }
     },
-  )
-
-  watch(
-    () => brandingQuery.data.value,
-    (response) => {
-      if (!response?.data || saveBrandingMutation.isPending.value || formDirty.value) return
-      hydrateBrandingForm(response.data)
-    },
-    { immediate: true },
-  )
+  })
 
   async function handleSaveBranding() {
     const normalizedSetting = normalizeSiteBrandingSetting(form.value)
-    const validationError = validateSiteBrandingSetting(normalizedSetting)
-    if (validationError) {
-      options.message.error(validationError)
-      return
-    }
-
-    try {
-      await saveBrandingMutation.mutateAsync(normalizedSetting)
-      options.message.success('项目品牌已保存')
-    } catch (error) {
-      options.message.error(formatDisplayErrorMessage(error, '保存项目品牌失败'))
-    }
+    await formLifecycle.save({
+      validate: () => validateSiteBrandingSetting(normalizedSetting),
+      run: () => saveBrandingMutation.mutateAsync(normalizedSetting),
+    })
   }
 
   async function handleUploadLogo(file: File) {
     try {
       await uploadLogoMutation.mutateAsync(file)
-      options.message.success('Logo 已上传，保存后生效')
+      options.feedback.logoUploaded()
       return true
     } catch (error) {
-      options.message.error(formatDisplayErrorMessage(error, '上传 Logo 失败'))
+      options.feedback.logoUploadFailed(error)
       return false
     }
   }
@@ -134,7 +116,7 @@ export function useAdminBrandingSettings(options: { message: AdminBrandingSettin
   }
 
   function resetBrandingForm() {
-    form.value = { ...lastSyncedForm.value }
+    formLifecycle.reset()
   }
 
   function hydrateBrandingForm(setting: Partial<BrandingSetting> | null | undefined) {
