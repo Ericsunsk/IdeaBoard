@@ -123,7 +123,13 @@
             @expand-frame-pointerdown="onFlowExpandFramePointerDown"
           />
         </template>
-        <CanvasMiniMap v-if="isCanvasMinimapEnabled" @center-requested="onMiniMapCenterRequested" />
+        <CanvasMiniMap
+          v-if="isCanvasMinimapEnabled"
+          @center-requested="onMiniMapCenterRequested"
+          @drag-start="onMiniMapDragStart"
+          @drag-move="handleMiniMapDragMove"
+          @drag-end="onMiniMapDragEnd"
+        />
       </VueFlow>
       <CanvasOverlays
         :chrome-model="imageToolChromeModel"
@@ -281,6 +287,9 @@ const {
   onFlowMoveEnd,
   onViewportChangeEnd,
   onMiniMapCenterRequested,
+  onMiniMapDragStart,
+  onMiniMapDragMove,
+  onMiniMapDragEnd,
   onNodeDragStart,
   onNodeDragStop,
   loadCanvasBoardAndProbe,
@@ -292,6 +301,7 @@ const {
   currentBoardId,
   viewport,
   getViewport,
+  setViewport: (nextViewport, options) => setViewport(nextViewport, options),
   setCenter: (x, y, options) => setCenter(x, y, options),
   zoomIn,
   zoomOut,
@@ -374,6 +384,10 @@ function onFlowMove(payload: Parameters<typeof syncFlowMove>[0]) {
   syncFlowMove(payload)
   if (!payload.flowTransform || !imageToolChromeModel.value.isReady) return
   scheduleImageEditorChromeAnchorUpdate()
+}
+
+function handleMiniMapDragMove(payload: { delta: Parameters<typeof onMiniMapDragMove>[0] }) {
+  onMiniMapDragMove(payload.delta)
 }
 
 function refreshFlowHandleVisibility() {

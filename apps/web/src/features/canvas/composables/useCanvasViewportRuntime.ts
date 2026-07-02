@@ -29,6 +29,11 @@ export type CanvasMiniMapCenterRequestPayload = {
   }
 }
 
+export type CanvasMiniMapDragDelta = {
+  x: number
+  y: number
+}
+
 type ReadonlyValueRef<T> = {
   readonly value: T
 }
@@ -41,6 +46,10 @@ export type UseCanvasViewportRuntimeOptions = {
   currentBoardId: ReadonlyValueRef<string | null>
   viewport: Readonly<Ref<CanvasFlowViewport>>
   getViewport: () => CanvasFlowViewport
+  setViewport: (
+    viewport: CanvasFlowViewport,
+    options?: { duration?: number },
+  ) => Promise<unknown> | unknown
   setCenter: (
     x: number,
     y: number,
@@ -68,6 +77,16 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   let activeViewportFrameProbe: CanvasFrameProbeSession | null = null
   let activeNodeDragFrameProbe: CanvasFrameProbeSession | null = null
   let lastCommittedViewportKey: string | null = null
+  let isMiniMapDragActive = false
+  let didMiniMapDragMove = false
+  let pendingMiniMapDragDelta: CanvasMiniMapDragDelta = { x: 0, y: 0 }
+  let pendingMiniMapDragFrameId: number | null = null
+  let pendingMiniMapDragEnd = false
+  let miniMapDragSessionId = 0
+  let miniMapDragTargetViewport: CanvasFlowViewport | null = null
+  let isMiniMapViewportUpdateInFlight = false
+  let lastRequestedMiniMapViewportKey: string | null = null
+  let lastSuccessfulMiniMapViewportKey: string | null = null
   let programmaticViewportCommitDepth = 0
 
   const zoomLevel = computed(() => {
@@ -134,9 +153,162 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     )
   }
 
+  function onMiniMapDragStart() {
+    miniMapDragSessionId += 1
+    clearPendingMiniMapDragFrame()
+    pendingMiniMapDragDelta = { x: 0, y: 0 }
+    pendingMiniMapDragEnd = false
+    miniMapDragTargetViewport = options.getViewport()
+    lastRequestedMiniMapViewportKey = null
+    lastSuccessfulMiniMapViewportKey = null
+    didMiniMapDragMove = false
+    isMiniMapDragActive = true
+    onFlowMoveStart()
+  }
+
+  function onMiniMapDragMove(delta: CanvasMiniMapDragDelta) {
+    if (!isMiniMapDragActive) return
+    if (![delta.x, delta.y].every(Number.isFinite)) return
+    if (!delta.x && !delta.y) return
+
+    pendingMiniMapDragDelta = {
+      x: pendingMiniMapDragDelta.x + delta.x,
+      y: pendingMiniMapDragDelta.y + delta.y,
+    }
+    scheduleMiniMapDragFrame()
+  }
+
+  function onMiniMapDragEnd() {
+    if (!isMiniMapDragActive) return
+
+    flushPendingMiniMapDragDelta()
+    isMiniMapDragActive = false
+    pendingMiniMapDragEnd = true
+
+    finishMiniMapDragEndIfIdle()
+  }
+
+  function scheduleMiniMapDragFrame() {
+    if (pendingMiniMapDragFrameId !== null) return
+    pendingMiniMapDragFrameId = window.requestAnimationFrame(() => {
+      pendingMiniMapDragFrameId = null
+      flushPendingMiniMapDragDelta()
+    })
+  }
+
+  function clearPendingMiniMapDragFrame() {
+    if (pendingMiniMapDragFrameId === null) return
+    window.cancelAnimationFrame(pendingMiniMapDragFrameId)
+    pendingMiniMapDragFrameId = null
+  }
+
+  function flushPendingMiniMapDragDelta() {
+    if (!pendingMiniMapDragDelta.x && !pendingMiniMapDragDelta.y) return
+
+    const baseViewport = miniMapDragTargetViewport ?? options.getViewport()
+    const zoom = baseViewport.zoom
+    if (!Number.isFinite(zoom) || zoom <= 0) {
+      pendingMiniMapDragDelta = { x: 0, y: 0 }
+      return
+    }
+
+    const delta = pendingMiniMapDragDelta
+    pendingMiniMapDragDelta = { x: 0, y: 0 }
+
+    didMiniMapDragMove = true
+    miniMapDragTargetViewport = {
+      x: baseViewport.x - delta.x * zoom,
+      y: baseViewport.y - delta.y * zoom,
+      zoom,
+    }
+    beginViewportFrameProbe({
+      x: miniMapDragTargetViewport.x,
+      y: miniMapDragTargetViewport.y,
+    })
+    requestMiniMapViewportUpdate()
+  }
+
+  function requestMiniMapViewportUpdate() {
+    if (isMiniMapViewportUpdateInFlight) return
+
+    const targetViewport = miniMapDragTargetViewport
+    if (!targetViewport) {
+      finishMiniMapDragEndIfIdle()
+      return
+    }
+
+    const targetViewportKey = viewportKey(targetViewport)
+    if (targetViewportKey === lastRequestedMiniMapViewportKey) {
+      finishMiniMapDragEndIfIdle()
+      return
+    }
+
+    const sessionId = miniMapDragSessionId
+    lastRequestedMiniMapViewportKey = targetViewportKey
+    isMiniMapViewportUpdateInFlight = true
+    programmaticViewportCommitDepth += 1
+
+    void Promise.resolve()
+      .then(() => options.setViewport(targetViewport, { duration: 0 }))
+      .then(
+        () => {
+          if (sessionId === miniMapDragSessionId) {
+            lastSuccessfulMiniMapViewportKey = targetViewportKey
+          }
+        },
+        (error) => {
+          console.warn('[canvas] minimap viewport update failed', error)
+        },
+      )
+      .finally(() => {
+        programmaticViewportCommitDepth -= 1
+        isMiniMapViewportUpdateInFlight = false
+        if (sessionId !== miniMapDragSessionId) {
+          if (didMiniMapDragMove) requestMiniMapViewportUpdate()
+          return
+        }
+
+        const latestTarget = miniMapDragTargetViewport
+        if (latestTarget && viewportKey(latestTarget) !== lastRequestedMiniMapViewportKey) {
+          requestMiniMapViewportUpdate()
+          return
+        }
+
+        finishMiniMapDragEndIfIdle()
+      })
+  }
+
+  function finishMiniMapDragEndIfIdle() {
+    if (!pendingMiniMapDragEnd || isMiniMapViewportUpdateInFlight) return
+
+    if (!didMiniMapDragMove) {
+      pendingMiniMapDragEnd = false
+      onFlowMoveEnd({ flowTransform: options.getViewport() })
+      miniMapDragTargetViewport = null
+      return
+    }
+
+    const latestTarget = miniMapDragTargetViewport
+    if (latestTarget && viewportKey(latestTarget) !== lastRequestedMiniMapViewportKey) {
+      requestMiniMapViewportUpdate()
+      return
+    }
+
+    pendingMiniMapDragEnd = false
+    if (
+      didMiniMapDragMove &&
+      latestTarget &&
+      lastSuccessfulMiniMapViewportKey === viewportKey(latestTarget)
+    ) {
+      commitViewportPersistence()
+    }
+    onFlowMoveEnd({ flowTransform: options.getViewport() })
+    miniMapDragTargetViewport = null
+  }
+
   function onViewportChangeEnd(viewport = options.viewport.value) {
     const key = viewportKey(viewport)
-    if (programmaticViewportCommitDepth > 0) {
+    if (programmaticViewportCommitDepth > 0 || isMiniMapDragActive) {
       lastCommittedViewportKey = key
       return
     }
@@ -235,6 +407,10 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function cleanupFrameProbes() {
+    clearPendingMiniMapDragFrame()
+    pendingMiniMapDragEnd = false
+    isMiniMapDragActive = false
+    isMiniMapViewportUpdateInFlight = false
     activeViewportFrameProbe?.cleanup()
     activeViewportFrameProbe = null
     activeNodeDragFrameProbe?.cleanup()
@@ -251,6 +427,9 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     onZoomOut,
     onPanViewport,
     onMiniMapCenterRequested,
+    onMiniMapDragStart,
+    onMiniMapDragMove,
+    onMiniMapDragEnd,
     onViewportChangeEnd,
     onFlowMoveStart,
     onFlowMove,

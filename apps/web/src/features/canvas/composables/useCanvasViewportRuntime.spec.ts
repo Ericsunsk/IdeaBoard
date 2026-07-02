@@ -17,6 +17,12 @@ vi.mock('../utils/animationFrame', () => ({
   waitForNextRenderFrame: frameProbeMocks.waitForNextRenderFrame,
 }))
 
+async function flushPromises(times = 4) {
+  for (let i = 0; i < times; i += 1) {
+    await Promise.resolve()
+  }
+}
+
 function createViewportRuntimeHarness() {
   const viewport = ref<CanvasFlowViewport>({ x: 0, y: 0, zoom: 1 })
   const startCanvasInteraction = vi.fn()
@@ -35,6 +41,9 @@ function createViewportRuntimeHarness() {
   const setCenter = vi.fn((x: number, y: number, _options?: { duration?: number; zoom?: number }) => {
     viewport.value = { x: -x, y: -y, zoom: viewport.value.zoom }
   })
+  const setViewport = vi.fn((nextViewport: CanvasFlowViewport) => {
+    viewport.value = nextViewport
+  })
   const loadInitialOrRouteBoard = vi.fn(async () => undefined)
 
   const scope = effectScope()
@@ -47,6 +56,7 @@ function createViewportRuntimeHarness() {
       currentBoardId: ref('board-a') as Ref<string | null>,
       viewport,
       getViewport: () => viewport.value,
+      setViewport,
       setCenter,
       zoomIn: vi.fn(() => {
         viewport.value = { ...viewport.value, zoom: viewport.value.zoom + 0.25 }
@@ -73,6 +83,7 @@ function createViewportRuntimeHarness() {
     scope,
     viewport,
     panBy,
+    setViewport,
     setCenter,
     markBoardViewportChanged,
     commitPendingBoardViewportChange,
@@ -86,11 +97,17 @@ describe('useCanvasViewportRuntime', () => {
   beforeEach(() => {
     frameProbeMocks.isEnabled.mockReturnValue(false)
     frameProbeMocks.begin.mockReset()
+    frameProbeMocks.begin.mockReturnValue({
+      mark: vi.fn(),
+      end: vi.fn(),
+      cleanup: vi.fn(),
+    })
     frameProbeMocks.waitForNextRenderFrame.mockClear()
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
   it('observes flow viewport movement without committing persistence during move frames', () => {
@@ -140,6 +157,177 @@ describe('useCanvasViewportRuntime', () => {
     })
     expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('coalesces minimap drag deltas and commits persistence once on drag end', async () => {
+    vi.useFakeTimers()
+    const requestAnimationFrame = vi
+      .fn<(callback: FrameRequestCallback) => number>()
+      .mockImplementation((callback) => window.setTimeout(() => callback(performance.now()), 16))
+    const cancelAnimationFrame = vi.fn((id: number) => window.clearTimeout(id))
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
+    const harness = createViewportRuntimeHarness()
+    harness.viewport.value = { x: -100, y: -200, zoom: 2 }
+
+    harness.runtime.onMiniMapDragStart()
+    harness.runtime.onMiniMapDragMove({ x: 10, y: -5 })
+    harness.runtime.onMiniMapDragMove({ x: 2, y: 4 })
+
+    expect(harness.setViewport).not.toHaveBeenCalled()
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
+
+    vi.runOnlyPendingTimers()
+    await flushPromises()
+
+    expect(harness.setViewport).toHaveBeenCalledOnce()
+    expect(harness.viewport.value).toEqual({ x: -124, y: -198, zoom: 2 })
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
+
+    harness.runtime.onMiniMapDragEnd()
+    await flushPromises()
+
+    expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('feeds minimap drag movement through the viewport frame probe path', async () => {
+    const harness = createViewportRuntimeHarness()
+    harness.viewport.value = { x: -100, y: -200, zoom: 2 }
+
+    harness.runtime.onMiniMapDragStart()
+    harness.runtime.onMiniMapDragMove({ x: 10, y: -5 })
+    await flushPromises()
+    harness.runtime.onMiniMapDragEnd()
+    await flushPromises()
+
+    expect(frameProbeMocks.begin).toHaveBeenCalledWith('pan', expect.any(Function))
+    harness.scope.stop()
+  })
+
+  it('waits for async minimap viewport updates before committing persistence', async () => {
+    let resolveViewportUpdate: () => void = () => {
+      throw new Error('viewport update resolver was not captured')
+    }
+    const harness = createViewportRuntimeHarness()
+    harness.viewport.value = { x: -100, y: -200, zoom: 2 }
+    harness.setViewport.mockImplementationOnce(async (nextViewport) => {
+      await new Promise<void>((resolve) => {
+        resolveViewportUpdate = resolve
+      })
+      harness.viewport.value = nextViewport
+    })
+
+    harness.runtime.onMiniMapDragStart()
+    harness.runtime.onMiniMapDragMove({ x: 10, y: -5 })
+    harness.runtime.onMiniMapDragEnd()
+    await flushPromises()
+
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
+
+    resolveViewportUpdate()
+    await flushPromises()
+
+    expect(harness.viewport.value).toEqual({ x: -120, y: -190, zoom: 2 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('serializes async minimap viewport updates and persists the latest drag target', async () => {
+    vi.useFakeTimers()
+    const requestAnimationFrame = vi
+      .fn<(callback: FrameRequestCallback) => number>()
+      .mockImplementation((callback) => window.setTimeout(() => callback(performance.now()), 16))
+    const cancelAnimationFrame = vi.fn((id: number) => window.clearTimeout(id))
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
+    let resolveFirstViewportUpdate: () => void = () => {
+      throw new Error('first viewport update resolver was not captured')
+    }
+    const harness = createViewportRuntimeHarness()
+    harness.viewport.value = { x: -100, y: -200, zoom: 2 }
+    harness.setViewport.mockImplementationOnce(async (nextViewport) => {
+      await new Promise<void>((resolve) => {
+        resolveFirstViewportUpdate = resolve
+      })
+      harness.viewport.value = nextViewport
+    })
+
+    harness.runtime.onMiniMapDragStart()
+    harness.runtime.onMiniMapDragMove({ x: 10, y: -5 })
+    vi.runOnlyPendingTimers()
+    await flushPromises()
+    harness.runtime.onMiniMapDragMove({ x: 3, y: 2 })
+    harness.runtime.onMiniMapDragEnd()
+    await flushPromises()
+
+    expect(harness.setViewport).toHaveBeenCalledOnce()
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
+
+    resolveFirstViewportUpdate()
+    await flushPromises(8)
+
+    expect(harness.setViewport).toHaveBeenCalledTimes(2)
+    expect(harness.setViewport).toHaveBeenLastCalledWith({ x: -126, y: -194, zoom: 2 }, { duration: 0 })
+    expect(harness.viewport.value).toEqual({ x: -126, y: -194, zoom: 2 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('keeps a new minimap drag behind an unresolved previous viewport update', async () => {
+    let resolveFirstViewportUpdate: () => void = () => {
+      throw new Error('first viewport update resolver was not captured')
+    }
+    const harness = createViewportRuntimeHarness()
+    harness.viewport.value = { x: -100, y: -200, zoom: 2 }
+    harness.setViewport.mockImplementationOnce(async (nextViewport) => {
+      await new Promise<void>((resolve) => {
+        resolveFirstViewportUpdate = resolve
+      })
+      harness.viewport.value = nextViewport
+    })
+
+    harness.runtime.onMiniMapDragStart()
+    harness.runtime.onMiniMapDragMove({ x: 10, y: -5 })
+    harness.runtime.onMiniMapDragEnd()
+    await flushPromises()
+
+    harness.runtime.onMiniMapDragStart()
+    harness.runtime.onMiniMapDragMove({ x: 3, y: 2 })
+    harness.runtime.onMiniMapDragEnd()
+    await flushPromises()
+
+    expect(harness.setViewport).toHaveBeenCalledOnce()
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
+
+    resolveFirstViewportUpdate()
+    await flushPromises(8)
+
+    expect(harness.setViewport).toHaveBeenCalledTimes(2)
+    expect(harness.setViewport).toHaveBeenLastCalledWith({ x: -106, y: -204, zoom: 2 }, { duration: 0 })
+    expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
+    expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
+    harness.scope.stop()
+  })
+
+  it('does not persist a minimap drag that ends without movement', async () => {
+    const harness = createViewportRuntimeHarness()
+
+    harness.runtime.onMiniMapDragStart()
+    harness.runtime.onMiniMapDragEnd()
+    await flushPromises()
+
+    expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    expect(harness.setViewport).not.toHaveBeenCalled()
+    expect(harness.markBoardViewportChanged).not.toHaveBeenCalled()
+    expect(harness.commitPendingBoardViewportChange).not.toHaveBeenCalled()
     harness.scope.stop()
   })
 
