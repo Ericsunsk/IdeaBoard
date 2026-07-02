@@ -19,6 +19,7 @@
           }"
         >
           <NodeToolIconButton
+            :ref="(el) => setItemStrengthTriggerRef(item, el)"
             class="image-action-icon-btn"
             :aria-label-value="item.title"
             :disabled="directGenerating"
@@ -73,6 +74,10 @@ const props = defineProps<{
     action: ImageStrengthAction,
     el: Element | ComponentPublicInstance | null,
   ) => void
+  setStrengthTriggerRef: (
+    action: ImageStrengthAction,
+    el: Element | ComponentPublicInstance | null,
+  ) => void
   onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
   onStrengthInput: (action: ImageStrengthAction, event: Event) => void
   onStrengthChange: (action: ImageStrengthAction, event: Event) => void
@@ -114,6 +119,15 @@ function setItemStrengthRangeRef(
   const action = getStrengthAction(item)
   if (!action) return
   props.setStrengthRangeRef(action, el)
+}
+
+function setItemStrengthTriggerRef(
+  item: ImageActionMenuItem,
+  el: Element | ComponentPublicInstance | null,
+) {
+  const action = getStrengthAction(item)
+  if (!action) return
+  props.setStrengthTriggerRef(action, el)
 }
 
 function onItemStrengthRangePointerDown(item: ImageActionMenuItem, event: PointerEvent) {

@@ -169,6 +169,7 @@ function mountCanvasImageTools() {
           activeStrengthAction,
           getActionStrength: () => 50,
           setStrengthRangeRef: vi.fn(),
+          setStrengthTriggerRef: vi.fn(),
           onStrengthRangePointerDown: vi.fn(),
           onStrengthInput: vi.fn(),
           onStrengthChange: vi.fn(),

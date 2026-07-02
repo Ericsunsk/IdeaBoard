@@ -197,6 +197,7 @@ describe('useCanvasWorkspaceRuntime', () => {
       activeStrengthAction: ref(null),
       getActionStrength: vi.fn(),
       setStrengthRangeRef: vi.fn(),
+      setStrengthTriggerRef: vi.fn(),
       onStrengthRangePointerDown: vi.fn(),
       onStrengthInput: vi.fn(),
       onStrengthChange: vi.fn(),
@@ -240,6 +241,7 @@ describe('useCanvasWorkspaceRuntime', () => {
       activeStrengthAction: ref(null),
       getActionStrength: vi.fn(),
       setStrengthRangeRef: vi.fn(),
+      setStrengthTriggerRef: vi.fn(),
       onStrengthRangePointerDown: vi.fn(),
       onStrengthInput: vi.fn(),
       onStrengthChange: vi.fn(),
@@ -293,7 +295,7 @@ describe('useCanvasWorkspaceRuntime', () => {
     const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
     const { onFlowFusionPromptGenerate } = runtime.createImageActionHandlers({
       flowImageEditorNodeId: ref(null),
-      suppressClickAction: ref(null),
+      consumeSuppressedStrengthClick: vi.fn(() => false),
       openActiveNodePanel: vi.fn(),
       clearActiveNodePanel: vi.fn(),
       hideStrengthControl: vi.fn(),

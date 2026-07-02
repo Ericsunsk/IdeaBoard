@@ -51,6 +51,10 @@ export type ImageActionBinding = {
     action: ImageStrengthAction,
     el: Element | ComponentPublicInstance | null,
   ) => void
+  setStrengthTriggerRef: (
+    action: ImageStrengthAction,
+    el: Element | ComponentPublicInstance | null,
+  ) => void
   onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
   onStrengthInput: (action: ImageStrengthAction, event: Event) => void
   onStrengthChange: (action: ImageStrengthAction, event: Event) => void

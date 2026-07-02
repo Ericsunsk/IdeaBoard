@@ -48,6 +48,7 @@ export function createImageToolNodeBindings(
       activeStrengthAction: options.activeStrengthAction.value,
       getStrengthValue: options.getActionStrength,
       setStrengthRangeRef: options.setStrengthRangeRef,
+      setStrengthTriggerRef: options.setStrengthTriggerRef,
       onStrengthRangePointerDown: options.onStrengthRangePointerDown,
       onStrengthInput: options.onStrengthInput,
       onStrengthChange: options.onStrengthChange,

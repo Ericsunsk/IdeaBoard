@@ -365,8 +365,9 @@ const { runImageDirectAction } = canvasWorkspace.imageWorkflow
 
 const {
   activeStrengthAction,
-  suppressClickAction,
+  consumeSuppressedStrengthClick,
   setStrengthRangeRef,
+  setStrengthTriggerRef,
   hideStrengthControl,
   getActionStrength,
   onStrengthRangePointerDown,
@@ -413,6 +414,7 @@ const imageTools = canvasWorkspace.createImageTools({
   activeStrengthAction,
   getActionStrength,
   setStrengthRangeRef,
+  setStrengthTriggerRef,
   onStrengthRangePointerDown,
   onStrengthInput,
   onStrengthChange,
@@ -551,7 +553,7 @@ const {
   onFlowFusionPromptGenerate,
 } = canvasWorkspace.createImageActionHandlers({
   flowImageEditorNodeId,
-  suppressClickAction,
+  consumeSuppressedStrengthClick,
   openActiveNodePanel,
   clearActiveNodePanel,
   hideStrengthControl,

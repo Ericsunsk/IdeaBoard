@@ -16,7 +16,7 @@ const LONG_PRESS_MS = 260
 const MIN_STRENGTH = 0
 const MAX_STRENGTH = 100
 
-type StrengthRangeRefTarget = Element | ComponentPublicInstance | null
+type StrengthRefTarget = Element | ComponentPublicInstance | null
 
 export function useFlowImageActionStrengthControl(options: {
   onCommit: (action: ImageStrengthAction, strength: number) => void
@@ -29,7 +29,8 @@ export function useFlowImageActionStrengthControl(options: {
   const suppressClickAction = ref<ImageStrengthAction | null>(null)
 
   const strengthRangeElements = new Map<ImageStrengthAction, HTMLInputElement>()
-  const stopLongPressByAction = new Map<ImageStrengthAction, () => void>()
+  const strengthTriggerElements = new Map<ImageStrengthAction, HTMLElement>()
+  const stopTriggerBindingByAction = new Map<ImageStrengthAction, () => void>()
   let editingAction: ImageStrengthAction | null = null
   let longPressGeneration = 0
 
@@ -38,9 +39,21 @@ export function useFlowImageActionStrengthControl(options: {
     return Math.max(MIN_STRENGTH, Math.min(MAX_STRENGTH, Math.round(value)))
   }
 
-  function getRangeInput(el: StrengthRangeRefTarget): HTMLInputElement | null {
-    if (el instanceof HTMLInputElement) return el
-    if (el && '$el' in el && el.$el instanceof HTMLInputElement) return el.$el
+  function getElement(el: StrengthRefTarget): Element | null {
+    if (el instanceof Element) return el
+    if (el && '$el' in el && el.$el instanceof Element) return el.$el
+    return null
+  }
+
+  function getRangeInput(el: StrengthRefTarget): HTMLInputElement | null {
+    const element = getElement(el)
+    if (element instanceof HTMLInputElement) return element
+    return null
+  }
+
+  function getTriggerElement(el: StrengthRefTarget): HTMLElement | null {
+    const element = getElement(el)
+    if (element instanceof HTMLElement) return element
     return null
   }
 
@@ -81,42 +94,81 @@ export function useFlowImageActionStrengthControl(options: {
     onCommit(action, strengths[action])
   }
 
-  function disposeLongPress(action: ImageStrengthAction) {
-    stopLongPressByAction.get(action)?.()
-    stopLongPressByAction.delete(action)
-    strengthRangeElements.delete(action)
+  function isTriggerDisabled(trigger: HTMLElement) {
+    return trigger instanceof HTMLButtonElement && trigger.disabled
   }
 
-  function attachLongPress(action: ImageStrengthAction, input: HTMLInputElement) {
+  function clearSuppressedClick(action: ImageStrengthAction) {
+    if (suppressClickAction.value === action) suppressClickAction.value = null
+  }
+
+  function consumeSuppressedStrengthClick(action: ImageStrengthAction): boolean {
+    if (suppressClickAction.value !== action) return false
+    suppressClickAction.value = null
+    return true
+  }
+
+  function disposeTriggerBinding(action: ImageStrengthAction) {
+    stopTriggerBindingByAction.get(action)?.()
+    stopTriggerBindingByAction.delete(action)
+  }
+
+  function attachTriggerBinding(action: ImageStrengthAction, trigger: HTMLElement) {
     const generation = longPressGeneration
-    stopLongPressByAction.get(action)?.()
-    stopLongPressByAction.set(
-      action,
-      onLongPress(
-        input,
-        () => {
-          if (generation !== longPressGeneration) return
-          if (input.disabled) return
-          beginStrengthEdit(action, input, { syncInitial: false })
-        },
-        {
-          delay: LONG_PRESS_MS,
-          distanceThreshold: false,
-        },
-      ),
+    disposeTriggerBinding(action)
+
+    const onTriggerPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return
+      clearSuppressedClick(action)
+    }
+    trigger.addEventListener('pointerdown', onTriggerPointerDown)
+
+    const stopLongPress = onLongPress(
+      trigger,
+      () => {
+        if (generation !== longPressGeneration) return
+        if (isTriggerDisabled(trigger)) return
+        const input = strengthRangeElements.get(action)
+        if (!input) return
+        if (input.disabled) return
+        beginStrengthEdit(action, input, { syncInitial: false })
+      },
+      {
+        delay: LONG_PRESS_MS,
+        distanceThreshold: false,
+      },
     )
+    stopTriggerBindingByAction.set(action, () => {
+      stopLongPress()
+      trigger.removeEventListener('pointerdown', onTriggerPointerDown)
+    })
   }
 
-  function setStrengthRangeRef(action: ImageStrengthAction, el: StrengthRangeRefTarget) {
+  function setStrengthRangeRef(action: ImageStrengthAction, el: StrengthRefTarget) {
     const input = getRangeInput(el)
     const current = strengthRangeElements.get(action)
     if (current === input) return
 
-    disposeLongPress(action)
-    if (!input) return
-
+    if (!input) {
+      strengthRangeElements.delete(action)
+      return
+    }
     strengthRangeElements.set(action, input)
-    attachLongPress(action, input)
+  }
+
+  function setStrengthTriggerRef(action: ImageStrengthAction, el: StrengthRefTarget) {
+    const trigger = getTriggerElement(el)
+    const current = strengthTriggerElements.get(action)
+    if (current === trigger) return
+
+    disposeTriggerBinding(action)
+    if (!trigger) {
+      strengthTriggerElements.delete(action)
+      return
+    }
+
+    strengthTriggerElements.set(action, trigger)
+    attachTriggerBinding(action, trigger)
   }
 
   function hideStrengthControl() {
@@ -125,7 +177,7 @@ export function useFlowImageActionStrengthControl(options: {
     if (editingAction) blurRange(editingAction)
     editingAction = null
     suppressClickAction.value = null
-    strengthRangeElements.forEach((input, action) => attachLongPress(action, input))
+    strengthTriggerElements.forEach((trigger, action) => attachTriggerBinding(action, trigger))
   }
 
   function onStrengthRangePointerDown(action: ImageStrengthAction, event: PointerEvent) {
@@ -172,7 +224,9 @@ export function useFlowImageActionStrengthControl(options: {
 
   function dispose() {
     hideStrengthControl()
-    Array.from(stopLongPressByAction.keys()).forEach(disposeLongPress)
+    Array.from(stopTriggerBindingByAction.keys()).forEach(disposeTriggerBinding)
+    strengthRangeElements.clear()
+    strengthTriggerElements.clear()
   }
 
   if (getCurrentInstance()) {
@@ -181,8 +235,9 @@ export function useFlowImageActionStrengthControl(options: {
 
   return {
     activeStrengthAction,
-    suppressClickAction,
+    consumeSuppressedStrengthClick,
     setStrengthRangeRef,
+    setStrengthTriggerRef,
     hideStrengthControl,
     getActionStrength,
     onStrengthRangePointerDown,

@@ -67,6 +67,7 @@
         :active-strength-action="actionBinding.activeStrengthAction"
         :get-strength-value="actionBinding.getStrengthValue"
         :set-strength-range-ref="actionBinding.setStrengthRangeRef"
+        :set-strength-trigger-ref="actionBinding.setStrengthTriggerRef"
         :on-strength-range-pointer-down="actionBinding.onStrengthRangePointerDown"
         :on-strength-input="actionBinding.onStrengthInput"
         :on-strength-change="actionBinding.onStrengthChange"

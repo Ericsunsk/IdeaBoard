@@ -22,7 +22,7 @@ type FusionPromptParamPatch = Extract<
 
 type UseFlowImageActionOrchestratorOptions = {
   flowImageEditorNodeId: Ref<string | null>
-  suppressClickAction: Ref<ImageStrengthAction | null>
+  consumeSuppressedStrengthClick: (action: ImageStrengthAction) => boolean
   openActiveNodePanel: (panel: ActiveNodePanel) => void
   clearActiveNodePanel: () => void
   hideStrengthControl: () => void
@@ -105,7 +105,7 @@ export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrches
       options.onWarning('当前图片工具不可执行')
       return
     }
-    if (isImageStrengthAction(action) && options.suppressClickAction.value === action) {
+    if (isImageStrengthAction(action) && options.consumeSuppressedStrengthClick(action)) {
       return
     }
     options.cancelFlowExpandMode()

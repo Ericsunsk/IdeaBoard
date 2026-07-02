@@ -31,6 +31,7 @@ function dispatchRangeInput(input: HTMLInputElement, value: number) {
 
 function bindRange(control: StrengthControl, action: ImageStrengthAction, value = 35) {
   const input = createRange(value)
+  const trigger = document.createElement('button')
   input.addEventListener('pointerdown', (event) =>
     control.onStrengthRangePointerDown(action, event),
   )
@@ -38,7 +39,8 @@ function bindRange(control: StrengthControl, action: ImageStrengthAction, value 
   input.addEventListener('change', (event) => control.onStrengthChange(action, event))
   input.addEventListener('pointerup', (event) => control.onStrengthPointerUp(action, event))
   control.setStrengthRangeRef(action, input)
-  return input
+  control.setStrengthTriggerRef(action, trigger)
+  return { input, trigger }
 }
 
 describe('useFlowImageActionStrengthControl', () => {
@@ -55,14 +57,14 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
     const action = IMAGE_NODE_ACTION.styleVariation
-    const input = bindRange(control, action)
+    const { trigger } = bindRange(control, action)
 
-    input.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown'))
     vi.advanceTimersByTime(259)
-    input.dispatchEvent(createPointerEvent('pointerup'))
+    trigger.dispatchEvent(createPointerEvent('pointerup'))
 
     expect(control.activeStrengthAction.value).toBeNull()
-    expect(control.suppressClickAction.value).toBeNull()
+    expect(control.consumeSuppressedStrengthClick(action)).toBe(false)
     expect(onCommit).not.toHaveBeenCalled()
 
     control.dispose()
@@ -72,9 +74,9 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
     const action = IMAGE_NODE_ACTION.styleVariation
-    const input = bindRange(control, action)
+    const { input, trigger } = bindRange(control, action)
 
-    input.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown'))
     vi.advanceTimersByTime(260)
     expect(control.activeStrengthAction.value).toBe(action)
 
@@ -83,9 +85,28 @@ describe('useFlowImageActionStrengthControl', () => {
 
     expect(control.activeStrengthAction.value).toBeNull()
     expect(control.getActionStrength(action)).toBe(80)
-    expect(control.suppressClickAction.value).toBe(action)
+    expect(control.consumeSuppressedStrengthClick(action)).toBe(true)
+    expect(control.consumeSuppressedStrengthClick(action)).toBe(false)
     expect(onCommit).toHaveBeenCalledWith(action, 80)
     expect(onCommit).toHaveBeenCalledTimes(1)
+
+    control.dispose()
+  })
+
+  it('clears stale strength click suppression on the next ordinary trigger press', () => {
+    const onCommit = vi.fn()
+    const control = useFlowImageActionStrengthControl({ onCommit })
+    const action = IMAGE_NODE_ACTION.styleVariation
+    const { input, trigger } = bindRange(control, action)
+
+    trigger.dispatchEvent(createPointerEvent('pointerdown'))
+    vi.advanceTimersByTime(260)
+    dispatchRangeInput(input, 80)
+    input.dispatchEvent(createPointerEvent('pointerup'))
+
+    trigger.dispatchEvent(createPointerEvent('pointerdown'))
+
+    expect(control.consumeSuppressedStrengthClick(action)).toBe(false)
 
     control.dispose()
   })
@@ -94,9 +115,9 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
     const action = IMAGE_NODE_ACTION.hdUpscale
-    const input = bindRange(control, action, 35)
+    const { input, trigger } = bindRange(control, action, 35)
 
-    input.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown'))
     vi.advanceTimersByTime(260)
     dispatchRangeInput(input, 62)
     input.dispatchEvent(new Event('change', { bubbles: true }))
@@ -112,15 +133,15 @@ describe('useFlowImageActionStrengthControl', () => {
     const onCommit = vi.fn()
     const control = useFlowImageActionStrengthControl({ onCommit })
     const action = IMAGE_NODE_ACTION.styleVariation
-    const input = bindRange(control, action)
+    const { trigger } = bindRange(control, action)
 
-    input.dispatchEvent(createPointerEvent('pointerdown'))
+    trigger.dispatchEvent(createPointerEvent('pointerdown'))
     control.hideStrengthControl()
     vi.advanceTimersByTime(260)
-    input.dispatchEvent(createPointerEvent('pointerup'))
+    trigger.dispatchEvent(createPointerEvent('pointerup'))
 
     expect(control.activeStrengthAction.value).toBeNull()
-    expect(control.suppressClickAction.value).toBeNull()
+    expect(control.consumeSuppressedStrengthClick(action)).toBe(false)
     expect(onCommit).not.toHaveBeenCalled()
 
     control.dispose()
