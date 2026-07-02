@@ -59,12 +59,14 @@ function createLevelsLayer(
   } satisfies ImageEditorLayer
 }
 
-function createInvertLayer(params = { enabled: true }) {
+function createSharpenLayer(
+  params = { amount: 120, radius: 1.5, threshold: 4, protectColor: true },
+) {
   return {
-    id: 'adjustment:invert',
+    id: 'adjustment:sharpen',
     type: 'adjustment',
-    kind: 'invert',
-    name: '反相 1',
+    kind: 'sharpen',
+    name: '锐化 1',
     visible: true,
     params,
   } satisfies ImageEditorLayer
@@ -91,7 +93,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
-      layers: ref([createInvertLayer()]),
+      layers: ref([createThresholdLayer({ threshold: 128, invert: true })]),
     })
 
     await flushPreviewLoad()
@@ -99,7 +101,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
     expect(runtime.renderPreview).toHaveBeenCalledWith(
       expect.objectContaining({
         source: { url: 'https://example.com/source.png' },
-        plan: buildImageAdjustmentPlan([createInvertLayer()]),
+        plan: buildImageAdjustmentPlan([createThresholdLayer({ threshold: 128, invert: true })]),
         taskId: 'image-adjustment:inline-preview',
         latestOnly: true,
         sizeStrategy: { maxSide: 960 },
@@ -125,7 +127,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
     const preview = useImageAdjustmentRenderedPreview({
       isAdjustMode: ref(true),
       sourceUrl: ref('https://example.com/source.png'),
-      layers: ref([createInvertLayer()]),
+      layers: ref([createThresholdLayer()]),
     })
 
     await flushPreviewLoad()
@@ -160,8 +162,8 @@ describe('useImageAdjustmentRenderedPreview', () => {
         outputBlack: 0,
         outputWhite: 255,
       }),
+      createSharpenLayer(),
       createThresholdLayer({ threshold: 150, invert: true }),
-      createInvertLayer(),
     ] satisfies ImageEditorLayer[]
     const finalPlan = buildImageAdjustmentPlan(layers)
     const preview = useImageAdjustmentRenderedPreview({
@@ -196,7 +198,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
         { ...createHslLayer(), visible: false },
         createCurvesLayer(),
         createLevelsLayer(),
-        createInvertLayer({ enabled: false }),
+        createSharpenLayer({ amount: 0, radius: 1, threshold: 4, protectColor: true }),
       ]),
     })
 

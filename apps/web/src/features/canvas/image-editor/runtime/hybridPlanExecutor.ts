@@ -1,5 +1,5 @@
 import {
-  createPlanWorkBytes,
+  createPlanWorkUnits,
   defaultNow,
   defaultYieldToMainThread,
   executeCooperativeCpuImageAdjustmentPlan,
@@ -20,12 +20,12 @@ export type CreateHybridImageAdjustmentPlanExecutorOptions =
   CreateImageAdjustmentPlanExecutorOptions & {
     cooperativeChunkBytes?: number
     cooperativeFrameBudgetMs?: number
-    syncMaxWorkBytes?: number
+    syncMaxWorkUnits?: number
     now?: () => number
     yieldToMainThread?: () => Promise<void>
   }
 
-export const DEFAULT_HYBRID_SYNC_MAX_WORK_BYTES = 24_000_000
+export const DEFAULT_HYBRID_SYNC_MAX_WORK_UNITS = 24_000_000
 export const DEFAULT_HYBRID_COOPERATIVE_CHUNK_BYTES = 1024 * 1024
 export const DEFAULT_HYBRID_COOPERATIVE_FRAME_BUDGET_MS = 10
 
@@ -34,9 +34,9 @@ export function createHybridImageAdjustmentPlanExecutor(
 ): ImageAdjustmentPlanExecutor {
   const cpuExecutor = createCpuImageAdjustmentPlanExecutor(options)
   const workerExecutor = createWorkerImageAdjustmentPlanExecutor(options)
-  const syncMaxWorkBytes = normalizePositiveInteger(
-    options.syncMaxWorkBytes,
-    DEFAULT_HYBRID_SYNC_MAX_WORK_BYTES,
+  const syncMaxWorkUnits = normalizePositiveInteger(
+    options.syncMaxWorkUnits,
+    DEFAULT_HYBRID_SYNC_MAX_WORK_UNITS,
   )
   const cooperativeChunkBytes = normalizePixelChunkBytes(
     options.cooperativeChunkBytes,
@@ -52,9 +52,9 @@ export function createHybridImageAdjustmentPlanExecutor(
   return {
     async execute(input) {
       const pixelCount = Math.max(0, input.imageData.width * input.imageData.height)
-      const workBytes = createPlanWorkBytes(input.imageData, input.plan)
+      const workUnits = createPlanWorkUnits(input.imageData, input.plan)
       const executionMode =
-        input.plan.length === 0 || workBytes <= syncMaxWorkBytes ? 'sync' : 'cooperative'
+        input.plan.length === 0 || workUnits <= syncMaxWorkUnits ? 'sync' : 'cooperative'
       reportPlanExecutionEvent(options.onPlanExecutorEvent, {
         kind: 'hybrid-plan-selected',
         backend: 'cpu-main',
@@ -64,8 +64,8 @@ export function createHybridImageAdjustmentPlanExecutor(
         width: input.imageData.width,
         height: input.imageData.height,
         pixelCount,
-        workBytes,
-        syncThresholdWorkBytes: syncMaxWorkBytes,
+        workUnits,
+        syncThresholdWorkUnits: syncMaxWorkUnits,
       })
       if (executionMode === 'sync') return cpuExecutor.execute(input)
 

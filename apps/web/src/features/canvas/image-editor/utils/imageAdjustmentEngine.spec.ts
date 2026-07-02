@@ -4,6 +4,7 @@ import {
   applyImageAdjustments,
   applyImageAdjustmentsInPlace,
   compileImageAdjustmentPlan,
+  createImageAdjustmentPlanStepExecutionState,
   executeImageAdjustmentPlan,
   executeImageAdjustmentPlanStepRange,
   hasEffectiveImageAdjustments,
@@ -11,7 +12,7 @@ import {
 } from './imageAdjustmentEngine'
 import { normalizeImageAdjustmentLayer } from './imageAdjustmentDefinitions'
 
-function makeImageData(values: number[]) {
+function makeImageData(values: number[], width = values.length / 4, height = 1) {
   class TestImageData {
     data: Uint8ClampedArray
     width: number
@@ -23,7 +24,7 @@ function makeImageData(values: number[]) {
       this.height = height
     }
   }
-  return new TestImageData(new Uint8ClampedArray(values), values.length / 4, 1) as ImageData
+  return new TestImageData(new Uint8ClampedArray(values), width, height) as ImageData
 }
 
 function pixelValues(imageData: ImageData) {
@@ -73,13 +74,13 @@ const levelsLayer: ImageEditorAdjustmentLayer = {
   params: { shadows: 0, midtones: 128, highlights: 255, outputBlack: 0, outputWhite: 255 },
 }
 
-const invertLayer: ImageEditorAdjustmentLayer = {
-  id: 'adjustment:invert',
+const sharpenLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:sharpen',
   type: 'adjustment',
-  kind: 'invert',
-  name: '反相 1',
+  kind: 'sharpen',
+  name: '锐化 1',
   visible: true,
-  params: { enabled: true },
+  params: { amount: 0, radius: 1, threshold: 4, protectColor: true },
 }
 
 describe('imageAdjustmentEngine', () => {
@@ -90,47 +91,39 @@ describe('imageAdjustmentEngine', () => {
       hslLayer,
       curvesLayer,
       levelsLayer,
-      makeLayer(invertLayer, { params: { enabled: false } }),
+      sharpenLayer,
     ])
 
     expect(pixelValues(result)).toEqual([32, 96, 160, 128])
     expect(pixelValues(source)).toEqual([32, 96, 160, 128])
-    expect(hasEffectiveImageAdjustments([hslLayer, curvesLayer, levelsLayer])).toBe(false)
+    expect(hasEffectiveImageAdjustments([hslLayer, curvesLayer, levelsLayer, sharpenLayer])).toBe(
+      false,
+    )
   })
 
   it('skips hidden layers and keeps alpha unchanged', () => {
     const source = makeImageData([10, 20, 30, 77])
 
-    const result = applyImageAdjustments(source, [makeLayer(invertLayer, { visible: false })])
+    const result = applyImageAdjustments(source, [makeLayer(thresholdLayer, { visible: false })])
 
     expect(pixelValues(result)).toEqual([10, 20, 30, 77])
-  })
-
-  it('applies invert without touching alpha', () => {
-    const source = makeImageData([10, 20, 30, 77])
-
-    const result = applyImageAdjustments(source, [invertLayer])
-
-    expect(pixelValues(result)).toEqual([245, 235, 225, 77])
   })
 
   it('can execute adjustments in place for renderer memory efficiency', () => {
     const source = makeImageData([10, 20, 30, 77])
 
-    const result = applyImageAdjustmentsInPlace(source, [invertLayer])
+    const result = applyImageAdjustmentsInPlace(source, [thresholdLayer])
 
     expect(result).toBe(source)
-    expect(pixelValues(source)).toEqual([245, 235, 225, 77])
+    expect(pixelValues(source)).toEqual([0, 0, 0, 77])
   })
 
   it('keeps ranged plan-step execution identical to whole-image execution', () => {
     const sourceValues = [10, 20, 30, 77, 120, 80, 40, 88, 200, 210, 220, 99, 32, 96, 160, 111]
     const wholeImage = makeImageData(sourceValues)
     const rangedImage = makeImageData(sourceValues)
-    const invertPlanStep = compileImageAdjustmentPlan([invertLayer])[0]
-    const invertLuts = invertPlanStep?.kind === 'channel-lut' ? invertPlanStep.luts : failLuts()
     const plan: ImageAdjustmentPlan = [
-      { kind: 'channel-lut', luts: invertLuts },
+      { kind: 'channel-lut', luts: createChannelLiftLutsForTest() },
       { kind: 'threshold', threshold: 128, invert: true },
       {
         kind: 'hsl',
@@ -146,6 +139,31 @@ describe('imageAdjustmentEngine', () => {
     for (const step of plan) {
       executeImageAdjustmentPlanStepRange(rangedImage.data, step, 0, 8)
       executeImageAdjustmentPlanStepRange(rangedImage.data, step, 8, rangedImage.data.length)
+    }
+
+    expect(pixelValues(rangedImage)).toEqual(pixelValues(wholeImage))
+  })
+
+  it('keeps ranged sharpen execution identical to whole-image execution', () => {
+    const sourceValues = [
+      24, 24, 24, 50, 24, 24, 24, 60, 210, 210, 210, 70, 210, 210, 210, 80, 24, 24, 24, 90,
+      24, 24, 24, 100, 210, 210, 210, 110, 210, 210, 210, 120, 24, 24, 24, 130, 24, 24, 24,
+      140, 210, 210, 210, 150, 210, 210, 210, 160,
+    ]
+    const wholeImage = makeImageData(sourceValues, 4, 3)
+    const rangedImage = makeImageData(sourceValues, 4, 3)
+    const plan = compileImageAdjustmentPlan([
+      makeLayer(sharpenLayer, {
+        params: { amount: 160, radius: 1.4, threshold: 0, protectColor: true },
+      }),
+    ])
+
+    executeImageAdjustmentPlan(wholeImage, plan)
+    for (const step of plan) {
+      const state = createImageAdjustmentPlanStepExecutionState(rangedImage, step)
+      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 0, 12, state)
+      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 12, 28, state)
+      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 28, rangedImage.data.length, state)
     }
 
     expect(pixelValues(rangedImage)).toEqual(pixelValues(wholeImage))
@@ -248,6 +266,105 @@ describe('imageAdjustmentEngine', () => {
     expect(pixelValues(result)).toEqual([51, 255, 51, 255])
   })
 
+  it('applies sharpen without touching alpha', () => {
+    const source = makeImageData(
+      [
+        32, 32, 32, 11, 32, 32, 32, 22, 192, 192, 192, 33, 192, 192, 192, 44, 192, 192, 192, 55,
+      ],
+      5,
+      1,
+    )
+
+    const result = applyImageAdjustments(source, [
+      makeLayer(sharpenLayer, {
+        params: { amount: 150, radius: 1, threshold: 0, protectColor: false },
+      }),
+    ])
+
+    expect(pixelValues(result)).not.toEqual(pixelValues(source))
+    expect([result.data[3], result.data[7], result.data[11], result.data[15], result.data[19]]).toEqual(
+      [11, 22, 33, 44, 55],
+    )
+  })
+
+  it('uses threshold to suppress low-contrast sharpen noise', () => {
+    const source = makeImageData(
+      [100, 100, 100, 255, 104, 104, 104, 255, 100, 100, 100, 255],
+      3,
+      1,
+    )
+
+    const suppressed = applyImageAdjustments(source, [
+      makeLayer(sharpenLayer, {
+        params: { amount: 200, radius: 1, threshold: 10, protectColor: false },
+      }),
+    ])
+    const enhanced = applyImageAdjustments(source, [
+      makeLayer(sharpenLayer, {
+        params: { amount: 200, radius: 1, threshold: 0, protectColor: false },
+      }),
+    ])
+
+    expect(pixelValues(suppressed)).toEqual(pixelValues(source))
+    expect(pixelValues(enhanced)).not.toEqual(pixelValues(source))
+  })
+
+  it('lets sharpen radius widen the affected area', () => {
+    const source = makeImageData(
+      [
+        20, 20, 20, 255, 20, 20, 20, 255, 20, 20, 20, 255, 220, 220, 220, 255, 220, 220, 220,
+        255, 220, 220, 220, 255, 220, 220, 220, 255,
+      ],
+      7,
+      1,
+    )
+
+    const narrow = applyImageAdjustments(source, [
+      makeLayer(sharpenLayer, {
+        params: { amount: 160, radius: 0.3, threshold: 0, protectColor: false },
+      }),
+    ])
+    const wide = applyImageAdjustments(source, [
+      makeLayer(sharpenLayer, {
+        params: { amount: 160, radius: 3, threshold: 0, protectColor: false },
+      }),
+    ])
+
+    expect(pixelValues(wide)).not.toEqual(pixelValues(narrow))
+    expect(Math.abs(wide.data[4] - source.data[4])).toBeGreaterThan(
+      Math.abs(narrow.data[4] - source.data[4]),
+    )
+  })
+
+  it('can protect color by injecting sharpened detail through luminance', () => {
+    const source = makeImageData(
+      [
+        96, 80, 70, 255, 96, 80, 70, 255, 170, 95, 82, 255, 170, 95, 82, 255, 170, 95, 82, 255,
+      ],
+      5,
+      1,
+    )
+
+    const protectedColor = applyImageAdjustments(source, [
+      makeLayer(sharpenLayer, {
+        params: { amount: 120, radius: 1, threshold: 0, protectColor: true },
+      }),
+    ])
+    const directRgb = applyImageAdjustments(source, [
+      makeLayer(sharpenLayer, {
+        params: { amount: 120, radius: 1, threshold: 0, protectColor: false },
+      }),
+    ])
+    const protectedDeltas = [
+      protectedColor.data[8] - source.data[8],
+      protectedColor.data[9] - source.data[9],
+      protectedColor.data[10] - source.data[10],
+    ]
+
+    expect(pixelValues(protectedColor)).not.toEqual(pixelValues(directRgb))
+    expect(new Set(protectedDeltas).size).toBe(1)
+  })
+
   it('applies non-commutative layers in declared order', () => {
     const source = makeImageData([128, 128, 128, 255])
 
@@ -273,8 +390,6 @@ describe('imageAdjustmentEngine', () => {
       hslLayer,
       curvesLayer,
       levelsLayer,
-      invertLayer,
-      makeLayer(invertLayer, { id: 'adjustment:invert:2' }),
     ])
 
     expect(plan).toEqual([])
@@ -283,11 +398,33 @@ describe('imageAdjustmentEngine', () => {
       makeLayer(curvesLayer, {
         params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
       }),
-      invertLayer,
+      makeLayer(levelsLayer, {
+        params: { shadows: 20, midtones: 128, highlights: 235, outputBlack: 0, outputWhite: 255 },
+      }),
     ])
 
     expect(channelPlan).toHaveLength(1)
     expect(channelPlan[0]?.kind).toBe('channel-lut')
+  })
+
+  it('compiles non-neutral sharpen as an ordered spatial plan step', () => {
+    const plan = compileImageAdjustmentPlan([
+      makeLayer(curvesLayer, {
+        params: { channels: { rgb: [{ id: 'point:mid', input: 50, output: 25 }] } },
+      }),
+      makeLayer(sharpenLayer, {
+        params: { amount: 120, radius: 1.25, threshold: 5, protectColor: true },
+      }),
+      makeLayer(levelsLayer, {
+        params: { shadows: 20, midtones: 128, highlights: 235, outputBlack: 0, outputWhite: 255 },
+      }),
+    ])
+
+    expect(plan.map((step) => step.kind)).toEqual(['channel-lut', 'sharpen', 'channel-lut'])
+    expect(plan[1]).toMatchObject({
+      kind: 'sharpen',
+      params: { amount: 120, radius: 1.25, threshold: 5, protectColor: true },
+    })
   })
 
   it('treats non-finite adjustment params as neutral defaults', () => {
@@ -336,6 +473,16 @@ describe('imageAdjustmentEngine', () => {
     const normalizedThreshold = normalizeImageAdjustmentLayer(
       makeLayer(thresholdLayer, { params: { threshold: Number.NaN, invert: true } }),
     )
+    const normalizedSharpen = normalizeImageAdjustmentLayer(
+      makeLayer(sharpenLayer, {
+        params: {
+          amount: Number.POSITIVE_INFINITY,
+          radius: Number.NaN,
+          threshold: Number.NEGATIVE_INFINITY,
+          protectColor: false,
+        },
+      }),
+    )
 
     expect(normalizedHsl.kind).toBe('hsl')
     if (normalizedHsl.kind !== 'hsl') throw new Error('expected hsl adjustment')
@@ -345,11 +492,25 @@ describe('imageAdjustmentEngine', () => {
       lightnessOffset: 0,
     })
     expect(normalizedThreshold.params).toEqual({ threshold: 128, invert: true })
+    expect(normalizedSharpen.params).toEqual({
+      amount: 0,
+      radius: 1,
+      threshold: 4,
+      protectColor: false,
+    })
   })
 })
 
-function failLuts(): NonNullable<
+function createChannelLiftLutsForTest(): NonNullable<
   Extract<ImageAdjustmentPlan[number], { kind: 'channel-lut' }>['luts']
 > {
-  throw new Error('expected compiled LUT step')
+  const lut = new Uint8ClampedArray(256)
+  for (let index = 0; index < lut.length; index += 1) {
+    lut[index] = Math.min(255, index + 10)
+  }
+  return {
+    red: lut,
+    green: lut,
+    blue: lut,
+  }
 }

@@ -40,13 +40,13 @@ vi.mock('../mask-editor/lib/maskPaintingCanvas', async (importOriginal) => {
 const cancelFinalRenderMock = vi.mocked(cancelImageAdjustmentFinalRender)
 const renderAdjustmentFileMock = vi.mocked(renderImageAdjustmentFile)
 
-const effectiveInvertLayer: ImageEditorAdjustmentLayer = {
-  id: 'adjustment:invert',
+const effectiveThresholdLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:threshold',
   type: 'adjustment',
-  kind: 'invert',
-  name: '反相 1',
+  kind: 'threshold',
+  name: '阈值 1',
   visible: true,
-  params: { enabled: true },
+  params: { threshold: 128, invert: false },
 }
 
 const sourceLayer: ImageEditorLayer = {
@@ -256,7 +256,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
     try {
       harness.runtime.enter('node-1', 'adjust')
-      harness.runtime.editorLayers.value = [effectiveInvertLayer, sourceLayer]
+      harness.runtime.editorLayers.value = [effectiveThresholdLayer, sourceLayer]
 
       const apply = harness.runtime.apply()
       await flushPromises()
@@ -269,7 +269,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       })
       expect(renderAdjustmentFileMock).toHaveBeenCalledWith(
         { url: 'https://example.com/source.png', title: 'Source' },
-        [effectiveInvertLayer],
+        [effectiveThresholdLayer],
         expect.objectContaining({
           scopeId: 'node-1',
           onProgress: expect.any(Function),
@@ -305,7 +305,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
     try {
       harness.runtime.enter('node-1', 'adjust')
-      harness.runtime.editorLayers.value = [effectiveInvertLayer, sourceLayer]
+      harness.runtime.editorLayers.value = [effectiveThresholdLayer, sourceLayer]
 
       const apply = harness.runtime.apply()
       await flushPromises()
@@ -337,7 +337,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
     try {
       harness.runtime.enter('node-1', 'adjust')
-      harness.runtime.editorLayers.value = [effectiveInvertLayer, sourceLayer]
+      harness.runtime.editorLayers.value = [effectiveThresholdLayer, sourceLayer]
 
       const oldApply = harness.runtime.apply()
       await flushPromises()

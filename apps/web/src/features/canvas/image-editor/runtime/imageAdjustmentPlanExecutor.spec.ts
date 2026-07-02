@@ -31,12 +31,12 @@ describe('image adjustment plan executor', () => {
 
     const result = await executor.execute({
       imageData: source,
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal: new AbortController().signal,
     })
 
     expect(result).toBe(source)
-    expect(pixelValues(result)).toEqual([245, 235, 225, 255])
+    expect(pixelValues(result)).toEqual([20, 30, 40, 255])
     expect(onPlanExecutorEvent).toHaveBeenCalledWith({
       kind: 'cpu-plan-completed',
       planLength: 1,
@@ -56,13 +56,13 @@ describe('image adjustment plan executor', () => {
     const executor = createWorkerImageAdjustmentPlanExecutor({ onPlanExecutorEvent })
     const result = await executor.execute({
       imageData: source,
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal,
       onProgress,
     })
 
     expect(result).toBe(workerOutput)
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(source, createInvertPlan(), {
+    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(source, createChannelLutPlan(), {
       signal,
       onProgress,
     })
@@ -84,19 +84,19 @@ describe('image adjustment plan executor', () => {
     const source = makeImageData([10, 20, 30, 255])
     const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
     const executor = createHybridImageAdjustmentPlanExecutor({
-      syncMaxWorkBytes: 4,
+      syncMaxWorkUnits: 4,
       onPlanExecutorEvent,
     })
 
     const result = await executor.execute({
       imageData: source,
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal: new AbortController().signal,
     })
 
     expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
     expect(result).toBe(source)
-    expect(pixelValues(result)).toEqual([245, 235, 225, 255])
+    expect(pixelValues(result)).toEqual([20, 30, 40, 255])
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
       kind: 'hybrid-plan-selected',
       backend: 'cpu-main',
@@ -106,8 +106,8 @@ describe('image adjustment plan executor', () => {
       width: 1,
       height: 1,
       pixelCount: 1,
-      workBytes: 4,
-      syncThresholdWorkBytes: 4,
+      workUnits: 4,
+      syncThresholdWorkUnits: 4,
     })
   })
 
@@ -121,21 +121,21 @@ describe('image adjustment plan executor', () => {
     const executor = createHybridImageAdjustmentPlanExecutor({
       cooperativeChunkBytes: 4,
       cooperativeFrameBudgetMs: 0,
-      syncMaxWorkBytes: 0,
+      syncMaxWorkUnits: 0,
       onPlanExecutorEvent,
       now: () => 1,
       yieldToMainThread,
     })
     const result = await executor.execute({
       imageData: source,
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal,
       onProgress,
     })
 
     expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
     expect(result).not.toBe(source)
-    expect(pixelValues(result)).toEqual([245, 235, 225, 255, 215, 205, 195, 255])
+    expect(pixelValues(result)).toEqual([20, 30, 40, 255, 50, 60, 70, 255])
     expect(pixelValues(source)).toEqual([10, 20, 30, 255, 40, 50, 60, 255])
     expect(yieldToMainThread).toHaveBeenCalledTimes(2)
     expect(onProgress).toHaveBeenCalledWith({ phase: 'render', loaded: 0, total: 8 })
@@ -150,14 +150,50 @@ describe('image adjustment plan executor', () => {
       width: 2,
       height: 1,
       pixelCount: 2,
-      workBytes: 8,
-      syncThresholdWorkBytes: 0,
+      workUnits: 8,
+      syncThresholdWorkUnits: 0,
     })
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(2, {
       kind: 'cpu-plan-completed',
       planLength: 1,
       width: 2,
       height: 1,
+    })
+  })
+
+  it('keeps cooperative sharpen execution identical to sync CPU execution', async () => {
+    const values = [
+      30, 30, 30, 255, 30, 30, 30, 240, 220, 220, 220, 230, 220, 220, 220, 220, 30, 30, 30,
+      210, 30, 30, 30, 200, 220, 220, 220, 190, 220, 220, 220, 180,
+    ]
+    const source = makeImageData(values, 4, 2)
+    const expected = await createCpuImageAdjustmentPlanExecutor().execute({
+      imageData: makeImageData(values, 4, 2),
+      plan: createSharpenPlan(),
+      signal: new AbortController().signal,
+    })
+    const onProgress = vi.fn()
+    const executor = createHybridImageAdjustmentPlanExecutor({
+      cooperativeChunkBytes: 12,
+      cooperativeFrameBudgetMs: 0,
+      syncMaxWorkUnits: 0,
+      now: () => 1,
+      yieldToMainThread: async () => {},
+    })
+
+    const result = await executor.execute({
+      imageData: source,
+      plan: createSharpenPlan(),
+      signal: new AbortController().signal,
+      onProgress,
+    })
+
+    expect(pixelValues(result)).toEqual(pixelValues(expected))
+    expect(pixelValues(source)).toEqual(values)
+    expect(onProgress).toHaveBeenCalledWith({
+      phase: 'render',
+      loaded: source.data.length * 3,
+      total: source.data.length * 3,
     })
   })
 
@@ -170,19 +206,19 @@ describe('image adjustment plan executor', () => {
     const executor = createHybridImageAdjustmentPlanExecutor({
       cooperativeChunkBytes: 4,
       cooperativeFrameBudgetMs: 0,
-      syncMaxWorkBytes: 0,
+      syncMaxWorkUnits: 0,
       now: () => 1,
       yieldToMainThread: () => Promise.reject(new Error('main thread failed')),
     })
     const result = await executor.execute({
       imageData: source,
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal,
     })
 
     expect(result).toBe(workerOutput)
     expect(pixelValues(source)).toEqual([10, 20, 30, 255, 40, 50, 60, 255])
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(source, createInvertPlan(), {
+    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(source, createChannelLutPlan(), {
       signal,
       onProgress: undefined,
     })
@@ -195,7 +231,7 @@ describe('image adjustment plan executor', () => {
     const executor = createHybridImageAdjustmentPlanExecutor({
       cooperativeChunkBytes: 4,
       cooperativeFrameBudgetMs: 0,
-      syncMaxWorkBytes: 0,
+      syncMaxWorkUnits: 0,
       now: () => 1,
       yieldToMainThread: async () => {
         controller.abort()
@@ -205,7 +241,7 @@ describe('image adjustment plan executor', () => {
     await expect(
       executor.execute({
         imageData: source,
-        plan: createInvertPlan(),
+        plan: createChannelLutPlan(),
         signal: controller.signal,
       }),
     ).rejects.toThrow('图像处理已取消')
@@ -218,7 +254,7 @@ describe('image adjustment plan executor', () => {
     const source = makeImageData([10, 20, 30, 255])
     const onPlanExecutorEvent = vi.fn<(event: ImageAdjustmentPlanExecutionEvent) => void>()
     const executor = createHybridImageAdjustmentPlanExecutor({
-      syncMaxWorkBytes: 0,
+      syncMaxWorkUnits: 0,
       onPlanExecutorEvent,
     })
 
@@ -240,8 +276,8 @@ describe('image adjustment plan executor', () => {
       width: 1,
       height: 1,
       pixelCount: 1,
-      workBytes: 0,
-      syncThresholdWorkBytes: 0,
+      workUnits: 0,
+      syncThresholdWorkUnits: 0,
     })
   })
 
@@ -253,12 +289,12 @@ describe('image adjustment plan executor', () => {
     const executor = createWorkerImageAdjustmentPlanExecutor({ onPlanExecutorEvent })
     const result = await executor.execute({
       imageData: source,
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal: new AbortController().signal,
     })
 
     expect(result).toBe(source)
-    expect(pixelValues(result)).toEqual([245, 235, 225, 255])
+    expect(pixelValues(result)).toEqual([20, 30, 40, 255])
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
       kind: 'worker-plan-started',
       planLength: 1,
@@ -294,7 +330,7 @@ describe('image adjustment plan executor', () => {
     await expect(
       executor.execute({
         imageData: source,
-        plan: createInvertPlan(),
+        plan: createChannelLutPlan(),
         signal: controller.signal,
       }),
     ).rejects.toThrow('cancelled')
@@ -310,7 +346,7 @@ describe('image adjustment plan executor', () => {
   })
 })
 
-function makeImageData(values: number[]): ImageData {
+function makeImageData(values: number[], width = values.length / 4, height = 1): ImageData {
   class TestImageDataImpl {
     data: Uint8ClampedArray
     width: number
@@ -322,19 +358,33 @@ function makeImageData(values: number[]): ImageData {
       this.height = height
     }
   }
-  return new TestImageDataImpl(new Uint8ClampedArray(values), values.length / 4, 1) as ImageData
+  return new TestImageDataImpl(new Uint8ClampedArray(values), width, height) as ImageData
 }
 
 function pixelValues(imageData: ImageData) {
   return Array.from(imageData.data)
 }
 
-function createInvertPlan(): ImageAdjustmentPlan {
+function createChannelLutPlan(): ImageAdjustmentPlan {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
-    lut[index] = 255 - index
+    lut[index] = Math.min(255, index + 10)
   }
   return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(lut) }]
+}
+
+function createSharpenPlan(): ImageAdjustmentPlan {
+  return [
+    {
+      kind: 'sharpen',
+      params: {
+        amount: 150,
+        radius: 1,
+        threshold: 0,
+        protectColor: true,
+      },
+    },
+  ]
 }
 
 function createRgbChannelLutsForTest(lut: Uint8ClampedArray) {

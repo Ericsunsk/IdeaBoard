@@ -112,6 +112,40 @@ describe('imageEditorLayerStack', () => {
     ])
   })
 
+  it('creates sharpen adjustment layers with normalized params', () => {
+    const sharpenStack = applyLayerCommand(createInitialLayerStack(), {
+      type: 'ensure-adjustment',
+      kind: 'sharpen',
+    })
+    const updatedStack = applyLayerCommand(sharpenStack, {
+      type: 'update-selected-adjustment-params',
+      params: {
+        amount: 240,
+        radius: 8,
+        threshold: Number.NaN,
+        protectColor: false,
+      },
+    })
+
+    expect(updatedStack.selectedLayerId).toBe('adjustment:sharpen')
+    expect(getSelectedAdjustment(updatedStack)).toMatchObject({
+      id: 'adjustment:sharpen',
+      kind: 'sharpen',
+      name: '锐化 1',
+      params: {
+        amount: 200,
+        radius: 5,
+        threshold: 4,
+        protectColor: false,
+      },
+    })
+    expect(updatedStack.layers.map((layer) => layer.id)).toEqual([
+      'adjustment:hsl',
+      'adjustment:sharpen',
+      'source',
+    ])
+  })
+
   it('falls back to source selection when the last editable layer is removed', () => {
     const nextStack = applyLayerCommand(createInitialLayerStack(), {
       type: 'remove',

@@ -2,10 +2,12 @@ import type { ImageEditorAdjustmentLayer } from '../types'
 import {
   CHANNEL_MAX,
   CHANNEL_MIN,
+  PERCENT_SCALE,
   isNeutralImageAdjustment,
   normalizeImageAdjustmentLayers,
   type NormalizedHslAdjustment,
   type NormalizedImageAdjustment,
+  type NormalizedSharpenAdjustment,
 } from './imageAdjustmentDefinitions'
 import { createCurvesLuts, type ImageEditorCurvesLuts } from './imageEditorCurves'
 import { createLevelsLut } from './imageEditorLevels'
@@ -15,8 +17,21 @@ export type ImageAdjustmentPlanStep =
   | { kind: 'hsl'; params: NormalizedHslAdjustment }
   | { kind: 'threshold'; threshold: number; invert: boolean }
   | { kind: 'channel-lut'; luts: ImageEditorCurvesLuts }
+  | { kind: 'sharpen'; params: NormalizedSharpenAdjustment }
 
 export type ImageAdjustmentPlan = readonly ImageAdjustmentPlanStep[]
+
+export type ImageAdjustmentPlanStepExecutionState =
+  | {
+      kind: 'sharpen'
+      width: number
+      height: number
+      sourceData: Uint8ClampedArray
+      blurredRgb: Float32Array
+    }
+  | null
+
+const SHARPEN_WORK_FACTOR = 3
 
 export function applyImageAdjustments(
   source: ImageData,
@@ -88,8 +103,9 @@ export function compileNormalizedImageAdjustmentPlan(
           createRgbChannelLuts(createLevelsLut(layer.params)),
         )
         break
-      case 'invert':
-        pendingChannelLut = appendChannelLut(pendingChannelLut, createRgbChannelLuts(INVERT_LUT))
+      case 'sharpen':
+        flushPendingChannelLut()
+        steps.push({ kind: 'sharpen', params: layer.params })
         break
     }
   }
@@ -99,14 +115,53 @@ export function compileNormalizedImageAdjustmentPlan(
 }
 
 export function executeImageAdjustmentPlan(imageData: ImageData, plan: ImageAdjustmentPlan) {
-  executeImageAdjustmentPlanData(imageData.data, plan)
+  executeImageAdjustmentPlanData(imageData, plan)
   return imageData
 }
 
-function executeImageAdjustmentPlanData(data: Uint8ClampedArray, plan: ImageAdjustmentPlan) {
+function executeImageAdjustmentPlanData(imageData: ImageData, plan: ImageAdjustmentPlan) {
   for (const step of plan) {
-    executeImageAdjustmentPlanStepRange(data, step, 0, data.length)
+    const state = createImageAdjustmentPlanStepExecutionState(imageData, step)
+    executeImageAdjustmentPlanStepRange(imageData.data, step, 0, imageData.data.length, state)
   }
+}
+
+export function createImageAdjustmentPlanStepExecutionState(
+  imageData: Pick<ImageData, 'data' | 'width' | 'height'>,
+  step: ImageAdjustmentPlanStep,
+): ImageAdjustmentPlanStepExecutionState {
+  if (step.kind !== 'sharpen') return null
+  const width = Math.max(0, Math.floor(imageData.width))
+  const height = Math.max(0, Math.floor(imageData.height))
+  const sourceData = new Uint8ClampedArray(imageData.data)
+  return {
+    kind: 'sharpen',
+    width,
+    height,
+    sourceData,
+    blurredRgb: createBlurredRgbData(sourceData, width, height, step.params.radius),
+  }
+}
+
+export function estimateImageAdjustmentPlanWorkUnits(
+  imageData: Pick<ImageData, 'data'>,
+  plan: ImageAdjustmentPlan,
+) {
+  return plan.reduce(
+    (total, step) => total + imageData.data.length * getImageAdjustmentPlanStepWorkFactor(step),
+    0,
+  )
+}
+
+export function estimateImageAdjustmentPlanStepRangeWorkUnits(
+  data: Uint8ClampedArray,
+  step: ImageAdjustmentPlanStep,
+  startByte: number,
+  endByte: number,
+) {
+  const start = alignPixelByteOffset(startByte)
+  const end = alignPixelByteOffset(Math.min(endByte, data.length))
+  return Math.max(0, end - start) * getImageAdjustmentPlanStepWorkFactor(step)
 }
 
 export function executeImageAdjustmentPlanStepRange(
@@ -114,6 +169,7 @@ export function executeImageAdjustmentPlanStepRange(
   step: ImageAdjustmentPlanStep,
   startByte: number,
   endByte: number,
+  state: ImageAdjustmentPlanStepExecutionState = null,
 ) {
   const start = alignPixelByteOffset(startByte)
   const end = alignPixelByteOffset(Math.min(endByte, data.length))
@@ -129,7 +185,14 @@ export function executeImageAdjustmentPlanStepRange(
     case 'channel-lut':
       applyChannelLut(data, step.luts, start, end)
       break
+    case 'sharpen':
+      applySharpenAdjustment(data, step.params, start, end, state)
+      break
   }
+}
+
+function getImageAdjustmentPlanStepWorkFactor(step: ImageAdjustmentPlanStep) {
+  return step.kind === 'sharpen' ? SHARPEN_WORK_FACTOR : 1
 }
 
 function appendChannelLut(
@@ -250,6 +313,147 @@ function applyChannelLut(
   }
 }
 
+function applySharpenAdjustment(
+  data: Uint8ClampedArray,
+  params: NormalizedSharpenAdjustment,
+  startByte: number,
+  endByte: number,
+  state: ImageAdjustmentPlanStepExecutionState,
+) {
+  if (!state || state.kind !== 'sharpen') {
+    throw new Error('Sharpen adjustment requires an image-sized execution state')
+  }
+
+  const amountScale = params.amount / PERCENT_SCALE
+  for (let index = startByte; index < endByte; index += 4) {
+    const pixelIndex = index / 4
+    const blurOffset = pixelIndex * 3
+    if (blurOffset + 2 >= state.blurredRgb.length) break
+
+    const sourceR = state.sourceData[index]
+    const sourceG = state.sourceData[index + 1]
+    const sourceB = state.sourceData[index + 2]
+    const blurredR = state.blurredRgb[blurOffset]
+    const blurredG = state.blurredRgb[blurOffset + 1]
+    const blurredB = state.blurredRgb[blurOffset + 2]
+
+    if (params.protectColor) {
+      const sourceLuminance = getLuminance(sourceR, sourceG, sourceB)
+      const blurredLuminance = getLuminance(blurredR, blurredG, blurredB)
+      const detail = sourceLuminance - blurredLuminance
+      const delta = Math.abs(detail) >= params.threshold ? detail * amountScale : 0
+      data[index] = clampChannel(sourceR + delta)
+      data[index + 1] = clampChannel(sourceG + delta)
+      data[index + 2] = clampChannel(sourceB + delta)
+    } else {
+      data[index] = sharpenSingleChannel(sourceR, blurredR, amountScale, params.threshold)
+      data[index + 1] = sharpenSingleChannel(sourceG, blurredG, amountScale, params.threshold)
+      data[index + 2] = sharpenSingleChannel(sourceB, blurredB, amountScale, params.threshold)
+    }
+
+    data[index + 3] = state.sourceData[index + 3]
+  }
+}
+
+function createBlurredRgbData(
+  sourceData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const pixelCount = Math.min(width * height, Math.floor(sourceData.length / 4))
+  const temp = new Float32Array(pixelCount * 3)
+  const output = new Float32Array(pixelCount * 3)
+  if (width <= 0 || height <= 0 || pixelCount === 0) return output
+
+  const kernel = createGaussianKernel(radius)
+  const kernelRadius = Math.floor(kernel.length / 2)
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixelIndex = y * width + x
+      if (pixelIndex >= pixelCount) continue
+
+      let red = 0
+      let green = 0
+      let blue = 0
+      for (let kernelIndex = 0; kernelIndex < kernel.length; kernelIndex += 1) {
+        const sampleX = clampInteger(x + kernelIndex - kernelRadius, 0, width - 1)
+        const sourceOffset = (y * width + sampleX) * 4
+        const weight = kernel[kernelIndex] ?? 0
+        red += sourceData[sourceOffset] * weight
+        green += sourceData[sourceOffset + 1] * weight
+        blue += sourceData[sourceOffset + 2] * weight
+      }
+
+      const tempOffset = pixelIndex * 3
+      temp[tempOffset] = red
+      temp[tempOffset + 1] = green
+      temp[tempOffset + 2] = blue
+    }
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixelIndex = y * width + x
+      if (pixelIndex >= pixelCount) continue
+
+      let red = 0
+      let green = 0
+      let blue = 0
+      for (let kernelIndex = 0; kernelIndex < kernel.length; kernelIndex += 1) {
+        const sampleY = clampInteger(y + kernelIndex - kernelRadius, 0, height - 1)
+        const tempOffset = (sampleY * width + x) * 3
+        const weight = kernel[kernelIndex] ?? 0
+        red += temp[tempOffset] * weight
+        green += temp[tempOffset + 1] * weight
+        blue += temp[tempOffset + 2] * weight
+      }
+
+      const outputOffset = pixelIndex * 3
+      output[outputOffset] = red
+      output[outputOffset + 1] = green
+      output[outputOffset + 2] = blue
+    }
+  }
+
+  return output
+}
+
+function createGaussianKernel(radius: number) {
+  const kernelRadius = Math.max(1, Math.ceil(radius * 2))
+  const sigma = Math.max(0.35, radius / 2)
+  const weights = new Float32Array(kernelRadius * 2 + 1)
+  let total = 0
+
+  for (let index = -kernelRadius; index <= kernelRadius; index += 1) {
+    const weight = Math.exp(-(index * index) / (2 * sigma * sigma))
+    weights[index + kernelRadius] = weight
+    total += weight
+  }
+
+  for (let index = 0; index < weights.length; index += 1) {
+    weights[index] /= total
+  }
+
+  return weights
+}
+
+function sharpenSingleChannel(
+  source: number,
+  blurred: number,
+  amountScale: number,
+  threshold: number,
+) {
+  const detail = source - blurred
+  if (Math.abs(detail) < threshold) return source
+  return clampChannel(source + detail * amountScale)
+}
+
+function getLuminance(red: number, green: number, blue: number) {
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+}
+
 function createRgbChannelLuts(lut: Uint8ClampedArray): ImageEditorCurvesLuts {
   return {
     red: lut,
@@ -262,6 +466,10 @@ function alignPixelByteOffset(offset: number) {
   return Math.max(0, Math.floor(offset / 4) * 4)
 }
 
+function clampInteger(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
 function createLut(resolve: (value: number) => number) {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index <= CHANNEL_MAX; index += 1) {
@@ -269,8 +477,6 @@ function createLut(resolve: (value: number) => number) {
   }
   return lut
 }
-
-const INVERT_LUT = createLut((value) => CHANNEL_MAX - value)
 
 function hueToRgb(p: number, q: number, t: number) {
   let value = t

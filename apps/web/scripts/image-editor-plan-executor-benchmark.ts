@@ -152,16 +152,6 @@ function createBenchmarkLayers(): readonly ImageEditorAdjustmentLayer[] {
       },
     },
     {
-      id: 'benchmark:invert',
-      type: 'adjustment',
-      kind: 'invert',
-      name: 'Benchmark Invert',
-      visible: true,
-      params: {
-        enabled: true,
-      },
-    },
-    {
       id: 'benchmark:threshold',
       type: 'adjustment',
       kind: 'threshold',

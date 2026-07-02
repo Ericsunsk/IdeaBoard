@@ -25,8 +25,8 @@ export type ImageAdjustmentPlanExecutionEvent =
       width: number
       height: number
       pixelCount: number
-      workBytes: number
-      syncThresholdWorkBytes: number
+      workUnits: number
+      syncThresholdWorkUnits: number
     }
   | {
       kind: 'worker-plan-started'

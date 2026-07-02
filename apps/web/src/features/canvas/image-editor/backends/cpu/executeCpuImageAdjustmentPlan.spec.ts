@@ -25,20 +25,20 @@ describe('cpu image adjustment backend', () => {
   it('keeps the in-place execution path available for runtime backends', () => {
     const source = makeImageData([10, 20, 30, 77])
     const plan: ImageAdjustmentPlan = [
-      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) },
+      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) },
     ]
 
     const result = executeCpuImageAdjustmentPlanInPlace(source, plan)
 
     expect(result).toBe(source)
-    expect(pixelValues(source)).toEqual([245, 235, 225, 77])
+    expect(pixelValues(source)).toEqual([20, 30, 40, 77])
   })
 })
 
-function createInvertLut() {
+function createChannelLiftLut() {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
-    lut[index] = 255 - index
+    lut[index] = Math.min(255, index + 10)
   }
   return lut
 }

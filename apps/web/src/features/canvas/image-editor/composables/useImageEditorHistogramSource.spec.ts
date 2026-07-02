@@ -22,14 +22,14 @@ function pixelValues(imageData: ImageData | null) {
   return imageData ? Array.from(imageData.data) : []
 }
 
-function createInvertLayer(id = 'adjustment:invert'): ImageEditorAdjustmentLayer {
+function createThresholdLayer(id = 'adjustment:threshold'): ImageEditorAdjustmentLayer {
   return {
     id,
     type: 'adjustment',
-    kind: 'invert',
-    name: '反相',
+    kind: 'threshold',
+    name: '阈值',
     visible: true,
-    params: { enabled: true },
+    params: { threshold: 20, invert: true },
   }
 }
 
@@ -69,9 +69,9 @@ describe('useImageEditorHistogramSource', () => {
       width: 1,
       height: 1,
     }))
-    const invertLayer = createInvertLayer()
+    const thresholdLayer = createThresholdLayer()
     const curvesLayer = createCurvesLayer()
-    const layers = ref<ImageEditorLayer[]>([invertLayer, curvesLayer, createSourceLayer()])
+    const layers = ref<ImageEditorLayer[]>([thresholdLayer, curvesLayer, createSourceLayer()])
     const selectedAdjustmentLayer = computed(() => curvesLayer)
     const { imageEditorHistogramSource } = useImageEditorHistogramSource({
       isAdjustMode: ref(true),
@@ -80,7 +80,7 @@ describe('useImageEditorHistogramSource', () => {
       previewSource,
     })
 
-    expect(pixelValues(imageEditorHistogramSource.value)).toEqual([245, 235, 225, 255])
+    expect(pixelValues(imageEditorHistogramSource.value)).toEqual([255, 255, 255, 255])
     expect(pixelValues(sourceImageData)).toEqual([10, 20, 30, 255])
   })
 
@@ -91,9 +91,9 @@ describe('useImageEditorHistogramSource', () => {
       width: 1,
       height: 1,
     }))
-    const invertLayer = createInvertLayer()
+    const thresholdLayer = createThresholdLayer()
     const curvesLayer = createCurvesLayer('adjustment:curves', 60)
-    const layers = ref<ImageEditorLayer[]>([invertLayer, curvesLayer, createSourceLayer()])
+    const layers = ref<ImageEditorLayer[]>([thresholdLayer, curvesLayer, createSourceLayer()])
     const selectedAdjustmentLayer = computed(() => layers.value[1] as ImageEditorAdjustmentLayer)
     const { imageEditorHistogramSource } = useImageEditorHistogramSource({
       isAdjustMode: ref(true),
@@ -104,7 +104,7 @@ describe('useImageEditorHistogramSource', () => {
 
     const firstHistogramSource = imageEditorHistogramSource.value
     layers.value = [
-      invertLayer,
+      thresholdLayer,
       createCurvesLayer('adjustment:curves', 20),
       createSourceLayer(),
     ]
@@ -119,11 +119,11 @@ describe('useImageEditorHistogramSource', () => {
       width: 1,
       height: 1,
     }))
-    const firstInvertLayer = createInvertLayer('adjustment:invert:1')
+    const firstThresholdLayer = createThresholdLayer('adjustment:threshold:1')
     const firstCurvesLayer = createCurvesLayer('adjustment:curves:1')
     const secondCurvesLayer = createCurvesLayer('adjustment:curves:2')
     const layers = ref<ImageEditorLayer[]>([
-      firstInvertLayer,
+      firstThresholdLayer,
       firstCurvesLayer,
       secondCurvesLayer,
       createSourceLayer(),
@@ -145,7 +145,7 @@ describe('useImageEditorHistogramSource', () => {
 
     const firstHistogramSource = imageEditorHistogramSource.value
     layers.value = [
-      { ...firstInvertLayer, visible: false },
+      { ...firstThresholdLayer, visible: false },
       firstCurvesLayer,
       secondCurvesLayer,
       createSourceLayer(),

@@ -11,7 +11,7 @@ import {
 } from './executeWorkerImageAdjustmentPlan'
 import type { WorkerImageProcessingRequest, WorkerImageProcessingResponse } from './protocol'
 
-function makeImageData(values: number[]) {
+function makeImageData(values: number[], width = values.length / 4, height = 1) {
   class TestImageData {
     data: Uint8ClampedArray
     width: number
@@ -23,7 +23,7 @@ function makeImageData(values: number[]) {
       this.height = height
     }
   }
-  return new TestImageData(new Uint8ClampedArray(values), values.length / 4, 1) as ImageData
+  return new TestImageData(new Uint8ClampedArray(values), width, height) as ImageData
 }
 
 function pixelValues(imageData: ImageData) {
@@ -42,14 +42,42 @@ function makeGeneratedImageData(pixelCount: number) {
   return makeImageData(values)
 }
 
-function createInvertPlan(): ImageAdjustmentPlan {
-  return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) }]
+function makeGeneratedGridImageData(width: number, height: number) {
+  const values = new Array<number>(width * height * 4)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const offset = (y * width + x) * 4
+      values[offset] = (x * 7 + y * 3) % 256
+      values[offset + 1] = (x * 5 + y * 11) % 256
+      values[offset + 2] = (x * 13 + y * 2) % 256
+      values[offset + 3] = 64 + ((x + y) % 192)
+    }
+  }
+  return makeImageData(values, width, height)
 }
 
-function createInvertLut() {
+function createChannelLutPlan(): ImageAdjustmentPlan {
+  return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) }]
+}
+
+function createSharpenPlan(): ImageAdjustmentPlan {
+  return [
+    {
+      kind: 'sharpen',
+      params: {
+        amount: 140,
+        radius: 1.6,
+        threshold: 3,
+        protectColor: true,
+      },
+    },
+  ]
+}
+
+function createChannelLiftLut() {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
-    lut[index] = 255 - index
+    lut[index] = Math.min(255, index + 10)
   }
   return lut
 }
@@ -68,13 +96,13 @@ describe('worker image adjustment backend', () => {
     const source = makeImageData([10, 20, 30, 77])
     const progress = vi.fn()
 
-    const result = await executeWorkerImageAdjustmentPlan(source, createInvertPlan(), {
+    const result = await executeWorkerImageAdjustmentPlan(source, createChannelLutPlan(), {
       requestId: 'request:success',
       workerFactory: () => worker,
       onProgress: progress,
     })
 
-    expect(pixelValues(result)).toEqual([245, 235, 225, 77])
+    expect(pixelValues(result)).toEqual([20, 30, 40, 77])
     expect(pixelValues(source)).toEqual([10, 20, 30, 77])
     expect(progress).toHaveBeenCalledWith({ phase: 'render', loaded: 0, total: 4 })
     expect(progress).toHaveBeenCalledWith({ phase: 'render', loaded: 4, total: 4 })
@@ -87,7 +115,7 @@ describe('worker image adjustment backend', () => {
   it('matches the CPU executor when worker rendering spans multiple chunks and steps', async () => {
     const source = makeGeneratedImageData(80_000)
     const plan: ImageAdjustmentPlan = [
-      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) },
+      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) },
       { kind: 'threshold', threshold: 128, invert: true },
       {
         kind: 'hsl',
@@ -116,13 +144,34 @@ describe('worker image adjustment backend', () => {
     })
   })
 
+  it('matches the CPU executor for sharpen when worker rendering spans multiple chunks', async () => {
+    const source = makeGeneratedGridImageData(320, 260)
+    const plan = createSharpenPlan()
+    const progress = vi.fn()
+    const expected = executeCpuImageAdjustmentPlanInPlace(cloneImageData(source), plan)
+
+    const result = await executeWorkerImageAdjustmentPlan(source, plan, {
+      requestId: 'request:sharpen-chunk-parity',
+      workerFactory: () => new FakeImageProcessingWorker(),
+      onProgress: progress,
+    })
+
+    expect(pixelValues(result)).toEqual(pixelValues(expected))
+    expect(pixelValues(source)).toEqual(pixelValues(makeGeneratedGridImageData(320, 260)))
+    expect(progress).toHaveBeenCalledWith({
+      phase: 'render',
+      loaded: source.data.length * 3,
+      total: source.data.length * 3,
+    })
+  })
+
   it('cancels between worker render chunks and does not send success after cancellation', async () => {
     const responses: WorkerImageProcessingResponse[] = []
     const transfers: Transferable[][] = []
     const requestId = 'request:cancel-during-render'
     const source = makeGeneratedImageData(80_000)
     const plan: ImageAdjustmentPlan = [
-      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createInvertLut()) },
+      { kind: 'channel-lut', luts: createRgbChannelLutsForTest(createChannelLiftLut()) },
     ]
 
     handleWorkerImageProcessingRequest(
@@ -207,7 +256,7 @@ describe('worker image adjustment backend', () => {
   it('transfers only the worker image data buffer and clones reusable LUT payloads', async () => {
     const worker = new ManualImageProcessingWorker()
     const source = makeImageData([10, 20, 30, 77])
-    const plan = createInvertPlan()
+    const plan = createChannelLutPlan()
     const sourceBuffer = source.data.buffer
     const luts = plan[0]?.kind === 'channel-lut' ? plan[0].luts : null
     const promise = executeWorkerImageAdjustmentPlan(source, plan, {
@@ -245,10 +294,42 @@ describe('worker image adjustment backend', () => {
     expect(pixelValues(source)).toEqual([10, 20, 30, 77])
   })
 
+  it('clones reusable sharpen payloads for worker requests', async () => {
+    const worker = new ManualImageProcessingWorker()
+    const source = makeImageData([10, 20, 30, 77, 200, 210, 220, 88], 2, 1)
+    const plan = createSharpenPlan()
+    const params = plan[0]?.kind === 'sharpen' ? plan[0].params : null
+    const promise = executeWorkerImageAdjustmentPlan(source, plan, {
+      requestId: 'request:sharpen-transfer',
+      workerFactory: () => worker,
+    })
+
+    const executeMessage = worker.messages[0]
+    expect(executeMessage?.type).toBe('execute')
+    if (executeMessage?.type !== 'execute') throw new Error('expected execute message')
+
+    expect(executeMessage.plan[0]?.kind).toBe('sharpen')
+    if (executeMessage.plan[0]?.kind !== 'sharpen') {
+      throw new Error('expected sharpen step')
+    }
+    expect(executeMessage.plan[0].params).toEqual(params)
+    expect(executeMessage.plan[0].params).not.toBe(params)
+
+    worker.emit({
+      type: 'success',
+      requestId: 'request:sharpen-transfer',
+      imageData: makeImageData([5, 6, 7, 8]),
+    })
+
+    await expect(promise).resolves.toSatisfy((imageData: ImageData) => {
+      return pixelValues(imageData).join(',') === '5,6,7,8'
+    })
+  })
+
   it('keeps caller ImageData readable after a transferred worker request fails', async () => {
     const worker = new ManualImageProcessingWorker()
     const source = makeImageData([10, 20, 30, 77])
-    const promise = executeWorkerImageAdjustmentPlan(source, createInvertPlan(), {
+    const promise = executeWorkerImageAdjustmentPlan(source, createChannelLutPlan(), {
       requestId: 'request:transfer-error',
       workerFactory: () => worker,
     })

@@ -1,4 +1,9 @@
-import { executeImageAdjustmentPlanStepRange } from '../../utils/imageAdjustmentEngine'
+import {
+  createImageAdjustmentPlanStepExecutionState,
+  estimateImageAdjustmentPlanStepRangeWorkUnits,
+  estimateImageAdjustmentPlanWorkUnits,
+  executeImageAdjustmentPlanStepRange,
+} from '../../utils/imageAdjustmentEngine'
 import type {
   WorkerImageProcessingErrorPayload,
   WorkerImageProcessingExecuteRequest,
@@ -115,12 +120,13 @@ async function executeWorkerImageAdjustmentPlanInChunks(
     const step = request.plan[stepIndex]
     if (!step) continue
 
+    const state = createImageAdjustmentPlanStepExecutionState(output, step)
     for (let startByte = 0; startByte < output.data.length; startByte += WORKER_RENDER_CHUNK_BYTES) {
       throwIfCancelled(request.requestId)
 
       const endByte = Math.min(startByte + WORKER_RENDER_CHUNK_BYTES, output.data.length)
-      executeImageAdjustmentPlanStepRange(output.data, step, startByte, endByte)
-      loaded += endByte - startByte
+      executeImageAdjustmentPlanStepRange(output.data, step, startByte, endByte, state)
+      loaded += estimateImageAdjustmentPlanStepRangeWorkUnits(output.data, step, startByte, endByte)
       onProgress(createRenderProgress(loaded, total))
 
       await yieldWorkerEventLoop()
@@ -140,7 +146,7 @@ function createRenderProgress(loaded: number, total: number): WorkerImageProcess
 }
 
 function createRenderProgressTotal(request: WorkerImageProcessingExecuteRequest) {
-  return request.imageData.data.length * request.plan.length
+  return estimateImageAdjustmentPlanWorkUnits(request.imageData, request.plan)
 }
 
 function throwIfCancelled(requestId: string) {

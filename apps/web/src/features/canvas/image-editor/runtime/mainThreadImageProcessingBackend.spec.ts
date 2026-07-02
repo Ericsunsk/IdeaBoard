@@ -28,7 +28,7 @@ describe('createMainThreadImageProcessingBackend', () => {
 
     const result = await backend.renderFinal({
       source: { url: 'https://example.com/source.png', title: 'source' },
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       context: createTaskContext(),
     })
 
@@ -40,7 +40,7 @@ describe('createMainThreadImageProcessingBackend', () => {
     expect(result.file.name).toBe('source.png')
     expect(planExecutor.execute).toHaveBeenCalledWith({
       imageData: source.imageData,
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal: expect.any(AbortSignal),
       onProgress: expect.any(Function),
     })
@@ -107,7 +107,7 @@ describe('createMainThreadImageProcessingBackend', () => {
     await expect(
       backend.renderFinal({
         source: { url: 'https://example.com/source.png', title: 'Encode Failure.png' },
-        plan: createInvertPlan(),
+        plan: createChannelLutPlan(),
         context: createTaskContext({ outputPolicy: createImageProcessingOutputPolicy() }),
       }),
     ).rejects.toThrow('Canvas toBlob returned null')
@@ -134,7 +134,7 @@ describe('createMainThreadImageProcessingBackend', () => {
     await expect(
       backend.renderFinal({
         source: { url: 'https://example.com/source.png', title: 'Cancelled.png' },
-        plan: createInvertPlan(),
+        plan: createChannelLutPlan(),
         context: createTaskContext({
           signal: controller.signal,
           outputPolicy: createImageProcessingOutputPolicy(),
@@ -157,14 +157,14 @@ describe('createMainThreadImageProcessingBackend', () => {
 
     const result = await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       context: createTaskContext(),
     })
 
     expect(result.file.name).toBe('image.png')
     expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: new Uint8ClampedArray([245, 235, 225, 255]),
+        data: new Uint8ClampedArray([20, 30, 40, 255]),
       }),
       0,
       0,
@@ -174,13 +174,13 @@ describe('createMainThreadImageProcessingBackend', () => {
   it('renders preview output through the injected plan executor and returns the decoded source', async () => {
     const source = createImageSource('preview-source', [10, 20, 30, 255])
     const sourceCache = createSourceCache({ fullSize: source })
-    const adjusted = makeImageData([245, 235, 225, 255])
+    const adjusted = makeImageData([20, 30, 40, 255])
     const planExecutor = createPlanExecutor(adjusted)
     const backend = createMainThreadImageProcessingBackend({ sourceCache, planExecutor })
 
     const result = await backend.renderPreview({
       source: { url: 'https://example.com/source.png' },
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       sizeStrategy: { maxSide: 960 },
       context: createTaskContext(),
     })
@@ -192,7 +192,7 @@ describe('createMainThreadImageProcessingBackend', () => {
       imageData: expect.objectContaining({
         data: new Uint8ClampedArray([10, 20, 30, 255]),
       }),
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       signal: expect.any(AbortSignal),
       onProgress: expect.any(Function),
     })
@@ -209,7 +209,7 @@ describe('createMainThreadImageProcessingBackend', () => {
   it('decodes preview source without executing a neutral plan', async () => {
     const source = createImageSource('preview-source', [10, 20, 30, 255])
     const sourceCache = createSourceCache({ fullSize: source })
-    const planExecutor = createPlanExecutor(makeImageData([245, 235, 225, 255]))
+    const planExecutor = createPlanExecutor(makeImageData([20, 30, 40, 255]))
     const backend = createMainThreadImageProcessingBackend({ sourceCache, planExecutor })
 
     const result = await backend.renderPreview({
@@ -313,7 +313,7 @@ async function renderFinalWithAdjustedPixels(input: {
 
   const result = await backend.renderFinal({
     source: input.source,
-    plan: createInvertPlan(),
+    plan: createChannelLutPlan(),
     context: createTaskContext({ outputPolicy: createImageProcessingOutputPolicy() }),
   })
 
@@ -422,10 +422,10 @@ class TestImageDataImpl {
   }
 }
 
-function createInvertPlan(): ImageAdjustmentPlan {
+function createChannelLutPlan(): ImageAdjustmentPlan {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
-    lut[index] = 255 - index
+    lut[index] = Math.min(255, index + 10)
   }
   return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(lut) }]
 }

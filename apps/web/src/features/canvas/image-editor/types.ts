@@ -9,9 +9,14 @@ export type ImageEditorTool =
   | 'crop'
   | 'zoom'
 
-export type ImageAdjustmentKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'invert'
+export type ImageAdjustmentKind =
+  | 'hsl'
+  | 'threshold'
+  | 'curves'
+  | 'levels'
+  | 'sharpen'
 
-export type ImageEditorParamValue = number | boolean
+export type ImageEditorParamValue = number
 
 export type ImageEditorHslParams = {
   hue: number
@@ -44,16 +49,20 @@ export type ImageEditorLevelsParams = {
   outputWhite: number
 }
 
-export type ImageEditorInvertParams = {
-  enabled: boolean
+export type ImageEditorSharpenParams = {
+  amount: number
+  radius: number
+  threshold: number
+  protectColor: boolean
 }
 
-export type ImageEditorParamKey = keyof ImageEditorHslParams | keyof ImageEditorInvertParams
+export type ImageEditorParamKey = keyof ImageEditorHslParams
 
 export type ImageEditorAdjustmentWholeParams =
   | ImageEditorThresholdParams
   | ImageEditorCurvesParams
   | ImageEditorLevelsParams
+  | ImageEditorSharpenParams
 
 export type ImageEditorSourceLayer = {
   id: string
@@ -110,13 +119,13 @@ export type ImageEditorLevelsLayer = {
   params: ImageEditorLevelsParams
 }
 
-export type ImageEditorInvertLayer = {
+export type ImageEditorSharpenLayer = {
   id: string
   type: 'adjustment'
-  kind: 'invert'
+  kind: 'sharpen'
   name: string
   visible: boolean
-  params: ImageEditorInvertParams
+  params: ImageEditorSharpenParams
 }
 
 export type ImageEditorAdjustmentLayer =
@@ -124,7 +133,7 @@ export type ImageEditorAdjustmentLayer =
   | ImageEditorThresholdLayer
   | ImageEditorCurvesLayer
   | ImageEditorLevelsLayer
-  | ImageEditorInvertLayer
+  | ImageEditorSharpenLayer
 
 export type ImageEditorMergedLayer = {
   id: string

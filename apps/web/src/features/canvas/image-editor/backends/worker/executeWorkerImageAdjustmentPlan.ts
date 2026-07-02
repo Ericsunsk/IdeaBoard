@@ -252,6 +252,11 @@ function cloneImageAdjustmentPlanForWorker(plan: ImageAdjustmentPlan): ImageAdju
             blue: new Uint8ClampedArray(step.luts.blue),
           },
         }
+      case 'sharpen':
+        return {
+          kind: 'sharpen',
+          params: { ...step.params },
+        }
     }
   })
 }

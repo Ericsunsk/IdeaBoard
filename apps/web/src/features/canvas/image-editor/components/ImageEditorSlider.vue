@@ -7,8 +7,8 @@
         type="number"
         :min="min"
         :max="max"
-        step="1"
-        inputmode="numeric"
+        :step="normalizedStep"
+        :inputmode="inputMode"
         :aria-label="`${label}数值`"
         :value="value"
         @input="onInput"
@@ -20,7 +20,7 @@
       type="range"
       :min="min"
       :max="max"
-      step="1"
+      :step="normalizedStep"
       :value="value"
       :aria-label="`${label}滑块`"
       @input="onInput"
@@ -39,6 +39,7 @@ const props = defineProps<{
   value: number
   min: number
   max: number
+  step?: number
   trackVariant?: ImageEditorSliderTrackVariant
 }>()
 
@@ -51,11 +52,32 @@ const rangeClass = computed(() => ({
   'editing-controls-slider-row__range--tonal': props.trackVariant === 'tonal',
   'editing-controls-slider-row__range--tonal-reverse': props.trackVariant === 'tonal-reverse',
 }))
+const normalizedStep = computed(() => normalizeStep(props.step))
+const inputMode = computed(() => (normalizedStep.value >= 1 ? 'numeric' : 'decimal'))
 
 function onInput(event: Event) {
   const value = readFiniteNumberInputValue(event)
   if (value == null) return
-  emit('update:value', Math.min(props.max, Math.max(props.min, Math.round(value))))
+  emit('update:value', normalizeValue(value, props.min, props.max, normalizedStep.value))
+}
+
+function normalizeStep(step: number | undefined) {
+  if (step === undefined || !Number.isFinite(step) || step <= 0) return 1
+  return step
+}
+
+function normalizeValue(value: number, min: number, max: number, step: number) {
+  const clamped = Math.min(max, Math.max(min, value))
+  if (step >= 1 && Number.isInteger(step)) return Math.round(clamped)
+
+  const offsetSteps = Math.round((clamped - min) / step)
+  const stepped = min + offsetSteps * step
+  return Number(Math.min(max, Math.max(min, stepped)).toFixed(resolveDecimalPlaces(step)))
+}
+
+function resolveDecimalPlaces(step: number) {
+  const [, fraction = ''] = step.toString().split('.')
+  return fraction.length
 }
 </script>
 

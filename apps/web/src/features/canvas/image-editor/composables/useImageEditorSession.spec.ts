@@ -184,6 +184,24 @@ describe('useImageEditorSession', () => {
         },
       },
     })
+
+    session.selectImageAdjustmentLayer('sharpen')
+    session.updateSelectedImageEditorAdjustmentParams({
+      amount: 80,
+      radius: 1.5,
+      threshold: 7,
+      protectColor: false,
+    })
+
+    expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
+      kind: 'sharpen',
+      params: {
+        amount: 80,
+        radius: 1.5,
+        threshold: 7,
+        protectColor: false,
+      },
+    })
   })
 
   it('keeps simple adjustment params on the field-level API', () => {
@@ -193,13 +211,6 @@ describe('useImageEditorSession', () => {
     expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
       kind: 'hsl',
       params: { lightness: 25 },
-    })
-
-    session.selectImageAdjustmentLayer('invert')
-    session.updateSelectedImageEditorLayerParam('enabled', false)
-    expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
-      kind: 'invert',
-      params: { enabled: false },
     })
   })
 })

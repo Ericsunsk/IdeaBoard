@@ -21,14 +21,14 @@ function pixelValues(imageData: ImageData | null) {
   return imageData ? Array.from(imageData.data) : []
 }
 
-function createInvertLayer(id = 'adjustment:invert'): ImageEditorAdjustmentLayer {
+function createThresholdLayer(id = 'adjustment:threshold'): ImageEditorAdjustmentLayer {
   return {
     id,
     type: 'adjustment',
-    kind: 'invert',
-    name: '反相',
+    kind: 'threshold',
+    name: '阈值',
     visible: true,
-    params: { enabled: true },
+    params: { threshold: 20, invert: true },
   }
 }
 
@@ -62,9 +62,9 @@ function createSourceLayer(): ImageEditorLayer {
 describe('resolveImageEditorHistogramSource', () => {
   it('renders visible upstream adjustment layers for the target adjustment layer', () => {
     const sourceImageData = makeImageData([10, 20, 30, 255])
-    const invertLayer = createInvertLayer()
+    const thresholdLayer = createThresholdLayer()
     const curvesLayer = createCurvesLayer()
-    const layers = [invertLayer, curvesLayer, createSourceLayer()]
+    const layers = [thresholdLayer, curvesLayer, createSourceLayer()]
 
     const resolution = resolveImageEditorHistogramSource({
       sourceImageData,
@@ -72,22 +72,22 @@ describe('resolveImageEditorHistogramSource', () => {
       targetLayerId: curvesLayer.id,
     })
 
-    expect(pixelValues(resolution.imageData)).toEqual([245, 235, 225, 255])
+    expect(pixelValues(resolution.imageData)).toEqual([255, 255, 255, 255])
     expect(pixelValues(sourceImageData)).toEqual([10, 20, 30, 255])
   })
 
   it('reuses cached output when the selected layer changes but upstream refs stay the same', () => {
     const sourceImageData = makeImageData([10, 20, 30, 255])
-    const invertLayer = createInvertLayer()
+    const thresholdLayer = createThresholdLayer()
     const firstCurvesLayer = createCurvesLayer('adjustment:curves', 60)
-    const firstLayers = [invertLayer, firstCurvesLayer, createSourceLayer()]
+    const firstLayers = [thresholdLayer, firstCurvesLayer, createSourceLayer()]
     const cachedResolution = resolveImageEditorHistogramSource({
       sourceImageData,
       layers: firstLayers,
       targetLayerId: firstCurvesLayer.id,
     })
     const nextCurvesLayer = createCurvesLayer('adjustment:curves', 20)
-    const nextLayers = [invertLayer, nextCurvesLayer, createSourceLayer()]
+    const nextLayers = [thresholdLayer, nextCurvesLayer, createSourceLayer()]
 
     const nextResolution = resolveImageEditorHistogramSource({
       sourceImageData,
@@ -101,17 +101,17 @@ describe('resolveImageEditorHistogramSource', () => {
 
   it('recomputes when an upstream layer ref changes', () => {
     const sourceImageData = makeImageData([10, 20, 30, 255])
-    const invertLayer = createInvertLayer()
+    const thresholdLayer = createThresholdLayer()
     const curvesLayer = createCurvesLayer()
     const cachedResolution = resolveImageEditorHistogramSource({
       sourceImageData,
-      layers: [invertLayer, curvesLayer, createSourceLayer()],
+      layers: [thresholdLayer, curvesLayer, createSourceLayer()],
       targetLayerId: curvesLayer.id,
     })
 
     const nextResolution = resolveImageEditorHistogramSource({
       sourceImageData,
-      layers: [{ ...invertLayer, visible: false }, curvesLayer, createSourceLayer()],
+      layers: [{ ...thresholdLayer, visible: false }, curvesLayer, createSourceLayer()],
       targetLayerId: curvesLayer.id,
       cachedResolution,
     })

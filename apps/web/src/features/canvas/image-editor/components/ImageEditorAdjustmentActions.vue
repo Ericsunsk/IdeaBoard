@@ -19,7 +19,7 @@ import type { Component } from 'vue'
 import {
   Brightness,
   ColorFilter,
-  MaskSquare,
+  PrecisionTool,
   ReportsSolid,
   SineWave,
 } from '@iconoir/vue'
@@ -41,7 +41,7 @@ const actionItems: Array<{
 }> = [
   { kind: 'threshold', label: '阈值', icon: Brightness },
   { kind: 'hsl', label: '色相/饱和度', icon: ColorFilter },
-  { kind: 'invert', label: '反相', icon: MaskSquare },
+  { kind: 'sharpen', label: '锐化', icon: PrecisionTool },
   { kind: 'curves', label: '曲线', icon: SineWave },
   { kind: 'levels', label: '色阶', icon: ReportsSolid },
 ]

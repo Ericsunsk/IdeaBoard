@@ -3,8 +3,8 @@ import type {
   ImageEditorAdjustmentLayer,
   ImageEditorCurvesParams,
   ImageEditorHslParams,
-  ImageEditorInvertParams,
   ImageEditorLevelsParams,
+  ImageEditorSharpenParams,
   ImageEditorThresholdParams,
 } from '../types'
 import { normalizeCurvesParams, type NormalizedCurvesAdjustment } from './imageEditorCurves'
@@ -31,8 +31,11 @@ export type NormalizedHslAdjustment = {
   lightnessOffset: number
 }
 
-export type NormalizedInvertAdjustment = {
-  enabled: boolean
+export type NormalizedSharpenAdjustment = {
+  amount: number
+  radius: number
+  threshold: number
+  protectColor: boolean
 }
 
 export type NormalizedImageAdjustment =
@@ -40,14 +43,14 @@ export type NormalizedImageAdjustment =
   | { kind: 'threshold'; params: NormalizedThresholdAdjustment }
   | { kind: 'curves'; params: NormalizedCurvesAdjustment }
   | { kind: 'levels'; params: NormalizedLevelsAdjustment }
-  | { kind: 'invert'; params: NormalizedInvertAdjustment }
+  | { kind: 'sharpen'; params: NormalizedSharpenAdjustment }
 
 type ImageAdjustmentDefaultsByKind = {
   hsl: ImageEditorHslParams
   threshold: ImageEditorThresholdParams
   curves: ImageEditorCurvesParams
   levels: ImageEditorLevelsParams
-  invert: ImageEditorInvertParams
+  sharpen: ImageEditorSharpenParams
 }
 
 type ImageAdjustmentRangeByKind = {
@@ -55,7 +58,7 @@ type ImageAdjustmentRangeByKind = {
   threshold: Record<'threshold', ImageAdjustmentNumberRange>
   curves: Record<string, never>
   levels: Record<keyof ImageEditorLevelsParams, ImageAdjustmentNumberRange>
-  invert: Record<string, never>
+  sharpen: Record<Exclude<keyof ImageEditorSharpenParams, 'protectColor'>, ImageAdjustmentNumberRange>
 }
 
 type ImageAdjustmentDefinitionByKind = {
@@ -83,11 +86,11 @@ type ImageAdjustmentDefinitionByKind = {
     normalize: (params: ImageEditorLevelsParams) => NormalizedLevelsAdjustment
     isNeutral: (params: NormalizedLevelsAdjustment) => boolean
   }
-  invert: {
-    defaults: ImageAdjustmentDefaultsByKind['invert']
-    ranges: ImageAdjustmentRangeByKind['invert']
-    normalize: (params: ImageEditorInvertParams) => NormalizedInvertAdjustment
-    isNeutral: (params: NormalizedInvertAdjustment) => boolean
+  sharpen: {
+    defaults: ImageAdjustmentDefaultsByKind['sharpen']
+    ranges: ImageAdjustmentRangeByKind['sharpen']
+    normalize: (params: ImageEditorSharpenParams) => NormalizedSharpenAdjustment
+    isNeutral: (params: NormalizedSharpenAdjustment) => boolean
   }
 }
 
@@ -108,6 +111,12 @@ const LEVELS_RANGES = {
   outputBlack: { label: '输出黑场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 0 },
   outputWhite: { label: '输出白场', min: CHANNEL_MIN, max: CHANNEL_MAX, defaultValue: 255 },
 } satisfies ImageAdjustmentRangeByKind['levels']
+
+const SHARPEN_RANGES = {
+  amount: { label: '数量', min: 0, max: 200, defaultValue: 0 },
+  radius: { label: '半径', min: 0.3, max: 5, defaultValue: 1 },
+  threshold: { label: '阈值', min: 0, max: 50, defaultValue: 4 },
+} satisfies ImageAdjustmentRangeByKind['sharpen']
 
 export const IMAGE_ADJUSTMENT_DEFINITIONS: ImageAdjustmentDefinitionByKind = {
   hsl: {
@@ -134,11 +143,11 @@ export const IMAGE_ADJUSTMENT_DEFINITIONS: ImageAdjustmentDefinitionByKind = {
     normalize: normalizeLevelsAdjustment,
     isNeutral: isNeutralLevelsAdjustment,
   },
-  invert: {
-    defaults: { enabled: true },
-    ranges: {},
-    normalize: normalizeInvertAdjustment,
-    isNeutral: isNeutralInvertAdjustment,
+  sharpen: {
+    defaults: { amount: 0, radius: 1, threshold: 4, protectColor: true },
+    ranges: SHARPEN_RANGES,
+    normalize: normalizeSharpenAdjustment,
+    isNeutral: isNeutralSharpenAdjustment,
   },
 }
 
@@ -169,10 +178,10 @@ export function normalizeImageAdjustmentLayer(
         kind: 'levels',
         params: IMAGE_ADJUSTMENT_DEFINITIONS.levels.normalize(layer.params),
       }
-    case 'invert':
+    case 'sharpen':
       return {
-        kind: 'invert',
-        params: IMAGE_ADJUSTMENT_DEFINITIONS.invert.normalize(layer.params),
+        kind: 'sharpen',
+        params: IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(layer.params),
       }
   }
 }
@@ -187,8 +196,8 @@ export function isNeutralImageAdjustment(adjustment: NormalizedImageAdjustment) 
       return IMAGE_ADJUSTMENT_DEFINITIONS.curves.isNeutral(adjustment.params)
     case 'levels':
       return IMAGE_ADJUSTMENT_DEFINITIONS.levels.isNeutral(adjustment.params)
-    case 'invert':
-      return IMAGE_ADJUSTMENT_DEFINITIONS.invert.isNeutral(adjustment.params)
+    case 'sharpen':
+      return IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.isNeutral(adjustment.params)
   }
 }
 
@@ -201,9 +210,13 @@ function normalizeHslAdjustment(params: ImageEditorHslParams): NormalizedHslAdju
   }
 }
 
-function normalizeInvertAdjustment(params: ImageEditorInvertParams): NormalizedInvertAdjustment {
+function normalizeSharpenAdjustment(params: ImageEditorSharpenParams): NormalizedSharpenAdjustment {
+  const ranges = IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.ranges
   return {
-    enabled: params.enabled === true,
+    amount: clampToRange(params.amount, ranges.amount),
+    radius: clampToRange(params.radius, ranges.radius),
+    threshold: clampToRange(params.threshold, ranges.threshold),
+    protectColor: params.protectColor !== false,
   }
 }
 
@@ -233,8 +246,8 @@ function isNeutralLevelsAdjustment(params: NormalizedLevelsAdjustment) {
   )
 }
 
-function isNeutralInvertAdjustment(params: NormalizedInvertAdjustment) {
-  return !params.enabled
+function isNeutralSharpenAdjustment(params: NormalizedSharpenAdjustment) {
+  return params.amount === 0
 }
 
 function clampToRange(value: number, range: ImageAdjustmentNumberRange) {
@@ -262,9 +275,9 @@ export function getImageAdjustmentDefaultParams<TKind extends ImageAdjustmentKin
       return {
         ...IMAGE_ADJUSTMENT_DEFINITIONS.levels.defaults,
       } as ImageAdjustmentDefaultsByKind[TKind]
-    case 'invert':
+    case 'sharpen':
       return {
-        ...IMAGE_ADJUSTMENT_DEFINITIONS.invert.defaults,
+        ...IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.defaults,
       } as ImageAdjustmentDefaultsByKind[TKind]
     default:
       return assertNever(kind)

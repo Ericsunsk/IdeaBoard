@@ -17,15 +17,6 @@ const ANIMATED_WEBP_BYTES = new Uint8Array([
   0x00, 0x00, 0x00, 0x00,
 ])
 
-const invertLayer: ImageEditorAdjustmentLayer = {
-  id: 'adjustment:invert',
-  type: 'adjustment',
-  kind: 'invert',
-  name: '反相 1',
-  visible: true,
-  params: { enabled: true },
-}
-
 const hslLayer: ImageEditorAdjustmentLayer = {
   id: 'adjustment:hsl',
   type: 'adjustment',
@@ -64,6 +55,15 @@ const levelsLayer: ImageEditorAdjustmentLayer = {
   name: '色阶 1',
   visible: true,
   params: { shadows: 20, midtones: 112, highlights: 235, outputBlack: 0, outputWhite: 255 },
+}
+
+const sharpenLayer: ImageEditorAdjustmentLayer = {
+  id: 'adjustment:sharpen',
+  type: 'adjustment',
+  kind: 'sharpen',
+  name: '锐化 1',
+  visible: true,
+  params: { amount: 120, radius: 1.5, threshold: 4, protectColor: true },
 }
 
 function createRuntimeMock(
@@ -153,7 +153,7 @@ describe('renderImageAdjustmentFile', () => {
       createRuntimeMock(renderFinal),
     )
 
-    await renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [invertLayer])
+    await renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [thresholdLayer])
 
     expect(renderFinal).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -179,7 +179,7 @@ describe('renderImageAdjustmentFile', () => {
 
     await renderImageAdjustmentFile(
       { url: 'https://example.com/source.png', title: 'Sample.png' },
-      [invertLayer],
+      [thresholdLayer],
       {
         scopeId: 'node-1',
         onProgress,
@@ -197,7 +197,7 @@ describe('renderImageAdjustmentFile', () => {
   })
 
   it('passes the compiled adjustment plan to final rendering without a separate final normalization path', async () => {
-    const layers = [hslLayer, curvesLayer, levelsLayer, thresholdLayer, invertLayer]
+    const layers = [hslLayer, curvesLayer, levelsLayer, sharpenLayer, thresholdLayer]
     const renderFinal = vi.fn<ImageProcessingRuntime['renderFinal']>(async () => ({
       status: 'completed',
       taskId: IMAGE_ADJUSTMENT_FINAL_TASK_ID,
@@ -246,7 +246,7 @@ describe('renderImageAdjustmentFile', () => {
 
     const result = await renderImageAdjustmentFile(
       { url: 'https://example.com/source.png', title: 'Sample.png' },
-      [invertLayer],
+      [thresholdLayer],
     )
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -261,7 +261,7 @@ describe('renderImageAdjustmentFile', () => {
   it('rejects empty visible adjustment stacks', async () => {
     await expect(
       renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
-        { ...invertLayer, visible: false },
+        { ...thresholdLayer, visible: false },
       ]),
     ).rejects.toThrow('没有可应用的编辑图层')
   })
@@ -269,7 +269,7 @@ describe('renderImageAdjustmentFile', () => {
   it('rejects visually neutral adjustment stacks before loading the image', async () => {
     await expect(
       renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [
-        { ...invertLayer, params: { enabled: false } },
+        { ...hslLayer, params: { hue: 0, saturation: 0, lightness: 0 } },
       ]),
     ).rejects.toThrow('没有可应用的编辑图层')
     expect(fetchMock).not.toHaveBeenCalled()
@@ -290,7 +290,7 @@ describe('renderImageAdjustmentFile', () => {
     )
 
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [invertLayer]),
+      renderImageAdjustmentFile({ url: 'https://example.com/source.png' }, [thresholdLayer]),
     ).rejects.toThrow('渲染服务暂不可用')
   })
 
@@ -303,7 +303,7 @@ describe('renderImageAdjustmentFile', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.gif' }, [invertLayer]),
+      renderImageAdjustmentFile({ url: 'https://example.com/source.gif' }, [thresholdLayer]),
     ).rejects.toThrow('暂不支持编辑动图')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })
@@ -317,7 +317,7 @@ describe('renderImageAdjustmentFile', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
-      renderImageAdjustmentFile({ url: 'https://example.com/source.webp' }, [invertLayer]),
+      renderImageAdjustmentFile({ url: 'https://example.com/source.webp' }, [thresholdLayer]),
     ).rejects.toThrow('暂不支持编辑动图')
     expect(createImageBitmapMock).not.toHaveBeenCalled()
   })

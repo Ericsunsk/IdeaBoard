@@ -54,9 +54,9 @@ import {
   Eye,
   EyeClosed,
   Lock,
-  MaskSquare,
   MediaImage,
   EditPencil,
+  PrecisionTool,
   ReportsSolid,
   SineWave,
   VerticalMerge,
@@ -114,7 +114,12 @@ function resolveLayerIcon(layer: ImageEditorLayer): Component {
   if (layer.kind === 'threshold') return Brightness
   if (layer.kind === 'curves') return SineWave
   if (layer.kind === 'levels') return ReportsSolid
-  return MaskSquare
+  if (layer.kind === 'sharpen') return PrecisionTool
+  return assertNever(layer)
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled image editor layer kind: ${String(value)}`)
 }
 
 onBeforeUnmount(clearLayerListScrollTimer)
@@ -233,14 +238,10 @@ onBeforeUnmount(clearLayerListScrollTimer)
 }
 
 .image-editor-layer-row__thumb.kind-curves,
-.image-editor-layer-row__thumb.kind-levels {
+.image-editor-layer-row__thumb.kind-levels,
+.image-editor-layer-row__thumb.kind-sharpen {
   color: var(--canvas-text-body);
   background: var(--canvas-surface-muted);
-}
-
-.image-editor-layer-row__thumb.kind-invert {
-  color: #ffffff;
-  background: var(--canvas-text-strong);
 }
 
 .image-editor-layer-row__thumb.kind-paint {

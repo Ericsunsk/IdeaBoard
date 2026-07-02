@@ -5,7 +5,6 @@ import type {
   ImageEditorCurvesParams,
   ImageEditorEditableLayer,
   ImageEditorHslParams,
-  ImageEditorInvertParams,
   ImageEditorLayer,
   ImageEditorLayerByKind,
   ImageEditorLevelsParams,
@@ -13,9 +12,13 @@ import type {
   ImageEditorPaintLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
+  ImageEditorSharpenParams,
   ImageEditorThresholdParams,
 } from '../types'
-import { getImageAdjustmentDefaultParams } from './imageAdjustmentDefinitions'
+import {
+  IMAGE_ADJUSTMENT_DEFINITIONS,
+  getImageAdjustmentDefaultParams,
+} from './imageAdjustmentDefinitions'
 import { normalizeCurvesParams } from './imageEditorCurves'
 import { clampLevelsHandles } from './imageEditorLevels'
 import { normalizeThresholdAdjustment } from './imageEditorThreshold'
@@ -60,13 +63,13 @@ const DEFAULT_ADJUSTMENT_LAYER_BY_KIND: {
     visible: true,
     params: getImageAdjustmentDefaultParams('levels'),
   },
-  invert: {
-    id: 'adjustment:invert',
+  sharpen: {
+    id: 'adjustment:sharpen',
     type: 'adjustment',
-    kind: 'invert',
-    name: '反相 1',
+    kind: 'sharpen',
+    name: '锐化 1',
     visible: true,
-    params: getImageAdjustmentDefaultParams('invert'),
+    params: getImageAdjustmentDefaultParams('sharpen'),
   },
 }
 
@@ -399,11 +402,7 @@ function updateAdjustmentLayerParam(
     case 'threshold':
     case 'curves':
     case 'levels':
-      return layer
-    case 'invert':
-      if (key === 'enabled' && typeof value === 'boolean') {
-        return { ...layer, params: { ...layer.params, enabled: value } }
-      }
+    case 'sharpen':
       return layer
   }
 }
@@ -414,7 +413,6 @@ function updateAdjustmentLayerParams(
 ): ImageEditorAdjustmentLayer {
   switch (layer.kind) {
     case 'hsl':
-    case 'invert':
       return layer
     case 'threshold':
       if (isThresholdParams(params)) {
@@ -431,6 +429,11 @@ function updateAdjustmentLayerParams(
         return { ...layer, params: cloneLevelsParams(params) }
       }
       return layer
+    case 'sharpen':
+      if (isSharpenParams(params)) {
+        return { ...layer, params: cloneSharpenParams(params) }
+      }
+      return layer
   }
 }
 
@@ -440,9 +443,10 @@ function cloneAdjustmentParams(
     | ImageEditorThresholdParams
     | ImageEditorCurvesParams
     | ImageEditorLevelsParams
-    | ImageEditorInvertParams,
+    | ImageEditorSharpenParams,
 ) {
   if ('channels' in params) return cloneCurvesParams(params)
+  if ('amount' in params) return cloneSharpenParams(params)
   if ('threshold' in params) return cloneThresholdParams(params)
   if ('shadows' in params) return cloneLevelsParams(params)
   return { ...params }
@@ -475,10 +479,14 @@ function cloneLevelsParams(params: ImageEditorLevelsParams): ImageEditorLevelsPa
   return clampLevelsHandles(params)
 }
 
+function cloneSharpenParams(params: ImageEditorSharpenParams): ImageEditorSharpenParams {
+  return IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(params)
+}
+
 function isThresholdParams(
   params: ImageEditorAdjustmentWholeParams,
 ): params is ImageEditorThresholdParams {
-  return 'threshold' in params
+  return 'threshold' in params && 'invert' in params
 }
 
 function isCurvesParams(
@@ -491,4 +499,10 @@ function isLevelsParams(
   params: ImageEditorAdjustmentWholeParams,
 ): params is ImageEditorLevelsParams {
   return 'shadows' in params
+}
+
+function isSharpenParams(
+  params: ImageEditorAdjustmentWholeParams,
+): params is ImageEditorSharpenParams {
+  return 'amount' in params
 }

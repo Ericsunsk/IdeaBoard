@@ -1,5 +1,8 @@
 import { cloneImageData } from '../utils/imageDataUtils'
 import {
+  createImageAdjustmentPlanStepExecutionState,
+  estimateImageAdjustmentPlanStepRangeWorkUnits,
+  estimateImageAdjustmentPlanWorkUnits,
   executeImageAdjustmentPlanStepRange,
   type ImageAdjustmentPlan,
 } from '../utils/imageAdjustmentEngine'
@@ -22,7 +25,7 @@ export async function executeCooperativeCpuImageAdjustmentPlan(
   throwIfAborted(input.signal)
 
   const output = cloneImageData(input.imageData)
-  const total = createPlanWorkBytes(output, input.plan)
+  const total = createPlanWorkUnits(output, input.plan)
   let loaded = 0
   let frameStartedAt = input.now()
   input.onProgress?.({ phase: 'render', loaded, total })
@@ -30,12 +33,18 @@ export async function executeCooperativeCpuImageAdjustmentPlan(
   if (total === 0) return output
 
   for (const step of input.plan) {
+    const state = createImageAdjustmentPlanStepExecutionState(output, step)
     for (let startByte = 0; startByte < output.data.length; startByte += input.chunkBytes) {
       throwIfAborted(input.signal)
 
       const endByte = Math.min(startByte + input.chunkBytes, output.data.length)
-      executeImageAdjustmentPlanStepRange(output.data, step, startByte, endByte)
-      loaded += endByte - startByte
+      executeImageAdjustmentPlanStepRange(output.data, step, startByte, endByte, state)
+      loaded += estimateImageAdjustmentPlanStepRangeWorkUnits(
+        output.data,
+        step,
+        startByte,
+        endByte,
+      )
       input.onProgress?.({ phase: 'render', loaded, total })
       throwIfAborted(input.signal)
 
@@ -50,8 +59,8 @@ export async function executeCooperativeCpuImageAdjustmentPlan(
   return output
 }
 
-export function createPlanWorkBytes(imageData: ImageData, plan: ImageAdjustmentPlan) {
-  return Math.max(0, imageData.data.length * plan.length)
+export function createPlanWorkUnits(imageData: ImageData, plan: ImageAdjustmentPlan) {
+  return Math.max(0, estimateImageAdjustmentPlanWorkUnits(imageData, plan))
 }
 
 export function throwIfAborted(signal: AbortSignal) {

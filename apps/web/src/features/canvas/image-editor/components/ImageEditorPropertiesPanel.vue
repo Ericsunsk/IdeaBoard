@@ -51,15 +51,11 @@
       />
     </div>
 
-    <div v-else-if="adjustmentLayer?.kind === 'invert'" class="editing-controls-panel__body">
-      <label class="editing-controls-toggle-row">
-        <span>启用反相</span>
-        <input
-          type="checkbox"
-          :checked="adjustmentLayer.params.enabled"
-          @change="onBooleanInput('enabled', $event)"
-        />
-      </label>
+    <div v-else-if="adjustmentLayer?.kind === 'sharpen'" class="editing-controls-panel__body">
+      <ImageEditorSharpenControl
+        :params="adjustmentLayer.params"
+        @update:params="emit('update-params', $event)"
+      />
     </div>
 
     <div v-else class="editing-controls-empty-state">选择一个编辑图层</div>
@@ -75,6 +71,7 @@ import type {
 } from '../types'
 import ImageEditorCurvesControl from './ImageEditorCurvesControl.vue'
 import ImageEditorLevelsControl from './ImageEditorLevelsControl.vue'
+import ImageEditorSharpenControl from './ImageEditorSharpenControl.vue'
 import ImageEditorSlider from './ImageEditorSlider.vue'
 import ImageEditorThresholdControl from './ImageEditorThresholdControl.vue'
 import { IMAGE_ADJUSTMENT_DEFINITIONS } from '../utils/imageAdjustmentDefinitions'
@@ -90,11 +87,6 @@ const emit = defineEmits<{
 }>()
 
 const ranges = IMAGE_ADJUSTMENT_DEFINITIONS
-
-function onBooleanInput(key: ImageEditorParamKey, event: Event) {
-  const target = event.target as HTMLInputElement | null
-  emit('update-param', key, !!target?.checked)
-}
 </script>
 
 <style src="../../components/styles/editing-controls.css"></style>

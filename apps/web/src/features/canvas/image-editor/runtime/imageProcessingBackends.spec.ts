@@ -37,14 +37,14 @@ describe('image processing backend factories', () => {
 
     await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       context: createTaskContext(),
     })
 
     expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
     expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: new Uint8ClampedArray([245, 235, 225, 255]),
+        data: new Uint8ClampedArray([20, 30, 40, 255]),
       }),
       0,
       0,
@@ -71,7 +71,7 @@ describe('image processing backend factories', () => {
 
     await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       context: createTaskContext(),
     })
     backend.dispose?.()
@@ -102,14 +102,14 @@ describe('image processing backend factories', () => {
 
     await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       context: createTaskContext(),
     })
 
     expect(executeWorkerImageAdjustmentPlanMock).not.toHaveBeenCalled()
     expect(source.context.putImageData).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: new Uint8ClampedArray([245, 235, 225, 255]),
+        data: new Uint8ClampedArray([20, 30, 40, 255]),
       }),
       0,
       0,
@@ -125,7 +125,7 @@ describe('image processing backend factories', () => {
 
     await backend.renderFinal({
       source: { url: 'https://example.com/source.png' },
-      plan: createInvertPlan(),
+      plan: createChannelLutPlan(),
       context: createTaskContext(),
     })
 
@@ -239,10 +239,10 @@ function makeImageData(values: number[]): ImageData {
   return new TestImageDataImpl(new Uint8ClampedArray(values), values.length / 4, 1) as ImageData
 }
 
-function createInvertPlan(): ImageAdjustmentPlan {
+function createChannelLutPlan(): ImageAdjustmentPlan {
   const lut = new Uint8ClampedArray(256)
   for (let index = 0; index < lut.length; index += 1) {
-    lut[index] = 255 - index
+    lut[index] = Math.min(255, index + 10)
   }
   return [{ kind: 'channel-lut', luts: createRgbChannelLutsForTest(lut) }]
 }
