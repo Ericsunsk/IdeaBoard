@@ -43,7 +43,7 @@ const hslLayer: ImageEditorAdjustmentLayer = {
   kind: 'hsl',
   name: '色相/饱和度 1',
   visible: true,
-  params: { hue: 0, saturation: 0, brightness: 0, contrast: 0 },
+  params: { hue: 0, saturation: 0, lightness: 0 },
 }
 
 const thresholdLayer: ImageEditorAdjustmentLayer = {
@@ -138,7 +138,6 @@ describe('imageAdjustmentEngine', () => {
           hueShift: 120 / 360,
           saturationScale: 0.75,
           lightnessOffset: 0.1,
-          contrastFactor: 1.2,
         },
       },
     ]
@@ -239,14 +238,14 @@ describe('imageAdjustmentEngine', () => {
     expect(pixelValues(result)).toEqual([0, 0, 255, 255])
   })
 
-  it('applies hue and brightness adjustments', () => {
+  it('applies hue and lightness adjustments', () => {
     const source = makeImageData([255, 0, 0, 255])
 
     const result = applyImageAdjustments(source, [
-      makeLayer(hslLayer, { params: { hue: 120, saturation: 0, brightness: 0, contrast: 0 } }),
+      makeLayer(hslLayer, { params: { hue: 120, saturation: 0, lightness: 10 } }),
     ])
 
-    expect(pixelValues(result)).toEqual([0, 255, 0, 255])
+    expect(pixelValues(result)).toEqual([51, 255, 51, 255])
   })
 
   it('applies non-commutative layers in declared order', () => {
@@ -299,8 +298,7 @@ describe('imageAdjustmentEngine', () => {
         params: {
           hue: Number.NaN,
           saturation: Number.POSITIVE_INFINITY,
-          brightness: Number.NEGATIVE_INFINITY,
-          contrast: Number.NaN,
+          lightness: Number.NEGATIVE_INFINITY,
         },
       }),
       makeLayer(curvesLayer, {
@@ -331,8 +329,7 @@ describe('imageAdjustmentEngine', () => {
         params: {
           hue: Number.NaN,
           saturation: Number.POSITIVE_INFINITY,
-          brightness: Number.NEGATIVE_INFINITY,
-          contrast: 24,
+          lightness: Number.NEGATIVE_INFINITY,
         },
       }),
     )
@@ -342,12 +339,11 @@ describe('imageAdjustmentEngine', () => {
 
     expect(normalizedHsl.kind).toBe('hsl')
     if (normalizedHsl.kind !== 'hsl') throw new Error('expected hsl adjustment')
-    expect(normalizedHsl.params).toMatchObject({
+    expect(normalizedHsl.params).toEqual({
       hueShift: 0,
       saturationScale: 1,
       lightnessOffset: 0,
     })
-    expect(normalizedHsl.params.contrastFactor).toBeCloseTo(1.62366026289181)
     expect(normalizedThreshold.params).toEqual({ threshold: 128, invert: true })
   })
 })

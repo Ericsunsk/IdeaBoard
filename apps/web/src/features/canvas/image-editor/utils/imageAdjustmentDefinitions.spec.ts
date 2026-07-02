@@ -13,8 +13,7 @@ describe('imageAdjustmentDefinitions', () => {
     expect(getImageAdjustmentDefaultParams('hsl')).toEqual({
       hue: 0,
       saturation: 0,
-      brightness: 0,
-      contrast: 0,
+      lightness: 0,
     })
   })
 

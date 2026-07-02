@@ -391,7 +391,7 @@ function updateAdjustmentLayerParam(
     case 'hsl':
       if (
         typeof value === 'number' &&
-        (key === 'hue' || key === 'saturation' || key === 'brightness' || key === 'contrast')
+        (key === 'hue' || key === 'saturation' || key === 'lightness')
       ) {
         return { ...layer, params: { ...layer.params, [key]: value } }
       }

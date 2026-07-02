@@ -27,13 +27,12 @@ describe('imageEditorLayerStack', () => {
       return
     }
 
-    firstHslLayer.params.brightness = 45
+    firstHslLayer.params.lightness = 45
 
     expect(secondHslLayer.params).toEqual({
       hue: 0,
       saturation: 0,
-      brightness: 0,
-      contrast: 0,
+      lightness: 0,
     })
   })
 

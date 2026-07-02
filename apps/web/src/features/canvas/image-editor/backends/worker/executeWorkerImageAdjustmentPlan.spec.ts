@@ -95,7 +95,6 @@ describe('worker image adjustment backend', () => {
           hueShift: 120 / 360,
           saturationScale: 0.75,
           lightnessOffset: 0.1,
-          contrastFactor: 1.2,
         },
       },
     ]

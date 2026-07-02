@@ -23,14 +23,12 @@ export type ImageAdjustmentNumberRange = {
   min: number
   max: number
   defaultValue: number
-  unit?: string
 }
 
 export type NormalizedHslAdjustment = {
   hueShift: number
   saturationScale: number
   lightnessOffset: number
-  contrastFactor: number
 }
 
 export type NormalizedInvertAdjustment = {
@@ -94,10 +92,9 @@ type ImageAdjustmentDefinitionByKind = {
 }
 
 const HSL_RANGES = {
-  hue: { label: '色相', min: -180, max: 180, defaultValue: 0, unit: 'deg' },
-  saturation: { label: '饱和度', min: -100, max: 100, defaultValue: 0, unit: '%' },
-  brightness: { label: '亮度', min: -100, max: 100, defaultValue: 0, unit: '%' },
-  contrast: { label: '对比度', min: -100, max: 100, defaultValue: 0, unit: '%' },
+  hue: { label: '色相', min: -180, max: 180, defaultValue: 0 },
+  saturation: { label: '饱和度', min: -100, max: 100, defaultValue: 0 },
+  lightness: { label: '明度', min: -100, max: 100, defaultValue: 0 },
 } satisfies ImageAdjustmentRangeByKind['hsl']
 
 const THRESHOLD_RANGES = {
@@ -114,7 +111,7 @@ const LEVELS_RANGES = {
 
 export const IMAGE_ADJUSTMENT_DEFINITIONS: ImageAdjustmentDefinitionByKind = {
   hsl: {
-    defaults: { hue: 0, saturation: 0, brightness: 0, contrast: 0 },
+    defaults: { hue: 0, saturation: 0, lightness: 0 },
     ranges: HSL_RANGES,
     normalize: normalizeHslAdjustment,
     isNeutral: isNeutralHslAdjustment,
@@ -200,8 +197,7 @@ function normalizeHslAdjustment(params: ImageEditorHslParams): NormalizedHslAdju
   return {
     hueShift: clampToRange(params.hue, ranges.hue) / 360,
     saturationScale: Math.max(0, 1 + clampToRange(params.saturation, ranges.saturation) / 100),
-    lightnessOffset: clampToRange(params.brightness, ranges.brightness) / 100,
-    contrastFactor: createContrastFactor(clampToRange(params.contrast, ranges.contrast)),
+    lightnessOffset: clampToRange(params.lightness, ranges.lightness) / 100,
   }
 }
 
@@ -215,8 +211,7 @@ function isNeutralHslAdjustment(params: NormalizedHslAdjustment) {
   return (
     params.hueShift === 0 &&
     params.saturationScale === 1 &&
-    params.lightnessOffset === 0 &&
-    params.contrastFactor === 1
+    params.lightnessOffset === 0
   )
 }
 
@@ -240,11 +235,6 @@ function isNeutralLevelsAdjustment(params: NormalizedLevelsAdjustment) {
 
 function isNeutralInvertAdjustment(params: NormalizedInvertAdjustment) {
   return !params.enabled
-}
-
-function createContrastFactor(value: number) {
-  const normalized = value * 2.55
-  return (259 * (normalized + 255)) / (255 * (259 - normalized))
 }
 
 function clampToRange(value: number, range: ImageAdjustmentNumberRange) {

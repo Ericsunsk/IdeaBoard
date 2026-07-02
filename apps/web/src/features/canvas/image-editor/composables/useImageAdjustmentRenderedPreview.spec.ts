@@ -13,7 +13,7 @@ vi.mock('../runtime/imageAdjustmentProcessingRuntime', () => ({
   getImageAdjustmentProcessingRuntime: getImageAdjustmentProcessingRuntimeMock,
 }))
 
-function createHslLayer(params = { hue: 0, saturation: 0, brightness: 0, contrast: 0 }) {
+function createHslLayer(params = { hue: 0, saturation: 0, lightness: 0 }) {
   return {
     id: 'adjustment:hsl',
     type: 'adjustment',
@@ -147,7 +147,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
       previewValues: [255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255],
     })
     const layers = [
-      createHslLayer({ hue: 35, saturation: 22, brightness: 8, contrast: 14 }),
+      createHslLayer({ hue: 35, saturation: 22, lightness: 8 }),
       createCurvesLayer({
         channels: {
           rgb: [{ id: 'point:midtone', input: 42, output: 70 }],
@@ -226,8 +226,7 @@ describe('useImageAdjustmentRenderedPreview', () => {
       createHslLayer({
         hue: Number.NaN,
         saturation: Number.POSITIVE_INFINITY,
-        brightness: Number.NEGATIVE_INFINITY,
-        contrast: Number.NaN,
+        lightness: Number.NEGATIVE_INFINITY,
       }),
     ] satisfies ImageEditorLayer[]
     const preview = useImageAdjustmentRenderedPreview({

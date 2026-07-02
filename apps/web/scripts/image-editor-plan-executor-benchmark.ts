@@ -122,8 +122,7 @@ function createBenchmarkLayers(): readonly ImageEditorAdjustmentLayer[] {
       params: {
         hue: 18,
         saturation: 22,
-        brightness: -8,
-        contrast: 12,
+        lightness: -8,
       },
     },
     {
@@ -182,8 +181,7 @@ function createBenchmarkLayers(): readonly ImageEditorAdjustmentLayer[] {
       params: {
         hue: -12,
         saturation: -16,
-        brightness: 6,
-        contrast: -6,
+        lightness: 6,
       },
     },
   ]

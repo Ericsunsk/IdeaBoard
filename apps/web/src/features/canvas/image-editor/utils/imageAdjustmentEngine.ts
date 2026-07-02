@@ -231,14 +231,10 @@ function applyHslAdjustment(
       nextB = hueToRgb(p, q, nextHue - 1 / 3)
     }
 
-    data[index] = applyContrast(nextR * CHANNEL_MAX, params.contrastFactor)
-    data[index + 1] = applyContrast(nextG * CHANNEL_MAX, params.contrastFactor)
-    data[index + 2] = applyContrast(nextB * CHANNEL_MAX, params.contrastFactor)
+    data[index] = clampChannel(nextR * CHANNEL_MAX)
+    data[index + 1] = clampChannel(nextG * CHANNEL_MAX)
+    data[index + 2] = clampChannel(nextB * CHANNEL_MAX)
   }
-}
-
-function applyContrast(value: number, contrastFactor: number) {
-  return clampChannel((value - 128) * contrastFactor + 128)
 }
 
 function applyChannelLut(

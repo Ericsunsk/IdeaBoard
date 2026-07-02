@@ -189,10 +189,10 @@ describe('useImageEditorSession', () => {
   it('keeps simple adjustment params on the field-level API', () => {
     const session = useImageEditorSession()
 
-    session.updateSelectedImageEditorLayerParam('brightness', 25)
+    session.updateSelectedImageEditorLayerParam('lightness', 25)
     expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
       kind: 'hsl',
-      params: { brightness: 25 },
+      params: { lightness: 25 },
     })
 
     session.selectImageAdjustmentLayer('invert')

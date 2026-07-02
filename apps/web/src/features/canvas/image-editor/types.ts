@@ -16,8 +16,7 @@ export type ImageEditorParamValue = number | boolean
 export type ImageEditorHslParams = {
   hue: number
   saturation: number
-  brightness: number
-  contrast: number
+  lightness: number
 }
 
 export type ImageEditorThresholdParams = {

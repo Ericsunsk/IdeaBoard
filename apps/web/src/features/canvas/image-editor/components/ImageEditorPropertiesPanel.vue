@@ -6,7 +6,6 @@
         :value="adjustmentLayer.params.hue"
         :min="ranges.hsl.ranges.hue.min"
         :max="ranges.hsl.ranges.hue.max"
-        :unit="ranges.hsl.ranges.hue.unit"
         @update:value="emit('update-param', 'hue', $event)"
       />
       <ImageEditorSlider
@@ -14,24 +13,14 @@
         :value="adjustmentLayer.params.saturation"
         :min="ranges.hsl.ranges.saturation.min"
         :max="ranges.hsl.ranges.saturation.max"
-        :unit="ranges.hsl.ranges.saturation.unit"
         @update:value="emit('update-param', 'saturation', $event)"
       />
       <ImageEditorSlider
-        :label="ranges.hsl.ranges.brightness.label"
-        :value="adjustmentLayer.params.brightness"
-        :min="ranges.hsl.ranges.brightness.min"
-        :max="ranges.hsl.ranges.brightness.max"
-        :unit="ranges.hsl.ranges.brightness.unit"
-        @update:value="emit('update-param', 'brightness', $event)"
-      />
-      <ImageEditorSlider
-        :label="ranges.hsl.ranges.contrast.label"
-        :value="adjustmentLayer.params.contrast"
-        :min="ranges.hsl.ranges.contrast.min"
-        :max="ranges.hsl.ranges.contrast.max"
-        :unit="ranges.hsl.ranges.contrast.unit"
-        @update:value="emit('update-param', 'contrast', $event)"
+        :label="ranges.hsl.ranges.lightness.label"
+        :value="adjustmentLayer.params.lightness"
+        :min="ranges.hsl.ranges.lightness.min"
+        :max="ranges.hsl.ranges.lightness.max"
+        @update:value="emit('update-param', 'lightness', $event)"
       />
     </div>
 

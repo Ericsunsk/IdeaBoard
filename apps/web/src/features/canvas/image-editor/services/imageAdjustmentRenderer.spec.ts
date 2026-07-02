@@ -32,7 +32,7 @@ const hslLayer: ImageEditorAdjustmentLayer = {
   kind: 'hsl',
   name: '色相/饱和度 1',
   visible: true,
-  params: { hue: 35, saturation: 22, brightness: 8, contrast: 14 },
+  params: { hue: 35, saturation: 22, lightness: 8 },
 }
 
 const thresholdLayer: ImageEditorAdjustmentLayer = {
