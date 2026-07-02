@@ -14,6 +14,7 @@
         :value="adjustmentLayer.params.saturation"
         :min="ranges.hsl.ranges.saturation.min"
         :max="ranges.hsl.ranges.saturation.max"
+        track-variant="tonal-reverse"
         @update:value="emit('update-param', 'saturation', $event)"
       />
       <ImageEditorSlider
@@ -21,6 +22,7 @@
         :value="adjustmentLayer.params.lightness"
         :min="ranges.hsl.ranges.lightness.min"
         :max="ranges.hsl.ranges.lightness.max"
+        track-variant="tonal"
         @update:value="emit('update-param', 'lightness', $event)"
       />
     </div>

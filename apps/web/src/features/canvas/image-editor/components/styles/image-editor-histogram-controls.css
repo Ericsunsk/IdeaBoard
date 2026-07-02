@@ -6,12 +6,7 @@
   --image-editor-histogram-frame-border-color: var(--canvas-accent-outline);
   --image-editor-histogram-frame-radius: 9px;
   --image-editor-histogram-marker-size: 12px;
-  --image-editor-levels-output-range-gradient: linear-gradient(
-    90deg,
-    var(--canvas-accent-strong, var(--color-canvas-accent-pressed)) 0%,
-    var(--canvas-accent, var(--color-canvas-accent)) 52%,
-    var(--canvas-accent-wash, var(--color-canvas-accent-soft)) 100%
-  );
+  --image-editor-levels-output-range-gradient: var(--editing-controls-tonal-range-gradient);
 }
 
 .image-editor-threshold-control .image-editor-histogram-plot,

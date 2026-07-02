@@ -21,6 +21,19 @@
   --editing-controls-content-gap: var(--canvas-panel-content-gap);
   --editing-controls-text-size: 11px;
   --editing-controls-meta-text-size: 10px;
+  --editing-controls-tonal-range-gradient: linear-gradient(
+    90deg,
+    var(--canvas-accent-strong, var(--color-canvas-accent-pressed)) 0%,
+    var(--canvas-accent, var(--color-canvas-accent)) 52%,
+    var(--canvas-accent-wash, var(--color-canvas-accent-soft)) 100%
+  );
+  --editing-controls-tonal-range-gradient-reverse: linear-gradient(
+    90deg,
+    var(--canvas-accent-wash, var(--color-canvas-accent-soft)) 0%,
+    var(--canvas-accent, var(--color-canvas-accent)) 48%,
+    var(--canvas-accent-strong, var(--color-canvas-accent-pressed)) 100%
+  );
+  --image-editor-levels-output-range-gradient: var(--editing-controls-tonal-range-gradient);
 }
 
 .editing-controls-panel {
@@ -320,6 +333,14 @@
   border: 2px solid #ffffff;
   background: transparent;
   box-shadow: 0 0 0 1px rgba(39, 41, 50, 0.22);
+}
+
+.editing-controls-slider-row__range--tonal {
+  --canvas-range-track-background: var(--editing-controls-tonal-range-gradient);
+}
+
+.editing-controls-slider-row__range--tonal-reverse {
+  --canvas-range-track-background: var(--editing-controls-tonal-range-gradient-reverse);
 }
 
 .editing-controls-slider-row__value {

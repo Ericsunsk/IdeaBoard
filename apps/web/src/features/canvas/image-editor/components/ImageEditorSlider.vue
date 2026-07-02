@@ -16,7 +16,7 @@
     </div>
     <input
       class="canvas-range-input editing-controls-slider-row__range"
-      :class="{ 'editing-controls-slider-row__range--hue': trackVariant === 'hue' }"
+      :class="rangeClass"
       type="range"
       :min="min"
       :max="max"
@@ -29,19 +29,28 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
+
+type ImageEditorSliderTrackVariant = 'hue' | 'tonal' | 'tonal-reverse'
 
 const props = defineProps<{
   label: string
   value: number
   min: number
   max: number
-  trackVariant?: 'hue'
+  trackVariant?: ImageEditorSliderTrackVariant
 }>()
 
 const emit = defineEmits<{
   (e: 'update:value', value: number): void
 }>()
+
+const rangeClass = computed(() => ({
+  'editing-controls-slider-row__range--hue': props.trackVariant === 'hue',
+  'editing-controls-slider-row__range--tonal': props.trackVariant === 'tonal',
+  'editing-controls-slider-row__range--tonal-reverse': props.trackVariant === 'tonal-reverse',
+}))
 
 function onInput(event: Event) {
   const value = readFiniteNumberInputValue(event)
