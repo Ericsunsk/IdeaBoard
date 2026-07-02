@@ -3,36 +3,16 @@
     <div class="editing-controls-label image-editor-levels-output__header">
       <span>输出色阶</span>
     </div>
-    <div
-      ref="sliderRef"
+    <EditingTwoHandleSlider
       class="image-editor-levels-output__slider"
-      @pointerdown="onSliderPointerDown"
-    >
-      <input
-        class="canvas-range-input image-editor-levels-output__range"
-        type="range"
-        :min="constraints.outputBlack.min"
-        :max="constraints.outputBlack.max"
-        step="1"
-        aria-label="输出黑场"
-        :aria-valuemin="constraints.outputBlack.min"
-        :aria-valuemax="constraints.outputBlack.max"
-        :value="params.outputBlack"
-        @input="onOutputInput('outputBlack', $event)"
-      />
-      <input
-        class="canvas-range-input image-editor-levels-output__range"
-        type="range"
-        :min="constraints.outputWhite.min"
-        :max="constraints.outputWhite.max"
-        step="1"
-        aria-label="输出白场"
-        :aria-valuemin="constraints.outputWhite.min"
-        :aria-valuemax="constraints.outputWhite.max"
-        :value="params.outputWhite"
-        @input="onOutputInput('outputWhite', $event)"
-      />
-    </div>
+      aria-label="输出色阶范围"
+      :min="IMAGE_EDITOR_CHANNEL_MIN"
+      :max="IMAGE_EDITOR_CHANNEL_MAX"
+      :step="1"
+      :shift-step="10"
+      :handles="outputSliderHandles"
+      @update:handle="onOutputSliderHandleUpdate"
+    />
     <div class="editing-controls-fields image-editor-levels-output__fields">
       <label
         class="editing-controls-field editing-controls-field--compact image-editor-levels-output__field"
@@ -73,14 +53,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
+import EditingTwoHandleSlider from '../../components/EditingTwoHandleSlider.vue'
 import type { ImageEditorLevelsParams } from '../types'
 import {
   moveLevelsOutputHandle,
   type ImageEditorLevelsConstraint,
   type ImageEditorLevelsOutputHandleId,
 } from '../utils/imageEditorLevels'
-import { imageEditorPlotPercentToChannel } from '../utils/imageEditorChannelScale'
+import {
+  IMAGE_EDITOR_CHANNEL_MAX,
+  IMAGE_EDITOR_CHANNEL_MIN,
+} from '../utils/imageEditorChannelScale'
 import { readFiniteNumberInputValue } from '../utils/readFiniteNumberInputValue'
 
 const props = defineProps<{
@@ -92,7 +76,22 @@ const emit = defineEmits<{
   (e: 'update:params', value: ImageEditorLevelsParams): void
 }>()
 
-const sliderRef = ref<HTMLElement | null>(null)
+const outputSliderHandles = computed(() => [
+  {
+    id: 'outputBlack',
+    value: props.params.outputBlack,
+    min: props.constraints.outputBlack.min,
+    max: props.constraints.outputBlack.max,
+    ariaLabel: '输出黑场',
+  },
+  {
+    id: 'outputWhite',
+    value: props.params.outputWhite,
+    min: props.constraints.outputWhite.min,
+    max: props.constraints.outputWhite.max,
+    ariaLabel: '输出白场',
+  },
+])
 
 function onOutputInput(handleId: ImageEditorLevelsOutputHandleId, event: Event) {
   const value = readFiniteNumberInputValue(event)
@@ -100,23 +99,12 @@ function onOutputInput(handleId: ImageEditorLevelsOutputHandleId, event: Event) 
   emit('update:params', moveLevelsOutputHandle(props.params, handleId, value))
 }
 
-function onSliderPointerDown(event: PointerEvent) {
-  const value = resolveSliderValue(event)
-  if (value == null) return
-  const nearestHandle = resolveNearestOutputHandle(value)
-  emit('update:params', moveLevelsOutputHandle(props.params, nearestHandle, value))
+function onOutputSliderHandleUpdate(handleId: string, value: number) {
+  if (!isOutputHandleId(handleId)) return
+  emit('update:params', moveLevelsOutputHandle(props.params, handleId, value))
 }
 
-function resolveSliderValue(event: PointerEvent) {
-  const rect = sliderRef.value?.getBoundingClientRect()
-  if (!rect || rect.width <= 0) return null
-  const position = ((event.clientX - rect.left) / rect.width) * 100
-  return imageEditorPlotPercentToChannel(position)
-}
-
-function resolveNearestOutputHandle(value: number): ImageEditorLevelsOutputHandleId {
-  return Math.abs(value - props.params.outputBlack) <= Math.abs(value - props.params.outputWhite)
-    ? 'outputBlack'
-    : 'outputWhite'
+function isOutputHandleId(handleId: string): handleId is ImageEditorLevelsOutputHandleId {
+  return handleId === 'outputBlack' || handleId === 'outputWhite'
 }
 </script>

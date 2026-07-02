@@ -62,37 +62,8 @@
 }
 
 .image-editor-levels-output__slider {
-  position: relative;
-  height: var(--canvas-range-input-height);
-  --canvas-range-fill-color: var(--canvas-accent);
-  --canvas-range-thumb-color: var(--canvas-accent);
-}
-
-.image-editor-levels-output__slider::before {
-  content: '';
-  position: absolute;
-  inset-inline: 0;
-  top: 50%;
-  height: var(--canvas-range-track-height);
-  border-radius: 999px;
-  background: var(--image-editor-levels-output-range-gradient);
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.image-editor-levels-output__range {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  --canvas-range-track-background: transparent;
-}
-
-.image-editor-levels-output__range::-webkit-slider-thumb {
-  pointer-events: auto;
-}
-
-.image-editor-levels-output__range::-moz-range-thumb {
-  pointer-events: auto;
+  --editing-two-handle-slider-track-background: var(--image-editor-levels-output-range-gradient);
+  --editing-two-handle-slider-handle-color: var(--canvas-accent);
 }
 
 .image-editor-threshold-control .image-editor-histogram-plot__marker.is-threshold,
