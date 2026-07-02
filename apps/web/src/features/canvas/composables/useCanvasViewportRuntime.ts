@@ -20,7 +20,7 @@ export type CanvasFlowMovePayload = {
   }
 }
 
-export type CanvasViewportRuntimeInteraction = 'flow-viewport' | 'node-drag'
+export type CanvasViewportRuntimeInteraction = 'flow-viewport' | 'viewport-pan' | 'node-drag'
 
 export type CanvasMiniMapCenterRequestPayload = {
   position: {
@@ -88,6 +88,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   let lastRequestedMiniMapViewportKey: string | null = null
   let lastSuccessfulMiniMapViewportKey: string | null = null
   let programmaticViewportCommitDepth = 0
+  let viewportMoveStartZoom: number | null = null
 
   const zoomLevel = computed(() => {
     const zoom = options.viewport.value.zoom
@@ -114,9 +115,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     options.commitPendingBoardViewportChange()
   }
 
-  async function runAndPersistViewportCommand(
-    run: () => Promise<unknown> | unknown,
-  ) {
+  async function runAndPersistViewportCommand(run: () => Promise<unknown> | unknown) {
     programmaticViewportCommitDepth += 1
     try {
       const result = await run()
@@ -323,10 +322,16 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
 
   function beginViewportFrameProbe(transform: CanvasFlowMovePayload['flowTransform']) {
     if (activeViewportFrameProbe) return
-    activeViewportFrameProbe = beginCanvasFrameProbe(
-      typeof transform?.zoom === 'number' ? 'zoom' : 'pan',
-      () => getCanvasFrameProbeMetadata(),
-    )
+    const nextZoom =
+      typeof transform?.zoom === 'number' && Number.isFinite(transform.zoom)
+        ? transform.zoom
+        : options.viewport.value.zoom
+    const baseZoom = viewportMoveStartZoom ?? options.viewport.value.zoom
+    const scene = Math.abs(nextZoom - baseZoom) > 0.0001 ? 'zoom' : 'pan'
+    if (scene === 'pan' && !isMiniMapDragActive) {
+      options.startCanvasInteraction('viewport-pan')
+    }
+    activeViewportFrameProbe = beginCanvasFrameProbe(scene, () => getCanvasFrameProbeMetadata())
   }
 
   function endViewportFrameProbe(reason: string) {
@@ -335,6 +340,8 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       reason,
     }))
     activeViewportFrameProbe = null
+    viewportMoveStartZoom = null
+    options.stopCanvasInteraction('viewport-pan')
   }
 
   async function loadCanvasBoardAndProbe() {
@@ -343,9 +350,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       return
     }
 
-    const frameProbe = beginCanvasFrameProbe('load-hydrate', () =>
-      getCanvasFrameProbeMetadata(),
-    )
+    const frameProbe = beginCanvasFrameProbe('load-hydrate', () => getCanvasFrameProbeMetadata())
     try {
       await options.loadInitialOrRouteBoard()
       frameProbe.mark('graph-committed', () => getCanvasFrameProbeMetadata())
@@ -358,6 +363,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   }
 
   function onFlowMoveStart() {
+    viewportMoveStartZoom = options.viewport.value.zoom
     options.closeBoardHeaderEditing()
     options.startCanvasInteraction('flow-viewport')
   }
@@ -413,6 +419,8 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     isMiniMapViewportUpdateInFlight = false
     activeViewportFrameProbe?.cleanup()
     activeViewportFrameProbe = null
+    viewportMoveStartZoom = null
+    options.stopCanvasInteraction('viewport-pan')
     activeNodeDragFrameProbe?.cleanup()
     activeNodeDragFrameProbe = null
   }

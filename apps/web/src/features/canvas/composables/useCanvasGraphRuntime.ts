@@ -109,6 +109,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
 
   const {
     isCanvasInteractionActive: isFlowInteractionActive,
+    isViewportPanInteractionActive: isFlowViewportPanInteractionActive,
     isCanvasInteractionLocked: isFlowInteractionLocked,
     startCanvasInteraction: startFlowInteraction,
     stopCanvasInteraction: stopFlowInteraction,
@@ -212,6 +213,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     hasSelectedFlowNodes,
     onExportSelectedImages,
     isFlowInteractionActive,
+    isFlowViewportPanInteractionActive,
     isFlowInteractionLocked,
     startFlowInteraction,
     stopFlowInteraction,

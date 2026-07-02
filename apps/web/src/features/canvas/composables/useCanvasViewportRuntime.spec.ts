@@ -38,9 +38,11 @@ function createViewportRuntimeHarness() {
     }
     return true
   })
-  const setCenter = vi.fn((x: number, y: number, _options?: { duration?: number; zoom?: number }) => {
-    viewport.value = { x: -x, y: -y, zoom: viewport.value.zoom }
-  })
+  const setCenter = vi.fn(
+    (x: number, y: number, _options?: { duration?: number; zoom?: number }) => {
+      viewport.value = { x: -x, y: -y, zoom: viewport.value.zoom }
+    },
+  )
   const setViewport = vi.fn((nextViewport: CanvasFlowViewport) => {
     viewport.value = nextViewport
   })
@@ -119,6 +121,28 @@ describe('useCanvasViewportRuntime', () => {
     harness.scope.stop()
   })
 
+  it('marks only viewport pan movement with the pan interaction key', () => {
+    const harness = createViewportRuntimeHarness()
+
+    harness.runtime.onFlowMoveStart()
+    harness.runtime.onFlowMove({ flowTransform: { x: 24, y: 32, zoom: 1 } })
+    harness.runtime.onFlowMoveEnd({ flowTransform: { x: 24, y: 32, zoom: 1 } })
+
+    expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    expect(harness.startCanvasInteraction).toHaveBeenCalledWith('viewport-pan')
+    expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('viewport-pan')
+    expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+
+    const zoomHarness = createViewportRuntimeHarness()
+    zoomHarness.runtime.onFlowMoveStart()
+    zoomHarness.runtime.onFlowMove({ flowTransform: { x: 0, y: 0, zoom: 1.5 } })
+    zoomHarness.runtime.onFlowMoveEnd({ flowTransform: { x: 0, y: 0, zoom: 1.5 } })
+
+    expect(zoomHarness.startCanvasInteraction).not.toHaveBeenCalledWith('viewport-pan')
+    zoomHarness.scope.stop()
+    harness.scope.stop()
+  })
+
   it('commits viewport persistence on viewport change end', () => {
     const harness = createViewportRuntimeHarness()
 
@@ -189,6 +213,7 @@ describe('useCanvasViewportRuntime', () => {
     await flushPromises()
 
     expect(harness.startCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
+    expect(harness.startCanvasInteraction).not.toHaveBeenCalledWith('viewport-pan')
     expect(harness.stopCanvasInteraction).toHaveBeenCalledWith('flow-viewport')
     expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
@@ -273,7 +298,10 @@ describe('useCanvasViewportRuntime', () => {
     await flushPromises(8)
 
     expect(harness.setViewport).toHaveBeenCalledTimes(2)
-    expect(harness.setViewport).toHaveBeenLastCalledWith({ x: -126, y: -194, zoom: 2 }, { duration: 0 })
+    expect(harness.setViewport).toHaveBeenLastCalledWith(
+      { x: -126, y: -194, zoom: 2 },
+      { duration: 0 },
+    )
     expect(harness.viewport.value).toEqual({ x: -126, y: -194, zoom: 2 })
     expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
@@ -310,7 +338,10 @@ describe('useCanvasViewportRuntime', () => {
     await flushPromises(8)
 
     expect(harness.setViewport).toHaveBeenCalledTimes(2)
-    expect(harness.setViewport).toHaveBeenLastCalledWith({ x: -106, y: -204, zoom: 2 }, { duration: 0 })
+    expect(harness.setViewport).toHaveBeenLastCalledWith(
+      { x: -106, y: -204, zoom: 2 },
+      { duration: 0 },
+    )
     expect(harness.markBoardViewportChanged).toHaveBeenCalledOnce()
     expect(harness.commitPendingBoardViewportChange).toHaveBeenCalledOnce()
     harness.scope.stop()

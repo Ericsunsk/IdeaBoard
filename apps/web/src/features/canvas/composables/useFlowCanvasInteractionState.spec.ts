@@ -8,14 +8,20 @@ describe('useFlowCanvasInteractionState', () => {
     state.startCanvasInteraction('flow-viewport')
 
     expect(state.isCanvasInteractionActive.value).toBe(true)
+    expect(state.isViewportPanInteractionActive.value).toBe(false)
     expect(state.isCanvasInteractionLocked.value).toBe(false)
+
+    state.startCanvasInteraction('viewport-pan')
+    expect(state.isViewportPanInteractionActive.value).toBe(true)
 
     state.startCanvasInteraction('node-drag')
     state.stopCanvasInteraction('flow-viewport')
 
     expect(state.isCanvasInteractionActive.value).toBe(true)
+    expect(state.isViewportPanInteractionActive.value).toBe(true)
     expect(state.isCanvasInteractionLocked.value).toBe(false)
 
+    state.stopCanvasInteraction('viewport-pan')
     state.stopCanvasInteraction('node-drag')
 
     expect(state.isCanvasInteractionActive.value).toBe(false)

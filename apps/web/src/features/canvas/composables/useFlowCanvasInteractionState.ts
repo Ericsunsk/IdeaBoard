@@ -1,12 +1,19 @@
 import { computed, ref } from 'vue'
 
-export type CanvasInteractionKey = 'image-mask-editor' | 'flow-viewport' | 'node-drag'
+export type CanvasInteractionKey =
+  | 'image-mask-editor'
+  | 'flow-viewport'
+  | 'viewport-pan'
+  | 'node-drag'
 
 const CANVAS_LOCKING_INTERACTIONS = new Set<CanvasInteractionKey>(['image-mask-editor'])
 
 export function useFlowCanvasInteractionState() {
   const activeInteractions = ref(new Set<CanvasInteractionKey>())
   const isCanvasInteractionActive = computed(() => activeInteractions.value.size > 0)
+  const isViewportPanInteractionActive = computed(() =>
+    activeInteractions.value.has('viewport-pan'),
+  )
   const isCanvasInteractionLocked = computed(() => {
     for (const key of activeInteractions.value) {
       if (CANVAS_LOCKING_INTERACTIONS.has(key)) return true
@@ -28,6 +35,7 @@ export function useFlowCanvasInteractionState() {
 
   return {
     isCanvasInteractionActive,
+    isViewportPanInteractionActive,
     isCanvasInteractionLocked,
     startCanvasInteraction,
     stopCanvasInteraction,

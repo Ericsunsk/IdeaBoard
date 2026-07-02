@@ -1,7 +1,13 @@
 <template>
   <div
     class="canvas-layout"
-    :class="[`tool-${activeTool}`, { 'interaction-lite': isFlowInteractionActive }]"
+    :class="[
+      `tool-${activeTool}`,
+      {
+        'interaction-lite': isFlowInteractionActive,
+        'viewport-pan-lite': isFlowViewportPanInteractionActive,
+      },
+    ]"
     @mousedown.self="closeBoardHeaderEditing"
   >
     <CanvasPageChrome
@@ -334,6 +340,7 @@ const {
   hasSelectedFlowNodes,
   onExportSelectedImages,
   isFlowInteractionActive,
+  isFlowViewportPanInteractionActive,
   isFlowInteractionLocked,
   startFlowInteraction,
   stopFlowInteraction,
@@ -802,6 +809,17 @@ onMounted(async () => {
 .canvas-layout.interaction-lite :deep(.vue-flow__edge.selected .vue-flow__edge-path) {
   filter: none !important;
 }
+
+.canvas-layout.viewport-pan-lite :deep(.vue-flow__transformationpane) {
+  will-change: transform;
+}
+
+.canvas-layout.viewport-pan-lite :deep(.vue-flow__nodes),
+.canvas-layout.viewport-pan-lite :deep(.vue-flow__edges),
+.canvas-layout.viewport-pan-lite :deep(.vue-flow__edge-labels) {
+  pointer-events: none;
+}
+
 .canvas-flow-wrap :deep(.vue-flow__viewport) {
   background-image: radial-gradient(circle, #e2e4e8 1px, transparent 1px);
   background-size: 12px 12px;
