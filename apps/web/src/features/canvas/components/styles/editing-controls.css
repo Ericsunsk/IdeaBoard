@@ -294,6 +294,34 @@
   width: 100%;
 }
 
+.editing-controls-slider-row__range--hue {
+  --canvas-range-track-height: 8px;
+  --canvas-range-thumb-offset: -1.5px;
+  --canvas-range-thumb-size: 11px;
+  --canvas-range-track-background: linear-gradient(
+    90deg,
+    #ff3b30 0%,
+    #ffcc00 16.67%,
+    #34c759 33.33%,
+    #00c7be 50%,
+    #007aff 66.67%,
+    #af52de 83.33%,
+    #ff3b30 100%
+  );
+}
+
+.editing-controls-slider-row__range--hue::-webkit-slider-thumb {
+  border: 2px solid #ffffff;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(39, 41, 50, 0.22);
+}
+
+.editing-controls-slider-row__range--hue::-moz-range-thumb {
+  border: 2px solid #ffffff;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(39, 41, 50, 0.22);
+}
+
 .editing-controls-slider-row__value {
   font-size: var(--editing-controls-meta-text-size);
   font-variant-numeric: tabular-nums;

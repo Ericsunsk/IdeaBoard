@@ -16,6 +16,7 @@
     </div>
     <input
       class="canvas-range-input editing-controls-slider-row__range"
+      :class="{ 'editing-controls-slider-row__range--hue': trackVariant === 'hue' }"
       type="range"
       :min="min"
       :max="max"
@@ -35,6 +36,7 @@ const props = defineProps<{
   value: number
   min: number
   max: number
+  trackVariant?: 'hue'
 }>()
 
 const emit = defineEmits<{

@@ -6,6 +6,7 @@
         :value="adjustmentLayer.params.hue"
         :min="ranges.hsl.ranges.hue.min"
         :max="ranges.hsl.ranges.hue.max"
+        track-variant="hue"
         @update:value="emit('update-param', 'hue', $event)"
       />
       <ImageEditorSlider
