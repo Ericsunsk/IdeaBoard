@@ -45,6 +45,11 @@
     :layers="chromeModel.editor.layers"
     :selected-layer-id="chromeModel.editor.selectedLayerId"
     :selected-adjustment-layer="chromeModel.editor.selectedAdjustmentLayer"
+    :raster-tool-settings="chromeModel.editor.rasterToolSettings"
+    :can-use-raster-tool="chromeModel.editor.canUseRasterTool"
+    :can-undo-raster-stroke="chromeModel.editor.canUndoRasterStroke"
+    :can-redo-raster-stroke="chromeModel.editor.canRedoRasterStroke"
+    :has-raster-edits="chromeModel.editor.hasRasterEdits"
     :histogram-source="chromeModel.editor.histogramSource"
     :applying-adjustments="chromeModel.editor.applyingAdjustments"
     @select-tool="chromeCommands.selectEditorTool"
@@ -57,6 +62,9 @@
     @remove-layer="chromeCommands.removeEditorLayer"
     @update-param="chromeCommands.updateEditorParam"
     @update-params="chromeCommands.updateEditorAdjustmentParams"
+    @update-raster-settings="chromeCommands.updateEditorRasterToolSettings"
+    @undo-raster-stroke="chromeCommands.undoEditorRasterStroke"
+    @redo-raster-stroke="chromeCommands.redoEditorRasterStroke"
     @apply-adjustments="chromeCommands.applyAdjustments"
   />
   <CanvasNodeContextMenu

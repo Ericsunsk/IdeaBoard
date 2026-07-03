@@ -31,7 +31,7 @@ type UseImageEditorModeOptions = {
   getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
   onBeforePointerCancel?: () => void
-  onBeforeExit?: (state: ImageEditorModeState) => void
+  onBeforeExit?: (state: ImageEditorModeState) => boolean | void
 }
 
 export function useImageEditorMode(options: UseImageEditorModeOptions) {
@@ -52,11 +52,13 @@ export function useImageEditorMode(options: UseImageEditorModeOptions) {
   })
   function exitImageEditorMode(exitOptions: { runBeforeExit?: boolean } = {}) {
     const current = state.value
-    if (!current) return
+    if (!current) return true
     if (exitOptions.runBeforeExit !== false) {
-      options.onBeforeExit?.(current)
+      const shouldExit = options.onBeforeExit?.(current)
+      if (shouldExit === false) return false
     }
     state.value = null
+    return true
   }
 
   function enterImageEditorMode(nodeId: string, mode: ImageEditorMode): boolean {
@@ -68,7 +70,7 @@ export function useImageEditorMode(options: UseImageEditorModeOptions) {
     const containRect = containImageRect(stage.clientWidth, stage.clientHeight, display.ratio)
     if (!containRect) return false
 
-    exitImageEditorMode()
+    if (!exitImageEditorMode()) return false
     state.value = {
       nodeId,
       mode,
@@ -91,6 +93,9 @@ export function useImageEditorMode(options: UseImageEditorModeOptions) {
     if (!state.value) return
     if (isEditableEventTarget(event.target)) return
     if (event.key !== 'Escape') return
+    const target = event.target as HTMLElement | null
+    if (target?.closest('[data-image-editor-tool-rail], [data-image-editor-popover]')) return
+    if (document.documentElement.dataset.imageEditorPopoverOpen === 'true') return
     event.preventDefault()
     exitImageEditorMode()
   }

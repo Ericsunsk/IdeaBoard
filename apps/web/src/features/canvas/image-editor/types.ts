@@ -9,12 +9,7 @@ export type ImageEditorTool =
   | 'crop'
   | 'zoom'
 
-export type ImageAdjustmentKind =
-  | 'hsl'
-  | 'threshold'
-  | 'curves'
-  | 'levels'
-  | 'sharpen'
+export type ImageAdjustmentKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'sharpen'
 
 export type ImageEditorParamValue = number
 
@@ -69,11 +64,21 @@ export type ImageEditorSourceLayer = {
   type: 'source'
   name: string
   visible: true
+  content?: ImageEditorRasterContent
 }
 
-export type ImageEditorPaintContent = {
+export type ImageEditorEmptyPaintContent = {
   kind: 'empty'
 }
+
+export type ImageEditorRasterContent = {
+  kind: 'raster'
+  dataUrl: string
+  width: number
+  height: number
+}
+
+export type ImageEditorPaintContent = ImageEditorEmptyPaintContent | ImageEditorRasterContent
 
 export type ImageEditorPaintLayer = {
   id: string

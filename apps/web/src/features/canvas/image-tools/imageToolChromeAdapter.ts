@@ -1,12 +1,11 @@
 import { computed } from 'vue'
 import {
+  canUseImageEditorRasterTool,
+  hasImageEditorRasterEdits,
   useImageAdjustmentRenderedPreview,
   useImageEditorHistogramSource,
 } from '../image-editor'
-import type {
-  ImageToolChromeCommands,
-  ImageToolChromeModel,
-} from './imageToolBindings'
+import type { ImageToolChromeCommands, ImageToolChromeModel } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
 export function createImageToolChromeAdapter(
@@ -53,7 +52,18 @@ export function createImageToolChromeAdapter(
         activeTool: session.imageEditorSession.activeImageEditorTool.value,
         layers: session.imageEditorSession.imageEditorLayers.value,
         selectedLayerId: session.imageEditorSession.selectedImageEditorLayerId.value,
-        selectedAdjustmentLayer: session.imageEditorSession.selectedImageEditorAdjustmentLayer.value,
+        selectedAdjustmentLayer:
+          session.imageEditorSession.selectedImageEditorAdjustmentLayer.value,
+        rasterToolSettings: session.imageEditorSession.imageEditorRasterToolSettings.value,
+        canUseRasterTool: canUseImageEditorRasterTool(
+          session.imageEditorSession.imageEditorLayers.value,
+          session.imageEditorSession.selectedImageEditorLayerId.value,
+        ),
+        canUndoRasterStroke: session.imageEditorSession.canUndoImageEditorRasterStroke.value,
+        canRedoRasterStroke: session.imageEditorSession.canRedoImageEditorRasterStroke.value,
+        hasRasterEdits: hasImageEditorRasterEdits(
+          session.imageEditorSession.imageEditorLayers.value,
+        ),
         histogramSource: imageEditorHistogramSource.value,
         applyingAdjustments: session.isApplyingImageEditorAdjustments.value,
       },

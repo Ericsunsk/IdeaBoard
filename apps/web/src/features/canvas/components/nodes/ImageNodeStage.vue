@@ -37,6 +37,16 @@
           @keydown.space.prevent="emit('append-to-canvas')"
         />
         <RenderedImagePreviewCanvas v-if="renderedImagePreview" :preview="renderedImagePreview" />
+        <ImageEditorRasterOverlay
+          v-if="isRasterOverlayVisible && imageToolStageBinding?.rasterOverlayStyle"
+          :style="imageToolStageBinding.rasterOverlayStyle"
+          :canvas-width="imageToolStageBinding.rasterCanvasWidth"
+          :canvas-height="imageToolStageBinding.rasterCanvasHeight"
+          :brush-size="imageToolStageBinding.rasterBrushSize"
+          :raster-tool-enabled="imageToolStageBinding.rasterToolEnabled"
+          :set-canvas-ref="imageToolStageBinding.setRasterCanvasRef"
+          @canvas-pointerdown="imageToolStageBinding.onRasterCanvasPointerDown"
+        />
         <ImageCanvasExtendOverlay
           v-if="expandModeActive && expandOverlayStyle"
           :overlay-style="expandOverlayStyle"
@@ -118,6 +128,7 @@ import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExt
 import type { ImageToolStageBinding } from '../../image-tools'
 import { useCanvasImagePreviewQuality } from '../../composables/useCanvasImagePreviewQuality'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
+import { ImageEditorRasterOverlay } from '../../image-editor'
 import { ImageMaskEditorOverlay } from '../../mask-editor'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import NodeActionButton from './NodeActionButton.vue'
@@ -176,6 +187,11 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
   maxSide: previewMaxSide,
 })
 const renderedImagePreview = computed(() => props.imageToolStageBinding?.renderedPreview ?? null)
+const isRasterOverlayVisible = computed(
+  () =>
+    props.imageToolStageBinding?.mode === 'adjust' &&
+    !!props.imageToolStageBinding.rasterOverlayVisible,
+)
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )

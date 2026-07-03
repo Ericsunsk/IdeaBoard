@@ -1,12 +1,16 @@
 import { computed, ref } from 'vue'
 
 export type CanvasInteractionKey =
+  | 'image-editor-raster'
   | 'image-mask-editor'
   | 'flow-viewport'
   | 'viewport-pan'
   | 'node-drag'
 
-const CANVAS_LOCKING_INTERACTIONS = new Set<CanvasInteractionKey>(['image-mask-editor'])
+const CANVAS_LOCKING_INTERACTIONS = new Set<CanvasInteractionKey>([
+  'image-editor-raster',
+  'image-mask-editor',
+])
 
 export function useFlowCanvasInteractionState() {
   const activeInteractions = ref(new Set<CanvasInteractionKey>())

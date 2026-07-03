@@ -1,7 +1,6 @@
 import {
-  flattenVisibleImageEditorAdjustmentLayers,
-  hasEffectiveImageEditorAdjustmentLayers,
-  renderImageAdjustmentFile,
+  hasRenderableImageEditorLayerStack,
+  renderImageEditorLayerStackFile,
 } from '../image-editor'
 import { useMaskEditorChromeActions } from '../mask-editor'
 import type { ImageToolChromeCommands } from './imageToolBindings'
@@ -24,12 +23,8 @@ export function createImageToolCommands(session: ImageToolSession) {
       return
     }
 
-    const visibleAdjustmentLayers = flattenVisibleImageEditorAdjustmentLayers(
-      session.imageEditorSession.imageEditorLayers.value,
-    )
-    if (
-      !hasEffectiveImageEditorAdjustmentLayers(session.imageEditorSession.imageEditorLayers.value)
-    ) {
+    const layers = session.imageEditorSession.imageEditorLayers.value
+    if (!hasRenderableImageEditorLayerStack(layers)) {
       options.feedback.warning('没有可应用的编辑图层')
       return
     }
@@ -39,9 +34,9 @@ export function createImageToolCommands(session: ImageToolSession) {
     const scopeId = nodeId
     session.activeImageAdjustmentFinalScopeId.value = scopeId
     try {
-      const renderedFile = await renderImageAdjustmentFile(
+      const renderedFile = await renderImageEditorLayerStackFile(
         { url: source.url, title: sourceNode.title || 'Image' },
-        visibleAdjustmentLayers,
+        layers,
         {
           scopeId,
           onProgress: (progress) => {
@@ -71,7 +66,9 @@ export function createImageToolCommands(session: ImageToolSession) {
         target: newNodeId,
         targetHandle: 'in:image',
       })
-      session.exitImageEditorMode()
+      session.imageEditorSession.clearImageEditorRasterHistory()
+      session.exitImageEditorMode({ runBeforeExit: false })
+      session.imageEditorSession.resetImageEditorSession()
       options.feedback.succeeded('已应用编辑并派生新节点')
     } catch (error) {
       if (
@@ -149,8 +146,15 @@ export function createImageToolCommands(session: ImageToolSession) {
     updateEditorParam: session.imageEditorSession.updateSelectedImageEditorLayerParam,
     updateEditorAdjustmentParams:
       session.imageEditorSession.updateSelectedImageEditorAdjustmentParams,
+    updateEditorRasterToolSettings: session.imageEditorSession.updateImageEditorRasterToolSettings,
+    undoEditorRasterStroke: session.imageEditorSession.undoImageEditorRasterStroke,
+    redoEditorRasterStroke: session.imageEditorSession.redoImageEditorRasterStroke,
     applyAdjustments,
   }
+
+  session.setImageEditorApplyRequest(() => {
+    void applyAdjustments()
+  })
 
   return {
     chromeCommands,

@@ -33,6 +33,21 @@ export function createImageToolNodeBindings(
       maskBrushShape: session.maskEditor.brushShape.value,
       setMaskCanvasRef: (element) => session.maskEditor.setMaskCanvasRef(nodeId, element),
       onMaskCanvasPointerDown: session.maskEditor.onCanvasPointerDown,
+      rasterOverlayStyle:
+        session.imageEditorNodeId.value === nodeId && session.imageEditorMode.value === 'adjust'
+          ? session.imageEditorRasterOverlay.rasterOverlayStyle.value
+          : null,
+      rasterCanvasWidth: session.imageEditorRasterOverlay.rasterCanvasWidth.value,
+      rasterCanvasHeight: session.imageEditorRasterOverlay.rasterCanvasHeight.value,
+      rasterBrushSize: session.imageEditorRasterOverlay.rasterBrushSize.value,
+      rasterTool: session.imageEditorRasterOverlay.rasterTool.value,
+      rasterToolEnabled: session.imageEditorRasterOverlay.rasterToolEnabled.value,
+      rasterOverlayVisible:
+        session.imageEditorRasterOverlay.hasRasterEdits.value ||
+        session.imageEditorRasterOverlay.rasterTool.value != null,
+      setRasterCanvasRef: (element) =>
+        session.imageEditorRasterOverlay.setRasterCanvasRef(nodeId, element),
+      onRasterCanvasPointerDown: session.imageEditorRasterOverlay.onRasterCanvasPointerDown,
     }
   }
 

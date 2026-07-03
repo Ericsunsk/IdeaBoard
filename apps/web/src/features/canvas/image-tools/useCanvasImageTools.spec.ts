@@ -7,7 +7,7 @@ import type { ImageEditorAdjustmentLayer, ImageEditorLayer } from '../image-edit
 import {
   cancelImageAdjustmentFinalRender,
   IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
-  renderImageAdjustmentFile,
+  renderImageEditorLayerStackFile,
   type CanvasImageAdjustmentFinalApplyContext,
 } from '../image-editor'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
@@ -18,10 +18,21 @@ vi.mock('../image-editor', async (importOriginal) => {
   return {
     ...actual,
     cancelImageAdjustmentFinalRender: vi.fn(),
-    renderImageAdjustmentFile: vi.fn(),
+    renderImageEditorLayerStackFile: vi.fn(),
     useImageAdjustmentRenderedPreview: vi.fn(() => ({
       imageEditorRenderedPreview: computed(() => null),
       imageEditorPreviewSource: computed(() => null),
+    })),
+    useImageEditorRasterOverlay: vi.fn(() => ({
+      rasterOverlayStyle: computed(() => null),
+      rasterCanvasWidth: computed(() => 1),
+      rasterCanvasHeight: computed(() => 1),
+      rasterBrushSize: computed(() => 32),
+      rasterTool: computed(() => null),
+      rasterToolEnabled: computed(() => false),
+      hasRasterEdits: computed(() => false),
+      setRasterCanvasRef: vi.fn(),
+      onRasterCanvasPointerDown: vi.fn(),
     })),
   }
 })
@@ -38,7 +49,7 @@ vi.mock('../mask-editor/lib/maskPaintingCanvas', async (importOriginal) => {
 })
 
 const cancelFinalRenderMock = vi.mocked(cancelImageAdjustmentFinalRender)
-const renderAdjustmentFileMock = vi.mocked(renderImageAdjustmentFile)
+const renderLayerStackFileMock = vi.mocked(renderImageEditorLayerStackFile)
 
 const effectiveThresholdLayer: ImageEditorAdjustmentLayer = {
   id: 'adjustment:threshold',
@@ -220,7 +231,7 @@ async function flushPromises() {
 afterEach(() => {
   vi.restoreAllMocks()
   cancelFinalRenderMock.mockReset()
-  renderAdjustmentFileMock.mockReset()
+  renderLayerStackFileMock.mockReset()
 })
 
 describe('useCanvasImageTools image adjustment final apply', () => {
@@ -246,7 +257,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
   it('records final render progress while applying and clears it after success', async () => {
     let resolveRender!: (file: File) => void
-    renderAdjustmentFileMock.mockImplementation(
+    renderLayerStackFileMock.mockImplementation(
       async (_source, _layers, options): Promise<File> =>
         new Promise((resolve) => {
           resolveRender = resolve
@@ -268,9 +279,9 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         loaded: 24,
         total: 96,
       })
-      expect(renderAdjustmentFileMock).toHaveBeenCalledWith(
+      expect(renderLayerStackFileMock).toHaveBeenCalledWith(
         { url: 'https://example.com/source.png', title: 'Source' },
-        [effectiveThresholdLayer],
+        [effectiveThresholdLayer, sourceLayer],
         expect.objectContaining({
           scopeId: 'node-1',
           onProgress: expect.any(Function),
@@ -295,7 +306,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
   })
 
   it('cancels the active final render without showing a warning toast', async () => {
-    renderAdjustmentFileMock.mockImplementation(
+    renderLayerStackFileMock.mockImplementation(
       async (_source, _layers, options): Promise<File> =>
         new Promise((_resolve, reject) => {
           options?.onProgress?.({ phase: 'encode' })
@@ -327,7 +338,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
   it('does not write an old final render result back after switching to another image node', async () => {
     let resolveOldRender!: (file: File) => void
-    renderAdjustmentFileMock.mockImplementation(
+    renderLayerStackFileMock.mockImplementation(
       async (_source, _layers, options): Promise<File> =>
         new Promise((resolve) => {
           resolveOldRender = resolve

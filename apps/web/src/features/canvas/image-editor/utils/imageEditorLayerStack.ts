@@ -12,6 +12,7 @@ import type {
   ImageEditorPaintLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
+  ImageEditorRasterContent,
   ImageEditorSharpenParams,
   ImageEditorThresholdParams,
 } from '../types'
@@ -88,6 +89,7 @@ export type ImageEditorLayerCommand =
   | { type: 'remove'; layerId: string }
   | { type: 'update-selected-param'; key: ImageEditorParamKey; value: ImageEditorParamValue }
   | { type: 'update-selected-adjustment-params'; params: ImageEditorAdjustmentWholeParams }
+  | { type: 'update-raster-content'; layerId: string; content: ImageEditorRasterContent }
 
 export function createInitialLayerStack(): ImageEditorLayerStack {
   return {
@@ -127,6 +129,8 @@ export function applyLayerCommand(
       return updateSelectedLayerParam(stack, command.key, command.value)
     case 'update-selected-adjustment-params':
       return updateSelectedAdjustmentParams(stack, command.params)
+    case 'update-raster-content':
+      return updateRasterLayerContent(stack, command.layerId, command.content)
   }
 }
 
@@ -272,6 +276,17 @@ function updateSelectedAdjustmentParams(
   }
 }
 
+function updateRasterLayerContent(
+  stack: ImageEditorLayerStack,
+  layerId: string,
+  content: ImageEditorRasterContent,
+): ImageEditorLayerStack {
+  return {
+    ...stack,
+    layers: stack.layers.map((layer) => updateRasterContentForLayer(layer, layerId, content)),
+  }
+}
+
 function resolveLayerInsertionIndex(stack: ImageEditorLayerStack) {
   const selectedIndex = stack.layers.findIndex((layer) => layer.id === stack.selectedLayerId)
   if (selectedIndex >= 0 && stack.layers[selectedIndex]?.type !== 'source') return selectedIndex
@@ -353,7 +368,7 @@ function cloneEditableLayer(
       ...layer,
       id: createLayerId('paint'),
       name,
-      content: { ...layer.content },
+      content: clonePaintContent(layer.content),
     }
   }
   if (layer.type === 'merged') {
@@ -370,6 +385,33 @@ function cloneEditableLayer(
     name,
     params: cloneAdjustmentParams(layer.params),
   } as ImageEditorAdjustmentLayer
+}
+
+function updateRasterContentForLayer(
+  layer: ImageEditorLayer,
+  layerId: string,
+  content: ImageEditorRasterContent,
+): ImageEditorLayer {
+  if (layer.id === layerId) {
+    if (layer.type === 'source') return { ...layer, content: cloneRasterContent(content) }
+    if (layer.type === 'paint') return { ...layer, content: cloneRasterContent(content) }
+    return layer
+  }
+  if (layer.type !== 'merged') return layer
+  return {
+    ...layer,
+    children: layer.children.map(
+      (child) => updateRasterContentForLayer(child, layerId, content) as ImageEditorEditableLayer,
+    ),
+  }
+}
+
+function clonePaintContent(content: ImageEditorPaintLayer['content']) {
+  return content.kind === 'raster' ? cloneRasterContent(content) : { ...content }
+}
+
+function cloneRasterContent(content: ImageEditorRasterContent): ImageEditorRasterContent {
+  return { ...content }
 }
 
 function createMergedLayer(

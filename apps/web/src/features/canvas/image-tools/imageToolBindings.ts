@@ -8,6 +8,8 @@ import type {
   ImageEditorMode,
   ImageEditorParamKey,
   ImageEditorParamValue,
+  ImageEditorRasterTool,
+  ImageEditorRasterToolSettings,
   ImageEditorRenderedPreview,
   ImageEditorTool,
 } from '../image-editor'
@@ -37,6 +39,15 @@ export type ImageToolStageBinding = {
   maskBrushShape: ImageMaskBrushShape
   setMaskCanvasRef: (element: Element | null) => void
   onMaskCanvasPointerDown: (event: PointerEvent) => void
+  rasterOverlayStyle: Record<string, string> | null
+  rasterCanvasWidth: number
+  rasterCanvasHeight: number
+  rasterBrushSize: number
+  rasterTool: ImageEditorRasterTool | null
+  rasterToolEnabled: boolean
+  rasterOverlayVisible: boolean
+  setRasterCanvasRef: (element: Element | null) => void
+  onRasterCanvasPointerDown: (event: PointerEvent) => void
 }
 
 export type ImageActionBinding = {
@@ -84,6 +95,11 @@ export type ImageToolChromeModel = {
     layers: ImageEditorLayer[]
     selectedLayerId: string
     selectedAdjustmentLayer: ImageEditorAdjustmentLayer | null
+    rasterToolSettings: ImageEditorRasterToolSettings
+    canUseRasterTool: boolean
+    canUndoRasterStroke: boolean
+    canRedoRasterStroke: boolean
+    hasRasterEdits: boolean
     histogramSource: ImageData | null
     applyingAdjustments: boolean
   }
@@ -115,6 +131,9 @@ export type ImageToolChromeCommands = {
   removeEditorLayer: (layerId: string) => void
   updateEditorParam: (key: ImageEditorParamKey, value: ImageEditorParamValue) => void
   updateEditorAdjustmentParams: (params: ImageEditorAdjustmentWholeParams) => void
+  updateEditorRasterToolSettings: (patch: Partial<ImageEditorRasterToolSettings>) => void
+  undoEditorRasterStroke: () => void
+  redoEditorRasterStroke: () => void
   applyAdjustments: () => Promise<void>
 }
 

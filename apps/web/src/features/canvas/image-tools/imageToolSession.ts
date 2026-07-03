@@ -1,3 +1,4 @@
+import { useEventListener } from '@vueuse/core'
 import { computed, ref } from 'vue'
 import type { Connection, Node } from '@vue-flow/core'
 import type { ComponentPublicInstance, Ref } from 'vue'
@@ -6,8 +7,10 @@ import type { CanvasInteractionKey } from '../composables/useFlowCanvasInteracti
 import type { ImageStrengthAction } from '../execution'
 import {
   cancelImageAdjustmentFinalRender,
+  hasImageEditorRasterEdits,
   type ImageAdjustmentFinalApplyProgress,
   type ImageEditorMode,
+  useImageEditorRasterOverlay,
   useImageEditorMode,
   useImageEditorSession,
   useImageEditorViewportController,
@@ -16,6 +19,7 @@ import { useImageMaskEditorOverlay, useMaskEditorChromeState } from '../mask-edi
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
+import { isEditableEventTarget } from '../utils/domEventTargets'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
 
 type ValueRef<T> = {
@@ -23,6 +27,8 @@ type ValueRef<T> = {
 }
 
 type CanvasImageToolsFeedback = CanvasFeedback['imageTools']
+
+const windowTarget = () => (typeof window === 'undefined' ? null : window)
 
 export type FlowViewport = { x: number; y: number; zoom: number }
 
@@ -93,13 +99,14 @@ export type UseCanvasImageToolsOptions = {
 export type ImageToolSession = ReturnType<typeof createImageToolSession>
 
 export function createImageToolSession(options: UseCanvasImageToolsOptions) {
+  let requestApplyImageEditorAdjustments: (() => void) | null = null
   const imageEditor = useImageEditorMode({
     nodes: options.nodes,
     activeTool: options.activeTool,
     getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
     getImageStageElement: options.getImageStageElement,
     onBeforePointerCancel: options.clearSelectedFlowElements,
-    onBeforeExit: (state) => cancelImageAdjustmentFinalTask(state.nodeId),
+    onBeforeExit: (state) => confirmImageEditorExit(state),
   })
   const {
     imageEditorMode,
@@ -115,6 +122,22 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   })
 
   const imageEditorSession = useImageEditorSession()
+  const imageEditorRasterOverlay = useImageEditorRasterOverlay({
+    editorState: imageEditor.imageEditorState,
+    sourceUrl: computed(() =>
+      imageEditorNodeId.value
+        ? (options.getImageNodeDisplayPayload(imageEditorNodeId.value)?.url ?? null)
+        : null,
+    ),
+    layers: imageEditorSession.imageEditorLayers,
+    selectedLayerId: imageEditorSession.selectedImageEditorLayerId,
+    activeTool: imageEditorSession.activeImageEditorTool,
+    settings: imageEditorSession.imageEditorRasterToolSettings,
+    captureHistorySnapshot: imageEditorSession.captureImageEditorRasterHistorySnapshot,
+    commitRasterStroke: imageEditorSession.commitImageEditorRasterStroke,
+    startCanvasInteraction: options.startCanvasInteraction,
+    stopCanvasInteraction: options.stopCanvasInteraction,
+  })
   const isApplyingImageEditorAdjustments = ref(false)
   const imageAdjustmentFinalApplyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(null)
   const activeImageAdjustmentFinalScopeId = ref<string | null>(null)
@@ -151,6 +174,46 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     }
   }
 
+  function setImageEditorApplyRequest(handler: () => void) {
+    requestApplyImageEditorAdjustments = handler
+  }
+
+  function confirmImageEditorExit(state: { nodeId: string; mode: ImageEditorMode }) {
+    if (state.mode !== 'adjust') {
+      cancelImageAdjustmentFinalTask(state.nodeId)
+      return true
+    }
+
+    const hasRasterEdits = hasImageEditorRasterEdits(imageEditorSession.imageEditorLayers.value)
+    if (!hasRasterEdits) {
+      imageEditorSession.clearImageEditorRasterHistory()
+      cancelImageAdjustmentFinalTask(state.nodeId)
+      return true
+    }
+
+    if (isApplyingImageEditorAdjustments.value) {
+      options.feedback.warning('正在应用编辑，请稍候')
+      return false
+    }
+
+    const shouldApply = window.confirm(
+      '有未应用的画笔/橡皮擦编辑。\n\n确定：应用并生成新节点\n取消：继续选择丢弃或返回编辑',
+    )
+    if (shouldApply) {
+      requestApplyImageEditorAdjustments?.()
+      return false
+    }
+
+    const shouldDiscard = window.confirm(
+      '是否丢弃这些未应用的编辑并退出？\n\n确定：丢弃并退出\n取消：返回编辑',
+    )
+    if (!shouldDiscard) return false
+
+    imageEditorSession.clearImageEditorRasterEdits()
+    cancelImageAdjustmentFinalTask(state.nodeId)
+    return true
+  }
+
   function enter(nodeId: string, mode: ImageEditorMode): boolean {
     const entered = enterImageEditorModeBase(nodeId, mode)
     if (!entered) return false
@@ -172,13 +235,35 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
 
   function discardNodeEdits(nodeId: string) {
     maskEditor.clearCommittedMaskData(nodeId)
+    if (imageEditorNodeId.value === nodeId) imageEditorSession.clearImageEditorRasterEdits()
   }
+
+  function onGlobalKeydown(event: KeyboardEvent) {
+    if (imageEditorMode.value !== 'adjust') return
+    if (isEditableEventTarget(event.target)) return
+    const key = event.key.toLowerCase()
+    const hasModifier = event.metaKey || event.ctrlKey
+    if (!hasModifier) return
+
+    if ((key === 'z' && event.shiftKey) || key === 'y') {
+      event.preventDefault()
+      imageEditorSession.redoImageEditorRasterStroke()
+      return
+    }
+    if (key === 'z') {
+      event.preventDefault()
+      imageEditorSession.undoImageEditorRasterStroke()
+    }
+  }
+
+  useEventListener<KeyboardEvent>(windowTarget, 'keydown', onGlobalKeydown, true)
 
   return {
     options,
     imageEditorMode,
     imageEditorNodeId,
     imageEditorSession,
+    imageEditorRasterOverlay,
     isImageAdjustmentMode,
     isApplyingImageEditorAdjustments,
     imageAdjustmentFinalApplyProgress,
@@ -191,6 +276,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     commitMask,
     exitImageEditorMode,
     cancelImageAdjustmentFinalTask,
+    setImageEditorApplyRequest,
     discardNodeEdits,
   }
 }
