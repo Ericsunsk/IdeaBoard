@@ -23,6 +23,24 @@ export type BoardSessionRepository = {
   sync: (boardId: string, stateOverride?: CanvasBoardState | null) => Promise<void>
 }
 
+export class BoardSessionRemoteSyncError extends Error {
+  readonly boardId: string
+  readonly savedState: CanvasBoardState
+
+  constructor(boardId: string, savedState: CanvasBoardState, cause: unknown) {
+    super('BOARD_REMOTE_SYNC_FAILED', { cause })
+    this.name = 'BoardSessionRemoteSyncError'
+    this.boardId = boardId
+    this.savedState = savedState
+  }
+}
+
+export function isBoardSessionRemoteSyncError(
+  error: unknown,
+): error is BoardSessionRemoteSyncError {
+  return error instanceof BoardSessionRemoteSyncError
+}
+
 export function createBoardSessionRepository(): BoardSessionRepository {
   async function load(boardId: string): Promise<CanvasBoardSnapshot | null> {
     const normalized = normalizeBoardId(boardId)
@@ -51,7 +69,11 @@ export function createBoardSessionRepository(): BoardSessionRepository {
     if (!touched) {
       throw new Error('TOUCH_BOARD_FAILED')
     }
-    await syncCanvasBoardToServer(normalized, saved)
+    try {
+      await syncCanvasBoardToServer(normalized, saved)
+    } catch (error) {
+      throw new BoardSessionRemoteSyncError(normalized, saved, error)
+    }
     return saved
   }
 

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
-import { createCanvasBoard } from '../../canvas-board/catalog/canvasBoards'
+import {
+  createCanvasBoard,
+  getCanvasBoardById,
+} from '../../canvas-board/catalog/canvasBoards'
 import {
   getCanvasBoardState,
   replaceCanvasBoardStateMap,
@@ -11,7 +14,10 @@ import {
   makeCanvasBoardState,
   makeCanvasViewport,
 } from '../../canvas-board/testing'
-import { createBoardSessionRepository } from './boardSessionRepository'
+import {
+  createBoardSessionRepository,
+  isBoardSessionRemoteSyncError,
+} from './boardSessionRepository'
 
 const mocks = vi.hoisted(() => {
   const boardApi = {
@@ -91,5 +97,37 @@ describe('createBoardSessionRepository', () => {
     const payload = mocks.boardApi.upsert.mock.calls[0]?.[1]
     expect(payload?.state?.viewport.zoomLevel).toBe(250)
     expect(payload?.state?.previewSnapshotDataUrl).toBeUndefined()
+  })
+
+  it('keeps the local state and reports recoverable remote sync failure', async () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    try {
+      const board = createCanvasBoard('Remote Failure')
+      replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 100) })
+      const repository = createBoardSessionRepository()
+      const remoteError = new Error('network down')
+      mocks.boardApi.upsert.mockRejectedValueOnce(remoteError)
+      nowSpy.mockReturnValue(2_000)
+
+      let thrown: unknown
+      try {
+        await repository.save(board.id, makeSnapshot(300))
+      } catch (error) {
+        thrown = error
+      }
+
+      const savedState = getCanvasBoardState(board.id)
+      expect(savedState?.viewport.zoomLevel).toBe(300)
+      expect(savedState?.updatedAt).toBe(2_000)
+      expect(getCanvasBoardById(board.id)?.updatedAt).toBe(2_000)
+      expect(isBoardSessionRemoteSyncError(thrown)).toBe(true)
+      if (!isBoardSessionRemoteSyncError(thrown)) return
+      expect(thrown.boardId).toBe(board.id)
+      expect(thrown.savedState).toEqual(savedState)
+      expect(thrown.cause).toBe(remoteError)
+      expect(mocks.boardApi.upsert).toHaveBeenCalledTimes(1)
+    } finally {
+      nowSpy.mockRestore()
+    }
   })
 })

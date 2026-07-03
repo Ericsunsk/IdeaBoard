@@ -25,6 +25,10 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     fullNodes.value = nextGraph.nodes
     fullEdges.value = nextGraph.edges
   })
+  const onWarning = vi.fn()
+  const onSuccess = vi.fn()
+  const onError = vi.fn()
+  const clearFlowHistoryBaseline = vi.fn()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => {
       const boardId = routeBoardId.value.trim()
@@ -47,11 +51,11 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     boardSession,
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     setViewport,
-    onWarning: vi.fn(),
-    onSuccess: vi.fn(),
-    onError: vi.fn(),
+    onWarning,
+    onSuccess,
+    onError,
     refreshSnapshot: vi.fn(),
-    clearFlowHistoryBaseline: vi.fn(),
+    clearFlowHistoryBaseline,
     commitGraph,
   })
 
@@ -67,6 +71,10 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     commitGraph,
     setViewport,
     boardSession,
+    onWarning,
+    onSuccess,
+    onError,
+    clearFlowHistoryBaseline,
   }
 }
 
@@ -137,7 +145,7 @@ describe('useFlowBoardPersistence', () => {
       (snapshot: CanvasBoardSnapshot) =>
         new Promise<void>((resolve) => {
           mocks.resolveSave = resolve
-        }).then(() => ({ snapshot })),
+        }).then(() => ({ snapshot, remoteSync: { ok: true } })),
     )
   })
 
@@ -173,6 +181,49 @@ describe('useFlowBoardPersistence', () => {
     )
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
+  })
+
+  it('keeps the board dirty and exposes retry state when remote sync fails after local save', async () => {
+    const harness = createPersistenceHarness()
+    const remoteError = new Error('network down')
+    mocks.save.mockResolvedValueOnce({
+      snapshot: createEmptyCanvasBoardSnapshot(),
+      remoteSync: { ok: false, error: remoteError },
+    })
+
+    const saved = await harness.persistence.saveCurrentBoardSnapshot({ silent: false })
+
+    expect(saved).toBe(false)
+    expect(harness.commitGraph).toHaveBeenCalledOnce()
+    expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('failed')
+    expect(harness.onWarning).toHaveBeenCalledWith(
+      '已保存到本地，远端同步失败，将在网络恢复后重试',
+    )
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+    expect(harness.onError).not.toHaveBeenCalled()
+  })
+
+  it('surfaces board name conflicts without retry copy when remote sync fails after local save', async () => {
+    const harness = createPersistenceHarness()
+    mocks.save.mockResolvedValueOnce({
+      snapshot: createEmptyCanvasBoardSnapshot(),
+      remoteSync: { ok: false, error: { status: 409, msg: '画布名称已存在' } },
+    })
+
+    const saved = await harness.persistence.saveCurrentBoardSnapshot({ silent: false })
+
+    expect(saved).toBe(false)
+    expect(harness.commitGraph).toHaveBeenCalledOnce()
+    expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('failed')
+    expect(harness.onError).toHaveBeenCalledWith(
+      '已保存到本地，但画布名称已存在，请更换后再试',
+    )
+    expect(harness.onWarning).not.toHaveBeenCalled()
+    expect(harness.onSuccess).not.toHaveBeenCalled()
   })
 
   it('saves from the full graph without dropping hidden nodes or edges', async () => {

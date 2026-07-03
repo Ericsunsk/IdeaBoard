@@ -5,6 +5,7 @@ import {
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from '../utils/flowSnapshotAdapter'
+import { isBoardNameConflictError } from '../../canvas-board/catalog/boardSync'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
@@ -202,6 +203,15 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     )
   }
 
+  function notifyRemoteSyncFailure(error: unknown, silent: boolean) {
+    if (silent) return
+    if (isBoardNameConflictError(error)) {
+      options.onError('已保存到本地，但画布名称已存在，请更换后再试')
+      return
+    }
+    options.onWarning('已保存到本地，远端同步失败，将在网络恢复后重试')
+  }
+
   async function saveCurrentBoardSnapshot(
     saveOptions: SaveCurrentBoardSnapshotOptions = {},
   ): Promise<boolean> {
@@ -215,7 +225,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     options.isSavingBoard.value = true
     try {
       const snapshot = buildCurrentBoardSnapshot()
-      const { snapshot: stabilizedSnapshot } = await measureCanvasPerfAsync(
+      const { snapshot: stabilizedSnapshot, remoteSync } = await measureCanvasPerfAsync(
         'board.save.session',
         () => ({
           imageNodes: snapshot.imageNodes.length,
@@ -234,21 +244,30 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       if (shouldCommitToCurrentGraph) {
         options.boardBaseSnapshot.value = stabilizedSnapshot
         const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
+        const isRemoteSynced = remoteSync.ok
         if (!hasPendingImageResultNode(options.fullNodes.value)) {
           options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] }, { preserveSelection: true })
-          options.clearFlowHistoryBaseline()
+          if (isRemoteSynced) {
+            options.clearFlowHistoryBaseline()
+          }
         }
-        options.isDirty.value = false
-        options.saveStatus.value = 'saved'
-        if (!saveOptions.silent) {
-          options.onSuccess('已保存')
+        if (isRemoteSynced) {
+          options.isDirty.value = false
+          options.saveStatus.value = 'saved'
+          if (!saveOptions.silent) {
+            options.onSuccess('已保存')
+          }
+        } else {
+          options.isDirty.value = true
+          options.saveStatus.value = 'failed'
+          notifyRemoteSyncFailure(remoteSync.error, !!saveOptions.silent)
         }
       }
       if (isSaveStillCurrent()) {
         options.refreshSnapshot()
         options.onGraphCommitted?.()
       }
-      return true
+      return remoteSync.ok
     } catch (error) {
       if (isSaveStillCurrent()) {
         options.saveStatus.value = 'failed'

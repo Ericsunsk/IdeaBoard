@@ -74,7 +74,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     load: vi.fn(async () => snapshot),
     save: vi.fn(async (nextSnapshot: CanvasBoardSnapshot) => {
       savedSnapshots.push(nextSnapshot)
-      return { snapshot: nextSnapshot }
+      return { snapshot: nextSnapshot, remoteSync: { ok: true as const } }
     }),
     refreshPreview: vi.fn(),
   }

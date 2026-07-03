@@ -6,7 +6,10 @@ import {
   makeCanvasViewport,
 } from '../../canvas-board/testing'
 import type { BoardSessionPreviewRenderer } from './boardSessionPreview'
-import type { BoardSessionRepository } from './boardSessionRepository'
+import {
+  BoardSessionRemoteSyncError,
+  type BoardSessionRepository,
+} from './boardSessionRepository'
 import { useCanvasBoardSession } from './useCanvasBoardSession'
 
 function makeSnapshot(zoomLevel: number): CanvasBoardSnapshot {
@@ -117,6 +120,7 @@ describe('useCanvasBoardSession', () => {
     const result = await session.save(snapshot, { waitForPreview: true })
 
     expect(result.snapshot).toBe(stabilizedSnapshot)
+    expect(result.remoteSync).toEqual({ ok: true })
     expect(createUploadLifecycle).toHaveBeenCalledWith({
       userId: 1,
       userUid: 'user-uid',
@@ -223,6 +227,46 @@ describe('useCanvasBoardSession', () => {
 
     expect(lifecycle.recycleRemovedUploadsAfterSave).toHaveBeenCalledOnce()
     expect(isResolved).toBe(true)
+  })
+
+  it('returns a recoverable remote sync failure without recycling removed uploads', async () => {
+    const snapshot = makeSnapshot(100)
+    const stabilizedSnapshot = makeSnapshot(250)
+    const savedState = makeState(stabilizedSnapshot)
+    const remoteError = new Error('network down')
+    const lifecycle = {
+      readPreviousSnapshot: vi.fn(() => makeSnapshot(50)),
+      stabilizeSnapshotForSave: vi.fn(async () => stabilizedSnapshot),
+      recycleRemovedUploadsAfterSave: vi.fn(async () => undefined),
+    }
+    const repository = createRepository({
+      save: vi.fn(async () => {
+        throw new BoardSessionRemoteSyncError('board-a', savedState, remoteError)
+      }),
+      sync: vi.fn(async () => undefined),
+    })
+    const previewRenderer: BoardSessionPreviewRenderer = {
+      rendererVersion: 1,
+      render: vi.fn(async () => 'data:image/webp;base64,preview'),
+    }
+    const session = useCanvasBoardSession({
+      getBoardIdQuery: () => 'board-a',
+      getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
+      repository,
+      previewRenderer,
+      message: { warning: vi.fn() },
+      createUploadLifecycle: vi.fn(() => lifecycle),
+    })
+
+    const result = await session.save(snapshot, { waitForPreview: true })
+
+    expect(result).toEqual({
+      snapshot: stabilizedSnapshot,
+      remoteSync: { ok: false, error: remoteError },
+    })
+    expect(previewRenderer.render).not.toHaveBeenCalled()
+    expect(repository.sync).not.toHaveBeenCalled()
+    expect(lifecycle.recycleRemovedUploadsAfterSave).not.toHaveBeenCalled()
   })
 
   it('normalizes board ids for load and exists', async () => {

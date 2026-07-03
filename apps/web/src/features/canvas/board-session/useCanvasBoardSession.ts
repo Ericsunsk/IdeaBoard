@@ -2,6 +2,7 @@ import { computed, type ComputedRef } from 'vue'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import {
   createBoardSessionRepository,
+  isBoardSessionRemoteSyncError,
   type BoardSessionRepository,
 } from './boardSessionRepository'
 import {
@@ -26,6 +27,7 @@ export type CanvasBoardSessionSaveOptions = {
 
 export type CanvasBoardSessionSaveResult = {
   snapshot: CanvasBoardSnapshot
+  remoteSync: { ok: true } | { ok: false; error: unknown }
 }
 
 export type CanvasBoardSession = {
@@ -106,7 +108,17 @@ export function useCanvasBoardSession(
     })
     const previousSnapshot = uploadLifecycle.readPreviousSnapshot()
     const stabilizedSnapshot = await uploadLifecycle.stabilizeSnapshotForSave(snapshot)
-    await repository.save(boardId, stabilizedSnapshot)
+    try {
+      await repository.save(boardId, stabilizedSnapshot)
+    } catch (error) {
+      if (!isBoardSessionRemoteSyncError(error)) {
+        throw error
+      }
+      return {
+        snapshot: stabilizedSnapshot,
+        remoteSync: { ok: false, error: error.cause ?? error },
+      }
+    }
     const previewRefreshTask = refreshPreview(boardId, stabilizedSnapshot).catch((error) => {
       console.warn('[canvas] refresh board preview after save failed', boardId, error)
     })
@@ -114,7 +126,7 @@ export function useCanvasBoardSession(
       await previewRefreshTask
     }
     await uploadLifecycle.recycleRemovedUploadsAfterSave(previousSnapshot, stabilizedSnapshot)
-    return { snapshot: stabilizedSnapshot }
+    return { snapshot: stabilizedSnapshot, remoteSync: { ok: true } }
   }
 
   async function refreshPreview(boardId: string, snapshot: CanvasBoardSnapshot): Promise<void> {
