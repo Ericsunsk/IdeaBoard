@@ -5,7 +5,7 @@
 - `compose.local.yml`：本地开发用 PostgreSQL + NATS
 - `compose.yml`：生产 VPS 用 `宿主机反代 + API + Auth + PostgreSQL + NATS`
 
-生产环境请优先使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的 GHCR + Docker Compose 部署方式。
+生产环境请优先使用 [docs/runbooks/deployment.md](../docs/runbooks/deployment.md) 中的 GHCR + Docker Compose 部署方式。
 
 
 ## 快速启动

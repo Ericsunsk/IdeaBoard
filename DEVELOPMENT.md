@@ -1,110 +1,138 @@
-# <div align="center">IdeaBoard 开发手册</div>
+# IdeaBoard Developer Handbook
 
-<p align="center">
-  <strong>面向仓库维护者与开发者的开发手册。</strong>
-</p>
+`DEVELOPMENT.md` 服务日常开发：怎么启动、改哪里、跑什么验证。系统设计 contract 见 [DESIGN.md](./DESIGN.md)，线上操作见 [docs/runbooks/](./docs/runbooks/)。
 
-<p align="center">
-  聚焦当前系统结构、workflow contract、本地开发路径与关键目录边界。
-</p>
+## 本地开发
 
-<p align="center">
-  <code>私有</code>
-  <code>闭源</code>
-  <code>内部工程文档</code>
-</p>
+环境要求：
 
-<p align="center">
-  <a href="#development-snapshot">系统概览</a> ·
-  <a href="#workflow-contract">工作流契约</a> ·
-  <a href="#task-lifecycle">任务链路</a> ·
-  <a href="#local-dev-fast-path">本地开发</a> ·
-  <a href="#repo-map">目录边界</a>
-</p>
+| 组件 | 建议版本 |
+| ---- | -------- |
+| Node.js | `22.18+` |
+| Go | `1.26.4+` |
+| PostgreSQL | `17+` |
 
+启动本地依赖：
 
-> [!IMPORTANT]
-> 本文档仅供 IdeaBoard 授权成员内部使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
-
-<a id="development-snapshot"></a>
-## 开发概览
-
-IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵守 workflow feature contract、执行链 contract 和提示词模板 contract。
-
-### 当前速览
-
-| 维度 | 当前配置 |
-|------|----------|
-| 前端 | `Vue 3` + `Vite` + `TypeScript` + `PrimeVue v4` + `Tailwind CSS v4` + `Pinia` |
-| 后端 | `Go` + `Gin` + `sqlc` + `Better Auth (Fastify/Node.js/TypeScript)` |
-| 基础设施 | `PostgreSQL 17+`（业务数据与 River 任务队列）+ `NATS JetStream`（事件层） |
-| 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001`，NATS `4222/8222` |
-| 当前主链 | 画布节点编排 -> 任务提交 -> Worker 执行 -> 结果回写 |
-| 技术标识 | `ideaboard-*` |
-
-### 架构形态
-
-```mermaid
-graph LR
-    Browser["浏览器 (SPA)"] --> Vite["Vite / 前端"]
-    Browser --> Auth["Better Auth (apps/auth)"]
-    Browser --> Gin["Gin API (Go)"]
-
-    Gin --> Postgres[("PostgreSQL<br>业务数据 + River 队列")]
-    Gin --> NATS["NATS JetStream<br>任务状态事件"]
-    Auth --> Postgres
-
-    Postgres --> Worker["Worker 消费者"]
-    Worker --> NATS
-    NATS --> Gin
-    Worker --> AI["上游 AI 渠道"]
-    Worker --> Storage["Local / S3-compatible 对象存储"]
+```bash
+cd docker
+cp .env.example .env
+# 至少修改 POSTGRES_PASSWORD
+docker compose -f compose.local.yml up -d
 ```
 
+启动 Auth：
 
-## 职责边界
+```bash
+cd apps/auth
+cp .env.example .env
+npm install
+npm run migrate
+npm run dev
+```
 
-### 前端职责
+启动 API：
 
-前端主要负责：
+```bash
+cd apps/api
+cp .env.example .env
+go run ./cmd migrate
+go run ./cmd
+```
 
-- 画布工作台、节点编排与连接交互
-- 任务请求装配
-- 结果展示与画板管理
-- 管理后台配置页
-- 登录态维护与权限路由
+启动 Web：
 
-主要页面入口：
+```bash
+cd apps/web
+npm install
+npm run dev
+```
 
-| 路径 | 说明 |
-|------|------|
-| `/user/home` | 用户首页与工作台入口 |
-| `/user/canvas` | 画布工作台主页面 |
-| `/user/boards` | 画板列表 |
-| `/user/center` | 用户中心 |
-| `/admin/*` | 管理后台 |
-| `/admin/statistics` | 运营统计仪表盘（调用趋势、模型占比、健康热力图） |
+初始化管理员：
 
-### 后端职责
+```bash
+cd apps/api
+INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
+```
 
-后端主要负责：
+开发代理：
 
-- 用户鉴权与管理员权限控制
-- 任务提交、任务记录与 SSE 状态推送
-- 账号池、渠道商与任务调度
-- 系统提示词模板读取与变量替换
-- 分割、超分、向量化、上传与对象存储
-- Worker 异步执行与结果持久化
-- 每日统计聚合（事件源去重 + 回填）与运营仪表盘 API
+| Path | Target |
+| ---- | ------ |
+| `/api/auth/**` | `http://localhost:6001` |
+| `/api/**` | `http://localhost:6000` |
+| `/uploads/**` | `http://localhost:6000` |
 
+## 验证矩阵
 
-<a id="workflow-contract"></a>
-## 工作流契约
+日常小改优先跑最小相关检查；跨层 contract 改动同时验证前后端。
 
-当前受支持的 workflow feature slug：
+| 场景 | 命令 |
+| ---- | ---- |
+| Web unit/spec | `cd apps/web && npm run test:run` |
+| Web build/type | `cd apps/web && npm run build` |
+| Web lint | `cd apps/web && npm run lint` |
+| Web style lint | `cd apps/web && npm run lint:style` |
+| API tests | `cd apps/api && go test ./...` |
+| API build | `cd apps/api && go build ./...` |
+| sqlc regeneration | `cd apps/api && go tool sqlc generate` |
+| Auth build | `cd apps/auth && npm run build` |
 
-| 功能 slug | 典型语义 |
-|-----------|----------|
+修改 `apps/api/internal/db/queries` 或 schema 后：
+
+```bash
+cd apps/api
+go tool sqlc generate
+git diff --exit-code -- internal/db/sqlc
+```
+
+## 常用入口
+
+### Canvas workflow
+
+| 入口 | 用途 |
+| ---- | ---- |
+| [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue) | Canvas route page |
+| [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts) | 前端 workflow feature contract |
+| [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowPromptGenerationOrchestrator.ts) | Prompt/node execution orchestration |
+| [useFlowImageDirectActions.ts](./apps/web/src/features/canvas/execution/runtime/useFlowImageDirectActions.ts) | Image node direct actions |
+| [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts) | Task SSE events |
+| [features.go](./apps/api/internal/workflow/features.go) | 后端 canonical feature contract |
+
+### Task runtime
+
+| 入口 | 用途 |
+| ---- | ---- |
+| [service.go](./apps/api/internal/tasking/taskservice/service.go) | Task service |
+| [store.go](./apps/api/internal/tasking/tasksubmission/store.go) | Transactional task submission |
+| [river_queue.go](./apps/api/internal/tasking/taskqueue/river_queue.go) | River enqueue adapter |
+| [river_worker.go](./apps/api/internal/runtime/worker/river_worker.go) | River worker adapter |
+| [task_processor.go](./apps/api/internal/runtime/worker/task_processor.go) | Worker task processing |
+| [provider_request.go](./apps/api/internal/runtime/worker/provider_request.go) | Provider request shaping |
+
+### Prompt config
+
+| 入口 | 用途 |
+| ---- | ---- |
+| [AdminPromptConfigPage.vue](./apps/web/src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue) | Admin prompt UI |
+| [engine.go](./apps/api/internal/prompts/engine.go) | Prompt rendering |
+| [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md) | 运营模板和变量规则 |
+
+### Auth
+
+| 入口 | 用途 |
+| ---- | ---- |
+| [middleware.go](./apps/api/internal/identity/auth/middleware.go) | API auth middleware |
+| [service_client.go](./apps/api/internal/identity/auth/service_client.go) | Go -> Auth internal client |
+| [index.ts](./apps/auth/src/index.ts) | Auth service routes |
+| [client.ts](./apps/web/src/shared/auth/client.ts) | Web auth client |
+| [user.ts](./apps/web/src/app/stores/user.ts) | User session store |
+| [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md) | Auth operation rules |
+
+## Workflow Feature Contract
+
+| Feature | 语义 |
+| ------- | ---- |
 | `sketch-to-image` | 草图成图 |
 | `style-variation` | 风格延展 |
 | `partial-edit` | 局部重绘 |
@@ -114,374 +142,119 @@ graph LR
 | `hd-upscale` | HD |
 | `image-extend` | 扩图 |
 
-### 契约规则
+Rules:
 
-- `feature` 应作为顶层任务字段传递，并在后端统一校验。
-- `image_urls` 应作为顶层任务字段传递，媒体引用由顶层媒体字段或 feature 运行时字段表达。
-- `params` 只承载 feature 专属结构化参数，例如 `hd.clarity_strength`、`fusion.input_weights`、`mask_image_url`、`reference_image_urls`。
-- 工作流参数只接受 canonical key；前端执行 contract、OpenAPI 与 Go validation 必须保持同名同层级。
-- `use_mask`、`mask_image_url`、`mask_image_urls` 是 `partial-edit` 局部重绘链路的运行时边界参数，不是 prompt 模板变量。
-- 产品文案、展示分组和模板 contract 只描述当前可执行能力。
+- `feature` 是顶层任务字段，由后端统一校验。
+- `image_urls` 是顶层媒体字段。
+- `params` 只承载 feature-specific structured parameters。
+- 工作流参数只接受 canonical key；前端 execution contract、OpenAPI 与 Go validation 必须保持同名同层级。
+- `use_mask`、`mask_image_url`、`mask_image_urls` 是 `partial-edit` 运行时边界参数，不是 prompt 模板变量。
+- 新增或修改 feature 时同步前端 contract、后端 workflow helper、Admin prompt config 和 runbook。
 
-对应实现：
+## Generated Code
 
-- [executionContract.ts](./apps/web/src/features/canvas/config/executionContract.ts)
-- [features.go](./apps/api/internal/workflow/features.go)
+Generated API:
 
-<a id="task-lifecycle"></a>
-## 任务生命周期
+- `apps/web/src/shared/api/generated-query` 由 Orval 生成，不手动编辑。
+- Route pages 和 components 不直接依赖 generated API。
+- 业务访问收口到 feature resource、feature adapter 或 shared composable。
 
-### 请求结构
+sqlc:
 
-前端通过统一执行 contract 拼装请求，典型字段如下：
+- `apps/api/internal/db/sqlc/*.go` 不手动编辑。
+- SQL schema/query 变更后运行 `go tool sqlc generate`。
+- migrations 位于 `apps/api/internal/db/migrations/`。
 
-```json
-{
-  "prompt": "用户提示词",
-  "feature": "style-fusion",
-  "image_urls": ["https://..."],
-  "params": {
-    "fusion": {
-      "mode": "weighted_reference",
-      "input_weights": [0.6, 0.4]
-    }
-  }
-}
-```
+## 环境变量要点
 
-### 前端入口
-
-- [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowPromptGenerationOrchestrator.ts)
-- [useFlowImageDirectActions.ts](./apps/web/src/features/canvas/composables/useFlowImageDirectActions.ts)
-- [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)
-- [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue)
-
-### 后端流程
-
-```mermaid
-sequenceDiagram
-    participant FE as 前端
-    participant API as Go API
-    participant DB as PostgreSQL/River
-    participant NATS as NATS JetStream
-    participant WK as Worker
-    participant AI as AI 渠道
-
-    FE->>API: 提交任务 (feature + prompt)
-    API->>API: 标准化参数 & 模板装配
-    API->>DB: 写入任务表 & 推入队列
-    API-->>FE: 返回任务 ID (建立 SSE 事件流)
-
-    DB->>WK: 消费任务
-    WK->>WK: 调度可用账号
-    WK->>AI: 调用接口
-    AI-->>WK: 返回结果
-    WK->>WK: 持久化存储 (OSS/Local)
-    WK->>DB: 更新状态为 Success/Failed
-    WK->>NATS: 发布 task.status_changed
-
-    NATS-->>API: 桥接任务状态事件到本地 SSE hub
-    API-->>FE: SSE 推送任务状态与最终结果
-```
-
-
-关键代码：
-
-- [service.go](./apps/api/internal/tasking/taskservice/service.go)
-- [store.go](./apps/api/internal/tasking/tasksubmission/store.go)
-- [river_queue.go](./apps/api/internal/tasking/taskqueue/river_queue.go)
-- [engine.go](./apps/api/internal/prompts/engine.go)
-- [river_worker.go](./apps/api/internal/runtime/worker/river_worker.go)
-- [task_processor.go](./apps/api/internal/runtime/worker/task_processor.go)
-- [provider_request.go](./apps/api/internal/runtime/worker/provider_request.go)
-
-
-## 提示词系统
-
-系统提示词由后台 `feature_prompts` 配置驱动，按 `feature_slug` 读取启用配置，并支持 `{{变量}}` 模板语法。
-
-### 核心规则
-
-- `feature slug` 是唯一索引，只接受当前 canonical slug。
-- `{{user_prompt}}` 是用户输入信号，与系统提示词模板分层装配。
-- 执行语义由后台模板和显式参数表达，模板变量必须来自稳定变量表。
-- Fusion 节点使用 `{{fusion_input_weights}}` 表达 2 到 4 张输入图的有序权重。
-- HD 节点使用 `{{clarity_strength}}` 表达清晰度强度；输出尺寸按原图尺寸由运行时尺寸参数控制。
-- Prompt 节点的 `pattern-gen` system prompt 是可选配置；为空时直接使用用户输入，后续可通过后台补充辅助性约束。
-
-### 常用变量
+本地 API/Auth 至少确认：
 
 | 变量 | 说明 |
-|------|------|
-| `{{user_prompt}}` | 用户输入文本 |
-| `{{variation_strength}}` | 风格延展强度百分比 |
-| `{{fusion_input_weights}}` | Fusion 有序图片权重，例如 `Image 1: 60%, Image 2: 40%` |
-| `{{extend_top_percent}}` `{{extend_right_percent}}` `{{extend_bottom_percent}}` `{{extend_left_percent}}` | 扩图方向百分比 |
-| `{{clarity_strength}}` | HD 清晰度强度百分比 |
+| ---- | ---- |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | PostgreSQL 连接 |
+| `AUTH_SERVICE_BASE_URL` | Go 调用 Auth service 的地址 |
+| `AUTH_INTERNAL_KEY` | API/Auth internal endpoint 共享密钥 |
+| `APP_SECRETS_ENCRYPTION_KEY` | API key 和 storage secret 静态加密主密钥 |
+| `BETTER_AUTH_SECRET` | Better Auth 签名密钥，生产必须高熵 |
+| `BETTER_AUTH_URL` | Auth 对外基准 URL |
 
-`original_image_url`、`image_urls`、`mask_image_url`、`mask_image_urls`、`reference_image_urls` 是运行时媒体字段，不是 prompt 模板变量；不要写成 `{{...}}` 插入 system prompt 正文。
+Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是部署输入变量，不是 API runtime 直接读取的公开链接配置。生产部署细节见 [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)。
 
-相关入口：
+## 改动 Checklist
 
-- 管理页：[AdminPromptConfigPage.vue](./apps/web/src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue)
-- 后端装配：[engine.go](./apps/api/internal/prompts/engine.go)
+### 改 Canvas 或 workflow
 
+1. 更新前端 execution contract。
+2. 更新 Go workflow validation/helper。
+3. 检查 Admin prompt config 展示和变量。
+4. 确认 prompt 变量没有承载媒体 URL、mask 或 provider 参数。
+5. 跑 Web tests/build 和 API tests。
 
-## 鉴权与会话
+### 改 task submission/runtime
 
-系统采用 `Better Auth session + Go 业务授权模型`：
+1. 保持 task insert 和 River enqueue 在同一个 PostgreSQL transaction。
+2. 保持 River 是任务队列，NATS 只做事件层。
+3. 检查 cancel、terminal state、retry 和 no-capacity 分支。
+4. 跑 API tests；跨层状态变化同时跑 Web task event 相关测试。
 
-- 登录、注册、登出、session 校验由 `apps/auth` 负责。
-- Go API 中间件读取 `Cookie`，通过 auth service 的 internal endpoint 校验 session。
-- Go 仅维护本地业务用户档案（`id/username/auth_user_id/storage_uid/role/status`）与权限判定。
-- 可在管理后台通过“开放注册”开关实时控制注册入口，状态持久化在 `system_configs` 表中。
-- 可在管理后台通过“注册与 API 限流”调整 Go API 全局 IP 限流，配置落在 `system_configs`（`api_rate_limit_window_seconds`、`api_rate_limit_max_requests`）。
-- `apps/auth` 对 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 启用基于来源 IP 的内存限流；反向代理场景依赖 Fastify `request.ip` 与 loopback `trustProxy` 解析客户端 IP。
-- `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销；不开放后台改密。
-- 角色升降级必须经由 Go Admin API：前端不直连 `authClient.admin.setRole`，由 Go 校验后同步 Auth Service 与业务侧 `users.role`。
-- 彻底注销必须经由 Go Admin API：先校验目标不是当前管理员/管理员账号，再调用 Auth Service internal endpoint 删除身份、会话与凭据，最后清理业务侧用户数据；前端不得直接调用 `authClient.admin.removeUser`。
-- 账号安全运维边界见 [auth-operation-runbook.md](./docs/auth-operation-runbook.md)，遵循“业务治理在 Admin，高风险身份操作由 Go Admin API 编排”的原则。
+### 改 Admin 页面
 
-关键代码：
+1. Route page 不直接依赖 generated API。
+2. 在 vertical context/resource 内处理 command sequencing 和 cache invalidation。
+3. 后端 payload ownership 不泄漏到无关 `shared` module。
+4. 跑 Web lint/test/build。
 
-- [middleware.go](./apps/api/internal/identity/auth/middleware.go)
-- [service_client.go](./apps/api/internal/identity/auth/service_client.go)
-- [index.ts](./apps/auth/src/index.ts)
-- [client.ts](./apps/web/src/shared/auth/client.ts)
-- [user.ts](./apps/web/src/app/stores/user.ts)
+### 改 Auth 或安全逻辑
 
+1. 高风险身份动作继续经由 Go Admin API 编排。
+2. 不允许前端直连 Better Auth admin client 执行跨库删除/角色变更。
+3. 检查 production secret validation。
+4. 跑 API/Auth 相关测试，并复核 [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)。
 
-<a id="local-dev-fast-path"></a>
-## 本地开发快速路径
-
-### 环境要求
-
-| 组件 | 建议版本 |
-|------|----------|
-| Node.js | `22.18+` |
-| Go | `1.26.4+` |
-| PostgreSQL | `17+` |
-
-### 启动步骤
-
-1. 启动本地依赖：
-
-```bash
-cd docker
-cp .env.example .env
-# 至少修改 POSTGRES_PASSWORD
-docker compose -f compose.local.yml up -d
-```
-
-2. 配置 auth 服务环境变量：
-
-```bash
-cd apps/auth
-cp .env.example .env
-```
-
-3. 启动 auth 服务：
-
-```bash
-cd apps/auth
-npm install
-npm run migrate
-npm run dev
-```
-
-> 启用 Better Auth Admin plugin 后必须先执行迁移：开发环境 `npm --prefix apps/auth run migrate`，生产环境 `npm --prefix apps/auth run migrate:dist`。不要手写 DDL，统一由 Better Auth migrate 管理字段变更。
-
-4. 配置后端环境变量：
-
-```bash
-cd apps/api
-cp .env.example .env
-```
-
-5. 启动后端：
-
-```bash
-cd apps/api
-go run ./cmd
-```
-
-6. 启动前端：
-
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-
-开发代理约定（`apps/web/vite.config.ts`）：
-
-- `/api/auth/**` -> `http://localhost:6001`
-- `/api/*` 与 `/uploads/*` -> `http://localhost:6000`
-
-7. 初始化管理员：
-
-```bash
-cd apps/api
-export INIT_ADMIN_PASSWORD='your-strong-password'
-go run ./cmd init-admin
-```
-
-> [!IMPORTANT]
-> `apps/api/.env` 与 `apps/auth/.env` 中的 `DB_USER / DB_PASSWORD` 是数据库连接账号，不是网站后台管理员账号。管理员登录账号来自 Better Auth 与本地 `users` 业务档案映射。
->
-> `init-admin` 会调用 auth service 确保 Better Auth 存在 `admin` 账号，并绑定/创建本地 admin profile；执行该命令前请先启动 `apps/auth`。
-
-
-## 验证矩阵
-
-### 前端
-
-```bash
-cd apps/web
-npm run lint -- --no-fix
-npm run lint:style
-npm run test:run
-npm run build
-```
-
-### 后端
-
-```bash
-cd apps/api
-go test ./...
-go build ./...
-```
-
-### SQL 生成代码
-
-`sqlc` 作为 Go module tool 固定在 `apps/api/go.mod`，不要依赖全局安装版本。修改 `apps/api/internal/db/queries` 或 `apps/api/internal/db/schema` 后执行：
-
-```bash
-cd apps/api
-go tool sqlc generate
-git diff --exit-code -- internal/db/sqlc
-```
-
-### 跨层改动
-
-以下改动默认同时验证前后端：
-
-- 路由
-- 鉴权
-- 任务 contract
-- 上传
-- 提示词模板
-- 管理后台配置
-
-
-## 环境变量
-
-下面按常用程度拆开。日常本地开发和常规部署通常只需要看“常用配置”，其余多半是调优或基础设施接入时才会改。
-
-### 常用配置
-
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `DB_HOST` | `localhost` | PostgreSQL 主机 |
-| `DB_PORT` | `5432` | PostgreSQL 端口 |
-| `DB_USER` | `ideaboard` | PostgreSQL 用户 |
-| `DB_PASSWORD` | 无默认值 | PostgreSQL 密码；使用仓库自带 Docker Compose 时读取 `docker/.env` 的 `POSTGRES_PASSWORD` |
-| `DB_NAME` | `ideaboard` | 数据库名 |
-| `DB_SSLMODE` | `disable` | PostgreSQL SSL 模式；本地与 Docker 内网默认关闭 |
-| `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
-| `APP_PORT` | `6000` | 后端监听端口 |
-| `APP_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
-| `APP_GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
-| `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
-| `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
-| `AUTH_INTERNAL_KEY` | 空 | Go 调用 auth service internal endpoint 的保护密钥；必须与 Auth 服务同名变量一致 |
-| `APP_SECRETS_ENCRYPTION_KEY` | 无默认值 | API Key 与对象存储密钥静态加密主密钥；必须是 `openssl rand -base64 32` 生成的 base64 编码 32 字节值 |
-
-Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是输入变量，不是 API runtime 直接读取的公开链接配置。生产 stack 会把 `APP_BASE_URL` 映射到 `APP_CORS_ALLOWED_ORIGINS` 与 `AUTH_TRUSTED_ORIGINS`，把 `API_BASE_URL` 映射到 `BETTER_AUTH_URL`；首次部署后在后台「系统设置」配置「前端访问地址」和「素材访问地址」，用于分享链接和上传素材公网访问。
-
-Auth 服务关键变量：
-
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `AUTH_HOST` | `127.0.0.1` | Auth 服务监听地址；生产建议仅监听回环地址 |
-| `AUTH_PORT` | `6001` | Auth 服务监听端口 |
-| `AUTH_INTERNAL_KEY` | 空 | Auth internal endpoint 保护密钥；生产必须设置为非占位随机值，并与 API 的同名变量一致 |
-| `AUTH_TRUSTED_ORIGINS` | 空 | Better Auth 可信浏览器源 |
-| `BETTER_AUTH_SECRET` | 本地开发 fallback | Better Auth 签名密钥；生产必须设置为非占位随机值，至少 32 字符高熵随机值 |
-| `BETTER_AUTH_URL` | `http://localhost:5173`（本地开发） | Better Auth 对外基准 URL；生产必须设置为正式访问地址 |
-
-### 高级调优
-
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `DB_CONNECT_MAX_RETRIES` | `60` | API 启动时等待 PostgreSQL 就绪的最大重试次数 |
-| `DB_CONNECT_RETRY_INTERVAL_MS` | `1000` | API 启动时 PostgreSQL 连接重试间隔 |
-| `AUTH_SERVICE_TIMEOUT_SECONDS` | `5` | Go 调用 auth service 的超时秒数 |
-| `RIVER_WORKER_CONCURRENCY` | `5` | River worker 并发数 |
-| `RIVER_TASK_TIMEOUT_SECONDS` | `180` | River 任务执行保护超时 |
-| `RIVER_NO_CAPACITY_RETRY_SECONDS` | `5` | 账号容量不足时 River snooze/retry 间隔 |
-| `RIVER_MAX_RETRY` | `25` | River 基础设施级最大重试次数 |
-| `NATS_URL` | 空 | NATS 服务地址；非空时默认启用 JetStream 事件层 |
-| `NATS_EVENT_BUS_ENABLED` | 随 `NATS_URL` | 显式开启或关闭 JetStream 事件层 |
-| `NATS_STREAM_NAME` | `IDEABOARD_EVENTS` | JetStream 事件 stream 名称 |
-| `NATS_SUBJECT_PREFIX` | `ideaboard` | 事件 subject 前缀 |
-| `NATS_CONSUMER_NAME` | 主机名派生 | 当前 API 实例的任务事件 consumer 名称 |
-| `NATS_RETENTION_DAYS` | `7` | JetStream 事件保留天数 |
-| `NATS_CONNECT_TIMEOUT_SECONDS` | `5` | NATS 初始连接超时 |
-| `NATS_REQUEST_TIMEOUT_SECONDS` | `5` | JetStream API 请求超时 |
-| `NATS_DRAIN_TIMEOUT_SECONDS` | `2` | NATS 连接关闭 drain 超时 |
-| `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
-
-
-<a id="repo-map"></a>
-## 仓库目录图
+## Repo Map
 
 ```text
 .github/workflows/           # CI / release workflow
-deploy/                      # 生产部署模板
-docker/                      # 本地数据库与开发环境
-docs/                        # 设计、运行与约束文档
-scripts/                     # 打包、部署与发布脚本
+deploy/                      # reverse proxy templates
+docker/                      # local PostgreSQL/NATS and production Compose
+docs/agents/                 # agent workflow docs
+docs/runbooks/               # deployment, operations, security runbooks
+scripts/                     # packaging, deployment and release scripts
 
 apps/web/src/
-├── app/                      # 入口、router、store 装配
-├── features/                 # 领域模块
-│   ├── canvas/            # 画布、节点与执行链路
-│   │   ├── pages/            # 路由级页面
-│   │   └── components/nodes/ # 节点组件，内部按 config/utils/styles/composables 拆分
-│   ├── boards/               # 画板列表、预览与同步
-│   ├── admin/                # 管理后台
-│   ├── auth/                 # 登录、注册与会话相关
-│   ├── user/                 # 用户侧 layout 与壳层
-│   └── profile/              # 用户中心
-└── shared/                   # 共享 API、auth、composables、types、utils、assets
-    └── api/generated-query/  # Orval 生成代码，不手动编辑
+├── app/                      # app startup, router, store wiring
+├── features/                 # business modules
+│   ├── canvas/               # Canvas Workspace
+│   ├── boards/               # board list/preview/sync
+│   ├── admin/                # Admin vertical contexts
+│   ├── auth/                 # login/register views
+│   ├── user/                 # user layout shell
+│   └── profile/              # user center
+└── shared/                   # cross-feature API/auth/types/utils/assets
 
 apps/api/
-├── cmd/                      # 服务入口
-├── internal/platform/        # 基础设施：config、database、response、safehttp
-├── internal/runtime/         # 启动、HTTP 路由、worker 与 embedded dist
-├── internal/accountpool/     # Accounts、channels、账号池负载与调度可见性
-├── internal/identity/        # Auth、auth errors、users 与用户管理
-├── internal/media/           # Storage、assets、image format validation 与 media refs
-├── internal/boards/          # 画板管理
-├── internal/tasking/         # Tasking bounded context：任务模型、提交、队列、统计与运行状态
+├── cmd/                      # service entrypoints
+├── internal/platform/        # config, database, response, safehttp
+├── internal/runtime/         # bootstrap, HTTP routes, worker, webdist
+├── internal/accountpool/     # accounts/channels/load
+├── internal/identity/        # auth/users/admin user management
+├── internal/media/           # storage/assets/media refs/image format
+├── internal/boards/          # board ownership and management
+├── internal/tasking/         # task model/submission/queue/runtime/stats
 ├── internal/workflow/        # feature contract
-└── internal/prompts/         # 提示词模板与装配
+└── internal/prompts/         # prompt templates and assembly
 
 apps/auth/
-├── src/auth.ts               # Better Auth 配置
-├── src/env.ts                # 环境变量与生产校验
-├── src/index.ts              # /api/auth 与子路径、/internal/* 路由
-└── .env.example              # auth 服务环境变量模板
+├── src/auth.ts               # Better Auth config
+├── src/env.ts                # env validation
+└── src/index.ts              # auth and internal routes
 ```
-
 
 ## 维护规则
 
-在继续迭代时，优先遵守以下规则：
-
 1. 以 working tree 为准，不回滚用户未提交改动。
-2. 改任务 contract 时，优先同步前端执行链、后端 canonical helper 和 admin 配置页。
-3. 产品文案、模板 contract 与展示分组只描述当前可执行能力。
-4. 跨层变更默认需要同时验证前端与后端。
+2. 优先小范围、可回滚改动。
+3. 跨层 contract 改动默认同时验证前端和后端。
+4. 改 domain language 时更新相关 `CONTEXT.md`。
+5. 改系统设计 contract 时更新 [DESIGN.md](./DESIGN.md)。
+6. 改执行流程或日常入口时更新本文档。

@@ -1,0 +1,222 @@
+# IdeaBoard System Design
+
+`DESIGN.md` 是 IdeaBoard 的系统设计契约。它记录当前架构为什么这样拆、跨模块协作如何发生，以及改动时必须守住的 invariants。
+
+它不是快速启动手册、部署手册、API 字段清单或迁移历史。需要执行命令时看 [DEVELOPMENT.md](./DEVELOPMENT.md)；需要线上操作时看 [docs/runbooks/](./docs/runbooks/)。
+
+## 文档职责
+
+| 文档 | 主问题 |
+| ---- | ------ |
+| [README.md](./README.md) | 这个项目是什么，怎么快速跑起来？ |
+| [DESIGN.md](./DESIGN.md) | 系统为什么这样设计，哪些 contract 不能破坏？ |
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | 今天要改代码，应看哪些入口、跑哪些验证？ |
+| [apps/web/DESIGN.md](./apps/web/DESIGN.md) | Agent 做前端 UI 改动时必须遵守哪些规则？ |
+| [docs/runbooks/](./docs/runbooks/) | 部署、运营、安全、数据保护等动作怎么执行？ |
+| `CONTEXT.md` | 某个 bounded context 的 domain language 和局部规则是什么？ |
+| [AGENTS.md](./AGENTS.md) | Agent 和 coding rules 应如何约束执行？ |
+
+新增文档前先问：它回答的主问题是否已经由上表覆盖。能合并就合并，避免创建第二事实源。
+
+## 系统形态
+
+IdeaBoard 是面向图像设计与电商展示场景的 AI 画布工作流平台。系统围绕 Canvas Board、workflow feature、Task、Prompt、AccountPool 和 Media Storage 协作。
+
+```mermaid
+flowchart TB
+    Browser["Browser / Vue SPA"] --> Proxy["Reverse Proxy"]
+    Proxy -- "/api/auth/**" --> Auth["Better Auth Service<br>Fastify :6001"]
+    Proxy -- "/api/**" --> API["Go API<br>Gin :6000"]
+    Proxy -- "/uploads/**" --> Uploads["Static Uploads"]
+
+    Auth --> Postgres[("PostgreSQL 17")]
+    API --> Postgres
+    API --> NATS["NATS JetStream<br>event layer"]
+    API --> Worker["Runtime Worker"]
+
+    Worker --> Postgres
+    Worker --> AI["Upstream AI Providers"]
+    Worker --> Storage["Local / S3-compatible Storage"]
+    Worker --> NATS
+    Uploads --> Storage
+    NATS --> API
+```
+
+生产推荐形态是 Cloudflare Pages 托管 Web，VPS 反代 API/Auth/Uploads，Docker Compose 运行 Go API、Auth、PostgreSQL、NATS JetStream 和 worker runtime。
+
+## 核心设计契约
+
+### 1. Canvas 是产品主界面
+
+Canvas Workspace 负责把用户输入、节点编排、工具参数、任务执行和结果回写放进同一交互面。前端可以有多个页面和 Admin vertical contexts，但产品主链路必须继续以 Canvas Board 和 workflow feature 为中心。
+
+Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/features/canvas/CONTEXT.md) 为准。特别注意：
+
+- `Canvas Board` 是持久化 graph document。
+- `Vue Flow Pane` 是 graph interaction plane，不等同于产品意义上的 Canvas。
+- `Canvas Node` 是 domain node，`Flow Node` 是 Vue Flow runtime representation。
+- `Execution Plan` 是把节点转成一个或多个 Task 的准备结果，不等同于 Task。
+
+### 2. Workflow feature 是执行语义边界
+
+支持的 workflow feature slug 必须在前端 execution contract、OpenAPI、Go validation、prompt 配置和 Admin 展示中保持一致。
+
+| Feature | 语义 |
+| ------- | ---- |
+| `sketch-to-image` | 草图成图 |
+| `style-variation` | 风格延展 |
+| `partial-edit` | 局部重绘 |
+| `remove-bg` | 抠图 |
+| `style-fusion` | 多图融合 |
+| `pattern-gen` | 图案生成 |
+| `hd-upscale` | HD |
+| `image-extend` | 扩图 |
+
+Contract rules:
+
+- `feature` 是顶层任务字段，由后端统一校验。
+- `image_urls` 是顶层媒体输入字段。
+- `params` 只承载 feature-specific structured parameters。
+- `use_mask`、`mask_image_url`、`mask_image_urls` 属于 `partial-edit` 的运行时边界参数，不是 prompt 模板变量。
+- 产品文案、模板变量和展示分组只能描述当前可执行能力。
+
+实现入口：
+
+- [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts)
+- [features.go](./apps/api/internal/workflow/features.go)
+
+### 3. Tasking 的事实源是 PostgreSQL + River
+
+任务提交必须保持 transactional：业务 task insert 和 River enqueue 必须在同一个 PostgreSQL transaction 中完成。不能出现“任务已落库但未入队”或“队列有 job 但业务 task 不存在”的 split-brain 状态。
+
+River + PostgreSQL 负责：
+
+- 任务入队、重试和 worker 执行
+- 账号容量调度和无容量延迟重试
+- 任务状态、取消标记和运行态事实源
+- 队列监控的聚合来源
+
+NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前核心事件是 `task.status_changed`，由 API 实例 bridge 到本地 SSE hub。禁止把 NATS JetStream 恢复成任务执行队列，也不保留 Redis/Asynq/Dragonfly/Garnet 等生产兼容路径。
+
+### 4. Worker 是 runtime adapter
+
+`internal/runtime/worker` 消费 Tasking、AccountPool、Workflow、Prompts 和 Media 的接口，并拥有 provider calls、River worker execution、process-level retry 和运行时错误收敛。
+
+不要把 worker implementation 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义；worker 拥有执行适配。
+
+### 5. Prompt 是配置，不是隐藏执行协议
+
+系统提示词由 `feature_prompts` 驱动，按 `feature_slug` 读取启用配置并做变量替换。Prompt 只描述任务边界、允许变化、禁止变化和质量要求；媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数由运行时处理。
+
+稳定变量和运营模板见 [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)。
+
+### 6. Auth 分成身份服务和业务授权
+
+Better Auth Service 负责登录、注册、session、身份侧字段和凭据；Go API 负责业务用户档案、角色/status 判定、Admin 操作编排和业务权限。
+
+高风险身份动作必须经由 Go Admin API 编排：
+
+- 角色升降级需要同时同步 Auth Service 与业务侧 `users.role`。
+- 彻底注销必须先调用 Auth Service internal endpoint 清理身份、会话与凭据，再清理业务侧数据。
+- 前端不得直接调用 Better Auth admin client 执行跨库高风险动作。
+
+运行规则见 [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)。
+
+### 7. Media 拥有上传、存储和引用边界
+
+Media context 拥有 object storage provider/profile、upload serving、upload authorization、media references、image format validation 和 bundled business assets。Local 与 S3-compatible storage 是同一抽象下的 provider choice。
+
+上传结果、provider output 和用户素材都必须通过 Media/Storage 边界进入业务语义。不要让无关 feature 直接拼接 storage secret、bucket URL 或本地文件路径。
+
+### 8. Admin 是 vertical contexts
+
+Admin route pages 不直接依赖 generated API。每个 Admin vertical context 自己拥有 resource access、view model、command sequencing、cache invalidation 和 side effect handling。
+
+| Frontend context | Backend context | Ownership |
+| ---------------- | --------------- | --------- |
+| `features/admin/users` | `internal/identity/users` | 用户列表、角色/status、会话、伪装登录、受控注销 |
+| `features/admin/provider-config` | `internal/accountpool` | channel/account/provider payload、模型检测、调度可见性 |
+| `features/admin/prompt-config` | `internal/prompts`, `internal/workflow` | feature slug、prompt template、variables、revisions |
+| `features/admin/storage` | `internal/media/storage` | storage provider/profile、secret masking、bucket test/apply |
+| `features/admin/task-monitor` | `internal/tasking` | task list/detail、runtime monitor、stream/poll fallback |
+| `features/admin/statistics` | `internal/tasking/taskstats` | statistics aggregation、backfill status、range contract |
+
+### 9. Generated code 是边界，不是业务模型
+
+`apps/web/src/shared/api/generated-query` 是 Orval generated code，不手动编辑。Vue route pages 和 components 不直接依赖 generated API；依赖必须收口到 feature context、shared composable 或明确的 API adapter。
+
+Backend generated sqlc code 不手动编辑。修改 SQL queries/schema 后运行 `go tool sqlc generate`，让 generated code 跟随事实源更新。
+
+### 10. Statistics 必须幂等
+
+统计模型以任务为去重边界：
+
+- `TaskStatEvent` 按 `task_id` 去重，保证同一任务只计数一次。
+- `TaskDailyStat` 按 `(stat_date, model_name, user_key)` upsert 聚合。
+- `TaskDailyStatBackfill` 标记某日期历史扫描已完成，避免重复回填。
+- 前端统计 API 返回 `backfill_status`，由前端决定是否触发补录。
+
+## Backend Context Map
+
+Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.md)。
+
+| Context | Directories | Responsibility |
+| ------- | ----------- | -------------- |
+| Runtime | `internal/runtime`, `cmd` | 进程启动、HTTP route wiring、worker adapters、embedded frontend dist |
+| Platform | `internal/platform`, `internal/db`, `internal/events` | config、database、response helpers、safe HTTP、event bus、sqlc |
+| Tasking | `internal/tasking` | task model、submission、queueing、runtime state、statistics |
+| Identity | `internal/identity` | auth middleware/client、user persistence、user/admin management |
+| AccountPool | `internal/accountpool` | accounts、channels、load、scheduling visibility |
+| Boards | `internal/boards` | board ownership、access checks、board management API |
+| Media | `internal/media` | storage、assets、media refs、image format validation |
+| Workflow/Prompts | `internal/workflow`, `internal/prompts` | executable feature contract、task params、prompt templates、prompt assembly |
+
+Dependency direction:
+
+- `cmd` stays lightweight and calls `internal/runtime/bootstrap`.
+- `internal/runtime` composes platform modules and business contexts.
+- Business contexts may depend on `internal/platform` and `internal/db/sqlc` through local repositories/adapters.
+- `internal/platform` must not import business contexts.
+- Cross-context collaboration should use small service/repository interfaces at the caller boundary.
+
+## Frontend Context Map
+
+Frontend context rules:
+
+- `apps/web/src/app` owns startup, router and store wiring.
+- `apps/web/src/features` owns business modules, route pages, feature-local UI and adapters.
+- `apps/web/src/shared` only contains cross-feature API helpers, auth, types, utils and assets.
+- `shared` must not depend on concrete feature modules.
+- Canvas submodules should depend through their `index.ts` public seams when crossing submodule boundaries.
+- `features/canvas-board/domain` remains the shared snapshot schema/core module.
+- Frontend UI changes must follow the agent protocol in [apps/web/DESIGN.md](./apps/web/DESIGN.md).
+
+## Operational Invariants
+
+- Production must set high-entropy `BETTER_AUTH_SECRET`, matching `AUTH_INTERNAL_KEY` on API/Auth, and `APP_SECRETS_ENCRYPTION_KEY`.
+- API/Auth should listen on loopback behind reverse proxy in production.
+- Cloudflare proxied API domains need explicit cache bypass for API/Auth/SSE/upload writes and careful real-client-IP handling.
+- PostgreSQL backup contains credentials and user/session data; treat `postgres-*.dump[.age|.gpg]` as secret artifacts.
+- DB restore and migration rollback are human-confirmed operations; runtime image rollback does not imply automatic database restore.
+
+Operational procedures live in:
+
+- [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)
+- [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)
+- [docs/runbooks/data-protection.md](./docs/runbooks/data-protection.md)
+- [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)
+
+## Change Rules
+
+Use this checklist before architectural changes:
+
+1. Does the change preserve the Tasking transactional boundary?
+2. Does it keep River as task queue and NATS as event layer?
+3. Does it avoid generated API/sqlc as hand-written business code?
+4. Does it keep route pages away from generated API details?
+5. Does it preserve workflow feature slug and params contract across FE/OpenAPI/Go/Admin?
+6. Does it keep Auth high-risk operations behind Go Admin API?
+7. Does it update the relevant `CONTEXT.md` if domain language changed?
+8. Does it update `DEVELOPMENT.md` only if the developer workflow changed?
+
+If a change intentionally breaks one of these contracts, capture the new decision in this file or a dedicated ADR before landing the implementation.

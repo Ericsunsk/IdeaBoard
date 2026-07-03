@@ -1,44 +1,39 @@
-# Issue tracker: GitHub
+# Issue Tracker Protocol
 
-Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues, PRDs, and external PR triage live in GitHub for `Ericsunsk/IdeaBoard`. Use `gh` from inside this clone whenever possible.
 
 ## Repository
 
-- GitHub repo: `Ericsunsk/IdeaBoard`
+- Repo: `Ericsunsk/IdeaBoard`
 - Remote: `https://github.com/Ericsunsk/IdeaBoard`
 
-Infer the repo from `git remote -v` when possible. The `gh` CLI does this automatically when run inside the clone.
+Prefer inferring the repo from `git remote -v`; `gh` does this automatically inside the clone.
 
-## Conventions
+## Issues
 
-- Create an issue: `gh issue create --title "..." --body "..."`
-- Read an issue: `gh issue view <number> --comments`
-- List issues: `gh issue list --state open --json number,title,body,labels,comments`
-- Comment on an issue: `gh issue comment <number> --body "..."`
-- Apply or remove labels: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
-- Close an issue: `gh issue close <number> --comment "..."`
+- Create: `gh issue create --title "..." --body "..."`
+- View: `gh issue view <number> --comments`
+- List: `gh issue list --state open --json number,title,body,labels,comments`
+- Comment: `gh issue comment <number> --body "..."`
+- Label: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
+- Close: `gh issue close <number> --comment "..."`
 
-Use a heredoc or a file for multi-line bodies to keep shell quoting reliable.
+Use a heredoc or a file for multi-line bodies.
 
-## Pull requests as a triage surface
+## Pull Requests
 
-PRs as a request surface: yes.
+Treat external PRs as a triage surface.
 
-External PRs should run through the same labels and states as issues. Use the `gh pr` equivalents:
+- View: `gh pr view <number> --comments`
+- Diff: `gh pr diff <number>`
+- List: `gh pr list --state open --json number,title,body,labels,author,authorAssociation,comments`
+- Comment/label/close: `gh pr comment`, `gh pr edit --add-label` / `--remove-label`, `gh pr close`
 
-- Read a PR: `gh pr view <number> --comments`
-- Inspect a PR diff: `gh pr diff <number>`
-- List open PRs: `gh pr list --state open --json number,title,body,labels,author,authorAssociation,comments`
-- Comment, label, or close: `gh pr comment`, `gh pr edit --add-label` / `--remove-label`, `gh pr close`
+For external PR triage, keep only `authorAssociation` values of `CONTRIBUTOR`, `FIRST_TIME_CONTRIBUTOR`, or `NONE`. Drop `OWNER`, `MEMBER`, and `COLLABORATOR`.
 
-When triaging external PRs, keep only `authorAssociation` values of `CONTRIBUTOR`, `FIRST_TIME_CONTRIBUTOR`, or `NONE`. Drop `OWNER`, `MEMBER`, and `COLLABORATOR`.
+GitHub shares one number space for issues and PRs. Resolve `#42` with `gh pr view 42`; if that fails, use `gh issue view 42`.
 
-GitHub shares one number space across issues and PRs, so a bare `#42` may be either. Resolve with `gh pr view 42` and fall back to `gh issue view 42`.
+## Skill Phrases
 
-## When a skill says "publish to the issue tracker"
-
-Create a GitHub issue.
-
-## When a skill says "fetch the relevant ticket"
-
-Run `gh issue view <number> --comments`. If the number is a PR, use `gh pr view <number> --comments`.
+- "Publish to the issue tracker" means create a GitHub issue.
+- "Fetch the relevant ticket" means view the issue or PR with comments.

@@ -74,4 +74,5 @@ apps/web/
 ## 相关文档
 
 - [根目录 README.md](../../README.md)：项目总体说明
+- [前端 DESIGN.md](./DESIGN.md)：Agent 做前端 UI 改动时的执行规则
 - [docker/README.md](../../docker/README.md)：本地 PostgreSQL 启动说明

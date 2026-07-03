@@ -1,45 +1,66 @@
-# IdeaBoard Agent Notes
+# IdeaBoard Agent Protocol
 
-## Defaults
+This file is the only agent-facing entry point. Keep it short, executable, and in English. Human-facing docs stay in Simplified Chinese with English Technical Terms.
 
-- 用简体中文回复；Technical Terms 保持 English。
-- 优先小范围、可回滚改动；只在涉及 destructive / external side effects 时确认。
-- 发现 repo-local docs 时优先读：`CONTEXT-MAP.md`、相关 `CONTEXT.md`、`docs/agents/*.md`。
+## Response Rules
 
-## Stack
+- Reply to the user in Simplified Chinese.
+- Keep Technical Terms in English.
+- Prefer direct execution over long explanations.
+- Report verification and unresolved risks clearly.
 
-- Frontend: Vue 3 + Vite + TypeScript + Tailwind CSS v4 + PrimeVue v4 unstyled.
-- Backend: Go + Gin + sqlc + River + NATS JetStream + PostgreSQL 17.
-- Auth: Better Auth + Fastify + TypeScript.
+## Read Order
 
-## Key Conventions
+Read only what is relevant to the task:
 
-- Vue SFC 用 `<script setup>`；`.ts/.tsx` 保持显式 imports，types 用 `import type`。
-- Generated API wrappers 在 `shared/api/generated-query`，只在 feature/service 边界适配。
-- Admin UI 使用 PrimeVue unstyled + Tailwind utilities；复用 `features/admin/shared/components/`。
-- Composables 协调 UI lifecycle/reactive state；services 执行 API/domain operations；utils 保持 pure。
-- Backend repository methods 接收 `context.Context` first，并使用 `dbWithContext(ctx)` pattern。
-- Migrations 位于 `apps/api/internal/db/migrations/`；不要手改 `apps/api/internal/db/sqlc/*.go`。
-- Task submission 必须保持 transactional：insert task 与 enqueue River job 在同一个 PG transaction。
+1. [DESIGN.md](./DESIGN.md) for system contracts and context map.
+2. The relevant `CONTEXT.md` for domain language.
+3. [apps/web/DESIGN.md](./apps/web/DESIGN.md) for frontend UI/design work.
+4. [DEVELOPMENT.md](./DEVELOPMENT.md) for commands, code entry points, and verification.
+5. `docs/agents/*.md` only when using the matching workflow.
 
-## Local Verification
+Do not create a new doc if an existing canonical doc can answer the same question.
+
+## Stack Snapshot
+
+- Frontend: Vue 3, Vite, TypeScript, Tailwind CSS v4, PrimeVue v4 unstyled.
+- Backend: Go, Gin, sqlc, River, NATS JetStream, PostgreSQL 17.
+- Auth: Better Auth, Fastify, TypeScript.
+
+## Hard Constraints
+
+- Keep changes small, reversible, and within scope.
+- Never hand-edit generated frontend API wrappers in `apps/web/src/shared/api/generated-query`.
+- Never hand-edit generated sqlc files in `apps/api/internal/db/sqlc`.
+- Backend migrations live in `apps/api/internal/db/migrations`.
+- Task submission must stay transactional: insert the task and enqueue the River job in the same PostgreSQL transaction.
+- River + PostgreSQL are the task queue and state fact source; NATS JetStream is the event layer, not a task queue.
+- Admin route pages must not call generated API directly; use the relevant feature/resource/adapter boundary.
+- Frontend `shared` must not depend on concrete feature modules.
+- For UI work, follow the frontend UI agent protocol in [apps/web/DESIGN.md](./apps/web/DESIGN.md) and reuse existing tokens/components before adding new ones.
+- Backend repository methods take `context.Context` first and use the `dbWithContext(ctx)` pattern.
+
+## Risk Modes
+
+Treat these as Production-mode work: deployment, auth/permission/billing/security logic, schema changes, bulk mutations, destructive actions, and real external writes.
+
+For Production-mode work, provide a brief plan, key risks, minimal compatible changes, relevant verification, and rollback/fallback notes. Ask for confirmation only for destructive, irreversible, or meaningful external side effects.
+
+## Verification
+
+Use the smallest relevant check:
 
 - Frontend unit/spec: `cd apps/web && npm run test:run`
-- Frontend type/build: `cd apps/web && npm run build`
+- Frontend build/type: `cd apps/web && npm run build`
 - Frontend lint/style: `cd apps/web && npm run lint` / `npm run lint:style`
 - Backend tests/build: `cd apps/api && go test ./...` / `go build ./...`
 - DB query/schema changes: `cd apps/api && go tool sqlc generate`
+- Auth build: `cd apps/auth && npm run build`
 
-## Agent skills
+If you cannot run a relevant check, say so and explain the residual risk.
 
-### Issue tracker
+## Agent Workflows
 
-Issues and PRDs are tracked in GitHub Issues for `Ericsunsk/IdeaBoard`; external PRs are also a triage surface. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Use the default five-label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Use a multi-context layout, with `CONTEXT-MAP.md` at the repo root and context-specific `CONTEXT.md` files. See `docs/agents/domain.md`.
+- Issue tracker: GitHub Issues for `Ericsunsk/IdeaBoard`; see [docs/agents/issue-tracker.md](./docs/agents/issue-tracker.md).
+- Triage labels: use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`; see [docs/agents/triage-labels.md](./docs/agents/triage-labels.md).
+- Domain docs: use `DESIGN.md` as the context map and local `CONTEXT.md` files for vocabulary; see [docs/agents/domain.md](./docs/agents/domain.md).

@@ -284,7 +284,7 @@ Prompt 节点的 `pattern-gen` system prompt 是可选配置；未配置时直�
 
 ## 维护建议
 
-- 新增 workflow feature 时，同步更新本文件、Admin prompt 变量面板和 `DEVELOPMENT.md`。
+- 新增 workflow feature 时，同步更新本文件、Admin prompt 变量面板和 [DEVELOPMENT.md](../../DEVELOPMENT.md)。
 - 新增模板变量时，先确认后端 `ApplyFeatureSystemPrompt` 已注入，再更新后台变量说明。
 - 调整 mask、本地重绘、多参考图或媒体安全边界时，优先复查 `partial-edit`；调整整图高清参数时复查 `hd-upscale`。
 - `hd-upscale` 当前不建议依赖任何模式变量；如果未来增加 UI 控制，再补充对应变量并同步代码和文档。

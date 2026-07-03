@@ -25,7 +25,7 @@
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员在内部部署与运维场景下使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
 >
-> 账号安全与业务运维的职责边界请同时参考 [docs/auth-operation-runbook.md](./docs/auth-operation-runbook.md)；PostgreSQL backup / restore 的密钥材料处理规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
+> 账号安全与业务运维的职责边界请同时参考 [auth-operations.md](./auth-operations.md)；PostgreSQL backup / restore 的密钥材料处理规则见 [data-protection.md](./data-protection.md)。
 
 <a id="deployment-profile"></a>
 ## 部署概览
@@ -112,7 +112,7 @@ VPS
 
 ### 1. 构建并发布镜像
 
-仓库已内置 [docker-images.yml](./.github/workflows/docker-images.yml)。触发方式：
+仓库已内置 [docker-images.yml](../../.github/workflows/docker-images.yml)。触发方式：
 
 - push 到 `main` / `master`
 - push `v*` tag
@@ -122,7 +122,7 @@ VPS
 
 Docker Images workflow 会在发布镜像后上传 `release-manifest` artifact，tag 发布还会把 `release-manifest.json` 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、SBOM artifact 名称与 Cosign OIDC identity。
 
-发布路径会为每个镜像生成 CycloneDX SBOM artifact，使用 Grype 拦截 `high` 及以上漏洞，并用 Cosign keyless OIDC 对镜像 digest 签名。Grype 例外统一维护在 [`.grype.yaml`](./.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
+发布路径会为每个镜像生成 CycloneDX SBOM artifact，使用 Grype 拦截 `high` 及以上漏洞，并用 Cosign keyless OIDC 对镜像 digest 签名。Grype 例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
 `ideaboard update` 默认会在 pull 前执行 Cosign keyless 验签。VPS 必须先安装 `cosign`；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
 

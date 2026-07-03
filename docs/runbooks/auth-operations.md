@@ -100,7 +100,8 @@
 
 | 文档 | 用途 |
 |------|------|
-| [README.md](../README.md) | 项目首页 |
-| [DEVELOPMENT.md](../DEVELOPMENT.md) | 架构与开发手册 |
-| [DEPLOYMENT.md](../DEPLOYMENT.md) | 部署与运维 |
-| [architecture-constraints.md](./architecture-constraints.md) | 目录边界与命名约束 |
+| [README.md](../../README.md) | 项目首页 |
+| [DESIGN.md](../../DESIGN.md) | 系统设计与 Auth 边界 |
+| [DEVELOPMENT.md](../../DEVELOPMENT.md) | 开发手册 |
+| [deployment.md](./deployment.md) | 部署与运维 |
+| [data-protection.md](./data-protection.md) | Backup、restore 与密钥材料处理 |
