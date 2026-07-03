@@ -195,4 +195,162 @@ describe('createAuthApp', () => {
     assert.equal(settingsQueried, false)
     assert.equal(authHandlerCalled, false)
   })
+
+  it('rejects disallowed CORS preflight before querying guard settings', async (t) => {
+    let settingsQueried = false
+    let authHandlerCalled = false
+    const app = createAuthApp(
+      createTestDeps({
+        getAuthGuardSettings: async () => {
+          settingsQueried = true
+          return {
+            registrationEnabled: true,
+            windowSeconds: 60,
+            maxRequests: 30,
+          }
+        },
+        authHandler: async (_req, res) => {
+          authHandlerCalled = true
+          res.statusCode = 204
+          res.end()
+        },
+      }),
+    )
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/sign-in/email',
+      headers: {
+        origin: 'https://evil.example.com',
+        'access-control-request-headers': 'content-type, authorization',
+      },
+    })
+
+    assert.equal(response.statusCode, 403)
+    assert.equal(settingsQueried, false)
+    assert.equal(authHandlerCalled, false)
+  })
+
+  it('rejects disallowed CORS auth requests before querying guard settings', async (t) => {
+    let settingsQueried = false
+    let authHandlerCalled = false
+    const app = createAuthApp(
+      createTestDeps({
+        getAuthGuardSettings: async () => {
+          settingsQueried = true
+          return {
+            registrationEnabled: true,
+            windowSeconds: 60,
+            maxRequests: 30,
+          }
+        },
+        authHandler: async (_req, res) => {
+          authHandlerCalled = true
+          res.statusCode = 204
+          res.end()
+        },
+      }),
+    )
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/email',
+      headers: {
+        origin: 'https://evil.example.com',
+      },
+      payload: {
+        email: 'alice@example.com',
+        password: 'secret123',
+      },
+    })
+
+    assert.equal(response.statusCode, 403)
+    assert.equal(settingsQueried, false)
+    assert.equal(authHandlerCalled, false)
+  })
+
+  it('allows auth requests without an Origin header through the guard', async (t) => {
+    let settingsQueried = false
+    let authHandlerCalled = false
+    const app = createAuthApp(
+      createTestDeps({
+        getAuthGuardSettings: async () => {
+          settingsQueried = true
+          return {
+            registrationEnabled: true,
+            windowSeconds: 60,
+            maxRequests: 30,
+          }
+        },
+        authHandler: async (_req, res) => {
+          authHandlerCalled = true
+          res.statusCode = 204
+          res.end()
+        },
+      }),
+    )
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-in/email',
+      payload: {
+        email: 'alice@example.com',
+        password: 'secret123',
+      },
+    })
+
+    assert.equal(response.statusCode, 204)
+    assert.equal(settingsQueried, true)
+    assert.equal(authHandlerCalled, true)
+  })
+
+  for (const url of ['/api/auth/sign-in/email', '/api/auth/sign-up/email']) {
+    it(`rate-limits ${url} before calling the auth handler again`, async (t) => {
+      let authHandlerCalls = 0
+      const app = createAuthApp(
+        createTestDeps({
+          getAuthGuardSettings: async () => ({
+            registrationEnabled: true,
+            windowSeconds: 60,
+            maxRequests: 1,
+          }),
+          authHandler: async (_req, res) => {
+            authHandlerCalls += 1
+            res.statusCode = 204
+            res.end()
+          },
+        }),
+      )
+      t.after(() => app.close())
+
+      const firstResponse = await app.inject({
+        method: 'POST',
+        url,
+        payload: {
+          email: 'alice@example.com',
+          password: 'secret123',
+        },
+      })
+      const secondResponse = await app.inject({
+        method: 'POST',
+        url,
+        payload: {
+          email: 'alice@example.com',
+          password: 'secret123',
+        },
+      })
+
+      assert.equal(firstResponse.statusCode, 204)
+      assert.equal(secondResponse.statusCode, 429)
+      assert.ok(Number(secondResponse.headers['retry-after']) > 0)
+      assert.deepEqual(secondResponse.json(), {
+        code: 429,
+        msg: '请求过于频繁，请稍后重试',
+      })
+      assert.equal(authHandlerCalls, 1)
+    })
+  }
 })

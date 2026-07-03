@@ -152,11 +152,8 @@ function authCORSMiddleware(
 
   const isAllowed = allowedAuthOrigins.has(normalizeCORSOrigin(origin))
   if (!isAllowed) {
-    if (req.method === 'OPTIONS') {
-      sendNodeStatus(res, 403)
-      return true
-    }
-    return false
+    sendNodeStatus(res, 403)
+    return true
   }
 
   res.setHeader('Access-Control-Allow-Origin', origin)
