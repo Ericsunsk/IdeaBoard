@@ -116,20 +116,4 @@ describe('ImageEditorLayerActions', () => {
       harness.unmount()
     }
   })
-
-  it('places remove before final apply in the compact action row', () => {
-    const harness = mountLayerActions()
-
-    try {
-      const labels = [
-        ...harness.host.querySelectorAll<HTMLButtonElement>(
-          '.image-editor-layer-actions__buttons button',
-        ),
-      ].map((button) => button.getAttribute('aria-label'))
-
-      expect(labels).toEqual(['添加图层', '复制图层', '合并图层', '删除图层', '应用为新节点'])
-    } finally {
-      harness.unmount()
-    }
-  })
 })

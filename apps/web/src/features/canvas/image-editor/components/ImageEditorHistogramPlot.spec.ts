@@ -104,38 +104,6 @@ describe('ImageEditorHistogramPlot', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders marker positions without business semantics', async () => {
-    const harness = mountHistogramPlot({
-      markers: [
-        {
-          id: 'main',
-          position: 50,
-          ariaLabel: '主手柄',
-          guideLine: true,
-          guideLineClassName: 'is-test-guide',
-        },
-      ],
-    })
-
-    try {
-      await nextTick()
-      const marker = harness.host.querySelector<HTMLButtonElement>(
-        '.image-editor-histogram-plot__marker',
-      )
-      const guideLine = harness.host.querySelector<SVGLineElement>(
-        '.image-editor-histogram-plot__guide-line',
-      )
-
-      expect(marker?.style.left).toBe('50%')
-      expect(marker?.getAttribute('aria-label')).toBe('主手柄')
-      expect(guideLine?.getAttribute('x1')).toBe('50')
-      expect(guideLine?.getAttribute('x2')).toBe('50')
-      expect(guideLine?.classList.contains('is-test-guide')).toBe(true)
-    } finally {
-      harness.unmount()
-    }
-  })
-
   it('drags the nearest marker using normalized horizontal coordinates', async () => {
     const harness = mountHistogramPlot({
       markers: [

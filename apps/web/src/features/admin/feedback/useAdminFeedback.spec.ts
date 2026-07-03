@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createAdminFeedback } from './useAdminFeedback'
 
 describe('createAdminFeedback', () => {
-  it('groups admin feedback by domain area', () => {
+  it('keeps security and permission failures explicit', () => {
     const appToast = {
       success: vi.fn(),
       warning: vi.fn(),
@@ -10,32 +10,40 @@ describe('createAdminFeedback', () => {
     }
     const feedback = createAdminFeedback(appToast)
 
-    feedback.login.succeeded()
-    feedback.login.sessionRevokeFailed()
     feedback.login.nonAdminAccount()
-    feedback.login.failed(new Error('登录失败'))
-    feedback.promptConfig.loadPromptsFailed(new Error('加载失败'))
-    feedback.promptConfig.promptSaved('图像生成')
-    feedback.promptConfig.savePromptFailed(new Error('保存坏了'))
-    feedback.channels.providerConfig.staleChannel()
-    feedback.channels.providerConfig.channelSaved(true)
-    feedback.channels.providerConfig.modelStatusChanged(false)
-    feedback.users.management.banSucceeded('alice')
-    feedback.systemSettings.branding.saveFailed(new Error('品牌设置失败'))
-    feedback.taskMonitor.resultDetail.copiedToClipboard()
+    feedback.users.management.adminStatusChangeForbidden()
+    feedback.users.management.missingAuthUserForSessionRevoke()
+    feedback.users.management.missingAuthUserForImpersonation()
+    feedback.taskMonitor.resultDetail.unsafeImageUrlRejected()
 
-    expect(appToast.success).toHaveBeenNthCalledWith(1, '管理员登录成功')
-    expect(appToast.warning).toHaveBeenNthCalledWith(1, '会话撤销失败，请稍后重试')
-    expect(appToast.error).toHaveBeenNthCalledWith(1, '该账号不是管理员')
-    expect(appToast.error).toHaveBeenNthCalledWith(2, '登录失败')
-    expect(appToast.error).toHaveBeenNthCalledWith(3, '加载失败')
-    expect(appToast.success).toHaveBeenNthCalledWith(2, '「图像生成」提示词已保存')
-    expect(appToast.error).toHaveBeenNthCalledWith(4, '保存坏了')
-    expect(appToast.warning).toHaveBeenNthCalledWith(2, '渠道商已刷新，请重新选择')
-    expect(appToast.success).toHaveBeenNthCalledWith(3, '渠道商已更新')
-    expect(appToast.success).toHaveBeenNthCalledWith(4, '模型已停止')
-    expect(appToast.success).toHaveBeenNthCalledWith(5, '已高级封禁用户 alice')
-    expect(appToast.error).toHaveBeenNthCalledWith(5, '品牌设置失败')
-    expect(appToast.success).toHaveBeenNthCalledWith(6, '已复制到剪贴板')
+    expect(appToast.warning.mock.calls.map(([message]) => message)).toEqual([
+      '管理员账号不可封禁或解封',
+      '目标用户缺少 Auth 标识，无法吊销会话',
+    ])
+    expect(appToast.error.mock.calls.map(([message]) => message)).toEqual([
+      '该账号不是管理员',
+      '目标用户缺少 Auth 标识，无法伪装登录',
+      '图片链接不安全，已拒绝打开',
+    ])
+    expect(appToast.success).not.toHaveBeenCalled()
+  })
+
+  it('uses safe fallbacks for admin API errors', () => {
+    const appToast = {
+      success: vi.fn(),
+      warning: vi.fn(),
+      error: vi.fn(),
+    }
+    const feedback = createAdminFeedback(appToast)
+
+    feedback.login.failed(new Error('dial tcp 127.0.0.1:5432'))
+    feedback.channels.providerConfig.accountLimitsFallback({ msg: 'api key invalid' })
+    feedback.channels.providerConfig.loadFailed({ msg: '渠道服务繁忙' })
+
+    expect(appToast.error.mock.calls.map(([message]) => message)).toEqual([
+      '管理员登录失败',
+      '渠道服务繁忙',
+    ])
+    expect(appToast.warning).toHaveBeenCalledWith('账号限制加载失败，已使用默认限制')
   })
 })

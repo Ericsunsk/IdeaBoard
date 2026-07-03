@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createBoardFeedback } from './useBoardFeedback'
 
 describe('createBoardFeedback', () => {
-  it('maps board command outcomes to user-facing messages', () => {
+  it('keeps board failure reasons distinct', () => {
     const appToast = {
       success: vi.fn(),
       warning: vi.fn(),
@@ -11,6 +11,8 @@ describe('createBoardFeedback', () => {
     const feedback = createBoardFeedback(appToast)
 
     feedback.createFailed({ ok: false, reason: 'name-conflict', board: boardMeta(), error: null })
+    feedback.createFailed({ ok: false, reason: 'sync-failed', board: boardMeta(), error: null })
+    feedback.renameValidationFailed({ ok: false, reason: 'local-name-conflict' })
     feedback.renameValidationFailed({ ok: false, reason: 'invalid-name' })
     feedback.renameSyncFailed({
       ok: false,
@@ -18,22 +20,31 @@ describe('createBoardFeedback', () => {
       boardId: 'b1',
       error: null,
     })
-    feedback.renamed()
+    feedback.renameSyncFailed({ ok: false, reason: 'sync-failed', boardId: 'b1', error: null })
     feedback.copyFailed({ ok: false, reason: 'source-missing' })
-    feedback.copied()
+    feedback.copyFailed({ ok: false, reason: 'name-conflict', board: boardMeta(), error: null })
+    feedback.copyFailed({ ok: false, reason: 'sync-failed', board: boardMeta(), error: null })
     feedback.deleteFailed({ ok: false, reason: 'sync-failed', error: null })
-    feedback.deleted()
+    feedback.deleteFailed({ ok: false, reason: 'local-missing' })
     feedback.catalogSyncFailed()
 
-    expect(appToast.error).toHaveBeenNthCalledWith(1, '画布名称已存在，请重试')
-    expect(appToast.warning).toHaveBeenCalledWith('画布名称不能为空')
-    expect(appToast.error).toHaveBeenNthCalledWith(2, '名称已存在，请更换后再试')
-    expect(appToast.success).toHaveBeenNthCalledWith(1, '画布已重命名')
-    expect(appToast.error).toHaveBeenNthCalledWith(3, '复制失败')
-    expect(appToast.success).toHaveBeenNthCalledWith(2, '已复制画布')
-    expect(appToast.error).toHaveBeenNthCalledWith(4, '删除失败，请稍后重试')
-    expect(appToast.success).toHaveBeenNthCalledWith(3, '已删除画布')
-    expect(appToast.error).toHaveBeenNthCalledWith(5, '画布同步失败，请稍后重试')
+    expect(appToast.warning.mock.calls.map(([message]) => message)).toEqual([
+      '名称已存在',
+      '画布名称不能为空',
+    ])
+    expect(appToast.error.mock.calls.map(([message]) => message)).toEqual([
+      '画布名称已存在，请重试',
+      '创建同步失败，请稍后重试',
+      '名称已存在，请更换后再试',
+      '重命名同步失败，请稍后重试',
+      '复制失败',
+      '复制后的画布名称已存在，请重试',
+      '复制同步失败，请稍后重试',
+      '删除失败，请稍后重试',
+      '删除失败',
+      '画布同步失败，请稍后重试',
+    ])
+    expect(appToast.success).not.toHaveBeenCalled()
   })
 })
 

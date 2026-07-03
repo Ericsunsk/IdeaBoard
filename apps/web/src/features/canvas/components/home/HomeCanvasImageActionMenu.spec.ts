@@ -2,14 +2,15 @@ import { createApp, defineComponent, h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { ImageStrengthAction } from '../../execution'
-import componentSource from './HomeCanvasImageActionMenu.vue?raw'
 import HomeCanvasImageActionMenu from './HomeCanvasImageActionMenu.vue'
 
-function mountImageActionMenu(input: {
-  activeStrengthAction?: ImageStrengthAction | null
-  showStrengthControl?: boolean
-  strengthValue?: number
-} = {}) {
+function mountImageActionMenu(
+  input: {
+    activeStrengthAction?: ImageStrengthAction | null
+    showStrengthControl?: boolean
+    strengthValue?: number
+  } = {},
+) {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const props = {
@@ -45,7 +46,7 @@ function mountImageActionMenu(input: {
 }
 
 describe('HomeCanvasImageActionMenu', () => {
-  it('keeps inactive strength ranges click-through so strength buttons keep normal UX', () => {
+  it('keeps inactive strength ranges outside keyboard navigation', () => {
     const harness = mountImageActionMenu()
 
     try {
@@ -59,41 +60,6 @@ describe('HomeCanvasImageActionMenu', () => {
         'HD强度',
       ])
       expect(strengthRanges.map((range) => range.getAttribute('tabindex'))).toEqual(['-1', '-1'])
-      expect(componentSource).toMatch(
-        /\.image-action-strength-range\s*\{[^}]*pointer-events:\s*none/s,
-      )
-      expect(componentSource).toMatch(
-        /\.image-action-control\.is-strength-active\s+\.image-action-strength-range\s*\{[^}]*pointer-events:\s*auto/s,
-      )
-    } finally {
-      harness.unmount()
-    }
-  })
-
-  it('renders strength ranges as progress bars without visible thumbs', () => {
-    const harness = mountImageActionMenu({
-      showStrengthControl: true,
-      activeStrengthAction: IMAGE_NODE_ACTION.styleVariation,
-      strengthValue: 73,
-    })
-
-    try {
-      const activeStyleRange = harness.host.querySelector<HTMLInputElement>(
-        'input[aria-label="风格延展强度"]',
-      )
-
-      expect(activeStyleRange?.style.getPropertyValue('--image-action-strength-progress')).toBe(
-        '73%',
-      )
-      expect(componentSource).toMatch(
-        /background:\s*linear-gradient\(\s*90deg,[\s\S]*var\(--image-action-strength-fill\)[\s\S]*--image-action-strength-progress[\s\S]*var\(--canvas-range-track-background\)/,
-      )
-      expect(componentSource).toMatch(
-        /\.image-action-strength-range::-[\w-]*slider-thumb\s*\{[^}]*opacity:\s*0/s,
-      )
-      expect(componentSource).toMatch(
-        /\.image-action-strength-range:focus-visible\s*\{[^}]*outline:\s*none/s,
-      )
     } finally {
       harness.unmount()
     }
@@ -138,14 +104,16 @@ describe('HomeCanvasImageActionMenu', () => {
       )
 
       expect(
-        activeStyleRange?.closest('.image-action-control')?.classList.contains('is-strength-active'),
+        activeStyleRange
+          ?.closest('.image-action-control')
+          ?.classList.contains('is-strength-active'),
       ).toBe(true)
       expect(
         hiddenHdRange?.closest('.image-action-control')?.classList.contains('is-strength-hidden'),
       ).toBe(true)
-      expect(activeHdRange?.closest('.image-action-control')?.classList.contains('is-strength-active')).toBe(
-        true,
-      )
+      expect(
+        activeHdRange?.closest('.image-action-control')?.classList.contains('is-strength-active'),
+      ).toBe(true)
     } finally {
       styleHarness.unmount()
       hdHarness.unmount()

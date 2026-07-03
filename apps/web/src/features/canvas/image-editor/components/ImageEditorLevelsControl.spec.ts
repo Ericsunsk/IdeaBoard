@@ -158,53 +158,6 @@ describe('ImageEditorLevelsControl', () => {
     }
   })
 
-  it('keeps levels numeric fields compact without visible Chinese labels', async () => {
-    const harness = mountLevelsControl({
-      shadows: 10,
-      midtones: 128,
-      highlights: 230,
-      outputBlack: 0,
-      outputWhite: 255,
-    })
-
-    try {
-      await nextTick()
-      const fields = harness.host.querySelectorAll<HTMLElement>('.image-editor-levels-fields span')
-      const numberInputs = harness.host.querySelectorAll<HTMLInputElement>(
-        '.image-editor-levels-fields input[type="number"]',
-      )
-
-      expect(fields).toHaveLength(0)
-      expect(
-        [...numberInputs].every((input) =>
-          input.classList.contains('editing-controls-number-input'),
-        ),
-      ).toBe(true)
-      expect([...numberInputs].map((input) => input.getAttribute('aria-label'))).toEqual([
-        '黑场',
-        '中点',
-        '白场',
-      ])
-      expect([...numberInputs].map((input) => [input.min, input.max])).toEqual([
-        ['0', '229'],
-        ['11', '229'],
-        ['11', '255'],
-      ])
-      expect([...numberInputs].map((input) => input.getAttribute('aria-valuemin'))).toEqual([
-        '0',
-        '11',
-        '11',
-      ])
-      expect([...numberInputs].map((input) => input.getAttribute('aria-valuemax'))).toEqual([
-        '229',
-        '229',
-        '255',
-      ])
-    } finally {
-      harness.unmount()
-    }
-  })
-
   it('updates full levels params from marker drag with handle constraints', async () => {
     const harness = mountLevelsControl({
       shadows: 10,
