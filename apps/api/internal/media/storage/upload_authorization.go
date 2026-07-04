@@ -22,7 +22,64 @@ type UploadOwnerStorageUIDResolver interface {
 	GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error)
 }
 
+type ReadableUploadAccess interface {
+	AuthorizeUploadPathRead(ctx context.Context, userID int64, rawPath string) (ReadableUploadAccessResult, error)
+	AuthorizeUploadResourceRead(ctx context.Context, userID int64, resource UploadResource) (ReadableUploadAccessResult, error)
+}
+
+type ReadableUploadAccessResult struct {
+	Resource UploadResource
+}
+
+type readableUploadAccess struct {
+	boardAccess  UploadBoardAccessResolver
+	ownerStorage UploadOwnerStorageUIDResolver
+}
+
+func NewReadableUploadAccess(
+	boardAccess UploadBoardAccessResolver,
+	ownerStorage UploadOwnerStorageUIDResolver,
+) ReadableUploadAccess {
+	return readableUploadAccess{
+		boardAccess:  boardAccess,
+		ownerStorage: ownerStorage,
+	}
+}
+
+func (a readableUploadAccess) AuthorizeUploadPathRead(
+	ctx context.Context,
+	userID int64,
+	rawPath string,
+) (ReadableUploadAccessResult, error) {
+	resource, err := ParseUploadResource(rawPath)
+	if err != nil {
+		return ReadableUploadAccessResult{}, fmt.Errorf("%w: %w", ErrUploadAccessInvalidPath, err)
+	}
+	return a.AuthorizeUploadResourceRead(ctx, userID, resource)
+}
+
+func (a readableUploadAccess) AuthorizeUploadResourceRead(
+	ctx context.Context,
+	userID int64,
+	resource UploadResource,
+) (ReadableUploadAccessResult, error) {
+	if err := authorizeUploadResourceRead(ctx, userID, resource, a.boardAccess, a.ownerStorage); err != nil {
+		return ReadableUploadAccessResult{}, err
+	}
+	return ReadableUploadAccessResult{Resource: resource}, nil
+}
+
 func AuthorizeUploadResourceRead(
+	ctx context.Context,
+	userID int64,
+	resource UploadResource,
+	boardAccess UploadBoardAccessResolver,
+	ownerStorage UploadOwnerStorageUIDResolver,
+) error {
+	return authorizeUploadResourceRead(ctx, userID, resource, boardAccess, ownerStorage)
+}
+
+func authorizeUploadResourceRead(
 	ctx context.Context,
 	userID int64,
 	resource UploadResource,
@@ -118,12 +175,9 @@ func AuthorizeUploadPathRead(
 	boardAccess UploadBoardAccessResolver,
 	ownerStorage UploadOwnerStorageUIDResolver,
 ) (UploadResource, error) {
-	resource, err := ParseUploadResource(rawPath)
+	result, err := NewReadableUploadAccess(boardAccess, ownerStorage).AuthorizeUploadPathRead(ctx, userID, rawPath)
 	if err != nil {
-		return UploadResource{}, fmt.Errorf("%w: %w", ErrUploadAccessInvalidPath, err)
-	}
-	if err := AuthorizeUploadResourceRead(ctx, userID, resource, boardAccess, ownerStorage); err != nil {
 		return UploadResource{}, err
 	}
-	return resource, nil
+	return result.Resource, nil
 }

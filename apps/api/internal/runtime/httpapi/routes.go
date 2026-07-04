@@ -47,6 +47,7 @@ type UploadDeps struct {
 type StaticUploadDeps struct {
 	Auth         AuthDeps
 	BoardService *boards.BoardService
+	ReadAccess   storage.ReadableUploadAccess
 }
 
 type UserRouteDeps struct {

@@ -67,6 +67,10 @@ func newAppRouter(
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,
 			BoardService: services.boardService,
+			ReadAccess: storage.NewReadableUploadAccess(
+				uploadBoardAccessResolver{service: services.boardService},
+				uploadOwnerStorageUIDResolver{repo: repos.userRepo},
+			),
 		},
 		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 		RateLimit:      services.runtimeSettings,

@@ -8,8 +8,7 @@ import (
 )
 
 type TaskMediaAuthorizer struct {
-	boardAccess  UploadBoardAccessResolver
-	ownerStorage UploadOwnerStorageUIDResolver
+	readAccess ReadableUploadAccess
 }
 
 var _ taskmedia.UploadAuthorizer = (*TaskMediaAuthorizer)(nil)
@@ -19,14 +18,16 @@ func NewTaskMediaAuthorizer(
 	ownerStorage UploadOwnerStorageUIDResolver,
 ) *TaskMediaAuthorizer {
 	return &TaskMediaAuthorizer{
-		boardAccess:  boardAccess,
-		ownerStorage: ownerStorage,
+		readAccess: NewReadableUploadAccess(boardAccess, ownerStorage),
 	}
 }
 
 func (a *TaskMediaAuthorizer) AuthorizeCanvasUpload(ctx context.Context, userID int64, rawPath string) error {
 	if a == nil {
 		return fmt.Errorf("task media authorizer is not configured")
+	}
+	if a.readAccess == nil {
+		return fmt.Errorf("task media readable upload access is not configured")
 	}
 	resource, err := ParseUploadResource(rawPath)
 	if err != nil {
@@ -35,5 +36,6 @@ func (a *TaskMediaAuthorizer) AuthorizeCanvasUpload(ctx context.Context, userID 
 	if resource.Kind != UploadResourceKindCanvas {
 		return fmt.Errorf("仅支持画布上传资源")
 	}
-	return AuthorizeUploadResourceRead(ctx, userID, resource, a.boardAccess, a.ownerStorage)
+	_, err = a.readAccess.AuthorizeUploadResourceRead(ctx, userID, resource)
+	return err
 }

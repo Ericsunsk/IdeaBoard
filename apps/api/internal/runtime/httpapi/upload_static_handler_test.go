@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
 
@@ -242,6 +243,10 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 		},
 		BoardService: boards.NewBoardService(boardRepo, userRepo),
 	}
+	deps.ReadAccess = storage.NewReadableUploadAccess(
+		staticUploadBoardAccessResolver{service: deps.BoardService},
+		staticUploadOwnerStorageUIDResolver{repo: userRepo},
+	)
 	handler := uploadStaticHandler(deps)
 	router.GET("/uploads/*filepath", handler)
 	router.HEAD("/uploads/*filepath", handler)

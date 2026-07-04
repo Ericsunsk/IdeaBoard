@@ -35,25 +35,12 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 			return
 		}
 
-		switch resource.Kind {
-		case storage.UploadResourceKindCanvas:
-			if resource.Canvas == nil || !authorizeCanvasUploadRead(c, deps, *resource.Canvas) {
-				return
-			}
-		case storage.UploadResourceKindProfileAvatar:
-			if !authorizeOwnedUploadRead(c, deps, resource) {
-				return
-			}
-		case storage.UploadResourceKindTaskOutput:
-			if !authorizeOwnedUploadRead(c, deps, resource) {
-				return
-			}
-		default:
-			c.Status(http.StatusNotFound)
+		result, ok := authorizeStaticUploadResourceRead(c, deps, resource)
+		if !ok {
 			return
 		}
 
-		serveLocalUploadFile(c, resource.ObjectKey)
+		serveLocalUploadFile(c, result.Resource.ObjectKey)
 	}
 }
 
@@ -86,6 +73,9 @@ type staticUploadBoardAccessResolver struct {
 }
 
 func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
+	if r.service == nil {
+		return 0, storage.ErrUploadAccessDependencyMissing
+	}
 	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
 	if err != nil {
 		return 0, err
@@ -93,62 +83,79 @@ func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Co
 	return board.UserID, nil
 }
 
-func authorizeCanvasUploadRead(c *gin.Context, deps StaticUploadDeps, uploadPath storage.UploadCanvasResource) bool {
+func authorizeStaticUploadResourceRead(
+	c *gin.Context,
+	deps StaticUploadDeps,
+	resource storage.UploadResource,
+) (storage.ReadableUploadAccessResult, bool) {
 	userID := c.GetInt64("user_id")
-	if deps.BoardService == nil || deps.Auth.UserRepo == nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("canvas upload dependencies not configured"))
-		return false
+	readAccess, ok := resolveStaticUploadReadAccess(c, deps, resource.Kind)
+	if !ok {
+		return storage.ReadableUploadAccessResult{}, false
 	}
-	resource := storage.UploadResource{
-		Kind: storage.UploadResourceKindCanvas,
-		Canvas: &storage.UploadCanvasResource{
-			OwnerSegment: uploadPath.OwnerSegment,
-			BoardSegment: uploadPath.BoardSegment,
-			RelativePath: uploadPath.RelativePath,
-		},
-	}
-	err := storage.AuthorizeUploadResourceRead(
-		c.Request.Context(),
-		userID,
-		resource,
-		staticUploadBoardAccessResolver{service: deps.BoardService},
-		staticUploadOwnerStorageUIDResolver{repo: deps.Auth.UserRepo},
-	)
+	result, err := readAccess.AuthorizeUploadResourceRead(c.Request.Context(), userID, resource)
 	if err != nil {
-		switch {
-		case errors.Is(err, boards.ErrInvalidBoardInput):
-			response.Error(c, http.StatusNotFound, "资源不存在")
-		case errors.Is(err, boards.ErrBoardNotFound):
-			response.Error(c, http.StatusNotFound, "资源不存在")
-		case errors.Is(err, boards.ErrBoardPermissionDenied):
-			response.Error(c, http.StatusForbidden, "无权访问该资源")
-		case errors.Is(err, storage.ErrUploadAccessOwnerMismatch):
-			response.Error(c, http.StatusNotFound, "资源不存在")
-		default:
-			response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
-		}
-		return false
+		writeStaticUploadReadError(c, resource.Kind, err)
+		return storage.ReadableUploadAccessResult{}, false
 	}
 
-	return true
+	return result, true
 }
 
-func authorizeOwnedUploadRead(c *gin.Context, deps StaticUploadDeps, resource storage.UploadResource) bool {
-	userID := c.GetInt64("user_id")
-	if deps.Auth.UserRepo == nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("upload dependencies not configured"))
-		return false
+func resolveStaticUploadReadAccess(
+	c *gin.Context,
+	deps StaticUploadDeps,
+	kind storage.UploadResourceKind,
+) (storage.ReadableUploadAccess, bool) {
+	if deps.ReadAccess != nil {
+		return deps.ReadAccess, true
 	}
-	err := storage.AuthorizeUploadResourceRead(
-		c.Request.Context(),
-		userID,
-		resource,
+
+	if kind == storage.UploadResourceKindCanvas {
+		if deps.BoardService == nil || deps.Auth.UserRepo == nil {
+			response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("canvas upload dependencies not configured"))
+			return nil, false
+		}
+	} else if deps.Auth.UserRepo == nil {
+		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("upload dependencies not configured"))
+		return nil, false
+	}
+
+	return storage.NewReadableUploadAccess(
 		staticUploadBoardAccessResolver{service: deps.BoardService},
 		staticUploadOwnerStorageUIDResolver{repo: deps.Auth.UserRepo},
-	)
-	if err == nil {
-		return true
+	), true
+}
+
+func writeStaticUploadReadError(c *gin.Context, kind storage.UploadResourceKind, err error) {
+	switch kind {
+	case storage.UploadResourceKindCanvas:
+		writeCanvasUploadReadError(c, err)
+	case storage.UploadResourceKindProfileAvatar, storage.UploadResourceKindTaskOutput:
+		writeOwnedUploadReadError(c, err)
+	default:
+		c.Status(http.StatusNotFound)
 	}
+}
+
+func writeCanvasUploadReadError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, storage.ErrUploadAccessInvalidPath):
+		response.Error(c, http.StatusNotFound, "资源不存在")
+	case errors.Is(err, boards.ErrInvalidBoardInput):
+		response.Error(c, http.StatusNotFound, "资源不存在")
+	case errors.Is(err, boards.ErrBoardNotFound):
+		response.Error(c, http.StatusNotFound, "资源不存在")
+	case errors.Is(err, boards.ErrBoardPermissionDenied), errors.Is(err, storage.ErrUploadAccessDenied):
+		response.Error(c, http.StatusForbidden, "无权访问该资源")
+	case errors.Is(err, storage.ErrUploadAccessOwnerMismatch):
+		response.Error(c, http.StatusNotFound, "资源不存在")
+	default:
+		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
+	}
+}
+
+func writeOwnedUploadReadError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, storage.ErrUploadAccessInvalidPath):
 		response.Error(c, http.StatusNotFound, "资源不存在")
@@ -157,7 +164,6 @@ func authorizeOwnedUploadRead(c *gin.Context, deps StaticUploadDeps, resource st
 	default:
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
 	}
-	return false
 }
 
 type staticUploadOwnerStorageUIDResolver struct {
@@ -165,6 +171,9 @@ type staticUploadOwnerStorageUIDResolver struct {
 }
 
 func (r staticUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
+	if r.repo == nil {
+		return "", storage.ErrUploadAccessDependencyMissing
+	}
 	user, err := r.repo.GetByID(ctx, userID)
 	if err != nil {
 		return "", err
