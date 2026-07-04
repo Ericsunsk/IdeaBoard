@@ -1,5 +1,6 @@
-import { createApp, defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { renderWithUser, screen, within } from '../../../../test/render'
 import type { ImageEditorLevelsParams } from '../types'
 import ImageEditorLevelsControl from './ImageEditorLevelsControl.vue'
 
@@ -19,7 +20,7 @@ function makeImageData(values: number[]) {
   return new TestImageData(new Uint8ClampedArray(values), values.length / 4, 1) as ImageData
 }
 
-function mountLevelsControl(
+function renderLevelsControl(
   initialParams: ImageEditorLevelsParams,
   histogramSource: ImageData | null = null,
 ) {
@@ -29,71 +30,50 @@ function mountLevelsControl(
       params.value = nextParams
     }),
   }
-  const host = document.createElement('div')
-  document.body.appendChild(host)
-  const app = createApp(
-    defineComponent({
-      setup() {
-        return () =>
-          h(ImageEditorLevelsControl, {
-            params: params.value,
-            histogramSource,
-            'onUpdate:params': events.updateParams,
-          })
-      },
-    }),
-  )
-  app.mount(host)
-  const plot = host.querySelector<HTMLElement>('.image-editor-histogram-plot')
-  if (!plot) throw new Error('expected levels histogram plot')
-  Object.defineProperty(plot, 'getBoundingClientRect', {
+  const Harness = defineComponent({
+    setup() {
+      return () =>
+        h(ImageEditorLevelsControl, {
+          params: params.value,
+          histogramSource,
+          'onUpdate:params': events.updateParams,
+        })
+    },
+  })
+
+  const result = renderWithUser(Harness)
+  const plot = screen.getByRole('group', { name: '色阶直方图' })
+  const outputSlider = screen.getByRole('group', { name: '输出色阶范围' })
+
+  stubPointerTarget(plot, { right: 100, bottom: 100, width: 100, height: 100 })
+  stubPointerTarget(outputSlider, { right: 255, bottom: 22, width: 255, height: 22 })
+
+  return {
+    events,
+    outputSlider,
+    params,
+    plot,
+    ...result,
+  }
+}
+
+function stubPointerTarget(
+  target: HTMLElement,
+  rect: Pick<DOMRect, 'right' | 'bottom' | 'width' | 'height'>,
+) {
+  Object.defineProperty(target, 'getBoundingClientRect', {
     value: () => ({
       x: 0,
       y: 0,
       left: 0,
       top: 0,
-      right: 100,
-      bottom: 100,
-      width: 100,
-      height: 100,
       toJSON: () => ({}),
+      ...rect,
     }),
   })
-  plot.setPointerCapture = vi.fn()
-  plot.releasePointerCapture = vi.fn()
-  plot.hasPointerCapture = vi.fn(() => true)
-  const outputSlider = host.querySelector<HTMLElement>('.image-editor-levels-output__slider')
-  if (outputSlider) {
-    Object.defineProperty(outputSlider, 'getBoundingClientRect', {
-      value: () => ({
-        x: 0,
-        y: 0,
-        left: 0,
-        top: 0,
-        right: 255,
-        bottom: 22,
-        width: 255,
-        height: 22,
-        toJSON: () => ({}),
-      }),
-    })
-    outputSlider.setPointerCapture = vi.fn()
-    outputSlider.releasePointerCapture = vi.fn()
-    outputSlider.hasPointerCapture = vi.fn(() => true)
-  }
-
-  return {
-    app,
-    events,
-    host,
-    outputSlider,
-    params,
-    plot,
-    unmount: () => {
-      app.unmount()
-      host.remove()
-    },
-  }
+  target.setPointerCapture = vi.fn()
+  target.releasePointerCapture = vi.fn()
+  target.hasPointerCapture = vi.fn(() => true)
 }
 
 function dispatchPointerEvent(target: EventTarget, type: string, init: Partial<PointerEvent> = {}) {
@@ -108,58 +88,55 @@ function dispatchPointerEvent(target: EventTarget, type: string, init: Partial<P
   )
 }
 
+function updateInputValue(target: HTMLElement, value: string) {
+  const input = target as HTMLInputElement
+  input.value = value
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 describe('ImageEditorLevelsControl', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('renders RGB histogram, level markers, and guide lines', async () => {
-    const harness = mountLevelsControl(
+  it('renders RGB histogram, level markers, and guide lines', () => {
+    const { plot } = renderLevelsControl(
       { shadows: 64, midtones: 128, highlights: 191, outputBlack: 0, outputWhite: 255 },
       makeImageData([0, 0, 0, 255, 255, 255, 255, 255]),
     )
 
-    try {
-      await nextTick()
-      const histogram = harness.host.querySelector<SVGPathElement>(
-        '.image-editor-histogram-plot__histogram',
-      )
-      const markers = harness.host.querySelectorAll<HTMLButtonElement>(
-        '.image-editor-histogram-plot__marker',
-      )
-      const guideLines = harness.host.querySelectorAll<SVGLineElement>(
-        '.image-editor-histogram-plot__guide-line',
-      )
+    const histogram = plot.querySelector<SVGPathElement>('.image-editor-histogram-plot__histogram')
+    const markers = within(plot).getAllByRole('slider')
+    const guideLines = plot.querySelectorAll<SVGLineElement>(
+      '.image-editor-histogram-plot__guide-line',
+    )
 
-      expect(histogram?.getAttribute('d')).toContain('L 0 0')
-      expect(markers).toHaveLength(3)
-      expect(guideLines).toHaveLength(3)
-      expect(markers[0]?.style.left).toBe(`${(64 / 255) * 100}%`)
-      expect(markers[1]?.style.left).toBe(`${(128 / 255) * 100}%`)
-      expect(markers[2]?.style.left).toBe(`${(191 / 255) * 100}%`)
-      expect(markers[0]?.getAttribute('aria-label')).toBe('黑场 64')
-      expect(markers[0]?.getAttribute('aria-valuemin')).toBe('0')
-      expect(markers[0]?.getAttribute('aria-valuemax')).toBe('190')
-      expect(markers[0]?.getAttribute('aria-valuenow')).toBe('64')
-      expect(markers[1]?.classList.contains('is-midtones')).toBe(true)
-      expect(markers[1]?.getAttribute('aria-valuemin')).toBe('65')
-      expect(markers[1]?.getAttribute('aria-valuemax')).toBe('190')
-      expect(markers[2]?.getAttribute('aria-label')).toBe('白场 191')
-      expect(markers[2]?.getAttribute('aria-valuemin')).toBe('65')
-      expect(markers[2]?.getAttribute('aria-valuemax')).toBe('255')
-      expect(guideLines[0]?.getAttribute('x1')).toBe(`${(64 / 255) * 100}`)
-      expect(guideLines[1]?.getAttribute('x1')).toBe(`${(128 / 255) * 100}`)
-      expect(guideLines[2]?.getAttribute('x1')).toBe(`${(191 / 255) * 100}`)
-      expect(guideLines[0]?.classList.contains('is-shadows')).toBe(true)
-      expect(guideLines[1]?.classList.contains('is-midtones')).toBe(true)
-      expect(guideLines[2]?.classList.contains('is-highlights')).toBe(true)
-    } finally {
-      harness.unmount()
-    }
+    expect(histogram?.getAttribute('d')).toContain('L 0 0')
+    expect(markers).toHaveLength(3)
+    expect(guideLines).toHaveLength(3)
+    expect(markers[0]?.style.left).toBe(`${(64 / 255) * 100}%`)
+    expect(markers[1]?.style.left).toBe(`${(128 / 255) * 100}%`)
+    expect(markers[2]?.style.left).toBe(`${(191 / 255) * 100}%`)
+    expect(markers[0]).toHaveAttribute('aria-label', '黑场 64')
+    expect(markers[0]).toHaveAttribute('aria-valuemin', '0')
+    expect(markers[0]).toHaveAttribute('aria-valuemax', '190')
+    expect(markers[0]).toHaveAttribute('aria-valuenow', '64')
+    expect(markers[1]).toHaveClass('is-midtones')
+    expect(markers[1]).toHaveAttribute('aria-valuemin', '65')
+    expect(markers[1]).toHaveAttribute('aria-valuemax', '190')
+    expect(markers[2]).toHaveAttribute('aria-label', '白场 191')
+    expect(markers[2]).toHaveAttribute('aria-valuemin', '65')
+    expect(markers[2]).toHaveAttribute('aria-valuemax', '255')
+    expect(guideLines[0]?.getAttribute('x1')).toBe(`${(64 / 255) * 100}`)
+    expect(guideLines[1]?.getAttribute('x1')).toBe(`${(128 / 255) * 100}`)
+    expect(guideLines[2]?.getAttribute('x1')).toBe(`${(191 / 255) * 100}`)
+    expect(guideLines[0]).toHaveClass('is-shadows')
+    expect(guideLines[1]).toHaveClass('is-midtones')
+    expect(guideLines[2]).toHaveClass('is-highlights')
   })
 
   it('updates full levels params from marker drag with handle constraints', async () => {
-    const harness = mountLevelsControl({
+    const { events } = renderLevelsControl({
       shadows: 10,
       midtones: 128,
       highlights: 153,
@@ -167,37 +144,32 @@ describe('ImageEditorLevelsControl', () => {
       outputWhite: 255,
     })
 
-    try {
-      await nextTick()
-      const markers = harness.host.querySelectorAll<HTMLButtonElement>(
-        '.image-editor-histogram-plot__marker',
-      )
+    dispatchPointerEvent(screen.getByRole('slider', { name: '黑场 10' }), 'pointerdown', {
+      clientX: 90,
+    })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 152,
+      midtones: 152,
+      highlights: 153,
+      outputBlack: 0,
+      outputWhite: 255,
+    })
 
-      dispatchPointerEvent(markers[0]!, 'pointerdown', { clientX: 90 })
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 152,
-        midtones: 152,
-        highlights: 153,
-        outputBlack: 0,
-        outputWhite: 255,
-      })
-
-      await nextTick()
-      dispatchPointerEvent(markers[1]!, 'pointerdown', { clientX: 30 })
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 152,
-        midtones: 152,
-        highlights: 153,
-        outputBlack: 0,
-        outputWhite: 255,
-      })
-    } finally {
-      harness.unmount()
-    }
+    await nextTick()
+    dispatchPointerEvent(screen.getByRole('slider', { name: '中点 152' }), 'pointerdown', {
+      clientX: 30,
+    })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 152,
+      midtones: 152,
+      highlights: 153,
+      outputBlack: 0,
+      outputWhite: 255,
+    })
   })
 
   it('updates full levels params from integer channel numeric inputs', async () => {
-    const harness = mountLevelsControl({
+    const { events } = renderLevelsControl({
       shadows: 10,
       midtones: 128,
       highlights: 230,
@@ -205,162 +177,128 @@ describe('ImageEditorLevelsControl', () => {
       outputWhite: 255,
     })
 
-    try {
-      await nextTick()
-      const numberInputs = harness.host.querySelectorAll<HTMLInputElement>(
-        '.image-editor-levels-fields input[type="number"]',
-      )
+    updateInputValue(screen.getByLabelText('白场'), '30')
 
-      numberInputs[2]!.value = '30'
-      numberInputs[2]?.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 10,
+      midtones: 29,
+      highlights: 30,
+      outputBlack: 0,
+      outputWhite: 255,
+    })
 
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 10,
-        midtones: 29,
-        highlights: 30,
-        outputBlack: 0,
-        outputWhite: 255,
-      })
+    await nextTick()
+    updateInputValue(screen.getByLabelText('中点'), '0')
 
-      await nextTick()
-      numberInputs[1]!.value = '0'
-      numberInputs[1]?.dispatchEvent(new Event('input', { bubbles: true }))
-
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 10,
-        midtones: 11,
-        highlights: 30,
-        outputBlack: 0,
-        outputWhite: 255,
-      })
-    } finally {
-      harness.unmount()
-    }
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 10,
+      midtones: 11,
+      highlights: 30,
+      outputBlack: 0,
+      outputWhite: 255,
+    })
   })
 
   it('updates output levels from the global range controls', async () => {
-    const harness = mountLevelsControl({
+    const { events, outputSlider } = renderLevelsControl({
       shadows: 0,
       midtones: 128,
       highlights: 255,
       outputBlack: 20,
       outputWhite: 220,
     })
+    const outputHandles = within(outputSlider).getAllByRole('slider')
+    const outputNumbers = [
+      screen.getByRole('spinbutton', { name: '输出黑场' }) as HTMLInputElement,
+      screen.getByRole('spinbutton', { name: '输出白场' }) as HTMLInputElement,
+    ]
 
-    try {
-      await nextTick()
-      const outputHandles = harness.host.querySelectorAll<HTMLButtonElement>(
-        '.editing-two-handle-slider__handle',
-      )
-      const outputNumbers = harness.host.querySelectorAll<HTMLInputElement>(
-        '.image-editor-levels-output__field input[type="number"]',
-      )
+    expect(outputHandles).toHaveLength(2)
+    expect(outputNumbers).toHaveLength(2)
+    expect(outputHandles[0]).toHaveAttribute('role', 'slider')
+    expect(outputHandles[1]).toHaveAttribute('role', 'slider')
+    expect(
+      outputNumbers.every((input) => input.classList.contains('editing-controls-number-input')),
+    ).toBe(true)
+    expect(outputNumbers[0]?.value).toBe('20')
+    expect(outputNumbers[1]?.value).toBe('220')
+    expect(outputHandles.map((handle) => handle.getAttribute('aria-label'))).toEqual([
+      '输出黑场',
+      '输出白场',
+    ])
+    expect(outputNumbers.map((input) => [input.min, input.max])).toEqual([
+      ['0', '219'],
+      ['21', '255'],
+    ])
+    expect(outputHandles.map((handle) => handle.getAttribute('aria-valuemin'))).toEqual(['0', '21'])
+    expect(outputHandles.map((handle) => handle.getAttribute('aria-valuemax'))).toEqual([
+      '219',
+      '255',
+    ])
+    expect(outputNumbers.map((input) => input.getAttribute('aria-valuemin'))).toEqual(['0', '21'])
+    expect(outputNumbers.map((input) => input.getAttribute('aria-valuemax'))).toEqual([
+      '219',
+      '255',
+    ])
 
-      expect(outputHandles).toHaveLength(2)
-      expect(outputNumbers).toHaveLength(2)
-      expect(outputHandles[0]?.getAttribute('role')).toBe('slider')
-      expect(outputHandles[1]?.getAttribute('role')).toBe('slider')
-      expect(
-        [...outputNumbers].every((input) =>
-          input.classList.contains('editing-controls-number-input'),
-        ),
-      ).toBe(true)
-      expect(outputNumbers[0]?.value).toBe('20')
-      expect(outputNumbers[0]?.getAttribute('aria-label')).toBe('输出黑场')
-      expect(outputNumbers[1]?.value).toBe('220')
-      expect(outputNumbers[1]?.getAttribute('aria-label')).toBe('输出白场')
-      expect([...outputHandles].map((handle) => handle.getAttribute('aria-label'))).toEqual([
-        '输出黑场',
-        '输出白场',
-      ])
-      expect([...outputNumbers].map((input) => [input.min, input.max])).toEqual([
-        ['0', '219'],
-        ['21', '255'],
-      ])
-      expect([...outputHandles].map((handle) => handle.getAttribute('aria-valuemin'))).toEqual([
-        '0',
-        '21',
-      ])
-      expect([...outputHandles].map((handle) => handle.getAttribute('aria-valuemax'))).toEqual([
-        '219',
-        '255',
-      ])
-      expect([...outputNumbers].map((input) => input.getAttribute('aria-valuemin'))).toEqual([
-        '0',
-        '21',
-      ])
-      expect([...outputNumbers].map((input) => input.getAttribute('aria-valuemax'))).toEqual([
-        '219',
-        '255',
-      ])
+    events.updateParams.mockClear()
+    dispatchPointerEvent(outputSlider, 'pointerdown', { clientX: 40 })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 0,
+      midtones: 128,
+      highlights: 255,
+      outputBlack: 40,
+      outputWhite: 220,
+    })
+    dispatchPointerEvent(window, 'pointerup', { clientX: 40 })
 
-      harness.events.updateParams.mockClear()
-      dispatchPointerEvent(harness.outputSlider!, 'pointerdown', { clientX: 40 })
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 0,
-        midtones: 128,
-        highlights: 255,
-        outputBlack: 40,
-        outputWhite: 220,
-      })
-      dispatchPointerEvent(window, 'pointerup', { clientX: 40 })
+    await nextTick()
+    const updatedOutputHandles = within(outputSlider).getAllByRole('slider')
+    events.updateParams.mockClear()
+    dispatchPointerEvent(updatedOutputHandles[1]!, 'pointerdown', { clientX: 220 })
+    expect(events.updateParams).not.toHaveBeenCalled()
+    dispatchPointerEvent(window, 'pointermove', { clientX: 10 })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 0,
+      midtones: 128,
+      highlights: 255,
+      outputBlack: 40,
+      outputWhite: 41,
+    })
+    dispatchPointerEvent(window, 'pointerup', { clientX: 10 })
 
-      await nextTick()
-      const updatedOutputHandles = harness.host.querySelectorAll<HTMLButtonElement>(
-        '.editing-two-handle-slider__handle',
-      )
-      harness.events.updateParams.mockClear()
-      dispatchPointerEvent(updatedOutputHandles[1]!, 'pointerdown', { clientX: 220 })
-      expect(harness.events.updateParams).not.toHaveBeenCalled()
-      dispatchPointerEvent(window, 'pointermove', { clientX: 10 })
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 0,
-        midtones: 128,
-        highlights: 255,
-        outputBlack: 40,
-        outputWhite: 41,
-      })
-      dispatchPointerEvent(window, 'pointerup', { clientX: 10 })
+    await nextTick()
+    const boundaryOutputHandles = within(outputSlider).getAllByRole('slider')
+    events.updateParams.mockClear()
+    dispatchPointerEvent(boundaryOutputHandles[0]!, 'pointerdown', { clientX: 40 })
+    dispatchPointerEvent(window, 'pointermove', { clientX: 240 })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 0,
+      midtones: 128,
+      highlights: 255,
+      outputBlack: 40,
+      outputWhite: 41,
+    })
+    dispatchPointerEvent(window, 'pointerup', { clientX: 240 })
 
-      await nextTick()
-      const boundaryOutputHandles = harness.host.querySelectorAll<HTMLButtonElement>(
-        '.editing-two-handle-slider__handle',
-      )
-      harness.events.updateParams.mockClear()
-      dispatchPointerEvent(boundaryOutputHandles[0]!, 'pointerdown', { clientX: 40 })
-      dispatchPointerEvent(window, 'pointermove', { clientX: 240 })
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 0,
-        midtones: 128,
-        highlights: 255,
-        outputBlack: 40,
-        outputWhite: 41,
-      })
-      dispatchPointerEvent(window, 'pointerup', { clientX: 240 })
+    await nextTick()
+    updateInputValue(outputNumbers[0]!, '30')
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 0,
+      midtones: 128,
+      highlights: 255,
+      outputBlack: 30,
+      outputWhite: 41,
+    })
 
-      await nextTick()
-      outputNumbers[0]!.value = '30'
-      outputNumbers[0]?.dispatchEvent(new Event('input', { bubbles: true }))
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 0,
-        midtones: 128,
-        highlights: 255,
-        outputBlack: 30,
-        outputWhite: 41,
-      })
-
-      await nextTick()
-      outputNumbers[1]!.value = '20'
-      outputNumbers[1]?.dispatchEvent(new Event('input', { bubbles: true }))
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        shadows: 0,
-        midtones: 128,
-        highlights: 255,
-        outputBlack: 30,
-        outputWhite: 31,
-      })
-    } finally {
-      harness.unmount()
-    }
+    await nextTick()
+    updateInputValue(outputNumbers[1]!, '20')
+    expect(events.updateParams).toHaveBeenCalledWith({
+      shadows: 0,
+      midtones: 128,
+      highlights: 255,
+      outputBlack: 30,
+      outputWhite: 31,
+    })
   })
 })
