@@ -49,7 +49,6 @@ export type UseFlowBoardPersistenceOptions = {
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
   onError: (text: string) => void
-  refreshSnapshot: () => void
   clearFlowHistoryBaseline: () => void
   commitGraph: (
     graph: { nodes: unknown[]; edges: unknown[] },
@@ -130,7 +129,6 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     }
     clearDirtyAfterImport()
     options.clearFlowHistoryBaseline()
-    options.refreshSnapshot()
     options.onGraphCommitted?.()
   }
 
@@ -264,7 +262,6 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
         }
       }
       if (isSaveStillCurrent()) {
-        options.refreshSnapshot()
         options.onGraphCommitted?.()
       }
       return remoteSync.ok

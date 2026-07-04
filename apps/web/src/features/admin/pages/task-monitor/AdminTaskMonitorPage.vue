@@ -185,146 +185,144 @@
         </AdminResourceToolbar>
       </template>
 
-      <AdminTableFrame>
-        <div
-          class="app-scrollbar overflow-x-auto overscroll-contain"
-          :class="{ 'is-scrolling': isTaskTableScrolling }"
-          @scroll.passive="handleTaskTableScroll"
+      <div
+        class="app-scrollbar overflow-x-auto overscroll-contain"
+        :class="{ 'is-scrolling': isTaskTableScrolling }"
+        @scroll.passive="handleTaskTableScroll"
+      >
+        <DataTable
+          v-model:selection="selectedTasks"
+          :value="tasks"
+          :loading="loading"
+          data-key="task_id"
+          size="small"
+          :pt="adminDenseDataTablePt"
+          :table-style="{ minWidth: '1220px' }"
         >
-          <DataTable
-            v-model:selection="selectedTasks"
-            :value="tasks"
-            :loading="loading"
-            data-key="task_id"
-            size="small"
-            :pt="adminDenseDataTablePt"
-            :table-style="{ minWidth: '1220px' }"
-          >
-            <template #empty>
-              <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
+          <template #empty>
+            <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
+          </template>
+
+          <Column
+            selection-mode="multiple"
+            header-style="width: 3.5rem"
+            :body-style="{ width: '3.5rem' }"
+          />
+
+          <Column header="创建时间" :style="{ width: '156px' }">
+            <template #body="{ data }">
+              <span
+                class="whitespace-nowrap font-mono text-admin-meta font-semibold text-admin-text-2-strong"
+              >
+                {{ formatTaskCreatedAt(data) }}
+              </span>
             </template>
+          </Column>
 
-            <Column
-              selection-mode="multiple"
-              header-style="width: 3.5rem"
-              :body-style="{ width: '3.5rem' }"
-            />
-
-            <Column header="创建时间" :style="{ width: '156px' }">
-              <template #body="{ data }">
-                <span
-                  class="whitespace-nowrap font-mono text-admin-meta font-semibold text-admin-text-2-strong"
-                >
-                  {{ formatTaskCreatedAt(data) }}
-                </span>
-              </template>
-            </Column>
-
-            <Column header="结果" :style="{ width: '104px', minWidth: '104px' }">
-              <template #body="{ data }">
-                <div class="flex h-12 w-12 shrink-0 items-center justify-start">
-                  <PrimeImage
-                    v-if="resultPreviewEnabled && getTaskResultImageUrl(data)"
-                    :src="getTaskResultImageUrl(data)"
-                    preview
-                    image-class="block h-12 w-12 min-w-12 shrink-0 overflow-hidden rounded-[10px] border border-admin-border-soft bg-admin-surface-muted object-cover"
-                    :image-style="{
-                      width: '48px',
-                      height: '48px',
-                      minWidth: '48px',
-                      objectFit: 'cover',
-                    }"
-                  />
-                  <span v-else class="text-admin-meta text-admin-text-3">-</span>
-                </div>
-              </template>
-            </Column>
-
-            <Column header="用户" :style="{ width: '140px' }">
-              <template #body="{ data }">
-                <span
-                  class="block max-w-[120px] truncate text-admin-meta font-bold text-admin-text-1"
-                >
-                  {{ getTaskUserIdentifier(data) }}
-                </span>
-              </template>
-            </Column>
-
-            <Column header="提示词" :style="{ width: '280px' }">
-              <template #body="{ data }">
-                <span
-                  class="block max-w-[252px] truncate text-admin-meta text-admin-text-2-strong"
-                  :title="data.prompt || '-'"
-                >
-                  {{ data.prompt || '-' }}
-                </span>
-              </template>
-            </Column>
-
-            <Column header="账号" :style="{ width: '88px' }">
-              <template #body="{ data }">
-                <span class="text-admin-meta text-admin-text-3">{{ data.account_id || '-' }}</span>
-              </template>
-            </Column>
-
-            <Column header="API调用" :style="{ width: '144px' }">
-              <template #body="{ data }">
-                <span v-if="getTaskApiCall(data)" class="inline-flex max-w-32 items-center gap-1.5">
-                  <Tag :value="getTaskApiCall(data)?.platform" severity="info" rounded />
-                </span>
-                <span v-else class="text-admin-meta text-admin-text-3">-</span>
-              </template>
-            </Column>
-
-            <Column header="状态" :style="{ width: '104px' }">
-              <template #body="{ data }">
-                <Tag
-                  :value="getTaskStatusDefinition(data.status).text"
-                  :severity="getTaskStatusDefinition(data.status).severity"
-                  rounded
-                  class="min-w-16 justify-center"
+          <Column header="结果" :style="{ width: '104px', minWidth: '104px' }">
+            <template #body="{ data }">
+              <div class="flex h-12 w-12 shrink-0 items-center justify-start">
+                <PrimeImage
+                  v-if="resultPreviewEnabled && getTaskResultImageUrl(data)"
+                  :src="getTaskResultImageUrl(data)"
+                  preview
+                  image-class="block h-12 w-12 min-w-12 shrink-0 overflow-hidden rounded-[10px] border border-admin-border-soft bg-admin-surface-muted object-cover"
+                  :image-style="{
+                    width: '48px',
+                    height: '48px',
+                    minWidth: '48px',
+                    objectFit: 'cover',
+                  }"
                 />
-              </template>
-            </Column>
-
-            <Column header="耗时" :style="{ width: '88px' }">
-              <template #body="{ data }">
-                <span v-if="getTaskDuration(data)" :class="getTaskDurationClass(data)">
-                  {{ getTaskDuration(data)?.seconds }}s
-                </span>
                 <span v-else class="text-admin-meta text-admin-text-3">-</span>
-              </template>
-            </Column>
+              </div>
+            </template>
+          </Column>
 
-            <Column header="错误诊断" :style="{ width: '240px' }">
-              <template #body="{ data }">
-                <span
-                  v-if="getTaskSanitizedError(data)"
-                  class="block max-w-[212px] truncate text-admin-meta text-admin-danger"
-                >
-                  {{ getTaskSanitizedError(data) }}
-                </span>
-                <span v-else class="text-admin-meta text-admin-text-3">-</span>
-              </template>
-            </Column>
+          <Column header="用户" :style="{ width: '140px' }">
+            <template #body="{ data }">
+              <span
+                class="block max-w-[120px] truncate text-admin-meta font-bold text-admin-text-1"
+              >
+                {{ getTaskUserIdentifier(data) }}
+              </span>
+            </template>
+          </Column>
 
-            <Column header="操作" :style="{ width: '72px' }">
-              <template #body="{ data }">
-                <Button
-                  text
-                  class="!h-8 !w-8 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none hover:!bg-admin-surface-muted"
-                  aria-label="查看任务详情"
-                  @click="showDetail(data)"
-                >
-                  <template #icon>
-                    <Eye class="size-4 text-admin-text-2" />
-                  </template>
-                </Button>
-              </template>
-            </Column>
-          </DataTable>
-        </div>
-      </AdminTableFrame>
+          <Column header="提示词" :style="{ width: '280px' }">
+            <template #body="{ data }">
+              <span
+                class="block max-w-[252px] truncate text-admin-meta text-admin-text-2-strong"
+                :title="data.prompt || '-'"
+              >
+                {{ data.prompt || '-' }}
+              </span>
+            </template>
+          </Column>
+
+          <Column header="账号" :style="{ width: '88px' }">
+            <template #body="{ data }">
+              <span class="text-admin-meta text-admin-text-3">{{ data.account_id || '-' }}</span>
+            </template>
+          </Column>
+
+          <Column header="API调用" :style="{ width: '144px' }">
+            <template #body="{ data }">
+              <span v-if="getTaskApiCall(data)" class="inline-flex max-w-32 items-center gap-1.5">
+                <Tag :value="getTaskApiCall(data)?.platform" severity="info" rounded />
+              </span>
+              <span v-else class="text-admin-meta text-admin-text-3">-</span>
+            </template>
+          </Column>
+
+          <Column header="状态" :style="{ width: '104px' }">
+            <template #body="{ data }">
+              <Tag
+                :value="getTaskStatusDefinition(data.status).text"
+                :severity="getTaskStatusDefinition(data.status).severity"
+                rounded
+                class="min-w-16 justify-center"
+              />
+            </template>
+          </Column>
+
+          <Column header="耗时" :style="{ width: '88px' }">
+            <template #body="{ data }">
+              <span v-if="getTaskDuration(data)" :class="getTaskDurationClass(data)">
+                {{ getTaskDuration(data)?.seconds }}s
+              </span>
+              <span v-else class="text-admin-meta text-admin-text-3">-</span>
+            </template>
+          </Column>
+
+          <Column header="错误诊断" :style="{ width: '240px' }">
+            <template #body="{ data }">
+              <span
+                v-if="getTaskSanitizedError(data)"
+                class="block max-w-[212px] truncate text-admin-meta text-admin-danger"
+              >
+                {{ getTaskSanitizedError(data) }}
+              </span>
+              <span v-else class="text-admin-meta text-admin-text-3">-</span>
+            </template>
+          </Column>
+
+          <Column header="操作" :style="{ width: '72px' }">
+            <template #body="{ data }">
+              <Button
+                text
+                class="!h-8 !w-8 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none hover:!bg-admin-surface-muted"
+                aria-label="查看任务详情"
+                @click="showDetail(data)"
+              >
+                <template #icon>
+                  <Eye class="size-4 text-admin-text-2" />
+                </template>
+              </Button>
+            </template>
+          </Column>
+        </DataTable>
+      </div>
     </AdminTablePanel>
 
     <Dialog
@@ -620,7 +618,6 @@ import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
-import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { adminCards } from '../../shared/lib/adminCardMeta'

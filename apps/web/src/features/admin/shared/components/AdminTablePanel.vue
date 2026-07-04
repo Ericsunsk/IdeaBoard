@@ -12,7 +12,9 @@
       </div>
 
       <div :class="resolvedContentClass">
-        <slot />
+        <div :class="tableFrameClass">
+          <slot />
+        </div>
       </div>
     </div>
   </div>
@@ -41,5 +43,11 @@ const panelClass = computed(() => [
   adminSurfacePanelClass,
   props.viewportHeight && adminSurfacePanelViewportClass,
 ])
-const resolvedContentClass = computed(() => props.contentClass || (hasToolbar.value ? 'px-6 pb-6' : 'p-6'))
+const resolvedContentClass = computed(
+  () => props.contentClass || (hasToolbar.value ? 'px-6 pb-6' : 'p-6'),
+)
+const tableFrameClass = computed(() => [
+  'min-w-0 overflow-hidden rounded-lg border border-admin-border-soft bg-white',
+  props.viewportHeight && 'h-full',
+])
 </script>

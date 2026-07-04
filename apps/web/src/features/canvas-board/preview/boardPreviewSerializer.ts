@@ -17,7 +17,7 @@ import {
   BLANK_BOARD_PREVIEW_DOT_SPACING,
 } from './boardPreviewStyle'
 
-export interface BoardPreviewFrame {
+interface BoardPreviewFrame {
   key: string
   kind: 'image' | 'node'
   x: number
@@ -275,7 +275,7 @@ function collectNodeFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
   return frames
 }
 
-export function collectBoardPreviewFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
+function collectBoardPreviewFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
   return collectNodeFrames(state)
 }
 

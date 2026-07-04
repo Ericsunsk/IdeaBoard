@@ -6,8 +6,6 @@ import {
   type CanvasConnectionContractNode,
 } from '../../canvas-board/domain'
 
-export type CanvasConnectionTone = 'image' | 'prompt'
-
 export interface CanvasConnectionEndpointLike {
   nodeType: CanvasConnectionNodeType
   nodeId: number
@@ -18,11 +16,6 @@ export type CanvasConnectionNodeLookup = (
   nodeType: CanvasConnectionNodeType,
   nodeId: number,
 ) => CanvasConnectionContractNode | null
-
-export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {
-  if (port === 'prompt') return 'prompt'
-  return 'image'
-}
 
 export function isCanvasConnectionAllowed(
   from: CanvasConnectionEndpointLike,

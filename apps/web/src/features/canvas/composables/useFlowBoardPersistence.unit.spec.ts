@@ -54,7 +54,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     onWarning,
     onSuccess,
     onError,
-    refreshSnapshot: vi.fn(),
     clearFlowHistoryBaseline,
     commitGraph,
   })

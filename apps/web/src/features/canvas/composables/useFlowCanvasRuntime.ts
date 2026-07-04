@@ -121,7 +121,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       didRecordChange = flowHistory.push(historyBefore as FlowHistorySnapshot)
     }
     if (sideEffects.markDirty !== false && didRecordChange) markDirty()
-    refreshSnapshot()
   }
 
   const graphAdapter: CanvasVueFlowGraphAdapter = useCanvasVueFlowGraphAdapter({
@@ -144,10 +143,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function captureFullGraphHistory() {
     return flowHistory.capture()
-  }
-
-  function refreshSnapshot() {
-    // Snapshot preview UI has been removed; callers keep this hook for flow parity.
   }
 
   function createRestoreGraphCommandOptions() {
@@ -180,7 +175,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onWarning: options.onWarning,
     onSuccess: options.onSuccess,
     onError: options.onError,
-    refreshSnapshot,
     clearFlowHistoryBaseline: flowHistory.clearBaseline,
     getViewport: options.getViewport,
     setViewport: options.setViewport,
@@ -236,7 +230,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     captureHistory: captureFullGraphHistory,
     markDirty: () => {
       markDirty()
-      refreshSnapshot()
     },
     nodeDrag: {
       begin: beginNodeDragTransaction,
@@ -366,6 +359,5 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onEdgesChange,
     fullNodes: options.nodes,
     fullEdges: options.edges,
-    refreshSnapshot,
   }
 }
