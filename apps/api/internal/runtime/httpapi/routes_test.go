@@ -8,11 +8,24 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
 
+	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/accountpool/channels"
+	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/identity/auth"
+	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/assets"
+	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/tasking/taskservice"
+	"ideaboard/api/internal/tasking/taskstats"
+	"ideaboard/api/internal/testdb"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,6 +37,14 @@ type stubBrandingSettingsProvider struct {
 
 func (p stubBrandingSettingsProvider) GetBranding(_ context.Context) (settings.BrandingSetting, error) {
 	return p.setting, p.err
+}
+
+type stubRateLimitSettingsProvider struct {
+	setting settings.RateLimitSetting
+}
+
+func (p stubRateLimitSettingsProvider) GetRateLimit(_ context.Context) (settings.RateLimitSetting, error) {
+	return p.setting, nil
 }
 
 func TestRegisterFrontendRoutesSkipsMissingIndexQuietlyInDevelopment(t *testing.T) {
@@ -119,6 +140,65 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 	}
 }
 
+func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	authUserID := "auth-admin-route-user"
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/internal/session" {
+			http.NotFound(w, r)
+			return
+		}
+		if cookie := r.Header.Get("Cookie"); !strings.Contains(cookie, "better-auth.session_token=valid") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"` + authUserID + `","username":"route-user"}}}`))
+	}))
+	defer authServer.Close()
+
+	db := testdb.Open(t)
+	userRepo := users.NewUserRepository(db)
+	if err := userRepo.Create(context.Background(), &users.User{
+		Username:   "route-user",
+		AuthUserID: &authUserID,
+		Status:     1,
+		Role:       "user",
+	}); err != nil {
+		t.Fatalf("seed local user failed: %v", err)
+	}
+
+	authDeps := AuthDeps{
+		AuthServiceClient: auth.NewServiceClient(config.AuthServiceConfig{
+			BaseURL:        authServer.URL,
+			TimeoutSeconds: 1,
+		}),
+		UserRepo: userRepo,
+	}
+	router := gin.New()
+	RegisterRoutes(router, newAdminRouteGuardTestDependencies(authDeps), fstest.MapFS{}, FrontendRouteOptions{})
+
+	adminRoutes := collectAdminRoutes(t, router)
+	assertAdminRouteSet(t, adminRoutes)
+
+	for _, route := range adminRoutes {
+		t.Run(route.Method+" "+route.Path, func(t *testing.T) {
+			noCookie := httptest.NewRecorder()
+			router.ServeHTTP(noCookie, newAdminRouteGuardRequest(t, route, ""))
+			if noCookie.Code != http.StatusUnauthorized {
+				t.Fatalf("no-cookie status = %d, want %d; body=%s", noCookie.Code, http.StatusUnauthorized, noCookie.Body.String())
+			}
+
+			localUser := httptest.NewRecorder()
+			router.ServeHTTP(localUser, newAdminRouteGuardRequest(t, route, "better-auth.session_token=valid"))
+			if localUser.Code != http.StatusForbidden {
+				t.Fatalf("local user status = %d, want %d; body=%s", localUser.Code, http.StatusForbidden, localUser.Body.String())
+			}
+		})
+	}
+}
+
 func TestRegisterStaticUploadRoutesDoesNotCreateUploadsDirectory(t *testing.T) {
 	t.Chdir(t.TempDir())
 	gin.SetMode(gin.TestMode)
@@ -165,4 +245,199 @@ func TestPublicBrandingSettingsHandlerRequiresProvider(t *testing.T) {
 	if res.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d; body=%s", res.Code, http.StatusInternalServerError, res.Body.String())
 	}
+}
+
+type adminRouteUnderTest struct {
+	Method string
+	Path   string
+}
+
+func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
+	return Dependencies{
+		Auth: authDeps,
+		UserRoutes: UserRouteDeps{
+			AuthHandler:      auth.NewAuthHandler(nil),
+			TaskHandler:      taskservice.NewHandler(nil),
+			BoardHandler:     boards.NewBoardHandler(nil, nil),
+			LineDraftHandler: assets.NewLineDraftHandler(nil),
+			Uploads: UploadDeps{
+				UserRepo:       authDeps.UserRepo,
+				UploadSettings: &fakeMediaUploadSettingsProvider{},
+			},
+		},
+		AdminRoutes: AdminRouteDeps{
+			AdminHandler:         users.NewAdminHandler(nil, nil, nil),
+			AccountHandler:       accounts.NewAccountHandler(nil),
+			TaskHandler:          taskservice.NewHandler(nil),
+			TaskStatsHandler:     taskstats.NewHandler(nil, nil),
+			ChannelHandler:       channels.NewChannelHandler(nil),
+			StorageHandler:       storage.NewStorageHandler(nil),
+			LineDraftHandler:     assets.NewLineDraftHandler(nil),
+			FeaturePromptHandler: prompts.NewFeaturePromptHandler(nil),
+			UploadSettings:       &fakeMediaUploadSettingsProvider{},
+		},
+		StaticUploads: StaticUploadDeps{Auth: authDeps},
+		CORSMiddleware: func(c *gin.Context) {
+			c.Next()
+		},
+		RateLimit: stubRateLimitSettingsProvider{
+			setting: settings.RateLimitSetting{
+				WindowSeconds: 1,
+				MaxRequests:   10000,
+			},
+		},
+	}
+}
+
+func collectAdminRoutes(t *testing.T, router *gin.Engine) []adminRouteUnderTest {
+	t.Helper()
+
+	var routes []adminRouteUnderTest
+	for _, route := range router.Routes() {
+		if route.Path == "/api/admin" || strings.HasPrefix(route.Path, "/api/admin/") {
+			routes = append(routes, adminRouteUnderTest{
+				Method: route.Method,
+				Path:   route.Path,
+			})
+		}
+	}
+	if len(routes) == 0 {
+		t.Fatal("no /api/admin routes were registered")
+	}
+	sort.Slice(routes, func(i, j int) bool {
+		if routes[i].Path == routes[j].Path {
+			return routes[i].Method < routes[j].Method
+		}
+		return routes[i].Path < routes[j].Path
+	})
+	return routes
+}
+
+func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
+	t.Helper()
+
+	want := map[string]bool{
+		"DELETE /api/admin/accounts/:id":                  false,
+		"DELETE /api/admin/channels/:id":                  false,
+		"DELETE /api/admin/line-draft-modes/:id":          false,
+		"DELETE /api/admin/storage/profiles/:id":          false,
+		"DELETE /api/admin/users/:id":                     false,
+		"GET /api/admin/accounts":                         false,
+		"GET /api/admin/accounts/:id":                     false,
+		"GET /api/admin/accounts/:id/queue":               false,
+		"GET /api/admin/accounts/limits":                  false,
+		"GET /api/admin/channels":                         false,
+		"GET /api/admin/feature-prompts":                  false,
+		"GET /api/admin/feature-prompts/:slug":            false,
+		"GET /api/admin/feature-prompts/:slug/revisions":  false,
+		"GET /api/admin/line-draft-modes":                 false,
+		"GET /api/admin/monitor":                          false,
+		"GET /api/admin/monitor/stream":                   false,
+		"GET /api/admin/settings/branding":                false,
+		"GET /api/admin/settings/media-upload":            false,
+		"GET /api/admin/settings/public-urls":             false,
+		"GET /api/admin/settings/rate-limit":              false,
+		"GET /api/admin/settings/registration":            false,
+		"GET /api/admin/settings/task-monitor":            false,
+		"GET /api/admin/statistics":                       false,
+		"GET /api/admin/storage/profiles":                 false,
+		"GET /api/admin/storage/profiles/:id/bucket-info": false,
+		"GET /api/admin/storage/providers":                false,
+		"GET /api/admin/tasks":                            false,
+		"GET /api/admin/tasks/:task_id":                   false,
+		"GET /api/admin/users":                            false,
+		"POST /api/admin/accounts":                        false,
+		"POST /api/admin/accounts/:id/start":              false,
+		"POST /api/admin/accounts/:id/stop":               false,
+		"POST /api/admin/channels":                        false,
+		"POST /api/admin/channels/detect-models":          false,
+		"POST /api/admin/line-draft-modes":                false,
+		"POST /api/admin/statistics/backfill":             false,
+		"POST /api/admin/storage/profiles":                false,
+		"POST /api/admin/storage/profiles/:id/apply":      false,
+		"POST /api/admin/storage/profiles/:id/test":       false,
+		"POST /api/admin/tasks/submit":                    false,
+		"POST /api/admin/upload":                          false,
+		"POST /api/admin/users/:id/ban":                   false,
+		"POST /api/admin/users/:id/revoke-sessions":       false,
+		"POST /api/admin/users/:id/unban":                 false,
+		"PUT /api/admin/accounts/:id":                     false,
+		"PUT /api/admin/channels/:id":                     false,
+		"PUT /api/admin/feature-prompts/:slug":            false,
+		"PUT /api/admin/line-draft-modes/:id":             false,
+		"PUT /api/admin/settings/branding":                false,
+		"PUT /api/admin/settings/media-upload":            false,
+		"PUT /api/admin/settings/public-urls":             false,
+		"PUT /api/admin/settings/rate-limit":              false,
+		"PUT /api/admin/settings/registration":            false,
+		"PUT /api/admin/settings/task-monitor":            false,
+		"PUT /api/admin/storage/profiles/:id":             false,
+		"PUT /api/admin/users/:id/role":                   false,
+	}
+
+	for _, route := range routes {
+		key := adminRouteKey(route)
+		if _, ok := want[key]; !ok {
+			t.Fatalf("registered admin route %s is not covered by this regression test's route set", key)
+		}
+		want[key] = true
+	}
+	for key, found := range want {
+		if !found {
+			t.Fatalf("expected admin route %s was not registered", key)
+		}
+	}
+}
+
+func newAdminRouteGuardRequest(t *testing.T, route adminRouteUnderTest, cookie string) *http.Request {
+	t.Helper()
+
+	body := strings.NewReader("")
+	if route.Method == http.MethodPost || route.Method == http.MethodPut || route.Method == http.MethodPatch || route.Method == http.MethodDelete {
+		body = strings.NewReader("{}")
+	}
+	req := httptest.NewRequest(route.Method, sampleAdminRoutePath(t, route.Path), body)
+	if body.Len() > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+	return req
+}
+
+func sampleAdminRoutePath(t *testing.T, routePath string) string {
+	t.Helper()
+
+	parts := strings.Split(routePath, "/")
+	for i, part := range parts {
+		switch {
+		case strings.HasPrefix(part, ":"):
+			parts[i] = sampleAdminRouteParam(strings.TrimPrefix(part, ":"))
+		case strings.HasPrefix(part, "*"):
+			parts[i] = "sample-file"
+		}
+	}
+	path := strings.Join(parts, "/")
+	if strings.Contains(path, ":") || strings.Contains(path, "*") {
+		t.Fatalf("admin route %s was not converted to a concrete sample path: %s", routePath, path)
+	}
+	return path
+}
+
+func sampleAdminRouteParam(name string) string {
+	switch name {
+	case "id":
+		return "123"
+	case "slug":
+		return "text-to-image"
+	case "task_id":
+		return "task-123"
+	default:
+		return "sample"
+	}
+}
+
+func adminRouteKey(route adminRouteUnderTest) string {
+	return route.Method + " " + route.Path
 }

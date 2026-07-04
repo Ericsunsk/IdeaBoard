@@ -176,6 +176,71 @@ func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
 	}
 }
 
+func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name           string
+		role           any
+		setRole        bool
+		wantStatus     int
+		wantHandlerRun bool
+	}{
+		{
+			name:       "missing role",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "non-admin role",
+			role:       "user",
+			setRole:    true,
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:           "admin role",
+			role:           "admin",
+			setRole:        true,
+			wantStatus:     http.StatusOK,
+			wantHandlerRun: true,
+		},
+		{
+			name:       "non-string role",
+			role:       123,
+			setRole:    true,
+			wantStatus: http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handlerRan := false
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				if tt.setRole {
+					c.Set("role", tt.role)
+				}
+				c.Next()
+			})
+			router.Use(AdminMiddleware())
+			router.GET("/admin-only", func(c *gin.Context) {
+				handlerRan = true
+				c.Status(http.StatusOK)
+			})
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/admin-only", nil)
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if handlerRan != tt.wantHandlerRun {
+				t.Fatalf("handlerRan = %v, want %v", handlerRan, tt.wantHandlerRun)
+			}
+		})
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
