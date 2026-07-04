@@ -7,8 +7,14 @@ import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardSession } from '../board-session'
 import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
 import type { FlowHistory } from './useFlowHistory'
-import type { FlowTransactions } from './useFlowTransactions'
-import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
+import {
+  useFlowCanvasRuntime,
+  type CanvasFlowGraphRuntimeControls,
+} from './useFlowCanvasRuntime'
+import type {
+  CanvasVueFlowGraphActions,
+  CanvasVueFlowGraphAdapter,
+} from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
@@ -30,6 +36,7 @@ type UseCanvasBoardRuntimeOptions = {
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   feedback: CanvasBoardRuntimeFeedback
   onNativeRemove?: () => void
+  vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
 type BoardOption = { id: string; name: string }
@@ -43,7 +50,8 @@ type CanvasBoardRuntime = {
   loadInitialOrRouteBoard: () => Promise<void>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   flowHistory: FlowHistory
-  flowTransactions: FlowTransactions
+  graphRuntime: CanvasFlowGraphRuntimeControls
+  graphAdapter: CanvasVueFlowGraphAdapter
   onNodesChange: (changes: NodeChange[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
   onNavigateRequest: (path: string) => Promise<void>
@@ -107,7 +115,8 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     loadInitialOrRouteBoard,
     flushAutosave,
     flowHistory,
-    flowTransactions,
+    graphRuntime,
+    graphAdapter,
     onNodesChange,
     onEdgesChange,
   } = useFlowCanvasRuntime({
@@ -125,6 +134,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     onSuccess: options.feedback.saveSucceeded,
     onError: options.feedback.saveFailed,
     onNativeRemove: options.onNativeRemove,
+    vueFlowGraphActions: options.vueFlowGraphActions,
   })
 
   const boardHeader = useFlowBoardHeaderActions({
@@ -155,7 +165,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     if (!shouldPersistViewport || isApplyingBoardViewport.value || isLoadingBoardSnapshot.value) {
       return
     }
-    flowTransactions.commitDirty()
+    graphRuntime.markDirty()
   }
 
   return {
@@ -167,7 +177,8 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     loadInitialOrRouteBoard,
     flushAutosave,
     flowHistory,
-    flowTransactions,
+    graphRuntime,
+    graphAdapter,
     onNodesChange,
     onEdgesChange,
     onNavigateRequest,

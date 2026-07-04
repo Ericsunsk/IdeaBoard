@@ -7,6 +7,8 @@ import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
+import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 
 type UseFlowImageNodeInteractionsOptions = {
   nodes: Ref<Node[]>
@@ -14,10 +16,7 @@ type UseFlowImageNodeInteractionsOptions = {
   getImageNodeSnapshot: (
     nodeId: string,
   ) => { x: number; y: number; width: number; outputCount?: ImageNodeItem['outputCount'] } | null
-  commitNodeMutation: (
-    mutator: (nodes: Node[]) => Node[],
-    options?: { recordHistory?: boolean },
-  ) => void
+  graphAdapter: CanvasVueFlowGraphAdapter
 }
 
 function createImageFlowNode(item: ImageNodeItem): Node {
@@ -55,7 +54,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
   } | null>(null)
 
   function appendImageFlowNode(item: ImageNodeItem) {
-    options.commitNodeMutation((items) => [...items, createImageFlowNode(item)])
+    options.graphAdapter.addNodes(createImageFlowNode(item), createFlowGraphCommandOptions())
   }
 
   function onFlowImageAppendToCanvas(nodeId: string) {
@@ -145,7 +144,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
       const startPos = altState.initialPositions.get(nodeId)
       if (startPos) resetPositionByNodeId.set(nodeId, startPos)
     })
-    options.commitNodeMutation(
+    options.graphAdapter.replaceNodes(
       (items) => [
         ...items.map((item) => {
           const resetPosition = resetPositionByNodeId.get(item.id)
@@ -153,7 +152,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
         }),
         ...appended,
       ],
-      { recordHistory: false },
+      createFlowGraphCommandOptions({ recordHistory: false }),
     )
   }
 

@@ -4,6 +4,11 @@ import { shallowRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
+import { readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
+import {
+  useCanvasVueFlowGraphAdapter,
+  type CanvasVueFlowGraphCommandResult,
+} from '../../composables/useCanvasVueFlowGraphAdapter'
 import { usePendingImageResultNodeLifecycle } from './usePendingImageResultNodes'
 
 const animationFrameMocks = vi.hoisted(() => ({
@@ -96,27 +101,26 @@ function makeImageEdge(target: string, overrides: Partial<Edge> = {}): Edge {
 function createHarness(initialNodes: Node[], initialEdges: Edge[] = []) {
   const nodes: Ref<Node[]> = shallowRef([...initialNodes])
   const edges: Ref<Edge[]> = shallowRef([...initialEdges])
+  const commandResults: CanvasVueFlowGraphCommandResult[] = []
+  const graphAdapter = useCanvasVueFlowGraphAdapter({
+    nodes,
+    edges,
+    afterCommand: (result) => {
+      commandResults.push(result)
+    },
+  })
 
   const actions = usePendingImageResultNodeLifecycle({
     nodes,
     edges,
-    commitGraphMutation: (mutator) => {
-      const next = mutator(nodes.value, edges.value)
-      nodes.value = next.nodes
-      edges.value = next.edges
-    },
-    commitNodeMutation: (mutator) => {
-      nodes.value = mutator(nodes.value)
-    },
-    commitEdgeMutation: (mutator) => {
-      edges.value = mutator(edges.value)
-    },
+    graphAdapter,
   })
 
   return {
     actions,
     nodes,
     edges,
+    commandResults,
   }
 }
 
@@ -124,6 +128,10 @@ function readImageSnapshot(nodes: Node[], nodeId: string): ImageNodeItem {
   const snapshot = nodes.find((node) => node.id === nodeId)?.data?.snapshotNode
   if (!snapshot || typeof snapshot !== 'object') throw new Error(`missing image node ${nodeId}`)
   return snapshot as ImageNodeItem
+}
+
+function readRecordHistory(result: CanvasVueFlowGraphCommandResult): boolean | undefined {
+  return readFlowGraphCommandSideEffects(result.metadata)?.recordHistory
 }
 
 describe('usePendingImageResultNodes', () => {
@@ -244,7 +252,7 @@ describe('usePendingImageResultNodes', () => {
     expect(secondNode?.position).toEqual({ x: 380, y: 320 })
   })
 
-  it('attaches a task id and materializes a resolved image result', async () => {
+  it('attaches a task id and materializes a resolved image result through graph adapter commands', async () => {
     const harness = createHarness([makeAnchorNode()])
 
     const { resultNodeId } = harness.actions.reservePendingResult({
@@ -282,6 +290,40 @@ describe('usePendingImageResultNodes', () => {
     })
     expect(readImageSnapshot(harness.nodes.value, resultNodeId).pendingTaskId).toBeUndefined()
     expect(harness.edges.value[0]?.animated).toBe(false)
+    expect(
+      harness.commandResults.map((result) => [result.command, readRecordHistory(result)]),
+    ).toEqual([
+      ['addNodes', true],
+      ['addEdges', false],
+      ['updateNode', false],
+      ['replaceGraph', false],
+    ])
+  })
+
+  it('keeps batched pending nodes in a single undoable creation step', async () => {
+    const harness = createHarness([makeAnchorNode()])
+
+    const resultNodeIds = harness.actions
+      .reservePendingResults({
+        source: { url: 'https://example.com/source.png', ratio: 1 },
+        sourceNodeId: 'anchor',
+        outputCount: 2,
+        resultOptions: { targetRatio: 1, targetWidth: 280 },
+      })
+      .map((reservation) => reservation.resultNodeId)
+    await flushPromises()
+
+    expect(resultNodeIds).toHaveLength(2)
+    expect(
+      harness.commandResults
+        .filter((result) => result.command === 'addNodes')
+        .map(readRecordHistory),
+    ).toEqual([true, false])
+    expect(
+      harness.commandResults
+        .filter((result) => result.command === 'addEdges')
+        .map(readRecordHistory),
+    ).toEqual([false, false])
   })
 
   it('cancels a pending result before the delayed edge append resolves', async () => {

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardSession } from '../board-session'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
+import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 
 function createSnapshot(): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
@@ -68,6 +69,18 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const savedSnapshots: CanvasBoardSnapshot[] = []
   const scheduledMicrotasks: Array<() => void> = []
   const onNativeRemove = vi.fn()
+  const graphActions = {
+    addNodes: vi.fn(),
+    setNodes: vi.fn(),
+    removeNodes: vi.fn(),
+    addEdges: vi.fn(),
+    setEdges: vi.fn(),
+    removeEdges: vi.fn(),
+    applyNodeChanges: vi.fn(),
+    applyEdgeChanges: vi.fn(),
+  }
+  const isDirty = ref(false)
+  const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => 'board-a'),
     exists: vi.fn(() => true),
@@ -83,8 +96,8 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     nodes,
     edges,
     boardBaseSnapshot,
-    isDirty: ref(false),
-    saveStatus: ref<'idle' | 'saved' | 'failed'>('idle'),
+    isDirty,
+    saveStatus,
     isLoadingBoardSnapshot: ref(false),
     isSavingBoard: ref(false),
     boardSession,
@@ -99,6 +112,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
     },
+    vueFlowGraphActions: graphActions,
   }
   const runtime = useFlowCanvasRuntime(runtimeOptions)
 
@@ -109,21 +123,15 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     }
   }
 
-  async function applyNativeNodeChanges(
-    applyChanges: () => void,
-    changes: Parameters<typeof runtime.onNodesChange>[0],
-  ) {
+  async function applyNativeNodeChanges(changes: Parameters<typeof runtime.onNodesChange>[0]) {
     runtime.onNodesChange(changes)
-    applyChanges()
+    await nextTick()
     await flushNativeGraphChanges()
   }
 
-  async function applyNativeEdgeChanges(
-    applyChanges: () => void,
-    changes: Parameters<typeof runtime.onEdgesChange>[0],
-  ) {
+  async function applyNativeEdgeChanges(changes: Parameters<typeof runtime.onEdgesChange>[0]) {
     runtime.onEdgesChange(changes)
-    applyChanges()
+    await nextTick()
     await flushNativeGraphChanges()
   }
 
@@ -137,9 +145,37 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     viewport,
     boardSession,
     onNativeRemove,
+    graphActions,
+    isDirty,
+    saveStatus,
     flushNativeGraphChanges,
     applyNativeNodeChanges,
     applyNativeEdgeChanges,
+  }
+}
+
+function createPromptFlowNode(id: number, x: number, y: number): Node {
+  return {
+    id: `prompt-${id}`,
+    type: 'canvas',
+    position: { x, y },
+    data: {
+      kind: 'prompt',
+      nodeType: 'prompt',
+      title: `Prompt ${id}`,
+      snapshotNode: {
+        id,
+        type: 'prompt',
+        x,
+        y,
+        width: 280,
+        title: `Prompt ${id}`,
+        text: '',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    },
   }
 }
 
@@ -149,14 +185,6 @@ function readSelectedFlag(node: Node | undefined) {
 
 function markFlowItemSelected<T extends Node | Edge>(items: T[], itemId: string): T[] {
   return items.map((item) => (item.id === itemId ? { ...item, selected: true } : item))
-}
-
-function patchFlowItem<T extends Node | Edge>(
-  items: T[],
-  itemId: string,
-  patch: Partial<T> & { selected?: boolean; dragging?: boolean },
-): T[] {
-  return items.map((item) => (item.id === itemId ? ({ ...item, ...patch } as T) : item))
 }
 
 function readNodeSelected(nodes: Node[], nodeId: string) {
@@ -198,12 +226,57 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1', 'prompt-2'])
   })
 
+  it('uses graph adapter command side effects as the history and dirty boundary', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.graphActions.setNodes.mockClear()
+
+    harness.runtime.graphAdapter.addNodes(
+      createPromptFlowNode(99, 720, 96),
+      createFlowGraphCommandOptions(),
+    )
+
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.fullNodes.value.map((node) => node.id)).toContain('prompt-99')
+
+    harness.runtime.flowHistory.undo()
+
+    expect(harness.graphActions.setNodes).toHaveBeenCalled()
+    expect(harness.fullNodes.value.map((node) => node.id)).not.toContain('prompt-99')
+
+    harness.runtime.flowHistory.redo()
+
+    expect(harness.fullNodes.value.map((node) => node.id)).toContain('prompt-99')
+
+    await harness.runtime.flushAutosave({ silent: true })
+
+    expect(harness.savedSnapshots[0]?.promptNodes.map((node) => node.id)).toContain(99)
+  })
+
+  it('does not mark dirty for selection-only graph adapter commands without side effects', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.graphAdapter.applyNodeChanges([
+      { id: 'prompt-1', type: 'select', selected: true },
+    ])
+
+    expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
+    expect(harness.isDirty.value).toBe(false)
+
+    await harness.runtime.flushAutosave({ silent: true })
+
+    expect(harness.savedSnapshots).toHaveLength(0)
+  })
+
   it('saves hidden nodes and edges from the full graph', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.runtime.flowTransactions.commitDirty()
+    harness.runtime.graphRuntime.markDirty()
     await harness.runtime.flushAutosave({ silent: true })
 
     expect(harness.savedSnapshots[0]?.imageNodes.map((node) => node.id)).toEqual([1])
@@ -218,7 +291,7 @@ describe('useFlowCanvasRuntime', () => {
 
     harness.nodes.value = markFlowItemSelected(harness.nodes.value, 'prompt-1')
 
-    harness.runtime.flowTransactions.commitDirty()
+    harness.runtime.graphRuntime.markDirty()
     await harness.runtime.flushAutosave({ silent: true })
 
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
@@ -232,7 +305,7 @@ describe('useFlowCanvasRuntime', () => {
 
     harness.fullNodes.value = markFlowItemSelected(harness.fullNodes.value, 'prompt-1')
 
-    harness.runtime.flowTransactions.commitDirty()
+    harness.runtime.graphRuntime.markDirty()
     await harness.runtime.flushAutosave({ silent: true })
 
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
@@ -246,7 +319,7 @@ describe('useFlowCanvasRuntime', () => {
 
     harness.edges.value = markFlowItemSelected(harness.edges.value, 'connection-3')
 
-    harness.runtime.flowTransactions.commitDirty()
+    harness.runtime.graphRuntime.markDirty()
     await harness.runtime.flushAutosave({ silent: true })
 
     expect(readEdgeSelected(harness.fullEdges.value, 'connection-3')).toBe(true)
@@ -295,16 +368,10 @@ describe('useFlowCanvasRuntime', () => {
     const originalFullNode = harness.fullNodes.value.find((node) => node.id === 'prompt-1')
     expect(originalFullNode?.position).toEqual({ x: 400, y: 40 })
 
-    harness.runtime.flowTransactions.beginNodeDragTransaction()
+    harness.runtime.graphRuntime.nodeDrag.begin()
 
     for (const x of [440, 500, 620]) {
-      await harness.applyNativeNodeChanges(() => {
-        harness.nodes.value = patchFlowItem(harness.nodes.value, 'prompt-1', {
-          selected: true,
-          position: { x, y: 80 },
-          dragging: true,
-        } as Partial<Node>)
-      }, [
+      await harness.applyNativeNodeChanges([
         { id: 'prompt-1', type: 'select', selected: true },
         {
           id: 'prompt-1',
@@ -323,7 +390,7 @@ describe('useFlowCanvasRuntime', () => {
       expect(harness.savedSnapshots).toHaveLength(0)
     }
 
-    harness.runtime.flowTransactions.commitNodeDragTransaction()
+    harness.runtime.graphRuntime.nodeDrag.commit()
     await nextTick()
 
     expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
@@ -331,6 +398,20 @@ describe('useFlowCanvasRuntime', () => {
       y: 80,
     })
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 400,
+      y: 40,
+    })
+
+    harness.runtime.flowHistory.redo()
+
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 620,
+      y: 80,
+    })
 
     await harness.runtime.flushAutosave({ silent: true })
 
@@ -356,7 +437,7 @@ describe('useFlowCanvasRuntime', () => {
       node.id === 'prompt-1' ? { ...node, selected: false } : node,
     )
 
-    harness.runtime.flowTransactions.captureHistory()
+    harness.runtime.graphRuntime.captureHistory()
 
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(false)
   })
@@ -366,12 +447,10 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    await harness.applyNativeNodeChanges(() => {
-      harness.nodes.value = patchFlowItem(harness.nodes.value, 'prompt-1', { selected: true })
-    }, [{ id: 'prompt-1', type: 'select', selected: true }])
-    await harness.applyNativeEdgeChanges(() => {
-      harness.edges.value = patchFlowItem(harness.edges.value, 'connection-3', { selected: true })
-    }, [{ id: 'connection-3', type: 'select', selected: true }])
+    await harness.applyNativeNodeChanges([{ id: 'prompt-1', type: 'select', selected: true }])
+    await harness.applyNativeEdgeChanges([
+      { id: 'connection-3', type: 'select', selected: true },
+    ])
 
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
     expect(readNodeSelected(harness.nodes.value, 'prompt-1')).toBe(true)
@@ -386,12 +465,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    await harness.applyNativeNodeChanges(() => {
-      harness.nodes.value = patchFlowItem(harness.nodes.value, 'prompt-1', {
-        position: { x: 720, y: 96 },
-        dragging: true,
-      } as Partial<Node>)
-    }, [
+    await harness.applyNativeNodeChanges([
       {
         id: 'prompt-1',
         type: 'position',
@@ -413,14 +487,9 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.runtime.flowTransactions.beginNodeDragTransaction()
+    harness.runtime.graphRuntime.nodeDrag.begin()
 
-    await harness.applyNativeNodeChanges(() => {
-      harness.nodes.value = patchFlowItem(harness.nodes.value, 'prompt-1', {
-        position: { x: 720, y: 96 },
-        dragging: true,
-      } as Partial<Node>)
-    }, [
+    await harness.applyNativeNodeChanges([
       {
         id: 'prompt-1',
         type: 'position',
@@ -431,7 +500,7 @@ describe('useFlowCanvasRuntime', () => {
     ])
     const nodesBeforeCommit = harness.nodes.value
 
-    harness.runtime.flowTransactions.commitNodeDragTransaction()
+    harness.runtime.graphRuntime.nodeDrag.commit()
     await nextTick()
 
     expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
@@ -441,7 +510,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.nodes.value).toBe(nodesBeforeCommit)
   })
 
-  it('records native node and edge remove changes after Vue Flow applies them', async () => {
+  it('records native node and edge remove changes through the graph adapter', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
@@ -457,11 +526,11 @@ describe('useFlowCanvasRuntime', () => {
         targetHandle: 'in:image',
       },
     ])
-    harness.nodes.value = harness.nodes.value.filter((node) => node.id !== 'image-1')
-    harness.edges.value = harness.edges.value.filter((edge) => edge.id !== 'connection-3')
     await harness.flushNativeGraphChanges()
 
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
 
@@ -487,8 +556,6 @@ describe('useFlowCanvasRuntime', () => {
       },
     ])
     harness.runtime.onNodesChange([{ id: 'image-1', type: 'remove' }])
-    harness.edges.value = harness.edges.value.filter((edge) => edge.id !== 'connection-3')
-    harness.nodes.value = harness.nodes.value.filter((node) => node.id !== 'image-1')
     await harness.flushNativeGraphChanges()
 
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
@@ -512,8 +579,6 @@ describe('useFlowCanvasRuntime', () => {
         targetHandle: 'in:image',
       },
     ])
-    harness.nodes.value = harness.nodes.value.filter((node) => node.id !== 'image-1')
-    harness.edges.value = harness.edges.value.filter((edge) => edge.id !== 'connection-3')
     await harness.flushNativeGraphChanges()
 
     harness.runtime.flowHistory.undo()

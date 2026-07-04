@@ -16,14 +16,16 @@ import type {
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 import type { ResolvedTaskImageResult } from './flowImageDirectActionTaskResult'
 import { waitForNextRenderFrame } from '../../utils/animationFrame'
-import type { FlowTransactions } from '../../composables/useFlowTransactions'
+import type {
+  CanvasVueFlowGraphAdapter,
+  CanvasVueFlowGraphCommandOptions,
+} from '../../composables/useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  commitGraphMutation: FlowTransactions['commitGraphMutation']
-  commitNodeMutation: FlowTransactions['commitNodeMutation']
-  commitEdgeMutation: FlowTransactions['commitEdgeMutation']
+  graphAdapter: CanvasVueFlowGraphAdapter
   refreshNodeInternals?: (nodeIds: string[]) => void
 }
 
@@ -68,9 +70,27 @@ type PendingImageResultLookup = {
   imageChildIdsBySource: Map<string, string[]>
 }
 
+type PendingImageResultMutationOptions = {
+  recordHistory?: boolean
+}
+
+type PendingImageResultPlacementOptions = PendingImageResultMutationOptions & {
+  anchor?: ImageResultAnchor
+  targetRatio?: number
+  targetWidth?: number
+}
+
 const IMAGE_RESULT_NODE_X_GAP = 100
 const IMAGE_RESULT_NODE_Y_GAP = 14
 const IMAGE_NODE_HEADER_HEIGHT = 26
+
+function createPendingResultCommandOptions(
+  sideEffects?: PendingImageResultMutationOptions,
+): CanvasVueFlowGraphCommandOptions {
+  return createFlowGraphCommandOptions({
+    recordHistory: sideEffects?.recordHistory,
+  })
+}
 
 function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'ratio'>): number {
   const stageHeight = resolveImageNodeStageHeight(source.width, source.ratio, true)
@@ -305,7 +325,10 @@ export function usePendingImageResultNodeLifecycle(
         edge.targetHandle === nextEdge.targetHandle,
     )
     if (hasSameEdge) return
-    options.commitEdgeMutation((items) => [...items, nextEdge], { recordHistory: false })
+    options.graphAdapter.addEdges(
+      nextEdge,
+      createPendingResultCommandOptions({ recordHistory: false }),
+    )
     options.refreshNodeInternals?.([anchorNodeId, resultNodeId])
   }
 
@@ -313,12 +336,7 @@ export function usePendingImageResultNodeLifecycle(
     source: ImageExecutionInput,
     anchorNodeId: string,
     lookup: PendingImageResultLookup,
-    optionsOverride?: {
-      recordHistory?: boolean
-      anchor?: ImageResultAnchor
-      targetRatio?: number
-      targetWidth?: number
-    },
+    optionsOverride?: PendingImageResultPlacementOptions,
     preferredNodeId?: string | null,
   ): string {
     pruneResultNodeLayouts()
@@ -354,12 +372,14 @@ export function usePendingImageResultNodeLifecycle(
 
     if (preferredNodeId) {
       let updatedNode: Node | null = null
-      options.commitNodeMutation(
-        (items) =>
-          items.map((item) => {
+      options.graphAdapter.replaceNodes(
+        (items) => {
+          let didUpdate = false
+          const nextItems = items.map((item) => {
             if (item.id !== preferredNodeId || item.data?.kind !== 'image') return item
             const snapshot = item.data.snapshotNode
             if (!snapshot || typeof snapshot !== 'object') return item
+            didUpdate = true
             updatedNode = {
               ...item,
               data: {
@@ -371,8 +391,10 @@ export function usePendingImageResultNodeLifecycle(
               },
             }
             return updatedNode
-          }),
-        optionsOverride,
+          })
+          return didUpdate ? nextItems : items
+        },
+        createPendingResultCommandOptions(optionsOverride),
       )
       if (updatedNode) lookup.nodeById.set(preferredNodeId, updatedNode)
       cancelledResultNodeIds.delete(preferredNodeId)
@@ -400,7 +422,10 @@ export function usePendingImageResultNodeLifecycle(
       },
     }
 
-    options.commitNodeMutation((items) => [...items, nextNode as Node], optionsOverride)
+    options.graphAdapter.addNodes(
+      nextNode as Node,
+      createPendingResultCommandOptions(optionsOverride),
+    )
     lookup.nodeById.set(nextNode.id, nextNode as Node)
     lookup.nodeOrderById.set(nextNode.id, lookup.nodeOrderById.size)
     cancelledResultNodeIds.delete(nextNode.id)
@@ -462,28 +487,22 @@ export function usePendingImageResultNodeLifecycle(
   function attachPendingTaskId(params: { resultNodeId: string; taskId: string }) {
     const normalizedTaskId = params.taskId.trim()
     if (!normalizedTaskId) return
-    options.commitNodeMutation(
-      (items) => {
-        let didUpdate = false
-        const nextItems = items.map((item) => {
-          if (item.id !== params.resultNodeId || item.data?.kind !== 'image') return item
-          const snapshot = item.data.snapshotNode
-          if (!snapshot || typeof snapshot !== 'object') return item
-          didUpdate = true
-          return {
-            ...item,
-            data: {
-              ...item.data,
-              snapshotNode: {
-                ...(snapshot as ImageNodeItem),
-                pendingTaskId: normalizedTaskId,
-              },
-            },
-          }
-        })
-        return didUpdate ? nextItems : items
+    const targetNode = options.nodes.value.find((item) => item.id === params.resultNodeId)
+    if (targetNode?.data?.kind !== 'image') return
+    const snapshot = targetNode.data.snapshotNode
+    if (!snapshot || typeof snapshot !== 'object') return
+    options.graphAdapter.updateNode(
+      params.resultNodeId,
+      {
+        data: {
+          ...targetNode.data,
+          snapshotNode: {
+            ...(snapshot as ImageNodeItem),
+            pendingTaskId: normalizedTaskId,
+          },
+        },
       },
-      { recordHistory: false },
+      createPendingResultCommandOptions({ recordHistory: false }),
     )
   }
 
@@ -507,62 +526,66 @@ export function usePendingImageResultNodeLifecycle(
     const resolvedFrameWidth = hasResolvedSize
       ? resolveImageNodeFrameSize(normalizedRatio, true).width
       : null
-    options.commitGraphMutation(
-      (items, currentEdges) => ({
-        nodes: items.map((item) => {
-          if (item.id !== resultNodeId || item.data?.kind !== 'image') return item
-          const snapshot = item.data.snapshotNode
-          if (!snapshot || typeof snapshot !== 'object') return item
-          const currentSnapshot = snapshot as ImageNodeItem
-          const currentWidth = Number(currentSnapshot.width)
-          const width =
-            resolvedFrameWidth ??
-            (Number.isFinite(currentWidth) && currentWidth > 0
-              ? Math.max(1, Math.round(currentWidth))
-              : resolveImageNodeFrameSize(normalizedRatio, true).width)
-          return {
-            ...item,
-            data: {
-              ...item.data,
-              snapshotNode: {
-                ...currentSnapshot,
-                width,
-                sourceImageUrl: result.url,
-                sourceImageRatio: normalizedRatio,
-                pendingTaskId: undefined,
-                outputStatus: 'ready',
-                outputImages: [],
-              },
-            },
-          }
-        }),
-        edges: currentEdges.map((edge) =>
-          edge.target === resultNodeId && edge.targetHandle === 'in:image'
-            ? { ...edge, animated: false }
-            : edge,
-        ),
-      }),
-      { recordHistory: false },
-    )
-    updateResultNodeLayout(resultNodeId, {
-      ratio: normalizedRatio,
-      ...(resolvedFrameWidth ? { width: resolvedFrameWidth } : {}),
+    let didUpdateNode = false
+    let didUpdateEdge = false
+    const nextNodes = options.nodes.value.map((item) => {
+      if (item.id !== resultNodeId || item.data?.kind !== 'image') return item
+      const snapshot = item.data.snapshotNode
+      if (!snapshot || typeof snapshot !== 'object') return item
+      const currentSnapshot = snapshot as ImageNodeItem
+      const currentWidth = Number(currentSnapshot.width)
+      const width =
+        resolvedFrameWidth ??
+        (Number.isFinite(currentWidth) && currentWidth > 0
+          ? Math.max(1, Math.round(currentWidth))
+          : resolveImageNodeFrameSize(normalizedRatio, true).width)
+      didUpdateNode = true
+      return {
+        ...item,
+        data: {
+          ...item.data,
+          snapshotNode: {
+            ...currentSnapshot,
+            width,
+            sourceImageUrl: result.url,
+            sourceImageRatio: normalizedRatio,
+            pendingTaskId: undefined,
+            outputStatus: 'ready',
+            outputImages: [],
+          },
+        },
+      }
     })
-    options.refreshNodeInternals?.([resultNodeId])
+    const nextEdges = options.edges.value.map((edge) => {
+      if (edge.target !== resultNodeId || edge.targetHandle !== 'in:image') return edge
+      if (edge.animated === false) return edge
+      didUpdateEdge = true
+      return { ...edge, animated: false }
+    })
+    if (!didUpdateNode && !didUpdateEdge) return
+    options.graphAdapter.replaceGraph(
+      {
+        nodes: didUpdateNode ? nextNodes : options.nodes.value,
+        edges: didUpdateEdge ? nextEdges : options.edges.value,
+      },
+      createPendingResultCommandOptions({ recordHistory: false }),
+    )
+    if (didUpdateNode) {
+      updateResultNodeLayout(resultNodeId, {
+        ratio: normalizedRatio,
+        ...(resolvedFrameWidth ? { width: resolvedFrameWidth } : {}),
+      })
+      options.refreshNodeInternals?.([resultNodeId])
+    }
   }
 
   function cancelPendingResult(params: { resultNodeId: string }) {
     cancelledResultNodeIds.add(params.resultNodeId)
     forgetResultNodeLayout(params.resultNodeId)
-    options.commitGraphMutation(
-      (items, currentEdges) => ({
-        nodes: items.filter((item) => item.id !== params.resultNodeId),
-        edges: currentEdges.filter(
-          (edge) => edge.source !== params.resultNodeId && edge.target !== params.resultNodeId,
-        ),
-      }),
-      { recordHistory: false },
-    )
+    options.graphAdapter.removeNodes(params.resultNodeId, {
+      ...createPendingResultCommandOptions({ recordHistory: false }),
+      removeConnectedEdges: true,
+    })
   }
 
   return {

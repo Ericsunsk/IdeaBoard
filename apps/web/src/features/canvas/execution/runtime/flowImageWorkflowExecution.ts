@@ -3,7 +3,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
-import type { FlowTransactions } from '../../composables/useFlowTransactions'
+import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { readCurrentBoardId } from '../../utils/currentBoardId'
 import {
   buildCanvasExtendReadinessRequest,
@@ -100,9 +100,7 @@ export type FlowImageWorkflowExecutionOptions = {
 export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  commitGraphMutation: FlowTransactions['commitGraphMutation']
-  commitNodeMutation: FlowTransactions['commitNodeMutation']
-  commitEdgeMutation: FlowTransactions['commitEdgeMutation']
+  graphAdapter: CanvasVueFlowGraphAdapter
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
@@ -328,7 +326,12 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
 }
 
 export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecutionOptions) {
-  const pendingImageResultLifecycle = usePendingImageResultNodeLifecycle(options)
+  const pendingImageResultLifecycle = usePendingImageResultNodeLifecycle({
+    nodes: options.nodes,
+    edges: options.edges,
+    graphAdapter: options.graphAdapter,
+    refreshNodeInternals: options.refreshNodeInternals,
+  })
   const runner = useFlowImageDirectActionRunner({
     nodes: options.nodes,
     pendingImageResultLifecycle,

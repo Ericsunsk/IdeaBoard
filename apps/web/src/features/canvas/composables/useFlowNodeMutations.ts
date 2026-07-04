@@ -10,7 +10,12 @@ import {
 } from '../utils/flowSnapshotParamMutations'
 import { useFlowConnectionMutations } from './useFlowConnectionMutations'
 import type { FlowNodeData } from '../types/flowTypes'
-import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransactions'
+import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import {
+  createFlowGraphCommandOptions,
+  type FlowGraphCommandSideEffectOptions,
+} from './flowGraphAdapterCommandSideEffects'
+import type { FlowHistorySnapshot } from './useFlowHistory'
 import {
   getCanvasNodePortInputLimit,
   isCanvasExecutionOutputNodeType,
@@ -25,9 +30,7 @@ type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
   createNodeKind: Ref<CanvasCreatableNodeKind>
-  commitGraphMutation: FlowTransactions['commitGraphMutation']
-  commitNodeMutation: FlowTransactions['commitNodeMutation']
-  commitEdgeMutation: FlowTransactions['commitEdgeMutation']
+  graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
 }
 
@@ -149,6 +152,16 @@ function markReadyExecutionOutputNodesStale(items: Node[], staleNodeIds: Set<str
   return nextNodes ?? items
 }
 
+function createSnapshotCommandSideEffects(
+  mutationOptions: UpdateSnapshotNodeOptions,
+): FlowGraphCommandSideEffectOptions {
+  const sideEffects: FlowGraphCommandSideEffectOptions = {}
+  if (mutationOptions.history !== undefined) sideEffects.recordHistory = mutationOptions.history
+  if (mutationOptions.historyBefore) sideEffects.historyBefore = mutationOptions.historyBefore
+  if (mutationOptions.dirty !== undefined) sideEffects.markDirty = mutationOptions.dirty
+  return sideEffects
+}
+
 export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   function resolveNodePosition(baseX = 120, baseY = 100) {
     if (options.nodes.value.length === 0) return { x: baseX, y: baseY }
@@ -206,7 +219,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       }
       return null
     },
-    commitEdgeMutation: options.commitEdgeMutation,
+    graphAdapter: options.graphAdapter,
     onWarning: options.onWarning,
     markFlowExecutionNodeDirty,
   })
@@ -246,7 +259,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         snapshotNode,
       } satisfies FlowNodeData,
     }
-    options.commitNodeMutation((items) => [...items, flowNode])
+    options.graphAdapter.addNodes(flowNode, createFlowGraphCommandOptions())
     return flowNodeId
   }
 
@@ -263,10 +276,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const flowNodes = options.nodes.value as Array<{ id: string; data?: unknown }>
     const target = flowNodes.find((node) => node.id === nodeId)
     if (!target) return
-    options.commitGraphMutation((items, currentEdges) => ({
-      nodes: items.filter((node) => node.id !== nodeId),
-      edges: currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
-    }))
+    options.graphAdapter.removeNodes(nodeId, {
+      ...createFlowGraphCommandOptions(),
+      removeConnectedEdges: true,
+    })
   }
 
   function updateSnapshotNode(
@@ -274,37 +287,25 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     patcher: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
     mutationOptions: UpdateSnapshotNodeOptions = {},
   ) {
-    const shouldPushHistory = mutationOptions.history ?? true
-    const shouldMarkDirty = mutationOptions.dirty ?? true
-    options.commitNodeMutation(
-      (items) => {
-        const nextNodes = [...items]
-        const index = nextNodes.findIndex((node) => node.id === nodeId)
-        if (index < 0) return items
-        const node = nextNodes[index]
-        const data = (node.data ?? {}) as { snapshotNode?: unknown; title?: string }
-        if (!data.snapshotNode || typeof data.snapshotNode !== 'object') return items
-        const snapshotNode = data.snapshotNode as CanvasNodeItem
-        const nextSnapshotNode = patcher(snapshotNode)
-        if (nextSnapshotNode === snapshotNode) return items
-        nextNodes[index] = {
-          ...node,
-          data: {
-            ...data,
-            title:
-              typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()
-                ? nextSnapshotNode.title.trim()
-                : data.title,
-            snapshotNode: nextSnapshotNode,
-          },
-        }
-        return nextNodes
-      },
+    const node = (options.nodes.value as Node[]).find((item) => item.id === nodeId)
+    const data = (node?.data ?? {}) as { snapshotNode?: unknown; title?: string }
+    if (!node || !data.snapshotNode || typeof data.snapshotNode !== 'object') return
+    const snapshotNode = data.snapshotNode as CanvasNodeItem
+    const nextSnapshotNode = patcher(snapshotNode)
+    if (nextSnapshotNode === snapshotNode) return
+    options.graphAdapter.updateNode(
+      nodeId,
       {
-        recordHistory: shouldPushHistory,
-        historyBefore: mutationOptions.historyBefore,
-        markDirty: shouldMarkDirty,
+        data: {
+          ...data,
+          title:
+            typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()
+              ? nextSnapshotNode.title.trim()
+              : data.title,
+          snapshotNode: nextSnapshotNode,
+        },
       },
+      createFlowGraphCommandOptions(createSnapshotCommandSideEffects(mutationOptions)),
     )
   }
 
@@ -333,9 +334,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
     if (staleNodeIds.size === 0) return
 
-    options.commitNodeMutation((items) => markReadyExecutionOutputNodesStale(items, staleNodeIds), {
-      recordHistory: false,
-    })
+    options.graphAdapter.replaceNodes(
+      (items) => markReadyExecutionOutputNodesStale(items, staleNodeIds),
+      createFlowGraphCommandOptions({ recordHistory: false }),
+    )
   }
 
   return {

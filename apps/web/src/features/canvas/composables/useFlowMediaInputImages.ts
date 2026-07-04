@@ -11,6 +11,8 @@ import type {
 } from '../../canvas-board/domain'
 import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
 import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
+import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 
 export type MediaInputImage = {
   id: string
@@ -30,9 +32,7 @@ type UseFlowMediaInputImagesOptions = {
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
     options?: { history?: boolean; dirty?: boolean },
   ) => void
-  commitGraphMutation: (
-    mutate: (nodes: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[] },
-  ) => void
+  graphAdapter: CanvasVueFlowGraphAdapter
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
   getImageNodeDisplayPayload: (nodeId: string) => { url: string; ratio: number } | null
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
@@ -344,36 +344,38 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     const currentInputImages = getMediaInputImages(nodeId)
     const removed = currentInputImages.find((item) => item.id === imageId)
     if (!removed) return
-    options.commitGraphMutation((currentNodes, currentEdges) => {
-      const nextNodes = currentNodes.map((node) => {
-        if (node.id !== nodeId || (node.data?.kind !== 'prompt' && node.data?.kind !== 'fusion'))
-          return node
-        const snapshotNode = node.data.snapshotNode
-        if (!snapshotNode || typeof snapshotNode !== 'object') return node
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            snapshotNode: {
-              ...(snapshotNode as Record<string, unknown>),
-              inputImages: currentInputImages.filter((item) => item.id !== imageId),
-            },
+    const nextNodes = options.nodes.value.map((node) => {
+      if (node.id !== nodeId || (node.data?.kind !== 'prompt' && node.data?.kind !== 'fusion')) {
+        return node
+      }
+      const snapshotNode = node.data.snapshotNode
+      if (!snapshotNode || typeof snapshotNode !== 'object') return node
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          snapshotNode: {
+            ...(snapshotNode as Record<string, unknown>),
+            inputImages: currentInputImages.filter((item) => item.id !== imageId),
           },
-        }
-      })
-      const nextEdges =
-        removed.sourceType === 'node'
-          ? currentEdges.filter(
-              (edge) =>
-                !(
-                  edge.source === removed.sourceId &&
-                  edge.target === nodeId &&
-                  isImageInputHandle(edge.targetHandle)
-                ),
-            )
-          : currentEdges
-      return { nodes: nextNodes, edges: nextEdges }
+        },
+      }
     })
+    const nextEdges =
+      removed.sourceType === 'node'
+        ? options.edges.value.filter(
+            (edge) =>
+              !(
+                edge.source === removed.sourceId &&
+                edge.target === nodeId &&
+                isImageInputHandle(edge.targetHandle)
+              ),
+          )
+        : options.edges.value
+    options.graphAdapter.replaceGraph(
+      { nodes: nextNodes, edges: nextEdges },
+      createFlowGraphCommandOptions(),
+    )
     options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
   }
 

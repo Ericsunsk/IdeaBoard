@@ -63,14 +63,15 @@ function createBoardRuntime() {
     fullEdges: ref([]),
     currentBoardId: ref('board-a'),
     flushAutosave: vi.fn(),
-    flowTransactions: {
-      commitGraphMutation: vi.fn(),
-      commitNodeMutation: vi.fn(),
-      commitEdgeMutation: vi.fn(),
-      commitDirty: vi.fn(),
-      beginNodeDragTransaction: vi.fn(),
-      commitNodeDragTransaction: vi.fn(),
+    graphRuntime: {
+      captureHistory: vi.fn(),
+      markDirty: vi.fn(),
+      nodeDrag: {
+        begin: vi.fn(),
+        commit: vi.fn(),
+      },
     },
+    graphAdapter: {},
     loadInitialOrRouteBoard: vi.fn(),
     markBoardViewportChanged: vi.fn(),
     commitPendingBoardViewportChange: vi.fn(),
@@ -156,9 +157,7 @@ describe('useCanvasWorkspaceRuntime', () => {
     const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
 
     expect(runtime.flowPane.nodes).toBe(board.nodes)
-    expect(runtime.flowPane.nodeDragTransactions.begin).toBe(
-      board.flowTransactions.beginNodeDragTransaction,
-    )
+    expect(runtime.flowPane.nodeDragTransactions.begin).toBe(board.graphRuntime.nodeDrag.begin)
     expect(runtime.boardChrome.currentBoardId).toBe(board.currentBoardId)
     expect(runtime.persistence.reattachPendingImageResults).toBe(
       task.reattachPendingImageResults,
@@ -173,6 +172,7 @@ describe('useCanvasWorkspaceRuntime', () => {
       expect.objectContaining({
         nodes: board.fullNodes,
         edges: board.fullEdges,
+        graphAdapter: board.graphAdapter,
         feedback: mocks.feedback.graph,
       }),
     )
@@ -180,6 +180,7 @@ describe('useCanvasWorkspaceRuntime', () => {
       expect.objectContaining({
         nodes: board.fullNodes,
         edges: board.fullEdges,
+        graphAdapter: board.graphAdapter,
         refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
         feedback: mocks.feedback.taskExecution,
       }),

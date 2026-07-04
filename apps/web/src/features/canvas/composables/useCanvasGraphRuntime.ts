@@ -13,7 +13,7 @@ import { useFlowNodeMutations } from './useFlowNodeMutations'
 import { useFlowNodeUiState } from './useFlowNodeUiState'
 import { useFlowSelectionExport } from './useFlowSelectionExport'
 import { useFlowSnapshotNodeUpdater } from './useFlowSnapshotNodeUpdater'
-import type { FlowTransactions } from './useFlowTransactions'
+import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
 type ValueRef<T> = {
@@ -44,10 +44,7 @@ type UseCanvasGraphRuntimeOptions = {
   edges: Ref<Edge[]>
   currentBoardId: ValueRef<string | null | undefined>
   createNodeKind: Ref<CanvasCreatableNodeKind>
-  flowTransactions: Pick<
-    FlowTransactions,
-    'commitGraphMutation' | 'commitNodeMutation' | 'commitEdgeMutation'
-  >
+  graphAdapter: CanvasVueFlowGraphAdapter
   updateNodeInternals: (nodeIds: string[]) => void
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   getSelectedElements: ValueRef<Array<Node | Edge>>
@@ -79,9 +76,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     nodes: options.nodes,
     edges: options.edges,
     createNodeKind: options.createNodeKind,
-    commitGraphMutation: options.flowTransactions.commitGraphMutation,
-    commitNodeMutation: options.flowTransactions.commitNodeMutation,
-    commitEdgeMutation: options.flowTransactions.commitEdgeMutation,
+    graphAdapter: options.graphAdapter,
     onWarning: (text) => {
       options.feedback.operationWarning(text)
     },
@@ -144,7 +139,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     edges: options.edges,
     uploadImageToBoard,
     updateSnapshotNodeBase: flowNodeMutations.updateSnapshotNode,
-    commitGraphMutation: options.flowTransactions.commitGraphMutation,
+    graphAdapter: options.graphAdapter,
     markFlowExecutionNodeDirty: flowNodeMutations.markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload,
     openImageUrlPreview: options.openImageUrlPreview,
@@ -186,7 +181,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
         outputCount: snapshot.outputCount,
       }
     },
-    commitNodeMutation: options.flowTransactions.commitNodeMutation,
+    graphAdapter: options.graphAdapter,
   })
 
   const { getFlowNodeUiStateCached } = useFlowNodeUiState({

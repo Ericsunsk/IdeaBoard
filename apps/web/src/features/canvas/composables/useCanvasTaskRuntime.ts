@@ -7,7 +7,7 @@ import {
   type ImageWorkflowCommands,
 } from '../execution/runtime/imageWorkflowCommandRuntime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { FlowTransactions } from './useFlowTransactions'
+import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 
 type ValueRef<T> = {
   readonly value: T
@@ -18,10 +18,7 @@ type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 type UseCanvasTaskRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  flowTransactions: Pick<
-    FlowTransactions,
-    'commitGraphMutation' | 'commitNodeMutation' | 'commitEdgeMutation' | 'commitDirty'
-  >
+  graphAdapter: CanvasVueFlowGraphAdapter
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   currentBoardId: ValueRef<string | null | undefined>
   refreshNodeInternals: (nodeIds: string[]) => void
@@ -38,9 +35,7 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
   const workflow = useFlowImageWorkflowExecution({
     nodes: options.nodes,
     edges: options.edges,
-    commitGraphMutation: options.flowTransactions.commitGraphMutation,
-    commitNodeMutation: options.flowTransactions.commitNodeMutation,
-    commitEdgeMutation: options.flowTransactions.commitEdgeMutation,
+    graphAdapter: options.graphAdapter,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
     getCurrentBoardId: () => options.currentBoardId.value ?? '',

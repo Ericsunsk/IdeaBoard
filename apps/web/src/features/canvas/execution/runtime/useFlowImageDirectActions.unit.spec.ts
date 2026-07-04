@@ -6,6 +6,11 @@ import { TaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { FlowNodeData } from '../../types/flowTypes'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
+import {
+  useCanvasVueFlowGraphAdapter,
+  type CanvasVueFlowGraphCommandResult,
+} from '../../composables/useCanvasVueFlowGraphAdapter'
+import { readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
 import { useFlowImageDirectActions } from './useFlowImageDirectActions'
 
 const mocks = vi.hoisted(() => ({
@@ -102,6 +107,30 @@ function makeImageNode(nodeId: string, snapshot: ImageNodeItem): Node<FlowNodeDa
   }
 }
 
+function makePromptNode(nodeId: string): Node<FlowNodeData> {
+  return {
+    id: nodeId,
+    type: 'canvas',
+    position: { x: 0, y: 0 },
+    data: {
+      kind: 'prompt',
+      nodeType: 'prompt',
+      title: 'Prompt',
+      snapshotNode: {
+        id: 1,
+        type: 'prompt',
+        x: 0,
+        y: 0,
+        width: 280,
+        text: '',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    },
+  }
+}
+
 function createHarness(initialNodes: Node<FlowNodeData>[], initialBoardId = 'board-a') {
   const boardId = ref(initialBoardId)
   const nodes: Ref<Node[]> = shallowRef([...initialNodes] as Node[])
@@ -109,30 +138,23 @@ function createHarness(initialNodes: Node<FlowNodeData>[], initialBoardId = 'boa
   const flushAutosave = vi.fn(async () => undefined)
   const onSuccess = vi.fn()
   const onWarning = vi.fn()
-  const commitDirty = vi.fn()
+  const markDirty = vi.fn()
+  const graphCommands: CanvasVueFlowGraphCommandResult[] = []
+  const graphAdapter = useCanvasVueFlowGraphAdapter({
+    nodes,
+    edges,
+    afterCommand: (result) => {
+      graphCommands.push(result)
+      if (readFlowGraphCommandSideEffects(result.metadata)?.markDirty !== false) {
+        markDirty()
+      }
+    },
+  })
 
   const actions = useFlowImageDirectActions({
     nodes,
     edges,
-    commitGraphMutation: (mutator) => {
-      const next = mutator(nodes.value, edges.value)
-      nodes.value = next.nodes
-      edges.value = next.edges
-      commitDirty()
-    },
-    commitNodeMutation: (mutator) => {
-      const next = mutator(nodes.value)
-      if (next === nodes.value) return
-      nodes.value = next
-      commitDirty()
-    },
-    commitEdgeMutation: (mutator) => {
-      const next = mutator(edges.value)
-      if (next === edges.value) return
-      edges.value = next
-      commitDirty()
-    },
-    commitDirty,
+    graphAdapter,
     flushAutosave,
     getCurrentBoardId: () => boardId.value,
     onSuccess,
@@ -147,6 +169,7 @@ function createHarness(initialNodes: Node<FlowNodeData>[], initialBoardId = 'boa
     flushAutosave,
     onSuccess,
     onWarning,
+    graphCommands,
   }
 }
 
@@ -163,6 +186,18 @@ function findPendingResultNode(nodes: Node[]): Node {
   })
   if (!node) throw new Error('missing pending result node')
   return node
+}
+
+function findImageBySourceUrl(nodes: Node[], sourceImageUrl: string): ImageNodeItem {
+  const snapshot = nodes
+    .map((node) => node.data?.snapshotNode as ImageNodeItem | undefined)
+    .find((item) => item?.sourceImageUrl === sourceImageUrl)
+  if (!snapshot) throw new Error(`missing image result ${sourceImageUrl}`)
+  return snapshot
+}
+
+function readRecordHistory(result: CanvasVueFlowGraphCommandResult): boolean | undefined {
+  return readFlowGraphCommandSideEffects(result.metadata)?.recordHistory
 }
 
 describe('useFlowImageDirectActions pending task recovery', () => {
@@ -297,6 +332,42 @@ describe('useFlowImageDirectActions pending task recovery', () => {
     expect(completed.outputStatus).toBe('ready')
     expect(completed.pendingTaskId).toBeUndefined()
     expect(harness.onSuccess).toHaveBeenCalledWith('处理完成')
+    expect(
+      harness.graphCommands
+        .filter((result) => result.command !== 'addEdges')
+        .map((result) => [result.command, readRecordHistory(result)]),
+    ).toEqual([
+      ['addNodes', true],
+      ['updateNode', false],
+      ['replaceGraph', false],
+    ])
+  })
+
+  it('materializes text prompt generation results through graph adapter commands', async () => {
+    mocks.submitTaskRequest.mockResolvedValue({ taskId: 'task-prompt' })
+    mocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
+      { url: 'https://example.com/prompt-result.png' },
+    ])
+    const harness = createHarness([makePromptNode('prompt-1')])
+
+    await harness.actions.runTextPromptGeneration('prompt-1', 'Draw this', 1, 'auto')
+
+    const completed = findImageBySourceUrl(
+      harness.nodes.value,
+      'https://example.com/prompt-result.png',
+    )
+    expect(completed.outputStatus).toBe('ready')
+    expect(completed.pendingTaskId).toBeUndefined()
+    expect(harness.onSuccess).toHaveBeenCalledWith('生成完成')
+    expect(
+      harness.graphCommands
+        .filter((result) => result.command !== 'addEdges')
+        .map((result) => [result.command, readRecordHistory(result)]),
+    ).toEqual([
+      ['addNodes', true],
+      ['updateNode', false],
+      ['replaceGraph', false],
+    ])
   })
 
   it('reattaches a loaded pending result once and saves the recovered image', async () => {

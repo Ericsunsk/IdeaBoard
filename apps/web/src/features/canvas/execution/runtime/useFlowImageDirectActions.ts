@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import type { FlowTransactions } from '../../composables/useFlowTransactions'
+import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createImageExecutionPlanner } from '../planning/ImageExecutionPlan'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
 import {
@@ -11,10 +11,7 @@ import {
 type UseFlowImageDirectActionsOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  commitGraphMutation: FlowTransactions['commitGraphMutation']
-  commitNodeMutation: FlowTransactions['commitNodeMutation']
-  commitEdgeMutation: FlowTransactions['commitEdgeMutation']
-  commitDirty: FlowTransactions['commitDirty']
+  graphAdapter: CanvasVueFlowGraphAdapter
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
@@ -35,9 +32,7 @@ export function useFlowImageDirectActions(
     useFlowImageWorkflowExecution({
       nodes: options.nodes,
       edges: options.edges,
-      commitGraphMutation: options.commitGraphMutation,
-      commitNodeMutation: options.commitNodeMutation,
-      commitEdgeMutation: options.commitEdgeMutation,
+      graphAdapter: options.graphAdapter,
       refreshNodeInternals: options.refreshNodeInternals,
       flushAutosave: options.flushAutosave,
       getCurrentBoardId: options.getCurrentBoardId,

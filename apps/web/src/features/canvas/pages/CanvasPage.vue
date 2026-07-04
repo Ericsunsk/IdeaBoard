@@ -59,6 +59,7 @@
         :multi-selection-key-code="!isFlowCanvasLocked && activeTool === 'select' ? 'Shift' : null"
         :delete-key-code="nativeDeleteKeyCode"
         :default-edge-options="{ animated: false, updatable: true }"
+        :apply-default="false"
         :min-zoom="0.1"
         :zoom-on-scroll="false"
         :pan-on-scroll="!isFlowCanvasLocked"
@@ -201,6 +202,15 @@ const {
   setCenter,
   getSelectedElements,
   removeSelectedElements,
+  setNodes,
+  setEdges,
+  addNodes,
+  addEdges,
+  removeNodes,
+  removeEdges,
+  updateNode,
+  applyNodeChanges,
+  applyEdgeChanges,
 } = useVueFlow()
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
@@ -250,6 +260,17 @@ const canvasWorkspace = useCanvasWorkspaceRuntime({
   startNodeDragInteraction: () => startNodeDragInteraction(),
   stopNodeDragInteraction: () => stopNodeDragInteraction(),
   refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
+  vueFlowGraphActions: {
+    setNodes,
+    setEdges,
+    addNodes,
+    addEdges,
+    removeNodes,
+    removeEdges,
+    updateNode,
+    applyNodeChanges,
+    applyEdgeChanges,
+  },
   onNativeRemove: () => {
     dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
   },

@@ -15,6 +15,7 @@ import { useImageCanvasExtendOverlay } from './useImageCanvasExtendOverlay'
 import { useCanvasFeedback } from '../feedback/useCanvasFeedback'
 import { useCanvasImageTools } from '../image-tools'
 import type { UseCanvasImageToolsOptions } from '../image-tools/useCanvasImageTools'
+import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
 
 type ValueRef<T> = {
   readonly value: T
@@ -126,6 +127,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   stopNodeDragInteraction: () => void
   refreshFlowHandleVisibility: () => void
   onNativeRemove?: () => void
+  vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
 export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOptions) {
@@ -140,6 +142,7 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
+    vueFlowGraphActions: options.vueFlowGraphActions,
   })
 
   const graph = useCanvasGraphRuntime({
@@ -147,7 +150,7 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
     edges: board.fullEdges,
     currentBoardId: board.currentBoardId,
     createNodeKind: options.createNodeKind,
-    flowTransactions: board.flowTransactions,
+    graphAdapter: board.graphAdapter,
     updateNodeInternals: options.updateNodeInternals,
     screenToFlowCoordinate: options.screenToFlowCoordinate,
     getSelectedElements: options.getSelectedElements,
@@ -186,7 +189,7 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
   const task = useCanvasTaskRuntime({
     nodes: board.fullNodes,
     edges: board.fullEdges,
-    flowTransactions: board.flowTransactions,
+    graphAdapter: board.graphAdapter,
     flushAutosave: board.flushAutosave,
     currentBoardId: board.currentBoardId,
     refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
@@ -319,8 +322,8 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
       onConnect: graph.onConnect,
       onEdgeUpdate: graph.onEdgeUpdate,
       nodeDragTransactions: {
-        begin: board.flowTransactions.beginNodeDragTransaction,
-        commit: board.flowTransactions.commitNodeDragTransaction,
+        begin: board.graphRuntime.nodeDrag.begin,
+        commit: board.graphRuntime.nodeDrag.commit,
       },
     },
     persistence: {
@@ -331,6 +334,7 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
     },
     viewportControls: viewport,
     graphEditing: {
+      graphAdapter: board.graphAdapter,
       scheduleFlowNodeInternalsRefresh: graph.scheduleFlowNodeInternalsRefresh,
       createNodeAtPosition: graph.createNodeAtPosition,
       hasSelectedFlowNodes: graph.hasSelectedFlowNodes,

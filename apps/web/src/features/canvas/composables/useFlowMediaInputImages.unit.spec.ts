@@ -10,6 +10,7 @@ import type {
 } from '../../canvas-board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
+import { useCanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 
 function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
   return {
@@ -62,6 +63,16 @@ function makeFlowNode(
 }
 
 function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
+  const graphActions = {
+    setNodes: vi.fn(),
+    setEdges: vi.fn(),
+  }
+  const graphAdapter = useCanvasVueFlowGraphAdapter({
+    nodes,
+    edges,
+    actions: graphActions,
+  })
+  const markFlowExecutionNodeDirty = vi.fn()
   const updateSnapshotNodeBase = vi.fn(
     (nodeId: string, mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem) => {
       nodes.value = nodes.value.map((node) => {
@@ -86,8 +97,8 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     edges,
     uploadImageToBoard: vi.fn(),
     updateSnapshotNodeBase,
-    commitGraphMutation: vi.fn(),
-    markFlowExecutionNodeDirty: vi.fn(),
+    graphAdapter,
+    markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload: (nodeId) => {
       const node = nodes.value.find((item) => item.id === nodeId)
       const snapshot = node?.data?.snapshotNode as ImageNodeItem | undefined
@@ -98,7 +109,7 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     onWarning: vi.fn(),
   })
 
-  return { ...api, updateSnapshotNodeBase }
+  return { ...api, updateSnapshotNodeBase, graphActions, markFlowExecutionNodeDirty }
 }
 
 describe('useFlowMediaInputImages', () => {
@@ -171,5 +182,50 @@ describe('useFlowMediaInputImages', () => {
         ratio: 1,
       },
     ])
+  })
+
+  it('removes a node-linked media input and its edge through the graph adapter', () => {
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode('image-1', 'image', makeImageSnapshot()),
+      makeFlowNode(
+        'prompt-1',
+        'prompt',
+        makePromptSnapshot({
+          inputImages: [
+            {
+              id: 'node:image-1',
+              sourceType: 'node',
+              sourceId: 'image-1',
+              sourceNodeId: 'image-1',
+              url: 'https://example.com/source.png',
+              ratio: 1,
+            } satisfies PromptNodeInputImage,
+          ],
+        }),
+      ),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([
+      {
+        id: 'edge-1',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'prompt-1',
+        targetHandle: 'in:image',
+      },
+    ] as Edge[])
+    const {
+      onFlowMediaInputImageRemove,
+      getMediaInputImages,
+      graphActions,
+      markFlowExecutionNodeDirty,
+    } = createHarness(nodes, edges)
+
+    onFlowMediaInputImageRemove('prompt-1', 'node:image-1')
+
+    expect(getMediaInputImages('prompt-1')).toEqual([])
+    expect(edges.value).toEqual([])
+    expect(graphActions.setNodes).toHaveBeenCalledOnce()
+    expect(graphActions.setEdges).toHaveBeenCalledOnce()
+    expect(markFlowExecutionNodeDirty).toHaveBeenCalledWith('prompt-1', { includeSelf: true })
   })
 })
