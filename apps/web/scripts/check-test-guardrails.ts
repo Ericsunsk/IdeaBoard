@@ -24,6 +24,13 @@ type GeneratedQueryMockException = Exception & {
   module: string
 }
 
+type ComponentClassAssertionRule =
+  | 'to-have-class'
+  | 'class-list'
+  | 'class-name'
+  | 'vue-test-utils-classes'
+  | 'class-attribute'
+
 type Violation = {
   file: string
   rule: string
@@ -39,6 +46,12 @@ type SpecFile = {
 
 type ComponentHarnessPattern = {
   rule: ComponentHarnessRule
+  pattern: RegExp
+  message: string
+}
+
+type ComponentClassAssertionPattern = {
+  rule: ComponentClassAssertionRule
   pattern: RegExp
   message: string
 }
@@ -61,6 +74,39 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 }
 
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
+
+const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/canvas/components/home/HomeCanvasImageActionMenu.component.spec.ts': [
+    {
+      reason:
+        'Verifies the visual active/hidden state class that coordinates the strength control overlay.',
+    },
+  ],
+  'src/features/canvas/image-editor/components/ImageEditorHistogramPlot.component.spec.ts': [
+    {
+      reason:
+        'Verifies the active marker visual state for the reusable SVG histogram interaction surface.',
+    },
+  ],
+  'src/features/canvas/image-editor/components/ImageEditorLevelsControl.component.spec.ts': [
+    {
+      reason:
+        'Verifies SVG marker, guide-line, and numeric control visual classes for the levels editor.',
+    },
+  ],
+  'src/features/canvas/image-editor/components/ImageEditorThresholdControl.component.spec.ts': [
+    {
+      reason:
+        'Verifies SVG threshold marker, guide-line, and control visual classes for the threshold editor.',
+    },
+  ],
+  'src/features/canvas/mask-editor/components/ImageMaskEditorOverlay.component.spec.ts': [
+    {
+      reason:
+        'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',
+    },
+  ],
+}
 
 const contractGeneratedQueryMockExceptions: ExceptionMap<GeneratedQueryMockException> = {
   'src/app/stores/user.contract.spec.ts': [
@@ -109,6 +155,39 @@ const componentHarnessPatterns: readonly ComponentHarnessPattern[] = [
     rule: 'vue-test-utils',
     pattern: /from\s+['"]@vue\/test-utils['"]/,
     message: 'Use src/test/render instead of importing @vue/test-utils directly.',
+  },
+]
+
+const componentClassAssertionPatterns: readonly ComponentClassAssertionPattern[] = [
+  {
+    rule: 'to-have-class',
+    pattern: /\.\s*toHaveClass\s*\(/,
+    message:
+      'Avoid class assertions in component specs unless they document a visual/layout contract.',
+  },
+  {
+    rule: 'class-list',
+    pattern: /\.\s*classList\b/,
+    message:
+      'Avoid classList assertions in component specs unless they document a visual/layout contract.',
+  },
+  {
+    rule: 'class-name',
+    pattern: /\.\s*className\b/,
+    message:
+      'Avoid className assertions in component specs unless they document a visual/layout contract.',
+  },
+  {
+    rule: 'vue-test-utils-classes',
+    pattern: /\.\s*classes\s*\(/,
+    message:
+      'Avoid Vue Test Utils classes() assertions in component specs unless they document a visual/layout contract.',
+  },
+  {
+    rule: 'class-attribute',
+    pattern: /\.\s*attributes\s*\(\s*['"]class['"]\s*\)/,
+    message:
+      'Avoid class attribute assertions in component specs unless they document a visual/layout contract.',
   },
 ]
 
@@ -206,6 +285,12 @@ function hasRenderHelperException(file: string, usedExceptions: Set<string>): bo
   return hasException
 }
 
+function hasComponentClassAssertionException(file: string, usedExceptions: Set<string>): boolean {
+  const hasException = Boolean(componentClassAssertionExceptions[file]?.length)
+  if (hasException) usedExceptions.add(file)
+  return hasException
+}
+
 function hasGeneratedQueryMockException(
   file: string,
   module: string,
@@ -263,6 +348,26 @@ function checkComponentRenderHelper(
         'Component specs that import .vue files must call render() or renderWithUser() from src/test/render.',
     },
   ]
+}
+
+function checkComponentClassAssertions(
+  specFile: SpecFile,
+  content: string,
+  usedExceptions: Set<string>,
+): Violation[] {
+  if (!specFile.relativePath.endsWith('.component.spec.ts')) return []
+
+  const violatedPatterns = componentClassAssertionPatterns.filter(({ pattern }) =>
+    pattern.test(content),
+  )
+  if (violatedPatterns.length === 0) return []
+  if (hasComponentClassAssertionException(specFile.sourcePath, usedExceptions)) return []
+
+  return violatedPatterns.map(({ rule, message }) => ({
+    file: specFile.sourcePath,
+    rule,
+    message,
+  }))
 }
 
 function importsVueComponent(content: string): boolean {
@@ -357,6 +462,22 @@ function checkStaleRenderHelperExceptions(usedExceptions: ReadonlySet<string>): 
   })
 }
 
+function checkStaleComponentClassAssertionExceptions(
+  usedExceptions: ReadonlySet<string>,
+): Violation[] {
+  return Object.keys(componentClassAssertionExceptions).flatMap((file) => {
+    if (usedExceptions.has(file)) return []
+
+    return [
+      {
+        file,
+        rule: 'stale-component-class-assertion-exception',
+        message: 'Remove stale component class assertion exception.',
+      },
+    ]
+  })
+}
+
 function checkStaleGeneratedQueryMockExceptions(usedExceptions: ReadonlySet<string>): Violation[] {
   return Object.entries(contractGeneratedQueryMockExceptions).flatMap(([file, exceptions]) =>
     exceptions.flatMap((exception) => {
@@ -376,6 +497,7 @@ function checkStaleGeneratedQueryMockExceptions(usedExceptions: ReadonlySet<stri
 async function checkSpecFiles(specFiles: readonly SpecFile[]): Promise<Violation[]> {
   const usedComponentHarnessExceptions = new Set<string>()
   const usedRenderHelperExceptions = new Set<string>()
+  const usedComponentClassAssertionExceptions = new Set<string>()
   const usedGeneratedQueryMockExceptions = new Set<string>()
   const violations = [...checkSpecNaming(specFiles)]
 
@@ -384,6 +506,7 @@ async function checkSpecFiles(specFiles: readonly SpecFile[]): Promise<Violation
     violations.push(
       ...checkComponentHarness(specFile, content, usedComponentHarnessExceptions),
       ...checkComponentRenderHelper(specFile, content, usedRenderHelperExceptions),
+      ...checkComponentClassAssertions(specFile, content, usedComponentClassAssertionExceptions),
       ...checkContractGeneratedQueryMocks(specFile, content, usedGeneratedQueryMockExceptions),
     )
   }
@@ -392,11 +515,16 @@ async function checkSpecFiles(specFiles: readonly SpecFile[]): Promise<Violation
     ...checkExceptionReasons(componentHarnessExceptions, 'componentHarnessExceptions'),
     ...checkExceptionReasons(componentRenderHelperExceptions, 'componentRenderHelperExceptions'),
     ...checkExceptionReasons(
+      componentClassAssertionExceptions,
+      'componentClassAssertionExceptions',
+    ),
+    ...checkExceptionReasons(
       contractGeneratedQueryMockExceptions,
       'contractGeneratedQueryMockExceptions',
     ),
     ...checkStaleComponentHarnessExceptions(usedComponentHarnessExceptions),
     ...checkStaleRenderHelperExceptions(usedRenderHelperExceptions),
+    ...checkStaleComponentClassAssertionExceptions(usedComponentClassAssertionExceptions),
     ...checkStaleGeneratedQueryMockExceptions(usedGeneratedQueryMockExceptions),
   )
 
