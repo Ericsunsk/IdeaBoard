@@ -5,7 +5,7 @@ import {
   isCanvasBoardNameTaken,
   renameCanvasBoard,
   type CanvasBoardMeta,
-} from '../../canvas-board/catalog/canvasBoards'
+} from './canvasBoards'
 import {
   hydrateCanvasBoardsFromServer,
   isBoardNameConflictError,
@@ -13,11 +13,8 @@ import {
   syncDeleteCanvasBoardToServer,
   type HydrateCanvasBoardsFromServerOptions,
   type HydrateCanvasBoardsFromServerResult,
-} from '../../canvas-board/catalog/boardSync'
-import {
-  deleteCanvasBoardState,
-  duplicateCanvasBoardState,
-} from '../../canvas-board/persistence'
+} from './boardSync'
+import { deleteCanvasBoardState, duplicateCanvasBoardState } from '../persistence'
 
 export type CanvasBoardCreateResult =
   | { ok: true; board: CanvasBoardMeta }

@@ -88,7 +88,7 @@ import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const { logoutAndRedirect } = useLogoutRedirect()
+const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const adminFeedback = useAdminFeedback()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const brandMarkClass = computed(() =>

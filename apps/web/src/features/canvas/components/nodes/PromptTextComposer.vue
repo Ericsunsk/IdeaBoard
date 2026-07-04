@@ -1,7 +1,7 @@
 <template>
   <div
     class="prompt-text-composer node-tool-surface flex min-w-0 flex-col gap-3"
-    :class="variantClass"
+    :class="[variantClass, { 'has-text': hasText }]"
     @mousedown.stop
     @click.stop
     @contextmenu.stop.prevent
@@ -33,58 +33,34 @@
         <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
       </button>
     </div>
-    <textarea
-      ref="inputRef"
-      v-model="draft"
-      class="prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-[14px] leading-[1.6] text-[#334155] outline-none placeholder:text-[#94a3b8] disabled:cursor-wait"
+    <PromptComposerControls
+      :model-value="modelValue"
+      :output-count="outputCount"
+      :aspect-ratio="aspectRatio"
       :placeholder="placeholder"
       :disabled="disabled"
+      :allow-empty="allowEmpty"
+      :submit-disabled="submitDisabled"
+      :show-aspect-ratio="showAspectRatio"
+      :autofocus="autofocus"
+      textarea-class="prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-[14px] leading-[1.6] text-[#334155] outline-none placeholder:text-[#94a3b8] disabled:cursor-wait"
+      actions-class="prompt-text-composer-actions flex self-end gap-[var(--node-tool-button-gap)]"
+      send-button-class="prompt-text-composer-send node-tool-send node-tool-button node-tool-tooltip-trigger"
+      @update:model-value="emit('update:modelValue', $event)"
+      @update:output-count="emit('update:output-count', $event)"
+      @update:aspect-ratio="emit('update:aspect-ratio', $event)"
       @focus="emit('focus')"
-      @keydown.enter.exact="onEnter"
+      @submit="onSubmit"
     />
-    <div
-      ref="actionsRef"
-      class="prompt-text-composer-actions flex self-end gap-[var(--node-tool-button-gap)]"
-    >
-      <NodeAspectRatioPicker
-        v-if="shouldShowAspectRatioPicker"
-        :model-value="aspectRatioValue"
-        :visible="aspectRatioPickerVisible"
-        :disabled="disabled"
-        @toggle="toggleAspectRatioPicker"
-        @select="selectAspectRatio"
-      />
-      <NodeOutputCountPicker
-        :model-value="outputCountValue"
-        :visible="outputCountPickerVisible"
-        :disabled="disabled"
-        tooltip="选择张数"
-        aria-label="输出张数"
-        @toggle="toggleOutputCountPicker"
-        @select="selectOutputCount"
-      />
-      <button
-        class="prompt-text-composer-send node-tool-send node-tool-button node-tool-tooltip-trigger"
-        type="button"
-        :disabled="!canSubmit"
-        aria-label="发送"
-        @click="submit"
-      >
-        <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
-        <span class="node-tool-tooltip" aria-hidden="true">发送</span>
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Plus, SendDiagonalSolid } from '@iconoir/vue'
+import { Plus } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
-import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
-import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
-import { usePromptComposerControls } from './composables/usePromptComposerControls'
+import PromptComposerControls from './PromptComposerControls.vue'
 
 type PromptTextComposerImageInput = {
   id: string
@@ -154,37 +130,11 @@ const canAddImageInput = computed(
   () => visibleImageInputs.value.length < maxVisibleImageInputs.value,
 )
 const variantClass = computed(() => promptTextComposerVariantClasses[props.variant])
+const hasText = computed(() => props.modelValue.trim().length > 0)
 
-const {
-  actionsRef,
-  aspectRatioPickerVisible,
-  aspectRatioValue,
-  canSubmit,
-  draft,
-  inputRef,
-  onEnter,
-  outputCountPickerVisible,
-  outputCountValue,
-  selectAspectRatio,
-  selectOutputCount,
-  shouldRenderAspectRatio: shouldShowAspectRatioPicker,
-  submit,
-  toggleAspectRatioPicker,
-  toggleOutputCountPicker,
-} = usePromptComposerControls({
-  modelValue: () => props.modelValue,
-  outputCount: () => props.outputCount,
-  aspectRatio: () => props.aspectRatio,
-  disabled: () => props.disabled,
-  submitDisabled: () => props.submitDisabled,
-  allowEmpty: () => props.allowEmpty,
-  autofocus: () => props.autofocus,
-  showAspectRatio: () => props.showAspectRatio,
-  onTextUpdate: (value) => emit('update:modelValue', value),
-  onOutputCountUpdate: (value) => emit('update:output-count', value),
-  onAspectRatioUpdate: (value) => emit('update:aspect-ratio', value),
-  onSubmit: (prompt, outputCount, aspectRatio) => emit('submit', prompt, outputCount, aspectRatio),
-})
+function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) {
+  emit('submit', prompt, outputCount, aspectRatio)
+}
 </script>
 
 <style scoped src="./styles/node-input-thumbnails.css"></style>
@@ -209,11 +159,11 @@ const {
 }
 
 .prompt-text-composer.variant-floating:focus-within,
-.prompt-text-composer.variant-floating:has(.prompt-text-composer-input:not(:placeholder-shown)) {
+.prompt-text-composer.variant-floating.has-text {
   border-color: var(--ib-focus-border-color);
 }
 
-.prompt-text-composer.variant-floating .prompt-text-composer-input {
+.prompt-text-composer.variant-floating :deep(.prompt-text-composer-input) {
   font-size: 12px;
   line-height: 18px;
   padding: 6px 4px;

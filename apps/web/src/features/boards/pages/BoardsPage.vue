@@ -188,9 +188,9 @@ import {
   type CanvasBoardMeta,
 } from '../../canvas-board/catalog/canvasBoards'
 import { hydrateCanvasBoardsFromServer } from '../../canvas-board/catalog/boardSync'
+import { createCanvasBoardCommands } from '../../canvas-board/catalog/canvasBoardCommands'
 import BoardCard from '../components/BoardCard.vue'
 import { useBoardFeedback } from '../feedback/useBoardFeedback'
-import { createCanvasBoardCommands } from '../lib/canvasBoardCommands'
 import { createBoardPreviewRefreshQueue } from '../lib/boardPreviewRefreshQueue'
 import {
   boardCatalogClasses,
@@ -223,7 +223,7 @@ import { userMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
 const userStore = useUserStore()
-const { logoutAndRedirect } = useLogoutRedirect()
+const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const { projectName } = useSiteBranding()
 const boardCommands = createCanvasBoardCommands()
 const boardPreviewRefresh = createBoardPreviewRefreshQueue()

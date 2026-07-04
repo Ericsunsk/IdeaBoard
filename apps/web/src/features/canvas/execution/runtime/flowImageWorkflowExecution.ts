@@ -31,7 +31,7 @@ import {
 } from '../planning/ImageExecutionPlan'
 import type { ResolvedTaskImageResult } from '../result-nodes/flowImageDirectActionTaskResult'
 import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpaintTaskResult'
-import { usePendingImageResultNodeLifecycle } from '../result-nodes/usePendingImageResultNodes'
+import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import {
   assertTaskRequestReady,
   submitTaskRequest,
@@ -55,17 +55,6 @@ type FlowImageWorkflowRunner = {
     taskId: string,
     fallbackRatio: number,
   ) => Promise<ResolvedTaskImageResult>
-  runPendingImageGeneration: (params: {
-    source: ImageExecutionInput
-    sourceNodeId: string
-    boardId: string
-    resultOptions?: ImageExecutionResultOptions
-    assertReady?: () => Promise<void>
-    submitTask: () => Promise<{ taskId: string }>
-    resolveResult: (taskId: string) => Promise<ResolvedTaskImageResult>
-    successMessage: string
-    fallbackErrorMessage: string
-  }) => Promise<void>
   runPendingImageBatchWorkflow: (params: {
     source: ImageExecutionInput
     sourceNodeId: string
@@ -79,6 +68,7 @@ type FlowImageWorkflowRunner = {
     resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
     persistPendingTaskIds?: boolean
     cleanup?: () => Promise<void>
+    successMessage?: string
     fallbackErrorMessage: string
     formatErrorMessage?: (error: Error) => string
   }) => Promise<void>
@@ -144,13 +134,14 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
     })
-    await options.runner.runPendingImageGeneration({
+    await options.runner.runPendingImageBatchWorkflow({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       resultOptions: plan.resultOptions,
       boardId,
+      outputCount: 1,
       assertReady: taskSubmission.assertReady,
-      submitTask: taskSubmission.submitTask,
+      submitTask: () => taskSubmission.submitTask(),
       resolveResult: (taskId) =>
         options.runner.resolveFirstTaskImageResult(taskId, plan.source.ratio),
       successMessage: '处理完成',
@@ -326,7 +317,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
 }
 
 export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecutionOptions) {
-  const pendingImageResultLifecycle = usePendingImageResultNodeLifecycle({
+  const pendingImageResults = usePendingImageResultExecution({
     nodes: options.nodes,
     edges: options.edges,
     graphAdapter: options.graphAdapter,
@@ -334,7 +325,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   })
   const runner = useFlowImageDirectActionRunner({
     nodes: options.nodes,
-    pendingImageResultLifecycle,
+    pendingImageResults,
     flushAutosave: options.flushAutosave,
     getCurrentBoardId: options.getCurrentBoardId,
     onSuccess: options.onSuccess,

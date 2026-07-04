@@ -1,12 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref } from 'vue'
-import {
-  getGetAdminTaskMonitorSettingQueryKey,
-} from '../../../shared/api/generated-query/admin-settings/admin-settings'
-import type {
-  ApiResponseTaskMonitorSetting,
-  TaskMonitorSetting,
-} from '../../../shared/api/generated-query/model'
+import { getGetAdminTaskMonitorSettingQueryKey } from '../../../shared/api/generated-query/admin-settings/admin-settings'
+import type { TaskMonitorSetting } from '../../../shared/api/generated-query/model'
 import type { AdminTaskMonitorSettingsFeedback } from '../feedback/useAdminFeedback'
 import {
   DEFAULT_ADMIN_TASK_MONITOR_SETTING,
@@ -18,81 +11,38 @@ import {
   useAdminTaskMonitorSettingQuery,
 } from './taskMonitorSettingsResource'
 import { updateTaskMonitorSetting } from './systemSettingsCommands'
-import { useSettingFormLifecycle } from './useSettingFormLifecycle'
+import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
 export function useAdminTaskMonitorSettings(options: {
   feedback: AdminTaskMonitorSettingsFeedback
 }) {
-  const queryClient = useQueryClient()
   const { query, settings } = useAdminTaskMonitorSettingQuery()
-  const form = ref<TaskMonitorSetting>({ ...DEFAULT_ADMIN_TASK_MONITOR_SETTING })
-  const lastSyncedForm = ref<TaskMonitorSetting>({ ...DEFAULT_ADMIN_TASK_MONITOR_SETTING })
-
-  function invalidateTaskMonitorSettingQuery() {
-    return queryClient.invalidateQueries({ queryKey: getGetAdminTaskMonitorSettingQueryKey() })
-  }
-
-  function writeTaskMonitorSettingQueryCache(setting: TaskMonitorSetting) {
-    queryClient.setQueryData<ApiResponseTaskMonitorSetting>(
-      getGetAdminTaskMonitorSettingQueryKey(),
-      (previous) => ({
-        code: previous?.code ?? 0,
-        msg: previous?.msg ?? 'ok',
-        data: setting,
-      }),
-    )
-  }
-
-  const saveTaskMonitorMutation = useMutation({
-    mutationFn: updateTaskMonitorSetting,
-    onSuccess: async (setting) => {
-      const normalizedSetting = hydrateTaskMonitorForm(setting)
-      writeTaskMonitorSettingQueryCache(normalizedSetting)
-      await invalidateTaskMonitorSettingQuery()
-    },
-  })
-
-  const loading = computed(() => query.isLoading.value || query.isFetching.value)
-  const saving = computed(() => saveTaskMonitorMutation.isPending.value)
-
-  const formLifecycle = useSettingFormLifecycle<Partial<TaskMonitorSetting>, TaskMonitorSetting>({
-    error: query.error,
-    source: settings,
-    current: form,
-    synced: lastSyncedForm,
-    isSaving: saveTaskMonitorMutation.isPending,
+  const resource = useSettingResourceLifecycle<TaskMonitorSetting>({
+    defaultSetting: DEFAULT_ADMIN_TASK_MONITOR_SETTING,
     feedback: options.feedback,
-    hydrate: hydrateTaskMonitorForm,
     isSame: isSameTaskMonitorSetting,
-    reset: (synced) => {
-      form.value = { ...synced }
-    },
+    normalize: normalizeTaskMonitorSetting,
+    query,
+    queryKey: getGetAdminTaskMonitorSettingQueryKey(),
+    save: updateTaskMonitorSetting,
+    source: settings,
+    validate: validateTaskMonitorSetting,
   })
 
   async function handleSaveTaskMonitorSettings() {
-    await formLifecycle.save({
-      validate: () => validateTaskMonitorSetting(form.value),
-      run: () => saveTaskMonitorMutation.mutateAsync(normalizeTaskMonitorSetting(form.value)),
-    })
-  }
-
-  function hydrateTaskMonitorForm(setting: Partial<TaskMonitorSetting> | null | undefined) {
-    const normalizedSetting = normalizeTaskMonitorSetting(setting)
-    lastSyncedForm.value = { ...normalizedSetting }
-    form.value = { ...normalizedSetting }
-    return normalizedSetting
+    await resource.save()
   }
 
   function resetTaskMonitorForm() {
-    formLifecycle.reset()
+    resource.reset()
   }
 
   return {
-    form,
+    form: resource.form,
     handleSaveTaskMonitorSettings,
-    loading,
+    loading: resource.loading,
     resetTaskMonitorForm,
-    saving,
+    saving: resource.saving,
   }
 }
 

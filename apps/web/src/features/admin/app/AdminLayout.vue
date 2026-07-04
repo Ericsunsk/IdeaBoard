@@ -271,7 +271,7 @@ type PrimePopupPanel = PrimePopupMenu & {
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const { logoutAndRedirect } = useLogoutRedirect()
+const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 
 const mobileMenuOpen = ref(false)
 const userMenuOpen = ref(false)

@@ -31,33 +31,49 @@ type UsePendingImageResultNodesOptions = {
 
 export type PendingImageResultOptions = ImageExecutionResultOptions
 
-export type PendingImageResultReservation = {
-  resultNodeId: string
-}
-
-export type ReservePendingImageResultParams = {
+export type PendingImageResultReservationParams = {
   source: ImageExecutionInput
   sourceNodeId: string
+  outputCount: number
   resultOptions?: PendingImageResultOptions
 }
 
-export type ReservePendingImageResultsParams = ReservePendingImageResultParams & {
-  outputCount: number
+export type PendingImageResultExecution = {
+  runPendingResults: (params: RunPendingImageResultsParams) => Promise<PendingImageResultRunSummary>
+  resolveAttachedPendingResult: (
+    params: ResolveAttachedPendingImageResultParams,
+  ) => Promise<boolean>
 }
 
-export type PendingImageResultLifecycle = {
-  reservePendingResult: (
-    params: ReservePendingImageResultParams,
-  ) => PendingImageResultReservation
-  reservePendingResults: (
-    params: ReservePendingImageResultsParams,
-  ) => PendingImageResultReservation[]
-  attachPendingTaskId: (params: { resultNodeId: string; taskId: string }) => void
-  materializeResolvedImage: (params: {
-    resultNodeId: string
-    result: ResolvedTaskImageResult
-  }) => void
-  cancelPendingResult: (params: { resultNodeId: string }) => void
+export type PendingImageResultTaskSubmission = {
+  taskId: string
+}
+
+export type RunPendingImageResultsParams = PendingImageResultReservationParams & {
+  submitTask: (resultNodeId: string) => Promise<PendingImageResultTaskSubmission>
+  resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
+  isCurrent: () => boolean
+  isPendingError: (error: unknown) => boolean
+  persistPendingTaskIds?: boolean
+  afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
+  onReserved?: (resultNodeIds: string[]) => void
+}
+
+export type ResolveAttachedPendingImageResultParams = {
+  resultNodeId: string
+  taskId: string
+  resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
+  isCurrent: () => boolean
+  isAttached: () => boolean
+}
+
+export type PendingImageResultRunSummary = {
+  resultNodeIds: string[]
+  totalCount: number
+  successCount: number
+  pendingCount: number
+  failureCount: number
+  firstFailure: unknown
 }
 
 type ImageResultLayout = ImageResultAnchor & {
@@ -97,9 +113,9 @@ function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'rati
   return IMAGE_NODE_HEADER_HEIGHT + stageHeight
 }
 
-export function usePendingImageResultNodeLifecycle(
+export function usePendingImageResultExecution(
   options: UsePendingImageResultNodesOptions,
-): PendingImageResultLifecycle {
+): PendingImageResultExecution {
   const cancelledResultNodeIds = new Set<string>()
   const resultLayoutsBySourceNodeId = new Map<string, Map<string, ImageResultLayout>>()
 
@@ -372,30 +388,27 @@ export function usePendingImageResultNodeLifecycle(
 
     if (preferredNodeId) {
       let updatedNode: Node | null = null
-      options.graphAdapter.replaceNodes(
-        (items) => {
-          let didUpdate = false
-          const nextItems = items.map((item) => {
-            if (item.id !== preferredNodeId || item.data?.kind !== 'image') return item
-            const snapshot = item.data.snapshotNode
-            if (!snapshot || typeof snapshot !== 'object') return item
-            didUpdate = true
-            updatedNode = {
-              ...item,
-              data: {
-                ...item.data,
-                snapshotNode: buildPendingImageNodeSnapshot(snapshot as ImageNodeItem, {
-                  sourceImageRatio: pendingImageNode.sourceImageRatio,
-                  width: pendingImageNode.width,
-                }),
-              },
-            }
-            return updatedNode
-          })
-          return didUpdate ? nextItems : items
-        },
-        createPendingResultCommandOptions(optionsOverride),
-      )
+      options.graphAdapter.replaceNodes((items) => {
+        let didUpdate = false
+        const nextItems = items.map((item) => {
+          if (item.id !== preferredNodeId || item.data?.kind !== 'image') return item
+          const snapshot = item.data.snapshotNode
+          if (!snapshot || typeof snapshot !== 'object') return item
+          didUpdate = true
+          updatedNode = {
+            ...item,
+            data: {
+              ...item.data,
+              snapshotNode: buildPendingImageNodeSnapshot(snapshot as ImageNodeItem, {
+                sourceImageRatio: pendingImageNode.sourceImageRatio,
+                width: pendingImageNode.width,
+              }),
+            },
+          }
+          return updatedNode
+        })
+        return didUpdate ? nextItems : items
+      }, createPendingResultCommandOptions(optionsOverride))
       if (updatedNode) lookup.nodeById.set(preferredNodeId, updatedNode)
       cancelledResultNodeIds.delete(preferredNodeId)
       rememberResultNodeLayout(anchorNodeId, preferredNodeId, {
@@ -441,35 +454,14 @@ export function usePendingImageResultNodeLifecycle(
     return nextNode.id
   }
 
-  function reservePendingResult(
-    params: ReservePendingImageResultParams,
-  ): PendingImageResultReservation {
-    return {
-      resultNodeId: appendPendingImageResultNodeWithLookup(
-        params.source,
-        params.sourceNodeId,
-        buildPendingResultLookup(),
-        {
-          recordHistory: true,
-          anchor: params.resultOptions?.anchor,
-          targetRatio: params.resultOptions?.targetRatio,
-          targetWidth: params.resultOptions?.targetWidth,
-        },
-        null,
-      ),
-    }
-  }
-
-  function reservePendingResults(
-    params: ReservePendingImageResultsParams,
-  ): PendingImageResultReservation[] {
+  function reservePendingResults(params: PendingImageResultReservationParams): string[] {
     const count = clampImageNodeOutputCount(params.outputCount)
     const resultOptions = params.resultOptions ?? {}
     const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? params.sourceNodeId
     const lookup = buildPendingResultLookup()
     const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId, lookup)
-    return Array.from({ length: count }, (_, index) => ({
-      resultNodeId: appendPendingImageResultNodeWithLookup(
+    return Array.from({ length: count }, (_, index) =>
+      appendPendingImageResultNodeWithLookup(
         params.source,
         anchorNodeId,
         lookup,
@@ -481,7 +473,7 @@ export function usePendingImageResultNodeLifecycle(
         },
         index === 0 ? reusableNodeId : null,
       ),
-    }))
+    )
   }
 
   function attachPendingTaskId(params: { resultNodeId: string; taskId: string }) {
@@ -588,39 +580,72 @@ export function usePendingImageResultNodeLifecycle(
     })
   }
 
-  return {
-    reservePendingResult,
-    reservePendingResults,
-    attachPendingTaskId,
-    materializeResolvedImage,
-    cancelPendingResult,
+  async function runPendingResults(
+    params: RunPendingImageResultsParams,
+  ): Promise<PendingImageResultRunSummary> {
+    const persistPendingTaskIds = params.persistPendingTaskIds ?? true
+    const resultNodeIds = reservePendingResults(params)
+    params.onReserved?.(resultNodeIds)
+
+    let successCount = 0
+    let pendingCount = 0
+    let failureCount = 0
+    let firstFailure: unknown = null
+
+    await Promise.allSettled(
+      resultNodeIds.map(async (resultNodeId) => {
+        try {
+          const { taskId } = await params.submitTask(resultNodeId)
+          if (persistPendingTaskIds && params.isCurrent()) {
+            attachPendingTaskId({ resultNodeId, taskId })
+            await params.afterTaskIdAttached?.({ resultNodeId, taskId })
+          }
+          const resolved = await params.resolveResult(taskId, resultNodeId)
+          if (params.isCurrent()) {
+            materializeResolvedImage({ resultNodeId, result: resolved })
+          }
+          successCount += 1
+        } catch (error) {
+          firstFailure ??= error
+          if (params.isPendingError(error)) {
+            pendingCount += 1
+            if (!persistPendingTaskIds && params.isCurrent()) {
+              cancelPendingResult({ resultNodeId })
+            }
+            return
+          }
+          failureCount += 1
+          if (params.isCurrent()) {
+            cancelPendingResult({ resultNodeId })
+          }
+        }
+      }),
+    )
+
+    return {
+      resultNodeIds,
+      totalCount: resultNodeIds.length,
+      successCount,
+      pendingCount,
+      failureCount,
+      firstFailure,
+    }
   }
-}
 
-export function usePendingImageResultNodes(options: UsePendingImageResultNodesOptions) {
-  const lifecycle = usePendingImageResultNodeLifecycle(options)
+  async function resolveAttachedPendingResult(
+    params: ResolveAttachedPendingImageResultParams,
+  ): Promise<boolean> {
+    const resolved = await params.resolveResult(params.taskId, params.resultNodeId)
+    if (!params.isCurrent() || !params.isAttached()) return false
+    materializeResolvedImage({
+      resultNodeId: params.resultNodeId,
+      result: resolved,
+    })
+    return true
+  }
 
   return {
-    appendPendingImageResultNode: (
-      source: ImageExecutionInput,
-      sourceNodeId: string,
-      resultOptions?: PendingImageResultOptions,
-    ) =>
-      lifecycle.reservePendingResult({ source, sourceNodeId, resultOptions }).resultNodeId,
-    appendPendingImageResultNodes: (
-      source: ImageExecutionInput,
-      sourceNodeId: string,
-      outputCount: number,
-      resultOptions?: PendingImageResultOptions,
-    ) =>
-      lifecycle
-        .reservePendingResults({ source, sourceNodeId, outputCount, resultOptions })
-        .map((reservation) => reservation.resultNodeId),
-    markPendingImageResultTask: (resultNodeId: string, taskId: string) =>
-      lifecycle.attachPendingTaskId({ resultNodeId, taskId }),
-    updatePendingImageResultNode: (resultNodeId: string, result: ResolvedTaskImageResult) =>
-      lifecycle.materializeResolvedImage({ resultNodeId, result }),
-    removePendingImageResultNode: (resultNodeId: string) =>
-      lifecycle.cancelPendingResult({ resultNodeId }),
+    runPendingResults,
+    resolveAttachedPendingResult,
   }
 }

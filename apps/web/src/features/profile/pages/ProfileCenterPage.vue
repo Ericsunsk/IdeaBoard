@@ -403,7 +403,7 @@ type ProfileField = {
 
 const router = useRouter()
 const userStore = useUserStore()
-const { logoutAndRedirect } = useLogoutRedirect()
+const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const { logoURL, projectName } = useSiteBranding()
 const {
   form: pwdForm,

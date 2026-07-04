@@ -1,16 +1,10 @@
 import { computed, nextTick, ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
+import { listCanvasBoards, normalizeCanvasBoardName } from '../../canvas-board/catalog/canvasBoards'
 import {
-  isCanvasBoardNameTaken,
-  listCanvasBoards,
-  normalizeCanvasBoardName,
-  renameCanvasBoard,
-} from '../../canvas-board/catalog/canvasBoards'
-import {
-  hydrateCanvasBoardsFromServer,
-  isBoardNameConflictError,
-  syncCanvasBoardToServer,
-} from '../../canvas-board/catalog/boardSync'
+  createCanvasBoardCommands,
+  type CanvasBoardCommands,
+} from '../../canvas-board/catalog/canvasBoardCommands'
 import { USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 
 type BoardMeta = { id: string; name: string }
@@ -25,9 +19,11 @@ type UseFlowBoardHeaderActionsOptions = {
   router: Router
   route: { query: Record<string, unknown> }
   flushAutosave: () => Promise<void>
+  boardCommands?: Pick<CanvasBoardCommands, 'rename'>
 }
 
 export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOptions) {
+  const boardCommands = options.boardCommands ?? createCanvasBoardCommands()
   const isBoardMenuOpen = ref(false)
   const isRenamingBoard = ref(false)
   const boardNameDraft = ref('')
@@ -100,30 +96,28 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     if (normalized === currentName) {
       return
     }
-    if (isCanvasBoardNameTaken(normalized, boardId)) {
-      options.message.warning('名称已存在')
-      return
-    }
-    if (!renameCanvasBoard(boardId, normalized)) {
-      options.message.warning('重命名失败')
-      return
+    const result = await boardCommands.rename({ boardId, nextName: normalized })
+    if (!result.ok) {
+      switch (result.reason) {
+        case 'local-name-conflict':
+          options.message.warning('名称已存在')
+          return
+        case 'invalid-name':
+          options.message.warning('重命名失败')
+          return
+        case 'remote-name-conflict':
+        case 'sync-failed':
+          refreshBoardMetas()
+          options.message.error?.(
+            result.reason === 'remote-name-conflict'
+              ? '名称已存在，请更换后再试'
+              : '重命名同步失败，请稍后重试',
+          )
+          console.warn('[canvas] failed to sync renamed board', result.error)
+          return
+      }
     }
     refreshBoardMetas()
-    try {
-      await syncCanvasBoardToServer(boardId)
-    } catch (error) {
-      await hydrateCanvasBoardsFromServer(
-        isBoardNameConflictError(error)
-          ? { preserveLocalNewer: false, rollbackBoardIds: [boardId] }
-          : undefined,
-      )
-      refreshBoardMetas()
-      options.message.error?.(
-        isBoardNameConflictError(error) ? '名称已存在，请更换后再试' : '重命名同步失败，请稍后重试',
-      )
-      console.warn('[canvas] failed to sync renamed board', error)
-      return
-    }
     options.message.success('已重命名画布')
   }
 

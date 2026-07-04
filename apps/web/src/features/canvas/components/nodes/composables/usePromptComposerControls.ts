@@ -5,7 +5,7 @@ import { clampImageNodeOutputCount } from '../../../../canvas-board/domain'
 import { useAutoResizeTextarea } from './useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
 
-type PromptComposerResizePayload = {
+export type PromptComposerResizePayload = {
   naturalHeight: number
   singleLineHeight: number
 }

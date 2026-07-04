@@ -189,7 +189,7 @@ import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { logoutAndRedirect } = useLogoutRedirect()
+const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const {
   screenToFlowCoordinate,
   updateNodeInternals,

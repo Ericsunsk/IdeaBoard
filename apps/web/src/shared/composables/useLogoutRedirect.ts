@@ -1,12 +1,14 @@
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../../app/stores/user'
 
-export function useLogoutRedirect() {
+type LogoutRedirectDependencies = {
+  logout: () => Promise<boolean> | boolean
+}
+
+export function useLogoutRedirect(deps: LogoutRedirectDependencies) {
   const router = useRouter()
-  const userStore = useUserStore()
 
   async function logoutAndRedirect(path: string, options: { replace?: boolean } = {}) {
-    if (!(await userStore.logout())) {
+    if (!(await deps.logout())) {
       return false
     }
     if (options.replace) {
