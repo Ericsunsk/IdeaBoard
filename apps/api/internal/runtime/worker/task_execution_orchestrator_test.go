@@ -389,6 +389,122 @@ func TestExecuteFailsImmediatelyWhenFailoverHasNoCandidates(t *testing.T) {
 	}
 }
 
+func TestExecuteProviderFailureRoutesThroughConvergenceDecision(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionOrchestratorTestDB(t)
+	accountRepo := accounts.NewAccountRepository(db)
+	taskRepo := taskstore.NewRepository(db)
+	account := createRiverTestAccount(t, db, accountRepo, "convergence-primary-account")
+	fallbackAccount := createRiverTestAccount(t, db, accountRepo, "convergence-fallback-account")
+
+	task := &tasks.Task{
+		TaskID:            "convergence-provider-failure-task",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-convergence-provider-failure",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	requeuer := &fakeRequeuer{}
+	assigner := &fakeAssigner{}
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	decider := &recordingTaskExecutionConvergenceDecider{
+		outcomes: []taskExecutionConvergenceOutcome{taskExecutionConvergenceFinalFail},
+	}
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.ApiAccount, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+		return providerOutputJSON(""), newUpstreamHTTPError(429, "rate limited")
+	})
+	orchestrator.convergenceDecider = decider
+
+	err := orchestrator.execute(ctx, &tasks.TaskPayload{
+		TaskID:     task.TaskID,
+		AccountIDs: []int64{account.ID, fallbackAccount.ID},
+	}, taskqueue.TaskAssignment{TaskID: task.TaskID, AccountID: account.ID, ChannelID: account.ChannelID, Status: taskqueue.AssignStatusAssigned, LeaseToken: task.LeaseToken})
+	if err != nil {
+		t.Fatalf("execute returned error: %v", err)
+	}
+
+	if len(decider.inputs) != 1 {
+		t.Fatalf("convergence decisions = %d, want 1", len(decider.inputs))
+	}
+	decisionInput := decider.inputs[0]
+	if !decisionInput.ProviderFailure.IsFailoverable {
+		t.Fatal("provider failure should be marked failoverable")
+	}
+	if decisionInput.ProviderFailure.Reason != "上游服务请求过于频繁，请稍后重试" {
+		t.Fatalf("reason = %q", decisionInput.ProviderFailure.Reason)
+	}
+	if decisionInput.ProviderFailure.Stage != tasks.ExecutionStageProvider {
+		t.Fatalf("failure stage = %q, want %q", decisionInput.ProviderFailure.Stage, tasks.ExecutionStageProvider)
+	}
+	if decisionInput.ProviderFailure.Category != tasks.FailureCategoryTimeout {
+		t.Fatalf("failure category = %q, want %q", decisionInput.ProviderFailure.Category, tasks.FailureCategoryTimeout)
+	}
+	if decisionInput.Failover.RemainingAccountCandidates != 1 {
+		t.Fatalf("remaining account candidates = %d, want 1", decisionInput.Failover.RemainingAccountCandidates)
+	}
+	if requeuer.calls != 0 {
+		t.Fatalf("requeue calls = %d, want 0", requeuer.calls)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusFailed {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusFailed)
+	}
+	failedAccount, err := accountRepo.GetByID(ctx, account.ID)
+	if err != nil {
+		t.Fatalf("reload account failed: %v", err)
+	}
+	if failedAccount.FailCount != 1 {
+		t.Fatalf("fail_count = %d, want 1", failedAccount.FailCount)
+	}
+
+	var attemptStatus, attemptReason, attemptFailureStage, attemptFailureCategory string
+	if err := db.QueryRowContext(ctx, `
+SELECT status, error_msg, failure_stage, failure_category
+FROM task_attempts
+WHERE task_id = $1`, task.TaskID).Scan(&attemptStatus, &attemptReason, &attemptFailureStage, &attemptFailureCategory); err != nil {
+		t.Fatalf("read task attempt failed: %v", err)
+	}
+	if attemptStatus != tasks.TaskAttemptStatusFailed {
+		t.Fatalf("attempt status = %s, want %s", attemptStatus, tasks.TaskAttemptStatusFailed)
+	}
+	if attemptReason != decisionInput.ProviderFailure.Reason {
+		t.Fatalf("attempt reason = %q, want %q", attemptReason, decisionInput.ProviderFailure.Reason)
+	}
+	if attemptFailureStage != tasks.ExecutionStageProvider {
+		t.Fatalf("attempt failure stage = %q, want %q", attemptFailureStage, tasks.ExecutionStageProvider)
+	}
+	if attemptFailureCategory != tasks.FailureCategoryTimeout {
+		t.Fatalf("attempt failure category = %q, want %q", attemptFailureCategory, tasks.FailureCategoryTimeout)
+	}
+
+	metricsByTaskID, err := taskRepo.ListExecutionMetricsByTaskIDs(ctx, []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("read execution metrics failed: %v", err)
+	}
+	metrics := metricsByTaskID[task.TaskID]
+	if metrics == nil {
+		t.Fatal("execution metrics should exist")
+	}
+	if metrics.CurrentStage != tasks.ExecutionStageFailed {
+		t.Fatalf("metrics current stage = %q, want %q", metrics.CurrentStage, tasks.ExecutionStageFailed)
+	}
+	if metrics.FailureStage != tasks.ExecutionStageProvider {
+		t.Fatalf("metrics failure stage = %q, want %q", metrics.FailureStage, tasks.ExecutionStageProvider)
+	}
+	if metrics.FailureCategory != tasks.FailureCategoryTimeout {
+		t.Fatalf("metrics failure category = %q, want %q", metrics.FailureCategory, tasks.FailureCategoryTimeout)
+	}
+}
+
 func newTaskExecutionOrchestratorTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	return testdb.Open(t)
@@ -405,4 +521,19 @@ func providerOutputJSON(result string) providerCallOutput {
 			FinalizeFinishedAt: &now,
 		},
 	}
+}
+
+type recordingTaskExecutionConvergenceDecider struct {
+	inputs   []taskExecutionConvergenceInput
+	outcomes []taskExecutionConvergenceOutcome
+}
+
+func (d *recordingTaskExecutionConvergenceDecider) DecideTaskExecutionConvergence(input taskExecutionConvergenceInput) taskExecutionConvergenceDecision {
+	d.inputs = append(d.inputs, input)
+	decision := taskExecutionConvergencePolicy{}.DecideTaskExecutionConvergence(input)
+	index := len(d.inputs) - 1
+	if index < len(d.outcomes) {
+		decision.Outcome = d.outcomes[index]
+	}
+	return decision
 }

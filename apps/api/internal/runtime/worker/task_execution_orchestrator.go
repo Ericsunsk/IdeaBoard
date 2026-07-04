@@ -23,10 +23,11 @@ type accountLookupStore interface {
 }
 
 type taskExecutionOrchestrator struct {
-	accountRepo  accountLookupStore
-	enqueuer     taskqueue.TaskEnqueuer
-	taskRuntime  *taskruntime.Service
-	providerCall providerCallFunc
+	accountRepo        accountLookupStore
+	enqueuer           taskqueue.TaskEnqueuer
+	taskRuntime        *taskruntime.Service
+	providerCall       providerCallFunc
+	convergenceDecider taskExecutionConvergenceDecider
 }
 
 const taskCleanupTimeout = 5 * time.Second
@@ -38,10 +39,11 @@ func newTaskExecutionOrchestrator(
 	providerCall providerCallFunc,
 ) *taskExecutionOrchestrator {
 	return &taskExecutionOrchestrator{
-		accountRepo:  accountRepo,
-		enqueuer:     enqueuer,
-		taskRuntime:  taskRuntime,
-		providerCall: providerCall,
+		accountRepo:        accountRepo,
+		enqueuer:           enqueuer,
+		taskRuntime:        taskRuntime,
+		providerCall:       providerCall,
+		convergenceDecider: taskExecutionConvergencePolicy{},
 	}
 }
 
@@ -199,79 +201,160 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 		if checkErr != nil {
 			slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", checkErr)
 		}
-		if cancelled {
+		decision := o.decideTaskExecutionConvergence(taskExecutionConvergenceInput{
+			IsExecutionInterrupted: true,
+			IsTaskCancelled:        cancelled,
+			ProviderFailure: taskExecutionConvergenceProviderFailure{
+				Reason:   err.Error(),
+				Stage:    tasks.ExecutionStageProvider,
+				Category: tasks.FailureCategoryUnknown,
+			},
+		})
+		switch decision.Outcome {
+		case taskExecutionConvergenceCancel:
 			cancelFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusCancelled, "任务已取消", tasks.ExecutionStageProvider, tasks.FailureCategoryCancelled, startTime, providerOutput.Timeline, time.Now())
 			o.skipCancelledTask(ctx, task, &cancelFinish)
 			return nil
+		case taskExecutionConvergenceInterruptRequeue:
+			requeueFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusRequeued, decision.Reason, decision.FailureStage, decision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
+			return o.handleExecutionInterrupted(ctx, task, assignment, err, &requeueFinish)
+		default:
+			slog.Warn("unexpected task execution convergence outcome for interrupted provider failure", "task_id", task.TaskID, "outcome", decision.Outcome)
+			requeueFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusRequeued, err.Error(), tasks.ExecutionStageProvider, tasks.FailureCategoryUnknown, startTime, providerOutput.Timeline, time.Now())
+			return o.handleExecutionInterrupted(ctx, task, assignment, err, &requeueFinish)
 		}
-		requeueFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusRequeued, err.Error(), tasks.ExecutionStageProvider, tasks.FailureCategoryUnknown, startTime, providerOutput.Timeline, time.Now())
-		return o.handleExecutionInterrupted(ctx, task, assignment, err, &requeueFinish)
 	}
 
 	slog.Warn("upstream provider call failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
 	elapsed := time.Since(startTime).Seconds()
 	reason := userFacingProviderError(err)
 	failureStage, failureCategory := classifyProviderFailure(err, providerOutput.Timeline)
-	if !shouldFailoverProviderError(err) {
+	decisionInput := taskExecutionConvergenceInput{
+		ProviderFailure: taskExecutionConvergenceProviderFailure{
+			IsFailoverable: shouldFailoverProviderError(err),
+			Reason:         reason,
+			Stage:          failureStage,
+			Category:       failureCategory,
+		},
+		Failover: taskExecutionConvergenceFailover{
+			RemainingAccountCandidates: len(task.AccountIDs),
+			HasFailoverCapacity:        true,
+		},
+	}
+
+	if decisionInput.ProviderFailure.IsFailoverable {
+		disabled, failCount, statErr := o.taskRuntime.RecordAccountFailure(ctx, accountID)
+		if statErr != nil {
+			slog.Warn("record account failure state failed", "account_id", accountID, "err", statErr)
+		}
+		if disabled {
+			slog.Warn("account disabled after too many failures", "account_id", accountID, "fail_count", failCount)
+		}
+		task.AccountIDs = removeAccountCandidate(task.AccountIDs, accountID)
+		decisionInput.Failover.RemainingAccountCandidates = len(task.AccountIDs)
+	}
+
+	decision := o.decideTaskExecutionConvergence(decisionInput)
+	switch decision.Outcome {
+	case taskExecutionConvergenceFinalFail, taskExecutionConvergenceFailoverExhaustedOrNoCapacity:
+		failFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
+		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, decision.Reason, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish); markErr != nil {
+			return markErr
+		}
+		return nil
+	case taskExecutionConvergenceDropConvergedDirtyWork:
+		o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
+		o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
+		return nil
+	case taskExecutionConvergenceRequeue:
+		return o.handleProviderFailoverRequeue(ctx, task, assignment, startTime, attemptRef, providerOutput, elapsed, decisionInput, decision)
+	default:
+		slog.Warn("unexpected task execution convergence outcome for provider failure", "task_id", task.TaskID, "outcome", decision.Outcome)
 		failFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
 		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsed, failureStage, failureCategory, &failFinish); markErr != nil {
 			return markErr
 		}
 		return nil
 	}
+}
 
-	finalFailFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
-	requeueFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusRequeued, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
-	disabled, failCount, statErr := o.taskRuntime.RecordAccountFailure(ctx, accountID)
-	if statErr != nil {
-		slog.Warn("record account failure state failed", "account_id", accountID, "err", statErr)
-	}
-	if disabled {
-		slog.Warn("account disabled after too many failures", "account_id", accountID, "fail_count", failCount)
-	}
-	task.AccountIDs = removeAccountCandidate(task.AccountIDs, accountID)
-	if len(task.AccountIDs) == 0 {
-		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsed, failureStage, failureCategory, &finalFailFinish); markErr != nil {
-			return markErr
-		}
-		return nil
-	}
-
+func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
+	ctx context.Context,
+	task *tasks.TaskPayload,
+	assignment taskqueue.TaskAssignment,
+	startTime time.Time,
+	attemptRef tasks.TaskAttemptRef,
+	providerOutput providerCallOutput,
+	elapsed float64,
+	decisionInput taskExecutionConvergenceInput,
+	decision taskExecutionConvergenceDecision,
+) error {
+	finalFailFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
+	requeueFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusRequeued, decision.Reason, decision.FailureStage, decision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
 	requeued, requeueErr := o.taskRuntime.RequeueTaskForFailover(ctx, taskruntime.RequeueForFailoverInput{
 		Assignment:             assignment,
-		Reason:                 reason,
+		Reason:                 decision.Reason,
 		RequeuedAttemptFinish:  &requeueFinish,
 		FinalFailAttemptFinish: &finalFailFinish,
 	})
 	if requeueErr != nil {
-		if errors.Is(requeueErr, taskruntime.ErrTaskNotFound) || errors.Is(requeueErr, taskruntime.ErrTaskTerminal) || errors.Is(requeueErr, taskruntime.ErrTaskStateConflict) {
-			o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
+		requeueFailureInput := decisionInput
+		requeueFailureInput.Task.IsDirtyConverged = isTaskConvergedError(requeueErr)
+		if !requeueFailureInput.Task.IsDirtyConverged {
+			requeueFailureInput.Failover.HasFailoverCapacity = false
+		}
+		requeueFailureDecision := o.decideTaskExecutionConvergence(requeueFailureInput)
+		switch requeueFailureDecision.Outcome {
+		case taskExecutionConvergenceDropConvergedDirtyWork:
+			o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, requeueFailureDecision.Reason, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
 			o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 			return nil
+		case taskExecutionConvergenceFinalFail, taskExecutionConvergenceFailoverExhaustedOrNoCapacity:
+			slog.Warn("reset task for failover retry failed", "task_id", task.TaskID, "err", requeueErr)
+			failFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, requeueFailureDecision.Reason, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
+			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, requeueFailureDecision.Reason, elapsed, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, &failFinish); markErr != nil {
+				return markErr
+			}
+			return nil
+		default:
+			slog.Warn("unexpected task execution convergence outcome after failover requeue failure", "task_id", task.TaskID, "outcome", requeueFailureDecision.Outcome, "err", requeueErr)
+			failFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
+			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, decision.Reason, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish); markErr != nil {
+				return markErr
+			}
+			return nil
 		}
-		slog.Warn("reset task for failover retry failed", "task_id", task.TaskID, "err", requeueErr)
-		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsed, failureStage, failureCategory, &finalFailFinish); markErr != nil {
-			return markErr
-		}
-		return nil
 	}
 	if !requeued {
+		exhaustedInput := decisionInput
+		exhaustedInput.Failover.HasFailoverCapacity = false
+		exhaustedDecision := o.decideTaskExecutionConvergence(exhaustedInput)
+		if exhaustedDecision.Outcome != taskExecutionConvergenceFailoverExhaustedOrNoCapacity {
+			slog.Warn("unexpected task execution convergence outcome after failover retry exhausted", "task_id", task.TaskID, "outcome", exhaustedDecision.Outcome)
+		}
 		slog.Info("task reached failover retry limit", "task_id", task.TaskID)
-		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, finalFailFinish.CompletedAt)
+		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, exhaustedDecision.FailureStage, exhaustedDecision.FailureCategory, finalFailFinish.CompletedAt)
 		return nil
 	}
 	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
 		TaskID:           task.TaskID,
 		CurrentStage:     tasks.StringPtr(tasks.ExecutionStageQueued),
 		BottleneckSource: tasks.StringPtr(tasks.BottleneckSourceProvider),
-		FailureStage:     tasks.StringPtr(failureStage),
-		FailureCategory:  tasks.StringPtr(failureCategory),
+		FailureStage:     tasks.StringPtr(decision.FailureStage),
+		FailureCategory:  tasks.StringPtr(decision.FailureCategory),
 	})
-	if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, reason); requeueErr != nil {
-		o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
+	if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, decision.Reason); requeueErr != nil {
+		o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, startTime, providerOutput.Timeline, time.Now())
 		return requeueErr
 	}
 	return nil
+}
+
+func (o *taskExecutionOrchestrator) decideTaskExecutionConvergence(input taskExecutionConvergenceInput) taskExecutionConvergenceDecision {
+	if o.convergenceDecider == nil {
+		return taskExecutionConvergencePolicy{}.DecideTaskExecutionConvergence(input)
+	}
+	return o.convergenceDecider.DecideTaskExecutionConvergence(input)
 }
 
 func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, reason string) error {
