@@ -1,5 +1,17 @@
-import type { Actions, Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
+import {
+  applyEdgeChanges as applyVueFlowEdgeChanges,
+  applyNodeChanges as applyVueFlowNodeChanges,
+  type Actions,
+  type Edge,
+  type EdgeChange,
+  type Node,
+  type NodeChange,
+} from '@vue-flow/core'
 import type { Ref } from 'vue'
+import {
+  recordCanvasGraphCommand,
+  recordCanvasInteractionCount,
+} from '../utils/canvasInteractionMetrics'
 
 export type CanvasVueFlowGraph = {
   nodes: Node[]
@@ -90,14 +102,11 @@ type NodeTargetResolver = NodeTargetInput | ((nodes: Node[]) => NodeTargetInput)
 type EdgeTargetResolver = EdgeTargetInput | ((edges: Edge[]) => EdgeTargetInput)
 type NodeUpdate = Partial<Node> | ((node: Node) => Partial<Node>)
 type EdgeUpdate = Partial<Edge> | ((edge: Edge) => Partial<Edge>)
-type NodeChangeTarget = Node & {
+type NativeNodeChangeState = Node & {
   selected?: boolean
   dragging?: boolean
-  dimensions?: unknown
-  handleBounds?: unknown
-  resizing?: boolean
 }
-type EdgeChangeTarget = Edge & {
+type NativeEdgeChangeState = Edge & {
   selected?: boolean
 }
 
@@ -119,98 +128,6 @@ function createGraph(nodes: Node[], edges: Edge[]): CanvasVueFlowGraph {
   return { nodes, edges }
 }
 
-function cloneNodesForChanges(nodes: Node[]): Node[] {
-  return nodes.map((node) => ({ ...node }))
-}
-
-function cloneEdgesForChanges(edges: Edge[]): Edge[] {
-  return edges.map((edge) => ({ ...edge }))
-}
-
-function applyNodeChangesToPlainNodes(changes: NodeChange[], currentNodes: Node[]): Node[] {
-  const nextNodes = cloneNodesForChanges(currentNodes)
-
-  for (const change of changes) {
-    if (change.type === 'add') {
-      if (!nextNodes.some((node) => node.id === change.item.id)) nextNodes.push(change.item as Node)
-      continue
-    }
-    if (change.type === 'remove') {
-      const index = nextNodes.findIndex((node) => node.id === change.id)
-      if (index >= 0) nextNodes.splice(index, 1)
-    }
-  }
-
-  for (const change of changes) {
-    if (change.type === 'add' || change.type === 'remove') continue
-    const node = nextNodes.find((item) => item.id === change.id)
-    if (!node) continue
-    const mutableNode = node as NodeChangeTarget
-    if (change.type === 'select') {
-      mutableNode.selected = change.selected
-      continue
-    }
-    if (change.type === 'position') {
-      mutableNode.position = change.position
-      if (typeof change.dragging !== 'undefined') mutableNode.dragging = change.dragging
-      continue
-    }
-    if (change.type === 'dimensions') {
-      if (typeof change.dimensions !== 'undefined') mutableNode.dimensions = change.dimensions
-      if (typeof change.handleBounds !== 'undefined') {
-        mutableNode.handleBounds = change.handleBounds
-      }
-      if (typeof change.resizing !== 'undefined') mutableNode.resizing = change.resizing
-      if (change.updateStyle && change.dimensions) {
-        const dimensionsStyle = {
-          width: `${change.dimensions.width}px`,
-          height: `${change.dimensions.height}px`,
-        }
-        if (typeof node.style === 'function') {
-          const style = node.style
-          node.style = ((params) => ({
-            ...style(params),
-            ...dimensionsStyle,
-          })) as Node['style']
-        } else {
-          node.style = {
-            ...((node.style ?? {}) as Record<string, unknown>),
-            ...dimensionsStyle,
-          } as Node['style']
-        }
-      }
-    }
-  }
-
-  return nextNodes
-}
-
-function applyEdgeChangesToPlainEdges(changes: EdgeChange[], currentEdges: Edge[]): Edge[] {
-  const nextEdges = cloneEdgesForChanges(currentEdges)
-
-  for (const change of changes) {
-    if (change.type === 'add') {
-      if (!nextEdges.some((edge) => edge.id === change.item.id)) nextEdges.push(change.item as Edge)
-      continue
-    }
-    if (change.type === 'remove') {
-      const index = nextEdges.findIndex((edge) => edge.id === change.id)
-      if (index >= 0) nextEdges.splice(index, 1)
-    }
-  }
-
-  for (const change of changes) {
-    if (change.type === 'add' || change.type === 'remove') continue
-    const edge = nextEdges.find((item) => item.id === change.id)
-    if (!edge) continue
-    if (change.type === 'select') {
-      ;(edge as EdgeChangeTarget).selected = change.selected
-    }
-  }
-
-  return nextEdges
-}
-
 function readNodeTargetId(target: NodeTarget): string {
   return typeof target === 'string' ? target : target.id
 }
@@ -223,16 +140,94 @@ function isSameGraph(left: CanvasVueFlowGraph, right: CanvasVueFlowGraph): boole
   return left.nodes === right.nodes && left.edges === right.edges
 }
 
+function createNodeLookup(nodes: Node[]): Map<string, Node> {
+  return new Map(nodes.map((node) => [node.id, node]))
+}
+
+function createEdgeLookup(edges: Edge[]): Map<string, Edge> {
+  return new Map(edges.map((edge) => [edge.id, edge]))
+}
+
+function isSamePosition(
+  left: { x: number; y: number } | undefined,
+  right: { x: number; y: number } | undefined,
+): boolean {
+  return left?.x === right?.x && left?.y === right?.y
+}
+
+function hasApplicableNodeChange(change: NodeChange, nodeLookup: Map<string, Node>): boolean {
+  if (change.type === 'add') {
+    return !nodeLookup.has(change.item.id)
+  }
+  if (change.type === 'remove') {
+    return nodeLookup.has(change.id)
+  }
+
+  const node = nodeLookup.get(change.id)
+  if (!node) return false
+
+  if (change.type === 'select') {
+    return (node as NativeNodeChangeState).selected !== change.selected
+  }
+  if (change.type === 'position') {
+    return (
+      (change.position !== undefined && !isSamePosition(node.position, change.position)) ||
+      (change.dragging !== undefined &&
+        (node as NativeNodeChangeState).dragging !== change.dragging)
+    )
+  }
+  if (change.type === 'dimensions') {
+    return (
+      change.dimensions !== undefined ||
+      change.handleBounds !== undefined ||
+      change.resizing !== undefined ||
+      change.updateStyle === true
+    )
+  }
+
+  return true
+}
+
+function hasApplicableEdgeChange(change: EdgeChange, edgeLookup: Map<string, Edge>): boolean {
+  if (change.type === 'add') {
+    return !edgeLookup.has(change.item.id)
+  }
+  if (change.type === 'remove') {
+    return edgeLookup.has(change.id)
+  }
+
+  const edge = edgeLookup.get(change.id)
+  if (!edge) return false
+
+  if (change.type === 'select') {
+    return (edge as NativeEdgeChangeState).selected !== change.selected
+  }
+
+  return true
+}
+
+function hasApplicableNodeChanges(changes: NodeChange[], currentNodes: Node[]): boolean {
+  const nodeLookup = createNodeLookup(currentNodes)
+  return changes.some((change) => hasApplicableNodeChange(change, nodeLookup))
+}
+
+function hasApplicableEdgeChanges(changes: EdgeChange[], currentEdges: Edge[]): boolean {
+  const edgeLookup = createEdgeLookup(currentEdges)
+  return changes.some((change) => hasApplicableEdgeChange(change, edgeLookup))
+}
+
 export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapterOptions) {
   function readGraph(): CanvasVueFlowGraph {
     return createGraph(options.nodes.value, options.edges.value)
   }
 
   function syncNodes(nextNodes: Node[]) {
+    if (nextNodes !== options.nodes.value) recordCanvasInteractionCount('nodeArrayReplacements')
     options.nodes.value = nextNodes
   }
 
   function syncEdges(nextEdges: Edge[]) {
+    if (nextEdges !== options.edges.value) recordCanvasInteractionCount('edgeArrayReplacements')
     options.edges.value = nextEdges
   }
 
@@ -263,6 +258,7 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     const commandBeforeValue = commandOptions.beforeCommand?.(context)
 
     commit()
+    recordCanvasGraphCommand(command)
 
     const result: CanvasVueFlowGraphCommandResult = {
       command,
@@ -274,6 +270,80 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     options.afterCommand?.(result, globalBeforeValue)
     commandOptions.afterCommand?.(result, commandBeforeValue)
     return result
+  }
+
+  function createNoOpCommandResult(
+    command: CanvasVueFlowGraphCommandName,
+    commandOptions: CanvasVueFlowGraphCommandOptions = {},
+  ): CanvasVueFlowGraphCommandResult {
+    const before = readGraph()
+    return {
+      command,
+      before,
+      after: before,
+      didChange: false,
+      metadata: commandOptions.metadata,
+    }
+  }
+
+  function runNativeChangeCommand(
+    command: CanvasVueFlowGraphCommandName,
+    commit: () => void,
+    commandOptions: CanvasVueFlowGraphCommandOptions = {},
+  ): CanvasVueFlowGraphCommandResult {
+    const before = readGraph()
+    const context: CanvasVueFlowGraphCommandContext = {
+      command,
+      before,
+      next: before,
+      metadata: commandOptions.metadata,
+    }
+    const globalBeforeValue = options.beforeCommand?.(context)
+    const commandBeforeValue = commandOptions.beforeCommand?.(context)
+
+    commit()
+    recordCanvasGraphCommand(command)
+
+    const result: CanvasVueFlowGraphCommandResult = {
+      command,
+      before,
+      after: readGraph(),
+      didChange: true,
+      metadata: commandOptions.metadata,
+    }
+    options.afterCommand?.(result, globalBeforeValue)
+    commandOptions.afterCommand?.(result, commandBeforeValue)
+    return result
+  }
+
+  function applyNativeNodeChanges(changes: NodeChange[]) {
+    recordCanvasInteractionCount('nativeNodeChangeBatches')
+    recordCanvasInteractionCount('nativeNodeChangeCount', changes.length)
+    const actionResult = options.actions?.applyNodeChanges?.(changes)
+    if (Array.isArray(actionResult)) {
+      syncNodes(actionResult as Node[])
+      return
+    }
+    const nextNodes = applyVueFlowNodeChanges(
+      changes,
+      options.nodes.value as Parameters<typeof applyVueFlowNodeChanges>[1],
+    ) as unknown as Node[]
+    if (nextNodes !== options.nodes.value) syncNodes(nextNodes)
+  }
+
+  function applyNativeEdgeChanges(changes: EdgeChange[]) {
+    recordCanvasInteractionCount('nativeEdgeChangeBatches')
+    recordCanvasInteractionCount('nativeEdgeChangeCount', changes.length)
+    const actionResult = options.actions?.applyEdgeChanges?.(changes)
+    if (Array.isArray(actionResult)) {
+      syncEdges(actionResult as Edge[])
+      return
+    }
+    const nextEdges = applyVueFlowEdgeChanges(
+      changes,
+      options.edges.value as Parameters<typeof applyVueFlowEdgeChanges>[1],
+    ) as unknown as Edge[]
+    if (nextEdges !== options.edges.value) syncEdges(nextEdges)
   }
 
   function replaceGraph(
@@ -544,24 +614,12 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     changes: NodeChange[],
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
-    if (changes.length === 0) {
-      const before = readGraph()
-      return {
-        command: 'applyNodeChanges',
-        before,
-        after: before,
-        didChange: false,
-        metadata: commandOptions?.metadata,
-      }
+    if (changes.length === 0 || !hasApplicableNodeChanges(changes, options.nodes.value)) {
+      return createNoOpCommandResult('applyNodeChanges', commandOptions)
     }
-    const nextNodes = applyNodeChangesToPlainNodes(changes, options.nodes.value)
-    return runCommand(
+    return runNativeChangeCommand(
       'applyNodeChanges',
-      createGraph(nextNodes, options.edges.value),
-      () => {
-        options.actions?.applyNodeChanges?.(changes)
-        syncNodes(nextNodes)
-      },
+      () => applyNativeNodeChanges(changes),
       commandOptions,
     )
   }
@@ -570,24 +628,12 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     changes: EdgeChange[],
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
-    if (changes.length === 0) {
-      const before = readGraph()
-      return {
-        command: 'applyEdgeChanges',
-        before,
-        after: before,
-        didChange: false,
-        metadata: commandOptions?.metadata,
-      }
+    if (changes.length === 0 || !hasApplicableEdgeChanges(changes, options.edges.value)) {
+      return createNoOpCommandResult('applyEdgeChanges', commandOptions)
     }
-    const nextEdges = applyEdgeChangesToPlainEdges(changes, options.edges.value)
-    return runCommand(
+    return runNativeChangeCommand(
       'applyEdgeChanges',
-      createGraph(options.nodes.value, nextEdges),
-      () => {
-        options.actions?.applyEdgeChanges?.(changes)
-        syncEdges(nextEdges)
-      },
+      () => applyNativeEdgeChanges(changes),
       commandOptions,
     )
   }
@@ -598,37 +644,19 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
   ): CanvasVueFlowGraphCommandResult {
     const nodeChanges = changes.nodes ?? []
     const edgeChanges = changes.edges ?? []
-    if (nodeChanges.length === 0 && edgeChanges.length === 0) {
-      const before = readGraph()
-      return {
-        command: 'applyGraphChanges',
-        before,
-        after: before,
-        didChange: false,
-        metadata: commandOptions?.metadata,
-      }
+    const shouldApplyNodeChanges =
+      nodeChanges.length > 0 && hasApplicableNodeChanges(nodeChanges, options.nodes.value)
+    const shouldApplyEdgeChanges =
+      edgeChanges.length > 0 && hasApplicableEdgeChanges(edgeChanges, options.edges.value)
+    if (!shouldApplyNodeChanges && !shouldApplyEdgeChanges) {
+      return createNoOpCommandResult('applyGraphChanges', commandOptions)
     }
-    const nextNodes =
-      nodeChanges.length > 0
-        ? applyNodeChangesToPlainNodes(nodeChanges, options.nodes.value)
-        : options.nodes.value
-    const nextEdges =
-      edgeChanges.length > 0
-        ? applyEdgeChangesToPlainEdges(edgeChanges, options.edges.value)
-        : options.edges.value
 
-    return runCommand(
+    return runNativeChangeCommand(
       'applyGraphChanges',
-      createGraph(nextNodes, nextEdges),
       () => {
-        if (nodeChanges.length > 0) {
-          options.actions?.applyNodeChanges?.(nodeChanges)
-          syncNodes(nextNodes)
-        }
-        if (edgeChanges.length > 0) {
-          options.actions?.applyEdgeChanges?.(edgeChanges)
-          syncEdges(nextEdges)
-        }
+        if (shouldApplyNodeChanges) applyNativeNodeChanges(nodeChanges)
+        if (shouldApplyEdgeChanges) applyNativeEdgeChanges(edgeChanges)
       },
       commandOptions,
     )

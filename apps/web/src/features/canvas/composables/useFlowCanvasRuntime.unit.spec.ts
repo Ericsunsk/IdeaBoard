@@ -1,10 +1,19 @@
-import type { Edge, Node } from '@vue-flow/core'
+import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardSession } from '../board-session'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+
+type MutableHarnessNode = Node & {
+  selected?: boolean
+  dragging?: boolean
+}
+
+type MutableHarnessEdge = Edge & {
+  selected?: boolean
+}
 
 function createSnapshot(): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
@@ -59,6 +68,57 @@ function createSnapshot(): CanvasBoardSnapshot {
   return snapshot
 }
 
+function applyHarnessNodeChanges(nodes: Node[], changes: NodeChange[]): Node[] {
+  for (const change of changes) {
+    if (change.type === 'add') {
+      if (!nodes.some((node) => node.id === change.item.id)) nodes.push(change.item as Node)
+      continue
+    }
+    if (change.type === 'remove') {
+      const index = nodes.findIndex((node) => node.id === change.id)
+      if (index >= 0) nodes.splice(index, 1)
+    }
+  }
+
+  for (const change of changes) {
+    if (change.type === 'add' || change.type === 'remove') continue
+    const node = nodes.find((item) => item.id === change.id)
+    if (!node) continue
+    const mutableNode = node as MutableHarnessNode
+    if (change.type === 'select') {
+      mutableNode.selected = change.selected
+      continue
+    }
+    if (change.type === 'position') {
+      if (change.position) mutableNode.position = change.position
+      if (change.dragging !== undefined) mutableNode.dragging = change.dragging
+    }
+  }
+
+  return nodes
+}
+
+function applyHarnessEdgeChanges(edges: Edge[], changes: EdgeChange[]): Edge[] {
+  for (const change of changes) {
+    if (change.type === 'add') {
+      if (!edges.some((edge) => edge.id === change.item.id)) edges.push(change.item as Edge)
+      continue
+    }
+    if (change.type === 'remove') {
+      const index = edges.findIndex((edge) => edge.id === change.id)
+      if (index >= 0) edges.splice(index, 1)
+    }
+  }
+
+  for (const change of changes) {
+    if (change.type !== 'select') continue
+    const edge = edges.find((item) => item.id === change.id)
+    if (edge) (edge as MutableHarnessEdge).selected = change.selected
+  }
+
+  return edges
+}
+
 function createRuntimeHarness(snapshot = createSnapshot()) {
   const fullNodes = shallowRef<Node[]>([])
   const fullEdges = shallowRef<Edge[]>([])
@@ -76,8 +136,12 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     addEdges: vi.fn(),
     setEdges: vi.fn(),
     removeEdges: vi.fn(),
-    applyNodeChanges: vi.fn(),
-    applyEdgeChanges: vi.fn(),
+    applyNodeChanges: vi.fn((changes: NodeChange[]) =>
+      applyHarnessNodeChanges(nodes.value, changes),
+    ),
+    applyEdgeChanges: vi.fn((changes: EdgeChange[]) =>
+      applyHarnessEdgeChanges(edges.value, changes),
+    ),
   }
   const isDirty = ref(false)
   const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
@@ -112,7 +176,8 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
     },
-    vueFlowGraphActions: graphActions,
+    vueFlowGraphActions:
+      graphActions as unknown as UseFlowCanvasRuntimeOptions['vueFlowGraphActions'],
   }
   const runtime = useFlowCanvasRuntime(runtimeOptions)
 
@@ -448,9 +513,7 @@ describe('useFlowCanvasRuntime', () => {
     await nextTick()
 
     await harness.applyNativeNodeChanges([{ id: 'prompt-1', type: 'select', selected: true }])
-    await harness.applyNativeEdgeChanges([
-      { id: 'connection-3', type: 'select', selected: true },
-    ])
+    await harness.applyNativeEdgeChanges([{ id: 'connection-3', type: 'select', selected: true }])
 
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
     expect(readNodeSelected(harness.nodes.value, 'prompt-1')).toBe(true)
@@ -480,6 +543,30 @@ describe('useFlowCanvasRuntime', () => {
       y: 96,
     })
     expect(harness.savedSnapshots).toHaveLength(0)
+  })
+
+  it('does not clone unrelated nodes while syncing native drag position changes', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const unrelatedNodeBefore = harness.fullNodes.value.find((node) => node.id === 'prompt-2')
+
+    await harness.applyNativeNodeChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 720, y: 96 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 720,
+      y: 96,
+    })
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-2')).toBe(unrelatedNodeBefore)
   })
 
   it('does not rewrite the controlled node model when a drag transaction commits', async () => {
@@ -580,6 +667,15 @@ describe('useFlowCanvasRuntime', () => {
       },
     ])
     await harness.flushNativeGraphChanges()
+
+    harness.runtime.flowHistory.undo()
+
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
 
     harness.runtime.flowHistory.undo()
 

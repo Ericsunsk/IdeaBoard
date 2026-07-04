@@ -39,9 +39,27 @@ type RawInteractionTrace = {
   mutationCount: number
   eventCount: number
   eventsByType: Record<string, number>
+  counters: InteractionCounterSnapshot
   samples: TargetSnapshot[]
   before: TargetSnapshot | null
   after: TargetSnapshot | null
+}
+
+type InteractionCounterName =
+  | 'graphCommandCount'
+  | 'nativeNodeChangeBatches'
+  | 'nativeNodeChangeCount'
+  | 'nativeEdgeChangeBatches'
+  | 'nativeEdgeChangeCount'
+  | 'nodeArrayReplacements'
+  | 'edgeArrayReplacements'
+  | 'historyCaptureCount'
+  | 'historyPushCount'
+  | 'autosaveScheduleCount'
+  | 'autosaveSaveCount'
+
+type InteractionCounterSnapshot = Record<InteractionCounterName, number> & {
+  graphCommands: Record<string, number>
 }
 
 type InteractionMetrics = {
@@ -54,12 +72,32 @@ type InteractionMetrics = {
   sampleCount: number
   mutationCount: number
   eventCount: number
+  counters: InteractionCounterSnapshot
   positionChanges?: number
   viewportChanges?: number
 }
 
+type InteractionBudget = {
+  maxP95FrameMs: number
+  maxDroppedFrames: number
+  maxMutationCount: number
+  maxNodeArrayReplacements: number
+  maxEdgeArrayReplacements: number
+  maxHistoryCaptureCount: number
+  maxHistoryPushCount: number
+  maxAutosaveScheduleCount: number
+  maxAutosaveSaveCount: number
+  maxNativeNodeChangeBatches: number
+  maxNativeEdgeChangeBatches: number
+}
+
+type BenchmarkVerdict = {
+  status: 'pass' | 'fail'
+  failures: string[]
+}
+
 type BenchmarkReport = {
-  schemaVersion: 1
+  schemaVersion: 2
   generatedAt: string
   command: string
   browser: {
@@ -79,8 +117,10 @@ type BenchmarkReport = {
     frameBudgetMs: number
     ranking: string
   }
+  budgets: Record<BenchmarkPath, InteractionBudget>
   paths: InteractionMetrics[]
   worstPath: InteractionMetrics
+  verdict: BenchmarkVerdict
 }
 
 const BENCHMARK_VIEWPORT = {
@@ -94,6 +134,60 @@ const GRID_X_GAP = 340
 const GRID_Y_GAP = 320
 const NODE_DRAG_TARGET_ID = 20
 const MOCK_UPDATED_AT = 1_764_000_000_000
+const INTERACTION_COUNTER_NAMES: InteractionCounterName[] = [
+  'graphCommandCount',
+  'nativeNodeChangeBatches',
+  'nativeNodeChangeCount',
+  'nativeEdgeChangeBatches',
+  'nativeEdgeChangeCount',
+  'nodeArrayReplacements',
+  'edgeArrayReplacements',
+  'historyCaptureCount',
+  'historyPushCount',
+  'autosaveScheduleCount',
+  'autosaveSaveCount',
+]
+const BENCHMARK_BUDGETS: Record<BenchmarkPath, InteractionBudget> = {
+  'node-drag': {
+    maxP95FrameMs: 75,
+    maxDroppedFrames: 120,
+    maxMutationCount: 180,
+    maxNodeArrayReplacements: 90,
+    maxEdgeArrayReplacements: 2,
+    maxHistoryCaptureCount: 2,
+    maxHistoryPushCount: 1,
+    maxAutosaveScheduleCount: 1,
+    maxAutosaveSaveCount: 1,
+    maxNativeNodeChangeBatches: 90,
+    maxNativeEdgeChangeBatches: 2,
+  },
+  'viewport-pan': {
+    maxP95FrameMs: 75,
+    maxDroppedFrames: 120,
+    maxMutationCount: 120,
+    maxNodeArrayReplacements: 2,
+    maxEdgeArrayReplacements: 0,
+    maxHistoryCaptureCount: 0,
+    maxHistoryPushCount: 0,
+    maxAutosaveScheduleCount: 1,
+    maxAutosaveSaveCount: 0,
+    maxNativeNodeChangeBatches: 2,
+    maxNativeEdgeChangeBatches: 0,
+  },
+  'viewport-zoom': {
+    maxP95FrameMs: 90,
+    maxDroppedFrames: 140,
+    maxMutationCount: 120,
+    maxNodeArrayReplacements: 0,
+    maxEdgeArrayReplacements: 0,
+    maxHistoryCaptureCount: 0,
+    maxHistoryPushCount: 0,
+    maxAutosaveScheduleCount: 1,
+    maxAutosaveSaveCount: 0,
+    maxNativeNodeChangeBatches: 0,
+    maxNativeEdgeChangeBatches: 0,
+  },
+}
 
 const smoke = createMockSmokeRuntime({
   hostEnvName: 'CANVAS_INTERACTION_BENCHMARK_HOST',
@@ -184,6 +278,30 @@ function setupBrowser(playwrightCli: CommandSpec) {
     },
   })
   smoke.routeJson(playwrightCli, `**/api/user/boards/${MOCK_BOARD_ID}/uploads`, BOARD_UPLOAD)
+}
+
+function createEmptyCounterSnapshot(): InteractionCounterSnapshot {
+  const counters = Object.fromEntries(INTERACTION_COUNTER_NAMES.map((name) => [name, 0])) as Record<
+    InteractionCounterName,
+    number
+  >
+  return {
+    ...counters,
+    graphCommands: {},
+  }
+}
+
+function normalizeCounterSnapshot(
+  counters: Partial<InteractionCounterSnapshot> | null | undefined,
+): InteractionCounterSnapshot {
+  const normalized = createEmptyCounterSnapshot()
+  if (!counters || typeof counters !== 'object') return normalized
+  for (const name of INTERACTION_COUNTER_NAMES) {
+    const value = Number(counters[name])
+    normalized[name] = Number.isFinite(value) ? value : 0
+  }
+  normalized.graphCommands = { ...(counters.graphCommands ?? {}) }
+  return normalized
 }
 
 function runPageCode(playwrightCli: CommandSpec, code: string, timeoutMs = 60_000): string {
@@ -470,12 +588,31 @@ await page.evaluate(() => {
       },
     }
   }
+  const counterNames = ${JSON.stringify(INTERACTION_COUNTER_NAMES)}
+  const createCounters = () => {
+    const counters = { graphCommands: {} }
+    counterNames.forEach((name) => {
+      counters[name] = 0
+    })
+    return counters
+  }
+  const cloneCounters = (value) => {
+    const counters = createCounters()
+    if (!value || typeof value !== 'object') return counters
+    counterNames.forEach((name) => {
+      const count = Number(value[name])
+      counters[name] = Number.isFinite(count) ? count : 0
+    })
+    counters.graphCommands = { ...(value.graphCommands || {}) }
+    return counters
+  }
 
   window.__canvasInteractionBenchmark = {
     active: null,
     traces: {},
     begin(path, targetSelector) {
       if (this.active) this.end()
+      window.__canvasInteractionBenchmarkCounters = createCounters()
       const target = document.querySelector(targetSelector)
       if (!target) throw new Error('Missing benchmark target: ' + targetSelector)
       const eventTarget = document
@@ -524,6 +661,7 @@ await page.evaluate(() => {
         samples,
         mutations,
         eventsByType,
+        counters: cloneCounters(window.__canvasInteractionBenchmarkCounters),
         eventTypes,
         onEvent,
         observer,
@@ -552,6 +690,7 @@ await page.evaluate(() => {
         mutationCount: active.mutations.length,
         eventCount: Object.values(active.eventsByType).reduce((total, count) => total + count, 0),
         eventsByType: active.eventsByType,
+        counters: cloneCounters(window.__canvasInteractionBenchmarkCounters),
         samples: active.samples,
         before: active.before,
         after: readSnapshot(active.target),
@@ -678,6 +817,7 @@ function summarizeTrace(trace: RawInteractionTrace): InteractionMetrics {
   const sortedFrameDeltas = [...trace.frameDeltas].sort((left, right) => left - right)
   const sampleCount = trace.frameDeltas.length
   const totalFrameMs = trace.frameDeltas.reduce((total, deltaMs) => total + deltaMs, 0)
+  const counters = normalizeCounterSnapshot(trace.counters)
   const metrics: InteractionMetrics = {
     path: trace.path,
     p95FrameMs: roundMs(percentile(sortedFrameDeltas, 0.95)),
@@ -688,6 +828,7 @@ function summarizeTrace(trace: RawInteractionTrace): InteractionMetrics {
     sampleCount,
     mutationCount: trace.mutationCount,
     eventCount: trace.eventCount,
+    counters,
   }
 
   if (trace.path === 'node-drag') {
@@ -779,13 +920,53 @@ function pickWorstPath(paths: readonly InteractionMetrics[]): InteractionMetrics
   }, firstPath)
 }
 
+function collectBudgetFailures(metrics: InteractionMetrics): string[] {
+  const budget = BENCHMARK_BUDGETS[metrics.path]
+  const counters = metrics.counters
+  const checks: Array<[string, number, number]> = [
+    ['p95FrameMs', metrics.p95FrameMs, budget.maxP95FrameMs],
+    ['droppedFrames', metrics.droppedFrames, budget.maxDroppedFrames],
+    ['mutationCount', metrics.mutationCount, budget.maxMutationCount],
+    ['nodeArrayReplacements', counters.nodeArrayReplacements, budget.maxNodeArrayReplacements],
+    ['edgeArrayReplacements', counters.edgeArrayReplacements, budget.maxEdgeArrayReplacements],
+    ['historyCaptureCount', counters.historyCaptureCount, budget.maxHistoryCaptureCount],
+    ['historyPushCount', counters.historyPushCount, budget.maxHistoryPushCount],
+    ['autosaveScheduleCount', counters.autosaveScheduleCount, budget.maxAutosaveScheduleCount],
+    ['autosaveSaveCount', counters.autosaveSaveCount, budget.maxAutosaveSaveCount],
+    [
+      'nativeNodeChangeBatches',
+      counters.nativeNodeChangeBatches,
+      budget.maxNativeNodeChangeBatches,
+    ],
+    [
+      'nativeEdgeChangeBatches',
+      counters.nativeEdgeChangeBatches,
+      budget.maxNativeEdgeChangeBatches,
+    ],
+  ]
+
+  return checks
+    .filter(([, actual, maximum]) => actual > maximum)
+    .map(
+      ([name, actual, maximum]) => `${metrics.path} ${name} ${actual} exceeded budget ${maximum}`,
+    )
+}
+
+function createBenchmarkVerdict(paths: readonly InteractionMetrics[]): BenchmarkVerdict {
+  const failures = paths.flatMap(collectBudgetFailures)
+  return {
+    status: failures.length > 0 ? 'fail' : 'pass',
+    failures,
+  }
+}
+
 function createReport(paths: InteractionMetrics[]): BenchmarkReport {
   const fixtureNodeCount =
     MOCK_BOARD_STATE.imageNodes.length +
     MOCK_BOARD_STATE.promptNodes.length +
     MOCK_BOARD_STATE.fusionNodes.length
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     command: 'cd apps/web && npm run benchmark:canvas-interactions',
     browser: {
@@ -805,8 +986,10 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
       frameBudgetMs: roundMs(FRAME_BUDGET_MS),
       ranking: 'Higher p95FrameMs, droppedFrames, then maxFrameMs is worse.',
     },
+    budgets: BENCHMARK_BUDGETS,
     paths,
     worstPath: pickWorstPath(paths),
+    verdict: createBenchmarkVerdict(paths),
   }
 }
 
@@ -824,6 +1007,9 @@ async function main() {
     ]
     const report = createReport(traces.map(summarizeTrace))
     console.log(JSON.stringify(report, null, 2))
+    if (report.verdict.status === 'fail') {
+      process.exitCode = 1
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : error)
     if (smoke.devServerLogs.length > 0) {

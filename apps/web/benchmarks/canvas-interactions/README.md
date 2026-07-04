@@ -13,13 +13,23 @@ npm run benchmark:canvas-interactions
 
 ## 输出
 
-脚本向 stdout 输出 JSON report，覆盖：
+脚本向 stdout 输出 JSON report，并根据内置 budgets 给出 `verdict.status`：
 
 - `node-drag`
 - `viewport-pan`
 - `viewport-zoom`
 
 每个 path 包含 `p95FrameMs`、`droppedFrames`、`durationMs`、`avgFrameMs`、`maxFrameMs`、`sampleCount`、`mutationCount`、`eventCount`，并在适用时包含 `positionChanges` 或 `viewportChanges`。
+
+每个 path 还包含 `counters`，用于区分 scripting hot path 与 rendering-only cost：
+
+- `nodeArrayReplacements` / `edgeArrayReplacements`
+- `nativeNodeChangeBatches` / `nativeEdgeChangeBatches`
+- `graphCommandCount` 和 `graphCommands`
+- `historyCaptureCount` / `historyPushCount`
+- `autosaveScheduleCount` / `autosaveSaveCount`
+
+如果未观察到 node drag movement 或 viewport movement，脚本会直接失败。若任一 path 超出 `budgets` 中配置的 `p95FrameMs`、DOM `mutationCount`、array replacement、history/autosave 或 native batch 阈值，`verdict.status` 为 `fail`，命令以 exit code `1` 结束。
 
 保存一次 run：
 

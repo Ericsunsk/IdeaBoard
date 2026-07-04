@@ -1,5 +1,6 @@
 import { useDebounceFn, useDocumentVisibility, useOnline } from '@vueuse/core'
 import { ref, watch, type Ref } from 'vue'
+import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
 
 type UseFlowAutosaveOptions = {
   isDirty: Ref<boolean>
@@ -31,6 +32,7 @@ export function useFlowAutosave(options: UseFlowAutosaveOptions) {
         return
       }
       const saveVersion = dirtyVersion.value
+      recordCanvasInteractionCount('autosaveSaveCount')
       const saved = await options.save({ silent: nextSilent })
       if (!saved) return
       if (dirtyVersion.value > saveVersion) {
@@ -61,6 +63,7 @@ export function useFlowAutosave(options: UseFlowAutosaveOptions) {
 
   function markDirtyAndSchedule() {
     dirtyVersion.value += 1
+    recordCanvasInteractionCount('autosaveScheduleCount')
     triggerAutosave()
   }
 

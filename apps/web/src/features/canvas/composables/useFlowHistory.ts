@@ -1,4 +1,5 @@
 import { shallowRef } from 'vue'
+import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
 import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 
 type FlowHistoryItemIndex = {
@@ -162,6 +163,7 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   const dragBeforeSnapshot = shallowRef<FlowHistorySnapshot | null>(null)
 
   function capture(): FlowHistorySnapshot {
+    recordCanvasInteractionCount('historyCaptureCount')
     return measureCanvasPerf(
       'history.capture',
       () => ({
@@ -216,6 +218,7 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   }
 
   function push(before: FlowHistorySnapshot, after = capture()): boolean {
+    recordCanvasInteractionCount('historyPushCount')
     return measureCanvasPerf(
       'history.push',
       () => ({

@@ -1,7 +1,12 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { useCanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import {
+  useCanvasVueFlowGraphAdapter,
+  type CanvasVueFlowGraphActions,
+} from './useCanvasVueFlowGraphAdapter'
+
+type SelectableNode = Node & { selected?: boolean }
 
 describe('useCanvasVueFlowGraphAdapter', () => {
   it('runs a node command through Vue Flow actions and exposes hook results', () => {
@@ -99,10 +104,17 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     expect(setEdges).toHaveBeenCalledWith(edges.value)
   })
 
-  it('applies node changes without mutating the command before graph', () => {
+  it('applies native node changes through Vue Flow actions', () => {
     const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
     const edges = shallowRef<Edge[]>([])
-    const applyNodeChanges = vi.fn()
+    const applyNodeChanges = vi.fn((changes) => {
+      for (const change of changes) {
+        if (change.type !== 'select') continue
+        const node = nodes.value.find((item) => item.id === change.id)
+        if (node) (node as SelectableNode).selected = change.selected
+      }
+      return nodes.value
+    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
     const beforeCommand = vi.fn()
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
@@ -111,21 +123,64 @@ describe('useCanvasVueFlowGraphAdapter', () => {
       beforeCommand,
     })
 
-    const result = adapter.applyNodeChanges([
-      { id: 'node-1', type: 'select', selected: true },
-    ])
+    const result = adapter.applyNodeChanges([{ id: 'node-1', type: 'select', selected: true }])
 
     expect(applyNodeChanges).toHaveBeenCalledOnce()
     expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: true })
-    expect(result.before.nodes[0]).not.toHaveProperty('selected')
     expect(result.after.nodes[0]).toMatchObject({ id: 'node-1', selected: true })
     expect(beforeCommand).toHaveBeenCalledWith(
-      expect.objectContaining({
-        before: expect.objectContaining({
-          nodes: [expect.not.objectContaining({ selected: true })],
-        }),
-      }),
+      expect.objectContaining({ command: 'applyNodeChanges' }),
     )
+  })
+
+  it('uses Vue Flow native node change results without cloning unchanged nodes', () => {
+    const unchangedNode: Node = { id: 'node-2', position: { x: 20, y: 0 }, data: {} }
+    const nodeToSelect: Node = { id: 'node-1', position: { x: 0, y: 0 }, data: {} }
+    const nativeNodes = [nodeToSelect, unchangedNode]
+    const nodes = shallowRef<Node[]>(nativeNodes)
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn((changes) => {
+      expect(changes).toEqual([{ id: 'node-1', type: 'select', selected: true }])
+      ;(nodeToSelect as SelectableNode).selected = true
+      return nativeNodes
+    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    const afterCommand = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+      afterCommand,
+    })
+
+    const result = adapter.applyNodeChanges([{ id: 'node-1', type: 'select', selected: true }])
+
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: true })
+    expect(applyNodeChanges).toHaveBeenCalledOnce()
+    expect(nodes.value).toBe(nativeNodes)
+    expect(nodes.value[1]).toBe(unchangedNode)
+    expect(nodes.value[0]).toMatchObject({ id: 'node-1', selected: true })
+    expect(afterCommand).toHaveBeenCalledOnce()
+  })
+
+  it('skips Vue Flow native node changes that do not target the current graph', () => {
+    const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn()
+    const afterCommand = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+      afterCommand,
+    })
+
+    const result = adapter.applyNodeChanges([
+      { id: 'missing-node', type: 'select', selected: true },
+    ])
+
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
+    expect(applyNodeChanges).not.toHaveBeenCalled()
+    expect(afterCommand).not.toHaveBeenCalled()
   })
 
   it('applies node and edge changes as one graph command', () => {
