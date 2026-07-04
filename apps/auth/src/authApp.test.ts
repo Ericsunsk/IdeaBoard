@@ -353,4 +353,41 @@ describe('createAuthApp', () => {
       assert.equal(authHandlerCalls, 1)
     })
   }
+
+  it('updates auth user role through the internal route adapter', async (t) => {
+    const updates: Array<{ authUserID: string; role: 'admin' | 'user' }> = []
+    const app = createAuthApp(
+      createTestDeps({
+        repository: {
+          updateAuthUserRole: async (authUserID, role) => {
+            updates.push({ authUserID, role })
+            return true
+          },
+        },
+      }),
+    )
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/internal/users/auth-user-1/role',
+      headers: {
+        'x-internal-key': 'test-internal-key',
+      },
+      payload: {
+        role: 'ADMIN',
+      },
+    })
+
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), {
+      code: 0,
+      msg: 'success',
+      data: {
+        auth_user_id: 'auth-user-1',
+        role: 'admin',
+      },
+    })
+    assert.deepEqual(updates, [{ authUserID: 'auth-user-1', role: 'admin' }])
+  })
 })

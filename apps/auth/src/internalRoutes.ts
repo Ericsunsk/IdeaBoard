@@ -8,6 +8,7 @@ import {
   normalizeOptionalText,
   normalizeUsername,
 } from './authUtils.js'
+import { runUpdateAuthUserRoleCommand } from './authInternalCommands.js'
 import { getHeaderValue, sendError, sendSuccess, toHeaders } from './httpResponse.js'
 
 type EnsureUserBody = {
@@ -191,30 +192,18 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     '/internal/users/:id/role',
     { preHandler: requireInternalKey },
     async (request, reply) => {
-      const authUserID = validateAuthUserID(request.params?.id)
-      const role = normalizeAuthRole(request.body?.role)
-      if (authUserID.error) {
-        sendError(reply, 400, authUserID.error)
+      const result = await runUpdateAuthUserRoleCommand(
+        {
+          authUserID: request.params?.id,
+          role: request.body?.role,
+        },
+        options.repository,
+      )
+      if (!result.ok) {
+        sendError(reply, result.status, result.message)
         return
       }
-      if (!role) {
-        sendError(reply, 400, 'role must be admin or user')
-        return
-      }
-
-      try {
-        const updated = await options.repository.updateAuthUserRole(authUserID.value, role)
-        if (!updated) {
-          sendError(reply, 404, 'auth user not found')
-          return
-        }
-        sendSuccess(reply, {
-          auth_user_id: authUserID.value,
-          role,
-        })
-      } catch (error) {
-        sendError(reply, 500, extractErrorMessage(error, 'failed to update auth user role'))
-      }
+      sendSuccess(reply, result.data)
     },
   )
 
