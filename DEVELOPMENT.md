@@ -70,6 +70,7 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 | 场景 | 命令 |
 | ---- | ---- |
 | Web unit/spec | `cd apps/web && npm run test:run` |
+| Web browser-level spec | `cd apps/web && npm run test:browser` |
 | Web build/type | `cd apps/web && npm run build` |
 | Web lint | `cd apps/web && npm run lint` |
 | Web style lint | `cd apps/web && npm run lint:style` |

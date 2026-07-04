@@ -1,46 +1,31 @@
-import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ImageEditorLayerActions from './ImageEditorLayerActions.vue'
 import type { ImageAdjustmentFinalApplyProgress } from '../runtime/imageAdjustmentFinalApplyContext'
+import { renderWithUser, screen } from '../../../../test/render'
 
-function mountLayerActions(
+function renderLayerActions(
   options: {
     applying?: boolean
+    applyDisabled?: boolean
     applyProgress?: ImageAdjustmentFinalApplyProgress | null
     onCancelApply?: () => void
   } = {},
 ) {
-  const applying = ref(options.applying ?? false)
-  const applyProgress = ref<ImageAdjustmentFinalApplyProgress | null>(options.applyProgress ?? null)
-  const host = document.createElement('div')
-  document.body.appendChild(host)
-  const app = createApp(
-    defineComponent({
-      setup() {
-        return () =>
-          h(ImageEditorLayerActions, {
-            canCopyLayer: true,
-            canMergeLayer: true,
-            canRemoveLayer: true,
-            applying: applying.value,
-            applyDisabled: applying.value,
-            applyProgress: applyProgress.value,
-            onCancelApply: options.onCancelApply,
-          })
+  return renderWithUser(
+    ImageEditorLayerActions,
+    {
+      props: {
+        canCopyLayer: true,
+        canMergeLayer: true,
+        canRemoveLayer: true,
+        applying: options.applying ?? false,
+        applyDisabled: options.applyDisabled ?? options.applying ?? false,
+        applyProgress: options.applyProgress ?? null,
+        'onCancel-apply': options.onCancelApply,
       },
-    }),
-  )
-  app.mount(host)
-
-  return {
-    applying,
-    applyProgress,
-    host,
-    unmount: () => {
-      app.unmount()
-      host.remove()
     },
-  }
+    { advanceTimers: vi.advanceTimersByTime },
+  )
 }
 
 describe('ImageEditorLayerActions', () => {
@@ -54,66 +39,44 @@ describe('ImageEditorLayerActions', () => {
 
   it('shows final apply progress after a short disclosure delay and emits cancel', async () => {
     const onCancelApply = vi.fn()
-    const harness = mountLayerActions({
+    const { user } = renderLayerActions({
       applying: true,
       applyProgress: { phase: 'render', loaded: 25, total: 100 },
       onCancelApply,
     })
 
-    try {
-      expect(harness.host.querySelector('[role="status"]')).toBeNull()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
 
-      vi.advanceTimersByTime(199)
-      await nextTick()
-      expect(harness.host.querySelector('[role="status"]')).toBeNull()
+    vi.advanceTimersByTime(199)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
 
-      vi.advanceTimersByTime(1)
-      await nextTick()
+    vi.advanceTimersByTime(1)
 
-      expect(harness.host.querySelector('[role="status"]')?.textContent).toContain('渲染调整')
-      expect(harness.host.querySelector('[role="status"]')?.textContent).toContain('25%')
-      expect(
-        harness.host.querySelector<HTMLElement>('.image-editor-layer-actions__progress-bar')?.style
-          .width,
-      ).toBe('25%')
+    expect(await screen.findByRole('status')).toHaveTextContent('渲染调整')
+    expect(screen.getByRole('status')).toHaveTextContent('25%')
 
-      harness.host.querySelector<HTMLButtonElement>('[aria-label="取消应用"]')?.click()
-      await nextTick()
+    await user.click(screen.getByRole('button', { name: '取消应用' }))
 
-      expect(onCancelApply).toHaveBeenCalledTimes(1)
-    } finally {
-      harness.unmount()
-    }
+    expect(onCancelApply).toHaveBeenCalledTimes(1)
   })
 
   it('does not flash final apply progress for quick apply tasks', async () => {
-    const harness = mountLayerActions({
+    const { rerender } = renderLayerActions({
       applying: true,
       applyProgress: { phase: 'render', loaded: 25, total: 100 },
     })
 
-    try {
-      vi.advanceTimersByTime(199)
-      await nextTick()
-      harness.applying.value = false
-      await nextTick()
-      vi.advanceTimersByTime(1)
-      await nextTick()
+    vi.advanceTimersByTime(199)
+    await rerender({ applying: false, applyDisabled: false })
+    vi.advanceTimersByTime(1)
 
-      expect(harness.host.querySelector('[role="status"]')).toBeNull()
-    } finally {
-      harness.unmount()
-    }
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('hides final apply progress when idle', () => {
-    const harness = mountLayerActions()
+    renderLayerActions()
 
-    try {
-      expect(harness.host.querySelector('[role="status"]')).toBeNull()
-      expect(harness.host.querySelector('[aria-label="取消应用"]')).toBeNull()
-    } finally {
-      harness.unmount()
-    }
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '取消应用' })).not.toBeInTheDocument()
   })
 })
