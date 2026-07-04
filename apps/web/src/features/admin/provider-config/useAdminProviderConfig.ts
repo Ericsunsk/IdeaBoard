@@ -2,61 +2,26 @@ import { computed, ref, watch } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
 import {
-  createAdminAccountRecord,
-  deleteAdminAccountRecord,
-  deleteAdminChannel,
-  detectAdminChannelModels,
-  FALLBACK_ADMIN_ACCOUNT_LIMITS,
-  fetchAdminAccountLimits,
-  fetchAllAdminAccounts,
-  fetchAdminChannels,
-  saveAdminChannel,
-  updateAdminAccountRecord,
-} from './providerConfigApi'
-import {
-  countUniqueAccountModels,
-  createAccountModelRows,
-  createProviderChannelView,
-  createProviderChannelCards,
-} from './providerConfigCards'
-import {
-  ADMIN_CHANNEL_API_TYPE_OPTIONS,
-  createAccountCreatePayload,
-  createAccountUpdatePayload,
-  createAccountUpdatePayloadFromAccount,
   createEmptyChannelForm,
-  getAdminChannelApiTypeLabel,
   inferChannelApiTypeFromUrl,
-  normalizeModelKey,
   uniqueTrimmedModelValues,
 } from './providerConfigPayload'
+import { createModelSuggestions } from './providerModelOptions'
 import {
-  createModelSuggestions,
-  MAX_DETECTED_MODELS,
-  mergeDetectedModelValues,
-  normalizeDetectedModelValues,
-} from './providerModelOptions'
+  createAdminProviderConfigWorkspace,
+  type AdminProviderConfirmPort,
+  type AdminProviderConfigWorkspace,
+} from './providerConfigWorkspace'
 import type {
   AdminProviderAccountLimits,
   ProviderAccountCommandTarget,
   ProviderAccountForm,
   ProviderAccountFormField,
-  ProviderAccountRecord,
-  ProviderAccountView,
   ProviderChannelCommandTarget,
   ProviderChannelFormData,
   ProviderChannelFormField,
   ProviderChannelRecord,
 } from './providerConfigTypes'
-
-type AdminProviderConfirmPort = {
-  danger: (options: {
-    title: string
-    content: string
-    acceptLabel: string
-    onConfirm: () => void | Promise<void>
-  }) => void
-}
 
 export type UseAdminProviderConfigOptions = {
   feedback: AdminProviderConfigFeedback
@@ -65,212 +30,45 @@ export type UseAdminProviderConfigOptions = {
 
 export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
   const { runAsyncAction } = useAsyncAction()
-  const loading = ref(false)
-  const channels = ref<ProviderChannelRecord[]>([])
-  const accounts = ref<ProviderAccountRecord[]>([])
-  const searchKeyword = ref('')
+  const workspace = createAdminProviderConfigWorkspace({
+    feedback: options.feedback,
+    confirm: options.confirm,
+    runAsyncAction,
+  })
 
   const channelEditor = createChannelEditor({
-    channels,
+    workspace,
     feedback: options.feedback,
-    reload: loadData,
-    runAsyncAction,
   })
   const accountEditor = createAccountEditor({
-    accounts,
-    channels,
+    workspace,
     feedback: options.feedback,
-    reload: loadData,
-    runAsyncAction,
   })
-
-  const filteredChannels = computed(() => {
-    const keyword = searchKeyword.value.trim().toLowerCase()
-    if (!keyword) return channels.value
-    return channels.value.filter((item) => item.name.toLowerCase().includes(keyword))
-  })
-
-  const cardItems = computed(() =>
-    createProviderChannelCards(filteredChannels.value, accounts.value),
-  )
-  const hasChannelSearch = computed(() => Boolean(searchKeyword.value.trim()))
-  const totalChannelsLabel = computed(() =>
-    hasChannelSearch.value
-      ? `${filteredChannels.value.length} 匹配渠道`
-      : `${channels.value.length} 渠道`,
-  )
-  const emptyChannelMessage = computed(() =>
-    hasChannelSearch.value ? '无匹配渠道商' : '暂无渠道商',
-  )
-  const totalAccountCount = computed(() => accounts.value.length)
-  const runningAccountCount = computed(
-    () => accounts.value.filter((account) => account.status === 1 && account.failCount < 5).length,
-  )
-  const accountRunningLabel = computed(() =>
-    totalAccountCount.value > 0
-      ? `${runningAccountCount.value}/${totalAccountCount.value} 运行中`
-      : '0 APIKey',
-  )
-  const activeModelCount = computed(() => countUniqueAccountModels(accounts.value))
-  const cards = {
-    items: cardItems,
-    searchKeyword,
-    isEmpty: computed(() => filteredChannels.value.length === 0),
-    isLoading: computed(() => loading.value && channels.value.length === 0),
-    hasSearch: hasChannelSearch,
-    totalChannelsLabel,
-    emptyMessage: emptyChannelMessage,
-    accountRunningLabel,
-    activeModelCount,
-  }
-
-  async function loadAccountLimits() {
-    try {
-      accountEditor.accountLimits.value = await fetchAdminAccountLimits()
-    } catch (error) {
-      accountEditor.accountLimits.value = FALLBACK_ADMIN_ACCOUNT_LIMITS
-      options.feedback.accountLimitsFallback(error)
-      console.warn('[provider-config] failed to load account limits, using fallback', error)
-    }
-  }
-
-  async function loadAccounts() {
-    const [nextAccounts] = await Promise.all([fetchAllAdminAccounts(), loadAccountLimits()])
-    accounts.value = nextAccounts
-  }
-
-  async function loadData() {
-    await runAsyncAction(
-      async () => {
-        channels.value = await fetchAdminChannels()
-        await loadAccounts()
-      },
-      {
-        loading,
-        feedback: {
-          error: options.feedback.loadFailed,
-        },
-      },
-    )
-  }
-
-  function deleteChannel(target: ProviderChannelCommandTarget) {
-    const channel = findChannelByTarget(channels.value, target)
-    if (!channel) {
-      options.feedback.staleChannel()
-      return
-    }
-
-    options.confirm.danger({
-      title: '确认删除',
-      content: `确定删除渠道商「${channel.name}」吗？此操作不可恢复。`,
-      acceptLabel: '确定',
-      onConfirm: async () => {
-        try {
-          await deleteAdminChannel(channel.id)
-          options.feedback.channelDeleted()
-          await loadData()
-        } catch (error) {
-          options.feedback.channelDeleteFailed(error)
-        }
-      },
-    })
-  }
-
-  function deleteAccount(target: ProviderAccountCommandTarget) {
-    const account = findAccountByTarget(accounts.value, target)
-    if (!account) {
-      options.feedback.staleAccount()
-      return
-    }
-
-    options.confirm.danger({
-      title: '确认删除 APIKey',
-      content: '确定删除该 APIKey 吗？关联的执行中任务会由后端统一结束。',
-      acceptLabel: '确定',
-      onConfirm: async () => {
-        try {
-          await deleteAdminAccountRecord(account.id)
-          options.feedback.accountDeleted()
-          await loadData()
-        } catch (error) {
-          options.feedback.accountDeleteFailed(error)
-        }
-      },
-    })
-  }
-
-  async function toggleAccountModelStatus(
-    commandTarget: ProviderAccountCommandTarget,
-    model: string,
-  ) {
-    const account = findAccountByTarget(accounts.value, commandTarget)
-    if (!account) {
-      options.feedback.staleAccount()
-      return
-    }
-
-    const modelKey = normalizeModelKey(model)
-    const targetModel = account.models.find((item) => normalizeModelKey(item.name) === modelKey)
-    if (!targetModel) {
-      options.feedback.staleModel()
-      return
-    }
-    const nextEnabled = !targetModel.enabled
-    const nextModels = account.models.map((item) =>
-      normalizeModelKey(item.name) === modelKey ? { ...item, enabled: nextEnabled } : item,
-    )
-
-    await runAsyncAction(
-      async () => {
-        const updatedAt = new Date().toISOString()
-        const nextAccount: ProviderAccountRecord = {
-          ...account,
-          models: nextModels,
-          updatedAt,
-        }
-
-        await updateAdminAccountRecord(
-          account.id,
-          createAccountUpdatePayloadFromAccount(nextAccount),
-        )
-        accounts.value = accounts.value.map((item) => (item.id === account.id ? nextAccount : item))
-        options.feedback.modelStatusChanged(nextEnabled)
-      },
-      {
-        feedback: {
-          error: options.feedback.modelStatusChangeFailed,
-        },
-      },
-    )
-  }
 
   return {
-    cards,
+    cards: workspace.cards,
     channelEditor,
     accountEditor,
     commands: {
-      loadData,
-      deleteChannel,
-      deleteAccount,
-      toggleAccountModelStatus,
-      getApiTypeLabel: getAdminChannelApiTypeLabel,
-      getAccountModelRows: createAccountModelRows,
-      getAccountStatusDotClass,
-      getAccountProgressPt,
+      loadData: workspace.loadData,
+      deleteChannel: workspace.deleteChannel,
+      deleteAccount: workspace.deleteAccount,
+      toggleAccountModelStatus: workspace.toggleAccountModelStatus,
+      getApiTypeLabel: workspace.getApiTypeLabel,
+      getAccountModelRows: workspace.getAccountModelRows,
+      getAccountStatusDotClass: workspace.getAccountStatusDotClass,
+      getAccountProgressPt: workspace.getAccountProgressPt,
     },
   }
 }
 
 function createChannelEditor(options: {
-  channels: Readonly<{ value: ProviderChannelRecord[] }>
+  workspace: AdminProviderConfigWorkspace
   feedback: AdminProviderConfigFeedback
-  reload: () => Promise<void> | void
-  runAsyncAction: ReturnType<typeof useAsyncAction>['runAsyncAction']
 }) {
   const visible = ref(false)
   const isEditing = ref(false)
-  const saveLoading = ref(false)
+  const saveLoading = options.workspace.channelSaveLoading
   const currentChannelId = ref(0)
   const form = ref<ProviderChannelFormData>(createEmptyChannelForm())
   const errors = ref<Record<ProviderChannelFormField, string>>(createEmptyChannelFormErrors())
@@ -284,11 +82,8 @@ function createChannelEditor(options: {
   }
 
   function openEdit(target: ProviderChannelCommandTarget) {
-    const row = findChannelByTarget(options.channels.value, target)
-    if (!row) {
-      options.feedback.staleChannel()
-      return
-    }
+    const row = options.workspace.resolveChannelTarget(target)
+    if (!row) return
 
     isEditing.value = true
     currentChannelId.value = row.id
@@ -317,24 +112,15 @@ function createChannelEditor(options: {
       return
     }
 
-    await options.runAsyncAction(
-      async () => {
-        await saveAdminChannel({
-          id: isEditing.value ? currentChannelId.value : undefined,
-          data: { ...form.value },
-        })
-        options.feedback.channelSaved(isEditing.value)
+    await options.workspace.saveChannel({
+      id: isEditing.value ? currentChannelId.value : undefined,
+      data: { ...form.value },
+      isEditing: isEditing.value,
+      afterSaved: () => {
         visible.value = false
         resetErrors()
-        await options.reload()
       },
-      {
-        loading: saveLoading,
-        feedback: {
-          error: options.feedback.channelSaveFailed,
-        },
-      },
-    )
+    })
   }
 
   function validate() {
@@ -367,7 +153,7 @@ function createChannelEditor(options: {
     saveLoading,
     form,
     errors,
-    apiTypeOptions: ADMIN_CHANNEL_API_TYPE_OPTIONS,
+    apiTypeOptions: options.workspace.apiTypeOptions,
     openCreate,
     openEdit,
     close,
@@ -378,35 +164,29 @@ function createChannelEditor(options: {
 }
 
 function createAccountEditor(options: {
-  accounts: Readonly<{ value: ProviderAccountRecord[] }>
-  channels: Readonly<{ value: ProviderChannelRecord[] }>
+  workspace: AdminProviderConfigWorkspace
   feedback: AdminProviderConfigFeedback
-  reload: () => Promise<void> | void
-  runAsyncAction: ReturnType<typeof useAsyncAction>['runAsyncAction']
 }) {
   const visible = ref(false)
   const isEditing = ref(false)
-  const saveLoading = ref(false)
+  const saveLoading = options.workspace.accountSaveLoading
   const currentAccountId = ref(0)
   const selectedChannel = ref<ProviderChannelRecord | null>(null)
   const selectedChannelView = computed(() =>
-    selectedChannel.value ? createProviderChannelView(selectedChannel.value) : null,
+    selectedChannel.value ? options.workspace.getChannelView(selectedChannel.value) : null,
   )
-  const accountLimits = ref<AdminProviderAccountLimits>(FALLBACK_ADMIN_ACCOUNT_LIMITS)
+  const accountLimits = options.workspace.accountLimits
   const form = ref(createEmptyAccountForm(accountLimits.value, 0))
   const errors = ref<Record<ProviderAccountFormField, string>>(createEmptyAccountFormErrors())
-  const detectModelsLoading = ref(false)
+  const detectModelsLoading = options.workspace.detectModelsLoading
   const detectedModelValues = ref<string[]>([])
   const modelSuggestions = ref<string[]>([])
   const detectedModelSessionCache = ref(new Set<string>())
   const hasShownApiKeyHint = ref(false)
 
   function openCreate(target: ProviderChannelCommandTarget) {
-    const channel = findChannelByTarget(options.channels.value, target)
-    if (!channel) {
-      options.feedback.staleChannel()
-      return
-    }
+    const channel = options.workspace.resolveChannelTarget(target)
+    if (!channel) return
 
     isEditing.value = false
     currentAccountId.value = 0
@@ -421,16 +201,12 @@ function createAccountEditor(options: {
   }
 
   function openEdit(target: ProviderAccountCommandTarget) {
-    const account = findAccountByTarget(options.accounts.value, target)
-    if (!account) {
-      options.feedback.staleAccount()
-      return
-    }
+    const account = options.workspace.resolveAccountTarget(target)
+    if (!account) return
 
     isEditing.value = true
     currentAccountId.value = account.id
-    selectedChannel.value =
-      options.channels.value.find((channel) => channel.id === account.channelId) || null
+    selectedChannel.value = options.workspace.findChannelById(account.channelId)
     form.value = {
       channelId: account.channelId,
       modelValues: account.models.map((model) => model.name),
@@ -495,48 +271,18 @@ function createAccountEditor(options: {
     const modelValues = uniqueTrimmedModelValues(form.value.modelValues)
     form.value.modelValues = modelValues
 
-    await options.runAsyncAction(
-      async () => {
-        const existingAccount = isEditing.value
-          ? options.accounts.value.find((account) => account.id === currentAccountId.value)
-          : undefined
-        const secret = form.value.secret.trim()
-
-        if (isEditing.value) {
-          await updateAdminAccountRecord(
-            currentAccountId.value,
-            createAccountUpdatePayload({
-              form: form.value,
-              channel: selectedChannel.value,
-              existingAccount,
-              modelValues,
-              secret,
-            }),
-          )
-          options.feedback.accountSaved(true)
-        } else {
-          await createAdminAccountRecord(
-            createAccountCreatePayload({
-              form: form.value,
-              channel: selectedChannel.value,
-              modelValues,
-              secret,
-            }),
-          )
-          options.feedback.accountSaved(false)
-        }
-
+    await options.workspace.saveAccount({
+      isEditing: isEditing.value,
+      accountId: currentAccountId.value,
+      form: form.value,
+      selectedChannel: selectedChannel.value,
+      modelValues,
+      secret: form.value.secret.trim(),
+      afterSaved: () => {
         visible.value = false
         resetErrors()
-        await options.reload()
       },
-      {
-        loading: saveLoading,
-        feedback: {
-          error: options.feedback.accountSaveFailed,
-        },
-      },
-    )
+    })
   }
 
   function searchModelSuggestions(event: { query?: string }) {
@@ -548,54 +294,22 @@ function createAccountEditor(options: {
   }
 
   async function detectModelsOnSelectOpen() {
-    const channel = selectedChannel.value
-    const secret = form.value.secret.trim()
-    const baseURL = (channel?.baseUrl || '').trim()
+    const result = await options.workspace.detectModels({
+      channel: selectedChannel.value,
+      secret: form.value.secret,
+      detectedValues: detectedModelValues.value,
+      sessionCache: detectedModelSessionCache.value,
+      hasShownApiKeyHint: hasShownApiKeyHint.value,
+    })
 
-    if (!baseURL) return
-    if (!secret) {
-      if (!hasShownApiKeyHint.value) {
-        hasShownApiKeyHint.value = true
-        options.feedback.missingApiKeyForModelDetection()
-      }
-      return
-    }
-    if (detectModelsLoading.value) return
-
-    const apiType = channel?.apiType || DEFAULT_PROVIDER_API_TYPE
-    const sessionKey = `${apiType}::${baseURL}::${secret}`
-    if (detectedModelSessionCache.value.has(sessionKey)) return
-    detectedModelSessionCache.value.add(sessionKey)
-
-    await options.runAsyncAction(
-      async () => {
-        const detectedModels = await detectAdminChannelModels({
-          baseUrl: baseURL,
-          apiKey: secret,
-          apiType,
-        })
-        const models = normalizeDetectedModelValues(detectedModels, MAX_DETECTED_MODELS)
-
-        if (models.length > 0) {
-          detectedModelValues.value = mergeDetectedModelValues(
-            detectedModelValues.value,
-            models,
-            MAX_DETECTED_MODELS,
-          )
-        }
-      },
-      {
-        loading: detectModelsLoading,
-        feedback: {
-          error: options.feedback.modelDetectionFailed,
-        },
-      },
-    )
+    detectedModelValues.value = result.detectedValues
+    detectedModelSessionCache.value = result.sessionCache
+    hasShownApiKeyHint.value = result.hasShownApiKeyHint
   }
 
   function handleModelSelectShow(show: boolean) {
-    if (!show) return
-    void detectModelsOnSelectOpen()
+    if (!show) return Promise.resolve()
+    return detectModelsOnSelectOpen()
   }
 
   watch(visible, (nextVisible) => {
@@ -618,13 +332,10 @@ function createAccountEditor(options: {
     save,
     clearError,
     searchModelSuggestions,
+    detectModelsOnSelectOpen,
     handleModelSelectShow,
   }
 }
-
-const activeProgressPt = { value: { class: '!bg-admin-success' } } as const
-const mutedProgressPt = { value: { class: '!bg-admin-text-3' } } as const
-const DEFAULT_PROVIDER_API_TYPE = ADMIN_CHANNEL_API_TYPE_OPTIONS[0].value
 
 function createEmptyChannelFormErrors(): Record<ProviderChannelFormField, string> {
   return {
@@ -678,30 +389,6 @@ function resolveNumberRangeError(value: number, min: number, max: number, label:
   if (!Number.isFinite(value)) return `请输入${label}`
   if (value < min || value > max) return `${label}需在 ${min}-${max} 之间`
   return ''
-}
-
-function getAccountStatusDotClass(account: ProviderAccountView) {
-  if (!account.isEnabled) return 'bg-admin-warning'
-  if (account.isDegraded) return 'bg-admin-danger'
-  return 'bg-admin-success'
-}
-
-function getAccountProgressPt(account: ProviderAccountView) {
-  return account.isEnabled ? activeProgressPt : mutedProgressPt
-}
-
-function findChannelByTarget(
-  channels: ProviderChannelRecord[],
-  target: ProviderChannelCommandTarget,
-) {
-  return channels.find((channel) => channel.id === target.id)
-}
-
-function findAccountByTarget(
-  accounts: ProviderAccountRecord[],
-  target: ProviderAccountCommandTarget,
-) {
-  return accounts.find((account) => account.id === target.id)
 }
 
 export type AdminProviderConfigContext = ReturnType<typeof useAdminProviderConfig>
