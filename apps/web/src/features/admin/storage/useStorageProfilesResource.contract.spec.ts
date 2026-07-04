@@ -204,10 +204,10 @@ function mountStorageProfilesResource() {
   app.use(VueQueryPlugin, { queryClient })
   app.mount(host)
 
-  if (!resource) throw new Error('expected storage profiles resource to mount')
+  const mountedResource = requireMountedStorageResource(resource)
 
   return {
-    resource,
+    resource: mountedResource,
     queryClient,
     async unmount() {
       app.unmount()
@@ -216,6 +216,13 @@ function mountStorageProfilesResource() {
       host.remove()
     },
   }
+}
+
+function requireMountedStorageResource(
+  resource: StorageProfilesResource | null,
+): StorageProfilesResource {
+  if (!resource) throw new Error('expected storage profiles resource to mount')
+  return resource
 }
 
 async function waitForStorageQueries(resource: StorageProfilesResource) {
