@@ -31,7 +31,7 @@ import {
 } from '../planning/ImageExecutionPlan'
 import type { ResolvedTaskImageResult } from '../result-nodes/flowImageDirectActionTaskResult'
 import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpaintTaskResult'
-import { usePendingImageResultNodes } from '../result-nodes/usePendingImageResultNodes'
+import { usePendingImageResultNodeLifecycle } from '../result-nodes/usePendingImageResultNodes'
 import {
   assertTaskRequestReady,
   submitTaskRequest,
@@ -328,10 +328,10 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
 }
 
 export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecutionOptions) {
-  const pendingImageResultNodes = usePendingImageResultNodes(options)
+  const pendingImageResultLifecycle = usePendingImageResultNodeLifecycle(options)
   const runner = useFlowImageDirectActionRunner({
     nodes: options.nodes,
-    pendingImageResultNodes,
+    pendingImageResultLifecycle,
     flushAutosave: options.flushAutosave,
     getCurrentBoardId: options.getCurrentBoardId,
     onSuccess: options.onSuccess,

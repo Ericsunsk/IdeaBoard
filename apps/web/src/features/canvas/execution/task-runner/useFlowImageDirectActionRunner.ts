@@ -9,34 +9,18 @@ import {
   type ResolvedTaskImageResult,
 } from '../result-nodes/flowImageDirectActionTaskResult'
 import type { ImageExecutionInput, ImageExecutionResultOptions } from '../planning/ImageExecutionPlan'
+import type { PendingImageResultLifecycle } from '../result-nodes/usePendingImageResultNodes'
 import {
   collectPendingImageTasks,
   isPendingImageTaskSnapshot,
   readPendingImageSnapshot,
 } from '../result-nodes/flowPendingImageTaskSnapshot'
 
-export type PendingImageResultNodes = {
-  appendPendingImageResultNode: (
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    options?: PendingImageResultOptions,
-  ) => string
-  appendPendingImageResultNodes: (
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    outputCount: number,
-    options?: PendingImageResultOptions,
-  ) => string[]
-  markPendingImageResultTask: (nodeId: string, taskId: string) => void
-  updatePendingImageResultNode: (nodeId: string, result: ResolvedTaskImageResult) => void
-  removePendingImageResultNode: (nodeId: string) => void
-}
-
 type PendingImageResultOptions = ImageExecutionResultOptions
 
 type UseFlowImageDirectActionRunnerOptions = {
   nodes: Ref<Node[]>
-  pendingImageResultNodes: PendingImageResultNodes
+  pendingImageResultLifecycle: PendingImageResultLifecycle
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
@@ -91,12 +75,12 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
   const runningNodeIds = ref<Set<string>>(new Set())
   const activeReattachKeys = new Set<string>()
   const {
-    appendPendingImageResultNode,
-    appendPendingImageResultNodes,
-    markPendingImageResultTask,
-    updatePendingImageResultNode,
-    removePendingImageResultNode,
-  } = options.pendingImageResultNodes
+    reservePendingResult,
+    reservePendingResults,
+    attachPendingTaskId,
+    materializeResolvedImage,
+    cancelPendingResult,
+  } = options.pendingImageResultLifecycle
 
   function setNodeRunning(nodeId: string, running: boolean) {
     const next = new Set(runningNodeIds.value)
@@ -114,7 +98,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
 
   function removePendingImageResultNodesIfCurrent(boardId: string, resultNodeIds: string[]) {
     if (!isBoardStillCurrent(boardId)) return
-    for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
+    for (const resultNodeId of resultNodeIds) cancelPendingResult({ resultNodeId })
   }
 
   function warnIfBoardCurrent(boardId: string, message: string) {
@@ -132,7 +116,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
 
   async function persistPendingImageTaskId(boardId: string, nodeId: string, taskId: string) {
     if (!isBoardStillCurrent(boardId)) return
-    markPendingImageResultTask(nodeId, taskId)
+    attachPendingTaskId({ resultNodeId: nodeId, taskId })
     await flushPendingTaskSnapshot()
   }
 
@@ -164,7 +148,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
           }
           const resolved = await params.resolveResult(taskId, resultNodeId)
           if (isBoardStillCurrent(params.boardId)) {
-            updatePendingImageResultNode(resultNodeId, resolved)
+            materializeResolvedImage({ resultNodeId, result: resolved })
           }
           successCount += 1
         } catch (error) {
@@ -172,13 +156,13 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
           if (isTaskResultPendingError(error)) {
             pendingCount += 1
             if (!persistPendingTaskIds && isBoardStillCurrent(params.boardId)) {
-              removePendingImageResultNode(resultNodeId)
+              cancelPendingResult({ resultNodeId })
             }
             return
           }
           failureCount += 1
           if (isBoardStillCurrent(params.boardId)) {
-            removePendingImageResultNode(resultNodeId)
+            cancelPendingResult({ resultNodeId })
           }
         }
       }),
@@ -214,12 +198,12 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
       await params.preflight?.()
       const prepared = await params.prepare?.()
       await params.assertReady?.()
-      resultNodeIds = appendPendingImageResultNodes(
-        prepared?.source ?? params.source,
-        prepared?.sourceNodeId ?? params.sourceNodeId,
-        params.outputCount,
-        prepared?.resultOptions ?? params.resultOptions,
-      )
+      resultNodeIds = reservePendingResults({
+        source: prepared?.source ?? params.source,
+        sourceNodeId: prepared?.sourceNodeId ?? params.sourceNodeId,
+        outputCount: params.outputCount,
+        resultOptions: prepared?.resultOptions ?? params.resultOptions,
+      }).map((reservation) => reservation.resultNodeId)
       resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
       await runPendingImageBatchGeneration({
         resultNodeIds,
@@ -246,17 +230,17 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
     let resultNodeId: string | null = null
     try {
       await params.assertReady?.()
-      resultNodeId = appendPendingImageResultNode(
-        params.source,
-        params.sourceNodeId,
-        params.resultOptions,
-      )
+      resultNodeId = reservePendingResult({
+        source: params.source,
+        sourceNodeId: params.sourceNodeId,
+        resultOptions: params.resultOptions,
+      }).resultNodeId
       setNodeRunning(resultNodeId, true)
       const { taskId } = await params.submitTask()
       await persistPendingImageTaskId(params.boardId, resultNodeId, taskId)
       const resolved = await params.resolveResult(taskId)
       if (!isBoardStillCurrent(params.boardId)) return
-      updatePendingImageResultNode(resultNodeId, resolved)
+      materializeResolvedImage({ resultNodeId, result: resolved })
       options.onSuccess(params.successMessage)
     } catch (error) {
       if (isTaskResultPendingError(error) && resultNodeId) {
@@ -264,7 +248,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
         return
       }
       if (resultNodeId && isBoardStillCurrent(params.boardId)) {
-        removePendingImageResultNode(resultNodeId)
+        cancelPendingResult({ resultNodeId })
       }
       const msg = error instanceof Error ? error.message : params.fallbackErrorMessage
       warnIfBoardCurrent(params.boardId, msg)
@@ -290,7 +274,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
           if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
             return
           }
-          updatePendingImageResultNode(nodeId, resolved)
+          materializeResolvedImage({ resultNodeId: nodeId, result: resolved })
           successCount += 1
         } catch (error) {
           if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {

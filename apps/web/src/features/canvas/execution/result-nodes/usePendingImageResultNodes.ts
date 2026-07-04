@@ -29,6 +29,35 @@ type UsePendingImageResultNodesOptions = {
 
 export type PendingImageResultOptions = ImageExecutionResultOptions
 
+export type PendingImageResultReservation = {
+  resultNodeId: string
+}
+
+export type ReservePendingImageResultParams = {
+  source: ImageExecutionInput
+  sourceNodeId: string
+  resultOptions?: PendingImageResultOptions
+}
+
+export type ReservePendingImageResultsParams = ReservePendingImageResultParams & {
+  outputCount: number
+}
+
+export type PendingImageResultLifecycle = {
+  reservePendingResult: (
+    params: ReservePendingImageResultParams,
+  ) => PendingImageResultReservation
+  reservePendingResults: (
+    params: ReservePendingImageResultsParams,
+  ) => PendingImageResultReservation[]
+  attachPendingTaskId: (params: { resultNodeId: string; taskId: string }) => void
+  materializeResolvedImage: (params: {
+    resultNodeId: string
+    result: ResolvedTaskImageResult
+  }) => void
+  cancelPendingResult: (params: { resultNodeId: string }) => void
+}
+
 type ImageResultLayout = ImageResultAnchor & {
   ratio: number
 }
@@ -48,7 +77,9 @@ function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'rati
   return IMAGE_NODE_HEADER_HEIGHT + stageHeight
 }
 
-export function usePendingImageResultNodes(options: UsePendingImageResultNodesOptions) {
+export function usePendingImageResultNodeLifecycle(
+  options: UsePendingImageResultNodesOptions,
+): PendingImageResultLifecycle {
   const cancelledResultNodeIds = new Set<string>()
   const resultLayoutsBySourceNodeId = new Map<string, Map<string, ImageResultLayout>>()
 
@@ -385,39 +416,36 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     return nextNode.id
   }
 
-  function appendPendingImageResultNode(
-    source: ImageExecutionInput,
-    anchorNodeId: string,
-    optionsOverride?: {
-      recordHistory?: boolean
-      anchor?: ImageResultAnchor
-      targetRatio?: number
-      targetWidth?: number
-    },
-    preferredNodeId?: string | null,
-  ): string {
-    return appendPendingImageResultNodeWithLookup(
-      source,
-      anchorNodeId,
-      buildPendingResultLookup(),
-      optionsOverride,
-      preferredNodeId,
-    )
+  function reservePendingResult(
+    params: ReservePendingImageResultParams,
+  ): PendingImageResultReservation {
+    return {
+      resultNodeId: appendPendingImageResultNodeWithLookup(
+        params.source,
+        params.sourceNodeId,
+        buildPendingResultLookup(),
+        {
+          recordHistory: true,
+          anchor: params.resultOptions?.anchor,
+          targetRatio: params.resultOptions?.targetRatio,
+          targetWidth: params.resultOptions?.targetWidth,
+        },
+        null,
+      ),
+    }
   }
 
-  function appendPendingImageResultNodes(
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    outputCount: number,
-    resultOptions: PendingImageResultOptions = {},
-  ): string[] {
-    const count = clampImageNodeOutputCount(outputCount)
-    const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? sourceNodeId
+  function reservePendingResults(
+    params: ReservePendingImageResultsParams,
+  ): PendingImageResultReservation[] {
+    const count = clampImageNodeOutputCount(params.outputCount)
+    const resultOptions = params.resultOptions ?? {}
+    const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? params.sourceNodeId
     const lookup = buildPendingResultLookup()
     const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId, lookup)
-    return Array.from({ length: count }, (_, index) =>
-      appendPendingImageResultNodeWithLookup(
-        source,
+    return Array.from({ length: count }, (_, index) => ({
+      resultNodeId: appendPendingImageResultNodeWithLookup(
+        params.source,
         anchorNodeId,
         lookup,
         {
@@ -428,17 +456,17 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
         },
         index === 0 ? reusableNodeId : null,
       ),
-    )
+    }))
   }
 
-  function markPendingImageResultTask(nodeId: string, taskId: string) {
-    const normalizedTaskId = taskId.trim()
+  function attachPendingTaskId(params: { resultNodeId: string; taskId: string }) {
+    const normalizedTaskId = params.taskId.trim()
     if (!normalizedTaskId) return
     options.commitNodeMutation(
       (items) => {
         let didUpdate = false
         const nextItems = items.map((item) => {
-          if (item.id !== nodeId || item.data?.kind !== 'image') return item
+          if (item.id !== params.resultNodeId || item.data?.kind !== 'image') return item
           const snapshot = item.data.snapshotNode
           if (!snapshot || typeof snapshot !== 'object') return item
           didUpdate = true
@@ -459,7 +487,11 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     )
   }
 
-  function updatePendingImageResultNode(nodeId: string, result: ResolvedTaskImageResult) {
+  function materializeResolvedImage(params: {
+    resultNodeId: string
+    result: ResolvedTaskImageResult
+  }) {
+    const { resultNodeId, result } = params
     const resolvedImageWidth = Number(result.width)
     const resolvedImageHeight = Number(result.height)
     const hasResolvedSize =
@@ -478,7 +510,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     options.commitGraphMutation(
       (items, currentEdges) => ({
         nodes: items.map((item) => {
-          if (item.id !== nodeId || item.data?.kind !== 'image') return item
+          if (item.id !== resultNodeId || item.data?.kind !== 'image') return item
           const snapshot = item.data.snapshotNode
           if (!snapshot || typeof snapshot !== 'object') return item
           const currentSnapshot = snapshot as ImageNodeItem
@@ -505,37 +537,67 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
           }
         }),
         edges: currentEdges.map((edge) =>
-          edge.target === nodeId && edge.targetHandle === 'in:image'
+          edge.target === resultNodeId && edge.targetHandle === 'in:image'
             ? { ...edge, animated: false }
             : edge,
         ),
       }),
       { recordHistory: false },
     )
-    updateResultNodeLayout(nodeId, {
+    updateResultNodeLayout(resultNodeId, {
       ratio: normalizedRatio,
       ...(resolvedFrameWidth ? { width: resolvedFrameWidth } : {}),
     })
-    options.refreshNodeInternals?.([nodeId])
+    options.refreshNodeInternals?.([resultNodeId])
   }
 
-  function removePendingImageResultNode(nodeId: string) {
-    cancelledResultNodeIds.add(nodeId)
-    forgetResultNodeLayout(nodeId)
+  function cancelPendingResult(params: { resultNodeId: string }) {
+    cancelledResultNodeIds.add(params.resultNodeId)
+    forgetResultNodeLayout(params.resultNodeId)
     options.commitGraphMutation(
       (items, currentEdges) => ({
-        nodes: items.filter((item) => item.id !== nodeId),
-        edges: currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+        nodes: items.filter((item) => item.id !== params.resultNodeId),
+        edges: currentEdges.filter(
+          (edge) => edge.source !== params.resultNodeId && edge.target !== params.resultNodeId,
+        ),
       }),
       { recordHistory: false },
     )
   }
 
   return {
-    appendPendingImageResultNode,
-    appendPendingImageResultNodes,
-    markPendingImageResultTask,
-    updatePendingImageResultNode,
-    removePendingImageResultNode,
+    reservePendingResult,
+    reservePendingResults,
+    attachPendingTaskId,
+    materializeResolvedImage,
+    cancelPendingResult,
+  }
+}
+
+export function usePendingImageResultNodes(options: UsePendingImageResultNodesOptions) {
+  const lifecycle = usePendingImageResultNodeLifecycle(options)
+
+  return {
+    appendPendingImageResultNode: (
+      source: ImageExecutionInput,
+      sourceNodeId: string,
+      resultOptions?: PendingImageResultOptions,
+    ) =>
+      lifecycle.reservePendingResult({ source, sourceNodeId, resultOptions }).resultNodeId,
+    appendPendingImageResultNodes: (
+      source: ImageExecutionInput,
+      sourceNodeId: string,
+      outputCount: number,
+      resultOptions?: PendingImageResultOptions,
+    ) =>
+      lifecycle
+        .reservePendingResults({ source, sourceNodeId, outputCount, resultOptions })
+        .map((reservation) => reservation.resultNodeId),
+    markPendingImageResultTask: (resultNodeId: string, taskId: string) =>
+      lifecycle.attachPendingTaskId({ resultNodeId, taskId }),
+    updatePendingImageResultNode: (resultNodeId: string, result: ResolvedTaskImageResult) =>
+      lifecycle.materializeResolvedImage({ resultNodeId, result }),
+    removePendingImageResultNode: (resultNodeId: string) =>
+      lifecycle.cancelPendingResult({ resultNodeId }),
   }
 }

@@ -28,12 +28,12 @@ describe('useFlowImageDirectActionRunner', () => {
   it('runs a prepared single-image task through pending node lifecycle', async () => {
     const submitTask = createDeferred<{ taskId: string }>()
     const resolveResult = createDeferred<{ url: string; ratio: number }>()
-    const pendingImageResultNodes = {
-      appendPendingImageResultNode: vi.fn(() => 'result-1'),
-      appendPendingImageResultNodes: vi.fn(),
-      markPendingImageResultTask: vi.fn(),
-      updatePendingImageResultNode: vi.fn(),
-      removePendingImageResultNode: vi.fn(),
+    const pendingImageResultLifecycle = {
+      reservePendingResult: vi.fn(() => ({ resultNodeId: 'result-1' })),
+      reservePendingResults: vi.fn(),
+      attachPendingTaskId: vi.fn(),
+      materializeResolvedImage: vi.fn(),
+      cancelPendingResult: vi.fn(),
     }
     const flushAutosave = vi.fn(async () => undefined)
     const onSuccess = vi.fn()
@@ -41,7 +41,7 @@ describe('useFlowImageDirectActionRunner', () => {
 
     const runner = useFlowImageDirectActionRunner({
       nodes: shallowRef([]) as Ref<Node[]>,
-      pendingImageResultNodes,
+      pendingImageResultLifecycle,
       flushAutosave,
       getCurrentBoardId: () => 'board-a',
       onSuccess,
@@ -62,29 +62,29 @@ describe('useFlowImageDirectActionRunner', () => {
     })
     await flushPromises()
 
-    expect(pendingImageResultNodes.appendPendingImageResultNode).toHaveBeenCalledWith(
-      { url: 'https://example.com/source.png', ratio: 1 },
-      'image-1',
-      undefined,
-    )
+    expect(pendingImageResultLifecycle.reservePendingResult).toHaveBeenCalledWith({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      resultOptions: undefined,
+    })
     expect(runner.isNodeDirectActionRunning('result-1')).toBe(true)
 
     submitTask.resolve({ taskId: 'task-1' })
     await flushPromises()
 
-    expect(pendingImageResultNodes.markPendingImageResultTask).toHaveBeenCalledWith(
-      'result-1',
-      'task-1',
-    )
+    expect(pendingImageResultLifecycle.attachPendingTaskId).toHaveBeenCalledWith({
+      resultNodeId: 'result-1',
+      taskId: 'task-1',
+    })
     expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
 
     resolveResult.resolve({ url: 'https://example.com/result.png', ratio: 1 })
     await run
 
-    expect(pendingImageResultNodes.updatePendingImageResultNode).toHaveBeenCalledWith(
-      'result-1',
-      { url: 'https://example.com/result.png', ratio: 1 },
-    )
+    expect(pendingImageResultLifecycle.materializeResolvedImage).toHaveBeenCalledWith({
+      resultNodeId: 'result-1',
+      result: { url: 'https://example.com/result.png', ratio: 1 },
+    })
     expect(runner.isNodeDirectActionRunning('result-1')).toBe(false)
     expect(onSuccess).toHaveBeenCalledWith('处理完成')
     expect(onWarning).not.toHaveBeenCalled()
