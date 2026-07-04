@@ -1,53 +1,190 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { http, HttpResponse, useMswHandlers } from '../../test/msw'
 import { UPLOAD_OPERATION_TIMEOUT_MS, uploadApi } from './upload'
 
-const mocks = vi.hoisted(() => ({
-  request: vi.fn(),
-}))
-
-vi.mock('./client', () => ({
-  api: {
-    request: mocks.request,
-  },
-}))
+async function readUploadedFile(request: Request): Promise<File> {
+  const formData = await request.formData()
+  const file = formData.get('file')
+  expect(file).toBeInstanceOf(File)
+  return file as File
+}
 
 describe('uploadApi', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mocks.request.mockResolvedValue({ code: 0, msg: 'ok' })
-  })
-
-  it('uses a longer per-operation timeout for board uploads', async () => {
+  it('uploads a board asset through the HTTP boundary', async () => {
     const file = new File(['image'], 'image.png', { type: 'image/png' })
+    const receivedRequests: Array<{
+      method: string
+      path: string
+      fileName: string
+      fileType: string
+      fileText: string
+    }> = []
 
-    await uploadApi.upload(file, ' board 1 ')
+    useMswHandlers(
+      http.post('/api/user/boards/:boardId/uploads', async ({ request }) => {
+        const uploadedFile = await readUploadedFile(request)
+        receivedRequests.push({
+          method: request.method,
+          path: new URL(request.url).pathname,
+          fileName: uploadedFile.name,
+          fileType: uploadedFile.type,
+          fileText: await uploadedFile.text(),
+        })
 
-    expect(mocks.request).toHaveBeenCalledWith(
-      '/user/boards/board%201/uploads',
-      expect.objectContaining({
-        method: 'POST',
-        timeout: UPLOAD_OPERATION_TIMEOUT_MS,
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            url: '/uploads/boards/board-1/image.png',
+            width: 640,
+            height: 480,
+            mime: uploadedFile.type,
+            ext: '.png',
+          },
+        })
       }),
     )
-    const body = mocks.request.mock.calls[0]?.[1]?.body
-    expect(body).toBeInstanceOf(FormData)
-    expect((body as FormData).get('file')).toBe(file)
+
+    await expect(uploadApi.upload(file, ' board 1 ')).resolves.toEqual({
+      code: 0,
+      msg: 'ok',
+      data: {
+        url: '/uploads/boards/board-1/image.png',
+        width: 640,
+        height: 480,
+        mime: 'image/png',
+        ext: '.png',
+      },
+    })
+    expect(receivedRequests).toEqual([
+      {
+        method: 'POST',
+        path: '/api/user/boards/board%201/uploads',
+        fileName: 'image.png',
+        fileType: 'image/png',
+        fileText: 'image',
+      },
+    ])
   })
 
-  it('uses a longer per-operation timeout for avatar uploads', async () => {
+  it('uploads a profile avatar through the HTTP boundary', async () => {
     const file = new File(['avatar'], 'avatar.jpg', { type: 'image/jpeg' })
+    const receivedRequests: Array<{
+      method: string
+      path: string
+      fileName: string
+      fileType: string
+      fileText: string
+    }> = []
 
-    await uploadApi.uploadAvatar(file)
+    useMswHandlers(
+      http.post('/api/user/profile/avatar', async ({ request }) => {
+        const uploadedFile = await readUploadedFile(request)
+        receivedRequests.push({
+          method: request.method,
+          path: new URL(request.url).pathname,
+          fileName: uploadedFile.name,
+          fileType: uploadedFile.type,
+          fileText: await uploadedFile.text(),
+        })
 
-    expect(mocks.request).toHaveBeenCalledWith(
-      '/user/profile/avatar',
-      expect.objectContaining({
-        method: 'POST',
-        timeout: UPLOAD_OPERATION_TIMEOUT_MS,
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            avatar: '/uploads/avatars/me.jpg',
+            width: 128,
+            height: 128,
+            mime: uploadedFile.type,
+            ext: '.jpg',
+          },
+        })
       }),
     )
-    const body = mocks.request.mock.calls[0]?.[1]?.body
-    expect(body).toBeInstanceOf(FormData)
-    expect((body as FormData).get('file')).toBe(file)
+
+    await expect(uploadApi.uploadAvatar(file)).resolves.toEqual({
+      code: 0,
+      msg: 'ok',
+      data: {
+        avatar: '/uploads/avatars/me.jpg',
+        width: 128,
+        height: 128,
+        mime: 'image/jpeg',
+        ext: '.jpg',
+      },
+    })
+    expect(receivedRequests).toEqual([
+      {
+        method: 'POST',
+        path: '/api/user/profile/avatar',
+        fileName: 'avatar.jpg',
+        fileType: 'image/jpeg',
+        fileText: 'avatar',
+      },
+    ])
+  })
+
+  it('keeps the upload timeout long enough for slow HTTP responses', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const slowResponseDelayMs = 10_050
+      const file = new File(['slow avatar'], 'slow-avatar.jpg', { type: 'image/jpeg' })
+      let resolveUploadStarted: () => void = () => {}
+      const uploadStarted = new Promise<void>((resolve) => {
+        resolveUploadStarted = resolve
+      })
+
+      useMswHandlers(
+        http.post('/api/user/profile/avatar', async ({ request }) => {
+          await readUploadedFile(request)
+          resolveUploadStarted()
+          await new Promise((resolve) => setTimeout(resolve, slowResponseDelayMs))
+
+          return HttpResponse.json({
+            code: 0,
+            msg: 'ok',
+            data: {
+              avatar: '/uploads/avatars/slow-avatar.jpg',
+              mime: 'image/jpeg',
+            },
+          })
+        }),
+      )
+
+      const response = uploadApi.uploadAvatar(file)
+
+      await uploadStarted
+      expect(UPLOAD_OPERATION_TIMEOUT_MS).toBeGreaterThan(slowResponseDelayMs)
+      await vi.advanceTimersByTimeAsync(slowResponseDelayMs)
+
+      await expect(response).resolves.toEqual({
+        code: 0,
+        msg: 'ok',
+        data: {
+          avatar: '/uploads/avatars/slow-avatar.jpg',
+          mime: 'image/jpeg',
+        },
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('surfaces upload API failures from the HTTP response body', async () => {
+    useMswHandlers(
+      http.post('/api/user/boards/:boardId/uploads', () => {
+        return HttpResponse.json({ code: 413, msg: 'upload too large' })
+      }),
+    )
+
+    await expect(
+      uploadApi.upload(new File(['too large'], 'large.png', { type: 'image/png' }), 'board-1'),
+    ).rejects.toMatchObject({
+      code: 413,
+      msg: 'upload too large',
+      message: 'upload too large',
+      status: 200,
+    })
   })
 })
