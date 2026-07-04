@@ -118,6 +118,58 @@ describe('waitTaskImageResultsWithSse', () => {
     expect(mocks.getTask).toHaveBeenCalledWith('task-1')
   })
 
+  it('resolves image results from a completed SSE event without polling', async () => {
+    vi.stubGlobal('EventSource', MockEventSource)
+
+    const result = waitTaskImageResultsWithSse('task-1')
+    expect(MockEventSource.instances).toHaveLength(1)
+    MockEventSource.instances[0]?.emit('task', {
+      task_id: 'task-1',
+      status: 'completed',
+      result: JSON.stringify({ image_url: 'https://cdn.example.com/result.png' }),
+      outputs: [makeImageOutput(' https://cdn.example.com/sse-output.png ')],
+    })
+
+    await expect(result).resolves.toEqual([
+      {
+        url: 'https://cdn.example.com/sse-output.png',
+        width: 1024,
+        height: 1024,
+        mimeType: 'image/png',
+      },
+    ])
+    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(MockEventSource.instances[0]?.closed).toBe(true)
+  })
+
+  it('rejects malformed SSE payloads without falling back to polling', async () => {
+    vi.stubGlobal('EventSource', MockEventSource)
+
+    const result = waitTaskImageResultsWithSse('task-1')
+    expect(MockEventSource.instances).toHaveLength(1)
+    MockEventSource.instances[0]?.emit('task', 'not-json')
+
+    await expect(result).rejects.toThrow('任务进度数据异常，请稍后重试')
+    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(MockEventSource.instances[0]?.closed).toBe(true)
+  })
+
+  it('propagates the backend failure message from a failed SSE event without polling', async () => {
+    vi.stubGlobal('EventSource', MockEventSource)
+
+    const result = waitTaskImageResultsWithSse('task-1')
+    expect(MockEventSource.instances).toHaveLength(1)
+    MockEventSource.instances[0]?.emit('task', {
+      task_id: 'task-1',
+      status: 'failed',
+      error_msg: ' 上游超时 ',
+    })
+
+    await expect(result).rejects.toThrow(/^上游超时$/)
+    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(MockEventSource.instances[0]?.closed).toBe(true)
+  })
+
   it('falls back to polling with backoff after an EventSource error', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('EventSource', MockEventSource)
