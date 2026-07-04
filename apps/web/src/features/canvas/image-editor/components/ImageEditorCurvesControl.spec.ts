@@ -1,35 +1,26 @@
-import { createApp, defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageEditorCurvesParams } from '../types'
 import ImageEditorCurvesControl from './ImageEditorCurvesControl.vue'
+import { renderWithUser, screen, waitFor } from '../../../../test/render'
 
-function mountCurvesControl(initialParams: ImageEditorCurvesParams) {
+function renderCurvesControl(initialParams: ImageEditorCurvesParams) {
   const params = ref(initialParams)
-  const host = document.createElement('div')
-  document.body.appendChild(host)
-  const app = createApp(
-    defineComponent({
-      setup() {
-        return () =>
-          h(ImageEditorCurvesControl, {
-            params: params.value,
-            'onUpdate:params': (nextParams: ImageEditorCurvesParams) => {
-              params.value = nextParams
-            },
-          })
-      },
-    }),
-  )
-  app.mount(host)
+  const Harness = defineComponent({
+    setup() {
+      return () =>
+        h(ImageEditorCurvesControl, {
+          params: params.value,
+          'onUpdate:params': (nextParams: ImageEditorCurvesParams) => {
+            params.value = nextParams
+          },
+        })
+    },
+  })
 
   return {
-    app,
-    host,
     params,
-    unmount: () => {
-      app.unmount()
-      host.remove()
-    },
+    ...renderWithUser(Harness),
   }
 }
 
@@ -45,7 +36,7 @@ describe('ImageEditorCurvesControl', () => {
   })
 
   it('keeps keyboard focus on the next curve point after deleting the selected point', async () => {
-    const harness = mountCurvesControl({
+    const { container, params } = renderCurvesControl({
       channels: {
         rgb: [
           { id: 'shadow', input: 25, output: 20 },
@@ -55,69 +46,41 @@ describe('ImageEditorCurvesControl', () => {
       },
     })
 
-    try {
-      await nextTick()
-      const bubbledKeydown = vi.fn()
-      harness.host.addEventListener('keydown', bubbledKeydown)
+    const bubbledKeydown = vi.fn()
+    container.addEventListener('keydown', bubbledKeydown)
+    const midtonePoint = screen.getByRole('button', { name: '曲线点 输入 50 输出 55' })
 
-      const midtonePoint = harness.host.querySelector<HTMLButtonElement>(
-        '[data-point-id="midtone"]',
-      )
-      midtonePoint?.focus()
-      await nextTick()
-      dispatchDelete(midtonePoint)
-      await nextTick()
-      await nextTick()
+    midtonePoint.focus()
+    dispatchDelete(midtonePoint)
 
-      const highlightPoint = harness.host.querySelector<HTMLButtonElement>(
-        '[data-point-id="highlight"]',
-      )
-      expect(document.activeElement).toBe(highlightPoint)
-      expect(harness.params.value.channels.rgb?.map((point) => point.id)).toEqual([
-        'shadow',
-        'highlight',
-      ])
+    const highlightPoint = screen.getByRole('button', { name: '曲线点 输入 75 输出 82' })
 
-      dispatchDelete(document.activeElement)
-      await nextTick()
-      await nextTick()
+    await waitFor(() => expect(highlightPoint).toHaveFocus())
+    expect(params.value.channels.rgb?.map((point) => point.id)).toEqual(['shadow', 'highlight'])
 
-      expect(bubbledKeydown).not.toHaveBeenCalled()
-      expect(harness.params.value.channels.rgb?.map((point) => point.id)).toEqual(['shadow'])
-    } finally {
-      harness.unmount()
-    }
+    dispatchDelete(document.activeElement)
+
+    await waitFor(() => {
+      expect(params.value.channels.rgb?.map((point) => point.id)).toEqual(['shadow'])
+    })
+    expect(bubbledKeydown).not.toHaveBeenCalled()
   })
 
   it('ignores cleared selected point number inputs instead of moving the point to zero', async () => {
-    const harness = mountCurvesControl({
+    const { params, user } = renderCurvesControl({
       channels: {
         rgb: [{ id: 'midtone', input: 50, output: 55 }],
       },
     })
 
-    try {
-      await nextTick()
-      harness.host.querySelector<HTMLButtonElement>('[data-point-id="midtone"]')?.click()
-      await nextTick()
+    await user.click(screen.getByRole('button', { name: '曲线点 输入 50 输出 55' }))
 
-      const [inputField, outputField] =
-        harness.host.querySelectorAll<HTMLInputElement>('input[type="number"]')
+    const inputField = screen.getByLabelText('输入')
+    const outputField = screen.getByLabelText('输出')
 
-      expect(inputField?.classList.contains('editing-controls-number-input')).toBe(true)
-      expect(outputField?.classList.contains('editing-controls-number-input')).toBe(true)
+    await user.clear(inputField)
+    await user.clear(outputField)
 
-      inputField.value = ''
-      inputField.dispatchEvent(new Event('input', { bubbles: true }))
-      await nextTick()
-
-      outputField.value = ''
-      outputField.dispatchEvent(new Event('input', { bubbles: true }))
-      await nextTick()
-
-      expect(harness.params.value.channels.rgb).toEqual([{ id: 'midtone', input: 50, output: 55 }])
-    } finally {
-      harness.unmount()
-    }
+    expect(params.value.channels.rgb).toEqual([{ id: 'midtone', input: 50, output: 55 }])
   })
 })

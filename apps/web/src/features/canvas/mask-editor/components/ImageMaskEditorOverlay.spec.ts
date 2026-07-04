@@ -1,31 +1,23 @@
-import { createApp, defineComponent, h, nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import ImageMaskEditorOverlay from './ImageMaskEditorOverlay.vue'
+import { render, waitFor } from '../../../../test/render'
 
-function mountOverlay() {
-  const host = document.createElement('div')
-  document.body.appendChild(host)
+function renderOverlay() {
   const setCanvasRef = vi.fn()
-  const app = createApp(
-    defineComponent({
-      setup() {
-        return () =>
-          h(ImageMaskEditorOverlay, {
-            brushShape: 'round',
-            brushSize: 40,
-            canvasHeight: 100,
-            canvasWidth: 200,
-            imageLayerVisible: true,
-            maskLayerOpacity: 72,
-            setCanvasRef,
-            onCanvasPointerdown: vi.fn(),
-          })
-      },
-    }),
-  )
-  app.mount(host)
-  const canvas = host.querySelector<HTMLCanvasElement>('canvas')
-  const cursor = host.querySelector<HTMLElement>('.image-mask-editor-brush-cursor')
+  const result = render(ImageMaskEditorOverlay, {
+    props: {
+      brushShape: 'round',
+      brushSize: 40,
+      canvasHeight: 100,
+      canvasWidth: 200,
+      imageLayerVisible: true,
+      maskLayerOpacity: 72,
+      setCanvasRef,
+      onCanvasPointerdown: vi.fn(),
+    },
+  })
+  const canvas = result.container.querySelector<HTMLCanvasElement>('canvas')
+  const cursor = result.container.querySelector<HTMLElement>('.image-mask-editor-brush-cursor')
   if (!canvas || !cursor) throw new Error('expected mask editor overlay elements')
   Object.defineProperties(canvas, {
     offsetWidth: { value: 200 },
@@ -33,41 +25,32 @@ function mountOverlay() {
   })
 
   return {
-    app,
     canvas,
     cursor,
-    host,
     setCanvasRef,
-    unmount() {
-      app.unmount()
-      host.remove()
-    },
+    ...result,
   }
 }
 
 describe('ImageMaskEditorOverlay', () => {
   it('positions the brush cursor from pointer offset coordinates', async () => {
-    const harness = mountOverlay()
-    await nextTick()
+    const { canvas, cursor } = renderOverlay()
 
-    try {
-      const event = new PointerEvent('pointermove', {
-        bubbles: true,
-        pointerType: 'mouse',
-        clientX: 0,
-        clientY: 0,
-      })
-      Object.defineProperties(event, {
-        offsetX: { value: 37 },
-        offsetY: { value: 42 },
-      })
-      harness.canvas.dispatchEvent(event)
-      await nextTick()
+    const event = new PointerEvent('pointermove', {
+      bubbles: true,
+      pointerType: 'mouse',
+      clientX: 0,
+      clientY: 0,
+    })
+    Object.defineProperties(event, {
+      offsetX: { value: 37 },
+      offsetY: { value: 42 },
+    })
+    canvas.dispatchEvent(event)
 
-      expect(harness.cursor.style.transform).toContain('translate3d(37px, 42px, 0)')
-      expect(harness.cursor.classList.contains('is-visible')).toBe(true)
-    } finally {
-      harness.unmount()
-    }
+    await waitFor(() => {
+      expect(cursor.style.transform).toContain('translate3d(37px, 42px, 0)')
+      expect(cursor).toHaveClass('is-visible')
+    })
   })
 })

@@ -1,108 +1,87 @@
-import { createApp, defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageEditorSharpenParams } from '../types'
 import ImageEditorSharpenControl from './ImageEditorSharpenControl.vue'
+import { renderWithUser, screen, waitFor } from '../../../../test/render'
 
-function mountSharpenControl(initialParams: ImageEditorSharpenParams) {
+function renderSharpenControl(initialParams: ImageEditorSharpenParams) {
   const params = ref(initialParams)
   const events = {
     updateParams: vi.fn((nextParams: ImageEditorSharpenParams) => {
       params.value = nextParams
     }),
   }
-  const host = document.createElement('div')
-  document.body.appendChild(host)
-  const app = createApp(
-    defineComponent({
-      setup() {
-        return () =>
-          h(ImageEditorSharpenControl, {
-            params: params.value,
-            'onUpdate:params': events.updateParams,
-          })
-      },
-    }),
-  )
-  app.mount(host)
-
-  return {
-    app,
-    events,
-    host,
-    params,
-    unmount: () => {
-      app.unmount()
-      host.remove()
+  const Harness = defineComponent({
+    setup() {
+      return () =>
+        h(ImageEditorSharpenControl, {
+          params: params.value,
+          'onUpdate:params': events.updateParams,
+        })
     },
+  })
+  return {
+    events,
+    params,
+    ...renderWithUser(Harness),
   }
+}
+
+function updateInputValue(target: HTMLElement, value: string) {
+  const input = target as HTMLInputElement
+  input.value = value
+  input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 describe('ImageEditorSharpenControl', () => {
   it('updates sharpen amount, decimal radius, threshold, and color protection', async () => {
-    const harness = mountSharpenControl({
+    const { events, user } = renderSharpenControl({
       amount: 0,
       radius: 1,
       threshold: 4,
       protectColor: true,
     })
 
-    try {
-      const amountRange = harness.host.querySelector<HTMLInputElement>(
-        'input[aria-label="数量滑块"]',
-      )
-      amountRange!.value = '120'
-      amountRange?.dispatchEvent(new Event('input', { bubbles: true }))
+    updateInputValue(screen.getByLabelText('数量滑块'), '120')
 
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        amount: 120,
-        radius: 1,
-        threshold: 4,
-        protectColor: true,
-      })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      amount: 120,
+      radius: 1,
+      threshold: 4,
+      protectColor: true,
+    })
 
-      await nextTick()
-      const radiusInput = harness.host.querySelector<HTMLInputElement>(
-        'input[aria-label="半径数值"]',
-      )
-      radiusInput!.value = '1.7'
-      radiusInput?.dispatchEvent(new Event('input', { bubbles: true }))
+    await waitFor(() => expect(screen.getByLabelText('数量数值')).toHaveValue(120))
+    updateInputValue(screen.getByLabelText('半径数值'), '1.7')
 
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        amount: 120,
-        radius: 1.7,
-        threshold: 4,
-        protectColor: true,
-      })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      amount: 120,
+      radius: 1.7,
+      threshold: 4,
+      protectColor: true,
+    })
 
-      await nextTick()
-      const thresholdInput = harness.host.querySelector<HTMLInputElement>(
-        'input[aria-label="阈值数值"]',
-      )
-      thresholdInput!.value = '60'
-      thresholdInput?.dispatchEvent(new Event('input', { bubbles: true }))
+    await waitFor(() => expect(screen.getByLabelText('半径数值')).toHaveValue(1.7))
+    updateInputValue(screen.getByLabelText('阈值数值'), '60')
 
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        amount: 120,
-        radius: 1.7,
-        threshold: 50,
-        protectColor: true,
-      })
+    expect(events.updateParams).toHaveBeenCalledWith({
+      amount: 120,
+      radius: 1.7,
+      threshold: 50,
+      protectColor: true,
+    })
 
-      await nextTick()
-      const protectColorButton = harness.host.querySelector<HTMLButtonElement>(
-        'button[aria-label="保护锐化颜色"]',
-      )
-      expect(protectColorButton?.getAttribute('aria-pressed')).toBe('true')
-      protectColorButton?.click()
+    await waitFor(() => expect(screen.getByLabelText('阈值数值')).toHaveValue(50))
+    const protectColorButton = screen.getByRole('button', { name: '保护锐化颜色' })
 
-      expect(harness.events.updateParams).toHaveBeenCalledWith({
-        amount: 120,
-        radius: 1.7,
-        threshold: 50,
-        protectColor: false,
-      })
-    } finally {
-      harness.unmount()
-    }
+    expect(protectColorButton).toHaveAttribute('aria-pressed', 'true')
+    await user.click(protectColorButton)
+
+    expect(events.updateParams).toHaveBeenCalledWith({
+      amount: 120,
+      radius: 1.7,
+      threshold: 50,
+      protectColor: false,
+    })
   })
 })

@@ -1,18 +1,16 @@
-import { createApp, defineComponent, h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { ImageStrengthAction } from '../../execution'
 import HomeCanvasImageActionMenu from './HomeCanvasImageActionMenu.vue'
+import { render, screen, waitFor, within } from '../../../../test/render'
 
-function mountImageActionMenu(
+function renderImageActionMenu(
   input: {
     activeStrengthAction?: ImageStrengthAction | null
     showStrengthControl?: boolean
     strengthValue?: number
   } = {},
 ) {
-  const host = document.createElement('div')
-  document.body.appendChild(host)
   const props = {
     showStrengthControl: input.showStrengthControl ?? false,
     directGenerating: false,
@@ -26,97 +24,64 @@ function mountImageActionMenu(
     onStrengthPointerUp: vi.fn(),
     onStrengthClick: vi.fn(),
   }
-  const app = createApp(
-    defineComponent({
-      setup() {
-        return () => h(HomeCanvasImageActionMenu, props)
-      },
-    }),
-  )
-  app.mount(host)
 
   return {
-    host,
     props,
-    unmount: () => {
-      app.unmount()
-      host.remove()
-    },
+    ...render(HomeCanvasImageActionMenu, { props }),
   }
 }
 
 describe('HomeCanvasImageActionMenu', () => {
   it('keeps inactive strength ranges outside keyboard navigation', () => {
-    const harness = mountImageActionMenu()
+    renderImageActionMenu()
 
-    try {
-      const strengthRanges = Array.from(
-        harness.host.querySelectorAll<HTMLInputElement>('.image-action-strength-range'),
-      )
+    const styleVariationRange = screen.getByLabelText('风格延展强度')
+    const hdRange = screen.getByLabelText('HD强度')
 
-      expect(strengthRanges).toHaveLength(2)
-      expect(strengthRanges.map((range) => range.getAttribute('aria-label'))).toEqual([
-        '风格延展强度',
-        'HD强度',
-      ])
-      expect(strengthRanges.map((range) => range.getAttribute('tabindex'))).toEqual(['-1', '-1'])
-    } finally {
-      harness.unmount()
-    }
+    expect(styleVariationRange).toHaveAttribute('tabindex', '-1')
+    expect(styleVariationRange).toHaveAttribute('aria-hidden', 'true')
+    expect(hdRange).toHaveAttribute('tabindex', '-1')
+    expect(hdRange).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('binds long press triggers to the visible strength buttons', () => {
-    const harness = mountImageActionMenu()
+  it('binds long press triggers to the visible strength buttons', async () => {
+    const { props } = renderImageActionMenu()
 
-    try {
-      expect(harness.props.setStrengthTriggerRef).toHaveBeenCalledWith(
+    await waitFor(() => {
+      expect(props.setStrengthTriggerRef).toHaveBeenCalledWith(
         IMAGE_NODE_ACTION.styleVariation,
         expect.anything(),
       )
-      expect(harness.props.setStrengthTriggerRef).toHaveBeenCalledWith(
+      expect(props.setStrengthTriggerRef).toHaveBeenCalledWith(
         IMAGE_NODE_ACTION.hdUpscale,
         expect.anything(),
       )
-    } finally {
-      harness.unmount()
-    }
+    })
   })
 
   it('shows the active strength range for style variation and HD actions', () => {
-    const styleHarness = mountImageActionMenu({
+    const styleRender = renderImageActionMenu({
       showStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.styleVariation,
     })
-    const hdHarness = mountImageActionMenu({
+    const styleMenu = within(styleRender.container)
+    const activeStyleRange = styleMenu.getByRole('slider', { name: '风格延展强度' })
+    const hiddenHdRange = styleMenu.getByLabelText('HD强度')
+
+    expect(activeStyleRange).not.toHaveAttribute('aria-hidden')
+    expect(activeStyleRange.closest('.image-action-control')).toHaveClass('is-strength-active')
+    expect(hiddenHdRange).toHaveAttribute('aria-hidden', 'true')
+    expect(hiddenHdRange.closest('.image-action-control')).toHaveClass('is-strength-hidden')
+
+    styleRender.unmount()
+
+    const hdRender = renderImageActionMenu({
       showStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.hdUpscale,
     })
+    const activeHdRange = within(hdRender.container).getByRole('slider', { name: 'HD强度' })
 
-    try {
-      const activeStyleRange = styleHarness.host.querySelector<HTMLInputElement>(
-        'input[aria-label="风格延展强度"]',
-      )
-      const hiddenHdRange = styleHarness.host.querySelector<HTMLInputElement>(
-        'input[aria-label="HD强度"]',
-      )
-      const activeHdRange = hdHarness.host.querySelector<HTMLInputElement>(
-        'input[aria-label="HD强度"]',
-      )
-
-      expect(
-        activeStyleRange
-          ?.closest('.image-action-control')
-          ?.classList.contains('is-strength-active'),
-      ).toBe(true)
-      expect(
-        hiddenHdRange?.closest('.image-action-control')?.classList.contains('is-strength-hidden'),
-      ).toBe(true)
-      expect(
-        activeHdRange?.closest('.image-action-control')?.classList.contains('is-strength-active'),
-      ).toBe(true)
-    } finally {
-      styleHarness.unmount()
-      hdHarness.unmount()
-    }
+    expect(activeHdRange).not.toHaveAttribute('aria-hidden')
+    expect(activeHdRange.closest('.image-action-control')).toHaveClass('is-strength-active')
   })
 })
