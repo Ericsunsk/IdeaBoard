@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { ImageStrengthAction } from '../../execution'
 import HomeCanvasImageActionMenu from './HomeCanvasImageActionMenu.vue'
-import { render, screen, waitFor, within } from '../../../../test/render'
+import { render, screen, waitFor } from '../../../../test/render'
 
 function renderImageActionMenu(
   input: {
@@ -29,6 +29,12 @@ function renderImageActionMenu(
     props,
     ...render(HomeCanvasImageActionMenu, { props }),
   }
+}
+
+function findActionControl(element: HTMLElement) {
+  const control = element.closest<HTMLElement>('.image-action-control')
+  if (!control) throw new Error('expected image action control')
+  return control
 }
 
 describe('HomeCanvasImageActionMenu', () => {
@@ -64,14 +70,13 @@ describe('HomeCanvasImageActionMenu', () => {
       showStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.styleVariation,
     })
-    const styleMenu = within(styleRender.container)
-    const activeStyleRange = styleMenu.getByRole('slider', { name: '风格延展强度' })
-    const hiddenHdRange = styleMenu.getByLabelText('HD强度')
+    const activeStyleRange = styleRender.getByRole('slider', { name: '风格延展强度' })
+    const hiddenHdRange = styleRender.getByLabelText('HD强度')
 
     expect(activeStyleRange).not.toHaveAttribute('aria-hidden')
-    expect(activeStyleRange.closest('.image-action-control')).toHaveClass('is-strength-active')
+    expect(findActionControl(activeStyleRange)).toHaveClass('is-strength-active')
     expect(hiddenHdRange).toHaveAttribute('aria-hidden', 'true')
-    expect(hiddenHdRange.closest('.image-action-control')).toHaveClass('is-strength-hidden')
+    expect(findActionControl(hiddenHdRange)).toHaveClass('is-strength-hidden')
 
     styleRender.unmount()
 
@@ -79,9 +84,9 @@ describe('HomeCanvasImageActionMenu', () => {
       showStrengthControl: true,
       activeStrengthAction: IMAGE_NODE_ACTION.hdUpscale,
     })
-    const activeHdRange = within(hdRender.container).getByRole('slider', { name: 'HD强度' })
+    const activeHdRange = hdRender.getByRole('slider', { name: 'HD强度' })
 
     expect(activeHdRange).not.toHaveAttribute('aria-hidden')
-    expect(activeHdRange.closest('.image-action-control')).toHaveClass('is-strength-active')
+    expect(findActionControl(activeHdRange)).toHaveClass('is-strength-active')
   })
 })

@@ -1,4 +1,4 @@
-import { configDefaults, defineConfig } from 'vitest/config'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -6,8 +6,11 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   test: {
     environment: 'happy-dom',
-    include: ['src/**/*.spec.ts'],
-    exclude: [...configDefaults.exclude, 'src/**/*.browser.spec.ts'],
+    include: [
+      'src/**/*.unit.spec.ts',
+      'src/**/*.component.spec.ts',
+      'src/**/*.contract.spec.ts',
+    ],
     setupFiles: ['src/test/setup.ts'],
   },
   build: {

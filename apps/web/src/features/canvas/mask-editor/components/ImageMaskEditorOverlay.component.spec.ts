@@ -13,7 +13,7 @@ function renderOverlay() {
       imageLayerVisible: true,
       maskLayerOpacity: 72,
       setCanvasRef,
-      onCanvasPointerdown: vi.fn(),
+      'onCanvas-pointerdown': vi.fn(),
     },
   })
   const canvas = result.container.querySelector<HTMLCanvasElement>('canvas')
