@@ -73,9 +73,13 @@ function createBoardRuntime() {
     },
     graphAdapter: {},
     loadInitialOrRouteBoard: vi.fn(),
+    onNodesChange: vi.fn(),
+    onEdgesChange: vi.fn(),
     markBoardViewportChanged: vi.fn(),
     commitPendingBoardViewportChange: vi.fn(),
     closeBoardHeaderEditing: vi.fn(),
+    onNavigateRequest: vi.fn(),
+    onLogoutRequest: vi.fn(),
   }
 }
 
@@ -86,6 +90,8 @@ function createGraphRuntime() {
     getImageNodeSnapshot: vi.fn(),
     createImageNodeFromFile: vi.fn(),
     onConnect: vi.fn(),
+    onEdgeUpdate: vi.fn(),
+    isValidConnection: vi.fn(() => true),
     uploadImageToBoard: vi.fn(),
     _onFlowNodeParamUpdate: vi.fn(),
     markFlowExecutionNodeDirty: vi.fn(),
@@ -157,11 +163,21 @@ describe('useCanvasWorkspaceRuntime', () => {
     const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
 
     expect(runtime.flowPane.nodes).toBe(board.nodes)
+    expect(runtime.flowPane.edges).toBe(board.edges)
+    expect(runtime.flowPane.onNodesChange).toBe(board.onNodesChange)
+    expect(runtime.flowPane.onEdgesChange).toBe(board.onEdgesChange)
+    expect(runtime.flowPane.onConnect).toBe(graph.onConnect)
+    expect(runtime.flowPane.onEdgeUpdate).toBe(graph.onEdgeUpdate)
     expect(runtime.flowPane.nodeDragTransactions.begin).toBe(board.graphRuntime.nodeDrag.begin)
     expect(runtime.boardChrome.currentBoardId).toBe(board.currentBoardId)
+    expect(runtime.boardChrome.onNavigateRequest).toBe(board.onNavigateRequest)
+    expect(runtime.boardChrome.onLogoutRequest).toBe(board.onLogoutRequest)
+    expect(runtime.persistence.flushAutosave).toBe(board.flushAutosave)
     expect(runtime.persistence.reattachPendingImageResults).toBe(
       task.reattachPendingImageResults,
     )
+    expect(runtime.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
+    expect(runtime.imageWorkflow.runCanvasExtendAction).toBe(task.runCanvasExtendAction)
 
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -318,5 +334,29 @@ describe('useCanvasWorkspaceRuntime', () => {
       includeSelf: true,
     })
     expect(task.runFusionPromptGeneration).toHaveBeenCalledWith('fusion-a', 'Blend', 3, '1:1')
+  })
+
+  it('keeps image workflow entrypoints reachable from the workspace runtime surface', () => {
+    const board = createBoardRuntime()
+    const graph = createGraphRuntime()
+    const task = createTaskRuntime()
+    mocks.useCanvasBoardRuntime.mockReturnValue(board)
+    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasTaskRuntime.mockReturnValue(task)
+
+    const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
+    const extendPayload = {
+      nodeId: 'image-1',
+      frameRect: { x: 0, y: 0, width: 100, height: 100 },
+      originalImageRect: { x: 10, y: 10, width: 80, height: 80 },
+      prompt: 'extend',
+      outputCount: 1,
+    }
+
+    runtime.imageWorkflow.runImageDirectAction('image-1', 'upscale')
+    runtime.imageWorkflow.runCanvasExtendAction('image-1', extendPayload)
+
+    expect(task.runImageDirectAction).toHaveBeenCalledWith('image-1', 'upscale')
+    expect(task.runCanvasExtendAction).toHaveBeenCalledWith('image-1', extendPayload)
   })
 })

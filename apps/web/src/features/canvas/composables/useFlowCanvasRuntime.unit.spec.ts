@@ -744,6 +744,33 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots[0]?.connections).toHaveLength(0)
   })
 
+  it('pins the Flow Pane native delete mutation path as a runtime contract', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    await harness.applyNativeNodeChanges([{ id: 'image-1', type: 'remove' }])
+
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.fullEdges.value).toHaveLength(0)
+    expect(harness.isDirty.value).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+
+    await harness.runtime.flushAutosave({ silent: true })
+
+    expect(harness.savedSnapshots[0]?.imageNodes.map((node) => node.id)).toEqual([1])
+    expect(harness.savedSnapshots[0]?.connections.map((connection) => connection.id)).toEqual([3])
+  })
+
   it('records native edge remove before node remove as one cleanup', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.loadInitialOrRouteBoard()
