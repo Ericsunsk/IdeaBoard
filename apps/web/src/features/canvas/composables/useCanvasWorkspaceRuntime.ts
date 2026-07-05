@@ -126,8 +126,6 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   startNodeDragInteraction: () => void
   stopNodeDragInteraction: () => void
   refreshFlowHandleVisibility: () => void
-  enableNodeDragV2?: boolean
-  enableGraphTransactionsV2?: boolean
   onNativeRemove?: () => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
@@ -144,8 +142,6 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
-    enableNodeDragV2: options.enableNodeDragV2,
-    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     vueFlowGraphActions: options.vueFlowGraphActions,
   })
 
@@ -153,7 +149,6 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
     nodes: board.fullNodes,
     edges: board.fullEdges,
     boardBaseSnapshot: board.boardBaseSnapshot,
-    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     currentBoardId: board.currentBoardId,
     createNodeKind: options.createNodeKind,
     graphAdapter: board.graphAdapter,

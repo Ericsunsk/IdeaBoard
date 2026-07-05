@@ -36,8 +36,6 @@ type UseCanvasBoardRuntimeOptions = {
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   feedback: CanvasBoardRuntimeFeedback
   onNativeRemove?: () => void
-  enableNodeDragV2?: boolean
-  enableGraphTransactionsV2?: boolean
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
@@ -137,8 +135,6 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     onSuccess: options.feedback.saveSucceeded,
     onError: options.feedback.saveFailed,
     onNativeRemove: options.onNativeRemove,
-    enableNodeDragV2: options.enableNodeDragV2,
-    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     vueFlowGraphActions: options.vueFlowGraphActions,
   })
 

@@ -47,7 +47,6 @@ type UseCanvasGraphRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
-  enableGraphTransactionsV2?: boolean
   currentBoardId: ValueRef<string | null | undefined>
   createNodeKind: Ref<CanvasCreatableNodeKind>
   graphAdapter: CanvasVueFlowGraphAdapter
@@ -82,7 +81,6 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     nodes: options.nodes,
     edges: options.edges,
     boardBaseSnapshot: options.boardBaseSnapshot,
-    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     createNodeKind: options.createNodeKind,
     graphAdapter: options.graphAdapter,
     onWarning: (text) => {

@@ -103,7 +103,6 @@
             :expand-handle-radius="flowExpandHandleRadius"
             :image-tool-stage-binding="imageToolStageBindingFor(nodeProps.id)"
             :handle-visibility-refresh-token="flowHandleVisibilityRefreshToken"
-            :lightweight-node-rendering="isCanvasLightweightNodesEnabled"
             @update-prompt-text="onFlowPromptTextUpdate"
             @update-node-param="onFlowNodeParamUpdate"
             @delete-node="onFlowDeleteNode"
@@ -190,17 +189,6 @@ import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const CANVAS_NODE_DRAG_V2_STORAGE_KEY = 'ideaboard:canvas-node-drag-v2'
-const CANVAS_GRAPH_TRANSACTIONS_V2_STORAGE_KEY = 'ideaboard:canvas-graph-transactions-v2'
-const CANVAS_LIGHTWEIGHT_NODES_STORAGE_KEY = 'ideaboard:canvas-lightweight-nodes'
-
-function resolveCanvasRuntimeSwitch(queryKey: string, storageKey: string) {
-  const rawQueryValue = route.query[queryKey]
-  const queryValue = Array.isArray(rawQueryValue) ? rawQueryValue[0] : rawQueryValue
-  const configuredValue =
-    typeof queryValue === 'string' ? queryValue : window.localStorage.getItem(storageKey)
-  return !['0', 'false', 'off'].includes(`${configuredValue ?? ''}`.trim().toLowerCase())
-}
 
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const {
@@ -231,10 +219,6 @@ const flowHandleVisibilityRefreshToken = ref(0)
 
 const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
-const isCanvasLightweightNodesEnabled = resolveCanvasRuntimeSwitch(
-  'canvasLightweightNodes',
-  CANVAS_LIGHTWEIGHT_NODES_STORAGE_KEY,
-)
 let dismissTransientCanvasUi: DismissTransientCanvasUi = () => {}
 
 const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
@@ -277,14 +261,6 @@ const canvasWorkspace = useCanvasWorkspaceRuntime({
   startNodeDragInteraction: () => startNodeDragInteraction(),
   stopNodeDragInteraction: () => stopNodeDragInteraction(),
   refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
-  enableNodeDragV2: resolveCanvasRuntimeSwitch(
-    'canvasNodeDragV2',
-    CANVAS_NODE_DRAG_V2_STORAGE_KEY,
-  ),
-  enableGraphTransactionsV2: resolveCanvasRuntimeSwitch(
-    'canvasGraphTransactionsV2',
-    CANVAS_GRAPH_TRANSACTIONS_V2_STORAGE_KEY,
-  ),
   vueFlowGraphActions: {
     setNodes,
     setEdges,

@@ -1,0 +1,137 @@
+# Canvas Graph Runtime Design Brief
+
+本文记录 Canvas performance program 的当前 graph runtime 主路径。Graph Runtime 已是 Canvas Workspace 的 canonical graph mutation path，不再保留迁移期 switch、旧 connection id path、临时降级渲染 path 或旧 graph mutation path。
+
+## Background Evidence
+
+Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总已写回 #65。
+
+| Case | Signal |
+| ---- | ------ |
+| `structure-heavy 500 node-drag` | p95 `116.7ms`，dropped `208`，`nodeArrayReplacements=36` |
+| `structure-heavy 1000 node-drag` | p95 `234.1ms`，dropped `479`，`nodeArrayReplacements=36` |
+| `structure-heavy 2500 node-drag` | p95 `950ms`，dropped `2005`，`nodeArrayReplacements=36` |
+| `structure-heavy 2500 initial-load` | max frame `14933.3ms`，dropped `903`，`nodeArrayReplacements=1668` |
+| `structure-heavy 2500 viewport-pan` | p95 低但 max frame `3433.4ms`，dropped `341` |
+| `media-heavy 500/1000` | 不比同规模 `structure-heavy` 更糟，media rendering 不是第一瓶颈 |
+
+#66 已移除 `node-drag` commit 的 immediate autosave flush。after benchmark 显示 `autosaveSaveCount` 从 `1` 降为 `0`，但 `nodeArrayReplacements=36` 和 drag p95 仍然很高。因此 Graph Runtime 的核心目标是 graph mutation/projection，而不是 autosave 微调。
+
+## Goals
+
+- 用 normalized `CanvasGraphStore` 作为 Canvas graph mutation 的 fact source。
+- 用 `CanvasGraphTransaction` 表达 interaction boundary，让 history/autosave 订阅 transaction commit，而不是响应 raw change floods。
+- 让 Vue Flow 成为 interaction plane 和 rendering projection adapter，不拥有 domain mutation semantics。
+- 让 `node-drag`、connect、edge update、disconnect、delete 和 batch delete 都走 canonical transaction path。
+- 对不可写入 canonical graph 的 corrupt/non-canonical data 显式 warning，要求刷新或重新 hydrate，不再静默回落到旧 mutation path。
+
+## Non-Goals
+
+- 不迁移 `CanvasBoardSnapshot` schema。
+- 不改变 route、Board Session、保存语义或 workflow execution contract。
+- 不承诺 `10000 nodes + media-heavy` 60fps；`5000/10000` 是 torture/ceiling probes。
+- 不把 progressive/degraded rendering 作为默认体验。
+
+## Preserved Contracts
+
+- `CanvasBoardSnapshot` 继续是 persistence schema 和 import/export contract。
+- Canvas route 和用户可见行为保持不变：打开 board、拖拽节点、连线、删除、undo/redo、autosave、运行 workflow 的交互语义不变。
+- Workflow execution contract 不变：Execution Plan、Task submission、Pending Result Node materialization 仍使用现有 feature contracts。
+- `features/canvas-board/domain` 继续拥有 shared snapshot schema/core module。
+- Benchmark report artifacts 继续只写入 ignored local directory，不能进入 git。
+
+## Module Shape
+
+### `CanvasGraphStore`
+
+`CanvasGraphStore` 是 normalized graph state 的 fact source。
+
+Responsibilities:
+
+- hydrate from `CanvasBoardSnapshot`
+- export to snapshot-compatible graph
+- read node/edge by id in O(1)
+- expose stable ordered ids for projection
+- support transaction begin/commit/cancel
+- maintain derived indexes needed by connection rules and media input lookup
+
+`CanvasGraphStore` must not import Vue Flow. It may store adapter-facing metadata only when the metadata is domain-neutral and serializable back through existing snapshot/export logic.
+
+### `CanvasGraphTransaction`
+
+`CanvasGraphTransaction` groups mutation intent and returns a commit summary.
+
+Responsibilities:
+
+- stage node/edge add, update, remove, connect, disconnect, selection and drag updates
+- expose cancel without mutating committed store
+- commit atomically and return `CanvasGraphTransactionSummary`
+- report dirty scope: changed node ids, changed edge ids, removed ids, order changes, history intent and autosave intent
+
+For `node-drag`, drag progress may update transient position projection, but one completed drag should produce at most one history entry and one autosave schedule.
+
+### `CanvasVueFlowGraphAdapter`
+
+`CanvasVueFlowGraphAdapter` applies Graph Runtime projections to Vue Flow controlled arrays.
+
+Responsibilities:
+
+- initialize Vue Flow arrays from board snapshot projection
+- apply graph adapter commands with command side effects
+- project native drag progress through `requestAnimationFrame`
+- preserve selection and existing user-visible Vue Flow behavior
+- keep Vue Flow-specific node/edge shape outside `CanvasGraphStore`
+
+Projection strategy:
+
+- Preserve object identity for unchanged nodes/edges.
+- Replace arrays only when order, visibility, add/remove, or Vue Flow limitations require it.
+- For single-node position updates, patch only the changed Flow Node record when practical.
+- Keep Flow Node UI-only fields separate from Canvas Node domain fields when possible.
+
+### Commit Side Effects
+
+History, autosave, viewport persistence, and frame probes subscribe to graph command side effects derived from transaction summaries.
+
+Responsibilities:
+
+- history receives one entry per logical user action
+- autosave schedules once per dirty transaction
+- viewport persistence remains separate from node/edge mutation unless explicitly marked dirty
+- benchmark counters attach to graph commands and interaction batches
+
+## Canonical Paths
+
+- `node-drag`: queue native position/select changes, project per frame, commit one `node-drag` transaction.
+- connect: normalize connection, compute canonical `connection-*` id, commit one `connect` transaction.
+- edge update: resolve canonical graph edge id from `connectionSnapshot` or canonical edge id, commit one `connect` transaction.
+- native disconnect/delete/batch delete: coalesce native remove changes, commit one `disconnect` / `delete` / `batch-delete` transaction.
+- node delete command: remove canonical graph node and connected edges via one `delete` transaction.
+
+Non-canonical node ids, non-canonical edge ids, or corrupt edge snapshots are not mutated through a legacy path. The UI must surface a warning and leave the current graph untouched.
+
+## Testing And Benchmarks
+
+Required coverage:
+
+- `CanvasGraphStore` hydrate/export roundtrip against `CanvasBoardSnapshot`
+- add/update/remove/connect/disconnect and batch delete transaction tests
+- transaction cancel/commit and dirty summary tests
+- node-drag commit and cancel tests
+- connection and edge update tests using canonical connection ids
+- native disconnect/delete/batch delete tests asserting one undoable transaction
+- before/after benchmark for `structure-heavy 1000 node-drag`
+- torture signal for `structure-heavy 5000 node-drag`, reported as ceiling evidence
+
+Benchmark reports remain local. Issue comments should include compact summaries and exact commands, not committed report JSON.
+
+## Future Optimization Candidates
+
+Only add these after benchmark evidence shows they address the measured bottleneck:
+
+- visible-region projection
+- edge projection budget / related-edge mode
+- media preview lazy/degraded mode
+- handle/tool chrome on-demand mounting
+- result materialization through Graph Runtime
+- permanent telemetry counters beyond benchmark-only instrumentation

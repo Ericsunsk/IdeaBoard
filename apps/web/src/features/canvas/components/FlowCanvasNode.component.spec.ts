@@ -53,7 +53,6 @@ function renderFlowCanvasNode(
   input: {
     selected?: boolean
     dragging?: boolean
-    lightweightNodeRendering?: boolean
   } = {},
 ) {
   const snapshot = createPromptSnapshot()
@@ -65,7 +64,6 @@ function renderFlowCanvasNode(
       dragging: input.dragging ?? false,
       copyMode: false,
       imageActionBinding: createImageActionBinding(),
-      lightweightNodeRendering: input.lightweightNodeRendering ?? false,
     },
     global: {
       stubs: {
@@ -75,31 +73,27 @@ function renderFlowCanvasNode(
   })
 }
 
-describe('FlowCanvasNode lightweight rendering', () => {
-  it('renders a lightweight body for non-interactive nodes when enabled', () => {
-    const view = renderFlowCanvasNode({ lightweightNodeRendering: true })
+describe('FlowCanvasNode prompt rendering', () => {
+  it('renders the full prompt body for non-interactive nodes', () => {
+    const view = renderFlowCanvasNode()
 
-    expect(view.container.querySelector('[data-canvas-lightweight-node="true"]')).not.toBeNull()
-    expect(view.container.querySelector('.node-stage-frame--prompt')).toBeNull()
-  })
-
-  it('keeps the full node body for selected nodes at rest', () => {
-    const view = renderFlowCanvasNode({
-      selected: true,
-      lightweightNodeRendering: true,
-    })
-
-    expect(view.container.querySelector('[data-canvas-lightweight-node="true"]')).toBeNull()
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
   })
 
-  it('uses the lightweight body while a selected node is dragging', () => {
+  it('keeps the full prompt body for selected nodes at rest', () => {
+    const view = renderFlowCanvasNode({
+      selected: true,
+    })
+
+    expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
+  })
+
+  it('keeps the full prompt body while a selected node is dragging', () => {
     const view = renderFlowCanvasNode({
       selected: true,
       dragging: true,
-      lightweightNodeRendering: true,
     })
 
-    expect(view.container.querySelector('[data-canvas-lightweight-node="true"]')).not.toBeNull()
+    expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
   })
 })

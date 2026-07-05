@@ -90,11 +90,7 @@ function makeEdge(
   return { id, source, target, sourceHandle, targetHandle }
 }
 
-function createMutationsHarness(
-  initialNodes: Node[],
-  initialEdges: Edge[],
-  options: { enableGraphTransactionsV2?: boolean } = {},
-) {
+function createMutationsHarness(initialNodes: Node[], initialEdges: Edge[]) {
   const nodes = shallowRef<Node[]>(initialNodes)
   const edges = shallowRef<Edge[]>(initialEdges)
   const graphActions = {
@@ -116,7 +112,6 @@ function createMutationsHarness(
   const mutations = useFlowNodeMutations({
     nodes,
     edges,
-    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     createNodeKind: shallowRef<CanvasCreatableNodeKind>('prompt'),
     graphAdapter,
     onWarning,
@@ -138,8 +133,8 @@ describe('useFlowNodeMutations', () => {
     const { nodes, graphActions, graphCommand, mutations } = createMutationsHarness(
       [
         makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(2)),
-        makeFlowNode('fusion-2', 'fusion', makeFusionSnapshot(3)),
+        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1)),
+        makeFlowNode('fusion-2', 'fusion', makeFusionSnapshot(2)),
       ],
       [makeEdge('e-1', 'prompt-1', 'fusion-1'), makeEdge('e-2', 'fusion-1', 'fusion-2')],
     )
@@ -189,9 +184,9 @@ describe('useFlowNodeMutations', () => {
     const { nodes, mutations } = createMutationsHarness(
       [
         makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(2)),
-        makeFlowNode('image-2', 'image', makeImageSnapshot(3)),
-        makeFlowNode('fusion-2', 'fusion', makeFusionSnapshot(4)),
+        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1)),
+        makeFlowNode('image-2', 'image', makeImageSnapshot(2)),
+        makeFlowNode('fusion-2', 'fusion', makeFusionSnapshot(2)),
       ],
       [makeEdge('e-1', 'image-1', 'fusion-1'), makeEdge('e-2', 'image-2', 'fusion-2')],
     )
@@ -271,7 +266,7 @@ describe('useFlowNodeMutations', () => {
     const { nodes, edges, graphActions, graphCommand, mutations } = createMutationsHarness(
       [
         makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(2, 'idle')),
+        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1, 'idle')),
       ],
       [makeEdge('e-1', 'prompt-1', 'fusion-1')],
     )
@@ -291,7 +286,7 @@ describe('useFlowNodeMutations', () => {
     const { nodes, edges, graphActions, graphCommand, mutations } = createMutationsHarness(
       [
         makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(2)),
+        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1)),
       ],
       [],
     )
@@ -321,7 +316,7 @@ describe('useFlowNodeMutations', () => {
     ])
   })
 
-  it('creates v2 connections with canonical connection edge ids', () => {
+  it('creates connections with canonical connection edge ids', () => {
     const { edges, graphActions, mutations } = createMutationsHarness(
       [
         makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
@@ -360,7 +355,7 @@ describe('useFlowNodeMutations', () => {
     )
   })
 
-  it('keeps single-input v2 connections last-write-wins', () => {
+  it('keeps single-input connections last-write-wins', () => {
     const { edges, graphActions, mutations } = createMutationsHarness(
       [
         makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
@@ -388,7 +383,7 @@ describe('useFlowNodeMutations', () => {
     expect(graphActions.setEdges).toHaveBeenCalledOnce()
   })
 
-  it('rejects v2 multi-input connections over the target limit', () => {
+  it('rejects multi-input connections over the target limit', () => {
     const imageNodes = [1, 2, 3, 4, 5].map((id) =>
       makeFlowNode(`image-${id}`, 'image', makeImageSnapshot(id)),
     )
@@ -410,31 +405,11 @@ describe('useFlowNodeMutations', () => {
     expect(onWarning).toHaveBeenCalledWith('Fusion 最多接入 4 张图片')
   })
 
-  it('keeps the legacy connection id path behind the v2 switch', () => {
-    const { edges, mutations } = createMutationsHarness(
-      [
-        makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1, 'idle')),
-      ],
-      [],
-      { enableGraphTransactionsV2: false },
-    )
-
-    mutations.onConnect({
-      source: 'image-1',
-      target: 'fusion-1',
-      sourceHandle: 'out:image',
-      targetHandle: 'in:image',
-    })
-
-    expect(edges.value[0]?.id).toMatch(/^edge-/)
-  })
-
   it('rejects invalid connections before graph adapter edge commands run', () => {
     const { edges, graphActions, onWarning, mutations } = createMutationsHarness(
       [
         makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(2, 'idle')),
+        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1, 'idle')),
       ],
       [],
     )
@@ -457,15 +432,26 @@ describe('useFlowNodeMutations', () => {
       [
         makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
         makeFlowNode('image-2', 'image', makeImageSnapshot(2)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(3, 'idle')),
+        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1, 'idle')),
       ],
       [
         {
-          id: 'e-1',
+          id: 'connection-1',
           source: 'image-1',
           target: 'fusion-1',
           sourceHandle: 'out:image',
           targetHandle: 'in:image',
+          data: {
+            connectionSnapshot: {
+              id: 1,
+              fromNodeType: 'image',
+              fromNodeId: 1,
+              fromPort: 'image',
+              toNodeType: 'fusion',
+              toNodeId: 1,
+              toPort: 'image',
+            },
+          },
         },
       ],
     )
@@ -481,7 +467,7 @@ describe('useFlowNodeMutations', () => {
     } as EdgeUpdateEvent)
 
     expect(edges.value[0]).toMatchObject({
-      id: 'e-1',
+      id: 'connection-1',
       source: 'image-2',
       target: 'fusion-1',
       sourceHandle: 'out:image',

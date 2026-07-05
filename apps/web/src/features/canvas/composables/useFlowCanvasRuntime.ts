@@ -28,7 +28,7 @@ import {
   type CanvasGraphTransaction,
   type CanvasGraphTransactionReason,
   type CanvasGraphTransactionSummary,
-} from '../runtime-v2'
+} from '../graph-runtime'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 
@@ -47,7 +47,7 @@ type FlowGraphCommitOptions = {
   preserveSelection?: boolean
 }
 
-type NodeDragV2Change = NodeChange & {
+type NodeDragChange = NodeChange & {
   id: string
   type: 'position' | 'select'
 }
@@ -80,18 +80,16 @@ export type UseFlowCanvasRuntimeOptions = {
   scheduleMicrotask?: (callback: () => void) => void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
-  enableNodeDragV2?: boolean
-  enableGraphTransactionsV2?: boolean
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   let isNodeDragActive = false
-  let activeNodeDragV2: {
+  let activeNodeDrag: {
     transaction: CanvasGraphTransaction
   } | null = null
-  let pendingNodeDragChanges: NodeDragV2Change[] = []
-  let latestNodeDragChanges: NodeDragV2Change[] = []
+  let pendingNodeDragChanges: NodeDragChange[] = []
+  let latestNodeDragChanges: NodeDragChange[] = []
   let pendingNodeDragFrameId: number | null = null
   let nativeRemoveHistoryBefore: FlowHistorySnapshot | null = null
   let isNativeRemoveCommitScheduled = false
@@ -104,8 +102,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     ((callback: FrameRequestCallback) => window.requestAnimationFrame(callback))
   const cancelAnimationFrame =
     options.cancelAnimationFrame ?? ((handle: number) => window.cancelAnimationFrame(handle))
-  const isNodeDragV2Enabled = options.enableNodeDragV2 ?? true
-  const isGraphTransactionsV2Enabled = options.enableGraphTransactionsV2 ?? true
 
   function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
     const ids = new Set<string>()
@@ -248,12 +244,12 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return /^(?:image|prompt|fusion)-\d+$/.test(nodeId)
   }
 
-  function isNodeDragV2Change(change: NodeChange): change is NodeDragV2Change {
+  function isNodeDragChange(change: NodeChange): change is NodeDragChange {
     return (change.type === 'position' || change.type === 'select') && 'id' in change
   }
 
-  function canQueueNodeDragV2Changes(changes: NodeChange[]): changes is NodeDragV2Change[] {
-    return isNodeDragV2Enabled && isNodeDragActive && changes.every(isNodeDragV2Change)
+  function canQueueNodeDragChanges(changes: NodeChange[]): changes is NodeDragChange[] {
+    return isNodeDragActive && changes.every(isNodeDragChange)
   }
 
   function createCurrentCanvasGraphStore() {
@@ -267,7 +263,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return createCanvasGraphStore(snapshot)
   }
 
-  function createNodeDragV2Transaction() {
+  function createNodeDragTransaction() {
     return createCurrentCanvasGraphStore().beginTransaction('node-drag')
   }
 
@@ -282,8 +278,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     })
   }
 
-  function stageNodeDragV2Change(change: NodeDragV2Change) {
-    const transaction = activeNodeDragV2?.transaction
+  function stageNodeDragChange(change: NodeDragChange) {
+    const transaction = activeNodeDrag?.transaction
     if (!transaction || !isCanvasGraphNodeId(change.id)) return
     if (change.type === 'position' && change.position) {
       transaction.updateNode(change.id, {
@@ -297,15 +293,15 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     }
   }
 
-  function getNodeDragChangeKey(change: NodeDragV2Change) {
+  function getNodeDragChangeKey(change: NodeDragChange) {
     return `${change.type}:${change.id}`
   }
 
   function mergeNodeDragChanges(
-    current: NodeDragV2Change[],
-    incoming: NodeDragV2Change[],
-  ): NodeDragV2Change[] {
-    const nextByKey = new Map<string, NodeDragV2Change>()
+    current: NodeDragChange[],
+    incoming: NodeDragChange[],
+  ): NodeDragChange[] {
+    const nextByKey = new Map<string, NodeDragChange>()
     current.forEach((change) => {
       nextByKey.set(getNodeDragChangeKey(change), change)
     })
@@ -342,8 +338,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     )
   }
 
-  function queueNodeDragV2Changes(changes: NodeDragV2Change[]) {
-    changes.forEach(stageNodeDragV2Change)
+  function queueNodeDragChanges(changes: NodeDragChange[]) {
+    changes.forEach(stageNodeDragChange)
     pendingNodeDragChanges = mergeNodeDragChanges(pendingNodeDragChanges, changes)
     latestNodeDragChanges = mergeNodeDragChanges(latestNodeDragChanges, changes)
     if (pendingNodeDragFrameId !== null) return
@@ -355,9 +351,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function beginNodeDragTransaction() {
     isNodeDragActive = true
-    activeNodeDragV2 = isNodeDragV2Enabled
-      ? { transaction: createNodeDragV2Transaction() }
-      : null
+    activeNodeDrag = { transaction: createNodeDragTransaction() }
     flowHistory.onNodeDragStart()
   }
 
@@ -365,7 +359,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     try {
       flushQueuedNodeDragChanges()
       syncProjectedNodeDragChanges()
-      activeNodeDragV2?.transaction.commit()
+      activeNodeDrag?.transaction.commit()
       flowHistory.onNodeDragStop(() => {
         markDirty()
       })
@@ -373,7 +367,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       pendingNodeDragChanges = []
       latestNodeDragChanges = []
       clearPendingNodeDragFrame()
-      activeNodeDragV2 = null
+      activeNodeDrag = null
       isNodeDragActive = false
     }
   }
@@ -382,8 +376,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     pendingNodeDragChanges = []
     latestNodeDragChanges = []
     clearPendingNodeDragFrame()
-    activeNodeDragV2?.transaction.cancel()
-    activeNodeDragV2 = null
+    activeNodeDrag?.transaction.cancel()
+    activeNodeDrag = null
     isNodeDragActive = false
   }
 
@@ -498,7 +492,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return Array.from(new Set(edgeIds))
   }
 
-  function commitNativeRemoveOperationV2(
+  function commitNativeRemoveTransaction(
     historyBefore: FlowHistorySnapshot,
     nodeChanges: NodeChange[],
     edgeChanges: EdgeChange[],
@@ -545,18 +539,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     pendingNativeRemoveEdgeChanges = []
     if (!historyBefore || !hasApplicableRemoveChanges(nodeChanges, edgeChanges)) return
 
-    if (
-      isGraphTransactionsV2Enabled &&
-      commitNativeRemoveOperationV2(historyBefore, nodeChanges, edgeChanges)
-    ) {
+    if (commitNativeRemoveTransaction(historyBefore, nodeChanges, edgeChanges)) {
       return
     }
-
-    const result = graphAdapter.applyGraphChanges(
-      { nodes: nodeChanges, edges: edgeChanges },
-      createFlowGraphCommandOptions({ historyBefore }),
-    )
-    if (result.didChange) options.onNativeRemove?.()
+    options.onWarning('删除操作未能应用，请刷新画布后重试')
   }
 
   function scheduleNativeRemoveCommit() {
@@ -572,8 +558,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function onNodesChange(changes: NodeChange[]) {
     if (changes.length === 0) return
-    if (canQueueNodeDragV2Changes(changes)) {
-      queueNodeDragV2Changes(changes)
+    if (canQueueNodeDragChanges(changes)) {
+      queueNodeDragChanges(changes)
       return
     }
     flushQueuedNodeDragChanges()
