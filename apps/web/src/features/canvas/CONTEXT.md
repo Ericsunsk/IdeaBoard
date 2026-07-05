@@ -2,6 +2,10 @@
 
 Canvas Workspace 是用户编辑 Canvas Board、编排节点、运行图像任务并就地编辑图像结果的上下文。
 
+## Design Docs
+
+- [RUNTIME_V2_DESIGN.md](./RUNTIME_V2_DESIGN.md)：Canvas performance/runtime v2 brief，定义 normalized graph store、transaction、Vue Flow adapter、migration order 和 fallback strategy。
+
 ## Language
 
 **Canvas Workspace**:
@@ -33,6 +37,18 @@ _Avoid_: Flow node
 **Flow Node**:
 Canvas Workspace 挂载期间，Canvas Node 在 Vue Flow 中的 runtime representation。
 _Avoid_: Canvas Node
+
+**CanvasGraphStore**:
+Canvas Runtime v2 的 normalized graph state fact source，负责 O(1) node/edge lookup、hydrate/export 和 transaction commit summary。
+_Avoid_: Vue Flow nodes array, persistence snapshot
+
+**CanvasGraphTransaction**:
+Canvas Runtime v2 的 logical mutation boundary，用于把 drag、connect、delete、result materialization 等用户动作聚合为一次 commit。
+_Avoid_: raw Vue Flow change batch
+
+**VueFlowGraphAdapter**:
+Canvas Runtime v2 中把 CanvasGraphStore projection 到 Vue Flow interaction plane 的 adapter。
+_Avoid_: graph domain store
 
 **Task**:
 Canvas Workspace 提交到后端的 image generation 或 image editing job。
