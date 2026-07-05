@@ -165,7 +165,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
         persistPendingTaskIds: params.persistPendingTaskIds,
         isCurrent: () => isBoardStillCurrent(params.boardId),
         isPendingError: isTaskResultPendingError,
-        afterTaskIdAttached: flushPendingTaskSnapshot,
+        afterTaskIdsAttached: flushPendingTaskSnapshot,
         onReserved: (ids) => {
           resultNodeIds = ids
           ids.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
@@ -189,36 +189,51 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
     const pendingTasks = collectPendingImageTasks(options.nodes.value)
     if (pendingTasks.length === 0) return
-    let successCount = 0
-    let failureCount = 0
-    await Promise.allSettled(
-      pendingTasks.map(async ({ nodeId, taskId, fallbackRatio }) => {
+    const tasksToResolve = pendingTasks
+      .map(({ nodeId, taskId, fallbackRatio }) => {
         const reattachKey = `${boardId}:${nodeId}:${taskId}`
-        if (activeReattachKeys.has(reattachKey) || runningNodeIds.value.has(nodeId)) return
+        if (activeReattachKeys.has(reattachKey) || runningNodeIds.value.has(nodeId)) return null
         activeReattachKeys.add(reattachKey)
         setNodeRunning(nodeId, true)
-        try {
-          const didResolve = await pendingResults.resolveAttachedPendingResult({
-            resultNodeId: nodeId,
-            taskId,
-            resolveResult: (pendingTaskId) =>
-              resolveFirstTaskImageResult(pendingTaskId, fallbackRatio),
-            isCurrent: () => isBoardStillCurrent(boardId),
-            isAttached: () => isPendingImageTaskStillCurrent(nodeId, taskId),
-          })
-          if (didResolve) successCount += 1
-        } catch (error) {
-          if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
+        return { nodeId, taskId, fallbackRatio, reattachKey }
+      })
+      .filter((task): task is NonNullable<typeof task> => !!task)
+    if (tasksToResolve.length === 0) return
+
+    let successCount: number
+    let failureCount: number
+    try {
+      const taskByNodeId = new Map(tasksToResolve.map((task) => [task.nodeId, task]))
+      const summary = await pendingResults.resolveAttachedPendingResults({
+        tasks: tasksToResolve.map(({ nodeId, taskId }) => ({
+          resultNodeId: nodeId,
+          taskId,
+        })),
+        resolveResult: (pendingTaskId, resultNodeId) => {
+          const task = taskByNodeId.get(resultNodeId)
+          return resolveFirstTaskImageResult(pendingTaskId, task?.fallbackRatio ?? 1)
+        },
+        isCurrent: () => isBoardStillCurrent(boardId),
+        isAttached: ({ resultNodeId, taskId }) =>
+          isPendingImageTaskStillCurrent(resultNodeId, taskId),
+        onResolveError: (task, error) => {
+          if (
+            !isBoardStillCurrent(boardId) ||
+            !isPendingImageTaskStillCurrent(task.resultNodeId, task.taskId)
+          ) {
             return
           }
           console.warn('[canvas] reattach pending image task failed', error)
-          failureCount += 1
-        } finally {
-          activeReattachKeys.delete(reattachKey)
-          setNodeRunning(nodeId, false)
-        }
-      }),
-    )
+        },
+      })
+      successCount = summary.successCount
+      failureCount = summary.failureCount
+    } finally {
+      tasksToResolve.forEach(({ nodeId, reattachKey }) => {
+        activeReattachKeys.delete(reattachKey)
+        setNodeRunning(nodeId, false)
+      })
+    }
     if (!isBoardStillCurrent(boardId)) return
     if (successCount > 0) {
       options.onSuccess(successCount > 1 ? `已恢复 ${successCount} 个生成结果` : '已恢复生成结果')

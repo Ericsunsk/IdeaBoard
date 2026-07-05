@@ -8,6 +8,7 @@ import {
 } from '../execution/runtime/imageWorkflowCommandRuntime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 
 type ValueRef<T> = {
   readonly value: T
@@ -18,6 +19,7 @@ type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 type UseCanvasTaskRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
+  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   graphAdapter: CanvasVueFlowGraphAdapter
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   currentBoardId: ValueRef<string | null | undefined>
@@ -35,6 +37,7 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
   const workflow = useFlowImageWorkflowExecution({
     nodes: options.nodes,
     edges: options.edges,
+    boardBaseSnapshot: options.boardBaseSnapshot,
     graphAdapter: options.graphAdapter,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,

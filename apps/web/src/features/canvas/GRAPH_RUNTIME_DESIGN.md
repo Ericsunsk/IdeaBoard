@@ -107,6 +107,7 @@ Responsibilities:
 - edge update: resolve canonical graph edge id from `connectionSnapshot` or canonical edge id, commit one `connect` transaction.
 - native disconnect/delete/batch delete: coalesce native remove changes, commit one `disconnect` / `delete` / `batch-delete` transaction.
 - node delete command: remove canonical graph node and connected edges via one `delete` transaction.
+- Pending/Result writeback: reserve pending result nodes, attach task ids, materialize resolved images, cancel failed results, and reattach pending results through one `result-materialize` transaction summary plus one batched Vue Flow projection command per writeback stage.
 
 Non-canonical node ids, non-canonical edge ids, or corrupt edge snapshots are not mutated through a legacy path. The UI must surface a warning and leave the current graph untouched.
 
@@ -133,5 +134,4 @@ Only add these after benchmark evidence shows they address the measured bottlene
 - edge projection budget / related-edge mode
 - media preview lazy/degraded mode
 - handle/tool chrome on-demand mounting
-- result materialization through Graph Runtime
 - permanent telemetry counters beyond benchmark-only instrumentation

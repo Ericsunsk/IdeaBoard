@@ -1,7 +1,13 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../../utils/canvasNodeFactory'
-import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
+import {
+  clampImageNodeOutputCount,
+  type CanvasBoardSnapshot,
+  type CanvasConnection,
+  type CanvasNodeItem,
+  type ImageNodeItem,
+} from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
 import { resolveFlowNodeDragHandle } from '../../utils/flowNodeDragHandle'
 import {
@@ -15,16 +21,29 @@ import type {
 } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
-import { waitForNextRenderFrame } from '../../utils/animationFrame'
 import type {
   CanvasVueFlowGraphAdapter,
   CanvasVueFlowGraphCommandOptions,
 } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
+import {
+  canvasConnectionToFlowEdge,
+  flowToCanvasBoardSnapshot,
+  parseFlowNodeId,
+  resolveNextCanvasConnectionId,
+} from '../../utils/flowSnapshotAdapter'
+import {
+  createCanvasGraphStore,
+  toCanvasGraphNodeId,
+  type CanvasGraphNodeId,
+  type CanvasGraphTransaction,
+  type CanvasGraphTransactionSummary,
+} from '../../graph-runtime'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
+  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   graphAdapter: CanvasVueFlowGraphAdapter
   refreshNodeInternals?: (nodeIds: string[]) => void
 }
@@ -43,6 +62,9 @@ export type PendingImageResultExecution = {
   resolveAttachedPendingResult: (
     params: ResolveAttachedPendingImageResultParams,
   ) => Promise<boolean>
+  resolveAttachedPendingResults: (
+    params: ResolveAttachedPendingImageResultsParams,
+  ) => Promise<ResolveAttachedPendingImageResultsSummary>
 }
 
 export type PendingImageResultTaskSubmission = {
@@ -56,6 +78,9 @@ export type RunPendingImageResultsParams = PendingImageResultReservationParams &
   isPendingError: (error: unknown) => boolean
   persistPendingTaskIds?: boolean
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
+  afterTaskIdsAttached?: (params: {
+    attachments: Array<{ resultNodeId: string; taskId: string }>
+  }) => Promise<void>
   onReserved?: (resultNodeIds: string[]) => void
 }
 
@@ -67,11 +92,30 @@ export type ResolveAttachedPendingImageResultParams = {
   isAttached: () => boolean
 }
 
+export type AttachedPendingImageResultTask = {
+  resultNodeId: string
+  taskId: string
+}
+
+export type ResolveAttachedPendingImageResultsParams = {
+  tasks: AttachedPendingImageResultTask[]
+  resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
+  isCurrent: () => boolean
+  isAttached: (task: AttachedPendingImageResultTask) => boolean
+  onResolveError?: (task: AttachedPendingImageResultTask, error: unknown) => void
+}
+
 export type PendingImageResultRunSummary = {
   resultNodeIds: string[]
   totalCount: number
   successCount: number
   pendingCount: number
+  failureCount: number
+  firstFailure: unknown
+}
+
+export type ResolveAttachedPendingImageResultsSummary = {
+  successCount: number
   failureCount: number
   firstFailure: unknown
 }
@@ -88,6 +132,8 @@ type PendingImageResultLookup = {
 
 type PendingImageResultMutationOptions = {
   recordHistory?: boolean
+  markDirty?: boolean
+  transactionSummary?: CanvasGraphTransactionSummary
 }
 
 type PendingImageResultPlacementOptions = PendingImageResultMutationOptions & {
@@ -103,8 +149,16 @@ const IMAGE_NODE_HEADER_HEIGHT = 26
 function createPendingResultCommandOptions(
   sideEffects?: PendingImageResultMutationOptions,
 ): CanvasVueFlowGraphCommandOptions {
+  const transactionSummary = sideEffects?.transactionSummary
+  const shouldUseTransactionSideEffects = transactionSummary?.didChange === true
   return createFlowGraphCommandOptions({
-    recordHistory: sideEffects?.recordHistory,
+    recordHistory: shouldUseTransactionSideEffects
+      ? transactionSummary.shouldRecordHistory
+      : sideEffects?.recordHistory,
+    markDirty: shouldUseTransactionSideEffects
+      ? transactionSummary.shouldMarkDirty
+      : sideEffects?.markDirty,
+    transactionSummary,
   })
 }
 
@@ -118,6 +172,83 @@ export function usePendingImageResultExecution(
 ): PendingImageResultExecution {
   const cancelledResultNodeIds = new Set<string>()
   const resultLayoutsBySourceNodeId = new Map<string, Map<string, ImageResultLayout>>()
+
+  function createCurrentCanvasGraphSnapshot(): CanvasBoardSnapshot {
+    return flowToCanvasBoardSnapshot(
+      {
+        nodes: options.nodes.value,
+        edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+      },
+      options.boardBaseSnapshot?.value,
+    )
+  }
+
+  function commitResultMaterializeTransaction(params: {
+    recordHistory: boolean
+    markDirty: boolean
+    apply: (transaction: CanvasGraphTransaction, snapshot: CanvasBoardSnapshot) => void
+  }): CanvasGraphTransactionSummary {
+    const snapshot = createCurrentCanvasGraphSnapshot()
+    const transaction = createCanvasGraphStore(snapshot).beginTransaction('result-materialize', {
+      recordHistory: params.recordHistory,
+      markDirty: params.markDirty,
+    })
+    params.apply(transaction, snapshot)
+    return transaction.commit()
+  }
+
+  function readCanvasGraphNodeId(nodeId: string): CanvasGraphNodeId | null {
+    const ref = parseFlowNodeId(nodeId)
+    return ref ? toCanvasGraphNodeId(ref.nodeType, ref.id) : null
+  }
+
+  function readCanvasNodeSnapshot(node: Node): CanvasNodeItem | null {
+    const snapshot = node.data?.snapshotNode
+    if (!snapshot || typeof snapshot !== 'object') return null
+    return snapshot as CanvasNodeItem
+  }
+
+  function hasCanvasGraphNodeSnapshot(snapshot: CanvasBoardSnapshot, nodeId: string): boolean {
+    const ref = parseFlowNodeId(nodeId)
+    if (!ref) return false
+    if (ref.nodeType === 'image') return snapshot.imageNodes.some((node) => node.id === ref.id)
+    if (ref.nodeType === 'prompt') return snapshot.promptNodes.some((node) => node.id === ref.id)
+    return snapshot.fusionNodes.some((node) => node.id === ref.id)
+  }
+
+  function resolveConnectionIdAllocator(snapshot: CanvasBoardSnapshot): () => number {
+    const usedIds = new Set(snapshot.connections.map((connection) => connection.id))
+    let nextConnectionId = resolveNextCanvasConnectionId(
+      snapshot,
+      options.edges.value as Parameters<typeof resolveNextCanvasConnectionId>[1],
+    )
+    return () => {
+      while (usedIds.has(nextConnectionId)) nextConnectionId += 1
+      const connectionId = nextConnectionId
+      usedIds.add(connectionId)
+      nextConnectionId += 1
+      return connectionId
+    }
+  }
+
+  function createPendingImageResultConnection(
+    connectionId: number,
+    anchorNodeId: string,
+    resultNodeId: string,
+  ): CanvasConnection | null {
+    const source = parseFlowNodeId(anchorNodeId)
+    const target = parseFlowNodeId(resultNodeId)
+    if (!source || !target) return null
+    return {
+      id: connectionId,
+      fromNodeType: source.nodeType,
+      fromNodeId: source.id,
+      fromPort: 'image',
+      toNodeType: target.nodeType,
+      toNodeId: target.id,
+      toPort: 'image',
+    }
+  }
 
   function buildPendingResultLookup(): PendingImageResultLookup {
     const nodeById = new Map<string, Node>()
@@ -313,49 +444,47 @@ export function usePendingImageResultExecution(
     }
   }
 
-  async function appendPendingImageResultEdge(anchorNodeId: string, resultNodeId: string) {
-    await waitForNextRenderFrame()
-    if (cancelledResultNodeIds.has(resultNodeId)) return
-    const hasSource = options.nodes.value.some((node) => node.id === anchorNodeId)
-    const targetNode = options.nodes.value.find((node) => node.id === resultNodeId)
-    const hasTarget = !!targetNode
-    if (!hasSource || !hasTarget) return
-    const targetSnapshot =
-      targetNode.data?.snapshotNode && typeof targetNode.data.snapshotNode === 'object'
-        ? (targetNode.data.snapshotNode as ImageNodeItem)
-        : null
-    options.refreshNodeInternals?.([anchorNodeId, resultNodeId])
-    const nextEdge: Edge = {
-      id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      source: anchorNodeId,
-      sourceHandle: 'out:image',
-      target: resultNodeId,
-      targetHandle: 'in:image',
-      animated: targetSnapshot?.outputStatus === 'running',
+  function createPendingImageResultEdge(
+    connection: CanvasConnection,
+    targetSnapshot: ImageNodeItem,
+  ): Edge {
+    const edge = canvasConnectionToFlowEdge(connection)
+    return {
+      ...edge,
+      animated: targetSnapshot.outputStatus === 'running',
     }
-    const hasSameEdge = options.edges.value.some(
-      (edge) =>
-        edge.source === nextEdge.source &&
-        edge.target === nextEdge.target &&
-        edge.sourceHandle === nextEdge.sourceHandle &&
-        edge.targetHandle === nextEdge.targetHandle,
-    )
-    if (hasSameEdge) return
-    options.graphAdapter.addEdges(
-      nextEdge,
-      createPendingResultCommandOptions({ recordHistory: false }),
-    )
-    options.refreshNodeInternals?.([anchorNodeId, resultNodeId])
   }
 
-  function appendPendingImageResultNodeWithLookup(
+  function hasSamePendingImageResultEdge(
+    edges: readonly Edge[],
+    anchorNodeId: string,
+    resultNodeId: string,
+  ): boolean {
+    return edges.some(
+      (edge) =>
+        edge.source === anchorNodeId &&
+        edge.target === resultNodeId &&
+        edge.sourceHandle === 'out:image' &&
+        edge.targetHandle === 'in:image',
+    )
+  }
+
+  type PendingImageResultReservationPlan = {
+    resultNodeId: string
+    node: Node
+    mode: 'add' | 'update'
+    anchorNodeId: string
+    layout: ImageResultLayout
+    refreshNodeIds: string[]
+  }
+
+  function planPendingImageResultNodeWithLookup(
     source: ImageExecutionInput,
     anchorNodeId: string,
     lookup: PendingImageResultLookup,
     optionsOverride?: PendingImageResultPlacementOptions,
     preferredNodeId?: string | null,
-  ): string {
-    pruneResultNodeLayouts()
+  ): PendingImageResultReservationPlan {
     const sourceRatio = source.ratio > 0 ? source.ratio : 1
     const fallbackAnchor: ImageResultLayout = {
       x: 0,
@@ -387,38 +516,37 @@ export function usePendingImageResultExecution(
     })
 
     if (preferredNodeId) {
-      let updatedNode: Node | null = null
-      options.graphAdapter.replaceNodes((items) => {
-        let didUpdate = false
-        const nextItems = items.map((item) => {
-          if (item.id !== preferredNodeId || item.data?.kind !== 'image') return item
-          const snapshot = item.data.snapshotNode
-          if (!snapshot || typeof snapshot !== 'object') return item
-          didUpdate = true
-          updatedNode = {
-            ...item,
-            data: {
-              ...item.data,
-              snapshotNode: buildPendingImageNodeSnapshot(snapshot as ImageNodeItem, {
-                sourceImageRatio: pendingImageNode.sourceImageRatio,
-                width: pendingImageNode.width,
-              }),
-            },
-          }
-          return updatedNode
-        })
-        return didUpdate ? nextItems : items
-      }, createPendingResultCommandOptions(optionsOverride))
-      if (updatedNode) lookup.nodeById.set(preferredNodeId, updatedNode)
-      cancelledResultNodeIds.delete(preferredNodeId)
-      rememberResultNodeLayout(anchorNodeId, preferredNodeId, {
-        ratio: pendingImageNode.sourceImageRatio,
-        x: position.x,
-        y: position.y,
-        width: pendingImageNode.width,
-      })
-      options.refreshNodeInternals?.([anchorNodeId, preferredNodeId])
-      return preferredNodeId
+      const targetNode = lookup.nodeById.get(preferredNodeId)
+      const snapshot = targetNode?.data?.snapshotNode
+      if (targetNode?.data?.kind === 'image' && snapshot && typeof snapshot === 'object') {
+        const updatedNode: Node = {
+          ...targetNode,
+          data: {
+            ...targetNode.data,
+            snapshotNode: buildPendingImageNodeSnapshot(snapshot as ImageNodeItem, {
+              sourceImageRatio: pendingImageNode.sourceImageRatio,
+              width: pendingImageNode.width,
+            }),
+          },
+        }
+        lookup.nodeById.set(preferredNodeId, updatedNode)
+        cancelledResultNodeIds.delete(preferredNodeId)
+        const layout = {
+          ratio: pendingImageNode.sourceImageRatio,
+          x: position.x,
+          y: position.y,
+          width: pendingImageNode.width,
+        }
+        rememberResultNodeLayout(anchorNodeId, preferredNodeId, layout)
+        return {
+          resultNodeId: preferredNodeId,
+          node: updatedNode,
+          mode: 'update',
+          anchorNodeId,
+          layout,
+          refreshNodeIds: [anchorNodeId, preferredNodeId],
+        }
+      }
     }
 
     const nextNode: Node<FlowNodeData> = {
@@ -435,38 +563,138 @@ export function usePendingImageResultExecution(
       },
     }
 
-    options.graphAdapter.addNodes(
-      nextNode as Node,
-      createPendingResultCommandOptions(optionsOverride),
-    )
     lookup.nodeById.set(nextNode.id, nextNode as Node)
     lookup.nodeOrderById.set(nextNode.id, lookup.nodeOrderById.size)
     cancelledResultNodeIds.delete(nextNode.id)
-    rememberResultNodeLayout(anchorNodeId, nextNode.id, {
+    const layout = {
       ratio: pendingImageNode.sourceImageRatio,
       x: pendingImageNode.x,
       y: pendingImageNode.y,
       width: pendingImageNode.width,
-    })
-    options.refreshNodeInternals?.([anchorNodeId, nextNode.id])
-    void appendPendingImageResultEdge(anchorNodeId, nextNode.id)
+    }
+    rememberResultNodeLayout(anchorNodeId, nextNode.id, layout)
 
-    return nextNode.id
+    return {
+      resultNodeId: nextNode.id,
+      node: nextNode as Node,
+      mode: 'add',
+      anchorNodeId,
+      layout,
+      refreshNodeIds: [anchorNodeId, nextNode.id],
+    }
+  }
+
+  function commitPendingResultReservationBatch(plans: PendingImageResultReservationPlan[]) {
+    if (plans.length === 0) return
+    const nodeUpdates = new Map<string, Node>()
+    const nodesToAdd: Node[] = []
+    plans.forEach((plan) => {
+      if (plan.mode === 'update') {
+        nodeUpdates.set(plan.resultNodeId, plan.node)
+      } else {
+        nodesToAdd.push(plan.node)
+      }
+    })
+
+    const nextNodes =
+      nodeUpdates.size > 0 || nodesToAdd.length > 0
+        ? [...options.nodes.value.map((node) => nodeUpdates.get(node.id) ?? node), ...nodesToAdd]
+        : options.nodes.value
+
+    const graphTransaction = commitResultMaterializeTransaction({
+      recordHistory: true,
+      markDirty: false,
+      apply: (transaction, snapshot) => {
+        plans.forEach((plan) => {
+          const snapshotNode = readCanvasNodeSnapshot(plan.node)
+          if (!snapshotNode) return
+          if (plan.mode === 'add') {
+            transaction.addNode(snapshotNode)
+            return
+          }
+          const nodeId = readCanvasGraphNodeId(plan.resultNodeId)
+          if (nodeId) transaction.updateNode(nodeId, () => snapshotNode)
+        })
+
+        const allocateConnectionId = resolveConnectionIdAllocator(snapshot)
+        plans.forEach((plan) => {
+          const existingEdges = options.edges.value
+          if (hasSamePendingImageResultEdge(existingEdges, plan.anchorNodeId, plan.resultNodeId)) {
+            return
+          }
+          const connection = createPendingImageResultConnection(
+            allocateConnectionId(),
+            plan.anchorNodeId,
+            plan.resultNodeId,
+          )
+          if (connection) transaction.addEdge(connection)
+        })
+      },
+    })
+
+    const connectionIdsByPlanKey = new Map<string, number>()
+    graphTransaction.projectionPatch.edges.added.forEach((record) => {
+      connectionIdsByPlanKey.set(
+        `${record.connection.fromNodeType}-${record.connection.fromNodeId}:${record.connection.toNodeType}-${record.connection.toNodeId}`,
+        record.connection.id,
+      )
+    })
+
+    const edgesToAdd: Edge[] = []
+    plans.forEach((plan) => {
+      const existingEdges = [...options.edges.value, ...edgesToAdd]
+      if (hasSamePendingImageResultEdge(existingEdges, plan.anchorNodeId, plan.resultNodeId)) return
+      const snapshot = plan.node.data?.snapshotNode
+      if (!snapshot || typeof snapshot !== 'object') return
+      const source = parseFlowNodeId(plan.anchorNodeId)
+      const target = parseFlowNodeId(plan.resultNodeId)
+      const connectionId =
+        source && target
+          ? connectionIdsByPlanKey.get(
+              `${source.nodeType}-${source.id}:${target.nodeType}-${target.id}`,
+            )
+          : undefined
+      if (!connectionId) return
+      const connection = createPendingImageResultConnection(
+        connectionId,
+        plan.anchorNodeId,
+        plan.resultNodeId,
+      )
+      if (!connection) return
+      edgesToAdd.push(createPendingImageResultEdge(connection, snapshot as ImageNodeItem))
+    })
+    const nextEdges =
+      edgesToAdd.length > 0 ? [...options.edges.value, ...edgesToAdd] : options.edges.value
+
+    options.graphAdapter.replaceGraph(
+      {
+        nodes: nextNodes,
+        edges: nextEdges,
+      },
+      createPendingResultCommandOptions({
+        recordHistory: true,
+        markDirty: false,
+        transactionSummary: graphTransaction,
+      }),
+    )
+
+    const refreshNodeIds = Array.from(new Set(plans.flatMap((plan) => plan.refreshNodeIds)))
+    if (refreshNodeIds.length > 0) options.refreshNodeInternals?.(refreshNodeIds)
   }
 
   function reservePendingResults(params: PendingImageResultReservationParams): string[] {
     const count = clampImageNodeOutputCount(params.outputCount)
     const resultOptions = params.resultOptions ?? {}
     const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? params.sourceNodeId
+    pruneResultNodeLayouts()
     const lookup = buildPendingResultLookup()
     const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId, lookup)
-    return Array.from({ length: count }, (_, index) =>
-      appendPendingImageResultNodeWithLookup(
+    const plans = Array.from({ length: count }, (_, index) =>
+      planPendingImageResultNodeWithLookup(
         params.source,
         anchorNodeId,
         lookup,
         {
-          recordHistory: index === 0,
           anchor: resultOptions.anchor,
           targetRatio: resultOptions.targetRatio,
           targetWidth: resultOptions.targetWidth,
@@ -474,35 +702,78 @@ export function usePendingImageResultExecution(
         index === 0 ? reusableNodeId : null,
       ),
     )
+    commitPendingResultReservationBatch(plans)
+    return plans.map((plan) => plan.resultNodeId)
   }
 
-  function attachPendingTaskId(params: { resultNodeId: string; taskId: string }) {
-    const normalizedTaskId = params.taskId.trim()
-    if (!normalizedTaskId) return
-    const targetNode = options.nodes.value.find((item) => item.id === params.resultNodeId)
-    if (targetNode?.data?.kind !== 'image') return
-    const snapshot = targetNode.data.snapshotNode
-    if (!snapshot || typeof snapshot !== 'object') return
-    options.graphAdapter.updateNode(
-      params.resultNodeId,
-      {
+  function attachPendingTaskIds(params: {
+    attachments: Array<{ resultNodeId: string; taskId: string }>
+    markDirty: boolean
+  }): Promise<void> {
+    const attachments = new Map<string, string>()
+    params.attachments.forEach((attachment) => {
+      const normalizedTaskId = attachment.taskId.trim()
+      if (normalizedTaskId) attachments.set(attachment.resultNodeId, normalizedTaskId)
+    })
+    if (attachments.size === 0) return Promise.resolve()
+    let didUpdate = false
+    const updatedSnapshotsByNodeId = new Map<string, ImageNodeItem>()
+    const nextNodes = options.nodes.value.map((item) => {
+      const taskId = attachments.get(item.id)
+      if (!taskId || item.data?.kind !== 'image') return item
+      const snapshot = item.data.snapshotNode
+      if (!snapshot || typeof snapshot !== 'object') return item
+      const nextSnapshot = {
+        ...(snapshot as ImageNodeItem),
+        pendingTaskId: taskId,
+      }
+      didUpdate = true
+      updatedSnapshotsByNodeId.set(item.id, nextSnapshot)
+      return {
+        ...item,
         data: {
-          ...targetNode.data,
-          snapshotNode: {
-            ...(snapshot as ImageNodeItem),
-            pendingTaskId: normalizedTaskId,
-          },
+          ...item.data,
+          snapshotNode: nextSnapshot,
         },
+      }
+    })
+    if (!didUpdate) return Promise.resolve()
+    const graphTransaction = commitResultMaterializeTransaction({
+      recordHistory: false,
+      markDirty: params.markDirty,
+      apply: (transaction, currentSnapshot) => {
+        updatedSnapshotsByNodeId.forEach((updatedSnapshot, nodeId) => {
+          const graphNodeId = readCanvasGraphNodeId(nodeId)
+          if (!graphNodeId) return
+          if (hasCanvasGraphNodeSnapshot(currentSnapshot, nodeId)) {
+            transaction.updateNode(graphNodeId, () => updatedSnapshot)
+            return
+          }
+          transaction.addNode(updatedSnapshot)
+        })
       },
-      createPendingResultCommandOptions({ recordHistory: false }),
+    })
+    options.graphAdapter.replaceNodes(
+      nextNodes,
+      createPendingResultCommandOptions({
+        recordHistory: false,
+        markDirty: params.markDirty,
+        transactionSummary: graphTransaction,
+      }),
     )
+    return Promise.resolve()
   }
 
-  function materializeResolvedImage(params: {
-    resultNodeId: string
-    result: ResolvedTaskImageResult
-  }) {
-    const { resultNodeId, result } = params
+  type ResolvedImageProjection = {
+    snapshot: ImageNodeItem
+    normalizedRatio: number
+    resolvedFrameWidth: number | null
+  }
+
+  function createResolvedImageProjection(
+    currentSnapshot: ImageNodeItem,
+    result: ResolvedTaskImageResult,
+  ): ResolvedImageProjection {
     const resolvedImageWidth = Number(result.width)
     const resolvedImageHeight = Number(result.height)
     const hasResolvedSize =
@@ -518,66 +789,143 @@ export function usePendingImageResultExecution(
     const resolvedFrameWidth = hasResolvedSize
       ? resolveImageNodeFrameSize(normalizedRatio, true).width
       : null
+    const currentWidth = Number(currentSnapshot.width)
+    const width =
+      resolvedFrameWidth ??
+      (Number.isFinite(currentWidth) && currentWidth > 0
+        ? Math.max(1, Math.round(currentWidth))
+        : resolveImageNodeFrameSize(normalizedRatio, true).width)
+    return {
+      snapshot: {
+        ...currentSnapshot,
+        width,
+        sourceImageUrl: result.url,
+        sourceImageRatio: normalizedRatio,
+        pendingTaskId: undefined,
+        outputStatus: 'ready',
+        outputImages: [],
+      },
+      normalizedRatio,
+      resolvedFrameWidth,
+    }
+  }
+
+  function materializeResolvedImages(
+    materializations: Array<{ resultNodeId: string; result: ResolvedTaskImageResult }>,
+  ): Promise<void> {
+    const materializationsByNodeId = new Map<string, ResolvedTaskImageResult>()
+    materializations.forEach((materialization) => {
+      materializationsByNodeId.set(materialization.resultNodeId, materialization.result)
+    })
+    if (materializationsByNodeId.size === 0) return Promise.resolve()
+
+    const appliedLayouts = new Map<
+      string,
+      { normalizedRatio: number; resolvedFrameWidth: number | null }
+    >()
+    const updatedSnapshotsByNodeId = new Map<string, ImageNodeItem>()
     let didUpdateNode = false
-    let didUpdateEdge = false
     const nextNodes = options.nodes.value.map((item) => {
-      if (item.id !== resultNodeId || item.data?.kind !== 'image') return item
+      const result = materializationsByNodeId.get(item.id)
+      if (!result || item.data?.kind !== 'image') return item
       const snapshot = item.data.snapshotNode
       if (!snapshot || typeof snapshot !== 'object') return item
-      const currentSnapshot = snapshot as ImageNodeItem
-      const currentWidth = Number(currentSnapshot.width)
-      const width =
-        resolvedFrameWidth ??
-        (Number.isFinite(currentWidth) && currentWidth > 0
-          ? Math.max(1, Math.round(currentWidth))
-          : resolveImageNodeFrameSize(normalizedRatio, true).width)
+      const projection = createResolvedImageProjection(snapshot as ImageNodeItem, result)
       didUpdateNode = true
+      appliedLayouts.set(item.id, {
+        normalizedRatio: projection.normalizedRatio,
+        resolvedFrameWidth: projection.resolvedFrameWidth,
+      })
+      updatedSnapshotsByNodeId.set(item.id, projection.snapshot)
       return {
         ...item,
         data: {
           ...item.data,
-          snapshotNode: {
-            ...currentSnapshot,
-            width,
-            sourceImageUrl: result.url,
-            sourceImageRatio: normalizedRatio,
-            pendingTaskId: undefined,
-            outputStatus: 'ready',
-            outputImages: [],
-          },
+          snapshotNode: projection.snapshot,
         },
       }
     })
+
+    const updatedNodeIds = new Set(appliedLayouts.keys())
+    let didUpdateEdge = false
     const nextEdges = options.edges.value.map((edge) => {
-      if (edge.target !== resultNodeId || edge.targetHandle !== 'in:image') return edge
+      if (!updatedNodeIds.has(edge.target) || edge.targetHandle !== 'in:image') return edge
       if (edge.animated === false) return edge
       didUpdateEdge = true
       return { ...edge, animated: false }
     })
-    if (!didUpdateNode && !didUpdateEdge) return
+    if (!didUpdateNode && !didUpdateEdge) return Promise.resolve()
+    const graphTransaction = commitResultMaterializeTransaction({
+      recordHistory: false,
+      markDirty: true,
+      apply: (transaction) => {
+        updatedSnapshotsByNodeId.forEach((snapshot, nodeId) => {
+          const graphNodeId = readCanvasGraphNodeId(nodeId)
+          if (graphNodeId) transaction.updateNode(graphNodeId, () => snapshot)
+        })
+      },
+    })
     options.graphAdapter.replaceGraph(
       {
         nodes: didUpdateNode ? nextNodes : options.nodes.value,
         edges: didUpdateEdge ? nextEdges : options.edges.value,
       },
-      createPendingResultCommandOptions({ recordHistory: false }),
+      createPendingResultCommandOptions({
+        recordHistory: false,
+        markDirty: true,
+        transactionSummary: graphTransaction,
+      }),
     )
-    if (didUpdateNode) {
+    appliedLayouts.forEach((layout, resultNodeId) => {
       updateResultNodeLayout(resultNodeId, {
-        ratio: normalizedRatio,
-        ...(resolvedFrameWidth ? { width: resolvedFrameWidth } : {}),
+        ratio: layout.normalizedRatio,
+        ...(layout.resolvedFrameWidth ? { width: layout.resolvedFrameWidth } : {}),
       })
-      options.refreshNodeInternals?.([resultNodeId])
-    }
+    })
+    const refreshNodeIds = Array.from(updatedNodeIds)
+    if (refreshNodeIds.length > 0) options.refreshNodeInternals?.(refreshNodeIds)
+    return Promise.resolve()
   }
 
-  function cancelPendingResult(params: { resultNodeId: string }) {
-    cancelledResultNodeIds.add(params.resultNodeId)
-    forgetResultNodeLayout(params.resultNodeId)
-    options.graphAdapter.removeNodes(params.resultNodeId, {
-      ...createPendingResultCommandOptions({ recordHistory: false }),
+  function cancelPendingResults(resultNodeIds: string[]): Promise<void> {
+    const uniqueResultNodeIds = Array.from(new Set(resultNodeIds))
+    if (uniqueResultNodeIds.length === 0) return Promise.resolve()
+    uniqueResultNodeIds.forEach((resultNodeId) => {
+      cancelledResultNodeIds.add(resultNodeId)
+      forgetResultNodeLayout(resultNodeId)
+    })
+    const graphTransaction = commitResultMaterializeTransaction({
+      recordHistory: false,
+      markDirty: true,
+      apply: (transaction) => {
+        uniqueResultNodeIds.forEach((resultNodeId) => {
+          const graphNodeId = readCanvasGraphNodeId(resultNodeId)
+          if (graphNodeId) transaction.removeNode(graphNodeId, { removeConnectedEdges: true })
+        })
+      },
+    })
+    options.graphAdapter.removeNodes(uniqueResultNodeIds, {
+      ...createPendingResultCommandOptions({
+        recordHistory: false,
+        markDirty: true,
+        transactionSummary: graphTransaction,
+      }),
       removeConnectedEdges: true,
     })
+    return Promise.resolve()
+  }
+
+  async function runTaskIdAttachmentCallbacks(
+    params: RunPendingImageResultsParams,
+    attachments: Array<{ resultNodeId: string; taskId: string }>,
+  ): Promise<void> {
+    if (!params.afterTaskIdsAttached && !params.afterTaskIdAttached) return Promise.resolve()
+    if (attachments.length === 0) return Promise.resolve()
+    if (params.afterTaskIdsAttached) {
+      await params.afterTaskIdsAttached({ attachments })
+      return
+    }
+    await Promise.all(attachments.map((attachment) => params.afterTaskIdAttached?.(attachment)))
   }
 
   async function runPendingResults(
@@ -586,23 +934,62 @@ export function usePendingImageResultExecution(
     const persistPendingTaskIds = params.persistPendingTaskIds ?? true
     const resultNodeIds = reservePendingResults(params)
     params.onReserved?.(resultNodeIds)
+    const resultNodeOrder = new Map(
+      resultNodeIds.map((resultNodeId, index) => [resultNodeId, index]),
+    )
 
     let successCount = 0
     let pendingCount = 0
     let failureCount = 0
     let firstFailure: unknown = null
+    const submittedResults: Array<{ resultNodeId: string; taskId: string }> = []
+    const materializations: Array<{ resultNodeId: string; result: ResolvedTaskImageResult }> = []
+    const resultNodeIdsToCancel: string[] = []
 
     await Promise.allSettled(
       resultNodeIds.map(async (resultNodeId) => {
         try {
           const { taskId } = await params.submitTask(resultNodeId)
-          if (persistPendingTaskIds && params.isCurrent()) {
-            attachPendingTaskId({ resultNodeId, taskId })
-            await params.afterTaskIdAttached?.({ resultNodeId, taskId })
+          submittedResults.push({ resultNodeId, taskId })
+        } catch (error) {
+          firstFailure ??= error
+          if (params.isPendingError(error)) {
+            pendingCount += 1
+            if (!persistPendingTaskIds && params.isCurrent()) {
+              resultNodeIdsToCancel.push(resultNodeId)
+            }
+            return
           }
+          failureCount += 1
+          if (params.isCurrent()) {
+            resultNodeIdsToCancel.push(resultNodeId)
+          }
+        }
+      }),
+    )
+
+    const orderedSubmittedResults = submittedResults.sort(
+      (left, right) =>
+        (resultNodeOrder.get(left.resultNodeId) ?? Number.MAX_SAFE_INTEGER) -
+        (resultNodeOrder.get(right.resultNodeId) ?? Number.MAX_SAFE_INTEGER),
+    )
+
+    if (persistPendingTaskIds && params.isCurrent()) {
+      const shouldPersistTaskIdAttachment =
+        !!params.afterTaskIdsAttached || !!params.afterTaskIdAttached
+      await attachPendingTaskIds({
+        attachments: orderedSubmittedResults,
+        markDirty: shouldPersistTaskIdAttachment,
+      })
+      await runTaskIdAttachmentCallbacks(params, orderedSubmittedResults)
+    }
+
+    await Promise.allSettled(
+      orderedSubmittedResults.map(async ({ resultNodeId, taskId }) => {
+        try {
           const resolved = await params.resolveResult(taskId, resultNodeId)
           if (params.isCurrent()) {
-            materializeResolvedImage({ resultNodeId, result: resolved })
+            materializations.push({ resultNodeId, result: resolved })
           }
           successCount += 1
         } catch (error) {
@@ -610,17 +997,27 @@ export function usePendingImageResultExecution(
           if (params.isPendingError(error)) {
             pendingCount += 1
             if (!persistPendingTaskIds && params.isCurrent()) {
-              cancelPendingResult({ resultNodeId })
+              resultNodeIdsToCancel.push(resultNodeId)
             }
             return
           }
           failureCount += 1
           if (params.isCurrent()) {
-            cancelPendingResult({ resultNodeId })
+            resultNodeIdsToCancel.push(resultNodeId)
           }
         }
       }),
     )
+
+    if (params.isCurrent()) {
+      const orderedMaterializations = materializations.sort(
+        (left, right) =>
+          (resultNodeOrder.get(left.resultNodeId) ?? Number.MAX_SAFE_INTEGER) -
+          (resultNodeOrder.get(right.resultNodeId) ?? Number.MAX_SAFE_INTEGER),
+      )
+      await materializeResolvedImages(orderedMaterializations)
+      await cancelPendingResults(resultNodeIdsToCancel)
+    }
 
     return {
       resultNodeIds,
@@ -635,17 +1032,71 @@ export function usePendingImageResultExecution(
   async function resolveAttachedPendingResult(
     params: ResolveAttachedPendingImageResultParams,
   ): Promise<boolean> {
-    const resolved = await params.resolveResult(params.taskId, params.resultNodeId)
-    if (!params.isCurrent() || !params.isAttached()) return false
-    materializeResolvedImage({
-      resultNodeId: params.resultNodeId,
-      result: resolved,
+    const summary = await resolveAttachedPendingResults({
+      tasks: [{ resultNodeId: params.resultNodeId, taskId: params.taskId }],
+      resolveResult: params.resolveResult,
+      isCurrent: params.isCurrent,
+      isAttached: () => params.isAttached(),
     })
-    return true
+    return summary.successCount > 0
+  }
+
+  async function resolveAttachedPendingResults(
+    params: ResolveAttachedPendingImageResultsParams,
+  ): Promise<ResolveAttachedPendingImageResultsSummary> {
+    const taskOrder = new Map(
+      params.tasks.map((task, index) => [`${task.resultNodeId}:${task.taskId}`, index]),
+    )
+    let successCount = 0
+    let failureCount = 0
+    let firstFailure: unknown = null
+    const materializations: Array<{
+      resultNodeId: string
+      result: ResolvedTaskImageResult
+      taskId: string
+    }> = []
+
+    await Promise.allSettled(
+      params.tasks.map(async (task) => {
+        try {
+          const resolved = await params.resolveResult(task.taskId, task.resultNodeId)
+          if (!params.isCurrent() || !params.isAttached(task)) return
+          materializations.push({
+            resultNodeId: task.resultNodeId,
+            result: resolved,
+            taskId: task.taskId,
+          })
+          successCount += 1
+        } catch (error) {
+          if (!params.isCurrent() || !params.isAttached(task)) return
+          firstFailure ??= error
+          failureCount += 1
+          params.onResolveError?.(task, error)
+        }
+      }),
+    )
+
+    if (params.isCurrent()) {
+      const orderedMaterializations = materializations
+        .sort(
+          (left, right) =>
+            (taskOrder.get(`${left.resultNodeId}:${left.taskId}`) ?? Number.MAX_SAFE_INTEGER) -
+            (taskOrder.get(`${right.resultNodeId}:${right.taskId}`) ?? Number.MAX_SAFE_INTEGER),
+        )
+        .map(({ resultNodeId, result }) => ({ resultNodeId, result }))
+      await materializeResolvedImages(orderedMaterializations)
+    }
+
+    return {
+      successCount,
+      failureCount,
+      firstFailure,
+    }
   }
 
   return {
     runPendingResults,
     resolveAttachedPendingResult,
+    resolveAttachedPendingResults,
   }
 }
