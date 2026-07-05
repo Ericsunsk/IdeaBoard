@@ -861,6 +861,112 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value).toHaveLength(0)
   })
 
+  it('deletes a node when connected Vue Flow edge metadata is missing', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const [currentEdge] = harness.fullEdges.value
+    expect(currentEdge).toBeDefined()
+    const generatedEdge = {
+      ...currentEdge,
+      id: 'vueflow__edge-image-1out:image-prompt-1in:image',
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [generatedEdge]
+
+    harness.runtime.onNodesChange([{ id: 'image-1', type: 'remove' }])
+    harness.runtime.onEdgesChange([
+      {
+        id: generatedEdge.id,
+        type: 'remove',
+        source: generatedEdge.source,
+        target: generatedEdge.target,
+        sourceHandle: generatedEdge.sourceHandle ?? null,
+        targetHandle: generatedEdge.targetHandle ?? null,
+      },
+    ])
+    await harness.flushNativeGraphChanges()
+
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      '删除操作未能应用，请刷新画布后重试',
+    )
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.fullEdges.value).toHaveLength(0)
+  })
+
+  it('deletes a node from Vue Flow delete-key edge-first remove changes', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const [currentEdge] = harness.fullEdges.value
+    expect(currentEdge).toBeDefined()
+    const generatedEdge = {
+      ...currentEdge,
+      id: 'vueflow__edge-image-1out:image-prompt-1in:image',
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [generatedEdge]
+
+    harness.runtime.onEdgesChange([
+      {
+        id: generatedEdge.id,
+        type: 'remove',
+        source: generatedEdge.source,
+        target: generatedEdge.target,
+        sourceHandle: generatedEdge.sourceHandle ?? null,
+        targetHandle: generatedEdge.targetHandle ?? null,
+      },
+    ])
+    harness.runtime.onNodesChange([{ id: 'image-1', type: 'remove' }])
+    await harness.flushNativeGraphChanges()
+
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      '删除操作未能应用，请刷新画布后重试',
+    )
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.fullEdges.value).toHaveLength(0)
+  })
+
+  it('deletes a canonical canvas node even when the Flow node id has drifted', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const imageNode = harness.fullNodes.value.find((node) => node.id === 'image-1')
+    expect(imageNode).toBeDefined()
+    const driftedImageNode = { ...imageNode, id: 'node-image-1' } as Node
+    harness.fullNodes.value = harness.fullNodes.value.map((node) =>
+      node.id === 'image-1' ? driftedImageNode : node,
+    )
+    harness.fullEdges.value = harness.fullEdges.value.map((edge) =>
+      edge.source === 'image-1' ? { ...edge, source: driftedImageNode.id } : edge,
+    )
+
+    harness.runtime.onEdgesChange([
+      {
+        id: 'connection-3',
+        type: 'remove',
+        source: driftedImageNode.id,
+        target: 'prompt-1',
+        sourceHandle: 'out:image',
+        targetHandle: 'in:image',
+      },
+    ])
+    harness.runtime.onNodesChange([{ id: driftedImageNode.id, type: 'remove' }])
+    await harness.flushNativeGraphChanges()
+
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      '删除操作未能应用，请刷新画布后重试',
+    )
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.fullEdges.value).toHaveLength(0)
+  })
+
   it('coalesces native multi-node delete into one undoable transaction', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.loadInitialOrRouteBoard()

@@ -18,12 +18,14 @@ import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/d
 import type { CanvasBoardSession } from '../board-session'
 import {
   flowToCanvasBoardSnapshot,
+  resolveFlowNodeCanvasRef,
   resolveFlowEdgeCanvasConnectionId,
 } from '../utils/flowSnapshotAdapter'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   createCanvasGraphStore,
   toCanvasGraphEdgeId,
+  toCanvasGraphNodeId,
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
   type CanvasGraphTransaction,
@@ -468,6 +470,12 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return 'batch-delete'
   }
 
+  function resolveGraphNodeIdForFlowNodeId(flowNodeId: string): CanvasGraphNodeId | null {
+    const node = options.nodes.value.find((item) => item.id === flowNodeId)
+    const ref = resolveFlowNodeCanvasRef(node ?? { id: flowNodeId, data: undefined })
+    return ref ? toCanvasGraphNodeId(ref.nodeType, ref.id) : null
+  }
+
   function isSameCanvasConnectionEndpoint(
     left: CanvasConnection,
     right: CanvasConnection,
@@ -557,9 +565,11 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     const removedNodeIds = new Set<string>()
     for (const change of nodeChanges) {
       if (change.type !== 'remove') continue
-      if (!isCanvasGraphNodeId(change.id)) return false
-      nodeIds.push(change.id)
+      const graphNodeId = resolveGraphNodeIdForFlowNodeId(change.id)
+      if (!graphNodeId) return false
+      nodeIds.push(graphNodeId)
       removedNodeIds.add(change.id)
+      removedNodeIds.add(graphNodeId)
     }
 
     const store = createCurrentCanvasGraphStore()

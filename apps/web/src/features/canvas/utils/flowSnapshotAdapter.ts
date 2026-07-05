@@ -70,6 +70,28 @@ export function parseFlowNodeId(
   return { nodeType: prefix, id: parsedId }
 }
 
+export function resolveFlowNodeCanvasRef(
+  node: Pick<FlowAdapterNode, 'id' | 'data'>,
+): { nodeType: CanvasConnectionNodeType; id: number } | null {
+  const parsed = parseFlowNodeId(node.id)
+  if (parsed) return parsed
+
+  const data = (node.data ?? {}) as Partial<FlowNodeData>
+  const snapshotNode = data.snapshotNode as Partial<CanvasNodeItem> | undefined
+  const nodeType = isCanvasConnectionNodeType(data.nodeType)
+    ? data.nodeType
+    : isCanvasConnectionNodeType(data.kind)
+      ? data.kind
+      : snapshotNode?.type === 'image-node'
+        ? 'image'
+        : isCanvasConnectionNodeType(snapshotNode?.type)
+          ? snapshotNode.type
+          : null
+  const id = Number(snapshotNode?.id)
+  if (!nodeType || !Number.isInteger(id) || id < 1) return null
+  return { nodeType, id }
+}
+
 export function parsePortFromHandle(
   handle: string | null | undefined,
   direction: 'in' | 'out',
@@ -311,7 +333,7 @@ export function flowToCanvasBoardSnapshot(
   }
 
   input.nodes.forEach((node) => {
-    const ref = parseFlowNodeId(node.id)
+    const ref = resolveFlowNodeCanvasRef(node)
     if (!ref) return
     const data = (node.data ?? {}) as FlowNodeData
     const snapshotNode = data.snapshotNode as CanvasNodeItem | undefined

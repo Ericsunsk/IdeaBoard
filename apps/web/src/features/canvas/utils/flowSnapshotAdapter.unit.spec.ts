@@ -122,6 +122,40 @@ describe('flowSnapshotAdapter', () => {
     expect(savedAgain.imageNodes[0]?.outputStatus).toBe('running')
   })
 
+  it('uses snapshot node identity when a Flow node id drifts', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'node-image-2',
+        id: 2,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source.png',
+      }),
+      makePromptFlowNode({ flowId: 'node-prompt-1', id: 1, text: 'use this image' }),
+    ]
+    const edges: FlowAdapterEdge[] = [
+      {
+        id: 'edge-drifted',
+        source: 'node-image-2',
+        sourceHandle: 'out:image',
+        target: 'node-prompt-1',
+        targetHandle: 'in:image',
+      },
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+
+    expect(snapshot.imageNodes.map((node) => node.id)).toEqual([2])
+    expect(snapshot.promptNodes.map((node) => node.id)).toEqual([1])
+    expect(snapshot.connections).toMatchObject([
+      {
+        fromNodeType: 'image',
+        fromNodeId: 2,
+        toNodeType: 'prompt',
+        toNodeId: 1,
+      },
+    ])
+  })
+
   it('does not persist legacy empty running image nodes without pending task metadata', () => {
     const nodes: FlowAdapterNode[] = [
       makeImageFlowNode({
