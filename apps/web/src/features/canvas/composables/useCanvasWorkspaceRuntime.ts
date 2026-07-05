@@ -126,6 +126,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   startNodeDragInteraction: () => void
   stopNodeDragInteraction: () => void
   refreshFlowHandleVisibility: () => void
+  enableNodeDragV2?: boolean
   onNativeRemove?: () => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
@@ -142,6 +143,7 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
+    enableNodeDragV2: options.enableNodeDragV2,
     vueFlowGraphActions: options.vueFlowGraphActions,
   })
 

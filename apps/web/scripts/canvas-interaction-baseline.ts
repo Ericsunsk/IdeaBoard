@@ -24,6 +24,7 @@ type CliOptions = {
   edgeDensity: number
   paths: BenchmarkPath[]
   outputDir: string
+  nodeDragV2: boolean
   printJson: boolean
   help: boolean
 }
@@ -127,6 +128,9 @@ type BenchmarkReport = {
     source: string
   }
   viewport: typeof BENCHMARK_VIEWPORT
+  runtime: {
+    nodeDragV2: boolean
+  }
   fixture: {
     name: BenchmarkFixture
     nodeCount: number
@@ -156,7 +160,7 @@ const DEFAULT_TOTAL_NODE_COUNT = 150
 const MIN_TOTAL_NODE_COUNT = 3
 const DEFAULT_EDGE_DENSITY = 1.6
 const DEFAULT_OUTPUT_DIR = '.benchmark-reports/canvas-interactions'
-const CANVAS_LOAD_READY_TIMEOUT_MS = 60_000
+const CANVAS_LOAD_READY_TIMEOUT_MS = 180_000
 const POST_INTERACTION_SETTLE_MS = 1_500
 const GRID_COLUMNS = 15
 const GRID_X_GAP = 340
@@ -333,6 +337,7 @@ function parseCliOptions(args: string[]): CliOptions {
     edgeDensity: DEFAULT_EDGE_DENSITY,
     paths: [...BENCHMARK_PATHS],
     outputDir: DEFAULT_OUTPUT_DIR,
+    nodeDragV2: true,
     printJson: false,
     help: false,
   }
@@ -376,6 +381,9 @@ function parseCliOptions(args: string[]): CliOptions {
       case '--output':
         options.outputDir = readValue()
         break
+      case '--node-drag-v2':
+        options.nodeDragV2 = parseBooleanSwitch(readValue(), '--node-drag-v2')
+        break
       default:
         throw new Error(`Unknown option ${rawArg}`)
     }
@@ -385,6 +393,13 @@ function parseCliOptions(args: string[]): CliOptions {
     throw new Error('At least one benchmark path is required')
   }
   return options
+}
+
+function parseBooleanSwitch(rawValue: string, optionName: string): boolean {
+  const normalized = rawValue.trim().toLowerCase()
+  if (['1', 'true', 'on', 'yes'].includes(normalized)) return true
+  if (['0', 'false', 'off', 'no'].includes(normalized)) return false
+  throw new Error(`${optionName} must be on/off, true/false, or 1/0, got ${rawValue}`)
 }
 
 function parseFixture(rawValue: string): BenchmarkFixture {
@@ -444,6 +459,7 @@ Options:
   --edge-density 1.6             Target edges per node. Defaults to ${DEFAULT_EDGE_DENSITY}.
   --paths initial-load,node-drag Comma-separated paths. Defaults to all paths.
   --output <dir>                 Report directory. Defaults to ${DEFAULT_OUTPUT_DIR}.
+  --node-drag-v2 on              Enable node-drag v2 path. Use off for fallback comparison.
   --json                         Print the full JSON report to stdout.
   --help                         Show this help.
 
@@ -795,10 +811,11 @@ function prepareOriginStorage(playwrightCli: CommandSpec) {
   runPageCode(
     playwrightCli,
     `
-await page.evaluate(async (user) => {
+await page.evaluate(async ({ user, nodeDragV2 }) => {
   localStorage.clear()
   sessionStorage.clear()
   localStorage.setItem('user', JSON.stringify(user))
+  localStorage.setItem('ideaboard:canvas-node-drag-v2', nodeDragV2 ? 'on' : 'off')
   if (!('indexedDB' in window)) return
   const databases = typeof indexedDB.databases === 'function' ? await indexedDB.databases() : []
   await Promise.all(databases.map((db) => new Promise((resolve) => {
@@ -806,7 +823,7 @@ await page.evaluate(async (user) => {
     const request = indexedDB.deleteDatabase(db.name)
     request.onsuccess = request.onerror = request.onblocked = () => resolve(undefined)
   })))
-}, ${JSON.stringify(MOCK_USER)})
+}, ${JSON.stringify({ user: MOCK_USER, nodeDragV2: CLI_OPTIONS.nodeDragV2 })})
 `,
   )
 }
@@ -1442,6 +1459,9 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
       source: 'playwright-cli default browser session',
     },
     viewport: BENCHMARK_VIEWPORT,
+    runtime: {
+      nodeDragV2: CLI_OPTIONS.nodeDragV2,
+    },
     fixture: {
       name: CLI_OPTIONS.fixture,
       nodeCount: fixtureNodeCount,

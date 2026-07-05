@@ -17,6 +17,7 @@ npm run benchmark:canvas-interactions
 npm run benchmark:canvas-interactions -- --nodes 500 --paths node-drag
 npm run benchmark:canvas-interactions -- --fixture media-heavy --nodes 1000 --edge-density 1.6
 npm run benchmark:canvas-interactions -- --paths initial-load,viewport-pan,viewport-zoom --json
+npm run benchmark:canvas-interactions -- --nodes 1000 --paths node-drag --node-drag-v2 off
 ```
 
 支持参数：
@@ -26,6 +27,7 @@ npm run benchmark:canvas-interactions -- --paths initial-load,viewport-pan,viewp
 - `--edge-density <edges-per-node>`：目标 edge density，默认 `1.6`。
 - `--paths initial-load,node-drag,viewport-pan,viewport-zoom`
 - `--output <report-directory>`
+- `--node-drag-v2 on|off`：默认 `on`。用于本地对比 node-drag v2 path 和 fallback path。
 - `--json`：向 stdout 输出完整 JSON report。
 
 Fixtures：

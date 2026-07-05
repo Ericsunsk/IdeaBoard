@@ -189,6 +189,19 @@ import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const CANVAS_NODE_DRAG_V2_STORAGE_KEY = 'ideaboard:canvas-node-drag-v2'
+
+function resolveCanvasNodeDragV2Enabled() {
+  const queryValue = Array.isArray(route.query.canvasNodeDragV2)
+    ? route.query.canvasNodeDragV2[0]
+    : route.query.canvasNodeDragV2
+  const configuredValue =
+    typeof queryValue === 'string'
+      ? queryValue
+      : window.localStorage.getItem(CANVAS_NODE_DRAG_V2_STORAGE_KEY)
+  return !['0', 'false', 'off'].includes(`${configuredValue ?? ''}`.trim().toLowerCase())
+}
+
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const {
   screenToFlowCoordinate,
@@ -260,6 +273,7 @@ const canvasWorkspace = useCanvasWorkspaceRuntime({
   startNodeDragInteraction: () => startNodeDragInteraction(),
   stopNodeDragInteraction: () => stopNodeDragInteraction(),
   refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
+  enableNodeDragV2: resolveCanvasNodeDragV2Enabled(),
   vueFlowGraphActions: {
     setNodes,
     setEdges,

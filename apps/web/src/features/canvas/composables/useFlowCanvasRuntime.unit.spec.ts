@@ -119,7 +119,10 @@ function applyHarnessEdgeChanges(edges: Edge[], changes: EdgeChange[]): Edge[] {
   return edges
 }
 
-function createRuntimeHarness(snapshot = createSnapshot()) {
+function createRuntimeHarness(
+  snapshot = createSnapshot(),
+  options: { enableNodeDragV2?: boolean } = {},
+) {
   const fullNodes = shallowRef<Node[]>([])
   const fullEdges = shallowRef<Edge[]>([])
   const nodes = fullNodes
@@ -128,6 +131,8 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const viewport = ref({ x: 0, y: 0, zoom: 1 })
   const savedSnapshots: CanvasBoardSnapshot[] = []
   const scheduledMicrotasks: Array<() => void> = []
+  const scheduledAnimationFrames = new Map<number, FrameRequestCallback>()
+  let nextAnimationFrameId = 1
   const onNativeRemove = vi.fn()
   const graphActions = {
     addNodes: vi.fn(),
@@ -176,10 +181,28 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
     },
+    scheduleAnimationFrame: (callback) => {
+      const frameId = nextAnimationFrameId
+      nextAnimationFrameId += 1
+      scheduledAnimationFrames.set(frameId, callback)
+      return frameId
+    },
+    cancelAnimationFrame: (frameId) => {
+      scheduledAnimationFrames.delete(frameId)
+    },
+    enableNodeDragV2: options.enableNodeDragV2,
     vueFlowGraphActions:
       graphActions as unknown as UseFlowCanvasRuntimeOptions['vueFlowGraphActions'],
   }
   const runtime = useFlowCanvasRuntime(runtimeOptions)
+
+  function flushAnimationFrames() {
+    const callbacks = Array.from(scheduledAnimationFrames.values())
+    scheduledAnimationFrames.clear()
+    callbacks.forEach((callback) => {
+      callback(performance.now())
+    })
+  }
 
   async function flushNativeGraphChanges() {
     while (scheduledMicrotasks.length > 0) {
@@ -190,6 +213,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
 
   async function applyNativeNodeChanges(changes: Parameters<typeof runtime.onNodesChange>[0]) {
     runtime.onNodesChange(changes)
+    flushAnimationFrames()
     await nextTick()
     await flushNativeGraphChanges()
   }
@@ -213,6 +237,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     graphActions,
     isDirty,
     saveStatus,
+    flushAnimationFrames,
     flushNativeGraphChanges,
     applyNativeNodeChanges,
     applyNativeEdgeChanges,
@@ -544,6 +569,126 @@ describe('useFlowCanvasRuntime', () => {
       y: 96,
     })
     expect(harness.savedSnapshots).toHaveLength(0)
+  })
+
+  it('coalesces native node drag progress through the v2 frame projection', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.graphActions.applyNodeChanges.mockClear()
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 440, y: 80 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 500, y: 80 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 620, y: 80 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+
+    expect(harness.graphActions.applyNodeChanges).not.toHaveBeenCalled()
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 400,
+      y: 40,
+    })
+
+    harness.flushAnimationFrames()
+    await nextTick()
+
+    expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.applyNodeChanges.mock.calls[0]?.[0]).toEqual([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 620, y: 80 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 620,
+      y: 80,
+    })
+
+    harness.runtime.graphRuntime.nodeDrag.commit()
+    await nextTick()
+
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.savedSnapshots).toHaveLength(0)
+  })
+
+  it('cancels queued v2 node drag progress without mutating the graph', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.graphActions.applyNodeChanges.mockClear()
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 720, y: 96 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+
+    harness.runtime.graphRuntime.nodeDrag.cancel()
+    harness.flushAnimationFrames()
+    await nextTick()
+
+    expect(harness.graphActions.applyNodeChanges).not.toHaveBeenCalled()
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 400,
+      y: 40,
+    })
+    expect(harness.isDirty.value).toBe(false)
+  })
+
+  it('keeps the old immediate drag projection path behind a switch', async () => {
+    const harness = createRuntimeHarness(createSnapshot(), { enableNodeDragV2: false })
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.graphActions.applyNodeChanges.mockClear()
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 720, y: 96 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+    await nextTick()
+
+    expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 720,
+      y: 96,
+    })
   })
 
   it('does not clone unrelated nodes while syncing native drag position changes', async () => {

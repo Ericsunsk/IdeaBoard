@@ -331,6 +331,32 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     if (nextNodes !== options.nodes.value) syncNodes(nextNodes)
   }
 
+  function projectNodeChanges(changes: NodeChange[]) {
+    recordCanvasInteractionCount('nativeNodeChangeBatches')
+    recordCanvasInteractionCount('nativeNodeChangeCount', changes.length)
+    options.actions?.applyNodeChanges?.(changes)
+  }
+
+  function syncProjectedNodeChanges(
+    changes: NodeChange[],
+    commandOptions?: CanvasVueFlowGraphCommandOptions,
+  ): CanvasVueFlowGraphCommandResult {
+    if (changes.length === 0 || !hasApplicableNodeChanges(changes, options.nodes.value)) {
+      return createNoOpCommandResult('applyNodeChanges', commandOptions)
+    }
+    return runNativeChangeCommand(
+      'applyNodeChanges',
+      () => {
+        const nextNodes = applyVueFlowNodeChanges(
+          changes,
+          options.nodes.value as Parameters<typeof applyVueFlowNodeChanges>[1],
+        ) as unknown as Node[]
+        if (nextNodes !== options.nodes.value) syncNodes(nextNodes)
+      },
+      commandOptions,
+    )
+  }
+
   function applyNativeEdgeChanges(changes: EdgeChange[]) {
     recordCanvasInteractionCount('nativeEdgeChangeBatches')
     recordCanvasInteractionCount('nativeEdgeChangeCount', changes.length)
@@ -673,6 +699,8 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     updateNode,
     updateEdge,
     applyGraphChanges,
+    projectNodeChanges,
+    syncProjectedNodeChanges,
     applyNodeChanges,
     applyEdgeChanges,
   }
