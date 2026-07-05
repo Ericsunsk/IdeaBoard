@@ -19,16 +19,25 @@ import type { FlowHistorySnapshot } from './useFlowHistory'
 import {
   getCanvasNodePortInputLimit,
   isCanvasExecutionOutputNodeType,
+  type CanvasBoardSnapshot,
   type CanvasCreatableNodeKind,
   type CanvasNodeItem,
   type CanvasNodeItemByKind,
 } from '../../canvas-board/domain'
+import {
+  createCanvasGraphStore,
+  type CanvasGraphNodeId,
+  type CanvasGraphTransactionSummary,
+} from '../runtime-v2'
+import { flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 
 type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   nodes: Ref<Array<Record<string, any>>>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
+  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  enableGraphTransactionsV2?: boolean
   createNodeKind: Ref<CanvasCreatableNodeKind>
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
@@ -163,6 +172,8 @@ function createSnapshotCommandSideEffects(
 }
 
 export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
+  const isGraphTransactionsV2Enabled = options.enableGraphTransactionsV2 ?? true
+
   function resolveNodePosition(baseX = 120, baseY = 100) {
     if (options.nodes.value.length === 0) return { x: baseX, y: baseY }
     let maxY = baseY
@@ -191,8 +202,34 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return isFlowConnectionAllowed(connection, lookupData)
   }
 
+  function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
+    return /^(?:image|prompt|fusion)-\d+$/.test(nodeId)
+  }
+
+  function createCurrentGraphStore() {
+    return createCanvasGraphStore(
+      flowToCanvasBoardSnapshot(
+        {
+          nodes: options.nodes.value as unknown as Node[],
+          edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+        },
+        options.boardBaseSnapshot?.value,
+      ),
+    )
+  }
+
+  function createTransactionCommandOptions(summary: CanvasGraphTransactionSummary) {
+    return createFlowGraphCommandOptions({
+      recordHistory: summary.shouldRecordHistory,
+      markDirty: summary.shouldMarkDirty,
+    })
+  }
+
   const connectionMutations = useFlowConnectionMutations({
+    nodes: options.nodes,
     edges: options.edges,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     isValidConnection,
     normalizeConnection: (connection, existingEdges) =>
       normalizeFlowConnection(connection, lookupData, existingEdges),
@@ -276,6 +313,18 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const flowNodes = options.nodes.value as Array<{ id: string; data?: unknown }>
     const target = flowNodes.find((node) => node.id === nodeId)
     if (!target) return
+    if (isGraphTransactionsV2Enabled && isCanvasGraphNodeId(nodeId)) {
+      const store = createCurrentGraphStore()
+      const transaction = store.beginTransaction('delete')
+      transaction.removeNode(nodeId, { removeConnectedEdges: true })
+      const summary = transaction.commit()
+      if (!summary.didChange) return
+      options.graphAdapter.removeNodes(nodeId, {
+        ...createTransactionCommandOptions(summary),
+        removeConnectedEdges: true,
+      })
+      return
+    }
     options.graphAdapter.removeNodes(nodeId, {
       ...createFlowGraphCommandOptions(),
       removeConnectedEdges: true,
@@ -336,7 +385,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
     options.graphAdapter.replaceNodes(
       (items) => markReadyExecutionOutputNodesStale(items, staleNodeIds),
-      createFlowGraphCommandOptions({ recordHistory: false }),
+      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
     )
   }
 

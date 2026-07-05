@@ -42,6 +42,8 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
+const CANVAS_CONNECTION_EDGE_ID_PATTERN = /^connection-(\d+)$/
+
 function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
   if (base) {
@@ -50,11 +52,11 @@ function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
   return snapshot
 }
 
-function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
+export function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
   return `${nodeType}-${id}`
 }
 
-function parseFlowNodeId(
+export function parseFlowNodeId(
   nodeId: string,
 ): { nodeType: CanvasConnectionNodeType; id: number } | null {
   const dashIndex = nodeId.indexOf('-')
@@ -68,7 +70,7 @@ function parseFlowNodeId(
   return { nodeType: prefix, id: parsedId }
 }
 
-function parsePortFromHandle(
+export function parsePortFromHandle(
   handle: string | null | undefined,
   direction: 'in' | 'out',
 ): CanvasConnectionPort | null {
@@ -168,17 +170,7 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
     const sourceNodeId = toFlowNodeId(connection.fromNodeType, connection.fromNodeId)
     const targetNodeId = toFlowNodeId(connection.toNodeType, connection.toNodeId)
     if (!flowNodeIds.has(sourceNodeId) || !flowNodeIds.has(targetNodeId)) return
-    const sourceHandle = `out:${connection.fromPort}`
-    const targetHandle = `in:${connection.toPort}`
-    edges.push({
-      id: `connection-${connection.id}`,
-      source: sourceNodeId,
-      sourceHandle,
-      target: targetNodeId,
-      targetHandle,
-      animated: false,
-      data: { connectionSnapshot: clone(connection) },
-    })
+    edges.push(canvasConnectionToFlowEdge(connection))
   })
 
   return { nodes, edges }
@@ -202,10 +194,22 @@ function hasRenderableImageSource(node: CanvasNodeItem): boolean {
 }
 
 function getRestoredConnectionId(edge: FlowAdapterEdge): number | null {
+  return resolveFlowEdgeCanvasConnectionId(edge)
+}
+
+export function resolveFlowEdgeCanvasConnectionId(
+  edge: Pick<FlowAdapterEdge, 'id' | 'data'>,
+): number | null {
   const data = edge.data
-  if (!data || typeof data !== 'object') return null
-  const restoredId = (data as { connectionSnapshot?: { id?: unknown } }).connectionSnapshot?.id
-  return typeof restoredId === 'number' && Number.isFinite(restoredId) ? restoredId : null
+  if (data && typeof data === 'object') {
+    const restoredId = (data as { connectionSnapshot?: { id?: unknown } }).connectionSnapshot?.id
+    if (typeof restoredId === 'number' && Number.isFinite(restoredId)) return restoredId
+  }
+
+  const edgeIdMatch = CANVAS_CONNECTION_EDGE_ID_PATTERN.exec(edge.id)
+  if (!edgeIdMatch) return null
+  const parsedId = Number(edgeIdMatch[1])
+  return Number.isInteger(parsedId) && parsedId >= 1 ? parsedId : null
 }
 
 function getInitialConnectionId(
@@ -227,6 +231,25 @@ function getInitialConnectionId(
     }
   }
   return maxConnectionId + 1
+}
+
+export function resolveNextCanvasConnectionId(
+  base: CanvasBoardSnapshot | undefined,
+  edges: readonly FlowAdapterEdge[],
+) {
+  return getInitialConnectionId(base, edges)
+}
+
+export function canvasConnectionToFlowEdge(connection: CanvasConnection): FlowAdapterEdge {
+  return {
+    id: `connection-${connection.id}`,
+    source: toFlowNodeId(connection.fromNodeType, connection.fromNodeId),
+    sourceHandle: `out:${connection.fromPort}`,
+    target: toFlowNodeId(connection.toNodeType, connection.toNodeId),
+    targetHandle: `in:${connection.toPort}`,
+    animated: false,
+    data: { connectionSnapshot: clone(connection) },
+  }
 }
 
 function getTargetPortKey(

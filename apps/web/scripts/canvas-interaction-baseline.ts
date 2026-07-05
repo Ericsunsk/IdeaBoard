@@ -12,7 +12,13 @@ import type {
 } from '../src/features/canvas-board/domain'
 import { createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 
-const BENCHMARK_PATHS = ['initial-load', 'node-drag', 'viewport-pan', 'viewport-zoom'] as const
+const BENCHMARK_PATHS = [
+  'initial-load',
+  'node-drag',
+  'connect-delete',
+  'viewport-pan',
+  'viewport-zoom',
+] as const
 const BENCHMARK_FIXTURES = ['structure-heavy', 'media-heavy'] as const
 
 type BenchmarkPath = (typeof BENCHMARK_PATHS)[number]
@@ -25,6 +31,7 @@ type CliOptions = {
   paths: BenchmarkPath[]
   outputDir: string
   nodeDragV2: boolean
+  graphTransactionsV2: boolean
   dragTargetId: number | null
   printJson: boolean
   help: boolean
@@ -67,6 +74,14 @@ type RawInteractionTrace = {
   samples: TargetSnapshot[]
   before: TargetSnapshot | null
   after: TargetSnapshot | null
+}
+
+type ConnectDeleteTarget = {
+  sourceNodeId: string
+  targetNodeId: string
+  sourceHandle: string
+  targetHandle: string
+  deleteNodeId: string
 }
 
 type InteractionCounterName =
@@ -121,7 +136,7 @@ type BenchmarkVerdict = {
 }
 
 type BenchmarkReport = {
-  schemaVersion: 3
+  schemaVersion: 4
   generatedAt: string
   command: string
   browser: {
@@ -131,6 +146,7 @@ type BenchmarkReport = {
   viewport: typeof BENCHMARK_VIEWPORT
   runtime: {
     nodeDragV2: boolean
+    graphTransactionsV2: boolean
     dragTargetId: number
   }
   fixture: {
@@ -208,6 +224,19 @@ const BENCHMARK_BUDGETS: Record<BenchmarkPath, InteractionBudget> = {
     maxNativeNodeChangeBatches: 90,
     maxNativeEdgeChangeBatches: 2,
   },
+  'connect-delete': {
+    maxP95FrameMs: 120,
+    maxDroppedFrames: 220,
+    maxMutationCount: 500,
+    maxNodeArrayReplacements: 8,
+    maxEdgeArrayReplacements: 4,
+    maxHistoryCaptureCount: 4,
+    maxHistoryPushCount: 2,
+    maxAutosaveScheduleCount: 8,
+    maxAutosaveSaveCount: 0,
+    maxNativeNodeChangeBatches: 4,
+    maxNativeEdgeChangeBatches: 4,
+  },
   'viewport-pan': {
     maxP95FrameMs: 75,
     maxDroppedFrames: 120,
@@ -273,6 +302,7 @@ const NODE_DRAG_TARGET_ID = resolveNodeDragTargetId(
   MOCK_BOARD_STATE,
   CLI_OPTIONS.dragTargetId,
 )
+const CONNECT_DELETE_TARGET = resolveConnectDeleteTarget(MOCK_BOARD_STATE)
 
 const AUTH_SESSION = {
   session: { id: 'canvas-interaction-benchmark-session' },
@@ -343,6 +373,7 @@ function parseCliOptions(args: string[]): CliOptions {
     paths: [...BENCHMARK_PATHS],
     outputDir: DEFAULT_OUTPUT_DIR,
     nodeDragV2: true,
+    graphTransactionsV2: true,
     dragTargetId: null,
     printJson: false,
     help: false,
@@ -389,6 +420,12 @@ function parseCliOptions(args: string[]): CliOptions {
         break
       case '--node-drag-v2':
         options.nodeDragV2 = parseBooleanSwitch(readValue(), '--node-drag-v2')
+        break
+      case '--graph-transactions-v2':
+        options.graphTransactionsV2 = parseBooleanSwitch(
+          readValue(),
+          '--graph-transactions-v2',
+        )
         break
       case '--drag-target-id':
         options.dragTargetId = parseDragTargetId(readValue())
@@ -475,6 +512,7 @@ Options:
   --paths initial-load,node-drag Comma-separated paths. Defaults to all paths.
   --output <dir>                 Report directory. Defaults to ${DEFAULT_OUTPUT_DIR}.
   --node-drag-v2 on              Enable node-drag v2 path. Use off for fallback comparison.
+  --graph-transactions-v2 on     Enable connect/delete v2 path. Use off for fallback comparison.
   --drag-target-id 20            Image node id to drag. Defaults to min(20, image node count).
   --json                         Print the full JSON report to stdout.
   --help                         Show this help.
@@ -801,6 +839,28 @@ function resolveNodeDragTargetId(state: CanvasBoardState, requestedId: number | 
   return Math.min(20, maxImageNodeId)
 }
 
+function resolveConnectDeleteTarget(state: CanvasBoardState): ConnectDeleteTarget {
+  if (state.imageNodes.length >= 2) {
+    return {
+      sourceNodeId: 'image-1',
+      targetNodeId: 'image-2',
+      sourceHandle: 'out:image',
+      targetHandle: 'in:image',
+      deleteNodeId: 'image-1',
+    }
+  }
+  if (state.imageNodes.length >= 1 && state.promptNodes.length >= 1) {
+    return {
+      sourceNodeId: 'image-1',
+      targetNodeId: 'prompt-1',
+      sourceHandle: 'out:image',
+      targetHandle: 'in:image',
+      deleteNodeId: 'image-1',
+    }
+  }
+  throw new Error('connect-delete benchmark requires at least one image and one target node')
+}
+
 function toApiBoardState(state: CanvasBoardState): UserBoardItem['state'] {
   return {
     ...state,
@@ -829,11 +889,15 @@ function prepareOriginStorage(playwrightCli: CommandSpec) {
   runPageCode(
     playwrightCli,
     `
-await page.evaluate(async ({ user, nodeDragV2 }) => {
+await page.evaluate(async ({ user, nodeDragV2, graphTransactionsV2 }) => {
   localStorage.clear()
   sessionStorage.clear()
   localStorage.setItem('user', JSON.stringify(user))
   localStorage.setItem('ideaboard:canvas-node-drag-v2', nodeDragV2 ? 'on' : 'off')
+  localStorage.setItem(
+    'ideaboard:canvas-graph-transactions-v2',
+    graphTransactionsV2 ? 'on' : 'off',
+  )
   if (!('indexedDB' in window)) return
   const databases = typeof indexedDB.databases === 'function' ? await indexedDB.databases() : []
   await Promise.all(databases.map((db) => new Promise((resolve) => {
@@ -841,14 +905,21 @@ await page.evaluate(async ({ user, nodeDragV2 }) => {
     const request = indexedDB.deleteDatabase(db.name)
     request.onsuccess = request.onerror = request.onblocked = () => resolve(undefined)
   })))
-}, ${JSON.stringify({ user: MOCK_USER, nodeDragV2: CLI_OPTIONS.nodeDragV2 })})
+}, ${JSON.stringify({
+      user: MOCK_USER,
+      nodeDragV2: CLI_OPTIONS.nodeDragV2,
+      graphTransactionsV2: CLI_OPTIONS.graphTransactionsV2,
+    })})
 `,
   )
 }
 
 function loadBenchmarkCanvas(playwrightCli: CommandSpec) {
   prepareOriginStorage(playwrightCli)
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}`])
+  smoke.runCommand(playwrightCli, [
+    'goto',
+    `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}&canvasBenchmarkActions=1`,
+  ])
   runPageCode(
     playwrightCli,
     `
@@ -1004,7 +1075,10 @@ await page.addInitScript(() => {
 })
 `,
   )
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}`])
+  smoke.runCommand(playwrightCli, [
+    'goto',
+    `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}&canvasBenchmarkActions=1`,
+  ])
   runPageCode(
     playwrightCli,
     `
@@ -1220,6 +1294,42 @@ await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
   return readEvalJson(playwrightCli, `window.__canvasInteractionBenchmark.traces['node-drag']`)
 }
 
+function runConnectDeleteBenchmark(playwrightCli: CommandSpec): RawInteractionTrace {
+  loadBenchmarkCanvas(playwrightCli)
+  runPageCode(
+    playwrightCli,
+    `
+${getInstallBenchmarkHarnessCode()}
+await page.getByRole('button', { name: '选择 (V)' }).click()
+await page.waitForTimeout(200)
+const target = ${JSON.stringify(CONNECT_DELETE_TARGET)}
+await page.evaluate((target) => {
+  const sourceNode = document.querySelector(\`.vue-flow__node[data-id="\${target.sourceNodeId}"]\`)
+  const targetNode = document.querySelector(\`.vue-flow__node[data-id="\${target.targetNodeId}"]\`)
+  if (!sourceNode || !targetNode) throw new Error('Missing connect-delete benchmark nodes')
+  const actions = window.__ideaboardCanvasBenchmarkActions
+  if (!actions?.connectDelete) throw new Error('Missing connect-delete benchmark action hook')
+  window.__canvasInteractionBenchmark.begin('connect-delete', '.vue-flow__transformationpane')
+  actions.connectDelete(target)
+}, target)
+await page.waitForFunction(
+  () => {
+    const commands = window.__canvasInteractionBenchmarkCounters?.graphCommands || {}
+    const connectCount = (commands.addEdges || 0) + (commands.replaceEdges || 0)
+    const deleteCount = (commands.applyNodeChanges || 0) + (commands.applyGraphChanges || 0)
+    return connectCount > 0 && deleteCount > 0
+  },
+  { timeout: 5000 },
+)
+await page.waitForTimeout(350)
+await page.evaluate(() => window.__canvasInteractionBenchmark.end())
+await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
+`,
+    90_000,
+  )
+  return readEvalJson(playwrightCli, `window.__canvasInteractionBenchmark.traces['connect-delete']`)
+}
+
 function runViewportPanBenchmark(playwrightCli: CommandSpec): RawInteractionTrace {
   loadBenchmarkCanvas(playwrightCli)
   runPageCode(
@@ -1304,6 +1414,8 @@ function runBenchmarkPath(playwrightCli: CommandSpec, benchmarkPath: BenchmarkPa
       return runInitialLoadBenchmark(playwrightCli)
     case 'node-drag':
       return runNodeDragBenchmark(playwrightCli)
+    case 'connect-delete':
+      return runConnectDeleteBenchmark(playwrightCli)
     case 'viewport-pan':
       return runViewportPanBenchmark(playwrightCli)
     case 'viewport-zoom':
@@ -1338,6 +1450,15 @@ function summarizeTrace(trace: RawInteractionTrace): InteractionMetrics {
     if (metrics.positionChanges <= 1) {
       throw new Error(
         `node-drag benchmark did not observe node movement ${formatTraceDebug(trace)}`,
+      )
+    }
+  } else if (trace.path === 'connect-delete') {
+    const commands = metrics.counters.graphCommands
+    const connectCount = (commands.addEdges ?? 0) + (commands.replaceEdges ?? 0)
+    const deleteCount = (commands.applyNodeChanges ?? 0) + (commands.applyGraphChanges ?? 0)
+    if (connectCount <= 0 || deleteCount <= 0) {
+      throw new Error(
+        `connect-delete benchmark did not observe graph mutation ${formatTraceDebug(trace)}`,
       )
     }
   } else {
@@ -1469,7 +1590,7 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
     MOCK_BOARD_STATE.fusionNodes.length
   const edgeCount = MOCK_BOARD_STATE.connections.length
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     generatedAt: new Date().toISOString(),
     command: createReportCommand(),
     browser: {
@@ -1479,6 +1600,7 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
     viewport: BENCHMARK_VIEWPORT,
     runtime: {
       nodeDragV2: CLI_OPTIONS.nodeDragV2,
+      graphTransactionsV2: CLI_OPTIONS.graphTransactionsV2,
       dragTargetId: NODE_DRAG_TARGET_ID,
     },
     fixture: {

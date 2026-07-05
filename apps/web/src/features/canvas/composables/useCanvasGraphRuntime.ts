@@ -1,6 +1,10 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { computed, type ComputedRef, type Ref } from 'vue'
-import type { CanvasCreatableNodeKind, ImageNodeItem } from '../../canvas-board/domain'
+import type {
+  CanvasBoardSnapshot,
+  CanvasCreatableNodeKind,
+  ImageNodeItem,
+} from '../../canvas-board/domain'
 import { useFlowCanvasDrop } from './useFlowCanvasDrop'
 import { useFlowCanvasInteractionState } from './useFlowCanvasInteractionState'
 import { useFlowImageNodeInteractions } from './useFlowImageNodeInteractions'
@@ -42,6 +46,8 @@ type CanvasGraphUploadApi = {
 type UseCanvasGraphRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
+  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  enableGraphTransactionsV2?: boolean
   currentBoardId: ValueRef<string | null | undefined>
   createNodeKind: Ref<CanvasCreatableNodeKind>
   graphAdapter: CanvasVueFlowGraphAdapter
@@ -75,6 +81,8 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
   const flowNodeMutations = useFlowNodeMutations({
     nodes: options.nodes,
     edges: options.edges,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     createNodeKind: options.createNodeKind,
     graphAdapter: options.graphAdapter,
     onWarning: (text) => {

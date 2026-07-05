@@ -150,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
@@ -190,15 +190,13 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const CANVAS_NODE_DRAG_V2_STORAGE_KEY = 'ideaboard:canvas-node-drag-v2'
+const CANVAS_GRAPH_TRANSACTIONS_V2_STORAGE_KEY = 'ideaboard:canvas-graph-transactions-v2'
 
-function resolveCanvasNodeDragV2Enabled() {
-  const queryValue = Array.isArray(route.query.canvasNodeDragV2)
-    ? route.query.canvasNodeDragV2[0]
-    : route.query.canvasNodeDragV2
+function resolveCanvasRuntimeSwitch(queryKey: string, storageKey: string) {
+  const rawQueryValue = route.query[queryKey]
+  const queryValue = Array.isArray(rawQueryValue) ? rawQueryValue[0] : rawQueryValue
   const configuredValue =
-    typeof queryValue === 'string'
-      ? queryValue
-      : window.localStorage.getItem(CANVAS_NODE_DRAG_V2_STORAGE_KEY)
+    typeof queryValue === 'string' ? queryValue : window.localStorage.getItem(storageKey)
   return !['0', 'false', 'off'].includes(`${configuredValue ?? ''}`.trim().toLowerCase())
 }
 
@@ -273,7 +271,14 @@ const canvasWorkspace = useCanvasWorkspaceRuntime({
   startNodeDragInteraction: () => startNodeDragInteraction(),
   stopNodeDragInteraction: () => stopNodeDragInteraction(),
   refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
-  enableNodeDragV2: resolveCanvasNodeDragV2Enabled(),
+  enableNodeDragV2: resolveCanvasRuntimeSwitch(
+    'canvasNodeDragV2',
+    CANVAS_NODE_DRAG_V2_STORAGE_KEY,
+  ),
+  enableGraphTransactionsV2: resolveCanvasRuntimeSwitch(
+    'canvasGraphTransactionsV2',
+    CANVAS_GRAPH_TRANSACTIONS_V2_STORAGE_KEY,
+  ),
   vueFlowGraphActions: {
     setNodes,
     setEdges,
@@ -300,6 +305,41 @@ const {
   onEdgeUpdate,
   nodeDragTransactions,
 } = canvasWorkspace.flowPane
+
+type CanvasBenchmarkConnectDeleteTarget = {
+  sourceNodeId: string
+  targetNodeId: string
+  sourceHandle: string
+  targetHandle: string
+  deleteNodeId: string
+}
+
+type CanvasBenchmarkWindow = Window & {
+  __ideaboardCanvasBenchmarkActions?: {
+    connectDelete: (target: CanvasBenchmarkConnectDeleteTarget) => void
+  }
+}
+
+const isCanvasBenchmarkActionsEnabled = computed(() => route.query.canvasBenchmarkActions === '1')
+
+if (import.meta.env.DEV && isCanvasBenchmarkActionsEnabled.value) {
+  const benchmarkWindow = window as CanvasBenchmarkWindow
+  benchmarkWindow.__ideaboardCanvasBenchmarkActions = {
+    connectDelete: (target) => {
+      onConnect({
+        source: target.sourceNodeId,
+        target: target.targetNodeId,
+        sourceHandle: target.sourceHandle,
+        targetHandle: target.targetHandle,
+      })
+      onNodesChange([{ id: target.deleteNodeId, type: 'remove' }])
+    },
+  }
+}
+
+onBeforeUnmount(() => {
+  delete (window as CanvasBenchmarkWindow).__ideaboardCanvasBenchmarkActions
+})
 
 const {
   currentBoardId,

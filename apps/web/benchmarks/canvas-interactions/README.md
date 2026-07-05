@@ -18,6 +18,7 @@ npm run benchmark:canvas-interactions -- --nodes 500 --paths node-drag
 npm run benchmark:canvas-interactions -- --fixture media-heavy --nodes 1000 --edge-density 1.6
 npm run benchmark:canvas-interactions -- --paths initial-load,viewport-pan,viewport-zoom --json
 npm run benchmark:canvas-interactions -- --nodes 1000 --paths node-drag --node-drag-v2 off
+npm run benchmark:canvas-interactions -- --nodes 1000 --paths connect-delete --graph-transactions-v2 off
 npm run benchmark:canvas-interactions -- --nodes 5000 --paths node-drag --drag-target-id 1
 ```
 
@@ -26,9 +27,10 @@ npm run benchmark:canvas-interactions -- --nodes 5000 --paths node-drag --drag-t
 - `--fixture structure-heavy|media-heavy`
 - `--nodes <total-node-count>`：总节点数，不是每类节点数。
 - `--edge-density <edges-per-node>`：目标 edge density，默认 `1.6`。
-- `--paths initial-load,node-drag,viewport-pan,viewport-zoom`
+- `--paths initial-load,node-drag,connect-delete,viewport-pan,viewport-zoom`
 - `--output <report-directory>`
 - `--node-drag-v2 on|off`：默认 `on`。用于本地对比 node-drag v2 path 和 fallback path。
+- `--graph-transactions-v2 on|off`：默认 `on`。用于本地对比 connect/delete v2 path 和 fallback path。
 - `--drag-target-id <image-node-id>`：默认 `min(20, image node count)`。用于 extreme fixture target readiness 对比。
 - `--json`：向 stdout 输出完整 JSON report。
 
@@ -62,6 +64,7 @@ Report artifacts 是本地生成物，不能进入 git。需要完整 JSON stdou
 脚本根据内置 budgets 给出 `verdict.status`：
 
 - `node-drag`
+- `connect-delete`
 - `initial-load`
 - `viewport-pan`
 - `viewport-zoom`

@@ -37,6 +37,7 @@ type UseCanvasBoardRuntimeOptions = {
   feedback: CanvasBoardRuntimeFeedback
   onNativeRemove?: () => void
   enableNodeDragV2?: boolean
+  enableGraphTransactionsV2?: boolean
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
@@ -47,6 +48,7 @@ type CanvasBoardRuntime = {
   edges: Ref<Edge[]>
   fullNodes: Ref<Node[]>
   fullEdges: Ref<Edge[]>
+  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   currentBoardId: ComputedRef<string | null>
   loadInitialOrRouteBoard: () => Promise<void>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
@@ -136,6 +138,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     onError: options.feedback.saveFailed,
     onNativeRemove: options.onNativeRemove,
     enableNodeDragV2: options.enableNodeDragV2,
+    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     vueFlowGraphActions: options.vueFlowGraphActions,
   })
 
@@ -175,6 +178,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     edges,
     fullNodes,
     fullEdges,
+    boardBaseSnapshot,
     currentBoardId,
     loadInitialOrRouteBoard,
     flushAutosave,

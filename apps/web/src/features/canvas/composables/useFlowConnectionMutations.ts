@@ -1,11 +1,31 @@
 import type { Ref } from 'vue'
-import type { Connection, Edge, EdgeUpdateEvent } from '@vue-flow/core'
+import type { Connection, Edge, EdgeUpdateEvent, Node } from '@vue-flow/core'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
+import {
+  canvasConnectionToFlowEdge,
+  flowToCanvasBoardSnapshot,
+  resolveFlowEdgeCanvasConnectionId,
+  resolveNextCanvasConnectionId,
+} from '../utils/flowSnapshotAdapter'
+import {
+  createCanvasGraphStore,
+  toCanvasGraphEdgeId,
+  type CanvasGraphEdgeId,
+  type CanvasGraphStore,
+  type CanvasGraphTransaction,
+  type CanvasGraphTransactionSummary,
+} from '../runtime-v2'
+import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/domain'
 
 type UseFlowConnectionMutationsOptions = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node data is an open Record; narrowing breaks vue-flow's internal type expectations
+  nodes: Ref<Array<Record<string, any>>>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow edge data is an open Record; narrowing breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
+  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  enableGraphTransactionsV2?: boolean
   isValidConnection: (connection: Connection) => boolean
   normalizeConnection?: (
     connection: Connection,
@@ -21,7 +41,13 @@ type UseFlowConnectionMutationsOptions = {
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
 
+type ConnectionTargetPolicy = {
+  allowsMultipleTargetConnections: boolean
+}
+
 export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOptions) {
+  const isGraphTransactionsV2Enabled = options.enableGraphTransactionsV2 ?? true
+
   function resolveValidatedConnection(
     connection: Connection,
     existingEdges: readonly Edge[],
@@ -43,20 +69,121 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     return resolvedConnection
   }
 
-  function onConnect(connection: Connection) {
-    const existingEdges = options.edges.value as unknown as Edge[]
-    const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
-    if (!resolvedConnection) return
-    const nextEdge = {
+  function createCurrentGraphStore(): CanvasGraphStore {
+    return createCanvasGraphStore(
+      flowToCanvasBoardSnapshot(
+        {
+          nodes: options.nodes.value as unknown as Node[],
+          edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+        },
+        options.boardBaseSnapshot?.value,
+      ),
+    )
+  }
+
+  function createTransactionCommandOptions(summary: CanvasGraphTransactionSummary) {
+    return createFlowGraphCommandOptions({
+      recordHistory: summary.shouldRecordHistory,
+      markDirty: summary.shouldMarkDirty,
+    })
+  }
+
+  function isSameCanvasConnectionEndpoint(left: CanvasConnection, right: CanvasConnection) {
+    return (
+      left.fromNodeType === right.fromNodeType &&
+      left.fromNodeId === right.fromNodeId &&
+      left.fromPort === right.fromPort &&
+      left.toNodeType === right.toNodeType &&
+      left.toNodeId === right.toNodeId &&
+      left.toPort === right.toPort
+    )
+  }
+
+  function targetsSameCanvasInput(left: CanvasConnection, right: CanvasConnection) {
+    return (
+      left.toNodeType === right.toNodeType &&
+      left.toNodeId === right.toNodeId &&
+      left.toPort === right.toPort
+    )
+  }
+
+  function shouldReplaceConnection(
+    current: CanvasConnection,
+    nextConnection: CanvasConnection,
+    policy: ConnectionTargetPolicy,
+  ) {
+    if (
+      !policy.allowsMultipleTargetConnections &&
+      targetsSameCanvasInput(current, nextConnection)
+    ) {
+      return true
+    }
+    return isSameCanvasConnectionEndpoint(current, nextConnection)
+  }
+
+  function removeTransactionEdgesMatching(
+    store: CanvasGraphStore,
+    transaction: CanvasGraphTransaction,
+    predicate: (connection: CanvasConnection, edgeId: CanvasGraphEdgeId) => boolean,
+  ) {
+    store.getEdgeIds().forEach((edgeId) => {
+      const record = store.getEdge(edgeId)
+      if (record && predicate(record.connection, edgeId)) transaction.removeEdge(edgeId)
+    })
+  }
+
+  function findTransactionEdgeId(
+    store: CanvasGraphStore,
+    edge: Edge,
+  ): CanvasGraphEdgeId | null {
+    const restoredConnectionId = resolveFlowEdgeCanvasConnectionId(edge)
+    if (restoredConnectionId !== null) {
+      const edgeId = toCanvasGraphEdgeId(restoredConnectionId)
+      if (store.getEdge(edgeId)) return edgeId
+    }
+
+    const canvasConnection = flowConnectionToCanvasConnection(1, edge)
+    if (!canvasConnection) return null
+    const matchedEdgeId = store
+      .getEdgeIds()
+      .find((edgeId) => {
+        const record = store.getEdge(edgeId)
+        return record
+          ? isSameCanvasConnectionEndpoint(record.connection, canvasConnection)
+          : false
+      })
+    return matchedEdgeId ?? null
+  }
+
+  function createNextEdgeFromConnection(resolvedConnection: Connection, existingEdges: Edge[]) {
+    const nextConnectionId = resolveNextCanvasConnectionId(
+      options.boardBaseSnapshot?.value,
+      existingEdges as Parameters<typeof resolveNextCanvasConnectionId>[1],
+    )
+    const nextConnection = flowConnectionToCanvasConnection(nextConnectionId, resolvedConnection)
+    if (!nextConnection) return null
+    return {
+      connection: nextConnection,
+      edge: canvasConnectionToFlowEdge(nextConnection) as Edge,
+    }
+  }
+
+  function createLegacyNextEdge(resolvedConnection: Connection): Edge {
+    return {
       ...resolvedConnection,
       id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       source: resolvedConnection.source,
       target: resolvedConnection.target,
       animated: false,
     } as Edge
-    const allowsMultipleTargetConnections =
-      options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
-    const filteredEdges = existingEdges.filter((edge) => {
+  }
+
+  function filterConnectEdges(
+    existingEdges: Edge[],
+    resolvedConnection: Connection,
+    allowsMultipleTargetConnections: boolean,
+  ) {
+    return existingEdges.filter((edge) => {
       const isSameTargetHandle =
         edge.target === resolvedConnection.target &&
         edge.targetHandle === resolvedConnection.targetHandle
@@ -72,22 +199,102 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
         return false
       return true
     })
-    const commandOptions = createFlowGraphCommandOptions()
+  }
+
+  function commitConnectProjection(
+    existingEdges: Edge[],
+    filteredEdges: Edge[],
+    nextEdge: Edge,
+    commandOptions = createFlowGraphCommandOptions(),
+  ) {
     if (filteredEdges.length === existingEdges.length) {
       options.graphAdapter.addEdges(nextEdge, commandOptions)
     } else {
       options.graphAdapter.replaceEdges([...filteredEdges, nextEdge], commandOptions)
     }
+  }
+
+  function onConnectLegacy(resolvedConnection: Connection) {
+    const existingEdges = options.edges.value as unknown as Edge[]
+    const nextEdge = createLegacyNextEdge(resolvedConnection)
+    const allowsMultipleTargetConnections =
+      options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
+    const filteredEdges = filterConnectEdges(
+      existingEdges,
+      resolvedConnection,
+      allowsMultipleTargetConnections,
+    )
+    commitConnectProjection(existingEdges, filteredEdges, nextEdge)
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
   }
 
-  function onEdgeUpdate(event: EdgeUpdateEvent) {
-    const { edge, connection } = event
-    const existingEdges = (options.edges.value as unknown as Edge[]).filter(
-      (item) => item.id !== edge.id,
+  function onConnectV2(resolvedConnection: Connection) {
+    const existingEdges = options.edges.value as unknown as Edge[]
+    const nextEdge = createNextEdgeFromConnection(resolvedConnection, existingEdges)
+    if (!nextEdge) {
+      onConnectLegacy(resolvedConnection)
+      return
+    }
+
+    const allowsMultipleTargetConnections =
+      options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
+    const filteredEdges = filterConnectEdges(
+      existingEdges,
+      resolvedConnection,
+      allowsMultipleTargetConnections,
     )
+    const store = createCurrentGraphStore()
+    const transaction = store.beginTransaction('connect')
+    let summary: CanvasGraphTransactionSummary
+    try {
+      removeTransactionEdgesMatching(store, transaction, (current) =>
+        shouldReplaceConnection(current, nextEdge.connection, {
+          allowsMultipleTargetConnections,
+        }),
+      )
+      transaction.addEdge(nextEdge.connection)
+      summary = transaction.commit()
+    } catch {
+      transaction.cancel()
+      onConnectLegacy(resolvedConnection)
+      return
+    }
+    if (!summary.didChange) return
+
+    commitConnectProjection(
+      existingEdges,
+      filteredEdges,
+      nextEdge.edge,
+      createTransactionCommandOptions(summary),
+    )
+    options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
+  }
+
+  function onConnect(connection: Connection) {
+    const existingEdges = options.edges.value as unknown as Edge[]
     const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
     if (!resolvedConnection) return
+    if (isGraphTransactionsV2Enabled) {
+      onConnectV2(resolvedConnection)
+      return
+    }
+    onConnectLegacy(resolvedConnection)
+  }
+
+  function createEdgeUpdatePatch(nextEdge: Edge): Partial<Edge> {
+    return {
+      id: nextEdge.id,
+      source: nextEdge.source,
+      target: nextEdge.target,
+      sourceHandle: nextEdge.sourceHandle ?? null,
+      targetHandle: nextEdge.targetHandle ?? null,
+      animated: nextEdge.animated,
+      data: nextEdge.data,
+    }
+  }
+
+  function onEdgeUpdateLegacy(event: EdgeUpdateEvent, resolvedConnection: Connection) {
+    const { edge } = event
     const allowsMultipleTargetConnections =
       options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
     const retainedEdges = (options.edges.value as unknown as Edge[]).filter((item) => {
@@ -123,6 +330,91 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       )
     }
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
+  }
+
+  function onEdgeUpdateV2(event: EdgeUpdateEvent, resolvedConnection: Connection) {
+    const { edge } = event
+    const store = createCurrentGraphStore()
+    const transactionEdgeId = findTransactionEdgeId(store, edge)
+    if (!transactionEdgeId) {
+      onEdgeUpdateLegacy(event, resolvedConnection)
+      return
+    }
+
+    const currentConnection = store.getEdge(transactionEdgeId)?.connection
+    if (!currentConnection) {
+      onEdgeUpdateLegacy(event, resolvedConnection)
+      return
+    }
+    const nextConnection = flowConnectionToCanvasConnection(currentConnection.id, resolvedConnection)
+    if (!nextConnection) {
+      onEdgeUpdateLegacy(event, resolvedConnection)
+      return
+    }
+
+    const allowsMultipleTargetConnections =
+      options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
+    const retainedEdges = (options.edges.value as unknown as Edge[]).filter((item) => {
+      if (item.id === edge.id) return true
+      const isSameTargetHandle =
+        item.target === resolvedConnection.target &&
+        (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
+      if (isSameTargetHandle && !allowsMultipleTargetConnections) {
+        return false
+      }
+      const isSameConnection =
+        item.source === resolvedConnection.source &&
+        item.target === resolvedConnection.target &&
+        (item.sourceHandle ?? null) === (resolvedConnection.sourceHandle ?? null) &&
+        (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
+      return !isSameConnection
+    })
+
+    const transaction = store.beginTransaction('connect')
+    let summary: CanvasGraphTransactionSummary
+    try {
+      removeTransactionEdgesMatching(store, transaction, (current, edgeId) => {
+        if (edgeId === transactionEdgeId) return false
+        return shouldReplaceConnection(current, nextConnection, {
+          allowsMultipleTargetConnections,
+        })
+      })
+      transaction.updateEdge(transactionEdgeId, nextConnection)
+      summary = transaction.commit()
+    } catch {
+      transaction.cancel()
+      onEdgeUpdateLegacy(event, resolvedConnection)
+      return
+    }
+    if (!summary.didChange) return
+
+    const nextEdge = canvasConnectionToFlowEdge(nextConnection) as Edge
+    const commandOptions = createTransactionCommandOptions(summary)
+    if (retainedEdges.length === options.edges.value.length) {
+      options.graphAdapter.updateEdge(edge.id, createEdgeUpdatePatch(nextEdge), commandOptions)
+    } else {
+      options.graphAdapter.replaceEdges(
+        retainedEdges.map((item) =>
+          item.id === edge.id ? ({ ...item, ...nextEdge } as Edge) : item,
+        ),
+        commandOptions,
+      )
+    }
+    options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
+  }
+
+  function onEdgeUpdate(event: EdgeUpdateEvent) {
+    const { edge, connection } = event
+    const existingEdges = (options.edges.value as unknown as Edge[]).filter(
+      (item) => item.id !== edge.id,
+    )
+    const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
+    if (!resolvedConnection) return
+    if (isGraphTransactionsV2Enabled) {
+      onEdgeUpdateV2(event, resolvedConnection)
+      return
+    }
+    onEdgeUpdateLegacy(event, resolvedConnection)
   }
 
   return {

@@ -16,11 +16,18 @@ import {
 } from './flowGraphAdapterCommandSideEffects'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
-import { flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
+import {
+  flowToCanvasBoardSnapshot,
+  resolveFlowEdgeCanvasConnectionId,
+} from '../utils/flowSnapshotAdapter'
 import {
   createCanvasGraphStore,
+  toCanvasGraphEdgeId,
+  type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
   type CanvasGraphTransaction,
+  type CanvasGraphTransactionReason,
+  type CanvasGraphTransactionSummary,
 } from '../runtime-v2'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
@@ -74,6 +81,7 @@ export type UseFlowCanvasRuntimeOptions = {
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
   enableNodeDragV2?: boolean
+  enableGraphTransactionsV2?: boolean
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
@@ -97,6 +105,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const cancelAnimationFrame =
     options.cancelAnimationFrame ?? ((handle: number) => window.cancelAnimationFrame(handle))
   const isNodeDragV2Enabled = options.enableNodeDragV2 ?? true
+  const isGraphTransactionsV2Enabled = options.enableGraphTransactionsV2 ?? true
 
   function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
     const ids = new Set<string>()
@@ -247,7 +256,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return isNodeDragV2Enabled && isNodeDragActive && changes.every(isNodeDragV2Change)
   }
 
-  function createNodeDragV2Transaction() {
+  function createCurrentCanvasGraphStore() {
     const snapshot = flowToCanvasBoardSnapshot(
       {
         nodes: options.nodes.value,
@@ -255,7 +264,22 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       },
       options.boardBaseSnapshot.value,
     )
-    return createCanvasGraphStore(snapshot).beginTransaction('node-drag')
+    return createCanvasGraphStore(snapshot)
+  }
+
+  function createNodeDragV2Transaction() {
+    return createCurrentCanvasGraphStore().beginTransaction('node-drag')
+  }
+
+  function createTransactionCommandOptions(
+    summary: CanvasGraphTransactionSummary,
+    historyBefore?: FlowHistorySnapshot | null,
+  ) {
+    return createFlowGraphCommandOptions({
+      historyBefore: summary.shouldRecordHistory ? historyBefore ?? undefined : undefined,
+      recordHistory: summary.shouldRecordHistory,
+      markDirty: summary.shouldMarkDirty,
+    })
   }
 
   function stageNodeDragV2Change(change: NodeDragV2Change) {
@@ -436,6 +460,79 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     )
   }
 
+  function resolveNativeRemoveReason(
+    nodeIds: CanvasGraphNodeId[],
+    extraEdgeIds: CanvasGraphEdgeId[],
+  ): CanvasGraphTransactionReason {
+    if (nodeIds.length === 0) return extraEdgeIds.length <= 1 ? 'disconnect' : 'batch-delete'
+    if (nodeIds.length === 1 && extraEdgeIds.length === 0) return 'delete'
+    return 'batch-delete'
+  }
+
+  function resolveGraphEdgeIdForFlowEdge(
+    store: ReturnType<typeof createCurrentCanvasGraphStore>,
+    edge: Pick<Edge, 'id' | 'data'>,
+  ): CanvasGraphEdgeId | null {
+    const restoredConnectionId = resolveFlowEdgeCanvasConnectionId(edge)
+    if (restoredConnectionId === null) return null
+    const edgeId = toCanvasGraphEdgeId(restoredConnectionId)
+    return store.getEdge(edgeId) ? edgeId : null
+  }
+
+  function resolveNativeRemovedEdgeIds(
+    store: ReturnType<typeof createCurrentCanvasGraphStore>,
+    edgeChanges: EdgeChange[],
+    removedNodeIds: Set<string>,
+  ): CanvasGraphEdgeId[] | null {
+    const edgeIds: CanvasGraphEdgeId[] = []
+    for (const change of edgeChanges) {
+      if (change.type !== 'remove') continue
+      const edge = options.edges.value.find((item) => item.id === change.id)
+      if (edge && (removedNodeIds.has(edge.source) || removedNodeIds.has(edge.target))) continue
+      const edgeId = edge
+        ? resolveGraphEdgeIdForFlowEdge(store, edge)
+        : resolveGraphEdgeIdForFlowEdge(store, { id: change.id, data: undefined })
+      if (!edgeId) return null
+      edgeIds.push(edgeId)
+    }
+    return Array.from(new Set(edgeIds))
+  }
+
+  function commitNativeRemoveOperationV2(
+    historyBefore: FlowHistorySnapshot,
+    nodeChanges: NodeChange[],
+    edgeChanges: EdgeChange[],
+  ): boolean {
+    const nodeIds: CanvasGraphNodeId[] = []
+    const removedNodeIds = new Set<string>()
+    for (const change of nodeChanges) {
+      if (change.type !== 'remove') continue
+      if (!isCanvasGraphNodeId(change.id)) return false
+      nodeIds.push(change.id)
+      removedNodeIds.add(change.id)
+    }
+
+    const store = createCurrentCanvasGraphStore()
+    const edgeIds = resolveNativeRemovedEdgeIds(store, edgeChanges, removedNodeIds)
+    if (!edgeIds) return false
+
+    const transaction = store.beginTransaction(resolveNativeRemoveReason(nodeIds, edgeIds))
+    transaction.batchDelete({
+      nodeIds,
+      edgeIds,
+      removeConnectedEdges: true,
+    })
+    const summary = transaction.commit()
+    if (!summary.didChange) return true
+
+    const result = graphAdapter.applyGraphChanges(
+      { nodes: nodeChanges, edges: edgeChanges },
+      createTransactionCommandOptions(summary, historyBefore),
+    )
+    if (result.didChange) options.onNativeRemove?.()
+    return true
+  }
+
   function commitNativeRemoveOperation() {
     isNativeRemoveCommitScheduled = false
     const historyBefore = nativeRemoveHistoryBefore
@@ -447,6 +544,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     pendingNativeRemoveNodeChanges = []
     pendingNativeRemoveEdgeChanges = []
     if (!historyBefore || !hasApplicableRemoveChanges(nodeChanges, edgeChanges)) return
+
+    if (
+      isGraphTransactionsV2Enabled &&
+      commitNativeRemoveOperationV2(historyBefore, nodeChanges, edgeChanges)
+    ) {
+      return
+    }
 
     const result = graphAdapter.applyGraphChanges(
       { nodes: nodeChanges, edges: edgeChanges },

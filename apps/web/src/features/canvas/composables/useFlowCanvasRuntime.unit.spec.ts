@@ -121,7 +121,7 @@ function applyHarnessEdgeChanges(edges: Edge[], changes: EdgeChange[]): Edge[] {
 
 function createRuntimeHarness(
   snapshot = createSnapshot(),
-  options: { enableNodeDragV2?: boolean } = {},
+  options: { enableNodeDragV2?: boolean; enableGraphTransactionsV2?: boolean } = {},
 ) {
   const fullNodes = shallowRef<Node[]>([])
   const fullEdges = shallowRef<Edge[]>([])
@@ -191,6 +191,7 @@ function createRuntimeHarness(
       scheduledAnimationFrames.delete(frameId)
     },
     enableNodeDragV2: options.enableNodeDragV2,
+    enableGraphTransactionsV2: options.enableGraphTransactionsV2,
     vueFlowGraphActions:
       graphActions as unknown as UseFlowCanvasRuntimeOptions['vueFlowGraphActions'],
   }
@@ -793,6 +794,79 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.fullEdges.value).toHaveLength(0)
+  })
+
+  it('records native edge disconnect as one undoable v2 transaction', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.onEdgesChange([
+      {
+        id: 'connection-3',
+        type: 'remove',
+        source: 'image-1',
+        target: 'prompt-1',
+        sourceHandle: 'out:image',
+        targetHandle: 'in:image',
+      },
+    ])
+    await harness.flushNativeGraphChanges()
+
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value).toHaveLength(0)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullEdges.value).toHaveLength(0)
+  })
+
+  it('coalesces native multi-node delete into one undoable v2 transaction', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.onNodesChange([
+      { id: 'image-1', type: 'remove' },
+      { id: 'prompt-2', type: 'remove' },
+    ])
+    harness.runtime.onEdgesChange([
+      {
+        id: 'connection-3',
+        type: 'remove',
+        source: 'image-1',
+        target: 'prompt-1',
+        sourceHandle: 'out:image',
+        targetHandle: 'in:image',
+      },
+    ])
+    await harness.flushNativeGraphChanges()
+
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1'])
+    expect(harness.fullEdges.value).toHaveLength(0)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
 
