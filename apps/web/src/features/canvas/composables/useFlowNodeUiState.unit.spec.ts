@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shallowRef } from 'vue'
+import { shallowRef, triggerRef } from 'vue'
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { FusionNodeItem, ImageNodeItem } from '../../canvas-board/domain'
@@ -140,5 +140,108 @@ describe('useFlowNodeUiState', () => {
 
     expect(pendingInputs?.image).toBe(true)
     expect(fusionState.primaryAction).toEqual({ label: '等待 Image', disabled: true })
+  })
+
+  it('preserves ui state identity across position-only node replacements', () => {
+    const imageSnapshot = makeImageSnapshot()
+    const fusionSnapshot = makeFusionSnapshot()
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode('image-1', 'image', imageSnapshot),
+      makeFlowNode('fusion-1', 'fusion', fusionSnapshot),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([
+      {
+        id: 'edge-1',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'fusion-1',
+        targetHandle: 'in:image',
+      },
+    ] as Edge[])
+
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const imageState = getFlowNodeUiStateCached('image-1')
+    const fusionState = getFlowNodeUiStateCached('fusion-1')
+
+    nodes.value = nodes.value.map((node) =>
+      node.id === 'fusion-1'
+        ? {
+            ...node,
+            position: { x: node.position.x + 80, y: node.position.y + 40 },
+          }
+        : node,
+    )
+
+    expect(getFlowNodeUiStateCached('image-1')).toBe(imageState)
+    expect(getFlowNodeUiStateCached('fusion-1')).toBe(fusionState)
+  })
+
+  it('returns a new ui state when a relevant connection status changes', () => {
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode(
+        'image-running',
+        'image',
+        makeImageSnapshot({
+          sourceImageUrl: 'https://example.com/running.png',
+          outputStatus: 'running',
+        }),
+      ),
+      makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot()),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([] as Edge[])
+
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const disconnectedFusionState = getFlowNodeUiStateCached('fusion-1')
+
+    edges.value = [
+      {
+        id: 'edge-running',
+        source: 'image-running',
+        sourceHandle: 'out:image',
+        target: 'fusion-1',
+        targetHandle: 'in:image',
+      },
+    ] as Edge[]
+
+    const connectedFusionState = getFlowNodeUiStateCached('fusion-1')
+    const connectedInputs = connectedFusionState.connection.connected as
+      | Record<string, boolean | undefined>
+      | undefined
+    const pendingInputs = connectedFusionState.connection.pending as
+      | Record<string, boolean | undefined>
+      | undefined
+
+    expect(connectedFusionState).not.toBe(disconnectedFusionState)
+    expect(connectedInputs?.image).toBe(true)
+    expect(pendingInputs?.image).toBe(true)
+    expect(connectedFusionState.primaryAction).toEqual({ label: '等待 Image', disabled: true })
+  })
+
+  it('refreshes connection state when edges update with the same array identity', () => {
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode('image-1', 'image', makeImageSnapshot()),
+      makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot()),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([] as Edge[])
+
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const disconnectedFusionState = getFlowNodeUiStateCached('fusion-1')
+
+    edges.value.push({
+      id: 'edge-1',
+      source: 'image-1',
+      sourceHandle: 'out:image',
+      target: 'fusion-1',
+      targetHandle: 'in:image',
+    } as Edge)
+    triggerRef(edges)
+
+    const connectedFusionState = getFlowNodeUiStateCached('fusion-1')
+    const connectedInputs = connectedFusionState.connection.connected as
+      | Record<string, boolean | undefined>
+      | undefined
+
+    expect(connectedFusionState).not.toBe(disconnectedFusionState)
+    expect(connectedInputs?.image).toBe(true)
   })
 })

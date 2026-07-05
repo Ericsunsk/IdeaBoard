@@ -10,7 +10,13 @@ import {
   renderImageEditorLayerStackFile,
   type CanvasImageAdjustmentFinalApplyContext,
 } from '../image-editor'
+import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
+
+const rasterOverlayMocks = vi.hoisted(() => ({
+  setRasterCanvasRef: vi.fn<(nodeId: string, element: Element | null) => void>(),
+  onRasterCanvasPointerDown: vi.fn<(event: PointerEvent) => void>(),
+}))
 
 vi.mock('../image-editor', async (importOriginal) => {
   const { computed } = await import('vue')
@@ -31,8 +37,8 @@ vi.mock('../image-editor', async (importOriginal) => {
       rasterTool: computed(() => null),
       rasterToolEnabled: computed(() => false),
       hasRasterEdits: computed(() => false),
-      setRasterCanvasRef: vi.fn(),
-      onRasterCanvasPointerDown: vi.fn(),
+      setRasterCanvasRef: rasterOverlayMocks.setRasterCanvasRef,
+      onRasterCanvasPointerDown: rasterOverlayMocks.onRasterCanvasPointerDown,
     })),
   }
 })
@@ -131,7 +137,7 @@ function mountCanvasImageTools() {
   const runInpaintAction = vi.fn()
   const runPromptGeneration = vi.fn()
   const updateOutputCount = vi.fn()
-  const activeStrengthAction = ref(null)
+  const activeStrengthAction = ref<ImageStrengthAction | null>(null)
   let imageAdjustmentFinalApplyContext: CanvasImageAdjustmentFinalApplyContext | null = null
   const feedback = {
     warning: vi.fn<(message: string) => void>(),
@@ -199,6 +205,7 @@ function mountCanvasImageTools() {
 
   return {
     activeTool,
+    activeStrengthAction,
     app,
     connectImageNodes,
     createImageNodeFromFile,
@@ -232,6 +239,8 @@ afterEach(() => {
   vi.restoreAllMocks()
   cancelFinalRenderMock.mockReset()
   renderLayerStackFileMock.mockReset()
+  rasterOverlayMocks.setRasterCanvasRef.mockReset()
+  rasterOverlayMocks.onRasterCanvasPointerDown.mockReset()
 })
 
 describe('useCanvasImageTools image adjustment final apply', () => {
@@ -393,6 +402,92 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(stageBinding.maskCanvasHeight).toBe(240)
       expect(actionBinding.actionMenuVisible).toBe(true)
       expect(actionBinding.promptPlaceholder).toBe('输入提示词改造这张图')
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('keeps node binding identities stable when state is unchanged', () => {
+    const harness = mountCanvasImageTools()
+
+    try {
+      expect(harness.runtime.enter('node-1', 'inpaint')).toBe(true)
+
+      const stageBinding = harness.runtime.stageBindingFor('node-1')
+      const actionBinding = harness.runtime.actionBindingFor('node-1')
+      const inactiveStageBinding = harness.runtime.stageBindingFor('node-2')
+      const inactiveActionBinding = harness.runtime.actionBindingFor('node-2')
+
+      expect(harness.runtime.stageBindingFor('node-1')).toBe(stageBinding)
+      expect(harness.runtime.actionBindingFor('node-1')).toBe(actionBinding)
+      expect(harness.runtime.stageBindingFor('node-2')).toBe(inactiveStageBinding)
+      expect(harness.runtime.actionBindingFor('node-2')).toBe(inactiveActionBinding)
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('refreshes cached node bindings when relevant state changes', () => {
+    const harness = mountCanvasImageTools()
+
+    try {
+      expect(harness.runtime.enter('node-1', 'inpaint')).toBe(true)
+
+      const stageBefore = harness.runtime.stageBindingFor('node-1')
+      harness.runtime.chromeCommands.setMaskBrushSize(48)
+      const stageAfter = harness.runtime.stageBindingFor('node-1')
+
+      expect(stageAfter).not.toBe(stageBefore)
+      expect(stageAfter.maskBrushSize).toBe(48)
+      expect(harness.runtime.stageBindingFor('node-1')).toBe(stageAfter)
+
+      const actionBefore = harness.runtime.actionBindingFor('node-1')
+      harness.activeStrengthAction.value = IMAGE_STRENGTH_ACTIONS[0]
+      const actionAfter = harness.runtime.actionBindingFor('node-1')
+
+      expect(actionAfter).not.toBe(actionBefore)
+      expect(actionAfter.activeStrengthAction).toBe(IMAGE_STRENGTH_ACTIONS[0])
+      expect(actionAfter.showStrengthControl).toBe(true)
+      expect(harness.runtime.actionBindingFor('node-1')).toBe(actionAfter)
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('keeps stage canvas ref callbacks stable and scoped to their node ids', () => {
+    const harness = mountCanvasImageTools()
+
+    try {
+      const node1StageBinding = harness.runtime.stageBindingFor('node-1')
+      const node1StageBindingAgain = harness.runtime.stageBindingFor('node-1')
+      const node2StageBinding = harness.runtime.stageBindingFor('node-2')
+
+      expect(node1StageBindingAgain.setMaskCanvasRef).toBe(node1StageBinding.setMaskCanvasRef)
+      expect(node1StageBindingAgain.setRasterCanvasRef).toBe(
+        node1StageBinding.setRasterCanvasRef,
+      )
+      expect(node2StageBinding.setMaskCanvasRef).not.toBe(node1StageBinding.setMaskCanvasRef)
+      expect(node2StageBinding.setRasterCanvasRef).not.toBe(
+        node1StageBinding.setRasterCanvasRef,
+      )
+
+      const rasterCanvas = document.createElement('canvas')
+      node2StageBinding.setRasterCanvasRef(rasterCanvas)
+      expect(rasterOverlayMocks.setRasterCanvasRef).toHaveBeenCalledWith('node-2', rasterCanvas)
+
+      expect(harness.runtime.enter('node-2', 'inpaint')).toBe(true)
+      const maskCanvas = document.createElement('canvas')
+      maskCanvas.width = 4
+      maskCanvas.height = 4
+      node2StageBinding.setMaskCanvasRef(maskCanvas)
+      harness.runtime.chromeCommands.submitMaskPrompt('重绘 node-2', 1)
+
+      expect(harness.runtime.actionBindingFor('node-2').promptPlaceholder).toBe(
+        '描述如何重绘选区',
+      )
+      expect(harness.runtime.actionBindingFor('node-1').promptPlaceholder).toBe(
+        '输入提示词改造这张图',
+      )
     } finally {
       harness.unmount()
     }

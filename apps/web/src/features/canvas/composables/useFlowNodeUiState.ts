@@ -39,6 +39,7 @@ type UseFlowNodeUiStateOptions = {
   edges: Ref<Edge[]>
   isFlowExecutionNodeRunning?: (nodeType: CanvasExecutionOutputNodeType, nodeId: string) => boolean
 }
+type FlowNodeUiState = NodeUiState | PromptNodeUiState
 
 type FlowNodeConnectionStatus = {
   hasAnyConnection: boolean
@@ -83,13 +84,70 @@ function createFlowConnectionIndex(flowEdges: FlowEdgeLike[]): FlowConnectionInd
   return { incomingByNodeId, outgoingByNodeId }
 }
 
+function areRecordsEqual(
+  left: Partial<Record<string, unknown>> | undefined,
+  right: Partial<Record<string, unknown>> | undefined,
+) {
+  const leftRecord = left ?? {}
+  const rightRecord = right ?? {}
+  const leftKeys = Object.keys(leftRecord)
+  const rightKeys = Object.keys(rightRecord)
+  if (leftKeys.length !== rightKeys.length) return false
+  return leftKeys.every((key) => Object.is(leftRecord[key], rightRecord[key]))
+}
+
+function arePrimaryActionsEqual(
+  left: NodeUiState['primaryAction'],
+  right: NodeUiState['primaryAction'],
+) {
+  if (!left || !right) return left === right
+  return left.label === right.label && left.disabled === right.disabled
+}
+
+function areConnectionStatesEqual(
+  left: FlowNodeUiState['connection'],
+  right: FlowNodeUiState['connection'],
+) {
+  return (
+    left.hasAnyConnection === right.hasAnyConnection &&
+    areRecordsEqual(left.connected, right.connected) &&
+    areRecordsEqual(left.pending, right.pending) &&
+    areRecordsEqual(left.sourceKind, right.sourceKind)
+  )
+}
+
+function areFlowNodeUiStatesEqual(left: FlowNodeUiState, right: FlowNodeUiState) {
+  return (
+    areConnectionStatesEqual(left.connection, right.connection) &&
+    arePrimaryActionsEqual(left.primaryAction, right.primaryAction) &&
+    left.cacheStatus === right.cacheStatus &&
+    left.isRunning === right.isRunning
+  )
+}
+
 export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
+  let previousUiStateByNodeId = new Map<string, FlowNodeUiState>()
+
+  const connectionIndexCache = computed(() =>
+    createFlowConnectionIndex(options.edges.value as FlowEdgeLike[]),
+  )
+
   const flowNodeUiStateCache = computed(() => {
-    const result: Record<string, NodeUiState | PromptNodeUiState> = {}
+    const result: Record<string, FlowNodeUiState> = {}
+    const nextUiStateByNodeId = new Map<string, FlowNodeUiState>()
     const flowNodes = options.nodes.value as FlowNodeLike[]
-    const flowEdges = options.edges.value as FlowEdgeLike[]
     const nodeMap = new Map(flowNodes.map((node) => [node.id, node]))
-    const connectionIndex = createFlowConnectionIndex(flowEdges)
+    const connectionIndex = connectionIndexCache.value
+
+    function setFlowNodeUiState(nodeId: string, nextState: FlowNodeUiState) {
+      const previousState = previousUiStateByNodeId.get(nodeId)
+      const state =
+        previousState && areFlowNodeUiStatesEqual(previousState, nextState)
+          ? previousState
+          : nextState
+      result[nodeId] = state
+      nextUiStateByNodeId.set(nodeId, state)
+    }
 
     function getSnapshotNode(nodeId: string): CanvasNodeItem | null {
       const node = nodeMap.get(nodeId)
@@ -172,9 +230,10 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       nodeType: CanvasExecutionOutputNodeType,
       nodeId: string,
       status: FlowNodeConnectionStatus,
+      isRunning: boolean,
     ) {
       const actionLabels = getCanvasNodeExecutionActionLabels(nodeType)
-      if (options.isFlowExecutionNodeRunning?.(nodeType, nodeId)) {
+      if (isRunning) {
         return {
           label: actionLabels.running,
           disabled: true,
@@ -219,12 +278,16 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
     flowNodes.forEach((node) => {
       const nodeType = isCanvasConnectionNodeType(node.data?.kind) ? node.data.kind : null
       if (!nodeType) {
-        result[node.id] = { connection: { hasAnyConnection: false, connected: {} } }
+        setFlowNodeUiState(node.id, {
+          connection: { hasAnyConnection: false, connected: {} },
+        })
         return
       }
       const snapshotNode = getSnapshotNode(node.id)
       if (!snapshotNode) {
-        result[node.id] = { connection: { hasAnyConnection: false, connected: {} } }
+        setFlowNodeUiState(node.id, {
+          connection: { hasAnyConnection: false, connected: {} },
+        })
         return
       }
 
@@ -244,22 +307,24 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       }
 
       if (!isCanvasExecutionOutputNodeType(nodeType)) {
-        result[node.id] = { connection }
+        setFlowNodeUiState(node.id, { connection })
         return
       }
 
       const executionNode = snapshotNode as CanvasExecutionOutputNodeItem
-      result[node.id] = {
+      const isRunning = options.isFlowExecutionNodeRunning?.(nodeType, node.id) ?? false
+      setFlowNodeUiState(node.id, {
         connection,
-        primaryAction: buildPrimaryAction(nodeType, node.id, status),
+        primaryAction: buildPrimaryAction(nodeType, node.id, status, isRunning),
         cacheStatus: resolveWorkflowNodeOutputStatus(
           executionNode.outputStatus,
           executionNode.outputImages,
         ),
-        isRunning: options.isFlowExecutionNodeRunning?.(nodeType, node.id) ?? false,
-      }
+        isRunning,
+      })
     })
 
+    previousUiStateByNodeId = nextUiStateByNodeId
     return result
   })
 
