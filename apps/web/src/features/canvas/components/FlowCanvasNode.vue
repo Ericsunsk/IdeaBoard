@@ -13,7 +13,50 @@
       v-if="showDefaultDragZone"
       class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--default"
     />
-    <template v-if="isPromptNode && promptSnapshot">
+    <template v-if="shouldRenderLightweightNode">
+      <NodeShell
+        :kind="data.kind"
+        :node-id="lightweightNodeId"
+        :width="lightweightNodeWidth"
+        :title="lightweightNodeTitle"
+        :active="selected"
+        :dragging="props.dragging"
+        :copy-mode="props.copyMode"
+        :rounded-header="data.kind !== 'prompt'"
+        @node-mousedown="onNodeMouseDown"
+        @update:title="emitNodeParam('title', $event)"
+        @delete="onDeleteRequest"
+      >
+        <template #icon>
+          <ChatLines v-if="data.kind === 'prompt'" />
+          <MediaImage v-else-if="data.kind === 'image'" />
+          <Keyframes v-else />
+        </template>
+        <div
+          class="flow-canvas-node__lightweight-body"
+          :class="`flow-canvas-node__lightweight-body--${data.kind}`"
+          :style="lightweightBodyStyle"
+          data-canvas-lightweight-node="true"
+          :aria-label="lightweightBodyAriaLabel"
+        >
+          <div class="flow-canvas-node__lightweight-mark" aria-hidden="true" />
+          <span class="flow-canvas-node__lightweight-label">{{ lightweightNodeKindLabel }}</span>
+        </div>
+        <div
+          class="flow-canvas-node__handle-rail"
+          :class="{ 'is-disabled': disableHandleRailInteraction }"
+        >
+          <FlowNodeHandles
+            :kind="data.kind"
+            :snapshot-node="data.snapshotNode"
+            :ui-state="props.uiState"
+            :show-handles="false"
+            @request-internals-update="requestNodeInternalsUpdate"
+          />
+        </div>
+      </NodeShell>
+    </template>
+    <template v-else-if="isPromptNode && promptSnapshot">
       <PromptNode
         :node="promptSnapshot"
         :active="selected"
@@ -159,7 +202,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type StyleValue } from 'vue'
+import { ChatLines, Keyframes, MediaImage } from '@iconoir/vue'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
@@ -172,6 +216,7 @@ import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations
 import FlowNodeHandles from './FlowNodeHandles.vue'
 import FusionNode from './nodes/FusionNode.vue'
 import ImageNode from './nodes/ImageNode.vue'
+import NodeShell from './nodes/NodeShell.vue'
 import PromptNode from './nodes/PromptNode.vue'
 
 const props = withDefaults(
@@ -191,6 +236,7 @@ const props = withDefaults(
     expandHandleRadius?: number
     imageToolStageBinding?: ImageToolStageBinding | null
     handleVisibilityRefreshToken?: number
+    lightweightNodeRendering?: boolean
   }>(),
   {
     selected: false,
@@ -205,6 +251,7 @@ const props = withDefaults(
     expandHandleRadius: 4,
     imageToolStageBinding: null,
     handleVisibilityRefreshToken: 0,
+    lightweightNodeRendering: false,
   },
 )
 
@@ -281,6 +328,58 @@ const {
   imageDirectGenerating: () => resolvedActionBinding.value.directGenerating,
   expandModeActive: () => !!props.expandModeActive,
   isImageEditorActive: () => isImageEditorActive.value,
+})
+
+const isNodeInteractiveAtRest = computed(
+  () =>
+    props.selected &&
+    !props.dragging &&
+    !nodeRunning.value &&
+    !props.copyMode &&
+    !props.expandModeActive,
+)
+const hasActiveNodeChrome = computed(
+  () =>
+    resolvedActionBinding.value.actionMenuVisible ||
+    resolvedActionBinding.value.promptComposerVisible ||
+    !!props.fusionPromptComposerVisible ||
+    isImageEditorActive.value ||
+    !!props.expandModeActive ||
+    !!resolvedStageBinding.value?.mode,
+)
+const canRenderLightweightNode = computed(
+  () =>
+    props.lightweightNodeRendering &&
+    !hasActiveNodeChrome.value &&
+    !nodeRunning.value &&
+    (isPromptNode.value || isImageNode.value || isFusionNode.value),
+)
+const shouldRenderLightweightNode = computed(
+  () => canRenderLightweightNode.value && !isNodeInteractiveAtRest.value,
+)
+const lightweightSnapshot = computed(
+  () => promptSnapshot.value ?? imageSnapshot.value ?? fusionSnapshot.value ?? null,
+)
+const lightweightNodeId = computed(() => lightweightSnapshot.value?.id ?? props.nodeId)
+const lightweightNodeWidth = computed(() => lightweightSnapshot.value?.width ?? 280)
+const lightweightNodeTitle = computed(() => {
+  const fallback = lightweightNodeKindLabel.value
+  return `${lightweightSnapshot.value?.title ?? ''}`.trim() || fallback
+})
+const lightweightNodeKindLabel = computed(() => {
+  if (props.data.kind === 'prompt') return 'Prompt'
+  if (props.data.kind === 'image') return 'Image'
+  return 'Fusion'
+})
+const lightweightBodyAriaLabel = computed(() => `${lightweightNodeKindLabel.value} 节点轻量预览`)
+const lightweightBodyStyle = computed<StyleValue>(() => {
+  const height =
+    props.data.kind === 'image'
+      ? stageHeight.value
+      : props.data.kind === 'fusion'
+        ? lightweightNodeWidth.value
+        : 280
+  return { height: `${height}px` }
 })
 
 const {
@@ -462,6 +561,44 @@ function noopMouse() {}
 .flow-canvas-node__drag-surface.is-running,
 .flow-canvas-node__drag-surface.is-running:active {
   cursor: default;
+}
+
+.flow-canvas-node__lightweight-body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 120px;
+  border: 1.5px solid var(--color-canvas-node-border-alt);
+  border-radius: 11px;
+  background: var(--color-canvas-node-bg);
+  color: var(--color-canvas-text-muted);
+  overflow: hidden;
+  user-select: none;
+}
+
+.flow-canvas-node__lightweight-body--prompt {
+  border-radius: 16px;
+}
+
+.flow-canvas-node__lightweight-mark {
+  position: absolute;
+  inset: 12px;
+  border: 1px dashed color-mix(in srgb, var(--color-canvas-text-muted) 42%, transparent);
+  border-radius: inherit;
+  opacity: 0.42;
+}
+
+.flow-canvas-node__lightweight-label {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  opacity: 0.58;
 }
 
 .flow-canvas-node__unsupported {

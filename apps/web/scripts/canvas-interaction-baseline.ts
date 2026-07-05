@@ -32,6 +32,7 @@ type CliOptions = {
   outputDir: string
   nodeDragV2: boolean
   graphTransactionsV2: boolean
+  lightweightNodes: boolean
   dragTargetId: number | null
   printJson: boolean
   help: boolean
@@ -136,7 +137,7 @@ type BenchmarkVerdict = {
 }
 
 type BenchmarkReport = {
-  schemaVersion: 4
+  schemaVersion: 5
   generatedAt: string
   command: string
   browser: {
@@ -147,6 +148,7 @@ type BenchmarkReport = {
   runtime: {
     nodeDragV2: boolean
     graphTransactionsV2: boolean
+    lightweightNodes: boolean
     dragTargetId: number
   }
   fixture: {
@@ -374,6 +376,7 @@ function parseCliOptions(args: string[]): CliOptions {
     outputDir: DEFAULT_OUTPUT_DIR,
     nodeDragV2: true,
     graphTransactionsV2: true,
+    lightweightNodes: false,
     dragTargetId: null,
     printJson: false,
     help: false,
@@ -426,6 +429,9 @@ function parseCliOptions(args: string[]): CliOptions {
           readValue(),
           '--graph-transactions-v2',
         )
+        break
+      case '--lightweight-nodes':
+        options.lightweightNodes = parseBooleanSwitch(readValue(), '--lightweight-nodes')
         break
       case '--drag-target-id':
         options.dragTargetId = parseDragTargetId(readValue())
@@ -513,6 +519,7 @@ Options:
   --output <dir>                 Report directory. Defaults to ${DEFAULT_OUTPUT_DIR}.
   --node-drag-v2 on              Enable node-drag v2 path. Use off for fallback comparison.
   --graph-transactions-v2 on     Enable connect/delete v2 path. Use off for fallback comparison.
+  --lightweight-nodes off        Enable internal lightweight Canvas node rendering for spike runs.
   --drag-target-id 20            Image node id to drag. Defaults to min(20, image node count).
   --json                         Print the full JSON report to stdout.
   --help                         Show this help.
@@ -889,7 +896,7 @@ function prepareOriginStorage(playwrightCli: CommandSpec) {
   runPageCode(
     playwrightCli,
     `
-await page.evaluate(async ({ user, nodeDragV2, graphTransactionsV2 }) => {
+await page.evaluate(async ({ user, nodeDragV2, graphTransactionsV2, lightweightNodes }) => {
   localStorage.clear()
   sessionStorage.clear()
   localStorage.setItem('user', JSON.stringify(user))
@@ -898,6 +905,7 @@ await page.evaluate(async ({ user, nodeDragV2, graphTransactionsV2 }) => {
     'ideaboard:canvas-graph-transactions-v2',
     graphTransactionsV2 ? 'on' : 'off',
   )
+  localStorage.setItem('ideaboard:canvas-lightweight-nodes', lightweightNodes ? 'on' : 'off')
   if (!('indexedDB' in window)) return
   const databases = typeof indexedDB.databases === 'function' ? await indexedDB.databases() : []
   await Promise.all(databases.map((db) => new Promise((resolve) => {
@@ -909,6 +917,7 @@ await page.evaluate(async ({ user, nodeDragV2, graphTransactionsV2 }) => {
       user: MOCK_USER,
       nodeDragV2: CLI_OPTIONS.nodeDragV2,
       graphTransactionsV2: CLI_OPTIONS.graphTransactionsV2,
+      lightweightNodes: CLI_OPTIONS.lightweightNodes,
     })})
 `,
   )
@@ -1590,7 +1599,7 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
     MOCK_BOARD_STATE.fusionNodes.length
   const edgeCount = MOCK_BOARD_STATE.connections.length
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     generatedAt: new Date().toISOString(),
     command: createReportCommand(),
     browser: {
@@ -1601,6 +1610,7 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
     runtime: {
       nodeDragV2: CLI_OPTIONS.nodeDragV2,
       graphTransactionsV2: CLI_OPTIONS.graphTransactionsV2,
+      lightweightNodes: CLI_OPTIONS.lightweightNodes,
       dragTargetId: NODE_DRAG_TARGET_ID,
     },
     fixture: {
