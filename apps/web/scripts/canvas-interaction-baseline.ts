@@ -25,6 +25,7 @@ type CliOptions = {
   paths: BenchmarkPath[]
   outputDir: string
   nodeDragV2: boolean
+  dragTargetId: number | null
   printJson: boolean
   help: boolean
 }
@@ -130,6 +131,7 @@ type BenchmarkReport = {
   viewport: typeof BENCHMARK_VIEWPORT
   runtime: {
     nodeDragV2: boolean
+    dragTargetId: number
   }
   fixture: {
     name: BenchmarkFixture
@@ -267,7 +269,10 @@ const MOCK_BOARD_STATE = createCanvasBoardState(
   CLI_OPTIONS.totalNodes,
   CLI_OPTIONS.edgeDensity,
 )
-const NODE_DRAG_TARGET_ID = resolveNodeDragTargetId(MOCK_BOARD_STATE)
+const NODE_DRAG_TARGET_ID = resolveNodeDragTargetId(
+  MOCK_BOARD_STATE,
+  CLI_OPTIONS.dragTargetId,
+)
 
 const AUTH_SESSION = {
   session: { id: 'canvas-interaction-benchmark-session' },
@@ -338,6 +343,7 @@ function parseCliOptions(args: string[]): CliOptions {
     paths: [...BENCHMARK_PATHS],
     outputDir: DEFAULT_OUTPUT_DIR,
     nodeDragV2: true,
+    dragTargetId: null,
     printJson: false,
     help: false,
   }
@@ -384,6 +390,9 @@ function parseCliOptions(args: string[]): CliOptions {
       case '--node-drag-v2':
         options.nodeDragV2 = parseBooleanSwitch(readValue(), '--node-drag-v2')
         break
+      case '--drag-target-id':
+        options.dragTargetId = parseDragTargetId(readValue())
+        break
       default:
         throw new Error(`Unknown option ${rawArg}`)
     }
@@ -393,6 +402,12 @@ function parseCliOptions(args: string[]): CliOptions {
     throw new Error('At least one benchmark path is required')
   }
   return options
+}
+
+function parseDragTargetId(rawValue: string): number {
+  const value = Number(rawValue)
+  if (Number.isInteger(value) && Number.isFinite(value) && value >= 1) return value
+  throw new Error(`--drag-target-id must be an integer >= 1, got ${rawValue}`)
 }
 
 function parseBooleanSwitch(rawValue: string, optionName: string): boolean {
@@ -460,6 +475,7 @@ Options:
   --paths initial-load,node-drag Comma-separated paths. Defaults to all paths.
   --output <dir>                 Report directory. Defaults to ${DEFAULT_OUTPUT_DIR}.
   --node-drag-v2 on              Enable node-drag v2 path. Use off for fallback comparison.
+  --drag-target-id 20            Image node id to drag. Defaults to min(20, image node count).
   --json                         Print the full JSON report to stdout.
   --help                         Show this help.
 
@@ -779,8 +795,10 @@ function wrapNodeId(id: number, nodeCount: number) {
   return ((id - 1) % nodeCount) + 1
 }
 
-function resolveNodeDragTargetId(state: CanvasBoardState): number {
-  return Math.min(20, Math.max(1, state.imageNodes.length))
+function resolveNodeDragTargetId(state: CanvasBoardState, requestedId: number | null): number {
+  const maxImageNodeId = Math.max(1, state.imageNodes.length)
+  if (requestedId !== null) return Math.min(requestedId, maxImageNodeId)
+  return Math.min(20, maxImageNodeId)
 }
 
 function toApiBoardState(state: CanvasBoardState): UserBoardItem['state'] {
@@ -1461,6 +1479,7 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
     viewport: BENCHMARK_VIEWPORT,
     runtime: {
       nodeDragV2: CLI_OPTIONS.nodeDragV2,
+      dragTargetId: NODE_DRAG_TARGET_ID,
     },
     fixture: {
       name: CLI_OPTIONS.fixture,
