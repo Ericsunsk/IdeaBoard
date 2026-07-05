@@ -130,6 +130,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const scheduledMicrotasks: Array<() => void> = []
   const scheduledAnimationFrames = new Map<number, FrameRequestCallback>()
   let nextAnimationFrameId = 1
+  const onWarning = vi.fn()
   const onNativeRemove = vi.fn()
   const graphActions = {
     addNodes: vi.fn(),
@@ -171,7 +172,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     setViewport: (nextViewport) => {
       viewport.value = nextViewport
     },
-    onWarning: vi.fn(),
+    onWarning,
     onSuccess: vi.fn(),
     onError: vi.fn(),
     onNativeRemove,
@@ -229,6 +230,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     savedSnapshots,
     viewport,
     boardSession,
+    onWarning,
     onNativeRemove,
     graphActions,
     isDirty,
@@ -824,6 +826,38 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
 
     harness.runtime.flowHistory.redo()
+    expect(harness.fullEdges.value).toHaveLength(0)
+  })
+
+  it('resolves native edge delete by endpoints when Vue Flow edge metadata is missing', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const [currentEdge] = harness.fullEdges.value
+    expect(currentEdge).toBeDefined()
+    const generatedEdge = {
+      ...currentEdge,
+      id: 'vueflow__edge-image-1out:image-prompt-1in:image',
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [generatedEdge]
+
+    await harness.applyNativeEdgeChanges([
+      {
+        id: generatedEdge.id,
+        type: 'remove',
+        source: generatedEdge.source,
+        target: generatedEdge.target,
+        sourceHandle: generatedEdge.sourceHandle ?? null,
+        targetHandle: generatedEdge.targetHandle ?? null,
+      },
+    ])
+
+    expect(harness.onWarning).not.toHaveBeenCalledWith(
+      '删除操作未能应用，请刷新画布后重试',
+    )
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullEdges.value).toHaveLength(0)
   })
 

@@ -14,12 +14,13 @@ import {
   createFlowGraphCommandOptions,
   readFlowGraphCommandSideEffects,
 } from './flowGraphAdapterCommandSideEffects'
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
 import {
   flowToCanvasBoardSnapshot,
   resolveFlowEdgeCanvasConnectionId,
 } from '../utils/flowSnapshotAdapter'
+import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   createCanvasGraphStore,
   toCanvasGraphEdgeId,
@@ -51,6 +52,10 @@ type NodeDragChange = NodeChange & {
   id: string
   type: 'position' | 'select'
 }
+
+type EdgeLookupInput = Pick<Edge, 'id' | 'data'> &
+  Partial<Pick<Edge, 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
+type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
 
 export type CanvasFlowGraphRuntimeControls = {
   captureHistory: () => FlowHistorySnapshot
@@ -463,14 +468,65 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return 'batch-delete'
   }
 
+  function isSameCanvasConnectionEndpoint(
+    left: CanvasConnection,
+    right: CanvasConnection,
+  ) {
+    return (
+      left.fromNodeType === right.fromNodeType &&
+      left.fromNodeId === right.fromNodeId &&
+      left.fromPort === right.fromPort &&
+      left.toNodeType === right.toNodeType &&
+      left.toNodeId === right.toNodeId &&
+      left.toPort === right.toPort
+    )
+  }
+
+  function resolveGraphEdgeIdByEndpoint(
+    store: ReturnType<typeof createCurrentCanvasGraphStore>,
+    edge: EdgeLookupInput,
+  ): CanvasGraphEdgeId | null {
+    if (!edge.source || !edge.target) return null
+    const canvasConnection = flowConnectionToCanvasConnection(1, {
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? null,
+      targetHandle: edge.targetHandle ?? null,
+    })
+    if (!canvasConnection) return null
+    return (
+      store.getEdgeIds().find((edgeId) => {
+        const record = store.getEdge(edgeId)
+        return record
+          ? isSameCanvasConnectionEndpoint(record.connection, canvasConnection)
+          : false
+      }) ?? null
+    )
+  }
+
   function resolveGraphEdgeIdForFlowEdge(
     store: ReturnType<typeof createCurrentCanvasGraphStore>,
-    edge: Pick<Edge, 'id' | 'data'>,
+    edge: EdgeLookupInput,
   ): CanvasGraphEdgeId | null {
     const restoredConnectionId = resolveFlowEdgeCanvasConnectionId(edge)
-    if (restoredConnectionId === null) return null
-    const edgeId = toCanvasGraphEdgeId(restoredConnectionId)
-    return store.getEdge(edgeId) ? edgeId : null
+    if (restoredConnectionId !== null) {
+      const edgeId = toCanvasGraphEdgeId(restoredConnectionId)
+      if (store.getEdge(edgeId)) return edgeId
+    }
+    return resolveGraphEdgeIdByEndpoint(store, edge)
+  }
+
+  function createEdgeLookupInput(change: EdgeRemoveChange): EdgeLookupInput {
+    const endpointChange = change as EdgeRemoveChange &
+      Partial<Pick<Edge, 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
+    return {
+      id: change.id,
+      data: undefined,
+      source: endpointChange.source,
+      target: endpointChange.target,
+      sourceHandle: endpointChange.sourceHandle,
+      targetHandle: endpointChange.targetHandle,
+    }
   }
 
   function resolveNativeRemovedEdgeIds(
@@ -485,7 +541,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       if (edge && (removedNodeIds.has(edge.source) || removedNodeIds.has(edge.target))) continue
       const edgeId = edge
         ? resolveGraphEdgeIdForFlowEdge(store, edge)
-        : resolveGraphEdgeIdForFlowEdge(store, { id: change.id, data: undefined })
+        : resolveGraphEdgeIdForFlowEdge(store, createEdgeLookupInput(change))
       if (!edgeId) return null
       edgeIds.push(edgeId)
     }
