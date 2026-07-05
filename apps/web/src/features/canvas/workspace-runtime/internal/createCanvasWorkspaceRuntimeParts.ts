@@ -1,21 +1,21 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import type { CanvasCreatableNodeKind, ImageNodeItem } from '../../canvas-board/domain'
-import type { CanvasFlowViewport } from './useCanvasViewportRuntime'
-import { useCanvasViewportRuntime } from './useCanvasViewportRuntime'
-import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
-import { useCanvasGraphRuntime } from './useCanvasGraphRuntime'
-import { useCanvasTaskRuntime } from './useCanvasTaskRuntime'
-import { useFlowImageActionOrchestrator } from './useFlowImageActionOrchestrator'
-import { useFlowPromptGenerationOrchestrator } from './useFlowPromptGenerationOrchestrator'
-import { useFlowCanvasNodeHandlers } from './useFlowCanvasNodeHandlers'
-import { useFlowNodeMediaInputs } from './useFlowNodeMediaInputs'
-import { useImageCanvasExtendOverlay } from './useImageCanvasExtendOverlay'
-import { useCanvasFeedback } from '../feedback/useCanvasFeedback'
-import { useCanvasImageTools } from '../image-tools'
-import type { UseCanvasImageToolsOptions } from '../image-tools/useCanvasImageTools'
-import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
+import type { CanvasCreatableNodeKind, ImageNodeItem } from '../../../canvas-board/domain'
+import type { CanvasFlowViewport } from '../../composables/useCanvasViewportRuntime'
+import { useCanvasViewportRuntime } from '../../composables/useCanvasViewportRuntime'
+import { useCanvasBoardRuntime } from '../../composables/useCanvasBoardRuntime'
+import { useCanvasGraphRuntime } from '../../composables/useCanvasGraphRuntime'
+import { useCanvasTaskRuntime } from '../../composables/useCanvasTaskRuntime'
+import { useFlowImageActionOrchestrator } from '../../composables/useFlowImageActionOrchestrator'
+import { useFlowPromptGenerationOrchestrator } from '../../composables/useFlowPromptGenerationOrchestrator'
+import { useFlowCanvasNodeHandlers } from '../../composables/useFlowCanvasNodeHandlers'
+import { useFlowNodeMediaInputs } from '../../composables/useFlowNodeMediaInputs'
+import { useImageCanvasExtendOverlay } from '../../composables/useImageCanvasExtendOverlay'
+import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
+import { useCanvasImageTools } from '../../image-tools'
+import type { UseCanvasImageToolsOptions } from '../../image-tools/useCanvasImageTools'
+import type { CanvasVueFlowGraphActions } from '../../composables/useCanvasVueFlowGraphAdapter'
 
 type ValueRef<T> = {
   readonly value: T
@@ -130,7 +130,9 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
-export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOptions) {
+export function createCanvasWorkspaceRuntimeParts(
+  options: UseCanvasWorkspaceRuntimeOptions,
+) {
   const feedback = useCanvasFeedback()
 
   const board = useCanvasBoardRuntime({

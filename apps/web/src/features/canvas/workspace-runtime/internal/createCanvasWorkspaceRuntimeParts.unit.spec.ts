@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
-import { useCanvasWorkspaceRuntime } from './useCanvasWorkspaceRuntime'
+import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
+import { createCanvasWorkspaceRuntimeParts } from './createCanvasWorkspaceRuntimeParts'
 
 const mocks = vi.hoisted(() => ({
   feedback: {
@@ -32,27 +32,27 @@ const mocks = vi.hoisted(() => ({
   useCanvasImageTools: vi.fn(),
 }))
 
-vi.mock('../feedback/useCanvasFeedback', () => ({
+vi.mock('../../feedback/useCanvasFeedback', () => ({
   useCanvasFeedback: () => mocks.feedback,
 }))
 
-vi.mock('./useCanvasBoardRuntime', () => ({
+vi.mock('../../composables/useCanvasBoardRuntime', () => ({
   useCanvasBoardRuntime: mocks.useCanvasBoardRuntime,
 }))
 
-vi.mock('./useCanvasGraphRuntime', () => ({
+vi.mock('../../composables/useCanvasGraphRuntime', () => ({
   useCanvasGraphRuntime: mocks.useCanvasGraphRuntime,
 }))
 
-vi.mock('./useCanvasViewportRuntime', () => ({
+vi.mock('../../composables/useCanvasViewportRuntime', () => ({
   useCanvasViewportRuntime: mocks.useCanvasViewportRuntime,
 }))
 
-vi.mock('./useCanvasTaskRuntime', () => ({
+vi.mock('../../composables/useCanvasTaskRuntime', () => ({
   useCanvasTaskRuntime: mocks.useCanvasTaskRuntime,
 }))
 
-vi.mock('../image-tools', () => ({
+vi.mock('../../image-tools', () => ({
   useCanvasImageTools: mocks.useCanvasImageTools,
 }))
 
@@ -146,7 +146,7 @@ function createWorkspaceOptions() {
   }
 }
 
-describe('useCanvasWorkspaceRuntime', () => {
+describe('createCanvasWorkspaceRuntimeParts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.useCanvasViewportRuntime.mockReturnValue({ zoomLevel: ref(100) })
@@ -161,7 +161,7 @@ describe('useCanvasWorkspaceRuntime', () => {
     mocks.useCanvasGraphRuntime.mockReturnValue(graph)
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
-    const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
+    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
 
     expect(runtime.flowPane.nodes).toBe(board.nodes)
     expect(runtime.flowPane.edges).toBe(board.edges)
@@ -246,7 +246,7 @@ describe('useCanvasWorkspaceRuntime', () => {
     mocks.useCanvasGraphRuntime.mockReturnValue(graph)
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
-    const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
+    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
     runtime.createImageTools({
       activeTool: ref('select'),
       canvasWrapRef: ref(null),
@@ -286,7 +286,7 @@ describe('useCanvasWorkspaceRuntime', () => {
     mocks.useCanvasGraphRuntime.mockReturnValue(graph)
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
-    const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
+    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
     const cancelFlowExpandMode = vi.fn()
     const cancelFlowMaskEditorMode = vi.fn()
     const { onFlowPromptGenerate } = runtime.createPromptGenerationHandlers({
@@ -310,7 +310,7 @@ describe('useCanvasWorkspaceRuntime', () => {
     mocks.useCanvasGraphRuntime.mockReturnValue(graph)
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
-    const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
+    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
     const { onFlowFusionPromptGenerate } = runtime.createImageActionHandlers({
       flowImageEditorNodeId: ref(null),
       consumeSuppressedStrengthClick: vi.fn(() => false),
@@ -345,7 +345,7 @@ describe('useCanvasWorkspaceRuntime', () => {
     mocks.useCanvasGraphRuntime.mockReturnValue(graph)
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
-    const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
+    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
     const extendPayload = {
       nodeId: 'image-1',
       frameRect: { left: 0, top: 0, width: 100, height: 100 },

@@ -3,14 +3,14 @@ import { ref } from 'vue'
 import { useCanvasWorkspaceRuntime } from './useCanvasWorkspaceRuntime'
 
 const mocks = vi.hoisted(() => ({
-  useLegacyCanvasWorkspaceRuntime: vi.fn(),
+  createCanvasWorkspaceRuntimeParts: vi.fn(),
 }))
 
-vi.mock('../composables/useCanvasWorkspaceRuntime', () => ({
-  useCanvasWorkspaceRuntime: mocks.useLegacyCanvasWorkspaceRuntime,
+vi.mock('./internal/createCanvasWorkspaceRuntimeParts', () => ({
+  createCanvasWorkspaceRuntimeParts: mocks.createCanvasWorkspaceRuntimeParts,
 }))
 
-function createLegacyRuntime() {
+function createRuntimeParts() {
   return {
     boardChrome: {
       currentBoardId: ref('board-a'),
@@ -106,32 +106,32 @@ function createLegacyRuntime() {
 
 describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
   it('exposes only viewModel and commands at the public seam', () => {
-    const legacyRuntime = createLegacyRuntime()
-    mocks.useLegacyCanvasWorkspaceRuntime.mockReturnValue(legacyRuntime)
+    const runtimeParts = createRuntimeParts()
+    mocks.createCanvasWorkspaceRuntimeParts.mockReturnValue(runtimeParts)
 
     const workspace = useCanvasWorkspaceRuntime({} as never)
 
     expect(Object.keys(workspace).sort()).toEqual(['commands', 'viewModel'])
     expect(workspace.viewModel.flowPane).toEqual({
-      nodes: legacyRuntime.flowPane.nodes,
-      edges: legacyRuntime.flowPane.edges,
+      nodes: runtimeParts.flowPane.nodes,
+      edges: runtimeParts.flowPane.edges,
     })
     expect(workspace.commands.flowPane).toEqual({
-      onNodesChange: legacyRuntime.flowPane.onNodesChange,
-      onEdgesChange: legacyRuntime.flowPane.onEdgesChange,
-      isValidConnection: legacyRuntime.flowPane.isValidConnection,
-      onConnect: legacyRuntime.flowPane.onConnect,
-      onEdgeUpdate: legacyRuntime.flowPane.onEdgeUpdate,
-      nodeDragTransactions: legacyRuntime.flowPane.nodeDragTransactions,
+      onNodesChange: runtimeParts.flowPane.onNodesChange,
+      onEdgesChange: runtimeParts.flowPane.onEdgesChange,
+      isValidConnection: runtimeParts.flowPane.isValidConnection,
+      onConnect: runtimeParts.flowPane.onConnect,
+      onEdgeUpdate: runtimeParts.flowPane.onEdgeUpdate,
+      nodeDragTransactions: runtimeParts.flowPane.nodeDragTransactions,
     })
     expect(workspace.commands.boardSession.onNavigateRequest).toBe(
-      legacyRuntime.boardChrome.onNavigateRequest,
+      runtimeParts.boardChrome.onNavigateRequest,
     )
     expect(workspace.commands.imageWorkflow.runImageDirectAction).toBe(
-      legacyRuntime.imageWorkflow.runImageDirectAction,
+      runtimeParts.imageWorkflow.runImageDirectAction,
     )
     expect(workspace.commands.imageTools.createImageTools).toBe(
-      legacyRuntime.createImageTools,
+      runtimeParts.createImageTools,
     )
   })
 })

@@ -1,12 +1,12 @@
-import type { useCanvasWorkspaceRuntime as useLegacyCanvasWorkspaceRuntime } from '../composables/useCanvasWorkspaceRuntime'
+import type { createCanvasWorkspaceRuntimeParts } from './internal/createCanvasWorkspaceRuntimeParts'
 
-export type { UseCanvasWorkspaceRuntimeOptions } from '../composables/useCanvasWorkspaceRuntime'
+export type { UseCanvasWorkspaceRuntimeOptions } from './internal/createCanvasWorkspaceRuntimeParts'
 
-type LegacyCanvasWorkspaceRuntime = ReturnType<typeof useLegacyCanvasWorkspaceRuntime>
+type CanvasWorkspaceRuntimeParts = ReturnType<typeof createCanvasWorkspaceRuntimeParts>
 
 export type CanvasWorkspaceRuntimeViewModel = {
   boardChrome: Pick<
-    LegacyCanvasWorkspaceRuntime['boardChrome'],
+    CanvasWorkspaceRuntimeParts['boardChrome'],
     | 'currentBoardId'
     | 'isBoardMenuOpen'
     | 'isRenamingBoard'
@@ -14,11 +14,11 @@ export type CanvasWorkspaceRuntimeViewModel = {
     | 'currentBoardName'
     | 'boardOptions'
   >
-  flowPane: Pick<LegacyCanvasWorkspaceRuntime['flowPane'], 'nodes' | 'edges'>
-  persistence: Pick<LegacyCanvasWorkspaceRuntime['persistence'], 'history'>
-  viewportControls: Pick<LegacyCanvasWorkspaceRuntime['viewportControls'], 'zoomLevel'>
+  flowPane: Pick<CanvasWorkspaceRuntimeParts['flowPane'], 'nodes' | 'edges'>
+  persistence: Pick<CanvasWorkspaceRuntimeParts['persistence'], 'history'>
+  viewportControls: Pick<CanvasWorkspaceRuntimeParts['viewportControls'], 'zoomLevel'>
   graphEditing: Pick<
-    LegacyCanvasWorkspaceRuntime['graphEditing'],
+    CanvasWorkspaceRuntimeParts['graphEditing'],
     | 'graphAdapter'
     | 'hasSelectedFlowNodes'
     | 'isFlowInteractionActive'
@@ -31,7 +31,7 @@ export type CanvasWorkspaceRuntimeViewModel = {
 
 export type CanvasWorkspaceRuntimeCommands = {
   boardSession: Pick<
-    LegacyCanvasWorkspaceRuntime['boardChrome'],
+    CanvasWorkspaceRuntimeParts['boardChrome'],
     | 'setBoardNameInputRef'
     | 'refreshBoardMetas'
     | 'toggleBoardMenu'
@@ -44,7 +44,7 @@ export type CanvasWorkspaceRuntimeCommands = {
     | 'onLogoutRequest'
   >
   flowPane: Pick<
-    LegacyCanvasWorkspaceRuntime['flowPane'],
+    CanvasWorkspaceRuntimeParts['flowPane'],
     | 'onNodesChange'
     | 'onEdgesChange'
     | 'isValidConnection'
@@ -53,12 +53,12 @@ export type CanvasWorkspaceRuntimeCommands = {
     | 'nodeDragTransactions'
   >
   persistence: Pick<
-    LegacyCanvasWorkspaceRuntime['persistence'],
+    CanvasWorkspaceRuntimeParts['persistence'],
     'flushAutosave' | 'loadCanvasBoardAndProbe' | 'reattachPendingImageResults'
   >
-  viewportControls: Omit<LegacyCanvasWorkspaceRuntime['viewportControls'], 'zoomLevel'>
+  viewportControls: Omit<CanvasWorkspaceRuntimeParts['viewportControls'], 'zoomLevel'>
   graphEditing: Pick<
-    LegacyCanvasWorkspaceRuntime['graphEditing'],
+    CanvasWorkspaceRuntimeParts['graphEditing'],
     | 'scheduleFlowNodeInternalsRefresh'
     | 'createNodeAtPosition'
     | 'onExportSelectedImages'
@@ -76,19 +76,19 @@ export type CanvasWorkspaceRuntimeCommands = {
     | 'finishFlowNodeDragDuplicateTracking'
     | 'getFlowNodeUiStateCached'
   >
-  imageTools: Pick<LegacyCanvasWorkspaceRuntime, 'createImageTools'>
+  imageTools: Pick<CanvasWorkspaceRuntimeParts, 'createImageTools'>
   imageWorkflow: Pick<
-    LegacyCanvasWorkspaceRuntime['imageWorkflow'],
+    CanvasWorkspaceRuntimeParts['imageWorkflow'],
     'runImageDirectAction' | 'runCanvasExtendAction'
   > &
     Pick<
-      LegacyCanvasWorkspaceRuntime,
+      CanvasWorkspaceRuntimeParts,
       | 'createImageActionHandlers'
       | 'createPromptGenerationHandlers'
       | 'createCanvasExtendOverlay'
     >
   nodeInteraction: Pick<
-    LegacyCanvasWorkspaceRuntime,
+    CanvasWorkspaceRuntimeParts,
     'createNodeMediaInputs' | 'createNodeHandlers'
   >
 }

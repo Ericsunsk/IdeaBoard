@@ -1,13 +1,13 @@
 import {
-  useCanvasWorkspaceRuntime as useLegacyCanvasWorkspaceRuntime,
+  createCanvasWorkspaceRuntimeParts,
   type UseCanvasWorkspaceRuntimeOptions,
-} from '../composables/useCanvasWorkspaceRuntime'
+} from './internal/createCanvasWorkspaceRuntimeParts'
 import type { CanvasWorkspaceRuntime } from './types'
 
 export function useCanvasWorkspaceRuntime(
   options: UseCanvasWorkspaceRuntimeOptions,
 ): CanvasWorkspaceRuntime {
-  const runtime = useLegacyCanvasWorkspaceRuntime(options)
+  const runtime = createCanvasWorkspaceRuntimeParts(options)
 
   return {
     viewModel: {
