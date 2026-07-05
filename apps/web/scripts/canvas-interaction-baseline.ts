@@ -13,7 +13,7 @@ import type {
 import { createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 
 const BENCHMARK_PATHS = ['node-drag', 'viewport-pan', 'viewport-zoom'] as const
-const BENCHMARK_FIXTURES = ['structure-heavy'] as const
+const BENCHMARK_FIXTURES = ['structure-heavy', 'media-heavy'] as const
 
 type BenchmarkPath = (typeof BENCHMARK_PATHS)[number]
 type BenchmarkFixture = (typeof BENCHMARK_FIXTURES)[number]
@@ -21,13 +21,14 @@ type BenchmarkFixture = (typeof BENCHMARK_FIXTURES)[number]
 type CliOptions = {
   fixture: BenchmarkFixture
   totalNodes: number
+  edgeDensity: number
   paths: BenchmarkPath[]
   outputDir: string
   printJson: boolean
   help: boolean
 }
 
-type StructureNodeCounts = {
+type FixtureNodeCounts = {
   image: number
   prompt: number
   fusion: number
@@ -118,7 +119,7 @@ type BenchmarkVerdict = {
 }
 
 type BenchmarkReport = {
-  schemaVersion: 2
+  schemaVersion: 3
   generatedAt: string
   command: string
   browser: {
@@ -127,9 +128,11 @@ type BenchmarkReport = {
   }
   viewport: typeof BENCHMARK_VIEWPORT
   fixture: {
-    name: string
+    name: BenchmarkFixture
     nodeCount: number
     edgeCount: number
+    requestedEdgeDensity: number
+    actualEdgeDensity: number
     imageNodes: number
     promptNodes: number
     fusionNodes: number
@@ -151,6 +154,7 @@ const BENCHMARK_VIEWPORT = {
 const FRAME_BUDGET_MS = 1000 / 60
 const DEFAULT_TOTAL_NODE_COUNT = 150
 const MIN_TOTAL_NODE_COUNT = 3
+const DEFAULT_EDGE_DENSITY = 1.6
 const DEFAULT_OUTPUT_DIR = '.benchmark-reports/canvas-interactions'
 const CANVAS_LOAD_READY_TIMEOUT_MS = 60_000
 const POST_INTERACTION_SETTLE_MS = 1_500
@@ -241,7 +245,11 @@ if (CLI_OPTIONS.help) {
   process.exit(0)
 }
 
-const MOCK_BOARD_STATE = createStructureHeavyCanvasBoardState(CLI_OPTIONS.totalNodes)
+const MOCK_BOARD_STATE = createCanvasBoardState(
+  CLI_OPTIONS.fixture,
+  CLI_OPTIONS.totalNodes,
+  CLI_OPTIONS.edgeDensity,
+)
 const NODE_DRAG_TARGET_ID = resolveNodeDragTargetId(MOCK_BOARD_STATE)
 
 const AUTH_SESSION = {
@@ -309,6 +317,7 @@ function parseCliOptions(args: string[]): CliOptions {
   const options: CliOptions = {
     fixture: 'structure-heavy',
     totalNodes: DEFAULT_TOTAL_NODE_COUNT,
+    edgeDensity: DEFAULT_EDGE_DENSITY,
     paths: [...BENCHMARK_PATHS],
     outputDir: DEFAULT_OUTPUT_DIR,
     printJson: false,
@@ -344,6 +353,9 @@ function parseCliOptions(args: string[]): CliOptions {
         break
       case '--nodes':
         options.totalNodes = parseTotalNodes(readValue())
+        break
+      case '--edge-density':
+        options.edgeDensity = parseEdgeDensity(readValue())
         break
       case '--paths':
         options.paths = parseBenchmarkPaths(readValue())
@@ -383,6 +395,14 @@ function parseTotalNodes(rawValue: string): number {
   throw new Error(`--nodes must be an integer >= ${MIN_TOTAL_NODE_COUNT}, got ${rawValue}`)
 }
 
+function parseEdgeDensity(rawValue: string): number {
+  const edgeDensity = Number(rawValue)
+  if (Number.isFinite(edgeDensity) && edgeDensity >= 0) {
+    return edgeDensity
+  }
+  throw new Error(`--edge-density must be a number >= 0, got ${rawValue}`)
+}
+
 function parseBenchmarkPaths(rawValue: string): BenchmarkPath[] {
   const paths = rawValue
     .split(',')
@@ -406,8 +426,9 @@ Usage:
   npm run benchmark:canvas-interactions -- [options]
 
 Options:
-  --fixture structure-heavy      Fixture type. Defaults to structure-heavy.
+  --fixture structure-heavy      Fixture type. Supported: ${BENCHMARK_FIXTURES.join(', ')}.
   --nodes 150                    Total node count. Defaults to ${DEFAULT_TOTAL_NODE_COUNT}.
+  --edge-density 1.6             Target edges per node. Defaults to ${DEFAULT_EDGE_DENSITY}.
   --paths node-drag,viewport-pan Comma-separated paths. Defaults to all paths.
   --output <dir>                 Report directory. Defaults to ${DEFAULT_OUTPUT_DIR}.
   --json                         Print the full JSON report to stdout.
@@ -485,8 +506,12 @@ function readEvalJson<T>(playwrightCli: CommandSpec, expression: string): T {
   return JSON.parse(JSON.parse(match[1].trim())) as T
 }
 
-function createStructureHeavyCanvasBoardState(totalNodes: number): CanvasBoardState {
-  const nodeCounts = resolveStructureNodeCounts(totalNodes)
+function createCanvasBoardState(
+  fixture: BenchmarkFixture,
+  totalNodes: number,
+  edgeDensity: number,
+): CanvasBoardState {
+  const nodeCounts = resolveFixtureNodeCounts(fixture, totalNodes)
   const imageNodes: ImageNodeItem[] = []
   const promptNodes: PromptNodeItem[] = []
   const fusionNodes: FusionNodeItem[] = []
@@ -511,7 +536,7 @@ function createStructureHeavyCanvasBoardState(totalNodes: number): CanvasBoardSt
     imageNodes,
     promptNodes,
     fusionNodes,
-    connections: createBenchmarkConnections(nodeCounts),
+    connections: createBenchmarkConnections(nodeCounts, edgeDensity),
     viewport: {
       canvasX: 72,
       canvasY: 34,
@@ -521,14 +546,47 @@ function createStructureHeavyCanvasBoardState(totalNodes: number): CanvasBoardSt
   }
 }
 
-function resolveStructureNodeCounts(totalNodes: number): StructureNodeCounts {
-  const baseCount = Math.floor(totalNodes / 3)
-  const remainder = totalNodes % 3
-  return {
-    image: baseCount + (remainder > 0 ? 1 : 0),
-    prompt: baseCount + (remainder > 1 ? 1 : 0),
-    fusion: baseCount,
+function resolveFixtureNodeCounts(
+  fixture: BenchmarkFixture,
+  totalNodes: number,
+): FixtureNodeCounts {
+  switch (fixture) {
+    case 'structure-heavy':
+      return resolveWeightedNodeCounts(totalNodes, { image: 1, prompt: 1, fusion: 1 })
+    case 'media-heavy':
+      return resolveWeightedNodeCounts(totalNodes, { image: 7, prompt: 2, fusion: 1 })
   }
+}
+
+function resolveWeightedNodeCounts(
+  totalNodes: number,
+  weights: FixtureNodeCounts,
+): FixtureNodeCounts {
+  const totalWeight = weights.image + weights.prompt + weights.fusion
+  const weightedCounts = (Object.keys(weights) as Array<keyof FixtureNodeCounts>).map((kind) => {
+    const exact = (totalNodes * weights[kind]) / totalWeight
+    return {
+      kind,
+      count: Math.floor(exact),
+      remainder: exact - Math.floor(exact),
+    }
+  })
+  let assigned = weightedCounts.reduce((total, item) => total + item.count, 0)
+  weightedCounts
+    .sort((left, right) => right.remainder - left.remainder)
+    .forEach((item) => {
+      if (assigned >= totalNodes) return
+      item.count += 1
+      assigned += 1
+    })
+
+  return weightedCounts.reduce(
+    (counts, item) => {
+      counts[item.kind] = item.count
+      return counts
+    },
+    { image: 0, prompt: 0, fusion: 0 } satisfies FixtureNodeCounts,
+  )
 }
 
 function createImageNode(id: number, gridIndex: number): ImageNodeItem {
@@ -603,68 +661,78 @@ function createFusionNode(id: number, gridIndex: number, imageNodeCount: number)
   }
 }
 
-function createBenchmarkConnections(nodeCounts: StructureNodeCounts): CanvasConnection[] {
+function createBenchmarkConnections(
+  nodeCounts: FixtureNodeCounts,
+  edgeDensity: number,
+): CanvasConnection[] {
   const connections: CanvasConnection[] = []
   let connectionId = 1
-  for (let id = 1; id <= nodeCounts.prompt; id += 1) {
-    const imageId = wrapNodeId(id, nodeCounts.image)
+
+  const nodeCount = nodeCounts.image + nodeCounts.prompt + nodeCounts.fusion
+  const targetEdgeCount = Math.round(nodeCount * edgeDensity)
+  const canAddEdges = () => connections.length < targetEdgeCount
+  const pushConnection = (
+    connection: Omit<CanvasConnection, 'id'>,
+  ): boolean => {
+    if (!canAddEdges()) return false
     connections.push({
       id: connectionId,
+      ...connection,
+    })
+    connectionId += 1
+    return true
+  }
+
+  for (let id = 1; id <= nodeCounts.prompt && canAddEdges(); id += 1) {
+    pushConnection({
       fromNodeType: 'image',
-      fromNodeId: imageId,
+      fromNodeId: wrapNodeId(id, nodeCounts.image),
       fromPort: 'image',
       toNodeType: 'prompt',
       toNodeId: id,
       toPort: 'image',
     })
-    connectionId += 1
   }
 
-  const targetEdgeCount = Math.round(
-    (nodeCounts.image + nodeCounts.prompt + nodeCounts.fusion) * 1.6,
-  )
-  let extraFusionImageEdgeBudget = Math.max(
-    0,
-    targetEdgeCount - (nodeCounts.prompt + nodeCounts.fusion * 3),
-  )
-
-  for (let id = 1; id <= nodeCounts.fusion; id += 1) {
-    const promptId = wrapNodeId(id, nodeCounts.prompt)
-    connections.push({
-      id: connectionId,
+  for (
+    let id = 1;
+    id <= nodeCounts.fusion && nodeCounts.prompt > 0 && canAddEdges();
+    id += 1
+  ) {
+    pushConnection({
       fromNodeType: 'prompt',
-      fromNodeId: promptId,
+      fromNodeId: wrapNodeId(id, nodeCounts.prompt),
       fromPort: 'prompt',
       toNodeType: 'fusion',
       toNodeId: id,
       toPort: 'prompt',
     })
-    connectionId += 1
-    for (let offset = 0; offset < 2; offset += 1) {
-      connections.push({
-        id: connectionId,
-        fromNodeType: 'image',
-        fromNodeId: wrapNodeId(id + offset, nodeCounts.image),
-        fromPort: 'image',
-        toNodeType: 'fusion',
-        toNodeId: id,
-        toPort: 'image',
-      })
-      connectionId += 1
-    }
-    if (extraFusionImageEdgeBudget > 0) {
-      connections.push({
-        id: connectionId,
-        fromNodeType: 'image',
-        fromNodeId: wrapNodeId(id + 2, nodeCounts.image),
-        fromPort: 'image',
-        toNodeType: 'fusion',
-        toNodeId: id,
-        toPort: 'image',
-      })
-      connectionId += 1
-      extraFusionImageEdgeBudget -= 1
-    }
+  }
+
+  let cycleIndex = 1
+  while (canAddEdges() && nodeCounts.image > 0 && nodeCounts.fusion > 0) {
+    const fusionId = wrapNodeId(cycleIndex, nodeCounts.fusion)
+    pushConnection({
+      fromNodeType: 'image',
+      fromNodeId: wrapNodeId(cycleIndex, nodeCounts.image),
+      fromPort: 'image',
+      toNodeType: 'fusion',
+      toNodeId: fusionId,
+      toPort: 'image',
+    })
+    cycleIndex += 1
+  }
+
+  while (canAddEdges() && nodeCounts.image > 0 && nodeCounts.prompt > 0) {
+    pushConnection({
+      fromNodeType: 'image',
+      fromNodeId: wrapNodeId(cycleIndex, nodeCounts.image),
+      fromPort: 'image',
+      toNodeType: 'prompt',
+      toNodeId: wrapNodeId(cycleIndex, nodeCounts.prompt),
+      toPort: 'image',
+    })
+    cycleIndex += 1
   }
   return connections
 }
@@ -750,6 +818,7 @@ await page.waitForFunction(
   { timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} },
 )
 await page.waitForTimeout(400)
+await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
 `,
     180_000,
   )
@@ -1187,8 +1256,9 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
     MOCK_BOARD_STATE.imageNodes.length +
     MOCK_BOARD_STATE.promptNodes.length +
     MOCK_BOARD_STATE.fusionNodes.length
+  const edgeCount = MOCK_BOARD_STATE.connections.length
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: new Date().toISOString(),
     command: createReportCommand(),
     browser: {
@@ -1199,7 +1269,9 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
     fixture: {
       name: CLI_OPTIONS.fixture,
       nodeCount: fixtureNodeCount,
-      edgeCount: MOCK_BOARD_STATE.connections.length,
+      edgeCount,
+      requestedEdgeDensity: CLI_OPTIONS.edgeDensity,
+      actualEdgeDensity: fixtureNodeCount > 0 ? roundMs(edgeCount / fixtureNodeCount) : 0,
       imageNodes: MOCK_BOARD_STATE.imageNodes.length,
       promptNodes: MOCK_BOARD_STATE.promptNodes.length,
       fusionNodes: MOCK_BOARD_STATE.fusionNodes.length,
@@ -1241,7 +1313,7 @@ function printCompactSummary(report: BenchmarkReport, reportPath: string) {
   const lines = [
     'Canvas interaction benchmark',
     `Report: ${reportPath}`,
-    `Fixture: ${report.fixture.name} (${report.fixture.nodeCount} nodes, ${report.fixture.edgeCount} edges)`,
+    `Fixture: ${report.fixture.name} (${report.fixture.nodeCount} nodes, ${report.fixture.edgeCount} edges, density=${report.fixture.actualEdgeDensity})`,
     `Paths: ${report.paths.map((item) => item.path).join(', ')}`,
     `Verdict: ${report.verdict.status}`,
     `Worst: ${report.worstPath.path} p95=${report.worstPath.p95FrameMs}ms dropped=${report.worstPath.droppedFrames} max=${report.worstPath.maxFrameMs}ms`,

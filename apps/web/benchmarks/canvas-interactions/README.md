@@ -15,18 +15,35 @@ npm run benchmark:canvas-interactions
 
 ```bash
 npm run benchmark:canvas-interactions -- --nodes 500 --paths node-drag
+npm run benchmark:canvas-interactions -- --fixture media-heavy --nodes 1000 --edge-density 1.6
 npm run benchmark:canvas-interactions -- --paths viewport-pan,viewport-zoom --json
 ```
 
 支持参数：
 
-- `--fixture structure-heavy`
+- `--fixture structure-heavy|media-heavy`
 - `--nodes <total-node-count>`：总节点数，不是每类节点数。
+- `--edge-density <edges-per-node>`：目标 edge density，默认 `1.6`。
 - `--paths node-drag,viewport-pan,viewport-zoom`
 - `--output <report-directory>`
 - `--json`：向 stdout 输出完整 JSON report。
 
-实用基准优先使用 `150`、`500`、`1000`、`2500`。`5000` 和 `10000` 只作为手动 torture / ceiling probe，不作为默认命令或 pass/fail gate。
+Fixtures：
+
+- `structure-heavy`：image / prompt / fusion 节点大致均分，默认约 `1.6x` edge density，用来压 graph/runtime 和 edge rendering。
+- `media-heavy`：节点 mix 约 `70% image / 20% prompt / 10% fusion`，图片全部使用 tiny inline/generated data URLs，不依赖 remote image loading。
+
+Required baseline sizes：
+
+- `structure-heavy`: `150`, `500`, `1000`, `2500`
+- `media-heavy`: `500`, `1000`
+
+Optional torture / ceiling probes：
+
+- `structure-heavy`: `5000`, `10000`
+- `media-heavy`: `2500+`
+
+这些 torture / ceiling runs 不是默认命令，也不作为 pass/fail gate。只有当 `1000` 或 `2500` 等 practical stress sizes 出现同类趋势时，才用它们辅助判断优化优先级。
 
 ## 输出
 
@@ -45,6 +62,8 @@ Report artifacts 是本地生成物，不能进入 git。需要完整 JSON stdou
 - `viewport-zoom`
 
 每个 path 包含 `p95FrameMs`、`droppedFrames`、`durationMs`、`avgFrameMs`、`maxFrameMs`、`sampleCount`、`mutationCount`、`eventCount`，并在适用时包含 `positionChanges` 或 `viewportChanges`。
+
+Report 的 `fixture` 区块记录实际 fixture shape：`nodeCount`、`imageNodes`、`promptNodes`、`fusionNodes`、`edgeCount`、`requestedEdgeDensity`、`actualEdgeDensity`。
 
 每个 path 还包含 `counters`，用于区分 scripting hot path 与 rendering-only cost：
 
