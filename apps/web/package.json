@@ -16,6 +16,7 @@
     "smoke:admin-mock": "tsx scripts/admin-mock-smoke.ts",
     "smoke:user": "tsx scripts/user-route-smoke.ts",
     "benchmark:canvas-interactions": "tsx scripts/canvas-interaction-baseline.ts",
+    "benchmark:canvas-task-results": "tsx scripts/canvas-task-result-heavy-benchmark.ts",
     "benchmark:image-editor-plan-executor": "tsx scripts/image-editor-plan-executor-benchmark.ts",
     "css:audit": "tsx scripts/audit-css-migration.ts",
     "test": "vitest",

@@ -24,22 +24,13 @@ import {
   type ResolvedFlowInputImage,
 } from '../../utils/flowNodeSourceResolution'
 import { resolveFusionOutputSize, type FusionOutputImageSize } from './fusionOutputSizing'
+import type {
+  ImageExecutionInput,
+  ImageExecutionResultOptions,
+  ImageResultAnchor,
+} from './imageExecutionResultTypes'
 
-export type ImageExecutionInput = {
-  url: string
-  ratio: number
-}
-export type ImageResultAnchor = {
-  x: number
-  y: number
-  width: number
-  outputAnchorNodeId?: string
-}
-export type ImageExecutionResultOptions = {
-  anchor?: ImageResultAnchor
-  targetRatio?: number
-  targetWidth?: number
-}
+export type { ImageExecutionInput, ImageExecutionResultOptions, ImageResultAnchor }
 
 export type CanvasExtendPercent = {
   top: number

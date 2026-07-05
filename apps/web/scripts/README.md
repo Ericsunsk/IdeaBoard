@@ -12,6 +12,7 @@ This directory is for durable Web app maintenance scripts. Prefer adding a
 | `admin-mock-smoke.ts`                     | `npm run smoke:admin-mock`                     | Runs mocked Admin UI smoke coverage through Playwright.                                       |
 | `user-route-smoke.ts`                     | `npm run smoke:user`                           | Runs mocked user route smoke coverage through Playwright.                                     |
 | `canvas-interaction-baseline.ts`          | `npm run benchmark:canvas-interactions`        | Records Canvas interaction smoothness metrics for initial load, graph edits, node drag, pan, and zoom. |
+| `canvas-task-result-heavy-benchmark.ts`   | `npm run benchmark:canvas-task-results`        | Profiles Pending Result Node reservation, materialization, and reattach writeback.            |
 | `image-editor-plan-executor-benchmark.ts` | `npm run benchmark:image-editor-plan-executor` | Benchmarks image editor adjustment plan execution.                                            |
 | `audit-css-migration.ts`                  | `npm run css:audit`                            | Audits CSS migration leftovers.                                                               |
 | `mock-smoke-utils.ts`                     | Internal helper                                | Shared mocked browser smoke/benchmark runtime helpers.                                        |

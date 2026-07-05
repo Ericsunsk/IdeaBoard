@@ -3,6 +3,7 @@ import {
   normalizeTaskImageResults,
   type TaskImageResult,
 } from '../../../../shared/query/taskResult'
+import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 
 export type ImageSize = {
   width: number
@@ -11,13 +12,7 @@ export type ImageSize = {
 
 export type ImageSizeLoader = (url: string) => Promise<ImageSize | null>
 
-export type ResolvedTaskImageResult = {
-  url: string
-  ratio: number
-  width?: number
-  height?: number
-  mimeType?: string
-}
+export type { ResolvedTaskImageResult }
 
 function normalizePositiveImageSize(width: unknown, height: unknown): ImageSize | null {
   const widthNumber = Number(width)

@@ -12,9 +12,9 @@ import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
   ImageResultAnchor,
-} from '../planning/ImageExecutionPlan'
+} from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
-import type { ResolvedTaskImageResult } from './flowImageDirectActionTaskResult'
+import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 import { waitForNextRenderFrame } from '../../utils/animationFrame'
 import type {
   CanvasVueFlowGraphAdapter,

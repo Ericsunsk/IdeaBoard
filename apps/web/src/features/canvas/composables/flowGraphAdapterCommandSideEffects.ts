@@ -1,11 +1,10 @@
 import type { CanvasVueFlowGraphCommandOptions } from './useCanvasVueFlowGraphAdapter'
-import type { FlowHistorySnapshot } from './useFlowHistory'
 
 const FLOW_GRAPH_COMMAND_SIDE_EFFECTS_METADATA_KEY = 'flowGraphCommandSideEffects'
 
 export type FlowGraphCommandSideEffectOptions = {
   recordHistory?: boolean
-  historyBefore?: FlowHistorySnapshot
+  historyBefore?: unknown
   markDirty?: boolean
 }
 
