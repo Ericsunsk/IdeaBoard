@@ -221,9 +221,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     } finally {
       isNodeDragActive = false
     }
-    if (options.isDirty.value) {
-      void flushAutosave({ silent: true })
-    }
   }
 
   const graphRuntime: CanvasFlowGraphRuntimeControls = {

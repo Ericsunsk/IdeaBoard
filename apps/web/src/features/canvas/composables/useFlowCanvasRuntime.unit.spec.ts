@@ -463,6 +463,7 @@ describe('useFlowCanvasRuntime', () => {
       y: 80,
     })
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
+    expect(harness.savedSnapshots).toHaveLength(0)
 
     harness.runtime.flowHistory.undo()
 
