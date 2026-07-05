@@ -190,7 +190,6 @@ export function useCanvasWorkspaceRuntime(options: UseCanvasWorkspaceRuntimeOpti
   const task = useCanvasTaskRuntime({
     nodes: board.fullNodes,
     edges: board.fullEdges,
-    boardBaseSnapshot: board.boardBaseSnapshot,
     graphAdapter: board.graphAdapter,
     flushAutosave: board.flushAutosave,
     currentBoardId: board.currentBoardId,

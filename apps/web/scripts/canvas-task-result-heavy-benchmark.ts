@@ -239,10 +239,9 @@ function installBenchmarkCounters(counters: InteractionCounterSnapshot): () => v
   const globalWithWindow = globalThis as GlobalWindowCarrier
   const previousWindow = globalWithWindow.window
   const nextWindow = {
-    ...((previousWindow && typeof previousWindow === 'object' ? previousWindow : {}) as Record<
-      string,
-      unknown
-    >),
+    ...((previousWindow && typeof previousWindow === 'object'
+      ? previousWindow
+      : {}) as Record<string, unknown>),
     __canvasInteractionBenchmarkCounters: counters,
   }
   Reflect.set(globalWithWindow, 'window', nextWindow)
@@ -257,7 +256,7 @@ function installBenchmarkCounters(counters: InteractionCounterSnapshot): () => v
 
 function makeAnchorNode(): Node {
   return {
-    id: 'prompt-1',
+    id: 'anchor',
     type: 'canvas',
     position: { x: 0, y: 0 },
     data: {
@@ -265,16 +264,7 @@ function makeAnchorNode(): Node {
       nodeType: 'prompt',
       title: 'Prompt',
       snapshotNode: {
-        id: 1,
-        type: 'prompt',
-        x: 0,
-        y: 0,
         width: 280,
-        title: 'Prompt',
-        text: '',
-        outputCount: 1,
-        aspectRatio: 'auto',
-        inputImages: [],
       },
     },
   }
@@ -300,7 +290,7 @@ function makeImageSnapshot(index: number, overrides: Partial<ImageNodeItem> = {}
 function makePendingImageNode(index: number): Node<FlowNodeData> {
   const snapshot = makeImageSnapshot(index)
   return {
-    id: `image-${snapshot.id}`,
+    id: `pending-${index}`,
     type: 'canvas',
     position: { x: snapshot.x, y: snapshot.y },
     data: {
@@ -313,12 +303,11 @@ function makePendingImageNode(index: number): Node<FlowNodeData> {
 }
 
 function makePendingImageEdge(index: number): Edge {
-  const targetSnapshot = makeImageSnapshot(index)
   return {
     id: `edge-pending-${index}`,
-    source: 'prompt-1',
+    source: 'anchor',
     sourceHandle: 'out:image',
-    target: `image-${targetSnapshot.id}`,
+    target: `pending-${index}`,
     targetHandle: 'in:image',
     animated: true,
   }
@@ -461,7 +450,7 @@ async function runPendingResultMaterialization(
       const reservedNodeIds: string[] = []
       await harness.actions.runPendingResults({
         source: { url: 'https://example.com/source.png', ratio: 1 },
-        sourceNodeId: 'prompt-1',
+        sourceNodeId: 'anchor',
         outputCount,
         resultOptions: { targetRatio: 1, targetWidth: 280 },
         submitTask: async (resultNodeId) => ({ taskId: `task-${resultNodeId}` }),
@@ -504,23 +493,22 @@ async function runAttachedPendingResultReattach(
   const startedAt = performance.now()
 
   try {
-    pendingNodes.forEach((node) => runningState.setNodeRunning(node.id, true))
-    try {
-      await harness.actions.resolveAttachedPendingResults({
-        tasks: pendingNodes.map((node, index) => ({
-          resultNodeId: node.id,
-          taskId: `task-${index + 1}`,
-        })),
-        resolveResult: async (_taskId, resultNodeId) => {
-          const index = pendingNodes.findIndex((node) => node.id === resultNodeId)
-          return createResolvedTaskImageResult(index + 1)
-        },
-        isCurrent: () => true,
-        isAttached: () => true,
-      })
-    } finally {
-      pendingNodes.forEach((node) => runningState.setNodeRunning(node.id, false))
-    }
+    await Promise.allSettled(
+      pendingNodes.map(async (node, index) => {
+        runningState.setNodeRunning(node.id, true)
+        try {
+          await harness.actions.resolveAttachedPendingResult({
+            resultNodeId: node.id,
+            taskId: `task-${index + 1}`,
+            resolveResult: async () => createResolvedTaskImageResult(index + 1),
+            isCurrent: () => true,
+            isAttached: () => true,
+          })
+        } finally {
+          runningState.setNodeRunning(node.id, false)
+        }
+      }),
+    )
     await flushAsyncGraphWork()
     const durationMs = performance.now() - startedAt
     return createPhaseMetrics(harness, pendingResults, durationMs, runningState.readMetrics())
@@ -558,8 +546,7 @@ function createRecommendation(profiles: readonly TaskResultProfile[]): string {
   const largest = profiles.at(-1)
   if (!largest) return 'No profiles were recorded.'
   const batchAutosaves = largest.runPendingResults.counters.autosaveScheduleCount
-  const reattachReplaceGraph =
-    largest.reattachPendingResults.counters.graphCommands.replaceGraph ?? 0
+  const reattachReplaceGraph = largest.reattachPendingResults.counters.graphCommands.replaceGraph ?? 0
   if (batchAutosaves >= largest.pendingResults || reattachReplaceGraph >= largest.pendingResults) {
     return [
       'Move Pending/Result writeback toward a transaction-backed batch path.',

@@ -4,7 +4,6 @@ import type { SubmitTaskData } from '../../../../shared/api/task'
 import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
-import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import { readCurrentBoardId } from '../../utils/currentBoardId'
 import {
   buildCanvasExtendReadinessRequest,
@@ -91,7 +90,6 @@ export type FlowImageWorkflowExecutionOptions = {
 export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   graphAdapter: CanvasVueFlowGraphAdapter
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
@@ -322,7 +320,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   const pendingImageResults = usePendingImageResultExecution({
     nodes: options.nodes,
     edges: options.edges,
-    boardBaseSnapshot: options.boardBaseSnapshot,
     graphAdapter: options.graphAdapter,
     refreshNodeInternals: options.refreshNodeInternals,
   })

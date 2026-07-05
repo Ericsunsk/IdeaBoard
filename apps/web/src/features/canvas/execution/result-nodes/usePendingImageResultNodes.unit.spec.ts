@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { shallowRef } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
 import { readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
@@ -11,13 +11,18 @@ import {
 } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { usePendingImageResultExecution } from './usePendingImageResultNodes'
 
+const animationFrameMocks = vi.hoisted(() => ({
+  waitForNextRenderFrame: vi.fn<() => Promise<void>>(async () => undefined),
+}))
+vi.mock('../../utils/animationFrame', () => ({
+  waitForNextRenderFrame: animationFrameMocks.waitForNextRenderFrame,
+}))
+
 type Deferred<T> = {
   promise: Promise<T>
   resolve: (value: T) => void
   reject: (reason?: unknown) => void
 }
-
-const ANCHOR_NODE_ID = 'prompt-1'
 
 function createDeferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void
@@ -35,26 +40,15 @@ async function flushPromises() {
   await Promise.resolve()
 }
 
-function makeAnchorNode(id = ANCHOR_NODE_ID): Node {
+function makeAnchorNode(id = 'anchor'): Node {
   return {
     id,
     type: 'canvas',
     position: { x: 0, y: 0 },
     data: {
       kind: 'prompt',
-      nodeType: 'prompt',
-      title: 'Prompt',
       snapshotNode: {
-        id: 1,
-        type: 'prompt',
-        x: 0,
-        y: 0,
         width: 280,
-        title: 'Prompt',
-        text: '',
-        outputCount: 1,
-        aspectRatio: 'auto',
-        inputImages: [],
       },
     },
   }
@@ -96,7 +90,7 @@ function makeImageNode(
 function makeImageEdge(target: string, overrides: Partial<Edge> = {}): Edge {
   return {
     id: `edge-${target}`,
-    source: ANCHOR_NODE_ID,
+    source: 'anchor',
     sourceHandle: 'out:image',
     target,
     targetHandle: 'in:image',
@@ -140,29 +134,12 @@ function readRecordHistory(result: CanvasVueFlowGraphCommandResult): boolean | u
   return readFlowGraphCommandSideEffects(result.metadata)?.recordHistory
 }
 
-function readMarkDirty(result: CanvasVueFlowGraphCommandResult): boolean | undefined {
-  return readFlowGraphCommandSideEffects(result.metadata)?.markDirty
-}
-
-function readTransactionSummary(result: CanvasVueFlowGraphCommandResult):
-  | {
-      reason?: string
-      didChange?: boolean
-      shouldRecordHistory?: boolean
-      shouldMarkDirty?: boolean
-    }
-  | undefined {
-  return readFlowGraphCommandSideEffects(result.metadata)?.transactionSummary as
-    | {
-        reason?: string
-        didChange?: boolean
-        shouldRecordHistory?: boolean
-        shouldMarkDirty?: boolean
-      }
-    | undefined
-}
-
 describe('usePendingImageResultExecution', () => {
+  beforeEach(() => {
+    animationFrameMocks.waitForNextRenderFrame.mockReset()
+    animationFrameMocks.waitForNextRenderFrame.mockResolvedValue(undefined)
+  })
+
   it('runs pending result nodes from reservation through materialization', async () => {
     const harness = createHarness([makeAnchorNode()])
     let reservedNodeIds: string[] = []
@@ -176,7 +153,7 @@ describe('usePendingImageResultExecution', () => {
 
     const run = harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
+      sourceNodeId: 'anchor',
       outputCount: 1,
       resultOptions: { targetRatio: 1, targetWidth: 320 },
       submitTask: () => submitTask.promise,
@@ -230,65 +207,11 @@ describe('usePendingImageResultExecution', () => {
     expect(
       harness.commandResults.map((result) => [result.command, readRecordHistory(result)]),
     ).toEqual([
-      ['replaceGraph', true],
-      ['replaceNodes', false],
+      ['addNodes', true],
+      ['addEdges', false],
+      ['updateNode', false],
       ['replaceGraph', false],
     ])
-  })
-
-  it('batches multi-output reservation, task attachment, and materialization writeback', async () => {
-    const harness = createHarness([makeAnchorNode()])
-
-    const summary = await harness.actions.runPendingResults({
-      source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
-      outputCount: 3,
-      resultOptions: { targetRatio: 1, targetWidth: 280 },
-      submitTask: async (resultNodeId) => ({ taskId: `task-${resultNodeId}` }),
-      resolveResult: async (_taskId, resultNodeId) => ({
-        url: `https://example.com/${resultNodeId}.png`,
-        ratio: 1,
-        width: 400,
-        height: 400,
-      }),
-      isCurrent: () => true,
-      isPendingError: () => false,
-    })
-    await flushPromises()
-
-    expect(summary).toMatchObject({
-      totalCount: 3,
-      successCount: 3,
-      pendingCount: 0,
-      failureCount: 0,
-    })
-    expect(summary.resultNodeIds).toHaveLength(3)
-    expect(
-      summary.resultNodeIds.map((nodeId) => readImageSnapshot(harness.nodes.value, nodeId)),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ sourceImageUrl: expect.stringContaining('/image-') }),
-      ]),
-    )
-    expect(
-      harness.commandResults.map((result) => [
-        result.command,
-        readRecordHistory(result),
-        readMarkDirty(result),
-      ]),
-    ).toEqual([
-      ['replaceGraph', true, false],
-      ['replaceNodes', false, false],
-      ['replaceGraph', false, true],
-    ])
-    expect(harness.commandResults.map((result) => readTransactionSummary(result)?.reason)).toEqual([
-      'result-materialize',
-      'result-materialize',
-      'result-materialize',
-    ])
-    expect(
-      harness.commandResults.map((result) => readTransactionSummary(result)?.didChange),
-    ).toEqual([true, true, true])
   })
 
   it('reuses the first valid empty image child and stacks batched pending nodes', async () => {
@@ -311,7 +234,7 @@ describe('usePendingImageResultExecution', () => {
 
     await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
+      sourceNodeId: 'anchor',
       outputCount: 2,
       resultOptions: { targetRatio: 1, targetWidth: 280 },
       submitTask: async (resultNodeId) => ({ taskId: `task-${resultNodeId}` }),
@@ -344,7 +267,7 @@ describe('usePendingImageResultExecution', () => {
 
     const run = harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
+      sourceNodeId: 'anchor',
       outputCount: 2,
       resultOptions: { targetRatio: 1, targetWidth: 280 },
       submitTask: async (resultNodeId) => ({ taskId: `task-${resultNodeId}` }),
@@ -358,7 +281,11 @@ describe('usePendingImageResultExecution', () => {
     await flushPromises()
     await run
 
-    expect(harness.commandResults.map(readRecordHistory).filter(Boolean)).toEqual([true])
+    expect(
+      harness.commandResults
+        .filter((result) => result.command === 'addNodes')
+        .map(readRecordHistory),
+    ).toEqual([true, false])
   })
 
   it('keeps persisted pending results when task resolution is still pending', async () => {
@@ -368,7 +295,7 @@ describe('usePendingImageResultExecution', () => {
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
+      sourceNodeId: 'anchor',
       outputCount: 1,
       submitTask: async () => ({ taskId: 'task-1' }),
       resolveResult: async () => {
@@ -402,7 +329,7 @@ describe('usePendingImageResultExecution', () => {
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
+      sourceNodeId: 'anchor',
       outputCount: 1,
       persistPendingTaskIds: false,
       submitTask: async () => ({ taskId: 'task-1' }),
@@ -424,53 +351,6 @@ describe('usePendingImageResultExecution', () => {
     expect(harness.nodes.value.some((node) => node.id === reservedNodeIds[0])).toBe(false)
   })
 
-  it('batches multi-output partial failure and cancellation cleanup', async () => {
-    const harness = createHarness([makeAnchorNode()])
-    const pendingError = new Error('任务仍在处理中')
-    const hardError = new Error('submit failed')
-    let submitIndex = 0
-    let reservedNodeIds: string[] = []
-
-    const summary = await harness.actions.runPendingResults({
-      source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
-      outputCount: 3,
-      persistPendingTaskIds: false,
-      submitTask: async () => {
-        submitIndex += 1
-        return { taskId: `task-${submitIndex}` }
-      },
-      resolveResult: async (taskId) => {
-        if (taskId === 'task-1') return { url: 'https://example.com/result.png', ratio: 1 }
-        if (taskId === 'task-2') throw pendingError
-        throw hardError
-      },
-      isCurrent: () => true,
-      isPendingError: (error) => error === pendingError,
-      onReserved: (ids) => {
-        reservedNodeIds = ids
-      },
-    })
-
-    expect(summary).toMatchObject({
-      successCount: 1,
-      pendingCount: 1,
-      failureCount: 1,
-      firstFailure: pendingError,
-    })
-    expect(readImageSnapshot(harness.nodes.value, reservedNodeIds[0])).toMatchObject({
-      sourceImageUrl: 'https://example.com/result.png',
-      outputStatus: 'ready',
-    })
-    expect(harness.nodes.value.some((node) => node.id === reservedNodeIds[1])).toBe(false)
-    expect(harness.nodes.value.some((node) => node.id === reservedNodeIds[2])).toBe(false)
-    expect(harness.commandResults.map((result) => result.command)).toEqual([
-      'replaceGraph',
-      'replaceGraph',
-      'removeNodes',
-    ])
-  })
-
   it('does not materialize a resolved result when the board is no longer current', async () => {
     const harness = createHarness([makeAnchorNode()])
     let isCurrent = true
@@ -478,7 +358,7 @@ describe('usePendingImageResultExecution', () => {
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
+      sourceNodeId: 'anchor',
       outputCount: 1,
       submitTask: async () => ({ taskId: 'task-1' }),
       resolveResult: async () => {
@@ -501,13 +381,15 @@ describe('usePendingImageResultExecution', () => {
     })
   })
 
-  it('cancels a failed pending result from the reservation batch', async () => {
+  it('cancels a failed pending result before the delayed edge append resolves', async () => {
+    const nextFrame = createDeferred<void>()
+    animationFrameMocks.waitForNextRenderFrame.mockReturnValueOnce(nextFrame.promise)
     const harness = createHarness([makeAnchorNode()])
     let reservedNodeIds: string[] = []
 
     await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
-      sourceNodeId: ANCHOR_NODE_ID,
+      sourceNodeId: 'anchor',
       outputCount: 1,
       submitTask: async () => {
         throw new Error('submit failed')
@@ -521,6 +403,10 @@ describe('usePendingImageResultExecution', () => {
     })
 
     expect(harness.nodes.value.some((node) => node.id === reservedNodeIds[0])).toBe(false)
+
+    nextFrame.resolve(undefined)
+    await flushPromises()
+
     expect(harness.edges.value).toEqual([])
   })
 
@@ -552,70 +438,5 @@ describe('usePendingImageResultExecution', () => {
       outputStatus: 'ready',
     })
     expect(readImageSnapshot(harness.nodes.value, 'pending-node').pendingTaskId).toBeUndefined()
-  })
-
-  it('materializes attached pending tasks in one batch writeback', async () => {
-    const harness = createHarness(
-      [
-        makeAnchorNode(),
-        makeImageNode('image-1', {
-          id: 1,
-          sourceImageUrl: '',
-          outputStatus: 'running',
-          pendingTaskId: 'task-1',
-        }),
-        makeImageNode('image-2', {
-          id: 2,
-          sourceImageUrl: '',
-          outputStatus: 'running',
-          pendingTaskId: 'task-2',
-        }),
-      ],
-      [makeImageEdge('image-1', { animated: true }), makeImageEdge('image-2', { animated: true })],
-    )
-
-    const summary = await harness.actions.resolveAttachedPendingResults({
-      tasks: [
-        { resultNodeId: 'image-1', taskId: 'task-1' },
-        { resultNodeId: 'image-2', taskId: 'task-2' },
-      ],
-      resolveResult: async (taskId) => ({
-        url: `https://example.com/${taskId}.png`,
-        ratio: 1,
-        width: 400,
-        height: 400,
-      }),
-      isCurrent: () => true,
-      isAttached: () => true,
-    })
-
-    expect(summary).toMatchObject({
-      successCount: 2,
-      failureCount: 0,
-      firstFailure: null,
-    })
-    expect(readImageSnapshot(harness.nodes.value, 'image-1')).toMatchObject({
-      sourceImageUrl: 'https://example.com/task-1.png',
-      outputStatus: 'ready',
-      pendingTaskId: undefined,
-    })
-    expect(readImageSnapshot(harness.nodes.value, 'image-2')).toMatchObject({
-      sourceImageUrl: 'https://example.com/task-2.png',
-      outputStatus: 'ready',
-      pendingTaskId: undefined,
-    })
-    expect(harness.edges.value.every((edge) => edge.animated === false)).toBe(true)
-    expect(
-      harness.commandResults.map((result) => [
-        result.command,
-        readRecordHistory(result),
-        readMarkDirty(result),
-      ]),
-    ).toEqual([['replaceGraph', false, true]])
-    expect(readTransactionSummary(harness.commandResults[0]!)).toMatchObject({
-      reason: 'result-materialize',
-      didChange: true,
-      shouldMarkDirty: true,
-    })
   })
 })

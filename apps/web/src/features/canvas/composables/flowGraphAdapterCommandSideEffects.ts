@@ -6,7 +6,6 @@ export type FlowGraphCommandSideEffectOptions = {
   recordHistory?: boolean
   historyBefore?: unknown
   markDirty?: boolean
-  transactionSummary?: unknown
 }
 
 export function createFlowGraphCommandOptions(
