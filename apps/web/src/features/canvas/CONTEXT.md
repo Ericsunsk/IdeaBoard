@@ -11,6 +11,21 @@ Canvas Workspace 是用户编辑 Canvas Board、编排节点、运行图像任�
 **Canvas Workspace**:
 一个 Board Session 的交互工作区，包含 graph interaction、overlay、image tools 和 execution feedback。
 
+**Canvas Workspace Runtime**:
+Canvas Workspace 的 page-level coordination runtime，由 `useCanvasWorkspaceRuntime()` 创建，负责组合 Board Session、Vue Flow Pane、persistence、viewport controls、graph editing、image tools、image workflow 和 node interaction。
+
+**workspace-runtime public seam**:
+`useCanvasWorkspaceRuntime()` 暴露给页面的稳定 seam，返回 `{ viewModel, commands }`。页面只通过这个 seam 读取 UI state 或触发动作；内部组合细节留在 `workspace-runtime/internal/createCanvasWorkspaceRuntimeParts.ts`。
+
+**viewModel**:
+Canvas Workspace Runtime 的 read side，暴露页面渲染和 binding 所需的 reactive state。业务决策不能从 adapter projection 反推 domain facts。
+
+**commands**:
+Canvas Workspace Runtime 的 write side，暴露用户动作、Vue Flow events、persistence、viewport、graph editing、image tools、image workflow 和 node interaction handlers。
+
+**flowPane adapter data**:
+`viewModel.flowPane.nodes` 和 `viewModel.flowPane.edges` 是给 Vue Flow 的 adapter projection，只用于 `<VueFlow>` binding，不是 Canvas Board 的业务事实来源。
+
 **Canvas Board**:
 持久化的 graph document，由节点、连接、viewport state 和 board metadata 组成。
 _Avoid_: Vue Flow graph, canvas state
@@ -90,3 +105,9 @@ _Avoid_: maskDataUrl
 **Image Tool Session**:
 一个 Canvas Workspace 内对 Image Editing、Image Mask Editing、chrome state、node bindings 和 workflow actions 的 active coordination。
 _Avoid_: Image editing domain, mask domain
+
+## Rules
+
+- `viewModel.flowPane.nodes` / `viewModel.flowPane.edges` 只允许用于 Vue Flow binding，例如 `CanvasPage.vue` 中的 `const { nodes, edges } = viewModel.flowPane`；不要用它们做业务决策。
+- Vue Flow native events 和 interaction handlers 放在 `commands.flowPane`，例如 `onNodesChange`、`onEdgesChange`、`onConnect`、`onEdgeUpdate` 和 `nodeDragTransactions`。
+- #74 的 Deferred / Later Work 仍然 out of scope：不要在当前 seam 文档化或实现 Image Tool Session deepening、#72 Pending Result materialization、Vue Flow deeper adapter cleanup、performance/flicker optimization。
