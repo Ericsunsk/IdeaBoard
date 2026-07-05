@@ -12,7 +12,7 @@ import type {
 } from '../src/features/canvas-board/domain'
 import { createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 
-const BENCHMARK_PATHS = ['node-drag', 'viewport-pan', 'viewport-zoom'] as const
+const BENCHMARK_PATHS = ['initial-load', 'node-drag', 'viewport-pan', 'viewport-zoom'] as const
 const BENCHMARK_FIXTURES = ['structure-heavy', 'media-heavy'] as const
 
 type BenchmarkPath = (typeof BENCHMARK_PATHS)[number]
@@ -176,6 +176,19 @@ const INTERACTION_COUNTER_NAMES: InteractionCounterName[] = [
   'autosaveSaveCount',
 ]
 const BENCHMARK_BUDGETS: Record<BenchmarkPath, InteractionBudget> = {
+  'initial-load': {
+    maxP95FrameMs: 250,
+    maxDroppedFrames: 1_000,
+    maxMutationCount: 50_000,
+    maxNodeArrayReplacements: 10_000,
+    maxEdgeArrayReplacements: 10_000,
+    maxHistoryCaptureCount: 10_000,
+    maxHistoryPushCount: 10_000,
+    maxAutosaveScheduleCount: 10_000,
+    maxAutosaveSaveCount: 10_000,
+    maxNativeNodeChangeBatches: 10_000,
+    maxNativeEdgeChangeBatches: 10_000,
+  },
   'node-drag': {
     maxP95FrameMs: 75,
     maxDroppedFrames: 120,
@@ -429,7 +442,7 @@ Options:
   --fixture structure-heavy      Fixture type. Supported: ${BENCHMARK_FIXTURES.join(', ')}.
   --nodes 150                    Total node count. Defaults to ${DEFAULT_TOTAL_NODE_COUNT}.
   --edge-density 1.6             Target edges per node. Defaults to ${DEFAULT_EDGE_DENSITY}.
-  --paths node-drag,viewport-pan Comma-separated paths. Defaults to all paths.
+  --paths initial-load,node-drag Comma-separated paths. Defaults to all paths.
   --output <dir>                 Report directory. Defaults to ${DEFAULT_OUTPUT_DIR}.
   --json                         Print the full JSON report to stdout.
   --help                         Show this help.
@@ -824,6 +837,163 @@ await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
   )
 }
 
+function runInitialLoadBenchmark(playwrightCli: CommandSpec): RawInteractionTrace {
+  prepareOriginStorage(playwrightCli)
+  runPageCode(
+    playwrightCli,
+    `
+await page.setViewportSize(${JSON.stringify(BENCHMARK_VIEWPORT)})
+await page.addInitScript(() => {
+  const round = (value) => Math.round(value * 10) / 10
+  const roundCoord = (value) => Math.round(value * 1000) / 1000
+  const parseTransform = (transform) => {
+    const matrix = new DOMMatrixReadOnly(transform === 'none' ? undefined : transform)
+    return {
+      translate: { x: roundCoord(matrix.m41), y: roundCoord(matrix.m42) },
+      scale: { x: roundCoord(matrix.a), y: roundCoord(matrix.d) },
+    }
+  }
+  const readSnapshot = (target) => {
+    const style = window.getComputedStyle(target)
+    const transform = style.transform
+    const parsed = parseTransform(transform)
+    const rect = target.getBoundingClientRect()
+    return {
+      t: roundCoord(performance.now()),
+      inlineTransform: target instanceof HTMLElement ? target.style.transform : '',
+      transform,
+      translate: parsed.translate,
+      scale: parsed.scale,
+      rect: {
+        x: roundCoord(rect.x),
+        y: roundCoord(rect.y),
+        width: roundCoord(rect.width),
+        height: roundCoord(rect.height),
+      },
+    }
+  }
+  const counterNames = ${JSON.stringify(INTERACTION_COUNTER_NAMES)}
+  const createCounters = () => {
+    const counters = { graphCommands: {} }
+    counterNames.forEach((name) => {
+      counters[name] = 0
+    })
+    return counters
+  }
+  const cloneCounters = (value) => {
+    const counters = createCounters()
+    if (!value || typeof value !== 'object') return counters
+    counterNames.forEach((name) => {
+      const count = Number(value[name])
+      counters[name] = Number.isFinite(count) ? count : 0
+    })
+    counters.graphCommands = { ...(value.graphCommands || {}) }
+    return counters
+  }
+
+  window.__canvasInteractionBenchmarkCounters = createCounters()
+  const frameDeltas = []
+  const mutations = []
+  const eventsByType = {}
+  const eventTarget = document
+  const eventTypes = ['pointerdown', 'pointermove', 'pointerup', 'mousemove', 'wheel', 'click']
+  let lastFrameAt
+  let frameId
+  let isSampling = true
+  const startedAt = performance.now()
+  const sample = (timestamp) => {
+    if (!isSampling) return
+    if (lastFrameAt !== undefined) {
+      const delta = timestamp - lastFrameAt
+      if (Number.isFinite(delta) && delta >= 0) frameDeltas.push(delta)
+    }
+    lastFrameAt = timestamp
+    frameId = requestAnimationFrame(sample)
+  }
+  const observer = new MutationObserver((entries) => {
+    mutations.push(...entries.map((entry) => ({
+      type: entry.type,
+      attributeName: entry.attributeName,
+      t: performance.now(),
+    })))
+  })
+  const onEvent = (event) => {
+    eventsByType[event.type] = (eventsByType[event.type] || 0) + 1
+  }
+
+  eventTypes.forEach((type) => {
+    eventTarget.addEventListener(type, onEvent, { capture: true, passive: true })
+  })
+  const observeRoot = () => {
+    observer.observe(document.documentElement, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ['style', 'class'],
+    })
+  }
+  if (document.documentElement) observeRoot()
+  else document.addEventListener('DOMContentLoaded', observeRoot, { once: true })
+  frameId = requestAnimationFrame(sample)
+
+  window.__canvasInitialLoadBenchmark = {
+    end(targetSelector) {
+      isSampling = false
+      if (frameId !== undefined) cancelAnimationFrame(frameId)
+      observer.disconnect()
+      eventTypes.forEach((type) => {
+        eventTarget.removeEventListener(type, onEvent, { capture: true })
+      })
+      const target = document.querySelector(targetSelector) || document.documentElement
+      const after = target ? readSnapshot(target) : null
+      const endedAt = performance.now()
+      const trace = {
+        path: 'initial-load',
+        durationMs: round(endedAt - startedAt),
+        frameDeltas: frameDeltas.map(round),
+        mutationCount: mutations.length,
+        eventCount: Object.values(eventsByType).reduce((total, count) => total + count, 0),
+        eventsByType,
+        counters: cloneCounters(window.__canvasInteractionBenchmarkCounters),
+        samples: after ? [after] : [],
+        before: null,
+        after,
+      }
+      window.__canvasInteractionBenchmark = {
+        active: null,
+        traces: { 'initial-load': trace },
+      }
+      return trace
+    },
+  }
+})
+`,
+  )
+  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}`])
+  runPageCode(
+    playwrightCli,
+    `
+const browserUserAgent = await page.evaluate(() => navigator.userAgent)
+if (!/Chrome|Chromium/.test(browserUserAgent)) {
+  throw new Error('Canvas interaction benchmark requires Chromium, got: ' + browserUserAgent)
+}
+await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).waitFor({ timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} })
+await page.waitForSelector('.vue-flow__transformationpane', { timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} })
+await page.waitForSelector(${JSON.stringify(`.vue-flow__node[data-id="image-${NODE_DRAG_TARGET_ID}"] .workflow-node-header`)}, { timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} })
+await page.waitForFunction(
+  (expectedCount) => document.querySelectorAll('.vue-flow__node').length >= expectedCount,
+  ${Math.min(20, MOCK_BOARD_STATE.imageNodes.length + MOCK_BOARD_STATE.promptNodes.length + MOCK_BOARD_STATE.fusionNodes.length)},
+  { timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} },
+)
+await page.waitForTimeout(400)
+await page.evaluate(() => window.__canvasInitialLoadBenchmark.end('.vue-flow__transformationpane'))
+await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
+`,
+    180_000,
+  )
+  return readEvalJson(playwrightCli, `window.__canvasInteractionBenchmark.traces['initial-load']`)
+}
+
 function getInstallBenchmarkHarnessCode(): string {
   return `
 await page.evaluate(() => {
@@ -1095,6 +1265,8 @@ await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
 
 function runBenchmarkPath(playwrightCli: CommandSpec, benchmarkPath: BenchmarkPath): RawInteractionTrace {
   switch (benchmarkPath) {
+    case 'initial-load':
+      return runInitialLoadBenchmark(playwrightCli)
     case 'node-drag':
       return runNodeDragBenchmark(playwrightCli)
     case 'viewport-pan':
@@ -1122,7 +1294,11 @@ function summarizeTrace(trace: RawInteractionTrace): InteractionMetrics {
     counters,
   }
 
-  if (trace.path === 'node-drag') {
+  if (trace.path === 'initial-load') {
+    if (metrics.sampleCount <= 0) {
+      throw new Error(`initial-load benchmark did not observe animation frames ${formatTraceDebug(trace)}`)
+    }
+  } else if (trace.path === 'node-drag') {
     metrics.positionChanges = countPositionChanges(trace.samples)
     if (metrics.positionChanges <= 1) {
       throw new Error(

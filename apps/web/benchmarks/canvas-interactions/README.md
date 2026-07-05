@@ -16,7 +16,7 @@ npm run benchmark:canvas-interactions
 ```bash
 npm run benchmark:canvas-interactions -- --nodes 500 --paths node-drag
 npm run benchmark:canvas-interactions -- --fixture media-heavy --nodes 1000 --edge-density 1.6
-npm run benchmark:canvas-interactions -- --paths viewport-pan,viewport-zoom --json
+npm run benchmark:canvas-interactions -- --paths initial-load,viewport-pan,viewport-zoom --json
 ```
 
 支持参数：
@@ -24,7 +24,7 @@ npm run benchmark:canvas-interactions -- --paths viewport-pan,viewport-zoom --js
 - `--fixture structure-heavy|media-heavy`
 - `--nodes <total-node-count>`：总节点数，不是每类节点数。
 - `--edge-density <edges-per-node>`：目标 edge density，默认 `1.6`。
-- `--paths node-drag,viewport-pan,viewport-zoom`
+- `--paths initial-load,node-drag,viewport-pan,viewport-zoom`
 - `--output <report-directory>`
 - `--json`：向 stdout 输出完整 JSON report。
 
@@ -58,6 +58,7 @@ Report artifacts 是本地生成物，不能进入 git。需要完整 JSON stdou
 脚本根据内置 budgets 给出 `verdict.status`：
 
 - `node-drag`
+- `initial-load`
 - `viewport-pan`
 - `viewport-zoom`
 
