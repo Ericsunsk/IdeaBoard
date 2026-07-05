@@ -9,11 +9,36 @@ cd apps/web
 npm run benchmark:canvas-interactions
 ```
 
-脚本会启动本地 Vite dev server，并通过 `playwright-cli` 默认 Chromium browser session 运行固定 `1440x900` desktop viewport。fixture 是可复现的 Medium-Large Canvas Board：150 个 Canvas Nodes、240 条 edges，包含 image、prompt、fusion 三类节点。
+脚本会启动本地 Vite dev server，并通过 `playwright-cli` 默认 Chromium browser session 运行固定 `1440x900` desktop viewport。默认 fixture 是可复现的 `structure-heavy` Canvas Board：约 150 个 Canvas Nodes、240 条 edges，包含 image、prompt、fusion 三类节点。
+
+常用参数：
+
+```bash
+npm run benchmark:canvas-interactions -- --nodes 500 --paths node-drag
+npm run benchmark:canvas-interactions -- --paths viewport-pan,viewport-zoom --json
+```
+
+支持参数：
+
+- `--fixture structure-heavy`
+- `--nodes <total-node-count>`：总节点数，不是每类节点数。
+- `--paths node-drag,viewport-pan,viewport-zoom`
+- `--output <report-directory>`
+- `--json`：向 stdout 输出完整 JSON report。
+
+实用基准优先使用 `150`、`500`、`1000`、`2500`。`5000` 和 `10000` 只作为手动 torture / ceiling probe，不作为默认命令或 pass/fail gate。
 
 ## 输出
 
-脚本向 stdout 输出 JSON report，并根据内置 budgets 给出 `verdict.status`：
+脚本默认向 stdout 输出 compact summary，并把完整 JSON report 写入：
+
+```text
+apps/web/.benchmark-reports/canvas-interactions/
+```
+
+Report artifacts 是本地生成物，不能进入 git。需要完整 JSON stdout 时使用 `--json`。
+
+脚本根据内置 budgets 给出 `verdict.status`：
 
 - `node-drag`
 - `viewport-pan`
@@ -30,12 +55,6 @@ npm run benchmark:canvas-interactions
 - `autosaveScheduleCount` / `autosaveSaveCount`
 
 如果未观察到 node drag movement 或 viewport movement，脚本会直接失败。若任一 path 超出 `budgets` 中配置的 `p95FrameMs`、DOM `mutationCount`、array replacement、history/autosave 或 native batch 阈值，`verdict.status` 为 `fail`，命令以 exit code `1` 结束。
-
-保存一次 run：
-
-```bash
-npm run benchmark:canvas-interactions > benchmarks/canvas-interactions/latest.json
-```
 
 比较 optimized path：
 

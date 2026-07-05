@@ -1,5 +1,7 @@
 /// <reference lib="dom" />
 
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import type { User, UserBoardItem } from '../src/shared/api/generated-query/model'
 import type {
   CanvasBoardState,
@@ -10,7 +12,26 @@ import type {
 } from '../src/features/canvas-board/domain'
 import { createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 
-type BenchmarkPath = 'node-drag' | 'viewport-pan' | 'viewport-zoom'
+const BENCHMARK_PATHS = ['node-drag', 'viewport-pan', 'viewport-zoom'] as const
+const BENCHMARK_FIXTURES = ['structure-heavy'] as const
+
+type BenchmarkPath = (typeof BENCHMARK_PATHS)[number]
+type BenchmarkFixture = (typeof BENCHMARK_FIXTURES)[number]
+
+type CliOptions = {
+  fixture: BenchmarkFixture
+  totalNodes: number
+  paths: BenchmarkPath[]
+  outputDir: string
+  printJson: boolean
+  help: boolean
+}
+
+type StructureNodeCounts = {
+  image: number
+  prompt: number
+  fusion: number
+}
 
 type TargetSnapshot = {
   t: number
@@ -128,11 +149,14 @@ const BENCHMARK_VIEWPORT = {
   height: 900,
 } as const
 const FRAME_BUDGET_MS = 1000 / 60
-const NODE_COUNT_BY_KIND = 50
+const DEFAULT_TOTAL_NODE_COUNT = 150
+const MIN_TOTAL_NODE_COUNT = 3
+const DEFAULT_OUTPUT_DIR = '.benchmark-reports/canvas-interactions'
+const CANVAS_LOAD_READY_TIMEOUT_MS = 60_000
+const POST_INTERACTION_SETTLE_MS = 1_500
 const GRID_COLUMNS = 15
 const GRID_X_GAP = 340
 const GRID_Y_GAP = 320
-const NODE_DRAG_TARGET_ID = 20
 const MOCK_UPDATED_AT = 1_764_000_000_000
 const INTERACTION_COUNTER_NAMES: InteractionCounterName[] = [
   'graphCommandCount',
@@ -211,7 +235,14 @@ const MOCK_USER = {
 
 const MOCK_BOARD_ID = 'mock-canvas-interaction-benchmark'
 const MOCK_BOARD_NAME = 'Canvas Interaction Benchmark Board'
-const MOCK_BOARD_STATE = createMediumLargeCanvasBoardState()
+const CLI_OPTIONS = readCliOptions(process.argv.slice(2))
+if (CLI_OPTIONS.help) {
+  printCliHelp()
+  process.exit(0)
+}
+
+const MOCK_BOARD_STATE = createStructureHeavyCanvasBoardState(CLI_OPTIONS.totalNodes)
+const NODE_DRAG_TARGET_ID = resolveNodeDragTargetId(MOCK_BOARD_STATE)
 
 const AUTH_SESSION = {
   session: { id: 'canvas-interaction-benchmark-session' },
@@ -262,6 +293,130 @@ const BOARD_UPLOAD = {
     size: 1024,
     mime: 'image/png',
   },
+}
+
+function readCliOptions(args: string[]): CliOptions {
+  try {
+    return parseCliOptions(args)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error)
+    console.error('Run with --help for usage.')
+    process.exit(1)
+  }
+}
+
+function parseCliOptions(args: string[]): CliOptions {
+  const options: CliOptions = {
+    fixture: 'structure-heavy',
+    totalNodes: DEFAULT_TOTAL_NODE_COUNT,
+    paths: [...BENCHMARK_PATHS],
+    outputDir: DEFAULT_OUTPUT_DIR,
+    printJson: false,
+    help: false,
+  }
+
+  for (let index = 0; index < args.length; index += 1) {
+    const rawArg = args[index]
+    if (!rawArg) continue
+    if (rawArg === '--help' || rawArg === '-h') {
+      options.help = true
+      continue
+    }
+    if (rawArg === '--json') {
+      options.printJson = true
+      continue
+    }
+
+    const [name, inlineValue] = rawArg.split('=', 2)
+    const readValue = () => {
+      if (inlineValue !== undefined) return inlineValue
+      const nextValue = args[index + 1]
+      if (!nextValue || nextValue.startsWith('--')) {
+        throw new Error(`Missing value for ${name}`)
+      }
+      index += 1
+      return nextValue
+    }
+
+    switch (name) {
+      case '--fixture':
+        options.fixture = parseFixture(readValue())
+        break
+      case '--nodes':
+        options.totalNodes = parseTotalNodes(readValue())
+        break
+      case '--paths':
+        options.paths = parseBenchmarkPaths(readValue())
+        break
+      case '--output':
+        options.outputDir = readValue()
+        break
+      default:
+        throw new Error(`Unknown option ${rawArg}`)
+    }
+  }
+
+  if (options.paths.length === 0) {
+    throw new Error('At least one benchmark path is required')
+  }
+  return options
+}
+
+function parseFixture(rawValue: string): BenchmarkFixture {
+  if ((BENCHMARK_FIXTURES as readonly string[]).includes(rawValue)) {
+    return rawValue as BenchmarkFixture
+  }
+  throw new Error(
+    `Unsupported fixture ${rawValue}. Supported fixtures: ${BENCHMARK_FIXTURES.join(', ')}`,
+  )
+}
+
+function parseTotalNodes(rawValue: string): number {
+  const totalNodes = Number(rawValue)
+  if (
+    Number.isInteger(totalNodes) &&
+    Number.isFinite(totalNodes) &&
+    totalNodes >= MIN_TOTAL_NODE_COUNT
+  ) {
+    return totalNodes
+  }
+  throw new Error(`--nodes must be an integer >= ${MIN_TOTAL_NODE_COUNT}, got ${rawValue}`)
+}
+
+function parseBenchmarkPaths(rawValue: string): BenchmarkPath[] {
+  const paths = rawValue
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const unsupported = paths.filter(
+    (item) => !(BENCHMARK_PATHS as readonly string[]).includes(item),
+  )
+  if (unsupported.length > 0) {
+    throw new Error(
+      `Unsupported benchmark path ${unsupported.join(', ')}. Supported paths: ${BENCHMARK_PATHS.join(', ')}`,
+    )
+  }
+  return paths as BenchmarkPath[]
+}
+
+function printCliHelp() {
+  console.log(`Canvas interaction benchmark
+
+Usage:
+  npm run benchmark:canvas-interactions -- [options]
+
+Options:
+  --fixture structure-heavy      Fixture type. Defaults to structure-heavy.
+  --nodes 150                    Total node count. Defaults to ${DEFAULT_TOTAL_NODE_COUNT}.
+  --paths node-drag,viewport-pan Comma-separated paths. Defaults to all paths.
+  --output <dir>                 Report directory. Defaults to ${DEFAULT_OUTPUT_DIR}.
+  --json                         Print the full JSON report to stdout.
+  --help                         Show this help.
+
+Notes:
+  Reports are always written locally and should not be committed to git.
+  5000/10000 node runs are torture probes; keep the default lightweight.
+`)
 }
 
 function setupBrowser(playwrightCli: CommandSpec) {
@@ -330,16 +485,25 @@ function readEvalJson<T>(playwrightCli: CommandSpec, expression: string): T {
   return JSON.parse(JSON.parse(match[1].trim())) as T
 }
 
-function createMediumLargeCanvasBoardState(): CanvasBoardState {
+function createStructureHeavyCanvasBoardState(totalNodes: number): CanvasBoardState {
+  const nodeCounts = resolveStructureNodeCounts(totalNodes)
   const imageNodes: ImageNodeItem[] = []
   const promptNodes: PromptNodeItem[] = []
   const fusionNodes: FusionNodeItem[] = []
 
-  for (let index = 0; index < NODE_COUNT_BY_KIND; index += 1) {
+  for (let index = 0; index < nodeCounts.image; index += 1) {
     const id = index + 1
     imageNodes.push(createImageNode(id, index))
-    promptNodes.push(createPromptNode(id, index + NODE_COUNT_BY_KIND))
-    fusionNodes.push(createFusionNode(id, index + NODE_COUNT_BY_KIND * 2))
+  }
+  for (let index = 0; index < nodeCounts.prompt; index += 1) {
+    const id = index + 1
+    promptNodes.push(createPromptNode(id, index + nodeCounts.image, nodeCounts.image))
+  }
+  for (let index = 0; index < nodeCounts.fusion; index += 1) {
+    const id = index + 1
+    fusionNodes.push(
+      createFusionNode(id, index + nodeCounts.image + nodeCounts.prompt, nodeCounts.image),
+    )
   }
 
   return {
@@ -347,13 +511,23 @@ function createMediumLargeCanvasBoardState(): CanvasBoardState {
     imageNodes,
     promptNodes,
     fusionNodes,
-    connections: createBenchmarkConnections(),
+    connections: createBenchmarkConnections(nodeCounts),
     viewport: {
       canvasX: 72,
       canvasY: 34,
       zoomLevel: 50,
     },
     updatedAt: MOCK_UPDATED_AT,
+  }
+}
+
+function resolveStructureNodeCounts(totalNodes: number): StructureNodeCounts {
+  const baseCount = Math.floor(totalNodes / 3)
+  const remainder = totalNodes % 3
+  return {
+    image: baseCount + (remainder > 0 ? 1 : 0),
+    prompt: baseCount + (remainder > 1 ? 1 : 0),
+    fusion: baseCount,
   }
 }
 
@@ -374,8 +548,9 @@ function createImageNode(id: number, gridIndex: number): ImageNodeItem {
   }
 }
 
-function createPromptNode(id: number, gridIndex: number): PromptNodeItem {
+function createPromptNode(id: number, gridIndex: number, imageNodeCount: number): PromptNodeItem {
   const position = getGridPosition(gridIndex)
+  const sourceId = wrapNodeId(id, imageNodeCount)
   return {
     id,
     type: 'prompt',
@@ -390,16 +565,16 @@ function createPromptNode(id: number, gridIndex: number): PromptNodeItem {
       {
         id: `prompt-input-${id}`,
         sourceType: 'node',
-        sourceId: `image-${id}`,
-        sourceNodeId: `image-${id}`,
-        url: createImageDataUrl(id),
+        sourceId: `image-${sourceId}`,
+        sourceNodeId: `image-${sourceId}`,
+        url: createImageDataUrl(sourceId),
         ratio: 1,
       },
     ],
   }
 }
 
-function createFusionNode(id: number, gridIndex: number): FusionNodeItem {
+function createFusionNode(id: number, gridIndex: number, imageNodeCount: number): FusionNodeItem {
   const position = getGridPosition(gridIndex)
   return {
     id,
@@ -413,7 +588,7 @@ function createFusionNode(id: number, gridIndex: number): FusionNodeItem {
     aspectRatio: '1:1',
     blendPoint: { x: 0.5, y: 0.5 },
     inputImages: [0, 1, 2, 3].map((offset) => {
-      const sourceId = wrapNodeId(id + offset)
+      const sourceId = wrapNodeId(id + offset, imageNodeCount)
       return {
         id: `fusion-input-${id}-${offset}`,
         sourceType: 'node',
@@ -428,24 +603,37 @@ function createFusionNode(id: number, gridIndex: number): FusionNodeItem {
   }
 }
 
-function createBenchmarkConnections(): CanvasConnection[] {
+function createBenchmarkConnections(nodeCounts: StructureNodeCounts): CanvasConnection[] {
   const connections: CanvasConnection[] = []
   let connectionId = 1
-  for (let id = 1; id <= NODE_COUNT_BY_KIND; id += 1) {
+  for (let id = 1; id <= nodeCounts.prompt; id += 1) {
+    const imageId = wrapNodeId(id, nodeCounts.image)
     connections.push({
       id: connectionId,
       fromNodeType: 'image',
-      fromNodeId: id,
+      fromNodeId: imageId,
       fromPort: 'image',
       toNodeType: 'prompt',
       toNodeId: id,
       toPort: 'image',
     })
     connectionId += 1
+  }
+
+  const targetEdgeCount = Math.round(
+    (nodeCounts.image + nodeCounts.prompt + nodeCounts.fusion) * 1.6,
+  )
+  let extraFusionImageEdgeBudget = Math.max(
+    0,
+    targetEdgeCount - (nodeCounts.prompt + nodeCounts.fusion * 3),
+  )
+
+  for (let id = 1; id <= nodeCounts.fusion; id += 1) {
+    const promptId = wrapNodeId(id, nodeCounts.prompt)
     connections.push({
       id: connectionId,
       fromNodeType: 'prompt',
-      fromNodeId: id,
+      fromNodeId: promptId,
       fromPort: 'prompt',
       toNodeType: 'fusion',
       toNodeId: id,
@@ -456,7 +644,7 @@ function createBenchmarkConnections(): CanvasConnection[] {
       connections.push({
         id: connectionId,
         fromNodeType: 'image',
-        fromNodeId: wrapNodeId(id + offset),
+        fromNodeId: wrapNodeId(id + offset, nodeCounts.image),
         fromPort: 'image',
         toNodeType: 'fusion',
         toNodeId: id,
@@ -464,17 +652,18 @@ function createBenchmarkConnections(): CanvasConnection[] {
       })
       connectionId += 1
     }
-    if (id <= 40) {
+    if (extraFusionImageEdgeBudget > 0) {
       connections.push({
         id: connectionId,
         fromNodeType: 'image',
-        fromNodeId: wrapNodeId(id + 2),
+        fromNodeId: wrapNodeId(id + 2, nodeCounts.image),
         fromPort: 'image',
         toNodeType: 'fusion',
         toNodeId: id,
         toPort: 'image',
       })
       connectionId += 1
+      extraFusionImageEdgeBudget -= 1
     }
   }
   return connections
@@ -489,8 +678,12 @@ function getGridPosition(index: number) {
   }
 }
 
-function wrapNodeId(id: number) {
-  return ((id - 1) % NODE_COUNT_BY_KIND) + 1
+function wrapNodeId(id: number, nodeCount: number) {
+  return ((id - 1) % nodeCount) + 1
+}
+
+function resolveNodeDragTargetId(state: CanvasBoardState): number {
+  return Math.min(20, Math.max(1, state.imageNodes.length))
 }
 
 function toApiBoardState(state: CanvasBoardState): UserBoardItem['state'] {
@@ -548,12 +741,17 @@ const browserUserAgent = await page.evaluate(() => navigator.userAgent)
 if (!/Chrome|Chromium/.test(browserUserAgent)) {
   throw new Error('Canvas interaction benchmark requires Chromium, got: ' + browserUserAgent)
 }
-await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).waitFor({ timeout: 15000 })
-await page.waitForSelector('.vue-flow__transformationpane', { timeout: 15000 })
-await page.waitForSelector(${JSON.stringify(`.vue-flow__node[data-id="image-${NODE_DRAG_TARGET_ID}"] .workflow-node-header`)}, { timeout: 15000 })
-await page.waitForFunction(() => document.querySelectorAll('.vue-flow__node').length >= 20, null, { timeout: 20000 })
+await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).waitFor({ timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} })
+await page.waitForSelector('.vue-flow__transformationpane', { timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} })
+await page.waitForSelector(${JSON.stringify(`.vue-flow__node[data-id="image-${NODE_DRAG_TARGET_ID}"] .workflow-node-header`)}, { timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} })
+await page.waitForFunction(
+  (expectedCount) => document.querySelectorAll('.vue-flow__node').length >= expectedCount,
+  ${Math.min(20, MOCK_BOARD_STATE.imageNodes.length + MOCK_BOARD_STATE.promptNodes.length + MOCK_BOARD_STATE.fusionNodes.length)},
+  { timeout: ${CANVAS_LOAD_READY_TIMEOUT_MS} },
+)
 await page.waitForTimeout(400)
 `,
+    180_000,
   )
 }
 
@@ -710,13 +908,23 @@ function runNodeDragBenchmark(playwrightCli: CommandSpec): RawInteractionTrace {
     playwrightCli,
     `
 ${getInstallBenchmarkHarnessCode()}
+await page.getByRole('button', { name: '抓手 (H)' }).click()
+await page.waitForTimeout(100)
 await page.getByRole('button', { name: '选择 (V)' }).click()
+await page.waitForTimeout(250)
 const drag = await page.evaluate(() => {
   const header = document.querySelector(${JSON.stringify(`.vue-flow__node[data-id="image-${NODE_DRAG_TARGET_ID}"] .workflow-node-header`)})
   if (!header) throw new Error('Missing node drag benchmark header')
   const box = header.getBoundingClientRect()
-  const x = box.right - Math.min(28, box.width / 3)
   const y = box.top + box.height / 2
+  let x = box.left + box.width * 0.8
+  for (let offset = box.width - 6; offset >= 4; offset -= 4) {
+    const candidateX = box.left + offset
+    if (document.elementFromPoint(candidateX, y)?.matches('.workflow-node-header')) {
+      x = candidateX
+      break
+    }
+  }
   return {
     start: { x, y },
     end: { x: x + 260, y: y + 120 },
@@ -731,6 +939,7 @@ await page.mouse.move(drag.end.x, drag.end.y, { steps: 36 })
 await page.mouse.up()
 await page.waitForTimeout(300)
 await page.evaluate(() => window.__canvasInteractionBenchmark.end())
+await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
 `,
     90_000,
   )
@@ -774,6 +983,7 @@ await page.mouse.move(pan.end.x, pan.end.y, { steps: 36 })
 await page.mouse.up()
 await page.waitForTimeout(300)
 await page.evaluate(() => window.__canvasInteractionBenchmark.end())
+await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
 `,
     90_000,
   )
@@ -807,10 +1017,22 @@ try {
 }
 await page.waitForTimeout(400)
 await page.evaluate(() => window.__canvasInteractionBenchmark.end())
+await page.waitForTimeout(${POST_INTERACTION_SETTLE_MS})
 `,
     90_000,
   )
   return readEvalJson(playwrightCli, `window.__canvasInteractionBenchmark.traces['viewport-zoom']`)
+}
+
+function runBenchmarkPath(playwrightCli: CommandSpec, benchmarkPath: BenchmarkPath): RawInteractionTrace {
+  switch (benchmarkPath) {
+    case 'node-drag':
+      return runNodeDragBenchmark(playwrightCli)
+    case 'viewport-pan':
+      return runViewportPanBenchmark(playwrightCli)
+    case 'viewport-zoom':
+      return runViewportZoomBenchmark(playwrightCli)
+  }
 }
 
 function summarizeTrace(trace: RawInteractionTrace): InteractionMetrics {
@@ -968,14 +1190,14 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
   return {
     schemaVersion: 2,
     generatedAt: new Date().toISOString(),
-    command: 'cd apps/web && npm run benchmark:canvas-interactions',
+    command: createReportCommand(),
     browser: {
       engine: 'chromium',
       source: 'playwright-cli default browser session',
     },
     viewport: BENCHMARK_VIEWPORT,
     fixture: {
-      name: 'medium-large-canvas-board',
+      name: CLI_OPTIONS.fixture,
       nodeCount: fixtureNodeCount,
       edgeCount: MOCK_BOARD_STATE.connections.length,
       imageNodes: MOCK_BOARD_STATE.imageNodes.length,
@@ -993,6 +1215,49 @@ function createReport(paths: InteractionMetrics[]): BenchmarkReport {
   }
 }
 
+function createReportCommand(): string {
+  const args = process.argv.slice(2)
+  return ['cd apps/web && npm run benchmark:canvas-interactions', args.length ? '--' : '', ...args]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function writeBenchmarkReport(report: BenchmarkReport, options: CliOptions): string {
+  const outputDir = path.resolve(process.cwd(), options.outputDir)
+  mkdirSync(outputDir, { recursive: true })
+  const timestamp = report.generatedAt.replace(/[:.]/g, '-')
+  const fileName = [
+    'canvas-interactions',
+    report.fixture.name,
+    `${report.fixture.nodeCount}-nodes`,
+    timestamp,
+  ].join('-')
+  const reportPath = path.join(outputDir, `${fileName}.json`)
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8')
+  return reportPath
+}
+
+function printCompactSummary(report: BenchmarkReport, reportPath: string) {
+  const lines = [
+    'Canvas interaction benchmark',
+    `Report: ${reportPath}`,
+    `Fixture: ${report.fixture.name} (${report.fixture.nodeCount} nodes, ${report.fixture.edgeCount} edges)`,
+    `Paths: ${report.paths.map((item) => item.path).join(', ')}`,
+    `Verdict: ${report.verdict.status}`,
+    `Worst: ${report.worstPath.path} p95=${report.worstPath.p95FrameMs}ms dropped=${report.worstPath.droppedFrames} max=${report.worstPath.maxFrameMs}ms`,
+    '',
+    'Path summary:',
+    ...report.paths.map(
+      (metrics) =>
+        `- ${metrics.path}: p95=${metrics.p95FrameMs}ms avg=${metrics.avgFrameMs}ms max=${metrics.maxFrameMs}ms dropped=${metrics.droppedFrames} mutations=${metrics.mutationCount} nodeReplacements=${metrics.counters.nodeArrayReplacements}`,
+    ),
+  ]
+  if (report.verdict.failures.length > 0) {
+    lines.push('', 'Budget failures:', ...report.verdict.failures.map((failure) => `- ${failure}`))
+  }
+  console.log(lines.join('\n'))
+}
+
 async function main() {
   let playwrightCli: CommandSpec | null = null
   try {
@@ -1000,13 +1265,16 @@ async function main() {
     await smoke.startDevServer()
     setupBrowser(playwrightCli)
 
-    const traces = [
-      runNodeDragBenchmark(playwrightCli),
-      runViewportPanBenchmark(playwrightCli),
-      runViewportZoomBenchmark(playwrightCli),
-    ]
+    const traces = CLI_OPTIONS.paths.map((benchmarkPath) =>
+      runBenchmarkPath(playwrightCli as CommandSpec, benchmarkPath),
+    )
     const report = createReport(traces.map(summarizeTrace))
-    console.log(JSON.stringify(report, null, 2))
+    const reportPath = writeBenchmarkReport(report, CLI_OPTIONS)
+    if (CLI_OPTIONS.printJson) {
+      console.log(JSON.stringify(report, null, 2))
+    } else {
+      printCompactSummary(report, reportPath)
+    }
     if (report.verdict.status === 'fail') {
       process.exitCode = 1
     }
