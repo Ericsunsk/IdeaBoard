@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
 import { useCanvasWorkspaceRuntime } from './useCanvasWorkspaceRuntime'
 
 const mocks = vi.hoisted(() => ({
@@ -347,16 +348,19 @@ describe('useCanvasWorkspaceRuntime', () => {
     const runtime = useCanvasWorkspaceRuntime(createWorkspaceOptions())
     const extendPayload = {
       nodeId: 'image-1',
-      frameRect: { x: 0, y: 0, width: 100, height: 100 },
-      originalImageRect: { x: 10, y: 10, width: 80, height: 80 },
+      frameRect: { left: 0, top: 0, width: 100, height: 100 },
+      originalImageRect: { left: 10, top: 10, width: 80, height: 80 },
       prompt: 'extend',
       outputCount: 1,
     }
 
-    runtime.imageWorkflow.runImageDirectAction('image-1', 'upscale')
+    runtime.imageWorkflow.runImageDirectAction('image-1', IMAGE_NODE_ACTION.hdUpscale)
     runtime.imageWorkflow.runCanvasExtendAction('image-1', extendPayload)
 
-    expect(task.runImageDirectAction).toHaveBeenCalledWith('image-1', 'upscale')
+    expect(task.runImageDirectAction).toHaveBeenCalledWith(
+      'image-1',
+      IMAGE_NODE_ACTION.hdUpscale,
+    )
     expect(task.runCanvasExtendAction).toHaveBeenCalledWith('image-1', extendPayload)
   })
 })

@@ -32,7 +32,7 @@ function createBoardRuntimeOptions() {
     getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
     getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
     setViewport: vi.fn(),
-    logoutAndRedirect: vi.fn(async () => undefined),
+    logoutAndRedirect: vi.fn(async (_path: string) => undefined),
     feedback: {
       warning: vi.fn(),
       saveSucceeded: vi.fn(),
@@ -105,7 +105,8 @@ describe('useCanvasBoardRuntime', () => {
     flowRuntime.flushAutosave.mockImplementation(async () => {
       events.push('flush')
     })
-    ;(options.router.push as ReturnType<typeof vi.fn>).mockImplementation(async (path: string) => {
+    ;(options.router.push as ReturnType<typeof vi.fn>).mockImplementation(async (...args) => {
+      const [path] = args as [string]
       events.push(`navigate:${path}`)
     })
     options.logoutAndRedirect.mockImplementation(async (path: string) => {
