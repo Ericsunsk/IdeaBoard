@@ -757,6 +757,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 	}
 	task := &tasks.TaskPayload{
 		TaskID: "task-model-field",
+		UserID: 42,
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,
 	}
@@ -804,6 +805,7 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 	}
 	task := &tasks.TaskPayload{
 		TaskID: "task-assignment-model",
+		UserID: 42,
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,
 	}

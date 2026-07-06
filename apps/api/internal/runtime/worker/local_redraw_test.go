@@ -235,6 +235,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	}
 	task := &tasks.TaskPayload{
 		TaskID: "task-local-redraw",
+		UserID: 42,
 		Prompt: "test prompt",
 		Params: paramsJSON,
 	}

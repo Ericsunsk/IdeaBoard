@@ -750,9 +750,6 @@ func classifyProviderFailure(err error, timeline providerCallTimeline) (string, 
 	if errors.Is(err, context.DeadlineExceeded) {
 		return tasks.ExecutionStageProvider, tasks.FailureCategoryTimeout
 	}
-	if timeline.FinalizeStartedAt != nil {
-		return tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError
-	}
 	if status, ok := providerHTTPStatus(err); ok {
 		switch status {
 		case http.StatusBadRequest, http.StatusUnprocessableEntity:
@@ -764,6 +761,9 @@ func classifyProviderFailure(err error, timeline providerCallTimeline) (string, 
 		case http.StatusRequestTimeout, http.StatusTooManyRequests:
 			return tasks.ExecutionStageProvider, tasks.FailureCategoryTimeout
 		}
+	}
+	if timeline.FinalizeStartedAt != nil {
+		return tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError
 	}
 	if timeline.ProviderStartedAt != nil {
 		return tasks.ExecutionStageProvider, tasks.FailureCategoryProviderError

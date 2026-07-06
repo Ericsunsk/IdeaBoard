@@ -543,7 +543,23 @@ func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {
 		}
 		return fmt.Errorf("删除文件失败: %w", err)
 	}
+	cleanupEmptyLocalUploadParentDirs(localPath)
 	return nil
+}
+
+func cleanupEmptyLocalUploadParentDirs(localPath string) {
+	root := filepath.Clean(uploadObjectRoot)
+	dir := filepath.Clean(filepath.Dir(localPath))
+	for dir != "." && dir != string(filepath.Separator) && dir != root {
+		rel, err := filepath.Rel(root, dir)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+			return
+		}
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
 }
 
 func (s *StorageService) readLocalByObjectKey(objectKey string, maxBytes int64) (*StoredUploadObject, error) {
