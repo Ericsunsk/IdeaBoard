@@ -3,7 +3,7 @@ import {
   GetAdminStatisticsRange,
   type AdminStatistics,
   type GetAdminStatisticsRangeValue,
-  useGetAdminStatistics,
+  useAdminStatisticsResource,
 } from './statisticsResource'
 import {
   pickAdminTimeRangeOptions,
@@ -28,50 +28,38 @@ export function useUsageStatisticsData() {
   const qualityRangeOptions: AdminTimeRangeOption[] = pickAdminTimeRangeOptions(qualityTrendRanges)
 
   const statisticsParams = computed(() => ({ range: timeRange.value }))
-  const statisticsQuery = useGetAdminStatistics(statisticsParams, {
-    query: {
-      placeholderData: (previous) => previous,
-      staleTime: 60_000,
-    },
+  const statisticsResource = useAdminStatisticsResource(statisticsParams, {
+    keepPreviousData: true,
   })
   const qualityStatisticsParams = computed(() => ({ range: qualityTimeRange.value }))
   const isQualityRangeShared = computed(() => qualityTimeRange.value === timeRange.value)
-  const qualityStatisticsQuery = useGetAdminStatistics(qualityStatisticsParams, {
-    query: {
-      enabled: computed(() => !isQualityRangeShared.value),
-      placeholderData: (previous) => previous,
-      staleTime: 60_000,
-    },
+  const qualityStatisticsResource = useAdminStatisticsResource(qualityStatisticsParams, {
+    enabled: computed(() => !isQualityRangeShared.value),
+    keepPreviousData: true,
   })
 
-  const adminStatistics = computed<AdminStatistics | null>(
-    () => statisticsQuery.data.value?.data ?? null,
-  )
+  const adminStatistics = computed<AdminStatistics | null>(() => statisticsResource.statistics.value)
   const qualityStatistics = computed<AdminStatistics | null>(() =>
     isQualityRangeShared.value
       ? adminStatistics.value
-      : (qualityStatisticsQuery.data.value?.data ?? null),
+      : qualityStatisticsResource.statistics.value,
   )
-  const isStatisticsSettled = computed(
-    () => statisticsQuery.isFetched.value || statisticsQuery.isError.value,
-  )
+  const isStatisticsSettled = computed(() => statisticsResource.isSettled.value)
   const isQualityStatisticsSettled = computed(() =>
     isQualityRangeShared.value
       ? isStatisticsSettled.value
-      : qualityStatisticsQuery.isFetched.value || qualityStatisticsQuery.isError.value,
+      : qualityStatisticsResource.isSettled.value,
   )
-  const isStatisticsError = computed(() => statisticsQuery.isError.value)
-  const statisticsError = computed(() =>
-    isStatisticsError.value ? (statisticsQuery.error.value ?? null) : null,
-  )
+  const isStatisticsError = computed(() => statisticsResource.isError.value)
+  const statisticsError = computed(() => statisticsResource.error.value)
   const isQualityStatisticsError = computed(() =>
-    isQualityRangeShared.value ? isStatisticsError.value : qualityStatisticsQuery.isError.value,
+    isQualityRangeShared.value ? isStatisticsError.value : qualityStatisticsResource.isError.value,
   )
   const qualityStatisticsError = computed(() =>
     isQualityStatisticsError.value
       ? isQualityRangeShared.value
         ? statisticsError.value
-        : (qualityStatisticsQuery.error.value ?? null)
+        : qualityStatisticsResource.error.value
       : null,
   )
 

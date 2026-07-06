@@ -1,10 +1,9 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useGetAdminMonitor } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
-import { useGetAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
 import {
   GetAdminStatisticsRange,
-  type AdminStatistics,
-} from '../../../../shared/api/generated-query/model'
+  useAdminStatisticsResource,
+} from '../../statistics/statisticsResource'
 import {
   buildAdminAnomalyItems,
   type AdminAnomalyItem,
@@ -44,24 +43,17 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
       refetchOnWindowFocus: false,
     },
   })
-  const statisticsQuery = useGetAdminStatistics(
+  const statisticsResource = useAdminStatisticsResource(
     computed(() => ({ range: GetAdminStatisticsRange['1d'] })),
     {
-      query: {
-        enabled: isEnabled,
-        refetchInterval: polling.refetchInterval,
-        refetchIntervalInBackground: false,
-        refetchOnWindowFocus: false,
-        staleTime: 60_000,
-      },
+      enabled: isEnabled,
+      refetchInterval: polling.refetchInterval,
     },
   )
 
   const monitorData = computed(() => monitorQuery.data.value?.data?.monitor || null)
   const monitorStats = computed(() => monitorQuery.data.value?.data?.stats || null)
-  const statistics = computed<AdminStatistics | null>(
-    () => statisticsQuery.data.value?.data ?? null,
-  )
+  const statistics = statisticsResource.statistics
   const stableRecords = ref(new Map<string, StableAnomalyRecord>())
   const anomalies = ref<AdminAnomalyItem[]>([])
 
@@ -72,7 +64,7 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
       monitorStats: monitorStats.value,
       statistics: statistics.value,
       isMonitorUnavailable: monitorQuery.isError.value,
-      isStatisticsUnavailable: statisticsQuery.isError.value,
+      isStatisticsUnavailable: statisticsResource.isError.value,
     })
   })
 

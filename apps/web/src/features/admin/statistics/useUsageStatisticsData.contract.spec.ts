@@ -8,7 +8,7 @@ const mockState = vi.hoisted(() => ({
 
 vi.mock('./statisticsResource', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./statisticsResource')>()),
-  useGetAdminStatistics: vi.fn(() => mockState.statisticsReturns.shift()),
+  useAdminStatisticsResource: vi.fn(() => mockState.statisticsReturns.shift()),
 }))
 
 beforeEach(() => {
@@ -33,10 +33,11 @@ describe('useUsageStatisticsData', () => {
 })
 
 function makeStatisticsQuery(options: { error?: Error; isError?: boolean } = {}) {
+  const isError = options.isError ?? false
   return {
-    data: ref(undefined),
+    statistics: ref(null),
     error: ref(options.error ?? null),
-    isError: ref(options.isError ?? false),
-    isFetched: ref(false),
+    isError: ref(isError),
+    isSettled: ref(isError),
   }
 }
