@@ -1,3 +1,4 @@
+/* eslint-disable vue/one-component-per-file -- Local chrome stubs keep the overlay contract test focused. */
 import { computed, defineComponent, type ComputedRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import CanvasOverlays from './CanvasOverlays.vue'

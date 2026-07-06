@@ -95,10 +95,10 @@ const props = defineProps<{
   canvasNodeMenuItems: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
 }>()
 
-const chromeModel = computed(() => props.imageToolSession.viewModel.chrome.value)
-const chromeCommands = computed(() => props.imageToolSession.commands.chrome)
-
 const emit = defineEmits<{
   'create-node': [kind: CanvasCreatableNodeKind]
 }>()
+
+const chromeModel = computed(() => props.imageToolSession.viewModel.chrome.value)
+const chromeCommands = computed(() => props.imageToolSession.commands.chrome)
 </script>
