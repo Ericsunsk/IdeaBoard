@@ -287,7 +287,6 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-editor-tool-rail__button {
   width: 100%;

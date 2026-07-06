@@ -52,7 +52,3 @@ const emit = defineEmits<{
   (event: 'toggle-minimap'): void
 }>()
 </script>
-
-<style scoped>
-@import './styles/canvas-controls.css';
-</style>

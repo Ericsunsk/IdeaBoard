@@ -626,11 +626,10 @@ onMounted(async () => {
 
 <style>
 @import '../components/styles/canvas-vue-flow-adapter-skin.css';
+@import '../components/styles/canvas-style-contracts.css';
 </style>
 
 <style scoped>
-@import '../components/styles/canvas-controls.css';
-
 :global(html.canvas-overscroll-guard),
 :global(body.canvas-overscroll-guard) {
   overscroll-behavior: none;

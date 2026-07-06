@@ -91,7 +91,6 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 }
 </script>
 
-<style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-node-prompt-composer {
   animation: image-node-prompt-rise var(--canvas-motion-fast) ease-out;

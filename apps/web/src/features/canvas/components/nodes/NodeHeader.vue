@@ -105,5 +105,3 @@ function onTitleInput() {
   draftTitle = titleTextRef.value?.textContent ?? ''
 }
 </script>
-
-<style scoped src="./styles/node-shared.css"></style>

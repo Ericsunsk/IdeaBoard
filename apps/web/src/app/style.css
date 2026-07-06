@@ -1,8 +1,6 @@
 @import 'tailwindcss';
 @import '../shared/theme/user-avatar-button.css';
 @import '../features/admin/shared/styles/admin-user-avatar-button.css';
-@import '../features/canvas/components/styles/canvas-range-input.css';
-@import '../features/canvas/components/styles/canvas-user-avatar-button.css';
 @plugin "tailwindcss-primeui";
 
 @theme {

@@ -159,7 +159,6 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
 }
 </script>
 
-<style scoped src="../nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-action-menu {
   position: absolute;

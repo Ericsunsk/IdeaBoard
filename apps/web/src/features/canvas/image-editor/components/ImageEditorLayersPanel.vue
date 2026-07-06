@@ -126,7 +126,6 @@ onBeforeUnmount(clearLayerListScrollTimer)
 </script>
 
 <style src="./styles/image-editor-panel.css"></style>
-<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-editor-layers-panel {
   height: calc(

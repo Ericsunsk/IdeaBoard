@@ -126,4 +126,3 @@ const resolvedAriaLabel = computed(
   display: block;
 }
 </style>
-<style scoped src="./styles/node-tool-buttons.css"></style>

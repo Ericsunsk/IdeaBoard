@@ -57,5 +57,3 @@ defineOptions({
   inheritAttrs: false,
 })
 </script>
-
-<style src="./styles/node-input-thumbnails.css"></style>

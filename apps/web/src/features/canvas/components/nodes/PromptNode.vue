@@ -132,8 +132,6 @@ const {
 })
 </script>
 
-<style scoped src="./styles/node-tool-buttons.css"></style>
-<style scoped src="./styles/node-input-thumbnails.css"></style>
 <style scoped>
 .node-stage-handle-wrap {
   position: relative;

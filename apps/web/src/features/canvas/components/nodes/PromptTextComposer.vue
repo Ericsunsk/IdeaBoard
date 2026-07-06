@@ -145,8 +145,6 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 }
 </script>
 
-<style scoped src="./styles/node-input-thumbnails.css"></style>
-<style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .prompt-text-composer.node-tool-surface {
   --node-tool-button-border: #e2e8f0;

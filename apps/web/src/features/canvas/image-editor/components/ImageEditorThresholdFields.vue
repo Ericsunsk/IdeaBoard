@@ -47,5 +47,3 @@ function onThresholdInput(event: Event) {
   emit('update:threshold', clampThresholdValue(value))
 }
 </script>
-
-<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>

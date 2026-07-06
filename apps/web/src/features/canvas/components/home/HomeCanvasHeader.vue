@@ -219,8 +219,6 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 </script>
 
 <style scoped>
-@import '../styles/canvas-controls.css';
-
 .home-canvas-menu-enter-active,
 .home-canvas-menu-leave-active {
   transition:

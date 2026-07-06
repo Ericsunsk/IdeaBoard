@@ -72,5 +72,3 @@ function emitNormalizedParams(params: ImageEditorSharpenParams) {
   emit('update:params', IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(params))
 }
 </script>
-
-<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>

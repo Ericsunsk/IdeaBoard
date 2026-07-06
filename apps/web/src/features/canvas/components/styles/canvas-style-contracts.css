@@ -1,0 +1,14 @@
+/*
+ * Canvas feature CSS contracts.
+ * CanvasPage loads this once for public Canvas classes shared across node,
+ * toolbar, image-editor, and mask-editor components. Component-private styles
+ * stay in the owning .vue or local image-editor CSS file.
+ */
+
+@import './canvas-controls.css';
+@import './canvas-range-input.css';
+@import './canvas-user-avatar-button.css';
+@import './editing-controls.css';
+@import '../nodes/styles/node-shared.css';
+@import '../nodes/styles/node-tool-buttons.css';
+@import '../nodes/styles/node-input-thumbnails.css';

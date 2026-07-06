@@ -80,7 +80,6 @@ const ratio = computed(() => normalizePromptAspectRatio(props.modelValue))
 const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
 </script>
 
-<style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .node-aspect-ratio-icon[data-ratio='3:4'] > span {
   width: 17px;

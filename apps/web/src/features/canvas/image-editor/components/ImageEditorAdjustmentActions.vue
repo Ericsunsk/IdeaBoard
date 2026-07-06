@@ -47,7 +47,6 @@ const actionItems: Array<{
 ]
 </script>
 
-<style scoped src="../../components/nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-editor-adjustment-actions {
   display: grid;

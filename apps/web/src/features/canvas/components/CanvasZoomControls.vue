@@ -43,7 +43,3 @@ const emit = defineEmits<{
   (event: 'zoom-out'): void
 }>()
 </script>
-
-<style scoped>
-@import './styles/canvas-controls.css';
-</style>

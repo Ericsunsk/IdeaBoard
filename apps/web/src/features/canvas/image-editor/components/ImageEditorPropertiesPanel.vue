@@ -89,7 +89,6 @@ const emit = defineEmits<{
 const ranges = IMAGE_ADJUSTMENT_DEFINITIONS
 </script>
 
-<style src="../../components/styles/editing-controls.css"></style>
 <style scoped>
 .image-editor-properties-panel {
   min-height: 0;

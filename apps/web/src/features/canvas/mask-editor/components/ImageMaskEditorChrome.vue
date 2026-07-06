@@ -365,9 +365,6 @@ function onSubmit(prompt: string, outputCount: number) {
 </script>
 
 <style scoped>
-@import '../../components/nodes/styles/node-tool-buttons.css';
-@import '../../components/styles/editing-controls.css';
-
 .image-mask-editor-right-panel {
   width: 100%;
   min-height: 0;

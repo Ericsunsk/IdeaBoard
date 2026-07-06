@@ -118,5 +118,3 @@ const {
   onSubmit: (prompt, outputCount, aspectRatio) => emit('submit', prompt, outputCount, aspectRatio),
 })
 </script>
-
-<style scoped src="./styles/node-tool-buttons.css"></style>

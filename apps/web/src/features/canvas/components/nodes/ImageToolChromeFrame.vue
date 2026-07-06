@@ -44,8 +44,6 @@ const chromeStyle = computed(() => ({
 </script>
 
 <style scoped>
-@import './styles/node-tool-buttons.css';
-
 .image-tool-chrome-frame {
   --image-tool-image-gap: 12px;
   --image-tool-stack-gap: 8px;

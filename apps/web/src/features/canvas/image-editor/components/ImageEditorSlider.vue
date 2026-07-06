@@ -80,5 +80,3 @@ function resolveDecimalPlaces(step: number) {
   return fraction.length
 }
 </script>
-
-<style src="../../components/styles/editing-controls.css"></style>

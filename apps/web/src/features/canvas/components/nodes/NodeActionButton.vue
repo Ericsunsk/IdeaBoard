@@ -64,7 +64,6 @@ const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.val
 const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant])
 </script>
 
-<style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .node-action-btn {
   --node-tool-border-width: var(--canvas-control-border-width);

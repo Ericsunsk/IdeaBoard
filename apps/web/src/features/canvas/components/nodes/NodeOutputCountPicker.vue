@@ -57,5 +57,3 @@ const emit = defineEmits<{
 const outputCountPresetOptions = IMAGE_OUTPUT_COUNT_PRESET_OPTIONS
 const resolvedTooltip = computed(() => props.tooltip || '选择张数')
 </script>
-
-<style scoped src="./styles/node-tool-buttons.css"></style>
