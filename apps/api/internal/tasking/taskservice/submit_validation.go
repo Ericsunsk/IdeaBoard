@@ -11,39 +11,40 @@ import (
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 var unsupportedSubmitTaskParamKeys = []string{
-	"image_url",
-	"mask_image_urls",
-	"variation_strength",
-	"extend_top",
-	"extend_right",
-	"extend_bottom",
-	"extend_left",
-	"clarity_strength",
-	"fusion_input_weights",
-	"upscale_mode",
-	"upscale_factor",
-	"output_format",
-	"output_quality",
+	paramkeys.ImageURL,
+	paramkeys.MaskImageURLs,
+	paramkeys.VariationStrength,
+	paramkeys.ExtendTop,
+	paramkeys.ExtendRight,
+	paramkeys.ExtendBottom,
+	paramkeys.ExtendLeft,
+	paramkeys.ClarityStrength,
+	paramkeys.FusionInputWeights,
+	paramkeys.UpscaleMode,
+	paramkeys.UpscaleFactor,
+	paramkeys.OutputFormat,
+	paramkeys.OutputQuality,
 }
 
 func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
 	if params == nil {
 		return
 	}
-	imageURLs := mediarefs.CollectStringList(params["image_urls"])
+	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) > 0 {
-		params["image_urls"] = imageURLs
+		params[paramkeys.ImageURLs] = imageURLs
 	} else {
-		delete(params, "image_urls")
+		delete(params, paramkeys.ImageURLs)
 	}
-	referenceImageURLs := mediarefs.CollectStringList(params["reference_image_urls"])
+	referenceImageURLs := mediarefs.CollectStringList(params[paramkeys.ReferenceImageURLs])
 	if len(referenceImageURLs) > 0 {
-		params["reference_image_urls"] = referenceImageURLs
+		params[paramkeys.ReferenceImageURLs] = referenceImageURLs
 	} else {
-		delete(params, "reference_image_urls")
+		delete(params, paramkeys.ReferenceImageURLs)
 	}
 }
 
@@ -51,11 +52,11 @@ func normalizeStyleFusionParams(params map[string]interface{}) error {
 	if params == nil {
 		return nil
 	}
-	imageURLs := mediarefs.CollectStringList(params["image_urls"])
+	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) < 2 || len(imageURLs) > 4 {
 		return fmt.Errorf("fusion 节点需要 2 到 4 张输入图")
 	}
-	rawFusion, ok := params["fusion"]
+	rawFusion, ok := params[paramkeys.Fusion]
 	if !ok {
 		return fmt.Errorf("fusion 参数缺少 fusion.input_weights")
 	}
@@ -63,7 +64,7 @@ func normalizeStyleFusionParams(params map[string]interface{}) error {
 	if !ok {
 		return fmt.Errorf("fusion 参数格式错误")
 	}
-	if _, ok := fusion["input_weights"]; !ok {
+	if _, ok := fusion[paramkeys.InputWeights]; !ok {
 		return fmt.Errorf("fusion 参数缺少 fusion.input_weights")
 	}
 	weights, ok := workflow.ReadStyleFusionInputWeights(params)
@@ -81,9 +82,9 @@ func normalizeStyleFusionParams(params map[string]interface{}) error {
 	for key, value := range fusion {
 		normalizedFusion[key] = value
 	}
-	normalizedFusion["mode"] = "weighted_reference"
-	normalizedFusion["input_weights"] = normalizedWeights
-	params["fusion"] = normalizedFusion
+	normalizedFusion[paramkeys.Mode] = "weighted_reference"
+	normalizedFusion[paramkeys.InputWeights] = normalizedWeights
+	params[paramkeys.Fusion] = normalizedFusion
 	return nil
 }
 
@@ -226,7 +227,7 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		return p, nil
 	}
 	for key, value := range params {
-		if isWorkflowTaskParamsKnownMapKey(key) {
+		if paramkeys.IsKnownSubmitTaskParamKey(key) {
 			continue
 		}
 		if p.Extra == nil {
@@ -234,10 +235,10 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		}
 		p.Extra[key] = value
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "feature"); ok {
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Feature); ok {
 		p.Feature = v
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Model); ok {
 		p.Model = strings.TrimSpace(v)
 	}
 
@@ -247,43 +248,43 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 
 	controls := &tasks.GenerationControls{}
 	hasControls := false
-	if v, ok := readFloatParam(params, "custom_width"); ok {
+	if v, ok := readFloatParam(params, paramkeys.CustomWidth); ok {
 		controls.CustomWidth = v
 		hasControls = true
 	}
-	if v, ok := readFloatParam(params, "custom_height"); ok {
+	if v, ok := readFloatParam(params, paramkeys.CustomHeight); ok {
 		controls.CustomHeight = v
 		hasControls = true
 	}
-	if v, ok := readFloatParam(params, "original_image_width"); ok {
+	if v, ok := readFloatParam(params, paramkeys.OriginalImageWidth); ok {
 		controls.OriginalWidth = v
 		hasControls = true
 	}
-	if v, ok := readFloatParam(params, "original_image_height"); ok {
+	if v, ok := readFloatParam(params, paramkeys.OriginalImageHeight); ok {
 		controls.OriginalHeight = v
 		hasControls = true
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "ratio"); ok {
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Ratio); ok {
 		controls.Ratio = v
 		hasControls = true
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "quality"); ok {
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Quality); ok {
 		controls.Quality = v
 		hasControls = true
 	}
-	if v, ok := readIntParam(params, "sample_count"); ok {
+	if v, ok := readIntParam(params, paramkeys.SampleCount); ok {
 		controls.SampleCount = v
 		hasControls = true
 	}
-	if v, ok := readIntParam(params, "output_count"); ok {
+	if v, ok := readIntParam(params, paramkeys.OutputCount); ok {
 		controls.OutputCount = v
 		hasControls = true
 	}
-	if v, ok := readIntParam(params, "image_count"); ok {
+	if v, ok := readIntParam(params, paramkeys.ImageCount); ok {
 		controls.ImageCount = v
 		hasControls = true
 	}
-	if v, ok := readBoolParam(params, "prompt_upsampling"); ok {
+	if v, ok := readBoolParam(params, paramkeys.PromptUpsampling); ok {
 		controls.PromptUpsampling = &v
 		hasControls = true
 	}
@@ -331,25 +332,25 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 		}
 	}
 
-	imageURLs := mediarefs.CollectStringList(params["image_urls"])
+	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) > 0 {
 		media.Inputs = mediaRefsFromURLs(imageURLs, "input", inputWeights)
 		hasMedia = true
 	}
-	referenceImageURLs := mediarefs.CollectStringList(params["reference_image_urls"])
+	referenceImageURLs := mediarefs.CollectStringList(params[paramkeys.ReferenceImageURLs])
 	if len(referenceImageURLs) > 0 {
 		media.References = mediaRefsFromURLs(referenceImageURLs, "reference", nil)
 		hasMedia = true
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.MaskImageURL); ok {
 		media.Mask = &tasks.MediaRef{URL: v, Role: "mask"}
 		hasMedia = true
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, "original_image_url"); ok {
+	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.OriginalImageURL); ok {
 		media.Original = &tasks.MediaRef{URL: v, Role: "original"}
 		hasMedia = true
 	}
-	if v, ok := readBoolParam(params, "use_mask"); ok {
+	if v, ok := readBoolParam(params, paramkeys.UseMask); ok {
 		media.UseMask = &v
 		hasMedia = true
 	}
@@ -375,36 +376,6 @@ func mediaRefsFromURLs(urls []string, role string, weights []float64) []tasks.Me
 		refs = append(refs, ref)
 	}
 	return refs
-}
-
-func isWorkflowTaskParamsKnownMapKey(key string) bool {
-	switch key {
-	case "feature",
-		"model",
-		"image_urls",
-		"reference_image_urls",
-		"mask_image_url",
-		"mask_image_urls",
-		"original_image_url",
-		"use_mask",
-		"custom_width",
-		"custom_height",
-		"original_image_width",
-		"original_image_height",
-		"ratio",
-		"quality",
-		"sample_count",
-		"output_count",
-		"image_count",
-		"prompt_upsampling",
-		"variation",
-		"extend",
-		"hd",
-		"fusion":
-		return true
-	default:
-		return false
-	}
 }
 
 func readBoolParam(params map[string]interface{}, key string) (bool, bool) {

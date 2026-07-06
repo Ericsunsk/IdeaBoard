@@ -270,11 +270,24 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 	})
 
 	t.Run("reject non-structured feature params", func(t *testing.T) {
-		err := validateSubmitTaskMediaParams(map[string]interface{}{
-			"variation_strength": 42,
-		})
-		if err == nil {
-			t.Fatalf("expected structured param validation error")
+		tests := []string{
+			"variation_strength",
+			"extend_top",
+			"extend_right",
+			"extend_bottom",
+			"extend_left",
+			"clarity_strength",
+			"fusion_input_weights",
+		}
+		for _, key := range tests {
+			t.Run(key, func(t *testing.T) {
+				err := validateSubmitTaskMediaParams(map[string]interface{}{
+					key: 42,
+				})
+				if err == nil {
+					t.Fatalf("expected structured param validation error")
+				}
+			})
 		}
 	})
 
@@ -491,6 +504,78 @@ func TestWorkflowTaskParamsFromMapPreservesExtraAndFusionContract(t *testing.T) 
 	}
 	if got := typedParams.Extra["provider_only"]; got != "keep-me" {
 		t.Fatalf("provider_only extra = %#v, want keep-me", got)
+	}
+}
+
+func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *testing.T) {
+	params := map[string]interface{}{
+		"feature": "image-extend",
+		"model":   "gpt-image-1",
+		"image_urls": []string{
+			"https://example.com/source.png",
+		},
+		"reference_image_urls": []string{
+			"https://example.com/ref.png",
+		},
+		"mask_image_url":          "https://example.com/mask.png",
+		"original_image_url":      "https://example.com/source.png",
+		"use_mask":                true,
+		"custom_width":            640,
+		"custom_height":           480,
+		"original_image_width":    1024,
+		"original_image_height":   768,
+		"ratio":                   "4:3",
+		"quality":                 "high",
+		"sample_count":            1,
+		"output_count":            2,
+		"image_count":             2,
+		"prompt_upsampling":       false,
+		"extend":                  map[string]interface{}{"top_percent": 0, "right_percent": 25, "bottom_percent": 0, "left_percent": 0},
+		"provider_specific_param": "keep-me",
+	}
+
+	typedParams, err := workflowTaskParamsFromMap(params, workflow.FeatureSlugImageExtend)
+	if err != nil {
+		t.Fatalf("workflowTaskParamsFromMap returned error: %v", err)
+	}
+	if typedParams.Extra == nil {
+		t.Fatalf("Extra is nil, want provider-specific param preserved")
+	}
+	if got := typedParams.Extra["provider_specific_param"]; got != "keep-me" {
+		t.Fatalf("provider_specific_param extra = %#v, want keep-me", got)
+	}
+	for _, key := range []string{
+		"feature",
+		"model",
+		"image_urls",
+		"reference_image_urls",
+		"mask_image_url",
+		"original_image_url",
+		"use_mask",
+		"custom_width",
+		"custom_height",
+		"original_image_width",
+		"original_image_height",
+		"ratio",
+		"quality",
+		"sample_count",
+		"output_count",
+		"image_count",
+		"prompt_upsampling",
+		"extend",
+	} {
+		if _, exists := typedParams.Extra[key]; exists {
+			t.Fatalf("known submit param %s leaked into Extra: %#v", key, typedParams.Extra)
+		}
+	}
+	if typedParams.Media == nil || typedParams.Media.Mask == nil || typedParams.Media.Original == nil || typedParams.Media.UseMask == nil {
+		t.Fatalf("media = %#v, want input/reference/mask/original/use_mask", typedParams.Media)
+	}
+	if typedParams.Controls == nil || typedParams.Controls.CustomWidth != 640 || typedParams.Controls.OutputCount != 2 {
+		t.Fatalf("controls = %#v, want canonical controls", typedParams.Controls)
+	}
+	if typedParams.Extend == nil || typedParams.Extend.RightPercent != 25 {
+		t.Fatalf("extend = %#v, want right_percent 25", typedParams.Extend)
 	}
 }
 

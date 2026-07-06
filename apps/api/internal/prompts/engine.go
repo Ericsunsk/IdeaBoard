@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 type promptParamReader func(map[string]interface{}, string) (interface{}, bool)
@@ -35,8 +36,8 @@ var featurePromptVariableProviders = map[string]featurePromptVariableProvider{
 var featurePromptBindings = map[string][]promptTemplateBinding{
 	workflow.FeatureSlugStyleFusion: {
 		{
-			placeholder: "{{fusion_input_weights}}",
-			paramKey:    "fusion.input_weights",
+			placeholder: paramkeys.PromptPlaceholderFusionInputWeights,
+			paramKey:    paramkeys.PromptPathFusionInputWeights,
 			reader:      readStyleFusionInputWeightsPromptParam,
 			formatter:   formatImageWeightsTemplateValue,
 		},

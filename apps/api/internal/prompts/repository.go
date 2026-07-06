@@ -12,6 +12,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 type FeaturePromptRepository struct {
@@ -255,23 +256,23 @@ func defaultPromptVariables(slug string) []FeaturePromptVariable {
 	case workflow.FeatureSlugPartialEdit, workflow.FeatureSlugPatternGen:
 		return promptVariables("{{user_prompt}}")
 	case workflow.FeatureSlugStyleVariation:
-		return []FeaturePromptVariable{{Key: "{{variation_strength}}", Tone: "control"}}
+		return []FeaturePromptVariable{{Key: paramkeys.PromptPlaceholderVariationStrength, Tone: "control"}}
 	case workflow.FeatureSlugStyleFusion:
 		return []FeaturePromptVariable{
 			{Key: "{{user_prompt}}", Tone: "prompt"},
-			{Key: "{{fusion_input_weights}}", Tone: "control"},
+			{Key: paramkeys.PromptPlaceholderFusionInputWeights, Tone: "control"},
 		}
 	case workflow.FeatureSlugHDUpscale:
 		return []FeaturePromptVariable{
-			{Key: "{{clarity_strength}}", Tone: "control"},
+			{Key: paramkeys.PromptPlaceholderClarityStrength, Tone: "control"},
 		}
 	case workflow.FeatureSlugImageExtend:
 		return []FeaturePromptVariable{
 			{Key: "{{user_prompt}}", Tone: "prompt"},
-			{Key: "{{extend_top_percent}}", Tone: "control"},
-			{Key: "{{extend_right_percent}}", Tone: "control"},
-			{Key: "{{extend_bottom_percent}}", Tone: "control"},
-			{Key: "{{extend_left_percent}}", Tone: "control"},
+			{Key: paramkeys.PromptPlaceholderExtendTopPercent, Tone: "control"},
+			{Key: paramkeys.PromptPlaceholderExtendRightPercent, Tone: "control"},
+			{Key: paramkeys.PromptPlaceholderExtendBottomPercent, Tone: "control"},
+			{Key: paramkeys.PromptPlaceholderExtendLeftPercent, Tone: "control"},
 		}
 	default:
 		return []FeaturePromptVariable{}

@@ -3,13 +3,15 @@ package workflow
 import (
 	"fmt"
 	"math"
+
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 const (
-	ParamKeyVariation = "variation"
-	ParamKeyExtend    = "extend"
-	ParamKeyHD        = "hd"
-	ParamKeyFusion    = "fusion"
+	ParamKeyVariation = paramkeys.Variation
+	ParamKeyExtend    = paramkeys.Extend
+	ParamKeyHD        = paramkeys.HD
+	ParamKeyFusion    = paramkeys.Fusion
 )
 
 type StyleVariationPromptContract struct {
@@ -32,7 +34,7 @@ func ReadStyleVariationPromptContract(params map[string]interface{}) (StyleVaria
 	if !ok {
 		return StyleVariationPromptContract{}, false
 	}
-	strength, ok := readNumberField(obj, "strength")
+	strength, ok := readNumberField(obj, paramkeys.Strength)
 	if !ok {
 		return StyleVariationPromptContract{}, false
 	}
@@ -41,7 +43,7 @@ func ReadStyleVariationPromptContract(params map[string]interface{}) (StyleVaria
 
 func (c StyleVariationPromptContract) PromptVariables() map[string]interface{} {
 	return map[string]interface{}{
-		"{{variation_strength}}": formatPercentControl(c.Strength),
+		paramkeys.PromptPlaceholderVariationStrength: formatPercentControl(c.Strength),
 	}
 }
 
@@ -50,19 +52,19 @@ func ReadImageExtendPromptContract(params map[string]interface{}) (ImageExtendPr
 	if !ok {
 		return ImageExtendPromptContract{}, false
 	}
-	top, ok := readNumberField(obj, "top_percent")
+	top, ok := readNumberField(obj, paramkeys.TopPercent)
 	if !ok {
 		return ImageExtendPromptContract{}, false
 	}
-	right, ok := readNumberField(obj, "right_percent")
+	right, ok := readNumberField(obj, paramkeys.RightPercent)
 	if !ok {
 		return ImageExtendPromptContract{}, false
 	}
-	bottom, ok := readNumberField(obj, "bottom_percent")
+	bottom, ok := readNumberField(obj, paramkeys.BottomPercent)
 	if !ok {
 		return ImageExtendPromptContract{}, false
 	}
-	left, ok := readNumberField(obj, "left_percent")
+	left, ok := readNumberField(obj, paramkeys.LeftPercent)
 	if !ok {
 		return ImageExtendPromptContract{}, false
 	}
@@ -76,10 +78,10 @@ func ReadImageExtendPromptContract(params map[string]interface{}) (ImageExtendPr
 
 func (c ImageExtendPromptContract) PromptVariables() map[string]interface{} {
 	return map[string]interface{}{
-		"{{extend_top_percent}}":    formatPercentControl(c.TopPercent),
-		"{{extend_right_percent}}":  formatPercentControl(c.RightPercent),
-		"{{extend_bottom_percent}}": formatPercentControl(c.BottomPercent),
-		"{{extend_left_percent}}":   formatPercentControl(c.LeftPercent),
+		paramkeys.PromptPlaceholderExtendTopPercent:    formatPercentControl(c.TopPercent),
+		paramkeys.PromptPlaceholderExtendRightPercent:  formatPercentControl(c.RightPercent),
+		paramkeys.PromptPlaceholderExtendBottomPercent: formatPercentControl(c.BottomPercent),
+		paramkeys.PromptPlaceholderExtendLeftPercent:   formatPercentControl(c.LeftPercent),
 	}
 }
 
@@ -88,7 +90,7 @@ func ReadHDUpscalePromptContract(params map[string]interface{}) (HDUpscalePrompt
 	if !ok {
 		return HDUpscalePromptContract{}, false
 	}
-	clarity, ok := readNumberField(obj, "clarity_strength")
+	clarity, ok := readNumberField(obj, paramkeys.ClarityStrength)
 	if !ok {
 		return HDUpscalePromptContract{}, false
 	}
@@ -97,7 +99,7 @@ func ReadHDUpscalePromptContract(params map[string]interface{}) (HDUpscalePrompt
 
 func (c HDUpscalePromptContract) PromptVariables() map[string]interface{} {
 	return map[string]interface{}{
-		"{{clarity_strength}}": formatPercentControl(c.ClarityStrength),
+		paramkeys.PromptPlaceholderClarityStrength: formatPercentControl(c.ClarityStrength),
 	}
 }
 
@@ -111,7 +113,7 @@ func ReadStyleFusionPromptContract(params map[string]interface{}) (StyleFusionPr
 	if !ok {
 		return StyleFusionPromptContract{}, false
 	}
-	mode, _ := readStringField(obj, "mode")
+	mode, _ := readStringField(obj, paramkeys.Mode)
 	weights, _ := ReadStyleFusionInputWeights(params)
 	if len(weights) == 0 {
 		return StyleFusionPromptContract{}, false
@@ -121,7 +123,7 @@ func ReadStyleFusionPromptContract(params map[string]interface{}) (StyleFusionPr
 
 func (c StyleFusionPromptContract) PromptVariables() map[string]interface{} {
 	return map[string]interface{}{
-		"{{fusion_input_weights}}": c.InputWeights,
+		paramkeys.PromptPlaceholderFusionInputWeights: c.InputWeights,
 	}
 }
 
@@ -153,6 +155,10 @@ func NormalizeStructuredPromptContractParams(params map[string]interface{}, feat
 }
 
 func BuildProviderPromptParams(params map[string]interface{}) map[string]interface{} {
+	return defaultProviderParamsEncoder.EncodePromptParams(params)
+}
+
+func buildProviderPromptParams(params map[string]interface{}) map[string]interface{} {
 	if params == nil {
 		return nil
 	}
@@ -161,16 +167,16 @@ func BuildProviderPromptParams(params map[string]interface{}) map[string]interfa
 		out[key] = value
 	}
 	if contract, ok := ReadStyleVariationPromptContract(params); ok {
-		out["variation_strength"] = contract.Strength
+		out[paramkeys.VariationStrength] = contract.Strength
 	}
 	if contract, ok := ReadImageExtendPromptContract(params); ok {
-		out["extend_top"] = contract.TopPercent
-		out["extend_right"] = contract.RightPercent
-		out["extend_bottom"] = contract.BottomPercent
-		out["extend_left"] = contract.LeftPercent
+		out[paramkeys.ExtendTop] = contract.TopPercent
+		out[paramkeys.ExtendRight] = contract.RightPercent
+		out[paramkeys.ExtendBottom] = contract.BottomPercent
+		out[paramkeys.ExtendLeft] = contract.LeftPercent
 	}
 	if contract, ok := ReadStyleFusionPromptContract(params); ok {
-		out["fusion_input_weights"] = contract.InputWeights
+		out[paramkeys.FusionInputWeights] = contract.InputWeights
 	}
 	return out
 }
@@ -180,11 +186,11 @@ func normalizeStyleVariationContract(params map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	strength, ok := readNumberField(obj, "strength")
+	strength, ok := readNumberField(obj, paramkeys.Strength)
 	if !ok {
 		return fmt.Errorf("variation.strength 必须是数字")
 	}
-	obj["strength"] = clampPercent(strength)
+	obj[paramkeys.Strength] = clampPercent(strength)
 	params[ParamKeyVariation] = obj
 	return nil
 }
@@ -195,7 +201,7 @@ func normalizeImageExtendContract(params map[string]interface{}) error {
 		return err
 	}
 	hasExtension := false
-	for _, key := range []string{"top_percent", "right_percent", "bottom_percent", "left_percent"} {
+	for _, key := range []string{paramkeys.TopPercent, paramkeys.RightPercent, paramkeys.BottomPercent, paramkeys.LeftPercent} {
 		value, ok := readNumberField(obj, key)
 		if !ok {
 			return fmt.Errorf("extend.%s 必须是数字", key)
@@ -218,11 +224,11 @@ func normalizeHDUpscaleContract(params map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	clarity, ok := readNumberField(obj, "clarity_strength")
+	clarity, ok := readNumberField(obj, paramkeys.ClarityStrength)
 	if !ok {
 		return fmt.Errorf("hd.clarity_strength 必须是数字")
 	}
-	obj["clarity_strength"] = clampPercent(clarity)
+	obj[paramkeys.ClarityStrength] = clampPercent(clarity)
 	params[ParamKeyHD] = obj
 	return nil
 }
@@ -236,8 +242,8 @@ func normalizeStyleFusionContract(params map[string]interface{}) error {
 	if !ok || len(weights) == 0 {
 		return fmt.Errorf("fusion.input_weights 至少需要一个权重")
 	}
-	obj["input_weights"] = weights
-	obj["mode"] = "weighted_reference"
+	obj[paramkeys.InputWeights] = weights
+	obj[paramkeys.Mode] = "weighted_reference"
 	params[ParamKeyFusion] = obj
 	return nil
 }

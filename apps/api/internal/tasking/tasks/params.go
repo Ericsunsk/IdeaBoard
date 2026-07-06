@@ -3,6 +3,8 @@ package tasks
 import (
 	"encoding/json"
 	"fmt"
+
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 // SchemaVersion tracks the WorkflowTaskParams schema carried by task records.
@@ -125,7 +127,7 @@ func (p *WorkflowTaskParams) UnmarshalJSON(data []byte) error {
 	}
 	extra := map[string]interface{}{}
 	for key, value := range raw {
-		if knownWorkflowTaskParamKey(key) {
+		if paramkeys.IsCanonicalTaskParamKey(key) {
 			continue
 		}
 		var decoded interface{}
@@ -147,22 +149,4 @@ func (p *WorkflowTaskParams) UnmarshalJSON(data []byte) error {
 		p.SchemaVersion = CurrentParamsSchemaVersion
 	}
 	return nil
-}
-
-func knownWorkflowTaskParamKey(key string) bool {
-	switch key {
-	case "schema_version",
-		"feature",
-		"model",
-		"media",
-		"controls",
-		"variation",
-		"extend",
-		"hd",
-		"fusion",
-		"extra":
-		return true
-	default:
-		return false
-	}
 }

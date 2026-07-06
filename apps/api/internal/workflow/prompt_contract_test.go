@@ -126,6 +126,110 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 	}
 }
 
+func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
+	tests := []struct {
+		name       string
+		params     *tasks.WorkflowTaskParams
+		want       map[string]interface{}
+		wantAbsent []string
+	}{
+		{
+			name: "style variation",
+			params: &tasks.WorkflowTaskParams{
+				Feature:   FeatureSlugStyleVariation,
+				Variation: &tasks.StyleVariationParams{Strength: 42},
+				Extra: map[string]interface{}{
+					"provider_hint":      "keep",
+					"variation_strength": 99,
+					"output_quality":     "high",
+					"upscale_factor":     4,
+				},
+			},
+			want: map[string]interface{}{
+				"feature":            FeatureSlugStyleVariation,
+				"variation":          map[string]interface{}{"strength": float64(42)},
+				"variation_strength": float64(42),
+				"provider_hint":      "keep",
+			},
+			wantAbsent: []string{"output_quality", "upscale_factor"},
+		},
+		{
+			name: "image extend",
+			params: &tasks.WorkflowTaskParams{
+				Feature: FeatureSlugImageExtend,
+				Extend: &tasks.ImageExtendParams{
+					TopPercent:    1,
+					RightPercent:  2,
+					BottomPercent: 3,
+					LeftPercent:   4,
+				},
+			},
+			want: map[string]interface{}{
+				"feature":       FeatureSlugImageExtend,
+				"extend":        map[string]interface{}{"top_percent": float64(1), "right_percent": float64(2), "bottom_percent": float64(3), "left_percent": float64(4)},
+				"extend_top":    float64(1),
+				"extend_right":  float64(2),
+				"extend_bottom": float64(3),
+				"extend_left":   float64(4),
+			},
+		},
+		{
+			name: "hd upscale",
+			params: &tasks.WorkflowTaskParams{
+				Feature: FeatureSlugHDUpscale,
+				HD:      &tasks.HDUpscaleParams{ClarityStrength: 75},
+			},
+			want: map[string]interface{}{
+				"feature": FeatureSlugHDUpscale,
+				"hd":      map[string]interface{}{"clarity_strength": float64(75)},
+			},
+			wantAbsent: []string{"clarity_strength", "output_quality"},
+		},
+		{
+			name: "style fusion",
+			params: &tasks.WorkflowTaskParams{
+				Feature: FeatureSlugStyleFusion,
+				Fusion: &tasks.StyleFusionParams{
+					Mode:         "weighted_reference",
+					InputWeights: []float64{0.8, 0.2},
+				},
+			},
+			want: map[string]interface{}{
+				"feature":              FeatureSlugStyleFusion,
+				"fusion":               map[string]interface{}{"mode": "weighted_reference", "input_weights": []float64{0.8, 0.2}},
+				"fusion_input_weights": []float64{0.8, 0.2},
+			},
+		},
+		{
+			name: "prompt workflow",
+			params: &tasks.WorkflowTaskParams{
+				Feature: FeatureSlugPatternGen,
+				Extra:   map[string]interface{}{"provider_hint": "keep"},
+			},
+			want: map[string]interface{}{
+				"feature":       FeatureSlugPatternGen,
+				"provider_hint": "keep",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			providerParams := BuildProviderTaskParams(tt.params)
+			for key, want := range tt.want {
+				if got := providerParams[key]; !reflect.DeepEqual(got, want) {
+					t.Fatalf("%s = %#v, want %#v; provider params=%#v", key, got, want, providerParams)
+				}
+			}
+			for _, key := range tt.wantAbsent {
+				if _, exists := providerParams[key]; exists {
+					t.Fatalf("did not expect %s in provider params: %#v", key, providerParams)
+				}
+			}
+		})
+	}
+}
+
 func TestStyleFusionPromptContractUsesPublishedWeightsVariable(t *testing.T) {
 	params := map[string]interface{}{
 		ParamKeyFusion: map[string]interface{}{

@@ -5,6 +5,8 @@ import (
 	"math"
 	"regexp"
 	"strings"
+
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
@@ -95,7 +97,7 @@ func ReadWorkflowStringParam(params map[string]interface{}, canonicalKey string)
 }
 
 func ReadStyleFusionInputWeights(params map[string]interface{}) ([]float64, bool) {
-	rawFusion, ok := ReadWorkflowParam(params, "fusion")
+	rawFusion, ok := ReadWorkflowParam(params, paramkeys.Fusion)
 	if !ok {
 		return nil, false
 	}
@@ -103,7 +105,7 @@ func ReadStyleFusionInputWeights(params map[string]interface{}) ([]float64, bool
 	if !ok {
 		return nil, false
 	}
-	rawWeights, ok := fusion["input_weights"]
+	rawWeights, ok := fusion[paramkeys.InputWeights]
 	if !ok {
 		return nil, false
 	}
@@ -177,7 +179,7 @@ func readFiniteNumber(value interface{}) (float64, bool) {
 }
 
 func ResolveWorkflowFeatureSlug(params map[string]interface{}) (string, error) {
-	rawFeature, ok := ReadWorkflowStringParam(params, "feature")
+	rawFeature, ok := ReadWorkflowStringParam(params, paramkeys.Feature)
 	if !ok {
 		return "", nil
 	}
