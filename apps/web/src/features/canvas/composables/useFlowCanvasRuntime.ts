@@ -1,8 +1,7 @@
 import type { Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useFlowHistory, type FlowHistorySnapshot } from './useFlowHistory'
-import { useFlowBoardPersistence } from './useFlowBoardPersistence'
-import { useFlowAutosave } from './useFlowAutosave'
+import { useCanvasBoardAutosave, useCanvasBoardPersistence } from '../board-session'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphActions,
@@ -206,7 +205,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       graphAdapter.replaceEdges(edges as Edge[], createRestoreGraphCommandOptions()),
   })
 
-  const boardPersistence = useFlowBoardPersistence({
+  const boardPersistence = useCanvasBoardPersistence({
     fullNodes: options.nodes,
     fullEdges: options.edges,
     boardBaseSnapshot: options.boardBaseSnapshot,
@@ -236,7 +235,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
   const canSaveBoard = boardPersistence.canSaveBoard
 
-  const { markDirtyAndSchedule, flushAutosave } = useFlowAutosave({
+  const { markDirtyAndSchedule, flushAutosave } = useCanvasBoardAutosave({
     isDirty: options.isDirty,
     isSaving: options.isSavingBoard,
     canRun: () => !isNodeDragActive,

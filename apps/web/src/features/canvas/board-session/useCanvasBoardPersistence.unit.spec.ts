@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
-import type { CanvasBoardSession } from '../board-session'
+import type { CanvasBoardSession } from './useCanvasBoardSession'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { FlowAdapterEdge, FlowAdapterNode } from '../utils/flowSnapshotAdapter'
-import { useFlowBoardPersistence } from './useFlowBoardPersistence'
+import { useCanvasBoardPersistence } from './useCanvasBoardPersistence'
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn(),
@@ -40,7 +40,7 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     refreshPreview: vi.fn(),
   }
 
-  const persistence = useFlowBoardPersistence({
+  const persistence = useCanvasBoardPersistence({
     fullNodes,
     fullEdges,
     boardBaseSnapshot,
@@ -135,16 +135,15 @@ async function waitForPendingSave() {
   throw new Error('save did not start')
 }
 
-describe('useFlowBoardPersistence', () => {
+describe('useCanvasBoardPersistence', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.resolveSave = undefined
     mocks.load.mockResolvedValue(createEmptyCanvasBoardSnapshot())
-    mocks.save.mockImplementation(
-      (snapshot: CanvasBoardSnapshot) =>
-        new Promise<void>((resolve) => {
-          mocks.resolveSave = resolve
-        }).then(() => ({ snapshot, remoteSync: { ok: true } })),
+    mocks.save.mockImplementation((snapshot: CanvasBoardSnapshot) =>
+      new Promise<void>((resolve) => {
+        mocks.resolveSave = resolve
+      }).then(() => ({ snapshot, remoteSync: { ok: true } })),
     )
   })
 
@@ -197,9 +196,7 @@ describe('useFlowBoardPersistence', () => {
     expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('failed')
-    expect(harness.onWarning).toHaveBeenCalledWith(
-      '已保存到本地，远端同步失败，将在网络恢复后重试',
-    )
+    expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
     expect(harness.onSuccess).not.toHaveBeenCalled()
     expect(harness.onError).not.toHaveBeenCalled()
   })
@@ -218,9 +215,7 @@ describe('useFlowBoardPersistence', () => {
     expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('failed')
-    expect(harness.onError).toHaveBeenCalledWith(
-      '已保存到本地，但画布名称已存在，请更换后再试',
-    )
+    expect(harness.onError).toHaveBeenCalledWith('已保存到本地，但画布名称已存在，请更换后再试')
     expect(harness.onWarning).not.toHaveBeenCalled()
     expect(harness.onSuccess).not.toHaveBeenCalled()
   })

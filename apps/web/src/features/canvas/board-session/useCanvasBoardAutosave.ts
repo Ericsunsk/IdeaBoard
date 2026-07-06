@@ -2,7 +2,7 @@ import { useDebounceFn, useDocumentVisibility, useOnline } from '@vueuse/core'
 import { ref, watch, type Ref } from 'vue'
 import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
 
-type UseFlowAutosaveOptions = {
+export type UseCanvasBoardAutosaveOptions = {
   isDirty: Ref<boolean>
   isSaving: Ref<boolean>
   save: (options?: { silent?: boolean }) => Promise<boolean>
@@ -10,7 +10,7 @@ type UseFlowAutosaveOptions = {
   delay?: number
 }
 
-export function useFlowAutosave(options: UseFlowAutosaveOptions) {
+export function useCanvasBoardAutosave(options: UseCanvasBoardAutosaveOptions) {
   const delay = options.delay ?? 1200
   const visibility = useDocumentVisibility()
   const online = useOnline()

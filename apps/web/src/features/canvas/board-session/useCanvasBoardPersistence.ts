@@ -7,7 +7,7 @@ import {
 } from '../utils/flowSnapshotAdapter'
 import { isBoardNameConflictError } from '../../canvas-board/catalog/boardSync'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
-import type { CanvasBoardSession } from '../board-session'
+import type { CanvasBoardSession } from './useCanvasBoardSession'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
@@ -35,7 +35,7 @@ type FlowGraphCommitOptions = {
   preserveSelection?: boolean
 }
 
-export type UseFlowBoardPersistenceOptions = {
+export type UseCanvasBoardPersistenceOptions = {
   fullNodes: ArrayRef
   fullEdges: ArrayRef
   boardBaseSnapshot: ValueRef<CanvasBoardSnapshot>
@@ -57,7 +57,7 @@ export type UseFlowBoardPersistenceOptions = {
   onGraphCommitted?: () => void
 }
 
-export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions) {
+export function useCanvasBoardPersistence(options: UseCanvasBoardPersistenceOptions) {
   let saveSequence = 0
   let loadSequence = 0
 
@@ -116,7 +116,9 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
             zoom: Math.max(0.1, vp.zoomLevel / 100),
           }
         : undefined
-    options.commitGraph(flow as { nodes: unknown[]; edges: unknown[] }, { preserveSelection: false })
+    options.commitGraph(flow as { nodes: unknown[]; edges: unknown[] }, {
+      preserveSelection: false,
+    })
     if (
       vp &&
       typeof vp.canvasX === 'number' &&
@@ -244,7 +246,9 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
         const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
         const isRemoteSynced = remoteSync.ok
         if (!hasPendingImageResultNode(options.fullNodes.value)) {
-          options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] }, { preserveSelection: true })
+          options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] }, {
+            preserveSelection: true,
+          })
           if (isRemoteSynced) {
             options.clearFlowHistoryBaseline()
           }

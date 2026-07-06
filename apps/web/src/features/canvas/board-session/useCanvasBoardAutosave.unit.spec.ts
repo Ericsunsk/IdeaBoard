@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { useFlowAutosave } from './useFlowAutosave'
+import { useCanvasBoardAutosave } from './useCanvasBoardAutosave'
 
 async function flushPromises() {
   await Promise.resolve()
   await Promise.resolve()
 }
 
-describe('useFlowAutosave', () => {
+describe('useCanvasBoardAutosave', () => {
   it('defers saves while autosave is gated and flushes when it can run', async () => {
     vi.useFakeTimers()
     try {
@@ -15,7 +15,7 @@ describe('useFlowAutosave', () => {
       const isSaving = ref(false)
       const canRun = ref(false)
       const save = vi.fn(async () => true)
-      const autosave = useFlowAutosave({
+      const autosave = useCanvasBoardAutosave({
         isDirty,
         isSaving,
         canRun: () => canRun.value,
