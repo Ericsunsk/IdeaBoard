@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useTaskResultDetail } from './useTaskResultDetail'
-import { getSafeTaskResultImageUrl, isAllowedResultImageUrl } from './taskResultImages'
+import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from './taskResultImages'
 import type { Task } from '../../../shared/api/task'
 
 describe('task result image URL validation', () => {
@@ -9,7 +9,7 @@ describe('task result image URL validation', () => {
     '/uploads/tasks/1/task/output.png?version=1',
     new URL('/uploads/tasks/1/task/output.png', window.location.origin).toString(),
   ])('allows %s', (url) => {
-    expect(isAllowedResultImageUrl(url)).toBe(true)
+    expect(getSafeResultImageUrl(url)).not.toBe('')
   })
 
   it.each([
@@ -26,7 +26,7 @@ describe('task result image URL validation', () => {
     '/uploads/../admin-secret.png',
     '/\\evil',
   ])('rejects %s', (url) => {
-    expect(isAllowedResultImageUrl(url)).toBe(false)
+    expect(getSafeResultImageUrl(url)).toBe('')
   })
 
   it('extracts the first safe task result image URL', () => {

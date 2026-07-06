@@ -60,10 +60,6 @@ export function getSafeResultImageUrl(rawUrl: string): string {
   return resolved
 }
 
-export function isAllowedResultImageUrl(rawUrl: string): boolean {
-  return getSafeResultImageUrl(rawUrl) !== ''
-}
-
 export function getSafeTaskResultImageUrl(result: string): string {
   try {
     const parsed = JSON.parse(result)
