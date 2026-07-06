@@ -174,7 +174,7 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   border: none;
   backdrop-filter: none;
   box-shadow: none;
-  z-index: 14;
+  z-index: 30;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;

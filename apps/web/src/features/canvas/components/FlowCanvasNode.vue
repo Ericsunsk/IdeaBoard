@@ -44,6 +44,7 @@
               :snapshot-node="data.snapshotNode"
               :ui-state="props.uiState"
               :show-handles="showHandleControlsGated"
+              :disabled="disableHandleRailInteraction"
               @request-internals-update="requestNodeInternalsUpdate"
             />
           </div>
@@ -102,6 +103,7 @@
                 :snapshot-node="data.snapshotNode"
                 :ui-state="props.uiState"
                 :show-handles="showHandleControlsGated"
+                :disabled="disableHandleRailInteraction"
                 @request-internals-update="requestNodeInternalsUpdate"
               />
             </div>
@@ -145,6 +147,7 @@
                 :snapshot-node="data.snapshotNode"
                 :ui-state="props.uiState"
                 :show-handles="showHandleControlsGated"
+                :disabled="disableHandleRailInteraction"
                 @request-internals-update="requestNodeInternalsUpdate"
               />
             </div>
@@ -481,15 +484,4 @@ function noopMouse() {}
   overflow: visible;
 }
 
-.flow-canvas-node__handle-rail.is-disabled :deep(.flow-canvas-node__handle-aggregate),
-.flow-canvas-node__handle-rail.is-disabled :deep(.flow-canvas-node__handle-plus),
-.flow-canvas-node__handle-rail.is-disabled :deep(.flow-canvas-node__handle-aggregate::before) {
-  pointer-events: none;
-  opacity: 0;
-}
-
-.flow-canvas-node :deep(.image-action-menu) {
-  top: calc(100% + 10px);
-  z-index: 30;
-}
 </style>

@@ -17,12 +17,12 @@
     :class="[
       'flow-canvas-node__handle-aggregate',
       'flow-canvas-node__handle-aggregate--input',
-      { 'is-visible': props.showHandles },
+      { 'is-visible': areAggregateHandlesVisible, 'is-disabled': props.disabled },
     ]"
     :style="leftCenteredHandleStyle"
-    :aria-hidden="props.showHandles ? undefined : 'true'"
+    :aria-hidden="areAggregateHandlesVisible ? undefined : 'true'"
     :aria-label="inputAggregateAriaLabel"
-    :tabindex="props.showHandles ? 0 : -1"
+    :tabindex="areAggregateHandlesVisible ? 0 : -1"
     title="拖拽创建输入连接"
   >
     <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
@@ -36,12 +36,12 @@
     :class="[
       'flow-canvas-node__handle-aggregate',
       'flow-canvas-node__handle-aggregate--output',
-      { 'is-visible': props.showHandles },
+      { 'is-visible': areAggregateHandlesVisible, 'is-disabled': props.disabled },
     ]"
     :style="rightCenteredHandleStyle"
-    :aria-hidden="props.showHandles ? undefined : 'true'"
+    :aria-hidden="areAggregateHandlesVisible ? undefined : 'true'"
     :aria-label="outputAggregateAriaLabel"
-    :tabindex="props.showHandles ? 0 : -1"
+    :tabindex="areAggregateHandlesVisible ? 0 : -1"
     title="拖拽创建输出连接"
   >
     <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
@@ -73,6 +73,7 @@ const props = defineProps<{
   snapshotNode: unknown
   uiState?: NodeUiState | PromptNodeUiState
   showHandles?: boolean
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -97,7 +98,8 @@ function getCanvasNodeVisiblePortsForKind(direction: 'input' | 'output'): Canvas
 const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))
 const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('output'))
 const hasInputPorts = computed(() => handleInputPorts.value.length > 0)
-const areAggregateHandlesConnectable = computed(() => props.showHandles === true)
+const areAggregateHandlesVisible = computed(() => props.showHandles === true && !props.disabled)
+const areAggregateHandlesConnectable = computed(() => areAggregateHandlesVisible.value)
 const nodeKindLabel = computed(() => {
   const labels: Partial<Record<FlowNodeData['kind'], string>> = {
     prompt: '提示词节点',
