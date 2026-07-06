@@ -3,5 +3,5 @@
 </template>
 
 <script setup lang="ts">
-import BoardsPage from '../../boards/pages/BoardsPage.vue'
+import BoardsPage from '../../board-catalog/pages/BoardsPage.vue'
 </script>

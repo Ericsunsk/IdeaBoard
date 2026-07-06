@@ -1,18 +1,10 @@
 import { ref, type Ref } from 'vue'
-import type { CanvasBoardState } from '../../canvas-board/domain'
-import {
-  getCanvasBoardState,
-  setCanvasBoardPreviewSnapshot,
-} from '../../canvas-board/persistence'
-import {
-  BOARD_PREVIEW_RENDERER_VERSION,
-  renderBoardPreviewDataUrl,
-} from '../../canvas-board/preview'
-import {
-  isBoardNameConflictError,
-  syncCanvasBoardToServer,
-} from '../../canvas-board/catalog/boardSync'
-import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
+import type { CanvasBoardState } from '../domain'
+import { getCanvasBoardState, setCanvasBoardPreviewSnapshot } from '../persistence'
+import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
+import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
+import { isBoardNameConflictError, syncCanvasBoardToServer } from '../catalog/boardSync'
+import type { CanvasBoardMeta } from '../catalog/canvasBoards'
 
 export interface BoardPreviewRefreshQueueDependencies {
   getBoardState: (boardId: string) => CanvasBoardState | null

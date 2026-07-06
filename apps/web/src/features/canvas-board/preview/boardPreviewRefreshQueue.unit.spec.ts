@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import type { CanvasBoardState } from '../../canvas-board/domain'
-import { createEmptyCanvasBoardState } from '../../canvas-board/domain'
+import type { CanvasBoardState } from '../domain'
+import { createEmptyCanvasBoardState } from '../domain'
 import {
   createBoardPreviewRefreshQueue,
   type BoardPreviewRefreshQueueDependencies,
 } from './boardPreviewRefreshQueue'
-import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
+import type { CanvasBoardMeta } from '../catalog/canvasBoards'
 
 function makeBoard(id: string): CanvasBoardMeta {
   return {

@@ -191,7 +191,7 @@ import { hydrateCanvasBoardsFromServer } from '../../canvas-board/catalog/boardS
 import { createCanvasBoardCommands } from '../../canvas-board/catalog/canvasBoardCommands'
 import BoardCard from '../components/BoardCard.vue'
 import { useBoardFeedback } from '../feedback/useBoardFeedback'
-import { createBoardPreviewRefreshQueue } from '../lib/boardPreviewRefreshQueue'
+import { createBoardPreviewRefreshQueue } from '../../canvas-board/preview'
 import {
   boardCatalogClasses,
   boardCatalogDeleteDialogPt,
