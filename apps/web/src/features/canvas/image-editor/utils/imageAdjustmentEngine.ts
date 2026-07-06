@@ -11,7 +11,6 @@ import {
 } from './imageAdjustmentDefinitions'
 import { createCurvesLuts, type ImageEditorCurvesLuts } from './imageEditorCurves'
 import { createLevelsLut } from './imageEditorLevels'
-import { cloneImageData } from './imageDataUtils'
 
 export type ImageAdjustmentPlanStep =
   | { kind: 'hsl'; params: NormalizedHslAdjustment }
@@ -32,15 +31,6 @@ export type ImageAdjustmentPlanStepExecutionState =
   | null
 
 const SHARPEN_WORK_FACTOR = 3
-
-export function applyImageAdjustments(
-  source: ImageData,
-  layers: readonly ImageEditorAdjustmentLayer[],
-): ImageData {
-  const output = cloneImageData(source)
-  applyImageAdjustmentsInPlace(output, layers)
-  return output
-}
 
 export function applyImageAdjustmentsInPlace(
   imageData: ImageData,

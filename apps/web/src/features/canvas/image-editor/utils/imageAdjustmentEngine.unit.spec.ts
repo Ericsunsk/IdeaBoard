@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ImageEditorAdjustmentLayer } from '../types'
 import {
-  applyImageAdjustments,
   applyImageAdjustmentsInPlace,
   compileImageAdjustmentPlan,
   createImageAdjustmentPlanStepExecutionState,
@@ -29,6 +28,15 @@ function makeImageData(values: number[], width = values.length / 4, height = 1) 
 
 function pixelValues(imageData: ImageData) {
   return Array.from(imageData.data)
+}
+
+function applyImageAdjustments(
+  source: ImageData,
+  layers: readonly ImageEditorAdjustmentLayer[],
+): ImageData {
+  const output = makeImageData(pixelValues(source), source.width, source.height)
+  applyImageAdjustmentsInPlace(output, layers)
+  return output
 }
 
 function makeLayer(
