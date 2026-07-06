@@ -251,6 +251,11 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	modelHealth, slowModels := buildModelHealthAndSlowModels(modelMetrics, latencyByModel)
 	bottlenecks := buildBottleneckSources(bottleneckRows)
 	failures := buildFailureCategories(failureCategoryRows)
+	var thisMonthCalls, thisMonthCancelled int64
+	for _, row := range monthRows {
+		thisMonthCalls += row.Total
+		thisMonthCancelled += row.Cancelled
+	}
 
 	return &AdminStatisticsResponse{
 		Summary: AdminStatisticsSummary{
@@ -263,8 +268,8 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 			YesterdaySuccess:   yesterdaySuccess,
 			YesterdayFailed:    yesterdayFailed,
 			YesterdayCancelled: yesterdayCancelled,
-			ThisMonthCalls:     sumDailyTotal(monthRows),
-			ThisMonthCancelled: sumDailyCancelled(monthRows),
+			ThisMonthCalls:     thisMonthCalls,
+			ThisMonthCancelled: thisMonthCancelled,
 			Pending:            stats[tasks.StatusPending],
 			Running:            stats[tasks.StatusRunning],
 			Completed:          stats[tasks.StatusCompleted],
@@ -667,22 +672,6 @@ func (s *Service) BackfillStatistics(ctx context.Context, rawRange string) (*Adm
 		ScannedDays:    len(missingDays),
 		BackfilledDays: backfilledCount,
 	}, nil
-}
-
-func sumDailyTotal(rows []taskstore.DailyStatAggregate) int64 {
-	var total int64
-	for _, row := range rows {
-		total += row.Total
-	}
-	return total
-}
-
-func sumDailyCancelled(rows []taskstore.DailyStatAggregate) int64 {
-	var total int64
-	for _, row := range rows {
-		total += row.Cancelled
-	}
-	return total
 }
 
 func buildMissingStatisticsDaysByMarker(rangeStart, todayStart time.Time, days int, markerDates []time.Time) []time.Time {
