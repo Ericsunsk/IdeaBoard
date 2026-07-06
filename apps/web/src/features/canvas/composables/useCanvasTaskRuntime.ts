@@ -1,11 +1,11 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import { createImageExecutionPlanner } from '../execution'
-import { useFlowImageWorkflowExecution } from '../execution/runtime/flowImageWorkflowExecution'
 import {
+  createImageExecutionPlanner,
   createImageWorkflowCommands,
   type ImageWorkflowCommands,
-} from '../execution/runtime/imageWorkflowCommandRuntime'
+  useFlowImageWorkflowExecution,
+} from '../execution'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'

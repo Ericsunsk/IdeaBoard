@@ -1,11 +1,16 @@
 import type { Node } from '@vue-flow/core'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { shallowRef, type Ref } from 'vue'
 import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import { createCanvasGraphStore } from '../../graph-runtime'
-import { useFlowImageDirectActionRunner } from './useFlowImageDirectActionRunner'
+import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
+import { useImageExecutionLifecycle } from './useImageExecutionLifecycle'
 
-vi.mock('./flowImageDirectActionExecutor', () => ({
+const pendingResultMocks = vi.hoisted(() => ({
+  usePendingImageResultExecution: vi.fn(),
+}))
+
+vi.mock('../task-runner/flowImageDirectActionExecutor', () => ({
   waitExistingOrLiveTaskImageResults: vi.fn(async () => [
     {
       url: 'https://example.com/result.png',
@@ -17,6 +22,13 @@ vi.mock('./flowImageDirectActionExecutor', () => ({
 vi.mock('../media/imageSize', () => ({
   loadImageSizeFromUrl: vi.fn(async () => ({ width: 400, height: 200 })),
 }))
+vi.mock('../result-nodes/usePendingImageResultNodes', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../result-nodes/usePendingImageResultNodes')>()
+  return {
+    ...actual,
+    usePendingImageResultExecution: pendingResultMocks.usePendingImageResultExecution,
+  }
+})
 
 type Deferred<T> = {
   promise: Promise<T>
@@ -76,7 +88,26 @@ function makePendingImageNode(nodeId: string, taskId: string): Node {
   } as Node
 }
 
-describe('useFlowImageDirectActionRunner', () => {
+function createLifecycle(pendingImageResults: PendingImageResultExecution, options = {}) {
+  const nodes = shallowRef([]) as Ref<Node[]>
+  const edges = shallowRef([])
+  pendingResultMocks.usePendingImageResultExecution.mockReturnValue(pendingImageResults)
+  return useImageExecutionLifecycle({
+    nodes,
+    edges,
+    graphAdapter: useCanvasVueFlowGraphAdapter({ nodes, edges }),
+    getCurrentBoardId: () => 'board-a',
+    onSuccess: vi.fn(),
+    onWarning: vi.fn(),
+    ...options,
+  })
+}
+
+describe('useImageExecutionLifecycle', () => {
+  beforeEach(() => {
+    pendingResultMocks.usePendingImageResultExecution.mockReset()
+  })
+
   it('runs direct image work through the pending result execution seam', async () => {
     const submitTask = createDeferred<{ taskId: string }>()
     const resolveResult = createDeferred<{ url: string; ratio: number }>()
@@ -98,16 +129,13 @@ describe('useFlowImageDirectActionRunner', () => {
     const onSuccess = vi.fn()
     const onWarning = vi.fn()
 
-    const runner = useFlowImageDirectActionRunner({
-      nodes: shallowRef([]) as Ref<Node[]>,
-      pendingImageResults,
+    const lifecycle = createLifecycle(pendingImageResults, {
       flushAutosave,
-      getCurrentBoardId: () => 'board-a',
       onSuccess,
       onWarning,
     })
 
-    const run = runner.runPendingImageBatchWorkflow({
+    const run = lifecycle.runImageExecutionBatch({
       source: {
         url: 'https://example.com/source.png',
         ratio: 1,
@@ -130,7 +158,7 @@ describe('useFlowImageDirectActionRunner', () => {
         resultOptions: undefined,
       }),
     )
-    expect(runner.isNodeDirectActionRunning('result-1')).toBe(true)
+    expect(lifecycle.isNodeDirectActionRunning('result-1')).toBe(true)
 
     submitTask.resolve({ taskId: 'task-1' })
     await flushPromises()
@@ -140,7 +168,7 @@ describe('useFlowImageDirectActionRunner', () => {
     resolveResult.resolve({ url: 'https://example.com/result.png', ratio: 1 })
     await run
 
-    expect(runner.isNodeDirectActionRunning('result-1')).toBe(false)
+    expect(lifecycle.isNodeDirectActionRunning('result-1')).toBe(false)
     expect(onSuccess).toHaveBeenCalledWith('处理完成')
     expect(onWarning).not.toHaveBeenCalled()
   })
@@ -161,15 +189,12 @@ describe('useFlowImageDirectActionRunner', () => {
     }
     const onWarning = vi.fn()
 
-    const runner = useFlowImageDirectActionRunner({
-      nodes: shallowRef([]) as Ref<Node[]>,
-      pendingImageResults,
-      getCurrentBoardId: () => 'board-a',
+    const lifecycle = createLifecycle(pendingImageResults, {
       onSuccess: vi.fn(),
       onWarning,
     })
 
-    await runner.runPendingImageBatchWorkflow({
+    await lifecycle.runImageExecutionBatch({
       source: {
         url: 'https://example.com/source.png',
         ratio: 1,
@@ -183,7 +208,7 @@ describe('useFlowImageDirectActionRunner', () => {
     })
 
     expect(onWarning).toHaveBeenCalledWith('任务进度推送超时，请稍后查看结果')
-    expect(runner.isNodeDirectActionRunning('result-1')).toBe(false)
+    expect(lifecycle.isNodeDirectActionRunning('result-1')).toBe(false)
   })
 
   it('batch materializes resolved attached pending results during reattach', async () => {
@@ -209,16 +234,19 @@ describe('useFlowImageDirectActionRunner', () => {
     const flushAutosave = vi.fn(async () => undefined)
     const onSuccess = vi.fn()
 
-    const runner = useFlowImageDirectActionRunner({
+    pendingResultMocks.usePendingImageResultExecution.mockReturnValue(pendingImageResults)
+
+    const lifecycle = useImageExecutionLifecycle({
       nodes,
-      pendingImageResults,
+      edges: shallowRef([]),
+      graphAdapter: useCanvasVueFlowGraphAdapter({ nodes, edges: shallowRef([]) }),
       flushAutosave,
       getCurrentBoardId: () => 'board-a',
       onSuccess,
       onWarning: vi.fn(),
     })
 
-    await runner.reattachPendingImageResults()
+    await lifecycle.reattachPendingImageResults()
 
     expect(pendingImageResults.resolveAttachedPendingResult).not.toHaveBeenCalled()
     expect(pendingImageResults.materializeResolvedAttachedPendingResults).toHaveBeenCalledTimes(1)
@@ -232,7 +260,7 @@ describe('useFlowImageDirectActionRunner', () => {
     )
     expect(onSuccess).toHaveBeenCalledWith('已恢复 2 个生成结果')
     expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
-    expect(runner.isNodeDirectActionRunning('image-1')).toBe(false)
-    expect(runner.isNodeDirectActionRunning('image-2.25')).toBe(false)
+    expect(lifecycle.isNodeDirectActionRunning('image-1')).toBe(false)
+    expect(lifecycle.isNodeDirectActionRunning('image-2.25')).toBe(false)
   })
 })

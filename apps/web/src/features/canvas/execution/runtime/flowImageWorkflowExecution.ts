@@ -25,56 +25,30 @@ import {
   type CanvasExtendExecutionPlan,
   type FusionExecutionPlan,
   type ImageActionExecutionPlan,
-  type ImageExecutionInput,
-  type ImageExecutionResultOptions,
   type ImageInpaintExecutionPlan,
   type ImagePromptExecutionPlan,
   type TextPromptExecutionPlan,
 } from '../planning/ImageExecutionPlan'
-import type { ResolvedTaskImageResult } from '../result-nodes/flowImageDirectActionTaskResult'
 import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpaintTaskResult'
-import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import {
   assertTaskRequestReady,
   submitTaskRequest,
   waitExistingOrLiveTaskImageResults,
 } from '../task-runner/flowImageDirectActionExecutor'
-import { useFlowImageDirectActionRunner } from '../task-runner/useFlowImageDirectActionRunner'
+import {
+  useImageExecutionLifecycle,
+  type ImageExecutionLifecycle,
+} from './useImageExecutionLifecycle'
 
 type TaskSubmissionCallbacks = {
   assertReady?: () => Promise<void>
   submitTask: () => Promise<{ taskId: string }>
 }
 
-type PendingImageBatchWorkflowPrepared = {
-  source?: ImageExecutionInput
-  sourceNodeId?: string
-  resultOptions?: ImageExecutionResultOptions
-}
-
-type FlowImageWorkflowRunner = {
-  resolveFirstTaskImageResult: (
-    taskId: string,
-    fallbackRatio: number,
-  ) => Promise<ResolvedTaskImageResult>
-  runPendingImageBatchWorkflow: (params: {
-    source: ImageExecutionInput
-    sourceNodeId: string
-    boardId: string
-    outputCount: number
-    resultOptions?: ImageExecutionResultOptions
-    preflight?: () => Promise<void>
-    assertReady?: () => Promise<void>
-    prepare?: () => Promise<PendingImageBatchWorkflowPrepared | void>
-    submitTask: (resultNodeId: string) => Promise<{ taskId: string }>
-    resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
-    persistPendingTaskIds?: boolean
-    cleanup?: () => Promise<void>
-    successMessage?: string
-    fallbackErrorMessage: string
-    formatErrorMessage?: (error: Error) => string
-  }) => Promise<void>
-}
+type FlowImageWorkflowLifecycle = Pick<
+  ImageExecutionLifecycle,
+  'resolveFirstTaskImageResult' | 'runImageExecutionBatch'
+>
 
 export type FlowImageWorkflowExecutionPlan =
   | ImageActionExecutionPlan
@@ -84,8 +58,8 @@ export type FlowImageWorkflowExecutionPlan =
   | TextPromptExecutionPlan
   | FusionExecutionPlan
 
-export type FlowImageWorkflowExecutionOptions = {
-  runner: FlowImageWorkflowRunner
+type FlowImageWorkflowExecutionOptions = {
+  lifecycle: FlowImageWorkflowLifecycle
   getCurrentBoardId?: () => string
 }
 
@@ -138,7 +112,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
     })
-    await options.runner.runPendingImageBatchWorkflow({
+    await options.lifecycle.runImageExecutionBatch({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       resultOptions: plan.resultOptions,
@@ -147,7 +121,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       assertReady: taskSubmission.assertReady,
       submitTask: () => taskSubmission.submitTask(),
       resolveResult: (taskId) =>
-        options.runner.resolveFirstTaskImageResult(taskId, plan.source.ratio),
+        options.lifecycle.resolveFirstTaskImageResult(taskId, plan.source.ratio),
       successMessage: '处理完成',
       fallbackErrorMessage: '执行失败',
     })
@@ -160,7 +134,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
     })
-    await options.runner.runPendingImageBatchWorkflow({
+    await options.lifecycle.runImageExecutionBatch({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       boardId,
@@ -169,7 +143,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       assertReady: taskSubmission.assertReady,
       submitTask: taskSubmission.submitTask,
       resolveResult: (taskId) =>
-        options.runner.resolveFirstTaskImageResult(taskId, plan.targetRatio),
+        options.lifecycle.resolveFirstTaskImageResult(taskId, plan.targetRatio),
       fallbackErrorMessage: '扩图失败',
     })
   }
@@ -182,7 +156,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       buildRequest: () => requirePreparedTaskRequest(request, '局部重绘任务未准备完成'),
       fallbackMessage: '提交局部重绘任务失败',
     })
-    await options.runner.runPendingImageBatchWorkflow({
+    await options.lifecycle.runImageExecutionBatch({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       boardId,
@@ -233,7 +207,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
     })
-    await options.runner.runPendingImageBatchWorkflow({
+    await options.lifecycle.runImageExecutionBatch({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       boardId,
@@ -242,7 +216,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       assertReady: taskSubmission.assertReady,
       submitTask: taskSubmission.submitTask,
       resolveResult: (taskId) =>
-        options.runner.resolveFirstTaskImageResult(taskId, plan.source.ratio),
+        options.lifecycle.resolveFirstTaskImageResult(taskId, plan.source.ratio),
       fallbackErrorMessage: '生成失败',
     })
   }
@@ -252,14 +226,14 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
     const taskSubmission = createTaskSubmissionCallbacks({
       buildRequest: () => buildImageExecutionTaskRequest(plan),
     })
-    await options.runner.runPendingImageBatchWorkflow({
+    await options.lifecycle.runImageExecutionBatch({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       submitTask: taskSubmission.submitTask,
-      resolveResult: (taskId) => options.runner.resolveFirstTaskImageResult(taskId, 1),
+      resolveResult: (taskId) => options.lifecycle.resolveFirstTaskImageResult(taskId, 1),
       fallbackErrorMessage: '生成失败',
     })
   }
@@ -273,7 +247,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       buildRequest: () => requirePreparedTaskRequest(request, 'Fusion 任务未准备完成'),
       fallbackMessage: '提交 Fusion 任务失败',
     })
-    await options.runner.runPendingImageBatchWorkflow({
+    await options.lifecycle.runImageExecutionBatch({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       boardId,
@@ -292,7 +266,7 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
       },
       assertReady: taskSubmission.assertReady,
       submitTask: taskSubmission.submitTask,
-      resolveResult: (taskId) => options.runner.resolveFirstTaskImageResult(taskId, targetRatio),
+      resolveResult: (taskId) => options.lifecycle.resolveFirstTaskImageResult(taskId, targetRatio),
       fallbackErrorMessage: 'Fusion 生成失败',
       formatErrorMessage: (error) => sanitizeApiErrorMessage(error.message, 'Fusion 生成失败'),
     })
@@ -321,30 +295,26 @@ function createFlowImageWorkflowExecutor(options: FlowImageWorkflowExecutionOpti
 }
 
 export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecutionOptions) {
-  const pendingImageResults = usePendingImageResultExecution({
+  const lifecycle = useImageExecutionLifecycle({
     nodes: options.nodes,
     edges: options.edges,
     graphAdapter: options.graphAdapter,
     createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
     boardBaseSnapshot: options.boardBaseSnapshot,
     refreshNodeInternals: options.refreshNodeInternals,
-  })
-  const runner = useFlowImageDirectActionRunner({
-    nodes: options.nodes,
-    pendingImageResults,
     flushAutosave: options.flushAutosave,
     getCurrentBoardId: options.getCurrentBoardId,
     onSuccess: options.onSuccess,
     onWarning: options.onWarning,
   })
   const executor = createFlowImageWorkflowExecutor({
-    runner,
+    lifecycle,
     getCurrentBoardId: options.getCurrentBoardId,
   })
 
   return {
     executeImageWorkflow: executor.executeImageWorkflow,
-    isNodeDirectActionRunning: runner.isNodeDirectActionRunning,
-    reattachPendingImageResults: runner.reattachPendingImageResults,
+    isNodeDirectActionRunning: lifecycle.isNodeDirectActionRunning,
+    reattachPendingImageResults: lifecycle.reattachPendingImageResults,
   }
 }

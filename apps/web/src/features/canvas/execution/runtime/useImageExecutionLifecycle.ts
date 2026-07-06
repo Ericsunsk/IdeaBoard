@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
-import type { Node } from '@vue-flow/core'
-import { waitExistingOrLiveTaskImageResults } from './flowImageDirectActionExecutor'
+import type { Edge, Node } from '@vue-flow/core'
+import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import { readCurrentBoardId } from '../../utils/currentBoardId'
 import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
@@ -12,12 +12,14 @@ import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
 } from '../planning/ImageExecutionPlan'
-import type {
-  PendingImageResultExecution,
-  PendingImageResultRunSummary,
+import {
+  usePendingImageResultExecution,
+  type PendingImageResultRunSummary,
 } from '../result-nodes/usePendingImageResultNodes'
 import type { ResultMaterializerImageResult } from '../result-nodes/resultMaterializer'
-import type { CanvasGraphNodeId } from '../../graph-runtime'
+import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
+import type { CanvasGraphNodeId, CanvasGraphStore } from '../../graph-runtime'
 import {
   collectPendingImageTasks,
   isPendingImageTaskSnapshot,
@@ -26,16 +28,20 @@ import {
 
 type PendingImageResultOptions = ImageExecutionResultOptions
 
-type UseFlowImageDirectActionRunnerOptions = {
+type UseImageExecutionLifecycleOptions = {
   nodes: Ref<Node[]>
-  pendingImageResults: PendingImageResultExecution
+  edges: Ref<Edge[]>
+  graphAdapter: CanvasVueFlowGraphAdapter
+  createCurrentCanvasGraphStore?: () => CanvasGraphStore
+  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   getCurrentBoardId?: () => string
 }
 
-type PendingImageBatchWorkflowParams = {
+export type ImageExecutionBatchParams = {
   source: ImageExecutionInput
   sourceNodeId: string
   boardId: string
@@ -43,7 +49,7 @@ type PendingImageBatchWorkflowParams = {
   resultOptions?: PendingImageResultOptions
   preflight?: () => Promise<void>
   assertReady?: () => Promise<void>
-  prepare?: () => Promise<PendingImageBatchWorkflowPrepared | void>
+  prepare?: () => Promise<ImageExecutionBatchPrepared | void>
   submitTask: (resultNodeId: string) => Promise<{ taskId: string }>
   resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
   persistPendingTaskIds?: boolean
@@ -53,16 +59,35 @@ type PendingImageBatchWorkflowParams = {
   formatErrorMessage?: (error: Error) => string
 }
 
-type PendingImageBatchWorkflowPrepared = {
+type ImageExecutionBatchPrepared = {
   source?: ImageExecutionInput
   sourceNodeId?: string
   resultOptions?: PendingImageResultOptions
 }
 
-export function useFlowImageDirectActionRunner(options: UseFlowImageDirectActionRunnerOptions) {
+export type ImageExecutionLifecycle = {
+  isNodeDirectActionRunning: (nodeId: string) => boolean
+  reattachPendingImageResults: () => Promise<void>
+  resolveFirstTaskImageResult: (
+    taskId: string,
+    fallbackRatio: number,
+  ) => Promise<ResolvedTaskImageResult>
+  runImageExecutionBatch: (params: ImageExecutionBatchParams) => Promise<void>
+}
+
+export function useImageExecutionLifecycle(
+  options: UseImageExecutionLifecycleOptions,
+): ImageExecutionLifecycle {
   const runningNodeIds = ref<Set<string>>(new Set())
   const activeReattachKeys = new Set<string>()
-  const pendingResults = options.pendingImageResults
+  const pendingResults = usePendingImageResultExecution({
+    nodes: options.nodes,
+    edges: options.edges,
+    graphAdapter: options.graphAdapter,
+    createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    refreshNodeInternals: options.refreshNodeInternals,
+  })
 
   function setNodeRunning(nodeId: string, running: boolean) {
     const next = new Set(runningNodeIds.value)
@@ -111,7 +136,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
   function reportPendingImageRunSummary(
     summary: PendingImageResultRunSummary,
     params: Pick<
-      PendingImageBatchWorkflowParams,
+      ImageExecutionBatchParams,
       'persistPendingTaskIds' | 'successMessage' | 'fallbackErrorMessage'
     >,
   ) {
@@ -153,9 +178,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
     )
   }
 
-  async function runPendingImageBatchWorkflow(
-    params: PendingImageBatchWorkflowParams,
-  ): Promise<void> {
+  async function runImageExecutionBatch(params: ImageExecutionBatchParams): Promise<void> {
     let resultNodeIds: string[] = []
     try {
       await params.preflight?.()
@@ -232,8 +255,7 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
         ? pendingResults.materializeResolvedAttachedPendingResults({
             results: resolvedResults,
             isAttached: (result) =>
-              !!result.taskId &&
-              isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId),
+              !!result.taskId && isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId),
           })
         : null
     const successCount = materialized?.materializedNodeIds.length ?? 0
@@ -256,6 +278,6 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
     isNodeDirectActionRunning,
     reattachPendingImageResults,
     resolveFirstTaskImageResult,
-    runPendingImageBatchWorkflow,
+    runImageExecutionBatch,
   }
 }
