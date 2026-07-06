@@ -1,8 +1,6 @@
-import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { CanvasCreatableNodeKind, ImageNodeItem } from '../../../canvas-board/domain'
-import type { CanvasFlowViewport } from '../../composables/useCanvasViewportRuntime'
 import { useCanvasViewportRuntime } from '../../composables/useCanvasViewportRuntime'
 import { useCanvasBoardRuntime } from '../../composables/useCanvasBoardRuntime'
 import { useCanvasGraphRuntime } from '../../composables/useCanvasGraphRuntime'
@@ -15,11 +13,7 @@ import { useImageCanvasExtendOverlay } from '../../composables/useImageCanvasExt
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
 import { useCanvasImageTools } from '../../image-tools'
 import type { UseCanvasImageToolsOptions } from '../../image-tools/useCanvasImageTools'
-import type { CanvasVueFlowGraphActions } from '../../composables/useCanvasVueFlowGraphAdapter'
-
-type ValueRef<T> = {
-  readonly value: T
-}
+import type { CanvasFlowPaneAdapter } from '../../flow-pane'
 
 type CanvasGraphUploadApi = {
   upload: (
@@ -64,10 +58,7 @@ type CanvasWorkspaceImageToolsOptions = Omit<
 
 type CanvasWorkspaceImageActionOptions = Omit<
   Parameters<typeof useFlowImageActionOrchestrator>[0],
-  | 'runImageDirectAction'
-  | 'runFusionPromptGeneration'
-  | 'onFlowNodeParamUpdate'
-  | 'onWarning'
+  'runImageDirectAction' | 'runFusionPromptGeneration' | 'onFlowNodeParamUpdate' | 'onWarning'
 >
 
 type CanvasWorkspacePromptGenerationOptions = Pick<
@@ -100,24 +91,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
   createNodeKind: Ref<CanvasCreatableNodeKind>
-  viewport: Readonly<Ref<CanvasFlowViewport>>
-  getViewport: () => CanvasFlowViewport
-  setViewport: (
-    viewport: CanvasFlowViewport,
-    options?: { duration?: number; interpolate?: 'smooth' },
-  ) => Promise<unknown> | unknown
-  setCenter: (
-    x: number,
-    y: number,
-    options?: { duration?: number; zoom?: number; interpolate?: 'smooth' },
-  ) => Promise<unknown> | unknown
-  zoomIn: () => Promise<unknown> | unknown
-  zoomOut: () => Promise<unknown> | unknown
-  panBy: (delta: { x: number; y: number }) => boolean
-  updateNodeInternals: (nodeIds: string[]) => void
-  screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
-  getSelectedElements: ValueRef<Array<Node | Edge>>
-  removeSelectedElements: (elements: Array<Node | Edge>) => void
+  flowPaneAdapter: CanvasFlowPaneAdapter
   uploadApi: CanvasGraphUploadApi
   sanitizeApiErrorMessage: (message: string | null | undefined, fallback: string) => string
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
@@ -127,24 +101,21 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   stopNodeDragInteraction: () => void
   refreshFlowHandleVisibility: () => void
   onNativeRemove?: () => void
-  vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
-export function createCanvasWorkspaceRuntimeParts(
-  options: UseCanvasWorkspaceRuntimeOptions,
-) {
+export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
   const feedback = useCanvasFeedback()
 
   const board = useCanvasBoardRuntime({
     route: options.route,
     router: options.router,
     getUserIdentity: options.getUserIdentity,
-    getViewport: options.getViewport,
-    setViewport: (viewport) => options.setViewport(viewport),
+    getViewport: options.flowPaneAdapter.getViewport,
+    setViewport: (viewport) => options.flowPaneAdapter.setViewport(viewport),
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
-    vueFlowGraphActions: options.vueFlowGraphActions,
+    vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
   })
 
   const graph = useCanvasGraphRuntime({
@@ -154,10 +125,10 @@ export function createCanvasWorkspaceRuntimeParts(
     currentBoardId: board.currentBoardId,
     createNodeKind: options.createNodeKind,
     graphAdapter: board.graphAdapter,
-    updateNodeInternals: options.updateNodeInternals,
-    screenToFlowCoordinate: options.screenToFlowCoordinate,
-    getSelectedElements: options.getSelectedElements,
-    removeSelectedElements: options.removeSelectedElements,
+    updateNodeInternals: options.flowPaneAdapter.updateNodeInternals,
+    screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
+    getSelectedElements: options.flowPaneAdapter.getSelectedElements,
+    removeSelectedElements: options.flowPaneAdapter.removeSelectedElements,
     uploadApi: options.uploadApi,
     sanitizeApiErrorMessage: options.sanitizeApiErrorMessage,
     openNodeImagePreview: options.openNodeImagePreview,
@@ -171,13 +142,13 @@ export function createCanvasWorkspaceRuntimeParts(
     fullNodes: board.fullNodes,
     fullEdges: board.fullEdges,
     currentBoardId: board.currentBoardId,
-    viewport: options.viewport,
-    getViewport: options.getViewport,
-    setViewport: options.setViewport,
-    setCenter: options.setCenter,
-    zoomIn: options.zoomIn,
-    zoomOut: options.zoomOut,
-    panBy: options.panBy,
+    viewport: options.flowPaneAdapter.viewport,
+    getViewport: options.flowPaneAdapter.getViewport,
+    setViewport: options.flowPaneAdapter.setViewport,
+    setCenter: options.flowPaneAdapter.setCenter,
+    zoomIn: options.flowPaneAdapter.zoomIn,
+    zoomOut: options.flowPaneAdapter.zoomOut,
+    panBy: options.flowPaneAdapter.panBy,
     markBoardViewportChanged: board.markBoardViewportChanged,
     commitPendingBoardViewportChange: board.commitPendingBoardViewportChange,
     loadInitialOrRouteBoard: board.loadInitialOrRouteBoard,
@@ -208,10 +179,10 @@ export function createCanvasWorkspaceRuntimeParts(
       currentBoardId: board.currentBoardId,
       getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
       getImageNodeSnapshot: graph.getImageNodeSnapshot,
-      screenToFlowCoordinate: options.screenToFlowCoordinate,
-      getViewport: options.getViewport,
-      setViewport: options.setViewport,
-      setCenter: options.setCenter,
+      screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
+      getViewport: options.flowPaneAdapter.getViewport,
+      setViewport: options.flowPaneAdapter.setViewport,
+      setCenter: options.flowPaneAdapter.setCenter,
       createImageNodeFromFile: graph.createImageNodeFromFile,
       connectImageNodes: graph.onConnect,
       uploadImageToBoard: graph.uploadImageToBoard,
@@ -243,9 +214,7 @@ export function createCanvasWorkspaceRuntimeParts(
     })
   }
 
-  function createPromptGenerationHandlers(
-    promptOptions: CanvasWorkspacePromptGenerationOptions,
-  ) {
+  function createPromptGenerationHandlers(promptOptions: CanvasWorkspacePromptGenerationOptions) {
     return useFlowPromptGenerationOrchestrator({
       ...promptOptions,
       getMediaInputImages: graph.getMediaInputImages,

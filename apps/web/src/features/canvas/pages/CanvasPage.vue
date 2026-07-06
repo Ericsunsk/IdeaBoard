@@ -157,7 +157,7 @@ import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
 import { USER_BOARDS_PATH, USER_CENTER_PATH } from '../../../shared/constants/routePaths'
-import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
+import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
@@ -179,6 +179,7 @@ import {
   type DismissTransientCanvasUi,
 } from '../composables/useFlowTransientUiDismissal'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
+import { useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import CanvasMiniMap from '../components/CanvasMiniMap.vue'
@@ -190,28 +191,8 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
-const {
-  screenToFlowCoordinate,
-  updateNodeInternals,
-  zoomIn,
-  zoomOut,
-  viewport,
-  panBy,
-  getViewport,
-  setViewport,
-  setCenter,
-  getSelectedElements,
-  removeSelectedElements,
-  setNodes,
-  setEdges,
-  addNodes,
-  addEdges,
-  removeNodes,
-  removeEdges,
-  updateNode,
-  applyNodeChanges,
-  applyEdgeChanges,
-} = useVueFlow()
+const flowPaneAdapter = useVueFlowPaneAdapter()
+const { screenToFlowCoordinate } = flowPaneAdapter
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const flowHandleVisibilityRefreshToken = ref(0)
@@ -241,17 +222,7 @@ const workspace = useCanvasWorkspaceRuntime({
     userUid: `${userStore.user?.uid ?? ''}`.trim(),
   }),
   createNodeKind,
-  viewport,
-  getViewport,
-  setViewport: (nextViewport, options) => setViewport(nextViewport, options),
-  setCenter: (x, y, options) => setCenter(x, y, options),
-  zoomIn,
-  zoomOut,
-  panBy,
-  updateNodeInternals,
-  screenToFlowCoordinate,
-  getSelectedElements,
-  removeSelectedElements,
+  flowPaneAdapter,
   uploadApi,
   sanitizeApiErrorMessage,
   openNodeImagePreview,
@@ -260,17 +231,6 @@ const workspace = useCanvasWorkspaceRuntime({
   startNodeDragInteraction: () => startNodeDragInteraction(),
   stopNodeDragInteraction: () => stopNodeDragInteraction(),
   refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
-  vueFlowGraphActions: {
-    setNodes,
-    setEdges,
-    addNodes,
-    addEdges,
-    removeNodes,
-    removeEdges,
-    updateNode,
-    applyNodeChanges,
-    applyEdgeChanges,
-  },
   onNativeRemove: () => {
     dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
   },
@@ -339,9 +299,7 @@ const {
 const { history: flowHistory } = viewModel.persistence
 const { flushAutosave, loadCanvasBoardAndProbe, reattachPendingImageResults } = commands.persistence
 
-const {
-  zoomLevel,
-} = viewModel.viewportControls
+const { zoomLevel } = viewModel.viewportControls
 const {
   onZoomIn,
   onZoomOut,
@@ -479,14 +437,8 @@ const imageTools = commands.imageTools.createImageTools({
 const {
   viewModel: {
     active: { nodeId: flowImageEditorNodeId, maskNodeId: flowMaskEditorNodeId },
-    locks: {
-      isChromeHidden: isImageEditorChromeHidden,
-      isCanvasLocked: isFlowCanvasLocked,
-    },
-    nodeBindings: {
-      stageFor: imageToolStageBindingFor,
-      actionFor: imageToolActionBindingFor,
-    },
+    locks: { isChromeHidden: isImageEditorChromeHidden, isCanvasLocked: isFlowCanvasLocked },
+    nodeBindings: { stageFor: imageToolStageBindingFor, actionFor: imageToolActionBindingFor },
   },
   commands: {
     lifecycle: {

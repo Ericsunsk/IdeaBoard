@@ -119,11 +119,7 @@ function createTaskRuntime() {
 }
 
 function createWorkspaceOptions() {
-  return {
-    route: { query: {} } as never,
-    router: {} as never,
-    getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
-    createNodeKind: ref('prompt' as const),
+  const flowPaneAdapter = {
     viewport: ref({ x: 0, y: 0, zoom: 1 }),
     getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
     setViewport: vi.fn(),
@@ -135,6 +131,17 @@ function createWorkspaceOptions() {
     screenToFlowCoordinate: vi.fn((point: { x: number; y: number }) => point),
     getSelectedElements: ref([]),
     removeSelectedElements: vi.fn(),
+    vueFlowGraphActions: {
+      setNodes: vi.fn(),
+    },
+  }
+
+  return {
+    route: { query: {} } as never,
+    router: {} as never,
+    getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
+    createNodeKind: ref('prompt' as const),
+    flowPaneAdapter,
     uploadApi: { upload: vi.fn() },
     sanitizeApiErrorMessage: vi.fn(),
     openNodeImagePreview: vi.fn(),
@@ -161,7 +168,8 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     mocks.useCanvasGraphRuntime.mockReturnValue(graph)
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
-    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
+    const runtimeOptions = createWorkspaceOptions()
+    const runtime = createCanvasWorkspaceRuntimeParts(runtimeOptions)
 
     expect(runtime.flowPane.nodes).toBe(board.nodes)
     expect(runtime.flowPane.edges).toBe(board.edges)
@@ -174,15 +182,15 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.boardChrome.onNavigateRequest).toBe(board.onNavigateRequest)
     expect(runtime.boardChrome.onLogoutRequest).toBe(board.onLogoutRequest)
     expect(runtime.persistence.flushAutosave).toBe(board.flushAutosave)
-    expect(runtime.persistence.reattachPendingImageResults).toBe(
-      task.reattachPendingImageResults,
-    )
+    expect(runtime.persistence.reattachPendingImageResults).toBe(task.reattachPendingImageResults)
     expect(runtime.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
     expect(runtime.imageWorkflow.runCanvasExtendAction).toBe(task.runCanvasExtendAction)
 
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: mocks.feedback.boardSession,
+        getViewport: runtimeOptions.flowPaneAdapter.getViewport,
+        vueFlowGraphActions: runtimeOptions.flowPaneAdapter.vueFlowGraphActions,
       }),
     )
     expect(mocks.useCanvasGraphRuntime).toHaveBeenCalledWith(
@@ -190,6 +198,8 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         nodes: board.fullNodes,
         edges: board.fullEdges,
         graphAdapter: board.graphAdapter,
+        screenToFlowCoordinate: runtimeOptions.flowPaneAdapter.screenToFlowCoordinate,
+        getSelectedElements: runtimeOptions.flowPaneAdapter.getSelectedElements,
         feedback: mocks.feedback.graph,
       }),
     )
@@ -357,10 +367,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     runtime.imageWorkflow.runImageDirectAction('image-1', IMAGE_NODE_ACTION.hdUpscale)
     runtime.imageWorkflow.runCanvasExtendAction('image-1', extendPayload)
 
-    expect(task.runImageDirectAction).toHaveBeenCalledWith(
-      'image-1',
-      IMAGE_NODE_ACTION.hdUpscale,
-    )
+    expect(task.runImageDirectAction).toHaveBeenCalledWith('image-1', IMAGE_NODE_ACTION.hdUpscale)
     expect(task.runCanvasExtendAction).toHaveBeenCalledWith('image-1', extendPayload)
   })
 })
