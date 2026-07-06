@@ -412,7 +412,7 @@ const {
   getImageStageElement,
 })
 
-const imageTools = commands.imageTools.createImageTools({
+const imageTools = commands.imageWorkflow.createImageTools({
   activeTool: activeTool as Ref<string>,
   canvasWrapRef,
   isCanvasInteractionLocked: isFlowInteractionLocked,

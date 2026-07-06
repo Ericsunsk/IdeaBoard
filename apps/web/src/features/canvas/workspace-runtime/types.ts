@@ -76,21 +76,16 @@ export type CanvasWorkspaceRuntimeCommands = {
     | 'finishFlowNodeDragDuplicateTracking'
     | 'getFlowNodeUiStateCached'
   >
-  imageTools: Pick<CanvasWorkspaceRuntimeParts, 'createImageTools'>
   imageWorkflow: Pick<
     CanvasWorkspaceRuntimeParts['imageWorkflow'],
-    'runImageDirectAction' | 'runCanvasExtendAction'
-  > &
-    Pick<
-      CanvasWorkspaceRuntimeParts,
-      | 'createImageActionHandlers'
-      | 'createPromptGenerationHandlers'
-      | 'createCanvasExtendOverlay'
-    >
-  nodeInteraction: Pick<
-    CanvasWorkspaceRuntimeParts,
-    'createNodeMediaInputs' | 'createNodeHandlers'
+    | 'runImageDirectAction'
+    | 'runCanvasExtendAction'
+    | 'createImageTools'
+    | 'createImageActionHandlers'
+    | 'createPromptGenerationHandlers'
+    | 'createCanvasExtendOverlay'
   >
+  nodeInteraction: Pick<CanvasWorkspaceRuntimeParts, 'createNodeMediaInputs' | 'createNodeHandlers'>
 }
 
 export type CanvasWorkspaceRuntime = {

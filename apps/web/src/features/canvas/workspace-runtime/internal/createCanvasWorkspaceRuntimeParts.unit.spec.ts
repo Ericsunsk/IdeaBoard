@@ -213,7 +213,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       }),
     )
 
-    runtime.createImageTools({
+    runtime.imageWorkflow.createImageTools({
       activeTool: ref('select'),
       canvasWrapRef: ref(null),
       isCanvasInteractionLocked: ref(false),
@@ -257,7 +257,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
-    runtime.createImageTools({
+    runtime.imageWorkflow.createImageTools({
       activeTool: ref('select'),
       canvasWrapRef: ref(null),
       isCanvasInteractionLocked: ref(false),
@@ -299,7 +299,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
     const cancelFlowExpandMode = vi.fn()
     const cancelFlowMaskEditorMode = vi.fn()
-    const { onFlowPromptGenerate } = runtime.createPromptGenerationHandlers({
+    const { onFlowPromptGenerate } = runtime.imageWorkflow.createPromptGenerationHandlers({
       cancelFlowExpandMode,
       cancelFlowMaskEditorMode,
     })
@@ -321,7 +321,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
-    const { onFlowFusionPromptGenerate } = runtime.createImageActionHandlers({
+    const { onFlowFusionPromptGenerate } = runtime.imageWorkflow.createImageActionHandlers({
       flowImageEditorNodeId: ref(null),
       consumeSuppressedStrengthClick: vi.fn(() => false),
       openActiveNodePanel: vi.fn(),

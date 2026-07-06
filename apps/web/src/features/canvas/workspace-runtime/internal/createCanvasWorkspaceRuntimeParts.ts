@@ -5,15 +5,11 @@ import { useCanvasViewportRuntime } from '../../composables/useCanvasViewportRun
 import { useCanvasBoardRuntime } from '../../composables/useCanvasBoardRuntime'
 import { useCanvasGraphRuntime } from '../../composables/useCanvasGraphRuntime'
 import { useCanvasTaskRuntime } from '../../composables/useCanvasTaskRuntime'
-import { useFlowImageActionOrchestrator } from '../../composables/useFlowImageActionOrchestrator'
-import { useFlowPromptGenerationOrchestrator } from '../../composables/useFlowPromptGenerationOrchestrator'
 import { useFlowCanvasNodeHandlers } from '../../composables/useFlowCanvasNodeHandlers'
 import { useFlowNodeMediaInputs } from '../../composables/useFlowNodeMediaInputs'
-import { useImageCanvasExtendOverlay } from '../../composables/useImageCanvasExtendOverlay'
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
-import { useCanvasImageTools } from '../../image-tools'
-import type { UseCanvasImageToolsOptions } from '../../image-tools/useCanvasImageTools'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'
+import { useCanvasImageWorkflow } from '../../image-workflow'
 
 type CanvasGraphUploadApi = {
   upload: (
@@ -31,45 +27,6 @@ type CanvasGraphUploadApi = {
     }
   }>
 }
-
-type CanvasWorkspaceImageToolsOptions = Omit<
-  UseCanvasImageToolsOptions,
-  | 'nodes'
-  | 'currentBoardId'
-  | 'getImageNodeDisplayPayload'
-  | 'getImageNodeSnapshot'
-  | 'screenToFlowCoordinate'
-  | 'getViewport'
-  | 'setViewport'
-  | 'setCenter'
-  | 'createImageNodeFromFile'
-  | 'connectImageNodes'
-  | 'uploadImageToBoard'
-  | 'openImageUrlPreview'
-  | 'updateOutputCount'
-  | 'runInpaintAction'
-  | 'runPromptGeneration'
-  | 'isDirectActionRunning'
-  | 'clearSelectedFlowElements'
-  | 'startCanvasInteraction'
-  | 'stopCanvasInteraction'
-  | 'feedback'
->
-
-type CanvasWorkspaceImageActionOptions = Omit<
-  Parameters<typeof useFlowImageActionOrchestrator>[0],
-  'runImageDirectAction' | 'runFusionPromptGeneration' | 'onFlowNodeParamUpdate' | 'onWarning'
->
-
-type CanvasWorkspacePromptGenerationOptions = Pick<
-  Parameters<typeof useFlowPromptGenerationOrchestrator>[0],
-  'cancelFlowExpandMode' | 'cancelFlowMaskEditorMode'
->
-
-type CanvasWorkspaceExpandOverlayOptions = Omit<
-  Parameters<typeof useImageCanvasExtendOverlay>[0],
-  'nodes' | 'getImageNodeDisplayPayload' | 'onBeforePointerCancel' | 'onCommit'
->
 
 type CanvasWorkspaceNodeMediaOptions = Omit<
   Parameters<typeof useFlowNodeMediaInputs>[0],
@@ -172,75 +129,28 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     feedback: feedback.taskExecution,
   })
 
-  function createImageTools(imageToolOptions: CanvasWorkspaceImageToolsOptions) {
-    return useCanvasImageTools({
-      ...imageToolOptions,
+  const imageWorkflow = useCanvasImageWorkflow({
+    graph: {
       nodes: board.nodes,
       currentBoardId: board.currentBoardId,
       getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
       getImageNodeSnapshot: graph.getImageNodeSnapshot,
-      screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
-      getViewport: options.flowPaneAdapter.getViewport,
-      setViewport: options.flowPaneAdapter.setViewport,
-      setCenter: options.flowPaneAdapter.setCenter,
       createImageNodeFromFile: graph.createImageNodeFromFile,
       connectImageNodes: graph.onConnect,
       uploadImageToBoard: graph.uploadImageToBoard,
-      openImageUrlPreview: options.openImageUrlPreview,
-      updateOutputCount: (nodeId, payload) => {
-        graph._onFlowNodeParamUpdate(nodeId, payload)
-        graph.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-      },
-      runInpaintAction: task.runImageInpaintAction,
-      runPromptGeneration: task.runImagePromptGeneration,
-      isDirectActionRunning: task.isNodeDirectActionRunning,
       clearSelectedFlowElements: graph.clearSelectedFlowElementsSync,
       startCanvasInteraction: graph.startFlowInteraction,
       stopCanvasInteraction: graph.stopFlowInteraction,
-      feedback: feedback.imageTools,
-    })
-  }
-
-  function createImageActionHandlers(actionOptions: CanvasWorkspaceImageActionOptions) {
-    return useFlowImageActionOrchestrator({
-      ...actionOptions,
-      runImageDirectAction: task.runImageDirectAction,
-      runFusionPromptGeneration: task.runFusionPromptGeneration,
-      onFlowNodeParamUpdate: (nodeId, patch) => {
-        graph._onFlowNodeParamUpdate(nodeId, patch)
-        graph.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-      },
-      onWarning: feedback.imageTools.actionUnavailable,
-    })
-  }
-
-  function createPromptGenerationHandlers(promptOptions: CanvasWorkspacePromptGenerationOptions) {
-    return useFlowPromptGenerationOrchestrator({
-      ...promptOptions,
       getMediaInputImages: graph.getMediaInputImages,
       resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
-      runTextPromptGeneration: task.runTextPromptGeneration,
-      runImagePromptGeneration: task.runImagePromptGeneration,
-      runImagePromptGenerationFromSource: task.runImagePromptGenerationFromSource,
-    })
-  }
-
-  function createCanvasExtendOverlay(overlayOptions: CanvasWorkspaceExpandOverlayOptions) {
-    return useImageCanvasExtendOverlay({
-      ...overlayOptions,
-      nodes: board.nodes,
-      getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
-      onBeforePointerCancel: graph.clearSelectedFlowElementsSync,
-      onCommit: async (payload) => {
-        await task.runCanvasExtendAction(payload.nodeId, {
-          frameRect: payload.frameRect,
-          originalImageRect: payload.originalImageRect,
-          prompt: payload.prompt,
-          outputCount: payload.outputCount,
-        })
-      },
-    })
-  }
+      updateSnapshotNodeParam: graph._onFlowNodeParamUpdate,
+      markNodeExecutionDirty: graph.markFlowExecutionNodeDirty,
+    },
+    task,
+    flowPaneAdapter: options.flowPaneAdapter,
+    openImageUrlPreview: options.openImageUrlPreview,
+    feedback: feedback.imageTools,
+  })
 
   function createNodeMediaInputs({
     discardNodeEdits,
@@ -332,14 +242,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       finishFlowNodeDragDuplicateTracking: graph.finishFlowNodeDragDuplicateTracking,
       getFlowNodeUiStateCached: graph.getFlowNodeUiStateCached,
     },
-    imageWorkflow: {
-      runImageDirectAction: task.runImageDirectAction,
-      runCanvasExtendAction: task.runCanvasExtendAction,
-    },
-    createImageTools,
-    createImageActionHandlers,
-    createPromptGenerationHandlers,
-    createCanvasExtendOverlay,
+    imageWorkflow,
     createNodeMediaInputs,
     createNodeHandlers,
   }

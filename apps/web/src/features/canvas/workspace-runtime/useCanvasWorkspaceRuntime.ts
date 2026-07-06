@@ -33,8 +33,7 @@ export function useCanvasWorkspaceRuntime(
         graphAdapter: runtime.graphEditing.graphAdapter,
         hasSelectedFlowNodes: runtime.graphEditing.hasSelectedFlowNodes,
         isFlowInteractionActive: runtime.graphEditing.isFlowInteractionActive,
-        isFlowViewportPanInteractionActive:
-          runtime.graphEditing.isFlowViewportPanInteractionActive,
+        isFlowViewportPanInteractionActive: runtime.graphEditing.isFlowViewportPanInteractionActive,
         isFlowInteractionLocked: runtime.graphEditing.isFlowInteractionLocked,
         nodeContextMenu: runtime.graphEditing.nodeContextMenu,
         canvasNodeMenuItems: runtime.graphEditing.canvasNodeMenuItems,
@@ -83,8 +82,7 @@ export function useCanvasWorkspaceRuntime(
         loadCanvasBoardAndProbe: runtime.viewportControls.loadCanvasBoardAndProbe,
       },
       graphEditing: {
-        scheduleFlowNodeInternalsRefresh:
-          runtime.graphEditing.scheduleFlowNodeInternalsRefresh,
+        scheduleFlowNodeInternalsRefresh: runtime.graphEditing.scheduleFlowNodeInternalsRefresh,
         createNodeAtPosition: runtime.graphEditing.createNodeAtPosition,
         onExportSelectedImages: runtime.graphEditing.onExportSelectedImages,
         closeNodeContextMenu: runtime.graphEditing.closeNodeContextMenu,
@@ -97,21 +95,18 @@ export function useCanvasWorkspaceRuntime(
         onCanvasDragOver: runtime.graphEditing.onCanvasDragOver,
         onFlowImageOpenPreview: runtime.graphEditing.onFlowImageOpenPreview,
         onFlowImageAppendToCanvas: runtime.graphEditing.onFlowImageAppendToCanvas,
-        beginFlowNodeDragDuplicateTracking:
-          runtime.graphEditing.beginFlowNodeDragDuplicateTracking,
+        beginFlowNodeDragDuplicateTracking: runtime.graphEditing.beginFlowNodeDragDuplicateTracking,
         finishFlowNodeDragDuplicateTracking:
           runtime.graphEditing.finishFlowNodeDragDuplicateTracking,
         getFlowNodeUiStateCached: runtime.graphEditing.getFlowNodeUiStateCached,
       },
-      imageTools: {
-        createImageTools: runtime.createImageTools,
-      },
       imageWorkflow: {
         runImageDirectAction: runtime.imageWorkflow.runImageDirectAction,
         runCanvasExtendAction: runtime.imageWorkflow.runCanvasExtendAction,
-        createImageActionHandlers: runtime.createImageActionHandlers,
-        createPromptGenerationHandlers: runtime.createPromptGenerationHandlers,
-        createCanvasExtendOverlay: runtime.createCanvasExtendOverlay,
+        createImageTools: runtime.imageWorkflow.createImageTools,
+        createImageActionHandlers: runtime.imageWorkflow.createImageActionHandlers,
+        createPromptGenerationHandlers: runtime.imageWorkflow.createPromptGenerationHandlers,
+        createCanvasExtendOverlay: runtime.imageWorkflow.createCanvasExtendOverlay,
       },
       nodeInteraction: {
         createNodeMediaInputs: runtime.createNodeMediaInputs,

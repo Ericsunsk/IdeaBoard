@@ -94,11 +94,11 @@ function createRuntimeParts() {
     imageWorkflow: {
       runImageDirectAction: vi.fn(),
       runCanvasExtendAction: vi.fn(),
+      createImageTools: vi.fn(),
+      createImageActionHandlers: vi.fn(),
+      createPromptGenerationHandlers: vi.fn(),
+      createCanvasExtendOverlay: vi.fn(),
     },
-    createImageTools: vi.fn(),
-    createImageActionHandlers: vi.fn(),
-    createPromptGenerationHandlers: vi.fn(),
-    createCanvasExtendOverlay: vi.fn(),
     createNodeMediaInputs: vi.fn(),
     createNodeHandlers: vi.fn(),
   }
@@ -130,8 +130,9 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     expect(workspace.commands.imageWorkflow.runImageDirectAction).toBe(
       runtimeParts.imageWorkflow.runImageDirectAction,
     )
-    expect(workspace.commands.imageTools.createImageTools).toBe(
-      runtimeParts.createImageTools,
+    expect(workspace.commands.imageWorkflow.createImageTools).toBe(
+      runtimeParts.imageWorkflow.createImageTools,
     )
+    expect('imageTools' in workspace.commands).toBe(false)
   })
 })
