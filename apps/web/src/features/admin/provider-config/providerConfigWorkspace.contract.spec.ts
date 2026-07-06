@@ -215,20 +215,21 @@ describe('provider config workspace facade', () => {
     workspace.deleteChannel({ kind: 'channel', id: 404 })
 
     expect(feedback.staleChannel).toHaveBeenCalledTimes(1)
-    expect(confirm.danger).not.toHaveBeenCalled()
+    expect(confirm.request).not.toHaveBeenCalled()
 
     await workspace.loadData()
     workspace.deleteChannel({ kind: 'channel', id: 1 })
 
-    expect(confirm.danger).toHaveBeenCalledWith(
+    expect(confirm.request).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '确认删除',
-        content: '确定删除渠道商「OpenAI Channel」吗？此操作不可恢复。',
-        acceptLabel: '确定',
+        message: '确定删除渠道商「OpenAI Channel」吗？此操作不可恢复。',
+        confirmLabel: '确定',
+        intent: 'danger',
       }),
     )
 
-    await confirm.danger.mock.calls[0]?.[0].onConfirm()
+    await confirm.request.mock.calls[0]?.[0].onConfirm()
 
     expect(mockApi.deleteAdminChannel).toHaveBeenCalledWith(1)
     expect(feedback.channelDeleted).toHaveBeenCalledTimes(1)
@@ -253,7 +254,7 @@ describe('provider config workspace facade', () => {
 
 function createWorkspace() {
   const feedback = createProviderConfigFeedback()
-  const confirm = { danger: vi.fn() }
+  const confirm = { request: vi.fn() }
   const { runAsyncAction } = useAsyncAction()
   const workspace = createAdminProviderConfigWorkspace({
     feedback,

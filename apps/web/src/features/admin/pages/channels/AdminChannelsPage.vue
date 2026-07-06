@@ -408,13 +408,13 @@ import ProgressBar from 'primevue/progressbar'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { useConfirm } from 'primevue/useconfirm'
 import { EditPencil, Plus, Refresh, Trash } from '@iconoir/vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
 import {
@@ -428,22 +428,14 @@ import { useAdminProviderConfig } from '../../provider-config/useAdminProviderCo
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 
 const adminFeedback = useAdminFeedback()
-const confirm = useConfirm()
+const adminConfirm = useAdminConfirm()
 
 const { isScrolling: isChannelPanelScrolling, handleScroll: handleChannelPanelScroll } =
   useTransientScrolling()
 
 const { cards, channelEditor, accountEditor, commands } = useAdminProviderConfig({
   feedback: adminFeedback.channels.providerConfig,
-  confirm: {
-    danger: ({ title, content, acceptLabel, onConfirm }) =>
-      requireAdminConfirm({
-        header: title,
-        message: content,
-        acceptLabel,
-        accept: onConfirm,
-      }),
-  },
+  confirm: adminConfirm,
 })
 
 const searchKeyword = cards.searchKeyword
@@ -487,30 +479,6 @@ async function handleSaveChannel() {
 
 function clearChannelFormError(field: keyof typeof channelForm.value) {
   channelEditor.clearError(field)
-}
-
-function requireAdminConfirm(options: {
-  header: string
-  message: string
-  acceptLabel: string
-  accept: () => void | Promise<void>
-}) {
-  confirm.require({
-    header: options.header,
-    message: options.message,
-    rejectLabel: '取消',
-    acceptLabel: options.acceptLabel,
-    acceptProps: {
-      severity: 'danger',
-    },
-    rejectProps: {
-      severity: 'secondary',
-      outlined: true,
-    },
-    accept: () => {
-      void options.accept()
-    },
-  })
 }
 
 const showAccountModal = accountEditor.visible

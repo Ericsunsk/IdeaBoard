@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
+import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   createEmptyChannelForm,
   inferChannelApiTypeFromUrl,
@@ -9,7 +10,6 @@ import {
 import { createModelSuggestions } from './providerModelOptions'
 import {
   createAdminProviderConfigWorkspace,
-  type AdminProviderConfirmPort,
   type AdminProviderConfigWorkspace,
 } from './providerConfigWorkspace'
 import type {
@@ -25,7 +25,7 @@ import type {
 
 export type UseAdminProviderConfigOptions = {
   feedback: AdminProviderConfigFeedback
-  confirm: AdminProviderConfirmPort
+  confirm: AdminConfirmPort
 }
 
 export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {

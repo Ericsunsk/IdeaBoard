@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import type { AdminUsersFeedback } from '../feedback/useAdminFeedback'
+import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { useAdminUserCommands } from './adminUserCommands'
 import type { AdminUserSessionCommands } from './adminUserSessionCommands'
 import { useAdminUsersResource, type AdminUsersQueryParams } from './adminUsersResource'
@@ -14,18 +15,6 @@ import {
   userStatusFilterOptions,
 } from './adminUserView'
 
-type AdminConfirmOptions = {
-  header: string
-  message: string
-  acceptLabel: string
-  severity: 'warn' | 'danger'
-  accept: () => void | Promise<void>
-}
-
-type AdminUsersConfirm = {
-  require: (options: AdminConfirmOptions) => void
-}
-
 type AdminUsersContextDependencies = {
   sessionCommands?: AdminUserSessionCommands
 }
@@ -33,7 +22,7 @@ type AdminUsersContextDependencies = {
 export function useAdminUsersContext(
   options: {
     feedback: AdminUsersFeedback
-    confirm: AdminUsersConfirm
+    confirm: AdminConfirmPort
   },
   dependencies: AdminUsersContextDependencies = {},
 ) {

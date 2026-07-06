@@ -47,7 +47,7 @@ describe('useAdminProviderConfig', () => {
 
     const context = useAdminProviderConfig({
       feedback,
-      confirm: { danger: vi.fn() },
+      confirm: { request: vi.fn() },
     })
 
     await context.commands.loadData()

@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import type { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
+import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   createAdminAccountRecord,
   deleteAdminAccountRecord,
@@ -43,20 +44,11 @@ import type {
   ProviderChannelRecord,
 } from './providerConfigTypes'
 
-export type AdminProviderConfirmPort = {
-  danger: (options: {
-    title: string
-    content: string
-    acceptLabel: string
-    onConfirm: () => void | Promise<void>
-  }) => void
-}
-
 type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']
 
 export type AdminProviderConfigWorkspaceOptions = {
   feedback: AdminProviderConfigFeedback
-  confirm: AdminProviderConfirmPort
+  confirm: AdminConfirmPort
   runAsyncAction: RunAsyncAction
 }
 
@@ -233,10 +225,11 @@ export function createAdminProviderConfigWorkspace(
     const channel = resolveChannelTarget(target)
     if (!channel) return
 
-    options.confirm.danger({
+    options.confirm.request({
       title: '确认删除',
-      content: `确定删除渠道商「${channel.name}」吗？此操作不可恢复。`,
-      acceptLabel: '确定',
+      message: `确定删除渠道商「${channel.name}」吗？此操作不可恢复。`,
+      confirmLabel: '确定',
+      intent: 'danger',
       onConfirm: async () => {
         try {
           await deleteAdminChannel(channel.id)
@@ -253,10 +246,11 @@ export function createAdminProviderConfigWorkspace(
     const account = resolveAccountTarget(target)
     if (!account) return
 
-    options.confirm.danger({
+    options.confirm.request({
       title: '确认删除 APIKey',
-      content: '确定删除该 APIKey 吗？关联的执行中任务会由后端统一结束。',
-      acceptLabel: '确定',
+      message: '确定删除该 APIKey 吗？关联的执行中任务会由后端统一结束。',
+      confirmLabel: '确定',
+      intent: 'danger',
       onConfirm: async () => {
         try {
           await deleteAdminAccountRecord(account.id)

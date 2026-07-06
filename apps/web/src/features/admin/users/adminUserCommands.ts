@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 import type { AdminUsersFeedback } from '../feedback/useAdminFeedback'
+import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   banAdminUser,
   deleteAdminUser,
@@ -21,18 +22,6 @@ import {
 
 type AsyncMutation<TInput> = {
   mutateAsync: (input: TInput) => Promise<void>
-}
-
-type AdminConfirmOptions = {
-  header: string
-  message: string
-  acceptLabel: string
-  severity: 'warn' | 'danger'
-  accept: () => void | Promise<void>
-}
-
-type AdminUserActionsConfirm = {
-  require: (options: AdminConfirmOptions) => void
 }
 
 type AdminUserCommandDependencies = {
@@ -69,7 +58,7 @@ export const banDurationOptions: Array<{ label: string; value: number }> = [
 export function useAdminUserCommands(
   options: {
     feedback: AdminUsersFeedback
-    confirm: AdminUserActionsConfirm
+    confirm: AdminConfirmPort
   },
   dependencies: AdminUserCommandDependencies = {},
 ) {
@@ -192,12 +181,12 @@ export function useAdminUserCommands(
       return
     }
 
-    options.confirm.require({
-      header: '确认解除封禁',
+    options.confirm.request({
+      title: '确认解除封禁',
       message: `确定要恢复用户 ${row.username} 的访问权限吗？`,
-      acceptLabel: '确认解封',
-      severity: 'warn',
-      accept: async () => {
+      confirmLabel: '确认解封',
+      intent: 'warn',
+      onConfirm: async () => {
         try {
           await unbanUserMutation.mutateAsync(row.id)
           options.feedback.unbanSucceeded()
@@ -233,12 +222,12 @@ export function useAdminUserCommands(
       options.feedback.missingAuthUserForSessionRevoke()
       return
     }
-    options.confirm.require({
-      header: '确认踢下线',
+    options.confirm.request({
+      title: '确认踢下线',
       message: `将强制吊销账号 ${row.username} 的所有活跃会话，是否继续？`,
-      acceptLabel: '确认',
-      severity: 'warn',
-      accept: async () => {
+      confirmLabel: '确认',
+      intent: 'warn',
+      onConfirm: async () => {
         try {
           await revokeUserSessionsMutation.mutateAsync(row.id)
           options.feedback.revokeSessionsSucceeded()
@@ -268,12 +257,12 @@ export function useAdminUserCommands(
       return
     }
 
-    options.confirm.require({
-      header: '危险操作：彻底注销',
+    options.confirm.request({
+      title: '危险操作：彻底注销',
       message: `确定要彻底删除用户 ${row.username} 吗？此操作将清除该用户在 Auth 及业务数据库中的所有数据，不可撤销！`,
-      acceptLabel: '确定删除',
-      severity: 'danger',
-      accept: async () => {
+      confirmLabel: '确定删除',
+      intent: 'danger',
+      onConfirm: async () => {
         try {
           await deleteUserMutation.mutateAsync(row.id)
           options.feedback.userDeleted()
@@ -286,15 +275,15 @@ export function useAdminUserCommands(
 
   function handleToggleRole(row: AdminUserCommandTarget) {
     const nextRole = isAdminUser(row) ? 'user' : 'admin'
-    options.confirm.require({
-      header: nextRole === 'admin' ? '确认设为管理员' : '确认取消管理员',
+    options.confirm.request({
+      title: nextRole === 'admin' ? '确认设为管理员' : '确认取消管理员',
       message:
         nextRole === 'admin'
           ? `确定要将用户 ${row.username} 设为管理员吗？该用户将获得后台访问权限。`
           : `确定要取消用户 ${row.username} 的管理员权限吗？`,
-      acceptLabel: '确认',
-      severity: 'warn',
-      accept: async () => {
+      confirmLabel: '确认',
+      intent: 'warn',
+      onConfirm: async () => {
         try {
           await updateUserRoleMutation.mutateAsync({ id: row.id, role: nextRole })
           options.feedback.roleUpdated(nextRole)

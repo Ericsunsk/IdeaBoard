@@ -241,12 +241,12 @@ import DataTable from 'primevue/datatable'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import { useConfirm } from 'primevue/useconfirm'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../shared/components/AdminToolbarSearch.vue'
+import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { useTransientScrolling } from '../shared/composables/useTransientScrolling'
 import { adminDenseDataTablePt } from '../shared/lib/adminDataTablePt'
 import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
@@ -266,14 +266,14 @@ type PrimePopupPanel = {
 }
 
 const adminFeedback = useAdminFeedback()
-const confirm = useConfirm()
+const adminConfirm = useAdminConfirm()
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
 const { isScrolling: isUserTableScrolling, handleScroll: handleUserTableScroll } =
   useTransientScrolling()
 
 const adminUsers = useAdminUsersContext({
   feedback: adminFeedback.users.management,
-  confirm: { require: requireAdminConfirm },
+  confirm: adminConfirm,
 })
 
 const {
@@ -329,28 +329,4 @@ function handleActionSelect(key: UserActionKey) {
   userActionPopoverRef.value?.hide?.()
 }
 
-function requireAdminConfirm(options: {
-  header: string
-  message: string
-  acceptLabel: string
-  severity: 'warn' | 'danger'
-  accept: () => void | Promise<void>
-}) {
-  confirm.require({
-    header: options.header,
-    message: options.message,
-    rejectLabel: '取消',
-    acceptLabel: options.acceptLabel,
-    acceptProps: {
-      severity: options.severity,
-    },
-    rejectProps: {
-      severity: 'secondary',
-      outlined: true,
-    },
-    accept: () => {
-      void options.accept()
-    },
-  })
-}
 </script>

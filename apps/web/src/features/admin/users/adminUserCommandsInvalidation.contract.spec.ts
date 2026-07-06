@@ -3,7 +3,7 @@ import { useAdminUserCommands } from './adminUserCommands'
 import type { AdminUserCommandTarget } from './adminUserView'
 
 type ConfirmRequest = {
-  accept: () => void | Promise<void>
+  onConfirm: () => void | Promise<void>
 }
 
 const userQueryClientMock = vi.hoisted(() => ({
@@ -100,7 +100,7 @@ describe('admin user command query invalidation', () => {
 function createHarness() {
   const confirmRequests: ConfirmRequest[] = []
   const confirm = {
-    require: vi.fn((request: ConfirmRequest) => confirmRequests.push(request)),
+    request: vi.fn((request: ConfirmRequest) => confirmRequests.push(request)),
   }
   const feedback = createAdminUsersFeedback()
   const commands = useAdminUserCommands(
@@ -117,7 +117,7 @@ function createHarness() {
     acceptLastConfirm: async () => {
       const request = confirmRequests.at(-1)
       expect(request).toBeTruthy()
-      await request?.accept()
+      await request?.onConfirm()
     },
   }
 }
