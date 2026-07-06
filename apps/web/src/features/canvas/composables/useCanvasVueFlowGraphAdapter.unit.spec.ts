@@ -51,6 +51,45 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     )
   })
 
+  it('runs global and command hooks around the graph commit in order', () => {
+    const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
+    const edges = shallowRef<Edge[]>([])
+    const events: string[] = []
+    const nodeToAdd: Node = { id: 'node-2', position: { x: 20, y: 0 }, data: {} }
+    const addNodes = vi.fn(() => events.push('commit'))
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { addNodes },
+      beforeCommand: (context) => {
+        events.push(`global-before:${context.next.nodes.length}`)
+        return 'global-token'
+      },
+      afterCommand: (_result, beforeValue) => {
+        events.push(`global-after:${String(beforeValue)}:${nodes.value.length}`)
+      },
+    })
+
+    const result = adapter.addNodes(nodeToAdd, {
+      beforeCommand: (context) => {
+        events.push(`command-before:${context.before.nodes.length}`)
+        return 'command-token'
+      },
+      afterCommand: (_result, beforeValue) => {
+        events.push(`command-after:${String(beforeValue)}:${nodes.value.length}`)
+      },
+    })
+
+    expect(result).toMatchObject({ command: 'addNodes', didChange: true })
+    expect(events).toEqual([
+      'global-before:2',
+      'command-before:1',
+      'commit',
+      'global-after:global-token:2',
+      'command-after:command-token:2',
+    ])
+  })
+
   it('runs an edge command through Vue Flow actions and skips hooks for no-op targets', () => {
     const nodes = shallowRef<Node[]>([
       { id: 'node-1', position: { x: 0, y: 0 }, data: {} },
