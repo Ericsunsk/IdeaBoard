@@ -263,6 +263,11 @@ export function useAdminUserCommands(
   }
 
   function handleDeleteUser(row: AdminUserCommandTarget) {
+    if (isAdminUser(row)) {
+      options.feedback.adminStatusChangeForbidden()
+      return
+    }
+
     options.confirm.require({
       header: '危险操作：彻底注销',
       message: `确定要彻底删除用户 ${row.username} 吗？此操作将清除该用户在 Auth 及业务数据库中的所有数据，不可撤销！`,

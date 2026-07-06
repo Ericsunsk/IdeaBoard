@@ -19,6 +19,7 @@ import (
 const (
 	RiverJobKindDrawingGenerate = "drawing_generate"
 	RiverQueueDefault           = "drawing_default"
+	RiverMaxAttemptsDefault     = 25
 )
 
 type DrawingTaskArgs struct {
@@ -55,7 +56,7 @@ func NewRiverQueueWithClient(client riverClient, db *sql.DB, accountLoadStore Ac
 		queueName = RiverQueueDefault
 	}
 	if maxRetry <= 0 {
-		maxRetry = 25
+		maxRetry = RiverMaxAttemptsDefault
 	}
 	return &RiverQueue{
 		client:           client,
@@ -127,7 +128,7 @@ func drawingTaskInsertOpts(task *tasks.TaskPayload, queueName string, maxRetry i
 		queueName = RiverQueueDefault
 	}
 	if maxRetry <= 0 {
-		maxRetry = 25
+		maxRetry = RiverMaxAttemptsDefault
 	}
 	taskID := ""
 	if task != nil {

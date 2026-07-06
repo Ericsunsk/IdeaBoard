@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { User } from '../../shared/api/generated-query/model'
+import type { User } from '../../shared/api/userSession'
 
 function makeUser(overrides: Partial<User> = {}): User {
   const id = overrides.id ?? 1
@@ -30,8 +30,8 @@ async function getFreshUserStore() {
     getSession: vi.fn(),
   }
 
-  vi.doMock('../../shared/api/generated-query/user/user', () => ({
-    getUserInfo,
+  vi.doMock('../../shared/api/userSession', () => ({
+    fetchCurrentUserInfo: getUserInfo,
   }))
   vi.doMock('../../shared/auth/client', () => ({
     authClient,

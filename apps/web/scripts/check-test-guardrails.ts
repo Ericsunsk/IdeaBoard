@@ -109,13 +109,6 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
 }
 
 const contractGeneratedQueryMockExceptions: ExceptionMap<GeneratedQueryMockException> = {
-  'src/app/stores/user.contract.spec.ts': [
-    {
-      module: '../../shared/api/generated-query/user/user',
-      reason:
-        'Hard boundary for the user store module import; this test verifies cache behavior around the generated getUserInfo endpoint.',
-    },
-  ],
   'src/features/admin/task-monitor/useAdminTaskMonitor.contract.spec.ts': [
     {
       module: '../../../shared/api/generated-query/admin-tasks/admin-tasks',

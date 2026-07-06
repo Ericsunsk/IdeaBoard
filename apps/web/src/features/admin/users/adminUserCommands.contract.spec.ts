@@ -41,6 +41,18 @@ describe('admin user commands', () => {
     expect(harness.mutations.banUser.mutateAsync).not.toHaveBeenCalled()
   })
 
+  it('blocks admin delete before confirmation and mutation side effects', () => {
+    const harness = createHarness()
+    const commands = harness.createCommands()
+
+    commands.openUserActionMenu(makeUser({ role: 'admin', username: 'root' }))
+    commands.handleActionSelect('delete')
+
+    expect(harness.feedback.adminStatusChangeForbidden).toHaveBeenCalled()
+    expect(harness.confirm.require).not.toHaveBeenCalled()
+    expect(harness.mutations.deleteUser.mutateAsync).not.toHaveBeenCalled()
+  })
+
   it('confirms unban and reports mutation failures as observable errors', async () => {
     const harness = createHarness()
     harness.mutations.unbanUser.mutateAsync.mockRejectedValueOnce(new Error('backend denied'))
@@ -73,6 +85,22 @@ describe('admin user commands', () => {
       role: 'admin',
     })
     expect(harness.feedback.roleUpdated).toHaveBeenCalledWith('admin')
+  })
+
+  it('keeps admin role demotion as an intentional confirmed action', async () => {
+    const harness = createHarness()
+    const commands = harness.createCommands()
+
+    commands.openUserActionMenu(makeUser({ id: 8, role: 'admin', username: 'root' }))
+    commands.handleActionSelect('role')
+    await harness.acceptLastConfirm()
+
+    expect(harness.feedback.adminStatusChangeForbidden).not.toHaveBeenCalled()
+    expect(harness.mutations.updateRole.mutateAsync).toHaveBeenCalledWith({
+      id: 8,
+      role: 'user',
+    })
+    expect(harness.feedback.roleUpdated).toHaveBeenCalledWith('user')
   })
 
   it('confirms session revoke only when the user has an auth identity', async () => {

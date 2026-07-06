@@ -53,6 +53,8 @@ graph LR
 - Docker Compose 管理 API、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。
 - River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。
 
+任务 retry 分两层：`taskruntime` 的 `defaultTaskRetryLimit=3` 是 DB/provider failover 的业务 retry 上限；River `MaxAttempts` 是 worker panic、process error、临时基础设施故障的队列层 retry。默认 River `MaxAttempts=25` 必须大于等于业务 retry 上限，调低 `RIVER_MAX_RETRY` 前要确认不会让队列层过早进入 final failure convergence。
+
 Pages 项目建议配置：
 
 | 项目 | 值 |
@@ -274,6 +276,22 @@ curl "${API_BASE_URL}/api/auth/get-session"
 ```
 
 `/api/auth/get-session` 未登录时返回未认证是正常的；关键是宿主机反代服务能转发到 Auth Service。`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream，以及公网 `${API_BASE_URL}/api/health`。
+
+对象存储 live smoke 默认不依赖外部凭据；缺少 env 时会自动 skip。需要在隔离的 R2/S3-compatible bucket 上验证 upload/read/public URL/delete/profile reload contract 时，只通过 shell env 或 CI secret 注入凭据，不要把 secret 写入仓库、issue、日志或未加密 artifact：
+
+```bash
+cd apps/api
+API_TEST_S3_ENDPOINT='<account>.r2.cloudflarestorage.com' \
+API_TEST_S3_ACCESS_KEY_ID='...' \
+API_TEST_S3_SECRET_ACCESS_KEY='...' \
+API_TEST_S3_BUCKET='ideaboard-smoke' \
+API_TEST_S3_ACCESS_DOMAIN='https://uploads.example.com' \
+API_TEST_S3_REGION='auto' \
+API_TEST_S3_FORCE_PATH_STYLE='false' \
+go test ./internal/media/storage -run TestS3CompatibleUploadReadPublicDeleteSmoke -count=1
+```
+
+该 smoke 会在 `uploads/smoke/s3-compatible/` 下创建临时 PNG object，验证 SDK read、公开访问 URL、重新加载 profile 后读取、删除后不可读，并在失败时尽量清理临时 object。`API_TEST_S3_FORCE_PATH_STYLE` 仅在目标 endpoint 要求 path-style 时设为 `true`。
 
 <a id="operations"></a>
 ## 日常运维

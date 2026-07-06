@@ -10,6 +10,7 @@
 | ---- | ------ |
 | [README.md](./README.md) | 这个项目是什么，怎么快速跑起来？ |
 | [DESIGN.md](./DESIGN.md) | 系统为什么这样设计，哪些 contract 不能破坏？ |
+| [docs/adr/](./docs/adr/) | system-wide architecture decisions 的 ADR、status 和后续替代关系是什么？ |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 今天要改代码，应看哪些入口、跑哪些验证？ |
 | [apps/web/DESIGN.md](./apps/web/DESIGN.md) | Agent 做前端 UI 改动时必须遵守哪些规则？ |
 | [docs/runbooks/](./docs/runbooks/) | 部署、运营、安全、数据保护等动作怎么执行？ |
@@ -219,4 +220,4 @@ Use this checklist before architectural changes:
 7. Does it update the relevant `CONTEXT.md` if domain language changed?
 8. Does it update `DEVELOPMENT.md` only if the developer workflow changed?
 
-If a change intentionally breaks one of these contracts, capture the new decision in this file or a dedicated ADR before landing the implementation.
+If a change intentionally breaks one of these contracts, capture the new decision in this file or a system-wide ADR under [docs/adr/](./docs/adr/) before landing the implementation.

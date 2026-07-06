@@ -89,6 +89,44 @@ export default tseslint.config(
     },
   },
   {
+    files: [
+      'src/app/**/*.{ts,tsx,vue}',
+      'src/features/**/app/**/*.{ts,tsx,vue}',
+      'src/features/**/pages/**/*.{ts,tsx,vue}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/generated-query/**'],
+              message:
+                'Route, page, and app layers must use feature/resource/shared API adapters instead of generated-query directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/shared/**/*.{ts,tsx,vue}'],
+    ignores: ['src/shared/api/generated-query/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/features/**'],
+              message: 'Shared modules must not depend on concrete feature modules.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/shared/api/generated-query/**'],
     rules: {

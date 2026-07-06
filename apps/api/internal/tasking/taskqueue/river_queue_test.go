@@ -80,6 +80,17 @@ func TestRiverQueueEnqueueUsesDrawingArgs(t *testing.T) {
 	}
 }
 
+func TestDrawingTaskInsertOptsUsesRiverDefaults(t *testing.T) {
+	opts := drawingTaskInsertOpts(&tasks.TaskPayload{TaskID: "task_default"}, "", 0)
+
+	if opts.Queue != RiverQueueDefault {
+		t.Fatalf("queue=%q, want %q", opts.Queue, RiverQueueDefault)
+	}
+	if opts.MaxAttempts != RiverMaxAttemptsDefault {
+		t.Fatalf("max attempts=%d, want %d", opts.MaxAttempts, RiverMaxAttemptsDefault)
+	}
+}
+
 func TestRiverQueueRejectsMissingTaskID(t *testing.T) {
 	client := &fakeRiverClient{}
 	queue := NewRiverQueueWithClient(client, nil, nil, RiverQueueDefault, 7)
