@@ -55,40 +55,28 @@
 </template>
 
 <script setup lang="ts">
-import type { ComponentPublicInstance } from 'vue'
+import { computed, type ComponentPublicInstance } from 'vue'
 import {
   IMAGE_ACTION_MENU_ITEMS,
   type ImageActionMenuItem,
   type ImageNodeAction,
 } from '../../config/imageActionRegistry'
 import type { ImageStrengthAction } from '../../execution'
+import type { ImageActionStrengthControl } from '../../image-tools'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
 
 const props = defineProps<{
-  showStrengthControl: boolean
   strengthMenuStyle?: string | Record<string, string>
   directGenerating: boolean
-  activeStrengthAction: ImageStrengthAction | null
-  getStrengthValue: (action: ImageStrengthAction) => number
-  setStrengthRangeRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
-  setStrengthTriggerRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
-  onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
-  onStrengthInput: (action: ImageStrengthAction, event: Event) => void
-  onStrengthChange: (action: ImageStrengthAction, event: Event) => void
-  onStrengthPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
-  onStrengthClick: (action: ImageStrengthAction, event: MouseEvent) => void
+  strengthControl: ImageActionStrengthControl
 }>()
 
 const emit = defineEmits<{
   (event: 'action', action: ImageNodeAction): void
 }>()
+
+const showStrengthControl = computed(() => props.strengthControl.visible)
 
 function onActionClick(item: ImageActionMenuItem) {
   emit('action', item.action)
@@ -100,17 +88,17 @@ function getStrengthAction(item: ImageActionMenuItem): ImageStrengthAction | nul
 
 function isStrengthActive(item: ImageActionMenuItem) {
   const action = getStrengthAction(item)
-  return !!action && props.showStrengthControl && props.activeStrengthAction === action
+  return !!action && showStrengthControl.value && props.strengthControl.activeAction === action
 }
 
 function isStrengthHidden(item: ImageActionMenuItem) {
   const action = getStrengthAction(item)
-  return props.showStrengthControl && props.activeStrengthAction !== action
+  return showStrengthControl.value && props.strengthControl.activeAction !== action
 }
 
 function getItemStrengthValue(item: ImageActionMenuItem) {
   const action = getStrengthAction(item)
-  return action ? props.getStrengthValue(action) : 0
+  return action ? props.strengthControl.getValue(action) : 0
 }
 
 function getItemStrengthRangeStyle(item: ImageActionMenuItem) {
@@ -127,7 +115,7 @@ function setItemStrengthRangeRef(
 ) {
   const action = getStrengthAction(item)
   if (!action) return
-  props.setStrengthRangeRef(action, el)
+  props.strengthControl.setRangeRef(action, el)
 }
 
 function setItemStrengthTriggerRef(
@@ -136,37 +124,37 @@ function setItemStrengthTriggerRef(
 ) {
   const action = getStrengthAction(item)
   if (!action) return
-  props.setStrengthTriggerRef(action, el)
+  props.strengthControl.setTriggerRef(action, el)
 }
 
 function onItemStrengthRangePointerDown(item: ImageActionMenuItem, event: PointerEvent) {
   const action = getStrengthAction(item)
   if (!action) return
-  props.onStrengthRangePointerDown(action, event)
+  props.strengthControl.onRangePointerDown(action, event)
 }
 
 function onItemStrengthInput(item: ImageActionMenuItem, event: Event) {
   const action = getStrengthAction(item)
   if (!action) return
-  props.onStrengthInput(action, event)
+  props.strengthControl.onInput(action, event)
 }
 
 function onItemStrengthChange(item: ImageActionMenuItem, event: Event) {
   const action = getStrengthAction(item)
   if (!action) return
-  props.onStrengthChange(action, event)
+  props.strengthControl.onChange(action, event)
 }
 
 function onItemStrengthPointerUp(item: ImageActionMenuItem, event: PointerEvent) {
   const action = getStrengthAction(item)
   if (!action) return
-  props.onStrengthPointerUp(action, event)
+  props.strengthControl.onPointerUp(action, event)
 }
 
 function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   const action = getStrengthAction(item)
   if (!action) return
-  props.onStrengthClick(action, event)
+  props.strengthControl.onClick(action, event)
   emit('action', item.action)
 }
 </script>

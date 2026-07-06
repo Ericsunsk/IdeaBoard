@@ -180,15 +180,17 @@ function mountCanvasImageTools() {
           isImageActionPanelVisible: (nodeId) => nodeId === 'node-1',
           isImagePromptComposerVisible: (nodeId) => nodeId === 'node-1',
           isDirectActionRunning: () => false,
-          activeStrengthAction,
-          getActionStrength: () => 50,
-          setStrengthRangeRef: vi.fn(),
-          setStrengthTriggerRef: vi.fn(),
-          onStrengthRangePointerDown: vi.fn(),
-          onStrengthInput: vi.fn(),
-          onStrengthChange: vi.fn(),
-          onStrengthPointerUp: vi.fn(),
-          onStrengthClick: vi.fn(),
+          strengthControl: {
+            activeAction: activeStrengthAction,
+            getValue: () => 50,
+            setRangeRef: vi.fn(),
+            setTriggerRef: vi.fn(),
+            onRangePointerDown: vi.fn(),
+            onInput: vi.fn(),
+            onChange: vi.fn(),
+            onPointerUp: vi.fn(),
+            onClick: vi.fn(),
+          },
           clearSelectedFlowElements: vi.fn(),
           startCanvasInteraction: vi.fn(),
           stopCanvasInteraction: vi.fn(),
@@ -478,8 +480,8 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
 
       expect(actionAfter).not.toBe(actionBefore)
-      expect(actionAfter.activeStrengthAction).toBe(IMAGE_STRENGTH_ACTIONS[0])
-      expect(actionAfter.showStrengthControl).toBe(true)
+      expect(actionAfter.strengthControl.activeAction).toBe(IMAGE_STRENGTH_ACTIONS[0])
+      expect(actionAfter.strengthControl.visible).toBe(true)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1')).toBe(actionAfter)
     } finally {
       harness.unmount()

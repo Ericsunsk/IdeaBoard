@@ -52,27 +52,38 @@ export type ImageToolStageBinding = {
   onRasterCanvasPointerDown: (event: PointerEvent) => void
 }
 
+type ImageActionStrengthControlHandlers = {
+  getValue: (action: ImageStrengthAction) => number
+  setRangeRef: (
+    action: ImageStrengthAction,
+    el: Element | ComponentPublicInstance | null,
+  ) => void
+  setTriggerRef: (
+    action: ImageStrengthAction,
+    el: Element | ComponentPublicInstance | null,
+  ) => void
+  onRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
+  onInput: (action: ImageStrengthAction, event: Event) => void
+  onChange: (action: ImageStrengthAction, event: Event) => void
+  onPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
+  onClick: (action: ImageStrengthAction, event: MouseEvent) => void
+}
+
+export type ImageActionStrengthControlSource = ImageActionStrengthControlHandlers & {
+  activeAction: { readonly value: ImageStrengthAction | null }
+}
+
+export type ImageActionStrengthControl = ImageActionStrengthControlHandlers & {
+  visible: boolean
+  activeAction: ImageStrengthAction | null
+}
+
 export type ImageActionBinding = {
   actionMenuVisible: boolean
   promptComposerVisible: boolean
   promptPlaceholder: string
   directGenerating: boolean
-  showStrengthControl: boolean
-  activeStrengthAction: ImageStrengthAction | null
-  getStrengthValue: (action: ImageStrengthAction) => number
-  setStrengthRangeRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
-  setStrengthTriggerRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
-  onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
-  onStrengthInput: (action: ImageStrengthAction, event: Event) => void
-  onStrengthChange: (action: ImageStrengthAction, event: Event) => void
-  onStrengthPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
-  onStrengthClick: (action: ImageStrengthAction, event: MouseEvent) => void
+  strengthControl: ImageActionStrengthControl
 }
 
 export type ImageToolChromeModel = {

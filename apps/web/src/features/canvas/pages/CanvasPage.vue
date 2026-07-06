@@ -423,15 +423,17 @@ const imageTools = commands.imageWorkflow.createImageTools({
     isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
   isImagePromptComposerVisible: (nodeId) =>
     isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
-  activeStrengthAction,
-  getActionStrength,
-  setStrengthRangeRef,
-  setStrengthTriggerRef,
-  onStrengthRangePointerDown,
-  onStrengthInput,
-  onStrengthChange,
-  onStrengthPointerUp,
-  onStrengthClick,
+  strengthControl: {
+    activeAction: activeStrengthAction,
+    getValue: getActionStrength,
+    setRangeRef: setStrengthRangeRef,
+    setTriggerRef: setStrengthTriggerRef,
+    onRangePointerDown: onStrengthRangePointerDown,
+    onInput: onStrengthInput,
+    onChange: onStrengthChange,
+    onPointerUp: onStrengthPointerUp,
+    onClick: onStrengthClick,
+  },
 })
 
 const {

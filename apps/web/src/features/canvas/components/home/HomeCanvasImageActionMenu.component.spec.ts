@@ -12,17 +12,19 @@ function renderImageActionMenu(
   } = {},
 ) {
   const props = {
-    showStrengthControl: input.showStrengthControl ?? false,
     directGenerating: false,
-    activeStrengthAction: input.activeStrengthAction ?? null,
-    getStrengthValue: () => input.strengthValue ?? 50,
-    setStrengthRangeRef: vi.fn(),
-    setStrengthTriggerRef: vi.fn(),
-    onStrengthRangePointerDown: vi.fn(),
-    onStrengthInput: vi.fn(),
-    onStrengthChange: vi.fn(),
-    onStrengthPointerUp: vi.fn(),
-    onStrengthClick: vi.fn(),
+    strengthControl: {
+      visible: input.showStrengthControl ?? false,
+      activeAction: input.activeStrengthAction ?? null,
+      getValue: () => input.strengthValue ?? 50,
+      setRangeRef: vi.fn(),
+      setTriggerRef: vi.fn(),
+      onRangePointerDown: vi.fn(),
+      onInput: vi.fn(),
+      onChange: vi.fn(),
+      onPointerUp: vi.fn(),
+      onClick: vi.fn(),
+    },
   }
 
   return {
@@ -54,11 +56,11 @@ describe('HomeCanvasImageActionMenu', () => {
     const { props } = renderImageActionMenu()
 
     await waitFor(() => {
-      expect(props.setStrengthTriggerRef).toHaveBeenCalledWith(
+      expect(props.strengthControl.setTriggerRef).toHaveBeenCalledWith(
         IMAGE_NODE_ACTION.styleVariation,
         expect.anything(),
       )
-      expect(props.setStrengthTriggerRef).toHaveBeenCalledWith(
+      expect(props.strengthControl.setTriggerRef).toHaveBeenCalledWith(
         IMAGE_NODE_ACTION.hdUpscale,
         expect.anything(),
       )

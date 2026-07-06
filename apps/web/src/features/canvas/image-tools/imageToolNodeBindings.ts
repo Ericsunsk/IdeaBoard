@@ -1,4 +1,8 @@
-import type { ImageActionBinding, ImageToolStageBinding } from './imageToolBindings'
+import type {
+  ImageActionBinding,
+  ImageActionStrengthControl,
+  ImageToolStageBinding,
+} from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
 type CssStyleRecord = Record<string, string> | null
@@ -35,6 +39,27 @@ function areStageBindingValuesEqual(
 ) {
   if (key === 'maskOverlayStyle' || key === 'rasterOverlayStyle') {
     return areCssStyleRecordsEqual(leftValue as CssStyleRecord, rightValue as CssStyleRecord)
+  }
+  return Object.is(leftValue, rightValue)
+}
+
+function areStrengthControlsEqual(
+  left: ImageActionStrengthControl,
+  right: ImageActionStrengthControl,
+) {
+  return areBindingObjectsEqual(left, right)
+}
+
+function areActionBindingValuesEqual(
+  key: keyof ImageActionBinding,
+  leftValue: ImageActionBinding[keyof ImageActionBinding],
+  rightValue: ImageActionBinding[keyof ImageActionBinding],
+) {
+  if (key === 'strengthControl') {
+    return areStrengthControlsEqual(
+      leftValue as ImageActionStrengthControl,
+      rightValue as ImageActionStrengthControl,
+    )
   }
   return Object.is(leftValue, rightValue)
 }
@@ -130,23 +155,28 @@ export function createImageToolNodeBindings(
   function actionBindingFor(nodeId: string): ImageActionBinding {
     const hasCommittedMask = !!session.maskEditor.getCommittedMaskData(nodeId)
     const actionMenuVisible = options.isImageActionPanelVisible(nodeId)
+    const activeStrengthAction = options.strengthControl.activeAction.value
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
       promptComposerVisible: options.isImagePromptComposerVisible(nodeId),
       promptPlaceholder: hasCommittedMask ? '描述如何重绘选区' : '输入提示词改造这张图',
       directGenerating: options.isDirectActionRunning(nodeId),
-      showStrengthControl: !!options.activeStrengthAction.value && actionMenuVisible,
-      activeStrengthAction: options.activeStrengthAction.value,
-      getStrengthValue: options.getActionStrength,
-      setStrengthRangeRef: options.setStrengthRangeRef,
-      setStrengthTriggerRef: options.setStrengthTriggerRef,
-      onStrengthRangePointerDown: options.onStrengthRangePointerDown,
-      onStrengthInput: options.onStrengthInput,
-      onStrengthChange: options.onStrengthChange,
-      onStrengthPointerUp: options.onStrengthPointerUp,
-      onStrengthClick: options.onStrengthClick,
+      strengthControl: {
+        visible: !!activeStrengthAction && actionMenuVisible,
+        activeAction: activeStrengthAction,
+        getValue: options.strengthControl.getValue,
+        setRangeRef: options.strengthControl.setRangeRef,
+        setTriggerRef: options.strengthControl.setTriggerRef,
+        onRangePointerDown: options.strengthControl.onRangePointerDown,
+        onInput: options.strengthControl.onInput,
+        onChange: options.strengthControl.onChange,
+        onPointerUp: options.strengthControl.onPointerUp,
+        onClick: options.strengthControl.onClick,
+      },
     }
-    return reuseCachedBinding(actionBindingCache, nodeId, nextBinding, areBindingObjectsEqual)
+    return reuseCachedBinding(actionBindingCache, nodeId, nextBinding, (left, right) =>
+      areBindingObjectsEqual(left, right, areActionBindingValuesEqual),
+    )
   }
 
   return {

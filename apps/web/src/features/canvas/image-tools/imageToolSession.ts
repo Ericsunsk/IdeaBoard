@@ -1,10 +1,9 @@
 import { useEventListener } from '@vueuse/core'
 import { computed, ref } from 'vue'
 import type { Connection, Node } from '@vue-flow/core'
-import type { ComponentPublicInstance, Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../composables/useFlowCanvasInteractionState'
-import type { ImageStrengthAction } from '../execution'
 import { useImageEditorMode } from '../image-editor/composables/useImageEditorMode'
 import { useImageEditorRasterOverlay } from '../image-editor/composables/useImageEditorRasterOverlay'
 import { useImageEditorSession } from '../image-editor/composables/useImageEditorSession'
@@ -20,6 +19,7 @@ import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import { isEditableEventTarget } from '../utils/domEventTargets'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
+import type { ImageActionStrengthControlSource } from './imageToolBindings'
 
 type ValueRef<T> = {
   readonly value: T
@@ -74,21 +74,7 @@ export type UseCanvasImageToolsOptions = {
   isImageActionPanelVisible: (nodeId: string) => boolean
   isImagePromptComposerVisible: (nodeId: string) => boolean
   isDirectActionRunning: (nodeId: string) => boolean
-  activeStrengthAction: ValueRef<ImageStrengthAction | null>
-  getActionStrength: (action: ImageStrengthAction) => number
-  setStrengthRangeRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
-  setStrengthTriggerRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
-  onStrengthRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
-  onStrengthInput: (action: ImageStrengthAction, event: Event) => void
-  onStrengthChange: (action: ImageStrengthAction, event: Event) => void
-  onStrengthPointerUp: (action: ImageStrengthAction, event: PointerEvent) => void
-  onStrengthClick: (action: ImageStrengthAction, event: MouseEvent) => void
+  strengthControl: ImageActionStrengthControlSource
   clearSelectedFlowElements: () => void
   startCanvasInteraction: (key: CanvasInteractionKey) => void
   stopCanvasInteraction: (key: CanvasInteractionKey) => void

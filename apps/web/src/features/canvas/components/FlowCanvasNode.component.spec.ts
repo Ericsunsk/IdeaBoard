@@ -36,16 +36,18 @@ function createImageActionBinding(): ImageActionBinding {
     promptComposerVisible: false,
     promptPlaceholder: '',
     directGenerating: false,
-    showStrengthControl: false,
-    activeStrengthAction: null,
-    getStrengthValue: () => 50,
-    setStrengthRangeRef: vi.fn(),
-    setStrengthTriggerRef: vi.fn(),
-    onStrengthRangePointerDown: vi.fn(),
-    onStrengthInput: vi.fn(),
-    onStrengthChange: vi.fn(),
-    onStrengthPointerUp: vi.fn(),
-    onStrengthClick: vi.fn(),
+    strengthControl: {
+      visible: false,
+      activeAction: null,
+      getValue: () => 50,
+      setRangeRef: vi.fn(),
+      setTriggerRef: vi.fn(),
+      onRangePointerDown: vi.fn(),
+      onInput: vi.fn(),
+      onChange: vi.fn(),
+      onPointerUp: vi.fn(),
+      onClick: vi.fn(),
+    },
   }
 }
 

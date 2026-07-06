@@ -153,6 +153,30 @@ function createWorkspaceOptions() {
   }
 }
 
+function createImageToolsOptions() {
+  return {
+    activeTool: ref('select'),
+    canvasWrapRef: ref(null),
+    isCanvasInteractionLocked: ref(false),
+    getImageStageElement: vi.fn(),
+    clearActiveNodePanel: vi.fn(),
+    hideStrengthControl: vi.fn(),
+    isImageActionPanelVisible: vi.fn(),
+    isImagePromptComposerVisible: vi.fn(),
+    strengthControl: {
+      activeAction: ref(null),
+      getValue: vi.fn(),
+      setRangeRef: vi.fn(),
+      setTriggerRef: vi.fn(),
+      onRangePointerDown: vi.fn(),
+      onInput: vi.fn(),
+      onChange: vi.fn(),
+      onPointerUp: vi.fn(),
+      onClick: vi.fn(),
+    },
+  }
+}
+
 describe('createCanvasWorkspaceRuntimeParts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -213,25 +237,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       }),
     )
 
-    runtime.imageWorkflow.createImageTools({
-      activeTool: ref('select'),
-      canvasWrapRef: ref(null),
-      isCanvasInteractionLocked: ref(false),
-      getImageStageElement: vi.fn(),
-      clearActiveNodePanel: vi.fn(),
-      hideStrengthControl: vi.fn(),
-      isImageActionPanelVisible: vi.fn(),
-      isImagePromptComposerVisible: vi.fn(),
-      activeStrengthAction: ref(null),
-      getActionStrength: vi.fn(),
-      setStrengthRangeRef: vi.fn(),
-      setStrengthTriggerRef: vi.fn(),
-      onStrengthRangePointerDown: vi.fn(),
-      onStrengthInput: vi.fn(),
-      onStrengthChange: vi.fn(),
-      onStrengthPointerUp: vi.fn(),
-      onStrengthClick: vi.fn(),
-    })
+    runtime.imageWorkflow.createImageTools(createImageToolsOptions())
 
     expect(mocks.useCanvasImageTools).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -257,25 +263,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
-    runtime.imageWorkflow.createImageTools({
-      activeTool: ref('select'),
-      canvasWrapRef: ref(null),
-      isCanvasInteractionLocked: ref(false),
-      getImageStageElement: vi.fn(),
-      clearActiveNodePanel: vi.fn(),
-      hideStrengthControl: vi.fn(),
-      isImageActionPanelVisible: vi.fn(),
-      isImagePromptComposerVisible: vi.fn(),
-      activeStrengthAction: ref(null),
-      getActionStrength: vi.fn(),
-      setStrengthRangeRef: vi.fn(),
-      setStrengthTriggerRef: vi.fn(),
-      onStrengthRangePointerDown: vi.fn(),
-      onStrengthInput: vi.fn(),
-      onStrengthChange: vi.fn(),
-      onStrengthPointerUp: vi.fn(),
-      onStrengthClick: vi.fn(),
-    })
+    runtime.imageWorkflow.createImageTools(createImageToolsOptions())
     const imageToolOptions = mocks.useCanvasImageTools.mock.calls[0]?.[0]
     const patch = { key: 'outputCount', value: 2 } as const
 
