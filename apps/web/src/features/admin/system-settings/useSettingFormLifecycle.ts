@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import type { QueryKey } from '@tanstack/vue-query'
+import type { QueryClient, QueryKey } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 
@@ -33,6 +33,7 @@ type SettingQueryCacheEntry<TSetting> = {
 
 export function useSettingResourceLifecycle<TSetting extends object>(options: {
   defaultSetting: TSetting
+  extraInvalidateQueryKeys?: QueryKey[]
   feedback: SettingFormLifecycleFeedback
   isSame: (current: TSetting, synced: TSetting) => boolean
   normalize: (setting: Partial<TSetting> | null | undefined) => TSetting
@@ -41,13 +42,19 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
   save: (setting: TSetting) => Promise<TSetting>
   source: ReadonlyValue<Partial<TSetting> | null | undefined>
   validate: (setting: TSetting) => string
+  writeAdditionalQueryCache?: (queryClient: QueryClient, setting: TSetting) => void
 }) {
   const queryClient = useQueryClient()
   const form = ref<TSetting>(cloneSetting(options.defaultSetting)) as Ref<TSetting>
   const lastSyncedForm = ref<TSetting>(cloneSetting(options.defaultSetting)) as Ref<TSetting>
 
   function invalidateQuery() {
-    return queryClient.invalidateQueries({ queryKey: options.queryKey })
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: options.queryKey }),
+      ...(options.extraInvalidateQueryKeys ?? []).map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    ])
   }
 
   function writeQueryCache(setting: TSetting) {
@@ -56,6 +63,7 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
       msg: previous?.msg ?? 'ok',
       data: setting,
     }))
+    options.writeAdditionalQueryCache?.(queryClient, setting)
   }
 
   function hydrate(setting: Partial<TSetting> | null | undefined) {

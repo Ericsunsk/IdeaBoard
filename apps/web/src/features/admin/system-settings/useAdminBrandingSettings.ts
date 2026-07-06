@@ -1,14 +1,11 @@
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref } from 'vue'
+import { useMutation } from '@tanstack/vue-query'
+import { computed } from 'vue'
 import { uploadAdminAsset } from '../../../shared/api/generated-query/admin-assets/admin-assets'
 import {
   getGetAdminBrandingSettingQueryKey,
   useGetAdminBrandingSetting,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
-import type {
-  ApiResponseBrandingSetting,
-  BrandingSetting,
-} from '../../../shared/api/generated-query/model'
+import type { BrandingSetting } from '../../../shared/api/generated-query/model'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import type { AdminBrandingSettingsFeedback } from '../feedback/useAdminFeedback'
 import {
@@ -25,79 +22,41 @@ import {
   writeSiteBrandingQueryCache,
 } from '../../../shared/composables/useSiteBranding'
 import { updateBrandingSetting } from './systemSettingsCommands'
-import { useSettingFormLifecycle } from './useSettingFormLifecycle'
+import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
 export function useAdminBrandingSettings(options: { feedback: AdminBrandingSettingsFeedback }) {
-  const queryClient = useQueryClient()
   const brandingQuery = useGetAdminBrandingSetting()
-  const form = ref<BrandingSetting>({ ...DEFAULT_SITE_BRANDING_SETTING })
-  const lastSyncedForm = ref<BrandingSetting>({ ...DEFAULT_SITE_BRANDING_SETTING })
-
-  function invalidateBrandingQueries() {
-    return Promise.all([
-      queryClient.invalidateQueries({ queryKey: getGetAdminBrandingSettingQueryKey() }),
-      queryClient.invalidateQueries({ queryKey: SITE_BRANDING_QUERY_KEY }),
-    ])
-  }
-
-  function writeBrandingQueryCache(setting: BrandingSetting) {
-    queryClient.setQueryData<ApiResponseBrandingSetting>(
-      getGetAdminBrandingSettingQueryKey(),
-      (previous) => ({
-        code: previous?.code ?? 0,
-        msg: previous?.msg ?? 'ok',
-        data: setting,
-      }),
-    )
-    writeSiteBrandingQueryCache(queryClient, setting)
-  }
-
-  const saveBrandingMutation = useMutation({
-    mutationFn: updateBrandingSetting,
-    onSuccess: async (setting) => {
-      const normalizedSetting = hydrateBrandingForm(setting)
-      writeBrandingQueryCache(normalizedSetting)
-      await invalidateBrandingQueries()
-    },
+  const sourceSetting = computed(() => brandingQuery.data.value?.data)
+  const resource = useSettingResourceLifecycle<BrandingSetting>({
+    defaultSetting: DEFAULT_SITE_BRANDING_SETTING,
+    extraInvalidateQueryKeys: [SITE_BRANDING_QUERY_KEY],
+    feedback: options.feedback,
+    isSame: isSameBrandingSetting,
+    normalize: normalizeSiteBrandingSetting,
+    query: brandingQuery,
+    queryKey: getGetAdminBrandingSettingQueryKey(),
+    save: updateBrandingSetting,
+    source: sourceSetting,
+    validate: (setting) => validateSiteBrandingSetting(normalizeSiteBrandingSetting(setting)),
+    writeAdditionalQueryCache: writeSiteBrandingQueryCache,
   })
 
   const uploadLogoMutation = useMutation({
     mutationFn: uploadBrandingLogoFile,
     onSuccess: (logoURL) => {
-      form.value.logo_url = normalizeSiteBrandingSetting({
-        ...form.value,
+      resource.form.value.logo_url = normalizeSiteBrandingSetting({
+        ...resource.form.value,
         logo_url: logoURL,
       }).logo_url
     },
   })
 
-  const loading = computed(() => brandingQuery.isLoading.value || brandingQuery.isFetching.value)
-  const saving = computed(() => saveBrandingMutation.isPending.value)
   const uploading = computed(() => uploadLogoMutation.isPending.value)
-  const fallbackText = computed(() => getSiteBrandFallbackText(form.value.project_name))
-  const logoPreviewURL = computed(() => resolveSiteBrandingLogoURL(form.value.logo_url))
-  const sourceSetting = computed(() => brandingQuery.data.value?.data)
-
-  const formLifecycle = useSettingFormLifecycle<Partial<BrandingSetting>, BrandingSetting>({
-    error: brandingQuery.error,
-    source: sourceSetting,
-    current: form,
-    synced: lastSyncedForm,
-    isSaving: saveBrandingMutation.isPending,
-    feedback: options.feedback,
-    hydrate: hydrateBrandingForm,
-    isSame: isSameBrandingSetting,
-    reset: (synced) => {
-      form.value = { ...synced }
-    },
-  })
+  const fallbackText = computed(() => getSiteBrandFallbackText(resource.form.value.project_name))
+  const logoPreviewURL = computed(() => resolveSiteBrandingLogoURL(resource.form.value.logo_url))
 
   async function handleSaveBranding() {
-    const normalizedSetting = normalizeSiteBrandingSetting(form.value)
-    await formLifecycle.save({
-      validate: () => validateSiteBrandingSetting(normalizedSetting),
-      run: () => saveBrandingMutation.mutateAsync(normalizedSetting),
-    })
+    await resource.save()
   }
 
   async function handleUploadLogo(file: File) {
@@ -112,30 +71,23 @@ export function useAdminBrandingSettings(options: { feedback: AdminBrandingSetti
   }
 
   function clearLogo() {
-    form.value.logo_url = ''
+    resource.form.value.logo_url = ''
   }
 
   function resetBrandingForm() {
-    formLifecycle.reset()
-  }
-
-  function hydrateBrandingForm(setting: Partial<BrandingSetting> | null | undefined) {
-    const normalizedSetting = normalizeSiteBrandingSetting(setting)
-    lastSyncedForm.value = { ...normalizedSetting }
-    form.value = { ...normalizedSetting }
-    return normalizedSetting
+    resource.reset()
   }
 
   return {
     clearLogo,
     fallbackText,
-    form,
+    form: resource.form,
     handleSaveBranding,
     handleUploadLogo,
-    loading,
+    loading: resource.loading,
     logoPreviewURL,
     resetBrandingForm,
-    saving,
+    saving: resource.saving,
     uploading,
   }
 }

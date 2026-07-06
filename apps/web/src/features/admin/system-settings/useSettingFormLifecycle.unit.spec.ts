@@ -1,4 +1,5 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import type { QueryKey } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, effectScope, nextTick, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
@@ -22,6 +23,7 @@ type TestSettingResource = {
 }
 
 const testSettingQueryKey = ['admin', 'settings', 'resource-lifecycle-test'] as const
+const extraTestSettingQueryKey = ['site', 'settings', 'resource-lifecycle-test'] as const
 
 describe('useSettingFormLifecycle', () => {
   it('hydrates the form from clean source changes and reports load failures', async () => {
@@ -245,12 +247,44 @@ describe('useSettingResourceLifecycle', () => {
       await harness.unmount()
     }
   })
+
+  it('writes additional query cache and invalidates extra query keys after save', async () => {
+    const harness = mountSettingResource({
+      extraInvalidateQueryKeys: [extraTestSettingQueryKey],
+      writeAdditionalQueryCache: (queryClient, setting) => {
+        queryClient.setQueryData(extraTestSettingQueryKey, {
+          code: 0,
+          msg: 'ok',
+          data: setting,
+        })
+      },
+    })
+    const invalidateSpy = vi.spyOn(harness.queryClient, 'invalidateQueries')
+
+    try {
+      harness.resource.form.value = { count: 3, title: ' Shared ' }
+
+      await harness.resource.save()
+
+      expect(harness.queryClient.getQueryData(extraTestSettingQueryKey)).toEqual({
+        code: 0,
+        msg: 'ok',
+        data: { count: 3, title: 'Shared' },
+      })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: testSettingQueryKey })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: extraTestSettingQueryKey })
+    } finally {
+      await harness.unmount()
+    }
+  })
 })
 
 function mountSettingResource(options: {
+  extraInvalidateQueryKeys?: QueryKey[]
   save?: (setting: TestSetting) => Promise<TestSetting>
   source?: Partial<TestSetting> | null
   validate?: (setting: TestSetting) => string
+  writeAdditionalQueryCache?: (queryClient: QueryClient, setting: TestSetting) => void
 } = {}) {
   let resource: TestSettingResource | null = null
   const source = ref<Partial<TestSetting> | null | undefined>(options.source ?? null)
@@ -282,6 +316,7 @@ function mountSettingResource(options: {
       setup() {
         resource = useSettingResourceLifecycle<TestSetting>({
           defaultSetting: { count: 0, title: '' },
+          extraInvalidateQueryKeys: options.extraInvalidateQueryKeys,
           feedback,
           isSame: (current, synced) =>
             current.count === synced.count && current.title === synced.title,
@@ -295,6 +330,7 @@ function mountSettingResource(options: {
           save: saveSetting,
           source,
           validate: options.validate ?? (() => ''),
+          writeAdditionalQueryCache: options.writeAdditionalQueryCache,
         })
         return () => null
       },
