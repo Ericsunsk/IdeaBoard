@@ -1,6 +1,7 @@
 import {
   clampImageNodeOutputCount,
   getCanvasNodeImageInputLimit,
+  normalizePromptReferenceImageUrls,
   normalizePromptAspectRatio,
   resolveImageNodeFrameSize,
   type FusionBlendPoint,
@@ -359,11 +360,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     const source = requireImageExecutionImage(readGraph(), nodeId)
     const rawMaskDataUrl = `${inpaint.maskDataUrl ?? ''}`.trim()
     if (!rawMaskDataUrl) failPlanning('请先标记局部重绘区域')
-    const referenceImageLimit = getCanvasNodeImageInputLimit('prompt')
-    const referenceImageUrls = (inpaint.referenceImageUrls ?? [])
-      .map((url) => `${url ?? ''}`.trim())
-      .filter(Boolean)
-      .slice(0, referenceImageLimit)
     return {
       kind: 'image-inpaint',
       sourceNodeId: nodeId,
@@ -371,7 +367,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       prompt,
       rawMaskDataUrl,
       outputCount: clampImageNodeOutputCount(inpaint.outputCount),
-      referenceImageUrls,
+      referenceImageUrls: normalizePromptReferenceImageUrls(inpaint.referenceImageUrls),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
       },

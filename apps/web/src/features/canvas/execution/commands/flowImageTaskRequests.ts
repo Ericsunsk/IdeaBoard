@@ -22,7 +22,10 @@ import {
   type ExecutionImageSize,
 } from '../contracts/executionSizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
-import { getCanvasNodeImageInputLimit, type PromptAspectRatio } from '../../../canvas-board/domain'
+import {
+  normalizePromptReferenceImageUrls,
+  type PromptAspectRatio,
+} from '../../../canvas-board/domain'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
   IMAGE_CANVAS_EXTEND_ACTION,
@@ -182,11 +185,6 @@ export function buildPromptImageTaskRequest(input: {
 export function buildImageInpaintTaskRequest(
   input: ImageInpaintTaskRequestInput,
 ): SubmitTaskData {
-  const referenceImageLimit = getCanvasNodeImageInputLimit('prompt')
-  const referenceImageUrls = (input.referenceImageUrls ?? [])
-    .map((url) => url.trim())
-    .filter(Boolean)
-    .slice(0, referenceImageLimit)
   return buildExecutionTaskRequest({
     prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
     feature: EXECUTION_PARTIAL_EDIT_META.feature,
@@ -194,7 +192,7 @@ export function buildImageInpaintTaskRequest(
     params: {
       original_image_url: input.croppedImageUrl,
       mask_image_url: input.croppedMaskUrl,
-      reference_image_urls: referenceImageUrls,
+      reference_image_urls: normalizePromptReferenceImageUrls(input.referenceImageUrls),
       use_mask: true,
       ...buildExecutionSizeParams(input.cropSize),
     },
