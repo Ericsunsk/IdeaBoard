@@ -13,6 +13,7 @@ import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import {
   createFlowGraphCommandOptions,
+  createFlowGraphCommandOptionsFromTransactionSummary,
   type FlowGraphCommandSideEffectOptions,
 } from './flowGraphAdapterCommandSideEffects'
 import type { FlowHistorySnapshot } from './useFlowHistory'
@@ -28,7 +29,6 @@ import {
   commitCanvasGraphDeleteIntent,
   createCanvasGraphStore,
   isCanvasGraphNodeId,
-  type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
 import { flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 
@@ -212,13 +212,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     )
   }
 
-  function createTransactionCommandOptions(summary: CanvasGraphTransactionSummary) {
-    return createFlowGraphCommandOptions({
-      recordHistory: summary.shouldRecordHistory,
-      markDirty: summary.shouldMarkDirty,
-    })
-  }
-
   const connectionMutations = useFlowConnectionMutations({
     nodes: options.nodes,
     edges: options.edges,
@@ -318,7 +311,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     })
     if (!summary.didChange) return
     options.graphAdapter.removeNodes(nodeId, {
-      ...createTransactionCommandOptions(summary),
+      ...createFlowGraphCommandOptionsFromTransactionSummary(summary),
       removeConnectedEdges: true,
     })
   }

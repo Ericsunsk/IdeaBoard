@@ -11,6 +11,7 @@ import {
 } from './useCanvasVueFlowGraphAdapter'
 import {
   createFlowGraphCommandOptions,
+  createFlowGraphCommandOptionsFromTransactionSummary,
   readFlowGraphCommandSideEffects,
 } from './flowGraphAdapterCommandSideEffects'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
@@ -30,7 +31,6 @@ import {
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
   type CanvasGraphTransaction,
-  type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
@@ -271,17 +271,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function createNodeDragTransaction() {
     return createCurrentCanvasGraphStore().beginTransaction('node-drag')
-  }
-
-  function createTransactionCommandOptions(
-    summary: CanvasGraphTransactionSummary,
-    historyBefore?: FlowHistorySnapshot | null,
-  ) {
-    return createFlowGraphCommandOptions({
-      historyBefore: summary.shouldRecordHistory ? (historyBefore ?? undefined) : undefined,
-      recordHistory: summary.shouldRecordHistory,
-      markDirty: summary.shouldMarkDirty,
-    })
   }
 
   function stageNodeDragChange(change: NodeDragChange) {
@@ -553,7 +542,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
     const result = graphAdapter.applyGraphChanges(
       { nodes: nodeChanges, edges: edgeChanges },
-      createTransactionCommandOptions(summary, historyBefore),
+      createFlowGraphCommandOptionsFromTransactionSummary(summary, { historyBefore }),
     )
     if (result.didChange) options.onNativeRemove?.()
     return true

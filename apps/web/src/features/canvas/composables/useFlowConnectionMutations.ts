@@ -1,7 +1,10 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, EdgeUpdateEvent, Node } from '@vue-flow/core'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
-import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import {
+  createFlowGraphCommandOptions,
+  createFlowGraphCommandOptionsFromTransactionSummary,
+} from './flowGraphAdapterCommandSideEffects'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   canvasConnectionToFlowEdge,
@@ -74,13 +77,6 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
         options.boardBaseSnapshot?.value,
       ),
     )
-  }
-
-  function createTransactionCommandOptions(summary: CanvasGraphTransactionSummary) {
-    return createFlowGraphCommandOptions({
-      recordHistory: summary.shouldRecordHistory,
-      markDirty: summary.shouldMarkDirty,
-    })
   }
 
   function findTransactionEdgeId(store: CanvasGraphStore, edge: Edge): CanvasGraphEdgeId | null {
@@ -166,7 +162,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       existingEdges,
       filteredEdges,
       nextEdge.edge,
-      createTransactionCommandOptions(summary),
+      createFlowGraphCommandOptionsFromTransactionSummary(summary),
     )
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
   }
@@ -240,7 +236,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     if (!summary.didChange) return
 
     const nextEdge = canvasConnectionToFlowEdge(nextConnection) as Edge
-    const commandOptions = createTransactionCommandOptions(summary)
+    const commandOptions = createFlowGraphCommandOptionsFromTransactionSummary(summary)
     if (retainedEdges.length === options.edges.value.length) {
       options.graphAdapter.updateEdge(edge.id, createEdgeUpdatePatch(nextEdge), commandOptions)
     } else {
