@@ -9,6 +9,13 @@ import (
 	"ideaboard/api/internal/platform/database"
 )
 
+type storageProfileLoadSecretPolicy int
+
+const (
+	storageProfileLoadMasked storageProfileLoadSecretPolicy = iota
+	storageProfileLoadPlaintext
+)
+
 func (s *StorageService) ListProfiles(ctx context.Context) ([]StorageProfile, error) {
 	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
@@ -169,22 +176,25 @@ func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*StorageP
 }
 
 func (s *StorageService) loadProfiles(ctx context.Context) ([]StorageProfile, error) {
-	return s.loadProfilesBySecretPolicy(ctx, false)
+	return s.loadProfilesBySecretPolicy(ctx, storageProfileLoadMasked)
 }
 
 func (s *StorageService) loadProfilesWithSecrets(ctx context.Context) ([]StorageProfile, error) {
-	return s.loadProfilesBySecretPolicy(ctx, true)
+	return s.loadProfilesBySecretPolicy(ctx, storageProfileLoadPlaintext)
 }
 
-func (s *StorageService) loadProfilesBySecretPolicy(ctx context.Context, includeSecrets bool) ([]StorageProfile, error) {
+func (s *StorageService) loadProfilesBySecretPolicy(ctx context.Context, secretPolicy storageProfileLoadSecretPolicy) ([]StorageProfile, error) {
 	var (
 		profiles []StorageProfile
 		err      error
 	)
-	if includeSecrets {
+	switch secretPolicy {
+	case storageProfileLoadPlaintext:
 		profiles, err = s.profileRepo.ListProfilesWithSecrets(ctx, false)
-	} else {
+	case storageProfileLoadMasked:
 		profiles, err = s.profileRepo.ListProfiles(ctx, false)
+	default:
+		return nil, fmt.Errorf("unknown storage profile load secret policy: %d", secretPolicy)
 	}
 	if err != nil {
 		return nil, err

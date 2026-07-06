@@ -157,6 +157,84 @@ func TestSaveAndApplyProfileCreatesRuntimeActiveProfile(t *testing.T) {
 	}
 }
 
+func TestSaveAndApplyProfileClearsPreviousCurrentProfile(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	ctx := context.Background()
+
+	first, err := service.SaveAndApplyProfile(ctx, &StorageProfile{
+		ID:       "s3-current-a",
+		Name:     "OSS 当前 A",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":     "ak-a",
+			"secret_access_key": "sk-a",
+			"bucket_name":       "bucket-a",
+			"endpoint":          "s3.example.com",
+			"access_domain":     "https://bucket-a.s3.example.com",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveAndApplyProfile first returned error: %v", err)
+	}
+	second, err := service.SaveAndApplyProfile(ctx, &StorageProfile{
+		ID:       "s3-current-b",
+		Name:     "OSS 当前 B",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":     "ak-b",
+			"secret_access_key": "sk-b",
+			"bucket_name":       "bucket-b",
+			"endpoint":          "s3.example.com",
+			"access_domain":     "https://bucket-b.s3.example.com",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveAndApplyProfile second returned error: %v", err)
+	}
+
+	profiles, err := service.ListProfiles(ctx)
+	if err != nil {
+		t.Fatalf("ListProfiles returned error: %v", err)
+	}
+	currentIDs := make([]string, 0, 1)
+	for _, profile := range profiles {
+		if profile.IsCurrent {
+			currentIDs = append(currentIDs, profile.ID)
+		}
+	}
+	if len(currentIDs) != 1 || currentIDs[0] != second.ID || first.ID == second.ID {
+		t.Fatalf("current profile ids = %#v, want only %q", currentIDs, second.ID)
+	}
+}
+
+func TestApplyProfileRejectsDisabledProfile(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	ctx := context.Background()
+
+	saved, err := service.SaveProfile(ctx, &StorageProfile{
+		ID:       "s3-disabled",
+		Name:     "OSS 停用",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  false,
+		Config: map[string]interface{}{
+			"access_key_id":     "ak-disabled",
+			"secret_access_key": "sk-disabled",
+			"bucket_name":       "bucket-disabled",
+			"endpoint":          "s3.example.com",
+			"access_domain":     "https://bucket-disabled.s3.example.com",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveProfile returned error: %v", err)
+	}
+
+	if _, err := service.ApplyProfile(ctx, saved.ID); err == nil {
+		t.Fatal("ApplyProfile should reject disabled profile")
+	}
+}
+
 func TestSaveProfileAllowsMultipleProfilesForSameProvider(t *testing.T) {
 	service, _ := newStorageServiceTest(t)
 
@@ -339,6 +417,39 @@ WHERE profile_id = $1 AND secret_name = $2 AND status = 'active'`,
 	runtimeProfile := mustFindProfileForTest(t, runtimeProfiles, "s3-secret-boundary")
 	if got := configString(runtimeProfile.Config, storageSecretAccessKeyName); got != rawSecret {
 		t.Fatalf("ListProfilesWithSecrets secret = %q, want %q", got, rawSecret)
+	}
+}
+
+func TestBuiltinLocalProfileNeverExposesSecretConfig(t *testing.T) {
+	service, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+
+	if err := repo.SaveProfile(ctx, StorageProfile{
+		ID:       builtinLocalProfileID(),
+		Name:     "本地存储",
+		Provider: StorageProviderLocal,
+		Enabled:  true,
+		Builtin:  true,
+		Config: map[string]interface{}{
+			storageSecretAccessKeyName: "should-not-persist",
+		},
+	}); err != nil {
+		t.Fatalf("SaveProfile local returned error: %v", err)
+	}
+
+	profiles, err := service.ListProfiles(ctx)
+	if err != nil {
+		t.Fatalf("ListProfiles returned error: %v", err)
+	}
+	local := mustFindProfileForTest(t, profiles, builtinLocalProfileID())
+	if local.Provider != StorageProviderLocal || !local.Builtin || !local.Enabled {
+		t.Fatalf("local profile = %+v, want enabled builtin local", local)
+	}
+	if local.SecretConfigured {
+		t.Fatal("local profile should not report configured secret")
+	}
+	if got := configString(local.Config, storageSecretAccessKeyName); got != "" {
+		t.Fatalf("local profile exposed secret config = %q, want empty", got)
 	}
 }
 

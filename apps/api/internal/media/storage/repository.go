@@ -18,6 +18,13 @@ import (
 
 const storageSecretAccessKeyName = "secret_access_key"
 
+type storageProfileSecretPolicy int
+
+const (
+	storageProfileSecretMetadataOnly storageProfileSecretPolicy = iota
+	storageProfileSecretPlaintext
+)
+
 type StorageProfileRepository struct {
 	db *sql.DB
 	q  *dbsqlc.Queries
@@ -28,21 +35,21 @@ func NewStorageProfileRepository(db *sql.DB) *StorageProfileRepository {
 }
 
 func (r *StorageProfileRepository) ListProfiles(ctx context.Context, includeDeleted bool) ([]StorageProfile, error) {
-	return r.listProfiles(ctx, includeDeleted, false)
+	return r.listProfiles(ctx, includeDeleted, storageProfileSecretMetadataOnly)
 }
 
 func (r *StorageProfileRepository) ListProfilesWithSecrets(ctx context.Context, includeDeleted bool) ([]StorageProfile, error) {
-	return r.listProfiles(ctx, includeDeleted, true)
+	return r.listProfiles(ctx, includeDeleted, storageProfileSecretPlaintext)
 }
 
-func (r *StorageProfileRepository) listProfiles(ctx context.Context, includeDeleted bool, includeSecrets bool) ([]StorageProfile, error) {
+func (r *StorageProfileRepository) listProfiles(ctx context.Context, includeDeleted bool, secretPolicy storageProfileSecretPolicy) ([]StorageProfile, error) {
 	rows, err := r.q.ListStorageProfiles(ctx, includeDeleted)
 	if err != nil {
 		return nil, err
 	}
 	profiles := make([]StorageProfile, 0, len(rows))
 	for _, row := range rows {
-		profile, err := r.profileFromRow(ctx, row, includeSecrets)
+		profile, err := r.profileFromRow(ctx, row, secretPolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -64,20 +71,7 @@ func (r *StorageProfileRepository) SaveAndApplyProfile(ctx context.Context, prof
 		if err := saveProfileTx(ctx, q, saved); err != nil {
 			return err
 		}
-		if err := q.ClearCurrentStorageProfiles(ctx); err != nil {
-			return err
-		}
-		rows, err := q.SetCurrentStorageProfile(ctx, dbsqlc.SetCurrentStorageProfileParams{
-			ProfileID: strings.TrimSpace(profile.ID),
-			UpdatedBy: sql.NullInt64{},
-		})
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return database.ErrNotFound
-		}
-		return nil
+		return applyStorageProfileTx(ctx, q, profile.ID)
 	})
 }
 
@@ -98,21 +92,29 @@ func (r *StorageProfileRepository) ApplyProfile(ctx context.Context, id string) 
 		return database.ErrNotFound
 	}
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		if err := q.ClearCurrentStorageProfiles(ctx); err != nil {
-			return err
-		}
-		rows, err := q.SetCurrentStorageProfile(ctx, dbsqlc.SetCurrentStorageProfileParams{
-			ProfileID: id,
-			UpdatedBy: sql.NullInt64{},
-		})
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return database.ErrNotFound
-		}
-		return nil
+		return applyStorageProfileTx(ctx, q, id)
 	})
+}
+
+func applyStorageProfileTx(ctx context.Context, q *dbsqlc.Queries, id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return database.ErrNotFound
+	}
+	if err := q.ClearCurrentStorageProfiles(ctx); err != nil {
+		return err
+	}
+	rows, err := q.SetCurrentStorageProfile(ctx, dbsqlc.SetCurrentStorageProfileParams{
+		ProfileID: id,
+		UpdatedBy: sql.NullInt64{},
+	})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
 func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfile) error {
@@ -165,7 +167,7 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 	})
 }
 
-func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsqlc.StorageProfile, includeSecret bool) (StorageProfile, error) {
+func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsqlc.StorageProfile, secretPolicy storageProfileSecretPolicy) (StorageProfile, error) {
 	var config map[string]interface{}
 	if len(row.Config) > 0 {
 		if err := json.Unmarshal(row.Config, &config); err != nil {
@@ -177,7 +179,8 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 	}
 
 	secretConfigured := false
-	if includeSecret {
+	switch secretPolicy {
+	case storageProfileSecretPlaintext:
 		secret, err := r.q.GetStorageProfileSecret(ctx, dbsqlc.GetStorageProfileSecretParams{
 			ProfileID:  row.ProfileID,
 			SecretName: storageSecretAccessKeyName,
@@ -195,7 +198,7 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 				secretConfigured = true
 			}
 		}
-	} else {
+	case storageProfileSecretMetadataOnly:
 		configured, err := r.q.HasStorageProfileSecret(ctx, dbsqlc.HasStorageProfileSecretParams{
 			ProfileID:  row.ProfileID,
 			SecretName: storageSecretAccessKeyName,
@@ -204,6 +207,8 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 			return StorageProfile{}, err
 		}
 		secretConfigured = configured
+	default:
+		return StorageProfile{}, fmt.Errorf("unknown storage profile secret policy: %d", secretPolicy)
 	}
 
 	return StorageProfile{
