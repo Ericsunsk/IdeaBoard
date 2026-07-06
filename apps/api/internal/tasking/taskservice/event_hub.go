@@ -2,7 +2,6 @@ package taskservice
 
 import (
 	"sync"
-	"time"
 )
 
 // TaskEvent is emitted when a task's status changes.
@@ -30,12 +29,9 @@ type EventHub struct {
 }
 
 const (
-	defaultSSEGlobalLimit   = 1000
-	defaultSSEPerUserLimit  = 10
-	defaultSSEMaxConnPeriod = 30 * time.Minute
+	defaultSSEGlobalLimit  = 1000
+	defaultSSEPerUserLimit = 10
 )
-
-var taskStreamHeartbeatInterval = 15 * time.Second
 
 func NewEventHub() *EventHub {
 	return newEventHubWithLimits(defaultSSEGlobalLimit, defaultSSEPerUserLimit)

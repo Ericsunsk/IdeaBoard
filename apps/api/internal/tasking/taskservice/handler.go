@@ -1,14 +1,12 @@
 package taskservice
 
 import (
-	"fmt"
-	"log/slog"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/platform/sse"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/tasking/tasks"
 
@@ -255,88 +253,15 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		return
 	}
 
-	if tasks.IsTerminalStatus(task.Status) {
-		if err := sse.Prepare(c); err != nil {
-			slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
-		}
-		if !writeTaskSSEvent(c, task) {
-			return
-		}
-		return
+	session := taskStreamSession{
+		taskID:      taskID,
+		userID:      userID,
+		initialTask: task,
+		taskLoader:  h.taskService,
+		events:      hub,
 	}
-
-	events, unsubscribe, ok := hub.Subscribe(taskID, userID)
-	if !ok {
+	if err := session.Run(c); errors.Is(err, errTaskStreamConnectionLimit) {
 		response.Error(c, http.StatusTooManyRequests, "SSE 连接数已达上限，请稍后重试")
-		return
-	}
-	defer unsubscribe()
-
-	if err := sse.Prepare(c); err != nil {
-		slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
-	}
-
-	task, err = h.taskService.GetUserTask(ctx, taskID, userID)
-	if err != nil {
-		writeTaskStatusFetchErrorSSE(c, taskID, userID, "initial_snapshot", err)
-		return
-	}
-	if !writeTaskSSEvent(c, task) {
-		return
-	}
-	if tasks.IsTerminalStatus(task.Status) {
-		return
-	}
-
-	heartbeat := time.NewTicker(taskStreamHeartbeatInterval)
-	defer heartbeat.Stop()
-	maxConnTimer := time.NewTimer(defaultSSEMaxConnPeriod)
-	defer maxConnTimer.Stop()
-
-	heartbeatTicks := 0
-	const fullRefreshEveryN = 4 // full DB refresh every 4th heartbeat (~60s)
-
-	for {
-		select {
-		case <-maxConnTimer.C:
-			_ = writeSSEvent(c, "close", gin.H{"reason": "max_connection_duration_reached"})
-			return
-		case <-c.Request.Context().Done():
-			return
-		case <-heartbeat.C:
-			heartbeatTicks++
-			if heartbeatTicks%fullRefreshEveryN == 0 {
-				latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
-				if err != nil {
-					writeTaskStatusFetchErrorSSE(c, taskID, userID, "heartbeat", err)
-					return
-				}
-				if !writeTaskSSEvent(c, latest) {
-					return
-				}
-				if tasks.IsTerminalStatus(latest.Status) {
-					return
-				}
-			} else {
-				// Keepalive-only heartbeat: no DB query, just prevent proxy timeout.
-				if _, err := fmt.Fprintf(c.Writer, ":keepalive\n\n"); err != nil {
-					return
-				}
-				c.Writer.Flush()
-			}
-		case <-events:
-			latest, err := h.taskService.GetUserTask(ctx, taskID, userID)
-			if err != nil {
-				writeTaskStatusFetchErrorSSE(c, taskID, userID, "event", err)
-				return
-			}
-			if !writeTaskSSEvent(c, latest) {
-				return
-			}
-			if tasks.IsTerminalStatus(latest.Status) {
-				return
-			}
-		}
 	}
 }
 
@@ -378,22 +303,6 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 		CancelledBy:       task.CancelledBy,
 		CancelReason:      task.CancelReason,
 	}
-}
-
-func writeTaskSSEvent(c *gin.Context, task *tasks.Task) bool {
-	return writeSSEvent(c, "task", task.ToUserView())
-}
-
-func writeTaskStatusFetchErrorSSE(c *gin.Context, taskID string, userID int64, source string, err error) {
-	slog.Warn("fetch SSE task status failed", "task_id", taskID, "user_id", userID, "source", source, "err", err)
-	if writeErr := sse.WriteEvent(c, "error", gin.H{"message": "获取任务状态失败"}); writeErr != nil {
-		slog.Warn("write SSE error event failed", "task_id", taskID, "user_id", userID, "source", source, "err", writeErr)
-	}
-	sse.WriteEvent(c, "close", gin.H{"reason": "fetch_failed"})
-}
-
-func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
-	return sse.WriteEvent(c, event, data) == nil
 }
 
 func (h *Handler) DeleteUserTask(c *gin.Context) {
