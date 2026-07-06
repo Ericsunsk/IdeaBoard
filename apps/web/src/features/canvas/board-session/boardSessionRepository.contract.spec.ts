@@ -20,18 +20,18 @@ import {
 } from './boardSessionRepository'
 
 const mocks = vi.hoisted(() => {
-  const boardApi = {
-    list: vi.fn(),
-    upsert: vi.fn(),
-    remove: vi.fn(),
-    joinByShareToken: vi.fn(),
+  const request = vi.fn()
+  const state = {
+    listResponse: { data: { list: [] } },
+    upsertResponse: { code: 0, data: null },
   }
-  return { boardApi }
+  return { request, state }
 })
 
-vi.mock('../../../shared/api/board', () => ({
-  default: mocks.boardApi,
-  boardApi: mocks.boardApi,
+vi.mock('../../../shared/api/client', () => ({
+  api: {
+    request: mocks.request,
+  },
 }))
 
 function makeSnapshot(zoomLevel: number): CanvasBoardSnapshot {
@@ -63,7 +63,9 @@ describe('createBoardSessionRepository', () => {
       updated_at: '2026-01-01T00:00:00.000Z',
     })
     vi.clearAllMocks()
-    mocks.boardApi.upsert.mockResolvedValue({ code: 0, data: null })
+    mocks.state.listResponse = { data: { list: [] } }
+    mocks.state.upsertResponse = { code: 0, data: null }
+    mocks.request.mockImplementation(mockBoardApiRequest)
   })
 
   it('drops preview data and still syncs remotely when localStorage write throws', async () => {
@@ -93,8 +95,8 @@ describe('createBoardSessionRepository', () => {
     const savedState = getCanvasBoardState(board.id)
     expect(savedState?.viewport.zoomLevel).toBe(250)
     expect(savedState?.previewSnapshotDataUrl).toBeUndefined()
-    expect(mocks.boardApi.upsert).toHaveBeenCalledTimes(1)
-    const payload = mocks.boardApi.upsert.mock.calls[0]?.[1]
+    expect(mocks.request).toHaveBeenCalledTimes(1)
+    const payload = readUpsertBoardPayload(board.id)
     expect(payload?.state?.viewport.zoomLevel).toBe(250)
     expect(payload?.state?.previewSnapshotDataUrl).toBeUndefined()
   })
@@ -106,7 +108,7 @@ describe('createBoardSessionRepository', () => {
       replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 100) })
       const repository = createBoardSessionRepository()
       const remoteError = new Error('network down')
-      mocks.boardApi.upsert.mockRejectedValueOnce(remoteError)
+      mocks.request.mockRejectedValueOnce(remoteError)
       nowSpy.mockReturnValue(2_000)
 
       let thrown: unknown
@@ -125,9 +127,36 @@ describe('createBoardSessionRepository', () => {
       expect(thrown.boardId).toBe(board.id)
       expect(thrown.savedState).toEqual(savedState)
       expect(thrown.cause).toBe(remoteError)
-      expect(mocks.boardApi.upsert).toHaveBeenCalledTimes(1)
+      expect(mocks.request).toHaveBeenCalledTimes(1)
     } finally {
       nowSpy.mockRestore()
     }
   })
 })
+
+function mockBoardApiRequest(url: string, config?: { method?: string }) {
+  const method = config?.method ?? 'GET'
+  if (url === '/user/boards' && method === 'GET') return Promise.resolve(mocks.state.listResponse)
+  if (url.startsWith('/user/boards/') && method === 'PUT') {
+    return Promise.resolve(mocks.state.upsertResponse)
+  }
+  if (url.startsWith('/user/boards/') && method === 'DELETE') {
+    return Promise.resolve({ code: 0, data: null })
+  }
+  return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
+}
+
+function readUpsertBoardPayload(boardId: string): { state?: CanvasBoardState } {
+  const call = mocks.request.mock.calls.find(
+    ([url, config]) =>
+      url === `/user/boards/${boardId}` &&
+      typeof config === 'object' &&
+      config !== null &&
+      'method' in config &&
+      config.method === 'PUT',
+  )
+  if (!call) throw new Error(`Missing upsert call for ${boardId}`)
+  const body = call[1]?.body
+  if (typeof body !== 'string') throw new Error(`Missing upsert body for ${boardId}`)
+  return JSON.parse(body) as { state?: CanvasBoardState }
+}

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UserBoardItem } from '../../../shared/api/board'
+import type { UserBoardItem } from '../../../shared/api/generated-query/model'
 import type { CanvasBoardState } from '../domain'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
 import { makeCanvasBoardState, makeCanvasViewport } from '../testing'
@@ -9,18 +9,18 @@ import { listCanvasBoards, replaceCanvasBoards } from './canvasBoards'
 import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from './boardSync'
 
 const mocks = vi.hoisted(() => {
-  const boardApi = {
-    list: vi.fn(),
-    upsert: vi.fn(),
-    remove: vi.fn(),
-    joinByShareToken: vi.fn(),
+  const request = vi.fn()
+  const state = {
+    listResponse: { data: { list: [] as UserBoardItem[] } },
+    upsertResponse: { code: 0, data: null },
   }
-  return { boardApi }
+  return { request, state }
 })
 
-vi.mock('../../../shared/api/board', () => ({
-  default: mocks.boardApi,
-  boardApi: mocks.boardApi,
+vi.mock('../../../shared/api/client', () => ({
+  api: {
+    request: mocks.request,
+  },
 }))
 
 function makeState(updatedAt: number, zoomLevel: number): CanvasBoardState {
@@ -60,14 +60,15 @@ describe('boardSync', () => {
       updated_at: '2026-01-01T00:00:00.000Z',
     })
     vi.clearAllMocks()
-    mocks.boardApi.list.mockResolvedValue({ data: { list: [] } })
-    mocks.boardApi.upsert.mockResolvedValue({ code: 0, data: null })
+    mocks.state.listResponse = { data: { list: [] } }
+    mocks.state.upsertResponse = { code: 0, data: null }
+    mocks.request.mockImplementation(mockBoardApiRequest)
   })
 
   it('preserves newer local board meta and state during hydrate', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 2_000 }])
     replaceCanvasBoardStateMap({ 'board-1': makeState(2_000, 220) })
-    mocks.boardApi.list.mockResolvedValue({
+    mocks.state.listResponse = {
       data: {
         list: [
           makeRemoteBoard({
@@ -79,7 +80,7 @@ describe('boardSync', () => {
           }),
         ],
       },
-    })
+    }
 
     await hydrateCanvasBoardsFromServer()
 
@@ -92,7 +93,7 @@ describe('boardSync', () => {
       { id: 'local-only', name: 'Unsynced Local', createdAt: 100, updatedAt: 2_000 },
     ])
     replaceCanvasBoardStateMap({ 'local-only': makeState(2_000, 220) })
-    mocks.boardApi.list.mockResolvedValue({
+    mocks.state.listResponse = {
       data: {
         list: [
           makeRemoteBoard({
@@ -104,7 +105,7 @@ describe('boardSync', () => {
           }),
         ],
       },
-    })
+    }
 
     await hydrateCanvasBoardsFromServer()
 
@@ -124,11 +125,11 @@ describe('boardSync', () => {
       'board-b': makeState(5_000, 500),
       'board-c': makeState(6_000, 600),
     })
-    mocks.boardApi.upsert.mockRejectedValueOnce({ status: 409, msg: '画布名称已存在' })
+    mocks.request.mockRejectedValueOnce({ status: 409, msg: '画布名称已存在' })
 
     await expect(syncCanvasBoardToServer('board-a')).rejects.toMatchObject({ status: 409 })
 
-    mocks.boardApi.list.mockResolvedValue({
+    mocks.state.listResponse = {
       data: {
         list: [
           makeRemoteBoard({
@@ -147,7 +148,7 @@ describe('boardSync', () => {
           }),
         ],
       },
-    })
+    }
 
     await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
 
@@ -163,7 +164,7 @@ describe('boardSync', () => {
   it('can replace local newer boards when explicitly requested for conflict recovery', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 2_000 }])
     replaceCanvasBoardStateMap({ 'board-1': makeState(2_000, 220) })
-    mocks.boardApi.list.mockResolvedValue({
+    mocks.state.listResponse = {
       data: {
         list: [
           makeRemoteBoard({
@@ -175,7 +176,7 @@ describe('boardSync', () => {
           }),
         ],
       },
-    })
+    }
 
     await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
 
@@ -185,7 +186,7 @@ describe('boardSync', () => {
 
   it('returns hydrate failure without clearing local boards', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Board', createdAt: 100, updatedAt: 2_000 }])
-    mocks.boardApi.list.mockRejectedValueOnce(new Error('network failed'))
+    mocks.request.mockRejectedValueOnce(new Error('network failed'))
 
     const result = await hydrateCanvasBoardsFromServer()
 
@@ -199,8 +200,7 @@ describe('boardSync', () => {
 
     await syncCanvasBoardToServer('board-1')
 
-    expect(mocks.boardApi.upsert).toHaveBeenCalledWith(
-      'board-1',
+    expect(readUpsertBoardPayload('board-1')).toEqual(
       expect.objectContaining({
         name: 'Local Rename',
         updated_at: 3_000,
@@ -208,3 +208,30 @@ describe('boardSync', () => {
     )
   })
 })
+
+function mockBoardApiRequest(url: string, config?: { method?: string }) {
+  const method = config?.method ?? 'GET'
+  if (url === '/user/boards' && method === 'GET') return Promise.resolve(mocks.state.listResponse)
+  if (url.startsWith('/user/boards/') && method === 'PUT') {
+    return Promise.resolve(mocks.state.upsertResponse)
+  }
+  if (url.startsWith('/user/boards/') && method === 'DELETE') {
+    return Promise.resolve({ code: 0, data: null })
+  }
+  return Promise.reject(new Error(`Unexpected board API request: ${method} ${url}`))
+}
+
+function readUpsertBoardPayload(boardId: string): Record<string, unknown> {
+  const call = mocks.request.mock.calls.find(
+    ([url, config]) =>
+      url === `/user/boards/${boardId}` &&
+      typeof config === 'object' &&
+      config !== null &&
+      'method' in config &&
+      config.method === 'PUT',
+  )
+  if (!call) throw new Error(`Missing upsert call for ${boardId}`)
+  const body = call[1]?.body
+  if (typeof body !== 'string') throw new Error(`Missing upsert body for ${boardId}`)
+  return JSON.parse(body) as Record<string, unknown>
+}

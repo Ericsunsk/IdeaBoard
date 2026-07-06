@@ -1,4 +1,12 @@
-import boardApi, { type BoardStateEnvelope, type UserBoardItem } from '../../../shared/api/board'
+import {
+  deleteUserBoard,
+  listUserBoards,
+  upsertUserBoard,
+} from '../../../shared/api/generated-query/boards/boards'
+import type {
+  BoardStateEnvelope,
+  UserBoardItem,
+} from '../../../shared/api/generated-query/model'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import {
   getCanvasBoardById,
@@ -152,7 +160,7 @@ function resolveHydrateOptions(
 }
 
 async function listRemoteBoards(): Promise<UserBoardItem[]> {
-  const res = await boardApi.list()
+  const res = await listUserBoards()
   return Array.isArray(res.data?.list) ? res.data.list : []
 }
 
@@ -194,7 +202,7 @@ export async function syncCanvasBoardToServer(
   const state =
     stateOverride ?? getCanvasBoardState(boardId) ?? createEmptyCanvasBoardState(board.updatedAt)
   try {
-    await boardApi.upsert(boardId, {
+    await upsertUserBoard(boardId, {
       name: board.name,
       state: state as unknown as BoardStateEnvelope,
       created_at: board.createdAt,
@@ -209,7 +217,7 @@ export async function syncCanvasBoardToServer(
 }
 
 export async function syncDeleteCanvasBoardToServer(boardId: string) {
-  await boardApi.remove(boardId)
+  await deleteUserBoard(boardId)
 }
 
 export function isBoardNameConflictError(error: unknown): boolean {

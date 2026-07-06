@@ -1,4 +1,4 @@
-import boardApi from '../../../shared/api/board'
+import { joinBoardByShareToken } from '../../../shared/api/generated-query/boards/boards'
 import { hydrateCanvasBoardsFromServer } from './boardSync'
 
 export interface JoinSharedCanvasBoardResult {
@@ -15,7 +15,7 @@ export async function joinSharedCanvasBoardByToken(
   token: string,
 ): Promise<JoinSharedCanvasBoardResult> {
   const normalizedToken = normalizeRequiredText(token, '缺少分享令牌')
-  const res = await boardApi.joinByShareToken(normalizedToken)
+  const res = await joinBoardByShareToken({ token: normalizedToken })
   const boardId = normalizeRequiredText(res.data?.board?.board_id, '服务端未返回可用画布 ID')
 
   const hydrateResult = await hydrateCanvasBoardsFromServer()

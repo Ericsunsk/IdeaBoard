@@ -2,16 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { joinSharedCanvasBoardByToken } from './joinSharedBoardWorkflow'
 
 const mocks = vi.hoisted(() => {
-  const boardApi = {
-    joinByShareToken: vi.fn(),
-  }
+  const request = vi.fn()
   const hydrateCanvasBoardsFromServer = vi.fn()
-  return { boardApi, hydrateCanvasBoardsFromServer }
+  return { hydrateCanvasBoardsFromServer, request }
 })
 
-vi.mock('../../../shared/api/board', () => ({
-  default: mocks.boardApi,
-  boardApi: mocks.boardApi,
+vi.mock('../../../shared/api/client', () => ({
+  api: {
+    request: mocks.request,
+  },
 }))
 
 vi.mock('./boardSync', () => ({
@@ -21,7 +20,7 @@ vi.mock('./boardSync', () => ({
 describe('joinSharedCanvasBoardByToken', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.boardApi.joinByShareToken.mockResolvedValue({
+    mocks.request.mockResolvedValue({
       data: { board: { board_id: 'board-1' } },
     })
     mocks.hydrateCanvasBoardsFromServer.mockResolvedValue({ ok: true })
@@ -30,12 +29,12 @@ describe('joinSharedCanvasBoardByToken', () => {
   it('rejects an empty token before calling the API', async () => {
     await expect(joinSharedCanvasBoardByToken('  ')).rejects.toThrow('缺少分享令牌')
 
-    expect(mocks.boardApi.joinByShareToken).not.toHaveBeenCalled()
+    expect(mocks.request).not.toHaveBeenCalled()
     expect(mocks.hydrateCanvasBoardsFromServer).not.toHaveBeenCalled()
   })
 
   it('joins with a trimmed token, hydrates the catalog, and returns the trimmed board id', async () => {
-    mocks.boardApi.joinByShareToken.mockResolvedValueOnce({
+    mocks.request.mockResolvedValueOnce({
       data: { board: { board_id: ' board-42 ' } },
     })
 
@@ -43,12 +42,12 @@ describe('joinSharedCanvasBoardByToken', () => {
       boardId: 'board-42',
     })
 
-    expect(mocks.boardApi.joinByShareToken).toHaveBeenCalledWith('share-token')
+    expect(expectJoinRequestBody()).toEqual({ token: 'share-token' })
     expect(mocks.hydrateCanvasBoardsFromServer).toHaveBeenCalledOnce()
   })
 
   it('rejects when the API response does not include a board id', async () => {
-    mocks.boardApi.joinByShareToken.mockResolvedValueOnce({
+    mocks.request.mockResolvedValueOnce({
       data: { board: { board_id: '  ' } },
     })
 
@@ -70,16 +69,29 @@ describe('joinSharedCanvasBoardByToken', () => {
       '画布同步失败，请稍后重试',
     )
 
-    expect(mocks.boardApi.joinByShareToken).toHaveBeenCalledWith('share-token')
+    expect(expectJoinRequestBody()).toEqual({ token: 'share-token' })
     expect(mocks.hydrateCanvasBoardsFromServer).toHaveBeenCalledOnce()
   })
 
   it('propagates API errors', async () => {
     const apiError = new Error('invalid share token')
-    mocks.boardApi.joinByShareToken.mockRejectedValueOnce(apiError)
+    mocks.request.mockRejectedValueOnce(apiError)
 
     await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toBe(apiError)
 
     expect(mocks.hydrateCanvasBoardsFromServer).not.toHaveBeenCalled()
   })
 })
+
+function expectJoinRequestBody() {
+  expect(mocks.request).toHaveBeenCalledWith(
+    '/user/boards/share-tokens/join',
+    expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+    }),
+  )
+  const body = mocks.request.mock.calls[0]?.[1]?.body
+  if (typeof body !== 'string') throw new Error('Missing join request body')
+  return JSON.parse(body) as Record<string, unknown>
+}
