@@ -3,6 +3,7 @@ import { computed, type ComputedRef, type Ref } from 'vue'
 import type {
   CanvasBoardSnapshot,
   CanvasCreatableNodeKind,
+  CanvasNodeItem,
   ImageNodeItem,
 } from '../../canvas-board/domain'
 import { useFlowCanvasDrop } from './useFlowCanvasDrop'
@@ -16,7 +17,6 @@ import { useFlowNodeInternalsRefreshQueue } from './useFlowNodeInternalsRefreshQ
 import { useFlowNodeMutations } from './useFlowNodeMutations'
 import { useFlowNodeUiState } from './useFlowNodeUiState'
 import { useFlowSelectionExport } from './useFlowSelectionExport'
-import { useFlowSnapshotNodeUpdater } from './useFlowSnapshotNodeUpdater'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
@@ -42,6 +42,8 @@ type CanvasGraphUploadApi = {
     }
   }>
 }
+
+type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
 
 type UseCanvasGraphRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -88,10 +90,14 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     },
   })
 
-  const { updateSnapshotNode } = useFlowSnapshotNodeUpdater({
-    updateSnapshotNodeBase: flowNodeMutations.updateSnapshotNode,
-    scheduleFlowNodeInternalsRefresh,
-  })
+  function updateSnapshotNode(
+    nodeId: string,
+    mutate: SnapshotNodeMutator,
+    updateOptions?: { history?: boolean },
+  ) {
+    flowNodeMutations.updateSnapshotNode(nodeId, mutate, updateOptions)
+    scheduleFlowNodeInternalsRefresh([nodeId])
+  }
 
   const selectionExport = useFlowSelectionExport({
     nodes: options.nodes,
