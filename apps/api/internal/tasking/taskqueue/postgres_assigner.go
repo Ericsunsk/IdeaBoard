@@ -61,7 +61,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 		committed = true
 		return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusDiscard}, nil
 	}
-	if status == tasks.StatusRunning && currentAccountID > 0 && currentChannelID > 0 && leaseBelongsToRiverJob(currentLeaseToken, task.RiverJobID) {
+	if status == tasks.StatusRunning && currentAccountID > 0 && currentChannelID > 0 && LeaseBelongsToRiverJob(currentLeaseToken, task.RiverJobID) {
 		if err := tx.Commit(); err != nil {
 			return TaskAssignment{}, err
 		}
@@ -357,10 +357,6 @@ func newTaskLeaseToken(riverJobID int64) (string, error) {
 		return random, nil
 	}
 	return fmt.Sprintf("river:%d:%s", riverJobID, random), nil
-}
-
-func leaseBelongsToRiverJob(leaseToken string, riverJobID int64) bool {
-	return LeaseBelongsToRiverJob(leaseToken, riverJobID)
 }
 
 func LeaseBelongsToRiverJob(leaseToken string, riverJobID int64) bool {

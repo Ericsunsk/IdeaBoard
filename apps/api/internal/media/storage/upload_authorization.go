@@ -69,16 +69,6 @@ func (a readableUploadAccess) AuthorizeUploadResourceRead(
 	return ReadableUploadAccessResult{Resource: resource}, nil
 }
 
-func AuthorizeUploadResourceRead(
-	ctx context.Context,
-	userID int64,
-	resource UploadResource,
-	boardAccess UploadBoardAccessResolver,
-	ownerStorage UploadOwnerStorageUIDResolver,
-) error {
-	return authorizeUploadResourceRead(ctx, userID, resource, boardAccess, ownerStorage)
-}
-
 func authorizeUploadResourceRead(
 	ctx context.Context,
 	userID int64,
@@ -166,18 +156,4 @@ func authorizeTaskOutputUploadResourceRead(userID int64, resource UploadResource
 		return ErrUploadAccessDenied
 	}
 	return nil
-}
-
-func AuthorizeUploadPathRead(
-	ctx context.Context,
-	userID int64,
-	rawPath string,
-	boardAccess UploadBoardAccessResolver,
-	ownerStorage UploadOwnerStorageUIDResolver,
-) (UploadResource, error) {
-	result, err := NewReadableUploadAccess(boardAccess, ownerStorage).AuthorizeUploadPathRead(ctx, userID, rawPath)
-	if err != nil {
-		return UploadResource{}, err
-	}
-	return result.Resource, nil
 }

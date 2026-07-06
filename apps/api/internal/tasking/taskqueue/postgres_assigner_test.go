@@ -20,13 +20,13 @@ func TestTaskLeaseTokenBindsToRiverJobID(t *testing.T) {
 	if !strings.HasPrefix(token, "river:987:") {
 		t.Fatalf("token %q should include river job id prefix", token)
 	}
-	if !leaseBelongsToRiverJob(token, 987) {
+	if !LeaseBelongsToRiverJob(token, 987) {
 		t.Fatalf("token %q should belong to river job 987", token)
 	}
-	if leaseBelongsToRiverJob(token, 986) {
+	if LeaseBelongsToRiverJob(token, 986) {
 		t.Fatalf("token %q should not belong to another river job", token)
 	}
-	if leaseBelongsToRiverJob("legacy-token", 987) {
+	if LeaseBelongsToRiverJob("legacy-token", 987) {
 		t.Fatal("unscoped lease token should not belong to a river job")
 	}
 }
