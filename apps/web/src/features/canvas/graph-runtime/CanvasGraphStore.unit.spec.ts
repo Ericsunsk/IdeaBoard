@@ -8,9 +8,8 @@ import {
 } from '../../canvas-board/domain'
 import {
   CanvasGraphStore,
-  createCanvasGraphConnectionId,
-  createCanvasGraphImageNodeId,
-  createCanvasGraphPromptNodeId,
+  toCanvasGraphEdgeId,
+  toCanvasGraphNodeId,
 } from './CanvasGraphStore'
 import {
   commitCanvasGraphConnectIntent,
@@ -90,20 +89,20 @@ describe('CanvasGraphStore', () => {
 
     expect(store.readCounts()).toEqual({ nodes: 3, edges: 1 })
     expect(store.getNodeIds()).toEqual([
-      createCanvasGraphImageNodeId(1),
-      createCanvasGraphPromptNodeId(1),
-      createCanvasGraphPromptNodeId(2),
+      toCanvasGraphNodeId('image', 1),
+      toCanvasGraphNodeId('prompt', 1),
+      toCanvasGraphNodeId('prompt', 2),
     ])
     expect(store.getNodeIdsByKind('prompt')).toEqual([
-      createCanvasGraphPromptNodeId(1),
-      createCanvasGraphPromptNodeId(2),
+      toCanvasGraphNodeId('prompt', 1),
+      toCanvasGraphNodeId('prompt', 2),
     ])
     expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
   })
 
   it('commits node updates with projection, history, and dirty summary data', () => {
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
-    const promptId = createCanvasGraphPromptNodeId(1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
 
     const summary = store
       .beginTransaction('node-update')
@@ -133,9 +132,9 @@ describe('CanvasGraphStore', () => {
 
   it('adds and removes edges while keeping endpoint indexes current', () => {
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
-    const imageId = createCanvasGraphImageNodeId(1)
-    const promptId = createCanvasGraphPromptNodeId(2)
-    const edgeId = createCanvasGraphConnectionId(2)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const promptId = toCanvasGraphNodeId('prompt', 2)
+    const edgeId = toCanvasGraphEdgeId(2)
 
     const addSummary = store
       .beginTransaction('connect')
@@ -143,7 +142,7 @@ describe('CanvasGraphStore', () => {
       .commit()
 
     expect(addSummary.changedEdgeIds).toEqual([edgeId])
-    expect(store.getOutgoingEdgeIds(imageId)).toEqual([createCanvasGraphConnectionId(1), edgeId])
+    expect(store.getOutgoingEdgeIds(imageId)).toEqual([toCanvasGraphEdgeId(1), edgeId])
     expect(store.getIncomingEdgeIds(promptId)).toEqual([edgeId])
 
     const removeSummary = store.beginTransaction('disconnect').removeEdge(edgeId).commit()
@@ -155,9 +154,9 @@ describe('CanvasGraphStore', () => {
 
   it('batch deletes nodes and connected edges as one transaction', () => {
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
-    const imageId = createCanvasGraphImageNodeId(1)
-    const promptId = createCanvasGraphPromptNodeId(1)
-    const edgeId = createCanvasGraphConnectionId(1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const edgeId = toCanvasGraphEdgeId(1)
 
     const summary = store
       .beginTransaction('batch-delete')
@@ -181,7 +180,7 @@ describe('CanvasGraphStore', () => {
     const store = CanvasGraphStore.fromSnapshot(snapshot)
     const transaction = store.beginTransaction('node-update')
 
-    transaction.updateNode(createCanvasGraphPromptNodeId(1), { x: 999 })
+    transaction.updateNode(toCanvasGraphNodeId('prompt', 1), { x: 999 })
     const summary = transaction.cancel()
 
     expect(summary.didChange).toBe(false)
@@ -193,8 +192,8 @@ describe('CanvasGraphStore', () => {
   it('tracks node and edge selection without marking history or dirty', () => {
     const snapshot = createSampleSnapshot()
     const store = CanvasGraphStore.fromSnapshot(snapshot)
-    const nodeId = createCanvasGraphPromptNodeId(1)
-    const edgeId = createCanvasGraphConnectionId(1)
+    const nodeId = toCanvasGraphNodeId('prompt', 1)
+    const edgeId = toCanvasGraphEdgeId(1)
 
     const summary = store
       .beginTransaction('node-update')
@@ -223,7 +222,7 @@ describe('CanvasGraphStore', () => {
 
     expect(isSameCanvasConnectionEndpoint(createConnection(1, 1, 1), sameEndpoint)).toBe(true)
     expect(findCanvasGraphEdgeIdByEndpoint(store, sameEndpoint)).toBe(
-      createCanvasGraphConnectionId(1),
+      toCanvasGraphEdgeId(1),
     )
   })
 
@@ -239,8 +238,8 @@ describe('CanvasGraphStore', () => {
 
     expect(summary).toMatchObject({
       reason: 'connect',
-      changedEdgeIds: [createCanvasGraphConnectionId(2)],
-      removedEdgeIds: [createCanvasGraphConnectionId(1)],
+      changedEdgeIds: [toCanvasGraphEdgeId(2)],
+      removedEdgeIds: [toCanvasGraphEdgeId(1)],
       shouldRecordHistory: true,
       shouldMarkDirty: true,
     })
@@ -254,19 +253,19 @@ describe('CanvasGraphStore', () => {
     const store = CanvasGraphStore.fromSnapshot(snapshot)
 
     const summary = commitCanvasGraphEdgeUpdateIntent(store, {
-      edgeId: createCanvasGraphConnectionId(2),
+      edgeId: toCanvasGraphEdgeId(2),
       connection: createConnection(2, 2, 1),
       allowsMultipleTargetConnections: false,
     })
 
-    expect(summary.changedEdgeIds).toEqual([createCanvasGraphConnectionId(2)])
-    expect(summary.removedEdgeIds).toEqual([createCanvasGraphConnectionId(1)])
+    expect(summary.changedEdgeIds).toEqual([toCanvasGraphEdgeId(2)])
+    expect(summary.removedEdgeIds).toEqual([toCanvasGraphEdgeId(1)])
     expect(store.exportSnapshot().connections).toEqual([createConnection(2, 2, 1)])
   })
 
   it('stages node drag position and selection as graph runtime intent', () => {
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
-    const promptId = createCanvasGraphPromptNodeId(1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
     const transaction = store.beginTransaction('node-drag')
 
     expect(
@@ -298,8 +297,8 @@ describe('CanvasGraphStore', () => {
 
   it('commits delete and disconnect intents with canonical transaction reasons', () => {
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
-    const imageId = createCanvasGraphImageNodeId(1)
-    const edgeId = createCanvasGraphConnectionId(1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const edgeId = toCanvasGraphEdgeId(1)
 
     const deleteSummary = commitCanvasGraphDeleteIntent(store, {
       nodeIds: [imageId],
@@ -328,7 +327,7 @@ describe('CanvasGraphStore', () => {
     (nodeCount) => {
       const snapshot = createLargeSnapshot(nodeCount)
       const store = CanvasGraphStore.fromSnapshot(snapshot)
-      const promptId = createCanvasGraphPromptNodeId(Math.floor(nodeCount / 2))
+      const promptId = toCanvasGraphNodeId('prompt', Math.floor(nodeCount / 2))
       const startedAt = performance.now()
 
       const summary = store

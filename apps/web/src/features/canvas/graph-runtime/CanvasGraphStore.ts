@@ -738,20 +738,4 @@ export function createCanvasGraphStore(snapshot?: CanvasBoardSnapshot): CanvasGr
   return new CanvasGraphStore(snapshot)
 }
 
-export function createCanvasGraphImageNodeId(id: number): CanvasGraphNodeId {
-  return toCanvasGraphNodeId('image', id)
-}
-
-export function createCanvasGraphPromptNodeId(id: number): CanvasGraphNodeId {
-  return toCanvasGraphNodeId('prompt', id)
-}
-
-export function createCanvasGraphFusionNodeId(id: number): CanvasGraphNodeId {
-  return toCanvasGraphNodeId('fusion', id)
-}
-
-export function createCanvasGraphConnectionId(id: number): CanvasGraphEdgeId {
-  return toCanvasGraphEdgeId(id)
-}
-
 export type CanvasGraphSnapshotNode = ImageNodeItem | PromptNodeItem | FusionNodeItem

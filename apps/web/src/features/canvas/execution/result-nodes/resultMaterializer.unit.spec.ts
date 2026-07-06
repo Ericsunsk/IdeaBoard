@@ -8,9 +8,8 @@ import {
 } from '../../../canvas-board/domain'
 import {
   CanvasGraphStore,
-  createCanvasGraphConnectionId,
-  createCanvasGraphImageNodeId,
-  createCanvasGraphPromptNodeId,
+  toCanvasGraphEdgeId,
+  toCanvasGraphNodeId,
 } from '../../graph-runtime'
 import { materializeResolvedImageResults } from './resultMaterializer'
 
@@ -78,7 +77,7 @@ describe('result materializer', () => {
       store,
       results: [
         {
-          resultNodeId: createCanvasGraphImageNodeId(1),
+          resultNodeId: toCanvasGraphNodeId('image', 1),
           taskId: 'task-1',
           url: 'https://example.com/result-1.png',
           ratio: 1,
@@ -86,7 +85,7 @@ describe('result materializer', () => {
           height: 200,
         },
         {
-          resultNodeId: createCanvasGraphImageNodeId(2),
+          resultNodeId: toCanvasGraphNodeId('image', 2),
           taskId: 'task-2',
           url: 'https://example.com/result-2.png',
           ratio: 0.75,
@@ -98,19 +97,19 @@ describe('result materializer', () => {
       reason: 'result-materialize',
       didChange: true,
       hasDomainChanges: true,
-      changedNodeIds: [createCanvasGraphImageNodeId(1), createCanvasGraphImageNodeId(2)],
+      changedNodeIds: [toCanvasGraphNodeId('image', 1), toCanvasGraphNodeId('image', 2)],
       changedEdgeIds: [],
       shouldRecordHistory: false,
       shouldMarkDirty: true,
     })
     expect(result.materializedNodeIds).toEqual([
-      createCanvasGraphImageNodeId(1),
-      createCanvasGraphImageNodeId(2),
+      toCanvasGraphNodeId('image', 1),
+      toCanvasGraphNodeId('image', 2),
     ])
     expect(result.skipped).toEqual([])
     expect(result.projection.updatedEdges).toEqual([
-      { id: createCanvasGraphConnectionId(1), animated: false },
-      { id: createCanvasGraphConnectionId(2), animated: false },
+      { id: toCanvasGraphEdgeId(1), animated: false },
+      { id: toCanvasGraphEdgeId(2), animated: false },
     ])
 
     const snapshot = store.exportSnapshot()
@@ -149,34 +148,34 @@ describe('result materializer', () => {
 
     const result = materializeResolvedImageResults({
       store,
-      isAttached: (item) => item.resultNodeId !== createCanvasGraphImageNodeId(4),
+      isAttached: (item) => item.resultNodeId !== toCanvasGraphNodeId('image', 4),
       results: [
         {
-          resultNodeId: createCanvasGraphImageNodeId(1),
+          resultNodeId: toCanvasGraphNodeId('image', 1),
           taskId: 'task-1',
           url: 'https://example.com/valid.png',
           ratio: 1,
         },
         {
-          resultNodeId: createCanvasGraphImageNodeId(99),
+          resultNodeId: toCanvasGraphNodeId('image', 99),
           taskId: 'task-99',
           url: 'https://example.com/missing.png',
           ratio: 1,
         },
         {
-          resultNodeId: createCanvasGraphImageNodeId(3),
+          resultNodeId: toCanvasGraphNodeId('image', 3),
           taskId: 'old-task',
           url: 'https://example.com/stale.png',
           ratio: 1,
         },
         {
-          resultNodeId: createCanvasGraphPromptNodeId(1),
+          resultNodeId: toCanvasGraphNodeId('prompt', 1),
           taskId: 'task-prompt',
           url: 'https://example.com/non-image.png',
           ratio: 1,
         },
         {
-          resultNodeId: createCanvasGraphImageNodeId(4),
+          resultNodeId: toCanvasGraphNodeId('image', 4),
           taskId: 'task-4',
           url: 'https://example.com/detached.png',
           ratio: 1,
@@ -184,22 +183,22 @@ describe('result materializer', () => {
       ],
     })
 
-    expect(result.materializedNodeIds).toEqual([createCanvasGraphImageNodeId(1)])
+    expect(result.materializedNodeIds).toEqual([toCanvasGraphNodeId('image', 1)])
     expect(result.skipped).toEqual([
-      { resultNodeId: createCanvasGraphImageNodeId(99), reason: 'missing-node' },
-      { resultNodeId: createCanvasGraphImageNodeId(3), reason: 'stale-task' },
-      { resultNodeId: createCanvasGraphPromptNodeId(1), reason: 'non-image-node' },
-      { resultNodeId: createCanvasGraphImageNodeId(4), reason: 'detached-node' },
+      { resultNodeId: toCanvasGraphNodeId('image', 99), reason: 'missing-node' },
+      { resultNodeId: toCanvasGraphNodeId('image', 3), reason: 'stale-task' },
+      { resultNodeId: toCanvasGraphNodeId('prompt', 1), reason: 'non-image-node' },
+      { resultNodeId: toCanvasGraphNodeId('image', 4), reason: 'detached-node' },
     ])
     expect(result.summary).toMatchObject({
       reason: 'result-materialize',
       didChange: true,
-      changedNodeIds: [createCanvasGraphImageNodeId(1)],
+      changedNodeIds: [toCanvasGraphNodeId('image', 1)],
       shouldRecordHistory: false,
       shouldMarkDirty: true,
     })
     expect(result.projection.updatedEdges).toEqual([
-      { id: createCanvasGraphConnectionId(1), animated: false },
+      { id: toCanvasGraphEdgeId(1), animated: false },
     ])
 
     const exported = store.exportSnapshot()
@@ -228,7 +227,7 @@ describe('result materializer', () => {
       store,
       results: [
         {
-          resultNodeId: createCanvasGraphImageNodeId(4),
+          resultNodeId: toCanvasGraphNodeId('image', 4),
           taskId: 'task-4',
           url: 'https://example.com/edge-later.png',
           ratio: 1,
@@ -236,7 +235,7 @@ describe('result materializer', () => {
       ],
     })
 
-    expect(result.materializedNodeIds).toEqual([createCanvasGraphImageNodeId(4)])
+    expect(result.materializedNodeIds).toEqual([toCanvasGraphNodeId('image', 4)])
     expect(result.skipped).toEqual([])
     expect(result.projection.updatedEdges).toEqual([])
     expect(store.exportSnapshot().imageNodes.find((node) => node.id === 4)).toMatchObject({
