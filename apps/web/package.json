@@ -14,6 +14,7 @@
     "lint:import-boundaries": "tsx scripts/check-eslint-import-boundaries.ts",
     "lint:style-governance": "tsx scripts/check-style-governance.ts",
     "lint:style": "stylelint \"src/**/*.{css,vue}\" --allow-empty-input",
+    "benchmark:canvas-interactions": "tsx scripts/canvas-interactions-benchmark.ts",
     "preview": "vite preview",
     "smoke:user": "tsx scripts/user-route-smoke.ts",
     "test": "vitest",

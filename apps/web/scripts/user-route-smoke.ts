@@ -248,6 +248,37 @@ function assertExpectedUserApiRequests(output: string, page: SmokePage) {
   }
 }
 
+function assertHomeMobileHeroLayout(playwrightCli: CommandSpec) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'for (const viewportSize of [{ width: 375, height: 812 }, { width: 390, height: 844 }]) {',
+      '  await page.setViewportSize(viewportSize)',
+      '  await page.waitForTimeout(150)',
+      '  const viewport = page.viewportSize()',
+      '  if (!viewport) throw new Error("Mobile viewport is not available")',
+      '  const safeElements = page.locator("[data-home-hero-safe]")',
+      '  const safeCount = await safeElements.count()',
+      '  if (safeCount < 4) throw new Error(`Expected at least 4 mobile-safe hero elements, got ${safeCount}`)',
+      '  for (let index = 0; index < safeCount; index += 1) {',
+      '    const element = safeElements.nth(index)',
+      '    const label = (await element.textContent())?.trim().replace(/\\s+/g, " ").slice(0, 80) || `hero element ${index}`',
+      '    const box = await element.boundingBox()',
+      '    if (!box) throw new Error(`Home mobile hero element has no bounding box: ${label}`)',
+      '    const left = Math.round(box.x)',
+      '    const right = Math.round(box.x + box.width)',
+      '    const top = Math.round(box.y)',
+      '    const bottom = Math.round(box.y + box.height)',
+      '    if (left < 0 || top < 0 || right > viewport.width || bottom > viewport.height) {',
+      '      throw new Error(`Home mobile hero element is clipped: ${label} at ${left},${top},${right},${bottom} within ${viewport.width}x${viewport.height}`)',
+      '    }',
+      '  }',
+      '}',
+      'await page.setViewportSize({ width: 1280, height: 720 })',
+    ].join('\n'),
+  ])
+}
+
 function assertCanvasDom(playwrightCli: CommandSpec, page: SmokePage) {
   smoke.runCommand(playwrightCli, [
     'run-code',
@@ -360,6 +391,10 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
 
   if (page.label === 'boards') {
     assertBoardsInteractions(playwrightCli)
+  }
+
+  if (page.label === 'home') {
+    assertHomeMobileHeroLayout(playwrightCli)
   }
 
   if (page.label === 'center') {

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative h-full w-full overflow-hidden bg-white bg-[radial-gradient(circle,#e2e4e8_1px,transparent_1px)] bg-[length:12px_12px] bg-center bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
+    class="canvas-landing-page relative h-full w-full overflow-hidden bg-white bg-[radial-gradient(circle,#e2e4e8_1px,transparent_1px)] bg-[length:12px_12px] bg-center bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
   >
     <!-- 轻量背景洗色，文字区排版保持稳定。 -->
     <div
@@ -13,26 +13,31 @@
 
     <!-- 顶部 Hero 区域 -->
     <div
-      class="relative z-[1] flex h-full min-h-full items-center justify-center overflow-hidden p-0"
+      class="home-hero-shell relative z-[1] flex h-full min-h-full items-center justify-center overflow-hidden p-0"
     >
-      <div class="relative aspect-[1440/900] w-[clamp(960px,min(100vw,160vh),1440px)] shrink-0">
+      <div
+        class="home-hero-stage relative aspect-[1440/900] w-[clamp(960px,min(100vw,160vh),1440px)] shrink-0"
+      >
         <!-- 核心文字内容 -->
         <div
-          class="hero-content absolute left-[22.2%] top-[38.9%] z-10 flex w-[55.6%] flex-col items-center gap-6 text-center"
+          class="hero-content home-hero-content absolute left-[22.2%] top-[38.9%] z-10 flex w-[55.6%] flex-col items-center gap-6 text-center"
         >
           <h1
-            class="m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[#202124] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif]"
+            data-home-hero-safe
+            class="home-hero-title m-0 max-w-full break-words text-[90px] leading-none font-semibold tracking-normal text-[#202124] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif]"
           >
             {{ projectName }}
           </h1>
           <p
-            class="mt-4 text-[15px] font-normal uppercase tracking-[0.1em] text-[#202124] [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif]"
+            data-home-hero-safe
+            class="home-hero-tagline mt-4 text-[15px] font-normal uppercase tracking-[0.1em] text-[#202124] [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif]"
           >
             EXPLORE, EXPAND, AND REFINE YOUR IDEAS
           </p>
-          <div class="mt-6 flex gap-4">
+          <div class="home-hero-cta-row mt-6 flex gap-4">
             <button
-              class="h-[43px] cursor-pointer rounded-full border-0 bg-[#9278e6] px-10 text-[15px] font-medium text-white shadow-none [transition:transform_0.2s_cubic-bezier(0.2,0.8,0.2,1),background_0.2s] hover:scale-[1.04] hover:bg-[#8065d6]"
+              data-home-hero-safe
+              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-[#9278e6] px-10 text-[15px] font-medium text-white shadow-none [transition:transform_0.2s_cubic-bezier(0.2,0.8,0.2,1),background_0.2s] hover:scale-[1.04] hover:bg-[#8065d6]"
               @click="startJourney"
             >
               Get started
@@ -41,38 +46,39 @@
         </div>
 
         <!-- 漂浮装饰元素 -->
-        <div class="pointer-events-none absolute inset-0 z-[5] h-full w-full">
+        <div class="home-hero-decorations pointer-events-none absolute inset-0 z-[5] h-full w-full">
           <div
-            class="absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] bg-[#e6ded5] px-8 py-7 text-[12px] leading-[1.5] text-[#202124] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
+            data-home-hero-safe
+            class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] bg-[#e6ded5] px-8 py-7 text-[12px] leading-[1.5] text-[#202124] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
           >
             {{ projectName }} is an AI-powered concepting board that helps you explore, expand, and
             refine your ideas.
           </div>
           <img
             :src="homeHeroAssets.starburst"
-            class="absolute left-[43%] top-[28%] w-[6.1%] rotate-[-4deg] object-contain drop-shadow-[0_12px_20px_rgba(224,195,42,0.18)]"
+            class="home-hero-starburst absolute left-[43%] top-[28%] w-[6.1%] rotate-[-4deg] object-contain drop-shadow-[0_12px_20px_rgba(224,195,42,0.18)]"
             alt=""
             aria-hidden="true"
           />
           <img
             :src="homeHeroAssets.socks"
-            class="absolute left-[8%] top-[38%] w-[29%] rotate-[-1.5deg] object-contain drop-shadow-[0_26px_28px_rgba(35,38,46,0.08)]"
+            class="home-hero-socks absolute left-[8%] top-[38%] w-[29%] rotate-[-1.5deg] object-contain drop-shadow-[0_26px_28px_rgba(35,38,46,0.08)]"
             alt=""
             aria-hidden="true"
           />
           <img
             :src="homeHeroAssets.boots"
-            class="absolute left-[66.8%] top-[10.6%] w-[20.2%] rotate-[3deg] object-contain drop-shadow-[0_26px_28px_rgba(35,38,46,0.08)]"
+            class="home-hero-boots absolute left-[66.8%] top-[10.6%] w-[20.2%] rotate-[3deg] object-contain drop-shadow-[0_26px_28px_rgba(35,38,46,0.08)]"
             alt=""
             aria-hidden="true"
           />
           <div
-            class="absolute left-[75.2%] top-[50.6%] h-[2.8%] w-[8.8%] rotate-[8deg] rounded-full border-[4px] border-white/95 shadow-[0_0_18px_rgba(255,255,255,0.86)]"
+            class="home-hero-ring absolute left-[75.2%] top-[50.6%] h-[2.8%] w-[8.8%] rotate-[8deg] rounded-full border-[4px] border-white/95 shadow-[0_0_18px_rgba(255,255,255,0.86)]"
             aria-hidden="true"
           ></div>
           <img
             :src="homeHeroAssets.portrait"
-            class="absolute left-[65%] top-[48%] w-[22.4%] rotate-[0.5deg] object-contain drop-shadow-[0_28px_26px_rgba(26,28,34,0.1)]"
+            class="home-hero-portrait absolute left-[65%] top-[48%] w-[22.4%] rotate-[0.5deg] object-contain drop-shadow-[0_28px_26px_rgba(26,28,34,0.1)]"
             alt=""
             aria-hidden="true"
           />
@@ -110,6 +116,149 @@ function startJourney() {
 .hero-content {
   opacity: 0;
   animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (max-width: 720px) {
+  .home-hero-shell {
+    align-items: flex-start;
+    min-height: 100%;
+    padding: clamp(48px, 8vh, 72px) 20px 36px;
+  }
+
+  .home-hero-stage {
+    width: min(100%, 430px);
+    height: min(100%, 720px);
+    min-height: 650px;
+    aspect-ratio: auto;
+  }
+
+  .home-hero-content {
+    right: 0;
+    left: 0;
+    top: 38%;
+    width: 100%;
+    gap: 18px;
+    padding: 0 6px;
+  }
+
+  .home-hero-title {
+    font-size: clamp(56px, 17vw, 70px);
+    line-height: 0.95;
+    overflow-wrap: anywhere;
+  }
+
+  .home-hero-tagline {
+    max-width: min(100%, 344px);
+    margin-top: 0;
+    font-size: clamp(12px, 3.3vw, 14px);
+    line-height: 1.45;
+    letter-spacing: 0.08em;
+  }
+
+  .home-hero-cta-row {
+    margin-top: 10px;
+  }
+
+  .home-hero-cta {
+    width: min(320px, 82vw);
+    height: 44px;
+    padding-inline: 30px;
+  }
+
+  .home-hero-note {
+    top: 11%;
+    left: 0;
+    width: min(226px, 58vw);
+    padding: 20px 22px;
+    transform: rotate(-4deg);
+  }
+
+  .home-hero-starburst {
+    top: 25%;
+    left: 58%;
+    width: max(54px, 15%);
+  }
+
+  .home-hero-socks {
+    top: 55%;
+    left: -26px;
+    width: min(165px, 40%);
+  }
+
+  .home-hero-boots {
+    top: 14%;
+    right: -20px;
+    left: auto;
+    width: min(124px, 28%);
+  }
+
+  .home-hero-ring {
+    top: 61%;
+    right: 6%;
+    left: auto;
+    width: 54px;
+    height: 18px;
+    border-width: 3px;
+  }
+
+  .home-hero-portrait {
+    top: 69%;
+    right: -42px;
+    left: auto;
+    width: min(150px, 36%);
+  }
+}
+
+@media (max-width: 420px) {
+  .home-hero-shell {
+    padding-inline: 16px;
+  }
+
+  .home-hero-stage {
+    width: 100%;
+    height: min(100%, 700px);
+    min-height: 640px;
+  }
+
+  .home-hero-content {
+    top: 40%;
+  }
+
+  .home-hero-title {
+    font-size: clamp(50px, 16.6vw, 64px);
+  }
+
+  .home-hero-note {
+    left: -8px;
+    width: 198px;
+  }
+
+  .home-hero-boots {
+    right: -44px;
+    width: 112px;
+  }
+
+  .home-hero-socks {
+    top: 57%;
+    left: -40px;
+    width: 154px;
+  }
+
+  .home-hero-portrait {
+    right: -54px;
+    width: 142px;
+  }
+}
+
+@media (max-width: 360px) {
+  .home-hero-title {
+    font-size: 48px;
+  }
+
+  .home-hero-tagline {
+    max-width: 300px;
+    font-size: 11px;
+  }
 }
 
 @keyframes fadeUp {
