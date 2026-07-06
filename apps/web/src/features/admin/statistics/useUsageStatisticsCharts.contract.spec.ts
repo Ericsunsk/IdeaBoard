@@ -42,10 +42,18 @@ describe('useUsageStatisticsCharts', () => {
         today_calls: 10,
         today_success: 9,
         today_failed: 1,
+        today_cancelled: 0,
         yesterday_calls: 5,
         yesterday_success: 3,
         yesterday_failed: 2,
+        yesterday_cancelled: 0,
         this_month_calls: 20,
+        this_month_cancelled: 0,
+        pending: 0,
+        running: 0,
+        completed: 0,
+        failed: 0,
+        cancelled: 0,
       },
       trend: [
         {
