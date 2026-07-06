@@ -21,7 +21,7 @@ type UseCanvasTaskRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore?: () => CanvasGraphStore
+  createCurrentCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   currentBoardId: ValueRef<string | null | undefined>

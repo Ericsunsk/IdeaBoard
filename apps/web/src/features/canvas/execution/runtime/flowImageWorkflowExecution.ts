@@ -95,7 +95,7 @@ export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore?: () => CanvasGraphStore
+  createCurrentCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>

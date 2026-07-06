@@ -6,6 +6,8 @@ import type { ImageNodeItem } from '../../../canvas-board/domain'
 import { TaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
+import { createCanvasGraphStore } from '../../graph-runtime'
+import { flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
 
 const executorMocks = vi.hoisted(() => ({
@@ -82,7 +84,7 @@ function makeImageNode(nodeId: string, overrides: Partial<ImageNodeItem> = {}): 
 
 function makePendingImageNode(nodeId: string, taskId: string): Node {
   return makeImageNode(nodeId, {
-    id: Number(nodeId.replace(/\D/g, '')) || 1,
+    id: Number(nodeId.slice(nodeId.indexOf('-') + 1)) || 1,
     sourceImageUrl: '',
     pendingTaskId: taskId,
     outputStatus: 'running',
@@ -96,7 +98,7 @@ function readImageSnapshot(nodes: Node[], nodeId: string): ImageNodeItem {
   return snapshot as ImageNodeItem
 }
 
-function createExecutionHarness(initialNodes: Node[] = [makeImageNode('image-source')]) {
+function createExecutionHarness(initialNodes: Node[] = [makeImageNode('image-1')]) {
   const nodes: Ref<Node[]> = shallowRef(initialNodes)
   const edges: Ref<Edge[]> = shallowRef([])
   const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
@@ -107,6 +109,13 @@ function createExecutionHarness(initialNodes: Node[] = [makeImageNode('image-sou
     nodes,
     edges,
     graphAdapter,
+    createCurrentCanvasGraphStore: () =>
+      createCanvasGraphStore(
+        flowToCanvasBoardSnapshot({
+          nodes: nodes.value,
+          edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+        }),
+      ),
     flushAutosave,
     onSuccess,
     onWarning,
@@ -126,7 +135,7 @@ function createExecutionHarness(initialNodes: Node[] = [makeImageNode('image-sou
 function imageActionPlan() {
   return {
     kind: 'image-action' as const,
-    sourceNodeId: 'image-source',
+    sourceNodeId: 'image-1',
     source: {
       url: 'https://example.com/source.png',
       ratio: 1,
@@ -137,7 +146,7 @@ function imageActionPlan() {
         x: 0,
         y: 0,
         width: 280,
-        outputAnchorNodeId: 'image-source',
+        outputAnchorNodeId: 'image-1',
       },
     },
   }
@@ -171,7 +180,7 @@ describe('flowImageWorkflowExecution', () => {
     const run = execution.executeImageWorkflow(imageActionPlan())
     await flushPromises()
 
-    const resultNode = nodes.value.find((node) => node.id !== 'image-source')
+    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
     expect(resultNode?.data?.kind).toBe('image')
     expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(true)
 
@@ -215,7 +224,7 @@ describe('flowImageWorkflowExecution', () => {
 
     await execution.executeImageWorkflow(imageActionPlan())
 
-    const resultNode = nodes.value.find((node) => node.id !== 'image-source')
+    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
     expect(resultNode?.data?.kind).toBe('image')
     expect(onWarning).toHaveBeenCalledWith('任务进度推送超时，请稍后查看结果')
     expect(onSuccess).not.toHaveBeenCalled()

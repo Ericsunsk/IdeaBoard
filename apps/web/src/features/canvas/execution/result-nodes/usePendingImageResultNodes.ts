@@ -24,7 +24,6 @@ import type {
 import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
 import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import {
-  createCanvasGraphStore,
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
   type CanvasGraphStore,
@@ -39,7 +38,7 @@ type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore?: () => CanvasGraphStore
+  createCurrentCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
 }
@@ -55,9 +54,6 @@ export type PendingImageResultReservationParams = {
 
 export type PendingImageResultExecution = {
   runPendingResults: (params: RunPendingImageResultsParams) => Promise<PendingImageResultRunSummary>
-  resolveAttachedPendingResult: (
-    params: ResolveAttachedPendingImageResultParams,
-  ) => Promise<boolean>
   materializeResolvedAttachedPendingResults: (
     params: MaterializeResolvedAttachedPendingImageResultsParams,
   ) => ResultMaterializerResult
@@ -75,14 +71,6 @@ export type RunPendingImageResultsParams = PendingImageResultReservationParams &
   persistPendingTaskIds?: boolean
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
   onReserved?: (resultNodeIds: string[]) => void
-}
-
-export type ResolveAttachedPendingImageResultParams = {
-  resultNodeId: string
-  taskId: string
-  resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
-  isCurrent: () => boolean
-  isAttached: () => boolean
 }
 
 export type MaterializeResolvedAttachedPendingImageResultsParams = {
@@ -314,14 +302,6 @@ export function usePendingImageResultExecution(
     resultLayoutsBySourceNodeId.forEach((items, sourceNodeId) => {
       items.delete(resultNodeId)
       if (items.size === 0) resultLayoutsBySourceNodeId.delete(sourceNodeId)
-    })
-  }
-
-  function updateResultNodeLayout(resultNodeId: string, patch: Partial<ImageResultLayout>) {
-    resultLayoutsBySourceNodeId.forEach((items) => {
-      const current = items.get(resultNodeId)
-      if (!current) return
-      items.set(resultNodeId, { ...current, ...patch })
     })
   }
 
@@ -580,79 +560,6 @@ export function usePendingImageResultExecution(
     )
   }
 
-  function materializeResolvedImage(params: {
-    resultNodeId: string
-    result: ResolvedTaskImageResult
-  }) {
-    const { resultNodeId, result } = params
-    const resolvedImageWidth = Number(result.width)
-    const resolvedImageHeight = Number(result.height)
-    const hasResolvedSize =
-      Number.isFinite(resolvedImageWidth) &&
-      resolvedImageWidth > 0 &&
-      Number.isFinite(resolvedImageHeight) &&
-      resolvedImageHeight > 0
-    const normalizedRatio = hasResolvedSize
-      ? resolvedImageHeight / resolvedImageWidth
-      : result.ratio > 0
-        ? result.ratio
-        : 1
-    const resolvedFrameWidth = hasResolvedSize
-      ? resolveImageNodeFrameSize(normalizedRatio, true).width
-      : null
-    let didUpdateNode = false
-    let didUpdateEdge = false
-    const nextNodes = options.nodes.value.map((item) => {
-      if (item.id !== resultNodeId || item.data?.kind !== 'image') return item
-      const snapshot = item.data.snapshotNode
-      if (!snapshot || typeof snapshot !== 'object') return item
-      const currentSnapshot = snapshot as ImageNodeItem
-      const currentWidth = Number(currentSnapshot.width)
-      const width =
-        resolvedFrameWidth ??
-        (Number.isFinite(currentWidth) && currentWidth > 0
-          ? Math.max(1, Math.round(currentWidth))
-          : resolveImageNodeFrameSize(normalizedRatio, true).width)
-      didUpdateNode = true
-      return {
-        ...item,
-        data: {
-          ...item.data,
-          snapshotNode: {
-            ...currentSnapshot,
-            width,
-            sourceImageUrl: result.url,
-            sourceImageRatio: normalizedRatio,
-            pendingTaskId: undefined,
-            outputStatus: 'ready',
-            outputImages: [],
-          },
-        },
-      }
-    })
-    const nextEdges = options.edges.value.map((edge) => {
-      if (edge.target !== resultNodeId || edge.targetHandle !== 'in:image') return edge
-      if (edge.animated === false) return edge
-      didUpdateEdge = true
-      return { ...edge, animated: false }
-    })
-    if (!didUpdateNode && !didUpdateEdge) return
-    options.graphAdapter.replaceGraph(
-      {
-        nodes: didUpdateNode ? nextNodes : options.nodes.value,
-        edges: didUpdateEdge ? nextEdges : options.edges.value,
-      },
-      createPendingResultCommandOptions({ recordHistory: false }),
-    )
-    if (didUpdateNode) {
-      updateResultNodeLayout(resultNodeId, {
-        ratio: normalizedRatio,
-        ...(resolvedFrameWidth ? { width: resolvedFrameWidth } : {}),
-      })
-      options.refreshNodeInternals?.([resultNodeId])
-    }
-  }
-
   function applyResultMaterializerProjection(
     store: CanvasGraphStore,
     result: ResultMaterializerResult,
@@ -695,33 +602,7 @@ export function usePendingImageResultExecution(
   function materializeResolvedAttachedPendingResults(
     params: MaterializeResolvedAttachedPendingImageResultsParams,
   ): ResultMaterializerResult {
-    const store = options.createCurrentCanvasGraphStore?.()
-    if (!store) {
-      const materializedNodeIds: CanvasGraphNodeId[] = []
-      params.results.forEach((result) => {
-        if (!params.isAttached(result)) return
-        materializeResolvedImage({
-          resultNodeId: result.resultNodeId,
-          result,
-        })
-        if (isCanvasGraphNodeId(result.resultNodeId)) {
-          materializedNodeIds.push(result.resultNodeId)
-        }
-      })
-      const noopSummary = createCanvasGraphStore(
-        options.boardBaseSnapshot?.value,
-      ).beginTransaction('result-materialize', {
-        recordHistory: false,
-        markDirty: materializedNodeIds.length > 0,
-      }).cancel()
-      return {
-        summary: noopSummary,
-        materializedNodeIds,
-        skipped: [],
-        projection: { updatedEdges: [] },
-      }
-    }
-
+    const store = options.createCurrentCanvasGraphStore()
     const result = materializeResolvedImageResults({
       store,
       results: params.results,
@@ -812,21 +693,8 @@ export function usePendingImageResultExecution(
     }
   }
 
-  async function resolveAttachedPendingResult(
-    params: ResolveAttachedPendingImageResultParams,
-  ): Promise<boolean> {
-    const resolved = await params.resolveResult(params.taskId, params.resultNodeId)
-    if (!params.isCurrent() || !params.isAttached()) return false
-    materializeResolvedImage({
-      resultNodeId: params.resultNodeId,
-      result: resolved,
-    })
-    return true
-  }
-
   return {
     runPendingResults,
-    resolveAttachedPendingResult,
     materializeResolvedAttachedPendingResults,
   }
 }

@@ -506,36 +506,6 @@ describe('usePendingImageResultExecution', () => {
     expect(harness.edges.value).toEqual([])
   })
 
-  it('resolves an already attached pending task only while it is still current', async () => {
-    const harness = createHarness([
-      makeImageNode('pending-node', {
-        sourceImageUrl: '',
-        outputStatus: 'running',
-        pendingTaskId: 'task-1',
-      }),
-    ])
-
-    const didResolve = await harness.actions.resolveAttachedPendingResult({
-      resultNodeId: 'pending-node',
-      taskId: 'task-1',
-      resolveResult: async () => ({
-        url: 'https://example.com/restored.png',
-        ratio: 1,
-        width: 400,
-        height: 400,
-      }),
-      isCurrent: () => true,
-      isAttached: () => true,
-    })
-
-    expect(didResolve).toBe(true)
-    expect(readImageSnapshot(harness.nodes.value, 'pending-node')).toMatchObject({
-      sourceImageUrl: 'https://example.com/restored.png',
-      outputStatus: 'ready',
-    })
-    expect(readImageSnapshot(harness.nodes.value, 'pending-node').pendingTaskId).toBeUndefined()
-  })
-
   it('batch materializes resolved attached pending tasks with one graph replacement', () => {
     const harness = createHarness(
       [
