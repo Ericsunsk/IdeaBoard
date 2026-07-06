@@ -53,6 +53,7 @@ func TestPostgresTaskAssignerAssignsLowestLoadRatioAccount(t *testing.T) {
 		t.Fatalf("assignment=%+v, want assigned to lowest load ratio account %d", assignment, lowRatio)
 	}
 	assertTaskLease(t, db, "pending-lowest-ratio", lowRatio, assignment.LeaseToken)
+	assertTaskAssignmentMetrics(t, db, "pending-lowest-ratio")
 }
 
 func TestPostgresTaskAssignerAssignsNextAccountWhenFirstIsFull(t *testing.T) {
@@ -93,6 +94,25 @@ func TestPostgresTaskAssignerAssignReturnsNoCapacityWhenAllAccountsFull(t *testi
 	assignment, err := assigner.Assign(ctx, []int64{first, second}, &tasks.TaskPayload{
 		TaskID:     "pending-no-capacity",
 		RiverJobID: 103,
+	})
+	if err != nil {
+		t.Fatalf("Assign failed: %v", err)
+	}
+	if assignment.Status != AssignStatusNoCapacity || assignment.AccountID != 0 {
+		t.Fatalf("assignment=%+v, want no_capacity", assignment)
+	}
+}
+
+func TestPostgresTaskAssignerAssignReturnsNoCapacityWithoutCandidates(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	createAssignerTask(t, db, "pending-empty-candidates", 0, tasks.StatusPending, "")
+
+	assignment, err := assigner.Assign(ctx, []int64{0, 0}, &tasks.TaskPayload{
+		TaskID:     "pending-empty-candidates",
+		RiverJobID: 109,
 	})
 	if err != nil {
 		t.Fatalf("Assign failed: %v", err)
@@ -364,5 +384,23 @@ func assertTaskLease(t *testing.T, db *sql.DB, taskID string, wantAccountID int6
 	if accountID != wantAccountID || assignedChannelID != wantChannelID || leaseToken != wantLeaseToken || status != tasks.StatusRunning {
 		t.Fatalf("task %q state account=%d assigned_channel=%d lease=%q status=%q, want account=%d assigned_channel=%d lease=%q status=%q",
 			taskID, accountID, assignedChannelID, leaseToken, status, wantAccountID, wantChannelID, wantLeaseToken, tasks.StatusRunning)
+	}
+}
+
+func assertTaskAssignmentMetrics(t *testing.T, db *sql.DB, taskID string) {
+	t.Helper()
+	var currentStage string
+	var bottleneckSource string
+	var queueWaitMS int64
+	err := db.QueryRow(`
+SELECT current_stage, bottleneck_source, queue_wait_ms
+FROM task_execution_metrics
+WHERE task_id = $1`, taskID).Scan(&currentStage, &bottleneckSource, &queueWaitMS)
+	if err != nil {
+		t.Fatalf("load task %q assignment metrics failed: %v", taskID, err)
+	}
+	if currentStage != tasks.ExecutionStageAssigned || bottleneckSource != tasks.BottleneckSourceQueue || queueWaitMS < 0 {
+		t.Fatalf("task %q metrics stage=%q bottleneck=%q queue_wait_ms=%d, want assigned queue non-negative wait",
+			taskID, currentStage, bottleneckSource, queueWaitMS)
 	}
 }

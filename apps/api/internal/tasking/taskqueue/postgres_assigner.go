@@ -24,6 +24,14 @@ func NewPostgresTaskAssigner(db *sql.DB) *PostgresTaskAssigner {
 	return &PostgresTaskAssigner{db: db}
 }
 
+func commitTaskAssignment(tx *sql.Tx, committed *bool, assignment TaskAssignment) (TaskAssignment, error) {
+	if err := tx.Commit(); err != nil {
+		return TaskAssignment{}, err
+	}
+	*committed = true
+	return assignment, nil
+}
+
 func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, task *tasks.TaskPayload) (TaskAssignment, error) {
 	if a == nil || a.db == nil {
 		return TaskAssignment{}, fmt.Errorf("postgres task assigner: db not configured")
@@ -43,64 +51,28 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 		}
 	}()
 
-	status, currentAccountID, currentChannelID, currentLeaseToken, currentResolvedModel, createdAt, err := getTaskStateForUpdate(ctx, tx, task.TaskID)
+	policy := taskAssignmentPolicy{}
+	taskState, err := getTaskStateForUpdate(ctx, tx, task.TaskID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			if commitErr := tx.Commit(); commitErr != nil {
-				return TaskAssignment{}, commitErr
-			}
-			committed = true
-			return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusDiscard}, nil
+			return commitTaskAssignment(tx, &committed, policy.discard(task.TaskID))
 		}
 		return TaskAssignment{}, err
 	}
-	if tasks.IsTerminalStatus(status) {
-		if err := tx.Commit(); err != nil {
-			return TaskAssignment{}, err
-		}
-		committed = true
-		return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusDiscard}, nil
-	}
-	if status == tasks.StatusRunning && currentAccountID > 0 && currentChannelID > 0 && LeaseBelongsToRiverJob(currentLeaseToken, task.RiverJobID) {
-		if err := tx.Commit(); err != nil {
-			return TaskAssignment{}, err
-		}
-		committed = true
-		return TaskAssignment{
-			TaskID:        task.TaskID,
-			AccountID:     currentAccountID,
-			ChannelID:     currentChannelID,
-			ResolvedModel: currentResolvedModel,
-			Status:        AssignStatusAssigned,
-			LeaseToken:    currentLeaseToken,
-		}, nil
-	}
-	if status == tasks.StatusRunning {
-		if err := tx.Commit(); err != nil {
-			return TaskAssignment{}, err
-		}
-		committed = true
-		return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusDiscard}, nil
+	if decision := policy.decideLockedTask(task.TaskID, task.RiverJobID, taskState); decision.done {
+		return commitTaskAssignment(tx, &committed, decision.assignment)
 	}
 
 	candidates := normalizeCandidateAccountIDs(accountIDs)
-	if len(candidates) == 0 {
-		if err := tx.Commit(); err != nil {
-			return TaskAssignment{}, err
-		}
-		committed = true
-		return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusNoCapacity}, nil
+	if decision := policy.decideCandidatePool(task.TaskID, candidates); decision.done {
+		return commitTaskAssignment(tx, &committed, decision.assignment)
 	}
 
 	requestedModel, featureSlug := taskRoutingHints(task.Params)
-	accountID, channelID, resolvedModel, err := selectLeastLoadedAccountTx(ctx, tx, candidates, requestedModel, featureSlug)
+	selectedAccount, err := selectLeastLoadedAccountTx(ctx, tx, candidates, requestedModel, featureSlug)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			if err := tx.Commit(); err != nil {
-				return TaskAssignment{}, err
-			}
-			committed = true
-			return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusNoCapacity}, nil
+			return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
 		}
 		return TaskAssignment{}, err
 	}
@@ -110,32 +82,17 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 		return TaskAssignment{}, err
 	}
 	assignedAt := time.Now()
-	updated, err := markTaskAssignedTx(ctx, tx, task.TaskID, accountID, channelID, leaseToken, resolvedModel)
+	updated, err := markTaskAssignedTx(ctx, tx, task.TaskID, selectedAccount.AccountID, selectedAccount.ChannelID, leaseToken, selectedAccount.ResolvedModel)
 	if err != nil {
 		return TaskAssignment{}, err
 	}
-	if updated == 0 {
-		if err := tx.Commit(); err != nil {
+	decision := policy.decideAssignedTask(task.TaskID, selectedAccount, leaseToken, updated)
+	if updated > 0 {
+		if err := patchTaskAssignmentMetricsTx(ctx, tx, task.TaskID, taskState.CreatedAt, assignedAt); err != nil {
 			return TaskAssignment{}, err
 		}
-		committed = true
-		return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusDiscard}, nil
 	}
-	if err := patchTaskAssignmentMetricsTx(ctx, tx, task.TaskID, createdAt, assignedAt); err != nil {
-		return TaskAssignment{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return TaskAssignment{}, err
-	}
-	committed = true
-	return TaskAssignment{
-		TaskID:        task.TaskID,
-		AccountID:     accountID,
-		ChannelID:     channelID,
-		ResolvedModel: resolvedModel,
-		Status:        AssignStatusAssigned,
-		LeaseToken:    leaseToken,
-	}, nil
+	return commitTaskAssignment(tx, &committed, decision.assignment)
 }
 
 func (a *PostgresTaskAssigner) ConfirmTaskLease(ctx context.Context, assignment TaskAssignment) error {
@@ -168,7 +125,7 @@ WHERE task_id = $1
 	return nil
 }
 
-func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (string, int64, int64, string, string, time.Time, error) {
+func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (taskAssignmentTaskState, error) {
 	var status string
 	var accountID sql.NullInt64
 	var channelID sql.NullInt64
@@ -180,6 +137,9 @@ SELECT status, account_id, assigned_channel_id, lease_token, resolved_model, cre
 FROM tasks
 WHERE task_id = $1
 FOR UPDATE`, taskID).Scan(&status, &accountID, &channelID, &leaseToken, &resolvedModel, &createdAt)
+	if err != nil {
+		return taskAssignmentTaskState{}, err
+	}
 	currentAccountID := int64(0)
 	if accountID.Valid {
 		currentAccountID = accountID.Int64
@@ -188,7 +148,14 @@ FOR UPDATE`, taskID).Scan(&status, &accountID, &channelID, &leaseToken, &resolve
 	if channelID.Valid {
 		currentChannelID = channelID.Int64
 	}
-	return status, currentAccountID, currentChannelID, leaseToken, resolvedModel, createdAt, err
+	return taskAssignmentTaskState{
+		Status:        status,
+		AccountID:     currentAccountID,
+		ChannelID:     currentChannelID,
+		LeaseToken:    leaseToken,
+		ResolvedModel: resolvedModel,
+		CreatedAt:     createdAt,
+	}, nil
 }
 
 func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, accountID int64, channelID int64, leaseToken string, resolvedModel string) (int64, error) {
@@ -244,7 +211,7 @@ SET current_stage = EXCLUDED.current_stage,
 	return err
 }
 
-func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []int64, requestedModel string, featureSlug string) (int64, int64, string, error) {
+func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []int64, requestedModel string, featureSlug string) (taskAssignmentSelectedAccount, error) {
 	var accountID int64
 	var channelID int64
 	var modelName string
@@ -308,7 +275,14 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 		strings.TrimSpace(requestedModel),
 		strings.TrimSpace(featureSlug),
 	).Scan(&accountID, &channelID, &modelName)
-	return accountID, channelID, modelName, err
+	if err != nil {
+		return taskAssignmentSelectedAccount{}, err
+	}
+	return taskAssignmentSelectedAccount{
+		AccountID:     accountID,
+		ChannelID:     channelID,
+		ResolvedModel: modelName,
+	}, nil
 }
 
 func taskRoutingHints(paramsJSON string) (string, string) {
