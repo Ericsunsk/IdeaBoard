@@ -102,7 +102,8 @@
                 :value="item.slug"
                 severity="secondary"
                 rounded
-                class="!min-w-0 max-w-full font-mono !text-admin-caption [&_.p-tag-label]:truncate"
+                class="!min-w-0 max-w-full font-mono !text-admin-caption"
+                :pt="promptSlugTagPt"
               />
             </div>
           </template>
@@ -133,6 +134,7 @@
                 size="small"
                 rounded
                 :label="v.key"
+                :pt="variableTokenButtonPt"
                 :class="getVariableTokenButtonClass(v.tone)"
                 @click="insertVar(item.slug, v.key)"
               />
@@ -178,10 +180,12 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
+import type { ButtonPassThroughOptions } from 'primevue/button'
 import Card from 'primevue/card'
 import Dialog from 'primevue/dialog'
 import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
+import type { TagPassThroughOptions } from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
@@ -237,7 +241,13 @@ const activeGroup = computed<FeatureGroup | null>(() => {
   return featureGroups.value.find((group) => group.key === activeGroupKey.value) || null
 })
 const variableTokenButtonClass =
-  'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-admin-caption !font-[760] !leading-4 [&_.p-button-label]:break-all [&_.p-button-label]:leading-4'
+  'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-admin-caption !font-[760] !leading-4'
+const variableTokenButtonPt = {
+  label: { class: 'break-all leading-4' },
+} satisfies ButtonPassThroughOptions
+const promptSlugTagPt = {
+  label: { class: 'truncate' },
+} satisfies TagPassThroughOptions
 const variableTokenButtonToneClass: Record<FeaturePromptVariableTone, string> = {
   prompt: '!bg-[rgba(71,117,168,0.16)] !text-admin-info hover:!bg-[rgba(71,117,168,0.22)]',
   control: '!bg-[rgba(212,136,48,0.16)] !text-admin-warning hover:!bg-[rgba(212,136,48,0.22)]',

@@ -47,7 +47,7 @@
           </Button>
           <Button
             label="新增存储"
-            class="!h-9 !rounded-lg"
+            :class="adminActionButtonClass"
             :disabled="creatableProviders.length === 0"
             @click="openCreate"
           >
@@ -423,6 +423,7 @@ import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
+  adminActionButtonClass,
   adminCompactTagClass,
   adminDialogFooterActionsClass,
   adminDialogHeaderContentClass,

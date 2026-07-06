@@ -36,7 +36,11 @@
                 <Refresh class="size-4 text-admin-text-2" />
               </template>
             </Button>
-            <Button label="新增渠道商" class="!h-9 !rounded-lg" @click="channelEditor.openCreate">
+            <Button
+              label="新增渠道商"
+              :class="adminActionButtonClass"
+              @click="channelEditor.openCreate"
+            >
               <template #icon>
                 <Plus class="size-4" />
               </template>
@@ -420,6 +424,7 @@ import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
 import {
   adminCompactTagClass,
+  adminActionButtonClass,
   adminDialogCompactFooterActionsClass,
   adminDialogFormBodyClass,
   adminFramedIconButtonClass,

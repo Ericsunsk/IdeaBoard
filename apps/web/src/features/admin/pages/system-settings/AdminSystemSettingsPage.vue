@@ -99,7 +99,7 @@
 
           <div :class="settingActionRowClass">
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="保存"
               severity="contrast"
               :disabled="brandingLoading || brandingSaving || uploading"
@@ -107,7 +107,7 @@
               @click="handleSaveBranding"
             />
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="重置"
               severity="secondary"
               outlined
@@ -170,7 +170,7 @@
 
           <div :class="settingActionRowClass">
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="保存"
               severity="contrast"
               :disabled="rateLimitLoading || rateLimitSaving"
@@ -178,7 +178,7 @@
               @click="handleSaveRateLimit"
             />
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="重置"
               severity="secondary"
               outlined
@@ -251,7 +251,7 @@
 
           <div :class="settingActionRowClass">
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="保存"
               severity="contrast"
               :disabled="taskMonitorLoading || taskMonitorSaving"
@@ -259,7 +259,7 @@
               @click="handleSaveTaskMonitorSettings"
             />
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="重置"
               severity="secondary"
               outlined
@@ -309,7 +309,7 @@
 
           <div :class="settingActionRowClass">
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="保存"
               severity="contrast"
               :disabled="publicURLLoading || publicURLSaving"
@@ -317,7 +317,7 @@
               @click="handleSavePublicURLSettings"
             />
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="重置"
               severity="secondary"
               outlined
@@ -358,7 +358,7 @@
 
           <div :class="settingActionRowClass">
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="保存"
               severity="contrast"
               :disabled="mediaUploadLoading || mediaUploadSaving"
@@ -366,7 +366,7 @@
               @click="handleSaveMediaUploadSettings"
             />
             <Button
-              class="!h-9 !rounded-lg"
+              :class="adminActionButtonClass"
               label="重置"
               severity="secondary"
               outlined
@@ -424,6 +424,7 @@ import { useAdminPublicURLSettings } from '../../system-settings/useAdminPublicU
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
+  adminActionButtonClass,
   adminMasonryCardClass,
   adminTwoColumnMasonryGridClass,
 } from '../../shared/lib/adminUiClasses'

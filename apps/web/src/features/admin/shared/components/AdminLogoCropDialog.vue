@@ -92,7 +92,7 @@
 
       <div :class="adminDialogFooterActionsClass">
         <Button
-          :class="[adminTextButtonClass, '!h-9 !rounded-lg']"
+          :class="[adminTextButtonClass, adminActionButtonClass]"
           label="取消"
           severity="contrast"
           text
@@ -104,7 +104,7 @@
           </template>
         </Button>
         <Button
-          class="!h-9 !rounded-lg"
+          :class="adminActionButtonClass"
           label="确认上传"
           severity="contrast"
           :disabled="isProcessing || !sourceURL"
@@ -129,6 +129,7 @@ import { Cropper } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
 import { createAdminDialogPt } from '../lib/adminOverlayPt'
 import {
+  adminActionButtonClass,
   adminDialogFooterActionsClass,
   adminDialogTitleClass,
   adminTextButtonClass,

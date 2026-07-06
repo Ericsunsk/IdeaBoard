@@ -52,6 +52,8 @@ export const adminToolbarPagerButtonClass = `${adminToolbarIconButtonClass} disa
 export const adminToolbarPageLabelClass =
   'flex h-9 items-center justify-center rounded-lg !border !border-ib-border !bg-ib-surface px-3 text-admin-meta font-semibold text-ib-text-muted'
 
+export const adminActionButtonClass = '!h-9 !rounded-lg'
+
 export const adminTextButtonClass = '!text-ib-text-muted hover:!text-admin-text-1'
 
 export const adminFilterPopoverClass =
