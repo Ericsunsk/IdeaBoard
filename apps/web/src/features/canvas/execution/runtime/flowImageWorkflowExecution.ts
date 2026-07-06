@@ -26,6 +26,7 @@ import {
   type FusionExecutionPlan,
   type ImageActionExecutionPlan,
   type ImageExecutionInput,
+  type ImageExecutionPlan,
   type ImageExecutionResultOptions,
   type ImageInpaintExecutionPlan,
   type ImagePromptExecutionPlan,
@@ -83,13 +84,7 @@ type PendingImageWorkflowBatchParams = {
   formatErrorMessage?: (error: Error) => string
 }
 
-export type FlowImageWorkflowExecutionPlan =
-  | ImageActionExecutionPlan
-  | CanvasExtendExecutionPlan
-  | ImageInpaintExecutionPlan
-  | ImagePromptExecutionPlan
-  | TextPromptExecutionPlan
-  | FusionExecutionPlan
+export type FlowImageWorkflowExecutionPlan = ImageExecutionPlan
 
 export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>

@@ -381,7 +381,7 @@ describe('flowImageTaskRequests', () => {
     })
   })
 
-  it('requires image inpaint plans to use the prepared inpaint request builder', () => {
+  it('uses the prepared inpaint request builder for image inpaint plans', () => {
     const plan: ImageInpaintExecutionPlan = {
       kind: 'image-inpaint',
       sourceNodeId: 'image-1',
@@ -393,9 +393,6 @@ describe('flowImageTaskRequests', () => {
       resultOptions: {},
     }
 
-    expect(() => buildImageExecutionTaskRequest(plan)).toThrow(
-      'Image inpaint plan must be prepared before building task request',
-    )
     expect(
       buildPreparedImageInpaintTaskRequest({
         plan,

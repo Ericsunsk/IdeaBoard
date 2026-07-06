@@ -8,6 +8,7 @@ import type {
   PreparedFusionExecutionPlan,
   TextPromptExecutionPlan,
 } from '../planning/ImageExecutionPlan'
+import type { CanvasExtendPercent } from '../../utils/canvasExtendGeometry'
 import {
   buildExecutionTaskRequest,
   EXECUTION_FEATURE,
@@ -15,7 +16,11 @@ import {
   EXECUTION_META,
   EXECUTION_PARTIAL_EDIT_META,
 } from '../contracts/executionContract'
-import { buildExecutionSizeParams, extendExecutionImageSize } from '../contracts/executionSizeParams'
+import {
+  buildExecutionSizeParams,
+  extendExecutionImageSize,
+  type ExecutionImageSize,
+} from '../contracts/executionSizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
 import { getCanvasNodeImageInputLimit, type PromptAspectRatio } from '../../../canvas-board/domain'
 import {
@@ -29,22 +34,10 @@ import {
   type ImageExecutionAction,
 } from '../contracts/imageActionExecution'
 
-type ImageSize = {
-  width: number
-  height: number
-}
-
 function requireImageExecutionInputUrl(source: ImageExecutionInput): string {
   const url = `${source.url ?? ''}`.trim()
   if (!url) throw new Error('图片缺少 URL')
   return url
-}
-
-export type CanvasExtendPercent = {
-  top: number
-  right: number
-  bottom: number
-  left: number
 }
 
 export type ImageInpaintTaskRequestInput = {
@@ -52,15 +45,15 @@ export type ImageInpaintTaskRequestInput = {
   croppedImageUrl: string
   croppedMaskUrl: string
   referenceImageUrls?: string[]
-  cropSize: ImageSize | null
+  cropSize: ExecutionImageSize | null
 }
 
 export type FusionTaskRequestInput = {
   prompt: string
   imageUrls: string[]
   inputWeights: number[]
-  sizeSource: ImageSize | null
-  targetSize: ImageSize | null
+  sizeSource: ExecutionImageSize | null
+  targetSize: ExecutionImageSize | null
   aspectRatio: PromptAspectRatio
 }
 
@@ -136,7 +129,7 @@ export function buildTextPromptTaskRequest(input: {
 export function buildDirectActionTaskRequest(input: {
   source: ImageExecutionInput
   action: ImageDirectTaskAction
-  imageSize: ImageSize | null
+  imageSize: ExecutionImageSize | null
   strength?: number
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
@@ -170,7 +163,7 @@ export function buildDirectActionTaskRequest(input: {
 export function buildPromptImageTaskRequest(input: {
   source: ImageExecutionInput
   prompt: string
-  imageSize: ImageSize | null
+  imageSize: ExecutionImageSize | null
   aspectRatio: PromptAspectRatio
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
@@ -210,7 +203,7 @@ export function buildImageInpaintTaskRequest(
 
 export function buildCanvasExtendTaskRequest(input: {
   source: ImageExecutionInput
-  imageSize: ImageSize | null
+  imageSize: ExecutionImageSize | null
   extendPercent: CanvasExtendPercent
   prompt?: string
 }): SubmitTaskData {
@@ -240,7 +233,7 @@ export function buildCanvasExtendTaskRequest(input: {
 
 export function buildHdUpscaleTaskRequest(input: {
   source: ImageExecutionInput
-  imageSize: ImageSize | null
+  imageSize: ExecutionImageSize | null
   strength?: number
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
@@ -280,14 +273,13 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
 type ImageExecutionTaskRequestPlan =
   | ImageActionExecutionPlan
   | CanvasExtendExecutionPlan
-  | ImageInpaintExecutionPlan
   | ImagePromptExecutionPlan
   | TextPromptExecutionPlan
   | PreparedFusionExecutionPlan
 
 export function buildImageExecutionTaskRequest(
   plan: ImageExecutionTaskRequestPlan,
-  imageSize: ImageSize | null = null,
+  imageSize: ExecutionImageSize | null = null,
 ): SubmitTaskData {
   switch (plan.kind) {
     case 'image-action':
@@ -314,8 +306,6 @@ export function buildImageExecutionTaskRequest(
         extendPercent: plan.extendPercent,
         prompt: plan.prompt,
       })
-    case 'image-inpaint':
-      throw new Error('Image inpaint plan must be prepared before building task request')
     case 'image-prompt':
       return buildPromptImageTaskRequest({
         source: plan.source,
@@ -344,7 +334,7 @@ export function buildPreparedImageInpaintTaskRequest(input: {
   plan: ImageInpaintExecutionPlan
   croppedImageUrl: string
   croppedMaskUrl: string
-  cropSize: ImageSize | null
+  cropSize: ExecutionImageSize | null
 }): SubmitTaskData {
   return buildImageInpaintTaskRequest({
     prompt: input.plan.prompt,

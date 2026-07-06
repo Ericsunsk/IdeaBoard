@@ -10,7 +10,11 @@ import {
 } from '../../../canvas-board/domain'
 import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
-import { resolveCanvasExtendIntent, type CanvasExtendRect } from '../../utils/canvasExtendGeometry'
+import {
+  resolveCanvasExtendIntent,
+  type CanvasExtendPercent,
+  type CanvasExtendRect,
+} from '../../utils/canvasExtendGeometry'
 import {
   resolveImageNodeLayoutAnchor,
   type ImageNodeLayoutAnchor,
@@ -30,13 +34,11 @@ import type {
   ImageResultAnchor,
 } from './imageExecutionResultTypes'
 
-export type { ImageExecutionInput, ImageExecutionResultOptions, ImageResultAnchor }
-
-export type CanvasExtendPercent = {
-  top: number
-  right: number
-  bottom: number
-  left: number
+export type {
+  CanvasExtendPercent,
+  ImageExecutionInput,
+  ImageExecutionResultOptions,
+  ImageResultAnchor,
 }
 
 export type ImageActionExecutionPlan = {
