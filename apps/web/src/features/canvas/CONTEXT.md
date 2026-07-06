@@ -106,8 +106,47 @@ _Avoid_: maskDataUrl
 一个 Canvas Workspace 内对 Image Editing、Image Mask Editing、chrome state、node bindings 和 workflow actions 的 active coordination。
 _Avoid_: Image editing domain, mask domain
 
+## Module Ownership
+
+本节定义 Canvas module cleanup 的 ownership map。它描述当前边界，不要求为了对齐文档移动大量文件；后续重构应优先让代码逐步收敛到这些 public Interface。
+
+| Module | Responsibility | Public Interface | Implementation Detail Boundary |
+| ------ | -------------- | ---------------- | ------------------------------ |
+| `workspace-runtime` | Canvas Workspace 的 Facade runtime，组合 Board Session、flow pane、persistence、viewport controls、graph editing、image tools、image workflow 和 node interaction。 | `workspace-runtime/index.ts` 导出的 `useCanvasWorkspaceRuntime(options)` 与 `CanvasWorkspaceRuntime` 类型。页面层只能读取 `runtime.viewModel`，并通过 `runtime.commands` 触发 runtime 能力。 | `workspace-runtime/internal/createCanvasWorkspaceRuntimeParts.ts` 和各子 runtime 的组合顺序、local refs、dependency wiring 是内部实现。页面和其他 module 不应直接 import internal parts 或反推内部对象结构。 |
+| `graph-runtime` | Canvas graph mutation 的 canonical domain runtime，维护 normalized graph fact source、transaction、commit summary、hydrate/export 和 O(1) lookup/index。 | `graph-runtime/index.ts` 导出的 `CanvasGraphStore`、transaction types、id helpers 和 summary types。调用方通过 transaction/summary 表达 mutation intent。 | `CanvasGraphStore` 的 `Map`/index 结构、transaction staging、projection patch 计算是实现细节。`graph-runtime` 不 import Vue Flow，不保存 Flow Node/Edge shape，也不把 Vue Flow event semantics 当成 domain truth。 |
+| `flow-pane` | Vue Flow interaction plane 的 adapter boundary，承接 native node/edge/viewport events，并把它们转成 Graph Runtime transaction 或 adapter projection。当前是 logical submodule，主要通过 `workspace-runtime` 的 `flowPane` view/commands 暴露。 | `viewModel.flowPane.nodes` / `viewModel.flowPane.edges` 只用于 `<VueFlow>` binding；`commands.flowPane` 暴露 `onNodesChange`、`onEdgesChange`、`isValidConnection`、`onConnect`、`onEdgeUpdate` 和 `nodeDragTransactions`。 | `@vue-flow/core` types/events、Flow Node/Flow Edge arrays、drag RAF projection、selection bridge、handle refresh 和 Vue Flow adapter composables 属于 adapter detail。页面业务逻辑和 graph domain 不应依赖这些细节。 |
+| `board-session` | 单个 Canvas Board 的打开、保存、remote sync recovery、preview refresh、upload lifecycle 和 board id resolution。 | `board-session/index.ts` 导出的 `useCanvasBoardSession()`、`CanvasBoardSession`、save options/result types。Workspace runtime 通过该 seam load/save/refresh board。 | `boardSessionRepository`、preview renderer、upload stabilization/recycle、remote sync error classification 是内部实现。页面不直接调用 repository 或拼装保存流程。 |
+| `execution` | Image action 的执行 contract 和 planning boundary，把 Canvas Node/input 转成 `Execution Plan` 和 task request 所需的 typed params。 | `execution/index.ts` 导出的 feature/action constants、execution contract builders、size/ratio helpers、`createImageExecutionPlanner()`、plan/result types。 | Feature-specific params assembly、media preparation、local inpaint helpers、task-runner 和 result-node materialization 不应泄漏成页面 API。`Execution Plan` 不是 `Task`，也不代表 pending UI state。 |
+| `image-workflow` | Canvas Workspace 中运行 image workflow 的 orchestration：准备 request、提交 task、创建 pending/completed result node、处理 direct action、prompt generation 和 canvas extend。当前实现位于 `execution/runtime`、`execution/task-runner`、`execution/result-nodes` 并由 workspace Facade 暴露。 | 页面只使用 `commands.imageWorkflow`：`runImageDirectAction`、`runCanvasExtendAction`、`createImageActionHandlers`、`createPromptGenerationHandlers`、`createCanvasExtendOverlay`。Runtime assembly 可使用 `createImageWorkflowCommands()` / `useFlowImageWorkflowExecution()`。 | Task submission sequencing、pending result snapshot、result materializer、poll/reattach、media upload/local inpaint fallback 和 node placement 是内部实现。页面不直接提交 task 或 materialize result nodes。 |
+
+### Page Boundary
+
+Canvas 页面层可以负责 route shell、Vue component binding、overlay placement、keyboard/dismissable UI 和 lightweight DOM refs，但 Canvas runtime 能力入口只能是 Canvas Facade：
+
+- `useCanvasWorkspaceRuntime()` 返回的 `viewModel` 是 read side；页面不得从 Vue Flow projection 反推 Canvas Board business facts。
+- `useCanvasWorkspaceRuntime()` 返回的 `commands` 是 write side；页面触发 graph mutation、board save/load、image workflow、node interaction 和 viewport runtime action 时必须走对应 command。
+- 页面不直接 import `workspace-runtime/internal/*`、`board-session` repository、`graph-runtime` store instance、execution task-runner 或 result materializer。
+
+### Vue Flow Adapter Boundary
+
+Vue Flow 是 interaction/rendering Adapter，不是 graph domain。
+
+- `Canvas Node` / `Canvas Connection` / `CanvasBoardSnapshot` 是 domain fact；`Flow Node` / `Flow Edge` / native Vue Flow events 是 adapter representation。
+- Vue Flow 细节可以存在于 `flow-pane`、adapter composables 和页面 `<VueFlow>` binding，但不能泄漏到 `graph-runtime`、`canvas-board/domain` 或页面业务规则。
+- 新增 graph domain rule 时，先表达为 Canvas Board/Graph Runtime 语义，再由 adapter 投影到 Vue Flow。
+
+### `canvas-board` Independence
+
+`features/canvas-board` 保持独立共享 domain module，因为 `CanvasBoardSnapshot` 是 workspace runtime、board catalog、persistence、preview serialization 和 tests 共同使用的 document contract。
+
+- `features/canvas-board/domain` 只拥有 schema、node/connection model、registry、sizing、aspect ratio 和 fusion blend 等 UI/runtime-neutral core。
+- `features/canvas-board` 不依赖 `features/canvas` 的 concrete runtime、Vue Flow adapter、image tool session 或 page shell。
+- `features/canvas` 可以 import `canvas-board/domain` 来 hydrate/export snapshot；反向依赖会让 shared document contract 被 Workspace implementation 绑死，应避免。
+
 ## Rules
 
 - `viewModel.flowPane.nodes` / `viewModel.flowPane.edges` 只允许用于 Vue Flow binding，例如 `CanvasPage.vue` 中的 `const { nodes, edges } = viewModel.flowPane`；不要用它们做业务决策。
 - Vue Flow native events 和 interaction handlers 放在 `commands.flowPane`，例如 `onNodesChange`、`onEdgesChange`、`onConnect`、`onEdgeUpdate` 和 `nodeDragTransactions`。
+- 页面层访问 Canvas runtime 能力必须通过 `useCanvasWorkspaceRuntime()` 的 `viewModel` / `commands` Facade；新增页面逻辑不要绕过 Facade 直接依赖 runtime internal module。
+- Graph domain 规则写在 `canvas-board/domain` 或 `graph-runtime` 语义里；Vue Flow-specific details 只留在 adapter/flow-pane 边界。
 - #74 的 Deferred / Later Work 仍然 out of scope：不要在当前 seam 文档化或实现 Image Tool Session deepening、#72 Pending Result materialization、Vue Flow deeper adapter cleanup、performance/flicker optimization。
