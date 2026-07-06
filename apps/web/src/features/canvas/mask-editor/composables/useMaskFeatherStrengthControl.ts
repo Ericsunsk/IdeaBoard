@@ -1,13 +1,15 @@
-import { onLongPress } from '@vueuse/core'
-import { getCurrentInstance, onBeforeUnmount, ref, type ComponentPublicInstance } from 'vue'
+import { computed, ref } from 'vue'
 import {
   clampMaskFeatherStrength,
   MASK_EDITOR_DEFAULT_FEATHER_STRENGTH,
 } from '../config/maskEditorConstants'
+import {
+  type StrengthRangeRefTarget,
+  useStrengthRangeEditSession,
+} from '../../composables/useStrengthRangeEditSession'
 
 const DEFAULT_LONG_PRESS_MS = 260
-
-type FeatherRangeRefTarget = Element | ComponentPublicInstance | null
+const FEATHER_STRENGTH_KEY = 'feather'
 
 type UseMaskFeatherStrengthControlOptions = {
   onApply: (strength: number) => void
@@ -16,86 +18,31 @@ type UseMaskFeatherStrengthControlOptions = {
 
 export function useMaskFeatherStrengthControl(options: UseMaskFeatherStrengthControlOptions) {
   const strength = ref(MASK_EDITOR_DEFAULT_FEATHER_STRENGTH)
-  const visible = ref(false)
-  const rangeRef = ref<HTMLInputElement | null>(null)
-  const longPressMs = options.longPressMs ?? DEFAULT_LONG_PRESS_MS
+  const rangeEdit = useStrengthRangeEditSession<typeof FEATHER_STRENGTH_KEY>({
+    readValue: () => strength.value,
+    normalizeValue: (_key, value) => clampMaskFeatherStrength(value),
+    writeValue: (_key, value) => {
+      strength.value = value
+    },
+    onCommit: () => {
+      options.onApply(strength.value)
+    },
+    longPressMs: options.longPressMs ?? DEFAULT_LONG_PRESS_MS,
+  })
+  const visible = computed(() => rangeEdit.activeKey.value === FEATHER_STRENGTH_KEY)
 
-  let stopLongPress: (() => void) | null = null
-  let isEditing = false
-  let shouldSuppressNextClick = false
-  let longPressGeneration = 0
-
-  function getRangeInput(event: Event): HTMLInputElement | null {
-    return event.currentTarget instanceof HTMLInputElement ? event.currentTarget : null
-  }
-
-  function syncStrengthFromRange(input: HTMLInputElement) {
-    strength.value = clampMaskFeatherStrength(input.valueAsNumber)
-  }
-
-  function beginStrengthEdit(input: HTMLInputElement, options: { syncInitial: boolean }) {
-    if (!options.syncInitial) input.value = `${strength.value}`
-    visible.value = true
-    isEditing = true
-    shouldSuppressNextClick = true
-    if (options.syncInitial) syncStrengthFromRange(input)
-    input.focus({ preventScroll: true })
-  }
-
-  function finishStrengthEdit() {
-    if (!isEditing) return
-    isEditing = false
-    visible.value = false
-    rangeRef.value?.blur()
-    options.onApply(strength.value)
-  }
-
-  function disposeLongPress() {
-    stopLongPress?.()
-    stopLongPress = null
-  }
-
-  function setRangeRef(el: FeatherRangeRefTarget) {
-    const input =
-      el instanceof HTMLInputElement
-        ? el
-        : el && '$el' in el && el.$el instanceof HTMLInputElement
-          ? el.$el
-          : null
-    if (rangeRef.value === input) return
-    disposeLongPress()
-    rangeRef.value = input
-    if (!input) return
-    const generation = longPressGeneration
-    stopLongPress = onLongPress(
-      input,
-      () => {
-        if (generation !== longPressGeneration) return
-        beginStrengthEdit(input, { syncInitial: false })
-      },
-      {
-        delay: longPressMs,
-        distanceThreshold: false,
-      },
-    )
+  function setRangeRef(el: StrengthRangeRefTarget) {
+    rangeEdit.setRangeRef(FEATHER_STRENGTH_KEY, el)
+    rangeEdit.setTriggerRef(FEATHER_STRENGTH_KEY, el)
   }
 
   function onButtonPointerDown(event: PointerEvent) {
-    if (event.button !== 0) return
-    const input = getRangeInput(event)
-    if (!input) return
-    if (visible.value) {
-      beginStrengthEdit(input, { syncInitial: true })
-      return
-    }
-    isEditing = false
-    shouldSuppressNextClick = false
+    rangeEdit.onRangePointerDown(FEATHER_STRENGTH_KEY, event)
   }
 
   function onButtonClick(event?: MouseEvent) {
     const input = event?.currentTarget instanceof HTMLInputElement ? event.currentTarget : null
-    if (shouldSuppressNextClick) {
-      shouldSuppressNextClick = false
+    if (rangeEdit.consumeSuppressedClick(FEATHER_STRENGTH_KEY)) {
       input?.blur()
       return
     }
@@ -104,34 +51,15 @@ export function useMaskFeatherStrengthControl(options: UseMaskFeatherStrengthCon
   }
 
   function onStrengthInput(event: Event) {
-    const input = getRangeInput(event)
-    if (!input || !isEditing) return
-    syncStrengthFromRange(input)
+    rangeEdit.onInput(FEATHER_STRENGTH_KEY, event)
   }
 
   function onStrengthChange(event: Event) {
-    const input = getRangeInput(event)
-    if (!input || !isEditing) return
-    syncStrengthFromRange(input)
-    finishStrengthEdit()
+    rangeEdit.onChange(FEATHER_STRENGTH_KEY, event)
   }
 
   function onStrengthPointerUp(event: PointerEvent) {
-    const input = getRangeInput(event)
-    if (input && isEditing) syncStrengthFromRange(input)
-    finishStrengthEdit()
-  }
-
-  function dispose() {
-    longPressGeneration += 1
-    disposeLongPress()
-    isEditing = false
-    visible.value = false
-    rangeRef.value = null
-  }
-
-  if (getCurrentInstance()) {
-    onBeforeUnmount(dispose)
+    rangeEdit.onPointerUp(FEATHER_STRENGTH_KEY, event)
   }
 
   return {
@@ -143,6 +71,6 @@ export function useMaskFeatherStrengthControl(options: UseMaskFeatherStrengthCon
     onStrengthInput,
     onStrengthChange,
     onStrengthPointerUp,
-    dispose,
+    dispose: rangeEdit.dispose,
   }
 }
