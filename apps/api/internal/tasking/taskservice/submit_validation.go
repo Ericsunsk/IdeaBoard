@@ -9,7 +9,6 @@ import (
 
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/platform/jsonlimit"
-	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
@@ -117,10 +116,6 @@ func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
 	return nil
 }
 
-func validateSubmitTaskImageURLs(imageURLs []string) error {
-	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, validateSubmitTaskMediaRef)
-}
-
 func (s *Service) validateSubmitTaskImageURLs(ctx context.Context, userID int64, imageURLs []string) error {
 	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, func(raw string) error {
 		return s.validateSubmitTaskMediaRef(ctx, userID, raw)
@@ -144,10 +139,6 @@ func validateSubmitTaskImageURLsWithRefValidator(imageURLs []string, validateRef
 		}
 	}
 	return nil
-}
-
-func validateSubmitTaskMediaParams(params map[string]interface{}) error {
-	return validateSubmitTaskMediaParamsWithRefValidator(params, validateSubmitTaskMediaRef)
 }
 
 func (s *Service) validateSubmitTaskMediaParams(ctx context.Context, userID int64, params map[string]interface{}) error {
@@ -184,10 +175,6 @@ func validateSubmitTaskContractKeys(params map[string]interface{}) error {
 		}
 	}
 	return nil
-}
-
-func validateSubmitTaskMediaRef(raw string) error {
-	return taskmedia.ValidateSubmitMediaRef(raw)
 }
 
 func (s *Service) validateSubmitTaskMediaRef(ctx context.Context, userID int64, raw string) error {
