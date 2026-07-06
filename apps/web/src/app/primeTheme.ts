@@ -14,7 +14,7 @@ export const ideaBoardPrimePreset = definePreset(Aura, {
       600: adminThemeTokens.accentPressed,
       700: adminThemeTokens.textPrimary,
       800: adminThemeTokens.accent,
-      900: '#344054',
+      900: adminThemeTokens.primeNeutralStrong,
       950: adminThemeTokens.accentPressed,
     },
     colorScheme: {
@@ -29,7 +29,7 @@ export const ideaBoardPrimePreset = definePreset(Aura, {
           500: adminThemeTokens.textTertiary,
           600: adminThemeTokens.textSecondary,
           700: adminThemeTokens.textSecondaryStrong,
-          800: '#344054',
+          800: adminThemeTokens.primeNeutralStrong,
           900: adminThemeTokens.textPrimary,
           950: adminThemeTokens.accentPressed,
         },

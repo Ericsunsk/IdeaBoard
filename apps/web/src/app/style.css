@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+@import '../shared/theme/user-avatar-button.css';
+@import '../features/admin/shared/styles/admin-user-avatar-button.css';
+@import '../features/canvas/components/styles/canvas-range-input.css';
+@import '../features/canvas/components/styles/canvas-user-avatar-button.css';
 @plugin "tailwindcss-primeui";
 
 @theme {
@@ -52,6 +56,14 @@
   --color-admin-model-indigo: #4f6f9f;
   --color-admin-model-purple: #7b668f;
   --color-admin-model-cyan: #3d8b9a;
+  --color-admin-prime-neutral-strong: #344054;
+  --color-admin-chart-tooltip-border: #d9e2ef;
+  --color-admin-chart-tooltip-text: #0f172a;
+  --color-admin-chart-axis-line: #d5deea;
+  --color-admin-chart-split-line: #edf2f7;
+  --color-admin-chart-legend-text: #475569;
+  --color-admin-chart-mist: #6f879f;
+  --color-admin-chart-olive: #6f8b71;
 
   --text-admin-micro: 10px;
   --text-admin-caption: 11px;
@@ -332,10 +344,6 @@
     --ib-focus-outline-offset: 2px;
     --ib-focus-outline-color: var(--color-canvas-accent);
     --ib-focus-border-color: var(--ib-focus-outline-color);
-    --canvas-range-input-height: 22px;
-    --canvas-range-track-height: 4px;
-    --canvas-range-thumb-size: 9px;
-    --canvas-range-thumb-offset: -2.5px;
   }
 
   /* 全局链接样式 */
@@ -370,168 +378,7 @@
   }
 }
 
-@layer components {
-  .canvas-range-input {
-    appearance: none;
-    -webkit-appearance: none;
-    display: block;
-    width: 100%;
-    min-width: 0;
-    height: var(--canvas-range-input-height, 22px);
-    margin: 0;
-    background: transparent;
-    cursor: pointer;
-    accent-color: var(
-      --canvas-range-fill-color,
-      var(--canvas-accent, var(--color-canvas-accent))
-    );
-  }
-
-  .canvas-range-input::-webkit-slider-runnable-track {
-    height: var(--canvas-range-track-height, 4px);
-    border: none;
-    border-radius: 999px;
-    background: var(
-      --canvas-range-track-background,
-      var(--canvas-range-track-color, var(--canvas-surface-muted, var(--color-canvas-track-bg)))
-    );
-  }
-
-  .canvas-range-input::-webkit-slider-thumb {
-    appearance: none;
-    -webkit-appearance: none;
-    width: var(--canvas-range-thumb-size, 9px);
-    height: var(--canvas-range-thumb-size, 9px);
-    margin-top: var(--canvas-range-thumb-offset, -2.5px);
-    border: 0;
-    border-radius: 999px;
-    background: var(
-      --canvas-range-thumb-color,
-      var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
-    );
-    box-shadow: none;
-    transition: background-color var(--canvas-motion-fast, 160ms) ease;
-  }
-
-  .canvas-range-input::-moz-range-track {
-    height: var(--canvas-range-track-height, 4px);
-    border: none;
-    border-radius: 999px;
-    background: var(
-      --canvas-range-track-background,
-      var(--canvas-range-track-color, var(--canvas-surface-muted, var(--color-canvas-track-bg)))
-    );
-  }
-
-  .canvas-range-input::-moz-range-thumb {
-    width: var(--canvas-range-thumb-size, 9px);
-    height: var(--canvas-range-thumb-size, 9px);
-    border: 0;
-    border-radius: 999px;
-    background: var(
-      --canvas-range-thumb-color,
-      var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
-    );
-    box-shadow: none;
-  }
-
-  .canvas-range-input:focus-visible {
-    outline: var(--ib-focus-outline-width) solid
-      var(--canvas-range-focus-color, var(--canvas-accent, var(--color-canvas-accent)));
-    outline-offset: var(--ib-focus-outline-offset);
-    border-radius: 999px;
-  }
-
-  .canvas-range-input:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .ib-user-avatar-button {
-    --ib-user-avatar-button-size: 40px;
-    --ib-user-avatar-button-border-width: 1px;
-    --ib-user-avatar-button-border: #e2e4e8;
-    --ib-user-avatar-button-border-hover: #d8ddea;
-    --ib-user-avatar-button-bg: #fff;
-    --ib-user-avatar-button-bg-hover: var(--ib-control-bg-hover);
-    --ib-user-avatar-button-color: var(--ib-control-icon);
-    --ib-user-avatar-button-color-hover: var(--ib-control-icon-hover);
-    --ib-user-avatar-button-focus-ring: rgba(122, 107, 213, 0.16);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--ib-user-avatar-button-size);
-    min-width: var(--ib-user-avatar-button-size);
-    height: var(--ib-user-avatar-button-size);
-    margin: 0;
-    padding: 0;
-    flex-shrink: 0;
-    overflow: hidden;
-    border: var(--ib-user-avatar-button-border-width) solid var(--ib-user-avatar-button-border);
-    border-radius: 999px;
-    background: var(--ib-user-avatar-button-bg);
-    color: var(--ib-user-avatar-button-color);
-    box-shadow: none;
-    cursor: pointer;
-    transition:
-      background-color 0.2s ease,
-      border-color 0.2s ease,
-      color 0.2s ease;
-    appearance: none;
-  }
-
-  .ib-user-avatar-button:hover:not(:disabled) {
-    border-color: var(--ib-user-avatar-button-border-hover);
-    background: var(--ib-user-avatar-button-bg-hover);
-    color: var(--ib-user-avatar-button-color-hover);
-  }
-
-  .ib-user-avatar-button:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px var(--ib-user-avatar-button-focus-ring);
-  }
-
-  .ib-user-avatar-button__image,
-  .ib-user-avatar-button__placeholder {
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-  }
-
-  .ib-user-avatar-button__image {
-    display: block;
-    object-fit: cover;
-  }
-
-  .ib-user-avatar-button__placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .admin-user-avatar-button {
-    --ib-user-avatar-button-border: transparent;
-    --ib-user-avatar-button-border-hover: var(--color-admin-border);
-    --ib-user-avatar-button-bg: transparent;
-    --ib-user-avatar-button-bg-hover: var(--color-admin-surface-hover);
-    --ib-user-avatar-button-color: var(--color-admin-text-2);
-    --ib-user-avatar-button-color-hover: var(--color-admin-text-1);
-    --ib-user-avatar-button-focus-ring: var(--color-admin-focus-ring);
-  }
-
-  .canvas-user-avatar-button {
-    --ib-user-avatar-button-bg: #f1f3f9;
-  }
-
-  .admin-user-avatar-button .ib-user-avatar-button__placeholder {
-    border: 1px solid var(--color-admin-border);
-    background: #fff;
-    color: var(--color-admin-text-1);
-  }
-}
-
-/* User-facing toast skin. */
+/* App-owned global: Sonner renders outside feature components and only exposes data selectors. */
 [data-sonner-toaster].ideaboard-toaster {
   --ideaboard-toast-bg: rgba(255, 255, 255, 0.9);
   --ideaboard-toast-border: #dbe2f1;
@@ -617,6 +464,10 @@ body.admin-route {
   font-feature-settings: 'tnum' 1;
 }
 
+/*
+ * App-owned global: scroll state is toggled from App.vue and reused by surfaces that need
+ * stable gutters without owning the root scroll listener.
+ */
 html,
 .app-scrollbar {
   scrollbar-gutter: stable;
@@ -658,6 +509,10 @@ html.app-scrolling::-webkit-scrollbar-thumb:hover,
   background-color: rgba(17, 24, 39, 0.72);
 }
 
+/*
+ * Admin global bridge: PrimeVue overlays/tooltips render library DOM outside feature files,
+ * so the route-scoped body class keeps the override bounded to Admin.
+ */
 body.admin-route
   :where(
     .p-component,

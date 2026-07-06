@@ -624,6 +624,10 @@ onMounted(async () => {
 })
 </script>
 
+<style>
+@import '../components/styles/canvas-vue-flow-adapter-skin.css';
+</style>
+
 <style scoped>
 @import '../components/styles/canvas-controls.css';
 
@@ -689,117 +693,11 @@ onMounted(async () => {
   overscroll-behavior-x: none;
 }
 
-.canvas-layout.interaction-lite :deep(.vue-flow__node),
-.canvas-layout.interaction-lite :deep(.workflow-node),
-.canvas-layout.interaction-lite :deep(.vue-flow__edge-path),
-.canvas-layout.interaction-lite :deep(.fusion-node-connection-layer) {
-  transition: none !important;
-}
-
-.canvas-layout.interaction-lite :deep(.workflow-node *) {
-  transition-duration: 0s !important;
-}
-
-.canvas-layout.interaction-lite :deep(.vue-flow__edge.selected .vue-flow__edge-path) {
-  filter: none !important;
-}
-
-.canvas-layout.viewport-pan-lite :deep(.vue-flow__transformationpane) {
-  will-change: transform;
-}
-
-.canvas-layout.viewport-pan-lite :deep(.vue-flow__nodes),
-.canvas-layout.viewport-pan-lite :deep(.vue-flow__edges),
-.canvas-layout.viewport-pan-lite :deep(.vue-flow__edge-labels) {
-  pointer-events: none;
-}
-
-.canvas-flow-wrap :deep(.vue-flow__viewport) {
-  background-image: radial-gradient(circle, #e2e4e8 1px, transparent 1px);
-  background-size: 12px 12px;
-  background-position: 0 0;
-}
-
 .canvas-flow-wrap {
   position: absolute;
   inset: 0;
   z-index: 2;
   overscroll-behavior: none;
   overscroll-behavior-x: none;
-}
-
-.canvas-flow-wrap :deep(.vue-flow) {
-  background: transparent;
-}
-
-.canvas-flow-wrap :deep(.vue-flow__edge-path),
-.canvas-flow-wrap :deep(.vue-flow__connection-path) {
-  stroke: var(--flow-edge-color);
-  stroke-width: var(--flow-edge-width);
-}
-
-.canvas-flow-wrap :deep(.vue-flow__edge.animated path) {
-  stroke-dasharray: var(--flow-edge-dasharray);
-  animation: flow-edge-dashdraw var(--flow-edge-running-duration) linear infinite;
-}
-
-.canvas-flow-wrap :deep(.vue-flow__edge.animated path.vue-flow__edge-interaction) {
-  stroke-dasharray: none;
-  animation: none;
-}
-
-.canvas-flow-wrap :deep(.vue-flow__edge.selected .vue-flow__edge-path),
-.canvas-flow-wrap :deep(.vue-flow__edge:focus-visible .vue-flow__edge-path) {
-  stroke: var(--flow-edge-selected-color);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .canvas-flow-wrap :deep(.vue-flow__edge.animated path),
-  .canvas-flow-wrap :deep(.fusion-node-connection-layer path) {
-    animation: none;
-  }
-}
-
-.canvas-flow-wrap :deep(.vue-flow__node) {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 0;
-  cursor: default;
-  transition: none;
-}
-
-.canvas-flow-wrap :deep(.vue-flow__node:hover),
-.canvas-flow-wrap :deep(.vue-flow__node.selected),
-.canvas-flow-wrap :deep(.vue-flow__node:focus),
-.canvas-flow-wrap :deep(.vue-flow__node:focus-visible) {
-  box-shadow: none !important;
-  border: 0 !important;
-  outline: none !important;
-}
-
-.canvas-flow-wrap :deep(.vue-flow__selectionpane) {
-  cursor: default;
-}
-
-.canvas-flow-wrap :deep(.vue-flow__pane) {
-  cursor: default;
-}
-
-.canvas-layout.tool-hand .canvas-flow-wrap :deep(.vue-flow__pane) {
-  cursor: grab;
-}
-
-.canvas-layout.tool-hand .canvas-flow-wrap :deep(.vue-flow__pane.dragging) {
-  cursor: grabbing;
-}
-</style>
-
-<style>
-@keyframes flow-edge-dashdraw {
-  from {
-    stroke-dashoffset: 10;
-  }
 }
 </style>

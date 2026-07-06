@@ -1,5 +1,6 @@
 import type { Chart, ChartData, ChartOptions, ChartType, Plugin, TooltipItem } from 'chart.js'
 import { markRaw, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { adminThemeTokenFallbacks } from '../../../../shared/theme/adminThemeTokens'
 
 export type AdminChartData = ChartData<ChartType, unknown[], string>
 export type AdminChartOptions = ChartOptions<ChartType>
@@ -18,28 +19,29 @@ export const adminChartBubbleClipPadding =
 const adminChartFontFamily =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 
+// Chart.js paints canvas colors and helpers like withAlpha need concrete values.
 export const adminChartTheme = {
-  tooltipBg: '#f8fafc',
-  tooltipBorder: '#d9e2ef',
-  tooltipText: '#0f172a',
-  axisLine: '#d5deea',
-  axisText: '#667085',
-  splitLine: '#edf2f7',
-  legendText: '#475569',
-  emptyText: '#98a2b3',
-  cardBg: '#f8fafc',
-  segmentBorder: '#ffffff',
-  mainText: '#1d2939',
-  brand: '#26364f',
-  slate: '#4f6f9f',
-  mist: '#6f879f',
-  cyan: '#3d8b9a',
-  olive: '#6f8b71',
-  mauve: '#7b668f',
-  success: '#2f9e73',
-  warning: '#d48830',
-  danger: '#d14d5a',
-  info: '#4775a8',
+  tooltipBg: adminThemeTokenFallbacks.controlBg,
+  tooltipBorder: adminThemeTokenFallbacks.chartTooltipBorder,
+  tooltipText: adminThemeTokenFallbacks.chartTooltipText,
+  axisLine: adminThemeTokenFallbacks.chartAxisLine,
+  axisText: adminThemeTokenFallbacks.textSecondary,
+  splitLine: adminThemeTokenFallbacks.chartSplitLine,
+  legendText: adminThemeTokenFallbacks.chartLegendText,
+  emptyText: adminThemeTokenFallbacks.textTertiary,
+  cardBg: adminThemeTokenFallbacks.controlBg,
+  segmentBorder: adminThemeTokenFallbacks.textInverse,
+  mainText: adminThemeTokenFallbacks.textPrimary,
+  brand: adminThemeTokenFallbacks.accent,
+  slate: adminThemeTokenFallbacks.modelIndigo,
+  mist: adminThemeTokenFallbacks.chartMist,
+  cyan: adminThemeTokenFallbacks.modelCyan,
+  olive: adminThemeTokenFallbacks.chartOlive,
+  mauve: adminThemeTokenFallbacks.modelPurple,
+  success: adminThemeTokenFallbacks.success,
+  warning: adminThemeTokenFallbacks.warning,
+  danger: adminThemeTokenFallbacks.danger,
+  info: adminThemeTokenFallbacks.info,
 }
 
 export const adminChartPlugins = markRaw<Plugin<ChartType>[]>([

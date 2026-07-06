@@ -299,31 +299,6 @@ function resolveOverlayDeltaScale(viewBoxRect: MiniMapRect): MiniMapPoint | null
   z-index: 6;
 }
 
-:global(.vue-flow__minimap.canvas-minimap) {
-  position: static;
-  margin: 0;
-  padding: 4px;
-  overflow: hidden;
-  border: 1px solid var(--canvas-surface-border);
-  border-radius: 6px;
-  background: rgb(255 255 255 / 72%);
-  box-shadow: none;
-}
-
-:global(.vue-flow__minimap.canvas-minimap svg) {
-  display: block;
-  touch-action: none;
-}
-
-:global(.vue-flow__minimap.canvas-minimap .vue-flow__minimap-node) {
-  fill: var(--canvas-minimap-node);
-  stroke: none;
-}
-
-:global(.vue-flow__minimap.canvas-minimap .vue-flow__minimap-mask) {
-  stroke: var(--canvas-minimap-viewport);
-}
-
 .canvas-minimap-viewport-overlay {
   position: absolute;
   inset: 5px;
@@ -341,10 +316,6 @@ function resolveOverlayDeltaScale(viewBoxRect: MiniMapRect): MiniMapPoint | null
 }
 
 .canvas-minimap-viewport-fill.is-dragging {
-  cursor: grabbing;
-}
-
-:global(.vue-flow__minimap.canvas-minimap.pannable:active) {
   cursor: grabbing;
 }
 </style>

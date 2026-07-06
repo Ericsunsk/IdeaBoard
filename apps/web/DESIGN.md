@@ -52,6 +52,26 @@ Token ownership:
 - `--color-ib-*`: cross-feature semantic aliases.
 - `--color-ib-auth-*`: Auth/User Shell.
 
+## Style Ownership
+
+Keep style ownership explicit. A selector should live at the narrowest layer that can own it without leaking implementation details.
+
+| Layer | Owns | Avoid |
+| ----- | ---- | ----- |
+| App global | Tailwind entry, app tokens, base reset, browser/app shell rules, tiny vendor-neutral mechanical resets | Feature/page skins, component variants, Admin visual semantics |
+| Third-party adapter skin | Vendor DOM that cannot be styled through props or pass-through APIs, such as Vue Flow pane/node/edge/minimap internals | Product business rules or component-private classes |
+| Surface skin | Stable surface-level layout and visual language for Canvas, Admin, Boards, Auth/User Shell, or Image Editor | Cross-surface tokens that only one feature understands |
+| Feature CSS contract | Classes intentionally shared by several components inside one feature, such as Canvas node/tool contracts | Styling private child implementation from unrelated parents |
+| Component private style | Markup and states owned by one component | Selectors relied on by parents unless promoted to a feature CSS contract |
+
+Rules:
+
+- `:deep(...)` is an escape hatch. Use it for third-party or adapter DOM only, and keep those selectors behind a named adapter-skin boundary where practical.
+- Business components must not add new `:deep(...)` selectors to style their own child components. Use props, explicit classes, slots, or CSS variables instead.
+- `:global(...)` is allowed for browser/app shell state, vendor skin, or documented feature CSS contracts. Do not use it for page-local convenience.
+- Stable raw colors, shadows, motion durations/easing, radii, and z-index stacks should be semantic tokens. Local raw values are acceptable only when they are one-off geometry, canvas drawing constants, test fixtures, or documented vendor fallbacks.
+- Route pages may compose layout and bind state, but repeated visual primitives should move to feature-local shared components or helpers before being copied.
+
 ## PrimeVue And Tailwind
 
 - PrimeVue usage defaults to `unstyled`.
