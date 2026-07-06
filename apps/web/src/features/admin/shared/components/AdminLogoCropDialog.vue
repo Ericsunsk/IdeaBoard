@@ -32,7 +32,7 @@
           class="absolute bottom-3 left-3 flex items-center gap-1 rounded-md border border-admin-border/80 bg-white/90 p-1 backdrop-blur"
         >
           <Button
-            class="!size-8 !rounded-md !p-0"
+            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="缩小"
             title="缩小"
             severity="contrast"
@@ -45,7 +45,7 @@
             </template>
           </Button>
           <Button
-            class="!size-8 !rounded-md !p-0"
+            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="放大"
             title="放大"
             severity="contrast"
@@ -58,7 +58,7 @@
             </template>
           </Button>
           <Button
-            class="!size-8 !rounded-md !p-0"
+            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="向左旋转"
             title="向左旋转"
             severity="contrast"
@@ -71,7 +71,7 @@
             </template>
           </Button>
           <Button
-            class="!size-8 !rounded-md !p-0"
+            :class="[adminTextButtonClass, '!size-8 !rounded-md !p-0']"
             aria-label="重置"
             title="重置"
             severity="contrast"
@@ -92,7 +92,7 @@
 
       <div :class="adminDialogFooterActionsClass">
         <Button
-          class="!h-9 !rounded-lg"
+          :class="[adminTextButtonClass, '!h-9 !rounded-lg']"
           label="取消"
           severity="contrast"
           text
@@ -131,6 +131,7 @@ import { createAdminDialogPt } from '../lib/adminOverlayPt'
 import {
   adminDialogFooterActionsClass,
   adminDialogTitleClass,
+  adminTextButtonClass,
 } from '../lib/adminUiClasses'
 
 type CropperInstance = InstanceType<typeof Cropper>

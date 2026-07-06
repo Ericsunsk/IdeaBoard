@@ -311,6 +311,7 @@
                     text
                     size="tiny"
                     label="自动获取"
+                    :class="adminTextButtonClass"
                     :loading="fetching"
                     @click="fetchBucketDomains"
                   />
@@ -342,6 +343,7 @@
                     severity="secondary"
                     text
                     rounded
+                    :class="adminTextButtonClass"
                     @click="updateConfigValue(field.key, `https://${domain}`)"
                   />
                 </div>
@@ -428,6 +430,7 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
   adminMasonryCardClass,
+  adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { storageVendorIcon, storageVendorLogo } from '../../storage/storageMeta'
 import { storageStatusSeverity, type StorageCard } from '../../storage/storageHelpers'

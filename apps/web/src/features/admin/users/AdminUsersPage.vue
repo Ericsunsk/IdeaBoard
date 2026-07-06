@@ -211,7 +211,10 @@
           text
           :severity="item.key === 'delete' ? 'danger' : 'secondary'"
           :disabled="item.disabled"
-          class="!w-full !justify-start !rounded-md !px-3 !py-2.5 !text-admin-meta !font-[650]"
+          :class="[
+            adminTextButtonClass,
+            '!w-full !justify-start !rounded-md !px-3 !py-2.5 !text-admin-meta !font-[650]',
+          ]"
           @click="handleActionSelect(item.key)"
         />
       </template>
@@ -250,7 +253,7 @@ import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import { useTransientScrolling } from '../shared/composables/useTransientScrolling'
 import { adminDenseDataTablePt } from '../shared/lib/adminDataTablePt'
 import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
-import { adminRoundIconButtonClass } from '../shared/lib/adminUiClasses'
+import { adminRoundIconButtonClass, adminTextButtonClass } from '../shared/lib/adminUiClasses'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'

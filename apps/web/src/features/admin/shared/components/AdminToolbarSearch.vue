@@ -15,7 +15,7 @@
       v-if="modelValue"
       text
       rounded
-      class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
+      :class="[adminTextButtonClass, 'absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2']"
       aria-label="清空搜索"
       @click="handleClear"
     >
@@ -32,7 +32,7 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import { Search, Xmark } from '@iconoir/vue'
-import { adminToolbarSearchInputClass } from '../lib/adminUiClasses'
+import { adminTextButtonClass, adminToolbarSearchInputClass } from '../lib/adminUiClasses'
 
 withDefaults(
   defineProps<{

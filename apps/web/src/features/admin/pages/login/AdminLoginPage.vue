@@ -19,7 +19,7 @@
             <span>账号</span>
             <IconField>
               <InputIcon>
-                <User class="h-4 w-4" />
+                <User class="h-4 w-4 text-admin-text-3" />
               </InputIcon>
               <InputText
                 v-model="formValue.username"
@@ -55,7 +55,13 @@
       </template>
 
       <template #footer>
-        <Button label="用户登录" text severity="secondary" @click="goUserLogin" />
+        <Button
+          label="用户登录"
+          text
+          severity="secondary"
+          :class="adminTextButtonClass"
+          @click="goUserLogin"
+        />
       </template>
     </Card>
   </div>
@@ -84,6 +90,7 @@ import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedir
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import { adminTextButtonClass } from '../../shared/lib/adminUiClasses'
 
 const router = useRouter()
 const route = useRoute()

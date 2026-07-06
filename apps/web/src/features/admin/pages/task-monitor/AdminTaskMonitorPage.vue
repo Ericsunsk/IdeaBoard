@@ -369,6 +369,7 @@
               text
               rounded
               size="small"
+              :class="adminTextButtonClass"
               aria-label="复制任务 ID"
               @click="copyToClipboard(detailTask?.task_id || '')"
             >
@@ -441,6 +442,7 @@
                   text
                   rounded
                   size="small"
+                  :class="adminTextButtonClass"
                   aria-label="复制用户 ID"
                   @click="copyToClipboard(String(detailTask.user_id))"
                 >
@@ -487,7 +489,7 @@
               text
               size="small"
               label="复制全文"
-              class="ml-auto !text-admin-caption !text-admin-text-3"
+              :class="[adminTextButtonClass, 'ml-auto !text-admin-caption !text-admin-text-3']"
               @click="copyToClipboard(detailTask.prompt || '')"
             />
           </div>
@@ -541,7 +543,7 @@
               text
               size="small"
               label="复制 JSON"
-              class="ml-auto !text-admin-caption !text-admin-text-3"
+              :class="[adminTextButtonClass, 'ml-auto !text-admin-caption !text-admin-text-3']"
               @click="copyToClipboard(resultSummaryText)"
             />
           </div>
@@ -569,6 +571,7 @@
                 text
                 size="small"
                 :label="showDebugResult ? '隐藏' : '展开'"
+                :class="adminTextButtonClass"
                 @click.stop="showDebugResult = !showDebugResult"
               />
             </div>
@@ -629,6 +632,7 @@ import {
   adminChartGridClass,
   adminDashboardRootClass,
   adminSummaryGridClass,
+  adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {

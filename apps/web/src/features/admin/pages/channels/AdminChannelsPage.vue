@@ -103,6 +103,7 @@
                   text
                   rounded
                   size="small"
+                  :class="adminTextButtonClass"
                   aria-label="添加 APIKey"
                   @click="accountEditor.openCreate(card.channel.commandTarget)"
                 >
@@ -423,6 +424,7 @@ import {
   adminDialogFormBodyClass,
   adminFramedIconButtonClass,
   adminMasonryCardClass,
+  adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'

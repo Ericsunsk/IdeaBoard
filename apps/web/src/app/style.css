@@ -515,8 +515,9 @@ html.app-scrolling::-webkit-scrollbar-thumb:hover,
 }
 
 /*
- * Admin global bridge: PrimeVue overlays/tooltips render library DOM outside feature files,
- * so the route-scoped body class keeps the override bounded to Admin.
+ * Admin global bridge: PrimeVue injects some component and overlay DOM outside
+ * feature-owned templates. Keep this route-scoped bridge limited to typography
+ * and tooltip vendor DOM; visual skins live in Admin pass-through helpers.
  */
 body.admin-route
   :where(
