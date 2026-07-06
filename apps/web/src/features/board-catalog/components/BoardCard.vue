@@ -187,8 +187,8 @@ watch(
 <style scoped>
 .board-card {
   transition:
-    border-color var(--canvas-motion-fast, 160ms) ease-out,
-    transform var(--canvas-motion-fast, 160ms) ease-out;
+    border-color var(--duration-ib-fast) ease-out,
+    transform var(--duration-ib-fast) ease-out;
 }
 
 .board-card:hover,
@@ -199,8 +199,8 @@ watch(
 .board-card-enter-active,
 .board-card-appear-active {
   transition:
-    opacity var(--canvas-motion-panel, 220ms) ease-out,
-    transform var(--canvas-motion-panel, 220ms) ease-out;
+    opacity var(--duration-ib-panel) ease-out,
+    transform var(--duration-ib-panel) ease-out;
 }
 
 .board-card-enter-from,
@@ -217,7 +217,7 @@ watch(
 
 @media (prefers-reduced-motion: reduce) {
   .board-card {
-    transition: border-color var(--canvas-motion-fast, 160ms) ease-out;
+    transition: border-color var(--duration-ib-fast) ease-out;
   }
 
   .board-card:hover,

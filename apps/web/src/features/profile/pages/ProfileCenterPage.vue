@@ -118,7 +118,7 @@
                 v-else
                 :label="userInitial"
                 shape="circle"
-                class="!h-full !w-full !bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-canvas-accent-secondary))] !text-[32px] !font-bold !text-ib-text-inverse"
+                class="!h-full !w-full !bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] !text-[32px] !font-bold !text-ib-text-inverse"
               />
               <Button
                 type="button"
@@ -455,7 +455,7 @@ const profileCardPt = {
 } as const
 
 const profileGridBgClass =
-  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,var(--color-canvas-accent-wash)_0%,var(--color-canvas-accent-clear)_42%),radial-gradient(circle,var(--color-ib-border-soft)_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
+  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,var(--color-ib-creative-accent-wash)_0%,var(--color-ib-creative-accent-clear)_42%),radial-gradient(circle,var(--color-ib-border-soft)_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
 
 const mainContentClass =
   'app-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6'

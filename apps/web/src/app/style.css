@@ -148,7 +148,7 @@
   --color-board-loading-bg: var(--color-board-surface-soft);
   --color-board-menu-border: #d8ddea;
   --color-board-menu-item: #4b5565;
-  --color-board-menu-item-hover-bg: var(--color-canvas-accent-ring);
+  --color-board-menu-item-hover-bg: var(--color-ib-creative-accent-ring);
   --color-board-menu-danger: var(--color-ib-danger);
   --color-board-menu-danger-hover-bg: color-mix(
     in srgb,
@@ -167,8 +167,8 @@
 
   /*
    * App semantic aliases.
-   * Keep these additive: colors map to existing Admin/Canvas/Boards tokens so
-   * current surfaces keep their visual contract until each ticket migrates call sites.
+   * Cross-surface tokens stay independent from Canvas so non-Canvas surfaces
+   * can share creative styling without depending on Canvas implementation tokens.
    */
   --color-ib-page: var(--color-admin-bg);
   --color-ib-surface: var(--color-admin-card-strong);
@@ -191,12 +191,16 @@
   --color-ib-accent-hover: var(--color-admin-accent-hover);
   --color-ib-accent-pressed: var(--color-admin-accent-pressed);
   --color-ib-accent-soft: var(--color-admin-accent-soft);
-  --color-ib-creative-accent: var(--color-canvas-accent);
-  --color-ib-creative-accent-hover: var(--color-canvas-accent-hover);
-  --color-ib-creative-accent-pressed: var(--color-canvas-accent-pressed);
-  --color-ib-creative-accent-soft: var(--color-canvas-accent-soft);
+  --color-ib-creative-accent: #9278e6;
+  --color-ib-creative-accent-hover: #7a6bd5;
+  --color-ib-creative-accent-pressed: #6d5fd0;
+  --color-ib-creative-accent-secondary: #c084fc;
+  --color-ib-creative-accent-soft: #f5f2ff;
+  --color-ib-creative-accent-ring: rgba(146, 120, 230, 0.1);
+  --color-ib-creative-accent-wash: rgba(122, 107, 213, 0.08);
+  --color-ib-creative-accent-clear: rgba(122, 107, 213, 0);
   --color-ib-focus-ring: var(--color-admin-focus-ring);
-  --color-ib-focus-accent: var(--color-canvas-accent);
+  --color-ib-focus-accent: var(--color-ib-creative-accent);
   --color-ib-success: var(--color-admin-success);
   --color-ib-warning: var(--color-admin-warning);
   --color-ib-danger: var(--color-admin-danger);
@@ -313,6 +317,9 @@
 
   --duration-ib-fast: 160ms;
   --duration-ib-standard: 200ms;
+  --duration-ib-panel: 220ms;
+  --duration-ib-dock: 240ms;
+  --ease-ib-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @layer base {
@@ -342,7 +349,7 @@
     --ib-control-bg-hover: #e8eaed;
     --ib-focus-outline-width: 2px;
     --ib-focus-outline-offset: 2px;
-    --ib-focus-outline-color: var(--color-canvas-accent);
+    --ib-focus-outline-color: var(--color-ib-focus-accent);
     --ib-focus-border-color: var(--ib-focus-outline-color);
   }
 

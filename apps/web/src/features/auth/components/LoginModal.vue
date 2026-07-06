@@ -253,10 +253,8 @@ async function handleLogin() {
 .auth-modal-leave-active,
 .auth-modal-appear-active {
   transition:
-    opacity var(--canvas-motion-dock, 240ms)
-      var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1)),
-    transform var(--canvas-motion-dock, 240ms)
-      var(--canvas-motion-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+    opacity var(--duration-ib-dock) var(--ease-ib-standard),
+    transform var(--duration-ib-dock) var(--ease-ib-standard);
 }
 
 .auth-modal-enter-from,
