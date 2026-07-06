@@ -10,11 +10,13 @@ import {
   resolveNextCanvasConnectionId,
 } from '../utils/flowSnapshotAdapter'
 import {
+  commitCanvasGraphConnectIntent,
+  commitCanvasGraphEdgeUpdateIntent,
   createCanvasGraphStore,
-  toCanvasGraphEdgeId,
+  resolveCanvasGraphEdgeId,
+  shouldReplaceCanvasConnection,
   type CanvasGraphEdgeId,
   type CanvasGraphStore,
-  type CanvasGraphTransaction,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
 import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/domain'
@@ -38,10 +40,6 @@ type UseFlowConnectionMutationsOptions = {
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
-}
-
-type ConnectionTargetPolicy = {
-  allowsMultipleTargetConnections: boolean
 }
 
 export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOptions) {
@@ -85,71 +83,13 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     })
   }
 
-  function isSameCanvasConnectionEndpoint(left: CanvasConnection, right: CanvasConnection) {
-    return (
-      left.fromNodeType === right.fromNodeType &&
-      left.fromNodeId === right.fromNodeId &&
-      left.fromPort === right.fromPort &&
-      left.toNodeType === right.toNodeType &&
-      left.toNodeId === right.toNodeId &&
-      left.toPort === right.toPort
-    )
-  }
-
-  function targetsSameCanvasInput(left: CanvasConnection, right: CanvasConnection) {
-    return (
-      left.toNodeType === right.toNodeType &&
-      left.toNodeId === right.toNodeId &&
-      left.toPort === right.toPort
-    )
-  }
-
-  function shouldReplaceConnection(
-    current: CanvasConnection,
-    nextConnection: CanvasConnection,
-    policy: ConnectionTargetPolicy,
-  ) {
-    if (
-      !policy.allowsMultipleTargetConnections &&
-      targetsSameCanvasInput(current, nextConnection)
-    ) {
-      return true
-    }
-    return isSameCanvasConnectionEndpoint(current, nextConnection)
-  }
-
-  function removeTransactionEdgesMatching(
-    store: CanvasGraphStore,
-    transaction: CanvasGraphTransaction,
-    predicate: (connection: CanvasConnection, edgeId: CanvasGraphEdgeId) => boolean,
-  ) {
-    store.getEdgeIds().forEach((edgeId) => {
-      const record = store.getEdge(edgeId)
-      if (record && predicate(record.connection, edgeId)) transaction.removeEdge(edgeId)
-    })
-  }
-
-  function findTransactionEdgeId(
-    store: CanvasGraphStore,
-    edge: Edge,
-  ): CanvasGraphEdgeId | null {
+  function findTransactionEdgeId(store: CanvasGraphStore, edge: Edge): CanvasGraphEdgeId | null {
     const restoredConnectionId = resolveFlowEdgeCanvasConnectionId(edge)
-    if (restoredConnectionId !== null) {
-      const edgeId = toCanvasGraphEdgeId(restoredConnectionId)
-      if (store.getEdge(edgeId)) return edgeId
-    }
-
     const canvasConnection = flowConnectionToCanvasConnection(1, edge)
-    if (!canvasConnection) return null
-    const matchedEdgeId = store
-      .getEdgeIds()
-      .find((edgeId) => {
-        const record = store.getEdge(edgeId)
-        return record
-          ? isSameCanvasConnectionEndpoint(record.connection, canvasConnection)
-          : false
-      })
-    return matchedEdgeId ?? null
+    return resolveCanvasGraphEdgeId(store, {
+      connectionId: restoredConnectionId,
+      endpointConnection: canvasConnection,
+    })
   }
 
   function createNextEdgeFromConnection(resolvedConnection: Connection, existingEdges: Edge[]) {
@@ -167,24 +107,16 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
   function filterConnectEdges(
     existingEdges: Edge[],
-    resolvedConnection: Connection,
+    nextConnection: CanvasConnection,
     allowsMultipleTargetConnections: boolean,
   ) {
     return existingEdges.filter((edge) => {
-      const isSameTargetHandle =
-        edge.target === resolvedConnection.target &&
-        edge.targetHandle === resolvedConnection.targetHandle
-      if (isSameTargetHandle && !allowsMultipleTargetConnections) {
-        return false
-      }
-      if (
-        edge.source === resolvedConnection.source &&
-        edge.target === resolvedConnection.target &&
-        edge.sourceHandle === resolvedConnection.sourceHandle &&
-        edge.targetHandle === resolvedConnection.targetHandle
-      )
-        return false
-      return true
+      const currentConnection = flowConnectionToCanvasConnection(nextConnection.id, edge)
+      return currentConnection
+        ? !shouldReplaceCanvasConnection(currentConnection, nextConnection, {
+            allowsMultipleTargetConnections,
+          })
+        : true
     })
   }
 
@@ -213,22 +145,17 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
     const filteredEdges = filterConnectEdges(
       existingEdges,
-      resolvedConnection,
+      nextEdge.connection,
       allowsMultipleTargetConnections,
     )
     const store = createCurrentGraphStore()
-    const transaction = store.beginTransaction('connect')
     let summary: CanvasGraphTransactionSummary
     try {
-      removeTransactionEdgesMatching(store, transaction, (current) =>
-        shouldReplaceConnection(current, nextEdge.connection, {
-          allowsMultipleTargetConnections,
-        }),
-      )
-      transaction.addEdge(nextEdge.connection)
-      summary = transaction.commit()
+      summary = commitCanvasGraphConnectIntent(store, {
+        connection: nextEdge.connection,
+        allowsMultipleTargetConnections,
+      })
     } catch (error) {
-      transaction.cancel()
       console.error('[Canvas] Failed to commit connection transaction', error)
       options.onWarning('连线未能写入画布，请刷新后重试')
       return
@@ -277,7 +204,10 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       options.onWarning('连线更新未能写入画布，请刷新后重试')
       return
     }
-    const nextConnection = flowConnectionToCanvasConnection(currentConnection.id, resolvedConnection)
+    const nextConnection = flowConnectionToCanvasConnection(
+      currentConnection.id,
+      resolvedConnection,
+    )
     if (!nextConnection) {
       options.onWarning('连线更新未能写入画布，请刷新后重试')
       return
@@ -287,33 +217,22 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
     const retainedEdges = (options.edges.value as unknown as Edge[]).filter((item) => {
       if (item.id === edge.id) return true
-      const isSameTargetHandle =
-        item.target === resolvedConnection.target &&
-        (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
-      if (isSameTargetHandle && !allowsMultipleTargetConnections) {
-        return false
-      }
-      const isSameConnection =
-        item.source === resolvedConnection.source &&
-        item.target === resolvedConnection.target &&
-        (item.sourceHandle ?? null) === (resolvedConnection.sourceHandle ?? null) &&
-        (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
-      return !isSameConnection
+      const currentConnection = flowConnectionToCanvasConnection(nextConnection.id, item)
+      return currentConnection
+        ? !shouldReplaceCanvasConnection(currentConnection, nextConnection, {
+            allowsMultipleTargetConnections,
+          })
+        : true
     })
 
-    const transaction = store.beginTransaction('connect')
     let summary: CanvasGraphTransactionSummary
     try {
-      removeTransactionEdgesMatching(store, transaction, (current, edgeId) => {
-        if (edgeId === transactionEdgeId) return false
-        return shouldReplaceConnection(current, nextConnection, {
-          allowsMultipleTargetConnections,
-        })
+      summary = commitCanvasGraphEdgeUpdateIntent(store, {
+        edgeId: transactionEdgeId,
+        connection: nextConnection,
+        allowsMultipleTargetConnections,
       })
-      transaction.updateEdge(transactionEdgeId, nextConnection)
-      summary = transaction.commit()
     } catch (error) {
-      transaction.cancel()
       console.error('[Canvas] Failed to commit edge update transaction', error)
       options.onWarning('连线更新未能写入画布，请刷新后重试')
       return

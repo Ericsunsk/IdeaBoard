@@ -12,6 +12,14 @@ import {
   createCanvasGraphImageNodeId,
   createCanvasGraphPromptNodeId,
 } from './CanvasGraphStore'
+import {
+  commitCanvasGraphConnectIntent,
+  commitCanvasGraphDeleteIntent,
+  commitCanvasGraphEdgeUpdateIntent,
+  findCanvasGraphEdgeIdByEndpoint,
+  isSameCanvasConnectionEndpoint,
+  stageCanvasGraphNodeDragIntent,
+} from '.'
 
 function createImageNode(id: number, x: number, y: number): ImageNodeItem {
   return {
@@ -43,11 +51,7 @@ function createPromptNode(id: number, x: number, y: number): PromptNodeItem {
   }
 }
 
-function createConnection(
-  id: number,
-  fromNodeId: number,
-  toNodeId: number,
-): CanvasConnection {
+function createConnection(id: number, fromNodeId: number, toNodeId: number): CanvasConnection {
   return {
     id,
     fromNodeType: 'image',
@@ -139,10 +143,7 @@ describe('CanvasGraphStore', () => {
       .commit()
 
     expect(addSummary.changedEdgeIds).toEqual([edgeId])
-    expect(store.getOutgoingEdgeIds(imageId)).toEqual([
-      createCanvasGraphConnectionId(1),
-      edgeId,
-    ])
+    expect(store.getOutgoingEdgeIds(imageId)).toEqual([createCanvasGraphConnectionId(1), edgeId])
     expect(store.getIncomingEdgeIds(promptId)).toEqual([edgeId])
 
     const removeSummary = store.beginTransaction('disconnect').removeEdge(edgeId).commit()
@@ -214,6 +215,112 @@ describe('CanvasGraphStore', () => {
     expect(store.getNode(nodeId)?.selected).toBe(true)
     expect(store.getEdge(edgeId)?.selected).toBe(true)
     expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
+  })
+
+  it('matches canonical edges by Canvas connection endpoint', () => {
+    const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
+    const sameEndpoint = createConnection(99, 1, 1)
+
+    expect(isSameCanvasConnectionEndpoint(createConnection(1, 1, 1), sameEndpoint)).toBe(true)
+    expect(findCanvasGraphEdgeIdByEndpoint(store, sameEndpoint)).toBe(
+      createCanvasGraphConnectionId(1),
+    )
+  })
+
+  it('commits connect intents with single-input last-write-wins policy', () => {
+    const snapshot = createSampleSnapshot()
+    snapshot.imageNodes.push(createImageNode(2, 80, 120))
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    const summary = commitCanvasGraphConnectIntent(store, {
+      connection: createConnection(2, 2, 1),
+      allowsMultipleTargetConnections: false,
+    })
+
+    expect(summary).toMatchObject({
+      reason: 'connect',
+      changedEdgeIds: [createCanvasGraphConnectionId(2)],
+      removedEdgeIds: [createCanvasGraphConnectionId(1)],
+      shouldRecordHistory: true,
+      shouldMarkDirty: true,
+    })
+    expect(store.exportSnapshot().connections).toEqual([createConnection(2, 2, 1)])
+  })
+
+  it('commits edge update intents while replacing conflicting target inputs', () => {
+    const snapshot = createSampleSnapshot()
+    snapshot.imageNodes.push(createImageNode(2, 80, 120))
+    snapshot.connections.push(createConnection(2, 2, 2))
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    const summary = commitCanvasGraphEdgeUpdateIntent(store, {
+      edgeId: createCanvasGraphConnectionId(2),
+      connection: createConnection(2, 2, 1),
+      allowsMultipleTargetConnections: false,
+    })
+
+    expect(summary.changedEdgeIds).toEqual([createCanvasGraphConnectionId(2)])
+    expect(summary.removedEdgeIds).toEqual([createCanvasGraphConnectionId(1)])
+    expect(store.exportSnapshot().connections).toEqual([createConnection(2, 2, 1)])
+  })
+
+  it('stages node drag position and selection as graph runtime intent', () => {
+    const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
+    const promptId = createCanvasGraphPromptNodeId(1)
+    const transaction = store.beginTransaction('node-drag')
+
+    expect(
+      stageCanvasGraphNodeDragIntent(transaction, {
+        nodeId: promptId,
+        position: { x: 640, y: 120 },
+      }),
+    ).toBe(true)
+    expect(
+      stageCanvasGraphNodeDragIntent(transaction, {
+        nodeId: promptId,
+        selected: true,
+      }),
+    ).toBe(true)
+    expect(
+      stageCanvasGraphNodeDragIntent(transaction, {
+        nodeId: 'vue-flow-generated-node',
+        position: { x: 1, y: 1 },
+      }),
+    ).toBe(false)
+
+    const summary = transaction.commit()
+
+    expect(summary.changedNodeIds).toEqual([promptId])
+    expect(summary.selectedNodeIds).toEqual([promptId])
+    expect(store.exportSnapshot().promptNodes[0]).toMatchObject({ x: 640, y: 120 })
+    expect(store.getNode(promptId)?.selected).toBe(true)
+  })
+
+  it('commits delete and disconnect intents with canonical transaction reasons', () => {
+    const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
+    const imageId = createCanvasGraphImageNodeId(1)
+    const edgeId = createCanvasGraphConnectionId(1)
+
+    const deleteSummary = commitCanvasGraphDeleteIntent(store, {
+      nodeIds: [imageId],
+      removeConnectedEdges: true,
+    })
+
+    expect(deleteSummary.reason).toBe('delete')
+    expect(deleteSummary.removedNodeIds).toEqual([imageId])
+    expect(deleteSummary.removedEdgeIds).toEqual([edgeId])
+    expect(store.exportSnapshot().imageNodes).toEqual([])
+    expect(store.exportSnapshot().connections).toEqual([])
+
+    const disconnectStore = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
+    const disconnectSummary = commitCanvasGraphDeleteIntent(disconnectStore, {
+      edgeIds: [edgeId],
+    })
+
+    expect(disconnectSummary.reason).toBe('disconnect')
+    expect(disconnectSummary.removedNodeIds).toEqual([])
+    expect(disconnectSummary.removedEdgeIds).toEqual([edgeId])
+    expect(disconnectStore.exportSnapshot().connections).toEqual([])
   })
 
   it.each([5_000, 10_000])(

@@ -25,8 +25,9 @@ import {
   type CanvasNodeItemByKind,
 } from '../../canvas-board/domain'
 import {
+  commitCanvasGraphDeleteIntent,
   createCanvasGraphStore,
-  type CanvasGraphNodeId,
+  isCanvasGraphNodeId,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
 import { flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
@@ -199,10 +200,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return isFlowConnectionAllowed(connection, lookupData)
   }
 
-  function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
-    return /^(?:image|prompt|fusion)-\d+$/.test(nodeId)
-  }
-
   function createCurrentGraphStore() {
     return createCanvasGraphStore(
       flowToCanvasBoardSnapshot(
@@ -315,9 +312,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     }
 
     const store = createCurrentGraphStore()
-    const transaction = store.beginTransaction('delete')
-    transaction.removeNode(nodeId, { removeConnectedEdges: true })
-    const summary = transaction.commit()
+    const summary = commitCanvasGraphDeleteIntent(store, {
+      nodeIds: [nodeId],
+      removeConnectedEdges: true,
+    })
     if (!summary.didChange) return
     options.graphAdapter.removeNodes(nodeId, {
       ...createTransactionCommandOptions(summary),

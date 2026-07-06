@@ -14,7 +14,7 @@ import {
   createFlowGraphCommandOptions,
   readFlowGraphCommandSideEffects,
 } from './flowGraphAdapterCommandSideEffects'
-import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/domain'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
 import {
   flowToCanvasBoardSnapshot,
@@ -23,13 +23,14 @@ import {
 } from '../utils/flowSnapshotAdapter'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
+  commitCanvasGraphDeleteIntent,
   createCanvasGraphStore,
-  toCanvasGraphEdgeId,
+  resolveCanvasGraphEdgeId,
+  stageCanvasGraphNodeDragIntent,
   toCanvasGraphNodeId,
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
   type CanvasGraphTransaction,
-  type CanvasGraphTransactionReason,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
 
@@ -199,8 +200,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onRestore: () => {
       markDirty()
     },
-    commitNodes: (nodes) => graphAdapter.replaceNodes(nodes as Node[], createRestoreGraphCommandOptions()),
-    commitEdges: (edges) => graphAdapter.replaceEdges(edges as Edge[], createRestoreGraphCommandOptions()),
+    commitNodes: (nodes) =>
+      graphAdapter.replaceNodes(nodes as Node[], createRestoreGraphCommandOptions()),
+    commitEdges: (edges) =>
+      graphAdapter.replaceEdges(edges as Edge[], createRestoreGraphCommandOptions()),
   })
 
   const boardPersistence = useFlowBoardPersistence({
@@ -248,10 +251,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     markDirtyAndSchedule()
   }
 
-  function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
-    return /^(?:image|prompt|fusion)-\d+$/.test(nodeId)
-  }
-
   function isNodeDragChange(change: NodeChange): change is NodeDragChange {
     return (change.type === 'position' || change.type === 'select') && 'id' in change
   }
@@ -280,7 +279,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     historyBefore?: FlowHistorySnapshot | null,
   ) {
     return createFlowGraphCommandOptions({
-      historyBefore: summary.shouldRecordHistory ? historyBefore ?? undefined : undefined,
+      historyBefore: summary.shouldRecordHistory ? (historyBefore ?? undefined) : undefined,
       recordHistory: summary.shouldRecordHistory,
       markDirty: summary.shouldMarkDirty,
     })
@@ -288,17 +287,11 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function stageNodeDragChange(change: NodeDragChange) {
     const transaction = activeNodeDrag?.transaction
-    if (!transaction || !isCanvasGraphNodeId(change.id)) return
-    if (change.type === 'position' && change.position) {
-      transaction.updateNode(change.id, {
-        x: change.position.x,
-        y: change.position.y,
-      })
-      return
-    }
-    if (change.type === 'select') {
-      transaction.selectNode(change.id, change.selected)
-    }
+    stageCanvasGraphNodeDragIntent(transaction, {
+      nodeId: change.id,
+      position: change.type === 'position' ? change.position : undefined,
+      selected: change.type === 'select' ? change.selected : undefined,
+    })
   }
 
   function getNodeDragChangeKey(change: NodeDragChange) {
@@ -421,16 +414,12 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     edgeChanges: EdgeChange[],
   ): EdgeChange[] {
     const removedNodeIds = new Set(
-      nodeChanges
-        .filter((change) => change.type === 'remove')
-        .map((change) => change.id),
+      nodeChanges.filter((change) => change.type === 'remove').map((change) => change.id),
     )
     if (removedNodeIds.size === 0) return edgeChanges
 
     const removedEdgeIds = new Set(
-      edgeChanges
-        .filter((change) => change.type === 'remove')
-        .map((change) => change.id),
+      edgeChanges.filter((change) => change.type === 'remove').map((change) => change.id),
     )
     const cleanupEdgeChanges = options.edges.value
       .filter(
@@ -449,9 +438,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
         }),
       )
 
-    return cleanupEdgeChanges.length > 0
-      ? edgeChanges.concat(cleanupEdgeChanges)
-      : edgeChanges
+    return cleanupEdgeChanges.length > 0 ? edgeChanges.concat(cleanupEdgeChanges) : edgeChanges
   }
 
   function hasApplicableRemoveChanges(nodeChanges: NodeChange[], edgeChanges: EdgeChange[]) {
@@ -463,33 +450,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     )
   }
 
-  function resolveNativeRemoveReason(
-    nodeIds: CanvasGraphNodeId[],
-    extraEdgeIds: CanvasGraphEdgeId[],
-  ): CanvasGraphTransactionReason {
-    if (nodeIds.length === 0) return extraEdgeIds.length <= 1 ? 'disconnect' : 'batch-delete'
-    if (nodeIds.length === 1 && extraEdgeIds.length === 0) return 'delete'
-    return 'batch-delete'
-  }
-
   function resolveGraphNodeIdForFlowNodeId(flowNodeId: string): CanvasGraphNodeId | null {
     const node = options.nodes.value.find((item) => item.id === flowNodeId)
     const ref = resolveFlowNodeCanvasRef(node ?? { id: flowNodeId, data: undefined })
     return ref ? toCanvasGraphNodeId(ref.nodeType, ref.id) : null
-  }
-
-  function isSameCanvasConnectionEndpoint(
-    left: CanvasConnection,
-    right: CanvasConnection,
-  ) {
-    return (
-      left.fromNodeType === right.fromNodeType &&
-      left.fromNodeId === right.fromNodeId &&
-      left.fromPort === right.fromPort &&
-      left.toNodeType === right.toNodeType &&
-      left.toNodeId === right.toNodeId &&
-      left.toPort === right.toPort
-    )
   }
 
   function resolveGraphEdgeIdByEndpoint(
@@ -504,14 +468,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       targetHandle: edge.targetHandle ?? null,
     })
     if (!canvasConnection) return null
-    return (
-      store.getEdgeIds().find((edgeId) => {
-        const record = store.getEdge(edgeId)
-        return record
-          ? isSameCanvasConnectionEndpoint(record.connection, canvasConnection)
-          : false
-      }) ?? null
-    )
+    return resolveCanvasGraphEdgeId(store, { endpointConnection: canvasConnection })
   }
 
   function resolveGraphEdgeIdForFlowEdge(
@@ -519,11 +476,21 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     edge: EdgeLookupInput,
   ): CanvasGraphEdgeId | null {
     const restoredConnectionId = resolveFlowEdgeCanvasConnectionId(edge)
-    if (restoredConnectionId !== null) {
-      const edgeId = toCanvasGraphEdgeId(restoredConnectionId)
-      if (store.getEdge(edgeId)) return edgeId
-    }
-    return resolveGraphEdgeIdByEndpoint(store, edge)
+    const endpointConnection =
+      edge.source && edge.target
+        ? flowConnectionToCanvasConnection(1, {
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle ?? null,
+            targetHandle: edge.targetHandle ?? null,
+          })
+        : null
+    return (
+      resolveCanvasGraphEdgeId(store, {
+        connectionId: restoredConnectionId,
+        endpointConnection,
+      }) ?? resolveGraphEdgeIdByEndpoint(store, edge)
+    )
   }
 
   function createEdgeLookupInput(change: EdgeRemoveChange): EdgeLookupInput {
@@ -578,13 +545,11 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     const edgeIds = resolveNativeRemovedEdgeIds(store, edgeChanges, removedNodeIds)
     if (!edgeIds) return false
 
-    const transaction = store.beginTransaction(resolveNativeRemoveReason(nodeIds, edgeIds))
-    transaction.batchDelete({
+    const summary = commitCanvasGraphDeleteIntent(store, {
       nodeIds,
       edgeIds,
       removeConnectedEdges: true,
     })
-    const summary = transaction.commit()
     if (!summary.didChange) return true
 
     const result = graphAdapter.applyGraphChanges(
