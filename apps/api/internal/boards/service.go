@@ -39,8 +39,8 @@ const maxBoardStateBytes = 8 * 1024 * 1024
 const maxBoardStateDepth = 32
 
 type BoardService struct {
-	repo             *BoardRepository
-	userRepo         *users.UserRepository
+	repo          *BoardRepository
+	userRepo      *users.UserRepository
 	canvasCleaner BoardCanvasCleaner
 }
 

@@ -399,8 +399,7 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	var err error
-	err = o.taskRuntime.CompleteTask(cleanupCtx, taskruntime.CompleteTaskInput{
+	err := o.taskRuntime.CompleteTask(cleanupCtx, taskruntime.CompleteTaskInput{
 		Assignment:    assignment,
 		Result:        result,
 		Outputs:       outputs,

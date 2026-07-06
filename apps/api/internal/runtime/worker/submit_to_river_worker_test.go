@@ -180,6 +180,7 @@ func waitForSubmitToRiverWorkerTaskStatus(t testing.TB, repo *taskstore.Reposito
 	}
 	if last == nil {
 		t.Fatalf("wait for task %q status=%q timed out after %s; task was never loaded", taskID, want, timeout)
+		return nil
 	}
 	t.Fatalf("wait for task %q status=%q timed out after %s; last status=%q error_msg=%q", taskID, want, timeout, last.Status, last.ErrorMsg)
 	return nil

@@ -13,7 +13,7 @@ const (
 type UploadResourceKind string
 
 const (
-	UploadResourceKindCanvas     UploadResourceKind = "canvas"
+	UploadResourceKindCanvas        UploadResourceKind = "canvas"
 	UploadResourceKindProfileAvatar UploadResourceKind = "profile_avatar"
 	UploadResourceKindTaskOutput    UploadResourceKind = "task_output"
 	UploadResourceKindSiteAsset     UploadResourceKind = "site_asset"
@@ -43,7 +43,7 @@ type UploadSiteAssetResource struct {
 type UploadResource struct {
 	Kind          UploadResourceKind
 	ObjectKey     string
-	Canvas     *UploadCanvasResource
+	Canvas        *UploadCanvasResource
 	ProfileAvatar *UploadProfileAvatarResource
 	TaskOutput    *UploadTaskOutputResource
 	SiteAsset     *UploadSiteAssetResource
