@@ -20,7 +20,6 @@ import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatio
 import { getCanvasNodeImageInputLimit, type PromptAspectRatio } from '../../../canvas-board/domain'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
-  IMAGE_ACTION_EXECUTION_REGISTRY,
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
   isImageDirectTaskAction,
@@ -28,7 +27,6 @@ import {
   requireImageActionExecution,
   type ImageDirectTaskAction,
   type ImageExecutionAction,
-  type ImageTaskAction,
 } from '../contracts/imageActionExecution'
 
 type ImageSize = {
@@ -67,9 +65,8 @@ export type FusionTaskRequestInput = {
 }
 
 function buildDirectActionReadinessRequest(action: ImageDirectTaskAction): SubmitTaskData {
-  const actionMeta = IMAGE_ACTION_EXECUTION_REGISTRY[action]
   const execution = requireImageActionExecution(action)
-  const strengthConfig = actionMeta.strength
+  const strengthConfig = execution.strength
   const params =
     strengthConfig?.paramPath === 'variation.strength'
       ? { variation: { strength: strengthConfig.defaultValue } }
@@ -105,9 +102,8 @@ export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
 }
 
 function buildHdUpscaleReadinessRequest(): SubmitTaskData {
-  const actionMeta = IMAGE_ACTION_EXECUTION_REGISTRY[IMAGE_HD_UPSCALE_ACTION]
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
-  const clarityStrength = actionMeta.strength?.defaultValue ?? DEFAULT_IMAGE_ACTION_STRENGTH
+  const clarityStrength = execution.strength?.defaultValue ?? DEFAULT_IMAGE_ACTION_STRENGTH
   return buildExecutionTaskRequest({
     prompt: 'submit readiness',
     feature: execution.feature,
@@ -144,10 +140,9 @@ export function buildDirectActionTaskRequest(input: {
   strength?: number
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
-  const actionMeta = IMAGE_ACTION_EXECUTION_REGISTRY[input.action]
   const execution = requireImageActionExecution(input.action)
   const sizeParams = buildExecutionSizeParams(input.imageSize)
-  const strengthConfig = actionMeta.strength
+  const strengthConfig = execution.strength
   if (strengthConfig?.paramPath === 'variation.strength') {
     return buildExecutionTaskRequest({
       prompt: '',
@@ -170,26 +165,6 @@ export function buildDirectActionTaskRequest(input: {
     imageUrls: [sourceUrl],
     params: sizeParams,
   })
-}
-
-export function buildImageTaskRequest(input: {
-  source: ImageExecutionInput
-  action: ImageTaskAction
-  imageSize: ImageSize | null
-  strength?: number
-}): SubmitTaskData {
-  if (input.action === IMAGE_HD_UPSCALE_ACTION) {
-    return buildHdUpscaleTaskRequest(input)
-  }
-  if (isImageDirectTaskAction(input.action)) {
-    return buildDirectActionTaskRequest({
-      source: input.source,
-      action: input.action,
-      imageSize: input.imageSize,
-      strength: input.strength,
-    })
-  }
-  throw new Error(`Unsupported image task action ${input.action}`)
 }
 
 export function buildPromptImageTaskRequest(input: {
@@ -316,12 +291,22 @@ export function buildImageExecutionTaskRequest(
 ): SubmitTaskData {
   switch (plan.kind) {
     case 'image-action':
-      return buildImageTaskRequest({
-        source: plan.source,
-        action: plan.action,
-        imageSize,
-        strength: plan.strength,
-      })
+      if (plan.action === IMAGE_HD_UPSCALE_ACTION) {
+        return buildHdUpscaleTaskRequest({
+          source: plan.source,
+          imageSize,
+          strength: plan.strength,
+        })
+      }
+      if (isImageDirectTaskAction(plan.action)) {
+        return buildDirectActionTaskRequest({
+          source: plan.source,
+          action: plan.action,
+          imageSize,
+          strength: plan.strength,
+        })
+      }
+      throw new Error(`Unsupported image task action ${plan.action}`)
     case 'canvas-extend':
       return buildCanvasExtendTaskRequest({
         source: plan.source,
