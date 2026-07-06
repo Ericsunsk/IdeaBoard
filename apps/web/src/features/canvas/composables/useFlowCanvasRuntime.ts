@@ -61,6 +61,7 @@ type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
 
 export type CanvasFlowGraphRuntimeControls = {
   captureHistory: () => FlowHistorySnapshot
+  createCurrentCanvasGraphStore: () => ReturnType<typeof createCanvasGraphStore>
   markDirty: () => void
   nodeDrag: {
     begin: () => void
@@ -390,6 +391,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   const graphRuntime: CanvasFlowGraphRuntimeControls = {
     captureHistory: captureFullGraphHistory,
+    createCurrentCanvasGraphStore,
     markDirty: () => {
       markDirty()
     },

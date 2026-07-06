@@ -77,18 +77,26 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { ImageEditorChrome } from '../image-editor'
 import { ImageMaskEditorChrome } from '../mask-editor'
-import type { ImageToolChromeCommands, ImageToolChromeModel } from '../image-tools'
+import type { CanvasImageTools } from '../image-tools'
 import CanvasNodeContextMenu from './CanvasNodeContextMenu.vue'
 
-defineProps<{
-  chromeModel: ImageToolChromeModel
-  chromeCommands: ImageToolChromeCommands
+type ImageToolChromeSession = {
+  viewModel: Pick<CanvasImageTools['viewModel'], 'chrome'>
+  commands: Pick<CanvasImageTools['commands'], 'chrome'>
+}
+
+const props = defineProps<{
+  imageToolSession: ImageToolChromeSession
   nodeContextMenu: { visible: boolean; x: number; y: number }
   canvasNodeMenuItems: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
 }>()
+
+const chromeModel = computed(() => props.imageToolSession.viewModel.chrome.value)
+const chromeCommands = computed(() => props.imageToolSession.commands.chrome)
 
 const emit = defineEmits<{
   'create-node': [kind: CanvasCreatableNodeKind]

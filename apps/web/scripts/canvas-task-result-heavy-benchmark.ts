@@ -12,6 +12,9 @@ import {
 } from '../src/features/canvas/composables/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../src/features/canvas/types/flowTypes'
 import { usePendingImageResultExecution } from '../src/features/canvas/execution/result-nodes/usePendingImageResultNodes'
+import { createCanvasGraphStore } from '../src/features/canvas/graph-runtime'
+import type { ResultMaterializerImageResult } from '../src/features/canvas/execution/result-nodes/resultMaterializer'
+import { flowToCanvasBoardSnapshot } from '../src/features/canvas/utils/flowSnapshotAdapter'
 
 type CliOptions = {
   pendingResultCounts: number[]
@@ -256,7 +259,7 @@ function installBenchmarkCounters(counters: InteractionCounterSnapshot): () => v
 
 function makeAnchorNode(): Node {
   return {
-    id: 'anchor',
+    id: 'prompt-1',
     type: 'canvas',
     position: { x: 0, y: 0 },
     data: {
@@ -264,7 +267,16 @@ function makeAnchorNode(): Node {
       nodeType: 'prompt',
       title: 'Prompt',
       snapshotNode: {
+        id: 1,
+        type: 'prompt',
+        x: 0,
+        y: 0,
         width: 280,
+        title: 'Prompt',
+        text: 'prompt',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
       },
     },
   }
@@ -290,7 +302,7 @@ function makeImageSnapshot(index: number, overrides: Partial<ImageNodeItem> = {}
 function makePendingImageNode(index: number): Node<FlowNodeData> {
   const snapshot = makeImageSnapshot(index)
   return {
-    id: `pending-${index}`,
+    id: `image-${snapshot.id}`,
     type: 'canvas',
     position: { x: snapshot.x, y: snapshot.y },
     data: {
@@ -303,11 +315,12 @@ function makePendingImageNode(index: number): Node<FlowNodeData> {
 }
 
 function makePendingImageEdge(index: number): Edge {
+  const imageNodeId = `image-${10_000 + index}`
   return {
-    id: `edge-pending-${index}`,
-    source: 'anchor',
+    id: `connection-${index}`,
+    source: 'prompt-1',
     sourceHandle: 'out:image',
-    target: `pending-${index}`,
+    target: imageNodeId,
     targetHandle: 'in:image',
     animated: true,
   }
@@ -352,6 +365,13 @@ function createHarness(initialNodes: Node[], initialEdges: Edge[] = []): Benchma
     nodes,
     edges,
     graphAdapter,
+    createCurrentCanvasGraphStore: () =>
+      createCanvasGraphStore(
+        flowToCanvasBoardSnapshot({
+          nodes: nodes.value,
+          edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+        }),
+      ),
   })
 
   return {
@@ -450,7 +470,7 @@ async function runPendingResultMaterialization(
       const reservedNodeIds: string[] = []
       await harness.actions.runPendingResults({
         source: { url: 'https://example.com/source.png', ratio: 1 },
-        sourceNodeId: 'anchor',
+        sourceNodeId: 'prompt-1',
         outputCount,
         resultOptions: { targetRatio: 1, targetWidth: 280 },
         submitTask: async (resultNodeId) => ({ taskId: `task-${resultNodeId}` }),
@@ -493,22 +513,26 @@ async function runAttachedPendingResultReattach(
   const startedAt = performance.now()
 
   try {
+    const resolvedResults: ResultMaterializerImageResult[] = []
     await Promise.allSettled(
       pendingNodes.map(async (node, index) => {
+        const taskId = `task-${index + 1}`
         runningState.setNodeRunning(node.id, true)
         try {
-          await harness.actions.resolveAttachedPendingResult({
-            resultNodeId: node.id,
-            taskId: `task-${index + 1}`,
-            resolveResult: async () => createResolvedTaskImageResult(index + 1),
-            isCurrent: () => true,
-            isAttached: () => true,
+          resolvedResults.push({
+            ...createResolvedTaskImageResult(index + 1),
+            resultNodeId: node.id as ResultMaterializerImageResult['resultNodeId'],
+            taskId,
           })
         } finally {
           runningState.setNodeRunning(node.id, false)
         }
       }),
     )
+    harness.actions.materializeResolvedAttachedPendingResults({
+      results: resolvedResults,
+      isAttached: () => true,
+    })
     await flushAsyncGraphWork()
     const durationMs = performance.now() - startedAt
     return createPhaseMetrics(harness, pendingResults, durationMs, runningState.readMetrics())

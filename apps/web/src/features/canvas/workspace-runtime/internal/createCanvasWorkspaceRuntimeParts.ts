@@ -193,6 +193,8 @@ export function createCanvasWorkspaceRuntimeParts(
     nodes: board.fullNodes,
     edges: board.fullEdges,
     graphAdapter: board.graphAdapter,
+    createCurrentCanvasGraphStore: board.graphRuntime.createCurrentCanvasGraphStore,
+    boardBaseSnapshot: board.boardBaseSnapshot,
     flushAutosave: board.flushAutosave,
     currentBoardId: board.currentBoardId,
     refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,

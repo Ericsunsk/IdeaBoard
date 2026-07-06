@@ -7,6 +7,7 @@ import { resolveFlowNodeDragHandle } from '../../utils/flowNodeDragHandle'
 import {
   resolveImageNodeFrameSize,
   resolveImageNodeStageHeight,
+  type CanvasBoardSnapshot,
 } from '../../../canvas-board/domain'
 import type {
   ImageExecutionInput,
@@ -21,11 +22,25 @@ import type {
   CanvasVueFlowGraphCommandOptions,
 } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
+import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import {
+  createCanvasGraphStore,
+  type CanvasGraphEdgeId,
+  type CanvasGraphNodeId,
+  type CanvasGraphStore,
+} from '../../graph-runtime'
+import {
+  materializeResolvedImageResults,
+  type ResultMaterializerImageResult,
+  type ResultMaterializerResult,
+} from './resultMaterializer'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
+  createCurrentCanvasGraphStore?: () => CanvasGraphStore
+  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
 }
 
@@ -43,6 +58,9 @@ export type PendingImageResultExecution = {
   resolveAttachedPendingResult: (
     params: ResolveAttachedPendingImageResultParams,
   ) => Promise<boolean>
+  materializeResolvedAttachedPendingResults: (
+    params: MaterializeResolvedAttachedPendingImageResultsParams,
+  ) => ResultMaterializerResult
 }
 
 export type PendingImageResultTaskSubmission = {
@@ -65,6 +83,11 @@ export type ResolveAttachedPendingImageResultParams = {
   resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
   isCurrent: () => boolean
   isAttached: () => boolean
+}
+
+export type MaterializeResolvedAttachedPendingImageResultsParams = {
+  results: ResultMaterializerImageResult[]
+  isAttached: (result: ResultMaterializerImageResult) => boolean
 }
 
 export type PendingImageResultRunSummary = {
@@ -96,6 +119,12 @@ type PendingImageResultPlacementOptions = PendingImageResultMutationOptions & {
   targetWidth?: number
 }
 
+type PendingImageResultReservationPlan = {
+  resultNodeId: string
+  nextNode: Node
+  edgeToAppend?: Edge
+}
+
 const IMAGE_RESULT_NODE_X_GAP = 100
 const IMAGE_RESULT_NODE_Y_GAP = 14
 const IMAGE_NODE_HEADER_HEIGHT = 26
@@ -106,6 +135,14 @@ function createPendingResultCommandOptions(
   return createFlowGraphCommandOptions({
     recordHistory: sideEffects?.recordHistory,
   })
+}
+
+function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
+  return /^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/.test(nodeId)
+}
+
+function isCanvasGraphEdgeId(edgeId: string): edgeId is CanvasGraphEdgeId {
+  return /^connection-\d+(?:\.\d+)?$/.test(edgeId)
 }
 
 function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'ratio'>): number {
@@ -313,49 +350,63 @@ export function usePendingImageResultExecution(
     }
   }
 
-  async function appendPendingImageResultEdge(anchorNodeId: string, resultNodeId: string) {
+  async function appendPendingImageResultEdges(
+    anchorNodeId: string,
+    resultNodeIds: string[],
+    edgesToAppend: Edge[],
+  ) {
+    if (edgesToAppend.length === 0) return
     await waitForNextRenderFrame()
-    if (cancelledResultNodeIds.has(resultNodeId)) return
-    const hasSource = options.nodes.value.some((node) => node.id === anchorNodeId)
-    const targetNode = options.nodes.value.find((node) => node.id === resultNodeId)
-    const hasTarget = !!targetNode
-    if (!hasSource || !hasTarget) return
-    const targetSnapshot =
-      targetNode.data?.snapshotNode && typeof targetNode.data.snapshotNode === 'object'
-        ? (targetNode.data.snapshotNode as ImageNodeItem)
-        : null
-    options.refreshNodeInternals?.([anchorNodeId, resultNodeId])
-    const nextEdge: Edge = {
-      id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      source: anchorNodeId,
-      sourceHandle: 'out:image',
-      target: resultNodeId,
-      targetHandle: 'in:image',
-      animated: targetSnapshot?.outputStatus === 'running',
-    }
-    const hasSameEdge = options.edges.value.some(
-      (edge) =>
-        edge.source === nextEdge.source &&
-        edge.target === nextEdge.target &&
-        edge.sourceHandle === nextEdge.sourceHandle &&
-        edge.targetHandle === nextEdge.targetHandle,
+    const activeResultNodeIds = resultNodeIds.filter(
+      (resultNodeId) => !cancelledResultNodeIds.has(resultNodeId),
     )
-    if (hasSameEdge) return
+    if (activeResultNodeIds.length === 0) return
+    const hasSource = options.nodes.value.some((node) => node.id === anchorNodeId)
+    if (!hasSource) return
+    const activeResultNodeIdSet = new Set(activeResultNodeIds)
+    const existingEdgeKeys = new Set(
+      options.edges.value.map(
+        (edge) => `${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
+      ),
+    )
+    const nodesById = new Map(options.nodes.value.map((node) => [node.id, node]))
+    const nextEdges = edgesToAppend
+      .filter((edge) => {
+        if (!activeResultNodeIdSet.has(edge.target)) return false
+        const targetNode = nodesById.get(edge.target)
+        if (!targetNode) return false
+        const edgeKey = `${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`
+        if (existingEdgeKeys.has(edgeKey)) return false
+        existingEdgeKeys.add(edgeKey)
+        return true
+      })
+      .map((edge) => {
+        const targetNode = nodesById.get(edge.target)
+        const targetSnapshot =
+          targetNode?.data?.snapshotNode && typeof targetNode.data.snapshotNode === 'object'
+            ? (targetNode.data.snapshotNode as ImageNodeItem)
+            : null
+        return {
+          ...edge,
+          animated: targetSnapshot?.outputStatus === 'running',
+        }
+      })
+    if (nextEdges.length === 0) return
+    options.refreshNodeInternals?.([anchorNodeId, ...activeResultNodeIds])
     options.graphAdapter.addEdges(
-      nextEdge,
+      nextEdges,
       createPendingResultCommandOptions({ recordHistory: false }),
     )
-    options.refreshNodeInternals?.([anchorNodeId, resultNodeId])
+    options.refreshNodeInternals?.([anchorNodeId, ...activeResultNodeIds])
   }
 
-  function appendPendingImageResultNodeWithLookup(
+  function planPendingImageResultNodeWithLookup(
     source: ImageExecutionInput,
     anchorNodeId: string,
     lookup: PendingImageResultLookup,
     optionsOverride?: PendingImageResultPlacementOptions,
     preferredNodeId?: string | null,
-  ): string {
-    pruneResultNodeLayouts()
+  ): PendingImageResultReservationPlan {
     const sourceRatio = source.ratio > 0 ? source.ratio : 1
     const fallbackAnchor: ImageResultLayout = {
       x: 0,
@@ -388,37 +439,38 @@ export function usePendingImageResultExecution(
 
     if (preferredNodeId) {
       let updatedNode: Node | null = null
-      options.graphAdapter.replaceNodes((items) => {
-        let didUpdate = false
-        const nextItems = items.map((item) => {
-          if (item.id !== preferredNodeId || item.data?.kind !== 'image') return item
-          const snapshot = item.data.snapshotNode
-          if (!snapshot || typeof snapshot !== 'object') return item
-          didUpdate = true
+      const currentNode = lookup.nodeById.get(preferredNodeId)
+      if (currentNode?.data?.kind === 'image') {
+        const snapshot = currentNode.data.snapshotNode
+        if (snapshot && typeof snapshot === 'object') {
           updatedNode = {
-            ...item,
+            ...currentNode,
             data: {
-              ...item.data,
+              ...currentNode.data,
               snapshotNode: buildPendingImageNodeSnapshot(snapshot as ImageNodeItem, {
                 sourceImageRatio: pendingImageNode.sourceImageRatio,
                 width: pendingImageNode.width,
               }),
             },
           }
-          return updatedNode
-        })
-        return didUpdate ? nextItems : items
-      }, createPendingResultCommandOptions(optionsOverride))
-      if (updatedNode) lookup.nodeById.set(preferredNodeId, updatedNode)
+        }
+      }
+      if (!updatedNode) {
+        throw new Error(`Reusable pending result node is no longer available: ${preferredNodeId}`)
+      }
+      lookup.nodeById.set(preferredNodeId, updatedNode)
       cancelledResultNodeIds.delete(preferredNodeId)
-      rememberResultNodeLayout(anchorNodeId, preferredNodeId, {
+      const layout = {
         ratio: pendingImageNode.sourceImageRatio,
         x: position.x,
         y: position.y,
         width: pendingImageNode.width,
-      })
-      options.refreshNodeInternals?.([anchorNodeId, preferredNodeId])
-      return preferredNodeId
+      }
+      rememberResultNodeLayout(anchorNodeId, preferredNodeId, layout)
+      return {
+        resultNodeId: preferredNodeId,
+        nextNode: updatedNode,
+      }
     }
 
     const nextNode: Node<FlowNodeData> = {
@@ -435,23 +487,29 @@ export function usePendingImageResultExecution(
       },
     }
 
-    options.graphAdapter.addNodes(
-      nextNode as Node,
-      createPendingResultCommandOptions(optionsOverride),
-    )
     lookup.nodeById.set(nextNode.id, nextNode as Node)
     lookup.nodeOrderById.set(nextNode.id, lookup.nodeOrderById.size)
     cancelledResultNodeIds.delete(nextNode.id)
-    rememberResultNodeLayout(anchorNodeId, nextNode.id, {
+    const layout = {
       ratio: pendingImageNode.sourceImageRatio,
       x: pendingImageNode.x,
       y: pendingImageNode.y,
       width: pendingImageNode.width,
-    })
-    options.refreshNodeInternals?.([anchorNodeId, nextNode.id])
-    void appendPendingImageResultEdge(anchorNodeId, nextNode.id)
+    }
+    rememberResultNodeLayout(anchorNodeId, nextNode.id, layout)
 
-    return nextNode.id
+    return {
+      resultNodeId: nextNode.id,
+      nextNode: nextNode as Node,
+      edgeToAppend: {
+        id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        source: anchorNodeId,
+        sourceHandle: 'out:image',
+        target: nextNode.id,
+        targetHandle: 'in:image',
+        animated: pendingImageNode.outputStatus === 'running',
+      },
+    }
   }
 
   function reservePendingResults(params: PendingImageResultReservationParams): string[] {
@@ -460,8 +518,9 @@ export function usePendingImageResultExecution(
     const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? params.sourceNodeId
     const lookup = buildPendingResultLookup()
     const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId, lookup)
-    return Array.from({ length: count }, (_, index) =>
-      appendPendingImageResultNodeWithLookup(
+    pruneResultNodeLayouts()
+    const plans = Array.from({ length: count }, (_, index) =>
+      planPendingImageResultNodeWithLookup(
         params.source,
         anchorNodeId,
         lookup,
@@ -474,6 +533,29 @@ export function usePendingImageResultExecution(
         index === 0 ? reusableNodeId : null,
       ),
     )
+    const plannedNodesById = new Map(plans.map((plan) => [plan.resultNodeId, plan.nextNode]))
+    const existingNodeIds = new Set(options.nodes.value.map((node) => node.id))
+    const nextNodes = [
+      ...options.nodes.value.map((node) => plannedNodesById.get(node.id) ?? node),
+      ...plans
+        .filter((plan) => !existingNodeIds.has(plan.resultNodeId))
+        .map((plan) => plan.nextNode),
+    ]
+    options.graphAdapter.replaceGraph(
+      {
+        nodes: nextNodes,
+        edges: options.edges.value,
+      },
+      createPendingResultCommandOptions({ recordHistory: true }),
+    )
+    const resultNodeIds = plans.map((plan) => plan.resultNodeId)
+    options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
+    void appendPendingImageResultEdges(
+      anchorNodeId,
+      resultNodeIds,
+      plans.flatMap((plan) => (plan.edgeToAppend ? [plan.edgeToAppend] : [])),
+    )
+    return resultNodeIds
   }
 
   function attachPendingTaskId(params: { resultNodeId: string; taskId: string }) {
@@ -571,6 +653,87 @@ export function usePendingImageResultExecution(
     }
   }
 
+  function applyResultMaterializerProjection(
+    store: CanvasGraphStore,
+    result: ResultMaterializerResult,
+  ) {
+    if (!result.summary.didChange && result.projection.updatedEdges.length === 0) return
+    const snapshot = store.exportSnapshot(options.boardBaseSnapshot?.value)
+
+    const nextFlow = canvasBoardSnapshotToFlow(snapshot)
+    const edgeUpdatesById = new Map(
+      result.projection.updatedEdges.map((edge) => [edge.id, edge.animated]),
+    )
+    const currentAnimatedById = new Map(
+      options.edges.value.flatMap((edge) =>
+        isCanvasGraphEdgeId(edge.id) ? [[edge.id, edge.animated] as const] : [],
+      ),
+    )
+    const nextEdges = nextFlow.edges.map((edge) => {
+      const edgeId = edge.id
+      if (!isCanvasGraphEdgeId(edgeId)) return edge
+      return edgeUpdatesById.has(edgeId)
+        ? {
+            ...edge,
+            animated: edgeUpdatesById.get(edgeId),
+          }
+        : {
+            ...edge,
+            animated: currentAnimatedById.get(edgeId) ?? edge.animated,
+          }
+    })
+
+    options.graphAdapter.replaceGraph(
+      {
+        nodes: nextFlow.nodes as Node[],
+        edges: nextEdges as Edge[],
+      },
+      createPendingResultCommandOptions({ recordHistory: false }),
+    )
+  }
+
+  function materializeResolvedAttachedPendingResults(
+    params: MaterializeResolvedAttachedPendingImageResultsParams,
+  ): ResultMaterializerResult {
+    const store = options.createCurrentCanvasGraphStore?.()
+    if (!store) {
+      const materializedNodeIds: CanvasGraphNodeId[] = []
+      params.results.forEach((result) => {
+        if (!params.isAttached(result)) return
+        materializeResolvedImage({
+          resultNodeId: result.resultNodeId,
+          result,
+        })
+        if (isCanvasGraphNodeId(result.resultNodeId)) {
+          materializedNodeIds.push(result.resultNodeId)
+        }
+      })
+      const noopSummary = createCanvasGraphStore(
+        options.boardBaseSnapshot?.value,
+      ).beginTransaction('result-materialize', {
+        recordHistory: false,
+        markDirty: materializedNodeIds.length > 0,
+      }).cancel()
+      return {
+        summary: noopSummary,
+        materializedNodeIds,
+        skipped: [],
+        projection: { updatedEdges: [] },
+      }
+    }
+
+    const result = materializeResolvedImageResults({
+      store,
+      results: params.results,
+      isAttached: params.isAttached,
+    })
+    applyResultMaterializerProjection(store, result)
+    result.materializedNodeIds.forEach((nodeId) => {
+      options.refreshNodeInternals?.([nodeId])
+    })
+    return result
+  }
+
   function cancelPendingResult(params: { resultNodeId: string }) {
     cancelledResultNodeIds.add(params.resultNodeId)
     forgetResultNodeLayout(params.resultNodeId)
@@ -586,6 +749,9 @@ export function usePendingImageResultExecution(
     const persistPendingTaskIds = params.persistPendingTaskIds ?? true
     const resultNodeIds = reservePendingResults(params)
     params.onReserved?.(resultNodeIds)
+    const resolvedResults = new Array<ResultMaterializerImageResult | null>(
+      resultNodeIds.length,
+    ).fill(null)
 
     let successCount = 0
     let pendingCount = 0
@@ -593,7 +759,7 @@ export function usePendingImageResultExecution(
     let firstFailure: unknown = null
 
     await Promise.allSettled(
-      resultNodeIds.map(async (resultNodeId) => {
+      resultNodeIds.map(async (resultNodeId, index) => {
         try {
           const { taskId } = await params.submitTask(resultNodeId)
           if (persistPendingTaskIds && params.isCurrent()) {
@@ -601,8 +767,12 @@ export function usePendingImageResultExecution(
             await params.afterTaskIdAttached?.({ resultNodeId, taskId })
           }
           const resolved = await params.resolveResult(taskId, resultNodeId)
-          if (params.isCurrent()) {
-            materializeResolvedImage({ resultNodeId, result: resolved })
+          if (params.isCurrent() && isCanvasGraphNodeId(resultNodeId)) {
+            resolvedResults[index] = {
+              ...resolved,
+              resultNodeId,
+              taskId: persistPendingTaskIds ? taskId : undefined,
+            }
           }
           successCount += 1
         } catch (error) {
@@ -621,6 +791,16 @@ export function usePendingImageResultExecution(
         }
       }),
     )
+
+    const materializableResults = resolvedResults.filter(
+      (result): result is ResultMaterializerImageResult => !!result,
+    )
+    if (materializableResults.length > 0 && params.isCurrent()) {
+      materializeResolvedAttachedPendingResults({
+        results: materializableResults,
+        isAttached: () => params.isCurrent(),
+      })
+    }
 
     return {
       resultNodeIds,
@@ -647,5 +827,6 @@ export function usePendingImageResultExecution(
   return {
     runPendingResults,
     resolveAttachedPendingResult,
+    materializeResolvedAttachedPendingResults,
   }
 }

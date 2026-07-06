@@ -1,8 +1,8 @@
 import {
   hasRenderableImageEditorLayerStack,
   renderImageEditorLayerStackFile,
-} from '../image-editor'
-import { useMaskEditorChromeActions } from '../mask-editor'
+} from '../image-editor/services/imageAdjustmentRenderer'
+import { useMaskEditorChromeActions } from '../mask-editor/composables/useMaskEditorChromeActions'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 

@@ -16,6 +16,8 @@ import type {
   PendingImageResultExecution,
   PendingImageResultRunSummary,
 } from '../result-nodes/usePendingImageResultNodes'
+import type { ResultMaterializerImageResult } from '../result-nodes/resultMaterializer'
+import type { CanvasGraphNodeId } from '../../graph-runtime'
 import {
   collectPendingImageTasks,
   isPendingImageTaskSnapshot,
@@ -100,6 +102,10 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
   function isPendingImageTaskStillCurrent(nodeId: string, taskId: string): boolean {
     const snapshot = readPendingImageSnapshot(options.nodes.value, nodeId)
     return !!snapshot && isPendingImageTaskSnapshot(snapshot, taskId)
+  }
+
+  function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
+    return /^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/.test(nodeId)
   }
 
   function reportPendingImageRunSummary(
@@ -189,8 +195,8 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
     const boardId = readCurrentBoardId(options.getCurrentBoardId)
     const pendingTasks = collectPendingImageTasks(options.nodes.value)
     if (pendingTasks.length === 0) return
-    let successCount = 0
     let failureCount = 0
+    const resolvedResults: ResultMaterializerImageResult[] = []
     await Promise.allSettled(
       pendingTasks.map(async ({ nodeId, taskId, fallbackRatio }) => {
         const reattachKey = `${boardId}:${nodeId}:${taskId}`
@@ -198,15 +204,16 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
         activeReattachKeys.add(reattachKey)
         setNodeRunning(nodeId, true)
         try {
-          const didResolve = await pendingResults.resolveAttachedPendingResult({
+          const resolved = await resolveFirstTaskImageResult(taskId, fallbackRatio)
+          if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
+            return
+          }
+          if (!isCanvasGraphNodeId(nodeId)) return
+          resolvedResults.push({
+            ...resolved,
             resultNodeId: nodeId,
             taskId,
-            resolveResult: (pendingTaskId) =>
-              resolveFirstTaskImageResult(pendingTaskId, fallbackRatio),
-            isCurrent: () => isBoardStillCurrent(boardId),
-            isAttached: () => isPendingImageTaskStillCurrent(nodeId, taskId),
           })
-          if (didResolve) successCount += 1
         } catch (error) {
           if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
             return
@@ -220,6 +227,16 @@ export function useFlowImageDirectActionRunner(options: UseFlowImageDirectAction
       }),
     )
     if (!isBoardStillCurrent(boardId)) return
+    const materialized =
+      resolvedResults.length > 0
+        ? pendingResults.materializeResolvedAttachedPendingResults({
+            results: resolvedResults,
+            isAttached: (result) =>
+              !!result.taskId &&
+              isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId),
+          })
+        : null
+    const successCount = materialized?.materializedNodeIds.length ?? 0
     if (successCount > 0) {
       options.onSuccess(successCount > 1 ? `已恢复 ${successCount} 个生成结果` : '已恢复生成结果')
       await flushPendingTaskSnapshot()

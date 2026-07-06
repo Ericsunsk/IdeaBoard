@@ -1,10 +1,10 @@
 import { computed } from 'vue'
+import { useImageAdjustmentRenderedPreview } from '../image-editor/composables/useImageAdjustmentRenderedPreview'
+import { useImageEditorHistogramSource } from '../image-editor/composables/useImageEditorHistogramSource'
 import {
   canUseImageEditorRasterTool,
   hasImageEditorRasterEdits,
-  useImageAdjustmentRenderedPreview,
-  useImageEditorHistogramSource,
-} from '../image-editor'
+} from '../image-editor/utils/imageEditorRasterTools'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 

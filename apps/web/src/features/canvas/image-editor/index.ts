@@ -1,11 +1,5 @@
 export { default as ImageEditorChrome } from './components/ImageEditorChrome.vue'
 export { default as ImageEditorRasterOverlay } from './components/ImageEditorRasterOverlay.vue'
-export { useImageAdjustmentRenderedPreview } from './composables/useImageAdjustmentRenderedPreview'
-export { useImageEditorHistogramSource } from './composables/useImageEditorHistogramSource'
-export { useImageEditorMode } from './composables/useImageEditorMode'
-export { useImageEditorRasterOverlay } from './composables/useImageEditorRasterOverlay'
-export { useImageEditorSession } from './composables/useImageEditorSession'
-export { useImageEditorViewportController } from './composables/useImageEditorViewportController'
 export {
   cancelImageAdjustmentFinalRender,
   hasRenderableImageEditorLayerStack,

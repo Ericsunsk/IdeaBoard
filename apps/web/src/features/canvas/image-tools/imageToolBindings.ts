@@ -1,23 +1,25 @@
 import type { ComponentPublicInstance, ComputedRef, Ref } from 'vue'
 import type {
   ImageAdjustmentKind,
-  ImageAdjustmentFinalApplyProgress,
   ImageEditorAdjustmentLayer,
   ImageEditorAdjustmentWholeParams,
   ImageEditorLayer,
   ImageEditorMode,
   ImageEditorParamKey,
   ImageEditorParamValue,
-  ImageEditorRasterTool,
-  ImageEditorRasterToolSettings,
   ImageEditorRenderedPreview,
   ImageEditorTool,
-} from '../image-editor'
+} from '../image-editor/types'
+import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
+import type {
+  ImageEditorRasterTool,
+  ImageEditorRasterToolSettings,
+} from '../image-editor/utils/imageEditorRasterTools'
 import type {
   ImageMaskBrushShape,
   ImageMaskDrawMode,
   MaskEditorReferenceImage,
-} from '../mask-editor'
+} from '../mask-editor/types'
 import type { ImageStrengthAction } from '../execution'
 
 export type ImageToolAnchorRect = {
@@ -138,25 +140,46 @@ export type ImageToolChromeCommands = {
 }
 
 export type CanvasImageTools = {
-  activeNodeId: ComputedRef<string | null>
-  activeMaskNodeId: ComputedRef<string | null>
-  activeMode: ComputedRef<ImageEditorMode | null>
-  chromeModel: ComputedRef<ImageToolChromeModel>
-  chromeCommands: ImageToolChromeCommands
-  isChromeHidden: ComputedRef<boolean>
-  isCanvasLocked: ComputedRef<boolean>
-  isApplyingAdjustments: Ref<boolean>
-  adjustmentFinalApplyProgress: Ref<ImageAdjustmentFinalApplyProgress | null>
-  editorLayers: Ref<ImageEditorLayer[]>
-  enter: (nodeId: string, mode: ImageEditorMode) => boolean
-  cancel: () => void
-  commit: () => boolean
-  apply: () => Promise<void>
-  onCanvasWheel: (event: WheelEvent) => void
-  focusAndShowChrome: (nodeId: string) => void | Promise<void>
-  scheduleChromeAnchorUpdate: () => void
-  stageBindingFor: (nodeId: string) => ImageToolStageBinding
-  actionBindingFor: (nodeId: string) => ImageActionBinding
-  discardNodeEdits: (nodeId: string) => void
-  runPromptAction: (nodeId: string, prompt: string, outputCount: number) => Promise<void> | void
+  viewModel: {
+    active: {
+      nodeId: ComputedRef<string | null>
+      maskNodeId: ComputedRef<string | null>
+      mode: ComputedRef<ImageEditorMode | null>
+    }
+    locks: {
+      isChromeHidden: ComputedRef<boolean>
+      isCanvasLocked: ComputedRef<boolean>
+    }
+    chrome: ComputedRef<ImageToolChromeModel>
+    adjustment: {
+      isApplying: Ref<boolean>
+      finalApplyProgress: Ref<ImageAdjustmentFinalApplyProgress | null>
+    }
+    nodeBindings: {
+      stageFor: (nodeId: string) => ImageToolStageBinding
+      actionFor: (nodeId: string) => ImageActionBinding
+    }
+  }
+  commands: {
+    lifecycle: {
+      enter: (nodeId: string, mode: ImageEditorMode) => boolean
+      cancel: () => void
+      commit: () => boolean
+      discardNodeEdits: (nodeId: string) => void
+    }
+    editor: {
+      apply: () => Promise<void>
+      onCanvasWheel: (event: WheelEvent) => void
+      focusAndShowChrome: (nodeId: string) => void | Promise<void>
+      scheduleChromeAnchorUpdate: () => void
+    }
+    prompt: {
+      runPromptAction: (
+        nodeId: string,
+        prompt: string,
+        outputCount: number,
+      ) => Promise<void> | void
+    }
+    chrome: ImageToolChromeCommands
+  }
 }

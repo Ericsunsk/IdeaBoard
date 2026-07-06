@@ -2,7 +2,7 @@ import { computed, provide, readonly } from 'vue'
 import {
   IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY,
   type CanvasImageAdjustmentFinalApplyContext,
-} from '../image-editor'
+} from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
 import type { CanvasImageTools } from './imageToolBindings'
 import { createImageToolChromeAdapter } from './imageToolChromeAdapter'
 import { createImageToolCommands } from './imageToolCommands'
@@ -31,26 +31,43 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
   )
 
   return {
-    activeNodeId: session.imageEditorNodeId,
-    activeMaskNodeId: session.maskEditor.maskEditorNodeId,
-    activeMode: session.imageEditorMode,
-    chromeModel: chrome.chromeModel,
-    chromeCommands: chrome.chromeCommands,
-    isChromeHidden,
-    isCanvasLocked,
-    isApplyingAdjustments: session.isApplyingImageEditorAdjustments,
-    adjustmentFinalApplyProgress: session.imageAdjustmentFinalApplyProgress,
-    editorLayers: session.imageEditorSession.imageEditorLayers,
-    enter: session.enter,
-    cancel: session.cancel,
-    commit: session.commitMask,
-    apply: commands.applyAdjustments,
-    onCanvasWheel: session.viewport.onCanvasWheel,
-    focusAndShowChrome: session.viewport.focusImageEditorAndShowChrome,
-    scheduleChromeAnchorUpdate: session.viewport.scheduleImageEditorChromeAnchorUpdate,
-    stageBindingFor: nodeBindings.stageBindingFor,
-    actionBindingFor: nodeBindings.actionBindingFor,
-    discardNodeEdits: session.discardNodeEdits,
-    runPromptAction: commands.runPromptAction,
+    viewModel: {
+      active: {
+        nodeId: session.imageEditorNodeId,
+        maskNodeId: session.maskEditor.maskEditorNodeId,
+        mode: session.imageEditorMode,
+      },
+      locks: {
+        isChromeHidden,
+        isCanvasLocked,
+      },
+      chrome: chrome.chromeModel,
+      adjustment: {
+        isApplying: session.isApplyingImageEditorAdjustments,
+        finalApplyProgress: session.imageAdjustmentFinalApplyProgress,
+      },
+      nodeBindings: {
+        stageFor: nodeBindings.stageBindingFor,
+        actionFor: nodeBindings.actionBindingFor,
+      },
+    },
+    commands: {
+      lifecycle: {
+        enter: session.enter,
+        cancel: session.cancel,
+        commit: session.commitMask,
+        discardNodeEdits: session.discardNodeEdits,
+      },
+      editor: {
+        apply: commands.applyAdjustments,
+        onCanvasWheel: session.viewport.onCanvasWheel,
+        focusAndShowChrome: session.viewport.focusImageEditorAndShowChrome,
+        scheduleChromeAnchorUpdate: session.viewport.scheduleImageEditorChromeAnchorUpdate,
+      },
+      prompt: {
+        runPromptAction: commands.runPromptAction,
+      },
+      chrome: chrome.chromeCommands,
+    },
   }
 }

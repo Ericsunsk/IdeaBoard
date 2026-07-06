@@ -6,6 +6,8 @@ import {
   createImageWorkflowCommands,
   type ImageWorkflowCommands,
 } from '../execution/runtime/imageWorkflowCommandRuntime'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 
@@ -19,6 +21,8 @@ type UseCanvasTaskRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
+  createCurrentCanvasGraphStore?: () => CanvasGraphStore
+  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   currentBoardId: ValueRef<string | null | undefined>
   refreshNodeInternals: (nodeIds: string[]) => void
@@ -36,6 +40,8 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
     nodes: options.nodes,
     edges: options.edges,
     graphAdapter: options.graphAdapter,
+    createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
+    boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
     getCurrentBoardId: () => options.currentBoardId.value ?? '',

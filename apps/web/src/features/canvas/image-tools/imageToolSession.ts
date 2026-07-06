@@ -5,17 +5,16 @@ import type { ComponentPublicInstance, Ref } from 'vue'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../composables/useFlowCanvasInteractionState'
 import type { ImageStrengthAction } from '../execution'
-import {
-  cancelImageAdjustmentFinalRender,
-  hasImageEditorRasterEdits,
-  type ImageAdjustmentFinalApplyProgress,
-  type ImageEditorMode,
-  useImageEditorRasterOverlay,
-  useImageEditorMode,
-  useImageEditorSession,
-  useImageEditorViewportController,
-} from '../image-editor'
-import { useImageMaskEditorOverlay, useMaskEditorChromeState } from '../mask-editor'
+import { useImageEditorMode } from '../image-editor/composables/useImageEditorMode'
+import { useImageEditorRasterOverlay } from '../image-editor/composables/useImageEditorRasterOverlay'
+import { useImageEditorSession } from '../image-editor/composables/useImageEditorSession'
+import { useImageEditorViewportController } from '../image-editor/composables/useImageEditorViewportController'
+import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
+import { cancelImageAdjustmentFinalRender } from '../image-editor/services/imageAdjustmentRenderer'
+import type { ImageEditorMode } from '../image-editor/types'
+import { hasImageEditorRasterEdits } from '../image-editor/utils/imageEditorRasterTools'
+import { useImageMaskEditorOverlay } from '../mask-editor/composables/useImageMaskEditorOverlay'
+import { useMaskEditorChromeState } from '../mask-editor/composables/useMaskEditorChromeState'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'

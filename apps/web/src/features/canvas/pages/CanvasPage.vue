@@ -139,8 +139,7 @@
         />
       </VueFlow>
       <CanvasOverlays
-        :chrome-model="imageToolChromeModel"
-        :chrome-commands="imageToolChromeCommands"
+        :image-tool-session="imageTools"
         :node-context-menu="nodeContextMenu"
         :canvas-node-menu-items="canvasNodeMenuItems"
         @create-node="handleNodeContextMenuCreate"
@@ -393,7 +392,7 @@ function onFlowConnectEnd() {
 
 function onFlowMove(payload: Parameters<typeof syncFlowMove>[0]) {
   syncFlowMove(payload)
-  if (!payload.flowTransform || !imageToolChromeModel.value.isReady) return
+  if (!payload.flowTransform || !imageTools.viewModel.chrome.value.isReady) return
   scheduleImageEditorChromeAnchorUpdate()
 }
 
@@ -478,21 +477,30 @@ const imageTools = commands.imageTools.createImageTools({
 })
 
 const {
-  activeNodeId: flowImageEditorNodeId,
-  activeMaskNodeId: flowMaskEditorNodeId,
-  chromeModel: imageToolChromeModel,
-  chromeCommands: imageToolChromeCommands,
-  isChromeHidden: isImageEditorChromeHidden,
-  isCanvasLocked: isFlowCanvasLocked,
-  enter: enterFlowImageEditorMode,
-  cancel: cancelFlowMaskEditorMode,
-  stageBindingFor: imageToolStageBindingFor,
-  actionBindingFor: imageToolActionBindingFor,
-  discardNodeEdits: discardFlowImageToolNodeEdits,
-  runPromptAction: runFlowImageToolPromptAction,
-  onCanvasWheel,
-  focusAndShowChrome: focusImageEditorAndShowChrome,
-  scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
+  viewModel: {
+    active: { nodeId: flowImageEditorNodeId, maskNodeId: flowMaskEditorNodeId },
+    locks: {
+      isChromeHidden: isImageEditorChromeHidden,
+      isCanvasLocked: isFlowCanvasLocked,
+    },
+    nodeBindings: {
+      stageFor: imageToolStageBindingFor,
+      actionFor: imageToolActionBindingFor,
+    },
+  },
+  commands: {
+    lifecycle: {
+      enter: enterFlowImageEditorMode,
+      cancel: cancelFlowMaskEditorMode,
+      discardNodeEdits: discardFlowImageToolNodeEdits,
+    },
+    editor: {
+      onCanvasWheel,
+      focusAndShowChrome: focusImageEditorAndShowChrome,
+      scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
+    },
+    prompt: { runPromptAction: runFlowImageToolPromptAction },
+  },
 } = imageTools
 
 const isCanvasShortcutSuppressed = computed(
