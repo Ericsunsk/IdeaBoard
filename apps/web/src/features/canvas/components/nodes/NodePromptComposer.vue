@@ -17,8 +17,8 @@
       :allow-empty="allowEmpty"
       :submit-disabled="submitDisabled"
       :show-aspect-ratio="showAspectRatio"
-      textarea-class="image-node-prompt-input min-w-0 cursor-text self-end resize-none overflow-hidden border-0 bg-transparent px-0 py-1.5 text-xs leading-[18px] text-[#272932] outline-none placeholder:text-[#9aa4b2] disabled:cursor-wait"
-      actions-class="image-node-prompt-actions flex self-end items-center gap-[var(--node-tool-button-gap)]"
+      :textarea-class="promptInputClass"
+      :actions-class="promptActionsClass"
       send-button-class="image-node-prompt-send node-tool-send node-tool-button node-tool-tooltip-trigger"
       @update:model-value="emit('update:modelValue', $event)"
       @update:output-count="emit('update:output-count', $event)"
@@ -65,6 +65,22 @@ const emit = defineEmits<{
 const shouldStackOutputCount = ref(false)
 const showAspectRatio = computed(() => props.aspectRatio !== undefined)
 const hasText = computed(() => props.modelValue.trim().length > 0)
+const promptInputClass = computed(() =>
+  [
+    'image-node-prompt-input min-w-0 cursor-text self-end resize-none overflow-hidden border-0 bg-transparent px-0 py-1.5 text-xs leading-[18px] text-[#272932] outline-none placeholder:text-[#9aa4b2] disabled:cursor-wait',
+    shouldStackOutputCount.value && 'min-h-[73px]',
+  ]
+    .filter(Boolean)
+    .join(' '),
+)
+const promptActionsClass = computed(() =>
+  [
+    'image-node-prompt-actions flex self-end items-center gap-[var(--node-tool-button-gap)]',
+    shouldStackOutputCount.value && 'flex-col',
+  ]
+    .filter(Boolean)
+    .join(' '),
+)
 
 function onTextareaResize(payload: PromptComposerResizePayload) {
   shouldStackOutputCount.value = payload.naturalHeight > payload.singleLineHeight + 2
@@ -89,14 +105,6 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 
 .image-node-prompt-composer.count-stacked {
   min-height: 73px;
-}
-
-.image-node-prompt-composer.count-stacked :deep(.image-node-prompt-input) {
-  min-height: 73px;
-}
-
-.image-node-prompt-composer.count-stacked :deep(.image-node-prompt-actions) {
-  flex-direction: column;
 }
 
 @keyframes image-node-prompt-rise {

@@ -113,6 +113,7 @@ const resolvedAriaLabel = computed(
   height: var(--node-tool-icon-button-icon-size);
 }
 
+/* Slot icon contract: external icon components render SVGs inside this slot. */
 .node-tool-icon-button__icon :deep(svg) {
   width: 100%;
   height: 100%;

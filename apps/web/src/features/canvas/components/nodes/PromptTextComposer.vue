@@ -43,7 +43,7 @@
       :submit-disabled="submitDisabled"
       :show-aspect-ratio="showAspectRatio"
       :autofocus="autofocus"
-      textarea-class="prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-[14px] leading-[1.6] text-[#334155] outline-none placeholder:text-[#94a3b8] disabled:cursor-wait"
+      :textarea-class="promptTextInputClass"
       actions-class="prompt-text-composer-actions flex self-end gap-[var(--node-tool-button-gap)]"
       send-button-class="prompt-text-composer-send node-tool-send node-tool-button node-tool-tooltip-trigger"
       @update:model-value="emit('update:modelValue', $event)"
@@ -131,6 +131,14 @@ const canAddImageInput = computed(
 )
 const variantClass = computed(() => promptTextComposerVariantClasses[props.variant])
 const hasText = computed(() => props.modelValue.trim().length > 0)
+const promptTextInputClass = computed(() =>
+  [
+    'prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent font-[inherit] text-[#334155] outline-none placeholder:text-[#94a3b8] disabled:cursor-wait',
+    props.variant === 'floating'
+      ? 'px-1 py-1.5 text-xs leading-[18px]'
+      : 'p-0 text-[14px] leading-[1.6]',
+  ].join(' '),
+)
 
 function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) {
   emit('submit', prompt, outputCount, aspectRatio)
@@ -161,12 +169,6 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 .prompt-text-composer.variant-floating:focus-within,
 .prompt-text-composer.variant-floating.has-text {
   border-color: var(--ib-focus-border-color);
-}
-
-.prompt-text-composer.variant-floating :deep(.prompt-text-composer-input) {
-  font-size: 12px;
-  line-height: 18px;
-  padding: 6px 4px;
 }
 
 .prompt-text-composer.variant-floating .prompt-text-composer-image-row {

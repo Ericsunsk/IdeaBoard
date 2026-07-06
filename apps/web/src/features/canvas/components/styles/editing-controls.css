@@ -1,3 +1,10 @@
+/*
+ * Canvas editing-controls CSS contract.
+ * Shared by image-editor and mask-editor controls. Public classes use the
+ * editing-controls-* prefix and may consume node-tool variables, but they stay
+ * Canvas-owned and must not leak into non-Canvas surfaces.
+ */
+
 .editing-controls-panel,
 .editing-controls-stack,
 .editing-controls-section,

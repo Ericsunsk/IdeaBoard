@@ -1,3 +1,13 @@
+/*
+ * Canvas node-tool CSS contract.
+ * Public classes: node-tool-surface, node-tool-button, node-tool-output-count,
+ * node-tool-output-count-wrap, node-tool-output-count-option,
+ * node-tool-output-count-popover, node-tool-popover-{grid,row},
+ * node-tool-tooltip, node-tool-tooltip-trigger, and node-tool-send.
+ * Consumers may set --node-tool-* variables on node-tool-surface; they should
+ * not style component-private descendants owned by a specific .vue file.
+ */
+
 .node-tool-surface {
   --node-tool-border-width: var(--canvas-control-border-width);
   --node-tool-button-size: 35px;

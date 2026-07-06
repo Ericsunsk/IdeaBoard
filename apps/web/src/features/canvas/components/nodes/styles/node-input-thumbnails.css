@@ -1,3 +1,11 @@
+/*
+ * Canvas node input-thumbnail CSS contract.
+ * Public classes: node-input-thumbnail-contract, node-input-thumbnail,
+ * node-input-thumbnail-item, node-input-thumbnail-remove,
+ * node-input-thumbnail-add, and variant-standard. Sortable state classes
+ * are intentionally public because useSortableMediaInputs applies them.
+ */
+
 .node-input-thumbnail-contract {
   --node-input-thumbnail-size-standard: 52px;
   --node-input-thumbnail-size: var(--node-input-thumbnail-size-standard);

@@ -16,6 +16,8 @@
     <NodeHeader
       :class="{ 'invisible pointer-events-none': headerHidden }"
       :title="title"
+      :active="active"
+      :copy-mode="copyMode"
       :rounded="roundedHeader"
       @node-mousedown="emit('node-mousedown', $event)"
       @update:title="emit('update:title', $event)"
@@ -61,14 +63,6 @@ const nodeStyle = computed(() => ({
   position: relative;
   z-index: 1;
   pointer-events: auto;
-}
-
-.workflow-node.active :deep(.workflow-node-header) {
-  color: var(--color-canvas-accent);
-}
-
-.workflow-node.copy-mode :deep(.workflow-node-header) {
-  cursor: copy;
 }
 
 .workflow-node.dragging {

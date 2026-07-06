@@ -21,6 +21,7 @@
       <div class="image-node-expand-composer-wrap" data-image-extend-composer @pointerdown.stop>
         <NodePromptComposer
           v-model="promptDraft"
+          class="image-node-expand-composer"
           offset="10px"
           placeholder="输入扩图提示词"
           :disabled="directGenerating"
@@ -136,7 +137,7 @@ function onSubmit(prompt: string, outputCount: number) {
   pointer-events: none;
 }
 
-.image-node-expand-composer-wrap :deep(.image-node-prompt-composer) {
+.image-node-expand-composer {
   pointer-events: auto;
 }
 

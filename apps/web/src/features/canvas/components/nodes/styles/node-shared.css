@@ -1,3 +1,11 @@
+/*
+ * Canvas node CSS contract.
+ * Public classes: workflow-node-header, node-header-title, node-execution-body,
+ * node-primary-action-slot, node-mode-card, node-control-*, node-option-row,
+ * and node-inline-range. These are shared by Canvas node components only.
+ * Component-private classes stay in their owning .vue file.
+ */
+
 .workflow-node-header {
   min-height: 20px;
   padding: 0;
@@ -18,11 +26,11 @@
     color var(--canvas-motion-standard) ease;
 }
 
-.workflow-node.active .workflow-node-header {
+.workflow-node-header.is-active {
   color: var(--color-canvas-accent);
 }
 
-.workflow-node.copy-mode .workflow-node-header {
+.workflow-node-header.is-copy-mode {
   cursor: copy;
 }
 
