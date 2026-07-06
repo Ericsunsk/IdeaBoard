@@ -31,16 +31,14 @@ import {
   baseChartOptions,
   baseChartPlugins,
   baseTooltipOptions,
-  buildDeltaFoot,
   colorForModel,
   defaultModelColors,
-  formatPercentValue,
-  formatSignedPercentPoint,
   normalizeModelName,
   normalizePercent,
   toNonNegativeInteger,
   toNonNegativeNumber,
 } from './usageStatisticsChartBase'
+import { useUsageStatisticsSummaryMetrics } from './usageStatisticsSummaryMetrics'
 
 type ModelRiskPoint = {
   x: number
@@ -212,45 +210,7 @@ export function useUsageStatisticsCharts(options: {
     }),
   )
 
-  const todayCalls = computed(() => options.adminStatistics.value?.summary?.today_calls || 0)
-  const todaySuccess = computed(() => options.adminStatistics.value?.summary?.today_success || 0)
-  const todayFailed = computed(() => options.adminStatistics.value?.summary?.today_failed || 0)
-  const monthCalls = computed(() => options.adminStatistics.value?.summary?.this_month_calls || 0)
-  const yesterdayCalls = computed(
-    () => options.adminStatistics.value?.summary?.yesterday_calls || 0,
-  )
-  const yesterdaySuccess = computed(
-    () => options.adminStatistics.value?.summary?.yesterday_success || 0,
-  )
-  const yesterdayFailed = computed(
-    () => options.adminStatistics.value?.summary?.yesterday_failed || 0,
-  )
-
-  const todayCallsFoot = computed(() =>
-    buildDeltaFoot(todayCalls.value, yesterdayCalls.value, '昨日'),
-  )
-  const todayFailedFoot = computed(() =>
-    buildDeltaFoot(todayFailed.value, yesterdayFailed.value, '昨日'),
-  )
-  const todayAttemptedCalls = computed(() => todaySuccess.value + todayFailed.value)
-  const todaySuccessRate = computed(() =>
-    todayAttemptedCalls.value === 0
-      ? '0.0%'
-      : `${((todaySuccess.value / todayAttemptedCalls.value) * 100).toFixed(1)}%`,
-  )
-  const yesterdayAttemptedCalls = computed(() => yesterdaySuccess.value + yesterdayFailed.value)
-  const todaySuccessRateFoot = computed(() => {
-    if (yesterdayAttemptedCalls.value === 0) return '昨日无可比数据'
-    const yesterdayRate = yesterdaySuccess.value / yesterdayAttemptedCalls.value
-    const currentRate =
-      todayAttemptedCalls.value === 0 ? 0 : todaySuccess.value / todayAttemptedCalls.value
-    return `${formatSignedPercentPoint((currentRate - yesterdayRate) * 100)} 较昨日`
-  })
-  const monthCallsFoot = computed(() => {
-    const totalCalls = options.adminStatistics.value?.summary?.total_calls || 0
-    if (totalCalls <= 0) return '累计无调用'
-    return `占总调用 ${formatPercentValue(monthCalls.value, totalCalls)}`
-  })
+  const summaryMetrics = useUsageStatisticsSummaryMetrics(options.adminStatistics)
 
   const modelRiskRows = computed(() =>
     (options.adminStatistics.value?.model_health || [])
@@ -555,14 +515,7 @@ export function useUsageStatisticsCharts(options: {
   return {
     trendChartData,
     trendChartOptions,
-    todayCalls,
-    todayFailed,
-    todayCallsFoot,
-    todayFailedFoot,
-    todaySuccessRate,
-    todaySuccessRateFoot,
-    monthCalls,
-    monthCallsFoot,
+    ...summaryMetrics,
     modelRiskChartData,
     modelRiskChartOptions,
     qualityTrendChartData,
