@@ -492,7 +492,7 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       'const profileMenuItem = page.getByText("账户管理", { exact: true }).first()',
       'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
       'await profileMenuItem.click()',
-      'await page.getByRole("heading", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
+      'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
       `await page.getByText(${JSON.stringify(MOCK_USER.username)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
       `await page.getByText(${JSON.stringify(MOCK_USER.uid)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
       'const boardsUrlAfterProfile = new URL(page.url())',
@@ -503,7 +503,7 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
   ])
 }
 
-function assertProfileDialogAvatarUpload(playwrightCli: CommandSpec) {
+function assertAccountManagementDialogAvatarUpload(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
@@ -520,12 +520,12 @@ function assertProfileDialogAvatarUpload(playwrightCli: CommandSpec) {
   ])
 }
 
-function closeProfileDialog(playwrightCli: CommandSpec) {
+function closeAccountManagementDialog(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
       'await page.keyboard.press("Escape")',
-      'await page.getByRole("heading", { name: "账户管理" }).waitFor({ state: "hidden", timeout: 10000 })',
+      'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "hidden", timeout: 10000 })',
     ].join('\n'),
   ])
 }
@@ -663,14 +663,14 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
       'await profileMenuItem.click()',
       'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
-      'await page.getByRole("heading", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
+      'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
       `await page.getByText(${JSON.stringify(MOCK_USER.username)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
       'const canvasUrlAfterProfile = new URL(page.url())',
       'if (canvasUrlAfterProfile.pathname !== canvasUrlBeforeProfile.pathname || canvasUrlAfterProfile.search !== canvasUrlBeforeProfile.search) {',
       '  throw new Error(`Canvas profile dialog should not change URL, before=${canvasUrlBeforeProfile.pathname}${canvasUrlBeforeProfile.search}, after=${canvasUrlAfterProfile.pathname}${canvasUrlAfterProfile.search}`)',
       '}',
       'await page.keyboard.press("Escape")',
-      'await page.getByRole("heading", { name: "账户管理" }).waitFor({ state: "hidden", timeout: 10000 })',
+      'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "hidden", timeout: 10000 })',
       'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
       'await pane.click({',
       '  button: "right",',
@@ -757,8 +757,8 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
 
   if (page.label === 'boards') {
     assertBoardsInteractions(playwrightCli)
-    assertProfileDialogAvatarUpload(playwrightCli)
-    closeProfileDialog(playwrightCli)
+    assertAccountManagementDialogAvatarUpload(playwrightCli)
+    closeAccountManagementDialog(playwrightCli)
   }
 
   if (page.label === 'home') {

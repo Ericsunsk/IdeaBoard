@@ -1,48 +1,56 @@
 /* eslint-disable vue/one-component-per-file -- Local stubs keep the dialog wrapper test focused. */
 import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import ProfileDialog from './ProfileDialog.vue'
+import AccountManagementDialog from './AccountManagementDialog.vue'
 import { renderWithUser, screen } from '../../../test/render'
 
 const DialogStub = defineComponent({
+  inheritAttrs: false,
   props: {
     visible: { type: Boolean, required: true },
     dismissableMask: { type: Boolean, default: true },
     closeOnEscape: { type: Boolean, default: false },
+    showHeader: { type: Boolean, default: true },
   },
   emits: ['update:visible'],
   template: `
     <div
       v-if="visible"
-      data-testid="profile-dialog-mask"
+      data-testid="account-management-dialog-mask"
       :data-dismissable-mask="String(dismissableMask)"
       @click="dismissableMask && $emit('update:visible', false)"
     >
       <section
         role="dialog"
-        aria-labelledby="profile-dialog-title"
         tabindex="-1"
         :data-close-on-escape="String(closeOnEscape)"
+        :data-show-header="String(showHeader)"
         @click.stop
         @keydown.escape="closeOnEscape && $emit('update:visible', false)"
+        v-bind="$attrs"
       >
-        <slot name="header" />
+        <slot v-if="showHeader" name="header" />
         <slot />
-        <button type="button" aria-label="关闭账户管理" @click="$emit('update:visible', false)">
-          关闭
-        </button>
       </section>
     </div>
   `,
 })
 
-const ProfileDialogContentStub = defineComponent({
-  name: 'ProfileDialogContent',
-  template: '<div data-testid="profile-dialog-content">Profile content</div>',
+const AccountManagementDialogContentStub = defineComponent({
+  name: 'AccountManagementDialogContent',
+  emits: ['close'],
+  template: `
+    <div data-testid="account-management-dialog-content">
+      Account management content
+      <button type="button" aria-label="关闭账户管理" @click="$emit('close')">
+        关闭
+      </button>
+    </div>
+  `,
 })
 
-const StatefulProfileDialogContentStub = defineComponent({
-  name: 'ProfileDialogContent',
+const StatefulAccountManagementDialogContentStub = defineComponent({
+  name: 'AccountManagementDialogContent',
   data() {
     return {
       tab: 'profile',
@@ -61,10 +69,10 @@ const StatefulProfileDialogContentStub = defineComponent({
   `,
 })
 
-function renderProfileDialog(visible: boolean, onVisibleUpdate = vi.fn()) {
+function renderAccountManagementDialog(visible: boolean, onVisibleUpdate = vi.fn()) {
   return {
     onVisibleUpdate,
-    ...renderWithUser(ProfileDialog, {
+    ...renderWithUser(AccountManagementDialog, {
       props: {
         visible,
         'onUpdate:visible': onVisibleUpdate,
@@ -72,43 +80,47 @@ function renderProfileDialog(visible: boolean, onVisibleUpdate = vi.fn()) {
       global: {
         stubs: {
           Dialog: DialogStub,
-          ProfileDialogContent: ProfileDialogContentStub,
+          AccountManagementDialogContent: AccountManagementDialogContentStub,
         },
       },
     }),
   }
 }
 
-function renderProfileDialogWithStatefulContent(visible: boolean) {
-  return renderWithUser(ProfileDialog, {
+function renderAccountManagementDialogWithStatefulContent(visible: boolean) {
+  return renderWithUser(AccountManagementDialog, {
     props: {
       visible,
     },
     global: {
       stubs: {
         Dialog: DialogStub,
-        ProfileDialogContent: StatefulProfileDialogContentStub,
+        AccountManagementDialogContent: StatefulAccountManagementDialogContentStub,
       },
     },
   })
 }
 
-describe('ProfileDialog', () => {
-  it('renders dialog-ready profile content when visible', () => {
-    renderProfileDialog(true)
+describe('AccountManagementDialog', () => {
+  it('renders dialog-ready account management content when visible', () => {
+    renderAccountManagementDialog(true)
 
     expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
-    expect(screen.getByTestId('profile-dialog-content')).toBeVisible()
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+      'data-show-header',
+      'false',
+    )
+    expect(screen.getByTestId('account-management-dialog-content')).toBeVisible()
   })
 
-  it('does not mount profile content while hidden', () => {
-    renderProfileDialog(false)
+  it('does not mount account management content while hidden', () => {
+    renderAccountManagementDialog(false)
 
-    expect(screen.queryByTestId('profile-dialog-content')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('account-management-dialog-content')).not.toBeInTheDocument()
   })
 
   it('emits visibility updates without owning route state', async () => {
-    const { user, onVisibleUpdate } = renderProfileDialog(true)
+    const { user, onVisibleUpdate } = renderAccountManagementDialog(true)
 
     await user.click(screen.getByRole('button', { name: '关闭账户管理' }))
 
@@ -116,16 +128,16 @@ describe('ProfileDialog', () => {
   })
 
   it('closes from Escape and the close button, but not from the mask', async () => {
-    const { user, onVisibleUpdate } = renderProfileDialog(true)
+    const { user, onVisibleUpdate } = renderAccountManagementDialog(true)
     const dialog = screen.getByRole('dialog', { name: '账户管理' })
 
-    expect(screen.getByTestId('profile-dialog-mask')).toHaveAttribute(
+    expect(screen.getByTestId('account-management-dialog-mask')).toHaveAttribute(
       'data-dismissable-mask',
       'false',
     )
     expect(dialog).toHaveAttribute('data-close-on-escape', 'true')
 
-    await user.click(screen.getByTestId('profile-dialog-mask'))
+    await user.click(screen.getByTestId('account-management-dialog-mask'))
     expect(onVisibleUpdate).not.toHaveBeenCalled()
 
     dialog.focus()
@@ -134,7 +146,7 @@ describe('ProfileDialog', () => {
   })
 
   it('unmounts panel state so reopening starts from profile without stale password input', async () => {
-    const { user, rerender } = renderProfileDialogWithStatefulContent(true)
+    const { user, rerender } = renderAccountManagementDialogWithStatefulContent(true)
 
     await user.click(screen.getByRole('button', { name: '账号安全' }))
     await user.type(screen.getByRole('textbox', { name: '当前原密码' }), 'old-secret')

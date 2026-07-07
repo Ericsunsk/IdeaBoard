@@ -186,7 +186,7 @@ import {
   type CanvasChromeToolState,
 } from '../components/chrome'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
-import { openProfileDialog } from '../../profile/useProfileDialogController'
+import { openAccountManagementDialog } from '../../account-management/useAccountManagementDialogController'
 
 const route = useRoute()
 const router = useRouter()
@@ -303,7 +303,7 @@ const userMenuItems = computed(() =>
     canAccessAdmin: canAccessAdmin(userStore.user),
     hiddenKeys: ['home'],
     handlers: {
-      profile: openProfileDialog,
+      profile: openAccountManagementDialog,
       admin: () => onNavigateRequest(ADMIN_ROOT_PATH),
       logout: () => {
         void onLogoutRequest()

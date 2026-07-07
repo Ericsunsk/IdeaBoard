@@ -181,7 +181,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
-import { openProfileDialog } from '../../profile/useProfileDialogController'
+import { openAccountManagementDialog } from '../../account-management/useAccountManagementDialogController'
 
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
@@ -215,7 +215,7 @@ const userMenuItems = computed(() =>
   createUserAccountMenuItems({
     canAccessAdmin: canAccessAdmin(userStore.user),
     handlers: {
-      profile: openCenter,
+      profile: openAccountManagement,
       admin: openAdmin,
       home: goHome,
       logout: () => {
@@ -413,9 +413,9 @@ async function confirmDeleteBoard() {
   boardFeedback.deleted()
 }
 
-function openCenter() {
+function openAccountManagement() {
   activeMenuBoardId.value = null
-  openProfileDialog()
+  openAccountManagementDialog()
 }
 
 function openAdmin() {

@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
-import { closeProfileDialog, openProfileDialog } from '../useProfileDialogController'
-import ProfileDialogHost from './ProfileDialogHost.vue'
+import { closeAccountManagementDialog, openAccountManagementDialog } from '../useAccountManagementDialogController'
+import AccountManagementDialogHost from './AccountManagementDialogHost.vue'
 
 const routes: RouteRecordRaw[] = [
   { path: '/user/boards', component: { template: '<div />' } },
@@ -44,11 +44,11 @@ async function renderHost(path = '/user/boards') {
   const store = useUserStore()
   store.setAuth(makeUser())
 
-  const view = render(ProfileDialogHost, {
+  const view = render(AccountManagementDialogHost, {
     global: {
       plugins: [router],
       stubs: {
-        ProfileDialog: {
+        AccountManagementDialog: {
           props: {
             visible: { type: Boolean, required: true },
           },
@@ -68,15 +68,15 @@ async function renderHost(path = '/user/boards') {
   return { router, store, ...view }
 }
 
-describe('ProfileDialogHost', () => {
+describe('AccountManagementDialogHost', () => {
   beforeEach(() => {
-    closeProfileDialog()
+    closeAccountManagementDialog()
     useUserStore().clearAuth()
     localStorage.clear()
   })
 
   it('shows the global dialog on authenticated user surfaces', async () => {
-    openProfileDialog()
+    openAccountManagementDialog()
 
     await renderHost()
 
@@ -86,7 +86,7 @@ describe('ProfileDialogHost', () => {
   it.each([['/admin/users'], ['/user/login'], ['/user/register']])(
     'does not host the dialog on excluded route %s',
     async (path) => {
-      openProfileDialog()
+      openAccountManagementDialog()
 
       await renderHost(path)
 
@@ -97,7 +97,7 @@ describe('ProfileDialogHost', () => {
   it('does not host the dialog without a current user', async () => {
     const { store } = await renderHost()
     store.clearAuth()
-    openProfileDialog()
+    openAccountManagementDialog()
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
@@ -105,7 +105,7 @@ describe('ProfileDialogHost', () => {
   })
 
   it('closes the dialog on route changes', async () => {
-    openProfileDialog()
+    openAccountManagementDialog()
     const { router } = await renderHost()
     expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
 
@@ -117,7 +117,7 @@ describe('ProfileDialogHost', () => {
   })
 
   it('closes the dialog when the current user becomes unavailable', async () => {
-    openProfileDialog()
+    openAccountManagementDialog()
     const { store } = await renderHost()
     expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
 

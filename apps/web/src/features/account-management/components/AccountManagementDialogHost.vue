@@ -1,5 +1,5 @@
 <template>
-  <ProfileDialog v-if="isHostAllowed" :visible="visible" @update:visible="setVisible" />
+  <AccountManagementDialog v-if="isHostAllowed" :visible="visible" @update:visible="setVisible" />
 </template>
 
 <script setup lang="ts">
@@ -12,12 +12,12 @@ import {
   USER_REGISTER_PATH,
   isPathUnderRoute,
 } from '../../../shared/constants/routePaths'
-import ProfileDialog from './ProfileDialog.vue'
-import { useProfileDialogController } from '../useProfileDialogController'
+import AccountManagementDialog from './AccountManagementDialog.vue'
+import { useAccountManagementDialogController } from '../useAccountManagementDialogController'
 
 const route = useRoute()
 const userStore = useUserStore()
-const { visible, close, setVisible } = useProfileDialogController()
+const { visible, close, setVisible } = useAccountManagementDialogController()
 
 const isAuthRoute = computed(
   () =>
