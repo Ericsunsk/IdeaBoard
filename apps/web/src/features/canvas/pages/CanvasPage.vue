@@ -579,6 +579,7 @@ const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragI
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
+    isNodeDragLocked: () => isFlowCanvasLocked.value,
   })
 
 const {

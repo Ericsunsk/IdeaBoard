@@ -4,10 +4,13 @@
       class="image-node-expand-frame"
       data-image-extend-frame
       :style="overlayStyle"
-      @pointermove="emit('handle-pointermove', $event)"
-      @pointerup="emit('handle-pointerup', $event)"
-      @pointercancel="emit('handle-pointerup', $event)"
+      @pointermove.stop="emit('handle-pointermove', $event)"
+      @pointerup.stop="emit('handle-pointerup', $event)"
+      @pointercancel.stop="emit('handle-pointerup', $event)"
       @pointerdown.stop.prevent="emit('frame-pointerdown', $event)"
+      @mousedown.stop
+      @mouseup.stop
+      @click.stop
     >
       <button
         v-for="anchor in anchors"

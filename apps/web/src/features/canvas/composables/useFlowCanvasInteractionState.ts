@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 
 export type CanvasInteractionKey =
+  | 'canvas-extend-overlay'
   | 'image-editor-raster'
   | 'image-mask-editor'
   | 'flow-viewport'
@@ -8,6 +9,7 @@ export type CanvasInteractionKey =
   | 'node-drag'
 
 const CANVAS_LOCKING_INTERACTIONS = new Set<CanvasInteractionKey>([
+  'canvas-extend-overlay',
   'image-editor-raster',
   'image-mask-editor',
 ])

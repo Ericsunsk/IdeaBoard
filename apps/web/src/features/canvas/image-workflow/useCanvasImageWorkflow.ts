@@ -156,6 +156,8 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions) {
       ...overlayOptions,
       nodes: graph.nodes,
       getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
+      startCanvasInteraction: graph.startCanvasInteraction,
+      stopCanvasInteraction: graph.stopCanvasInteraction,
       onBeforePointerCancel: graph.clearSelectedFlowElements,
       onCommit: async (payload) => {
         await task.runCanvasExtendAction(payload.nodeId, {

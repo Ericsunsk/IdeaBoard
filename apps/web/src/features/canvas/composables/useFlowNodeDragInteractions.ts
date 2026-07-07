@@ -8,12 +8,14 @@ type UseFlowNodeDragInteractionsOptions = {
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   dismissTransientCanvasUi: DismissTransientCanvasUi
+  isNodeDragLocked?: () => boolean
 }
 
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
   let pendingDragStopCommit: object | null = null
 
   function onNodeDragStart() {
+    if (options.isNodeDragLocked?.()) return
     pendingDragStopCommit = null
     options.dismissTransientCanvasUi({ closeExpand: true })
     options.beginNodeDragTransaction()
@@ -21,6 +23,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   }
 
   function onNodeDragStop() {
+    if (options.isNodeDragLocked?.()) return
     options.dismissTransientCanvasUi({
       closeExpand: true,
       clearNodePanel: false,

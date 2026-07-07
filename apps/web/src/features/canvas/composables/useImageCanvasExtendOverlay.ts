@@ -1,7 +1,8 @@
-import { useEventListener } from '@vueuse/core'
+import { tryOnScopeDispose, useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { clampImageNodeOutputCount } from '../../canvas-board/domain'
+import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 import {
   containImageRect,
   createCanvasExtendRect,
@@ -38,6 +39,8 @@ type UseImageCanvasExtendOverlayOptions = {
   activeTool: Ref<string>
   getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
+  startCanvasInteraction?: (key: CanvasInteractionKey) => void
+  stopCanvasInteraction?: (key: CanvasInteractionKey) => void
   onBeforePointerCancel?: () => void
   onCommit: (payload: ExtendCommitPayload) => Promise<void> | void
 }
@@ -65,6 +68,7 @@ type MoveDragSession = {
 type DragSession = ResizeDragSession | MoveDragSession
 
 const HANDLE_RADIUS = 4
+const CANVAS_EXTEND_OVERLAY_INTERACTION_KEY: CanvasInteractionKey = 'canvas-extend-overlay'
 
 export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlayOptions) {
   const state = ref<ExtendOverlayState | null>(null)
@@ -101,9 +105,20 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     if (!stoppedDragSession) clearDragSession()
   }
 
+  function startExpandInteraction() {
+    options.startCanvasInteraction?.(CANVAS_EXTEND_OVERLAY_INTERACTION_KEY)
+  }
+
+  function stopExpandInteraction() {
+    options.stopCanvasInteraction?.(CANVAS_EXTEND_OVERLAY_INTERACTION_KEY)
+  }
+
   function cancelExpandMode() {
     stopDragSession()
-    state.value = null
+    if (state.value) {
+      state.value = null
+      stopExpandInteraction()
+    }
   }
 
   function enterExpandMode(nodeId: string): boolean {
@@ -115,7 +130,9 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     if (!containRect) return false
     const imageRect = containRect
     const frameRect = resolveDefaultCanvasExtendFrame(imageRect)
+    const wasExpandActive = !!state.value
     state.value = { nodeId, frameRect, imageRect }
+    if (!wasExpandActive) startExpandInteraction()
     return true
   }
 
@@ -276,6 +293,10 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
 
   useEventListener<KeyboardEvent>(windowTarget, 'keydown', onGlobalKeydown, true)
   useEventListener<PointerEvent>(windowTarget, 'pointerdown', onGlobalPointerDown, true)
+  tryOnScopeDispose(() => {
+    stopDragSession()
+    if (state.value) stopExpandInteraction()
+  })
 
   return {
     isExpandMode,

@@ -32,14 +32,31 @@ describe('useFlowCanvasInteractionState', () => {
     const state = useFlowCanvasInteractionState()
 
     state.startCanvasInteraction('flow-viewport')
-    state.startCanvasInteraction('image-mask-editor')
+    state.startCanvasInteraction('canvas-extend-overlay')
 
     expect(state.isCanvasInteractionActive.value).toBe(true)
     expect(state.isCanvasInteractionLocked.value).toBe(true)
 
-    state.stopCanvasInteraction('image-mask-editor')
+    state.stopCanvasInteraction('canvas-extend-overlay')
 
     expect(state.isCanvasInteractionActive.value).toBe(true)
+    expect(state.isCanvasInteractionLocked.value).toBe(false)
+  })
+
+  it('stays locked while any lock-level interaction remains active', () => {
+    const state = useFlowCanvasInteractionState()
+
+    state.startCanvasInteraction('canvas-extend-overlay')
+    state.startCanvasInteraction('image-mask-editor')
+
+    expect(state.isCanvasInteractionLocked.value).toBe(true)
+
+    state.stopCanvasInteraction('canvas-extend-overlay')
+
+    expect(state.isCanvasInteractionLocked.value).toBe(true)
+
+    state.stopCanvasInteraction('image-mask-editor')
+
     expect(state.isCanvasInteractionLocked.value).toBe(false)
   })
 })

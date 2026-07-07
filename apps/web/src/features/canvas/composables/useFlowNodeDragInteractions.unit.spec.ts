@@ -2,20 +2,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useFlowNodeDragInteractions } from './useFlowNodeDragInteractions'
 
-function createHarness(duplicateModifierPressed = false) {
+function createHarness(
+  options: { duplicateModifierPressed?: boolean; nodeDragLocked?: boolean } = {},
+) {
   const beginNodeDragTransaction = vi.fn()
   const commitNodeDragTransaction = vi.fn()
   const beginFlowNodeDragDuplicateTracking = vi.fn()
   const finishFlowNodeDragDuplicateTracking = vi.fn()
   const dismissTransientCanvasUi = vi.fn()
+  const isNodeDragLocked = vi.fn(() => options.nodeDragLocked ?? false)
 
   const interactions = useFlowNodeDragInteractions({
     beginNodeDragTransaction,
     commitNodeDragTransaction,
-    duplicateModifierPressed: ref(duplicateModifierPressed),
+    duplicateModifierPressed: ref(options.duplicateModifierPressed ?? false),
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
+    isNodeDragLocked,
   })
 
   return {
@@ -25,12 +29,13 @@ function createHarness(duplicateModifierPressed = false) {
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
     dismissTransientCanvasUi,
+    isNodeDragLocked,
   }
 }
 
 describe('useFlowNodeDragInteractions', () => {
   it('dismisses transient UI before starting a node drag transaction', () => {
-    const harness = createHarness(true)
+    const harness = createHarness({ duplicateModifierPressed: true })
 
     harness.interactions.onNodeDragStart()
 
@@ -43,7 +48,7 @@ describe('useFlowNodeDragInteractions', () => {
   })
 
   it('only closes expand mode when a node drag stops', async () => {
-    const harness = createHarness(false)
+    const harness = createHarness()
 
     harness.interactions.onNodeDragStop()
 
@@ -61,7 +66,7 @@ describe('useFlowNodeDragInteractions', () => {
   })
 
   it('only commits the latest queued drag stop', async () => {
-    const harness = createHarness(false)
+    const harness = createHarness()
 
     harness.interactions.onNodeDragStop()
     harness.interactions.onNodeDragStop()
@@ -69,5 +74,21 @@ describe('useFlowNodeDragInteractions', () => {
     await Promise.resolve()
 
     expect(harness.commitNodeDragTransaction).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores node drag callbacks while node drag is locked', async () => {
+    const harness = createHarness({ nodeDragLocked: true })
+
+    harness.interactions.onNodeDragStart()
+    harness.interactions.onNodeDragStop()
+
+    expect(harness.dismissTransientCanvasUi).not.toHaveBeenCalled()
+    expect(harness.beginNodeDragTransaction).not.toHaveBeenCalled()
+    expect(harness.beginFlowNodeDragDuplicateTracking).not.toHaveBeenCalled()
+    expect(harness.finishFlowNodeDragDuplicateTracking).not.toHaveBeenCalled()
+
+    await Promise.resolve()
+
+    expect(harness.commitNodeDragTransaction).not.toHaveBeenCalled()
   })
 })
