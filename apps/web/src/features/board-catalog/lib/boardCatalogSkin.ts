@@ -4,10 +4,10 @@ export const boardCatalogClasses = {
   page: 'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:pb-10',
   pageBackground:
     "pointer-events-none fixed inset-0 ib-page-dot-bg before:absolute before:inset-0 before:bg-[radial-gradient(55%_35%_at_45%_45%,var(--color-board-page-glow)_0%,var(--color-board-page-glow-clear)_100%)] before:content-['']",
-  header: 'relative z-[1] flex items-center justify-between',
+  header: 'relative z-[1] flex items-start justify-between',
   brand: 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center',
   brandName: 'min-w-0 truncate text-[32px] font-bold tracking-normal',
-  userMenuWrap: 'relative',
+  userMenuWrap: 'relative inline-flex h-10 shrink-0 leading-none',
   userAvatarButton: 'ib-round-control ib-page-chrome-control ib-user-avatar-button',
   userAvatar: 'ib-user-avatar-button__image',
   userAvatarPlaceholder: 'ib-user-avatar-button__placeholder',

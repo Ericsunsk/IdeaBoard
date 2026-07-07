@@ -1,5 +1,11 @@
 <template>
-  <div :class="wrapClass" @pointerdown.stop @mousedown.stop @click.stop>
+  <div
+    class="inline-flex shrink-0 leading-none"
+    :class="wrapClass"
+    @pointerdown.stop
+    @mousedown.stop
+    @click.stop
+  >
     <Button
       ref="avatarButtonRef"
       unstyled
