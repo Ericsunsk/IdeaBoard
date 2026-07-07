@@ -19,20 +19,12 @@ import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 
-type FlowViewport = {
-  x: number
-  y: number
-  zoom: number
-}
-
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 
 type UseCanvasBoardRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
-  getViewport: () => FlowViewport
-  setViewport: (viewport: FlowViewport) => Promise<unknown> | unknown
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   feedback: CanvasBoardRuntimeFeedback
   onNativeRemove?: () => void
@@ -57,8 +49,6 @@ type CanvasBoardRuntime = {
   onEdgesChange: (changes: EdgeChange[]) => void
   onNavigateRequest: (path: string) => Promise<void>
   onLogoutRequest: () => Promise<void>
-  markBoardViewportChanged: () => void
-  commitPendingBoardViewportChange: () => void
   isBoardMenuOpen: Ref<boolean>
   isRenamingBoard: Ref<boolean>
   boardNameDraft: Ref<string>
@@ -89,19 +79,6 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
   const isSavingBoard: Ref<boolean> = ref(false)
   const isDirty: Ref<boolean> = ref(false)
   const saveStatus: Ref<SaveStatus> = ref('idle')
-  const hasPendingViewportChange = ref(false)
-  const isApplyingBoardViewport = ref(false)
-
-  function setBoardViewport(viewport: FlowViewport) {
-    isApplyingBoardViewport.value = true
-    const result = options.setViewport(viewport)
-    const clearApplyingFlag = () => {
-      window.requestAnimationFrame(() => {
-        isApplyingBoardViewport.value = false
-      })
-    }
-    void Promise.resolve(result).then(clearApplyingFlag, clearApplyingFlag)
-  }
 
   const boardSession = useCanvasBoardSession({
     getBoardIdQuery: () => options.route.query.boardId,
@@ -129,8 +106,6 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     isLoadingBoardSnapshot,
     isSavingBoard,
     boardSession,
-    getViewport: options.getViewport,
-    setViewport: setBoardViewport,
     onWarning: options.feedback.warning,
     onSuccess: options.feedback.saveSucceeded,
     onError: options.feedback.saveFailed,
@@ -156,19 +131,6 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     await options.logoutAndRedirect(USER_HOME_PATH)
   }
 
-  function markBoardViewportChanged() {
-    hasPendingViewportChange.value = true
-  }
-
-  function commitPendingBoardViewportChange() {
-    const shouldPersistViewport = hasPendingViewportChange.value
-    hasPendingViewportChange.value = false
-    if (!shouldPersistViewport || isApplyingBoardViewport.value || isLoadingBoardSnapshot.value) {
-      return
-    }
-    graphRuntime.markDirty()
-  }
-
   return {
     nodes,
     edges,
@@ -185,8 +147,6 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     onEdgesChange,
     onNavigateRequest,
     onLogoutRequest,
-    markBoardViewportChanged,
-    commitPendingBoardViewportChange,
     isBoardMenuOpen: boardHeader.isBoardMenuOpen,
     isRenamingBoard: boardHeader.isRenamingBoard,
     boardNameDraft: boardHeader.boardNameDraft,

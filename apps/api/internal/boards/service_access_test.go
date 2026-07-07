@@ -116,9 +116,9 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	}
 	var state struct {
 		SchemaVersion int `json:"schemaVersion"`
-		Viewport      struct {
-			ZoomLevel int `json:"zoomLevel"`
-		} `json:"viewport"`
+		PromptNodes   []struct {
+			Marker int `json:"marker"`
+		} `json:"promptNodes"`
 	}
 	if err := json.Unmarshal([]byte(updated.Board.State), &state); err != nil {
 		t.Fatalf("decode updated state failed: %v", err)
@@ -126,8 +126,8 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	if state.SchemaVersion != 1 {
 		t.Fatalf("updated schemaVersion = %d, want 1", state.SchemaVersion)
 	}
-	if state.Viewport.ZoomLevel != 250 {
-		t.Fatalf("updated zoomLevel = %d, want 250", state.Viewport.ZoomLevel)
+	if len(state.PromptNodes) != 1 || state.PromptNodes[0].Marker != 250 {
+		t.Fatalf("updated prompt marker = %+v, want 250", state.PromptNodes)
 	}
 
 	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Renamed Board", State: validBoardState(1, 300)}); !errors.Is(err, ErrBoardPermissionDenied) {

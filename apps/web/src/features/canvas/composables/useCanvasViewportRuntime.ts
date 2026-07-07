@@ -5,6 +5,11 @@ import {
   type CanvasFrameProbeSession,
 } from '../utils/canvasFrameProbe'
 import { waitForNextRenderFrame } from '../utils/animationFrame'
+import {
+  createCanvasViewportPersistence,
+  type CanvasViewportPersistence,
+  type CanvasViewportPersistenceIdentity,
+} from '../utils/canvasViewportPersistence'
 
 export type CanvasFlowViewport = {
   x: number
@@ -44,6 +49,7 @@ export type UseCanvasViewportRuntimeOptions = {
   fullNodes: ReadonlyValueRef<readonly unknown[]>
   fullEdges: ReadonlyValueRef<readonly unknown[]>
   currentBoardId: ReadonlyValueRef<string | null>
+  getUserUid: () => string
   viewport: Readonly<Ref<CanvasFlowViewport>>
   getViewport: () => CanvasFlowViewport
   setViewport: (
@@ -58,8 +64,6 @@ export type UseCanvasViewportRuntimeOptions = {
   zoomIn: () => Promise<unknown> | unknown
   zoomOut: () => Promise<unknown> | unknown
   panBy: (delta: { x: number; y: number }) => boolean
-  markBoardViewportChanged: () => void
-  commitPendingBoardViewportChange: () => void
   loadInitialOrRouteBoard: () => Promise<void>
   closeBoardHeaderEditing: () => void
   startCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
@@ -67,6 +71,7 @@ export type UseCanvasViewportRuntimeOptions = {
   startNodeDragInteraction: () => void
   stopNodeDragInteraction: () => void
   refreshFlowHandleVisibility: () => void
+  viewportPersistence?: CanvasViewportPersistence
 }
 
 function viewportKey(viewport: CanvasFlowViewport) {
@@ -76,7 +81,6 @@ function viewportKey(viewport: CanvasFlowViewport) {
 export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOptions) {
   let activeViewportFrameProbe: CanvasFrameProbeSession | null = null
   let activeNodeDragFrameProbe: CanvasFrameProbeSession | null = null
-  let lastCommittedViewportKey: string | null = null
   let isMiniMapDragActive = false
   let didMiniMapDragMove = false
   let pendingMiniMapDragDelta: CanvasMiniMapDragDelta = { x: 0, y: 0 }
@@ -89,6 +93,14 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   let lastSuccessfulMiniMapViewportKey: string | null = null
   let programmaticViewportCommitDepth = 0
   let viewportMoveStartZoom: number | null = null
+
+  const viewportPersistence =
+    options.viewportPersistence ??
+    createCanvasViewportPersistence({
+      getIdentity: getViewportStorageIdentity,
+      getViewport: options.getViewport,
+      setViewport: options.setViewport,
+    })
 
   const zoomLevel = computed(() => {
     const zoom = options.viewport.value.zoom
@@ -109,10 +121,20 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     }
   }
 
-  function commitViewportPersistence() {
-    lastCommittedViewportKey = viewportKey(options.viewport.value)
-    options.markBoardViewportChanged()
-    options.commitPendingBoardViewportChange()
+  function getViewportStorageIdentity(): CanvasViewportPersistenceIdentity {
+    return {
+      userUid: options.getUserUid(),
+      boardId: options.currentBoardId.value,
+    }
+  }
+
+  async function restoreViewportForCurrentBoard() {
+    programmaticViewportCommitDepth += 1
+    try {
+      await viewportPersistence.restore()
+    } finally {
+      programmaticViewportCommitDepth -= 1
+    }
   }
 
   async function runAndPersistViewportCommand(run: () => Promise<unknown> | unknown) {
@@ -121,7 +143,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       const result = await run()
       if (result === false) return
 
-      commitViewportPersistence()
+      viewportPersistence.scheduleDelayedPersist()
     } finally {
       programmaticViewportCommitDepth -= 1
     }
@@ -139,7 +161,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     programmaticViewportCommitDepth += 1
     try {
       if (!options.panBy(delta)) return
-      commitViewportPersistence()
+      viewportPersistence.scheduleDelayedPersist()
     } finally {
       programmaticViewportCommitDepth -= 1
     }
@@ -299,20 +321,17 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       latestTarget &&
       lastSuccessfulMiniMapViewportKey === viewportKey(latestTarget)
     ) {
-      commitViewportPersistence()
+      viewportPersistence.persistNow()
     }
     onFlowMoveEnd({ flowTransform: options.getViewport() })
     miniMapDragTargetViewport = null
   }
 
   function onViewportChangeEnd(viewport = options.viewport.value) {
-    const key = viewportKey(viewport)
     if (programmaticViewportCommitDepth > 0 || isMiniMapDragActive) {
-      lastCommittedViewportKey = key
       return
     }
-    if (key === lastCommittedViewportKey) return
-    commitViewportPersistence()
+    viewportPersistence.persistViewportEnd(viewport)
   }
 
   function observeViewportMove(transform: CanvasFlowMovePayload['flowTransform']) {
@@ -347,12 +366,14 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
   async function loadCanvasBoardAndProbe() {
     if (!isCanvasFrameProbeEnabled()) {
       await options.loadInitialOrRouteBoard()
+      await restoreViewportForCurrentBoard()
       return
     }
 
     const frameProbe = beginCanvasFrameProbe('load-hydrate', () => getCanvasFrameProbeMetadata())
     try {
       await options.loadInitialOrRouteBoard()
+      await restoreViewportForCurrentBoard()
       frameProbe.mark('graph-committed', () => getCanvasFrameProbeMetadata())
       await waitForNextRenderFrame()
       frameProbe.end(() => getCanvasFrameProbeMetadata())
@@ -417,6 +438,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     pendingMiniMapDragEnd = false
     isMiniMapDragActive = false
     isMiniMapViewportUpdateInFlight = false
+    viewportPersistence.dispose()
     activeViewportFrameProbe?.cleanup()
     activeViewportFrameProbe = null
     viewportMoveStartZoom = null
@@ -444,6 +466,7 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     onFlowMoveEnd,
     onNodeDragStart,
     onNodeDragStop,
+    flushViewportPersistence: viewportPersistence.flush,
     loadCanvasBoardAndProbe,
   }
 }

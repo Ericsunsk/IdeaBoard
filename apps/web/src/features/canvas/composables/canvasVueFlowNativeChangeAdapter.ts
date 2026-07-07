@@ -14,6 +14,11 @@ import type {
   CanvasVueFlowGraphCommandResult,
   CanvasVueFlowGraphCommandRunner,
 } from './canvasVueFlowGraphCommandRunner'
+import {
+  classifyVueFlowNativeEdgeChanges,
+  classifyVueFlowNativeNodeChanges,
+  mergeVueFlowNativeChangeClassifications,
+} from './canvasVueFlowNativeChangePolicy'
 
 export type CanvasVueFlowGraphActions = Partial<
   Pick<
@@ -30,14 +35,6 @@ export type CanvasVueFlowGraphActions = Partial<
   >
 >
 
-type NativeNodeChangeState = Node & {
-  selected?: boolean
-  dragging?: boolean
-}
-type NativeEdgeChangeState = Edge & {
-  selected?: boolean
-}
-
 type CanvasVueFlowNativeChangeAdapterOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
@@ -47,80 +44,19 @@ type CanvasVueFlowNativeChangeAdapterOptions = {
   commandRunner: CanvasVueFlowGraphCommandRunner
 }
 
-function createNodeLookup(nodes: Node[]): Map<string, Node> {
-  return new Map(nodes.map((node) => [node.id, node]))
-}
-
-function createEdgeLookup(edges: Edge[]): Map<string, Edge> {
-  return new Map(edges.map((edge) => [edge.id, edge]))
-}
-
-function isSamePosition(
-  left: { x: number; y: number } | undefined,
-  right: { x: number; y: number } | undefined,
-): boolean {
-  return left?.x === right?.x && left?.y === right?.y
-}
-
-function hasApplicableNodeChange(change: NodeChange, nodeLookup: Map<string, Node>): boolean {
-  if (change.type === 'add') {
-    return !nodeLookup.has(change.item.id)
+function createVisualOnlyResult(
+  command: 'applyGraphChanges' | 'applyNodeChanges' | 'applyEdgeChanges',
+  before: { nodes: Node[]; edges: Edge[] },
+  after: { nodes: Node[]; edges: Edge[] },
+  commandOptions: CanvasVueFlowGraphCommandOptions | undefined,
+): CanvasVueFlowGraphCommandResult {
+  return {
+    command,
+    before,
+    after,
+    didChange: false,
+    metadata: commandOptions?.metadata,
   }
-  if (change.type === 'remove') {
-    return nodeLookup.has(change.id)
-  }
-
-  const node = nodeLookup.get(change.id)
-  if (!node) return false
-
-  if (change.type === 'select') {
-    return (node as NativeNodeChangeState).selected !== change.selected
-  }
-  if (change.type === 'position') {
-    return (
-      (change.position !== undefined && !isSamePosition(node.position, change.position)) ||
-      (change.dragging !== undefined &&
-        (node as NativeNodeChangeState).dragging !== change.dragging)
-    )
-  }
-  if (change.type === 'dimensions') {
-    return (
-      change.dimensions !== undefined ||
-      change.handleBounds !== undefined ||
-      change.resizing !== undefined ||
-      change.updateStyle === true
-    )
-  }
-
-  return true
-}
-
-function hasApplicableEdgeChange(change: EdgeChange, edgeLookup: Map<string, Edge>): boolean {
-  if (change.type === 'add') {
-    return !edgeLookup.has(change.item.id)
-  }
-  if (change.type === 'remove') {
-    return edgeLookup.has(change.id)
-  }
-
-  const edge = edgeLookup.get(change.id)
-  if (!edge) return false
-
-  if (change.type === 'select') {
-    return (edge as NativeEdgeChangeState).selected !== change.selected
-  }
-
-  return true
-}
-
-function hasApplicableNodeChanges(changes: NodeChange[], currentNodes: Node[]): boolean {
-  const nodeLookup = createNodeLookup(currentNodes)
-  return changes.some((change) => hasApplicableNodeChange(change, nodeLookup))
-}
-
-function hasApplicableEdgeChanges(changes: EdgeChange[], currentEdges: Edge[]): boolean {
-  const edgeLookup = createEdgeLookup(currentEdges)
-  return changes.some((change) => hasApplicableEdgeChange(change, edgeLookup))
 }
 
 export function createCanvasVueFlowNativeChangeAdapter(
@@ -151,8 +87,19 @@ export function createCanvasVueFlowNativeChangeAdapter(
     changes: NodeChange[],
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
-    if (changes.length === 0 || !hasApplicableNodeChanges(changes, options.nodes.value)) {
+    const classification = classifyVueFlowNativeNodeChanges(changes, options.nodes.value)
+    if (classification === 'no-op') {
       return options.commandRunner.noOp('applyNodeChanges', commandOptions)
+    }
+    if (classification === 'visual-only') {
+      const before = { nodes: options.nodes.value, edges: options.edges.value }
+      applyNativeNodeChanges(changes)
+      return createVisualOnlyResult(
+        'applyNodeChanges',
+        before,
+        { nodes: options.nodes.value, edges: options.edges.value },
+        commandOptions,
+      )
     }
     return options.commandRunner.runNative(
       'applyNodeChanges',
@@ -186,8 +133,19 @@ export function createCanvasVueFlowNativeChangeAdapter(
     changes: NodeChange[],
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
-    if (changes.length === 0 || !hasApplicableNodeChanges(changes, options.nodes.value)) {
+    const classification = classifyVueFlowNativeNodeChanges(changes, options.nodes.value)
+    if (classification === 'no-op') {
       return options.commandRunner.noOp('applyNodeChanges', commandOptions)
+    }
+    if (classification === 'visual-only') {
+      const before = { nodes: options.nodes.value, edges: options.edges.value }
+      applyNativeNodeChanges(changes)
+      return createVisualOnlyResult(
+        'applyNodeChanges',
+        before,
+        { nodes: options.nodes.value, edges: options.edges.value },
+        commandOptions,
+      )
     }
     return options.commandRunner.runNative(
       'applyNodeChanges',
@@ -200,8 +158,19 @@ export function createCanvasVueFlowNativeChangeAdapter(
     changes: EdgeChange[],
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
-    if (changes.length === 0 || !hasApplicableEdgeChanges(changes, options.edges.value)) {
+    const classification = classifyVueFlowNativeEdgeChanges(changes, options.edges.value)
+    if (classification === 'no-op') {
       return options.commandRunner.noOp('applyEdgeChanges', commandOptions)
+    }
+    if (classification === 'visual-only') {
+      const before = { nodes: options.nodes.value, edges: options.edges.value }
+      applyNativeEdgeChanges(changes)
+      return createVisualOnlyResult(
+        'applyEdgeChanges',
+        before,
+        { nodes: options.nodes.value, edges: options.edges.value },
+        commandOptions,
+      )
     }
     return options.commandRunner.runNative(
       'applyEdgeChanges',
@@ -216,12 +185,27 @@ export function createCanvasVueFlowNativeChangeAdapter(
   ): CanvasVueFlowGraphCommandResult {
     const nodeChanges = changes.nodes ?? []
     const edgeChanges = changes.edges ?? []
-    const shouldApplyNodeChanges =
-      nodeChanges.length > 0 && hasApplicableNodeChanges(nodeChanges, options.nodes.value)
-    const shouldApplyEdgeChanges =
-      edgeChanges.length > 0 && hasApplicableEdgeChanges(edgeChanges, options.edges.value)
-    if (!shouldApplyNodeChanges && !shouldApplyEdgeChanges) {
+    const nodeClassification = classifyVueFlowNativeNodeChanges(nodeChanges, options.nodes.value)
+    const edgeClassification = classifyVueFlowNativeEdgeChanges(edgeChanges, options.edges.value)
+    const classification = mergeVueFlowNativeChangeClassifications(
+      nodeClassification,
+      edgeClassification,
+    )
+    if (classification === 'no-op') {
       return options.commandRunner.noOp('applyGraphChanges', commandOptions)
+    }
+    const shouldApplyNodeChanges = nodeClassification !== 'no-op'
+    const shouldApplyEdgeChanges = edgeClassification !== 'no-op'
+    if (classification === 'visual-only') {
+      const before = { nodes: options.nodes.value, edges: options.edges.value }
+      if (shouldApplyNodeChanges) applyNativeNodeChanges(nodeChanges)
+      if (shouldApplyEdgeChanges) applyNativeEdgeChanges(edgeChanges)
+      return createVisualOnlyResult(
+        'applyGraphChanges',
+        before,
+        { nodes: options.nodes.value, edges: options.edges.value },
+        commandOptions,
+      )
     }
 
     return options.commandRunner.runNative(

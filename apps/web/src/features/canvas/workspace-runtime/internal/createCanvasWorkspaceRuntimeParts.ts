@@ -67,8 +67,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     route: options.route,
     router: options.router,
     getUserIdentity: options.getUserIdentity,
-    getViewport: options.flowPaneAdapter.getViewport,
-    setViewport: (viewport) => options.flowPaneAdapter.setViewport(viewport),
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
@@ -99,6 +97,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     fullNodes: board.fullNodes,
     fullEdges: board.fullEdges,
     currentBoardId: board.currentBoardId,
+    getUserUid: () => options.getUserIdentity().userUid,
     viewport: options.flowPaneAdapter.viewport,
     getViewport: options.flowPaneAdapter.getViewport,
     setViewport: options.flowPaneAdapter.setViewport,
@@ -106,8 +105,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     zoomIn: options.flowPaneAdapter.zoomIn,
     zoomOut: options.flowPaneAdapter.zoomOut,
     panBy: options.flowPaneAdapter.panBy,
-    markBoardViewportChanged: board.markBoardViewportChanged,
-    commitPendingBoardViewportChange: board.commitPendingBoardViewportChange,
     loadInitialOrRouteBoard: board.loadInitialOrRouteBoard,
     closeBoardHeaderEditing: board.closeBoardHeaderEditing,
     startCanvasInteraction: graph.startFlowInteraction,
@@ -117,13 +114,20 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     refreshFlowHandleVisibility: options.refreshFlowHandleVisibility,
   })
 
+  async function flushAutosaveWithViewportPersistence(
+    autosaveOptions?: Parameters<typeof board.flushAutosave>[0],
+  ) {
+    viewport.flushViewportPersistence()
+    await board.flushAutosave(autosaveOptions)
+  }
+
   const task = useCanvasTaskRuntime({
     nodes: board.fullNodes,
     edges: board.fullEdges,
     graphAdapter: board.graphAdapter,
     createCurrentCanvasGraphStore: board.graphRuntime.createCurrentCanvasGraphStore,
     boardBaseSnapshot: board.boardBaseSnapshot,
-    flushAutosave: board.flushAutosave,
+    flushAutosave: flushAutosaveWithViewportPersistence,
     currentBoardId: board.currentBoardId,
     refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
     feedback: feedback.taskExecution,
@@ -211,7 +215,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       },
     },
     persistence: {
-      flushAutosave: board.flushAutosave,
+      flushAutosave: flushAutosaveWithViewportPersistence,
       history: board.flowHistory,
       loadCanvasBoardAndProbe: viewport.loadCanvasBoardAndProbe,
       reattachPendingImageResults: task.reattachPendingImageResults,

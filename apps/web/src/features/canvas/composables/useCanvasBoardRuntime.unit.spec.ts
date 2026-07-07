@@ -30,8 +30,6 @@ function createBoardRuntimeOptions() {
       push: vi.fn(async () => undefined),
     } as unknown as Router,
     getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
-    getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
-    setViewport: vi.fn(),
     logoutAndRedirect: vi.fn(async (_path: string) => undefined),
     feedback: {
       warning: vi.fn(),
@@ -123,41 +121,6 @@ describe('useCanvasBoardRuntime', () => {
     expect(flowRuntime.flushAutosave).toHaveBeenCalledTimes(2)
   })
 
-  it('marks viewport dirty only when a pending user viewport change commits', () => {
-    const flowRuntime = createFlowRuntime()
-    mocks.useFlowCanvasRuntime.mockReturnValue(flowRuntime)
-    const runtime = useCanvasBoardRuntime(createBoardRuntimeOptions())
-
-    runtime.commitPendingBoardViewportChange()
-
-    expect(flowRuntime.graphRuntime.markDirty).not.toHaveBeenCalled()
-
-    runtime.markBoardViewportChanged()
-
-    expect(flowRuntime.graphRuntime.markDirty).not.toHaveBeenCalled()
-
-    runtime.commitPendingBoardViewportChange()
-    runtime.commitPendingBoardViewportChange()
-
-    expect(flowRuntime.graphRuntime.markDirty).toHaveBeenCalledOnce()
-  })
-
-  it('does not mark viewport dirty while applying a board snapshot viewport', () => {
-    const flowRuntime = createFlowRuntime()
-    mocks.useFlowCanvasRuntime.mockReturnValue(flowRuntime)
-    const options = createBoardRuntimeOptions()
-
-    const runtime = useCanvasBoardRuntime(options)
-    const flowOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0]
-
-    flowOptions.setViewport({ x: 80, y: 40, zoom: 0.75 })
-    runtime.markBoardViewportChanged()
-    runtime.commitPendingBoardViewportChange()
-
-    expect(options.setViewport).toHaveBeenCalledWith({ x: 80, y: 40, zoom: 0.75 })
-    expect(flowRuntime.graphRuntime.markDirty).not.toHaveBeenCalled()
-  })
-
   it('passes board session state into the Flow Pane runtime seam', () => {
     const flowRuntime = createFlowRuntime()
     mocks.useFlowCanvasRuntime.mockReturnValue(flowRuntime)
@@ -170,11 +133,27 @@ describe('useCanvasBoardRuntime', () => {
         boardBaseSnapshot: expect.objectContaining({
           value: createEmptyCanvasBoardSnapshot(),
         }),
-        getViewport: options.getViewport,
         onWarning: options.feedback.warning,
         onSuccess: options.feedback.saveSucceeded,
         onError: options.feedback.saveFailed,
       }),
     )
+  })
+
+  it('keeps viewport persistence outside board dirty and autosave inputs', () => {
+    const flowRuntime = createFlowRuntime()
+    mocks.useFlowCanvasRuntime.mockReturnValue(flowRuntime)
+
+    const runtime = useCanvasBoardRuntime(createBoardRuntimeOptions())
+    const flowRuntimeOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >
+
+    expect(runtime).not.toHaveProperty('markBoardViewportChanged')
+    expect(runtime).not.toHaveProperty('commitPendingBoardViewportChange')
+    expect(flowRuntimeOptions).not.toHaveProperty('getViewport')
+    expect(flowRuntimeOptions).not.toHaveProperty('setViewport')
+    expect(flowRuntime.graphRuntime.markDirty).not.toHaveBeenCalled()
   })
 })

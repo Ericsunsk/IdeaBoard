@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import type { CanvasBoardSession } from './useCanvasBoardSession'
-import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
+import {
+  createEmptyCanvasBoardSnapshot,
+  type CanvasBoardSnapshot,
+  type PromptNodeItem,
+} from '../../canvas-board/domain'
 import type { FlowAdapterEdge, FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import { useCanvasBoardPersistence } from './useCanvasBoardPersistence'
 
@@ -20,7 +24,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
   const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
   const isLoadingBoardSnapshot = ref(false)
   const isSavingBoard = ref(false)
-  const setViewport = vi.fn()
   const commitGraph = vi.fn((nextGraph: { nodes: unknown[]; edges: unknown[] }) => {
     fullNodes.value = nextGraph.nodes
     fullEdges.value = nextGraph.edges
@@ -49,8 +52,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     isLoadingBoardSnapshot,
     isSavingBoard,
     boardSession,
-    getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
-    setViewport,
     onWarning,
     onSuccess,
     onError,
@@ -68,7 +69,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     saveStatus,
     isLoadingBoardSnapshot,
     commitGraph,
-    setViewport,
     boardSession,
     onWarning,
     onSuccess,
@@ -78,6 +78,7 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
 }
 
 function makePromptFlowNode(flowId: string, id: number, x: number): FlowAdapterNode {
+  const snapshotNode = makePromptSnapshot(id, x)
   return {
     id: flowId,
     type: 'canvas',
@@ -87,18 +88,22 @@ function makePromptFlowNode(flowId: string, id: number, x: number): FlowAdapterN
       nodeType: 'prompt',
       title: `Prompt #${id}`,
       summary: 'Canvas prompt node',
-      snapshotNode: {
-        id,
-        type: 'prompt',
-        x,
-        y: 40,
-        width: 280,
-        text: `prompt ${id}`,
-        outputCount: 1,
-        aspectRatio: 'auto',
-        inputImages: [],
-      },
+      snapshotNode,
     },
+  }
+}
+
+function makePromptSnapshot(id: number, x: number): PromptNodeItem {
+  return {
+    id,
+    type: 'prompt',
+    x,
+    y: 40,
+    width: 280,
+    text: `prompt ${id}`,
+    outputCount: 1,
+    aspectRatio: 'auto',
+    inputImages: [],
   }
 }
 
@@ -275,18 +280,17 @@ describe('useCanvasBoardPersistence', () => {
     const secondLoad = harness.persistence.loadInitialOrRouteBoard()
 
     const boardB = createEmptyCanvasBoardSnapshot()
-    boardB.viewport = { canvasX: 20, canvasY: 20, zoomLevel: 222 }
+    boardB.promptNodes = [makePromptSnapshot(2, 20)]
     resolvers.get('board-b')?.(boardB)
     await secondLoad
 
     const boardA = createEmptyCanvasBoardSnapshot()
-    boardA.viewport = { canvasX: 10, canvasY: 10, zoomLevel: 111 }
+    boardA.promptNodes = [makePromptSnapshot(1, 10)]
     resolvers.get('board-a')?.(boardA)
     await firstLoad
     await Promise.resolve()
 
-    expect(harness.boardBaseSnapshot.value.viewport?.zoomLevel).toBe(222)
-    expect(harness.setViewport).toHaveBeenLastCalledWith({ x: 20, y: 20, zoom: 2.22 })
+    expect(harness.boardBaseSnapshot.value.promptNodes[0]?.id).toBe(2)
     expect(harness.isLoadingBoardSnapshot.value).toBe(false)
   })
 

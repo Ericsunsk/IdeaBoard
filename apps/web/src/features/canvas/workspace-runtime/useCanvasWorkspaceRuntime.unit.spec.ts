@@ -64,6 +64,7 @@ function createRuntimeParts() {
       onFlowMoveEnd: vi.fn(),
       onNodeDragStart: vi.fn(),
       onNodeDragStop: vi.fn(),
+      flushViewportPersistence: vi.fn(),
       loadCanvasBoardAndProbe: vi.fn(),
     },
     graphEditing: {

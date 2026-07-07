@@ -9,11 +9,7 @@ import {
   replaceCanvasBoardStateMap,
 } from '../../canvas-board/persistence'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
-import {
-  makeCanvasBoardSnapshot,
-  makeCanvasBoardState,
-  makeCanvasViewport,
-} from '../../canvas-board/testing'
+import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
 import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
@@ -34,13 +30,27 @@ vi.mock('../../../shared/api/client', () => ({
   },
 }))
 
-function makeSnapshot(zoomLevel: number): CanvasBoardSnapshot {
-  return makeCanvasBoardSnapshot({ viewport: makeCanvasViewport({ zoomLevel }) })
+function makeSnapshot(promptText: string): CanvasBoardSnapshot {
+  return makeCanvasBoardSnapshot({
+    promptNodes: [
+      {
+        id: 1,
+        type: 'prompt',
+        x: 0,
+        y: 0,
+        width: 280,
+        text: promptText,
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    ],
+  })
 }
 
-function makeState(updatedAt: number, zoomLevel: number): CanvasBoardState {
+function makeState(updatedAt: number, promptText: string): CanvasBoardState {
   return makeCanvasBoardState({
-    ...makeSnapshot(zoomLevel),
+    ...makeSnapshot(promptText),
     previewSnapshotDataUrl: 'data:image/webp;base64,preview',
     previewSnapshotUpdatedAt: updatedAt,
     previewSnapshotVersion: 1,
@@ -70,7 +80,7 @@ describe('createBoardSessionRepository', () => {
 
   it('drops preview data and still syncs remotely when localStorage write throws', async () => {
     const board = createCanvasBoard('Quota Test')
-    replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 100) })
+    replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
     const repository = createBoardSessionRepository()
     const originalSetItem = localStorage.setItem.bind(localStorage)
     let setItemCalls = 0
@@ -86,18 +96,20 @@ describe('createBoardSessionRepository', () => {
       })
 
     try {
-      await repository.save(board.id, makeSnapshot(250))
+      await repository.save(board.id, makeSnapshot('saved'))
     } finally {
       setItemSpy.mockRestore()
       warnSpy.mockRestore()
     }
 
     const savedState = getCanvasBoardState(board.id)
-    expect(savedState?.viewport.zoomLevel).toBe(250)
+    expect(savedState?.promptNodes[0]?.text).toBe('saved')
+    expect(savedState).not.toHaveProperty('viewport')
     expect(savedState?.previewSnapshotDataUrl).toBeUndefined()
     expect(mocks.request).toHaveBeenCalledTimes(1)
     const payload = readUpsertBoardPayload(board.id)
-    expect(payload?.state?.viewport.zoomLevel).toBe(250)
+    expect(payload?.state?.promptNodes[0]?.text).toBe('saved')
+    expect(payload?.state).not.toHaveProperty('viewport')
     expect(payload?.state?.previewSnapshotDataUrl).toBeUndefined()
   })
 
@@ -105,7 +117,7 @@ describe('createBoardSessionRepository', () => {
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_000)
     try {
       const board = createCanvasBoard('Remote Failure')
-      replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 100) })
+      replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
       const repository = createBoardSessionRepository()
       const remoteError = new Error('network down')
       mocks.request.mockRejectedValueOnce(remoteError)
@@ -113,13 +125,14 @@ describe('createBoardSessionRepository', () => {
 
       let thrown: unknown
       try {
-        await repository.save(board.id, makeSnapshot(300))
+        await repository.save(board.id, makeSnapshot('saved-after-remote-failure'))
       } catch (error) {
         thrown = error
       }
 
       const savedState = getCanvasBoardState(board.id)
-      expect(savedState?.viewport.zoomLevel).toBe(300)
+      expect(savedState?.promptNodes[0]?.text).toBe('saved-after-remote-failure')
+      expect(savedState).not.toHaveProperty('viewport')
       expect(savedState?.updatedAt).toBe(2_000)
       expect(getCanvasBoardById(board.id)?.updatedAt).toBe(2_000)
       expect(isBoardSessionRemoteSyncError(thrown)).toBe(true)
@@ -131,6 +144,29 @@ describe('createBoardSessionRepository', () => {
     } finally {
       nowSpy.mockRestore()
     }
+  })
+
+  it('loads a session snapshot without preview or local metadata', async () => {
+    const board = createCanvasBoard('Load Snapshot')
+    replaceCanvasBoardStateMap({
+      [board.id]: makeCanvasBoardState({
+        ...makeSnapshot('loaded'),
+        updatedAt: 2_000,
+        mediaRefs: [{ url: 'https://example.com/source.png' }],
+        previewSnapshotDataUrl: 'data:image/webp;base64,preview',
+        previewSnapshotUpdatedAt: 2_001,
+        previewSnapshotVersion: 2,
+      }),
+    })
+    const repository = createBoardSessionRepository()
+
+    const snapshot = await repository.load(board.id)
+
+    expect(snapshot?.promptNodes[0]?.text).toBe('loaded')
+    expect(snapshot?.mediaRefs).toEqual([{ url: 'https://example.com/source.png' }])
+    expect(snapshot).not.toHaveProperty('updatedAt')
+    expect(snapshot).not.toHaveProperty('previewSnapshotDataUrl')
+    expect(snapshot).not.toHaveProperty('viewport')
   })
 })
 

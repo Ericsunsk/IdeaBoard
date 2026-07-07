@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
-import {
-  makeCanvasBoardSnapshot,
-  makeCanvasBoardState,
-  makeCanvasViewport,
-} from '../../canvas-board/testing'
+import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
 import type { BoardSessionPreviewRenderer } from './boardSessionPreview'
 import {
   BoardSessionRemoteSyncError,
@@ -12,8 +8,22 @@ import {
 } from './boardSessionRepository'
 import { useCanvasBoardSession } from './useCanvasBoardSession'
 
-function makeSnapshot(zoomLevel: number): CanvasBoardSnapshot {
-  return makeCanvasBoardSnapshot({ viewport: makeCanvasViewport({ zoomLevel }) })
+function makeSnapshot(marker: string | number): CanvasBoardSnapshot {
+  return makeCanvasBoardSnapshot({
+    promptNodes: [
+      {
+        id: 1,
+        type: 'prompt',
+        x: 0,
+        y: 0,
+        width: 280,
+        text: `snapshot-${marker}`,
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    ],
+  })
 }
 
 function makeState(snapshot: CanvasBoardSnapshot): CanvasBoardState {

@@ -48,8 +48,8 @@ function clone<T>(value: T): T {
 
 function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
-  if (base) {
-    snapshot.viewport = { ...base.viewport }
+  if (base?.mediaRefs) {
+    snapshot.mediaRefs = base.mediaRefs.map((ref) => ({ ...ref }))
   }
   return snapshot
 }

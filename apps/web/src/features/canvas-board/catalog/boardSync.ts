@@ -16,8 +16,10 @@ import {
   type CanvasBoardMeta,
 } from './canvasBoards'
 import {
+  deserializeRemoteBoardStateEnvelope,
   getCanvasBoardState,
   replaceCanvasBoardStateMap,
+  serializeCanvasBoardState,
 } from '../persistence'
 import { createEmptyCanvasBoardState, type CanvasBoardState } from '../domain'
 
@@ -49,15 +51,23 @@ function toLocalMeta(board: UserBoardItem): CanvasBoardMeta | null {
 }
 
 function toLocalState(board: UserBoardItem): CanvasBoardState | null {
-  if (!board.state || typeof board.state !== 'object') return null
-  const state = board.state as unknown as Record<string, unknown>
+  return deserializeRemoteBoardStateEnvelope(board.state)
+}
+
+function toGeneratedBoardStateProjection(state: CanvasBoardState): BoardStateEnvelope {
+  const envelope = serializeCanvasBoardState(state, 'remote-envelope')
   return {
-    ...state,
-    updatedAt:
-      typeof state.updatedAt === 'number'
-        ? state.updatedAt
-        : Number(board.updated_at) || Date.now(),
-  } as CanvasBoardState
+    schemaVersion: envelope.schemaVersion,
+    imageNodes: envelope.imageNodes.map((node) => ({ ...node })),
+    promptNodes: envelope.promptNodes.map((node) => ({ ...node })),
+    fusionNodes: envelope.fusionNodes.map((node) => ({ ...node })),
+    connections: envelope.connections.map((connection) => ({ ...connection })),
+    mediaRefs: envelope.mediaRefs?.map((ref) => ({ ...ref })),
+    previewSnapshotDataUrl: envelope.previewSnapshotDataUrl,
+    previewSnapshotUpdatedAt: envelope.previewSnapshotUpdatedAt,
+    previewSnapshotVersion: envelope.previewSnapshotVersion,
+    updatedAt: envelope.updatedAt,
+  }
 }
 
 function isLocalNewer(localUpdatedAt: number | undefined, remoteUpdatedAt: number | undefined) {
@@ -204,7 +214,7 @@ export async function syncCanvasBoardToServer(
   try {
     await upsertUserBoard(boardId, {
       name: board.name,
-      state: state as unknown as BoardStateEnvelope,
+      state: toGeneratedBoardStateProjection(state),
       created_at: board.createdAt,
       updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
     })

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserBoardItem } from '../../../shared/api/generated-query/model'
 import type { CanvasBoardState } from '../domain'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
-import { makeCanvasBoardState, makeCanvasViewport } from '../testing'
+import { makeCanvasBoardState } from '../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../persistence'
 import { listCanvasBoards, replaceCanvasBoards } from './canvasBoards'
@@ -23,8 +23,27 @@ vi.mock('../../../shared/api/client', () => ({
   },
 }))
 
-function makeState(updatedAt: number, zoomLevel: number): CanvasBoardState {
-  return makeCanvasBoardState({ updatedAt, viewport: makeCanvasViewport({ zoomLevel }) })
+function makeState(updatedAt: number, promptText: string): CanvasBoardState {
+  return makeCanvasBoardState({
+    updatedAt,
+    promptNodes: [
+      {
+        id: 1,
+        type: 'prompt',
+        x: 0,
+        y: 0,
+        width: 280,
+        text: promptText,
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    ],
+  })
+}
+
+function getPromptText(boardId: string): string | undefined {
+  return getCanvasBoardState(boardId)?.promptNodes[0]?.text
 }
 
 function makeRemoteBoard(params: {
@@ -67,7 +86,7 @@ describe('boardSync', () => {
 
   it('preserves newer local board meta and state during hydrate', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 2_000 }])
-    replaceCanvasBoardStateMap({ 'board-1': makeState(2_000, 220) })
+    replaceCanvasBoardStateMap({ 'board-1': makeState(2_000, 'local-newer') })
     mocks.state.listResponse = {
       data: {
         list: [
@@ -76,7 +95,7 @@ describe('boardSync', () => {
             name: 'Remote Old',
             createdAt: 100,
             updatedAt: 1_000,
-            state: makeState(1_000, 100),
+            state: makeState(1_000, 'remote-older'),
           }),
         ],
       },
@@ -85,14 +104,14 @@ describe('boardSync', () => {
     await hydrateCanvasBoardsFromServer()
 
     expect(listCanvasBoards()[0]?.name).toBe('Local Rename')
-    expect(getCanvasBoardState('board-1')?.viewport.zoomLevel).toBe(220)
+    expect(getPromptText('board-1')).toBe('local-newer')
   })
 
   it('preserves local-only boards while adding remote boards during hydrate', async () => {
     replaceCanvasBoards([
       { id: 'local-only', name: 'Unsynced Local', createdAt: 100, updatedAt: 2_000 },
     ])
-    replaceCanvasBoardStateMap({ 'local-only': makeState(2_000, 220) })
+    replaceCanvasBoardStateMap({ 'local-only': makeState(2_000, 'local-only-state') })
     mocks.state.listResponse = {
       data: {
         list: [
@@ -101,7 +120,7 @@ describe('boardSync', () => {
             name: 'Remote Board',
             createdAt: 100,
             updatedAt: 1_500,
-            state: makeState(1_500, 150),
+            state: makeState(1_500, 'remote-only-state'),
           }),
         ],
       },
@@ -110,8 +129,8 @@ describe('boardSync', () => {
     await hydrateCanvasBoardsFromServer()
 
     expect(listCanvasBoards().map((board) => board.id)).toEqual(['local-only', 'remote-only'])
-    expect(getCanvasBoardState('local-only')?.viewport.zoomLevel).toBe(220)
-    expect(getCanvasBoardState('remote-only')?.viewport.zoomLevel).toBe(150)
+    expect(getPromptText('local-only')).toBe('local-only-state')
+    expect(getPromptText('remote-only')).toBe('remote-only-state')
   })
 
   it('rolls back only the conflict target while preserving other local newer and local-only boards', async () => {
@@ -121,9 +140,9 @@ describe('boardSync', () => {
       { id: 'board-c', name: 'Local Only', createdAt: 100, updatedAt: 6_000 },
     ])
     replaceCanvasBoardStateMap({
-      'board-a': makeState(4_000, 400),
-      'board-b': makeState(5_000, 500),
-      'board-c': makeState(6_000, 600),
+      'board-a': makeState(4_000, 'local-conflict'),
+      'board-b': makeState(5_000, 'local-newer'),
+      'board-c': makeState(6_000, 'local-only'),
     })
     mocks.request.mockRejectedValueOnce({ status: 409, msg: '画布名称已存在' })
 
@@ -137,14 +156,14 @@ describe('boardSync', () => {
             name: 'Remote Winner',
             createdAt: 100,
             updatedAt: 1_000,
-            state: makeState(1_000, 100),
+            state: makeState(1_000, 'remote-winner'),
           }),
           makeRemoteBoard({
             id: 'board-b',
             name: 'Remote Older',
             createdAt: 100,
             updatedAt: 1_000,
-            state: makeState(1_000, 110),
+            state: makeState(1_000, 'remote-older'),
           }),
         ],
       },
@@ -156,14 +175,14 @@ describe('boardSync', () => {
     expect(boardNames.get('board-a')).toBe('Remote Winner')
     expect(boardNames.get('board-b')).toBe('Local Newer')
     expect(boardNames.get('board-c')).toBe('Local Only')
-    expect(getCanvasBoardState('board-a')?.viewport.zoomLevel).toBe(100)
-    expect(getCanvasBoardState('board-b')?.viewport.zoomLevel).toBe(500)
-    expect(getCanvasBoardState('board-c')?.viewport.zoomLevel).toBe(600)
+    expect(getPromptText('board-a')).toBe('remote-winner')
+    expect(getPromptText('board-b')).toBe('local-newer')
+    expect(getPromptText('board-c')).toBe('local-only')
   })
 
   it('can replace local newer boards when explicitly requested for conflict recovery', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 2_000 }])
-    replaceCanvasBoardStateMap({ 'board-1': makeState(2_000, 220) })
+    replaceCanvasBoardStateMap({ 'board-1': makeState(2_000, 'local-newer') })
     mocks.state.listResponse = {
       data: {
         list: [
@@ -172,7 +191,7 @@ describe('boardSync', () => {
             name: 'Remote Winner',
             createdAt: 100,
             updatedAt: 1_000,
-            state: makeState(1_000, 100),
+            state: makeState(1_000, 'remote-winner'),
           }),
         ],
       },
@@ -181,7 +200,7 @@ describe('boardSync', () => {
     await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
 
     expect(listCanvasBoards()[0]?.name).toBe('Remote Winner')
-    expect(getCanvasBoardState('board-1')?.viewport.zoomLevel).toBe(100)
+    expect(getPromptText('board-1')).toBe('remote-winner')
   })
 
   it('returns hydrate failure without clearing local boards', async () => {
@@ -196,7 +215,7 @@ describe('boardSync', () => {
 
   it('syncs a rename with the board metadata timestamp when state is older', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 3_000 }])
-    replaceCanvasBoardStateMap({ 'board-1': makeState(1_000, 100) })
+    replaceCanvasBoardStateMap({ 'board-1': makeState(1_000, 'remote-older') })
 
     await syncCanvasBoardToServer('board-1')
 
@@ -206,6 +225,38 @@ describe('boardSync', () => {
         updated_at: 3_000,
       }),
     )
+  })
+
+  it('syncs the shared remote envelope shape without viewport', async () => {
+    replaceCanvasBoards([{ id: 'board-1', name: 'Envelope Board', createdAt: 100, updatedAt: 3_000 }])
+    replaceCanvasBoardStateMap({
+      'board-1': makeCanvasBoardState({
+        updatedAt: 2_000,
+        mediaRefs: [{ url: 'https://example.com/source.png', role: 'source' }],
+        previewSnapshotDataUrl: 'data:image/webp;base64,preview',
+        previewSnapshotUpdatedAt: 2_001,
+        previewSnapshotVersion: 4,
+      }),
+    })
+
+    await syncCanvasBoardToServer('board-1')
+
+    const payload = readUpsertBoardPayload('board-1')
+    expect(payload.state).toEqual(
+      expect.objectContaining({
+        schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+        imageNodes: expect.any(Array),
+        promptNodes: expect.any(Array),
+        fusionNodes: expect.any(Array),
+        connections: expect.any(Array),
+        mediaRefs: [{ url: 'https://example.com/source.png', role: 'source' }],
+        previewSnapshotDataUrl: 'data:image/webp;base64,preview',
+        previewSnapshotUpdatedAt: 2_001,
+        previewSnapshotVersion: 4,
+        updatedAt: 2_000,
+      }),
+    )
+    expect(payload.state).not.toHaveProperty('viewport')
   })
 })
 

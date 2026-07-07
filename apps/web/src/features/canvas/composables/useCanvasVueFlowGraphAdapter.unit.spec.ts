@@ -1,4 +1,4 @@
-import type { Edge, Node } from '@vue-flow/core'
+import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -7,6 +7,12 @@ import {
 } from './useCanvasVueFlowGraphAdapter'
 
 type SelectableNode = Node & { selected?: boolean }
+type SelectableEdge = Edge & { selected?: boolean }
+type MeasuredNode = Node & {
+  dimensions?: { width: number; height: number }
+  handleBounds?: unknown
+  resizing?: boolean
+}
 
 describe('useCanvasVueFlowGraphAdapter', () => {
   it('runs a node command through Vue Flow actions and exposes hook results', () => {
@@ -143,7 +149,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     expect(setEdges).toHaveBeenCalledWith(edges.value)
   })
 
-  it('applies native node changes through Vue Flow actions', () => {
+  it('applies native node selection as a visual-only command result', () => {
     const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
     const edges = shallowRef<Edge[]>([])
     const applyNodeChanges = vi.fn((changes) => {
@@ -165,11 +171,9 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     const result = adapter.applyNodeChanges([{ id: 'node-1', type: 'select', selected: true }])
 
     expect(applyNodeChanges).toHaveBeenCalledOnce()
-    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: true })
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
     expect(result.after.nodes[0]).toMatchObject({ id: 'node-1', selected: true })
-    expect(beforeCommand).toHaveBeenCalledWith(
-      expect.objectContaining({ command: 'applyNodeChanges' }),
-    )
+    expect(beforeCommand).not.toHaveBeenCalled()
   })
 
   it('uses Vue Flow native node change results without cloning unchanged nodes', () => {
@@ -193,12 +197,12 @@ describe('useCanvasVueFlowGraphAdapter', () => {
 
     const result = adapter.applyNodeChanges([{ id: 'node-1', type: 'select', selected: true }])
 
-    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: true })
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
     expect(applyNodeChanges).toHaveBeenCalledOnce()
     expect(nodes.value).toBe(nativeNodes)
     expect(nodes.value[1]).toBe(unchangedNode)
     expect(nodes.value[0]).toMatchObject({ id: 'node-1', selected: true })
-    expect(afterCommand).toHaveBeenCalledOnce()
+    expect(afterCommand).not.toHaveBeenCalled()
   })
 
   it('skips Vue Flow native node changes that do not target the current graph', () => {
@@ -219,6 +223,246 @@ describe('useCanvasVueFlowGraphAdapter', () => {
 
     expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
     expect(applyNodeChanges).not.toHaveBeenCalled()
+    expect(afterCommand).not.toHaveBeenCalled()
+  })
+
+  it('skips repeated native node dimension changes that match current node state', () => {
+    const nodes = shallowRef<Node[]>([
+      {
+        id: 'node-1',
+        position: { x: 0, y: 0 },
+        data: {},
+        dimensions: { width: 100, height: 80 },
+        handleBounds: { source: [], target: [] },
+        resizing: false,
+      } as MeasuredNode,
+    ])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn()
+    const afterCommand = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+      afterCommand,
+    })
+
+    const result = adapter.applyNodeChanges([
+      {
+        id: 'node-1',
+        type: 'dimensions',
+        dimensions: { width: 100, height: 80 },
+        handleBounds: { source: [], target: [] },
+        resizing: false,
+      } as NodeChange,
+    ])
+
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
+    expect(applyNodeChanges).not.toHaveBeenCalled()
+    expect(afterCommand).not.toHaveBeenCalled()
+  })
+
+  it('applies native node dimension changes as visual-only command results', () => {
+    const measuredNode = {
+      id: 'node-1',
+      position: { x: 0, y: 0 },
+      data: {},
+      dimensions: { width: 100, height: 80 },
+    } as MeasuredNode
+    const nodes = shallowRef<Node[]>([measuredNode])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn((changes) => {
+      const change = changes[0]
+      if (change?.type === 'dimensions') {
+        measuredNode.dimensions = change.dimensions
+      }
+      return nodes.value
+    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    const afterCommand = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+      afterCommand,
+    })
+
+    const result = adapter.applyNodeChanges([
+      {
+        id: 'node-1',
+        type: 'dimensions',
+        dimensions: { width: 120, height: 80 },
+      } as NodeChange,
+    ])
+
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
+    expect(applyNodeChanges).toHaveBeenCalledOnce()
+    expect(afterCommand).not.toHaveBeenCalled()
+  })
+
+  it('classifies repeated handle bounds and resizing changes as no-op native node changes', () => {
+    const nodes = shallowRef<Node[]>([
+      {
+        id: 'node-1',
+        position: { x: 0, y: 0 },
+        data: {},
+        handleBounds: { source: [{ id: 'out' }], target: [] },
+        resizing: true,
+      } as MeasuredNode,
+    ])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+    })
+
+    const repeatedHandleBoundsResult = adapter.applyNodeChanges([
+      {
+        id: 'node-1',
+        type: 'dimensions',
+        handleBounds: { source: [{ id: 'out' }], target: [] },
+      } as unknown as NodeChange,
+    ])
+    const repeatedResizingResult = adapter.applyNodeChanges([
+      {
+        id: 'node-1',
+        type: 'dimensions',
+        resizing: true,
+      } as NodeChange,
+    ])
+
+    expect(repeatedHandleBoundsResult).toMatchObject({
+      command: 'applyNodeChanges',
+      didChange: false,
+    })
+    expect(repeatedResizingResult).toMatchObject({
+      command: 'applyNodeChanges',
+      didChange: false,
+    })
+    expect(applyNodeChanges).not.toHaveBeenCalled()
+  })
+
+  it('applies changed handle bounds and resizing as visual-only command results', () => {
+    const measuredNode = {
+      id: 'node-1',
+      position: { x: 0, y: 0 },
+      data: {},
+      handleBounds: { source: [], target: [] },
+      resizing: false,
+    } as MeasuredNode
+    const nodes = shallowRef<Node[]>([measuredNode])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn((changes) => {
+      for (const change of changes) {
+        if (change.type !== 'dimensions') continue
+        measuredNode.handleBounds = change.handleBounds ?? measuredNode.handleBounds
+        measuredNode.resizing = change.resizing ?? measuredNode.resizing
+      }
+      return nodes.value
+    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    const afterCommand = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+      afterCommand,
+    })
+
+    const result = adapter.applyNodeChanges([
+      {
+        id: 'node-1',
+        type: 'dimensions',
+        handleBounds: { source: [{ id: 'out' }], target: [] },
+        resizing: true,
+      } as unknown as NodeChange,
+    ])
+
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
+    expect(result.after.nodes[0]).toMatchObject({
+      handleBounds: { source: [{ id: 'out' }], target: [] },
+      resizing: true,
+    })
+    expect(applyNodeChanges).toHaveBeenCalledOnce()
+    expect(afterCommand).not.toHaveBeenCalled()
+  })
+
+  it('classifies unchanged node position changes as no-op native node changes', () => {
+    const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 10, y: 20 }, data: {} }])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+    })
+
+    const result = adapter.applyNodeChanges([
+      { id: 'node-1', type: 'position', position: { x: 10, y: 20 } } as NodeChange,
+    ])
+
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
+    expect(applyNodeChanges).not.toHaveBeenCalled()
+  })
+
+  it('classifies changed node position as a graph-affecting command result', () => {
+    const positionedNode = { id: 'node-1', position: { x: 10, y: 20 }, data: {} }
+    const nodes = shallowRef<Node[]>([positionedNode])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn((changes) => {
+      const change = changes[0]
+      if (change?.type === 'position' && change.position) {
+        positionedNode.position = change.position
+      }
+      return nodes.value
+    }) as unknown as CanvasVueFlowGraphActions['applyNodeChanges']
+    const beforeCommand = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyNodeChanges },
+      beforeCommand,
+    })
+
+    const result = adapter.applyNodeChanges([
+      { id: 'node-1', type: 'position', position: { x: 12, y: 24 } } as NodeChange,
+    ])
+
+    expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: true })
+    expect(result.after.nodes[0]).toMatchObject({ position: { x: 12, y: 24 } })
+    expect(applyNodeChanges).toHaveBeenCalledOnce()
+    expect(beforeCommand).toHaveBeenCalledOnce()
+  })
+
+  it('applies native edge selection as a visual-only command result', () => {
+    const nodes = shallowRef<Node[]>([
+      { id: 'node-1', position: { x: 0, y: 0 }, data: {} },
+      { id: 'node-2', position: { x: 20, y: 0 }, data: {} },
+    ])
+    const edges = shallowRef<Edge[]>([{ id: 'edge-1', source: 'node-1', target: 'node-2' }])
+    const applyEdgeChanges = vi.fn((changes: EdgeChange[]) => {
+      const change = changes[0]
+      if (change?.type === 'select') {
+        edges.value[0] = {
+          ...(edges.value[0] as SelectableEdge),
+          selected: change.selected,
+        } as unknown as Edge
+      }
+      return edges.value
+    }) as unknown as CanvasVueFlowGraphActions['applyEdgeChanges']
+    const afterCommand = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { applyEdgeChanges },
+      afterCommand,
+    })
+
+    const result = adapter.applyEdgeChanges([{ id: 'edge-1', type: 'select', selected: true }])
+
+    expect(result).toMatchObject({ command: 'applyEdgeChanges', didChange: false })
+    expect(result.after.edges[0]).toMatchObject({ selected: true })
+    expect(applyEdgeChanges).toHaveBeenCalledOnce()
     expect(afterCommand).not.toHaveBeenCalled()
   })
 

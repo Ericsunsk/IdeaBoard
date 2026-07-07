@@ -79,6 +79,7 @@ export function useCanvasWorkspaceRuntime(
         onFlowMoveEnd: runtime.viewportControls.onFlowMoveEnd,
         onNodeDragStart: runtime.viewportControls.onNodeDragStart,
         onNodeDragStop: runtime.viewportControls.onNodeDragStop,
+        flushViewportPersistence: runtime.viewportControls.flushViewportPersistence,
         loadCanvasBoardAndProbe: runtime.viewportControls.loadCanvasBoardAndProbe,
       },
       graphEditing: {

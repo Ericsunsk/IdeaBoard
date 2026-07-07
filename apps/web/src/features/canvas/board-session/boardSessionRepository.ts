@@ -5,6 +5,7 @@ import {
 import { getCanvasBoardById, touchCanvasBoard } from '../../canvas-board/catalog/canvasBoards'
 import {
   getCanvasBoardState,
+  serializeCanvasBoardState,
   setCanvasBoardPreviewSnapshot,
   setCanvasBoardState,
 } from '../../canvas-board/persistence'
@@ -46,7 +47,8 @@ export function createBoardSessionRepository(): BoardSessionRepository {
     const normalized = normalizeBoardId(boardId)
     if (!normalized) return null
     await hydrateCanvasBoardsFromServer()
-    return getCanvasBoardState(normalized)
+    const state = getCanvasBoardState(normalized)
+    return state ? serializeCanvasBoardState(state, 'session-snapshot') : null
   }
 
   async function save(

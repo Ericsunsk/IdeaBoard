@@ -278,7 +278,9 @@ function exportSnapshotFromState(
   base?: CanvasBoardSnapshot,
 ): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
-  if (base) snapshot.viewport = { ...base.viewport }
+  if (base?.mediaRefs) {
+    snapshot.mediaRefs = base.mediaRefs.map((ref) => ({ ...ref }))
+  }
 
   for (const nodeId of state.nodeOrder) {
     const record = state.nodesById.get(nodeId)

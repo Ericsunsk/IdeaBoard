@@ -46,13 +46,79 @@ func TestMarshalStateLimits(t *testing.T) {
 			"promptNodes": []interface{}{},
 			"fusionNodes": []interface{}{},
 			"connections": []interface{}{},
-			"viewport": map[string]interface{}{
-				"canvasX":   0,
-				"canvasY":   0,
-				"zoomLevel": 100,
-			},
-			"updatedAt": 1,
+			"updatedAt":   1,
 		})
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject unknown top-level field", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["unexpected"] = true
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject viewport", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["viewport"] = map[string]interface{}{"x": 1, "y": 2, "zoom": 1}
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("valid optional envelope metadata", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["mediaRefs"] = []interface{}{
+			map[string]interface{}{"url": "https://example.com/source.png", "role": "source"},
+		}
+		state["previewSnapshotDataUrl"] = "data:image/webp;base64,preview"
+		state["previewSnapshotUpdatedAt"] = 123
+		state["previewSnapshotVersion"] = 2
+		if _, _, err := marshalState(state); err != nil {
+			t.Fatalf("marshalState returned error: %v", err)
+		}
+	})
+
+	t.Run("reject invalid media ref", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["mediaRefs"] = []interface{}{
+			map[string]interface{}{"url": "https://example.com/source.png", "unexpected": true},
+		}
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject empty media ref role", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["mediaRefs"] = []interface{}{
+			map[string]interface{}{"url": "https://example.com/source.png", "role": ""},
+		}
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject invalid preview metadata", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["previewSnapshotVersion"] = 1.25
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject non-positive preview snapshot version", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["previewSnapshotVersion"] = 0
+		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {
 			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
 		}
@@ -79,18 +145,18 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 }
 
-func validBoardState(schemaVersion int, zoomLevel int) map[string]interface{} {
+func validBoardState(schemaVersion int, marker int) map[string]interface{} {
 	return map[string]interface{}{
 		"schemaVersion": schemaVersion,
 		"imageNodes":    []interface{}{},
-		"promptNodes":   []interface{}{},
-		"fusionNodes":   []interface{}{},
-		"connections":   []interface{}{},
-		"viewport": map[string]interface{}{
-			"canvasX":   0,
-			"canvasY":   0,
-			"zoomLevel": zoomLevel,
+		"promptNodes": []interface{}{
+			map[string]interface{}{
+				"id":     "prompt-marker",
+				"marker": marker,
+			},
 		},
-		"updatedAt": 1,
+		"fusionNodes": []interface{}{},
+		"connections": []interface{}{},
+		"updatedAt":   1,
 	}
 }

@@ -51,7 +51,8 @@
         :delete-key-code="nativeDeleteKeyCode"
         :default-edge-options="{ animated: false, updatable: true }"
         :apply-default="false"
-        :min-zoom="0.1"
+        :min-zoom="CANVAS_VIEWPORT_MIN_ZOOM"
+        :max-zoom="CANVAS_VIEWPORT_MAX_ZOOM"
         :zoom-on-scroll="false"
         :pan-on-scroll="!isFlowCanvasLocked"
         :zoom-on-pinch="!isFlowCanvasLocked"
@@ -176,6 +177,7 @@ import {
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
+import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import {
   CanvasChrome,

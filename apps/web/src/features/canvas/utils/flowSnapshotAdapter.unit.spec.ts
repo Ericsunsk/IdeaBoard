@@ -510,11 +510,26 @@ describe('flowSnapshotAdapter', () => {
         },
       ],
       connections: [],
-      viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
     })
     const restored = flowToCanvasBoardSnapshot(flow)
     expect(restored.fusionNodes[0]?.blendPoint.x).toBe(0.62)
     expect(restored.fusionNodes[0]?.blendPoint.y).toBe(0.41)
+  })
+
+  it('preserves base media refs while exporting flow state', () => {
+    const base = createEmptyCanvasBoardSnapshot()
+    base.mediaRefs = [{ url: 'https://example.com/source.png', role: 'source' }]
+
+    const snapshot = flowToCanvasBoardSnapshot(
+      {
+        nodes: [makePromptFlowNode({ flowId: 'prompt-1', id: 1, text: 'prompt' })],
+        edges: [],
+      },
+      base,
+    )
+
+    expect(snapshot.mediaRefs).toEqual([{ url: 'https://example.com/source.png', role: 'source' }])
+    expect(snapshot.mediaRefs).not.toBe(base.mediaRefs)
   })
 
   it('adds stable node dimensions for minimap geometry before nodes are rendered', () => {
@@ -548,7 +563,6 @@ describe('flowSnapshotAdapter', () => {
       ],
       fusionNodes: [],
       connections: [],
-      viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
     })
 
     expect(flow.nodes.find((node) => node.id === 'image-1')?.dimensions).toEqual({

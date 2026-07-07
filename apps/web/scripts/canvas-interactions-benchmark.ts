@@ -539,7 +539,6 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
     promptNodes,
     fusionNodes,
     connections,
-    viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
     updatedAt: MOCK_UPDATED_AT,
   }
   const board = {
@@ -578,12 +577,16 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
 
 function toBoardStateEnvelope(state: CanvasBoardState): BoardStateEnvelope {
   return {
-    ...state,
+    schemaVersion: state.schemaVersion,
     imageNodes: state.imageNodes.map((node) => ({ ...node })),
     promptNodes: state.promptNodes.map((node) => ({ ...node })),
     fusionNodes: state.fusionNodes.map((node) => ({ ...node })),
     connections: state.connections.map((connection) => ({ ...connection })),
-    viewport: { ...state.viewport },
+    mediaRefs: state.mediaRefs?.map((ref) => ({ ...ref })),
+    previewSnapshotDataUrl: state.previewSnapshotDataUrl,
+    previewSnapshotUpdatedAt: state.previewSnapshotUpdatedAt,
+    previewSnapshotVersion: state.previewSnapshotVersion,
+    updatedAt: state.updatedAt,
   }
 }
 
@@ -749,9 +752,7 @@ function isCanvasBoardState(value: unknown): value is CanvasBoardState {
     Array.isArray(record.imageNodes) &&
     Array.isArray(record.promptNodes) &&
     Array.isArray(record.fusionNodes) &&
-    Array.isArray(record.connections) &&
-    !!record.viewport &&
-    typeof record.viewport === 'object'
+    Array.isArray(record.connections)
   )
 }
 

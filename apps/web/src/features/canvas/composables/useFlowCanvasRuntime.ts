@@ -35,12 +35,6 @@ import {
 
 type SaveStatus = 'idle' | 'saved' | 'failed'
 
-type ViewportState = {
-  x: number
-  y: number
-  zoom: number
-}
-
 type SelectableFlowItem = {
   id: string
   selected?: boolean
@@ -79,8 +73,6 @@ export type UseFlowCanvasRuntimeOptions = {
   isLoadingBoardSnapshot: Ref<boolean>
   isSavingBoard: Ref<boolean>
   boardSession: CanvasBoardSession
-  getViewport: () => ViewportState
-  setViewport: (viewport: ViewportState) => void
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
@@ -218,8 +210,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onSuccess: options.onSuccess,
     onError: options.onError,
     clearFlowHistoryBaseline: flowHistory.clearBaseline,
-    getViewport: options.getViewport,
-    setViewport: options.setViewport,
     commitGraph: (graph, commitOptions) =>
       commitFlowGraph(
         {

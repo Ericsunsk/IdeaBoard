@@ -58,7 +58,6 @@ function createSessionHarness(initialBoardId = 'board-a') {
   const isLoadingBoardSnapshot = ref(false)
   const isSavingBoard = ref(false)
   const canSaveBoard = ref(true)
-  const setViewport = vi.fn()
   const commitGraph = vi.fn((nextGraph: { nodes: unknown[]; edges: unknown[] }) => {
     fullNodes.value = nextGraph.nodes
     fullEdges.value = nextGraph.edges
@@ -91,8 +90,6 @@ function createSessionHarness(initialBoardId = 'board-a') {
     isSavingBoard,
     boardSession,
     canSaveBoard: () => canSaveBoard.value,
-    getViewport: () => ({ x: 12, y: 24, zoom: 1.5 }),
-    setViewport,
     onWarning,
     onSuccess,
     onError,
@@ -111,7 +108,6 @@ function createSessionHarness(initialBoardId = 'board-a') {
     isLoadingBoardSnapshot,
     isSavingBoard,
     canSaveBoard,
-    setViewport,
     commitGraph,
     onWarning,
     onSuccess,
@@ -123,11 +119,10 @@ function createSessionHarness(initialBoardId = 'board-a') {
 }
 
 describe('boardPersistenceSession', () => {
-  it('loads a board snapshot, applies the graph, restores viewport, and clears dirty state', async () => {
+  it('loads a board snapshot, applies the graph, and clears dirty state', async () => {
     const harness = createSessionHarness()
     const snapshot = createEmptyCanvasBoardSnapshot()
     snapshot.promptNodes = [makePromptSnapshot()]
-    snapshot.viewport = { canvasX: 20, canvasY: 30, zoomLevel: 175 }
     vi.mocked(harness.boardSession.load).mockResolvedValueOnce(snapshot)
 
     await harness.session.loadInitialOrRouteBoard()
@@ -141,10 +136,8 @@ describe('boardPersistenceSession', () => {
       }),
       { preserveSelection: false },
     )
-    expect(harness.setViewport).toHaveBeenCalledWith({ x: 20, y: 30, zoom: 1.75 })
     expect(harness.boardBaseSnapshot.value).toMatchObject({
       promptNodes: snapshot.promptNodes,
-      viewport: snapshot.viewport,
     })
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')

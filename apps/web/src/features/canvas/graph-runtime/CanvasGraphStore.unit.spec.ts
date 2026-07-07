@@ -64,10 +64,10 @@ function createConnection(id: number, fromNodeId: number, toNodeId: number): Can
 
 function createSampleSnapshot(): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
-  snapshot.viewport = { canvasX: 120, canvasY: -40, zoomLevel: 75 }
   snapshot.imageNodes = [createImageNode(1, 40, 80)]
   snapshot.promptNodes = [createPromptNode(1, 420, 80), createPromptNode(2, 820, 80)]
   snapshot.connections = [createConnection(1, 1, 1)]
+  snapshot.mediaRefs = [{ url: 'https://example.com/source.png', role: 'source' }]
   return snapshot
 }
 
@@ -97,7 +97,9 @@ describe('CanvasGraphStore', () => {
       toCanvasGraphNodeId('prompt', 1),
       toCanvasGraphNodeId('prompt', 2),
     ])
-    expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
+    const exported = store.exportSnapshot(snapshot)
+    expect(exported).toEqual(snapshot)
+    expect(exported.mediaRefs).not.toBe(snapshot.mediaRefs)
   })
 
   it('commits node updates with projection, history, and dirty summary data', () => {

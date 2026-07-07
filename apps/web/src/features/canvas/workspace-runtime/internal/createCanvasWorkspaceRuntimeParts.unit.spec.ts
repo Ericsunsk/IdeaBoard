@@ -76,8 +76,6 @@ function createBoardRuntime() {
     loadInitialOrRouteBoard: vi.fn(),
     onNodesChange: vi.fn(),
     onEdgesChange: vi.fn(),
-    markBoardViewportChanged: vi.fn(),
-    commitPendingBoardViewportChange: vi.fn(),
     closeBoardHeaderEditing: vi.fn(),
     onNavigateRequest: vi.fn(),
     onLogoutRequest: vi.fn(),
@@ -180,17 +178,31 @@ function createImageToolsOptions() {
 describe('createCanvasWorkspaceRuntimeParts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.useCanvasViewportRuntime.mockReturnValue({ zoomLevel: ref(100) })
+    mocks.useCanvasViewportRuntime.mockReturnValue({
+      zoomLevel: ref(100),
+      flushViewportPersistence: vi.fn(),
+      loadCanvasBoardAndProbe: vi.fn(),
+    })
     mocks.useCanvasImageTools.mockReturnValue({ kind: 'image-tools' })
   })
 
-  it('owns feedback selection for board, graph, task, and image tools', () => {
+  it('owns feedback selection for board, graph, task, and image tools', async () => {
     const board = createBoardRuntime()
     const graph = createGraphRuntime()
     const task = createTaskRuntime()
+    const events: string[] = []
+    const viewportRuntime = {
+      zoomLevel: ref(100),
+      flushViewportPersistence: vi.fn(() => events.push('viewport')),
+      loadCanvasBoardAndProbe: vi.fn(),
+    }
+    board.flushAutosave.mockImplementation(async () => {
+      events.push('autosave')
+    })
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
     mocks.useCanvasGraphRuntime.mockReturnValue(graph)
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
+    mocks.useCanvasViewportRuntime.mockReturnValue(viewportRuntime)
 
     const runtimeOptions = createWorkspaceOptions()
     const runtime = createCanvasWorkspaceRuntimeParts(runtimeOptions)
@@ -205,18 +217,30 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.boardChrome.currentBoardId).toBe(board.currentBoardId)
     expect(runtime.boardChrome.onNavigateRequest).toBe(board.onNavigateRequest)
     expect(runtime.boardChrome.onLogoutRequest).toBe(board.onLogoutRequest)
-    expect(runtime.persistence.flushAutosave).toBe(board.flushAutosave)
+    expect(runtime.persistence.flushAutosave).not.toBe(board.flushAutosave)
     expect(runtime.persistence.reattachPendingImageResults).toBe(task.reattachPendingImageResults)
     expect(runtime.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
     expect(runtime.imageWorkflow.runCanvasExtendAction).toBe(task.runCanvasExtendAction)
 
+    await runtime.persistence.flushAutosave({ silent: false })
+
+    expect(events).toEqual(['viewport', 'autosave'])
+    expect(board.flushAutosave).toHaveBeenCalledWith({ silent: false })
+
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: mocks.feedback.boardSession,
-        getViewport: runtimeOptions.flowPaneAdapter.getViewport,
         vueFlowGraphActions: runtimeOptions.flowPaneAdapter.vueFlowGraphActions,
       }),
     )
+    expect(mocks.useCanvasViewportRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        getUserUid: expect.any(Function),
+        getViewport: runtimeOptions.flowPaneAdapter.getViewport,
+        setViewport: runtimeOptions.flowPaneAdapter.setViewport,
+      }),
+    )
+    expect(mocks.useCanvasViewportRuntime.mock.calls[0]?.[0].getUserUid()).toBe('user-a')
     expect(mocks.useCanvasGraphRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         nodes: board.fullNodes,
@@ -233,6 +257,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         edges: board.fullEdges,
         graphAdapter: board.graphAdapter,
         refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
+        flushAutosave: runtime.persistence.flushAutosave,
         feedback: mocks.feedback.taskExecution,
       }),
     )

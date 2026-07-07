@@ -8,16 +8,33 @@ import (
 
 const CurrentBoardStateSchemaVersion = 1
 
+var allowedBoardStateEnvelopeFields = map[string]struct{}{
+	"schemaVersion":            {},
+	"imageNodes":               {},
+	"promptNodes":              {},
+	"fusionNodes":              {},
+	"connections":              {},
+	"mediaRefs":                {},
+	"previewSnapshotDataUrl":   {},
+	"previewSnapshotUpdatedAt": {},
+	"previewSnapshotVersion":   {},
+	"updatedAt":                {},
+}
+
 // BoardStateEnvelope validates the outer canvas state contract while leaving
 // node internals to the frontend canvas schema.
 type BoardStateEnvelope struct {
-	SchemaVersion int               `json:"schemaVersion"`
-	ImageNodes    []json.RawMessage `json:"imageNodes"`
-	PromptNodes   []json.RawMessage `json:"promptNodes"`
-	FusionNodes   []json.RawMessage `json:"fusionNodes"`
-	Connections   []json.RawMessage `json:"connections"`
-	Viewport      json.RawMessage   `json:"viewport"`
-	MediaRefs     []json.RawMessage `json:"mediaRefs,omitempty"`
+	SchemaVersion int                  `json:"schemaVersion"`
+	ImageNodes    []json.RawMessage    `json:"imageNodes"`
+	PromptNodes   []json.RawMessage    `json:"promptNodes"`
+	FusionNodes   []json.RawMessage    `json:"fusionNodes"`
+	Connections   []json.RawMessage    `json:"connections"`
+	MediaRefs     []BoardStateMediaRef `json:"mediaRefs,omitempty"`
+}
+
+type BoardStateMediaRef struct {
+	URL  string `json:"url"`
+	Role string `json:"role,omitempty"`
 }
 
 // ParseBoardStateEnvelope extracts the schema version from raw state JSON for
@@ -49,6 +66,11 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 	if err := json.Unmarshal(payload, &raw); err != nil || raw == nil {
 		return BoardStateEnvelope{}, ErrInvalidBoardInput
 	}
+	for key := range raw {
+		if _, ok := allowedBoardStateEnvelopeFields[key]; !ok {
+			return BoardStateEnvelope{}, ErrInvalidBoardInput
+		}
+	}
 
 	schemaVersion, err := requiredIntegerField(raw, "schemaVersion")
 	if err != nil || schemaVersion != CurrentBoardStateSchemaVersion {
@@ -71,18 +93,20 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 	if err != nil {
 		return BoardStateEnvelope{}, err
 	}
-	viewport, err := requiredObjectField(raw, "viewport")
-	if err != nil {
-		return BoardStateEnvelope{}, err
-	}
-	if err := validateBoardStateViewport(viewport); err != nil {
-		return BoardStateEnvelope{}, err
-	}
 	if _, err := requiredNumberField(raw, "updatedAt"); err != nil {
 		return BoardStateEnvelope{}, err
 	}
-	mediaRefs, err := optionalArrayField(raw, "mediaRefs")
+	mediaRefs, err := optionalMediaRefsField(raw, "mediaRefs")
 	if err != nil {
+		return BoardStateEnvelope{}, err
+	}
+	if _, err := optionalStringField(raw, "previewSnapshotDataUrl"); err != nil {
+		return BoardStateEnvelope{}, err
+	}
+	if _, err := optionalNumberField(raw, "previewSnapshotUpdatedAt"); err != nil {
+		return BoardStateEnvelope{}, err
+	}
+	if _, err := optionalPositiveIntegerField(raw, "previewSnapshotVersion"); err != nil {
 		return BoardStateEnvelope{}, err
 	}
 
@@ -92,22 +116,8 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 		PromptNodes:   promptNodes,
 		FusionNodes:   fusionNodes,
 		Connections:   connections,
-		Viewport:      viewport,
 		MediaRefs:     mediaRefs,
 	}, nil
-}
-
-func validateBoardStateViewport(raw json.RawMessage) error {
-	var viewport map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &viewport); err != nil || viewport == nil {
-		return ErrInvalidBoardInput
-	}
-	for _, key := range []string{"canvasX", "canvasY", "zoomLevel"} {
-		if _, err := requiredNumberField(viewport, key); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func requiredIntegerField(raw map[string]json.RawMessage, key string) (int, error) {
@@ -152,14 +162,88 @@ func optionalArrayField(raw map[string]json.RawMessage, key string) ([]json.RawM
 	return requiredArrayField(raw, key)
 }
 
-func requiredObjectField(raw map[string]json.RawMessage, key string) (json.RawMessage, error) {
-	value, ok := raw[key]
-	if !ok {
-		return nil, ErrInvalidBoardInput
+func optionalNumberField(raw map[string]json.RawMessage, key string) (float64, error) {
+	if _, ok := raw[key]; !ok {
+		return 0, nil
 	}
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(value, &object); err != nil || object == nil {
-		return nil, ErrInvalidBoardInput
+	return requiredNumberField(raw, key)
+}
+
+func optionalIntegerField(raw map[string]json.RawMessage, key string) (int, error) {
+	if _, ok := raw[key]; !ok {
+		return 0, nil
+	}
+	return requiredIntegerField(raw, key)
+}
+
+func optionalPositiveIntegerField(raw map[string]json.RawMessage, key string) (int, error) {
+	if _, ok := raw[key]; !ok {
+		return 0, nil
+	}
+	value, err := requiredIntegerField(raw, key)
+	if err != nil || value < 1 {
+		return 0, ErrInvalidBoardInput
 	}
 	return value, nil
+}
+
+func optionalStringField(raw map[string]json.RawMessage, key string) (string, error) {
+	value, ok := raw[key]
+	if !ok {
+		return "", nil
+	}
+	var text string
+	if err := json.Unmarshal(value, &text); err != nil || text == "" {
+		return "", ErrInvalidBoardInput
+	}
+	return text, nil
+}
+
+func optionalMediaRefsField(raw map[string]json.RawMessage, key string) ([]BoardStateMediaRef, error) {
+	items, err := optionalArrayField(raw, key)
+	if err != nil || items == nil {
+		return nil, err
+	}
+	refs := make([]BoardStateMediaRef, 0, len(items))
+	for _, item := range items {
+		ref, err := validateBoardStateMediaRef(item)
+		if err != nil {
+			return nil, err
+		}
+		refs = append(refs, ref)
+	}
+	return refs, nil
+}
+
+func validateBoardStateMediaRef(payload json.RawMessage) (BoardStateMediaRef, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil || raw == nil {
+		return BoardStateMediaRef{}, ErrInvalidBoardInput
+	}
+	for key := range raw {
+		if key != "url" && key != "role" {
+			return BoardStateMediaRef{}, ErrInvalidBoardInput
+		}
+	}
+	url, err := requiredStringField(raw, "url")
+	if err != nil {
+		return BoardStateMediaRef{}, err
+	}
+	role, err := optionalStringField(raw, "role")
+	if err != nil {
+		return BoardStateMediaRef{}, err
+	}
+	return BoardStateMediaRef{URL: url, Role: role}, nil
+}
+
+func requiredStringField(raw map[string]json.RawMessage, key string) (string, error) {
+	value, ok := raw[key]
+	if !ok {
+		return "", ErrInvalidBoardInput
+	}
+	var text string
+	if err := json.Unmarshal(value, &text); err != nil || text == "" {
+		return "", ErrInvalidBoardInput
+	}
+	return text, nil
 }

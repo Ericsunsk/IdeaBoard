@@ -79,6 +79,11 @@ export interface ImageNodeOutputItem {
   ratio: number
 }
 
+export interface BoardStateMediaRef {
+  url: string
+  role?: string
+}
+
 export interface ImageNodeItem {
   id: number
   type: 'image-node'
@@ -136,19 +141,13 @@ export type CanvasNodeItemByKind = {
   fusion: FusionNodeItem
 }
 
-export interface CanvasViewportState {
-  canvasX: number
-  canvasY: number
-  zoomLevel: number
-}
-
 export interface CanvasBoardSnapshot {
   schemaVersion: typeof CANVAS_BOARD_STATE_SCHEMA_VERSION
   imageNodes: ImageNodeItem[]
   promptNodes: PromptNodeItem[]
   fusionNodes: FusionNodeItem[]
   connections: CanvasConnection[]
-  viewport: CanvasViewportState
+  mediaRefs?: BoardStateMediaRef[]
 }
 
 export interface CanvasBoardState extends CanvasBoardSnapshot {
@@ -165,11 +164,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
     promptNodes: [],
     fusionNodes: [],
     connections: [],
-    viewport: {
-      canvasX: 0,
-      canvasY: 0,
-      zoomLevel: 100,
-    },
   }
 }
 

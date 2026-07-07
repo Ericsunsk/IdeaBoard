@@ -6,6 +6,8 @@
  */
 
 export interface BoardStateMediaRef {
+  /** @minLength 1 */
   url: string
+  /** @minLength 1 */
   role?: string
 }

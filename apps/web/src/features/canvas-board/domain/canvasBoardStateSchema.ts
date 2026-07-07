@@ -36,6 +36,11 @@ const imageNodeOutputItemSchema = v.strictObject({
   ratio: positiveFiniteNumberSchema,
 })
 
+const boardStateMediaRefSchema = v.strictObject({
+  url: nonEmptyStringSchema,
+  role: v.optional(nonEmptyStringSchema),
+})
+
 const promptNodeInputImageSchema = v.strictObject({
   url: nonEmptyStringSchema,
   ratio: positiveFiniteNumberSchema,
@@ -105,19 +110,13 @@ const canvasConnectionSchema = v.strictObject({
   toPort: canvasConnectionPortSchema,
 })
 
-const canvasViewportStateSchema = v.strictObject({
-  canvasX: finiteNumberSchema,
-  canvasY: finiteNumberSchema,
-  zoomLevel: finiteNumberSchema,
-})
-
 const canvasBoardSnapshotShape = v.strictObject({
   schemaVersion: v.literal(CANVAS_BOARD_STATE_SCHEMA_VERSION),
   imageNodes: v.array(imageNodeItemSchema),
   promptNodes: v.array(promptNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),
   connections: v.array(canvasConnectionSchema),
-  viewport: canvasViewportStateSchema,
+  mediaRefs: v.optional(v.array(boardStateMediaRefSchema)),
 })
 
 export const canvasBoardSnapshotSchema = canvasBoardSnapshotShape satisfies v.GenericSchema<
@@ -131,7 +130,7 @@ const canvasBoardStateShape = v.strictObject({
   promptNodes: v.array(promptNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),
   connections: v.array(canvasConnectionSchema),
-  viewport: canvasViewportStateSchema,
+  mediaRefs: v.optional(v.array(boardStateMediaRefSchema)),
   previewSnapshotDataUrl: v.optional(nonEmptyStringSchema),
   previewSnapshotUpdatedAt: v.optional(finiteNumberSchema),
   previewSnapshotVersion: v.optional(positiveIntegerSchema),

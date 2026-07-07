@@ -8,7 +8,6 @@ import type { BoardStateConnection } from './boardStateConnection'
 import type { BoardStateEnvelopeSchemaVersion } from './boardStateEnvelopeSchemaVersion'
 import type { BoardStateMediaRef } from './boardStateMediaRef'
 import type { BoardStateNode } from './boardStateNode'
-import type { BoardStateViewport } from './boardStateViewport'
 
 export interface BoardStateEnvelope {
   schemaVersion: BoardStateEnvelopeSchemaVersion
@@ -16,10 +15,11 @@ export interface BoardStateEnvelope {
   promptNodes: BoardStateNode[]
   fusionNodes: BoardStateNode[]
   connections: BoardStateConnection[]
-  viewport: BoardStateViewport
   mediaRefs?: BoardStateMediaRef[]
+  /** @minLength 1 */
   previewSnapshotDataUrl?: string
   previewSnapshotUpdatedAt?: number
+  /** @minimum 1 */
   previewSnapshotVersion?: number
   updatedAt: number
 }

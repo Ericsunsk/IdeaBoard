@@ -1408,7 +1408,7 @@ components:
 
     BoardStateEnvelope:
       type: object
-      required: [schemaVersion, imageNodes, promptNodes, fusionNodes, connections, viewport, updatedAt]
+      required: [schemaVersion, imageNodes, promptNodes, fusionNodes, connections, updatedAt]
       additionalProperties: false
       properties:
         schemaVersion:
@@ -1430,15 +1430,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BoardStateConnection'
-        viewport:
-          $ref: '#/components/schemas/BoardStateViewport'
         mediaRefs:
           type: array
           items:
             $ref: '#/components/schemas/BoardStateMediaRef'
-        previewSnapshotDataUrl: { type: string }
+        previewSnapshotDataUrl: { type: string, minLength: 1 }
         previewSnapshotUpdatedAt: { type: number }
-        previewSnapshotVersion: { type: integer }
+        previewSnapshotVersion: { type: integer, minimum: 1 }
         updatedAt: { type: number }
 
     BoardStateNode:
@@ -1449,22 +1447,13 @@ components:
       type: object
       additionalProperties: true
 
-    BoardStateViewport:
-      type: object
-      required: [canvasX, canvasY, zoomLevel]
-      additionalProperties: false
-      properties:
-        canvasX: { type: number }
-        canvasY: { type: number }
-        zoomLevel: { type: number }
-
     BoardStateMediaRef:
       type: object
       required: [url]
       additionalProperties: false
       properties:
-        url: { type: string }
-        role: { type: string }
+        url: { type: string, minLength: 1 }
+        role: { type: string, minLength: 1 }
 
     BoardMemberItem:
       type: object

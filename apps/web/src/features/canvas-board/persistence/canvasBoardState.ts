@@ -1,11 +1,13 @@
-import * as v from 'valibot'
 import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  canvasBoardStateSchema,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
 } from '../domain'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
+import {
+  normalizeCanvasBoardState,
+  serializeCanvasBoardState,
+} from './boardStateSerialization'
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boardStates.v2'
 
@@ -21,8 +23,18 @@ function getScopedStorageKey(): string | null {
 }
 
 function toValidBoardState(item: unknown): CanvasBoardState | null {
-  const parsed = v.safeParse(canvasBoardStateSchema, item)
-  return parsed.success ? parsed.output : null
+  return normalizeCanvasBoardState(item)
+}
+
+function stripPreviewSnapshotsFromStateMap(
+  stateMap: Record<string, CanvasBoardState>,
+): Record<string, CanvasBoardState> {
+  return Object.fromEntries(
+    Object.entries(stateMap).map(([boardId, state]) => [
+      boardId,
+      serializeCanvasBoardState(state, 'local-preview-fallback'),
+    ]),
+  )
 }
 
 function readRawStateMap(): Record<string, CanvasBoardState> {
@@ -44,26 +56,6 @@ function readRawStateMap(): Record<string, CanvasBoardState> {
   } catch {
     return {}
   }
-}
-
-function stripPreviewSnapshot(state: CanvasBoardState): CanvasBoardState {
-  return {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    imageNodes: state.imageNodes,
-    promptNodes: state.promptNodes,
-    fusionNodes: state.fusionNodes,
-    connections: state.connections,
-    viewport: state.viewport,
-    updatedAt: state.updatedAt,
-  }
-}
-
-function stripPreviewSnapshotsFromStateMap(
-  stateMap: Record<string, CanvasBoardState>,
-): Record<string, CanvasBoardState> {
-  return Object.fromEntries(
-    Object.entries(stateMap).map(([boardId, state]) => [boardId, stripPreviewSnapshot(state)]),
-  )
 }
 
 function tryWriteRawStateMap(stateMap: Record<string, CanvasBoardState>): boolean {
@@ -164,7 +156,7 @@ export function setCanvasBoardState(
   if (!validState) return null
   stateMap[id] = validState
   const persistedStateMap = writeRawStateMapWithPreviewFallback(stateMap)
-  return persistedStateMap?.[id] ?? stripPreviewSnapshot(validState)
+  return persistedStateMap?.[id] ?? serializeCanvasBoardState(validState, 'local-preview-fallback')
 }
 
 export function setCanvasBoardPreviewSnapshot(

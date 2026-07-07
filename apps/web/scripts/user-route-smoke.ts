@@ -91,7 +91,6 @@ const MOCK_BOARD_STATE = {
   ],
   fusionNodes: [],
   connections: [],
-  viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
   updatedAt: MOCK_UPDATED_AT,
 }
 

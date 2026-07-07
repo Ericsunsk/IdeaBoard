@@ -43,7 +43,7 @@ Canvas Workspace Runtime 的 write side，暴露用户动作、Vue Flow events�
 `viewModel.flowPane.nodes` 和 `viewModel.flowPane.edges` 是给 Vue Flow 的 adapter projection，只用于 `<VueFlow>` binding，不是 Canvas Board 的业务事实来源。
 
 **Canvas Board**:
-持久化的 graph document，由节点、连接、viewport state 和 board metadata 组成。
+持久化的 graph document，由节点、连接和 board metadata 组成；viewport 是按 user+board 存在浏览器本地的 UI state，不属于 board content。
 _Avoid_: Vue Flow graph, canvas state
 
 **Board Session**:

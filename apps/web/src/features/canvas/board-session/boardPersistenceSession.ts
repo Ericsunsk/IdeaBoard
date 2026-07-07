@@ -12,7 +12,6 @@ import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfPr
 export type SaveStatus = 'idle' | 'saved' | 'failed'
 export type ValueRef<T> = { value: T }
 export type ArrayRef = { value: unknown[] }
-export type ViewportState = { x: number; y: number; zoom: number }
 
 type FlowNodeLike = {
   data?: {
@@ -45,8 +44,6 @@ export type BoardPersistenceSessionOptions = {
   isSavingBoard: ValueRef<boolean>
   boardSession: CanvasBoardSession
   canSaveBoard: () => boolean
-  getViewport: () => ViewportState
-  setViewport: (viewport: ViewportState) => void
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
   onError: (text: string) => void
@@ -83,23 +80,6 @@ function hasPendingImageResultNode(nodes: unknown[]): boolean {
   })
 }
 
-function resolveSnapshotViewport(snapshot: CanvasBoardSnapshot): ViewportState | null {
-  const vp = snapshot.viewport
-  if (
-    !vp ||
-    typeof vp.canvasX !== 'number' ||
-    typeof vp.canvasY !== 'number' ||
-    typeof vp.zoomLevel !== 'number'
-  ) {
-    return null
-  }
-  return {
-    x: vp.canvasX,
-    y: vp.canvasY,
-    zoom: Math.max(0.1, vp.zoomLevel / 100),
-  }
-}
-
 export function createBoardPersistenceSession(
   options: BoardPersistenceSessionOptions,
 ): BoardPersistenceSession {
@@ -118,15 +98,9 @@ export function createBoardPersistenceSession(
   function applyBoardSnapshot(snapshot: CanvasBoardSnapshot) {
     const flow = canvasBoardSnapshotToFlow(snapshot)
     options.boardBaseSnapshot.value = snapshot
-    const importedViewport = resolveSnapshotViewport(snapshot)
     options.commitGraph(flow as { nodes: unknown[]; edges: unknown[] }, {
       preserveSelection: false,
     })
-    if (importedViewport) {
-      void Promise.resolve().then(() => {
-        options.setViewport(importedViewport)
-      })
-    }
     clearDirtyAfterImport()
     options.clearFlowHistoryBaseline()
     options.onGraphCommitted?.()
@@ -184,20 +158,13 @@ export function createBoardPersistenceSession(
         fullEdges: options.fullEdges.value.length,
       }),
       () => {
-        const snapshot = flowToCanvasBoardSnapshot(
+        return flowToCanvasBoardSnapshot(
           {
             nodes: options.fullNodes.value as unknown as FlowAdapterNode[],
             edges: options.fullEdges.value as unknown as FlowAdapterEdge[],
           },
           options.boardBaseSnapshot.value,
         )
-        const vp = options.getViewport()
-        snapshot.viewport = {
-          canvasX: vp.x,
-          canvasY: vp.y,
-          zoomLevel: Math.round(vp.zoom * 100),
-        }
-        return snapshot
       },
     )
   }

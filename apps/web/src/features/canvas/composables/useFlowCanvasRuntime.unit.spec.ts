@@ -125,7 +125,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const nodes = fullNodes
   const edges = fullEdges
   const boardBaseSnapshot = shallowRef(createEmptyCanvasBoardSnapshot())
-  const viewport = ref({ x: 0, y: 0, zoom: 1 })
   const savedSnapshots: CanvasBoardSnapshot[] = []
   const scheduledMicrotasks: Array<() => void> = []
   const scheduledAnimationFrames = new Map<number, FrameRequestCallback>()
@@ -168,10 +167,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     isLoadingBoardSnapshot: ref(false),
     isSavingBoard: ref(false),
     boardSession,
-    getViewport: () => viewport.value,
-    setViewport: (nextViewport) => {
-      viewport.value = nextViewport
-    },
     onWarning,
     onSuccess: vi.fn(),
     onError: vi.fn(),
@@ -228,7 +223,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     fullNodes,
     fullEdges,
     savedSnapshots,
-    viewport,
     boardSession,
     onWarning,
     onNativeRemove,
@@ -298,20 +292,6 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
     expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1', 'prompt-2'])
     expect(harness.edges.value.map((edge) => edge.id)).toEqual(['connection-3'])
-  })
-
-  it('does not reslice the Vue Flow store when the viewport changes', async () => {
-    const harness = createRuntimeHarness()
-
-    await harness.runtime.loadInitialOrRouteBoard()
-
-    expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1', 'prompt-2'])
-    expect(harness.edges.value.map((edge) => edge.id)).toEqual(['connection-3'])
-
-    harness.viewport.value = { x: -1800, y: 0, zoom: 1 }
-    await nextTick()
-
-    expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1', 'prompt-2'])
   })
 
   it('uses graph adapter command side effects as the history and dirty boundary', async () => {
