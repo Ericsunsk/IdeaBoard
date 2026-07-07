@@ -28,16 +28,6 @@
   pointer-events: none;
 }
 
-.canvas-flow-wrap .vue-flow__viewport {
-  background-image: radial-gradient(circle, #e2e4e8 1px, transparent 1px);
-  background-size: 12px 12px;
-  background-position: 0 0;
-}
-
-.canvas-flow-wrap .vue-flow {
-  background: transparent;
-}
-
 .canvas-flow-wrap .vue-flow__edge-path,
 .canvas-flow-wrap .vue-flow__connection-path {
   stroke: var(--flow-edge-color);

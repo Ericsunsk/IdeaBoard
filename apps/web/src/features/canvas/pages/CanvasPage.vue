@@ -41,7 +41,7 @@
 
     <div
       ref="canvasWrapRef"
-      class="canvas-flow-wrap"
+      class="canvas-flow-wrap ib-page-dot-bg"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
       @wheel="onCanvasWheel"
@@ -656,6 +656,7 @@ onMounted(async () => {
 }
 
 .canvas-layout {
+  --canvas-chrome-inset: var(--spacing-ib-page-chrome-inset);
   --canvas-control-border-width: 1.2px;
   --canvas-tool-button-gap: 7px;
   --canvas-page-chrome-fade-duration: 0.18s;

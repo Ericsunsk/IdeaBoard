@@ -1,6 +1,6 @@
 <template>
   <header
-    class="pointer-events-none absolute top-4 right-4 left-4 z-[100] flex items-start justify-between gap-4"
+    class="pointer-events-none absolute top-[var(--canvas-chrome-inset)] right-[var(--canvas-chrome-inset)] left-[var(--canvas-chrome-inset)] z-[100] flex items-start justify-between gap-4"
     @wheel.prevent.stop
   >
     <div

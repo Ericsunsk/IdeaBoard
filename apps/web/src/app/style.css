@@ -108,11 +108,15 @@
   --color-canvas-running-from: #9278e6;
   --color-canvas-running-to: #6dbef7;
 
+  /* ── Page surface tokens ─────────────────────────────────── */
+  --color-ib-page-dot: #e2e4e8;
+  --spacing-ib-page-dot: 12px;
+  --spacing-ib-page-chrome-inset: 16px;
+
   /* ── Boards list tokens ────────────────────────────────── */
   --color-board-page: #f8f9fd;
   --color-board-page-text: #1f2430;
   --color-board-page-text-muted: #6e7487;
-  --color-board-page-grid-dot: #e2e4e8;
   --color-board-page-glow: rgba(150, 120, 230, 0.24);
   --color-board-page-glow-clear: rgba(150, 120, 230, 0);
   --color-board-primary: var(--color-ib-creative-accent-hover);
@@ -324,6 +328,12 @@
   --duration-ib-panel: 220ms;
   --duration-ib-dock: 240ms;
   --ease-ib-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@utility ib-page-dot-bg {
+  background-image: radial-gradient(circle, var(--color-ib-page-dot) 1px, transparent 1px);
+  background-position: center center;
+  background-size: var(--spacing-ib-page-dot) var(--spacing-ib-page-dot);
 }
 
 @layer base {

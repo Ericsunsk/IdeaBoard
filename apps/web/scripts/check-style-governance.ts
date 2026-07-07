@@ -172,7 +172,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
   },
   'src/features/canvas/components/styles/canvas-vue-flow-adapter-skin.css': {
     counts: {
-      'vue-flow-internal-selector': 36,
+      'vue-flow-internal-selector': 34,
     },
     reason: 'Central adapter skin owns Vue Flow vendor DOM styling.',
   },
@@ -248,6 +248,10 @@ function isAdminProductionStyleFile(file: SourceFile): boolean {
 
 function isCanvasTokenAllowedFile(file: SourceFile): boolean {
   return file.sourcePath === 'src/app/style.css' || file.sourcePath.startsWith('src/features/canvas/')
+}
+
+function isPageDotBackgroundAllowedFile(file: SourceFile): boolean {
+  return file.sourcePath === 'src/app/style.css' || file.sourcePath.startsWith('src/features/canvas-board/preview/')
 }
 
 function checkAllowanceReasons<T extends string>(
@@ -334,6 +338,22 @@ function checkCanvasTokenBoundaries(file: SourceFile, content: string): Violatio
   ]
 }
 
+function checkPageDotBackgroundUtilityBoundary(file: SourceFile, content: string): Violation[] {
+  const pattern = /radial-gradient\(\s*circle\s*,[^\]\n)]*(?:\s|_)1px\s*,\s*transparent(?:\s|_)1px/g
+  const count = countMatches(content, pattern)
+  if (count === 0 || isPageDotBackgroundAllowedFile(file)) return []
+
+  return [
+    {
+      file: file.sourcePath,
+      rule: 'page-dot-background-utility',
+      message:
+        'User page dot backgrounds must use ib-page-dot-bg; board preview dots stay in canvas-board/preview because previews mirror the serialized canvas thumbnail surface.',
+      details: matchDetails(content, pattern),
+    },
+  ]
+}
+
 async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Violation[]> {
   const contents = new Map<string, string>()
   const violations: Violation[] = [
@@ -347,6 +367,7 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
 
     violations.push(
       ...checkCanvasTokenBoundaries(file, content),
+      ...checkPageDotBackgroundUtilityBoundary(file, content),
       ...checkCountRules(file, content, selectorCountRules, selectorAllowances),
     )
 

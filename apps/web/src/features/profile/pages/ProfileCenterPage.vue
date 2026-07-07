@@ -455,7 +455,7 @@ const profileCardPt = {
 } as const
 
 const profileGridBgClass =
-  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,var(--color-ib-creative-accent-wash)_0%,var(--color-ib-creative-accent-clear)_42%),radial-gradient(circle,var(--color-ib-border-soft)_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
+  "pointer-events-none fixed inset-0 z-0 overflow-hidden ib-page-dot-bg before:absolute before:inset-0 before:bg-[linear-gradient(135deg,var(--color-ib-creative-accent-wash)_0%,var(--color-ib-creative-accent-clear)_42%)] before:content-['']"
 
 const mainContentClass =
   'app-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6'

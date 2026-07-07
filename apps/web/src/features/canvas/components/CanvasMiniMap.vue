@@ -294,8 +294,8 @@ function resolveOverlayDeltaScale(viewBoxRect: MiniMapRect): MiniMapPoint | null
 <style scoped>
 .canvas-minimap-shell {
   position: absolute;
-  bottom: 24px;
-  left: 24px;
+  bottom: var(--canvas-chrome-inset);
+  left: var(--canvas-chrome-inset);
   z-index: 6;
 }
 

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="pointer-events-auto absolute right-6 bottom-6 z-[100]"
+    class="pointer-events-auto absolute right-[var(--canvas-chrome-inset)] bottom-[var(--canvas-chrome-inset)] z-[100]"
     :inert="inert"
     @wheel.prevent.stop
   >

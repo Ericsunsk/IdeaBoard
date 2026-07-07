@@ -1,9 +1,9 @@
 import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
 
 export const boardCatalogClasses = {
-  page: 'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-board-page px-7 pt-4 pb-16 text-board-page-text [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:px-3.5 max-[860px]:pt-3.5 max-[860px]:pb-10',
+  page: 'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:pb-10',
   pageBackground:
-    'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,var(--color-board-page-glow)_0%,var(--color-board-page-glow-clear)_100%),radial-gradient(circle,var(--color-board-page-grid-dot)_1px,transparent_1px)] [background-position:center_center,center_center] [background-size:100%_100%,12px_12px]',
+    "pointer-events-none fixed inset-0 ib-page-dot-bg before:absolute before:inset-0 before:bg-[radial-gradient(55%_35%_at_45%_45%,var(--color-board-page-glow)_0%,var(--color-board-page-glow-clear)_100%)] before:content-['']",
   header: 'relative z-[1] flex items-center justify-between',
   brand: 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center',
   brandName: 'min-w-0 truncate text-[32px] font-bold tracking-normal',

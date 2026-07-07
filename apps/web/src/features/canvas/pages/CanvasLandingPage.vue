@@ -1,6 +1,6 @@
 <template>
   <div
-    class="canvas-landing-page relative h-full w-full overflow-hidden bg-white bg-[radial-gradient(circle,#e2e4e8_1px,transparent_1px)] bg-[length:12px_12px] bg-center bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
+    class="canvas-landing-page ib-page-dot-bg relative h-full w-full overflow-hidden bg-white bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
   >
     <!-- 轻量背景洗色，文字区排版保持稳定。 -->
     <div
