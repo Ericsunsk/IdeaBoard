@@ -4,13 +4,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
+import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
+
+const logoutAndRedirectMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../shared/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({
     fallbackText: 'IB',
     logoURL: '',
     projectName: 'IdeaBoard',
+  }),
+}))
+
+vi.mock('../../../shared/composables/useLogoutRedirect', () => ({
+  useLogoutRedirect: () => ({
+    logoutAndRedirect: logoutAndRedirectMock,
   }),
 }))
 
@@ -105,6 +114,8 @@ function renderAccountManagementDialogContent() {
 
 describe('AccountManagementDialogContent', () => {
   beforeEach(() => {
+    logoutAndRedirectMock.mockReset()
+    logoutAndRedirectMock.mockResolvedValue(true)
     useUserStore().clearAuth()
     localStorage.clear()
   })
@@ -121,7 +132,7 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.getByRole('button', { name: '退出登录' })).toBeVisible()
     expect(screen.getAllByText('mock-user')[0]).toBeVisible()
     expect(screen.getAllByText('USM001')[0]).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'mock-user' })).toBeVisible()
+    expect(screen.getByRole('region', { name: '账户资料概览' })).toBeVisible()
     expect(screen.getAllByText('auth-user-layout')[0]).toBeVisible()
   })
 
@@ -134,20 +145,21 @@ describe('AccountManagementDialogContent', () => {
       'aria-current',
       'page',
     )
-    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
     expect(screen.getByRole('textbox', { name: '当前原密码' })).toBeVisible()
-    expect(screen.queryByRole('heading', { name: 'mock-user' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '设置新密码' })).toBeVisible()
+    expect(screen.queryByText('auth-user-layout')).not.toBeInTheDocument()
   })
 
-  it('asks for confirmation before logging out from the left rail', async () => {
+  it('logs out directly from the left rail without extra confirmation', async () => {
     const { user } = renderAccountManagementDialogContent()
 
     expect(screen.queryByRole('group', { name: '退出登录确认' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '退出登录' }))
 
-    expect(screen.getByRole('group', { name: '退出登录确认' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '取消' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '确认退出' })).toBeVisible()
+    await vi.waitFor(() => {
+      expect(logoutAndRedirectMock).toHaveBeenCalledWith(USER_HOME_PATH)
+    })
+    expect(screen.queryByRole('group', { name: '退出登录确认' })).not.toBeInTheDocument()
   })
 })

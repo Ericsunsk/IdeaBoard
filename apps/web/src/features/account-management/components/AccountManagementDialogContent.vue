@@ -54,35 +54,6 @@
       </nav>
 
       <div class="mt-auto pt-4">
-        <div
-          v-if="logoutConfirmationVisible"
-          class="mb-3 rounded-[var(--radius-ib-panel)] bg-ib-danger/5 px-3 py-3 text-ib-danger"
-          role="group"
-          aria-label="退出登录确认"
-        >
-          <p class="m-0 text-[13px] leading-5 font-semibold">确认退出当前账号？</p>
-          <p class="mt-1 mb-3 text-[12px] leading-5 text-ib-text-muted">
-            退出后可重新登录继续访问。
-          </p>
-          <div class="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              text
-              label="取消"
-              :disabled="logoutLoading"
-              class="!h-9 !rounded-[var(--radius-ib-control)] !border-0 !bg-transparent !px-2 !text-[13px] !font-semibold !text-ib-text-muted !shadow-none hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-60"
-              @click="cancelLogout"
-            />
-            <Button
-              type="button"
-              text
-              :label="logoutLoading ? '退出中...' : '确认退出'"
-              :disabled="logoutLoading"
-              class="!h-9 !rounded-[var(--radius-ib-control)] !border-0 !bg-ib-danger !px-2 !text-[13px] !font-semibold !text-ib-text-inverse !shadow-none hover:!bg-ib-danger/90 focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-70"
-              @click="confirmLogout"
-            />
-          </div>
-        </div>
         <Button
           type="button"
           text
@@ -110,116 +81,103 @@
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
-        <div v-if="activeTab === 'profile'" key="profile">
-          <div
-            class="mb-8 flex min-w-0 items-center gap-7 max-[720px]:items-start max-[520px]:flex-col"
+        <div v-if="activeTab === 'profile'" key="profile" class="grid gap-7">
+          <section
+            class="min-w-0"
+            aria-label="账户资料概览"
           >
-            <div
-              class="relative h-[132px] w-[132px] shrink-0 overflow-visible rounded-[var(--radius-ib-pill)] bg-ib-surface shadow-[var(--shadow-ib-control)] max-[520px]:h-24 max-[520px]:w-24"
-            >
-              <Avatar
-                v-if="userStore.user?.avatar"
-                :image="userStore.user.avatar"
-                shape="circle"
-                class="!h-full !w-full"
-              />
-              <Avatar
-                v-else
-                :label="userInitial"
-                shape="circle"
-                class="!h-full !w-full !bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] !text-[44px] !font-bold !text-ib-text-inverse max-[520px]:!text-[32px]"
-              />
-              <Button
-                type="button"
-                text
-                rounded
-                class="!absolute !right-1 !bottom-1 !flex !h-10 !w-10 !min-w-10 !items-center !justify-center !rounded-[var(--radius-ib-pill)] !border !border-ib-border !bg-ib-surface !p-0 !text-ib-text-muted !shadow-[var(--shadow-ib-control)] !transition !duration-[var(--duration-ib-standard)] hover:!border-ib-border-hover hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-60 max-[520px]:!h-8 max-[520px]:!w-8 max-[520px]:!min-w-8"
-                :disabled="avatarUploading"
-                aria-label="更换头像"
-                title="更换头像"
-                @click="openAvatarPicker"
+            <div class="flex min-w-0 items-center gap-5 max-[520px]:items-start">
+              <div
+                class="relative size-[88px] shrink-0 overflow-visible rounded-[var(--radius-ib-pill)] bg-ib-surface-raised shadow-[var(--shadow-ib-control)] max-[520px]:size-20"
               >
-                <Camera class="h-[18px] w-[18px] max-[520px]:h-[15px] max-[520px]:w-[15px]" />
-              </Button>
-              <input
-                ref="avatarInputRef"
-                class="hidden"
-                type="file"
-                accept="image/*"
-                :disabled="avatarUploading"
-                @change="onAvatarFileChange"
-              />
-            </div>
-
-            <div class="min-w-0">
-              <h2 class="m-0 truncate text-[32px] leading-tight font-bold tracking-normal text-ib-text max-[520px]:text-[26px]">
-                {{ userStore.user?.username }}
-              </h2>
-              <p class="mt-2 mb-5 truncate text-[22px] leading-7 font-semibold text-ib-text-subtle max-[520px]:text-lg">
-                {{ userStore.user?.uid || '-' }}
-              </p>
-              <div class="grid gap-3">
-                <Tag
-                  :value="userStatusLabel"
-                  :severity="userStatusSeverity"
-                  rounded
-                  class="!w-fit !bg-ib-surface !px-0 !text-[22px] !font-bold max-[520px]:!text-lg"
+                <Avatar
+                  v-if="userStore.user?.avatar"
+                  :image="userStore.user.avatar"
+                  shape="circle"
+                  class="!h-full !w-full"
                 />
-                <Tag
-                  :value="userRoleLabel"
-                  :severity="userRoleSeverity"
+                <Avatar
+                  v-else
+                  :label="userInitial"
+                  shape="circle"
+                  class="!h-full !w-full !bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] !text-[34px] !font-bold !text-ib-text-inverse max-[520px]:!text-[28px]"
+                />
+                <Button
+                  type="button"
+                  text
                   rounded
-                  class="!w-fit !bg-ib-surface !px-0 !text-[22px] !font-bold max-[520px]:!text-lg"
+                  class="!absolute !right-0 !bottom-0 !flex !size-9 !min-w-9 !items-center !justify-center !rounded-[var(--radius-ib-pill)] !border !border-ib-border !bg-ib-surface !p-0 !text-ib-text-muted !shadow-[var(--shadow-ib-control)] !transition !duration-[var(--duration-ib-standard)] hover:!border-ib-border-hover hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-60 max-[520px]:!size-8 max-[520px]:!min-w-8"
+                  :disabled="avatarUploading"
+                  aria-label="更换头像"
+                  title="更换头像"
+                  @click="openAvatarPicker"
+                >
+                  <Camera class="h-4 w-4" />
+                </Button>
+                <input
+                  ref="avatarInputRef"
+                  class="hidden"
+                  type="file"
+                  accept="image/*"
+                  :disabled="avatarUploading"
+                  @change="onAvatarFileChange"
                 />
               </div>
-            </div>
-          </div>
 
-          <dl class="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
-            <div
-              v-for="field in profileFields"
-              :key="field.label"
-              class="min-w-0 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface px-4 py-3.5"
-              :class="field.full ? 'col-span-2 max-[720px]:col-span-1' : ''"
-            >
-              <dt class="mb-2 block text-[13px] font-semibold text-ib-text-subtle">
-                {{ field.label }}
-              </dt>
-              <dd class="m-0 min-w-0">
-                <Tag
-                  v-if="field.kind === 'tag'"
-                  :value="field.value"
-                  :severity="field.severity"
-                  rounded
-                  class="!bg-ib-surface-raised"
-                />
-                <span
-                  v-else
-                  class="block truncate text-base font-semibold text-ib-text"
-                  :class="field.mono ? 'font-mono text-[15px]' : ''"
-                  :title="field.value"
-                >
-                  {{ field.value }}
-                </span>
-              </dd>
+              <div class="min-w-0">
+                <p class="m-0 truncate text-[30px] leading-tight font-bold tracking-normal text-ib-text max-[520px]:text-[24px]">
+                  {{ userStore.user?.username }}
+                </p>
+                <p class="mt-1 mb-0 truncate font-mono text-[14px] leading-6 font-semibold text-ib-text-subtle">
+                  {{ userStore.user?.uid || '-' }}
+                </p>
+                <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
+                  <Tag
+                    :value="userStatusLabel"
+                    :severity="userStatusSeverity"
+                    rounded
+                    class="!bg-ib-surface !px-2.5 !py-1 !text-[13px] !font-semibold"
+                  />
+                  <Tag
+                    :value="userRoleLabel"
+                    :severity="userRoleSeverity"
+                    rounded
+                    class="!bg-ib-surface !px-2.5 !py-1 !text-[13px] !font-semibold"
+                  />
+                </div>
+              </div>
             </div>
-          </dl>
+          </section>
+
+          <section
+            class="min-w-0"
+            aria-label="账号信息"
+          >
+            <dl class="m-0 border-y border-ib-border-soft">
+              <div
+                v-for="field in profileFields"
+                :key="field.label"
+                class="grid min-h-14 grid-cols-[148px_minmax(0,1fr)] items-center gap-4 border-b border-ib-border-soft py-3 last:border-b-0 max-[640px]:grid-cols-1 max-[640px]:gap-1"
+              >
+                <dt class="text-[13px] font-semibold text-ib-text-subtle">
+                  {{ field.label }}
+                </dt>
+                <dd class="m-0 min-w-0">
+                  <span
+                    class="block truncate text-[15px] font-semibold text-ib-text"
+                    :class="field.mono ? 'font-mono text-[14px]' : ''"
+                    :title="field.value"
+                  >
+                    {{ field.value }}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+          </section>
         </div>
 
         <div v-else-if="activeTab === 'security'" key="security">
-          <div class="mb-7">
-            <p class="m-0 mb-1 text-[13px] font-semibold text-ib-creative-accent-pressed">
-              登录凭据
-            </p>
-            <h2 class="m-0 text-[28px] leading-tight font-bold tracking-normal text-ib-text">
-              账号安全
-            </h2>
-            <p class="mt-2 mb-0 max-w-2xl text-[14px] leading-6 text-ib-text-subtle">
-              更新密码后会退出当前登录状态，请使用新密码重新登录。
-            </p>
-          </div>
-
-          <form class="flex max-w-3xl flex-col gap-7" novalidate @submit.prevent="handleUpdatePassword">
+          <form class="grid gap-5" novalidate @submit.prevent="handleUpdatePassword">
             <label :class="passwordFieldClass">
               <span>当前原密码</span>
               <Password
@@ -227,6 +185,8 @@
                 autocomplete="current-password"
                 :feedback="false"
                 fluid
+                unstyled
+                :pt="ibPasswordPt"
                 :input-props="{
                   autocomplete: 'current-password',
                   'aria-describedby': getPasswordDescribedby(
@@ -251,7 +211,8 @@
               <Message
                 v-if="shouldShowPasswordMessage('oldPassword')"
                 id="profile-old-password-error"
-                class="!mt-1 !rounded-xl"
+                unstyled
+                :pt="ibFormErrorMessagePt"
                 severity="error"
                 size="small"
                 :closable="false"
@@ -268,6 +229,8 @@
                   autocomplete="new-password"
                   :feedback="false"
                   fluid
+                  unstyled
+                  :pt="ibPasswordPt"
                   :input-props="{
                     autocomplete: 'new-password',
                     'aria-describedby': getPasswordDescribedby(
@@ -292,7 +255,8 @@
                 <Message
                   v-if="shouldShowPasswordMessage('newPassword')"
                   id="profile-new-password-error"
-                  class="!mt-1 !rounded-xl"
+                  unstyled
+                  :pt="ibFormErrorMessagePt"
                   severity="error"
                   size="small"
                   :closable="false"
@@ -308,6 +272,8 @@
                   autocomplete="new-password"
                   :feedback="false"
                   fluid
+                  unstyled
+                  :pt="ibPasswordPt"
                   :input-props="{
                     autocomplete: 'new-password',
                     'aria-describedby': getPasswordDescribedby(
@@ -332,7 +298,8 @@
                 <Message
                   v-if="shouldShowPasswordMessage('confirmPassword')"
                   id="profile-confirm-password-error"
-                  class="!mt-1 !rounded-xl"
+                  unstyled
+                  :pt="ibFormErrorMessagePt"
                   severity="error"
                   size="small"
                   :closable="false"
@@ -372,6 +339,13 @@ import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import {
+  ibFormErrorMessagePt,
+  ibFormFieldClass,
+  ibFormInputClass,
+  ibFormInputErrorClass,
+  ibPasswordPt,
+} from '../../../shared/theme/formControls'
 
 type NavItem = {
   key: 'profile' | 'security'
@@ -383,10 +357,7 @@ type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
 type ProfileField = {
   label: string
   value: string
-  kind?: 'tag'
-  severity?: TagSeverity
   mono?: boolean
-  full?: boolean
 }
 
 const emit = defineEmits<{
@@ -415,7 +386,6 @@ const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } =
 const activeTab = ref<NavItem['key']>('profile')
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 const isProfileMainScrolling = ref(false)
-const logoutConfirmationVisible = ref(false)
 const logoutLoading = ref(false)
 let profileMainScrollTimer: number | undefined
 
@@ -436,11 +406,9 @@ const mainContentClass =
   'relative grid h-[min(78dvh,720px)] min-h-0 grid-cols-[234px_minmax(0,1fr)] overflow-hidden bg-ib-surface-raised max-[820px]:h-[calc(100dvh-64px)] max-[820px]:grid-cols-1'
 const profilePaneClass =
   'app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto rounded-l-[var(--radius-ib-overlay)] bg-ib-surface-muted px-8 py-7 pr-14 max-[820px]:rounded-l-none max-[820px]:rounded-t-[var(--radius-ib-overlay)] max-[820px]:px-4 max-[820px]:py-5 max-[820px]:pr-14'
-const passwordFieldClass = 'flex min-w-0 flex-col gap-2 text-sm font-medium text-ib-text'
-const passwordInputClass =
-  '!h-12 !w-full !rounded-[var(--radius-ib-control)] !border-ib-border !bg-ib-surface-raised !px-3 !text-[15px] !text-ib-text !shadow-none placeholder:!text-ib-text-subtle enabled:hover:!border-ib-border-hover enabled:focus:!border-ib-creative-accent enabled:focus:!shadow-[var(--shadow-ib-focus)]'
-const passwordInputErrorClass =
-  '!border-ib-danger !bg-ib-danger/5 placeholder:!text-ib-danger/75 enabled:focus:!border-ib-danger'
+const passwordFieldClass = ibFormFieldClass
+const passwordInputClass = ibFormInputClass
+const passwordInputErrorClass = ibFormInputErrorClass
 
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))
@@ -458,31 +426,13 @@ const userInitial = computed(() => {
 })
 const profileFields = computed<ProfileField[]>(() => [
   {
-    label: '用户账号',
+    label: '登录账号',
     value: userStore.user?.username || '-',
-  },
-  {
-    label: '账号状态',
-    value: userStatusLabel.value,
-    kind: 'tag',
-    severity: userStatusSeverity.value,
-  },
-  {
-    label: '用户 UID',
-    value: userStore.user?.uid || '-',
-    mono: true,
-  },
-  {
-    label: '角色',
-    value: userRoleLabel.value,
-    kind: 'tag',
-    severity: userRoleSeverity.value,
   },
   {
     label: '认证 ID',
     value: userStore.user?.auth_user_id?.trim() || '-',
     mono: true,
-    full: true,
   },
   {
     label: '加入时间',
@@ -515,17 +465,7 @@ function handleProfileMainScroll() {
   }, 700)
 }
 
-function handleLogout() {
-  if (logoutLoading.value) return
-  logoutConfirmationVisible.value = true
-}
-
-function cancelLogout() {
-  if (logoutLoading.value) return
-  logoutConfirmationVisible.value = false
-}
-
-async function confirmLogout() {
+async function handleLogout() {
   if (logoutLoading.value) return
 
   logoutLoading.value = true
