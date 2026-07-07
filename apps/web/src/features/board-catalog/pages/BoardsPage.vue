@@ -142,8 +142,6 @@
         </div>
       </div>
     </Dialog>
-
-    <ProfileDialog v-model:visible="profileDialogVisible" />
   </div>
 </template>
 
@@ -183,7 +181,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
-import ProfileDialog from '../../profile/components/ProfileDialog.vue'
+import { openProfileDialog } from '../../profile/useProfileDialogController'
 
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
@@ -202,7 +200,6 @@ const renameDraft = ref('')
 const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
 const deleteDialogVisible = ref(false)
-const profileDialogVisible = ref(false)
 const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
 const isDeleteBoardPending = ref(false)
 const isBoardsPageScrolling = ref(false)
@@ -418,7 +415,7 @@ async function confirmDeleteBoard() {
 
 function openCenter() {
   activeMenuBoardId.value = null
-  profileDialogVisible.value = true
+  openProfileDialog()
 }
 
 function openAdmin() {

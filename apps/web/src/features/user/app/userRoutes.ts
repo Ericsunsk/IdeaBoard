@@ -47,12 +47,12 @@ export const userRoutes: RouteRecordRaw[] = [
         component: () => import('../pages/UserBoardsPage.vue'),
         meta: { requiresAuth: true },
       },
+      {
+        path: 'canvas',
+        name: 'UserCanvas',
+        component: () => import('../pages/UserCanvasPage.vue'),
+        meta: { requiresAuth: true },
+      },
     ],
-  },
-  {
-    path: USER_CANVAS_PATH,
-    name: 'UserCanvas',
-    component: () => import('../pages/UserCanvasPage.vue'),
-    meta: { requiresAuth: true },
   },
 ]

@@ -33,6 +33,7 @@
       <router-view :key="route.path === USER_CANVAS_PATH ? route.path : route.fullPath" />
     </div>
 
+    <ProfileDialogHost />
     <UserAuthModals v-if="authMode" :mode="authMode" />
   </div>
 </template>
@@ -53,6 +54,7 @@ import {
 } from '../../../shared/constants/routePaths'
 import { useAuthFeedback } from '../../auth/useAuthFeedback'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
+import ProfileDialogHost from '../../profile/components/ProfileDialogHost.vue'
 
 const router = useRouter()
 const route = useRoute()

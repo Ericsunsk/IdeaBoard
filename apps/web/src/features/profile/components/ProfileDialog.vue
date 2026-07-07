@@ -2,7 +2,8 @@
   <Dialog
     :visible="visible"
     modal
-    dismissable-mask
+    :dismissable-mask="false"
+    close-on-escape
     :draggable="false"
     :style="profileDialogStyle"
     :pt="profileDialogPt"

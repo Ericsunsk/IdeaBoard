@@ -138,8 +138,6 @@
         @create-node="handleNodeContextMenuCreate"
       />
     </div>
-
-    <ProfileDialog v-model:visible="profileDialogVisible" />
   </div>
 </template>
 
@@ -188,7 +186,7 @@ import {
   type CanvasChromeToolState,
 } from '../components/chrome'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
-import ProfileDialog from '../../profile/components/ProfileDialog.vue'
+import { openProfileDialog } from '../../profile/useProfileDialogController'
 
 const route = useRoute()
 const router = useRouter()
@@ -200,7 +198,6 @@ const { screenToFlowCoordinate } = flowPaneAdapter
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const flowHandleVisibilityRefreshToken = ref(0)
-const profileDialogVisible = ref(false)
 
 const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
@@ -306,9 +303,7 @@ const userMenuItems = computed(() =>
     canAccessAdmin: canAccessAdmin(userStore.user),
     hiddenKeys: ['home'],
     handlers: {
-      profile: () => {
-        profileDialogVisible.value = true
-      },
+      profile: openProfileDialog,
       admin: () => onNavigateRequest(ADMIN_ROOT_PATH),
       logout: () => {
         void onLogoutRequest()
