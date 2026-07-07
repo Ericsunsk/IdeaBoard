@@ -1,0 +1,59 @@
+export type UserAccountMenuItemKey = 'profile' | 'admin' | 'home' | 'logout'
+
+export type UserAccountMenuItemTone = 'default' | 'danger'
+
+export type UserAccountMenuItem = {
+  key: UserAccountMenuItemKey
+  label: string
+  tone?: UserAccountMenuItemTone
+  command: () => void
+}
+
+export type CreateUserAccountMenuItemsOptions = {
+  canAccessAdmin: boolean
+  hiddenKeys?: readonly UserAccountMenuItemKey[]
+  handlers: {
+    profile: () => void
+    admin?: () => void
+    home?: () => void
+    logout: () => void
+  }
+}
+
+export function createUserAccountMenuItems(
+  options: CreateUserAccountMenuItemsOptions,
+): UserAccountMenuItem[] {
+  const hiddenKeys = new Set(options.hiddenKeys ?? [])
+  const items: UserAccountMenuItem[] = [
+    {
+      key: 'profile',
+      label: '个人中心',
+      command: options.handlers.profile,
+    },
+  ]
+
+  if (options.canAccessAdmin && options.handlers.admin) {
+    items.push({
+      key: 'admin',
+      label: '管理后台',
+      command: options.handlers.admin,
+    })
+  }
+
+  if (options.handlers.home) {
+    items.push({
+      key: 'home',
+      label: '返回首页',
+      command: options.handlers.home,
+    })
+  }
+
+  items.push({
+    key: 'logout',
+    label: '退出登录',
+    tone: 'danger',
+    command: options.handlers.logout,
+  })
+
+  return items.filter((item) => !hiddenKeys.has(item.key))
+}

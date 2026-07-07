@@ -18,5 +18,4 @@ const boardPopupMenuThemeClass =
 
 const boardsDropdownRootClass = `!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !rounded-[var(--radius-ib-control)] !border !border-board-menu-border !bg-board-overlay-bg !p-0 !shadow-none backdrop-blur-[10px] ${boardPopupMenuThemeClass}`
 
-export const userMenuPt = createBoardPopupMenuPt(boardsDropdownRootClass, '')
-export const boardMenuPt = userMenuPt
+export const boardMenuPt = createBoardPopupMenuPt(boardsDropdownRootClass, '')

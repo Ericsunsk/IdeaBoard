@@ -9,49 +9,15 @@
       <div :class="boardCatalogClasses.brand">
         <span :class="boardCatalogClasses.brandName">{{ projectName }}</span>
       </div>
-      <div :class="boardCatalogClasses.userMenuWrap" @pointerdown.stop @mousedown.stop @click.stop>
-        <Button
-          unstyled
-          type="button"
-          title="账户菜单"
-          aria-label="账户菜单"
-          aria-haspopup="menu"
-          :aria-expanded="isUserMenuOpen"
-          :class="boardCatalogClasses.userAvatarButton"
-          @click="toggleUserMenu"
-        >
-          <img
-            v-if="userStore.user?.avatar"
-            :src="userStore.user.avatar"
-            :class="boardCatalogClasses.userAvatar"
-            alt="用户头像"
-          />
-          <div v-else :class="boardCatalogClasses.userAvatarPlaceholder">
-            <User :class="boardCatalogClasses.avatarIcon" />
-          </div>
-        </Button>
-        <Menu
-          ref="userMenuRef"
-          :model="userMenuItems"
-          popup
-          append-to="body"
-          :pt="userMenuPt"
-          @show="handleUserMenuShow"
-          @hide="handleUserMenuHide"
-        >
-          <template #item="{ item, props }">
-            <a
-              v-bind="props.action"
-              :class="[
-                appOverlayMenuItemClass,
-                item.key === 'logout' ? appOverlayMenuDangerItemClass : '',
-              ]"
-            >
-              <span>{{ item.label }}</span>
-            </a>
-          </template>
-        </Menu>
-      </div>
+      <UserAccountMenu
+        :avatar-url="userStore.user?.avatar || undefined"
+        :items="userMenuItems"
+        :wrap-class="boardCatalogClasses.userMenuWrap"
+        :avatar-button-class="boardCatalogClasses.userAvatarButton"
+        :avatar-image-class="boardCatalogClasses.userAvatar"
+        :avatar-placeholder-class="boardCatalogClasses.userAvatarPlaceholder"
+        :avatar-icon-class="boardCatalogClasses.avatarIcon"
+      />
     </header>
 
     <main :class="boardCatalogClasses.main">
@@ -201,24 +167,21 @@ import {
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import {
-  appOverlayMenuDangerItemClass,
-  appOverlayMenuItemClass,
-} from '../../../shared/theme/appOverlayMenu'
-import {
+  ADMIN_ROOT_PATH,
   USER_CENTER_PATH,
-  USER_HOME_PATH,
   USER_CANVAS_PATH,
+  USER_HOME_PATH,
 } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../../app/stores/user'
-import { Search, User } from '@iconoir/vue'
+import { canAccessAdmin } from '../../../shared/auth/adminAccess'
+import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
+import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
+import { Search } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import Menu from 'primevue/menu'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
-import type { MenuItem } from 'primevue/menuitem'
-import { userMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
 
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
@@ -236,8 +199,6 @@ const renamingBoardId = ref<string | null>(null)
 const renameDraft = ref('')
 const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
-const isUserMenuOpen = ref(false)
-const userMenuRef = ref<PrimePopupMenuRef | null>(null)
 const deleteDialogVisible = ref(false)
 const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
 const isDeleteBoardPending = ref(false)
@@ -250,29 +211,19 @@ const sortOptions = [
   { label: 'Name', value: 'name' },
 ]
 
-const userMenuItems = computed<MenuItem[]>(() => [
-  {
-    key: 'center',
-    label: '个人中心',
-    command: () => {
-      void openCenter()
+const userMenuItems = computed(() =>
+  createUserAccountMenuItems({
+    canAccessAdmin: canAccessAdmin(userStore.user),
+    handlers: {
+      profile: openCenter,
+      admin: openAdmin,
+      home: goHome,
+      logout: () => {
+        void logout()
+      },
     },
-  },
-  {
-    key: 'home',
-    label: '返回首页',
-    command: () => {
-      void goHome()
-    },
-  },
-  {
-    key: 'logout',
-    label: '退出登录',
-    command: () => {
-      void logout()
-    },
-  },
-])
+  }),
+)
 
 const visibleBoards = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -462,35 +413,19 @@ async function confirmDeleteBoard() {
   boardFeedback.deleted()
 }
 
-function handleUserMenuShow() {
-  isUserMenuOpen.value = true
-}
-
-function handleUserMenuHide() {
-  isUserMenuOpen.value = false
-}
-
-function closeUserMenu() {
-  isUserMenuOpen.value = false
-  userMenuRef.value?.hide()
-}
-
-function toggleUserMenu(event: Event) {
-  userMenuRef.value?.toggle(event)
-}
-
 function openCenter() {
-  closeUserMenu()
-  router.push(USER_CENTER_PATH)
+  void router.push(USER_CENTER_PATH)
+}
+
+function openAdmin() {
+  void router.push(ADMIN_ROOT_PATH)
 }
 
 function goHome() {
-  closeUserMenu()
-  router.push(USER_HOME_PATH)
+  void router.push(USER_HOME_PATH)
 }
 
 async function logout() {
-  closeUserMenu()
   await logoutAndRedirect(USER_HOME_PATH)
 }
 

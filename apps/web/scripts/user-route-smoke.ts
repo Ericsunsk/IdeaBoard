@@ -26,22 +26,38 @@ const MOCK_USER = {
   updated_at: '2026-01-01T00:00:00Z',
 } satisfies User
 
+const MOCK_ADMIN = {
+  ...MOCK_USER,
+  id: 2,
+  uid: 'ADM001',
+  username: 'mock-admin',
+  role: 'admin',
+  auth_user_id: 'auth-admin-route',
+} satisfies User
+
 const MOCK_BOARD_ID = 'mock-board-1'
 const MOCK_BOARD_NAME = 'Mock Canvas Board'
 const MOCK_UPDATED_AT = 1_764_000_000_000
 const MOCK_CANVAS_UPLOAD_URL = `/uploads/canvas/${MOCK_USER.uid}/${MOCK_BOARD_ID}/content/mock-upload.png`
 const MOCK_AVATAR_URL = `/uploads/profile/${MOCK_USER.uid}/avatar/mock-avatar.png`
 
-const AUTH_SESSION = {
-  session: { id: 'user-route-smoke-session' },
-  user: { id: MOCK_USER.auth_user_id, username: MOCK_USER.username, role: MOCK_USER.role },
+function createAuthSession(user: User) {
+  return {
+    session: { id: `user-route-smoke-session-${user.uid}` },
+    user: { id: user.auth_user_id, username: user.username, role: user.role },
+  }
 }
 
-const USER_INFO = {
-  code: 0,
-  msg: 'ok',
-  data: { user: MOCK_USER },
+function createUserInfo(user: User) {
+  return {
+    code: 0,
+    msg: 'ok',
+    data: { user },
+  }
 }
+
+const AUTH_SESSION = createAuthSession(MOCK_USER)
+const USER_INFO = createUserInfo(MOCK_USER)
 
 const SITE_BRANDING_SETTING = {
   code: 0,
@@ -198,6 +214,33 @@ function setupBrowser(playwrightCli: CommandSpec) {
   )
 }
 
+function setSessionUserRoute(playwrightCli: CommandSpec, user: User) {
+  const userInfoBody = JSON.stringify(createUserInfo(user))
+  const authSessionBody = JSON.stringify(createAuthSession(user))
+
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'await page.unroute("**/api/user/info").catch(() => undefined)',
+      'await page.unroute("**/api/auth/get-session").catch(() => undefined)',
+      'await page.route("**/api/user/info", async (route) => {',
+      '  await route.fulfill({',
+      '    status: 200,',
+      '    contentType: "application/json",',
+      `    body: ${JSON.stringify(userInfoBody)},`,
+      '  })',
+      '})',
+      'await page.route("**/api/auth/get-session", async (route) => {',
+      '  await route.fulfill({',
+      '    status: 200,',
+      '    contentType: "application/json",',
+      `    body: ${JSON.stringify(authSessionBody)},`,
+      '  })',
+      '})',
+    ].join('\n'),
+  ])
+}
+
 function prepareOriginStorage(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/home`])
   smoke.runCommand(playwrightCli, [
@@ -324,6 +367,13 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       '}',
       'await page.getByRole("button", { name: "取消" }).click()',
       'await page.getByRole("heading", { name: "删除画布" }).waitFor({ state: "hidden", timeout: 10000 })',
+      'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'await accountButton.click()',
+      'const adminMenuItem = page.getByText("管理后台", { exact: true }).first()',
+      'if (await adminMenuItem.isVisible().catch(() => false)) {',
+      '  throw new Error("Regular user should not see admin menu item on boards page")',
+      '}',
+      'await page.keyboard.press("Escape")',
     ].join('\n'),
   ])
 }
@@ -353,10 +403,65 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'await pane.waitFor({ state: "visible", timeout: 10000 })',
       'const paneBox = await pane.boundingBox()',
       'if (!paneBox) throw new Error("Canvas pane has no bounding box")',
+      'const layout = page.locator(".canvas-layout").first()',
+      'const flowWrap = page.locator(".canvas-flow-wrap").first()',
+      'const controlGroup = page.locator(".canvas-control-group").first()',
+      'const layoutBefore = await layout.boundingBox()',
+      'const flowWrapBefore = await flowWrap.boundingBox()',
+      'const controlGroupBefore = await controlGroup.boundingBox()',
+      'if (!layoutBefore || !flowWrapBefore || !controlGroupBefore) throw new Error("Canvas layout metrics are unavailable before account menu opens")',
+      'const scrollWidthBefore = await page.evaluate(() => document.documentElement.scrollWidth)',
       'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'const accountButtonBox = await accountButton.boundingBox()',
+      'if (!accountButtonBox) throw new Error("Canvas account button has no bounding box")',
       'await accountButton.click()',
       'const userMenu = page.getByRole("menu").filter({ hasText: "个人中心" })',
       'await userMenu.waitFor({ state: "visible", timeout: 10000 })',
+      'await page.waitForTimeout(120)',
+      'const layoutAfter = await layout.boundingBox()',
+      'const flowWrapAfter = await flowWrap.boundingBox()',
+      'const controlGroupAfter = await controlGroup.boundingBox()',
+      'if (!layoutAfter || !flowWrapAfter || !controlGroupAfter) throw new Error("Canvas layout metrics are unavailable after account menu opens")',
+      'const scrollWidthAfter = await page.evaluate(() => document.documentElement.scrollWidth)',
+      'const assertStableMetric = (name, before, after) => {',
+      '  if (Math.abs(before - after) > 1) {',
+      '    throw new Error(`${name} shifted after account menu opened: before=${before}, after=${after}`)',
+      '  }',
+      '}',
+      'assertStableMetric("Canvas layout x", layoutBefore.x, layoutAfter.x)',
+      'assertStableMetric("Canvas layout width", layoutBefore.width, layoutAfter.width)',
+      'assertStableMetric("Canvas flow x", flowWrapBefore.x, flowWrapAfter.x)',
+      'assertStableMetric("Canvas flow width", flowWrapBefore.width, flowWrapAfter.width)',
+      'assertStableMetric("Canvas control group x", controlGroupBefore.x, controlGroupAfter.x)',
+      'assertStableMetric("Canvas document scrollWidth", scrollWidthBefore, scrollWidthAfter)',
+      'const canvasMenuStyle = await userMenu.evaluate((element) => {',
+      '  const menuElement = element instanceof HTMLElement ? element : null',
+      '  const panel = menuElement?.closest(".home-canvas-user-menu")',
+      '  const style = panel ? getComputedStyle(panel) : null',
+      '  return {',
+      '    backgroundColor: style?.backgroundColor ?? "",',
+      '    borderTopWidth: style?.borderTopWidth ?? "",',
+      '    width: panel instanceof HTMLElement ? panel.getBoundingClientRect().width : 0,',
+      '    top: panel instanceof HTMLElement ? panel.getBoundingClientRect().top : 0,',
+      '  }',
+      '})',
+      'if (canvasMenuStyle.width < 112 || canvasMenuStyle.width > 180) {',
+      '  throw new Error(`Canvas account menu width should stay compact, got ${canvasMenuStyle.width}`)',
+      '}',
+      'const verticalGap = canvasMenuStyle.top - (accountButtonBox.y + accountButtonBox.height)',
+      'if (verticalGap < 8 || verticalGap > 12) {',
+      '  throw new Error(`Canvas account menu vertical gap should be about 10px, got ${verticalGap}`)',
+      '}',
+      'if (canvasMenuStyle.backgroundColor === "rgba(0, 0, 0, 0)" || canvasMenuStyle.backgroundColor === "transparent") {',
+      '  throw new Error("Canvas account menu lost its panel background")',
+      '}',
+      'if (canvasMenuStyle.borderTopWidth === "0px") {',
+      '  throw new Error("Canvas account menu lost its panel border")',
+      '}',
+      'const adminMenuItem = page.getByText("管理后台", { exact: true }).first()',
+      'if (await adminMenuItem.isVisible().catch(() => false)) {',
+      '  throw new Error("Regular user should not see admin menu item on canvas page")',
+      '}',
       'await page.mouse.click(paneBox.x + paneBox.width - 24, paneBox.y + paneBox.height - 24)',
       'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
       'await pane.click({',
@@ -381,6 +486,33 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       '}',
     ].join('\n'),
   ])
+}
+
+function assertAdminAccountMenuNavigation(
+  playwrightCli: CommandSpec,
+  pagePath: string,
+  expectedText: string,
+) {
+  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${pagePath}`])
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      `await page.getByText(${JSON.stringify(expectedText)}).first().waitFor({ state: "visible", timeout: 15000 })`,
+      'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'await accountButton.waitFor({ state: "visible", timeout: 10000 })',
+      'await accountButton.click()',
+      'const adminMenuItem = page.getByText("管理后台", { exact: true }).first()',
+      'await adminMenuItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await adminMenuItem.click()',
+      'await page.waitForURL((url) => url.pathname.startsWith("/admin"), { timeout: 10000 })',
+    ].join('\n'),
+  ])
+}
+
+function assertAdminAccountMenus(playwrightCli: CommandSpec) {
+  setSessionUserRoute(playwrightCli, MOCK_ADMIN)
+  assertAdminAccountMenuNavigation(playwrightCli, '/user/boards', MOCK_BOARD_NAME)
+  assertAdminAccountMenuNavigation(playwrightCli, `/user/canvas?boardId=${MOCK_BOARD_ID}`, MOCK_BOARD_NAME)
 }
 
 function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
@@ -428,6 +560,7 @@ async function main() {
     for (const page of pages) {
       smokePage(playwrightCli, page)
     }
+    assertAdminAccountMenus(playwrightCli)
 
     console.log(`user route smoke passed: ${pages.length} pages`)
   } catch (error) {

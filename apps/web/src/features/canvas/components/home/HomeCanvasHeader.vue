@@ -98,64 +98,26 @@
       >
         <Download class="canvas-control-icon" />
       </button>
-      <div class="relative" @pointerdown.stop @mousedown.stop @click.stop>
-        <button
-          type="button"
-          class="ib-user-avatar-button canvas-user-avatar-button"
-          aria-label="账户菜单"
-          aria-haspopup="menu"
-          :aria-expanded="isUserMenuOpen"
-          aria-controls="canvas-user-menu"
-          @click="toggleUserMenu"
-        >
-          <img
-            v-if="avatarUrl"
-            :src="avatarUrl"
-            class="ib-user-avatar-button__image"
-            alt="用户头像"
-          />
-          <div v-else class="ib-user-avatar-button__placeholder">
-            <User class="size-5" />
-          </div>
-        </button>
-        <Transition name="home-canvas-menu">
-          <div
-            v-if="isUserMenuOpen"
-            id="canvas-user-menu"
-            role="menu"
-            class="home-canvas-user-menu absolute top-[calc(100%+8px)] right-0 z-[140] flex w-32 flex-col gap-0.5 rounded-[var(--canvas-surface-radius)] bg-[var(--canvas-surface-bg)] p-1.5 backdrop-blur-[var(--canvas-surface-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-surface-border)]"
-          >
-            <button
-              class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[var(--canvas-text-body)] hover:bg-[var(--canvas-accent-soft)]"
-              role="menuitem"
-              @click="onOpenCenter"
-            >
-              个人中心
-            </button>
-            <button
-              class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[#d14343] hover:bg-[rgba(209,67,67,0.1)]"
-              role="menuitem"
-              @click="onLogout"
-            >
-              退出登录
-            </button>
-          </div>
-        </Transition>
-      </div>
+      <UserAccountMenu
+        :avatar-url="avatarUrl"
+        :items="userMenuItems"
+        avatar-button-class="ib-user-avatar-button canvas-user-avatar-button"
+      />
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import {
   ArrowLeft,
   Download,
   ShareAndroid,
   ShareAndroidSolid,
   SquareCursor,
-  User,
 } from '@iconoir/vue'
+import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
+import type { UserAccountMenuItem } from '../../../../shared/components/userAccountMenuActions'
 
 const props = defineProps<{
   currentBoardName: string
@@ -166,6 +128,7 @@ const props = defineProps<{
   setBoardNameInputRef: (el: HTMLElement | null) => void
   exportDisabled: boolean
   avatarUrl?: string
+  userMenuItems: UserAccountMenuItem[]
 }>()
 
 const emit = defineEmits<{
@@ -176,42 +139,8 @@ const emit = defineEmits<{
   (e: 'confirm-board-rename'): void
   (e: 'select-board', boardId: string): void
   (e: 'export'): void
-  (e: 'open-center'): void
-  (e: 'logout'): void
   (e: 'navigate-back'): void
 }>()
-
-const isUserMenuOpen = ref(false)
-
-function closeUserMenu() {
-  isUserMenuOpen.value = false
-}
-
-function toggleUserMenu() {
-  isUserMenuOpen.value = !isUserMenuOpen.value
-}
-
-function onOpenCenter() {
-  closeUserMenu()
-  emit('open-center')
-}
-
-function onLogout() {
-  closeUserMenu()
-  emit('logout')
-}
-
-function onGlobalPointerDown() {
-  closeUserMenu()
-}
-
-onMounted(() => {
-  window.addEventListener('pointerdown', onGlobalPointerDown)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('pointerdown', onGlobalPointerDown)
-})
 
 function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null) {
   props.setBoardNameInputRef(element as HTMLElement | null)
@@ -228,10 +157,6 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 
 .home-canvas-board-menu {
   transform-origin: top left;
-}
-
-.home-canvas-user-menu {
-  transform-origin: top right;
 }
 
 .home-canvas-menu-enter-from,

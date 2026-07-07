@@ -22,6 +22,7 @@
       :set-board-name-input-ref="setBoardNameInputRef"
       :export-disabled="!hasSelectedFlowNodes"
       :avatar-url="userStore.user?.avatar ?? undefined"
+      :user-menu-items="userMenuItems"
       :minimap-enabled="isCanvasMinimapEnabled"
       :zoom-level="zoomLevel"
       @update:board-name-draft="boardNameDraft = $event"
@@ -31,8 +32,6 @@
       @confirm-board-rename="onConfirmBoardRename"
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
-      @open-center="onNavigateRequest(USER_CENTER_PATH)"
-      @logout="onLogoutRequest"
       @navigate-back="onNavigateRequest(USER_BOARDS_PATH)"
       @select-tool="setActiveTool"
       @toggle-minimap="toggleCanvasMinimap"
@@ -156,7 +155,13 @@ import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
-import { USER_BOARDS_PATH, USER_CENTER_PATH } from '../../../shared/constants/routePaths'
+import {
+  ADMIN_ROOT_PATH,
+  USER_BOARDS_PATH,
+  USER_CENTER_PATH,
+} from '../../../shared/constants/routePaths'
+import { canAccessAdmin } from '../../../shared/auth/adminAccess'
+import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
 import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -295,6 +300,20 @@ const {
   onNavigateRequest,
   onLogoutRequest,
 } = commands.boardSession
+
+const userMenuItems = computed(() =>
+  createUserAccountMenuItems({
+    canAccessAdmin: canAccessAdmin(userStore.user),
+    hiddenKeys: ['home'],
+    handlers: {
+      profile: () => onNavigateRequest(USER_CENTER_PATH),
+      admin: () => onNavigateRequest(ADMIN_ROOT_PATH),
+      logout: () => {
+        void onLogoutRequest()
+      },
+    },
+  }),
+)
 
 const { history: flowHistory } = viewModel.persistence
 const { flushAutosave, loadCanvasBoardAndProbe, reattachPendingImageResults } = commands.persistence

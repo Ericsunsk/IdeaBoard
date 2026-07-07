@@ -207,6 +207,12 @@
   --color-ib-info: var(--color-admin-info);
   --color-ib-board-border: var(--color-board-card-border);
   --color-ib-board-border-hover: var(--color-board-card-border-hover);
+  --color-ib-account-menu-bg: var(--color-board-overlay-bg);
+  --color-ib-account-menu-border: var(--color-board-menu-border);
+  --color-ib-account-menu-item: var(--color-board-menu-item);
+  --color-ib-account-menu-item-hover-bg: var(--color-board-menu-item-hover-bg);
+  --color-ib-account-menu-danger: var(--color-board-menu-danger);
+  --color-ib-account-menu-danger-hover-bg: var(--color-board-menu-danger-hover-bg);
 
   /*
    * Auth modal aliases.

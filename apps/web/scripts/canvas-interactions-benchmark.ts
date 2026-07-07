@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -11,7 +13,7 @@ import type {
   ImageNodeItem,
   PromptNodeItem,
 } from '../src/features/canvas-board/domain'
-import type { User, UserBoardItem } from '../src/shared/api/generated-query/model'
+import type { BoardStateEnvelope, User, UserBoardItem } from '../src/shared/api/generated-query/model'
 import { createMockSmokeRuntime } from './mock-smoke-utils'
 
 type BenchmarkPath =
@@ -21,7 +23,18 @@ type BenchmarkPath =
   | 'viewport-zoom'
   | 'connect-delete'
 
-type BenchmarkCounters = Record<string, number> & {
+type BenchmarkCounters = {
+  graphCommandCount?: number
+  nativeNodeChangeBatches?: number
+  nativeNodeChangeCount?: number
+  nativeEdgeChangeBatches?: number
+  nativeEdgeChangeCount?: number
+  nodeArrayReplacements?: number
+  edgeArrayReplacements?: number
+  historyCaptureCount?: number
+  historyPushCount?: number
+  autosaveScheduleCount?: number
+  autosaveSaveCount?: number
   graphCommands?: Record<string, number>
 }
 
@@ -320,6 +333,7 @@ function parsePaths(rawValue: string): BenchmarkPath[] {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
+  const benchmarkPaths: BenchmarkPath[] = []
 
   if (paths.length === 0) throw new Error('--paths must include at least one path')
 
@@ -327,9 +341,10 @@ function parsePaths(rawValue: string): BenchmarkPath[] {
     if (!isBenchmarkPath(pathName)) {
       throw new Error(`Unknown benchmark path "${pathName}". Supported paths: ${ALL_BENCHMARK_PATHS.join(', ')}`)
     }
+    benchmarkPaths.push(pathName)
   }
 
-  return [...new Set(paths)]
+  return [...new Set(benchmarkPaths)]
 }
 
 function parseViewport(rawValue: string): BenchmarkOptions['viewport'] {
@@ -530,7 +545,7 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
   const board = {
     board_id: BOARD_ID,
     name: BOARD_NAME,
-    state,
+    state: toBoardStateEnvelope(state),
     access_role: 'owner',
     revision: 1,
     state_schema_version: 1,
@@ -558,6 +573,17 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
       promptNodes: promptNodes.length,
       fusionNodes: fusionNodes.length,
     },
+  }
+}
+
+function toBoardStateEnvelope(state: CanvasBoardState): BoardStateEnvelope {
+  return {
+    ...state,
+    imageNodes: state.imageNodes.map((node) => ({ ...node })),
+    promptNodes: state.promptNodes.map((node) => ({ ...node })),
+    fusionNodes: state.fusionNodes.map((node) => ({ ...node })),
+    connections: state.connections.map((connection) => ({ ...connection })),
+    viewport: { ...state.viewport },
   }
 }
 
@@ -703,7 +729,7 @@ function applyBoardMutation(board: UserBoardItem, bodyText: string | null): User
     return {
       ...board,
       ...(typeof payload.name === 'string' ? { name: payload.name } : {}),
-      ...(isCanvasBoardState(payload.state) ? { state: payload.state } : {}),
+      ...(isCanvasBoardState(payload.state) ? { state: toBoardStateEnvelope(payload.state) } : {}),
       ...(typeof payload.revision === 'number' ? { revision: payload.revision } : {}),
       updated_at: Date.now(),
     }
@@ -829,9 +855,8 @@ async function runPath(
   try {
     await gotoBenchmarkCanvas(page, baseUrl)
 
-    let interaction = {
+    let interaction: { eventCount: number; positionChanges?: number } = {
       eventCount: 0,
-      positionChanges: undefined as number | undefined,
     }
 
     if (pathName !== 'initial-load') {

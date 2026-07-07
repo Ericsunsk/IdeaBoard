@@ -11,6 +11,7 @@
     :set-board-name-input-ref="setBoardNameInputRef"
     :export-disabled="exportDisabled"
     :avatar-url="avatarUrl"
+    :user-menu-items="userMenuItems"
     @update:board-name-draft="emit('update:board-name-draft', $event)"
     @toggle-board-menu="emit('toggle-board-menu')"
     @start-board-rename="emit('start-board-rename')"
@@ -18,8 +19,6 @@
     @confirm-board-rename="emit('confirm-board-rename')"
     @select-board="emit('select-board', $event)"
     @export="emit('export')"
-    @open-center="emit('open-center')"
-    @logout="emit('logout')"
     @navigate-back="emit('navigate-back')"
   />
 
@@ -47,6 +46,7 @@
 import HomeCanvasHeader from './home/HomeCanvasHeader.vue'
 import CanvasToolPalette from './CanvasToolPalette.vue'
 import CanvasZoomControls from './CanvasZoomControls.vue'
+import type { UserAccountMenuItem } from '../../../shared/components/userAccountMenuActions'
 
 defineProps<{
   inert: boolean
@@ -59,6 +59,7 @@ defineProps<{
   setBoardNameInputRef: (el: HTMLElement | null) => void
   exportDisabled: boolean
   avatarUrl?: string
+  userMenuItems: UserAccountMenuItem[]
   activeTool: 'select' | 'hand'
   minimapEnabled: boolean
   zoomLevel: number
@@ -72,8 +73,6 @@ const emit = defineEmits<{
   'confirm-board-rename': []
   'select-board': [boardId: string]
   export: []
-  'open-center': []
-  logout: []
   'navigate-back': []
   'select-tool': [tool: 'select' | 'hand']
   'toggle-minimap': []
