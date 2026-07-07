@@ -18,10 +18,8 @@
       class="flex min-h-0 flex-col bg-ib-surface px-4 py-5 max-[820px]:px-4 max-[820px]:py-4"
     >
       <div class="mb-7 flex min-w-0 items-center gap-2.5 px-1" :aria-label="projectName">
-        <span
-          class="inline-flex size-[2.7rem] shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-ib-control)] border border-ib-border-soft bg-ib-surface-raised text-ib-creative-accent-pressed"
-        >
-          <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
+        <span :class="accountBrandMarkClass">
+          <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
         </span>
         <span class="min-w-0 truncate text-[19px] leading-[29px] font-bold tracking-normal text-ib-text">
           {{ projectName }}
@@ -339,6 +337,7 @@ import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
 import {
   ibFormErrorMessagePt,
   ibFormFieldClass,
@@ -406,6 +405,7 @@ const mainContentClass =
   'relative grid h-[min(78dvh,720px)] min-h-0 grid-cols-[234px_minmax(0,1fr)] overflow-hidden bg-ib-surface-raised max-[820px]:h-[calc(100dvh-64px)] max-[820px]:grid-cols-1'
 const profilePaneClass =
   'app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto rounded-l-[var(--radius-ib-overlay)] bg-ib-surface-muted px-8 py-7 pr-14 max-[820px]:rounded-l-none max-[820px]:rounded-t-[var(--radius-ib-overlay)] max-[820px]:px-4 max-[820px]:py-5 max-[820px]:pr-14'
+const accountBrandMarkClass = createBrandMarkClass(brandMarkClasses.sizes.account)
 const passwordFieldClass = ibFormFieldClass
 const passwordInputClass = ibFormInputClass
 const passwordInputErrorClass = ibFormInputErrorClass

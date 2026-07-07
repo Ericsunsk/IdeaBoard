@@ -29,7 +29,7 @@
             <div class="flex min-w-0 flex-col gap-3">
               <div class="group/logo relative size-28">
                 <button
-                  class="flex size-full items-center justify-center overflow-hidden rounded-lg border border-admin-border bg-white text-admin-accent-pressed transition-colors hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
+                  :class="brandingLogoButtonClass"
                   type="button"
                   :disabled="brandingLoading || brandingSaving || uploading"
                   aria-label="上传站点 Logo"
@@ -39,7 +39,7 @@
                     :src="brandingLogoPreviewURL"
                     :fallback-text="brandingFallbackText"
                     fallback-class="select-none text-center text-xl leading-none font-[850] tracking-normal"
-                    class="h-full w-full"
+                    :class="brandMarkClasses.logo"
                   />
                 </button>
 
@@ -429,11 +429,17 @@ import {
   adminTwoColumnMasonryGridClass,
 } from '../../shared/lib/adminUiClasses'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
+import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
 const settingActionRowClass = 'flex flex-wrap items-center gap-2 pt-1'
 const settingToggleRowClass =
   'flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border bg-admin-surface-muted px-3.5 py-3'
+const brandingLogoButtonClass = createBrandMarkClass(
+  brandMarkClasses.sizes.fill,
+  brandMarkClasses.states.fallbackSoft,
+  'hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60',
+)
 
 const adminFeedback = useAdminFeedback()
 const {

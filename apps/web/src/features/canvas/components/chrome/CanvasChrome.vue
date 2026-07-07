@@ -75,7 +75,7 @@
     <div class="canvas-chrome-control-group canvas-chrome-action-group">
       <button
         type="button"
-        :class="canvasChromeRoundControlClass"
+        :class="canvasChromeActionControlClass"
         aria-label="分享功能稍后接入"
         title="分享功能稍后接入"
         disabled
@@ -190,6 +190,7 @@ import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
 import {
   createPageChromeAccountAvatarButtonClass,
   createPageChromeRoundControlClass,
+  pageChromeRoundControlVariants,
 } from '../../../../shared/lib/pageChrome'
 import type {
   CanvasChromeAccountState,
@@ -223,8 +224,13 @@ const emit = defineEmits<{
 }>()
 
 const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
+const canvasChromeActionControlClass = createPageChromeRoundControlClass(
+  pageChromeRoundControlVariants.borderless,
+  'canvas-chrome-icon-button',
+)
 const canvasChromeExportControlClass = createPageChromeRoundControlClass(
-  'canvas-chrome-icon-button enabled:!border-[var(--canvas-accent)] enabled:!bg-[var(--canvas-accent)] enabled:!text-white enabled:hover:!border-[var(--canvas-accent-hover)] enabled:hover:!bg-[var(--canvas-accent-hover)] enabled:hover:!text-white',
+  pageChromeRoundControlVariants.borderless,
+  'canvas-chrome-icon-button enabled:!bg-[var(--canvas-accent)] enabled:!text-white enabled:hover:!bg-[var(--canvas-accent-hover)] enabled:hover:!text-white',
 )
 const canvasChromeAvatarButtonClass = createPageChromeAccountAvatarButtonClass(
   'canvas-user-avatar-button',

@@ -1,6 +1,7 @@
 import type { DialogPassThroughOptions } from 'primevue/dialog'
 import type { MenuPassThroughOptions } from 'primevue/menu'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
+import { ibDialogMaskPt } from '../../../../shared/theme/dialogMask'
 
 type OverlayClass = string | undefined
 
@@ -54,6 +55,7 @@ export function createAdminDialogPt(input: {
   contentClass?: string
 }): DialogPassThroughOptions {
   return {
+    ...ibDialogMaskPt,
     ...(input.rootClass ? { root: { class: input.rootClass } } : {}),
     ...(input.headerClass ? { header: { class: input.headerClass } } : {}),
     ...(input.contentClass ? { content: { class: input.contentClass } } : {}),

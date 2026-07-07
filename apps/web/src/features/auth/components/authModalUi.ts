@@ -5,11 +5,10 @@ import {
   ibFormInputErrorClass,
   ibFormInputIconClass,
 } from '../../../shared/theme/formControls'
+import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 
 export const authDialogPt = {
-  mask: {
-    class: 'bg-[var(--color-ib-auth-mask)] backdrop-blur-[8px] transition-all duration-300',
-  },
+  ...ibDialogMaskPt,
   root: {
     class: 'm-5 w-[min(420px,calc(100vw-32px))] overflow-visible bg-transparent p-0',
   },

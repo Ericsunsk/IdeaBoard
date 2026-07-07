@@ -68,10 +68,10 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/pages/login/AdminLoginPage.vue': {
     counts: {
-      'raw-color': 2,
-      'raw-shadow': 2,
+      'raw-color': 1,
+      'raw-shadow': 1,
     },
-    reason: 'Login first-screen brand mark/card composition is a one-off Admin entry surface.',
+    reason: 'Login first-screen card composition keeps a one-off Admin entry shadow.',
   },
   'src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue': {
     counts: {

@@ -18,6 +18,7 @@
 <script setup lang="ts">
 import Dialog from 'primevue/dialog'
 import type { DialogPassThroughOptions } from 'primevue/dialog'
+import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
 defineProps<{
@@ -33,6 +34,7 @@ const accountManagementDialogStyle = {
 } as const
 
 const accountManagementDialogPt = {
+  ...ibDialogMaskPt,
   root: {
     class:
       '!max-h-[calc(100dvh-32px)] !overflow-hidden !rounded-[var(--radius-ib-overlay)] !border !border-ib-border-soft !bg-[var(--color-ib-surface)] !shadow-[var(--shadow-ib-overlay)] max-[640px]:!max-h-[calc(100dvh-20px)]',

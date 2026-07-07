@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '../shared/theme/brand-mark.css';
 @import '../shared/theme/round-control.css';
 @import '../shared/theme/page-chrome.css';
 @import '../shared/theme/user-avatar-button.css';
@@ -161,7 +162,6 @@
   );
   --color-board-danger: var(--color-ib-danger);
   --color-board-danger-hover: var(--color-ib-danger-pressed);
-  --color-board-dialog-mask: rgba(31, 36, 48, 0.34);
   --color-board-dialog-title: var(--color-board-control-input-text);
   --color-board-dialog-description: var(--color-board-page-text-muted);
   --radius-board-dialog: 20px;
@@ -211,6 +211,7 @@
   --color-ib-danger-hover: var(--color-admin-danger-hover);
   --color-ib-danger-pressed: var(--color-admin-danger-pressed);
   --color-ib-info: var(--color-admin-info);
+  --color-ib-dialog-mask: color-mix(in srgb, var(--color-ib-text) 38%, transparent);
   --color-ib-board-border: var(--color-board-card-border);
   --color-ib-board-border-hover: var(--color-board-card-border-hover);
   --color-ib-account-menu-bg: var(--color-board-overlay-bg);
@@ -225,7 +226,6 @@
    * These preserve the creative glass treatment while sourcing neutral values
    * from app semantics and expressive values from creative accent tokens.
    */
-  --color-ib-auth-mask: color-mix(in srgb, var(--color-ib-text) 40%, transparent);
   --color-ib-auth-shell: color-mix(in srgb, var(--color-ib-surface) 75%, transparent);
   --color-ib-auth-shell-border: color-mix(
     in srgb,

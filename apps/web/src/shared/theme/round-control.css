@@ -38,6 +38,31 @@
     --ib-round-control-size: var(--ib-page-chrome-control-size);
   }
 
+  .ib-round-control--borderless {
+    --ib-round-control-border-width: 0px;
+    --ib-round-control-border: transparent;
+    --ib-round-control-border-hover: transparent;
+  }
+
+  .ib-round-control--ghost {
+    --ib-round-control-border-width: 0px;
+    --ib-round-control-border: transparent;
+    --ib-round-control-border-hover: transparent;
+    --ib-round-control-bg: transparent;
+    --ib-round-control-bg-hover: var(--color-ib-surface-hover);
+  }
+
+  .ib-round-control--accent {
+    --ib-round-control-border-width: 0px;
+    --ib-round-control-border: transparent;
+    --ib-round-control-border-hover: transparent;
+    --ib-round-control-bg: var(--color-ib-accent);
+    --ib-round-control-bg-hover: var(--color-ib-accent-hover);
+    --ib-round-control-color: var(--color-ib-text-inverse);
+    --ib-round-control-color-hover: var(--color-ib-text-inverse);
+    --ib-round-control-focus-ring: color-mix(in srgb, var(--color-ib-accent) 18%, transparent);
+  }
+
   .ib-round-control:hover:not(:disabled) {
     border-color: var(--ib-round-control-border-hover);
     background: var(--ib-round-control-bg-hover);

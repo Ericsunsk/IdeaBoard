@@ -3,7 +3,7 @@
     <Card :class="loginCardClass" :pt="loginCardPt">
       <template #header>
         <router-link :class="brandMarkClass" to="/" :aria-label="projectName">
-          <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
+          <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
         </router-link>
       </template>
 
@@ -89,6 +89,7 @@ import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
+import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import { adminTextButtonClass } from '../../shared/lib/adminUiClasses'
 
@@ -99,10 +100,10 @@ const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout
 const adminFeedback = useAdminFeedback()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const brandMarkClass = computed(() =>
-  [
-    'inline-flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-[15px] border bg-ib-surface text-sm font-black text-ib-accent-pressed shadow-[0_10px_22px_rgba(45,64,89,0.08)]',
-    logoURL.value ? 'border-transparent' : 'border-ib-accent-pressed',
-  ].join(' '),
+  createBrandMarkClass(
+    brandMarkClasses.sizes.login,
+    logoURL.value ? brandMarkClasses.states.image : brandMarkClasses.states.fallbackStrong,
+  ),
 )
 const loginCardClass =
   'admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-ib-border bg-ib-surface shadow-[0_24px_70px_rgba(45,64,89,0.12)]'

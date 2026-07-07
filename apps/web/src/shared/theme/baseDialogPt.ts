@@ -1,6 +1,8 @@
 import type { DialogPassThroughOptions } from 'primevue/dialog'
+import { ibDialogMaskPt } from './dialogMask'
 
 export const baseDialogPt = {
+  ...ibDialogMaskPt,
   header: { class: '!items-start !gap-3 !px-6 !pt-5 !pb-3.5' },
   headerActions: { class: '!mt-1 !shrink-0' },
   pcCloseButton: {

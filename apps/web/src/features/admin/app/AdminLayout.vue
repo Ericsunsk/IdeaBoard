@@ -3,7 +3,7 @@
   <div v-else :class="layoutShellClass">
     <aside :class="siderClass" aria-label="后台导航">
       <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" :aria-label="brandAriaLabel">
-        <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
+        <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
       </router-link>
 
       <nav :class="navRailClass" aria-label="后台功能">
@@ -179,7 +179,7 @@
               :aria-label="brandAriaLabel"
               @click="closeCallback"
             >
-              <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
+              <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
             </router-link>
             <Button
               :class="shellButtonClass"
@@ -241,6 +241,7 @@ import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
+import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 import {
@@ -284,14 +285,13 @@ const layoutShellClass =
   'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-ib-surface text-ib-text max-[1080px]:grid-cols-1'
 const siderClass =
   "sticky top-0 flex h-screen self-start flex-col items-start bg-ib-surface py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[var(--radius-ib-overlay)] before:bg-admin-control-bg before:content-['']"
-const railItemSizeClass = 'size-10 min-w-[40px]'
 const railButtonSizeClass = '!size-10 !min-w-[40px]'
-const brandMarkBaseClass = [
-  'relative z-[1] ml-[42px] inline-flex flex-none items-center justify-center overflow-hidden rounded-xl border bg-ib-surface text-ib-accent-pressed no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]',
-  railItemSizeClass,
-].join(' ')
 const brandMarkClass = computed(() =>
-  [brandMarkBaseClass, logoURL.value ? 'border-transparent' : 'border-black'].join(' '),
+  createBrandMarkClass(
+    brandMarkClasses.sizes.compact,
+    logoURL.value ? brandMarkClasses.states.image : brandMarkClasses.states.fallbackStrong,
+    'relative z-[1] ml-[42px] focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]',
+  ),
 )
 const navRailClass =
   'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
