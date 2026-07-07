@@ -38,6 +38,7 @@ import {
   readPendingImageSnapshot,
 } from '../result-nodes/flowPendingImageTaskSnapshot'
 import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpaintTaskResult'
+import { syncImageInputEdgeAnimation } from '../flowEdgeAnimation'
 import type { ResultMaterializerImageResult } from '../result-nodes/resultMaterializer'
 import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import {
@@ -105,6 +106,19 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     refreshNodeInternals: options.refreshNodeInternals,
   })
 
+  function isImageNodeSnapshotRunning(nodeId: string): boolean {
+    return readPendingImageSnapshot(options.nodes.value, nodeId)?.outputStatus === 'running'
+  }
+
+  function syncRunningInputEdgeAnimation(nodeId: string, running: boolean) {
+    syncImageInputEdgeAnimation({
+      edges: options.edges.value,
+      graphAdapter: options.graphAdapter,
+      targetNodeIds: [nodeId],
+      shouldAnimate: running || isImageNodeSnapshotRunning(nodeId),
+    })
+  }
+
   function setNodeRunning(nodeId: string, running: boolean) {
     const next = new Set(runningNodeIds.value)
     if (running) {
@@ -113,6 +127,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       next.delete(nodeId)
     }
     runningNodeIds.value = next
+    syncRunningInputEdgeAnimation(nodeId, running)
   }
 
   function isBoardStillCurrent(boardId: string): boolean {

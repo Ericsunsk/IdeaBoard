@@ -120,9 +120,12 @@ function readImageSnapshot(nodes: Node[], nodeId: string): ImageNodeItem {
   return snapshot as ImageNodeItem
 }
 
-function createExecutionHarness(initialNodes: Node[] = [makeImageNode('image-1')]) {
+function createExecutionHarness(
+  initialNodes: Node[] = [makeImageNode('image-1')],
+  initialEdges: Edge[] = [],
+) {
   const nodes: Ref<Node[]> = shallowRef(initialNodes)
-  const edges: Ref<Edge[]> = shallowRef([])
+  const edges: Ref<Edge[]> = shallowRef(initialEdges)
   const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
   const flushAutosave = vi.fn(async () => undefined)
   const onSuccess = vi.fn()
@@ -240,7 +243,9 @@ describe('flowImageWorkflowExecution', () => {
     const submitTask = createDeferred<{ taskId: string }>()
     const taskResult = createDeferred<Array<{ url: string; width: number; height: number }>>()
     executorMocks.submitTaskRequest.mockImplementationOnce(() => submitTask.promise)
-    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(() => taskResult.promise)
+    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
+      () => taskResult.promise,
+    )
     const { execution, nodes, flushAutosave, onSuccess, onWarning } = createExecutionHarness()
 
     const run = execution.executeImageWorkflow(imageActionPlan())
@@ -342,16 +347,18 @@ describe('flowImageWorkflowExecution', () => {
   })
 
   it('reattaches pending image results through the workflow public API', async () => {
-    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementation(async (...args: unknown[]) => {
-      const taskId = String(args[0])
-      return [
-        {
-          url: `https://example.com/${taskId}.png`,
-          width: 400,
-          height: 200,
-        },
-      ]
-    })
+    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementation(
+      async (...args: unknown[]) => {
+        const taskId = String(args[0])
+        return [
+          {
+            url: `https://example.com/${taskId}.png`,
+            width: 400,
+            height: 200,
+          },
+        ]
+      },
+    )
     const { execution, nodes, flushAutosave, onSuccess, onWarning } = createExecutionHarness([
       makePendingImageNode('image-1', 'task-1'),
       makePendingImageNode('image-2.25', 'task-2'),
@@ -378,5 +385,43 @@ describe('flowImageWorkflowExecution', () => {
     expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
     expect(execution.isNodeDirectActionRunning('image-1')).toBe(false)
     expect(execution.isNodeDirectActionRunning('image-2.25')).toBe(false)
+  })
+
+  it('animates pending image input edges while reattaching running nodes', async () => {
+    const taskResult = createDeferred<Array<{ url: string; width: number; height: number }>>()
+    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
+      () => taskResult.promise,
+    )
+    const { execution, edges } = createExecutionHarness(
+      [makeImageNode('image-10', { id: 10 }), makePendingImageNode('image-1', 'task-1')],
+      [
+        {
+          id: 'connection-1',
+          source: 'image-10',
+          sourceHandle: 'out:image',
+          target: 'image-1',
+          targetHandle: 'in:image',
+          animated: false,
+        },
+      ],
+    )
+
+    const run = execution.reattachPendingImageResults()
+    await flushPromises()
+
+    expect(execution.isNodeDirectActionRunning('image-1')).toBe(true)
+    expect(edges.value.find((edge) => edge.id === 'connection-1')?.animated).toBe(true)
+
+    taskResult.resolve([
+      {
+        url: 'https://example.com/task-1.png',
+        width: 400,
+        height: 200,
+      },
+    ])
+    await run
+
+    expect(execution.isNodeDirectActionRunning('image-1')).toBe(false)
+    expect(edges.value.find((edge) => edge.id === 'connection-1')?.animated).toBe(false)
   })
 })

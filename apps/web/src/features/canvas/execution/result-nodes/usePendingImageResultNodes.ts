@@ -17,6 +17,7 @@ import type {
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 import { waitForNextRenderFrame } from '../../utils/animationFrame'
+import { syncImageInputEdgeAnimation } from '../flowEdgeAnimation'
 import type {
   CanvasVueFlowGraphAdapter,
   CanvasVueFlowGraphCommandOptions,
@@ -351,7 +352,8 @@ export function usePendingImageResultExecution(
     const activeResultNodeIdSet = new Set(activeResultNodeIds)
     const existingEdgeKeys = new Set(
       options.edges.value.map(
-        (edge) => `${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
+        (edge) =>
+          `${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
       ),
     )
     const nodesById = new Map(options.nodes.value.map((node) => [node.id, node]))
@@ -383,6 +385,15 @@ export function usePendingImageResultExecution(
       createPendingResultCommandOptions({ recordHistory: false }),
     )
     options.refreshNodeInternals?.([anchorNodeId, ...activeResultNodeIds])
+  }
+
+  function syncPendingResultInputEdgeAnimation(resultNodeIds: string[]) {
+    syncImageInputEdgeAnimation({
+      edges: options.edges.value,
+      graphAdapter: options.graphAdapter,
+      targetNodeIds: resultNodeIds,
+      shouldAnimate: true,
+    })
   }
 
   function planPendingImageResultNodeWithLookup(
@@ -526,6 +537,7 @@ export function usePendingImageResultExecution(
         .filter((plan) => !existingNodeIds.has(plan.resultNodeId))
         .map((plan) => plan.nextNode),
     ]
+    const resultNodeIds = plans.map((plan) => plan.resultNodeId)
     options.graphAdapter.replaceGraph(
       {
         nodes: nextNodes,
@@ -533,7 +545,7 @@ export function usePendingImageResultExecution(
       },
       createPendingResultCommandOptions({ recordHistory: true }),
     )
-    const resultNodeIds = plans.map((plan) => plan.resultNodeId)
+    syncPendingResultInputEdgeAnimation(resultNodeIds)
     options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
     void appendPendingImageResultEdges(
       anchorNodeId,

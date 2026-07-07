@@ -300,6 +300,48 @@ describe('usePendingImageResultExecution', () => {
     })
   })
 
+  it('animates reused and appended pending result edges while a batch is running', async () => {
+    const reusableNode = makeImageNode('image-1', {
+      id: 1,
+      sourceImageUrl: '',
+      outputStatus: 'idle',
+    })
+    const harness = createHarness(
+      [makePromptNode('prompt-1'), reusableNode],
+      [makeImageEdge('image-1', { id: 'connection-1', source: 'prompt-1', animated: false })],
+    )
+    let reservedNodeIds: string[] = []
+    const pendingResult = createDeferred<{
+      url: string
+      ratio: number
+    }>()
+
+    const run = harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'prompt-1',
+      outputCount: 2,
+      resultOptions: { targetRatio: 1, targetWidth: 280 },
+      submitTask: async (resultNodeId) => ({ taskId: `task-${resultNodeId}` }),
+      resolveResult: () => pendingResult.promise,
+      isCurrent: () => true,
+      isPendingError: (error) => error instanceof Error && error.message === 'pending',
+      onReserved: (ids) => {
+        reservedNodeIds = ids
+      },
+    })
+    await flushPromises()
+
+    expect(reservedNodeIds[0]).toBe('image-1')
+    const animatedByTarget = new Map(
+      harness.edges.value.map((edge) => [edge.target, edge.animated]),
+    )
+    expect(animatedByTarget.get('image-1')).toBe(true)
+    expect(animatedByTarget.get(reservedNodeIds[1])).toBe(true)
+
+    pendingResult.reject(new Error('pending'))
+    await run
+  })
+
   it('keeps batched pending nodes in a single undoable creation step', async () => {
     const harness = createHarness([makeAnchorNode()])
 
@@ -370,9 +412,7 @@ describe('usePendingImageResultExecution', () => {
         (command) => command.command === 'replaceGraph' && readRecordHistory(command) === false,
       ),
     ).toHaveLength(1)
-    expect(
-      reservedNodeIds.map((nodeId) => readImageSnapshot(harness.nodes.value, nodeId)),
-    ).toEqual(
+    expect(reservedNodeIds.map((nodeId) => readImageSnapshot(harness.nodes.value, nodeId))).toEqual(
       reservedNodeIds.map((nodeId) =>
         expect.objectContaining({
           sourceImageUrl: `https://example.com/${nodeId}.png`,
