@@ -34,7 +34,8 @@
   }
 
   .ib-page-chrome-control {
-    --ib-round-control-size: 40px;
+    --ib-page-chrome-control-size: 40px;
+    --ib-round-control-size: var(--ib-page-chrome-control-size);
   }
 
   .ib-round-control:hover:not(:disabled) {

@@ -75,7 +75,7 @@
     <div class="canvas-chrome-control-group canvas-chrome-action-group">
       <button
         type="button"
-        class="ib-round-control ib-page-chrome-control canvas-chrome-icon-button"
+        :class="canvasChromeRoundControlClass"
         aria-label="分享功能稍后接入"
         title="分享功能稍后接入"
         disabled
@@ -87,7 +87,7 @@
         </span>
       </button>
       <button
-        class="ib-round-control ib-page-chrome-control canvas-chrome-icon-button enabled:!border-[var(--canvas-accent)] enabled:!bg-[var(--canvas-accent)] enabled:!text-white enabled:hover:!border-[var(--canvas-accent-hover)] enabled:hover:!bg-[var(--canvas-accent-hover)] enabled:hover:!text-white"
+        :class="canvasChromeExportControlClass"
         type="button"
         aria-label="导出"
         :disabled="status.exportDisabled"
@@ -99,7 +99,7 @@
       <UserAccountMenu
         :avatar-url="account.avatarUrl"
         :items="account.menuItems"
-        avatar-button-class="ib-round-control ib-page-chrome-control ib-user-avatar-button canvas-user-avatar-button"
+        :avatar-button-class="canvasChromeAvatarButtonClass"
       />
     </div>
   </header>
@@ -112,8 +112,7 @@
   >
     <button
       type="button"
-      class="ib-round-control ib-page-chrome-control canvas-chrome-icon-button"
-      :class="{ 'is-active': tools.activeTool === 'select' }"
+      :class="[canvasChromeRoundControlClass, { 'is-active': tools.activeTool === 'select' }]"
       aria-label="选择 (V)"
       :aria-pressed="tools.activeTool === 'select'"
       @click="emit('select-tool', 'select')"
@@ -122,8 +121,7 @@
     </button>
     <button
       type="button"
-      class="ib-round-control ib-page-chrome-control canvas-chrome-icon-button"
-      :class="{ 'is-active': tools.activeTool === 'hand' }"
+      :class="[canvasChromeRoundControlClass, { 'is-active': tools.activeTool === 'hand' }]"
       aria-label="抓手 (H)"
       :aria-pressed="tools.activeTool === 'hand'"
       @click="emit('select-tool', 'hand')"
@@ -132,8 +130,7 @@
     </button>
     <button
       type="button"
-      class="ib-round-control ib-page-chrome-control canvas-chrome-icon-button"
-      :class="{ 'is-active': tools.minimapEnabled }"
+      :class="[canvasChromeRoundControlClass, { 'is-active': tools.minimapEnabled }]"
       aria-label="小地图"
       :aria-pressed="tools.minimapEnabled"
       title="小地图"
@@ -190,6 +187,10 @@ import {
   SquareCursor,
 } from '@iconoir/vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
+import {
+  createPageChromeAccountAvatarButtonClass,
+  createPageChromeRoundControlClass,
+} from '../../../../shared/lib/pageChrome'
 import type {
   CanvasChromeAccountState,
   CanvasChromeBoardState,
@@ -220,6 +221,14 @@ const emit = defineEmits<{
   'zoom-out': []
   'zoom-in': []
 }>()
+
+const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
+const canvasChromeExportControlClass = createPageChromeRoundControlClass(
+  'canvas-chrome-icon-button enabled:!border-[var(--canvas-accent)] enabled:!bg-[var(--canvas-accent)] enabled:!text-white enabled:hover:!border-[var(--canvas-accent-hover)] enabled:hover:!bg-[var(--canvas-accent-hover)] enabled:hover:!text-white',
+)
+const canvasChromeAvatarButtonClass = createPageChromeAccountAvatarButtonClass(
+  'canvas-user-avatar-button',
+)
 
 function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null) {
   props.board.setNameInputRef(element as HTMLElement | null)

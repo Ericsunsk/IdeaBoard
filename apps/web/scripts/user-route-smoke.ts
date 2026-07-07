@@ -1,5 +1,6 @@
 import type { User, UserBoardItem } from '../src/shared/api/generated-query/model'
 import { assertNoConsoleErrors, createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
+import { pageChromeBrowserAssertionHelpers } from './page-chrome-smoke-helpers'
 
 type SmokePage = {
   label: string
@@ -180,30 +181,6 @@ const pages: SmokePage[] = [
 
 const DESKTOP_CANVAS_VIEWPORT = { width: 1280, height: 720 } as const
 const NARROW_CANVAS_VIEWPORT = { width: 390, height: 844 } as const
-
-const pageChromeBrowserAssertionHelpers = [
-  'const assertPageChromeRoundControl = (name, box) => {',
-  '  if (!box) throw new Error(`${name} has no bounding box`)',
-  '  if (Math.abs(box.width - 40) > 1 || Math.abs(box.height - 40) > 1) {',
-  '    throw new Error(`${name} should use the 40px page chrome round-control contract, got ${box.width}x${box.height}`)',
-  '  }',
-  '}',
-  'const assertAccountMenuWrapperFitsButton = async (name, button) => {',
-  '  const metrics = await button.evaluate((element) => {',
-  '    const wrapper = element.parentElement',
-  '    const buttonRect = element.getBoundingClientRect()',
-  '    const wrapperRect = wrapper?.getBoundingClientRect()',
-  '    return {',
-  '      buttonHeight: buttonRect.height,',
-  '      wrapperHeight: wrapperRect?.height ?? 0,',
-  '      wrapperDisplay: wrapper ? getComputedStyle(wrapper).display : "",',
-  '    }',
-  '  })',
-  '  if (Math.abs(metrics.wrapperHeight - metrics.buttonHeight) > 0.5) {',
-  '    throw new Error(`${name} wrapper should fit the avatar button without line-box drift, got wrapper=${metrics.wrapperHeight}, button=${metrics.buttonHeight}, display=${metrics.wrapperDisplay}`)',
-  '  }',
-  '}',
-]
 
 const canvasChromeStabilityBrowserAssertionHelpers = [
   'const requireVisibleChromeBox = async (name, locator) => {',

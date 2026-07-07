@@ -1,0 +1,15 @@
+@layer components {
+  .ib-page-chrome-account {
+    --ib-page-chrome-control-size: 40px;
+    display: inline-flex;
+    min-width: var(--ib-page-chrome-control-size);
+    height: var(--ib-page-chrome-control-size);
+    align-items: center;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .ib-page-chrome-account > .ib-page-chrome-control {
+    flex: none;
+  }
+}

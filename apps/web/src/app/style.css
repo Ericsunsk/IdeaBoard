@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '../shared/theme/round-control.css';
+@import '../shared/theme/page-chrome.css';
 @import '../shared/theme/user-avatar-button.css';
 @import '../features/admin/shared/styles/admin-user-avatar-button.css';
 @plugin "tailwindcss-primeui";

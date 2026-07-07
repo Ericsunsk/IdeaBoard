@@ -50,10 +50,8 @@ import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import type { MenuPassThroughOptions } from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
-import {
-  appOverlayMenuDangerItemClass,
-  appOverlayMenuItemClass,
-} from '../theme/appOverlayMenu'
+import { appOverlayMenuDangerItemClass, appOverlayMenuItemClass } from '../theme/appOverlayMenu'
+import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
 import { userAccountMenuPt } from '../theme/userAccountMenuSkin'
 import type { UserAccountMenuItem } from './userAccountMenuActions'
 
@@ -80,11 +78,11 @@ const props = withDefaults(
   }>(),
   {
     avatarUrl: undefined,
-    wrapClass: 'relative',
-    avatarButtonClass: 'ib-round-control ib-page-chrome-control ib-user-avatar-button',
-    avatarImageClass: 'ib-user-avatar-button__image',
-    avatarPlaceholderClass: 'ib-user-avatar-button__placeholder',
-    avatarIconClass: 'size-5',
+    wrapClass: pageChromeAccountMenuClasses.wrap,
+    avatarButtonClass: pageChromeAccountMenuClasses.avatarButton,
+    avatarImageClass: pageChromeAccountMenuClasses.avatarImage,
+    avatarPlaceholderClass: pageChromeAccountMenuClasses.avatarPlaceholder,
+    avatarIconClass: pageChromeAccountMenuClasses.avatarIcon,
     appendTo: 'body',
     menuPt: undefined,
     menuItemClass: appOverlayMenuItemClass,
