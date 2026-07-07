@@ -178,6 +178,124 @@ const pages: SmokePage[] = [
   },
 ]
 
+const DESKTOP_CANVAS_VIEWPORT = { width: 1280, height: 720 } as const
+const NARROW_CANVAS_VIEWPORT = { width: 390, height: 844 } as const
+
+const pageChromeBrowserAssertionHelpers = [
+  'const assertPageChromeRoundControl = (name, box) => {',
+  '  if (!box) throw new Error(`${name} has no bounding box`)',
+  '  if (Math.abs(box.width - 40) > 1 || Math.abs(box.height - 40) > 1) {',
+  '    throw new Error(`${name} should use the 40px page chrome round-control contract, got ${box.width}x${box.height}`)',
+  '  }',
+  '}',
+  'const assertAccountMenuWrapperFitsButton = async (name, button) => {',
+  '  const metrics = await button.evaluate((element) => {',
+  '    const wrapper = element.parentElement',
+  '    const buttonRect = element.getBoundingClientRect()',
+  '    const wrapperRect = wrapper?.getBoundingClientRect()',
+  '    return {',
+  '      buttonHeight: buttonRect.height,',
+  '      wrapperHeight: wrapperRect?.height ?? 0,',
+  '      wrapperDisplay: wrapper ? getComputedStyle(wrapper).display : "",',
+  '    }',
+  '  })',
+  '  if (Math.abs(metrics.wrapperHeight - metrics.buttonHeight) > 0.5) {',
+  '    throw new Error(`${name} wrapper should fit the avatar button without line-box drift, got wrapper=${metrics.wrapperHeight}, button=${metrics.buttonHeight}, display=${metrics.wrapperDisplay}`)',
+  '  }',
+  '}',
+]
+
+const canvasChromeStabilityBrowserAssertionHelpers = [
+  'const requireVisibleChromeBox = async (name, locator) => {',
+  '  await locator.waitFor({ state: "visible", timeout: 10000 })',
+  '  const box = await locator.boundingBox()',
+  '  if (!box || box.width <= 0 || box.height <= 0) {',
+  '    throw new Error(`${name} has no visible bounding box`)',
+  '  }',
+  '  return box',
+  '}',
+  'const assertNoHorizontalOverflow = async (viewportLabel) => {',
+  '  const metrics = await page.evaluate(() => {',
+  '    const root = document.documentElement',
+  '    const body = document.body',
+  '    return {',
+  '      clientWidth: root.clientWidth,',
+  '      scrollWidth: Math.max(root.scrollWidth, body?.scrollWidth ?? 0),',
+  '    }',
+  '  })',
+  '  if (metrics.scrollWidth > metrics.clientWidth + 1) {',
+  '    throw new Error(`${viewportLabel} Canvas chrome should not create horizontal overflow: scrollWidth=${metrics.scrollWidth}, clientWidth=${metrics.clientWidth}`)',
+  '  }',
+  '}',
+  'const getOverlapSize = (first, second) => {',
+  '  const x = Math.max(0, Math.min(first.x + first.width, second.x + second.width) - Math.max(first.x, second.x))',
+  '  const y = Math.max(0, Math.min(first.y + first.height, second.y + second.height) - Math.max(first.y, second.y))',
+  '  return { x, y }',
+  '}',
+  'const assertNoObviousChromeOverlap = (viewportLabel, first, second) => {',
+  '  const overlap = getOverlapSize(first.box, second.box)',
+  '  if (overlap.x > 2 && overlap.y > 2) {',
+  '    throw new Error(`${viewportLabel} Canvas chrome has incoherent overlap: ${first.name} and ${second.name} overlap by ${Math.round(overlap.x)}x${Math.round(overlap.y)}`)',
+  '  }',
+  '}',
+  'const assertCanvasChromeStableViewport = async (viewportLabel, viewportSize, boardName) => {',
+  '  await page.setViewportSize(viewportSize)',
+  '  await page.waitForTimeout(150)',
+  '  const viewport = page.viewportSize()',
+  '  if (!viewport) throw new Error(`${viewportLabel} Canvas viewport is not available`)',
+  '  await assertNoHorizontalOverflow(viewportLabel)',
+  '  await requireVisibleChromeBox(`${viewportLabel} Canvas pane`, page.locator(".vue-flow__pane").first())',
+  '  const visibleChromeTargets = [',
+  '    [`${viewportLabel} Canvas board title`, page.getByText(boardName, { exact: true }).first()],',
+  '    [`${viewportLabel} Canvas account button`, page.getByRole("button", { name: "账户菜单" }).first()],',
+  '    [`${viewportLabel} Canvas share button`, page.getByRole("button", { name: "分享功能稍后接入" }).first()],',
+  '    [`${viewportLabel} Canvas export button`, page.getByRole("button", { name: "导出" }).first()],',
+  '    [`${viewportLabel} Canvas select tool button`, page.getByRole("button", { name: "选择 (V)" }).first()],',
+  '    [`${viewportLabel} Canvas zoom out button`, page.getByRole("button", { name: "缩小" }).first()],',
+  '    [`${viewportLabel} Canvas zoom level`, page.getByText("100%", { exact: true }).first()],',
+  '    [`${viewportLabel} Canvas zoom in button`, page.getByRole("button", { name: "放大" }).first()],',
+  '    [`${viewportLabel} Canvas minimap button`, page.getByRole("button", { name: "小地图" }).first()],',
+  '  ]',
+  '  for (const [name, locator] of visibleChromeTargets) {',
+  '    await requireVisibleChromeBox(name, locator)',
+  '  }',
+  '  const chromeLayoutTargets = [',
+  '    [`${viewportLabel} Canvas board control`, page.locator(".canvas-chrome-board-control").first()],',
+  '    [`${viewportLabel} Canvas action group`, page.locator(".canvas-chrome-action-group").first()],',
+  '    [`${viewportLabel} Canvas left toolbar`, page.locator(".canvas-chrome-region--left").first()],',
+  '    [`${viewportLabel} Canvas status controls`, page.locator(".canvas-chrome-region--status").first()],',
+  '  ]',
+  '  const chromeBoxes = []',
+  '  for (const [name, locator] of chromeLayoutTargets) {',
+  '    chromeBoxes.push({ name, box: await requireVisibleChromeBox(name, locator) })',
+  '  }',
+  '  for (let firstIndex = 0; firstIndex < chromeBoxes.length; firstIndex += 1) {',
+  '    for (let secondIndex = firstIndex + 1; secondIndex < chromeBoxes.length; secondIndex += 1) {',
+  '      assertNoObviousChromeOverlap(viewportLabel, chromeBoxes[firstIndex], chromeBoxes[secondIndex])',
+  '    }',
+  '  }',
+  '  const chromeInset = await page.locator(".canvas-chrome-region--top").first().evaluate((element) => Number.parseFloat(getComputedStyle(element).getPropertyValue("--canvas-chrome-inset")))',
+  '  if (!Number.isFinite(chromeInset)) throw new Error(`${viewportLabel} Canvas chrome inset token is not readable`)',
+  '  const minimapButton = page.getByRole("button", { name: "小地图" }).first()',
+  '  await minimapButton.click()',
+  '  const minimapShell = page.locator(".canvas-minimap-shell").first()',
+  '  const minimapBox = await requireVisibleChromeBox(`${viewportLabel} Canvas minimap shell`, minimapShell)',
+  '  const minimapRight = minimapBox.x + minimapBox.width',
+  '  const minimapBottomInset = viewport.height - (minimapBox.y + minimapBox.height)',
+  '  if (Math.abs(minimapBox.x - chromeInset) > 1 || Math.abs(minimapBottomInset - chromeInset) > 1) {',
+  '    throw new Error(`${viewportLabel} Canvas minimap should anchor to chrome inset ${chromeInset}px, got left=${minimapBox.x}, bottom=${minimapBottomInset}`)',
+  '  }',
+  '  if (minimapRight > viewport.width - chromeInset + 1) {',
+  '    throw new Error(`${viewportLabel} Canvas minimap should fit within viewport, got right=${minimapRight}, viewport=${viewport.width}`)',
+  '  }',
+  '  for (const chromeBox of chromeBoxes) {',
+  '    assertNoObviousChromeOverlap(viewportLabel, chromeBox, { name: `${viewportLabel} Canvas minimap shell`, box: minimapBox })',
+  '  }',
+  '  await minimapButton.click()',
+  '  await minimapShell.waitFor({ state: "hidden", timeout: 10000 })',
+  '}',
+]
+
 function setupBrowser(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, ['open', 'about:blank'])
   smoke.routeJson(playwrightCli, '**/api/auth/get-session', AUTH_SESSION)
@@ -210,11 +328,7 @@ function setupBrowser(playwrightCli: CommandSpec) {
     { code: 599, msg: 'user route smoke blocked auth mutation' },
     599,
   )
-  smoke.routeJson(
-    playwrightCli,
-    '**/api/user/profile/avatar',
-    AVATAR_UPLOAD,
-  )
+  smoke.routeJson(playwrightCli, '**/api/user/profile/avatar', AVATAR_UPLOAD)
 }
 
 function setSessionUserRoute(playwrightCli: CommandSpec, user: User) {
@@ -341,6 +455,19 @@ function assertCanvasDom(playwrightCli: CommandSpec, page: SmokePage) {
   assertNoConsoleErrors(consoleOutput, page.path)
 }
 
+function assertCanvasChromeStability(playwrightCli: CommandSpec) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      ...canvasChromeStabilityBrowserAssertionHelpers,
+      `await assertCanvasChromeStableViewport("desktop", ${JSON.stringify(DESKTOP_CANVAS_VIEWPORT)}, ${JSON.stringify(MOCK_BOARD_NAME)})`,
+      `await assertCanvasChromeStableViewport("narrow", ${JSON.stringify(NARROW_CANVAS_VIEWPORT)}, ${JSON.stringify(MOCK_BOARD_NAME)})`,
+      `await page.setViewportSize(${JSON.stringify(DESKTOP_CANVAS_VIEWPORT)})`,
+      'await page.waitForTimeout(150)',
+    ].join('\n'),
+  ])
+}
+
 function assertBoardsInteractions(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, [
     'run-code',
@@ -370,27 +497,7 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       '}',
       'await page.getByRole("button", { name: "取消" }).click()',
       'await page.getByRole("heading", { name: "删除画布" }).waitFor({ state: "hidden", timeout: 10000 })',
-      'const assertPageChromeRoundControl = (name, box) => {',
-      '  if (!box) throw new Error(`${name} has no bounding box`)',
-      '  if (Math.abs(box.width - 40) > 1 || Math.abs(box.height - 40) > 1) {',
-      '    throw new Error(`${name} should use the 40px page chrome round-control contract, got ${box.width}x${box.height}`)',
-      '  }',
-      '}',
-      'const assertAccountMenuWrapperFitsButton = async (name, button) => {',
-      '  const metrics = await button.evaluate((element) => {',
-      '    const wrapper = element.parentElement',
-      '    const buttonRect = element.getBoundingClientRect()',
-      '    const wrapperRect = wrapper?.getBoundingClientRect()',
-      '    return {',
-      '      buttonHeight: buttonRect.height,',
-      '      wrapperHeight: wrapperRect?.height ?? 0,',
-      '      wrapperDisplay: wrapper ? getComputedStyle(wrapper).display : "",',
-      '    }',
-      '  })',
-      '  if (Math.abs(metrics.wrapperHeight - metrics.buttonHeight) > 0.5) {',
-      '    throw new Error(`${name} wrapper should fit the avatar button without line-box drift, got wrapper=${metrics.wrapperHeight}, button=${metrics.buttonHeight}, display=${metrics.wrapperDisplay}`)',
-      '  }',
-      '}',
+      ...pageChromeBrowserAssertionHelpers,
       'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
       'await accountButton.waitFor({ state: "visible", timeout: 10000 })',
       'const accountButtonBox = await accountButton.boundingBox()',
@@ -441,11 +548,11 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'if (!paneBox) throw new Error("Canvas pane has no bounding box")',
       'const layout = page.locator(".canvas-layout").first()',
       'const flowWrap = page.locator(".canvas-flow-wrap").first()',
-      'const controlGroup = page.locator(".canvas-control-group").first()',
+      'const actionGroup = page.locator(".canvas-chrome-action-group").first()',
       'const layoutBefore = await layout.boundingBox()',
       'const flowWrapBefore = await flowWrap.boundingBox()',
-      'const controlGroupBefore = await controlGroup.boundingBox()',
-      'if (!layoutBefore || !flowWrapBefore || !controlGroupBefore) throw new Error("Canvas layout metrics are unavailable before account menu opens")',
+      'const actionGroupBefore = await actionGroup.boundingBox()',
+      'if (!layoutBefore || !flowWrapBefore || !actionGroupBefore) throw new Error("Canvas layout metrics are unavailable before account menu opens")',
       'const flowWrapBackground = await flowWrap.evaluate((element) => getComputedStyle(element).backgroundImage)',
       'if (!flowWrapBackground.includes("radial-gradient")) throw new Error(`Canvas flow wrapper should own dot background, got ${flowWrapBackground}`)',
       'const vueFlowRoot = page.locator(".vue-flow").first()',
@@ -459,9 +566,9 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'const vueFlowViewport = page.locator(".vue-flow__viewport").first()',
       'const viewportBackground = await vueFlowViewport.evaluate((element) => getComputedStyle(element).backgroundImage)',
       'if (viewportBackground !== "none") throw new Error(`Vue Flow viewport should not own dot background, got ${viewportBackground}`)',
-      'const header = page.locator(".canvas-page-chrome--header").first()',
-      'const toolPalette = page.locator(".canvas-page-chrome--left").first()',
-      'const zoomControls = page.locator(".canvas-page-chrome--status").first()',
+      'const header = page.locator(".canvas-chrome-region--top").first()',
+      'const toolPalette = page.locator(".canvas-chrome-region--left").first()',
+      'const zoomControls = page.locator(".canvas-chrome-region--status").first()',
       'const headerBox = await header.boundingBox()',
       'const toolPaletteBox = await toolPalette.boundingBox()',
       'const zoomControlsBox = await zoomControls.boundingBox()',
@@ -474,27 +581,7 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       '    throw new Error(`${name} should use canvas chrome inset ${chromeInset}px, got ${actual}`)',
       '  }',
       '}',
-      'const assertPageChromeRoundControl = (name, box) => {',
-      '  if (!box) throw new Error(`${name} has no bounding box`)',
-      '  if (Math.abs(box.width - 40) > 1 || Math.abs(box.height - 40) > 1) {',
-      '    throw new Error(`${name} should use the 40px page chrome round-control contract, got ${box.width}x${box.height}`)',
-      '  }',
-      '}',
-      'const assertAccountMenuWrapperFitsButton = async (name, button) => {',
-      '  const metrics = await button.evaluate((element) => {',
-      '    const wrapper = element.parentElement',
-      '    const buttonRect = element.getBoundingClientRect()',
-      '    const wrapperRect = wrapper?.getBoundingClientRect()',
-      '    return {',
-      '      buttonHeight: buttonRect.height,',
-      '      wrapperHeight: wrapperRect?.height ?? 0,',
-      '      wrapperDisplay: wrapper ? getComputedStyle(wrapper).display : "",',
-      '    }',
-      '  })',
-      '  if (Math.abs(metrics.wrapperHeight - metrics.buttonHeight) > 0.5) {',
-      '    throw new Error(`${name} wrapper should fit the avatar button without line-box drift, got wrapper=${metrics.wrapperHeight}, button=${metrics.buttonHeight}, display=${metrics.wrapperDisplay}`)',
-      '  }',
-      '}',
+      ...pageChromeBrowserAssertionHelpers,
       'assertChromeInset("Canvas header top", headerBox.y)',
       'assertChromeInset("Canvas header left", headerBox.x)',
       'assertChromeInset("Canvas header right", viewportSize.width - (headerBox.x + headerBox.width))',
@@ -537,8 +624,8 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'await page.waitForTimeout(120)',
       'const layoutAfter = await layout.boundingBox()',
       'const flowWrapAfter = await flowWrap.boundingBox()',
-      'const controlGroupAfter = await controlGroup.boundingBox()',
-      'if (!layoutAfter || !flowWrapAfter || !controlGroupAfter) throw new Error("Canvas layout metrics are unavailable after account menu opens")',
+      'const actionGroupAfter = await actionGroup.boundingBox()',
+      'if (!layoutAfter || !flowWrapAfter || !actionGroupAfter) throw new Error("Canvas layout metrics are unavailable after account menu opens")',
       'const scrollWidthAfter = await page.evaluate(() => document.documentElement.scrollWidth)',
       'const assertStableMetric = (name, before, after) => {',
       '  if (Math.abs(before - after) > 1) {',
@@ -549,11 +636,11 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'assertStableMetric("Canvas layout width", layoutBefore.width, layoutAfter.width)',
       'assertStableMetric("Canvas flow x", flowWrapBefore.x, flowWrapAfter.x)',
       'assertStableMetric("Canvas flow width", flowWrapBefore.width, flowWrapAfter.width)',
-      'assertStableMetric("Canvas control group x", controlGroupBefore.x, controlGroupAfter.x)',
+      'assertStableMetric("Canvas action group x", actionGroupBefore.x, actionGroupAfter.x)',
       'assertStableMetric("Canvas document scrollWidth", scrollWidthBefore, scrollWidthAfter)',
       'const canvasMenuStyle = await userMenu.evaluate((element) => {',
       '  const menuElement = element instanceof HTMLElement ? element : null',
-      '  const panel = menuElement?.closest(".home-canvas-user-menu")',
+      '  const panel = menuElement?.closest(".ib-user-account-menu-panel")',
       '  const style = panel ? getComputedStyle(panel) : null',
       '  return {',
       '    backgroundColor: style?.backgroundColor ?? "",',
@@ -629,7 +716,11 @@ function assertAdminAccountMenuNavigation(
 function assertAdminAccountMenus(playwrightCli: CommandSpec) {
   setSessionUserRoute(playwrightCli, MOCK_ADMIN)
   assertAdminAccountMenuNavigation(playwrightCli, '/user/boards', MOCK_BOARD_NAME)
-  assertAdminAccountMenuNavigation(playwrightCli, `/user/canvas?boardId=${MOCK_BOARD_ID}`, MOCK_BOARD_NAME)
+  assertAdminAccountMenuNavigation(
+    playwrightCli,
+    `/user/canvas?boardId=${MOCK_BOARD_ID}`,
+    MOCK_BOARD_NAME,
+  )
 }
 
 function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
@@ -652,6 +743,7 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
 
   if (page.label === 'canvas') {
     assertCanvasDom(playwrightCli, page)
+    assertCanvasChromeStability(playwrightCli)
     assertCanvasInteractions(playwrightCli)
   }
 

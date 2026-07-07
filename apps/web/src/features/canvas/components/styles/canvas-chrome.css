@@ -1,0 +1,253 @@
+.canvas-chrome-region {
+  --canvas-chrome-inset: var(--spacing-ib-page-chrome-inset);
+  --canvas-chrome-control-gap: 12px;
+  --canvas-chrome-fade-duration: 0.18s;
+  --canvas-chrome-icon-size: 19px;
+  --canvas-chrome-slide-duration: 0.28s;
+  --canvas-chrome-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --canvas-chrome-active-color: var(--color-canvas-accent);
+  --canvas-chrome-z-index: 100;
+  z-index: var(--canvas-chrome-z-index);
+  opacity: 1;
+  filter: blur(0);
+  transform-origin: center;
+  transition:
+    opacity var(--canvas-chrome-fade-duration) ease,
+    filter var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease),
+    transform var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease);
+  will-change: transform, opacity, filter;
+}
+
+.canvas-chrome-region.is-hidden {
+  opacity: 0;
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+.canvas-chrome-region--top {
+  pointer-events: none;
+  position: absolute;
+  top: var(--canvas-chrome-inset);
+  right: var(--canvas-chrome-inset);
+  left: var(--canvas-chrome-inset);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.canvas-chrome-region--left {
+  position: absolute;
+  top: 50%;
+  left: var(--canvas-chrome-inset);
+  display: flex;
+  flex-direction: column;
+  gap: var(--canvas-chrome-control-gap);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  transform: translateY(-50%);
+}
+
+.canvas-chrome-region--status {
+  pointer-events: auto;
+  position: absolute;
+  right: var(--canvas-chrome-inset);
+  bottom: var(--canvas-chrome-inset);
+}
+
+.canvas-chrome-region--minimap {
+  position: absolute;
+  bottom: var(--canvas-chrome-inset);
+  left: var(--canvas-chrome-inset);
+}
+
+.canvas-chrome-region--top.is-hidden {
+  transform: translateY(-82px) scale(0.985);
+}
+
+.canvas-chrome-region--left.is-hidden {
+  transform: translate(-76px, -50%) scale(0.985);
+}
+
+.canvas-chrome-region--status.is-hidden {
+  transform: translateY(76px) scale(0.985);
+}
+
+.canvas-chrome-region--minimap.is-hidden {
+  transform: translateY(76px) scale(0.985);
+}
+
+.canvas-chrome-board-control {
+  pointer-events: auto;
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  width: min(200px, calc(100vw - 32px));
+  height: 39px;
+  align-items: center;
+  gap: 8px;
+  border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
+  border-radius: 999px;
+  background: var(--canvas-surface-bg-soft);
+  padding: 4px;
+}
+
+.canvas-chrome-board-icon-button {
+  display: flex;
+  width: 29px;
+  height: 29px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  color: var(--ib-control-icon);
+}
+
+.canvas-chrome-board-icon-button:hover,
+.canvas-chrome-board-icon-button:focus-visible {
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
+}
+
+.canvas-chrome-board-menu-slot {
+  width: 29px;
+  height: 29px;
+  flex: none;
+}
+
+.canvas-chrome-board-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 140;
+  max-height: 280px;
+  min-width: 220px;
+  max-width: 280px;
+  overflow-y: auto;
+  border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
+  border-radius: var(--canvas-surface-radius);
+  background: var(--canvas-surface-bg);
+  padding: 6px;
+  backdrop-filter: blur(var(--canvas-surface-blur));
+  transform-origin: top left;
+}
+
+.canvas-chrome-board-menu-enter-active,
+.canvas-chrome-board-menu-leave-active {
+  transition:
+    opacity var(--canvas-motion-fast) ease-out,
+    transform var(--canvas-motion-fast) ease-out;
+}
+
+.canvas-chrome-board-menu-enter-from,
+.canvas-chrome-board-menu-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+}
+
+.canvas-chrome-board-menu-enter-to,
+.canvas-chrome-board-menu-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.canvas-chrome-control-group {
+  display: flex;
+  gap: var(--canvas-chrome-control-gap);
+}
+
+.canvas-chrome-action-group {
+  pointer-events: auto;
+}
+
+.canvas-chrome-icon-button {
+  position: relative;
+  margin: 0;
+  cursor: pointer;
+}
+
+.canvas-chrome-icon-button.is-active {
+  border-color: var(--canvas-surface-border);
+  background: var(--canvas-surface-muted);
+  color: var(--canvas-chrome-active-color);
+}
+
+.canvas-chrome-icon {
+  width: var(--canvas-chrome-icon-size);
+  height: var(--canvas-chrome-icon-size);
+}
+
+.canvas-chrome-icon-swap {
+  position: relative;
+  display: block;
+  width: var(--canvas-chrome-icon-size);
+  height: var(--canvas-chrome-icon-size);
+}
+
+.canvas-chrome-icon-swap .canvas-chrome-icon {
+  position: absolute;
+  inset: 0;
+  transition: opacity var(--canvas-motion-fast) ease;
+}
+
+.canvas-chrome-icon-swap-default {
+  opacity: 1;
+}
+
+.canvas-chrome-icon-swap-hover {
+  opacity: 0;
+}
+
+.canvas-chrome-icon-button:hover .canvas-chrome-icon-swap-default,
+.canvas-chrome-icon-button:focus-visible .canvas-chrome-icon-swap-default {
+  opacity: 0;
+}
+
+.canvas-chrome-icon-button:hover .canvas-chrome-icon-swap-hover,
+.canvas-chrome-icon-button:focus-visible .canvas-chrome-icon-swap-hover {
+  opacity: 1;
+}
+
+.canvas-chrome-status-control {
+  display: flex;
+  box-sizing: border-box;
+  height: 33px;
+  align-items: center;
+  gap: 9px;
+  border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
+  border-radius: 999px;
+  background: var(--canvas-surface-bg-soft);
+  padding: 4px;
+  color: var(--canvas-text-strong);
+}
+
+.canvas-chrome-status-button {
+  display: flex;
+  width: 23px;
+  height: 23px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  color: var(--ib-control-icon);
+}
+
+.canvas-chrome-status-button:hover,
+.canvas-chrome-status-button:focus-visible {
+  background: var(--canvas-surface-muted);
+  color: var(--ib-control-icon-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-chrome-region,
+  .canvas-chrome-board-menu-enter-active,
+  .canvas-chrome-board-menu-leave-active {
+    transition-duration: 1ms;
+  }
+}

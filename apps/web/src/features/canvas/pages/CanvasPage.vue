@@ -10,21 +10,13 @@
     ]"
     @mousedown.self="closeBoardHeaderEditing"
   >
-    <CanvasPageChrome
-      :active-tool="activeTool"
+    <CanvasChrome
       :inert="isImageEditorChromeHidden"
-      :chrome-hidden="isImageEditorChromeHidden"
-      :current-board-name="currentBoardName"
-      :board-options="boardOptions"
-      :current-board-id="currentBoardId"
-      :is-board-menu-open="isBoardMenuOpen"
-      :is-renaming-board="isRenamingBoard"
-      :set-board-name-input-ref="setBoardNameInputRef"
-      :export-disabled="!hasSelectedFlowNodes"
-      :avatar-url="userStore.user?.avatar ?? undefined"
-      :user-menu-items="userMenuItems"
-      :minimap-enabled="isCanvasMinimapEnabled"
-      :zoom-level="zoomLevel"
+      :is-hidden="isImageEditorChromeHidden"
+      :board="canvasChromeBoard"
+      :account="canvasChromeAccount"
+      :tools="canvasChromeTools"
+      :status="canvasChromeStatus"
       @update:board-name-draft="boardNameDraft = $event"
       @toggle-board-menu="toggleBoardMenu"
       @start-board-rename="startBoardRename"
@@ -129,8 +121,10 @@
             @expand-frame-pointerdown="onFlowExpandFramePointerDown"
           />
         </template>
-        <CanvasMiniMap
-          v-if="isCanvasMinimapEnabled"
+        <CanvasChromeMiniMap
+          :enabled="isCanvasMinimapEnabled"
+          :inert="isImageEditorChromeHidden"
+          :is-hidden="isImageEditorChromeHidden"
           @center-requested="onMiniMapCenterRequested"
           @drag-start="onMiniMapDragStart"
           @drag-move="handleMiniMapDragMove"
@@ -187,9 +181,15 @@ import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
-import CanvasMiniMap from '../components/CanvasMiniMap.vue'
+import {
+  CanvasChrome,
+  CanvasChromeMiniMap,
+  type CanvasChromeAccountState,
+  type CanvasChromeBoardState,
+  type CanvasChromeStatusState,
+  type CanvasChromeToolState,
+} from '../components/chrome'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
-import CanvasPageChrome from '../components/CanvasPageChrome.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -314,6 +314,27 @@ const userMenuItems = computed(() =>
     },
   }),
 )
+
+const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
+  currentName: currentBoardName.value,
+  options: boardOptions.value,
+  currentId: currentBoardId.value,
+  isMenuOpen: isBoardMenuOpen.value,
+  isRenaming: isRenamingBoard.value,
+  setNameInputRef: setBoardNameInputRef,
+}))
+const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
+  avatarUrl: userStore.user?.avatar ?? undefined,
+  menuItems: userMenuItems.value,
+}))
+const canvasChromeTools = computed<CanvasChromeToolState>(() => ({
+  activeTool: activeTool.value,
+  minimapEnabled: isCanvasMinimapEnabled.value,
+}))
+const canvasChromeStatus = computed<CanvasChromeStatusState>(() => ({
+  exportDisabled: !hasSelectedFlowNodes.value,
+  zoomLevel: zoomLevel.value,
+}))
 
 const { history: flowHistory } = viewModel.persistence
 const { flushAutosave, loadCanvasBoardAndProbe, reattachPendingImageResults } = commands.persistence
@@ -656,12 +677,8 @@ onMounted(async () => {
 }
 
 .canvas-layout {
-  --canvas-chrome-inset: var(--spacing-ib-page-chrome-inset);
   --canvas-control-border-width: 1.2px;
   --canvas-tool-button-gap: 7px;
-  --canvas-page-chrome-fade-duration: 0.18s;
-  --canvas-page-chrome-slide-duration: 0.28s;
-  --canvas-page-chrome-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --canvas-surface-bg: rgba(255, 255, 255, 0.98);
   --canvas-surface-bg-soft: rgba(255, 255, 255, 0.94);
   --canvas-surface-muted: #f4f7fb;

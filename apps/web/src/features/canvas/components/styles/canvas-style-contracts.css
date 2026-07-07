@@ -5,7 +5,7 @@
  * stay in the owning .vue or local image-editor CSS file.
  */
 
-@import './canvas-controls.css';
+@import './canvas-chrome.css';
 @import './canvas-range-input.css';
 @import './canvas-user-avatar-button.css';
 @import './editing-controls.css';
