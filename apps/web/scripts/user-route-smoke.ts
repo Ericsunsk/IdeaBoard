@@ -168,11 +168,6 @@ const pages: SmokePage[] = [
     expectedText: ['Welcome to IdeaBoard!', 'New Canvas', MOCK_BOARD_NAME],
   },
   {
-    label: 'center',
-    path: '/user/center',
-    expectedText: [MOCK_USER.username, MOCK_USER.uid, '个人基本资料'],
-  },
-  {
     label: 'canvas',
     path: `/user/canvas?boardId=${MOCK_BOARD_ID}`,
     expectedText: [MOCK_BOARD_NAME, '100%'],
@@ -493,12 +488,22 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       'if (await adminMenuItem.isVisible().catch(() => false)) {',
       '  throw new Error("Regular user should not see admin menu item on boards page")',
       '}',
-      'await page.keyboard.press("Escape")',
+      'const boardsUrlBeforeProfile = new URL(page.url())',
+      'const profileMenuItem = page.getByText("个人中心", { exact: true }).first()',
+      'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await profileMenuItem.click()',
+      'await page.getByRole("heading", { name: "个人中心" }).waitFor({ state: "visible", timeout: 10000 })',
+      `await page.getByText(${JSON.stringify(MOCK_USER.username)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
+      `await page.getByText(${JSON.stringify(MOCK_USER.uid)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
+      'const boardsUrlAfterProfile = new URL(page.url())',
+      'if (boardsUrlAfterProfile.pathname !== boardsUrlBeforeProfile.pathname || boardsUrlAfterProfile.search !== boardsUrlBeforeProfile.search) {',
+      '  throw new Error(`Boards profile dialog should not change URL, before=${boardsUrlBeforeProfile.pathname}${boardsUrlBeforeProfile.search}, after=${boardsUrlAfterProfile.pathname}${boardsUrlAfterProfile.search}`)',
+      '}',
     ].join('\n'),
   ])
 }
 
-function assertCenterAvatarUpload(playwrightCli: CommandSpec) {
+function assertProfileDialogAvatarUpload(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
@@ -511,6 +516,16 @@ function assertCenterAvatarUpload(playwrightCli: CommandSpec) {
       '  buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),',
       '})',
       `await page.locator(${JSON.stringify(`img[src$="${MOCK_AVATAR_URL}"]`)}).first().waitFor({ state: "visible", timeout: 10000 })`,
+    ].join('\n'),
+  ])
+}
+
+function closeProfileDialog(playwrightCli: CommandSpec) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'await page.keyboard.press("Escape")',
+      'await page.getByRole("heading", { name: "个人中心" }).waitFor({ state: "hidden", timeout: 10000 })',
     ].join('\n'),
   ])
 }
@@ -643,7 +658,19 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'if (await adminMenuItem.isVisible().catch(() => false)) {',
       '  throw new Error("Regular user should not see admin menu item on canvas page")',
       '}',
-      'await page.mouse.click(paneBox.x + paneBox.width - 24, paneBox.y + paneBox.height - 24)',
+      'const canvasUrlBeforeProfile = new URL(page.url())',
+      'const profileMenuItem = userMenu.getByText("个人中心", { exact: true }).first()',
+      'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await profileMenuItem.click()',
+      'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
+      'await page.getByRole("heading", { name: "个人中心" }).waitFor({ state: "visible", timeout: 10000 })',
+      `await page.getByText(${JSON.stringify(MOCK_USER.username)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
+      'const canvasUrlAfterProfile = new URL(page.url())',
+      'if (canvasUrlAfterProfile.pathname !== canvasUrlBeforeProfile.pathname || canvasUrlAfterProfile.search !== canvasUrlBeforeProfile.search) {',
+      '  throw new Error(`Canvas profile dialog should not change URL, before=${canvasUrlBeforeProfile.pathname}${canvasUrlBeforeProfile.search}, after=${canvasUrlAfterProfile.pathname}${canvasUrlAfterProfile.search}`)',
+      '}',
+      'await page.keyboard.press("Escape")',
+      'await page.getByRole("heading", { name: "个人中心" }).waitFor({ state: "hidden", timeout: 10000 })',
       'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
       'await pane.click({',
       '  button: "right",',
@@ -700,6 +727,28 @@ function assertAdminAccountMenus(playwrightCli: CommandSpec) {
   )
 }
 
+function assertAdminShellAccountMenuReturnsToBoards(playwrightCli: CommandSpec) {
+  setSessionUserRoute(playwrightCli, MOCK_ADMIN)
+  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/admin/users`])
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'await page.getByRole("heading", { name: "用户管理" }).waitFor({ state: "visible", timeout: 15000 })',
+      'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'await accountButton.waitFor({ state: "visible", timeout: 10000 })',
+      'await accountButton.click()',
+      'const legacyProfileItem = page.getByText("个人中心", { exact: true }).first()',
+      'if (await legacyProfileItem.isVisible().catch(() => false)) {',
+      '  throw new Error("Admin account menu should not link to personal center")',
+      '}',
+      'const boardsItem = page.getByText("返回画布列表", { exact: true }).first()',
+      'await boardsItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await boardsItem.click()',
+      'await page.waitForURL((url) => url.pathname === "/user/boards", { timeout: 10000 })',
+    ].join('\n'),
+  ])
+}
+
 function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
   smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${page.path}`])
   waitForExpectedText(playwrightCli, page)
@@ -708,14 +757,12 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
 
   if (page.label === 'boards') {
     assertBoardsInteractions(playwrightCli)
+    assertProfileDialogAvatarUpload(playwrightCli)
+    closeProfileDialog(playwrightCli)
   }
 
   if (page.label === 'home') {
     assertHomeMobileHeroLayout(playwrightCli)
-  }
-
-  if (page.label === 'center') {
-    assertCenterAvatarUpload(playwrightCli)
   }
 
   if (page.label === 'canvas') {
@@ -747,6 +794,7 @@ async function main() {
       smokePage(playwrightCli, page)
     }
     assertAdminAccountMenus(playwrightCli)
+    assertAdminShellAccountMenuReturnsToBoards(playwrightCli)
 
     console.log(`user route smoke passed: ${pages.length} pages`)
   } catch (error) {

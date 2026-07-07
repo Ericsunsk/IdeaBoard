@@ -138,6 +138,8 @@
         @create-node="handleNodeContextMenuCreate"
       />
     </div>
+
+    <ProfileDialog v-model:visible="profileDialogVisible" />
   </div>
 </template>
 
@@ -149,11 +151,7 @@ import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
-import {
-  ADMIN_ROOT_PATH,
-  USER_BOARDS_PATH,
-  USER_CENTER_PATH,
-} from '../../../shared/constants/routePaths'
+import { ADMIN_ROOT_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
 import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
@@ -190,6 +188,7 @@ import {
   type CanvasChromeToolState,
 } from '../components/chrome'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
+import ProfileDialog from '../../profile/components/ProfileDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -201,6 +200,7 @@ const { screenToFlowCoordinate } = flowPaneAdapter
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const flowHandleVisibilityRefreshToken = ref(0)
+const profileDialogVisible = ref(false)
 
 const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
@@ -306,7 +306,9 @@ const userMenuItems = computed(() =>
     canAccessAdmin: canAccessAdmin(userStore.user),
     hiddenKeys: ['home'],
     handlers: {
-      profile: () => onNavigateRequest(USER_CENTER_PATH),
+      profile: () => {
+        profileDialogVisible.value = true
+      },
       admin: () => onNavigateRequest(ADMIN_ROOT_PATH),
       logout: () => {
         void onLogoutRequest()

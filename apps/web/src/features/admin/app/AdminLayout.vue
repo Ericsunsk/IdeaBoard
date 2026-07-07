@@ -3,11 +3,7 @@
   <div v-else :class="layoutShellClass">
     <aside :class="siderClass" aria-label="后台导航">
       <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" :aria-label="brandAriaLabel">
-        <SiteBrandLogo
-          :src="logoURL"
-          :fallback-text="fallbackText"
-          class="h-full w-full"
-        />
+        <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
       </router-link>
 
       <nav :class="navRailClass" aria-label="后台功能">
@@ -29,7 +25,7 @@
 
       <div :class="siderBottomClass">
         <button
-          v-tooltip.right="'个人中心'"
+          v-tooltip.right="'账户菜单'"
           type="button"
           :class="userAvatarButtonClass"
           aria-label="账户菜单"
@@ -183,11 +179,7 @@
               :aria-label="brandAriaLabel"
               @click="closeCallback"
             >
-              <SiteBrandLogo
-                :src="logoURL"
-                :fallback-text="fallbackText"
-                class="h-full w-full"
-              />
+              <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" class="h-full w-full" />
             </router-link>
             <Button
               :class="shellButtonClass"
@@ -247,7 +239,7 @@ import {
 } from './adminNavigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
-import { USER_CENTER_PATH } from '../../../shared/constants/routePaths'
+import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
@@ -304,8 +296,7 @@ const brandMarkClass = computed(() =>
 const navRailClass =
   'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
-const focusRingClass =
-  'focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]'
+const focusRingClass = 'focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]'
 const railButtonClass = [
   '!inline-flex !items-center !justify-center !rounded-[var(--radius-ib-control)] !border !border-transparent !text-ib-text-muted !no-underline !shadow-none !transition-colors !duration-[var(--duration-ib-standard)]',
   railButtonSizeClass,
@@ -392,9 +383,9 @@ const userMenuItems = computed<MenuItem[]>(() => [
   },
   { separator: true },
   {
-    label: '个人中心',
+    label: '返回画布列表',
     command: () => {
-      void handleUserAction('profile')
+      void handleUserAction('boards')
     },
   },
   {
@@ -419,11 +410,11 @@ function handleAnomalySelect(item: AdminAnomalyItem) {
   void router.push(item.route)
 }
 
-async function handleUserAction(key: 'profile' | 'logout') {
+async function handleUserAction(key: 'boards' | 'logout') {
   if (key === 'logout') {
     await logoutAndRedirect(ADMIN_LOGIN_PATH)
   } else {
-    await router.push(USER_CENTER_PATH)
+    await router.push(USER_BOARDS_PATH)
   }
 }
 

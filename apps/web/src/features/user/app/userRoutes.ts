@@ -2,7 +2,6 @@ import type { RouteRecordRaw } from 'vue-router'
 import {
   SHARE_JOIN_PATH,
   USER_BOARDS_PATH,
-  USER_CENTER_PATH,
   USER_HOME_PATH,
   USER_LOGIN_PATH as USER_LOGIN_ROUTE_PATH,
   USER_REGISTER_PATH,
@@ -10,13 +9,7 @@ import {
   USER_CANVAS_PATH,
 } from '../../../shared/constants/routePaths'
 
-export {
-  USER_BOARDS_PATH,
-  USER_CENTER_PATH,
-  USER_HOME_PATH,
-  USER_REGISTER_PATH,
-  USER_CANVAS_PATH,
-}
+export { USER_BOARDS_PATH, USER_HOME_PATH, USER_REGISTER_PATH, USER_CANVAS_PATH }
 export const USER_DEFAULT_PATH = USER_HOME_PATH
 export const USER_LOGIN_PATH = USER_LOGIN_ROUTE_PATH
 
@@ -52,12 +45,6 @@ export const userRoutes: RouteRecordRaw[] = [
         path: 'boards',
         name: 'UserBoards',
         component: () => import('../pages/UserBoardsPage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'center',
-        name: 'UserCenter',
-        component: () => import('../pages/UserCenterPage.vue'),
         meta: { requiresAuth: true },
       },
     ],

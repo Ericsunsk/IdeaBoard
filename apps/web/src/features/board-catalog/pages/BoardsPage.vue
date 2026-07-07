@@ -142,6 +142,8 @@
         </div>
       </div>
     </Dialog>
+
+    <ProfileDialog v-model:visible="profileDialogVisible" />
   </div>
 </template>
 
@@ -168,7 +170,6 @@ import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import {
   ADMIN_ROOT_PATH,
-  USER_CENTER_PATH,
   USER_CANVAS_PATH,
   USER_HOME_PATH,
 } from '../../../shared/constants/routePaths'
@@ -182,6 +183,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
+import ProfileDialog from '../../profile/components/ProfileDialog.vue'
 
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
@@ -200,6 +202,7 @@ const renameDraft = ref('')
 const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
 const deleteDialogVisible = ref(false)
+const profileDialogVisible = ref(false)
 const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
 const isDeleteBoardPending = ref(false)
 const isBoardsPageScrolling = ref(false)
@@ -414,7 +417,8 @@ async function confirmDeleteBoard() {
 }
 
 function openCenter() {
-  void router.push(USER_CENTER_PATH)
+  activeMenuBoardId.value = null
+  profileDialogVisible.value = true
 }
 
 function openAdmin() {
