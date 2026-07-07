@@ -22,7 +22,10 @@ import type {
   CanvasVueFlowGraphCommandOptions,
 } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
-import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import {
+  canvasBoardSnapshotToFlow,
+  type FlowToCanvasBoardSnapshotOptions,
+} from '../../utils/flowSnapshotAdapter'
 import {
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
@@ -38,7 +41,9 @@ type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore: () => CanvasGraphStore
+  createCurrentCanvasGraphStore: (
+    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
+  ) => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
 }
@@ -602,7 +607,9 @@ export function usePendingImageResultExecution(
   function materializeResolvedAttachedPendingResults(
     params: MaterializeResolvedAttachedPendingImageResultsParams,
   ): ResultMaterializerResult {
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.createCurrentCanvasGraphStore({
+      projection: 'runtime',
+    })
     const result = materializeResolvedImageResults({
       store,
       results: params.results,

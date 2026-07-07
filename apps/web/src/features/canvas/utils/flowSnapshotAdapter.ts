@@ -42,6 +42,12 @@ export interface FlowAdapterEdge {
   data?: unknown
 }
 
+export type FlowSnapshotProjection = 'persistable' | 'runtime'
+
+export type FlowToCanvasBoardSnapshotOptions = {
+  projection?: FlowSnapshotProjection
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
@@ -190,7 +196,10 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   return { nodes, edges }
 }
 
-function hasRenderableImageSource(node: CanvasNodeItem): boolean {
+function hasRenderableImageSource(
+  node: CanvasNodeItem,
+  options: FlowToCanvasBoardSnapshotOptions,
+): boolean {
   if (node.type !== 'image-node') return true
   const imageNode = node as ImageNodeItem
   const sourceUrl = imageNode.sourceImageUrl.trim()
@@ -202,7 +211,8 @@ function hasRenderableImageSource(node: CanvasNodeItem): boolean {
   const pendingTaskId =
     typeof imageNode.pendingTaskId === 'string' ? imageNode.pendingTaskId.trim() : ''
   if (imageNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage && !pendingTaskId) {
-    return false
+    const projection = options.projection ?? 'persistable'
+    return projection === 'runtime'
   }
   return true
 }
@@ -222,6 +232,7 @@ export function canvasConnectionToFlowEdge(connection: CanvasConnection): FlowAd
 export function flowToCanvasBoardSnapshot(
   input: { nodes: FlowAdapterNode[]; edges: FlowAdapterEdge[] },
   base?: CanvasBoardSnapshot,
+  options: FlowToCanvasBoardSnapshotOptions = {},
 ): CanvasBoardSnapshot {
   const snapshot = createSnapshotShell(base)
 
@@ -238,7 +249,7 @@ export function flowToCanvasBoardSnapshot(
     const data = (node.data ?? {}) as FlowNodeData
     const snapshotNode = data.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode || typeof snapshotNode !== 'object') return
-    if (!hasRenderableImageSource(snapshotNode)) return
+    if (!hasRenderableImageSource(snapshotNode, options)) return
 
     const positionedNode = clone(snapshotNode) as CanvasNodeItem
     positionedNode.x = node.position.x

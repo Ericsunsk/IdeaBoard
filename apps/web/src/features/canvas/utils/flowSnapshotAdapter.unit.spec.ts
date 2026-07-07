@@ -156,7 +156,7 @@ describe('flowSnapshotAdapter', () => {
     ])
   })
 
-  it('does not persist legacy empty running image nodes without pending task metadata', () => {
+  it('does not persist local-only empty running image nodes without pending task metadata', () => {
     const nodes: FlowAdapterNode[] = [
       makeImageFlowNode({
         flowId: 'image-1',
@@ -185,6 +185,44 @@ describe('flowSnapshotAdapter', () => {
     expect(snapshot.imageNodes.length).toBe(1)
     expect(snapshot.imageNodes[0]?.id).toBe(1)
     expect(snapshot.connections.length).toBe(0)
+  })
+
+  it('can include local-only empty running image nodes for runtime materialization', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'running',
+        sourceImageUrl: '',
+      }),
+    ]
+    const edges: FlowAdapterEdge[] = [
+      {
+        id: 'edge-1',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'image-2',
+        targetHandle: 'in:image',
+      },
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges }, undefined, {
+      projection: 'runtime',
+    })
+    expect(snapshot.imageNodes.map((node) => node.id)).toEqual([1, 2])
+    expect(snapshot.connections).toHaveLength(1)
+    expect(snapshot.imageNodes[1]).toMatchObject({
+      id: 2,
+      outputStatus: 'running',
+      sourceImageUrl: '',
+      outputImages: [],
+    })
   })
 
   it('persists ready image nodes with connections', () => {

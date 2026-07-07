@@ -139,12 +139,16 @@ function createHarness(initialNodes: Node[], initialEdges: Edge[] = []) {
     nodes,
     edges,
     graphAdapter,
-    createCurrentCanvasGraphStore: () =>
+    createCurrentCanvasGraphStore: (snapshotOptions) =>
       createCanvasGraphStore(
-        flowToCanvasBoardSnapshot({
-          nodes: nodes.value,
-          edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
-        }),
+        flowToCanvasBoardSnapshot(
+          {
+            nodes: nodes.value,
+            edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+          },
+          undefined,
+          snapshotOptions,
+        ),
       ),
   })
 

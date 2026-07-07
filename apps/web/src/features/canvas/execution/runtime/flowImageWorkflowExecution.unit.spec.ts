@@ -26,8 +26,30 @@ const imageSizeMocks = vi.hoisted(() => ({
   loadImageSizeFromUrl: vi.fn(async () => ({ width: 400, height: 400 })),
 }))
 
+const localInpaintMocks = vi.hoisted(() => ({
+  prepareFlowLocalInpaintMedia: vi.fn(async () => ({
+    crop: {
+      croppedImageUrl: 'https://example.com/cropped-source.png',
+      croppedMaskUrl: 'https://example.com/cropped-mask.png',
+      bbox: { x: 8, y: 12, width: 64, height: 72 },
+      originalSize: { width: 400, height: 400 },
+      cropSize: { width: 64, height: 72 },
+    },
+  })),
+  cleanupFlowLocalInpaintMedia: vi.fn(async () => undefined),
+}))
+
+const localInpaintResultMocks = vi.hoisted(() => ({
+  composeFlowLocalInpaintTaskResult: vi.fn(async () => ({
+    url: 'https://example.com/local-inpaint-final.png',
+    ratio: 1,
+  })),
+}))
+
 vi.mock('../task-runner/flowImageDirectActionExecutor', () => executorMocks)
 vi.mock('../media/imageSize', () => imageSizeMocks)
+vi.mock('../media/flowLocalInpaint', () => localInpaintMocks)
+vi.mock('../result-nodes/flowLocalInpaintTaskResult', () => localInpaintResultMocks)
 vi.mock('../../utils/animationFrame', () => ({
   waitForNextRenderFrame: vi.fn(async () => undefined),
 }))
@@ -109,12 +131,16 @@ function createExecutionHarness(initialNodes: Node[] = [makeImageNode('image-1')
     nodes,
     edges,
     graphAdapter,
-    createCurrentCanvasGraphStore: () =>
+    createCurrentCanvasGraphStore: (snapshotOptions) =>
       createCanvasGraphStore(
-        flowToCanvasBoardSnapshot({
-          nodes: nodes.value,
-          edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
-        }),
+        flowToCanvasBoardSnapshot(
+          {
+            nodes: nodes.value,
+            edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+          },
+          undefined,
+          snapshotOptions,
+        ),
       ),
     flushAutosave,
     onSuccess,
@@ -152,12 +178,38 @@ function imageActionPlan() {
   }
 }
 
+function imageInpaintPlan() {
+  return {
+    kind: 'image-inpaint' as const,
+    sourceNodeId: 'image-1',
+    source: {
+      url: 'https://example.com/source.png',
+      ratio: 1,
+    },
+    prompt: 'replace the marked area',
+    rawMaskDataUrl: 'data:image/png;base64,mask',
+    outputCount: 1,
+    referenceImageUrls: [],
+    resultOptions: {
+      anchor: {
+        x: 0,
+        y: 0,
+        width: 280,
+        outputAnchorNodeId: 'image-1',
+      },
+    },
+  }
+}
+
 describe('flowImageWorkflowExecution', () => {
   beforeEach(() => {
     executorMocks.assertTaskRequestReady.mockReset()
     executorMocks.submitTaskRequest.mockReset()
     executorMocks.waitExistingOrLiveTaskImageResults.mockReset()
     imageSizeMocks.loadImageSizeFromUrl.mockReset()
+    localInpaintMocks.prepareFlowLocalInpaintMedia.mockReset()
+    localInpaintMocks.cleanupFlowLocalInpaintMedia.mockReset()
+    localInpaintResultMocks.composeFlowLocalInpaintTaskResult.mockReset()
     executorMocks.assertTaskRequestReady.mockResolvedValue(undefined)
     executorMocks.submitTaskRequest.mockResolvedValue({ taskId: 'task-1' })
     executorMocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
@@ -168,6 +220,20 @@ describe('flowImageWorkflowExecution', () => {
       },
     ])
     imageSizeMocks.loadImageSizeFromUrl.mockResolvedValue({ width: 400, height: 400 })
+    localInpaintMocks.prepareFlowLocalInpaintMedia.mockResolvedValue({
+      crop: {
+        croppedImageUrl: 'https://example.com/cropped-source.png',
+        croppedMaskUrl: 'https://example.com/cropped-mask.png',
+        bbox: { x: 8, y: 12, width: 64, height: 72 },
+        originalSize: { width: 400, height: 400 },
+        cropSize: { width: 64, height: 72 },
+      },
+    })
+    localInpaintMocks.cleanupFlowLocalInpaintMedia.mockResolvedValue(undefined)
+    localInpaintResultMocks.composeFlowLocalInpaintTaskResult.mockResolvedValue({
+      url: 'https://example.com/local-inpaint-final.png',
+      ratio: 1,
+    })
   })
 
   it('executes image actions through the unified pending image batch path', async () => {
@@ -213,6 +279,46 @@ describe('flowImageWorkflowExecution', () => {
       outputImages: [],
     })
     expect(snapshot.pendingTaskId).toBeUndefined()
+    expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
+  })
+
+  it('keeps local inpaint result nodes alive across pending result timeouts', async () => {
+    executorMocks.waitExistingOrLiveTaskImageResults
+      .mockRejectedValueOnce(new TaskResultPendingError('任务进度推送超时，请稍后查看结果'))
+      .mockResolvedValueOnce([
+        {
+          url: 'https://example.com/cropped-result.png',
+          width: 64,
+          height: 72,
+        },
+      ])
+    const { execution, nodes, onSuccess, onWarning } = createExecutionHarness()
+
+    await execution.executeImageWorkflow(imageInpaintPlan())
+
+    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
+    expect(resultNode?.data?.kind).toBe('image')
+    expect(executorMocks.waitExistingOrLiveTaskImageResults).toHaveBeenCalledTimes(2)
+    expect(localInpaintResultMocks.composeFlowLocalInpaintTaskResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalImageUrl: 'https://example.com/source.png',
+        croppedTaskResults: [
+          {
+            url: 'https://example.com/cropped-result.png',
+            width: 64,
+            height: 72,
+          },
+        ],
+      }),
+    )
+    expect(readImageSnapshot(nodes.value, resultNode!.id)).toMatchObject({
+      sourceImageUrl: 'https://example.com/local-inpaint-final.png',
+      sourceImageRatio: 1,
+      outputStatus: 'ready',
+      outputImages: [],
+    })
+    expect(onSuccess).toHaveBeenCalledWith('生成完成')
+    expect(onWarning).not.toHaveBeenCalled()
     expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
   })
 

@@ -6,6 +6,7 @@ import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphNodeId, CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
 import { readCurrentBoardId } from '../../utils/currentBoardId'
 import {
   buildCanvasExtendReadinessRequest,
@@ -57,7 +58,9 @@ export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore: () => CanvasGraphStore
+  createCurrentCanvasGraphStore: (
+    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
+  ) => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
@@ -287,9 +290,20 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       submitTask: taskSubmission.submitTask,
       resolveResult: async (taskId) => {
         if (!localInpaint) throw new Error('局部重绘任务未准备完成')
+        async function waitLocalInpaintTaskResults() {
+          while (true) {
+            try {
+              return await waitExistingOrLiveTaskImageResults(taskId)
+            } catch (error) {
+              if (!isTaskResultPendingError(error) || !isBoardStillCurrent(boardId)) {
+                throw error
+              }
+            }
+          }
+        }
         return await composeFlowLocalInpaintTaskResult({
           originalImageUrl: plan.source.url,
-          croppedTaskResults: await waitExistingOrLiveTaskImageResults(taskId),
+          croppedTaskResults: await waitLocalInpaintTaskResults(),
           prepared: localInpaint,
           boardId,
           fallbackRatio: plan.source.ratio,

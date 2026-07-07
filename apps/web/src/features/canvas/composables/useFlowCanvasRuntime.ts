@@ -20,6 +20,7 @@ import {
   flowToCanvasBoardSnapshot,
   resolveFlowNodeCanvasRef,
   resolveFlowEdgeCanvasConnectionId,
+  type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
@@ -55,7 +56,9 @@ type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
 
 export type CanvasFlowGraphRuntimeControls = {
   captureHistory: () => FlowHistorySnapshot
-  createCurrentCanvasGraphStore: () => ReturnType<typeof createCanvasGraphStore>
+  createCurrentCanvasGraphStore: (
+    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
+  ) => ReturnType<typeof createCanvasGraphStore>
   markDirty: () => void
   nodeDrag: {
     begin: () => void
@@ -248,13 +251,14 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return isNodeDragActive && changes.every(isNodeDragChange)
   }
 
-  function createCurrentCanvasGraphStore() {
+  function createCurrentCanvasGraphStore(snapshotOptions?: FlowToCanvasBoardSnapshotOptions) {
     const snapshot = flowToCanvasBoardSnapshot(
       {
         nodes: options.nodes.value,
         edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
       },
       options.boardBaseSnapshot.value,
+      snapshotOptions,
     )
     return createCanvasGraphStore(snapshot)
   }

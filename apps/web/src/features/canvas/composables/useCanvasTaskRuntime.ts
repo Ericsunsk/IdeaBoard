@@ -10,6 +10,7 @@ import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import type { FlowToCanvasBoardSnapshotOptions } from '../utils/flowSnapshotAdapter'
 
 type ValueRef<T> = {
   readonly value: T
@@ -21,7 +22,9 @@ type UseCanvasTaskRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore: () => CanvasGraphStore
+  createCurrentCanvasGraphStore: (
+    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
+  ) => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   currentBoardId: ValueRef<string | null | undefined>
