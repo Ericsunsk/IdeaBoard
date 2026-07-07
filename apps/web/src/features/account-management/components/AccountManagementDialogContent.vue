@@ -335,7 +335,6 @@ import { Camera, Lock, LogOut, User, Xmark } from '@iconoir/vue'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
-import { useAppToast } from '../../../shared/composables/useAppToast'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
 import {
@@ -345,6 +344,7 @@ import {
   ibFormInputErrorClass,
   ibPasswordPt,
 } from '../../../shared/theme/formControls'
+import { useProfileFeedback } from '../useProfileFeedback'
 
 type NavItem = {
   key: 'profile' | 'security'
@@ -365,7 +365,7 @@ const emit = defineEmits<{
 const userStore = useUserStore()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
-const appToast = useAppToast()
+const profileFeedback = useProfileFeedback()
 const {
   form: pwdForm,
   errors: pwdErrors,
@@ -473,7 +473,7 @@ async function handleLogout() {
     if (await logoutAndRedirect(USER_HOME_PATH)) {
       emit('close')
     } else {
-      appToast.error('退出登录失败，请稍后重试')
+      profileFeedback.logoutFailed()
     }
   } finally {
     logoutLoading.value = false

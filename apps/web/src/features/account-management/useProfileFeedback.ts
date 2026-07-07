@@ -6,6 +6,7 @@ type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'warning' |
 
 export type ProfileFeedback = {
   invalidAvatarFile: () => void
+  logoutFailed: () => void
   avatarUpload: AsyncActionFeedback<void>
   passwordChange: AsyncActionFeedback<boolean>
 }
@@ -14,6 +15,9 @@ export function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
   return {
     invalidAvatarFile() {
       appToast.warning('仅支持上传图片文件')
+    },
+    logoutFailed() {
+      appToast.error('退出登录失败，请稍后重试')
     },
     avatarUpload: {
       success() {
