@@ -30,7 +30,7 @@ describe('user account menu actions', () => {
 
     expect(items.map((item) => item.key)).toEqual(['profile', 'admin', 'home', 'logout'])
     expect(items.map((item) => item.label)).toEqual([
-      '个人中心',
+      '账户管理',
       '管理后台',
       '返回首页',
       '退出登录',

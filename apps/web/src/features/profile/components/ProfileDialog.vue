@@ -13,7 +13,7 @@
     <template #header>
       <div class="min-w-0">
         <h2 id="profile-dialog-title" class="m-0 text-[22px] leading-tight font-bold text-ib-text">
-          个人中心
+          账户管理
         </h2>
         <p class="mt-1 mb-0 text-sm leading-5 text-ib-text-subtle">管理个人资料与账号安全</p>
       </div>

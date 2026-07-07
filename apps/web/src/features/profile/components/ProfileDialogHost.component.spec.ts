@@ -54,8 +54,8 @@ async function renderHost(path = '/user/boards') {
           },
           emits: ['update:visible'],
           template: `
-            <section v-if="visible" role="dialog" aria-label="个人中心">
-              <button type="button" aria-label="关闭个人中心" @click="$emit('update:visible', false)">
+            <section v-if="visible" role="dialog" aria-label="账户管理">
+              <button type="button" aria-label="关闭账户管理" @click="$emit('update:visible', false)">
                 关闭
               </button>
             </section>
@@ -80,7 +80,7 @@ describe('ProfileDialogHost', () => {
 
     await renderHost()
 
-    expect(screen.getByRole('dialog', { name: '个人中心' })).toBeVisible()
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
   })
 
   it.each([['/admin/users'], ['/user/login'], ['/user/register']])(
@@ -90,7 +90,7 @@ describe('ProfileDialogHost', () => {
 
       await renderHost(path)
 
-      expect(screen.queryByRole('dialog', { name: '个人中心' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
     },
   )
 
@@ -100,31 +100,31 @@ describe('ProfileDialogHost', () => {
     openProfileDialog()
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: '个人中心' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
     })
   })
 
   it('closes the dialog on route changes', async () => {
     openProfileDialog()
     const { router } = await renderHost()
-    expect(screen.getByRole('dialog', { name: '个人中心' })).toBeVisible()
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
 
     await router.push('/user/canvas?boardId=demo')
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: '个人中心' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
     })
   })
 
   it('closes the dialog when the current user becomes unavailable', async () => {
     openProfileDialog()
     const { store } = await renderHost()
-    expect(screen.getByRole('dialog', { name: '个人中心' })).toBeVisible()
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
 
     store.clearAuth()
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: '个人中心' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
     })
   })
 })

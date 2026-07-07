@@ -1,12 +1,12 @@
 <template>
   <section
     :class="[mainContentClass, { 'is-scrolling': isProfileMainScrolling }]"
-    aria-label="个人中心"
+    aria-label="账户管理"
     @scroll.passive="handleProfileMainScroll"
   >
     <nav
       class="mb-6 grid grid-cols-2 gap-2 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface-raised p-1.5"
-      aria-label="个人中心导航"
+      aria-label="账户管理导航"
     >
       <Button
         v-for="item in navItems"

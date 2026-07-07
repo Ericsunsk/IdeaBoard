@@ -28,7 +28,7 @@ const DialogStub = defineComponent({
       >
         <slot name="header" />
         <slot />
-        <button type="button" aria-label="关闭个人中心" @click="$emit('update:visible', false)">
+        <button type="button" aria-label="关闭账户管理" @click="$emit('update:visible', false)">
           关闭
         </button>
       </section>
@@ -97,7 +97,7 @@ describe('ProfileDialog', () => {
   it('renders dialog-ready profile content when visible', () => {
     renderProfileDialog(true)
 
-    expect(screen.getByRole('dialog', { name: '个人中心' })).toBeVisible()
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
     expect(screen.getByTestId('profile-dialog-content')).toBeVisible()
   })
 
@@ -110,14 +110,14 @@ describe('ProfileDialog', () => {
   it('emits visibility updates without owning route state', async () => {
     const { user, onVisibleUpdate } = renderProfileDialog(true)
 
-    await user.click(screen.getByRole('button', { name: '关闭个人中心' }))
+    await user.click(screen.getByRole('button', { name: '关闭账户管理' }))
 
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
   })
 
   it('closes from Escape and the close button, but not from the mask', async () => {
     const { user, onVisibleUpdate } = renderProfileDialog(true)
-    const dialog = screen.getByRole('dialog', { name: '个人中心' })
+    const dialog = screen.getByRole('dialog', { name: '账户管理' })
 
     expect(screen.getByTestId('profile-dialog-mask')).toHaveAttribute(
       'data-dismissable-mask',

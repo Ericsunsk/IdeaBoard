@@ -27,7 +27,7 @@ export function createUserAccountMenuItems(
   const items: UserAccountMenuItem[] = [
     {
       key: 'profile',
-      label: '个人中心',
+      label: '账户管理',
       command: options.handlers.profile,
     },
   ]
