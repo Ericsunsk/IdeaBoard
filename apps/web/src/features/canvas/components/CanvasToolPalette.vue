@@ -6,7 +6,7 @@
   >
     <button
       type="button"
-      class="canvas-icon-button"
+      class="ib-round-control ib-page-chrome-control canvas-icon-button"
       :class="{ 'is-active': activeTool === 'select' }"
       aria-label="选择 (V)"
       :aria-pressed="activeTool === 'select'"
@@ -16,7 +16,7 @@
     </button>
     <button
       type="button"
-      class="canvas-icon-button"
+      class="ib-round-control ib-page-chrome-control canvas-icon-button"
       :class="{ 'is-active': activeTool === 'hand' }"
       aria-label="抓手 (H)"
       :aria-pressed="activeTool === 'hand'"
@@ -26,7 +26,7 @@
     </button>
     <button
       type="button"
-      class="canvas-icon-button"
+      class="ib-round-control ib-page-chrome-control canvas-icon-button"
       :class="{ 'is-active': minimapEnabled }"
       aria-label="小地图"
       :aria-pressed="minimapEnabled"

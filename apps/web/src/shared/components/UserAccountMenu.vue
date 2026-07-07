@@ -75,7 +75,7 @@ const props = withDefaults(
   {
     avatarUrl: undefined,
     wrapClass: 'relative',
-    avatarButtonClass: 'ib-user-avatar-button',
+    avatarButtonClass: 'ib-round-control ib-page-chrome-control ib-user-avatar-button',
     avatarImageClass: 'ib-user-avatar-button__image',
     avatarPlaceholderClass: 'ib-user-avatar-button__placeholder',
     avatarIconClass: 'size-5',

@@ -314,7 +314,7 @@ const railButtonClass = [
 const railButtonIdleClass = '!bg-transparent hover:!bg-ib-surface-hover hover:!text-ib-text'
 const railButtonActiveClass =
   '!bg-ib-accent-pressed !text-ib-text-inverse !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
-const userAvatarButtonClass = 'ib-user-avatar-button admin-user-avatar-button'
+const userAvatarButtonClass = 'ib-round-control ib-user-avatar-button admin-user-avatar-button'
 const userAvatarImageClass = 'ib-user-avatar-button__image'
 const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
 const userAvatarIconClass = 'size-[17px]'

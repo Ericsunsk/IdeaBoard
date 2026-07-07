@@ -8,7 +8,7 @@ export const boardCatalogClasses = {
   brand: 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center',
   brandName: 'min-w-0 truncate text-[32px] font-bold tracking-normal',
   userMenuWrap: 'relative',
-  userAvatarButton: 'ib-user-avatar-button',
+  userAvatarButton: 'ib-round-control ib-page-chrome-control ib-user-avatar-button',
   userAvatar: 'ib-user-avatar-button__image',
   userAvatarPlaceholder: 'ib-user-avatar-button__placeholder',
   avatarIcon: 'size-5',

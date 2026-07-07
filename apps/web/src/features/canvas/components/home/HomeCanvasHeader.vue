@@ -77,7 +77,7 @@
     <div class="canvas-control-group pointer-events-auto">
       <button
         type="button"
-        class="canvas-icon-button share-btn"
+        class="ib-round-control ib-page-chrome-control canvas-icon-button share-btn"
         aria-label="分享功能稍后接入"
         title="分享功能稍后接入"
         disabled
@@ -89,7 +89,7 @@
         </span>
       </button>
       <button
-        class="canvas-icon-button enabled:!border-[var(--canvas-accent)] enabled:!bg-[var(--canvas-accent)] enabled:!text-white enabled:hover:!border-[var(--canvas-accent-hover)] enabled:hover:!bg-[var(--canvas-accent-hover)] enabled:hover:!text-white"
+        class="ib-round-control ib-page-chrome-control canvas-icon-button enabled:!border-[var(--canvas-accent)] enabled:!bg-[var(--canvas-accent)] enabled:!text-white enabled:hover:!border-[var(--canvas-accent-hover)] enabled:hover:!bg-[var(--canvas-accent-hover)] enabled:hover:!text-white"
         type="button"
         aria-label="导出"
         :disabled="exportDisabled"
@@ -101,7 +101,7 @@
       <UserAccountMenu
         :avatar-url="avatarUrl"
         :items="userMenuItems"
-        avatar-button-class="ib-user-avatar-button canvas-user-avatar-button"
+        avatar-button-class="ib-round-control ib-page-chrome-control ib-user-avatar-button canvas-user-avatar-button"
       />
     </div>
   </header>

@@ -1,5 +1,5 @@
 @layer components {
   .canvas-user-avatar-button {
-    --ib-user-avatar-button-bg: #f1f3f9;
+    --ib-round-control-bg: var(--canvas-surface-muted);
   }
 }

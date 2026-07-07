@@ -1,12 +1,12 @@
 @layer components {
   .admin-user-avatar-button {
-    --ib-user-avatar-button-border: transparent;
-    --ib-user-avatar-button-border-hover: var(--color-admin-border);
-    --ib-user-avatar-button-bg: transparent;
-    --ib-user-avatar-button-bg-hover: var(--color-admin-surface-hover);
-    --ib-user-avatar-button-color: var(--color-admin-text-2);
-    --ib-user-avatar-button-color-hover: var(--color-admin-text-1);
-    --ib-user-avatar-button-focus-ring: var(--color-admin-focus-ring);
+    --ib-round-control-border: transparent;
+    --ib-round-control-border-hover: var(--color-admin-border);
+    --ib-round-control-bg: transparent;
+    --ib-round-control-bg-hover: var(--color-admin-surface-hover);
+    --ib-round-control-color: var(--color-admin-text-2);
+    --ib-round-control-color-hover: var(--color-admin-text-1);
+    --ib-round-control-focus-ring: var(--color-admin-focus-ring);
   }
 
   .admin-user-avatar-button .ib-user-avatar-button__placeholder {

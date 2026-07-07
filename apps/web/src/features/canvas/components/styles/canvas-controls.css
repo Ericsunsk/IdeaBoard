@@ -1,5 +1,4 @@
 .canvas-control-group {
-  --canvas-control-size: 40px;
   --canvas-control-gap: 12px;
   --canvas-control-icon-size: 19px;
   --canvas-control-active-color: var(--color-canvas-accent);
@@ -13,44 +12,12 @@
 
 .canvas-icon-button {
   position: relative;
-  width: var(--canvas-control-size);
-  height: var(--canvas-control-size);
-  padding: 0;
-  border: var(--canvas-control-border-width) solid #e2e4e8;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--ib-control-icon);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background-color var(--canvas-motion-standard) ease,
-    border-color var(--canvas-motion-standard) ease,
-    color var(--canvas-motion-standard) ease;
-}
-
-.canvas-icon-button:hover:not(:disabled) {
-  border-color: var(--canvas-surface-border);
-  background: var(--ib-control-bg-hover);
-  color: var(--ib-control-icon-hover);
-}
-
-.canvas-icon-button:focus-visible {
-  outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
-  outline-offset: var(--ib-focus-outline-offset);
 }
 
 .canvas-icon-button.is-active {
   border-color: var(--canvas-surface-border);
-  background: #f1f3f9;
+  background: var(--canvas-surface-muted);
   color: var(--canvas-control-active-color);
-}
-
-.canvas-icon-button:disabled {
-  background: #e2e4e8;
-  color: #a8adb7;
-  cursor: not-allowed;
 }
 
 .canvas-control-icon {

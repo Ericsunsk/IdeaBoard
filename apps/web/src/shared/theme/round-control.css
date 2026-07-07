@@ -1,0 +1,57 @@
+@layer components {
+  .ib-round-control {
+    --ib-round-control-size: 40px;
+    --ib-round-control-border-width: 1px;
+    --ib-round-control-border: var(--color-ib-page-dot);
+    --ib-round-control-border-hover: var(--color-ib-account-menu-border);
+    --ib-round-control-bg: var(--color-ib-surface);
+    --ib-round-control-bg-hover: var(--ib-control-bg-hover);
+    --ib-round-control-bg-disabled: var(--color-ib-surface-disabled);
+    --ib-round-control-color: var(--ib-control-icon);
+    --ib-round-control-color-hover: var(--ib-control-icon-hover);
+    --ib-round-control-color-disabled: var(--color-ib-text-disabled);
+    --ib-round-control-focus-ring: var(--color-board-focus-ring);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--ib-round-control-size);
+    min-width: var(--ib-round-control-size);
+    height: var(--ib-round-control-size);
+    margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+    border: var(--ib-round-control-border-width) solid var(--ib-round-control-border);
+    border-radius: 999px;
+    background: var(--ib-round-control-bg);
+    color: var(--ib-round-control-color);
+    box-shadow: none;
+    cursor: pointer;
+    appearance: none;
+    transition:
+      background-color var(--duration-ib-standard) var(--ease-ib-standard),
+      border-color var(--duration-ib-standard) var(--ease-ib-standard),
+      color var(--duration-ib-standard) var(--ease-ib-standard);
+  }
+
+  .ib-page-chrome-control {
+    --ib-round-control-size: 40px;
+  }
+
+  .ib-round-control:hover:not(:disabled) {
+    border-color: var(--ib-round-control-border-hover);
+    background: var(--ib-round-control-bg-hover);
+    color: var(--ib-round-control-color-hover);
+  }
+
+  .ib-round-control:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ib-round-control-focus-ring);
+  }
+
+  .ib-round-control:disabled {
+    border-color: var(--ib-round-control-border);
+    background: var(--ib-round-control-bg-disabled);
+    color: var(--ib-round-control-color-disabled);
+    cursor: not-allowed;
+  }
+}
