@@ -39,7 +39,7 @@
             :class="iconButtonClass"
             aria-label="刷新存储"
             :loading="loading"
-            @click="loadData"
+            @click="refreshData"
           >
             <template #icon>
               <Refresh class="size-4 text-admin-text-2" />
@@ -133,13 +133,13 @@
               @click="openEdit(card.storage.id)"
             />
             <Button
-              v-if="supportsTest(card.storage)"
+              v-if="card.supportsTest"
               size="small"
               label="测试连接"
               severity="contrast"
               outlined
               :loading="testingId === card.storage.id"
-              :disabled="!canTest(card.storage)"
+              :disabled="!card.canTest"
               @click="handleTest(card.storage)"
             />
             <Button
@@ -148,8 +148,8 @@
               label="设为当前"
               severity="contrast"
               :loading="applyingId === card.storage.id"
-              :disabled="!canApply(card.storage)"
-              @click="applyStorage(card.storage.id)"
+              :disabled="!card.canApply"
+              @click="applyStorage(card.storage)"
             />
             <Button
               v-if="!card.storage.isCurrent && !card.storage.builtin"
@@ -401,7 +401,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted } from 'vue'
 import { Plus, Refresh } from '@iconoir/vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -433,11 +433,10 @@ import {
   adminMasonryCardClass,
   adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'
-import { storageVendorIcon, storageVendorLogo } from '../../storage/storageMeta'
-import { storageStatusSeverity, type StorageCard } from '../../storage/storageHelpers'
 import { useAdminStorageContext } from '../../storage/useAdminStorageContext'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 
+const adminConfirm = useAdminConfirm()
 const {
   saving,
   savingAndApplying,
@@ -457,17 +456,11 @@ const {
   switchFields,
   activeVendorPreset,
   vendorSelectOptions,
+  cards,
   configTextValue,
   configBoolValue,
   updateConfigValue,
   providerLabel,
-  supportsTest,
-  canTest,
-  canApply,
-  statusText,
-  statusClass,
-  storageSubtitle,
-  storageMetaItems,
   handleVendorSelect,
   openCreate,
   openEdit,
@@ -477,80 +470,27 @@ const {
   applyStorage,
   handleTest,
   fetchBucketDomains,
-  removeProfile,
+  requestRemoveProfile,
   loadData,
-} = useAdminStorageContext()
-const adminConfirm = useAdminConfirm()
+  refreshData,
+} = useAdminStorageContext({ confirm: adminConfirm })
 const { isScrolling: isStoragePanelScrolling, handleScroll: handleStoragePanelScroll } =
   useTransientScrolling()
 const { isScrolling: isStorageDialogScrolling, handleScroll: handleStorageDialogScroll } =
   useTransientScrolling()
-const searchKeyword = ref('')
-const hasStorageSearch = computed(() => Boolean(searchKeyword.value.trim()))
-const storageCardViews = computed(() => storages.value.map(createStorageCardView))
-const filteredStorageCards = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  if (!keyword) return storageCardViews.value
-  return storageCardViews.value.filter((card) => card.searchableText.includes(keyword))
-})
-const currentStorage = computed(
-  () => storageCardViews.value.find((card) => card.storage.isCurrent)?.storage || null,
-)
-const configuredStorageCount = computed(
-  () => storageCardViews.value.filter((card) => card.statusClass !== 'is-empty').length,
-)
-const storageCountLabel = computed(() =>
-  hasStorageSearch.value
-    ? `${filteredStorageCards.value.length} 匹配存储`
-    : `${storages.value.length} 存储`,
-)
-const emptyStorageMessage = computed(() => (hasStorageSearch.value ? '无匹配存储' : '暂无存储配置'))
-
-function createStorageCardView(storage: StorageCard) {
-  const vendorLogo = storageVendorLogo(storage)
-  const vendorIcon = storageVendorIcon(storage)
-  const providerName = providerLabel(storage.provider)
-  const storageStatusClass = statusClass(storage)
-  const metaItems = storageMetaItems(storage)
-  const storageStatusText = statusText(storage)
-  const subtitle = storageSubtitle(storage)
-
-  return {
-    storage,
-    vendorLogo,
-    vendorIcon,
-    avatarLabel: vendorLogo || vendorIcon ? undefined : providerName.slice(0, 2).toUpperCase(),
-    providerLabel: providerName,
-    subtitle,
-    statusText: storageStatusText,
-    statusClass: storageStatusClass,
-    statusSeverity: storageStatusSeverity(storageStatusClass),
-    metaItems,
-    searchableText: [
-      storage.name,
-      providerName,
-      subtitle,
-      storageStatusText,
-      ...metaItems.flatMap((item) => [item.label, item.value]),
-    ]
-      .join(' ')
-      .toLowerCase(),
-  }
-}
+const searchKeyword = cards.searchKeyword
+const hasStorageSearch = cards.hasSearch
+const filteredStorageCards = cards.items
+const currentStorage = cards.currentStorage
+const configuredStorageCount = cards.configuredStorageCount
+const storageCountLabel = cards.storageCountLabel
+const emptyStorageMessage = cards.emptyMessage
 
 function handleEditorDialogVisibleUpdate(visible: boolean) {
   if (!visible) closeEditor()
 }
 
-function requestRemoveProfile(storage: StorageCard) {
-  adminConfirm.request({
-    title: '确认删除存储',
-    message: `确定删除存储「${storage.name}」吗？此操作不可恢复。`,
-    confirmLabel: '确定删除',
-    intent: 'danger',
-    onConfirm: () => {
-      void removeProfile(storage.id)
-    },
-  })
-}
+onMounted(() => {
+  void loadData()
+})
 </script>

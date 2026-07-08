@@ -9,6 +9,7 @@ type AdminStorageToast = Pick<
 export type AdminStorageFeedback = {
   loadProfilesFailed: (error: unknown) => void
   refreshFailed: (error: unknown) => void
+  staleProfile: () => void
   unsupportedVendorPreset: (label: string) => void
   noCreatableProviders: () => void
   missingEditableTarget: () => void
@@ -34,6 +35,9 @@ export function createAdminStorageFeedback(appToast: AdminStorageToast): AdminSt
     },
     refreshFailed(error) {
       appToast.error(formatDisplayErrorMessage(error, '刷新存储配置失败'))
+    },
+    staleProfile() {
+      appToast.warning('存储配置已变化，请刷新后重试')
     },
     unsupportedVendorPreset(label) {
       appToast.info(`${label} 暂未接入后端，当前先作为预设展示`)
