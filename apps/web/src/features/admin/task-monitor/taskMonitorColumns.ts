@@ -25,6 +25,23 @@ export function getTaskUserIdentifier(row: Task) {
   )
 }
 
+export function getTaskEndpointLabel(row: Task) {
+  return row.provider_endpoint_name || formatIDLabel('Endpoint', row.assigned_provider_endpoint_id)
+}
+
+export function getTaskCredentialLabel(row: Task) {
+  if (row.credential_fingerprint) return row.credential_fingerprint
+  return formatIDLabel('Credential', row.assigned_credential_id)
+}
+
+export function getTaskModelLabel(row: Task) {
+  return row.resolved_model || row.requested_model || ''
+}
+
+function formatIDLabel(prefix: string, id: number | null | undefined) {
+  return id ? `${prefix} #${id}` : ''
+}
+
 export {
   getTaskApiCall,
   getTaskDuration,

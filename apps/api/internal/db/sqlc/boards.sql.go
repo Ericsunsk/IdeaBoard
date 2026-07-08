@@ -51,22 +51,22 @@ func (q *Queries) ConsumeBoardShareToken(ctx context.Context, tokenHash string) 
 
 const countBoardNameConflicts = `-- name: CountBoardNameConflicts :one
 SELECT COUNT(*)
-FROM user_boards
-WHERE user_id = $1
+FROM boards
+WHERE owner_user_id = $1
   AND LOWER(name) = LOWER($2)
   AND (NOT $3::boolean OR board_id <> $4)
 `
 
 type CountBoardNameConflictsParams struct {
-	UserID     int64  `json:"user_id"`
-	Name       string `json:"name"`
-	HasBoardID bool   `json:"has_board_id"`
-	BoardID    string `json:"board_id"`
+	OwnerUserID int64  `json:"owner_user_id"`
+	Name        string `json:"name"`
+	HasBoardID  bool   `json:"has_board_id"`
+	BoardID     string `json:"board_id"`
 }
 
 func (q *Queries) CountBoardNameConflicts(ctx context.Context, arg CountBoardNameConflictsParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countBoardNameConflicts,
-		arg.UserID,
+		arg.OwnerUserID,
 		arg.Name,
 		arg.HasBoardID,
 		arg.BoardID,
@@ -84,6 +84,19 @@ WHERE token_hash = $1
 
 func (q *Queries) CountBoardShareTokenByHash(ctx context.Context, tokenHash string) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countBoardShareTokenByHash, tokenHash)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countBoardsByBoardID = `-- name: CountBoardsByBoardID :one
+SELECT COUNT(*)
+FROM boards
+WHERE board_id = $1
+`
+
+func (q *Queries) CountBoardsByBoardID(ctx context.Context, boardID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countBoardsByBoardID, boardID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -129,8 +142,8 @@ func (q *Queries) CreateBoardShareToken(ctx context.Context, arg CreateBoardShar
 }
 
 const deleteBoardByOwnerAndBoardID = `-- name: DeleteBoardByOwnerAndBoardID :execrows
-DELETE FROM user_boards
-WHERE user_id = $1 AND board_id = $2
+DELETE FROM boards
+WHERE owner_user_id = $1 AND board_id = $2
 `
 
 type DeleteBoardByOwnerAndBoardIDParams struct {
@@ -148,63 +161,52 @@ func (q *Queries) DeleteBoardByOwnerAndBoardID(ctx context.Context, arg DeleteBo
 
 const deleteBoardMember = `-- name: DeleteBoardMember :execrows
 DELETE FROM board_members
-WHERE owner_user_id = $1 AND board_id = $2 AND user_id = $3
+WHERE board_id = $1 AND user_id = $2
 `
 
 type DeleteBoardMemberParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-	UserID      int64  `json:"user_id"`
+	BoardID string `json:"board_id"`
+	UserID  int64  `json:"user_id"`
 }
 
 func (q *Queries) DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteBoardMember, arg.OwnerUserID, arg.BoardID, arg.UserID)
+	result, err := q.db.ExecContext(ctx, deleteBoardMember, arg.BoardID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
 }
 
-const deleteBoardMembersByOwnerAndBoardID = `-- name: DeleteBoardMembersByOwnerAndBoardID :exec
+const deleteBoardMembersByBoardID = `-- name: DeleteBoardMembersByBoardID :exec
 DELETE FROM board_members
-WHERE owner_user_id = $1 AND board_id = $2
+WHERE board_id = $1
 `
 
-type DeleteBoardMembersByOwnerAndBoardIDParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-}
-
-func (q *Queries) DeleteBoardMembersByOwnerAndBoardID(ctx context.Context, arg DeleteBoardMembersByOwnerAndBoardIDParams) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardMembersByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
+func (q *Queries) DeleteBoardMembersByBoardID(ctx context.Context, boardID string) error {
+	_, err := q.db.ExecContext(ctx, deleteBoardMembersByBoardID, boardID)
 	return err
 }
 
-const deleteBoardShareTokensByOwnerAndBoardID = `-- name: DeleteBoardShareTokensByOwnerAndBoardID :exec
+const deleteBoardShareTokensByBoardID = `-- name: DeleteBoardShareTokensByBoardID :exec
 DELETE FROM board_share_tokens
-WHERE created_by = $1 AND board_id = $2
+WHERE board_id = $1
 `
 
-type DeleteBoardShareTokensByOwnerAndBoardIDParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-}
-
-func (q *Queries) DeleteBoardShareTokensByOwnerAndBoardID(ctx context.Context, arg DeleteBoardShareTokensByOwnerAndBoardIDParams) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardShareTokensByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
+func (q *Queries) DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error {
+	_, err := q.db.ExecContext(ctx, deleteBoardShareTokensByBoardID, boardID)
 	return err
 }
 
 const getAccessibleBoardByBoardID = `-- name: GetAccessibleBoardByBoardID :one
 SELECT
-  b.id, b.board_id, b.user_id, b.name, b.state,
+  b.id, b.board_id, b.owner_user_id, b.created_by, b.name, b.state,
   b.revision, b.state_schema_version, b.last_saved_by,
   b.created_at, b.updated_at,
   m.role AS member_role
-FROM user_boards AS b
-LEFT JOIN board_members AS m ON m.owner_user_id = b.user_id AND m.board_id = b.board_id AND m.user_id = $1
+FROM boards AS b
+LEFT JOIN board_members AS m ON m.board_id = b.board_id AND m.user_id = $1
 WHERE b.board_id = $2
-  AND (b.user_id = $1 OR m.user_id = $1)
+  AND (b.owner_user_id = $1 OR m.user_id = $1)
 ORDER BY CASE WHEN m.user_id IS NOT NULL THEN 0 ELSE 1 END, b.updated_at DESC
 LIMIT 1
 `
@@ -217,7 +219,8 @@ type GetAccessibleBoardByBoardIDParams struct {
 type GetAccessibleBoardByBoardIDRow struct {
 	ID                 int64           `json:"id"`
 	BoardID            string          `json:"board_id"`
-	UserID             int64           `json:"user_id"`
+	OwnerUserID        int64           `json:"owner_user_id"`
+	CreatedBy          int64           `json:"created_by"`
 	Name               string          `json:"name"`
 	State              json.RawMessage `json:"state"`
 	Revision           int64           `json:"revision"`
@@ -234,7 +237,8 @@ func (q *Queries) GetAccessibleBoardByBoardID(ctx context.Context, arg GetAccess
 	err := row.Scan(
 		&i.ID,
 		&i.BoardID,
-		&i.UserID,
+		&i.OwnerUserID,
+		&i.CreatedBy,
 		&i.Name,
 		&i.State,
 		&i.Revision,
@@ -247,10 +251,36 @@ func (q *Queries) GetAccessibleBoardByBoardID(ctx context.Context, arg GetAccess
 	return i, err
 }
 
+const getBoardByBoardID = `-- name: GetBoardByBoardID :one
+SELECT id, board_id, owner_user_id, created_by, name, state, revision, state_schema_version, last_saved_by, created_at, updated_at
+FROM boards
+WHERE board_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetBoardByBoardID(ctx context.Context, boardID string) (Board, error) {
+	row := q.db.QueryRowContext(ctx, getBoardByBoardID, boardID)
+	var i Board
+	err := row.Scan(
+		&i.ID,
+		&i.BoardID,
+		&i.OwnerUserID,
+		&i.CreatedBy,
+		&i.Name,
+		&i.State,
+		&i.Revision,
+		&i.StateSchemaVersion,
+		&i.LastSavedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getBoardByOwnerAndBoardID = `-- name: GetBoardByOwnerAndBoardID :one
-SELECT id, board_id, user_id, name, state, revision, state_schema_version, last_saved_by, created_at, updated_at
-FROM user_boards
-WHERE user_id = $1 AND board_id = $2
+SELECT id, board_id, owner_user_id, created_by, name, state, revision, state_schema_version, last_saved_by, created_at, updated_at
+FROM boards
+WHERE owner_user_id = $1 AND board_id = $2
 LIMIT 1
 `
 
@@ -259,13 +289,14 @@ type GetBoardByOwnerAndBoardIDParams struct {
 	BoardID     string `json:"board_id"`
 }
 
-func (q *Queries) GetBoardByOwnerAndBoardID(ctx context.Context, arg GetBoardByOwnerAndBoardIDParams) (UserBoard, error) {
+func (q *Queries) GetBoardByOwnerAndBoardID(ctx context.Context, arg GetBoardByOwnerAndBoardIDParams) (Board, error) {
 	row := q.db.QueryRowContext(ctx, getBoardByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
-	var i UserBoard
+	var i Board
 	err := row.Scan(
 		&i.ID,
 		&i.BoardID,
-		&i.UserID,
+		&i.OwnerUserID,
+		&i.CreatedBy,
 		&i.Name,
 		&i.State,
 		&i.Revision,
@@ -278,23 +309,21 @@ func (q *Queries) GetBoardByOwnerAndBoardID(ctx context.Context, arg GetBoardByO
 }
 
 const getBoardMemberByUserID = `-- name: GetBoardMemberByUserID :one
-SELECT id, owner_user_id, board_id, user_id, role, created_at, updated_at
+SELECT id, board_id, user_id, role, created_at, updated_at
 FROM board_members
-WHERE owner_user_id = $1 AND board_id = $2 AND user_id = $3
+WHERE board_id = $1 AND user_id = $2
 `
 
 type GetBoardMemberByUserIDParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-	UserID      int64  `json:"user_id"`
+	BoardID string `json:"board_id"`
+	UserID  int64  `json:"user_id"`
 }
 
 func (q *Queries) GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error) {
-	row := q.db.QueryRowContext(ctx, getBoardMemberByUserID, arg.OwnerUserID, arg.BoardID, arg.UserID)
+	row := q.db.QueryRowContext(ctx, getBoardMemberByUserID, arg.BoardID, arg.UserID)
 	var i BoardMember
 	err := row.Scan(
 		&i.ID,
-		&i.OwnerUserID,
 		&i.BoardID,
 		&i.UserID,
 		&i.Role,
@@ -307,17 +336,16 @@ func (q *Queries) GetBoardMemberByUserID(ctx context.Context, arg GetBoardMember
 const getBoardMemberRole = `-- name: GetBoardMemberRole :one
 SELECT role
 FROM board_members
-WHERE owner_user_id = $1 AND board_id = $2 AND user_id = $3
+WHERE board_id = $1 AND user_id = $2
 `
 
 type GetBoardMemberRoleParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-	UserID      int64  `json:"user_id"`
+	BoardID string `json:"board_id"`
+	UserID  int64  `json:"user_id"`
 }
 
 func (q *Queries) GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error) {
-	row := q.db.QueryRowContext(ctx, getBoardMemberRole, arg.OwnerUserID, arg.BoardID, arg.UserID)
+	row := q.db.QueryRowContext(ctx, getBoardMemberRole, arg.BoardID, arg.UserID)
 	var role string
 	err := row.Scan(&role)
 	return role, err
@@ -357,20 +385,21 @@ func (q *Queries) GetBoardShareTokenByHash(ctx context.Context, tokenHash string
 
 const listAccessibleBoardsByUserID = `-- name: ListAccessibleBoardsByUserID :many
 SELECT
-  b.id, b.board_id, b.user_id, b.name, b.state,
+  b.id, b.board_id, b.owner_user_id, b.created_by, b.name, b.state,
   b.revision, b.state_schema_version, b.last_saved_by,
   b.created_at, b.updated_at,
   m.role AS member_role
-FROM user_boards AS b
-LEFT JOIN board_members AS m ON m.owner_user_id = b.user_id AND m.board_id = b.board_id AND m.user_id = $1
-WHERE b.user_id = $1 OR m.user_id = $1
+FROM boards AS b
+LEFT JOIN board_members AS m ON m.board_id = b.board_id AND m.user_id = $1
+WHERE b.owner_user_id = $1 OR m.user_id = $1
 ORDER BY b.updated_at DESC
 `
 
 type ListAccessibleBoardsByUserIDRow struct {
 	ID                 int64           `json:"id"`
 	BoardID            string          `json:"board_id"`
-	UserID             int64           `json:"user_id"`
+	OwnerUserID        int64           `json:"owner_user_id"`
+	CreatedBy          int64           `json:"created_by"`
 	Name               string          `json:"name"`
 	State              json.RawMessage `json:"state"`
 	Revision           int64           `json:"revision"`
@@ -393,7 +422,8 @@ func (q *Queries) ListAccessibleBoardsByUserID(ctx context.Context, userID int64
 		if err := rows.Scan(
 			&i.ID,
 			&i.BoardID,
-			&i.UserID,
+			&i.OwnerUserID,
+			&i.CreatedBy,
 			&i.Name,
 			&i.State,
 			&i.Revision,
@@ -420,14 +450,9 @@ const listBoardMembers = `-- name: ListBoardMembers :many
 SELECT m.user_id, u.storage_uid AS member_uid, u.username, m.role
 FROM board_members AS m
 INNER JOIN users AS u ON u.id = m.user_id
-WHERE m.owner_user_id = $1 AND m.board_id = $2
+WHERE m.board_id = $1
 ORDER BY m.created_at ASC
 `
-
-type ListBoardMembersParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-}
 
 type ListBoardMembersRow struct {
 	UserID    int64  `json:"user_id"`
@@ -436,8 +461,8 @@ type ListBoardMembersRow struct {
 	Role      string `json:"role"`
 }
 
-func (q *Queries) ListBoardMembers(ctx context.Context, arg ListBoardMembersParams) ([]ListBoardMembersRow, error) {
-	rows, err := q.db.QueryContext(ctx, listBoardMembers, arg.OwnerUserID, arg.BoardID)
+func (q *Queries) ListBoardMembers(ctx context.Context, boardID string) ([]ListBoardMembersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listBoardMembers, boardID)
 	if err != nil {
 		return nil, err
 	}
@@ -470,17 +495,12 @@ SELECT
   usage_count, max_uses, last_used_at, revoked_at, revoked_by,
   expires_at, created_at, updated_at
 FROM board_share_tokens
-WHERE created_by = $1 AND board_id = $2
+WHERE board_id = $1
 ORDER BY created_at DESC
 `
 
-type ListBoardShareTokensParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-}
-
-func (q *Queries) ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]BoardShareToken, error) {
-	rows, err := q.db.QueryContext(ctx, listBoardShareTokens, arg.OwnerUserID, arg.BoardID)
+func (q *Queries) ListBoardShareTokens(ctx context.Context, boardID string) ([]BoardShareToken, error) {
+	rows, err := q.db.QueryContext(ctx, listBoardShareTokens, boardID)
 	if err != nil {
 		return nil, err
 	}
@@ -523,54 +543,50 @@ UPDATE board_share_tokens
 SET revoked = TRUE,
     revoked_at = now(),
     revoked_by = $1
-WHERE created_by = $2 AND board_id = $3 AND id = $4
+WHERE board_id = $2 AND id = $3
 `
 
 type RevokeBoardShareTokenByIDParams struct {
-	RevokedBy   sql.NullInt64 `json:"revoked_by"`
-	OwnerUserID int64         `json:"owner_user_id"`
-	BoardID     string        `json:"board_id"`
-	TokenID     int64         `json:"token_id"`
+	RevokedBy sql.NullInt64 `json:"revoked_by"`
+	BoardID   string        `json:"board_id"`
+	TokenID   int64         `json:"token_id"`
 }
 
 func (q *Queries) RevokeBoardShareTokenByID(ctx context.Context, arg RevokeBoardShareTokenByIDParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeBoardShareTokenByID,
-		arg.RevokedBy,
-		arg.OwnerUserID,
-		arg.BoardID,
-		arg.TokenID,
-	)
+	result, err := q.db.ExecContext(ctx, revokeBoardShareTokenByID, arg.RevokedBy, arg.BoardID, arg.TokenID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
 }
 
-const upsertBoard = `-- name: UpsertBoard :exec
-INSERT INTO user_boards (
-  board_id, user_id, name, state,
+const upsertBoard = `-- name: UpsertBoard :execrows
+INSERT INTO boards (
+  board_id, owner_user_id, created_by, name, state,
   revision, state_schema_version, last_saved_by,
   created_at, updated_at
 )
 VALUES (
-  $1, $2, $3, $4,
-  COALESCE($5::bigint, 1),
-  COALESCE($6::integer, 1),
-  $7,
-  $8, $9
+  $1, $2, $3, $4, $5,
+  COALESCE($6::bigint, 1),
+  COALESCE($7::integer, 1),
+  $8,
+  $9, $10
 )
-ON CONFLICT (user_id, board_id) DO UPDATE
+ON CONFLICT (board_id) DO UPDATE
 SET name = EXCLUDED.name,
     state = EXCLUDED.state,
-    revision = user_boards.revision + 1,
-    state_schema_version = COALESCE($6::integer, user_boards.state_schema_version),
-    last_saved_by = COALESCE($7::bigint, user_boards.last_saved_by),
+    revision = boards.revision + 1,
+    state_schema_version = COALESCE($7::integer, boards.state_schema_version),
+    last_saved_by = COALESCE($8::bigint, boards.last_saved_by),
     updated_at = EXCLUDED.updated_at
+WHERE boards.owner_user_id = EXCLUDED.owner_user_id
 `
 
 type UpsertBoardParams struct {
 	BoardID            string          `json:"board_id"`
-	UserID             int64           `json:"user_id"`
+	OwnerUserID        int64           `json:"owner_user_id"`
+	CreatedBy          int64           `json:"created_by"`
 	Name               string          `json:"name"`
 	State              json.RawMessage `json:"state"`
 	Revision           sql.NullInt64   `json:"revision"`
@@ -580,10 +596,11 @@ type UpsertBoardParams struct {
 	UpdatedAt          time.Time       `json:"updated_at"`
 }
 
-func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) error {
-	_, err := q.db.ExecContext(ctx, upsertBoard,
+func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, upsertBoard,
 		arg.BoardID,
-		arg.UserID,
+		arg.OwnerUserID,
+		arg.CreatedBy,
 		arg.Name,
 		arg.State,
 		arg.Revision,
@@ -592,29 +609,26 @@ func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) error 
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const upsertBoardMember = `-- name: UpsertBoardMember :exec
-INSERT INTO board_members (owner_user_id, board_id, user_id, role)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (owner_user_id, board_id, user_id) DO UPDATE
+INSERT INTO board_members (board_id, user_id, role)
+VALUES ($1, $2, $3)
+ON CONFLICT (board_id, user_id) DO UPDATE
 SET role = EXCLUDED.role
 `
 
 type UpsertBoardMemberParams struct {
-	OwnerUserID int64  `json:"owner_user_id"`
-	BoardID     string `json:"board_id"`
-	UserID      int64  `json:"user_id"`
-	Role        string `json:"role"`
+	BoardID string `json:"board_id"`
+	UserID  int64  `json:"user_id"`
+	Role    string `json:"role"`
 }
 
 func (q *Queries) UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error {
-	_, err := q.db.ExecContext(ctx, upsertBoardMember,
-		arg.OwnerUserID,
-		arg.BoardID,
-		arg.UserID,
-		arg.Role,
-	)
+	_, err := q.db.ExecContext(ctx, upsertBoardMember, arg.BoardID, arg.UserID, arg.Role)
 	return err
 }

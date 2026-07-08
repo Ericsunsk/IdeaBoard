@@ -9,10 +9,9 @@ import type { AdminAccountModel } from './adminAccountModel'
 export interface AdminAccount {
   id: number
   name: string
-  channel_id: number
-  platform: string
-  api_type: string
-  proxy_url: string
+  provider_endpoint_id: number
+  provider_endpoint_api_type: string
+  provider_endpoint_base_url: string
   models: AdminAccountModel[]
   secret_configured: boolean
   max_concurrent: number

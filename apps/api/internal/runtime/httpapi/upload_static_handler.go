@@ -80,7 +80,7 @@ func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Co
 	if err != nil {
 		return 0, err
 	}
-	return board.UserID, nil
+	return board.OwnerUserID, nil
 }
 
 func authorizeStaticUploadResourceRead(

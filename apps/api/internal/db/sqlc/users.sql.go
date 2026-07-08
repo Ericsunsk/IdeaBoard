@@ -43,16 +43,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, 
 	return id, err
 }
 
-const deleteBoardMembersByOwnerUserID = `-- name: DeleteBoardMembersByOwnerUserID :exec
-DELETE FROM board_members
-WHERE owner_user_id = $1
-`
-
-func (q *Queries) DeleteBoardMembersByOwnerUserID(ctx context.Context, ownerUserID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardMembersByOwnerUserID, ownerUserID)
-	return err
-}
-
 const deleteBoardMembersByUserID = `-- name: DeleteBoardMembersByUserID :exec
 DELETE FROM board_members
 WHERE user_id = $1
@@ -63,19 +53,9 @@ func (q *Queries) DeleteBoardMembersByUserID(ctx context.Context, userID int64) 
 	return err
 }
 
-const deleteBoardShareTokensByCreatedBy = `-- name: DeleteBoardShareTokensByCreatedBy :exec
-DELETE FROM board_share_tokens
-WHERE created_by = $1
-`
-
-func (q *Queries) DeleteBoardShareTokensByCreatedBy(ctx context.Context, createdBy int64) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardShareTokensByCreatedBy, createdBy)
-	return err
-}
-
 const deleteUserBoardsByUserID = `-- name: DeleteUserBoardsByUserID :exec
-DELETE FROM user_boards
-WHERE user_id = $1
+DELETE FROM boards
+WHERE owner_user_id = $1
 `
 
 func (q *Queries) DeleteUserBoardsByUserID(ctx context.Context, userID int64) error {

@@ -7,18 +7,30 @@ import (
 )
 
 type taskAssignmentTaskState struct {
-	Status        string
-	AccountID     int64
-	ChannelID     int64
-	LeaseToken    string
-	ResolvedModel string
-	CreatedAt     time.Time
+	Status                  string
+	AccountID               int64
+	ProviderEndpointID      int64
+	CredentialID            int64
+	LeaseToken              string
+	ResolvedModel           string
+	APIType                 string
+	ProviderEndpointName    string
+	ProviderEndpointBaseURL string
+	CredentialFingerprint   string
+	CredentialKeyVersion    string
+	CreatedAt               time.Time
 }
 
 type taskAssignmentSelectedAccount struct {
-	AccountID     int64
-	ChannelID     int64
-	ResolvedModel string
+	AccountID               int64
+	ProviderEndpointID      int64
+	CredentialID            int64
+	ResolvedModel           string
+	APIType                 string
+	ProviderEndpointName    string
+	ProviderEndpointBaseURL string
+	CredentialFingerprint   string
+	CredentialKeyVersion    string
 }
 
 type taskAssignmentDecision struct {
@@ -38,12 +50,18 @@ func (taskAssignmentPolicy) noCapacity(taskID string) TaskAssignment {
 
 func (taskAssignmentPolicy) assigned(taskID string, selectedAccount taskAssignmentSelectedAccount, leaseToken string) TaskAssignment {
 	return TaskAssignment{
-		TaskID:        taskID,
-		AccountID:     selectedAccount.AccountID,
-		ChannelID:     selectedAccount.ChannelID,
-		ResolvedModel: selectedAccount.ResolvedModel,
-		Status:        AssignStatusAssigned,
-		LeaseToken:    leaseToken,
+		TaskID:                  taskID,
+		AccountID:               selectedAccount.AccountID,
+		ProviderEndpointID:      selectedAccount.ProviderEndpointID,
+		CredentialID:            selectedAccount.CredentialID,
+		ResolvedModel:           selectedAccount.ResolvedModel,
+		APIType:                 selectedAccount.APIType,
+		ProviderEndpointName:    selectedAccount.ProviderEndpointName,
+		ProviderEndpointBaseURL: selectedAccount.ProviderEndpointBaseURL,
+		CredentialFingerprint:   selectedAccount.CredentialFingerprint,
+		CredentialKeyVersion:    selectedAccount.CredentialKeyVersion,
+		Status:                  AssignStatusAssigned,
+		LeaseToken:              leaseToken,
 	}
 }
 
@@ -51,13 +69,19 @@ func (p taskAssignmentPolicy) decideLockedTask(taskID string, riverJobID int64, 
 	if tasks.IsTerminalStatus(state.Status) {
 		return taskAssignmentDecision{done: true, assignment: p.discard(taskID)}
 	}
-	if state.Status == tasks.StatusRunning && state.AccountID > 0 && state.ChannelID > 0 && LeaseBelongsToRiverJob(state.LeaseToken, riverJobID) {
+	if state.Status == tasks.StatusRunning && state.AccountID > 0 && state.ProviderEndpointID > 0 && LeaseBelongsToRiverJob(state.LeaseToken, riverJobID) {
 		return taskAssignmentDecision{
 			done: true,
 			assignment: p.assigned(taskID, taskAssignmentSelectedAccount{
-				AccountID:     state.AccountID,
-				ChannelID:     state.ChannelID,
-				ResolvedModel: state.ResolvedModel,
+				AccountID:               state.AccountID,
+				ProviderEndpointID:      state.ProviderEndpointID,
+				CredentialID:            state.CredentialID,
+				ResolvedModel:           state.ResolvedModel,
+				APIType:                 state.APIType,
+				ProviderEndpointName:    state.ProviderEndpointName,
+				ProviderEndpointBaseURL: state.ProviderEndpointBaseURL,
+				CredentialFingerprint:   state.CredentialFingerprint,
+				CredentialKeyVersion:    state.CredentialKeyVersion,
 			}, state.LeaseToken),
 		}
 	}

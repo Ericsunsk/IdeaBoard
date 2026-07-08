@@ -4,6 +4,7 @@ import {
   isCanvasConnectionNodeType,
   resolveImageNodeStageHeight,
   type CanvasSnapshotNodeCollectionKey,
+  type BoardStateMediaRef,
   type CanvasBoardSnapshot,
   type CanvasConnection,
   type CanvasConnectionNodeType,
@@ -54,10 +55,57 @@ function clone<T>(value: T): T {
 
 function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
   const snapshot = createEmptyCanvasBoardSnapshot()
-  if (base?.mediaRefs) {
-    snapshot.mediaRefs = base.mediaRefs.map((ref) => ({ ...ref }))
-  }
+  const boardRefs = collectBoardScopedMediaRefs(base)
+  if (boardRefs.length > 0) snapshot.mediaRefs = boardRefs
   return snapshot
+}
+
+function collectBoardScopedMediaRefs(base?: CanvasBoardSnapshot): BoardStateMediaRef[] {
+  return (base?.mediaRefs ?? [])
+    .filter((ref) => ref.refType === 'board')
+    .map((ref) => ({ ...ref }))
+}
+
+function resolveImageNodeMediaRefRole(
+  base: CanvasBoardSnapshot | undefined,
+  refId: string,
+): string {
+  return (
+    base?.mediaRefs?.find((ref) => ref.refType === 'board_node' && ref.refId === refId)?.role ||
+    'source'
+  )
+}
+
+function appendCurrentImageNodeMediaRefs(
+  snapshot: CanvasBoardSnapshot,
+  base?: CanvasBoardSnapshot,
+) {
+  const refs = snapshot.mediaRefs ? snapshot.mediaRefs.map((ref) => ({ ...ref })) : []
+  const seen = new Set(
+    refs.map((ref) => `${ref.mediaAssetId}:${ref.refType}:${ref.refId}:${ref.role ?? ''}`),
+  )
+
+  snapshot.imageNodes.forEach((node) => {
+    const mediaAssetId = Number(node.sourceMediaAssetId)
+    if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) return
+    const refId = `image-${node.id}`
+    const ref = {
+      mediaAssetId,
+      refType: 'board_node' as const,
+      refId,
+      role: resolveImageNodeMediaRefRole(base, refId),
+    }
+    const key = `${ref.mediaAssetId}:${ref.refType}:${ref.refId}:${ref.role}`
+    if (seen.has(key)) return
+    seen.add(key)
+    refs.push(ref)
+  })
+
+  if (refs.length > 0) {
+    snapshot.mediaRefs = refs
+  } else {
+    delete snapshot.mediaRefs
+  }
 }
 
 export function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
@@ -266,6 +314,7 @@ export function flowToCanvasBoardSnapshot(
     persistedFlowNodeRefs,
     lookupData: (nodeId) => flowNodeDataMap.get(nodeId),
   })
+  appendCurrentImageNodeMediaRefs(snapshot, base)
 
   return snapshot
 }

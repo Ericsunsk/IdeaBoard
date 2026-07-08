@@ -37,12 +37,12 @@ describe('createAdminFeedback', () => {
     const feedback = createAdminFeedback(appToast)
 
     feedback.login.failed(new Error('dial tcp 127.0.0.1:5432'))
-    feedback.channels.providerConfig.accountLimitsFallback({ msg: 'api key invalid' })
-    feedback.channels.providerConfig.loadFailed({ msg: '渠道服务繁忙' })
+    feedback.providerEndpoints.providerConfig.accountLimitsFallback({ msg: 'api key invalid' })
+    feedback.providerEndpoints.providerConfig.loadFailed({ msg: '端点服务繁忙' })
 
     expect(appToast.error.mock.calls.map(([message]) => message)).toEqual([
       '管理员登录失败',
-      '渠道服务繁忙',
+      '端点服务繁忙',
     ])
     expect(appToast.warning).toHaveBeenCalledWith('账号限制加载失败，已使用默认限制')
   })

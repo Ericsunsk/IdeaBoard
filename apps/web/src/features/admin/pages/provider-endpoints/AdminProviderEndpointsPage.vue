@@ -2,13 +2,13 @@
   <div>
     <AdminResourceGridFrame
       :empty-description="
-        hasChannelSearch ? '调整搜索关键词后重试。' : '点击右上角新增渠道商开始配置。'
+        hasProviderEndpointSearch ? '调整搜索关键词后重试。' : '点击右上角新增供应商端点开始配置。'
       "
-      :empty-title="emptyChannelMessage"
-      :is-empty="channelCards.length === 0"
-      :is-loading="isChannelLoading"
-      :is-scrolling="isChannelPanelScrolling"
-      @scroll="handleChannelPanelScroll"
+      :empty-title="emptyProviderEndpointMessage"
+      :is-empty="providerEndpointCards.length === 0"
+      :is-loading="isProviderEndpointLoading"
+      :is-scrolling="isProviderEndpointPanelScrolling"
+      @scroll="handleProviderEndpointPanelScroll"
     >
       <template #toolbar>
         <AdminResourceToolbar>
@@ -19,7 +19,7 @@
           <template #metrics="{ metricClass }">
             <span :class="metricClass">
               <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
-              <span>{{ totalChannelsLabel }}</span>
+              <span>{{ totalProviderEndpointsLabel }}</span>
             </span>
             <Tag :value="accountRunningLabel" severity="success" rounded />
             <Tag :value="`${activeModelCount} 模型`" severity="info" rounded />
@@ -29,7 +29,7 @@
             <Button
               text
               :class="iconButtonClass"
-              aria-label="刷新渠道商"
+              aria-label="刷新供应商端点"
               @click="commands.loadData"
             >
               <template #icon>
@@ -37,9 +37,9 @@
               </template>
             </Button>
             <Button
-              label="新增渠道商"
+              label="新增供应商端点"
               :class="adminActionButtonClass"
-              @click="channelEditor.openCreate"
+              @click="providerEndpointEditor.openCreate"
             >
               <template #icon>
                 <Plus class="size-4" />
@@ -50,8 +50,8 @@
       </template>
 
       <Card
-        v-for="card in channelCards"
-        :key="card.channel.id"
+        v-for="card in providerEndpointCards"
+        :key="card.providerEndpoint.id"
         :class="adminMasonryCardClass"
         :pt="adminCardPt"
       >
@@ -59,16 +59,16 @@
           <div class="flex items-start gap-3">
             <div class="flex min-w-0 items-center gap-3">
               <Avatar
-                :label="(card.channel.name || 'CH').substring(0, 2).toUpperCase()"
+                :label="(card.providerEndpoint.name || 'EP').substring(0, 2).toUpperCase()"
                 shape="circle"
                 class="!h-10 !w-10 !shrink-0 !bg-admin-accent !text-sm !font-bold !text-admin-text-inverse"
               />
               <div class="min-w-0">
                 <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
-                  {{ card.channel.name }}
+                  {{ card.providerEndpoint.name }}
                 </div>
                 <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
-                  {{ card.channel.baseUrl }}
+                  {{ card.providerEndpoint.baseUrl }}
                 </div>
               </div>
             </div>
@@ -79,8 +79,14 @@
           <div class="flex flex-col gap-3.5">
             <div class="flex flex-wrap items-center gap-1.5">
               <Tag
-                :value="card.channel.apiTypeLabel"
+                :value="card.providerEndpoint.apiTypeLabel"
                 severity="info"
+                :class="adminCompactTagClass"
+                rounded
+              />
+              <Tag
+                :value="card.providerEndpoint.status === 1 ? '启用' : '停用'"
+                :severity="card.providerEndpoint.status === 1 ? 'success' : 'warn'"
                 :class="adminCompactTagClass"
                 rounded
               />
@@ -109,7 +115,7 @@
                   size="small"
                   :class="adminTextButtonClass"
                   aria-label="添加 APIKey"
-                  @click="accountEditor.openCreate(card.channel.commandTarget)"
+                  @click="accountEditor.openCreate(card.providerEndpoint.commandTarget)"
                 >
                   <template #icon>
                     <Plus />
@@ -209,14 +215,14 @@
                 size="small"
                 label="编辑"
                 severity="contrast"
-                @click="channelEditor.openEdit(card.channel.commandTarget)"
+                @click="providerEndpointEditor.openEdit(card.providerEndpoint.commandTarget)"
               />
               <Button
                 size="small"
                 label="删除"
                 severity="contrast"
                 outlined
-                @click="commands.deleteChannel(card.channel.commandTarget)"
+                @click="commands.deleteProviderEndpoint(card.providerEndpoint.commandTarget)"
               />
             </div>
           </div>
@@ -224,71 +230,86 @@
       </Card>
     </AdminResourceGridFrame>
 
-    <!-- 渠道商表单弹窗 -->
+    <!-- 供应商端点表单弹窗 -->
     <Dialog
-      v-model:visible="showChannelModal"
+      v-model:visible="showProviderEndpointModal"
       modal
-      :header="isEditChannel ? '编辑渠道商' : '新增渠道商'"
+      :header="isEditProviderEndpoint ? '编辑供应商端点' : '新增供应商端点'"
       :style="{ width: 'min(480px, calc(100vw - 24px))' }"
     >
       <div :class="adminDialogFormBodyClass">
         <AdminFormField
           v-slot="{ describedbyId, invalid }"
-          label="渠道商名称"
-          for="admin-channel-name"
-          :error="channelFormErrors.name"
+          label="端点名称"
+          for="admin-provider-endpoint-name"
+          :error="providerEndpointFormErrors.name"
         >
           <InputText
-            id="admin-channel-name"
-            v-model="channelForm.name"
+            id="admin-provider-endpoint-name"
+            v-model="providerEndpointForm.name"
             class="w-full"
-            placeholder="例如：Nano Banana 官方"
+            placeholder="例如：Nano Banana 官方端点"
             :invalid="invalid"
             :aria-describedby="describedbyId"
-            @update:model-value="clearChannelFormError('name')"
+            @update:model-value="clearProviderEndpointFormError('name')"
           />
         </AdminFormField>
         <AdminFormField
           v-slot="{ describedbyId, invalid }"
           label="接口类型"
-          for="admin-channel-type"
-          :error="channelFormErrors.apiType"
+          for="admin-provider-endpoint-type"
+          :error="providerEndpointFormErrors.apiType"
         >
           <Select
-            v-model="channelForm.apiType"
-            input-id="admin-channel-type"
+            v-model="providerEndpointForm.apiType"
+            input-id="admin-provider-endpoint-type"
             class="w-full"
-            :options="channelEditor.apiTypeOptions"
+            :options="providerEndpointEditor.apiTypeOptions"
             option-label="label"
             option-value="value"
             placeholder="选择接口协议"
             :invalid="invalid"
             :aria-describedby="describedbyId"
-            @update:model-value="clearChannelFormError('apiType')"
+            @update:model-value="clearProviderEndpointFormError('apiType')"
           />
         </AdminFormField>
         <AdminFormField
           v-slot="{ describedbyId, invalid }"
           label="Base URL地址"
-          for="admin-channel-api-url"
-          :error="channelFormErrors.baseUrl"
+          for="admin-provider-endpoint-api-url"
+          :error="providerEndpointFormErrors.baseUrl"
         >
           <InputText
-            id="admin-channel-api-url"
-            v-model="channelForm.baseUrl"
+            id="admin-provider-endpoint-api-url"
+            v-model="providerEndpointForm.baseUrl"
             class="w-full"
             placeholder="例如：https://api.example.com/v1"
             :invalid="invalid"
             :aria-describedby="describedbyId"
-            @blur="channelEditor.handleApiUrlBlur"
-            @update:model-value="clearChannelFormError('baseUrl')"
+            @blur="providerEndpointEditor.handleApiUrlBlur"
+            @update:model-value="clearProviderEndpointFormError('baseUrl')"
           />
+        </AdminFormField>
+        <AdminFormField label="端点状态" for="admin-provider-endpoint-status">
+          <div
+            class="flex min-h-10 items-center justify-between rounded-lg border border-admin-border-soft bg-white px-3"
+          >
+            <span class="text-admin-body-sm font-medium text-admin-text-1">
+              {{ providerEndpointForm.status === 1 ? '启用' : '停用' }}
+            </span>
+            <ToggleSwitch
+              input-id="admin-provider-endpoint-status"
+              :model-value="providerEndpointForm.status === 1"
+              aria-label="供应商端点启用状态"
+              @update:model-value="providerEndpointForm.status = $event ? 1 : 0"
+            />
+          </div>
         </AdminFormField>
       </div>
       <template #footer>
         <div :class="adminDialogCompactFooterActionsClass">
-          <Button label="取消" severity="secondary" outlined @click="closeChannelModal" />
-          <Button label="确定" :loading="channelSaveLoading" @click="handleSaveChannel" />
+          <Button label="取消" severity="secondary" outlined @click="closeProviderEndpointModal" />
+          <Button label="确定" :loading="providerEndpointSaveLoading" @click="handleSaveProviderEndpoint" />
         </div>
       </template>
     </Dialog>
@@ -302,12 +323,29 @@
     >
       <div :class="adminDialogFormBodyClass">
         <div
-          v-if="selectedChannelForAccount"
+          v-if="selectedProviderEndpointForAccount"
           class="mb-4 flex items-center gap-1.5 rounded-xl border border-admin-border bg-admin-surface-muted px-3 py-2 text-admin-meta text-admin-text-2"
         >
-          <span>所属渠道：</span>
-          <code class="font-semibold text-admin-text-1">{{ selectedChannelForAccount.name }}</code>
+          <span>所属端点：</span>
+          <code class="font-semibold text-admin-text-1">{{ selectedProviderEndpointForAccount.name }}</code>
         </div>
+
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
+          label="APIKey 名称"
+          for="admin-account-name"
+          :error="accountFormErrors.name"
+        >
+          <InputText
+            id="admin-account-name"
+            v-model="accountForm.name"
+            class="w-full"
+            placeholder="用于区分同一端点下的不同 APIKey"
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
+            @update:model-value="clearAccountFormError('name')"
+          />
+        </AdminFormField>
 
         <AdminFormField
           v-slot="{ describedbyId, invalid }"
@@ -320,7 +358,7 @@
             v-model="accountForm.secret"
             class="w-full"
             type="password"
-            :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此渠道商的 API Key'"
+            :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此供应商端点的 API Key'"
             :invalid="invalid"
             :aria-describedby="describedbyId"
             @update:model-value="clearAccountFormError('secret')"
@@ -340,6 +378,7 @@
             fluid
             :suggestions="modelSuggestions"
             :loading="detectModelsLoading"
+            complete-on-focus
             placeholder="选择或输入分配给该 APIKey 的模型"
             :pt="modelSelectPt"
             :invalid="invalid"
@@ -437,28 +476,28 @@ import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 const adminFeedback = useAdminFeedback()
 const adminConfirm = useAdminConfirm()
 
-const { isScrolling: isChannelPanelScrolling, handleScroll: handleChannelPanelScroll } =
+const { isScrolling: isProviderEndpointPanelScrolling, handleScroll: handleProviderEndpointPanelScroll } =
   useTransientScrolling()
 
-const { cards, channelEditor, accountEditor, commands } = useAdminProviderConfig({
-  feedback: adminFeedback.channels.providerConfig,
+const { cards, providerEndpointEditor, accountEditor, commands } = useAdminProviderConfig({
+  feedback: adminFeedback.providerEndpoints.providerConfig,
   confirm: adminConfirm,
 })
 
 const searchKeyword = cards.searchKeyword
-const channelCards = cards.items
-const isChannelLoading = cards.isLoading
-const hasChannelSearch = cards.hasSearch
-const totalChannelsLabel = cards.totalChannelsLabel
-const emptyChannelMessage = cards.emptyMessage
+const providerEndpointCards = cards.items
+const isProviderEndpointLoading = cards.isLoading
+const hasProviderEndpointSearch = cards.hasSearch
+const totalProviderEndpointsLabel = cards.totalProviderEndpointsLabel
+const emptyProviderEndpointMessage = cards.emptyMessage
 const accountRunningLabel = cards.accountRunningLabel
 const activeModelCount = cards.activeModelCount
 
-const showChannelModal = channelEditor.visible
-const isEditChannel = channelEditor.isEditing
-const channelSaveLoading = channelEditor.saveLoading
-const channelForm = channelEditor.form
-const channelFormErrors = channelEditor.errors
+const showProviderEndpointModal = providerEndpointEditor.visible
+const isEditProviderEndpoint = providerEndpointEditor.isEditing
+const providerEndpointSaveLoading = providerEndpointEditor.saveLoading
+const providerEndpointForm = providerEndpointEditor.form
+const providerEndpointFormErrors = providerEndpointEditor.errors
 
 const modelSelectPt = {
   root: { class: 'w-full' },
@@ -476,23 +515,23 @@ const modelChipPt = {
   label: { class: 'min-w-0 truncate' },
 } as const
 
-function closeChannelModal() {
-  channelEditor.close()
+function closeProviderEndpointModal() {
+  providerEndpointEditor.close()
 }
 
-async function handleSaveChannel() {
-  await channelEditor.save()
+async function handleSaveProviderEndpoint() {
+  await providerEndpointEditor.save()
 }
 
-function clearChannelFormError(field: keyof typeof channelForm.value) {
-  channelEditor.clearError(field)
+function clearProviderEndpointFormError(field: keyof typeof providerEndpointForm.value) {
+  providerEndpointEditor.clearError(field)
 }
 
 const showAccountModal = accountEditor.visible
 const isEditAccount = accountEditor.isEditing
 const accountSaveLoading = accountEditor.saveLoading
 const accountLimits = accountEditor.accountLimits
-const selectedChannelForAccount = accountEditor.selectedChannel
+const selectedProviderEndpointForAccount = accountEditor.selectedProviderEndpoint
 const accountForm = accountEditor.form
 const accountFormErrors = accountEditor.errors
 const detectModelsLoading = accountEditor.detectModelsLoading

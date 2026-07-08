@@ -28,20 +28,19 @@ func seedStatisticsAccount(t testing.TB, ctx context.Context, db *sql.DB, name s
 	accountRepo := accounts.NewAccountRepository(db)
 	var channelID int64
 	if err := db.QueryRowContext(ctx, `
-INSERT INTO channels (type, name, api_url, status)
+INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', $1, $2, 1)
 RETURNING id`, name+"-channel", "https://example.com/"+name).Scan(&channelID); err != nil {
 		t.Fatalf("create channel failed: %v", err)
 	}
 	account := &accounts.ApiAccount{
-		Name:      name,
-		ChannelID: channelID,
-		Platform:  "openai-compatible",
-		ApiType:   "openai-compatible",
-		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:    "test",
-		ProxyURL:  "https://example.com/" + name,
-		Status:    1,
+		Name:               name,
+		ProviderEndpointID: channelID,
+		ApiType:            "openai-compatible",
+		Models:             []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:             "test",
+		ProxyURL:           "https://example.com/" + name,
+		Status:             1,
 	}
 	if err := accountRepo.Create(ctx, account); err != nil {
 		t.Fatalf("create account failed: %v", err)
@@ -78,11 +77,11 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	}
 	runningAccount := seedStatisticsAccount(t, ctx, db, "stats-running-account")
 	if err := taskRepo.Create(ctx, &tasks.Task{
-		TaskID:            "r1",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(runningAccount.ChannelID),
-		AccountID:         tasks.IDPtr(runningAccount.ID),
-		Status:            tasks.StatusRunning,
+		TaskID:                     "r1",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(runningAccount.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(runningAccount.ID),
+		Status:                     tasks.StatusRunning,
 	}); err != nil {
 		t.Fatalf("seed running task failed: %v", err)
 	}
@@ -169,33 +168,32 @@ func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 
 func TestGetStatisticsOneDayTrendUsesFourHourBuckets(t *testing.T) {
 	ctx := context.Background()
-	svc, taskRepo, _ := newStatisticsTestService(t)
+	svc, _, db := newStatisticsTestService(t)
 	loc := time.Now().Location()
 	now := time.Now().In(loc)
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	today := todayStart.Format(statisticsDateLayout)
 
 	seed := []struct {
-		id        string
-		status    string
-		model     string
-		createdAt time.Time
+		id         string
+		status     string
+		model      string
+		occurredAt time.Time
 	}{
-		{id: "bucket-00-completed", status: tasks.StatusCompleted, model: "model-a", createdAt: todayStart.Add(1 * time.Hour)},
-		{id: "bucket-04-failed", status: tasks.StatusFailed, model: "model-b", createdAt: todayStart.Add(5 * time.Hour)},
-		{id: "bucket-20-completed", status: tasks.StatusCompleted, model: "model-a", createdAt: todayStart.Add(21 * time.Hour)},
+		{id: "bucket-00-completed", status: tasks.StatusCompleted, model: "model-a", occurredAt: todayStart.Add(1 * time.Hour)},
+		{id: "bucket-04-failed", status: tasks.StatusFailed, model: "model-b", occurredAt: todayStart.Add(5 * time.Hour)},
+		{id: "bucket-20-completed", status: tasks.StatusCompleted, model: "model-a", occurredAt: todayStart.Add(21 * time.Hour)},
 	}
 	for _, item := range seed {
-		completedAt := item.createdAt.Add(30 * time.Second)
-		if err := taskRepo.Create(ctx, &tasks.Task{
-			TaskID:      item.id,
-			UserID:      1,
-			Status:      item.status,
-			Result:      `{"model":"` + item.model + `"}`,
-			CreatedAt:   item.createdAt,
-			CompletedAt: &completedAt,
-		}); err != nil {
-			t.Fatalf("seed task failed: %v", err)
-		}
+		insertTaskStatEvent(t, db, taskStatEventSeed{
+			TaskID:         item.id,
+			OccurredAt:     item.occurredAt,
+			StatDate:       today,
+			ModelName:      item.model,
+			UserKey:        "1",
+			Status:         item.status,
+			LatencySeconds: 30,
+		})
 	}
 
 	stats, err := svc.GetStatistics(ctx, "1d")
@@ -523,7 +521,7 @@ func TestBackfillStatisticsIncludesCancelledWithoutFailure(t *testing.T) {
 	t.Fatalf("quality trend missing cancelled day %s: %+v", day, stats.QualityTrend)
 }
 
-func TestBackfillStatisticsUsesSingleEnabledAccountModelFallback(t *testing.T) {
+func TestBackfillStatisticsDoesNotUseSingleEnabledAccountModelFallback(t *testing.T) {
 	ctx := context.Background()
 	svc, taskRepo, db := newStatisticsTestService(t)
 	account := seedStatisticsAccount(t, ctx, db, "stats-single-model-fallback")
@@ -533,16 +531,16 @@ func TestBackfillStatisticsUsesSingleEnabledAccountModelFallback(t *testing.T) {
 	created := pastDay.Add(45 * time.Second)
 	completed := created.Add(8 * time.Second)
 	if err := taskRepo.Create(ctx, &tasks.Task{
-		TaskID:            "single-model-fallback",
-		UserID:            93,
-		AssignedChannelID: tasks.IDPtr(account.ChannelID),
-		AccountID:         tasks.IDPtr(account.ID),
-		FeatureSlug:       "fusion",
-		APIType:           "openai-compatible",
-		Status:            tasks.StatusCompleted,
-		Result:            `{}`,
-		CreatedAt:         created,
-		CompletedAt:       &completed,
+		TaskID:                     "single-model-fallback",
+		UserID:                     93,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		FeatureSlug:                "fusion",
+		APIType:                    "openai-compatible",
+		Status:                     tasks.StatusCompleted,
+		Result:                     `{}`,
+		CreatedAt:                  created,
+		CompletedAt:                &completed,
 	}); err != nil {
 		t.Fatalf("seed fallback task failed: %v", err)
 	}
@@ -554,20 +552,20 @@ func TestBackfillStatisticsUsesSingleEnabledAccountModelFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list fallback day rows failed: %v", err)
 	}
-	if len(rows) != 1 || rows[0].ModelName != "gpt-image-1" || rows[0].UserKey != "93" || rows[0].Total != 1 {
-		t.Fatalf("fallback model stats mismatch: %+v", rows)
+	if len(rows) != 1 || rows[0].ModelName != "未识别模型" || rows[0].UserKey != "93" || rows[0].Total != 1 {
+		t.Fatalf("stats should not infer model from account fallback: %+v", rows)
 	}
 
 	var userID, accountID, channelID int64
 	var featureSlug, apiType string
 	if err := db.QueryRowContext(ctx, `
-SELECT user_id, account_id, channel_id, feature_slug, api_type
+SELECT user_id, account_id, provider_endpoint_id, feature_slug, api_type
 FROM task_stat_events
 WHERE task_id = 'single-model-fallback'`,
 	).Scan(&userID, &accountID, &channelID, &featureSlug, &apiType); err != nil {
 		t.Fatalf("read backfill stat event dimensions failed: %v", err)
 	}
-	if userID != 93 || accountID != account.ID || channelID != account.ChannelID ||
+	if userID != 93 || accountID != account.ID || channelID != account.ProviderEndpointID ||
 		featureSlug != "fusion" || apiType != "openai-compatible" {
 		t.Fatalf("unexpected backfill event dimensions: user=%d account=%d channel=%d feature=%q api=%q",
 			userID, accountID, channelID, featureSlug, apiType)
@@ -686,17 +684,16 @@ func TestGetStatisticsKeepsUnknownWhenAccountHasMultipleModels(t *testing.T) {
 	accountRepo := accounts.NewAccountRepository(db)
 	var channelID int64
 	if err := db.QueryRowContext(ctx, `
-INSERT INTO channels (type, name, api_url, status)
+INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', 'stats-channel-multi', 'https://example.com/stats-multi', 1)
 RETURNING id`).Scan(&channelID); err != nil {
 		t.Fatalf("create channel failed: %v", err)
 	}
 
 	account := &accounts.ApiAccount{
-		Name:      "acc-multi",
-		ChannelID: channelID,
-		Platform:  "openai-compatible",
-		ApiType:   "openai-compatible",
+		Name:               "acc-multi",
+		ProviderEndpointID: channelID,
+		ApiType:            "openai-compatible",
 		Models: []accounts.AccountModel{
 			{Name: "a", Enabled: true},
 			{Name: "b", Enabled: true},
@@ -712,14 +709,14 @@ RETURNING id`).Scan(&channelID); err != nil {
 	created := time.Now().Add(-3 * time.Hour)
 	completed := created.Add(8 * time.Second)
 	task := &tasks.Task{
-		TaskID:            "repair-multi-1",
-		UserID:            12,
-		AssignedChannelID: tasks.IDPtr(account.ChannelID),
-		AccountID:         tasks.IDPtr(account.ID),
-		Status:            tasks.StatusCompleted,
-		Result:            `{}`,
-		CreatedAt:         created,
-		CompletedAt:       &completed,
+		TaskID:                     "repair-multi-1",
+		UserID:                     12,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		Status:                     tasks.StatusCompleted,
+		Result:                     `{}`,
+		CreatedAt:                  created,
+		CompletedAt:                &completed,
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
@@ -768,6 +765,7 @@ type taskDailyStatSeed struct {
 
 type taskStatEventSeed struct {
 	TaskID         string
+	OccurredAt     time.Time
 	StatDate       string
 	ModelName      string
 	UserKey        string
@@ -790,11 +788,19 @@ func insertTaskDailyStat(t *testing.T, db *sql.DB, stat taskDailyStatSeed) {
 
 func insertTaskStatEvent(t *testing.T, db *sql.DB, event taskStatEventSeed) {
 	t.Helper()
+	occurredAt := event.OccurredAt
+	if occurredAt.IsZero() {
+		parsed, err := time.ParseInLocation(statisticsDateLayout, event.StatDate, time.Local)
+		if err != nil {
+			t.Fatalf("parse stat event date failed: %v", err)
+		}
+		occurredAt = parsed
+	}
 	_, err := db.ExecContext(
 		context.Background(),
-		`INSERT INTO task_stat_events (task_id, stat_date, model_name, user_key, status, latency_seconds)
-		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		event.TaskID, event.StatDate, event.ModelName, event.UserKey, event.Status, event.LatencySeconds,
+		`INSERT INTO task_stat_events (task_id, occurred_at, stat_date, model_name, user_key, status, latency_seconds)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		event.TaskID, occurredAt, event.StatDate, event.ModelName, event.UserKey, event.Status, event.LatencySeconds,
 	)
 	if err != nil {
 		t.Fatalf("seed stat event failed: %v", err)

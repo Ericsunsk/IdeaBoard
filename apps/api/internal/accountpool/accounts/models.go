@@ -1,25 +1,38 @@
 package accounts
 
-import "time"
+import (
+	"bytes"
+	"encoding/json"
+	"time"
+)
 
 type ApiAccount struct {
-	ID               int64          `json:"id"`
-	Name             string         `json:"name"`
-	ChannelID        int64          `json:"channel_id"`
-	Platform         string         `json:"platform"`
-	ApiType          string         `json:"api_type"`
-	Models           []AccountModel `json:"models"`
-	ApiKey           string         `json:"-"`
-	SecretConfigured bool           `json:"secret_configured"`
-	ProxyURL         string         `json:"proxy_url"`
-	MaxConcurrent    int            `json:"max_concurrent"`
-	Timeout          int            `json:"timeout"`
-	ExtraConfig      string         `json:"extra_config"`
-	Status           int16          `json:"status"`
-	FailCount        int            `json:"fail_count"`
-	Weight           int            `json:"weight"`
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
+	ID                 int64          `json:"id"`
+	Name               string         `json:"name"`
+	ProviderEndpointID int64          `json:"provider_endpoint_id"`
+	ApiType            string         `json:"provider_endpoint_api_type"`
+	Models             []AccountModel `json:"models"`
+	ApiKey             string         `json:"-"`
+	SecretConfigured   bool           `json:"secret_configured"`
+	ProxyURL           string         `json:"provider_endpoint_base_url"`
+	MaxConcurrent      int            `json:"max_concurrent"`
+	Timeout            int            `json:"timeout"`
+	ExtraConfig        string         `json:"extra_config"`
+	Status             int16          `json:"status"`
+	FailCount          int            `json:"fail_count"`
+	Weight             int            `json:"weight"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+}
+
+type RuntimeCredential struct {
+	ID                 int64
+	AccountID          int64
+	APIKey             string
+	SecretMaterialKind string
+	KeyVersion         string
+	Fingerprint        string
+	Status             string
 }
 
 type AccountModel struct {
@@ -40,32 +53,57 @@ type AccountModelInput struct {
 	FeatureSlugs  []string `json:"feature_slugs,omitempty"`
 }
 
+type NullableIntPatch struct {
+	Set   bool
+	Valid bool
+	Value int
+}
+
+func (p *NullableIntPatch) UnmarshalJSON(data []byte) error {
+	p.Set = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		p.Valid = false
+		p.Value = 0
+		return nil
+	}
+	var value int
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	p.Valid = true
+	p.Value = value
+	return nil
+}
+
 // 请求结构
 type CreateAccountRequest struct {
-	Name          string              `json:"name"`
-	ChannelID     int64               `json:"channel_id" binding:"required"`
-	Platform      string              `json:"platform"`
-	ApiType       string              `json:"api_type"`
-	Models        []AccountModelInput `json:"models" binding:"required"`
-	Secret        string              `json:"secret" binding:"required"`
-	ProxyURL      string              `json:"proxy_url"`
-	MaxConcurrent int                 `json:"max_concurrent"`
-	Timeout       int                 `json:"timeout"`
-	ExtraConfig   string              `json:"extra_config"`
-	Weight        int                 `json:"weight"`
+	Name               string              `json:"name"`
+	ProviderEndpointID int64               `json:"provider_endpoint_id" binding:"required"`
+	Models             []AccountModelInput `json:"models" binding:"required"`
+	Secret             string              `json:"secret" binding:"required"`
+	MaxConcurrent      int                 `json:"max_concurrent"`
+	Timeout            int                 `json:"timeout"`
+	ExtraConfig        string              `json:"extra_config"`
+	Weight             int                 `json:"weight"`
 }
 
 type UpdateAccountRequest struct {
-	Name          string              `json:"name"`
-	Platform      string              `json:"platform"`
-	ApiType       string              `json:"api_type"`
-	Models        []AccountModelInput `json:"models" binding:"required"`
-	Secret        string              `json:"secret"`
-	ProxyURL      string              `json:"proxy_url"`
-	MaxConcurrent int                 `json:"max_concurrent"`
-	Timeout       int                 `json:"timeout"`
-	ExtraConfig   string              `json:"extra_config"`
-	Weight        int                 `json:"weight"`
+	Name          *string              `json:"name,omitempty"`
+	Models        *[]AccountModelInput `json:"models,omitempty"`
+	Secret        *string              `json:"secret,omitempty"`
+	MaxConcurrent *int                 `json:"max_concurrent,omitempty"`
+	Timeout       *int                 `json:"timeout,omitempty"`
+	ExtraConfig   *string              `json:"extra_config,omitempty"`
+	Weight        *int                 `json:"weight,omitempty"`
+}
+
+type PatchAccountModelRequest struct {
+	Name          string           `json:"name" binding:"required"`
+	Enabled       *bool            `json:"enabled,omitempty"`
+	Weight        *int             `json:"weight,omitempty"`
+	MaxConcurrent NullableIntPatch `json:"max_concurrent,omitempty"`
+	FeatureSlugs  *[]string        `json:"feature_slugs,omitempty"`
+	SortOrder     *int             `json:"sort_order,omitempty"`
 }
 
 type AccountLimitRange struct {
@@ -82,7 +120,7 @@ type AccountLimits struct {
 // 列表响应
 type AccountListRequest struct {
 	Keyword  string `form:"keyword"`
-	Platform string `form:"platform"`
+	ApiType  string `form:"api_type"`
 	Page     int    `form:"page,default=1"`
 	PageSize int    `form:"page_size,default=20"`
 }

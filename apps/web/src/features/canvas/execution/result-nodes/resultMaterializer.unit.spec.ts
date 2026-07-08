@@ -83,6 +83,7 @@ describe('result materializer', () => {
           ratio: 1,
           width: 400,
           height: 200,
+          mediaAssetId: 42,
         },
         {
           resultNodeId: toCanvasGraphNodeId('image', 2),
@@ -116,6 +117,7 @@ describe('result materializer', () => {
     expect(snapshot.imageNodes[0]).toMatchObject({
       id: 1,
       sourceImageUrl: 'https://example.com/result-1.png',
+      sourceMediaAssetId: 42,
       sourceImageRatio: 0.5,
       outputStatus: 'ready',
       outputImages: [],

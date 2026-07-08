@@ -33,25 +33,26 @@ func (q *Queries) ArchiveAccount(ctx context.Context, id int64) (int64, error) {
 
 const countAccounts = `-- name: CountAccounts :one
 SELECT COUNT(*)
-FROM api_accounts
-WHERE deleted_at IS NULL
-  AND (NOT $1::boolean OR name ILIKE $2 OR platform ILIKE $2 OR api_type ILIKE $2)
-  AND (NOT $3::boolean OR platform = $4)
+FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
+WHERE a.deleted_at IS NULL
+  AND (NOT $1::boolean OR a.name ILIKE $2 OR pe.name ILIKE $2 OR pe.api_type ILIKE $2 OR pe.base_url ILIKE $2)
+  AND (NOT $3::boolean OR pe.api_type = $4)
 `
 
 type CountAccountsParams struct {
 	HasKeyword  bool   `json:"has_keyword"`
 	KeywordLike string `json:"keyword_like"`
-	HasPlatform bool   `json:"has_platform"`
-	Platform    string `json:"platform"`
+	HasApiType  bool   `json:"has_api_type"`
+	ApiType     string `json:"api_type"`
 }
 
 func (q *Queries) CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countAccounts,
 		arg.HasKeyword,
 		arg.KeywordLike,
-		arg.HasPlatform,
-		arg.Platform,
+		arg.HasApiType,
+		arg.ApiType,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -60,38 +61,31 @@ func (q *Queries) CountAccounts(ctx context.Context, arg CountAccountsParams) (i
 
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO api_accounts (
-  name, channel_id, platform, api_type, proxy_url,
+  name, provider_endpoint_id,
   max_concurrent, timeout, extra_config, status, fail_count, weight
 ) VALUES (
-  $1, $2, $3, $4,
-  $5,
-  $6, $7, $8,
-  $9, $10, $11
+  $1, $2,
+  $3, $4, $5,
+  $6, $7, $8
 )
 RETURNING id
 `
 
 type CreateAccountParams struct {
-	Name          string `json:"name"`
-	ChannelID     int64  `json:"channel_id"`
-	Platform      string `json:"platform"`
-	ApiType       string `json:"api_type"`
-	ProxyUrl      string `json:"proxy_url"`
-	MaxConcurrent int32  `json:"max_concurrent"`
-	Timeout       int32  `json:"timeout"`
-	ExtraConfig   string `json:"extra_config"`
-	Status        int16  `json:"status"`
-	FailCount     int32  `json:"fail_count"`
-	Weight        int32  `json:"weight"`
+	Name               string `json:"name"`
+	ProviderEndpointID int64  `json:"provider_endpoint_id"`
+	MaxConcurrent      int32  `json:"max_concurrent"`
+	Timeout            int32  `json:"timeout"`
+	ExtraConfig        string `json:"extra_config"`
+	Status             int16  `json:"status"`
+	FailCount          int32  `json:"fail_count"`
+	Weight             int32  `json:"weight"`
 }
 
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, createAccount,
 		arg.Name,
-		arg.ChannelID,
-		arg.Platform,
-		arg.ApiType,
-		arg.ProxyUrl,
+		arg.ProviderEndpointID,
 		arg.MaxConcurrent,
 		arg.Timeout,
 		arg.ExtraConfig,
@@ -106,10 +100,10 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (i
 
 const createAccountSecret = `-- name: CreateAccountSecret :one
 INSERT INTO api_account_secrets (
-  account_id, secret_material_kind, secret_ref, secret_payload, key_version, fingerprint, status, rotated_at, expires_at
+  account_id, secret_material_kind, secret_payload, key_version, fingerprint, status, rotated_at, expires_at
 ) SELECT
-  $1, $2, $3, $4,
-  $5, $6, $7, now(), $8
+  $1, $2, $3,
+  $4, $5, $6, now(), $7
 WHERE EXISTS (
   SELECT 1 FROM api_accounts
   WHERE id = $1
@@ -121,7 +115,6 @@ RETURNING id
 type CreateAccountSecretParams struct {
 	AccountID          int64        `json:"account_id"`
 	SecretMaterialKind string       `json:"secret_material_kind"`
-	SecretRef          string       `json:"secret_ref"`
 	SecretPayload      string       `json:"secret_payload"`
 	KeyVersion         string       `json:"key_version"`
 	Fingerprint        string       `json:"fingerprint"`
@@ -133,7 +126,6 @@ func (q *Queries) CreateAccountSecret(ctx context.Context, arg CreateAccountSecr
 	row := q.db.QueryRowContext(ctx, createAccountSecret,
 		arg.AccountID,
 		arg.SecretMaterialKind,
-		arg.SecretRef,
 		arg.SecretPayload,
 		arg.KeyVersion,
 		arg.Fingerprint,
@@ -185,36 +177,36 @@ func (q *Queries) DeleteAccountModelsByAccountID(ctx context.Context, accountID 
 }
 
 const getAccountByID = `-- name: GetAccountByID :one
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.id = $1
   AND a.deleted_at IS NULL
 `
 
 type GetAccountByIDRow struct {
-	ID               int64     `json:"id"`
-	Name             string    `json:"name"`
-	ChannelID        int64     `json:"channel_id"`
-	Platform         string    `json:"platform"`
-	ApiType          string    `json:"api_type"`
-	ApiKey           string    `json:"api_key"`
-	SecretConfigured bool      `json:"secret_configured"`
-	ProxyUrl         string    `json:"proxy_url"`
-	MaxConcurrent    int32     `json:"max_concurrent"`
-	Timeout          int32     `json:"timeout"`
-	ExtraConfig      string    `json:"extra_config"`
-	Status           int16     `json:"status"`
-	FailCount        int32     `json:"fail_count"`
-	Weight           int32     `json:"weight"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	ApiType            string    `json:"api_type"`
+	ApiKey             string    `json:"api_key"`
+	SecretConfigured   bool      `json:"secret_configured"`
+	ProxyUrl           string    `json:"proxy_url"`
+	MaxConcurrent      int32     `json:"max_concurrent"`
+	Timeout            int32     `json:"timeout"`
+	ExtraConfig        string    `json:"extra_config"`
+	Status             int16     `json:"status"`
+	FailCount          int32     `json:"fail_count"`
+	Weight             int32     `json:"weight"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 func (q *Queries) GetAccountByID(ctx context.Context, id int64) (GetAccountByIDRow, error) {
@@ -223,8 +215,7 @@ func (q *Queries) GetAccountByID(ctx context.Context, id int64) (GetAccountByIDR
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
-		&i.ChannelID,
-		&i.Platform,
+		&i.ProviderEndpointID,
 		&i.ApiType,
 		&i.ApiKey,
 		&i.SecretConfigured,
@@ -242,7 +233,7 @@ func (q *Queries) GetAccountByID(ctx context.Context, id int64) (GetAccountByIDR
 }
 
 const getActiveAccountSecretByAccountID = `-- name: GetActiveAccountSecretByAccountID :one
-SELECT id, account_id, secret_material_kind, secret_ref, secret_payload, key_version, fingerprint,
+SELECT id, account_id, secret_material_kind, secret_payload, key_version, fingerprint,
        status, rotated_at, expires_at, retired_at, created_at, updated_at
 FROM api_account_secrets
 WHERE account_id = $1
@@ -258,7 +249,6 @@ func (q *Queries) GetActiveAccountSecretByAccountID(ctx context.Context, account
 		&i.ID,
 		&i.AccountID,
 		&i.SecretMaterialKind,
-		&i.SecretRef,
 		&i.SecretPayload,
 		&i.KeyVersion,
 		&i.Fingerprint,
@@ -273,35 +263,34 @@ func (q *Queries) GetActiveAccountSecretByAccountID(ctx context.Context, account
 }
 
 const getRuntimeAccountByIDWithSecret = `-- name: GetRuntimeAccountByIDWithSecret :one
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 INNER JOIN LATERAL (
   SELECT secret_payload, secret_material_kind
   FROM api_account_secrets
   WHERE account_id = a.id
     AND status = 'active'
-    AND (
-      (secret_material_kind = 'encrypted' AND btrim(secret_payload) <> '')
-      OR (secret_material_kind = 'external_ref' AND btrim(secret_ref) <> '')
-    )
+    AND secret_material_kind = 'encrypted'
+    AND btrim(secret_payload) <> ''
   ORDER BY rotated_at DESC, id DESC
   LIMIT 1
 ) AS secret ON TRUE
 WHERE a.id = $1
   AND a.status = 1
+  AND pe.status = 1
   AND a.deleted_at IS NULL
 `
 
 type GetRuntimeAccountByIDWithSecretRow struct {
 	ID                 int64     `json:"id"`
 	Name               string    `json:"name"`
-	ChannelID          int64     `json:"channel_id"`
-	Platform           string    `json:"platform"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
 	ApiType            string    `json:"api_type"`
 	ApiKey             string    `json:"api_key"`
 	ApiKeyMaterialKind string    `json:"api_key_material_kind"`
@@ -323,8 +312,7 @@ func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64)
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
-		&i.ChannelID,
-		&i.Platform,
+		&i.ProviderEndpointID,
 		&i.ApiType,
 		&i.ApiKey,
 		&i.ApiKeyMaterialKind,
@@ -342,10 +330,52 @@ func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64)
 	return i, err
 }
 
+const getRuntimeCredentialByID = `-- name: GetRuntimeCredentialByID :one
+SELECT s.id, s.account_id, s.secret_material_kind, s.secret_payload, s.key_version, s.fingerprint,
+       s.status, s.rotated_at, s.expires_at, s.retired_at, s.created_at, s.updated_at
+FROM api_account_secrets AS s
+JOIN api_accounts AS a ON a.id = s.account_id
+  AND a.status = 1
+  AND a.deleted_at IS NULL
+JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
+  AND pe.status = 1
+WHERE s.id = $1
+  AND s.account_id = $2
+  AND s.status = 'active'
+  AND s.secret_material_kind = 'encrypted'
+  AND btrim(s.secret_payload) <> ''
+`
+
+type GetRuntimeCredentialByIDParams struct {
+	ID        int64 `json:"id"`
+	AccountID int64 `json:"account_id"`
+}
+
+func (q *Queries) GetRuntimeCredentialByID(ctx context.Context, arg GetRuntimeCredentialByIDParams) (ApiAccountSecret, error) {
+	row := q.db.QueryRowContext(ctx, getRuntimeCredentialByID, arg.ID, arg.AccountID)
+	var i ApiAccountSecret
+	err := row.Scan(
+		&i.ID,
+		&i.AccountID,
+		&i.SecretMaterialKind,
+		&i.SecretPayload,
+		&i.KeyVersion,
+		&i.Fingerprint,
+		&i.Status,
+		&i.RotatedAt,
+		&i.ExpiresAt,
+		&i.RetiredAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSingleEnabledModelByAccountID = `-- name: GetSingleEnabledModelByAccountID :one
 SELECT (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
 FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.deleted_at IS NULL
+INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
 WHERE m.account_id = $1
   AND m.enabled = TRUE
 HAVING COUNT(*) = 1
@@ -500,18 +530,19 @@ func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds 
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.deleted_at IS NULL
-  AND (NOT $1::boolean OR a.name ILIKE $2 OR a.platform ILIKE $2 OR a.api_type ILIKE $2)
-  AND (NOT $3::boolean OR a.platform = $4)
+  AND (NOT $1::boolean OR a.name ILIKE $2 OR pe.name ILIKE $2 OR pe.api_type ILIKE $2 OR pe.base_url ILIKE $2)
+  AND (NOT $3::boolean OR pe.api_type = $4)
 ORDER BY a.id DESC
 LIMIT $6 OFFSET $5
 `
@@ -519,37 +550,36 @@ LIMIT $6 OFFSET $5
 type ListAccountsParams struct {
 	HasKeyword  bool   `json:"has_keyword"`
 	KeywordLike string `json:"keyword_like"`
-	HasPlatform bool   `json:"has_platform"`
-	Platform    string `json:"platform"`
+	HasApiType  bool   `json:"has_api_type"`
+	ApiType     string `json:"api_type"`
 	PageOffset  int32  `json:"page_offset"`
 	PageLimit   int32  `json:"page_limit"`
 }
 
 type ListAccountsRow struct {
-	ID               int64     `json:"id"`
-	Name             string    `json:"name"`
-	ChannelID        int64     `json:"channel_id"`
-	Platform         string    `json:"platform"`
-	ApiType          string    `json:"api_type"`
-	ApiKey           string    `json:"api_key"`
-	SecretConfigured bool      `json:"secret_configured"`
-	ProxyUrl         string    `json:"proxy_url"`
-	MaxConcurrent    int32     `json:"max_concurrent"`
-	Timeout          int32     `json:"timeout"`
-	ExtraConfig      string    `json:"extra_config"`
-	Status           int16     `json:"status"`
-	FailCount        int32     `json:"fail_count"`
-	Weight           int32     `json:"weight"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	ApiType            string    `json:"api_type"`
+	ApiKey             string    `json:"api_key"`
+	SecretConfigured   bool      `json:"secret_configured"`
+	ProxyUrl           string    `json:"proxy_url"`
+	MaxConcurrent      int32     `json:"max_concurrent"`
+	Timeout            int32     `json:"timeout"`
+	ExtraConfig        string    `json:"extra_config"`
+	Status             int16     `json:"status"`
+	FailCount          int32     `json:"fail_count"`
+	Weight             int32     `json:"weight"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAccounts,
 		arg.HasKeyword,
 		arg.KeywordLike,
-		arg.HasPlatform,
-		arg.Platform,
+		arg.HasApiType,
+		arg.ApiType,
 		arg.PageOffset,
 		arg.PageLimit,
 	)
@@ -563,8 +593,7 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
-			&i.ChannelID,
-			&i.Platform,
+			&i.ProviderEndpointID,
 			&i.ApiType,
 			&i.ApiKey,
 			&i.SecretConfigured,
@@ -592,41 +621,43 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 }
 
 const listEnabledAccounts = `-- name: ListEnabledAccounts :many
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        ''::text AS api_key,
        TRUE::boolean AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.status = 1
+  AND pe.status = 1
   AND a.deleted_at IS NULL
   AND EXISTS (
     SELECT 1
-    FROM api_account_secrets AS active_secret
-    WHERE active_secret.account_id = a.id
-      AND active_secret.status = 'active'
-      AND btrim(active_secret.secret_payload) <> ''
-  )
+	    FROM api_account_secrets AS active_secret
+	    WHERE active_secret.account_id = a.id
+	      AND active_secret.status = 'active'
+	      AND active_secret.secret_material_kind = 'encrypted'
+	      AND btrim(active_secret.secret_payload) <> ''
+	  )
 ORDER BY a.id ASC
 `
 
 type ListEnabledAccountsRow struct {
-	ID               int64     `json:"id"`
-	Name             string    `json:"name"`
-	ChannelID        int64     `json:"channel_id"`
-	Platform         string    `json:"platform"`
-	ApiType          string    `json:"api_type"`
-	ApiKey           string    `json:"api_key"`
-	SecretConfigured bool      `json:"secret_configured"`
-	ProxyUrl         string    `json:"proxy_url"`
-	MaxConcurrent    int32     `json:"max_concurrent"`
-	Timeout          int32     `json:"timeout"`
-	ExtraConfig      string    `json:"extra_config"`
-	Status           int16     `json:"status"`
-	FailCount        int32     `json:"fail_count"`
-	Weight           int32     `json:"weight"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	ApiType            string    `json:"api_type"`
+	ApiKey             string    `json:"api_key"`
+	SecretConfigured   bool      `json:"secret_configured"`
+	ProxyUrl           string    `json:"proxy_url"`
+	MaxConcurrent      int32     `json:"max_concurrent"`
+	Timeout            int32     `json:"timeout"`
+	ExtraConfig        string    `json:"extra_config"`
+	Status             int16     `json:"status"`
+	FailCount          int32     `json:"fail_count"`
+	Weight             int32     `json:"weight"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error) {
@@ -641,8 +672,7 @@ func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccount
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
-			&i.ChannelID,
-			&i.Platform,
+			&i.ProviderEndpointID,
 			&i.ApiType,
 			&i.ApiKey,
 			&i.SecretConfigured,
@@ -674,7 +704,8 @@ SELECT
   m.account_id AS id,
   (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
 FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.deleted_at IS NULL
+INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
 WHERE m.account_id = ANY($1::bigint[])
   AND m.enabled = TRUE
 GROUP BY m.account_id
@@ -728,8 +759,7 @@ func (q *Queries) ResetAccountFailCount(ctx context.Context, id int64) (int64, e
 const retireActiveAccountSecrets = `-- name: RetireActiveAccountSecrets :exec
 UPDATE api_account_secrets
 SET status = 'retired',
-    retired_at = now(),
-    secret_payload = ''
+    retired_at = now()
 WHERE account_id = $1
   AND status = 'active'
   AND EXISTS (
@@ -747,7 +777,6 @@ func (q *Queries) RetireActiveAccountSecrets(ctx context.Context, accountID int6
 const revokeAccountSecretsForArchive = `-- name: RevokeAccountSecretsForArchive :exec
 UPDATE api_account_secrets
 SET status = 'revoked',
-    secret_ref = '',
     secret_payload = '',
     retired_at = COALESCE(retired_at, now())
 WHERE account_id = $1
@@ -762,23 +791,17 @@ func (q *Queries) RevokeAccountSecretsForArchive(ctx context.Context, accountID 
 const updateAccount = `-- name: UpdateAccount :execrows
 UPDATE api_accounts
 SET name = $1,
-    platform = $2,
-    api_type = $3,
-    proxy_url = $4,
-    max_concurrent = $5,
-    timeout = $6,
-    extra_config = $7,
-    fail_count = $8,
-    weight = $9
-WHERE id = $10
+    max_concurrent = $2,
+    timeout = $3,
+    extra_config = $4,
+    fail_count = $5,
+    weight = $6
+WHERE id = $7
   AND deleted_at IS NULL
 `
 
 type UpdateAccountParams struct {
 	Name          string `json:"name"`
-	Platform      string `json:"platform"`
-	ApiType       string `json:"api_type"`
-	ProxyUrl      string `json:"proxy_url"`
 	MaxConcurrent int32  `json:"max_concurrent"`
 	Timeout       int32  `json:"timeout"`
 	ExtraConfig   string `json:"extra_config"`
@@ -790,9 +813,6 @@ type UpdateAccountParams struct {
 func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateAccount,
 		arg.Name,
-		arg.Platform,
-		arg.ApiType,
-		arg.ProxyUrl,
 		arg.MaxConcurrent,
 		arg.Timeout,
 		arg.ExtraConfig,

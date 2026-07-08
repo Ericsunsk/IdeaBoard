@@ -1,24 +1,27 @@
 import {
   createAdminAccount,
   deleteAdminAccount,
+  deleteAdminAccountModel,
   getAdminAccountLimits,
   listAdminAccounts,
+  patchAdminAccountModel,
   updateAdminAccount,
 } from '../../../shared/api/generated-query/admin-accounts/admin-accounts'
 import {
-  createAdminChannel,
-  deleteAdminChannel as deleteAdminChannelRequest,
-  detectAdminChannelModels as detectAdminChannelModelsRequest,
-  listAdminChannels,
-  updateAdminChannel,
-} from '../../../shared/api/generated-query/admin-channels/admin-channels'
+  createAdminProviderEndpoint,
+  deleteAdminProviderEndpoint as deleteAdminProviderEndpointRequest,
+  detectAdminProviderEndpointModels as detectAdminProviderEndpointModelsRequest,
+  listAdminProviderEndpoints,
+  updateAdminProviderEndpoint,
+} from '../../../shared/api/generated-query/admin-provider-endpoints/admin-provider-endpoints'
 import type {
   AccountLimitRange,
   AccountLimits,
   AdminAccount as AdminAccountDto,
   AdminAccountCreateRequest,
+  AdminAccountModelPatchRequest,
   AdminAccountUpdateRequest,
-  Channel as ChannelDto,
+  ProviderEndpoint as ProviderEndpointDto,
 } from '../../../shared/api/generated-query/model'
 import { assertApiOk, requireApiData } from '../shared/queries/adminApiResponse'
 import type {
@@ -26,45 +29,45 @@ import type {
   ProviderModelDetectionInput,
   ProviderAccountRecord,
   ProviderApiTypeValue,
-  ProviderChannelFormData,
-  ProviderChannelRecord,
+  ProviderEndpointFormData,
+  ProviderEndpointRecord,
 } from './providerConfigTypes'
-import { createChannelSavePayload } from './providerConfigPayload'
+import { createProviderEndpointSavePayload } from './providerConfigPayload'
 
 export const FALLBACK_ADMIN_ACCOUNT_LIMITS: AdminProviderAccountLimits = {
   maxConcurrent: { min: 1, max: 64, default: 3 },
   timeoutSeconds: { min: 1, max: 600, default: 120 },
 }
 
-type SaveAdminChannelInput = {
+type SaveAdminProviderEndpointInput = {
   id?: number
-  data: ProviderChannelFormData
+  data: ProviderEndpointFormData
 }
 
 const ADMIN_ACCOUNT_LIST_PAGE_SIZE = 100
 
-export async function fetchAdminChannels(): Promise<ProviderChannelRecord[]> {
-  const res = await listAdminChannels()
-  const data = requireApiData(res, '加载渠道商失败')
-  return (data.list ?? []).map(toProviderChannelRecord)
+export async function fetchAdminProviderEndpoints(): Promise<ProviderEndpointRecord[]> {
+  const res = await listAdminProviderEndpoints()
+  const data = requireApiData(res, '加载供应商端点失败')
+  return (data.list ?? []).map(toProviderEndpointRecord)
 }
 
-export async function saveAdminChannel(input: SaveAdminChannelInput): Promise<void> {
-  const payload = createChannelSavePayload(input.data)
+export async function saveAdminProviderEndpoint(input: SaveAdminProviderEndpointInput): Promise<void> {
+  const payload = createProviderEndpointSavePayload(input.data)
   const res =
     input.id != null
-      ? await updateAdminChannel(input.id, payload)
-      : await createAdminChannel(payload)
-  assertApiOk(res, '保存渠道商失败')
+      ? await updateAdminProviderEndpoint(input.id, payload)
+      : await createAdminProviderEndpoint(payload)
+  assertApiOk(res, '保存供应商端点失败')
 }
 
-export async function deleteAdminChannel(id: number): Promise<void> {
-  const res = await deleteAdminChannelRequest(id)
-  assertApiOk(res, '删除渠道商失败')
+export async function deleteAdminProviderEndpoint(id: number): Promise<void> {
+  const res = await deleteAdminProviderEndpointRequest(id)
+  assertApiOk(res, '删除供应商端点失败')
 }
 
-export async function detectAdminChannelModels(input: ProviderModelDetectionInput): Promise<string[]> {
-  const res = await detectAdminChannelModelsRequest(toDetectModelsRequest(input))
+export async function detectAdminProviderEndpointModels(input: ProviderModelDetectionInput): Promise<string[]> {
+  const res = await detectAdminProviderEndpointModelsRequest(toDetectModelsRequest(input))
   const data = requireApiData(res, '自动检测模型失败')
   return data.models ?? []
 }
@@ -109,6 +112,24 @@ export async function updateAdminAccountRecord(
   assertApiOk(res, '更新账号失败')
 }
 
+export async function patchAdminAccountModelRecord(
+  id: number,
+  data: AdminAccountModelPatchRequest,
+): Promise<ProviderAccountRecord> {
+  const res = await patchAdminAccountModel(id, data)
+  const responseData = requireApiData(res, '更新账号模型失败')
+  return toProviderAccountRecord(responseData.account)
+}
+
+export async function deleteAdminAccountModelRecord(
+  id: number,
+  modelName: string,
+): Promise<ProviderAccountRecord> {
+  const res = await deleteAdminAccountModel(id, { model_name: modelName })
+  const responseData = requireApiData(res, '删除账号模型失败')
+  return toProviderAccountRecord(responseData.account)
+}
+
 export async function deleteAdminAccountRecord(id: number): Promise<void> {
   const res = await deleteAdminAccount(id)
   assertApiOk(res, '删除账号失败')
@@ -148,15 +169,15 @@ function normalizeAdminAccountLimitRange(
   return { min, max, default: defaultValue }
 }
 
-function toProviderChannelRecord(channel: ChannelDto): ProviderChannelRecord {
+function toProviderEndpointRecord(providerEndpoint: ProviderEndpointDto): ProviderEndpointRecord {
   return {
-    id: channel.id,
-    apiType: channel.type as ProviderApiTypeValue,
-    name: channel.name,
-    baseUrl: channel.api_url,
-    status: channel.status,
-    createdAt: channel.created_at,
-    updatedAt: channel.updated_at,
+    id: providerEndpoint.id,
+    apiType: providerEndpoint.api_type as ProviderApiTypeValue,
+    name: providerEndpoint.name,
+    baseUrl: providerEndpoint.base_url,
+    status: providerEndpoint.status,
+    createdAt: providerEndpoint.created_at,
+    updatedAt: providerEndpoint.updated_at,
   }
 }
 
@@ -164,10 +185,9 @@ function toProviderAccountRecord(account: AdminAccountDto): ProviderAccountRecor
   return {
     id: account.id,
     name: account.name,
-    channelId: account.channel_id,
-    platform: account.platform,
-    apiType: account.api_type,
-    baseUrl: account.proxy_url,
+    providerEndpointId: account.provider_endpoint_id,
+    apiType: account.provider_endpoint_api_type,
+    baseUrl: account.provider_endpoint_base_url,
     models: account.models.map((model) => ({
       name: model.name,
       enabled: model.enabled,

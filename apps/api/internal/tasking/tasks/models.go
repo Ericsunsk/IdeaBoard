@@ -6,37 +6,43 @@ import (
 )
 
 type Task struct {
-	ID                int64                 `json:"id"`
-	TaskID            string                `json:"task_id"`
-	UserID            int64                 `json:"user_id"`
-	AssignedChannelID *int64                `json:"assigned_channel_id"`
-	AccountID         *int64                `json:"account_id"`
-	Prompt            string                `json:"prompt"`
-	UserPrompt        string                `json:"user_prompt"`
-	Params            string                `json:"params"`
-	FeatureSlug       string                `json:"feature_slug"`
-	RequestedModel    string                `json:"requested_model"`
-	ResolvedModel     string                `json:"resolved_model"`
-	APIType           string                `json:"api_type"`
-	Status            string                `json:"status"`
-	LeaseToken        string                `json:"lease_token"`
-	RetryCount        int                   `json:"retry_count"`
-	ErrorMsg          string                `json:"error_msg"`
-	Result            string                `json:"result"`
-	CreatedAt         time.Time             `json:"created_at"`
-	UpdatedAt         time.Time             `json:"updated_at"`
-	CompletedAt       *time.Time            `json:"completed_at"`
-	CancelledAt       *time.Time            `json:"cancelled_at"`
-	CancelledBy       *int64                `json:"cancelled_by"`
-	CancelReason      string                `json:"cancel_reason"`
-	Outputs           []TaskOutput          `json:"outputs,omitempty"`
-	ExecutionMetrics  *TaskExecutionMetrics `json:"execution_metrics,omitempty"`
+	ID                         int64                 `json:"id"`
+	TaskID                     string                `json:"task_id"`
+	UserID                     int64                 `json:"user_id"`
+	AssignedProviderEndpointID *int64                `json:"assigned_provider_endpoint_id"`
+	AssignedCredentialID       *int64                `json:"assigned_credential_id"`
+	AccountID                  *int64                `json:"account_id"`
+	Prompt                     string                `json:"prompt"`
+	UserPrompt                 string                `json:"user_prompt"`
+	Params                     string                `json:"params"`
+	FeatureSlug                string                `json:"feature_slug"`
+	RequestedModel             string                `json:"requested_model"`
+	ResolvedModel              string                `json:"resolved_model"`
+	APIType                    string                `json:"api_type"`
+	ProviderEndpointName       string                `json:"provider_endpoint_name"`
+	ProviderEndpointBaseURL    string                `json:"provider_endpoint_base_url"`
+	CredentialFingerprint      string                `json:"credential_fingerprint"`
+	CredentialKeyVersion       string                `json:"credential_key_version"`
+	Status                     string                `json:"status"`
+	LeaseToken                 string                `json:"lease_token"`
+	RetryCount                 int                   `json:"retry_count"`
+	ErrorMsg                   string                `json:"error_msg"`
+	Result                     string                `json:"result"`
+	CreatedAt                  time.Time             `json:"created_at"`
+	UpdatedAt                  time.Time             `json:"updated_at"`
+	CompletedAt                *time.Time            `json:"completed_at"`
+	CancelledAt                *time.Time            `json:"cancelled_at"`
+	CancelledBy                *int64                `json:"cancelled_by"`
+	CancelReason               string                `json:"cancel_reason"`
+	Outputs                    []TaskOutput          `json:"outputs,omitempty"`
+	ExecutionMetrics           *TaskExecutionMetrics `json:"execution_metrics,omitempty"`
 }
 
 type TaskOutput struct {
 	ID             int64     `json:"id"`
 	TaskID         string    `json:"task_id"`
 	MediaAssetID   *int64    `json:"media_asset_id,omitempty"`
+	OutputKind     string    `json:"output_kind"`
 	Role           string    `json:"role"`
 	URL            string    `json:"url"`
 	StorageKey     string    `json:"storage_key"`
@@ -69,17 +75,18 @@ type TaskUserView struct {
 }
 
 type TaskOutputUserView struct {
-	ID        int64     `json:"id"`
-	TaskID    string    `json:"task_id"`
-	Role      string    `json:"role"`
-	URL       string    `json:"url"`
-	MIMEType  string    `json:"mime_type"`
-	Width     int       `json:"width"`
-	Height    int       `json:"height"`
-	SizeBytes int64     `json:"size_bytes"`
-	SortIndex int       `json:"sort_index"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         int64     `json:"id"`
+	TaskID     string    `json:"task_id"`
+	OutputKind string    `json:"output_kind"`
+	Role       string    `json:"role"`
+	URL        string    `json:"url"`
+	MIMEType   string    `json:"mime_type"`
+	Width      int       `json:"width"`
+	Height     int       `json:"height"`
+	SizeBytes  int64     `json:"size_bytes"`
+	SortIndex  int       `json:"sort_index"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type TaskResultUserView struct {
@@ -114,17 +121,18 @@ func taskOutputsUserView(outputs []TaskOutput) []TaskOutputUserView {
 	result := make([]TaskOutputUserView, 0, len(outputs))
 	for _, output := range outputs {
 		result = append(result, TaskOutputUserView{
-			ID:        output.ID,
-			TaskID:    output.TaskID,
-			Role:      output.Role,
-			URL:       output.URL,
-			MIMEType:  output.MIMEType,
-			Width:     output.Width,
-			Height:    output.Height,
-			SizeBytes: output.SizeBytes,
-			SortIndex: output.SortIndex,
-			CreatedAt: output.CreatedAt,
-			UpdatedAt: output.UpdatedAt,
+			ID:         output.ID,
+			TaskID:     output.TaskID,
+			OutputKind: output.OutputKind,
+			Role:       output.Role,
+			URL:        output.URL,
+			MIMEType:   output.MIMEType,
+			Width:      output.Width,
+			Height:     output.Height,
+			SizeBytes:  output.SizeBytes,
+			SortIndex:  output.SortIndex,
+			CreatedAt:  output.CreatedAt,
+			UpdatedAt:  output.UpdatedAt,
 		})
 	}
 	return result

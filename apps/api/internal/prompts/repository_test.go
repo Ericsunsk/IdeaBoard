@@ -2,7 +2,12 @@ package prompts
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"sort"
+	"sync"
 	"testing"
 
 	"ideaboard/api/internal/platform/database"
@@ -23,6 +28,11 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 			{Key: "{{user_prompt}}", Tone: "prompt"},
 			{Key: "{{fusion_input_weights}}", Tone: "control"},
 		},
+		ModelDefaults: FeaturePromptModelDefaults{Model: "image-alpha"},
+		UserPromptMergePolicy: &FeaturePromptMergePolicy{
+			AppendUserPromptWhenTemplateMissesPlaceholder: false,
+			AppendBasePromptWithoutTemplate:               false,
+		},
 	}, nil)
 	if err != nil {
 		t.Fatalf("SetPromptConfig disabled returned error: %v", err)
@@ -36,6 +46,11 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 	if disabledConfig.SchemaVersion != 1 {
 		t.Fatalf("disabled schema version = %d, want 1", disabledConfig.SchemaVersion)
 	}
+	if disabledConfig.CurrentRevisionID <= 0 {
+		t.Fatalf("disabled current revision id = %d, want positive id", disabledConfig.CurrentRevisionID)
+	}
+	assertFeaturePromptCurrentPointer(t, ctx, db, slug, disabledConfig.CurrentRevisionID)
+	assertFeaturePromptCurrentRowHasNoCopiedConfigFacts(t, ctx, db)
 
 	if _, err := repo.GetPrompt(ctx, slug); !errors.Is(err, database.ErrNotFound) {
 		t.Fatalf("runtime GetPrompt disabled error = %v, want ErrNotFound", err)
@@ -50,6 +65,12 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 	}
 	if !hasPromptVariable(adminConfig.Variables, "{{fusion_input_weights}}", "control") {
 		t.Fatalf("admin variables = %#v, want fusion_input_weights control variable", adminConfig.Variables)
+	}
+	if adminConfig.ModelDefaults.Model != "image-alpha" {
+		t.Fatalf("admin model defaults = %#v, want persisted revision model default", adminConfig.ModelDefaults)
+	}
+	if adminConfig.UserPromptMergePolicy.AppendBasePromptWithoutTemplate {
+		t.Fatalf("admin merge policy = %#v, want revision policy", adminConfig.UserPromptMergePolicy)
 	}
 
 	enabledConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
@@ -87,6 +108,13 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 	if runtimePrompt != enabledConfig.Prompt {
 		t.Fatalf("runtime prompt = %q, want %q", runtimePrompt, enabledConfig.Prompt)
 	}
+	runtimeConfig, err := repo.GetPromptRuntimeConfig(ctx, slug)
+	if err != nil {
+		t.Fatalf("runtime GetPromptRuntimeConfig enabled returned error: %v", err)
+	}
+	if !runtimeConfig.UserPromptMergePolicy.AppendBasePromptWithoutTemplate {
+		t.Fatalf("runtime merge policy = %#v, want default style-fusion append policy", runtimeConfig.UserPromptMergePolicy)
+	}
 
 	clearedConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
 		Prompt:    "enabled prompt without visible variables",
@@ -103,21 +131,76 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 		t.Fatalf("cleared variables = %#v, want empty slice", clearedConfig.Variables)
 	}
 
-	revisions, err := repo.ListPromptRevisions(ctx, slug)
-	if err != nil {
-		t.Fatalf("ListPromptRevisions returned error: %v", err)
-	}
+	revisions := listFeaturePromptRevisionsForTest(t, ctx, db, slug)
 	if len(revisions) != 3 {
 		t.Fatalf("revision count = %d, want 3", len(revisions))
 	}
-	if revisions[0].SchemaVersion != 3 || !revisions[0].Enabled || revisions[0].PublishedAt == nil || len(revisions[0].Variables) != 0 {
+	if revisions[0].SchemaVersion != 3 || !revisions[0].Enabled || !revisions[0].PublishedAt.Valid || len(revisions[0].Variables) != 0 {
 		t.Fatalf("latest revision = %#v, want enabled schema version 3 with empty variables and PublishedAt", revisions[0])
 	}
-	if revisions[1].SchemaVersion != 2 || !revisions[1].Enabled || revisions[1].PublishedAt == nil {
+	if revisions[1].SchemaVersion != 2 || !revisions[1].Enabled || !revisions[1].PublishedAt.Valid {
 		t.Fatalf("second revision = %#v, want enabled schema version 2 with PublishedAt", revisions[1])
 	}
-	if revisions[2].SchemaVersion != 1 || revisions[2].Enabled || revisions[2].PublishedAt != nil {
+	if revisions[2].SchemaVersion != 1 || revisions[2].Enabled || revisions[2].PublishedAt.Valid {
 		t.Fatalf("old revision = %#v, want disabled schema version 1 without PublishedAt", revisions[2])
+	}
+	if revisions[2].ModelDefaults.Model != "image-alpha" {
+		t.Fatalf("old revision model defaults = %#v, want append-only revision payload", revisions[2].ModelDefaults)
+	}
+}
+
+func TestFeaturePromptConcurrentSavesCreateSequentialAppendOnlyRevisions(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugImageExtend
+
+	const saveCount = 6
+	var wg sync.WaitGroup
+	errs := make(chan error, saveCount)
+	for i := 0; i < saveCount; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+				Prompt:    fmt.Sprintf("concurrent prompt %02d {{user_prompt}}", i),
+				Enabled:   true,
+				Variables: promptVariables("{{user_prompt}}"),
+			}, nil)
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent SetPromptConfig returned error: %v", err)
+		}
+	}
+
+	revisions := listFeaturePromptRevisionsForTest(t, ctx, db, slug)
+	if len(revisions) != saveCount {
+		t.Fatalf("revision count = %d, want %d", len(revisions), saveCount)
+	}
+	versions := make([]int, 0, len(revisions))
+	ids := make(map[int64]struct{}, len(revisions))
+	for _, revision := range revisions {
+		versions = append(versions, int(revision.SchemaVersion))
+		ids[revision.ID] = struct{}{}
+	}
+	sort.Ints(versions)
+	for i, version := range versions {
+		if version != i+1 {
+			t.Fatalf("schema versions = %v, want contiguous versions 1..%d", versions, saveCount)
+		}
+	}
+	current, err := repo.GetPromptConfig(ctx, slug)
+	if err != nil {
+		t.Fatalf("GetPromptConfig returned error: %v", err)
+	}
+	if _, ok := ids[current.CurrentRevisionID]; !ok {
+		t.Fatalf("current revision id %d not found in append-only revisions %#v", current.CurrentRevisionID, revisions)
 	}
 }
 
@@ -135,6 +218,16 @@ func TestFeaturePromptDefaultConfigUsesStableSchemaVersion(t *testing.T) {
 	}
 	if !hasPromptVariable(config.Variables, "{{user_prompt}}", "prompt") {
 		t.Fatalf("default variables = %#v, want user_prompt variable", config.Variables)
+	}
+	if config.CurrentRevisionID != 0 {
+		t.Fatalf("default current revision id = %d, want 0 before first save", config.CurrentRevisionID)
+	}
+	var rowCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM feature_prompts`).Scan(&rowCount); err != nil {
+		t.Fatalf("count feature_prompts returned error: %v", err)
+	}
+	if rowCount != 0 {
+		t.Fatalf("default prompt initialization inserted %d current rows, want 0", rowCount)
 	}
 }
 
@@ -162,4 +255,90 @@ func hasPromptVariable(variables []FeaturePromptVariable, key string, tone strin
 		}
 	}
 	return false
+}
+
+func assertFeaturePromptCurrentPointer(t *testing.T, ctx context.Context, db queryDB, slug string, revisionID int64) {
+	t.Helper()
+	var currentRevisionID int64
+	if err := db.QueryRowContext(ctx, `SELECT current_revision_id FROM feature_prompts WHERE feature_slug = $1`, slug).Scan(&currentRevisionID); err != nil {
+		t.Fatalf("read current revision pointer failed: %v", err)
+	}
+	if currentRevisionID != revisionID {
+		t.Fatalf("current revision pointer = %d, want %d", currentRevisionID, revisionID)
+	}
+}
+
+func assertFeaturePromptCurrentRowHasNoCopiedConfigFacts(t *testing.T, ctx context.Context, db queryDB) {
+	t.Helper()
+	var copiedFactColumns int
+	if err := db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM information_schema.columns
+WHERE table_name = 'feature_prompts'
+  AND column_name IN ('prompt', 'enabled', 'variables', 'model_defaults', 'user_prompt_merge_policy', 'schema_version', 'published_at', 'updated_by')
+`).Scan(&copiedFactColumns); err != nil {
+		t.Fatalf("inspect feature_prompts columns failed: %v", err)
+	}
+	if copiedFactColumns != 0 {
+		t.Fatalf("feature_prompts has %d copied config fact columns, want only identity/current pointer metadata", copiedFactColumns)
+	}
+}
+
+type queryDB interface {
+	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+}
+
+type featurePromptRevisionForTest struct {
+	ID            int64
+	Enabled       bool
+	Variables     []FeaturePromptVariable
+	ModelDefaults FeaturePromptModelDefaults
+	SchemaVersion int32
+	PublishedAt   sql.NullTime
+}
+
+func listFeaturePromptRevisionsForTest(t *testing.T, ctx context.Context, db queryDB, slug string) []featurePromptRevisionForTest {
+	t.Helper()
+	rows, err := db.QueryContext(ctx, `
+SELECT id, enabled, variables, model_defaults, schema_version, published_at
+FROM feature_prompt_revisions
+WHERE feature_slug = $1
+ORDER BY schema_version DESC, id DESC`, slug)
+	if err != nil {
+		t.Fatalf("list feature prompt revisions failed: %v", err)
+	}
+	defer rows.Close()
+
+	revisions := []featurePromptRevisionForTest{}
+	for rows.Next() {
+		var revision featurePromptRevisionForTest
+		var variablesJSON json.RawMessage
+		var modelDefaultsJSON json.RawMessage
+		if err := rows.Scan(
+			&revision.ID,
+			&revision.Enabled,
+			&variablesJSON,
+			&modelDefaultsJSON,
+			&revision.SchemaVersion,
+			&revision.PublishedAt,
+		); err != nil {
+			t.Fatalf("scan feature prompt revision failed: %v", err)
+		}
+		variables, err := variablesFromJSON(variablesJSON)
+		if err != nil {
+			t.Fatalf("decode revision variables failed: %v", err)
+		}
+		modelDefaults, err := modelDefaultsFromJSON(modelDefaultsJSON)
+		if err != nil {
+			t.Fatalf("decode revision model defaults failed: %v", err)
+		}
+		revision.Variables = variables
+		revision.ModelDefaults = modelDefaults
+		revisions = append(revisions, revision)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate feature prompt revisions failed: %v", err)
+	}
+	return revisions
 }

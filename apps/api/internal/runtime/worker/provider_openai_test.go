@@ -749,7 +749,6 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ID:       1,
 		Name:     "test",
-		Platform: "openai-compatible",
 		ApiType:  workflow.ProviderOpenAICompatible,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -794,7 +793,6 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ID:       1,
 		Name:     "test",
-		Platform: "openai-compatible",
 		ApiType:  workflow.ProviderOpenAICompatible,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",

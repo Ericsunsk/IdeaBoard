@@ -9,18 +9,15 @@ import (
 
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
 var ErrAccountNotFound = errors.New("account not found")
+var ErrAccountNameConflict = errors.New("account name conflict")
+var ErrAccountModelNotFound = errors.New("account model not found")
 
 func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRequest) (*ApiAccount, error) {
-	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
-	if err != nil {
-		return nil, fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
-	}
 	req.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(req.MaxConcurrent)
 	req.Timeout = accountlimits.NormalizeTimeoutSeconds(req.Timeout)
 	if req.Weight <= 0 {
@@ -30,29 +27,18 @@ func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRe
 	if err != nil {
 		return nil, err
 	}
-	apiType, ok := workflow.ValidateProviderAPIType(req.ApiType, proxyURL)
-	if !ok {
-		return nil, fmt.Errorf("api_type 不支持")
-	}
-	platform := strings.TrimSpace(req.Platform)
-	if platform == "" {
-		platform = apiType
-	}
 
 	account := &ApiAccount{
-		Name:             req.Name,
-		ChannelID:        req.ChannelID,
-		Platform:         platform,
-		ApiType:          apiType,
-		Models:           models,
-		ApiKey:           req.Secret,
-		SecretConfigured: strings.TrimSpace(req.Secret) != "",
-		ProxyURL:         proxyURL,
-		MaxConcurrent:    req.MaxConcurrent,
-		Timeout:          req.Timeout,
-		ExtraConfig:      req.ExtraConfig,
-		Weight:           req.Weight,
-		Status:           1,
+		Name:               strings.TrimSpace(req.Name),
+		ProviderEndpointID: req.ProviderEndpointID,
+		Models:             models,
+		ApiKey:             req.Secret,
+		SecretConfigured:   strings.TrimSpace(req.Secret) != "",
+		MaxConcurrent:      req.MaxConcurrent,
+		Timeout:            req.Timeout,
+		ExtraConfig:        req.ExtraConfig,
+		Weight:             req.Weight,
+		Status:             1,
 	}
 
 	if err := s.accountRepo.Create(ctx, account); err != nil {
@@ -74,7 +60,7 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 		req.PageSize = 20
 	}
 
-	accounts, total, err := s.accountRepo.List(ctx, req.Keyword, req.Platform, req.Page, req.PageSize)
+	accounts, total, err := s.accountRepo.List(ctx, req.Keyword, req.ApiType, req.Page, req.PageSize)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -128,53 +114,153 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 }
 
 func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *UpdateAccountRequest) error {
-	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
-	if err != nil {
-		return fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
+	if req == nil {
+		return fmt.Errorf("请求参数错误")
 	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("%w", ErrAccountNotFound)
 	}
 
-	account.Name = req.Name
-	models, err := normalizeAccountModelInputs(req.Models)
-	if err != nil {
-		return err
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return fmt.Errorf("name 不能为空")
+		}
+		account.Name = name
 	}
-	apiType, ok := workflow.ValidateProviderAPIType(req.ApiType, proxyURL)
-	if !ok {
-		return fmt.Errorf("api_type 不支持")
+	shouldReplaceModels := req.Models != nil
+	if shouldReplaceModels {
+		models, err := normalizeAccountModelInputs(*req.Models)
+		if err != nil {
+			return err
+		}
+		account.Models = models
 	}
-	account.ApiType = apiType
-	if strings.TrimSpace(req.Platform) == "" {
-		account.Platform = account.ApiType
-	} else {
-		account.Platform = req.Platform
+	if req.MaxConcurrent != nil {
+		account.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(*req.MaxConcurrent)
 	}
-	account.Models = models
-	account.ProxyURL = proxyURL
-	account.MaxConcurrent = accountlimits.NormalizeMaxConcurrent(req.MaxConcurrent)
-	account.Timeout = accountlimits.NormalizeTimeoutSeconds(req.Timeout)
-	account.ExtraConfig = req.ExtraConfig
-	if req.Weight <= 0 {
-		account.Weight = 1
-	} else {
-		account.Weight = req.Weight
+	if req.Timeout != nil {
+		account.Timeout = accountlimits.NormalizeTimeoutSeconds(*req.Timeout)
+	}
+	if req.ExtraConfig != nil {
+		account.ExtraConfig = *req.ExtraConfig
+	}
+	if req.Weight != nil {
+		if *req.Weight <= 0 {
+			account.Weight = 1
+		} else {
+			account.Weight = *req.Weight
+		}
 	}
 
-	if req.Secret != "" {
-		account.ApiKey = req.Secret
+	if req.Secret != nil && *req.Secret != "" {
+		account.ApiKey = *req.Secret
 	}
 
-	if err := s.accountRepo.Update(ctx, account); err != nil {
-		if database.IsNotFound(err) {
+	var updateErr error
+	if shouldReplaceModels {
+		updateErr = s.accountRepo.Update(ctx, account)
+	} else {
+		updateErr = s.accountRepo.UpdateFields(ctx, account)
+	}
+	if updateErr != nil {
+		if database.IsNotFound(updateErr) {
 			return fmt.Errorf("%w", ErrAccountNotFound)
 		}
-		return err
+		return updateErr
 	}
 
 	return nil
+}
+
+func (s *AccountService) PatchAccountModel(ctx context.Context, accountID int64, req *PatchAccountModelRequest) (*ApiAccount, error) {
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("%w", ErrAccountNotFound)
+	}
+	modelName := strings.TrimSpace(req.Name)
+	if modelName == "" {
+		return nil, fmt.Errorf("model name 不能为空")
+	}
+
+	model, exists := findAccountModelByName(account.Models, modelName)
+	if !exists {
+		model = AccountModel{
+			Name:      modelName,
+			Enabled:   true,
+			Weight:    1,
+			SortOrder: len(account.Models),
+		}
+	}
+	model.Name = modelName
+	if req.Enabled != nil {
+		model.Enabled = *req.Enabled
+	}
+	if req.Weight != nil {
+		if *req.Weight <= 0 {
+			return nil, fmt.Errorf("model weight 必须大于 0")
+		}
+		model.Weight = *req.Weight
+	}
+	if req.MaxConcurrent.Set {
+		if req.MaxConcurrent.Valid {
+			if req.MaxConcurrent.Value <= 0 {
+				return nil, fmt.Errorf("model max_concurrent 必须大于 0")
+			}
+			value := req.MaxConcurrent.Value
+			model.MaxConcurrent = &value
+		} else {
+			model.MaxConcurrent = nil
+		}
+	}
+	if req.FeatureSlugs != nil {
+		featureSlugs, err := normalizeFeatureSlugs(*req.FeatureSlugs)
+		if err != nil {
+			return nil, err
+		}
+		model.FeatureSlugs = featureSlugs
+	}
+	if req.SortOrder != nil {
+		if *req.SortOrder < 0 {
+			return nil, fmt.Errorf("model sort_order 不能小于 0")
+		}
+		model.SortOrder = *req.SortOrder
+	}
+
+	if err := s.accountRepo.UpsertModel(ctx, accountID, model); err != nil {
+		if database.IsNotFound(err) {
+			return nil, fmt.Errorf("%w", ErrAccountNotFound)
+		}
+		return nil, err
+	}
+	return s.accountRepo.GetByID(ctx, accountID)
+}
+
+func (s *AccountService) DeleteAccountModel(ctx context.Context, accountID int64, modelName string) (*ApiAccount, error) {
+	if _, err := s.accountRepo.GetByID(ctx, accountID); err != nil {
+		return nil, fmt.Errorf("%w", ErrAccountNotFound)
+	}
+	if strings.TrimSpace(modelName) == "" {
+		return nil, fmt.Errorf("model name 不能为空")
+	}
+	if err := s.accountRepo.DeleteModel(ctx, accountID, modelName); err != nil {
+		if database.IsNotFound(err) {
+			return nil, fmt.Errorf("%w", ErrAccountModelNotFound)
+		}
+		return nil, err
+	}
+	return s.accountRepo.GetByID(ctx, accountID)
+}
+
+func findAccountModelByName(models []AccountModel, modelName string) (AccountModel, bool) {
+	modelKey := strings.ToLower(strings.TrimSpace(modelName))
+	for _, model := range models {
+		if strings.ToLower(strings.TrimSpace(model.Name)) == modelKey {
+			return model, true
+		}
+	}
+	return AccountModel{}, false
 }
 
 func normalizeAccountModelInputs(inputs []AccountModelInput) ([]AccountModel, error) {

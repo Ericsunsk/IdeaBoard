@@ -20,9 +20,9 @@ type promptTemplateBinding struct {
 	formatter   promptParamFormatter
 }
 
-type featurePromptMergePolicy struct {
-	appendUserPromptWhenTemplateMissesPlaceholder bool
-	appendBasePromptWithoutTemplate               bool
+type FeaturePromptMergePolicy struct {
+	AppendUserPromptWhenTemplateMissesPlaceholder bool `json:"append_user_prompt_when_template_misses_placeholder"`
+	AppendBasePromptWithoutTemplate               bool `json:"append_base_prompt_without_template"`
 }
 
 type featurePromptVariableProvider func(map[string]interface{}) map[string]interface{}
@@ -44,16 +44,16 @@ var featurePromptBindings = map[string][]promptTemplateBinding{
 	},
 }
 
-var defaultFeaturePromptMergePolicy = featurePromptMergePolicy{
-	appendUserPromptWhenTemplateMissesPlaceholder: true,
-	appendBasePromptWithoutTemplate:               true,
+var defaultPromptMergePolicy = FeaturePromptMergePolicy{
+	AppendUserPromptWhenTemplateMissesPlaceholder: true,
+	AppendBasePromptWithoutTemplate:               true,
 }
 
-func resolveFeaturePromptMergePolicy(featureSlug string) featurePromptMergePolicy {
+func DefaultFeaturePromptMergePolicy(featureSlug string) FeaturePromptMergePolicy {
 	if featureSlug == workflow.FeatureSlugStyleVariation {
-		return featurePromptMergePolicy{}
+		return FeaturePromptMergePolicy{}
 	}
-	return defaultFeaturePromptMergePolicy
+	return defaultPromptMergePolicy
 }
 
 func applyPromptTemplateBindings(
@@ -148,19 +148,47 @@ func ApplyFeatureSystemPrompt(
 		"{{user_prompt}}": userPrompt,
 	}
 	applyPromptTemplateBindings(varMap, featureSlug, params)
-	policy := resolveFeaturePromptMergePolicy(featureSlug)
+	policy := DefaultFeaturePromptMergePolicy(featureSlug)
+	return applyFeatureSystemPromptWithMergePolicy(basePrompt, userPrompt, featureSlug, params, sysPrompt, policy)
+}
+
+func ApplyFeatureSystemPromptWithConfig(
+	basePrompt string,
+	userPrompt string,
+	featureSlug string,
+	params map[string]interface{},
+	config FeaturePromptRuntimeConfig,
+) string {
+	if featureSlug == "" || config.Prompt == "" {
+		return basePrompt
+	}
+	return applyFeatureSystemPromptWithMergePolicy(basePrompt, userPrompt, featureSlug, params, config.Prompt, config.UserPromptMergePolicy)
+}
+
+func applyFeatureSystemPromptWithMergePolicy(
+	basePrompt string,
+	userPrompt string,
+	featureSlug string,
+	params map[string]interface{},
+	sysPrompt string,
+	policy FeaturePromptMergePolicy,
+) string {
+	varMap := map[string]string{
+		"{{user_prompt}}": userPrompt,
+	}
+	applyPromptTemplateBindings(varMap, featureSlug, params)
 	if strings.Contains(sysPrompt, "{{") {
 		hasUserPromptPlaceholder := strings.Contains(sysPrompt, "{{user_prompt}}")
 		result := sysPrompt
 		result = replacePromptTemplateVariables(result, varMap)
-		if policy.appendUserPromptWhenTemplateMissesPlaceholder &&
+		if policy.AppendUserPromptWhenTemplateMissesPlaceholder &&
 			!hasUserPromptPlaceholder &&
 			strings.TrimSpace(userPrompt) != "" {
 			result += " " + userPrompt
 		}
 		return result
 	}
-	if !policy.appendBasePromptWithoutTemplate {
+	if !policy.AppendBasePromptWithoutTemplate {
 		return sysPrompt
 	}
 	return sysPrompt + " " + basePrompt

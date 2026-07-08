@@ -17,22 +17,25 @@ export type ProviderModelDetectionInput = {
   apiType: ProviderApiTypeValue
 }
 
-export type ProviderChannelFormData = {
+export type ProviderEndpointFormData = {
   apiType: ProviderApiTypeValue
   name: string
   baseUrl: string
+  status: number
 }
 
-export type ProviderChannelFormField = keyof ProviderChannelFormData
+export type ProviderEndpointFormField = keyof ProviderEndpointFormData
 
 export type ProviderAccountFormField =
+  | 'name'
   | 'secret'
   | 'modelValues'
   | 'maxConcurrent'
   | 'timeoutSeconds'
 
 export type ProviderAccountForm = {
-  channelId: number
+  providerEndpointId: number
+  name: string
   modelValues: string[]
   secret: string
   maxConcurrent: number
@@ -53,7 +56,7 @@ export type ProviderAccountModelRecord = {
   sortOrder: number
 }
 
-export type ProviderChannelRecord = {
+export type ProviderEndpointRecord = {
   id: number
   apiType: ProviderApiTypeValue
   name: string
@@ -66,8 +69,7 @@ export type ProviderChannelRecord = {
 export type ProviderAccountRecord = {
   id: number
   name: string
-  channelId: number
-  platform: string
+  providerEndpointId: number
   apiType: string
   baseUrl: string
   models: ProviderAccountModelRecord[]
@@ -90,8 +92,8 @@ export type AccountModelRow = {
   disabled: boolean
 }
 
-export type ProviderChannelCommandTarget = {
-  kind: 'channel'
+export type ProviderEndpointCommandTarget = {
+  kind: 'providerEndpoint'
   id: number
 }
 
@@ -100,13 +102,14 @@ export type ProviderAccountCommandTarget = {
   id: number
 }
 
-export type ProviderChannelView = {
+export type ProviderEndpointView = {
   id: number
   name: string
   baseUrl: string
   apiType: ProviderApiTypeValue
   apiTypeLabel: string
-  commandTarget: ProviderChannelCommandTarget
+  status: number
+  commandTarget: ProviderEndpointCommandTarget
 }
 
 export type ProviderAccountView = {
@@ -122,8 +125,8 @@ export type ProviderAccountView = {
   commandTarget: ProviderAccountCommandTarget
 }
 
-export type ProviderChannelCard = {
-  channel: ProviderChannelView
+export type ProviderEndpointCard = {
+  providerEndpoint: ProviderEndpointView
   accounts: ProviderAccountView[]
   modelCount: number
 }

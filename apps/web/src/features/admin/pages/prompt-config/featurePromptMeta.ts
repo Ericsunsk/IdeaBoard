@@ -13,10 +13,3 @@ export const featureMap: Record<FeatureSlug, FeatureItem> = WORKFLOW_FEATURE_PRO
 export const groupedFeatureGroups = WORKFLOW_FEATURE_PROMPT_CONFIG_GROUPS
 
 export type FeatureGroup = WorkflowFeaturePromptConfigGroup
-
-export function getGroupFilledCount(
-  group: FeatureGroup,
-  savedPromptMap: Record<string, string>,
-): number {
-  return group.items.filter((item) => (savedPromptMap[item.slug] || '').trim().length > 0).length
-}

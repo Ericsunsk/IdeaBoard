@@ -16,6 +16,14 @@ func newAccountServiceTestDB(t *testing.T) *sql.DB {
 	return testdb.Open(t)
 }
 
+func testStringPtr(value string) *string {
+	return &value
+}
+
+func testIntPtr(value int) *int {
+	return &value
+}
+
 func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
@@ -23,35 +31,19 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	service := &AccountService{
 		accountRepo: repo,
 	}
-	channelID := createAccountTestChannel(t, db, "timeout")
+	account := seedAdminAccountWithTwoModelFixture(t, ctx, repo, db, "timeout", func(account *ApiAccount) {
+		account.Name = "demo"
+		account.ApiKey = "test-key"
+	})
 
-	account := &ApiAccount{
-		Name:          "demo",
-		ChannelID:     channelID,
-		Platform:      "openai-compatible",
-		ApiType:       "openai-compatible",
-		Models:        []AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:        "test-key",
-		ProxyURL:      "https://example.com/timeout",
-		MaxConcurrent: 1,
-		Timeout:       30,
-		Weight:        1,
-		Status:        1,
-	}
-	if err := repo.Create(ctx, account); err != nil {
-		t.Fatalf("seed account failed: %v", err)
-	}
-
+	models := adminAccountModelInputsForFullUpdate(account.Models)
 	err := service.UpdateAccount(ctx, account.ID, &UpdateAccountRequest{
-		Name:          account.Name,
-		Platform:      account.Platform,
-		ApiType:       account.ApiType,
-		Models:        []AccountModelInput{{Name: "gpt-image-1"}},
-		ProxyURL:      account.ProxyURL,
-		MaxConcurrent: account.MaxConcurrent,
-		Timeout:       -30,
-		ExtraConfig:   account.ExtraConfig,
-		Weight:        account.Weight,
+		Name:          testStringPtr(account.Name),
+		Models:        &models,
+		MaxConcurrent: testIntPtr(account.MaxConcurrent),
+		Timeout:       testIntPtr(-30),
+		ExtraConfig:   testStringPtr(account.ExtraConfig),
+		Weight:        testIntPtr(account.Weight),
 	})
 	if err != nil {
 		t.Fatalf("update account failed: %v", err)

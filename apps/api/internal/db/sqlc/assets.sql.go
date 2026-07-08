@@ -50,6 +50,23 @@ func (q *Queries) CreateLineDraftMode(ctx context.Context, arg CreateLineDraftMo
 	return id, err
 }
 
+const deleteBoardMediaRefsByOwnerAndBoardID = `-- name: DeleteBoardMediaRefsByOwnerAndBoardID :exec
+DELETE FROM media_refs
+WHERE owner_user_id = $1
+  AND board_id = $2
+  AND ref_type IN ('board', 'board_node')
+`
+
+type DeleteBoardMediaRefsByOwnerAndBoardIDParams struct {
+	OwnerUserID int64  `json:"owner_user_id"`
+	BoardID     string `json:"board_id"`
+}
+
+func (q *Queries) DeleteBoardMediaRefsByOwnerAndBoardID(ctx context.Context, arg DeleteBoardMediaRefsByOwnerAndBoardIDParams) error {
+	_, err := q.db.ExecContext(ctx, deleteBoardMediaRefsByOwnerAndBoardID, arg.OwnerUserID, arg.BoardID)
+	return err
+}
+
 const deleteLineDraftMode = `-- name: DeleteLineDraftMode :exec
 DELETE FROM line_draft_modes
 WHERE id = $1
@@ -93,6 +110,25 @@ WHERE task_id = $1
 
 func (q *Queries) DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByTaskID, taskID)
+	return err
+}
+
+const deleteTaskOutputMediaRefsByUserTaskID = `-- name: DeleteTaskOutputMediaRefsByUserTaskID :exec
+DELETE FROM media_refs AS mr
+USING tasks AS t
+WHERE mr.task_id = $1
+  AND mr.ref_type = 'task_output'
+  AND t.task_id = mr.task_id
+  AND t.user_id = $2
+`
+
+type DeleteTaskOutputMediaRefsByUserTaskIDParams struct {
+	TaskID string `json:"task_id"`
+	UserID int64  `json:"user_id"`
+}
+
+func (q *Queries) DeleteTaskOutputMediaRefsByUserTaskID(ctx context.Context, arg DeleteTaskOutputMediaRefsByUserTaskIDParams) error {
+	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByUserTaskID, arg.TaskID, arg.UserID)
 	return err
 }
 

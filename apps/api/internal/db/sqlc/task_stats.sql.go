@@ -7,67 +7,47 @@ package dbsqlc
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
 const backfillDailyStatsByCreatedRange = `-- name: BackfillDailyStatsByCreatedRange :one
 WITH candidate_tasks AS (
-  SELECT t.task_id, t.user_id, t.account_id, t.assigned_channel_id, t.status, t.result,
-         t.feature_slug, t.requested_model, t.resolved_model, t.api_type, t.created_at, t.completed_at
+  SELECT t.task_id, t.user_id, t.account_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.status,
+         t.feature_slug, t.requested_model,
+         COALESCE(latest_lease.resolved_model, '') AS resolved_model,
+         COALESCE(latest_lease.api_type, '') AS api_type,
+         t.created_at, t.completed_at, t.cancelled_at,
+         COALESCE(t.completed_at, t.cancelled_at, t.updated_at) AS occurred_at
   FROM tasks AS t
-  WHERE t.created_at >= $1
-    AND t.created_at < $2
+  LEFT JOIN LATERAL (
+    SELECT resolved_model, api_type
+    FROM task_leases
+    WHERE task_id = t.task_id
+    ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    LIMIT 1
+  ) AS latest_lease ON TRUE
+  WHERE COALESCE(t.completed_at, t.cancelled_at, t.updated_at) >= $1
+    AND COALESCE(t.completed_at, t.cancelled_at, t.updated_at) < $2
     AND t.status IN ('completed', 'failed', 'cancelled')
-),
-single_enabled_models AS (
-  SELECT m.account_id,
-         (array_agg(trim(m.model_name) ORDER BY m.sort_order, m.id))[1]::text AS model_name
-  FROM api_account_models m
-  JOIN api_accounts a ON a.id = m.account_id AND a.deleted_at IS NULL
-  JOIN (SELECT DISTINCT account_id FROM candidate_tasks WHERE account_id IS NOT NULL) c
-    ON c.account_id = m.account_id
-  WHERE m.enabled = TRUE
-  GROUP BY m.account_id
-  HAVING COUNT(*) = 1
 ),
 normalized_events AS (
   SELECT
     t.task_id,
+    t.occurred_at,
     $3::date AS stat_date,
     GREATEST(t.user_id, 0)::bigint AS user_id,
     COALESCE(t.account_id, 0)::bigint AS account_id,
-    COALESCE(t.assigned_channel_id, 0)::bigint AS channel_id,
+    COALESCE(t.assigned_provider_endpoint_id, 0)::bigint AS provider_endpoint_id,
+    COALESCE(t.assigned_credential_id, 0)::bigint AS credential_id,
     LEFT(COALESCE(NULLIF(trim(t.feature_slug), ''), ''), 64)::varchar(64) AS feature_slug,
     LEFT(COALESCE(NULLIF(trim(t.api_type), ''), ''), 50)::varchar(50) AS api_type,
     LEFT(COALESCE(
       NULLIF(trim(t.resolved_model), ''),
       NULLIF(trim(t.requested_model), ''),
-      CASE
-        WHEN jsonb_typeof(result_json.value -> 'model') = 'string'
-        THEN NULLIF(trim(result_json.value ->> 'model'), '')
-      END,
-      NULLIF(trim(sm.model_name), ''),
       '未识别模型'
     ), 128)::varchar(128) AS model_name,
-    LEFT(COALESCE(
-      CASE
-        WHEN jsonb_typeof(result_json.value -> 'username') = 'string'
-        THEN NULLIF(trim(result_json.value ->> 'username'), '')
-      END,
-      CASE
-        WHEN jsonb_typeof(result_json.value -> 'email') = 'string'
-        THEN NULLIF(trim(result_json.value ->> 'email'), '')
-      END,
-      CASE
-        WHEN jsonb_typeof(result_json.value -> 'user_id') = 'string'
-        THEN NULLIF(trim(result_json.value ->> 'user_id'), '')
-        WHEN jsonb_typeof(result_json.value -> 'user_id') = 'number'
-         AND (result_json.value ->> 'user_id')::numeric > 0
-        THEN round((result_json.value ->> 'user_id')::numeric)::text
-      END,
-      NULLIF(t.user_id::text, '0'),
-      'unknown'
-    ), 128)::varchar(128) AS user_key,
+    LEFT(COALESCE(NULLIF(t.user_id::text, '0'), 'unknown'), 128)::varchar(128) AS user_key,
     t.status,
     CASE
       WHEN t.status = 'completed'
@@ -75,29 +55,29 @@ normalized_events AS (
        AND t.completed_at > t.created_at
       THEN EXTRACT(EPOCH FROM (t.completed_at - t.created_at))::double precision
       ELSE 0::double precision
-    END AS latency_seconds
+    END AS latency_seconds,
+    0::bigint AS cost_micros
   FROM candidate_tasks t
-  LEFT JOIN single_enabled_models sm ON sm.account_id = t.account_id
-  LEFT JOIN LATERAL safe_jsonb_object(t.result) AS result_json(value) ON TRUE
 ),
 inserted_events AS (
   INSERT INTO task_stat_events (
-    task_id, stat_date, user_id, account_id, channel_id, feature_slug, api_type,
-    model_name, user_key, status, latency_seconds
+    task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
+    feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
   )
-  SELECT task_id, stat_date, user_id, account_id, channel_id, feature_slug, api_type,
-         model_name, user_key, status, latency_seconds
+  SELECT task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
+         feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
   FROM normalized_events
   ON CONFLICT (task_id) DO NOTHING
-  RETURNING stat_date, user_id, account_id, channel_id, feature_slug, api_type,
-            model_name, user_key, status, latency_seconds
+  RETURNING stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type,
+            model_name, user_key, status, latency_seconds, cost_micros
 ),
 daily_delta AS (
   SELECT
     stat_date,
     user_id,
     account_id,
-    channel_id,
+    provider_endpoint_id,
+    credential_id,
     feature_slug,
     api_type,
     model_name,
@@ -107,27 +87,29 @@ daily_delta AS (
     COUNT(*) FILTER (WHERE status = 'failed')::bigint AS failed,
     COUNT(*) FILTER (WHERE status = 'cancelled')::bigint AS cancelled,
     COALESCE(SUM(latency_seconds), 0)::double precision AS latency_seconds_sum,
-    COUNT(*) FILTER (WHERE status = 'completed' AND latency_seconds > 0)::bigint AS latency_count
+    COUNT(*) FILTER (WHERE status = 'completed' AND latency_seconds > 0)::bigint AS latency_count,
+    COALESCE(SUM(cost_micros), 0)::bigint AS cost_micros_sum
   FROM inserted_events
-  GROUP BY stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key
+  GROUP BY stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type, model_name, user_key
 ),
 upserted_daily AS (
   INSERT INTO task_daily_stats (
-    stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key,
+    stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type, model_name, user_key,
     total, completed, failed, cancelled,
-    latency_seconds_sum, latency_count
+    latency_seconds_sum, latency_count, cost_micros_sum
   )
-  SELECT stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key,
+  SELECT stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type, model_name, user_key,
          total, completed, failed, cancelled,
-         latency_seconds_sum, latency_count
+         latency_seconds_sum, latency_count, cost_micros_sum
   FROM daily_delta
-  ON CONFLICT (stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key) DO UPDATE
+  ON CONFLICT (stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type, model_name, user_key) DO UPDATE
   SET total = task_daily_stats.total + EXCLUDED.total,
       completed = task_daily_stats.completed + EXCLUDED.completed,
       failed = task_daily_stats.failed + EXCLUDED.failed,
       cancelled = task_daily_stats.cancelled + EXCLUDED.cancelled,
       latency_seconds_sum = task_daily_stats.latency_seconds_sum + EXCLUDED.latency_seconds_sum,
-      latency_count = task_daily_stats.latency_count + EXCLUDED.latency_count
+      latency_count = task_daily_stats.latency_count + EXCLUDED.latency_count,
+      cost_micros_sum = task_daily_stats.cost_micros_sum + EXCLUDED.cost_micros_sum
   RETURNING 1
 ),
 marked AS (
@@ -144,10 +126,10 @@ SELECT
 `
 
 type BackfillDailyStatsByCreatedRangeParams struct {
-	StartedAt time.Time `json:"started_at"`
-	EndedAt   time.Time `json:"ended_at"`
-	StatDate  time.Time `json:"stat_date"`
-	MarkDone  bool      `json:"mark_done"`
+	StartedAt sql.NullTime `json:"started_at"`
+	EndedAt   sql.NullTime `json:"ended_at"`
+	StatDate  time.Time    `json:"stat_date"`
+	MarkDone  bool         `json:"mark_done"`
 }
 
 type BackfillDailyStatsByCreatedRangeRow struct {
@@ -170,43 +152,50 @@ func (q *Queries) BackfillDailyStatsByCreatedRange(ctx context.Context, arg Back
 
 const insertTaskStatEventIgnore = `-- name: InsertTaskStatEventIgnore :execrows
 INSERT INTO task_stat_events (
-  task_id, stat_date, user_id, account_id, channel_id, feature_slug, api_type,
-  model_name, user_key, status, latency_seconds
+  task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
+  feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
 ) VALUES (
-  $1, $2, $3, $4,
-  $5, $6, $7, $8,
-  $9, $10, $11
+  $1, $2, $3, $4, $5,
+  $6, $7, $8, $9,
+  $10, $11, $12, $13,
+  $14
 )
 ON CONFLICT (task_id) DO NOTHING
 `
 
 type InsertTaskStatEventIgnoreParams struct {
-	TaskID         string    `json:"task_id"`
-	StatDate       time.Time `json:"stat_date"`
-	UserID         int64     `json:"user_id"`
-	AccountID      int64     `json:"account_id"`
-	ChannelID      int64     `json:"channel_id"`
-	FeatureSlug    string    `json:"feature_slug"`
-	ApiType        string    `json:"api_type"`
-	ModelName      string    `json:"model_name"`
-	UserKey        string    `json:"user_key"`
-	Status         string    `json:"status"`
-	LatencySeconds float64   `json:"latency_seconds"`
+	TaskID             string    `json:"task_id"`
+	OccurredAt         time.Time `json:"occurred_at"`
+	StatDate           time.Time `json:"stat_date"`
+	UserID             int64     `json:"user_id"`
+	AccountID          int64     `json:"account_id"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	CredentialID       int64     `json:"credential_id"`
+	FeatureSlug        string    `json:"feature_slug"`
+	ApiType            string    `json:"api_type"`
+	ModelName          string    `json:"model_name"`
+	UserKey            string    `json:"user_key"`
+	Status             string    `json:"status"`
+	LatencySeconds     float64   `json:"latency_seconds"`
+	CostMicros         int64     `json:"cost_micros"`
 }
 
 func (q *Queries) InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskStatEventIgnoreParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, insertTaskStatEventIgnore,
 		arg.TaskID,
+		arg.OccurredAt,
 		arg.StatDate,
 		arg.UserID,
 		arg.AccountID,
-		arg.ChannelID,
+		arg.ProviderEndpointID,
+		arg.CredentialID,
 		arg.FeatureSlug,
 		arg.ApiType,
 		arg.ModelName,
 		arg.UserKey,
 		arg.Status,
 		arg.LatencySeconds,
+		arg.CostMicros,
 	)
 	if err != nil {
 		return 0, err
@@ -250,7 +239,7 @@ func (q *Queries) ListBackfilledDatesByRange(ctx context.Context, arg ListBackfi
 }
 
 const listDailyStatsByDateRange = `-- name: ListDailyStatsByDateRange :many
-SELECT stat_date, model_name, user_key, total, completed, failed, cancelled, latency_seconds_sum, latency_count
+SELECT stat_date, model_name, user_key, total, completed, failed, cancelled, latency_seconds_sum, latency_count, cost_micros_sum
 FROM task_daily_stats
 WHERE stat_date >= $1 AND stat_date <= $2
 ORDER BY stat_date ASC
@@ -271,6 +260,7 @@ type ListDailyStatsByDateRangeRow struct {
 	Cancelled         int64     `json:"cancelled"`
 	LatencySecondsSum float64   `json:"latency_seconds_sum"`
 	LatencyCount      int64     `json:"latency_count"`
+	CostMicrosSum     int64     `json:"cost_micros_sum"`
 }
 
 func (q *Queries) ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error) {
@@ -292,6 +282,7 @@ func (q *Queries) ListDailyStatsByDateRange(ctx context.Context, arg ListDailySt
 			&i.Cancelled,
 			&i.LatencySecondsSum,
 			&i.LatencyCount,
+			&i.CostMicrosSum,
 		); err != nil {
 			return nil, err
 		}
@@ -346,40 +337,159 @@ func (q *Queries) ListStatEventLatencySamplesByDateRange(ctx context.Context, ar
 	return items, nil
 }
 
+const listStatEventsByOccurredRange = `-- name: ListStatEventsByOccurredRange :many
+SELECT occurred_at, stat_date, model_name, user_key, status, latency_seconds, cost_micros
+FROM task_stat_events
+WHERE occurred_at >= $1 AND occurred_at < $2
+ORDER BY occurred_at ASC
+`
+
+type ListStatEventsByOccurredRangeParams struct {
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
+}
+
+type ListStatEventsByOccurredRangeRow struct {
+	OccurredAt     time.Time `json:"occurred_at"`
+	StatDate       time.Time `json:"stat_date"`
+	ModelName      string    `json:"model_name"`
+	UserKey        string    `json:"user_key"`
+	Status         string    `json:"status"`
+	LatencySeconds float64   `json:"latency_seconds"`
+	CostMicros     int64     `json:"cost_micros"`
+}
+
+func (q *Queries) ListStatEventsByOccurredRange(ctx context.Context, arg ListStatEventsByOccurredRangeParams) ([]ListStatEventsByOccurredRangeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listStatEventsByOccurredRange, arg.StartedAt, arg.EndedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListStatEventsByOccurredRangeRow
+	for rows.Next() {
+		var i ListStatEventsByOccurredRangeRow
+		if err := rows.Scan(
+			&i.OccurredAt,
+			&i.StatDate,
+			&i.ModelName,
+			&i.UserKey,
+			&i.Status,
+			&i.LatencySeconds,
+			&i.CostMicros,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const rebuildTaskDailyStatsByEventDateRange = `-- name: RebuildTaskDailyStatsByEventDateRange :one
+WITH deleted AS (
+  DELETE FROM task_daily_stats
+  WHERE task_daily_stats.stat_date >= $1 AND task_daily_stats.stat_date <= $2
+  RETURNING 1
+),
+daily_delta AS (
+  SELECT
+    e.stat_date,
+    e.user_id,
+    e.account_id,
+    e.provider_endpoint_id,
+    e.credential_id,
+    e.feature_slug,
+    e.api_type,
+    e.model_name,
+    e.user_key,
+    COUNT(*)::bigint AS total,
+    COUNT(*) FILTER (WHERE e.status = 'completed')::bigint AS completed,
+    COUNT(*) FILTER (WHERE e.status = 'failed')::bigint AS failed,
+    COUNT(*) FILTER (WHERE e.status = 'cancelled')::bigint AS cancelled,
+    COALESCE(SUM(e.latency_seconds), 0)::double precision AS latency_seconds_sum,
+    COUNT(*) FILTER (WHERE e.status = 'completed' AND e.latency_seconds > 0)::bigint AS latency_count,
+    COALESCE(SUM(e.cost_micros), 0)::bigint AS cost_micros_sum
+  FROM task_stat_events AS e
+  WHERE e.stat_date >= $1 AND e.stat_date <= $2
+  GROUP BY e.stat_date, e.user_id, e.account_id, e.provider_endpoint_id, e.credential_id, e.feature_slug, e.api_type, e.model_name, e.user_key
+),
+inserted AS (
+  INSERT INTO task_daily_stats (
+    stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type,
+    model_name, user_key, total, completed, failed, cancelled,
+    latency_seconds_sum, latency_count, cost_micros_sum
+  )
+  SELECT stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type,
+         model_name, user_key, total, completed, failed, cancelled,
+         latency_seconds_sum, latency_count, cost_micros_sum
+  FROM daily_delta
+  RETURNING 1
+)
+SELECT
+  (SELECT COUNT(*) FROM deleted)::bigint AS deleted_groups,
+  (SELECT COUNT(*) FROM inserted)::bigint AS rebuilt_groups
+`
+
+type RebuildTaskDailyStatsByEventDateRangeParams struct {
+	StartDate time.Time `json:"start_date"`
+	EndDate   time.Time `json:"end_date"`
+}
+
+type RebuildTaskDailyStatsByEventDateRangeRow struct {
+	DeletedGroups int64 `json:"deleted_groups"`
+	RebuiltGroups int64 `json:"rebuilt_groups"`
+}
+
+func (q *Queries) RebuildTaskDailyStatsByEventDateRange(ctx context.Context, arg RebuildTaskDailyStatsByEventDateRangeParams) (RebuildTaskDailyStatsByEventDateRangeRow, error) {
+	row := q.db.QueryRowContext(ctx, rebuildTaskDailyStatsByEventDateRange, arg.StartDate, arg.EndDate)
+	var i RebuildTaskDailyStatsByEventDateRangeRow
+	err := row.Scan(&i.DeletedGroups, &i.RebuiltGroups)
+	return i, err
+}
+
 const upsertTaskDailyStatDelta = `-- name: UpsertTaskDailyStatDelta :exec
 INSERT INTO task_daily_stats (
-  stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key,
-  total, completed, failed, cancelled, latency_seconds_sum, latency_count
+  stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type,
+  model_name, user_key, total, completed, failed, cancelled, latency_seconds_sum, latency_count,
+  cost_micros_sum
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7, $8,
-  $9, $10, $11, $12,
-  $13, $14
+  $5, $6, $7, $8, $9,
+  $10, $11, $12, $13,
+  $14, $15, $16
 )
-ON CONFLICT (stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key) DO UPDATE
+ON CONFLICT (stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type, model_name, user_key) DO UPDATE
 SET total = task_daily_stats.total + EXCLUDED.total,
     completed = task_daily_stats.completed + EXCLUDED.completed,
     failed = task_daily_stats.failed + EXCLUDED.failed,
     cancelled = task_daily_stats.cancelled + EXCLUDED.cancelled,
     latency_seconds_sum = task_daily_stats.latency_seconds_sum + EXCLUDED.latency_seconds_sum,
-    latency_count = task_daily_stats.latency_count + EXCLUDED.latency_count
+    latency_count = task_daily_stats.latency_count + EXCLUDED.latency_count,
+    cost_micros_sum = task_daily_stats.cost_micros_sum + EXCLUDED.cost_micros_sum
 `
 
 type UpsertTaskDailyStatDeltaParams struct {
-	StatDate          time.Time `json:"stat_date"`
-	UserID            int64     `json:"user_id"`
-	AccountID         int64     `json:"account_id"`
-	ChannelID         int64     `json:"channel_id"`
-	FeatureSlug       string    `json:"feature_slug"`
-	ApiType           string    `json:"api_type"`
-	ModelName         string    `json:"model_name"`
-	UserKey           string    `json:"user_key"`
-	Total             int64     `json:"total"`
-	Completed         int64     `json:"completed"`
-	Failed            int64     `json:"failed"`
-	Cancelled         int64     `json:"cancelled"`
-	LatencySecondsSum float64   `json:"latency_seconds_sum"`
-	LatencyCount      int64     `json:"latency_count"`
+	StatDate           time.Time `json:"stat_date"`
+	UserID             int64     `json:"user_id"`
+	AccountID          int64     `json:"account_id"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	CredentialID       int64     `json:"credential_id"`
+	FeatureSlug        string    `json:"feature_slug"`
+	ApiType            string    `json:"api_type"`
+	ModelName          string    `json:"model_name"`
+	UserKey            string    `json:"user_key"`
+	Total              int64     `json:"total"`
+	Completed          int64     `json:"completed"`
+	Failed             int64     `json:"failed"`
+	Cancelled          int64     `json:"cancelled"`
+	LatencySecondsSum  float64   `json:"latency_seconds_sum"`
+	LatencyCount       int64     `json:"latency_count"`
+	CostMicrosSum      int64     `json:"cost_micros_sum"`
 }
 
 func (q *Queries) UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error {
@@ -387,7 +497,8 @@ func (q *Queries) UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDa
 		arg.StatDate,
 		arg.UserID,
 		arg.AccountID,
-		arg.ChannelID,
+		arg.ProviderEndpointID,
+		arg.CredentialID,
 		arg.FeatureSlug,
 		arg.ApiType,
 		arg.ModelName,
@@ -398,6 +509,73 @@ func (q *Queries) UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDa
 		arg.Cancelled,
 		arg.LatencySecondsSum,
 		arg.LatencyCount,
+		arg.CostMicrosSum,
 	)
 	return err
+}
+
+const upsertTaskStatEventCorrection = `-- name: UpsertTaskStatEventCorrection :execrows
+INSERT INTO task_stat_events (
+  task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
+  feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
+) VALUES (
+  $1, $2, $3, $4, $5,
+  $6, $7, $8, $9,
+  $10, $11, $12, $13,
+  $14
+)
+ON CONFLICT (task_id) DO UPDATE
+SET occurred_at = EXCLUDED.occurred_at,
+    stat_date = EXCLUDED.stat_date,
+    user_id = EXCLUDED.user_id,
+    account_id = EXCLUDED.account_id,
+    provider_endpoint_id = EXCLUDED.provider_endpoint_id,
+    credential_id = EXCLUDED.credential_id,
+    feature_slug = EXCLUDED.feature_slug,
+    api_type = EXCLUDED.api_type,
+    model_name = EXCLUDED.model_name,
+    user_key = EXCLUDED.user_key,
+    status = EXCLUDED.status,
+    latency_seconds = EXCLUDED.latency_seconds,
+    cost_micros = EXCLUDED.cost_micros
+`
+
+type UpsertTaskStatEventCorrectionParams struct {
+	TaskID             string    `json:"task_id"`
+	OccurredAt         time.Time `json:"occurred_at"`
+	StatDate           time.Time `json:"stat_date"`
+	UserID             int64     `json:"user_id"`
+	AccountID          int64     `json:"account_id"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	CredentialID       int64     `json:"credential_id"`
+	FeatureSlug        string    `json:"feature_slug"`
+	ApiType            string    `json:"api_type"`
+	ModelName          string    `json:"model_name"`
+	UserKey            string    `json:"user_key"`
+	Status             string    `json:"status"`
+	LatencySeconds     float64   `json:"latency_seconds"`
+	CostMicros         int64     `json:"cost_micros"`
+}
+
+func (q *Queries) UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertTaskStatEventCorrectionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, upsertTaskStatEventCorrection,
+		arg.TaskID,
+		arg.OccurredAt,
+		arg.StatDate,
+		arg.UserID,
+		arg.AccountID,
+		arg.ProviderEndpointID,
+		arg.CredentialID,
+		arg.FeatureSlug,
+		arg.ApiType,
+		arg.ModelName,
+		arg.UserKey,
+		arg.Status,
+		arg.LatencySeconds,
+		arg.CostMicros,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

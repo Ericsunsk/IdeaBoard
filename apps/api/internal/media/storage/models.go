@@ -1,5 +1,7 @@
 package storage
 
+import "time"
+
 // S3CompatibleConfig 通用 S3 兼容对象存储配置
 type S3CompatibleConfig struct {
 	ProfileID       string `json:"-"`
@@ -49,6 +51,26 @@ type StorageProviderMeta struct {
 	Fields             []StorageProviderField `json:"fields"`
 }
 
+const (
+	StorageSecretVersionStatusActive  = "active"
+	StorageSecretVersionStatusRetired = "retired"
+	StorageSecretVersionStatusRevoked = "revoked"
+)
+
+type StorageSecretVersion struct {
+	ID             int64      `json:"id"`
+	SecretName     string     `json:"secret_name"`
+	VersionNumber  int32      `json:"version_number"`
+	Status         string     `json:"status"`
+	RotatedAt      time.Time  `json:"rotated_at"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	RetiredAt      *time.Time `json:"retired_at,omitempty"`
+	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	HasSecretValue bool       `json:"has_secret_value"`
+}
+
 type StorageProfile struct {
 	ID               string                 `json:"id"`
 	Name             string                 `json:"name"`
@@ -57,5 +79,6 @@ type StorageProfile struct {
 	IsCurrent        bool                   `json:"is_current"`
 	Builtin          bool                   `json:"builtin"`
 	SecretConfigured bool                   `json:"secret_configured,omitempty"`
+	SecretVersions   []StorageSecretVersion `json:"-"`
 	Config           map[string]interface{} `json:"config"`
 }

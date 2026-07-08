@@ -9,54 +9,41 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/lib/pq"
 )
 
 const createTaskOutput = `-- name: CreateTaskOutput :one
 INSERT INTO task_outputs (
-  task_id, media_asset_id, role, url, storage_key, mime_type, width, height, size_bytes,
-  source_url, checksum_sha256, storage_profile, metadata, sort_index
+  task_id, media_asset_id, output_kind, role, url,
+  source_url, metadata, sort_index
 ) VALUES (
   $1, $2, $3, $4, $5,
-  $6, $7, $8, $9,
-  $10, $11, $12, $13,
-  $14
+  $6, $7, $8
 )
 RETURNING id
 `
 
 type CreateTaskOutputParams struct {
-	TaskID         string          `json:"task_id"`
-	MediaAssetID   sql.NullInt64   `json:"media_asset_id"`
-	Role           string          `json:"role"`
-	Url            string          `json:"url"`
-	StorageKey     string          `json:"storage_key"`
-	MimeType       string          `json:"mime_type"`
-	Width          int32           `json:"width"`
-	Height         int32           `json:"height"`
-	SizeBytes      int64           `json:"size_bytes"`
-	SourceUrl      string          `json:"source_url"`
-	ChecksumSha256 string          `json:"checksum_sha256"`
-	StorageProfile string          `json:"storage_profile"`
-	Metadata       json.RawMessage `json:"metadata"`
-	SortIndex      int32           `json:"sort_index"`
+	TaskID       string          `json:"task_id"`
+	MediaAssetID sql.NullInt64   `json:"media_asset_id"`
+	OutputKind   string          `json:"output_kind"`
+	Role         string          `json:"role"`
+	Url          string          `json:"url"`
+	SourceUrl    string          `json:"source_url"`
+	Metadata     json.RawMessage `json:"metadata"`
+	SortIndex    int32           `json:"sort_index"`
 }
 
 func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, createTaskOutput,
 		arg.TaskID,
 		arg.MediaAssetID,
+		arg.OutputKind,
 		arg.Role,
 		arg.Url,
-		arg.StorageKey,
-		arg.MimeType,
-		arg.Width,
-		arg.Height,
-		arg.SizeBytes,
 		arg.SourceUrl,
-		arg.ChecksumSha256,
-		arg.StorageProfile,
 		arg.Metadata,
 		arg.SortIndex,
 	)
@@ -76,26 +63,66 @@ func (q *Queries) DeleteOutputsByTaskID(ctx context.Context, taskID string) erro
 }
 
 const listOutputsByTaskIDs = `-- name: ListOutputsByTaskIDs :many
-SELECT id, task_id, media_asset_id, role, url, storage_key, mime_type, width, height, size_bytes,
-       source_url, checksum_sha256, storage_profile, metadata, sort_index, created_at, updated_at
-FROM task_outputs
-WHERE task_id = ANY($1::text[])
-ORDER BY task_id ASC, sort_index ASC, id ASC
+SELECT
+  o.id,
+  o.task_id,
+  o.media_asset_id,
+  o.output_kind,
+  o.role,
+  (CASE WHEN o.output_kind = 'remote' THEN o.url ELSE COALESCE(a.url, '') END)::text AS url,
+  COALESCE(a.storage_key, '') AS storage_key,
+  COALESCE(a.mime_type, '') AS mime_type,
+  COALESCE(a.width, 0)::int AS width,
+  COALESCE(a.height, 0)::int AS height,
+  COALESCE(a.size_bytes, 0)::bigint AS size_bytes,
+  o.source_url,
+  COALESCE(a.checksum_sha256, '') AS checksum_sha256,
+  COALESCE(a.storage_profile_id, '') AS storage_profile,
+  o.metadata,
+  o.sort_index,
+  o.created_at,
+  o.updated_at
+FROM task_outputs AS o
+LEFT JOIN media_assets AS a ON a.id = o.media_asset_id
+WHERE o.task_id = ANY($1::text[])
+ORDER BY o.task_id ASC, o.sort_index ASC, o.id ASC
 `
 
-func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskOutput, error) {
+type ListOutputsByTaskIDsRow struct {
+	ID             int64           `json:"id"`
+	TaskID         string          `json:"task_id"`
+	MediaAssetID   sql.NullInt64   `json:"media_asset_id"`
+	OutputKind     string          `json:"output_kind"`
+	Role           string          `json:"role"`
+	Url            string          `json:"url"`
+	StorageKey     string          `json:"storage_key"`
+	MimeType       string          `json:"mime_type"`
+	Width          int32           `json:"width"`
+	Height         int32           `json:"height"`
+	SizeBytes      int64           `json:"size_bytes"`
+	SourceUrl      string          `json:"source_url"`
+	ChecksumSha256 string          `json:"checksum_sha256"`
+	StorageProfile string          `json:"storage_profile"`
+	Metadata       json.RawMessage `json:"metadata"`
+	SortIndex      int32           `json:"sort_index"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listOutputsByTaskIDs, pq.Array(taskIds))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TaskOutput
+	var items []ListOutputsByTaskIDsRow
 	for rows.Next() {
-		var i TaskOutput
+		var i ListOutputsByTaskIDsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.TaskID,
 			&i.MediaAssetID,
+			&i.OutputKind,
 			&i.Role,
 			&i.Url,
 			&i.StorageKey,

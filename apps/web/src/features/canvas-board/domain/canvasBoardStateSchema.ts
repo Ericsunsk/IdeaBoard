@@ -37,7 +37,9 @@ const imageNodeOutputItemSchema = v.strictObject({
 })
 
 const boardStateMediaRefSchema = v.strictObject({
-  url: nonEmptyStringSchema,
+  mediaAssetId: positiveIntegerSchema,
+  refType: v.picklist(['board', 'board_node']),
+  refId: v.pipe(nonEmptyStringSchema, v.maxLength(128)),
   role: v.optional(nonEmptyStringSchema),
 })
 
@@ -71,6 +73,7 @@ const imageNodeItemSchema = v.strictObject({
   width: finiteNumberSchema,
   title: v.optional(v.string()),
   sourceImageUrl: v.string(),
+  sourceMediaAssetId: v.optional(positiveIntegerSchema),
   sourceImageRatio: positiveFiniteNumberSchema,
   outputCount: v.optional(outputCountSchema),
   pendingTaskId: v.optional(nonEmptyStringSchema),

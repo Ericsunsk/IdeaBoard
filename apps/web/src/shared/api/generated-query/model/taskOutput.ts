@@ -4,12 +4,14 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { TaskOutputOutputKind } from './taskOutputOutputKind'
 
 export interface TaskOutput {
   id: number
   task_id: string
   /** @nullable */
   media_asset_id?: number | null
+  output_kind: TaskOutputOutputKind
   role: string
   url: string
   storage_key?: string

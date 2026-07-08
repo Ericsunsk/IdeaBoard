@@ -23,7 +23,10 @@ export type TaskApiCallInfo = {
   platform: string
 }
 
-const taskApiCallCache = new WeakMap<Task, { result: string; value: TaskApiCallInfo | null }>()
+const taskApiCallCache = new WeakMap<
+  Task,
+  { result: string; apiType: string; value: TaskApiCallInfo | null }
+>()
 
 export function getTaskResultImageUrl(row: Pick<Task, 'status' | 'result'>): string {
   if (row.status !== adminTaskStatuses.completed || !row.result) return ''
@@ -36,19 +39,27 @@ export function getTaskResultDetailImageUrl(row: Pick<Task, 'result'> | null | u
 }
 
 export function getTaskApiCall(row: Task): TaskApiCallInfo | null {
-  if (!row.result) return null
+  if (!row.result && !row.api_type) return null
   const cached = taskApiCallCache.get(row)
-  if (cached?.result === row.result) return cached.value
+  const result = row.result || ''
+  const apiType = row.api_type || ''
+  if (cached?.result === result && cached.apiType === apiType) return cached.value
 
-  let value: TaskApiCallInfo | null = null
-  const parsed = parseResultSafely(row.result)
-  if (isRecord(parsed) && parsed.platform) {
-    value = {
-      platform: String(parsed.platform),
+  let value: TaskApiCallInfo | null = apiType
+    ? {
+        platform: apiType,
+      }
+    : null
+  if (!value && result) {
+    const parsed = parseResultSafely(result)
+    if (isRecord(parsed) && parsed.platform) {
+      value = {
+        platform: String(parsed.platform),
+      }
     }
   }
 
-  taskApiCallCache.set(row, { result: row.result, value })
+  taskApiCallCache.set(row, { result, apiType, value })
   return value
 }
 

@@ -79,93 +79,170 @@ WHERE profile_id = sqlc.arg(profile_id)
   AND enabled
   AND status = 'active';
 
--- name: UpsertStorageProfileSecret :exec
-INSERT INTO storage_profile_secrets (
-  profile_id, secret_name, secret_material_kind, secret_ref, secret_payload, fingerprint,
-  key_version, status, rotated_at, expires_at, retired_at
-)
-VALUES (
-  sqlc.arg(profile_id), sqlc.arg(secret_name), sqlc.arg(secret_material_kind), sqlc.arg(secret_ref), sqlc.arg(secret_payload), sqlc.arg(fingerprint),
-  sqlc.arg(key_version), sqlc.arg(status), COALESCE(sqlc.narg(rotated_at), now()), sqlc.narg(expires_at), sqlc.narg(retired_at)
-)
-ON CONFLICT (profile_id, secret_name) WHERE status = 'active' DO UPDATE
-SET secret_material_kind = EXCLUDED.secret_material_kind,
-    secret_ref = EXCLUDED.secret_ref,
-    secret_payload = EXCLUDED.secret_payload,
-    fingerprint = EXCLUDED.fingerprint,
-    key_version = EXCLUDED.key_version,
-    status = EXCLUDED.status,
-    rotated_at = CASE
-      WHEN storage_profile_secrets.fingerprint IS DISTINCT FROM EXCLUDED.fingerprint THEN EXCLUDED.rotated_at
-      ELSE storage_profile_secrets.rotated_at
-    END,
-    expires_at = EXCLUDED.expires_at,
-    retired_at = EXCLUDED.retired_at;
+-- name: LockStorageProfileSecretVersionRotation :one
+SELECT TRUE::boolean AS locked
+FROM (
+  SELECT pg_advisory_xact_lock(
+    hashtextextended(
+      'storage_profile_secret_versions:' ||
+        sqlc.arg(profile_id)::text ||
+        ':' ||
+        sqlc.arg(secret_name)::text,
+      0
+    )
+  )
+) AS storage_profile_secret_rotation_lock;
 
--- name: GetStorageProfileSecret :one
-SELECT
-  id, profile_id, secret_name, secret_material_kind, secret_ref, secret_payload, fingerprint,
-  key_version, status, rotated_at, expires_at, retired_at, created_at, updated_at
-FROM storage_profile_secrets
+-- name: RetireActiveStorageProfileSecretVersion :execrows
+UPDATE storage_profile_secret_versions
+SET status = 'retired',
+    retired_at = now()
 WHERE profile_id = sqlc.arg(profile_id)
   AND secret_name = sqlc.arg(secret_name)
   AND status = 'active';
 
--- name: HasStorageProfileSecret :one
+-- name: InsertStorageProfileSecretVersion :one
+INSERT INTO storage_profile_secret_versions (
+  profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
+  fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at
+)
+VALUES (
+  sqlc.arg(profile_id),
+  sqlc.arg(secret_name),
+  COALESCE((
+    SELECT MAX(version_number) + 1
+    FROM storage_profile_secret_versions
+    WHERE profile_id = sqlc.arg(profile_id)
+      AND secret_name = sqlc.arg(secret_name)
+  ), 1),
+  sqlc.arg(secret_material_kind),
+  sqlc.arg(secret_ref),
+  sqlc.arg(secret_payload),
+  sqlc.arg(fingerprint),
+  sqlc.arg(key_version),
+  'active',
+  COALESCE(sqlc.narg(rotated_at), now()),
+  sqlc.narg(expires_at),
+  NULL,
+  NULL
+)
+RETURNING
+  id, profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
+  fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at, created_at, updated_at;
+
+-- name: GetActiveStorageProfileSecretVersion :one
+SELECT
+  id, profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
+  fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at, created_at, updated_at
+FROM storage_profile_secret_versions
+WHERE profile_id = sqlc.arg(profile_id)
+  AND secret_name = sqlc.arg(secret_name)
+  AND status = 'active';
+
+-- name: HasActiveStorageProfileSecretVersion :one
 SELECT EXISTS (
   SELECT 1
-  FROM storage_profile_secrets
+  FROM storage_profile_secret_versions
   WHERE profile_id = sqlc.arg(profile_id)
     AND secret_name = sqlc.arg(secret_name)
     AND status = 'active'
     AND (btrim(secret_payload) <> '' OR btrim(secret_ref) <> '')
 )::boolean;
 
--- name: UpsertFeaturePrompt :one
-INSERT INTO feature_prompts (
-  feature_slug, prompt, enabled, variables,
-  schema_version, updated_by, published_at
-)
-VALUES (
-  sqlc.arg(feature_slug), sqlc.arg(prompt), sqlc.arg(enabled), sqlc.arg(variables),
-  1, sqlc.narg(updated_by), sqlc.narg(published_at)
-)
-ON CONFLICT (feature_slug) DO UPDATE
-SET prompt = EXCLUDED.prompt,
-    enabled = EXCLUDED.enabled,
-    variables = EXCLUDED.variables,
-    schema_version = feature_prompts.schema_version + 1,
-    updated_by = EXCLUDED.updated_by,
-    published_at = EXCLUDED.published_at
-RETURNING schema_version;
+-- name: ListStorageProfileSecretVersions :many
+SELECT
+  id, profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
+  fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at, created_at, updated_at
+FROM storage_profile_secret_versions
+WHERE profile_id = sqlc.arg(profile_id)
+  AND secret_name = sqlc.arg(secret_name)
+ORDER BY version_number DESC;
+
+-- name: RevokeActiveStorageProfileSecretVersion :execrows
+UPDATE storage_profile_secret_versions
+SET status = 'revoked',
+    revoked_at = now(),
+    retired_at = NULL
+WHERE profile_id = sqlc.arg(profile_id)
+  AND secret_name = sqlc.arg(secret_name)
+  AND status = 'active';
+
+-- name: RestoreLatestRetiredStorageProfileSecretVersion :execrows
+UPDATE storage_profile_secret_versions AS target_version
+SET status = 'active',
+    retired_at = NULL,
+    revoked_at = NULL
+WHERE id = (
+    SELECT retired_version.id
+    FROM storage_profile_secret_versions AS retired_version
+    WHERE retired_version.profile_id = sqlc.arg(profile_id)
+      AND retired_version.secret_name = sqlc.arg(secret_name)
+      AND retired_version.status = 'retired'
+    ORDER BY retired_version.version_number DESC
+    LIMIT 1
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM storage_profile_secret_versions AS active_version
+    WHERE active_version.profile_id = sqlc.arg(profile_id)
+      AND active_version.secret_name = sqlc.arg(secret_name)
+      AND active_version.status = 'active'
+  );
+
+-- name: EnsureFeaturePrompt :exec
+INSERT INTO feature_prompts (feature_slug)
+VALUES (sqlc.arg(feature_slug))
+ON CONFLICT (feature_slug) DO NOTHING;
+
+-- name: GetFeaturePromptForUpdate :one
+SELECT feature_slug, current_revision_id, created_at, updated_at
+FROM feature_prompts
+WHERE feature_slug = sqlc.arg(feature_slug)
+FOR UPDATE;
 
 -- name: GetFeaturePrompt :one
 SELECT
-  feature_slug, prompt, enabled, variables,
-  schema_version, updated_by, published_at, created_at, updated_at
-FROM feature_prompts
-WHERE feature_slug = sqlc.arg(feature_slug);
+  p.feature_slug, p.current_revision_id,
+  r.id AS revision_id, r.prompt, r.enabled, r.variables,
+  r.model_defaults, r.user_prompt_merge_policy,
+  r.schema_version, r.updated_by, r.published_at,
+  p.created_at, p.updated_at, r.created_at AS revision_created_at
+FROM feature_prompts AS p
+JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
+WHERE p.feature_slug = sqlc.arg(feature_slug);
 
 -- name: ListFeaturePrompts :many
 SELECT
-  feature_slug, prompt, enabled, variables,
-  schema_version, updated_by, published_at, created_at, updated_at
-FROM feature_prompts
-ORDER BY feature_slug ASC;
+  p.feature_slug, p.current_revision_id,
+  r.id AS revision_id, r.prompt, r.enabled, r.variables,
+  r.model_defaults, r.user_prompt_merge_policy,
+  r.schema_version, r.updated_by, r.published_at,
+  p.created_at, p.updated_at, r.created_at AS revision_created_at
+FROM feature_prompts AS p
+JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
+ORDER BY p.feature_slug ASC;
 
 -- name: CreateFeaturePromptRevision :one
 INSERT INTO feature_prompt_revisions (
-  feature_slug, prompt, enabled, variables, schema_version, updated_by, published_at
+  feature_slug, prompt, enabled, variables, model_defaults,
+  user_prompt_merge_policy, schema_version, updated_by, published_at
 )
 VALUES (
   sqlc.arg(feature_slug), sqlc.arg(prompt), sqlc.arg(enabled), sqlc.arg(variables),
-  sqlc.arg(schema_version), sqlc.narg(updated_by), sqlc.narg(published_at)
+  sqlc.arg(model_defaults), sqlc.arg(user_prompt_merge_policy),
+  COALESCE((
+    SELECT MAX(schema_version) + 1
+    FROM feature_prompt_revisions
+    WHERE feature_slug = sqlc.arg(feature_slug)
+  ), 1),
+  sqlc.narg(updated_by), sqlc.narg(published_at)
 )
-RETURNING id;
+RETURNING
+  id, feature_slug, prompt, enabled, variables, model_defaults,
+  user_prompt_merge_policy, schema_version, updated_by, published_at, created_at;
 
--- name: ListFeaturePromptRevisions :many
-SELECT
-  id, feature_slug, prompt, enabled, variables, schema_version, updated_by, published_at, created_at
-FROM feature_prompt_revisions
+-- name: SetFeaturePromptCurrentRevision :one
+UPDATE feature_prompts
+SET current_revision_id = sqlc.arg(revision_id)
 WHERE feature_slug = sqlc.arg(feature_slug)
-ORDER BY schema_version DESC, id DESC;
+RETURNING feature_slug, current_revision_id, created_at, updated_at;

@@ -57,6 +57,17 @@ describe('task result presentation', () => {
     expect(getTaskResultImageUrl(task)).toBe('/uploads/tasks/1/task/output.png')
   })
 
+  it('prefers assignment api type snapshot over legacy result metadata', () => {
+    const task = makeTask({
+      api_type: 'openai-compatible',
+      result: JSON.stringify({
+        platform: 'google',
+      }),
+    })
+
+    expect(getTaskApiCall(task)).toEqual({ platform: 'openai-compatible' })
+  })
+
   it('formats duration and tone consistently', () => {
     const task = makeTask({
       created_at: '2026-07-06T00:00:00Z',

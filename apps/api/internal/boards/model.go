@@ -13,7 +13,8 @@ const (
 type UserBoard struct {
 	ID                 int64     `json:"id"`
 	BoardID            string    `json:"board_id"`
-	UserID             int64     `json:"user_id"`
+	OwnerUserID        int64     `json:"owner_user_id"`
+	CreatedBy          int64     `json:"created_by"`
 	Name               string    `json:"name"`
 	State              string    `json:"state"`
 	Revision           int64     `json:"revision"`
@@ -24,13 +25,12 @@ type UserBoard struct {
 }
 
 type BoardMember struct {
-	ID          int64     `json:"id"`
-	OwnerUserID int64     `json:"owner_user_id"`
-	BoardID     string    `json:"board_id"`
-	UserID      int64     `json:"user_id"`
-	Role        string    `json:"role"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        int64     `json:"id"`
+	BoardID   string    `json:"board_id"`
+	UserID    int64     `json:"user_id"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type BoardShareToken struct {

@@ -4,10 +4,17 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { BoardStateMediaRefRefType } from './boardStateMediaRefRefType'
 
 export interface BoardStateMediaRef {
-  /** @minLength 1 */
-  url: string
+  /** @minimum 1 */
+  mediaAssetId: number
+  refType: BoardStateMediaRefRefType
+  /**
+   * @minLength 1
+   * @maxLength 128
+   */
+  refId: string
   /** @minLength 1 */
   role?: string
 }

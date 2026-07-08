@@ -108,6 +108,52 @@ func TestCreateTaskOutputRequiresMediaAssetOwner(t *testing.T) {
 	}
 }
 
+func TestCreateTaskOutputEnforcesOutputKindShape(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	q := dbsqlc.New(db)
+	repo := NewRepository(db)
+	owner := createMediaOwnerForTest(t, db, "task-output-kind-owner", "TOKIND")
+
+	task := &tasks.Task{
+		TaskID: "task-output-kind-boundary",
+		UserID: owner.ID,
+		Status: tasks.StatusPending,
+	}
+	if err := repo.Create(ctx, task); err != nil {
+		t.Fatalf("create task failed: %v", err)
+	}
+	assetID, err := q.UpsertMediaAsset(ctx, mediaAssetParamsForTest(owner.ID, "task-output-kind-asset", "owner-kind/output.png"))
+	if err != nil {
+		t.Fatalf("UpsertMediaAsset returned error: %v", err)
+	}
+
+	if _, err := q.CreateTaskOutput(ctx, taskOutputParamsForTest(task.TaskID, assetID, "owner-kind/output.png")); err != nil {
+		t.Fatalf("asset output CreateTaskOutput returned error: %v", err)
+	}
+
+	remoteParams := taskOutputParamsForTest(task.TaskID, assetID, "owner-kind/remote.png")
+	remoteParams.MediaAssetID = sql.NullInt64{}
+	remoteParams.OutputKind = "remote"
+	remoteParams.Url = "https://provider.example/result.png"
+	if _, err := q.CreateTaskOutput(ctx, remoteParams); err != nil {
+		t.Fatalf("remote output CreateTaskOutput returned error: %v", err)
+	}
+
+	assetWithoutMedia := taskOutputParamsForTest(task.TaskID, assetID, "owner-kind/missing.png")
+	assetWithoutMedia.MediaAssetID = sql.NullInt64{}
+	if _, err := q.CreateTaskOutput(ctx, assetWithoutMedia); err == nil {
+		t.Fatal("asset output without media_asset_id should fail")
+	}
+
+	remoteWithAsset := taskOutputParamsForTest(task.TaskID, assetID, "owner-kind/bad-remote.png")
+	remoteWithAsset.OutputKind = "remote"
+	remoteWithAsset.Url = "https://provider.example/bad.png"
+	if _, err := q.CreateTaskOutput(ctx, remoteWithAsset); err == nil {
+		t.Fatal("remote output with media_asset_id should fail")
+	}
+}
+
 func createMediaOwnerForTest(t *testing.T, db *sql.DB, username string, storageUID string) *users.User {
 	t.Helper()
 	repo := users.NewUserRepository(db)
@@ -159,13 +205,9 @@ func taskOutputParamsForTest(taskID string, mediaAssetID int64, storageKey strin
 	return dbsqlc.CreateTaskOutputParams{
 		TaskID:       taskID,
 		MediaAssetID: sql.NullInt64{Int64: mediaAssetID, Valid: true},
+		OutputKind:   "asset",
 		Role:         "image",
-		Url:          "/uploads/" + storageKey,
-		StorageKey:   storageKey,
-		MimeType:     "image/png",
-		Width:        64,
-		Height:       64,
-		SizeBytes:    1024,
+		Url:          "",
 		Metadata:     []byte(`{}`),
 	}
 }

@@ -2,37 +2,35 @@ import { describe, expect, it } from 'vitest'
 import type {
   ProviderAccountModelRecord,
   ProviderAccountRecord,
-  ProviderChannelRecord,
+  ProviderEndpointRecord,
 } from './providerConfigTypes'
 import {
   DEFAULT_ADMIN_ACCOUNT_EXTRA_CONFIG,
   accountModelInputsFromValues,
   createAccountCreatePayload,
   createAccountUpdatePayload,
-  inferChannelApiTypeFromUrl,
+  inferProviderEndpointApiTypeFromUrl,
 } from './providerConfigPayload'
 
 describe('provider config payload mapping', () => {
   it('maps new account form values to the backend create payload defaults', () => {
     const payload = createAccountCreatePayload({
       form: {
-        channelId: 7,
+        providerEndpointId: 7,
+        name: 'Google APIKey A',
         modelValues: ['gemini-2.5-flash'],
         secret: 'sk-test',
         maxConcurrent: 4,
         timeoutSeconds: 90,
       },
-      channel: makeChannel(),
+      providerEndpoint: makeProviderEndpoint(),
       modelValues: ['gemini-2.5-flash', ' gemini-2.5-flash '],
       secret: 'sk-test',
     })
 
     expect(payload).toMatchObject({
-      channel_id: 7,
-      name: 'Google Channel',
-      platform: 'google-ai',
-      api_type: 'google-ai',
-      proxy_url: 'https://generativelanguage.googleapis.com/v1beta',
+      provider_endpoint_id: 7,
+      name: 'Google APIKey A',
       secret: 'sk-test',
       max_concurrent: 4,
       timeout: 90,
@@ -44,13 +42,14 @@ describe('provider config payload mapping', () => {
   it('maps edited account form values while preserving account backend-only fields', () => {
     const payload = createAccountUpdatePayload({
       form: {
-        channelId: 7,
+        providerEndpointId: 7,
+        name: 'Google APIKey B',
         modelValues: ['gemini-2.5-flash', 'imagen-4'],
         secret: '',
         maxConcurrent: 8,
         timeoutSeconds: 180,
       },
-      channel: makeChannel(),
+      providerEndpoint: makeProviderEndpoint(),
       existingAccount: makeAccount({
         weight: 250,
         extraConfig: '{"region":"asia"}',
@@ -67,10 +66,7 @@ describe('provider config payload mapping', () => {
     })
 
     expect(payload).toMatchObject({
-      name: 'Google Channel',
-      platform: 'google-ai',
-      api_type: 'google-ai',
-      proxy_url: 'https://generativelanguage.googleapis.com/v1beta',
+      name: 'Google APIKey B',
       max_concurrent: 8,
       timeout: 180,
       weight: 250,
@@ -120,19 +116,19 @@ describe('provider config payload mapping', () => {
   })
 
   it('infers known provider api types from Base URL', () => {
-    expect(inferChannelApiTypeFromUrl('https://generativelanguage.googleapis.com/v1beta')).toBe(
+    expect(inferProviderEndpointApiTypeFromUrl('https://generativelanguage.googleapis.com/v1beta')).toBe(
       'google-ai',
     )
-    expect(inferChannelApiTypeFromUrl('https://api.openai.com/v1')).toBe('openai-compatible')
-    expect(inferChannelApiTypeFromUrl('https://example.com/custom', 'google-ai')).toBe('google-ai')
+    expect(inferProviderEndpointApiTypeFromUrl('https://api.openai.com/v1')).toBe('openai-compatible')
+    expect(inferProviderEndpointApiTypeFromUrl('https://example.com/custom', 'google-ai')).toBe('google-ai')
   })
 })
 
-function makeChannel(overrides: Partial<ProviderChannelRecord> = {}): ProviderChannelRecord {
+function makeProviderEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): ProviderEndpointRecord {
   return {
     id: 7,
     apiType: 'google-ai',
-    name: 'Google Channel',
+    name: 'Google ProviderEndpoint',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     status: 1,
     createdAt: '',
@@ -145,8 +141,7 @@ function makeAccount(overrides: Partial<ProviderAccountRecord> = {}): ProviderAc
   return {
     id: 3,
     name: 'Account',
-    channelId: 7,
-    platform: 'google-ai',
+    providerEndpointId: 7,
     apiType: 'google-ai',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     models: [],

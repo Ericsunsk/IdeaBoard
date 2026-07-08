@@ -68,8 +68,14 @@ func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) er
 	case taskqueue.AssignStatusNoCapacity:
 		return fmt.Errorf("%w: task=%s", taskqueue.ErrNoAccountCapacity, task.TaskID)
 	case taskqueue.AssignStatusAssigned:
-		if assignment.AccountID == 0 || assignment.ChannelID == 0 || assignment.LeaseToken == "" {
-			return fmt.Errorf("invalid assignment for task=%s account=%d channel=%d has_token=%v", task.TaskID, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken != "")
+		if !assignment.HasRuntimeSnapshot() {
+			return fmt.Errorf("invalid assignment snapshot for task=%s account=%d provider_endpoint=%d credential=%d has_token=%v",
+				task.TaskID,
+				assignment.AccountID,
+				assignment.ProviderEndpointID,
+				assignment.CredentialID,
+				assignment.LeaseToken != "",
+			)
 		}
 	default:
 		return fmt.Errorf("unexpected assign status %q for task=%s", assignment.Status, task.TaskID)

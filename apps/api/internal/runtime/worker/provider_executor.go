@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/accountpool/channels"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
@@ -67,7 +67,7 @@ func truncateErrorBody(body string) string {
 }
 
 type ProviderExecutor struct {
-	channelRepo        *channels.ChannelRepository
+	channelRepo        *providerendpoints.ProviderEndpointRepository
 	mediaReader        taskmedia.UploadReader
 	resultMaterializer taskmedia.ResultMaterializer
 	publicURLs         settings.PublicURLSettingProvider
@@ -111,11 +111,11 @@ type providerCallOutput struct {
 }
 
 type providerExecutionConfig struct {
-	APIType        string
-	ChannelName    string
-	Timeout        time.Duration
-	LocalRedrawCtx *localRedrawContext
-	Request        providerRequest
+	APIType              string
+	ProviderEndpointName string
+	Timeout              time.Duration
+	LocalRedrawCtx       *localRedrawContext
+	Request              providerRequest
 }
 
 func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload) (providerCallOutput, error) {
@@ -123,7 +123,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 }
 
 func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
-	slog.Info("calling provider API", "account_name", account.Name, "channel_id", account.ChannelID, "task_id", task.TaskID)
+	slog.Info("calling provider API", "account_name", account.Name, "provider_endpoint_id", account.ProviderEndpointID, "task_id", task.TaskID)
 
 	exec, err := c.prepareProviderExecution(ctx, account, task, assignment)
 	if err != nil {
@@ -145,7 +145,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		return output, newExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			providerFailureCategory(err),
-			fmt.Errorf("调用 API 失败 (渠道: %s): %w", exec.ChannelName, err),
+			fmt.Errorf("调用 API 失败 (渠道: %s): %w", exec.ProviderEndpointName, err),
 		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
@@ -189,15 +189,14 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 
 	result := map[string]interface{}{
-		"task_id":      task.TaskID,
-		"account_id":   account.ID,
-		"channel_id":   account.ChannelID,
-		"channel_name": exec.ChannelName,
-		"platform":     account.Platform,
-		"api_type":     exec.APIType,
-		"status":       tasks.ResultStatusSuccess,
-		"image_url":    imageURL,
-		"image_urls":   imageURLs,
+		"task_id":              task.TaskID,
+		"account_id":           account.ID,
+		"provider_endpoint_id": account.ProviderEndpointID,
+		"channel_name":         exec.ProviderEndpointName,
+		"api_type":             exec.APIType,
+		"status":               tasks.ResultStatusSuccess,
+		"image_url":            imageURL,
+		"image_urls":           imageURLs,
 	}
 	if strings.TrimSpace(callResult.Model) != "" {
 		result["model"] = strings.TrimSpace(callResult.Model)
@@ -221,9 +220,15 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		)
 	}
 
-	channelName, err := c.applyAccountChannelEndpoint(ctx, account)
+	channelName, err := c.applyAssignmentEndpointSnapshot(account, assignment)
 	if err != nil {
 		return providerExecutionConfig{}, err
+	}
+	if channelName == "" {
+		channelName, err = c.applyAccountChannelEndpoint(ctx, account)
+		if err != nil {
+			return providerExecutionConfig{}, err
+		}
 	}
 
 	taskParams := c.parseAndNormalizeTaskParams(ctx, task)
@@ -253,27 +258,27 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 	}
 
 	return providerExecutionConfig{
-		APIType:        apiType,
-		ChannelName:    channelName,
-		Timeout:        timeout,
-		LocalRedrawCtx: localRedrawCtx,
-		Request:        taskParams.providerRequest(task.Prompt, resolvedModel),
+		APIType:              apiType,
+		ProviderEndpointName: channelName,
+		Timeout:              timeout,
+		LocalRedrawCtx:       localRedrawCtx,
+		Request:              taskParams.providerRequest(task.Prompt, resolvedModel),
 	}, nil
 }
 
 func (c *ProviderExecutor) applyAccountChannelEndpoint(ctx context.Context, account *accounts.ApiAccount) (string, error) {
-	if account.ChannelID <= 0 || c.channelRepo == nil {
+	if account.ProviderEndpointID <= 0 || c.channelRepo == nil {
 		return "", nil
 	}
-	channel, err := c.channelRepo.GetByID(ctx, account.ChannelID)
+	channel, err := c.channelRepo.GetByID(ctx, account.ProviderEndpointID)
 	if err != nil {
 		return "", newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
 			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("渠道商(ID=%d)不存在: %w", account.ChannelID, err),
+			fmt.Errorf("渠道商(ID=%d)不存在: %w", account.ProviderEndpointID, err),
 		)
 	}
-	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(channel.ApiURL, outbound.AllowHostsFromEnv()...)
+	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(channel.BaseURL, outbound.AllowHostsFromEnv()...)
 	if validateErr != nil {
 		return "", newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
@@ -282,8 +287,33 @@ func (c *ProviderExecutor) applyAccountChannelEndpoint(ctx context.Context, acco
 		)
 	}
 	account.ProxyURL = proxyURL
-	slog.Info("using channel API URL", "channel_name", channel.Name, "channel_id", channel.ID, "api_url", redactLogURL(channel.ApiURL))
+	slog.Info("using provider endpoint base URL", "provider_endpoint_name", channel.Name, "provider_endpoint_id", channel.ID, "base_url", redactLogURL(channel.BaseURL))
 	return channel.Name, nil
+}
+
+func (c *ProviderExecutor) applyAssignmentEndpointSnapshot(account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) (string, error) {
+	baseURL := strings.TrimSpace(assignment.ProviderEndpointBaseURL)
+	apiType := strings.TrimSpace(assignment.APIType)
+	if assignment.ProviderEndpointID <= 0 || baseURL == "" || apiType == "" {
+		return "", nil
+	}
+	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHostsFromEnv()...)
+	if validateErr != nil {
+		return "", newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			fmt.Errorf("ProviderEndpoint snapshot URL 不可用"),
+		)
+	}
+	account.ProviderEndpointID = assignment.ProviderEndpointID
+	account.ApiType = apiType
+	account.ProxyURL = proxyURL
+	name := strings.TrimSpace(assignment.ProviderEndpointName)
+	if name == "" {
+		name = fmt.Sprintf("ProviderEndpoint#%d", assignment.ProviderEndpointID)
+	}
+	slog.Info("using assignment provider endpoint snapshot", "provider_endpoint_name", name, "provider_endpoint_id", assignment.ProviderEndpointID, "base_url", redactLogURL(baseURL))
+	return name, nil
 }
 
 func (c *ProviderExecutor) parseAndNormalizeTaskParams(ctx context.Context, task *tasks.TaskPayload) providerTaskParams {

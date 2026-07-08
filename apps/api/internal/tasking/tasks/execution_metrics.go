@@ -43,28 +43,30 @@ const (
 )
 
 type TaskExecutionSnapshot struct {
-	TaskID         string
-	FeatureSlug    string
-	RequestedModel string
-	ResolvedModel  string
-	APIType        string
+	TaskID                  string
+	FeatureSlug             string
+	RequestedModel          string
+	ResolvedModel           string
+	APIType                 string
+	ProviderEndpointName    string
+	ProviderEndpointBaseURL string
+	CredentialFingerprint   string
+	CredentialKeyVersion    string
 }
 
 type TaskAttemptStart struct {
-	TaskID            string
-	RiverJobID        int64
-	LeaseToken        string
-	AccountID         int64
-	ChannelID         int64
-	FeatureSlug       string
-	RequestedModel    string
-	ResolvedModel     string
-	APIType           string
-	ProviderStartedAt time.Time
+	TaskID             string
+	RiverJobID         int64
+	LeaseToken         string
+	AccountID          int64
+	ProviderEndpointID int64
+	CredentialID       int64
+	ProviderStartedAt  time.Time
 }
 
 type TaskAttemptRef struct {
 	ID        int64
+	LeaseID   int64
 	AttemptNo int
 }
 

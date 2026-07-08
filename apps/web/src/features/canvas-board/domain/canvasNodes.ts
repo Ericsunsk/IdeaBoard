@@ -80,7 +80,9 @@ export interface ImageNodeOutputItem {
 }
 
 export interface BoardStateMediaRef {
-  url: string
+  mediaAssetId: number
+  refType: 'board' | 'board_node'
+  refId: string
   role?: string
 }
 
@@ -92,6 +94,7 @@ export interface ImageNodeItem {
   width: number
   title?: string
   sourceImageUrl: string
+  sourceMediaAssetId?: number
   sourceImageRatio: number
   outputCount?: number
   pendingTaskId?: string

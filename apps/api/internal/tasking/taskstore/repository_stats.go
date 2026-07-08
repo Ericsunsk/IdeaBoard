@@ -19,88 +19,134 @@ func (r *Repository) CountAllTasks(ctx context.Context) (int64, error) {
 	return r.q.CountAllTasks(ctx)
 }
 
-func (r *Repository) ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]TaskStatisticLite, error) {
-	rows, err := r.q.ListTaskStatisticsByCreatedRange(ctx, dbsqlc.ListTaskStatisticsByCreatedRangeParams{StartedAt: start, EndedAt: end})
-	if err != nil {
-		return nil, err
-	}
-	result := make([]TaskStatisticLite, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, TaskStatisticLite{
-			TaskID:         row.TaskID,
-			UserID:         row.UserID,
-			AccountID:      dbutil.Int64Ptr(row.AccountID),
-			Status:         row.Status,
-			Result:         row.Result,
-			FeatureSlug:    row.FeatureSlug,
-			RequestedModel: row.RequestedModel,
-			ResolvedModel:  row.ResolvedModel,
-			APIType:        row.ApiType,
-			CreatedAt:      row.CreatedAt,
-			CompletedAt:    dbutil.TimePtr(row.CompletedAt),
-		})
-	}
-	return result, nil
-}
-
 func (r *Repository) UpsertDailyStatByTask(ctx context.Context, task *tasks.Task) error {
-	return r.UpsertDailyStatByTaskWithFallbackModel(ctx, task, "")
-}
-
-func (r *Repository) UpsertDailyStatByTaskWithFallbackModel(ctx context.Context, task *tasks.Task, fallbackModel string) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		if task != nil && strings.TrimSpace(fallbackModel) == "" && taskNeedsFallbackModel(task) {
-			fallbackModel = resolveAccountSingleEnabledModelTx(ctx, q, task.AccountID)
-		}
-		return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModel)
+		return upsertDailyStatByTaskTx(ctx, q, task, nil)
 	})
 }
 
-func upsertDailyStatByTaskIDTx(ctx context.Context, q *dbsqlc.Queries, taskID string) error {
+func upsertDailyStatByTaskIDTx(ctx context.Context, q *dbsqlc.Queries, taskID string, attemptFinish *tasks.TaskAttemptFinish) error {
 	row, err := q.GetTaskByTaskID(ctx, taskID)
 	if err != nil {
 		return err
 	}
 	task := taskFromSQLC(row)
-	fallbackModel := ""
-	if taskNeedsFallbackModel(&task) {
-		fallbackModel = resolveAccountSingleEnabledModelTx(ctx, q, task.AccountID)
-	}
-	return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, &task, fallbackModel)
+	return upsertDailyStatByTaskTx(ctx, q, &task, attemptFinish)
 }
 
-func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, fallbackModel string) error {
-	if task == nil || task.Status == "" || task.TaskID == "" {
+func upsertDailyStatByTaskTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, attemptFinish *tasks.TaskAttemptFinish) error {
+	event, ok := taskStatEventFromTask(task, attemptFinish)
+	if !ok {
 		return nil
+	}
+
+	inserted, err := q.InsertTaskStatEventIgnore(ctx, dbsqlc.InsertTaskStatEventIgnoreParams{
+		TaskID:             event.TaskID,
+		OccurredAt:         event.OccurredAt,
+		StatDate:           event.StatDate,
+		UserID:             event.UserID,
+		AccountID:          event.AccountID,
+		ProviderEndpointID: event.ProviderEndpointID,
+		CredentialID:       event.CredentialID,
+		FeatureSlug:        event.FeatureSlug,
+		ApiType:            event.APIType,
+		ModelName:          event.ModelName,
+		UserKey:            event.UserKey,
+		Status:             event.Status,
+		LatencySeconds:     event.LatencySeconds,
+		CostMicros:         event.CostMicros,
+	})
+	if err != nil || inserted == 0 {
+		return err
+	}
+
+	return upsertTaskDailyStatDeltaTx(ctx, q, event)
+}
+
+type normalizedTaskStatEvent struct {
+	TaskID             string
+	OccurredAt         time.Time
+	StatDate           time.Time
+	UserID             int64
+	AccountID          int64
+	ProviderEndpointID int64
+	CredentialID       int64
+	FeatureSlug        string
+	APIType            string
+	ModelName          string
+	UserKey            string
+	Status             string
+	LatencySeconds     float64
+	CostMicros         int64
+}
+
+func taskStatEventFromTask(task *tasks.Task, attemptFinish *tasks.TaskAttemptFinish) (normalizedTaskStatEvent, bool) {
+	if task == nil || strings.TrimSpace(task.Status) == "" || strings.TrimSpace(task.TaskID) == "" {
+		return normalizedTaskStatEvent{}, false
 	}
 	if task.Status != tasks.StatusCompleted && task.Status != tasks.StatusFailed && task.Status != tasks.StatusCancelled {
-		return nil
+		return normalizedTaskStatEvent{}, false
 	}
+	occurredAt := taskStatOccurredAt(task)
 	loc := time.Now().Location()
-	createdLocal := task.CreatedAt.In(loc)
-	statDate := taskStatDateFromTime(task.CreatedAt, loc)
-	model := taskStatModel(task, fallbackModel)
-	user := extractTaskUser(task.Result, task.UserID)
-	userID := nonNegativeIDValue(task.UserID)
-	accountID := positiveIDValue(task.AccountID)
-	channelID := positiveIDValue(task.AssignedChannelID)
-	featureSlug := normalizeStatFeature(task.FeatureSlug)
-	apiType := normalizeStatAPIType(task.APIType)
+	event := normalizedTaskStatEvent{
+		TaskID:             strings.TrimSpace(task.TaskID),
+		OccurredAt:         occurredAt,
+		StatDate:           taskStatDateFromTime(occurredAt, loc),
+		UserID:             nonNegativeIDValue(task.UserID),
+		AccountID:          positiveIDValue(task.AccountID),
+		ProviderEndpointID: positiveIDValue(task.AssignedProviderEndpointID),
+		CredentialID:       positiveIDValue(task.AssignedCredentialID),
+		FeatureSlug:        normalizeStatFeature(task.FeatureSlug),
+		APIType:            normalizeStatAPIType(task.APIType),
+		ModelName:          taskStatModel(task),
+		UserKey:            taskStatUserKey(task.UserID),
+		Status:             task.Status,
+		LatencySeconds:     taskStatLatencySeconds(task, attemptFinish, occurredAt),
+		CostMicros:         0,
+	}
+	return event, true
+}
 
+func taskStatOccurredAt(task *tasks.Task) time.Time {
+	switch task.Status {
+	case tasks.StatusCancelled:
+		if task.CancelledAt != nil && !task.CancelledAt.IsZero() {
+			return *task.CancelledAt
+		}
+	}
+	if task.CompletedAt != nil && !task.CompletedAt.IsZero() {
+		return *task.CompletedAt
+	}
+	if task.UpdatedAt.IsZero() {
+		return time.Now()
+	}
+	return task.UpdatedAt
+}
+
+func taskStatLatencySeconds(task *tasks.Task, attemptFinish *tasks.TaskAttemptFinish, occurredAt time.Time) float64 {
+	if task.Status != tasks.StatusCompleted {
+		return 0
+	}
+	if attemptFinish != nil && attemptFinish.TotalLatencyMS > 0 {
+		return float64(attemptFinish.TotalLatencyMS) / 1000
+	}
+	if !task.CreatedAt.IsZero() && occurredAt.After(task.CreatedAt) {
+		return occurredAt.Sub(task.CreatedAt).Seconds()
+	}
+	return 0
+}
+
+func upsertTaskDailyStatDeltaTx(ctx context.Context, q *dbsqlc.Queries, event normalizedTaskStatEvent) error {
 	completedDelta := int64(0)
 	failedDelta := int64(0)
 	cancelledDelta := int64(0)
-	latencySeconds := float64(0)
 	latencyCountDelta := int64(0)
-	switch task.Status {
+	switch event.Status {
 	case tasks.StatusCompleted:
 		completedDelta = 1
-		if task.CompletedAt != nil {
-			end := task.CompletedAt.In(loc)
-			if end.After(createdLocal) {
-				latencySeconds = end.Sub(createdLocal).Seconds()
-				latencyCountDelta = 1
-			}
+		if event.LatencySeconds > 0 {
+			latencyCountDelta = 1
 		}
 	case tasks.StatusFailed:
 		failedDelta = 1
@@ -108,46 +154,24 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 		cancelledDelta = 1
 	}
 
-	inserted, err := q.InsertTaskStatEventIgnore(ctx, dbsqlc.InsertTaskStatEventIgnoreParams{
-		TaskID:         task.TaskID,
-		StatDate:       statDate,
-		UserID:         userID,
-		AccountID:      accountID,
-		ChannelID:      channelID,
-		FeatureSlug:    featureSlug,
-		ApiType:        apiType,
-		ModelName:      model,
-		UserKey:        user,
-		Status:         task.Status,
-		LatencySeconds: latencySeconds,
-	})
-	if err != nil || inserted == 0 {
-		return err
-	}
-
 	return q.UpsertTaskDailyStatDelta(ctx, dbsqlc.UpsertTaskDailyStatDeltaParams{
-		StatDate:          statDate,
-		UserID:            userID,
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		FeatureSlug:       featureSlug,
-		ApiType:           apiType,
-		ModelName:         model,
-		UserKey:           user,
-		Total:             1,
-		Completed:         completedDelta,
-		Failed:            failedDelta,
-		Cancelled:         cancelledDelta,
-		LatencySecondsSum: latencySeconds,
-		LatencyCount:      latencyCountDelta,
+		StatDate:           event.StatDate,
+		UserID:             event.UserID,
+		AccountID:          event.AccountID,
+		ProviderEndpointID: event.ProviderEndpointID,
+		CredentialID:       event.CredentialID,
+		FeatureSlug:        event.FeatureSlug,
+		ApiType:            event.APIType,
+		ModelName:          event.ModelName,
+		UserKey:            event.UserKey,
+		Total:              1,
+		Completed:          completedDelta,
+		Failed:             failedDelta,
+		Cancelled:          cancelledDelta,
+		LatencySecondsSum:  event.LatencySeconds,
+		LatencyCount:       latencyCountDelta,
+		CostMicrosSum:      event.CostMicros,
 	})
-}
-
-func nonNegativeIDValue(value int64) int64 {
-	if value < 0 {
-		return 0
-	}
-	return value
 }
 
 func positiveIDValue(value *int64) int64 {
@@ -157,13 +181,14 @@ func positiveIDValue(value *int64) int64 {
 	return *value
 }
 
-func taskNeedsFallbackModel(task *tasks.Task) bool {
-	return task != nil &&
-		strings.TrimSpace(task.ResolvedModel) == "" &&
-		strings.TrimSpace(task.RequestedModel) == ""
+func nonNegativeIDValue(value int64) int64 {
+	if value < 0 {
+		return 0
+	}
+	return value
 }
 
-func taskStatModel(task *tasks.Task, fallbackModel string) string {
+func taskStatModel(task *tasks.Task) string {
 	if task == nil {
 		return unknownModelName
 	}
@@ -173,63 +198,14 @@ func taskStatModel(task *tasks.Task, fallbackModel string) string {
 	if model := normalizeStatDimension(task.RequestedModel); model != "" {
 		return model
 	}
-	if model := ExtractTaskModel(task.Result); model != unknownModelName {
-		return model
-	}
-	if fallbackModel = normalizeStatDimension(fallbackModel); fallbackModel != "" {
-		return fallbackModel
-	}
 	return unknownModelName
 }
 
-func resolveAccountSingleEnabledModelTx(ctx context.Context, q *dbsqlc.Queries, accountID *int64) string {
-	if accountID == nil || *accountID <= 0 {
-		return ""
+func taskStatUserKey(userID int64) string {
+	if userID <= 0 {
+		return "unknown"
 	}
-	model, err := q.GetSingleEnabledModelByAccountID(ctx, *accountID)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(model)
-}
-
-func nullableAccountIDValue(value sql.NullInt64) int64 {
-	if !value.Valid {
-		return 0
-	}
-	return value.Int64
-}
-
-func listSingleEnabledModelByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, accountIDs []int64) (map[int64]string, error) {
-	result := make(map[int64]string)
-	if len(accountIDs) == 0 {
-		return result, nil
-	}
-
-	uniq := make(map[int64]struct{}, len(accountIDs))
-	ids := make([]int64, 0, len(accountIDs))
-	for _, id := range accountIDs {
-		if id == 0 {
-			continue
-		}
-		if _, ok := uniq[id]; ok {
-			continue
-		}
-		uniq[id] = struct{}{}
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return result, nil
-	}
-
-	rows, err := q.ListSingleEnabledModelsByAccountIDs(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range rows {
-		result[row.ID] = strings.TrimSpace(row.ModelName)
-	}
-	return result, nil
+	return normalizeStatDimension(fmt.Sprintf("%d", userID))
 }
 
 func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]DailyStatAggregate, error) {
@@ -254,6 +230,30 @@ func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, e
 			Cancelled:         row.Cancelled,
 			LatencySecondsSum: row.LatencySecondsSum,
 			LatencyCount:      row.LatencyCount,
+			CostMicrosSum:     row.CostMicrosSum,
+		})
+	}
+	return result, nil
+}
+
+func (r *Repository) ListStatEventsByOccurredRange(ctx context.Context, start, end time.Time) ([]StatEventTrendRow, error) {
+	if start.IsZero() || end.IsZero() {
+		return nil, fmt.Errorf("stat event occurred range is required")
+	}
+	rows, err := r.q.ListStatEventsByOccurredRange(ctx, dbsqlc.ListStatEventsByOccurredRangeParams{StartedAt: start, EndedAt: end})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]StatEventTrendRow, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, StatEventTrendRow{
+			OccurredAt:     row.OccurredAt,
+			StatDate:       row.StatDate,
+			ModelName:      row.ModelName,
+			UserKey:        row.UserKey,
+			Status:         row.Status,
+			LatencySeconds: row.LatencySeconds,
+			CostMicros:     row.CostMicros,
 		})
 	}
 	return result, nil
@@ -285,6 +285,88 @@ func (r *Repository) ListBackfilledDatesByRange(ctx context.Context, startDate, 
 	return r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StartDate: start, EndDate: end})
 }
 
+func (r *Repository) RebuildDailyStatsFromEventsByDateRange(ctx context.Context, startDate, endDate time.Time) (RebuildDailyStatsResult, error) {
+	if startDate.IsZero() || endDate.IsZero() {
+		return RebuildDailyStatsResult{}, fmt.Errorf("stat date range is required")
+	}
+	start := normalizeTaskStatDate(startDate)
+	end := normalizeTaskStatDate(endDate)
+	row, err := r.q.RebuildTaskDailyStatsByEventDateRange(ctx, dbsqlc.RebuildTaskDailyStatsByEventDateRangeParams{StartDate: start, EndDate: end})
+	if err != nil {
+		return RebuildDailyStatsResult{}, err
+	}
+	return RebuildDailyStatsResult{DeletedGroups: row.DeletedGroups, RebuiltGroups: row.RebuiltGroups}, nil
+}
+
+func (r *Repository) CorrectTaskStatEvent(ctx context.Context, correction TaskStatEventCorrection) (int64, error) {
+	event, ok := taskStatEventFromCorrection(correction)
+	if !ok {
+		return 0, fmt.Errorf("task stat event correction is invalid")
+	}
+	return r.q.UpsertTaskStatEventCorrection(ctx, dbsqlc.UpsertTaskStatEventCorrectionParams{
+		TaskID:             event.TaskID,
+		OccurredAt:         event.OccurredAt,
+		StatDate:           event.StatDate,
+		UserID:             event.UserID,
+		AccountID:          event.AccountID,
+		ProviderEndpointID: event.ProviderEndpointID,
+		CredentialID:       event.CredentialID,
+		FeatureSlug:        event.FeatureSlug,
+		ApiType:            event.APIType,
+		ModelName:          event.ModelName,
+		UserKey:            event.UserKey,
+		Status:             event.Status,
+		LatencySeconds:     event.LatencySeconds,
+		CostMicros:         event.CostMicros,
+	})
+}
+
+func taskStatEventFromCorrection(correction TaskStatEventCorrection) (normalizedTaskStatEvent, bool) {
+	taskID := strings.TrimSpace(correction.TaskID)
+	if taskID == "" {
+		return normalizedTaskStatEvent{}, false
+	}
+	if correction.Status != tasks.StatusCompleted && correction.Status != tasks.StatusFailed && correction.Status != tasks.StatusCancelled {
+		return normalizedTaskStatEvent{}, false
+	}
+	occurredAt := correction.OccurredAt
+	if occurredAt.IsZero() {
+		occurredAt = time.Now()
+	}
+	model := normalizeStatDimension(correction.ModelName)
+	if model == "" {
+		model = unknownModelName
+	}
+	userKey := normalizeStatDimension(correction.UserKey)
+	if userKey == "" {
+		userKey = taskStatUserKey(correction.UserID)
+	}
+	latencySeconds := correction.LatencySeconds
+	if latencySeconds < 0 {
+		latencySeconds = 0
+	}
+	costMicros := correction.CostMicros
+	if costMicros < 0 {
+		costMicros = 0
+	}
+	return normalizedTaskStatEvent{
+		TaskID:             taskID,
+		OccurredAt:         occurredAt,
+		StatDate:           taskStatDateFromTime(occurredAt, time.Now().Location()),
+		UserID:             nonNegativeIDValue(correction.UserID),
+		AccountID:          nonNegativeIDValue(correction.AccountID),
+		ProviderEndpointID: nonNegativeIDValue(correction.ProviderEndpointID),
+		CredentialID:       nonNegativeIDValue(correction.CredentialID),
+		FeatureSlug:        normalizeStatFeature(correction.FeatureSlug),
+		APIType:            normalizeStatAPIType(correction.APIType),
+		ModelName:          model,
+		UserKey:            userKey,
+		Status:             correction.Status,
+		LatencySeconds:     latencySeconds,
+		CostMicros:         costMicros,
+	}, true
+}
+
 func (r *Repository) BackfillDailyStatsByCreatedRange(ctx context.Context, startedAt, endedAt, statDate time.Time, markDone bool) (BackfillDailyStatsResult, error) {
 	if startedAt.IsZero() || endedAt.IsZero() || statDate.IsZero() {
 		return BackfillDailyStatsResult{}, fmt.Errorf("backfill date range is required")
@@ -296,8 +378,8 @@ func (r *Repository) BackfillDailyStatsByCreatedRange(ctx context.Context, start
 	var result BackfillDailyStatsResult
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		row, err := q.BackfillDailyStatsByCreatedRange(ctx, dbsqlc.BackfillDailyStatsByCreatedRangeParams{
-			StartedAt: startedAt,
-			EndedAt:   endedAt,
+			StartedAt: dbutil.NullTime(&startedAt),
+			EndedAt:   dbutil.NullTime(&endedAt),
 			StatDate:  normalizeTaskStatDate(statDate),
 			MarkDone:  markDone,
 		})
@@ -326,30 +408,222 @@ func normalizeTaskStatDate(value time.Time) time.Time {
 	return taskStatDateFromTime(value, value.Location())
 }
 
-func taskFromSQLC(row dbsqlc.Task) tasks.Task {
+type taskSQLCFields struct {
+	ID                         int64
+	TaskID                     string
+	UserID                     int64
+	AssignedProviderEndpointID sql.NullInt64
+	AssignedCredentialID       sql.NullInt64
+	AccountID                  sql.NullInt64
+	Prompt                     string
+	UserPrompt                 string
+	Params                     string
+	FeatureSlug                string
+	RequestedModel             string
+	ResolvedModel              string
+	APIType                    string
+	ProviderEndpointName       string
+	ProviderEndpointBaseURL    string
+	CredentialFingerprint      string
+	CredentialKeyVersion       string
+	Status                     string
+	LeaseToken                 string
+	RetryCount                 int32
+	ErrorMsg                   string
+	Result                     string
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	CompletedAt                sql.NullTime
+	CancelledAt                sql.NullTime
+	CancelledBy                sql.NullInt64
+	CancelReason               string
+}
+
+func taskFromSQLC(row any) tasks.Task {
+	switch r := row.(type) {
+	case dbsqlc.GetTaskByTaskIDRow:
+		return taskFromSQLCFields(taskSQLCFields{
+			ID:                         r.ID,
+			TaskID:                     r.TaskID,
+			UserID:                     r.UserID,
+			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
+			AssignedCredentialID:       r.AssignedCredentialID,
+			AccountID:                  r.AccountID,
+			Prompt:                     r.Prompt,
+			UserPrompt:                 r.UserPrompt,
+			Params:                     r.Params,
+			FeatureSlug:                r.FeatureSlug,
+			RequestedModel:             r.RequestedModel,
+			ResolvedModel:              r.ResolvedModel,
+			APIType:                    r.ApiType,
+			ProviderEndpointName:       r.ProviderEndpointName,
+			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:      r.CredentialFingerprint,
+			CredentialKeyVersion:       r.CredentialKeyVersion,
+			Status:                     r.Status,
+			LeaseToken:                 r.LeaseToken,
+			RetryCount:                 r.RetryCount,
+			ErrorMsg:                   r.ErrorMsg,
+			Result:                     r.Result,
+			CreatedAt:                  r.CreatedAt,
+			UpdatedAt:                  r.UpdatedAt,
+			CompletedAt:                r.CompletedAt,
+			CancelledAt:                r.CancelledAt,
+			CancelledBy:                r.CancelledBy,
+			CancelReason:               r.CancelReason,
+		})
+	case dbsqlc.GetTaskByTaskIDAndUserIDRow:
+		return taskFromSQLCFields(taskSQLCFields{
+			ID:                         r.ID,
+			TaskID:                     r.TaskID,
+			UserID:                     r.UserID,
+			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
+			AssignedCredentialID:       r.AssignedCredentialID,
+			AccountID:                  r.AccountID,
+			Prompt:                     r.Prompt,
+			UserPrompt:                 r.UserPrompt,
+			Params:                     r.Params,
+			FeatureSlug:                r.FeatureSlug,
+			RequestedModel:             r.RequestedModel,
+			ResolvedModel:              r.ResolvedModel,
+			APIType:                    r.ApiType,
+			ProviderEndpointName:       r.ProviderEndpointName,
+			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:      r.CredentialFingerprint,
+			CredentialKeyVersion:       r.CredentialKeyVersion,
+			Status:                     r.Status,
+			LeaseToken:                 r.LeaseToken,
+			RetryCount:                 r.RetryCount,
+			ErrorMsg:                   r.ErrorMsg,
+			Result:                     r.Result,
+			CreatedAt:                  r.CreatedAt,
+			UpdatedAt:                  r.UpdatedAt,
+			CompletedAt:                r.CompletedAt,
+			CancelledAt:                r.CancelledAt,
+			CancelledBy:                r.CancelledBy,
+			CancelReason:               r.CancelReason,
+		})
+	case dbsqlc.ListTasksRow:
+		return taskFromSQLCFields(taskSQLCFields{
+			ID:                         r.ID,
+			TaskID:                     r.TaskID,
+			UserID:                     r.UserID,
+			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
+			AssignedCredentialID:       r.AssignedCredentialID,
+			AccountID:                  r.AccountID,
+			Prompt:                     r.Prompt,
+			UserPrompt:                 r.UserPrompt,
+			Params:                     r.Params,
+			FeatureSlug:                r.FeatureSlug,
+			RequestedModel:             r.RequestedModel,
+			ResolvedModel:              r.ResolvedModel,
+			APIType:                    r.ApiType,
+			ProviderEndpointName:       r.ProviderEndpointName,
+			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:      r.CredentialFingerprint,
+			CredentialKeyVersion:       r.CredentialKeyVersion,
+			Status:                     r.Status,
+			LeaseToken:                 r.LeaseToken,
+			RetryCount:                 r.RetryCount,
+			ErrorMsg:                   r.ErrorMsg,
+			Result:                     r.Result,
+			CreatedAt:                  r.CreatedAt,
+			UpdatedAt:                  r.UpdatedAt,
+			CompletedAt:                r.CompletedAt,
+			CancelledAt:                r.CancelledAt,
+			CancelledBy:                r.CancelledBy,
+			CancelReason:               r.CancelReason,
+		})
+	case dbsqlc.ListTasksByUserIDRow:
+		return taskFromSQLCFields(taskSQLCFields{
+			ID:                         r.ID,
+			TaskID:                     r.TaskID,
+			UserID:                     r.UserID,
+			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
+			AssignedCredentialID:       r.AssignedCredentialID,
+			AccountID:                  r.AccountID,
+			Prompt:                     r.Prompt,
+			UserPrompt:                 r.UserPrompt,
+			Params:                     r.Params,
+			FeatureSlug:                r.FeatureSlug,
+			RequestedModel:             r.RequestedModel,
+			ResolvedModel:              r.ResolvedModel,
+			APIType:                    r.ApiType,
+			ProviderEndpointName:       r.ProviderEndpointName,
+			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:      r.CredentialFingerprint,
+			CredentialKeyVersion:       r.CredentialKeyVersion,
+			Status:                     r.Status,
+			LeaseToken:                 r.LeaseToken,
+			RetryCount:                 r.RetryCount,
+			ErrorMsg:                   r.ErrorMsg,
+			Result:                     r.Result,
+			CreatedAt:                  r.CreatedAt,
+			UpdatedAt:                  r.UpdatedAt,
+			CompletedAt:                r.CompletedAt,
+			CancelledAt:                r.CancelledAt,
+			CancelledBy:                r.CancelledBy,
+			CancelReason:               r.CancelReason,
+		})
+	case dbsqlc.Task:
+		return taskFromSQLCFields(taskSQLCFields{
+			ID:                         r.ID,
+			TaskID:                     r.TaskID,
+			UserID:                     r.UserID,
+			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
+			AssignedCredentialID:       r.AssignedCredentialID,
+			AccountID:                  r.AccountID,
+			Prompt:                     r.Prompt,
+			UserPrompt:                 r.UserPrompt,
+			Params:                     r.Params,
+			FeatureSlug:                r.FeatureSlug,
+			RequestedModel:             r.RequestedModel,
+			Status:                     r.Status,
+			LeaseToken:                 r.LeaseToken,
+			RetryCount:                 r.RetryCount,
+			ErrorMsg:                   r.ErrorMsg,
+			Result:                     r.Result,
+			CreatedAt:                  r.CreatedAt,
+			UpdatedAt:                  r.UpdatedAt,
+			CompletedAt:                r.CompletedAt,
+			CancelledAt:                r.CancelledAt,
+			CancelledBy:                r.CancelledBy,
+			CancelReason:               r.CancelReason,
+		})
+	default:
+		panic(fmt.Sprintf("unsupported task sqlc row %T", row))
+	}
+}
+
+func taskFromSQLCFields(row taskSQLCFields) tasks.Task {
 	return tasks.Task{
-		ID:                row.ID,
-		TaskID:            row.TaskID,
-		UserID:            row.UserID,
-		AssignedChannelID: dbutil.Int64Ptr(row.AssignedChannelID),
-		AccountID:         dbutil.Int64Ptr(row.AccountID),
-		Prompt:            row.Prompt,
-		UserPrompt:        row.UserPrompt,
-		Params:            row.Params,
-		FeatureSlug:       row.FeatureSlug,
-		RequestedModel:    row.RequestedModel,
-		ResolvedModel:     row.ResolvedModel,
-		APIType:           row.ApiType,
-		Status:            row.Status,
-		LeaseToken:        row.LeaseToken,
-		RetryCount:        int(row.RetryCount),
-		ErrorMsg:          row.ErrorMsg,
-		Result:            row.Result,
-		CreatedAt:         row.CreatedAt,
-		UpdatedAt:         row.UpdatedAt,
-		CompletedAt:       dbutil.TimePtr(row.CompletedAt),
-		CancelledAt:       dbutil.TimePtr(row.CancelledAt),
-		CancelledBy:       dbutil.Int64Ptr(row.CancelledBy),
-		CancelReason:      row.CancelReason,
+		ID:                         row.ID,
+		TaskID:                     row.TaskID,
+		UserID:                     row.UserID,
+		AssignedProviderEndpointID: dbutil.Int64Ptr(row.AssignedProviderEndpointID),
+		AssignedCredentialID:       dbutil.Int64Ptr(row.AssignedCredentialID),
+		AccountID:                  dbutil.Int64Ptr(row.AccountID),
+		Prompt:                     row.Prompt,
+		UserPrompt:                 row.UserPrompt,
+		Params:                     row.Params,
+		FeatureSlug:                row.FeatureSlug,
+		RequestedModel:             row.RequestedModel,
+		ResolvedModel:              row.ResolvedModel,
+		APIType:                    row.APIType,
+		ProviderEndpointName:       row.ProviderEndpointName,
+		ProviderEndpointBaseURL:    row.ProviderEndpointBaseURL,
+		CredentialFingerprint:      row.CredentialFingerprint,
+		CredentialKeyVersion:       row.CredentialKeyVersion,
+		Status:                     row.Status,
+		LeaseToken:                 row.LeaseToken,
+		RetryCount:                 int(row.RetryCount),
+		ErrorMsg:                   row.ErrorMsg,
+		Result:                     row.Result,
+		CreatedAt:                  row.CreatedAt,
+		UpdatedAt:                  row.UpdatedAt,
+		CompletedAt:                dbutil.TimePtr(row.CompletedAt),
+		CancelledAt:                dbutil.TimePtr(row.CancelledAt),
+		CancelledBy:                dbutil.Int64Ptr(row.CancelledBy),
+		CancelReason:               row.CancelReason,
 	}
 }

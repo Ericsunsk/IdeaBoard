@@ -19,6 +19,7 @@ import (
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 type Service struct {
@@ -52,6 +53,7 @@ type TaskSubmissionStore interface {
 
 type FeaturePromptStore interface {
 	GetPrompt(ctx context.Context, slug string) (string, error)
+	GetPromptRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
 }
 
 type ServiceDeps struct {
@@ -210,6 +212,14 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 			req.Params["feature"] = featureSlug
 		}
 	}
+
+	var runtimePromptConfig *prompts.FeaturePromptRuntimeConfig
+	if s.featurePrompts != nil {
+		if config, err := s.featurePrompts.GetPromptRuntimeConfig(ctx, featureSlug); err == nil {
+			runtimePromptConfig = &config
+			applyFeaturePromptModelDefaults(req.Params, config.ModelDefaults)
+		}
+	}
 	if err := workflow.NormalizeStructuredPromptContractParams(req.Params, featureSlug); err != nil {
 		return nil, nil, nil, "", "", err
 	}
@@ -227,12 +237,10 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 		return nil, nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
-	fullPrompt := applyTaskSystemPrompt(req.Prompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
-		if s.featurePrompts == nil {
-			return "", fmt.Errorf("feature prompt repo 未配置")
-		}
-		return s.featurePrompts.GetPrompt(ctx, slug)
-	})
+	fullPrompt := req.Prompt
+	if runtimePromptConfig != nil {
+		fullPrompt = prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, req.Params, *runtimePromptConfig)
+	}
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
 		return nil, nil, nil, "", "", err
 	}
@@ -241,6 +249,18 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 	}
 
 	return apiAccounts, typedParams, req.Params, featureSlug, fullPrompt, nil
+}
+
+func applyFeaturePromptModelDefaults(params map[string]interface{}, defaults prompts.FeaturePromptModelDefaults) {
+	if params == nil {
+		return
+	}
+	if _, exists := params[paramkeys.Model]; exists {
+		return
+	}
+	if defaults.Model != "" {
+		params[paramkeys.Model] = defaults.Model
+	}
 }
 
 func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {

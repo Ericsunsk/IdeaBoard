@@ -12,17 +12,15 @@ type FeaturePromptHandler struct {
 }
 
 type featurePromptPayload struct {
-	Prompt    *string                 `json:"prompt"`
-	Enabled   *bool                   `json:"enabled"`
-	Variables []FeaturePromptVariable `json:"variables"`
+	Prompt                *string                     `json:"prompt"`
+	Enabled               *bool                       `json:"enabled"`
+	Variables             []FeaturePromptVariable     `json:"variables"`
+	ModelDefaults         *FeaturePromptModelDefaults `json:"model_defaults"`
+	UserPromptMergePolicy *FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
 }
 
 type featurePromptListResponse struct {
 	Prompts []FeaturePromptConfig `json:"prompts"`
-}
-
-type featurePromptRevisionListResponse struct {
-	Revisions []FeaturePromptRevision `json:"revisions"`
 }
 
 func NewFeaturePromptHandler(promptRepo *FeaturePromptRepository) *FeaturePromptHandler {
@@ -86,11 +84,21 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 	if variables == nil {
 		variables = current.Variables
 	}
+	modelDefaults := current.ModelDefaults
+	if req.ModelDefaults != nil {
+		modelDefaults = *req.ModelDefaults
+	}
+	mergePolicy := req.UserPromptMergePolicy
+	if mergePolicy == nil {
+		mergePolicy = &current.UserPromptMergePolicy
+	}
 
 	config, err := h.promptRepo.SetPromptConfig(c.Request.Context(), slug, FeaturePromptSaveInput{
-		Prompt:    *req.Prompt,
-		Enabled:   enabled,
-		Variables: variables,
+		Prompt:                *req.Prompt,
+		Enabled:               enabled,
+		Variables:             variables,
+		ModelDefaults:         modelDefaults,
+		UserPromptMergePolicy: mergePolicy,
 	}, promptUpdatedBy(c))
 	if err != nil {
 		response.InternalError(c, 500, "保存失败", err)
@@ -108,25 +116,6 @@ func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, featurePromptListResponse{Prompts: prompts})
-}
-
-func (h *FeaturePromptHandler) ListRevisions(c *gin.Context) {
-	rawSlug := c.Param("slug")
-	if rawSlug == "" {
-		response.Error(c, 400, "缺少 slug 参数")
-		return
-	}
-	slug, err := workflow.ValidateWorkflowFeatureSlug(rawSlug)
-	if err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-	revisions, err := h.promptRepo.ListPromptRevisions(c.Request.Context(), slug)
-	if err != nil {
-		response.InternalError(c, 500, "获取版本失败", err)
-		return
-	}
-	response.SuccessDTO(c, featurePromptRevisionListResponse{Revisions: revisions})
 }
 
 func promptUpdatedBy(c *gin.Context) *int64 {

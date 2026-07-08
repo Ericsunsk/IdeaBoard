@@ -1,7 +1,8 @@
-package channels
+package providerendpoints
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,12 +27,12 @@ const (
 	maxDetectedModels     = 100
 )
 
-type channelListResponse struct {
-	List []*Channel `json:"list"`
+type providerEndpointListResponse struct {
+	List []*ProviderEndpoint `json:"list"`
 }
 
-type channelResponse struct {
-	Channel *Channel `json:"channel"`
+type providerEndpointResponse struct {
+	ProviderEndpoint *ProviderEndpoint `json:"provider_endpoint"`
 }
 
 type detectedModelsResponse struct {
@@ -39,129 +40,148 @@ type detectedModelsResponse struct {
 	APIType string   `json:"api_type"`
 }
 
-type ChannelHandler struct {
-	channelRepo *ChannelRepository
-	appEnv      string
+type ProviderEndpointHandler struct {
+	endpointRepo *ProviderEndpointRepository
+	appEnv       string
 }
 
-func NewChannelHandler(channelRepo *ChannelRepository, appEnv ...string) *ChannelHandler {
+func NewProviderEndpointHandler(endpointRepo *ProviderEndpointRepository, appEnv ...string) *ProviderEndpointHandler {
 	env := ""
 	if len(appEnv) > 0 {
 		env = strings.TrimSpace(appEnv[0])
 	}
-	return &ChannelHandler{channelRepo: channelRepo, appEnv: env}
+	return &ProviderEndpointHandler{endpointRepo: endpointRepo, appEnv: env}
 }
 
-func (h *ChannelHandler) List(c *gin.Context) {
-	channels, err := h.channelRepo.List(c.Request.Context())
+func (h *ProviderEndpointHandler) List(c *gin.Context) {
+	endpoints, err := h.endpointRepo.List(c.Request.Context())
 	if err != nil {
-		response.Error(c, 500, "获取渠道商列表失败")
+		response.Error(c, 500, "获取 ProviderEndpoint 列表失败")
 		return
 	}
-	response.SuccessDTO(c, channelListResponse{List: channels})
+	response.SuccessDTO(c, providerEndpointListResponse{List: endpoints})
 }
 
-func (h *ChannelHandler) Create(c *gin.Context) {
-	var req CreateChannelRequest
+func (h *ProviderEndpointHandler) Create(c *gin.Context) {
+	var req CreateProviderEndpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-
-	apiURL, err := outbound.ValidateConfiguredEndpoint(req.ApiURL, outbound.AllowHostsFromEnv()...)
-	if err != nil {
-		response.Error(c, 400, "api_url 不可用，仅支持可达的公网 http(s) 地址")
+	if !isValidProviderEndpointStatus(req.Status) {
+		response.Error(c, 400, "status 只支持 0 或 1")
 		return
 	}
 
-	apiType, ok := workflow.ValidateProviderAPIType(req.Type, apiURL)
+	baseURL, err := outbound.ValidateConfiguredEndpoint(req.BaseURL, outbound.AllowHostsFromEnv()...)
+	if err != nil {
+		response.Error(c, 400, "base_url 不可用，仅支持可达的公网 http(s) 地址")
+		return
+	}
+
+	apiType, ok := workflow.ValidateProviderAPIType(req.APIType, baseURL)
 	if !ok {
 		response.Error(c, 400, "接口类型不支持")
 		return
 	}
 
-	channel := &Channel{
-		Type:   apiType,
-		Name:   req.Name,
-		ApiURL: apiURL,
-		Status: 1,
+	endpoint := &ProviderEndpoint{
+		APIType: apiType,
+		Name:    req.Name,
+		BaseURL: baseURL,
+		Status:  req.Status,
 	}
 
-	if err := h.channelRepo.Create(c.Request.Context(), channel); err != nil {
-		response.InternalError(c, 500, "创建渠道商失败", err)
+	if err := h.endpointRepo.Create(c.Request.Context(), endpoint); err != nil {
+		if respondProviderEndpointConflict(c, err) {
+			return
+		}
+		response.InternalError(c, 500, "创建 ProviderEndpoint 失败", err)
 		return
 	}
 
-	response.SuccessDTO(c, channelResponse{Channel: channel})
+	response.SuccessDTO(c, providerEndpointResponse{ProviderEndpoint: endpoint})
 }
 
-func (h *ChannelHandler) Update(c *gin.Context) {
+func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的ID")
 		return
 	}
 
-	var req UpdateChannelRequest
+	var req UpdateProviderEndpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-
-	apiURL, err := outbound.ValidateConfiguredEndpoint(req.ApiURL, outbound.AllowHostsFromEnv()...)
-	if err != nil {
-		response.Error(c, 400, "api_url 不可用，仅支持可达的公网 http(s) 地址")
+	if !isValidProviderEndpointStatus(req.Status) {
+		response.Error(c, 400, "status 只支持 0 或 1")
 		return
 	}
 
-	channel, err := h.channelRepo.GetByID(c.Request.Context(), id)
+	baseURL, err := outbound.ValidateConfiguredEndpoint(req.BaseURL, outbound.AllowHostsFromEnv()...)
 	if err != nil {
-		response.Error(c, 404, "渠道商不存在")
+		response.Error(c, 400, "base_url 不可用，仅支持可达的公网 http(s) 地址")
 		return
 	}
 
-	apiType, ok := workflow.ValidateProviderAPIType(req.Type, apiURL)
+	endpoint, err := h.endpointRepo.GetByID(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, 404, "ProviderEndpoint 不存在")
+		return
+	}
+
+	apiType, ok := workflow.ValidateProviderAPIType(req.APIType, baseURL)
 	if !ok {
 		response.Error(c, 400, "接口类型不支持")
 		return
 	}
 
-	channel.Type = apiType
-	channel.Name = req.Name
-	channel.ApiURL = apiURL
+	endpoint.APIType = apiType
+	endpoint.Name = req.Name
+	endpoint.BaseURL = baseURL
+	endpoint.Status = req.Status
 
-	if err := h.channelRepo.Update(c.Request.Context(), channel); err != nil {
+	if err := h.endpointRepo.Update(c.Request.Context(), endpoint); err != nil {
 		if database.IsNotFound(err) {
-			response.Error(c, 404, "渠道商不存在")
+			response.Error(c, 404, "ProviderEndpoint 不存在")
 			return
 		}
-		response.InternalError(c, 500, "更新渠道商失败", err)
+		if respondProviderEndpointConflict(c, err) {
+			return
+		}
+		response.InternalError(c, 500, "更新 ProviderEndpoint 失败", err)
 		return
 	}
 
-	response.SuccessDTO(c, channelResponse{Channel: channel})
+	response.SuccessDTO(c, providerEndpointResponse{ProviderEndpoint: endpoint})
 }
 
-func (h *ChannelHandler) Delete(c *gin.Context) {
+func (h *ProviderEndpointHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的ID")
 		return
 	}
 
-	if err := h.channelRepo.Delete(c.Request.Context(), id); err != nil {
+	if err := h.endpointRepo.Delete(c.Request.Context(), id); err != nil {
 		if database.IsNotFound(err) {
-			response.Error(c, 404, "渠道商不存在")
+			response.Error(c, 404, "ProviderEndpoint 不存在")
 			return
 		}
-		response.InternalError(c, 500, "删除渠道商失败", err)
+		if errors.Is(err, ErrProviderEndpointInUse) {
+			response.Error(c, 409, "ProviderEndpoint 已绑定 APIKey，不能删除")
+			return
+		}
+		response.InternalError(c, 500, "删除 ProviderEndpoint 失败", err)
 		return
 	}
 
 	response.Success(c, nil)
 }
 
-func (h *ChannelHandler) DetectModels(c *gin.Context) {
+func (h *ProviderEndpointHandler) DetectModels(c *gin.Context) {
 	var req DetectModelsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
@@ -206,7 +226,7 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		response.Error(c, 400, "模型检测失败，请检查 API Key 或渠道配置")
+		response.Error(c, 400, "模型检测失败，请检查 API Key 或 ProviderEndpoint 配置")
 		return
 	}
 
@@ -230,7 +250,7 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 	response.SuccessDTO(c, detectedModelsResponse{Models: models, APIType: apiType})
 }
 
-func (h *ChannelHandler) detectModelsAllowHosts() []string {
+func (h *ProviderEndpointHandler) detectModelsAllowHosts() []string {
 	allowHosts := outbound.AllowHostsFromEnv()
 	if h.isDevLikeEnvironment() {
 		allowHosts = append(allowHosts, "localhost", "127.0.0.1", "::1")
@@ -238,7 +258,7 @@ func (h *ChannelHandler) detectModelsAllowHosts() []string {
 	return allowHosts
 }
 
-func (h *ChannelHandler) isDevLikeEnvironment() bool {
+func (h *ProviderEndpointHandler) isDevLikeEnvironment() bool {
 	env := strings.ToLower(strings.TrimSpace(h.appEnv))
 	switch env {
 	case "prod", "production", "release":
@@ -249,6 +269,22 @@ func (h *ChannelHandler) isDevLikeEnvironment() bool {
 
 	mode := strings.ToLower(strings.TrimSpace(gin.Mode()))
 	if mode == gin.DebugMode || mode == "development" {
+		return true
+	}
+	return false
+}
+
+func isValidProviderEndpointStatus(status int16) bool {
+	return status == 0 || status == 1
+}
+
+func respondProviderEndpointConflict(c *gin.Context, err error) bool {
+	if errors.Is(err, ErrProviderEndpointNameConflict) {
+		response.Error(c, 409, "ProviderEndpoint 名称已存在，请使用其他名称")
+		return true
+	}
+	if errors.Is(err, ErrProviderEndpointURLConflict) {
+		response.Error(c, 409, "同一接口类型下已存在相同 Base URL 的 ProviderEndpoint")
 		return true
 	}
 	return false

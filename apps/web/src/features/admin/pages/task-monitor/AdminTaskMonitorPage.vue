@@ -197,7 +197,7 @@
           data-key="task_id"
           size="small"
           :pt="adminDenseDataTablePt"
-          :table-style="{ minWidth: '1220px' }"
+          :table-style="{ minWidth: '1460px' }"
         >
           <template #empty>
             <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
@@ -263,6 +263,33 @@
           <Column header="账号" :style="{ width: '88px' }">
             <template #body="{ data }">
               <span class="text-admin-meta text-admin-text-3">{{ data.account_id || '-' }}</span>
+            </template>
+          </Column>
+
+          <Column header="Endpoint" :style="{ width: '184px' }">
+            <template #body="{ data }">
+              <div class="flex min-w-0 flex-col gap-0.5">
+                <span
+                  class="block max-w-[160px] truncate text-admin-meta font-semibold text-admin-text-2-strong"
+                  :title="data.provider_endpoint_base_url || getTaskEndpointLabel(data) || '-'"
+                >
+                  {{ getTaskEndpointLabel(data) || '-' }}
+                </span>
+                <span class="block max-w-[160px] truncate text-admin-micro text-admin-text-3">
+                  {{ data.api_type || '-' }}
+                </span>
+              </div>
+            </template>
+          </Column>
+
+          <Column header="模型" :style="{ width: '156px' }">
+            <template #body="{ data }">
+              <span
+                class="block max-w-[132px] truncate text-admin-meta font-semibold text-admin-text-2-strong"
+                :title="getTaskModelLabel(data) || '-'"
+              >
+                {{ getTaskModelLabel(data) || '-' }}
+              </span>
             </template>
           </Column>
 
@@ -463,6 +490,39 @@
             <div
               class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
             >
+              <span class="text-admin-caption font-bold text-admin-text-3">Endpoint</span>
+              <span
+                class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1"
+                :title="detailTask.provider_endpoint_base_url || getTaskEndpointLabel(detailTask)"
+              >
+                {{ getTaskEndpointLabel(detailTask) || 'N/A' }}
+              </span>
+            </div>
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
+            >
+              <span class="text-admin-caption font-bold text-admin-text-3">Credential</span>
+              <span
+                class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1"
+                :title="getTaskCredentialLabel(detailTask) || 'N/A'"
+              >
+                {{ getTaskCredentialLabel(detailTask) || 'N/A' }}
+              </span>
+            </div>
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
+            >
+              <span class="text-admin-caption font-bold text-admin-text-3">模型 / API Type</span>
+              <span
+                class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1"
+                :title="`${getTaskModelLabel(detailTask) || 'N/A'} · ${detailTask.api_type || 'N/A'}`"
+              >
+                {{ getTaskModelLabel(detailTask) || 'N/A' }} · {{ detailTask.api_type || 'N/A' }}
+              </span>
+            </div>
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
+            >
               <span class="text-admin-caption font-bold text-admin-text-3">创建时间</span>
               <span class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1">
                 {{ formatDateTime(detailTask.created_at) }}
@@ -639,6 +699,9 @@ import {
   formatTaskCreatedAt,
   getTaskApiCall,
   getTaskDuration,
+  getTaskCredentialLabel,
+  getTaskEndpointLabel,
+  getTaskModelLabel,
   getTaskResultImageUrl,
   getTaskSanitizedError,
   getTaskUserIdentifier,

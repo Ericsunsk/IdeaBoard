@@ -6,8 +6,9 @@
  */
 import type { ProviderAPIType } from './providerAPIType'
 
-export interface ChannelFormData {
-  type: ProviderAPIType
+export interface ProviderEndpointFormData {
+  api_type: ProviderAPIType
   name: string
-  api_url: string
+  base_url: string
+  status: number
 }

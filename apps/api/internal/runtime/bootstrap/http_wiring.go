@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/accountpool/channels"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
@@ -53,16 +53,16 @@ func newAppRouter(
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
-			AdminHandler:         users.NewAdminHandler(services.userService, services.runtimeSettings, services.authServiceClient),
-			AccountHandler:       accountHandler,
-			TaskHandler:          taskHandler,
-			TaskStatsHandler:     taskStatsHandler,
-			ChannelHandler:       channels.NewChannelHandler(repos.channelRepo, cfg.App.Env),
-			StorageHandler:       storage.NewStorageHandler(services.storageService),
-			LineDraftHandler:     assets.NewLineDraftHandler(repos.lineDraftModeRepo),
-			FeaturePromptHandler: prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
-			StorageService:       services.storageService,
-			UploadSettings:       services.runtimeSettings,
+			AdminHandler:            users.NewAdminHandler(services.userService, services.runtimeSettings, services.authServiceClient),
+			AccountHandler:          accountHandler,
+			TaskHandler:             taskHandler,
+			TaskStatsHandler:        taskStatsHandler,
+			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(repos.channelRepo, cfg.App.Env),
+			StorageHandler:          storage.NewStorageHandler(services.storageService),
+			LineDraftHandler:        assets.NewLineDraftHandler(repos.lineDraftModeRepo),
+			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
+			StorageService:          services.storageService,
+			UploadSettings:          services.runtimeSettings,
 		},
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,

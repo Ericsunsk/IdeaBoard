@@ -33,8 +33,10 @@ type BoardStateEnvelope struct {
 }
 
 type BoardStateMediaRef struct {
-	URL  string `json:"url"`
-	Role string `json:"role,omitempty"`
+	MediaAssetID int64  `json:"mediaAssetId"`
+	RefType      string `json:"refType"`
+	RefID        string `json:"refId"`
+	Role         string `json:"role,omitempty"`
 }
 
 // ParseBoardStateEnvelope extracts the schema version from raw state JSON for
@@ -221,19 +223,63 @@ func validateBoardStateMediaRef(payload json.RawMessage) (BoardStateMediaRef, er
 		return BoardStateMediaRef{}, ErrInvalidBoardInput
 	}
 	for key := range raw {
-		if key != "url" && key != "role" {
+		if key != "mediaAssetId" && key != "refType" && key != "refId" && key != "role" {
 			return BoardStateMediaRef{}, ErrInvalidBoardInput
 		}
 	}
-	url, err := requiredStringField(raw, "url")
+	mediaAssetID, err := requiredInt64Field(raw, "mediaAssetId")
 	if err != nil {
 		return BoardStateMediaRef{}, err
+	}
+	if mediaAssetID <= 0 {
+		return BoardStateMediaRef{}, ErrInvalidBoardInput
+	}
+	refType, err := requiredStringField(raw, "refType")
+	if err != nil {
+		return BoardStateMediaRef{}, err
+	}
+	refType = strings.TrimSpace(refType)
+	if refType != "board" && refType != "board_node" {
+		return BoardStateMediaRef{}, ErrInvalidBoardInput
+	}
+	refID, err := requiredStringField(raw, "refId")
+	if err != nil {
+		return BoardStateMediaRef{}, err
+	}
+	refID = strings.TrimSpace(refID)
+	if len(refID) > 128 {
+		return BoardStateMediaRef{}, ErrInvalidBoardInput
 	}
 	role, err := optionalStringField(raw, "role")
 	if err != nil {
 		return BoardStateMediaRef{}, err
 	}
-	return BoardStateMediaRef{URL: url, Role: role}, nil
+	role = strings.TrimSpace(role)
+	if len(role) > 32 {
+		return BoardStateMediaRef{}, ErrInvalidBoardInput
+	}
+	return BoardStateMediaRef{
+		MediaAssetID: mediaAssetID,
+		RefType:      refType,
+		RefID:        refID,
+		Role:         role,
+	}, nil
+}
+
+func requiredInt64Field(raw map[string]json.RawMessage, key string) (int64, error) {
+	value, ok := raw[key]
+	if !ok {
+		return 0, ErrInvalidBoardInput
+	}
+	var number json.Number
+	if err := json.Unmarshal(value, &number); err != nil {
+		return 0, ErrInvalidBoardInput
+	}
+	parsed, err := number.Int64()
+	if err != nil {
+		return 0, ErrInvalidBoardInput
+	}
+	return parsed, nil
 }
 
 func requiredStringField(raw map[string]json.RawMessage, key string) (string, error) {

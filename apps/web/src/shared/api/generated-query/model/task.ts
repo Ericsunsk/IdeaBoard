@@ -12,7 +12,9 @@ export interface Task {
   task_id: string
   user_id: number
   /** @nullable */
-  assigned_channel_id?: number | null
+  assigned_provider_endpoint_id?: number | null
+  /** @nullable */
+  assigned_credential_id?: number | null
   /** @nullable */
   account_id?: number | null
   prompt: string
@@ -22,6 +24,10 @@ export interface Task {
   requested_model?: string
   resolved_model?: string
   api_type?: string
+  provider_endpoint_name?: string
+  provider_endpoint_base_url?: string
+  credential_fingerprint?: string
+  credential_key_version?: string
   status: string
   retry_count?: number
   error_msg?: string

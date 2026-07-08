@@ -10,18 +10,18 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 )
 
-func TestPostgresTaskRuntimeStoreGetAccountLoadInfoUsesRunningTaskAttempts(t *testing.T) {
+func TestPostgresTaskRuntimeStoreGetAccountLoadInfoUsesActiveTaskLeases(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	store := NewPostgresTaskRuntimeStore(db)
 	ctx := context.Background()
 
 	accountID := createAssignerAccount(t, db, "runtime-load", 5)
-	channelID := loadAssignerAccountChannelID(t, db, accountID)
-	createAssignerTask(t, db, "running-without-attempt", accountID, tasks.StatusRunning, "lease-no-attempt")
-	createAssignerTask(t, db, "running-with-attempt", accountID, tasks.StatusRunning, "lease-running-attempt")
-	createAssignerTask(t, db, "completed-with-attempt", accountID, tasks.StatusCompleted, "")
-	insertRuntimeTaskAttempt(t, db, "running-with-attempt", accountID, channelID, tasks.TaskAttemptStatusRunning)
-	insertRuntimeTaskAttempt(t, db, "completed-with-attempt", accountID, channelID, tasks.TaskAttemptStatusCompleted)
+	channelID := loadAssignerAccountProviderEndpointID(t, db, accountID)
+	createAssignerTask(t, db, "running-without-lease", accountID, tasks.StatusRunning, "")
+	createAssignerTask(t, db, "running-with-active-lease", accountID, tasks.StatusRunning, "lease-running-active")
+	createAssignerTask(t, db, "running-with-released-lease", accountID, tasks.StatusRunning, "lease-running-released")
+	insertRuntimeTaskLease(t, db, "running-with-active-lease", accountID, channelID, "lease-running-active", false)
+	insertRuntimeTaskLease(t, db, "running-with-released-lease", accountID, channelID, "lease-running-released", true)
 
 	loads, err := store.GetAccountLoadInfo(ctx, []int64{accountID})
 	if err != nil {
@@ -33,7 +33,7 @@ func TestPostgresTaskRuntimeStoreGetAccountLoadInfoUsesRunningTaskAttempts(t *te
 		return
 	}
 	if load.CurrentConcurrent != 1 {
-		t.Fatalf("current concurrent=%d, want running task attempt count 1", load.CurrentConcurrent)
+		t.Fatalf("current concurrent=%d, want active task lease count 1", load.CurrentConcurrent)
 	}
 	if load.MaxConcurrent != 5 {
 		t.Fatalf("max concurrent=%d, want 5", load.MaxConcurrent)
@@ -69,26 +69,26 @@ func TestPostgresTaskRuntimeStoreUsesAccountMaxConcurrentLimit(t *testing.T) {
 	}
 }
 
-func TestRiverQueueCountsRunningTaskAttempts(t *testing.T) {
+func TestRiverQueueCountsActiveTaskLeases(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	queue := NewRiverQueueWithClient(nil, db, nil, RiverQueueDefault, 7)
 	ctx := context.Background()
 
 	accountID := createAssignerAccount(t, db, "runtime-running-count", 3)
-	channelID := loadAssignerAccountChannelID(t, db, accountID)
+	channelID := loadAssignerAccountProviderEndpointID(t, db, accountID)
 	createAssignerTask(t, db, "running-count-1", accountID, tasks.StatusRunning, "lease-running-count-1")
 	createAssignerTask(t, db, "running-count-2", accountID, tasks.StatusRunning, "lease-running-count-2")
-	createAssignerTask(t, db, "failed-count-ignored", accountID, tasks.StatusFailed, "")
-	insertRuntimeTaskAttempt(t, db, "running-count-1", accountID, channelID, tasks.TaskAttemptStatusRunning)
-	insertRuntimeTaskAttempt(t, db, "running-count-2", accountID, channelID, tasks.TaskAttemptStatusRunning)
-	insertRuntimeTaskAttempt(t, db, "failed-count-ignored", accountID, channelID, tasks.TaskAttemptStatusFailed)
+	createAssignerTask(t, db, "running-count-released", accountID, tasks.StatusRunning, "lease-running-count-released")
+	insertRuntimeTaskLease(t, db, "running-count-1", accountID, channelID, "lease-running-count-1", false)
+	insertRuntimeTaskLease(t, db, "running-count-2", accountID, channelID, "lease-running-count-2", false)
+	insertRuntimeTaskLease(t, db, "running-count-released", accountID, channelID, "lease-running-count-released", true)
 
-	count, err := queue.countRunningTaskAttempts(ctx)
+	count, err := queue.countActiveTaskLeases(ctx)
 	if err != nil {
-		t.Fatalf("countRunningTaskAttempts failed: %v", err)
+		t.Fatalf("countActiveTaskLeases failed: %v", err)
 	}
 	if count != 2 {
-		t.Fatalf("running task attempts=%d, want 2", count)
+		t.Fatalf("active task leases=%d, want 2", count)
 	}
 }
 
@@ -139,21 +139,36 @@ func TestPostgresTaskRuntimeStoreMarkCancelledPrunesExpiredRows(t *testing.T) {
 	}
 }
 
-func insertRuntimeTaskAttempt(t *testing.T, db *sql.DB, taskID string, accountID int64, channelID int64, status string) {
+func insertRuntimeTaskLease(t *testing.T, db *sql.DB, taskID string, accountID int64, channelID int64, leaseToken string, released bool) {
 	t.Helper()
+	credentialID := loadAssignerAccountCredentialID(t, db, accountID)
+	releasedAtSQL := "NULL"
+	releaseReason := ""
+	if released {
+		releasedAtSQL = "now()"
+		releaseReason = "completed"
+	}
 	_, err := db.Exec(`
-INSERT INTO task_attempts (
-  task_id, attempt_no, river_job_id, lease_token, account_id, channel_id,
-  feature_slug, requested_model, resolved_model, api_type, status, provider_started_at
+INSERT INTO task_leases (
+  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
+  feature_slug, requested_model, resolved_model, api_type,
+  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
+  acquired_at, released_at, release_reason
 )
-VALUES ($1, 1, 1, $2, $3, $4, 'image-generate', 'gpt-image-1', 'gpt-image-1', 'openai-compatible', $5, now())`,
+VALUES (
+  $1, $2, 1, $3, $4, $5,
+  'image-generate', 'gpt-image-1', 'gpt-image-1', 'openai-compatible',
+  'runtime-test-endpoint', 'https://example.com/runtime-test', 'runtime-test-fingerprint', 'test-key-v1',
+  now(), `+releasedAtSQL+`, $6
+)`,
 		taskID,
-		"attempt-"+taskID,
+		leaseToken,
 		accountID,
 		channelID,
-		status,
+		credentialID,
+		releaseReason,
 	)
 	if err != nil {
-		t.Fatalf("insert task attempt for %q failed: %v", taskID, err)
+		t.Fatalf("insert task lease for %q failed: %v", taskID, err)
 	}
 }

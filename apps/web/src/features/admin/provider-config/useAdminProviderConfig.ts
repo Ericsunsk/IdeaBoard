@@ -3,8 +3,8 @@ import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
-  createEmptyChannelForm,
-  inferChannelApiTypeFromUrl,
+  createEmptyProviderEndpointForm,
+  inferProviderEndpointApiTypeFromUrl,
   uniqueTrimmedModelValues,
 } from './providerConfigPayload'
 import { createModelSuggestions } from './providerModelOptions'
@@ -17,10 +17,10 @@ import type {
   ProviderAccountCommandTarget,
   ProviderAccountForm,
   ProviderAccountFormField,
-  ProviderChannelCommandTarget,
-  ProviderChannelFormData,
-  ProviderChannelFormField,
-  ProviderChannelRecord,
+  ProviderEndpointCommandTarget,
+  ProviderEndpointFormData,
+  ProviderEndpointFormField,
+  ProviderEndpointRecord,
 } from './providerConfigTypes'
 
 export type UseAdminProviderConfigOptions = {
@@ -36,7 +36,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
     runAsyncAction,
   })
 
-  const channelEditor = createChannelEditor({
+  const providerEndpointEditor = createProviderEndpointEditor({
     workspace,
     feedback: options.feedback,
   })
@@ -47,11 +47,11 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
 
   return {
     cards: workspace.cards,
-    channelEditor,
+    providerEndpointEditor,
     accountEditor,
     commands: {
       loadData: workspace.loadData,
-      deleteChannel: workspace.deleteChannel,
+      deleteProviderEndpoint: workspace.deleteProviderEndpoint,
       deleteAccount: workspace.deleteAccount,
       toggleAccountModelStatus: workspace.toggleAccountModelStatus,
       getApiTypeLabel: workspace.getApiTypeLabel,
@@ -62,32 +62,32 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
   }
 }
 
-function createChannelEditor(options: {
+function createProviderEndpointEditor(options: {
   workspace: AdminProviderConfigWorkspace
   feedback: AdminProviderConfigFeedback
 }) {
   const visible = ref(false)
   const isEditing = ref(false)
-  const saveLoading = options.workspace.channelSaveLoading
-  const currentChannelId = ref(0)
-  const form = ref<ProviderChannelFormData>(createEmptyChannelForm())
-  const errors = ref<Record<ProviderChannelFormField, string>>(createEmptyChannelFormErrors())
+  const saveLoading = options.workspace.providerEndpointSaveLoading
+  const currentProviderEndpointId = ref(0)
+  const form = ref<ProviderEndpointFormData>(createEmptyProviderEndpointForm())
+  const errors = ref<Record<ProviderEndpointFormField, string>>(createEmptyProviderEndpointFormErrors())
 
   function openCreate() {
     isEditing.value = false
-    currentChannelId.value = 0
-    form.value = createEmptyChannelForm()
+    currentProviderEndpointId.value = 0
+    form.value = createEmptyProviderEndpointForm()
     resetErrors()
     visible.value = true
   }
 
-  function openEdit(target: ProviderChannelCommandTarget) {
-    const row = options.workspace.resolveChannelTarget(target)
+  function openEdit(target: ProviderEndpointCommandTarget) {
+    const row = options.workspace.resolveProviderEndpointTarget(target)
     if (!row) return
 
     isEditing.value = true
-    currentChannelId.value = row.id
-    form.value = { apiType: row.apiType, name: row.name, baseUrl: row.baseUrl }
+    currentProviderEndpointId.value = row.id
+    form.value = { apiType: row.apiType, name: row.name, baseUrl: row.baseUrl, status: row.status }
     resetErrors()
     visible.value = true
   }
@@ -98,7 +98,7 @@ function createChannelEditor(options: {
   }
 
   function inferApiTypeFromUrl() {
-    form.value.apiType = inferChannelApiTypeFromUrl(form.value.baseUrl, form.value.apiType)
+    form.value.apiType = inferProviderEndpointApiTypeFromUrl(form.value.baseUrl, form.value.apiType)
   }
 
   function handleApiUrlBlur() {
@@ -108,12 +108,12 @@ function createChannelEditor(options: {
 
   async function save() {
     if (!validate()) {
-      options.feedback.channelFormInvalid()
+      options.feedback.providerEndpointFormInvalid()
       return
     }
 
-    await options.workspace.saveChannel({
-      id: isEditing.value ? currentChannelId.value : undefined,
+    await options.workspace.saveProviderEndpoint({
+      id: isEditing.value ? currentProviderEndpointId.value : undefined,
       data: { ...form.value },
       isEditing: isEditing.value,
       afterSaved: () => {
@@ -124,27 +124,27 @@ function createChannelEditor(options: {
   }
 
   function validate() {
-    const nextErrors = createEmptyChannelFormErrors()
-    ;(['name', 'apiType', 'baseUrl'] as ProviderChannelFormField[]).forEach((field) => {
-      nextErrors[field] = resolveChannelFieldError(form.value, field)
+    const nextErrors = createEmptyProviderEndpointFormErrors()
+    ;(['name', 'apiType', 'baseUrl', 'status'] as ProviderEndpointFormField[]).forEach((field) => {
+      nextErrors[field] = resolveProviderEndpointFieldError(form.value, field)
     })
     errors.value = nextErrors
     return !Object.values(nextErrors).some(Boolean)
   }
 
-  function validateField(field: ProviderChannelFormField) {
-    errors.value[field] = resolveChannelFieldError(form.value, field)
+  function validateField(field: ProviderEndpointFormField) {
+    errors.value[field] = resolveProviderEndpointFieldError(form.value, field)
     return !errors.value[field]
   }
 
-  function clearError(field: ProviderChannelFormField) {
+  function clearError(field: ProviderEndpointFormField) {
     if (errors.value[field]) {
       errors.value[field] = ''
     }
   }
 
   function resetErrors() {
-    errors.value = createEmptyChannelFormErrors()
+    errors.value = createEmptyProviderEndpointFormErrors()
   }
 
   return {
@@ -171,9 +171,9 @@ function createAccountEditor(options: {
   const isEditing = ref(false)
   const saveLoading = options.workspace.accountSaveLoading
   const currentAccountId = ref(0)
-  const selectedChannel = ref<ProviderChannelRecord | null>(null)
-  const selectedChannelView = computed(() =>
-    selectedChannel.value ? options.workspace.getChannelView(selectedChannel.value) : null,
+  const selectedProviderEndpoint = ref<ProviderEndpointRecord | null>(null)
+  const selectedProviderEndpointView = computed(() =>
+    selectedProviderEndpoint.value ? options.workspace.getProviderEndpointView(selectedProviderEndpoint.value) : null,
   )
   const accountLimits = options.workspace.accountLimits
   const form = ref(createEmptyAccountForm(accountLimits.value, 0))
@@ -184,14 +184,21 @@ function createAccountEditor(options: {
   const detectedModelSessionCache = ref(new Set<string>())
   const hasShownApiKeyHint = ref(false)
 
-  function openCreate(target: ProviderChannelCommandTarget) {
-    const channel = options.workspace.resolveChannelTarget(target)
-    if (!channel) return
+  function openCreate(target: ProviderEndpointCommandTarget) {
+    const providerEndpoint = options.workspace.resolveProviderEndpointTarget(target)
+    if (!providerEndpoint) return
 
     isEditing.value = false
     currentAccountId.value = 0
-    selectedChannel.value = channel
-    form.value = createEmptyAccountForm(accountLimits.value, channel.id)
+    selectedProviderEndpoint.value = providerEndpoint
+    form.value = createEmptyAccountForm(
+      accountLimits.value,
+      providerEndpoint.id,
+      createUniqueAccountName(
+        `${providerEndpoint.name} APIKey`,
+        options.workspace.getProviderEndpointAccounts(providerEndpoint.id).map((account) => account.name),
+      ),
+    )
     detectedModelValues.value = []
     modelSuggestions.value = []
     detectedModelSessionCache.value = new Set()
@@ -206,9 +213,10 @@ function createAccountEditor(options: {
 
     isEditing.value = true
     currentAccountId.value = account.id
-    selectedChannel.value = options.workspace.findChannelById(account.channelId)
+    selectedProviderEndpoint.value = options.workspace.findProviderEndpointById(account.providerEndpointId)
     form.value = {
-      channelId: account.channelId,
+      providerEndpointId: account.providerEndpointId,
+      name: account.name,
       modelValues: account.models.map((model) => model.name),
       secret: '',
       maxConcurrent: account.maxConcurrent,
@@ -239,7 +247,13 @@ function createAccountEditor(options: {
 
   function validate() {
     const nextErrors = createEmptyAccountFormErrors()
+    const accountName = form.value.name.trim()
     const selectedModels = uniqueTrimmedModelValues(form.value.modelValues)
+    if (!accountName) {
+      nextErrors.name = '请输入 APIKey 名称'
+    } else if (hasDuplicateAccountName(accountName)) {
+      nextErrors.name = '同一端点下已存在同名 APIKey'
+    }
     if (selectedModels.length === 0) {
       nextErrors.modelValues = '请至少选择或输入一个模型'
     }
@@ -269,13 +283,14 @@ function createAccountEditor(options: {
     }
 
     const modelValues = uniqueTrimmedModelValues(form.value.modelValues)
+    form.value.name = form.value.name.trim()
     form.value.modelValues = modelValues
 
     await options.workspace.saveAccount({
       isEditing: isEditing.value,
       accountId: currentAccountId.value,
       form: form.value,
-      selectedChannel: selectedChannel.value,
+      selectedProviderEndpoint: selectedProviderEndpoint.value,
       modelValues,
       secret: form.value.secret.trim(),
       afterSaved: () => {
@@ -285,17 +300,21 @@ function createAccountEditor(options: {
     })
   }
 
-  function searchModelSuggestions(event: { query?: string }) {
+  function refreshModelSuggestions(query?: string) {
     modelSuggestions.value = createModelSuggestions({
       detectedValues: detectedModelValues.value,
       selectedValues: form.value.modelValues,
-      query: event.query,
+      query,
     })
+  }
+
+  function searchModelSuggestions(event: { query?: string }) {
+    refreshModelSuggestions(event.query)
   }
 
   async function detectModelsOnSelectOpen() {
     const result = await options.workspace.detectModels({
-      channel: selectedChannel.value,
+      providerEndpoint: selectedProviderEndpoint.value,
       secret: form.value.secret,
       detectedValues: detectedModelValues.value,
       sessionCache: detectedModelSessionCache.value,
@@ -305,11 +324,23 @@ function createAccountEditor(options: {
     detectedModelValues.value = result.detectedValues
     detectedModelSessionCache.value = result.sessionCache
     hasShownApiKeyHint.value = result.hasShownApiKeyHint
+    refreshModelSuggestions()
   }
 
   function handleModelSelectShow(show: boolean) {
     if (!show) return Promise.resolve()
     return detectModelsOnSelectOpen()
+  }
+
+  function hasDuplicateAccountName(accountName: string) {
+    const normalizedName = accountName.toLowerCase()
+    return options.workspace
+      .getProviderEndpointAccounts(form.value.providerEndpointId)
+      .some(
+        (account) =>
+          account.id !== currentAccountId.value &&
+          account.name.trim().toLowerCase() === normalizedName,
+      )
   }
 
   watch(visible, (nextVisible) => {
@@ -321,7 +352,7 @@ function createAccountEditor(options: {
     isEditing,
     saveLoading,
     accountLimits,
-    selectedChannel: selectedChannelView,
+    selectedProviderEndpoint: selectedProviderEndpointView,
     form,
     errors,
     detectModelsLoading,
@@ -337,20 +368,23 @@ function createAccountEditor(options: {
   }
 }
 
-function createEmptyChannelFormErrors(): Record<ProviderChannelFormField, string> {
+function createEmptyProviderEndpointFormErrors(): Record<ProviderEndpointFormField, string> {
   return {
     apiType: '',
     name: '',
     baseUrl: '',
+    status: '',
   }
 }
 
 function createEmptyAccountForm(
   accountLimits: AdminProviderAccountLimits,
-  channelId: number,
+  providerEndpointId: number,
+  name = '',
 ): ProviderAccountForm {
   return {
-    channelId,
+    providerEndpointId,
+    name,
     modelValues: [],
     secret: '',
     maxConcurrent: accountLimits.maxConcurrent.default,
@@ -360,6 +394,7 @@ function createEmptyAccountForm(
 
 function createEmptyAccountFormErrors(): Record<ProviderAccountFormField, string> {
   return {
+    name: '',
     secret: '',
     modelValues: '',
     maxConcurrent: '',
@@ -367,8 +402,22 @@ function createEmptyAccountFormErrors(): Record<ProviderAccountFormField, string
   }
 }
 
-function resolveChannelFieldError(form: ProviderChannelFormData, field: ProviderChannelFormField) {
-  if (field === 'name' && !form.name.trim()) return '请输入渠道商名称'
+function createUniqueAccountName(baseName: string, existingNames: string[]) {
+  const normalizedExistingNames = new Set(
+    existingNames.map((name) => name.trim().toLowerCase()).filter(Boolean),
+  )
+  const trimmedBaseName = baseName.trim() || 'APIKey'
+  if (!normalizedExistingNames.has(trimmedBaseName.toLowerCase())) return trimmedBaseName
+
+  let suffix = 2
+  while (normalizedExistingNames.has(`${trimmedBaseName} ${suffix}`.toLowerCase())) {
+    suffix += 1
+  }
+  return `${trimmedBaseName} ${suffix}`
+}
+
+function resolveProviderEndpointFieldError(form: ProviderEndpointFormData, field: ProviderEndpointFormField) {
+  if (field === 'name' && !form.name.trim()) return '请输入供应商端点名称'
   if (field === 'apiType' && !form.apiType) return '请选择接口类型'
   if (field === 'baseUrl') {
     const apiUrl = form.baseUrl.trim()
@@ -381,6 +430,9 @@ function resolveChannelFieldError(form: ProviderChannelFormData, field: Provider
     } catch {
       return '请输入有效的 Base URL'
     }
+  }
+  if (field === 'status' && form.status !== 0 && form.status !== 1) {
+    return '请选择启用状态'
   }
   return ''
 }

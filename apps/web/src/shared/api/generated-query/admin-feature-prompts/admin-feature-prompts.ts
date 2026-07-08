@@ -20,7 +20,6 @@ import type { MaybeRef } from 'vue'
 import type {
   ApiResponseFeaturePrompt,
   ApiResponseFeaturePromptList,
-  ApiResponseFeaturePromptRevisions,
   SetAdminFeaturePromptBody,
 } from '../model'
 
@@ -88,84 +87,6 @@ export function useListAdminFeaturePrompts<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminFeaturePromptsQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getListAdminFeaturePromptRevisionsUrl = (slug: string) => {
-  return `/admin/feature-prompts/${encodeURIComponent(String(slug))}/revisions`
-}
-
-export const listAdminFeaturePromptRevisions = async (
-  slug: string,
-  options?: RequestInit,
-): Promise<ApiResponseFeaturePromptRevisions> => {
-  return orvalMutator<ApiResponseFeaturePromptRevisions>(
-    getListAdminFeaturePromptRevisionsUrl(slug),
-    {
-      ...options,
-      method: 'GET',
-    },
-  )
-}
-
-export const getListAdminFeaturePromptRevisionsQueryKey = (slug: MaybeRef<string>) => {
-  return ['admin', 'feature-prompts', slug, 'revisions'] as const
-}
-
-export const getListAdminFeaturePromptRevisionsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listAdminFeaturePromptRevisions>>,
-  TError = ErrorType<unknown>,
->(
-  slug: MaybeRef<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePromptRevisions>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getListAdminFeaturePromptRevisionsQueryKey(slug)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminFeaturePromptRevisions>>> = ({
-    signal,
-  }) => listAdminFeaturePromptRevisions(unref(slug), { signal, ...requestOptions })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePromptRevisions>>, TError, TData>
-}
-
-export type ListAdminFeaturePromptRevisionsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listAdminFeaturePromptRevisions>>
->
-export type ListAdminFeaturePromptRevisionsQueryError = ErrorType<unknown>
-
-export function useListAdminFeaturePromptRevisions<
-  TData = Awaited<ReturnType<typeof listAdminFeaturePromptRevisions>>,
-  TError = ErrorType<unknown>,
->(
-  slug: MaybeRef<string>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePromptRevisions>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListAdminFeaturePromptRevisionsQueryOptions(slug, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

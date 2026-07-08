@@ -180,7 +180,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			}
 			return
 		}
-		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.UserID)
+		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.OwnerUserID)
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return
@@ -234,7 +234,7 @@ func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
 			}
 			return
 		}
-		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.UserID)
+		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.OwnerUserID)
 		if err != nil {
 			response.InternalError(c, 500, "删除失败", err)
 			return

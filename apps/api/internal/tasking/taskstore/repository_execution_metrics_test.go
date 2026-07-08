@@ -14,12 +14,12 @@ func TestListAttachesExecutionMetrics(t *testing.T) {
 	accountID := seedRepositoryTestAccount(t, db, 92)
 	createdAt := time.Now().Add(-5 * time.Minute)
 	task := &tasks.Task{
-		TaskID:            "metrics-list-task",
-		UserID:            10,
-		AssignedChannelID: tasks.IDPtr(accountID + 10000),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		CreatedAt:         createdAt,
+		TaskID:                     "metrics-list-task",
+		UserID:                     10,
+		AssignedProviderEndpointID: tasks.IDPtr(accountID + 10000),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		CreatedAt:                  createdAt,
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -196,19 +196,19 @@ func TestMarkTaskFailedWithLeaseWritesTerminalExecutionMetrics(t *testing.T) {
 	channelID := accountID + 10000
 	completedAt := time.Now()
 	task := &tasks.Task{
-		TaskID:            "metrics-failed-with-lease",
-		UserID:            10,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-metrics-failed",
-		CreatedAt:         completedAt.Add(-2 * time.Second),
+		TaskID:                     "metrics-failed-with-lease",
+		UserID:                     10,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-metrics-failed",
+		CreatedAt:                  completedAt.Add(-2 * time.Second),
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	rows, err := taskRepo.MarkTaskFailedWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, task.LeaseToken, "provider timeout", "{}", completedAt, &tasks.TaskAttemptFinish{
+	rows, err := taskRepo.MarkTaskFailedWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, "provider timeout", "{}", completedAt, &tasks.TaskAttemptFinish{
 		FailureStage:    tasks.ExecutionStageProvider,
 		FailureCategory: tasks.FailureCategoryTimeout,
 		CompletedAt:     completedAt,
@@ -245,19 +245,19 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 	channelID := accountID + 10000
 	completedAt := time.Now()
 	task := &tasks.Task{
-		TaskID:            "metrics-completed-with-outputs",
-		UserID:            10,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-metrics-completed",
-		CreatedAt:         completedAt.Add(-3 * time.Second),
+		TaskID:                     "metrics-completed-with-outputs",
+		UserID:                     10,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-metrics-completed",
+		CreatedAt:                  completedAt.Add(-3 * time.Second),
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, task.LeaseToken, `{"status":"success"}`, completedAt, nil, nil)
+	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, `{"status":"success"}`, completedAt, nil, nil)
 	if err != nil || rows != 1 {
 		t.Fatalf("complete task rows=%d err=%v, want rows=1 nil err", rows, err)
 	}

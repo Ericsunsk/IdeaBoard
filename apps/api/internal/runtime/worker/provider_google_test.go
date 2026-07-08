@@ -306,7 +306,6 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ID:       1,
 		Name:     "google-native",
-		Platform: "custom display name",
 		ApiType:  workflow.ProviderGoogleAI,
 		ProxyURL: server.URL,
 		ApiKey:   "google-key",

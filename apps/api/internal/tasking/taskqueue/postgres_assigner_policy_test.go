@@ -10,11 +10,11 @@ func TestTaskAssignmentPolicyReusesRunningLeaseForSameRiverJob(t *testing.T) {
 	policy := taskAssignmentPolicy{}
 
 	decision := policy.decideLockedTask("task-1", 42, taskAssignmentTaskState{
-		Status:        tasks.StatusRunning,
-		AccountID:     11,
-		ChannelID:     22,
-		ResolvedModel: "gpt-image-1",
-		LeaseToken:    "river:42:existing",
+		Status:             tasks.StatusRunning,
+		AccountID:          11,
+		ProviderEndpointID: 22,
+		ResolvedModel:      "gpt-image-1",
+		LeaseToken:         "river:42:existing",
 	})
 
 	if !decision.done {
@@ -22,7 +22,7 @@ func TestTaskAssignmentPolicyReusesRunningLeaseForSameRiverJob(t *testing.T) {
 	}
 	if decision.assignment.Status != AssignStatusAssigned ||
 		decision.assignment.AccountID != 11 ||
-		decision.assignment.ChannelID != 22 ||
+		decision.assignment.ProviderEndpointID != 22 ||
 		decision.assignment.ResolvedModel != "gpt-image-1" ||
 		decision.assignment.LeaseToken != "river:42:existing" {
 		t.Fatalf("assignment=%+v, want existing running lease", decision.assignment)
@@ -33,10 +33,10 @@ func TestTaskAssignmentPolicyDiscardsRunningTaskWithStaleLease(t *testing.T) {
 	policy := taskAssignmentPolicy{}
 
 	decision := policy.decideLockedTask("task-1", 43, taskAssignmentTaskState{
-		Status:     tasks.StatusRunning,
-		AccountID:  11,
-		ChannelID:  22,
-		LeaseToken: "river:42:existing",
+		Status:             tasks.StatusRunning,
+		AccountID:          11,
+		ProviderEndpointID: 22,
+		LeaseToken:         "river:42:existing",
 	})
 
 	if !decision.done || decision.assignment.Status != AssignStatusDiscard {
@@ -80,9 +80,9 @@ func TestTaskAssignmentPolicyDiscardsWhenPendingUpdateLosesRace(t *testing.T) {
 	policy := taskAssignmentPolicy{}
 
 	decision := policy.decideAssignedTask("task-1", taskAssignmentSelectedAccount{
-		AccountID:     11,
-		ChannelID:     22,
-		ResolvedModel: "gpt-image-1",
+		AccountID:          11,
+		ProviderEndpointID: 22,
+		ResolvedModel:      "gpt-image-1",
 	}, "river:42:new", 0)
 
 	if !decision.done || decision.assignment.Status != AssignStatusDiscard {
@@ -94,9 +94,9 @@ func TestTaskAssignmentPolicyBuildsSuccessfulAssignment(t *testing.T) {
 	policy := taskAssignmentPolicy{}
 
 	decision := policy.decideAssignedTask("task-1", taskAssignmentSelectedAccount{
-		AccountID:     11,
-		ChannelID:     22,
-		ResolvedModel: "gpt-image-1",
+		AccountID:          11,
+		ProviderEndpointID: 22,
+		ResolvedModel:      "gpt-image-1",
 	}, "river:42:new", 1)
 
 	if !decision.done {
@@ -104,7 +104,7 @@ func TestTaskAssignmentPolicyBuildsSuccessfulAssignment(t *testing.T) {
 	}
 	if decision.assignment.Status != AssignStatusAssigned ||
 		decision.assignment.AccountID != 11 ||
-		decision.assignment.ChannelID != 22 ||
+		decision.assignment.ProviderEndpointID != 22 ||
 		decision.assignment.ResolvedModel != "gpt-image-1" ||
 		decision.assignment.LeaseToken != "river:42:new" {
 		t.Fatalf("assignment=%+v, want successful assignment", decision.assignment)

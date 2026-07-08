@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/accountpool/channels"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/identity/users"
@@ -31,7 +31,7 @@ type appRepositories struct {
 	userRepo           *users.UserRepository
 	accountRepo        *accounts.AccountRepository
 	taskRepo           *taskstore.Repository
-	channelRepo        *channels.ChannelRepository
+	channelRepo        *providerendpoints.ProviderEndpointRepository
 	systemConfigRepo   *settings.SystemConfigRepository
 	featurePromptRepo  *prompts.FeaturePromptRepository
 	storageProfileRepo *storage.StorageProfileRepository
@@ -67,7 +67,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		userRepo:           users.NewUserRepository(db),
 		accountRepo:        accounts.NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo),
 		taskRepo:           taskRepo,
-		channelRepo:        channels.NewChannelRepository(db),
+		channelRepo:        providerendpoints.NewProviderEndpointRepository(db),
 		systemConfigRepo:   settings.NewSystemConfigRepository(db),
 		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),
 		storageProfileRepo: storage.NewStorageProfileRepository(db),

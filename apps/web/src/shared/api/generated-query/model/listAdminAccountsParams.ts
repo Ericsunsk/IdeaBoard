@@ -9,7 +9,7 @@ import type { PageSizeParameter } from './pageSizeParameter'
 
 export type ListAdminAccountsParams = {
   keyword?: string
-  platform?: string
+  api_type?: string
   page?: PageParameter
   page_size?: PageSizeParameter
 }

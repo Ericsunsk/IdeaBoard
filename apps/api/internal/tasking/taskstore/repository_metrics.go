@@ -146,8 +146,6 @@ func (r *Repository) PatchExecutionSnapshot(ctx context.Context, snapshot tasks.
 		TaskID:         taskID,
 		FeatureSlug:    strings.TrimSpace(snapshot.FeatureSlug),
 		RequestedModel: strings.TrimSpace(snapshot.RequestedModel),
-		ResolvedModel:  strings.TrimSpace(snapshot.ResolvedModel),
-		ApiType:        strings.TrimSpace(snapshot.APIType),
 	})
 }
 
@@ -156,26 +154,26 @@ func (r *Repository) CreateTaskAttempt(ctx context.Context, start tasks.TaskAtte
 	if taskID == "" {
 		return tasks.TaskAttemptRef{}, fmt.Errorf("task_id is required")
 	}
+	if start.CredentialID <= 0 {
+		return tasks.TaskAttemptRef{}, fmt.Errorf("credential_id is required")
+	}
 	providerStartedAt := start.ProviderStartedAt
 	if providerStartedAt.IsZero() {
 		providerStartedAt = time.Now()
 	}
 	row, err := r.q.CreateTaskAttempt(ctx, dbsqlc.CreateTaskAttemptParams{
-		TaskID:            taskID,
-		RiverJobID:        start.RiverJobID,
-		LeaseToken:        strings.TrimSpace(start.LeaseToken),
-		AccountID:         start.AccountID,
-		ChannelID:         start.ChannelID,
-		FeatureSlug:       strings.TrimSpace(start.FeatureSlug),
-		RequestedModel:    strings.TrimSpace(start.RequestedModel),
-		ResolvedModel:     strings.TrimSpace(start.ResolvedModel),
-		ApiType:           strings.TrimSpace(start.APIType),
-		ProviderStartedAt: sql.NullTime{Time: providerStartedAt, Valid: true},
+		TaskID:             taskID,
+		RiverJobID:         start.RiverJobID,
+		LeaseToken:         strings.TrimSpace(start.LeaseToken),
+		AccountID:          start.AccountID,
+		ProviderEndpointID: start.ProviderEndpointID,
+		CredentialID:       start.CredentialID,
+		ProviderStartedAt:  sql.NullTime{Time: providerStartedAt, Valid: true},
 	})
 	if err != nil {
 		return tasks.TaskAttemptRef{}, err
 	}
-	return tasks.TaskAttemptRef{ID: row.ID, AttemptNo: int(row.AttemptNo)}, nil
+	return tasks.TaskAttemptRef{ID: row.ID, LeaseID: row.LeaseID, AttemptNo: int(row.AttemptNo)}, nil
 }
 
 func (r *Repository) FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) (int64, error) {
@@ -204,15 +202,42 @@ func finishTaskAttemptParams(finish tasks.TaskAttemptFinish) dbsqlc.FinishTaskAt
 	if status == "" {
 		status = tasks.TaskAttemptStatusFailed
 	}
+	failureStage := strings.TrimSpace(finish.FailureStage)
+	failureCategory := strings.TrimSpace(finish.FailureCategory)
+	errorMsg := strings.TrimSpace(finish.ErrorMsg)
+	switch status {
+	case tasks.TaskAttemptStatusCompleted:
+		failureStage = ""
+		failureCategory = ""
+		errorMsg = ""
+	case tasks.TaskAttemptStatusCancelled:
+		if failureStage == "" {
+			failureStage = tasks.ExecutionStageQueued
+		}
+		failureCategory = tasks.FailureCategoryCancelled
+		if errorMsg == "" {
+			errorMsg = "task cancelled"
+		}
+	case tasks.TaskAttemptStatusFailed, tasks.TaskAttemptStatusRequeued:
+		if failureStage == "" {
+			failureStage = tasks.ExecutionStageAssigned
+		}
+		if failureCategory == "" {
+			failureCategory = tasks.FailureCategoryUnknown
+		}
+		if errorMsg == "" {
+			errorMsg = "task attempt finished"
+		}
+	}
 	completedAt := finish.CompletedAt
 	if completedAt.IsZero() {
 		completedAt = time.Now()
 	}
 	return dbsqlc.FinishTaskAttemptParams{
 		Status:             status,
-		FailureStage:       strings.TrimSpace(finish.FailureStage),
-		FailureCategory:    strings.TrimSpace(finish.FailureCategory),
-		ErrorMsg:           strings.TrimSpace(finish.ErrorMsg),
+		FailureStage:       failureStage,
+		FailureCategory:    failureCategory,
+		ErrorMsg:           errorMsg,
 		ProviderFinishedAt: dbutil.NullTime(finish.ProviderFinishedAt),
 		FinalizeStartedAt:  dbutil.NullTime(finish.FinalizeStartedAt),
 		FinalizeFinishedAt: dbutil.NullTime(finish.FinalizeFinishedAt),

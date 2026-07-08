@@ -74,7 +74,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	t.Run("valid optional envelope metadata", func(t *testing.T) {
 		state := validBoardState(1, 100)
 		state["mediaRefs"] = []interface{}{
-			map[string]interface{}{"url": "https://example.com/source.png", "role": "source"},
+			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "role": "source"},
 		}
 		state["previewSnapshotDataUrl"] = "data:image/webp;base64,preview"
 		state["previewSnapshotUpdatedAt"] = 123
@@ -87,7 +87,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	t.Run("reject invalid media ref", func(t *testing.T) {
 		state := validBoardState(1, 100)
 		state["mediaRefs"] = []interface{}{
-			map[string]interface{}{"url": "https://example.com/source.png", "unexpected": true},
+			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "unexpected": true},
 		}
 		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {
@@ -98,7 +98,18 @@ func TestMarshalStateLimits(t *testing.T) {
 	t.Run("reject empty media ref role", func(t *testing.T) {
 		state := validBoardState(1, 100)
 		state["mediaRefs"] = []interface{}{
-			map[string]interface{}{"url": "https://example.com/source.png", "role": ""},
+			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "role": ""},
+		}
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject task output ref in board state", func(t *testing.T) {
+		state := validBoardState(1, 100)
+		state["mediaRefs"] = []interface{}{
+			map[string]interface{}{"mediaAssetId": 12, "refType": "task_output", "refId": "output-1", "role": "image"},
 		}
 		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {

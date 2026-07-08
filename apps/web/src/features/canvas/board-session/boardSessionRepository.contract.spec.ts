@@ -152,7 +152,7 @@ describe('createBoardSessionRepository', () => {
       [board.id]: makeCanvasBoardState({
         ...makeSnapshot('loaded'),
         updatedAt: 2_000,
-        mediaRefs: [{ url: 'https://example.com/source.png' }],
+        mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }],
         previewSnapshotDataUrl: 'data:image/webp;base64,preview',
         previewSnapshotUpdatedAt: 2_001,
         previewSnapshotVersion: 2,
@@ -163,7 +163,7 @@ describe('createBoardSessionRepository', () => {
     const snapshot = await repository.load(board.id)
 
     expect(snapshot?.promptNodes[0]?.text).toBe('loaded')
-    expect(snapshot?.mediaRefs).toEqual([{ url: 'https://example.com/source.png' }])
+    expect(snapshot?.mediaRefs).toEqual([{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }])
     expect(snapshot).not.toHaveProperty('updatedAt')
     expect(snapshot).not.toHaveProperty('previewSnapshotDataUrl')
     expect(snapshot).not.toHaveProperty('viewport')

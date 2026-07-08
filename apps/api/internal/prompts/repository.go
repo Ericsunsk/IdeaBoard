@@ -25,31 +25,57 @@ type FeaturePromptVariable struct {
 	Tone string `json:"tone,omitempty"`
 }
 
-type FeaturePromptConfig struct {
-	Slug          string                  `json:"slug"`
-	Prompt        string                  `json:"prompt"`
-	Enabled       bool                    `json:"enabled"`
-	Variables     []FeaturePromptVariable `json:"variables"`
-	SchemaVersion int32                   `json:"schema_version"`
-	PublishedAt   *time.Time              `json:"published_at,omitempty"`
-	UpdatedAt     *time.Time              `json:"updated_at,omitempty"`
+type FeaturePromptModelDefaults struct {
+	Model string `json:"model,omitempty"`
 }
 
-type FeaturePromptRevision struct {
-	ID            int64                   `json:"id"`
-	Slug          string                  `json:"slug"`
-	Prompt        string                  `json:"prompt"`
-	Enabled       bool                    `json:"enabled"`
-	Variables     []FeaturePromptVariable `json:"variables"`
-	SchemaVersion int32                   `json:"schema_version"`
-	PublishedAt   *time.Time              `json:"published_at,omitempty"`
-	CreatedAt     time.Time               `json:"created_at"`
+func (d *FeaturePromptModelDefaults) UnmarshalJSON(raw []byte) error {
+	fields := map[string]json.RawMessage{}
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	for key, value := range fields {
+		if key != paramkeys.Model {
+			return fmt.Errorf("unsupported model_defaults field %q", key)
+		}
+		var model string
+		if err := json.Unmarshal(value, &model); err != nil {
+			return fmt.Errorf("model must be a string")
+		}
+		model = strings.TrimSpace(model)
+		if model == "" {
+			return fmt.Errorf("model must not be empty")
+		}
+		d.Model = model
+	}
+	return nil
+}
+
+type FeaturePromptConfig struct {
+	Slug                  string                     `json:"slug"`
+	CurrentRevisionID     int64                      `json:"-"`
+	Prompt                string                     `json:"prompt"`
+	Enabled               bool                       `json:"enabled"`
+	Variables             []FeaturePromptVariable    `json:"variables"`
+	ModelDefaults         FeaturePromptModelDefaults `json:"model_defaults"`
+	UserPromptMergePolicy FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
+	SchemaVersion         int32                      `json:"schema_version"`
+	PublishedAt           *time.Time                 `json:"published_at,omitempty"`
+	UpdatedAt             *time.Time                 `json:"updated_at,omitempty"`
 }
 
 type FeaturePromptSaveInput struct {
-	Prompt    string
-	Enabled   bool
-	Variables []FeaturePromptVariable
+	Prompt                string
+	Enabled               bool
+	Variables             []FeaturePromptVariable
+	ModelDefaults         FeaturePromptModelDefaults
+	UserPromptMergePolicy *FeaturePromptMergePolicy
+}
+
+type FeaturePromptRuntimeConfig struct {
+	Prompt                string
+	ModelDefaults         FeaturePromptModelDefaults
+	UserPromptMergePolicy FeaturePromptMergePolicy
 }
 
 func NewFeaturePromptRepository(db *sql.DB) *FeaturePromptRepository {
@@ -57,14 +83,34 @@ func NewFeaturePromptRepository(db *sql.DB) *FeaturePromptRepository {
 }
 
 func (r *FeaturePromptRepository) GetPrompt(ctx context.Context, slug string) (string, error) {
-	row, err := r.q.GetFeaturePrompt(ctx, slug)
+	config, err := r.GetPromptRuntimeConfig(ctx, slug)
 	if err != nil {
 		return "", err
 	}
-	if !row.Enabled {
-		return "", database.ErrNotFound
+	return config.Prompt, nil
+}
+
+func (r *FeaturePromptRepository) GetPromptRuntimeConfig(ctx context.Context, slug string) (FeaturePromptRuntimeConfig, error) {
+	row, err := r.q.GetFeaturePrompt(ctx, slug)
+	if err != nil {
+		return FeaturePromptRuntimeConfig{}, err
 	}
-	return row.Prompt, nil
+	if !row.Enabled {
+		return FeaturePromptRuntimeConfig{}, database.ErrNotFound
+	}
+	mergePolicy, err := mergePolicyFromJSON(row.UserPromptMergePolicy, row.FeatureSlug)
+	if err != nil {
+		return FeaturePromptRuntimeConfig{}, fmt.Errorf("decode feature prompt %q merge policy: %w", row.FeatureSlug, err)
+	}
+	modelDefaults, err := modelDefaultsFromJSON(row.ModelDefaults)
+	if err != nil {
+		return FeaturePromptRuntimeConfig{}, fmt.Errorf("decode feature prompt %q model defaults: %w", row.FeatureSlug, err)
+	}
+	return FeaturePromptRuntimeConfig{
+		Prompt:                row.Prompt,
+		ModelDefaults:         modelDefaults,
+		UserPromptMergePolicy: mergePolicy,
+	}, nil
 }
 
 func (r *FeaturePromptRepository) GetPromptConfig(ctx context.Context, slug string) (*FeaturePromptConfig, error) {
@@ -88,7 +134,7 @@ func (r *FeaturePromptRepository) ListPromptConfigs(ctx context.Context) ([]Feat
 	if err != nil {
 		return nil, err
 	}
-	bySlug := make(map[string]dbsqlc.FeaturePrompt, len(rows))
+	bySlug := make(map[string]dbsqlc.ListFeaturePromptsRow, len(rows))
 	for _, row := range rows {
 		bySlug[row.FeatureSlug] = row
 	}
@@ -96,7 +142,7 @@ func (r *FeaturePromptRepository) ListPromptConfigs(ctx context.Context) ([]Feat
 	configs := make([]FeaturePromptConfig, 0, len(slugs))
 	for _, slug := range slugs {
 		if row, ok := bySlug[slug]; ok {
-			cfg, err := promptConfigFromRow(row)
+			cfg, err := promptConfigFromListRow(row)
 			if err != nil {
 				return nil, err
 			}
@@ -119,30 +165,45 @@ func (r *FeaturePromptRepository) SetPromptConfig(ctx context.Context, slug stri
 	if err != nil {
 		return nil, err
 	}
+	modelDefaultsJSON, err := json.Marshal(input.ModelDefaults)
+	if err != nil {
+		return nil, err
+	}
+	mergePolicy := DefaultFeaturePromptMergePolicy(slug)
+	if input.UserPromptMergePolicy != nil {
+		mergePolicy = *input.UserPromptMergePolicy
+	}
+	mergePolicyJSON, err := json.Marshal(mergePolicy)
+	if err != nil {
+		return nil, err
+	}
 	publishedAt := sql.NullTime{}
 	if input.Enabled {
 		publishedAt = sql.NullTime{Time: time.Now(), Valid: true}
 	}
 	err = dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		version, err := q.UpsertFeaturePrompt(ctx, dbsqlc.UpsertFeaturePromptParams{
-			FeatureSlug: slug,
-			Prompt:      input.Prompt,
-			Enabled:     input.Enabled,
-			Variables:   variablesJSON,
-			UpdatedBy:   updatedByValue,
-			PublishedAt: publishedAt,
+		if err := q.EnsureFeaturePrompt(ctx, slug); err != nil {
+			return err
+		}
+		if _, err := q.GetFeaturePromptForUpdate(ctx, slug); err != nil {
+			return err
+		}
+		revision, err := q.CreateFeaturePromptRevision(ctx, dbsqlc.CreateFeaturePromptRevisionParams{
+			FeatureSlug:           slug,
+			Prompt:                input.Prompt,
+			Enabled:               input.Enabled,
+			Variables:             variablesJSON,
+			ModelDefaults:         modelDefaultsJSON,
+			UserPromptMergePolicy: mergePolicyJSON,
+			UpdatedBy:             updatedByValue,
+			PublishedAt:           publishedAt,
 		})
 		if err != nil {
 			return err
 		}
-		_, err = q.CreateFeaturePromptRevision(ctx, dbsqlc.CreateFeaturePromptRevisionParams{
-			FeatureSlug:   slug,
-			Prompt:        input.Prompt,
-			Enabled:       input.Enabled,
-			Variables:     variablesJSON,
-			SchemaVersion: version,
-			UpdatedBy:     updatedByValue,
-			PublishedAt:   publishedAt,
+		_, err = q.SetFeaturePromptCurrentRevision(ctx, dbsqlc.SetFeaturePromptCurrentRevisionParams{
+			FeatureSlug: slug,
+			RevisionID:  sql.NullInt64{Int64: revision.ID, Valid: true},
 		})
 		return err
 	})
@@ -152,64 +213,48 @@ func (r *FeaturePromptRepository) SetPromptConfig(ctx context.Context, slug stri
 	return r.GetPromptConfig(ctx, slug)
 }
 
-func (r *FeaturePromptRepository) ListPromptRevisions(ctx context.Context, slug string) ([]FeaturePromptRevision, error) {
-	rows, err := r.q.ListFeaturePromptRevisions(ctx, slug)
-	if err != nil {
-		return nil, err
-	}
-	revisions := make([]FeaturePromptRevision, 0, len(rows))
-	for _, row := range rows {
-		revision, err := promptRevisionFromRow(row)
-		if err != nil {
-			return nil, err
-		}
-		revisions = append(revisions, revision)
-	}
-	return revisions, nil
-}
-
 func defaultPromptConfig(slug string) FeaturePromptConfig {
 	return FeaturePromptConfig{
-		Slug:          slug,
-		Prompt:        "",
-		Enabled:       true,
-		Variables:     defaultPromptVariables(slug),
-		SchemaVersion: 1,
+		Slug:                  slug,
+		Prompt:                "",
+		Enabled:               true,
+		Variables:             defaultPromptVariables(slug),
+		ModelDefaults:         FeaturePromptModelDefaults{},
+		UserPromptMergePolicy: DefaultFeaturePromptMergePolicy(slug),
+		SchemaVersion:         1,
 	}
 }
 
-func promptConfigFromRow(row dbsqlc.FeaturePrompt) (FeaturePromptConfig, error) {
+func promptConfigFromRow(row dbsqlc.GetFeaturePromptRow) (FeaturePromptConfig, error) {
 	variables, err := variablesFromJSON(row.Variables)
 	if err != nil {
 		return FeaturePromptConfig{}, fmt.Errorf("decode feature prompt %q variables: %w", row.FeatureSlug, err)
 	}
+	modelDefaults, err := modelDefaultsFromJSON(row.ModelDefaults)
+	if err != nil {
+		return FeaturePromptConfig{}, fmt.Errorf("decode feature prompt %q model defaults: %w", row.FeatureSlug, err)
+	}
+	mergePolicy, err := mergePolicyFromJSON(row.UserPromptMergePolicy, row.FeatureSlug)
+	if err != nil {
+		return FeaturePromptConfig{}, fmt.Errorf("decode feature prompt %q merge policy: %w", row.FeatureSlug, err)
+	}
 	updatedAt := row.UpdatedAt
 	return FeaturePromptConfig{
-		Slug:          row.FeatureSlug,
-		Prompt:        row.Prompt,
-		Enabled:       row.Enabled,
-		Variables:     variables,
-		SchemaVersion: row.SchemaVersion,
-		PublishedAt:   dbutil.TimePtr(row.PublishedAt),
-		UpdatedAt:     &updatedAt,
+		Slug:                  row.FeatureSlug,
+		CurrentRevisionID:     row.RevisionID,
+		Prompt:                row.Prompt,
+		Enabled:               row.Enabled,
+		Variables:             variables,
+		ModelDefaults:         modelDefaults,
+		UserPromptMergePolicy: mergePolicy,
+		SchemaVersion:         row.SchemaVersion,
+		PublishedAt:           dbutil.TimePtr(row.PublishedAt),
+		UpdatedAt:             &updatedAt,
 	}, nil
 }
 
-func promptRevisionFromRow(row dbsqlc.FeaturePromptRevision) (FeaturePromptRevision, error) {
-	variables, err := variablesFromJSON(row.Variables)
-	if err != nil {
-		return FeaturePromptRevision{}, fmt.Errorf("decode feature prompt revision %q v%d variables: %w", row.FeatureSlug, row.SchemaVersion, err)
-	}
-	return FeaturePromptRevision{
-		ID:            row.ID,
-		Slug:          row.FeatureSlug,
-		Prompt:        row.Prompt,
-		Enabled:       row.Enabled,
-		Variables:     variables,
-		SchemaVersion: row.SchemaVersion,
-		PublishedAt:   dbutil.TimePtr(row.PublishedAt),
-		CreatedAt:     row.CreatedAt,
-	}, nil
+func promptConfigFromListRow(row dbsqlc.ListFeaturePromptsRow) (FeaturePromptConfig, error) {
+	return promptConfigFromRow(dbsqlc.GetFeaturePromptRow(row))
 }
 
 func variablesFromJSON(raw json.RawMessage) ([]FeaturePromptVariable, error) {
@@ -220,6 +265,28 @@ func variablesFromJSON(raw json.RawMessage) ([]FeaturePromptVariable, error) {
 		}
 	}
 	return normalizePromptVariables(variables), nil
+}
+
+func modelDefaultsFromJSON(raw json.RawMessage) (FeaturePromptModelDefaults, error) {
+	result := FeaturePromptModelDefaults{}
+	if len(raw) == 0 {
+		return result, nil
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return FeaturePromptModelDefaults{}, err
+	}
+	return result, nil
+}
+
+func mergePolicyFromJSON(raw json.RawMessage, slug string) (FeaturePromptMergePolicy, error) {
+	policy := DefaultFeaturePromptMergePolicy(slug)
+	if len(raw) == 0 {
+		return policy, nil
+	}
+	if err := json.Unmarshal(raw, &policy); err != nil {
+		return FeaturePromptMergePolicy{}, err
+	}
+	return policy, nil
 }
 
 func normalizePromptVariables(variables []FeaturePromptVariable) []FeaturePromptVariable {

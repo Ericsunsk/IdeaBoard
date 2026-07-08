@@ -105,18 +105,10 @@ INSERT INTO users_used_uids (storage_uid)
 VALUES (sqlc.arg(storage_uid))
 ON CONFLICT (storage_uid) DO NOTHING;
 
--- name: DeleteBoardShareTokensByCreatedBy :exec
-DELETE FROM board_share_tokens
-WHERE created_by = sqlc.arg(created_by);
-
--- name: DeleteBoardMembersByOwnerUserID :exec
-DELETE FROM board_members
-WHERE owner_user_id = sqlc.arg(owner_user_id);
-
 -- name: DeleteBoardMembersByUserID :exec
 DELETE FROM board_members
 WHERE user_id = sqlc.arg(user_id);
 
 -- name: DeleteUserBoardsByUserID :exec
-DELETE FROM user_boards
-WHERE user_id = sqlc.arg(user_id);
+DELETE FROM boards
+WHERE owner_user_id = sqlc.arg(user_id);

@@ -5,18 +5,19 @@ import { createAdminProviderConfigWorkspace } from './providerConfigWorkspace'
 import type {
   AdminProviderAccountLimits,
   ProviderAccountRecord,
-  ProviderChannelRecord,
+  ProviderEndpointRecord,
 } from './providerConfigTypes'
 
 const mockApi = vi.hoisted(() => ({
   createAdminAccountRecord: vi.fn(),
   deleteAdminAccountRecord: vi.fn(),
-  deleteAdminChannel: vi.fn(),
-  detectAdminChannelModels: vi.fn(),
+  deleteAdminProviderEndpoint: vi.fn(),
+  detectAdminProviderEndpointModels: vi.fn(),
   fetchAdminAccountLimits: vi.fn(),
   fetchAllAdminAccounts: vi.fn(),
-  fetchAdminChannels: vi.fn(),
-  saveAdminChannel: vi.fn(),
+  fetchAdminProviderEndpoints: vi.fn(),
+  patchAdminAccountModelRecord: vi.fn(),
+  saveAdminProviderEndpoint: vi.fn(),
   updateAdminAccountRecord: vi.fn(),
 }))
 
@@ -24,18 +25,19 @@ vi.mock('./providerConfigApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./providerConfigApi')>()),
   createAdminAccountRecord: mockApi.createAdminAccountRecord,
   deleteAdminAccountRecord: mockApi.deleteAdminAccountRecord,
-  deleteAdminChannel: mockApi.deleteAdminChannel,
-  detectAdminChannelModels: mockApi.detectAdminChannelModels,
+  deleteAdminProviderEndpoint: mockApi.deleteAdminProviderEndpoint,
+  detectAdminProviderEndpointModels: mockApi.detectAdminProviderEndpointModels,
   fetchAdminAccountLimits: mockApi.fetchAdminAccountLimits,
   fetchAllAdminAccounts: mockApi.fetchAllAdminAccounts,
-  fetchAdminChannels: mockApi.fetchAdminChannels,
-  saveAdminChannel: mockApi.saveAdminChannel,
+  fetchAdminProviderEndpoints: mockApi.fetchAdminProviderEndpoints,
+  patchAdminAccountModelRecord: mockApi.patchAdminAccountModelRecord,
+  saveAdminProviderEndpoint: mockApi.saveAdminProviderEndpoint,
   updateAdminAccountRecord: mockApi.updateAdminAccountRecord,
 }))
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockApi.fetchAdminChannels.mockResolvedValue([makeChannel()])
+  mockApi.fetchAdminProviderEndpoints.mockResolvedValue([makeProviderEndpoint()])
   mockApi.fetchAllAdminAccounts.mockResolvedValue([
     makeAccount({
       models: [makeModel({ name: 'gpt-4o', enabled: true, weight: 7 })],
@@ -44,9 +46,15 @@ beforeEach(() => {
   mockApi.fetchAdminAccountLimits.mockResolvedValue(makeAccountLimits())
   mockApi.createAdminAccountRecord.mockResolvedValue(undefined)
   mockApi.deleteAdminAccountRecord.mockResolvedValue(undefined)
-  mockApi.deleteAdminChannel.mockResolvedValue(undefined)
-  mockApi.detectAdminChannelModels.mockResolvedValue([])
-  mockApi.saveAdminChannel.mockResolvedValue(undefined)
+  mockApi.deleteAdminProviderEndpoint.mockResolvedValue(undefined)
+  mockApi.detectAdminProviderEndpointModels.mockResolvedValue([])
+  mockApi.patchAdminAccountModelRecord.mockResolvedValue(
+    makeAccount({
+      models: [makeModel({ name: 'gpt-4o', enabled: false, weight: 7 })],
+      updatedAt: 'patched-at',
+    }),
+  )
+  mockApi.saveAdminProviderEndpoint.mockResolvedValue(undefined)
   mockApi.updateAdminAccountRecord.mockResolvedValue(undefined)
 })
 
@@ -55,69 +63,71 @@ afterEach(() => {
 })
 
 describe('provider config workspace facade', () => {
-  it('loads channels, accounts, account limits, and card view models', async () => {
+  it('loads providerEndpoints, accounts, account limits, and card view models', async () => {
     const { workspace } = createWorkspace()
 
     await workspace.loadData()
 
-    expect(mockApi.fetchAdminChannels).toHaveBeenCalledTimes(1)
+    expect(mockApi.fetchAdminProviderEndpoints).toHaveBeenCalledTimes(1)
     expect(mockApi.fetchAllAdminAccounts).toHaveBeenCalledTimes(1)
     expect(mockApi.fetchAdminAccountLimits).toHaveBeenCalledTimes(1)
     expect(workspace.accountLimits.value).toEqual(makeAccountLimits())
     expect(workspace.cards.items.value).toHaveLength(1)
-    expect(workspace.cards.items.value[0]?.channel.name).toBe('OpenAI Channel')
+    expect(workspace.cards.items.value[0]?.providerEndpoint.name).toBe('OpenAI ProviderEndpoint')
     expect(workspace.cards.items.value[0]?.accounts[0]?.concurrencyLabel).toBe('1/3')
-    expect(workspace.cards.totalChannelsLabel.value).toBe('1 渠道')
+    expect(workspace.cards.totalProviderEndpointsLabel.value).toBe('1 端点')
     expect(workspace.cards.accountRunningLabel.value).toBe('1/1 运行中')
     expect(workspace.cards.activeModelCount.value).toBe(1)
 
     workspace.cards.searchKeyword.value = 'missing'
 
     expect(workspace.cards.items.value).toHaveLength(0)
-    expect(workspace.cards.totalChannelsLabel.value).toBe('0 匹配渠道')
-    expect(workspace.cards.emptyMessage.value).toBe('无匹配渠道商')
+    expect(workspace.cards.totalProviderEndpointsLabel.value).toBe('0 匹配端点')
+    expect(workspace.cards.emptyMessage.value).toBe('无匹配供应商端点')
   })
 
-  it('saves a channel then reloads through the workspace command sequence', async () => {
+  it('saves a providerEndpoint then reloads through the workspace command sequence', async () => {
     const { workspace, feedback } = createWorkspace()
     const afterSaved = vi.fn()
     const data = {
       apiType: 'openai-compatible' as const,
-      name: 'Updated Channel',
+      name: 'Updated ProviderEndpoint',
       baseUrl: 'https://api.updated.example/v1',
+      status: 1,
     }
 
     await workspace.loadData()
-    await workspace.saveChannel({
+    await workspace.saveProviderEndpoint({
       id: 1,
       data,
       isEditing: true,
       afterSaved,
     })
 
-    expect(mockApi.saveAdminChannel).toHaveBeenCalledWith({ id: 1, data })
-    expect(feedback.channelSaved).toHaveBeenCalledWith(true)
+    expect(mockApi.saveAdminProviderEndpoint).toHaveBeenCalledWith({ id: 1, data })
+    expect(feedback.providerEndpointSaved).toHaveBeenCalledWith(true)
     expect(afterSaved).toHaveBeenCalledTimes(1)
-    expect(mockApi.fetchAdminChannels).toHaveBeenCalledTimes(2)
+    expect(mockApi.fetchAdminProviderEndpoints).toHaveBeenCalledTimes(2)
   })
 
   it('saves an account while preserving existing model settings', async () => {
     const { workspace, feedback } = createWorkspace()
     const afterSaved = vi.fn()
-    const selectedChannel = makeChannel()
+    const selectedProviderEndpoint = makeProviderEndpoint()
 
     await workspace.loadData()
     await workspace.saveAccount({
       isEditing: true,
       accountId: 11,
       form: {
-        channelId: 1,
+        providerEndpointId: 1,
+        name: 'OpenAI Account',
         modelValues: ['gpt-4o', 'imagen-4'],
         secret: 'sk-new',
         maxConcurrent: 5,
         timeoutSeconds: 180,
       },
-      selectedChannel,
+      selectedProviderEndpoint,
       modelValues: ['gpt-4o', 'imagen-4'],
       secret: 'sk-new',
       afterSaved,
@@ -126,10 +136,7 @@ describe('provider config workspace facade', () => {
     expect(mockApi.updateAdminAccountRecord).toHaveBeenCalledWith(
       11,
       expect.objectContaining({
-        name: 'OpenAI Channel',
-        platform: 'openai-compatible',
-        api_type: 'openai-compatible',
-        proxy_url: 'https://api.example.com/v1',
+        name: 'OpenAI Account',
         max_concurrent: 5,
         timeout: 180,
         secret: 'sk-new',
@@ -141,16 +148,16 @@ describe('provider config workspace facade', () => {
     )
     expect(feedback.accountSaved).toHaveBeenCalledWith(true)
     expect(afterSaved).toHaveBeenCalledTimes(1)
-    expect(mockApi.fetchAdminChannels).toHaveBeenCalledTimes(2)
+    expect(mockApi.fetchAdminProviderEndpoints).toHaveBeenCalledTimes(2)
   })
 
   it('detects models with missing-key feedback and per-session caching', async () => {
     const { workspace, feedback } = createWorkspace()
-    const channel = makeChannel()
-    mockApi.detectAdminChannelModels.mockResolvedValueOnce(['gpt-4o', ' GPT-4o ', 'imagen-4'])
+    const providerEndpoint = makeProviderEndpoint()
+    mockApi.detectAdminProviderEndpointModels.mockResolvedValueOnce(['gpt-4o', ' GPT-4o ', 'imagen-4'])
 
     const missingKeyResult = await workspace.detectModels({
-      channel,
+      providerEndpoint,
       secret: '',
       detectedValues: [],
       sessionCache: new Set(),
@@ -159,17 +166,17 @@ describe('provider config workspace facade', () => {
 
     expect(feedback.missingApiKeyForModelDetection).toHaveBeenCalledTimes(1)
     expect(missingKeyResult.hasShownApiKeyHint).toBe(true)
-    expect(mockApi.detectAdminChannelModels).not.toHaveBeenCalled()
+    expect(mockApi.detectAdminProviderEndpointModels).not.toHaveBeenCalled()
 
     const detectedResult = await workspace.detectModels({
-      channel,
+      providerEndpoint,
       secret: ' sk-live ',
       detectedValues: ['existing-model'],
       sessionCache: new Set(),
       hasShownApiKeyHint: false,
     })
 
-    expect(mockApi.detectAdminChannelModels).toHaveBeenCalledWith({
+    expect(mockApi.detectAdminProviderEndpointModels).toHaveBeenCalledWith({
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'sk-live',
       apiType: 'openai-compatible',
@@ -181,14 +188,14 @@ describe('provider config workspace facade', () => {
     ])
 
     await workspace.detectModels({
-      channel,
+      providerEndpoint,
       secret: 'sk-live',
       detectedValues: detectedResult.detectedValues,
       sessionCache: detectedResult.sessionCache,
       hasShownApiKeyHint: false,
     })
 
-    expect(mockApi.detectAdminChannelModels).toHaveBeenCalledTimes(1)
+    expect(mockApi.detectAdminProviderEndpointModels).toHaveBeenCalledTimes(1)
   })
 
   it('toggles account model status and updates local card rows', async () => {
@@ -197,12 +204,11 @@ describe('provider config workspace facade', () => {
     await workspace.loadData()
     await workspace.toggleAccountModelStatus({ kind: 'account', id: 11 }, 'GPT-4O')
 
-    expect(mockApi.updateAdminAccountRecord).toHaveBeenCalledWith(
-      11,
-      expect.objectContaining({
-        models: [expect.objectContaining({ name: 'gpt-4o', enabled: false, weight: 7 })],
-      }),
-    )
+    expect(mockApi.patchAdminAccountModelRecord).toHaveBeenCalledWith(11, {
+      name: 'gpt-4o',
+      enabled: false,
+    })
+    expect(mockApi.updateAdminAccountRecord).not.toHaveBeenCalled()
     expect(feedback.modelStatusChanged).toHaveBeenCalledWith(false)
     expect(
       workspace.getAccountModelRows(workspace.cards.items.value[0]!.accounts[0]!),
@@ -212,18 +218,18 @@ describe('provider config workspace facade', () => {
   it('keeps stale target feedback and delete confirmation in the facade', async () => {
     const { workspace, feedback, confirm } = createWorkspace()
 
-    workspace.deleteChannel({ kind: 'channel', id: 404 })
+    workspace.deleteProviderEndpoint({ kind: 'providerEndpoint', id: 404 })
 
-    expect(feedback.staleChannel).toHaveBeenCalledTimes(1)
+    expect(feedback.staleProviderEndpoint).toHaveBeenCalledTimes(1)
     expect(confirm.request).not.toHaveBeenCalled()
 
     await workspace.loadData()
-    workspace.deleteChannel({ kind: 'channel', id: 1 })
+    workspace.deleteProviderEndpoint({ kind: 'providerEndpoint', id: 1 })
 
     expect(confirm.request).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '确认删除',
-        message: '确定删除渠道商「OpenAI Channel」吗？此操作不可恢复。',
+        message: '确定删除供应商端点「OpenAI ProviderEndpoint」吗？此操作不可恢复。',
         confirmLabel: '确定',
         intent: 'danger',
       }),
@@ -231,8 +237,8 @@ describe('provider config workspace facade', () => {
 
     await confirm.request.mock.calls[0]?.[0].onConfirm()
 
-    expect(mockApi.deleteAdminChannel).toHaveBeenCalledWith(1)
-    expect(feedback.channelDeleted).toHaveBeenCalledTimes(1)
+    expect(mockApi.deleteAdminProviderEndpoint).toHaveBeenCalledWith(1)
+    expect(feedback.providerEndpointDeleted).toHaveBeenCalledTimes(1)
   })
 
   it('falls back to default account limits when limit loading fails', async () => {
@@ -268,15 +274,15 @@ function createProviderConfigFeedback() {
   return {
     accountLimitsFallback: vi.fn(),
     loadFailed: vi.fn(),
-    staleChannel: vi.fn(),
+    staleProviderEndpoint: vi.fn(),
     staleAccount: vi.fn(),
     staleModel: vi.fn(),
-    channelFormInvalid: vi.fn(),
+    providerEndpointFormInvalid: vi.fn(),
     accountFormInvalid: vi.fn(),
-    channelSaved: vi.fn(),
-    channelSaveFailed: vi.fn(),
-    channelDeleted: vi.fn(),
-    channelDeleteFailed: vi.fn(),
+    providerEndpointSaved: vi.fn(),
+    providerEndpointSaveFailed: vi.fn(),
+    providerEndpointDeleted: vi.fn(),
+    providerEndpointDeleteFailed: vi.fn(),
     accountSaved: vi.fn(),
     accountSaveFailed: vi.fn(),
     accountDeleted: vi.fn(),
@@ -295,11 +301,11 @@ function makeAccountLimits(): AdminProviderAccountLimits {
   }
 }
 
-function makeChannel(overrides: Partial<ProviderChannelRecord> = {}): ProviderChannelRecord {
+function makeProviderEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): ProviderEndpointRecord {
   return {
     id: 1,
     apiType: 'openai-compatible',
-    name: 'OpenAI Channel',
+    name: 'OpenAI ProviderEndpoint',
     baseUrl: 'https://api.example.com/v1',
     status: 1,
     createdAt: '',
@@ -312,8 +318,7 @@ function makeAccount(overrides: Partial<ProviderAccountRecord> = {}): ProviderAc
   return {
     id: 11,
     name: 'OpenAI Account',
-    channelId: 1,
-    platform: 'openai-compatible',
+    providerEndpointId: 1,
     apiType: 'openai-compatible',
     baseUrl: 'https://api.example.com/v1',
     models: [],

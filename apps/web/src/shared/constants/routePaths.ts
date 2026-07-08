@@ -9,7 +9,7 @@ export const USER_CANVAS_PATH = '/user/canvas'
 
 export const ADMIN_ROOT_PATH = '/admin'
 export const ADMIN_STATISTICS_PATH = '/admin/statistics'
-export const ADMIN_CHANNELS_PATH = '/admin/channels'
+export const ADMIN_PROVIDER_ENDPOINTS_PATH = '/admin/provider-endpoints'
 export const ADMIN_USERS_PATH = '/admin/users'
 export const ADMIN_TASK_MONITOR_PATH = '/admin/task-monitor'
 export const ADMIN_FEATURE_PROMPTS_PATH = '/admin/feature-prompts'

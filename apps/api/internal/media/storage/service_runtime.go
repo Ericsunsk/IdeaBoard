@@ -316,7 +316,7 @@ func (s *StorageService) resolveActiveProfile(ctx context.Context) (*StorageProf
 		if s.isProfileReady(profile) {
 			return &profile, nil
 		}
-		break
+		return nil, fmt.Errorf("当前存储 %q 的 active secret version 不可用或配置不完整", profile.ID)
 	}
 
 	local, err := s.findProfile(profiles, builtinLocalProfileID())

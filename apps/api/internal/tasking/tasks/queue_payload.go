@@ -20,7 +20,7 @@ type AccountLoad struct {
 }
 
 // MonitorInfo is the queue/account runtime snapshot returned to the admin monitor API.
-// RunningAttempts and AccountLoads are derived from running task attempts, so the
+// RunningAttempts and AccountLoads are derived from active task leases, so the
 // monitor reflects active execution facts instead of task status alone.
 type MonitorInfo struct {
 	GlobalQueueLen  int64                  `json:"global_queue_len"`

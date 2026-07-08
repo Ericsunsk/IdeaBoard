@@ -101,17 +101,16 @@ func createTestAccount(t *testing.T, repo *AccountRepository, name string, statu
 	ctx := context.Background()
 	channelID := createAccountTestChannel(t, repo.db, name)
 	acc := &ApiAccount{
-		Name:          name,
-		ChannelID:     channelID,
-		Platform:      "openai-compatible",
-		ApiType:       "openai-compatible",
-		Models:        []AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:        "k",
-		ProxyURL:      "https://example.com/" + name,
-		MaxConcurrent: 3,
-		Timeout:       120,
-		Weight:        1,
-		Status:        status,
+		Name:               name,
+		ProviderEndpointID: channelID,
+		ApiType:            "openai-compatible",
+		Models:             []AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:             "k",
+		ProxyURL:           "https://example.com/" + name,
+		MaxConcurrent:      3,
+		Timeout:            120,
+		Weight:             1,
+		Status:             status,
 	}
 	if err := repo.Create(ctx, acc); err != nil {
 		t.Fatalf("create account failed: %v", err)
@@ -129,7 +128,7 @@ func createAccountTestChannel(t testing.TB, db *sql.DB, suffix string) int64 {
 	t.Helper()
 	var id int64
 	err := db.QueryRowContext(context.Background(), `
-INSERT INTO channels (type, name, api_url, status)
+INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', $1, $2, 1)
 RETURNING id`,
 		"test-channel-"+suffix,
@@ -205,10 +204,15 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 }
 
 func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
+	ctx := context.Background()
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	acc := createTestAccount(t, accountRepo, "update-zero-weight", 1)
+	acc := seedAdminAccountWithTwoModelFixture(t, ctx, accountRepo, db, "update-zero-weight", func(account *ApiAccount) {
+		account.ApiKey = "k"
+		account.MaxConcurrent = 3
+		account.Timeout = 120
+	})
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
@@ -219,21 +223,19 @@ func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
 		MonitorStore:     &fakeMonitorStore{},
 	}, AccountServiceOptions{})
 
-	err := svc.UpdateAccount(context.Background(), acc.ID, &UpdateAccountRequest{
-		Name:          acc.Name,
-		Platform:      acc.Platform,
-		ApiType:       acc.ApiType,
-		Models:        []AccountModelInput{{Name: "gpt-image-1"}},
-		ProxyURL:      acc.ProxyURL,
-		MaxConcurrent: acc.MaxConcurrent,
-		Timeout:       acc.Timeout,
-		Weight:        0,
+	models := adminAccountModelInputsForFullUpdate(acc.Models)
+	err := svc.UpdateAccount(ctx, acc.ID, &UpdateAccountRequest{
+		Name:          testStringPtr(acc.Name),
+		Models:        &models,
+		MaxConcurrent: testIntPtr(acc.MaxConcurrent),
+		Timeout:       testIntPtr(acc.Timeout),
+		Weight:        testIntPtr(0),
 	})
 	if err != nil {
 		t.Fatalf("UpdateAccount failed: %v", err)
 	}
 
-	updated, err := accountRepo.GetByID(context.Background(), acc.ID)
+	updated, err := accountRepo.GetByID(ctx, acc.ID)
 	if err != nil {
 		t.Fatalf("reload account failed: %v", err)
 	}
@@ -305,8 +307,7 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	}
 	if _, err := accountRepo.q.CreateAccountSecret(context.Background(), dbsqlc.CreateAccountSecretParams{
 		AccountID:          acc.ID,
-		SecretMaterialKind: "stored",
-		SecretRef:          "",
+		SecretMaterialKind: "encrypted",
 		SecretPayload:      "should-not-write",
 		KeyVersion:         "",
 		Fingerprint:        "",
@@ -324,17 +325,14 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	}
 
 	recreated := &ApiAccount{
-		Name:          acc.Name,
-		ChannelID:     acc.ChannelID,
-		Platform:      acc.Platform,
-		ApiType:       acc.ApiType,
-		Models:        []AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:        "new-secret",
-		ProxyURL:      acc.ProxyURL,
-		MaxConcurrent: 1,
-		Timeout:       30,
-		Weight:        1,
-		Status:        1,
+		Name:               acc.Name,
+		ProviderEndpointID: acc.ProviderEndpointID,
+		Models:             []AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:             "new-secret",
+		MaxConcurrent:      1,
+		Timeout:            30,
+		Weight:             1,
+		Status:             1,
 	}
 	if err := accountRepo.Create(context.Background(), recreated); err != nil {
 		t.Fatalf("create account with archived account name failed: %v", err)
@@ -413,8 +411,8 @@ func TestDeleteAccountFailsResidualInFlightTasks(t *testing.T) {
 	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "delete-residual", 0)
 
-	first := &tasks.Task{TaskID: "delete-residual-running-1", UserID: 1, AssignedChannelID: tasks.IDPtr(acc.ChannelID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
-	second := &tasks.Task{TaskID: "delete-residual-running-2", UserID: 1, AssignedChannelID: tasks.IDPtr(acc.ChannelID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
+	first := &tasks.Task{TaskID: "delete-residual-running-1", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
+	second := &tasks.Task{TaskID: "delete-residual-running-2", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
 	if err := taskRepo.Create(context.Background(), first); err != nil {
 		t.Fatalf("create first running task failed: %v", err)
 	}
@@ -467,8 +465,8 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 
-	first := &tasks.Task{TaskID: "t-running-1", UserID: 1, AssignedChannelID: tasks.IDPtr(acc.ChannelID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
-	second := &tasks.Task{TaskID: "t-running-2", UserID: 1, AssignedChannelID: tasks.IDPtr(acc.ChannelID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
+	first := &tasks.Task{TaskID: "t-running-1", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
+	second := &tasks.Task{TaskID: "t-running-2", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
 	if err := taskRepo.Create(context.Background(), first); err != nil {
 		t.Fatalf("create first running task failed: %v", err)
 	}

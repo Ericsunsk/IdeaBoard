@@ -14,7 +14,10 @@ const (
 	AssignStatusDiscard    = "discard"
 )
 
-var ErrNoAccountCapacity = errors.New("no account capacity")
+var (
+	ErrNoAccountCapacity = errors.New("no account capacity")
+	ErrTaskLeaseConflict = errors.New("task lease conflict")
+)
 
 type TaskEnqueuer interface {
 	Enqueue(ctx context.Context, task *tasks.TaskPayload) error
@@ -30,16 +33,26 @@ type TaskAssigner interface {
 }
 
 type TaskAssignment struct {
-	TaskID        string
-	AccountID     int64
-	ChannelID     int64
-	ResolvedModel string
-	Status        string
-	LeaseToken    string
+	TaskID                  string
+	AccountID               int64
+	ProviderEndpointID      int64
+	CredentialID            int64
+	ResolvedModel           string
+	APIType                 string
+	ProviderEndpointName    string
+	ProviderEndpointBaseURL string
+	CredentialFingerprint   string
+	CredentialKeyVersion    string
+	Status                  string
+	LeaseToken              string
 }
 
 func (a TaskAssignment) HasLeaseIdentity() bool {
-	return a.TaskID != "" && a.AccountID > 0 && a.ChannelID > 0 && a.LeaseToken != ""
+	return a.TaskID != "" && a.AccountID > 0 && a.ProviderEndpointID > 0 && a.CredentialID > 0 && a.LeaseToken != ""
+}
+
+func (a TaskAssignment) HasRuntimeSnapshot() bool {
+	return a.HasLeaseIdentity() && a.CredentialID > 0 && a.APIType != "" && a.ProviderEndpointBaseURL != ""
 }
 
 type AccountConcurrencyStore interface {

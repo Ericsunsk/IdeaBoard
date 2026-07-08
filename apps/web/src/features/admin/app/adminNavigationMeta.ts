@@ -1,5 +1,5 @@
 import {
-  ADMIN_CHANNELS_PATH,
+  ADMIN_PROVIDER_ENDPOINTS_PATH,
   ADMIN_FEATURE_PROMPTS_PATH,
   ADMIN_LOGIN_PATH,
   ADMIN_OSS_CONFIG_PATH,
@@ -14,7 +14,7 @@ export { ADMIN_LOGIN_PATH }
 
 export type AdminNavigationKey =
   | 'users'
-  | 'channels'
+  | 'provider-endpoints'
   | 'statistics'
   | 'task-monitor'
   | 'feature-prompts'
@@ -40,12 +40,12 @@ export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
     routeName: 'AdminStatistics',
   },
   {
-    key: 'channels',
-    path: ADMIN_CHANNELS_PATH,
-    childPath: 'channels',
-    label: '渠道商管理',
-    title: '渠道商管理',
-    routeName: 'AdminChannels',
+    key: 'provider-endpoints',
+    path: ADMIN_PROVIDER_ENDPOINTS_PATH,
+    childPath: 'provider-endpoints',
+    label: '供应商端点',
+    title: '供应商端点',
+    routeName: 'AdminProviderEndpoints',
   },
   {
     key: 'users',

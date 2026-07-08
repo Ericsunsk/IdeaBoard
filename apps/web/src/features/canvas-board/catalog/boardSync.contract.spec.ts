@@ -232,7 +232,7 @@ describe('boardSync', () => {
     replaceCanvasBoardStateMap({
       'board-1': makeCanvasBoardState({
         updatedAt: 2_000,
-        mediaRefs: [{ url: 'https://example.com/source.png', role: 'source' }],
+        mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
         previewSnapshotDataUrl: 'data:image/webp;base64,preview',
         previewSnapshotUpdatedAt: 2_001,
         previewSnapshotVersion: 4,
@@ -249,7 +249,7 @@ describe('boardSync', () => {
         promptNodes: expect.any(Array),
         fusionNodes: expect.any(Array),
         connections: expect.any(Array),
-        mediaRefs: [{ url: 'https://example.com/source.png', role: 'source' }],
+        mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
         previewSnapshotDataUrl: 'data:image/webp;base64,preview',
         previewSnapshotUpdatedAt: 2_001,
         previewSnapshotVersion: 4,

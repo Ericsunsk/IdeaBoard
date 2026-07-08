@@ -67,7 +67,7 @@ function createSampleSnapshot(): CanvasBoardSnapshot {
   snapshot.imageNodes = [createImageNode(1, 40, 80)]
   snapshot.promptNodes = [createPromptNode(1, 420, 80), createPromptNode(2, 820, 80)]
   snapshot.connections = [createConnection(1, 1, 1)]
-  snapshot.mediaRefs = [{ url: 'https://example.com/source.png', role: 'source' }]
+  snapshot.mediaRefs = [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }]
   return snapshot
 }
 

@@ -3,6 +3,7 @@ package taskqueue
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 
@@ -80,6 +81,29 @@ func TestPostgresTaskAssignerAssignsNextAccountWhenFirstIsFull(t *testing.T) {
 	}
 }
 
+func TestPostgresTaskAssignerIgnoresReleasedLeasesWhenCheckingCapacity(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "released-capacity", 1)
+	createAssignerTask(t, db, "released-capacity-load", accountID, tasks.StatusRunning, "")
+	insertAssignerTaskLease(t, db, "released-capacity-load", accountID, "lease-released", "", true)
+	createAssignerTask(t, db, "pending-released-capacity", 0, tasks.StatusPending, "")
+
+	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+		TaskID:     "pending-released-capacity",
+		RiverJobID: 112,
+	})
+	if err != nil {
+		t.Fatalf("Assign failed: %v", err)
+	}
+	if assignment.Status != AssignStatusAssigned || assignment.AccountID != accountID {
+		t.Fatalf("assignment=%+v, want released lease to leave account capacity open", assignment)
+	}
+	assertTaskLease(t, db, "pending-released-capacity", accountID, assignment.LeaseToken)
+}
+
 func TestPostgresTaskAssignerAssignReturnsNoCapacityWhenAllAccountsFull(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	assigner := NewPostgresTaskAssigner(db)
@@ -120,6 +144,49 @@ func TestPostgresTaskAssignerAssignReturnsNoCapacityWithoutCandidates(t *testing
 	if assignment.Status != AssignStatusNoCapacity || assignment.AccountID != 0 {
 		t.Fatalf("assignment=%+v, want no_capacity", assignment)
 	}
+}
+
+func TestPostgresTaskAssignerSkipsDisabledProviderEndpoint(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "disabled-endpoint", 3)
+	setAssignerProviderEndpointStatus(t, db, accountID, 0)
+	createAssignerTask(t, db, "pending-disabled-endpoint", 0, tasks.StatusPending, "")
+
+	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+		TaskID:     "pending-disabled-endpoint",
+		RiverJobID: 110,
+	})
+	if err != nil {
+		t.Fatalf("Assign failed: %v", err)
+	}
+	if assignment.Status != AssignStatusNoCapacity || assignment.AccountID != 0 {
+		t.Fatalf("assignment=%+v, want no_capacity when endpoint is disabled", assignment)
+	}
+}
+
+func TestPostgresTaskAssignerWritesRuntimeAssignmentSnapshot(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "snapshot", 3)
+	createAssignerTask(t, db, "pending-snapshot", 0, tasks.StatusPending, "")
+
+	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+		TaskID:     "pending-snapshot",
+		Params:     `{"feature":"pattern-gen","model":"gpt-image-1"}`,
+		RiverJobID: 111,
+	})
+	if err != nil {
+		t.Fatalf("Assign failed: %v", err)
+	}
+	if assignment.Status != AssignStatusAssigned {
+		t.Fatalf("assignment=%+v, want assigned", assignment)
+	}
+	assertRuntimeAssignmentSnapshot(t, db, "pending-snapshot", assignment)
 }
 
 func TestPostgresTaskAssignerHonorsModelMaxConcurrent(t *testing.T) {
@@ -227,11 +294,12 @@ func TestPostgresTaskAssignerConfirmsMatchingLease(t *testing.T) {
 	createAssignerTask(t, db, "running-confirm-lease", accountID, tasks.StatusRunning, "lease-confirm")
 
 	err := assigner.ConfirmTaskLease(ctx, TaskAssignment{
-		TaskID:     "running-confirm-lease",
-		AccountID:  accountID,
-		ChannelID:  loadAssignerAccountChannelID(t, db, accountID),
-		Status:     AssignStatusAssigned,
-		LeaseToken: "lease-confirm",
+		TaskID:             "running-confirm-lease",
+		AccountID:          accountID,
+		ProviderEndpointID: loadAssignerAccountProviderEndpointID(t, db, accountID),
+		CredentialID:       loadAssignerAccountCredentialID(t, db, accountID),
+		Status:             AssignStatusAssigned,
+		LeaseToken:         "lease-confirm",
 	})
 	if err != nil {
 		t.Fatalf("ConfirmTaskLease failed: %v", err)
@@ -247,14 +315,66 @@ func TestPostgresTaskAssignerRejectsStaleLease(t *testing.T) {
 	createAssignerTask(t, db, "running-stale-lease", accountID, tasks.StatusRunning, "lease-current")
 
 	err := assigner.ConfirmTaskLease(ctx, TaskAssignment{
-		TaskID:     "running-stale-lease",
-		AccountID:  accountID,
-		ChannelID:  loadAssignerAccountChannelID(t, db, accountID),
-		Status:     AssignStatusAssigned,
-		LeaseToken: "lease-stale",
+		TaskID:             "running-stale-lease",
+		AccountID:          accountID,
+		ProviderEndpointID: loadAssignerAccountProviderEndpointID(t, db, accountID),
+		CredentialID:       loadAssignerAccountCredentialID(t, db, accountID),
+		Status:             AssignStatusAssigned,
+		LeaseToken:         "lease-stale",
 	})
 	if err == nil {
 		t.Fatal("expected stale lease confirmation to fail")
+	}
+	if !errors.Is(err, ErrTaskLeaseConflict) {
+		t.Fatalf("expected ErrTaskLeaseConflict, got %v", err)
+	}
+}
+
+func TestPostgresTaskAssignerRejectsTaskRowNotRunning(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "confirm-not-running", 1)
+	createAssignerTask(t, db, "completed-confirm-lease", accountID, tasks.StatusRunning, "lease-confirm")
+	if _, err := db.Exec(`UPDATE tasks SET status = $1 WHERE task_id = $2`, tasks.StatusCompleted, "completed-confirm-lease"); err != nil {
+		t.Fatalf("mark task completed failed: %v", err)
+	}
+
+	err := assigner.ConfirmTaskLease(ctx, TaskAssignment{
+		TaskID:             "completed-confirm-lease",
+		AccountID:          accountID,
+		ProviderEndpointID: loadAssignerAccountProviderEndpointID(t, db, accountID),
+		CredentialID:       loadAssignerAccountCredentialID(t, db, accountID),
+		Status:             AssignStatusAssigned,
+		LeaseToken:         "lease-confirm",
+	})
+	if !errors.Is(err, ErrTaskLeaseConflict) {
+		t.Fatalf("expected ErrTaskLeaseConflict, got %v", err)
+	}
+}
+
+func TestPostgresTaskAssignerRejectsTaskRowLeaseMismatch(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "confirm-mismatch", 1)
+	createAssignerTask(t, db, "mismatch-confirm-lease", accountID, tasks.StatusRunning, "lease-confirm")
+	if _, err := db.Exec(`UPDATE tasks SET assigned_provider_endpoint_id = assigned_provider_endpoint_id + 1000 WHERE task_id = $1`, "mismatch-confirm-lease"); err != nil {
+		t.Fatalf("mutate task assignment failed: %v", err)
+	}
+
+	err := assigner.ConfirmTaskLease(ctx, TaskAssignment{
+		TaskID:             "mismatch-confirm-lease",
+		AccountID:          accountID,
+		ProviderEndpointID: loadAssignerAccountProviderEndpointID(t, db, accountID),
+		CredentialID:       loadAssignerAccountCredentialID(t, db, accountID),
+		Status:             AssignStatusAssigned,
+		LeaseToken:         "lease-confirm",
+	})
+	if !errors.Is(err, ErrTaskLeaseConflict) {
+		t.Fatalf("expected ErrTaskLeaseConflict, got %v", err)
 	}
 }
 
@@ -268,15 +388,15 @@ func createAssignerAccount(t *testing.T, db *sql.DB, name string, maxConcurrent 
 	t.Helper()
 	var channelID int64
 	if err := db.QueryRow(`
-INSERT INTO channels (type, name, api_url, status)
+INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', $1, $2, 1)
 RETURNING id`, "assigner-channel-"+name, "https://example.com/"+name).Scan(&channelID); err != nil {
 		t.Fatalf("create channel %q failed: %v", name, err)
 	}
 	var id int64
 	err := db.QueryRow(`
-INSERT INTO api_accounts (name, channel_id, platform, api_type, proxy_url, max_concurrent, timeout, extra_config, status, weight)
-VALUES ($1, $2, 'openai-compatible', 'openai-compatible', 'https://example.com', $3, 120, '', 1, 1)
+INSERT INTO api_accounts (name, provider_endpoint_id, max_concurrent, timeout, extra_config, status, weight)
+VALUES ($1, $2, $3, 120, '', 1, 1)
 RETURNING id`, name, channelID, maxConcurrent).Scan(&id)
 	if err != nil {
 		t.Fatalf("create account %q failed: %v", name, err)
@@ -287,8 +407,8 @@ VALUES ($1, 'gpt-image-1', TRUE, 0)`, id); err != nil {
 		t.Fatalf("create account model %q failed: %v", name, err)
 	}
 	if _, err := db.Exec(`
-INSERT INTO api_account_secrets (account_id, secret_material_kind, secret_payload, status)
-VALUES ($1, 'encrypted', $2, 'active')`, id, mustEncryptForTest(t, "k")); err != nil {
+INSERT INTO api_account_secrets (account_id, secret_material_kind, secret_payload, key_version, fingerprint, status)
+VALUES ($1, 'encrypted', $2, 'test-key-v1', $3, 'active')`, id, mustEncryptForTest(t, "k"), "fp-"+name); err != nil {
 		t.Fatalf("create account secret %q failed: %v", name, err)
 	}
 	return id
@@ -326,13 +446,37 @@ func addAssignerModel(t *testing.T, db *sql.DB, accountID int64, modelName strin
 	}
 }
 
-func loadAssignerAccountChannelID(t *testing.T, db *sql.DB, accountID int64) int64 {
+func loadAssignerAccountProviderEndpointID(t *testing.T, db *sql.DB, accountID int64) int64 {
 	t.Helper()
 	var channelID int64
-	if err := db.QueryRow(`SELECT channel_id FROM api_accounts WHERE id = $1`, accountID).Scan(&channelID); err != nil {
+	if err := db.QueryRow(`SELECT provider_endpoint_id FROM api_accounts WHERE id = $1`, accountID).Scan(&channelID); err != nil {
 		t.Fatalf("load account %d channel failed: %v", accountID, err)
 	}
 	return channelID
+}
+
+func loadAssignerAccountCredentialID(t *testing.T, db *sql.DB, accountID int64) int64 {
+	t.Helper()
+	var credentialID int64
+	if err := db.QueryRow(`
+SELECT id
+FROM api_account_secrets
+WHERE account_id = $1 AND status = 'active'
+ORDER BY rotated_at DESC, id DESC
+LIMIT 1`, accountID).Scan(&credentialID); err != nil {
+		t.Fatalf("load account %d credential failed: %v", accountID, err)
+	}
+	return credentialID
+}
+
+func setAssignerProviderEndpointStatus(t *testing.T, db *sql.DB, accountID int64, status int) {
+	t.Helper()
+	if _, err := db.Exec(`
+UPDATE provider_endpoints
+SET status = $2
+WHERE id = (SELECT provider_endpoint_id FROM api_accounts WHERE id = $1)`, accountID, status); err != nil {
+		t.Fatalf("set provider endpoint status for account %d failed: %v", accountID, err)
+	}
 }
 
 func createAssignerTask(t *testing.T, db *sql.DB, taskID string, accountID int64, status string, leaseToken string) {
@@ -343,8 +487,31 @@ func createAssignerTask(t *testing.T, db *sql.DB, taskID string, accountID int64
 func createAssignerTaskWithModel(t *testing.T, db *sql.DB, taskID string, accountID int64, status string, leaseToken string, resolvedModel string) {
 	t.Helper()
 	_, err := db.Exec(`
-	INSERT INTO tasks (task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params, status, lease_token, error_msg, result, resolved_model)
-	VALUES ($1, 1, (SELECT channel_id FROM api_accounts WHERE id = $2), NULLIF($2, 0), 'prompt', 'prompt', '{}', $3, $4, '', '', $5)`,
+	INSERT INTO tasks (
+		task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id,
+		prompt, user_prompt, params, status, lease_token, error_msg, result, resolved_model,
+		api_type, provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version
+	)
+	VALUES (
+		$1,
+		1,
+		(SELECT provider_endpoint_id FROM api_accounts WHERE id = $2),
+		(SELECT id FROM api_account_secrets WHERE account_id = $2 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1),
+		NULLIF($2, 0),
+		'prompt',
+		'prompt',
+		'{}',
+		$3,
+		$4,
+		'',
+		'',
+		CASE WHEN NULLIF($5, '') IS NOT NULL THEN $5 WHEN $2 = 0 THEN '' ELSE 'gpt-image-1' END,
+		COALESCE((SELECT pe.api_type FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $2), ''),
+		COALESCE((SELECT pe.name FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $2), ''),
+		COALESCE((SELECT pe.base_url FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $2), ''),
+		COALESCE((SELECT fingerprint FROM api_account_secrets WHERE account_id = $2 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1), ''),
+		COALESCE((SELECT key_version FROM api_account_secrets WHERE account_id = $2 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1), '')
+	)`,
 		taskID,
 		accountID,
 		status,
@@ -353,6 +520,48 @@ func createAssignerTaskWithModel(t *testing.T, db *sql.DB, taskID string, accoun
 	)
 	if err != nil {
 		t.Fatalf("create task %q failed: %v", taskID, err)
+	}
+	if status == tasks.StatusRunning && accountID > 0 && leaseToken != "" {
+		insertAssignerTaskLease(t, db, taskID, accountID, leaseToken, resolvedModel, false)
+	}
+}
+
+func insertAssignerTaskLease(t *testing.T, db *sql.DB, taskID string, accountID int64, leaseToken string, resolvedModel string, released bool) {
+	t.Helper()
+	releasedAtSQL := "NULL"
+	releaseReason := ""
+	if released {
+		releasedAtSQL = "now()"
+		releaseReason = "completed"
+	}
+	_, err := db.Exec(`
+INSERT INTO task_leases (
+  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
+  feature_slug, requested_model, resolved_model, api_type,
+  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
+  acquired_at, released_at, release_reason
+)
+VALUES (
+  $1, $2, 1, $3,
+  (SELECT provider_endpoint_id FROM api_accounts WHERE id = $3),
+  (SELECT id FROM api_account_secrets WHERE account_id = $3 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1),
+  'image-generate', '',
+  CASE WHEN NULLIF($4, '') IS NOT NULL THEN $4 ELSE 'gpt-image-1' END,
+  COALESCE((SELECT pe.api_type FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),
+  COALESCE((SELECT pe.name FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),
+  COALESCE((SELECT pe.base_url FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),
+  COALESCE((SELECT fingerprint FROM api_account_secrets WHERE account_id = $3 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1), ''),
+  COALESCE((SELECT key_version FROM api_account_secrets WHERE account_id = $3 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1), ''),
+  now(), `+releasedAtSQL+`, $5
+)`,
+		taskID,
+		leaseToken,
+		accountID,
+		resolvedModel,
+		releaseReason,
+	)
+	if err != nil {
+		t.Fatalf("insert task lease %q failed: %v", taskID, err)
 	}
 }
 
@@ -370,20 +579,66 @@ func assertTaskResolvedModel(t *testing.T, db *sql.DB, taskID string, wantModel 
 func assertTaskLease(t *testing.T, db *sql.DB, taskID string, wantAccountID int64, wantLeaseToken string) {
 	t.Helper()
 	var accountID int64
-	var assignedChannelID int64
-	var wantChannelID int64
+	var assignedProviderEndpointID int64
+	var wantProviderEndpointID int64
 	var leaseToken string
 	var status string
-	err := db.QueryRow(`SELECT account_id, assigned_channel_id, lease_token, status FROM tasks WHERE task_id = $1`, taskID).Scan(&accountID, &assignedChannelID, &leaseToken, &status)
+	err := db.QueryRow(`SELECT account_id, assigned_provider_endpoint_id, lease_token, status FROM tasks WHERE task_id = $1`, taskID).Scan(&accountID, &assignedProviderEndpointID, &leaseToken, &status)
 	if err != nil {
 		t.Fatalf("load task %q failed: %v", taskID, err)
 	}
-	if err := db.QueryRow(`SELECT channel_id FROM api_accounts WHERE id = $1`, wantAccountID).Scan(&wantChannelID); err != nil {
+	if err := db.QueryRow(`SELECT provider_endpoint_id FROM api_accounts WHERE id = $1`, wantAccountID).Scan(&wantProviderEndpointID); err != nil {
 		t.Fatalf("load account %d channel failed: %v", wantAccountID, err)
 	}
-	if accountID != wantAccountID || assignedChannelID != wantChannelID || leaseToken != wantLeaseToken || status != tasks.StatusRunning {
+	if accountID != wantAccountID || assignedProviderEndpointID != wantProviderEndpointID || leaseToken != wantLeaseToken || status != tasks.StatusRunning {
 		t.Fatalf("task %q state account=%d assigned_channel=%d lease=%q status=%q, want account=%d assigned_channel=%d lease=%q status=%q",
-			taskID, accountID, assignedChannelID, leaseToken, status, wantAccountID, wantChannelID, wantLeaseToken, tasks.StatusRunning)
+			taskID, accountID, assignedProviderEndpointID, leaseToken, status, wantAccountID, wantProviderEndpointID, wantLeaseToken, tasks.StatusRunning)
+	}
+}
+
+func assertRuntimeAssignmentSnapshot(t *testing.T, db *sql.DB, taskID string, assignment TaskAssignment) {
+	t.Helper()
+	var assignedCredentialID sql.NullInt64
+	var apiType string
+	var providerEndpointName string
+	var providerEndpointBaseURL string
+	var credentialFingerprint string
+	var credentialKeyVersion string
+	var resolvedModel string
+	err := db.QueryRow(`
+SELECT assigned_credential_id, api_type, provider_endpoint_name, provider_endpoint_base_url,
+       credential_fingerprint, credential_key_version, resolved_model
+FROM tasks
+WHERE task_id = $1`, taskID).Scan(
+		&assignedCredentialID,
+		&apiType,
+		&providerEndpointName,
+		&providerEndpointBaseURL,
+		&credentialFingerprint,
+		&credentialKeyVersion,
+		&resolvedModel,
+	)
+	if err != nil {
+		t.Fatalf("load task %q runtime assignment snapshot failed: %v", taskID, err)
+	}
+	if !assignedCredentialID.Valid || assignedCredentialID.Int64 != assignment.CredentialID {
+		t.Fatalf("assigned_credential_id=%v, want %d", assignedCredentialID, assignment.CredentialID)
+	}
+	if apiType != assignment.APIType ||
+		providerEndpointName != assignment.ProviderEndpointName ||
+		providerEndpointBaseURL != assignment.ProviderEndpointBaseURL ||
+		credentialFingerprint != assignment.CredentialFingerprint ||
+		credentialKeyVersion != assignment.CredentialKeyVersion ||
+		resolvedModel != assignment.ResolvedModel {
+		t.Fatalf("snapshot api_type=%q endpoint_name=%q endpoint_base=%q credential_fp=%q key_version=%q model=%q, want assignment=%+v",
+			apiType,
+			providerEndpointName,
+			providerEndpointBaseURL,
+			credentialFingerprint,
+			credentialKeyVersion,
+			resolvedModel,
+			assignment,
+		)
 	}
 }
 

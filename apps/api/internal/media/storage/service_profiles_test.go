@@ -3,10 +3,13 @@ package storage
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
@@ -385,7 +388,7 @@ func TestListProfilesDoesNotExposeSecretByDefault(t *testing.T) {
 	var storedMaterialKind, storedPayload string
 	if err := repo.db.QueryRowContext(ctx, `
 SELECT secret_material_kind, secret_payload
-FROM storage_profile_secrets
+FROM storage_profile_secret_versions
 WHERE profile_id = $1 AND secret_name = $2 AND status = 'active'`,
 		"s3-secret-boundary", storageSecretAccessKeyName,
 	).Scan(&storedMaterialKind, &storedPayload); err != nil {
@@ -417,6 +420,367 @@ WHERE profile_id = $1 AND secret_name = $2 AND status = 'active'`,
 	runtimeProfile := mustFindProfileForTest(t, runtimeProfiles, "s3-secret-boundary")
 	if got := configString(runtimeProfile.Config, storageSecretAccessKeyName); got != rawSecret {
 		t.Fatalf("ListProfilesWithSecrets secret = %q, want %q", got, rawSecret)
+	}
+}
+
+func TestStorageSecretRotationAppendsVersionsAndRetiresPreviousActive(t *testing.T) {
+	_, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+
+	profile := StorageProfile{
+		ID:       "s3-rotation",
+		Name:     "Rotation",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak-rotation",
+			storageSecretAccessKeyName: "sk-v1",
+			"bucket_name":              "bucket-rotation",
+			"endpoint":                 "s3.example.com",
+			"access_domain":            "https://bucket-rotation.s3.example.com",
+		},
+	}
+	if err := repo.SaveProfile(ctx, profile); err != nil {
+		t.Fatalf("SaveProfile v1 returned error: %v", err)
+	}
+	profile.Config[storageSecretAccessKeyName] = "sk-v2"
+	if err := repo.SaveProfile(ctx, profile); err != nil {
+		t.Fatalf("SaveProfile v2 returned error: %v", err)
+	}
+
+	rows, err := repo.db.QueryContext(ctx, `
+SELECT version_number, status
+FROM storage_profile_secret_versions
+WHERE profile_id = $1 AND secret_name = $2
+ORDER BY version_number ASC`,
+		profile.ID, storageSecretAccessKeyName)
+	if err != nil {
+		t.Fatalf("list secret versions failed: %v", err)
+	}
+	defer rows.Close()
+
+	type versionState struct {
+		version int
+		status  string
+	}
+	var states []versionState
+	for rows.Next() {
+		var state versionState
+		if err := rows.Scan(&state.version, &state.status); err != nil {
+			t.Fatalf("scan secret version failed: %v", err)
+		}
+		states = append(states, state)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate secret versions failed: %v", err)
+	}
+	if len(states) != 2 ||
+		states[0] != (versionState{version: 1, status: StorageSecretVersionStatusRetired}) ||
+		states[1] != (versionState{version: 2, status: StorageSecretVersionStatusActive}) {
+		t.Fatalf("secret version states = %#v, want v1 retired and v2 active", states)
+	}
+
+	runtimeProfiles, err := repo.ListProfilesWithSecrets(ctx, false)
+	if err != nil {
+		t.Fatalf("ListProfilesWithSecrets returned error: %v", err)
+	}
+	runtimeProfile := mustFindProfileForTest(t, runtimeProfiles, profile.ID)
+	if got := configString(runtimeProfile.Config, storageSecretAccessKeyName); got != "sk-v2" {
+		t.Fatalf("active runtime secret = %q, want sk-v2", got)
+	}
+	if len(runtimeProfile.SecretVersions) != 2 {
+		t.Fatalf("secret version metadata count = %d, want 2", len(runtimeProfile.SecretVersions))
+	}
+}
+
+func TestStorageServiceSkipsSecretRotationWhenSecretWasNotExplicitlyProvided(t *testing.T) {
+	service, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+	const profileID = "s3-metadata-only-save"
+
+	if _, err := service.SaveProfile(ctx, &StorageProfile{
+		ID:       profileID,
+		Name:     "Metadata Only",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak-metadata",
+			storageSecretAccessKeyName: "sk-initial",
+			"bucket_name":              "bucket-metadata",
+			"endpoint":                 "s3.example.com",
+			"access_domain":            "https://bucket-metadata.s3.example.com",
+		},
+	}); err != nil {
+		t.Fatalf("SaveProfile seed returned error: %v", err)
+	}
+
+	cases := []struct {
+		name   string
+		config map[string]interface{}
+	}{
+		{
+			name: "omitted secret",
+			config: map[string]interface{}{
+				"access_key_id": "ak-metadata",
+				"bucket_name":   "bucket-metadata-renamed",
+				"endpoint":      "s3.example.com",
+				"access_domain": "https://bucket-metadata.s3.example.com",
+			},
+		},
+		{
+			name: "empty secret",
+			config: map[string]interface{}{
+				"access_key_id":            "ak-metadata",
+				storageSecretAccessKeyName: "",
+				"bucket_name":              "bucket-metadata-renamed-again",
+				"endpoint":                 "s3.example.com",
+				"access_domain":            "https://bucket-metadata.s3.example.com",
+			},
+		},
+		{
+			name: "masked secret",
+			config: map[string]interface{}{
+				"access_key_id":            "ak-metadata",
+				storageSecretAccessKeyName: "********",
+				"bucket_name":              "bucket-metadata-final",
+				"endpoint":                 "s3.example.com",
+				"access_domain":            "https://bucket-metadata.s3.example.com",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := service.SaveProfile(ctx, &StorageProfile{
+				ID:       profileID,
+				Name:     "Metadata Only Updated",
+				Provider: StorageProviderS3Compatible,
+				Enabled:  true,
+				Config:   tc.config,
+			}); err != nil {
+				t.Fatalf("SaveProfile metadata update returned error: %v", err)
+			}
+			assertSerialStorageSecretVersionsForTest(t, loadStorageSecretVersionStatesForTest(t, repo, profileID), 1)
+		})
+	}
+
+	runtimeProfiles, err := repo.ListProfilesWithSecrets(ctx, false)
+	if err != nil {
+		t.Fatalf("ListProfilesWithSecrets returned error: %v", err)
+	}
+	runtimeProfile := mustFindProfileForTest(t, runtimeProfiles, profileID)
+	if got := configString(runtimeProfile.Config, storageSecretAccessKeyName); got != "sk-initial" {
+		t.Fatalf("runtime secret after metadata saves = %q, want sk-initial", got)
+	}
+}
+
+func TestStorageSecretRotationSkipsEquivalentSecretValue(t *testing.T) {
+	_, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+	const profileID = "s3-equivalent-secret"
+
+	profile := storageSecretRotationProfileForTest(profileID, "sk-same")
+	if err := repo.SaveProfile(ctx, profile); err != nil {
+		t.Fatalf("SaveProfile seed returned error: %v", err)
+	}
+	profile.Name = "Equivalent Secret Updated"
+	if err := repo.SaveProfile(ctx, profile); err != nil {
+		t.Fatalf("SaveProfile equivalent secret returned error: %v", err)
+	}
+
+	assertSerialStorageSecretVersionsForTest(t, loadStorageSecretVersionStatesForTest(t, repo, profileID), 1)
+}
+
+func TestStorageSecretRotationIntentPreventsStaleMetadataRollback(t *testing.T) {
+	_, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+	const profileID = "s3-stale-metadata"
+
+	if err := repo.SaveProfile(ctx, storageSecretRotationProfileForTest(profileID, "sk-initial")); err != nil {
+		t.Fatalf("SaveProfile seed returned error: %v", err)
+	}
+	if err := repo.SaveProfile(ctx, storageSecretRotationProfileForTest(profileID, "sk-rotated")); err != nil {
+		t.Fatalf("SaveProfile rotated returned error: %v", err)
+	}
+	staleMetadata := storageSecretRotationProfileForTest(profileID, "sk-initial")
+	staleMetadata.Name = "Stale Metadata"
+	if err := repo.saveProfile(ctx, staleMetadata, storageProfileSaveOptions{rotateSecret: false}); err != nil {
+		t.Fatalf("metadata save returned error: %v", err)
+	}
+
+	assertSerialStorageSecretVersionsForTest(t, loadStorageSecretVersionStatesForTest(t, repo, profileID), 2)
+	runtimeProfiles, err := repo.ListProfilesWithSecrets(ctx, false)
+	if err != nil {
+		t.Fatalf("ListProfilesWithSecrets returned error: %v", err)
+	}
+	runtimeProfile := mustFindProfileForTest(t, runtimeProfiles, profileID)
+	if got := configString(runtimeProfile.Config, storageSecretAccessKeyName); got != "sk-rotated" {
+		t.Fatalf("runtime secret after stale metadata save = %q, want sk-rotated", got)
+	}
+}
+
+func TestStorageSecretRotationSerializesConcurrentRepositorySavesAndSkipsMatchingFingerprint(t *testing.T) {
+	_, repo := newStorageServiceTest(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	const profileID = "s3-repo-concurrent-rotation"
+
+	if err := repo.SaveProfile(ctx, storageSecretRotationProfileForTest(profileID, "sk-initial")); err != nil {
+		t.Fatalf("SaveProfile seed returned error: %v", err)
+	}
+
+	const rotations = 12
+	start := make(chan struct{})
+	errs := make(chan error, rotations)
+	var wg sync.WaitGroup
+	for i := 0; i < rotations; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			profile := storageSecretRotationProfileForTest(profileID, fmt.Sprintf("sk-repo-%02d", i))
+			profile.Name = fmt.Sprintf("Repo Rotation %02d", i)
+			errs <- repo.SaveProfile(ctx, profile)
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent repository SaveProfile returned error: %v", err)
+		}
+	}
+
+	assertSerialStorageSecretVersionsForTest(t, loadStorageSecretVersionStatesForTest(t, repo, profileID), rotations+1)
+
+	runtimeProfiles, err := repo.ListProfilesWithSecrets(ctx, false)
+	if err != nil {
+		t.Fatalf("ListProfilesWithSecrets returned error: %v", err)
+	}
+	activeSecret := configString(mustFindProfileForTest(t, runtimeProfiles, profileID).Config, storageSecretAccessKeyName)
+	if activeSecret == "" {
+		t.Fatal("active secret should be available after repository rotations")
+	}
+
+	const duplicateSaves = 8
+	duplicatesStart := make(chan struct{})
+	duplicateErrs := make(chan error, duplicateSaves)
+	for i := 0; i < duplicateSaves; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-duplicatesStart
+			profile := storageSecretRotationProfileForTest(profileID, activeSecret)
+			profile.Name = fmt.Sprintf("Duplicate Fingerprint %02d", i)
+			duplicateErrs <- repo.SaveProfile(ctx, profile)
+		}()
+	}
+	close(duplicatesStart)
+	wg.Wait()
+	close(duplicateErrs)
+
+	for err := range duplicateErrs {
+		if err != nil {
+			t.Fatalf("concurrent duplicate repository SaveProfile returned error: %v", err)
+		}
+	}
+
+	assertSerialStorageSecretVersionsForTest(t, loadStorageSecretVersionStatesForTest(t, repo, profileID), rotations+1)
+}
+
+func TestStorageServiceRotatesExplicitSecret(t *testing.T) {
+	service, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+	const profileID = "s3-service-rotation-smoke"
+
+	if _, err := service.SaveProfile(ctx, &StorageProfile{
+		ID:       profileID,
+		Name:     "Service Rotation",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak-service-rotation",
+			storageSecretAccessKeyName: "sk-initial",
+			"bucket_name":              "bucket-service-rotation",
+			"endpoint":                 "s3.example.com",
+			"access_domain":            "https://bucket-service-rotation.s3.example.com",
+		},
+	}); err != nil {
+		t.Fatalf("SaveProfile seed returned error: %v", err)
+	}
+
+	rotated, err := service.SaveProfile(ctx, &StorageProfile{
+		ID:       profileID,
+		Name:     "Service Rotation Updated",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak-service-rotation",
+			storageSecretAccessKeyName: "sk-service-rotated",
+			"bucket_name":              "bucket-service-rotation",
+			"endpoint":                 "s3.example.com",
+			"access_domain":            "https://bucket-service-rotation.s3.example.com",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveProfile rotated returned error: %v", err)
+	}
+	if !rotated.SecretConfigured {
+		t.Fatal("rotated service profile should report configured active secret")
+	}
+
+	assertSerialStorageSecretVersionsForTest(t, loadStorageSecretVersionStatesForTest(t, repo, profileID), 2)
+
+	profiles, err := service.ListProfiles(ctx)
+	if err != nil {
+		t.Fatalf("ListProfiles returned error: %v", err)
+	}
+	profile := mustFindProfileForTest(t, profiles, profileID)
+	activeCount := 0
+	for _, version := range profile.SecretVersions {
+		if version.Status == StorageSecretVersionStatusActive {
+			activeCount += 1
+		}
+	}
+	if activeCount != 1 {
+		t.Fatalf("service active secret version count = %d, want 1", activeCount)
+	}
+}
+
+func TestStorageSecretVersionsAllowOnlyOneActivePerProfile(t *testing.T) {
+	_, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+	const profileID = "s3-active-unique"
+
+	if err := repo.SaveProfile(ctx, StorageProfile{
+		ID:       profileID,
+		Name:     "Active Unique",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak-unique",
+			storageSecretAccessKeyName: "sk-unique",
+			"bucket_name":              "bucket-unique",
+			"endpoint":                 "s3.example.com",
+			"access_domain":            "https://bucket-unique.s3.example.com",
+		},
+	}); err != nil {
+		t.Fatalf("SaveProfile returned error: %v", err)
+	}
+
+	_, err := repo.db.ExecContext(ctx, `
+INSERT INTO storage_profile_secret_versions (
+  profile_id, secret_name, version_number, secret_material_kind, secret_payload, fingerprint, status
+) VALUES ($1, $2, 99, 'encrypted', 'duplicate-active', 'duplicate-fingerprint', 'active')`,
+		profileID, storageSecretAccessKeyName)
+	if err == nil {
+		t.Fatal("inserting a second active secret version should fail")
+	}
+	if !strings.Contains(err.Error(), "uq_storage_profile_secret_versions_active") {
+		t.Fatalf("duplicate active error = %v, want active unique constraint", err)
 	}
 }
 
@@ -474,7 +838,7 @@ func TestListProfilesWithSecretsFailsOnUnsupportedExternalSecretMaterial(t *test
 	}
 
 	if _, err := repo.db.ExecContext(ctx, `
-UPDATE storage_profile_secrets
+UPDATE storage_profile_secret_versions
 SET secret_material_kind = 'external_ref',
     secret_payload = '',
     secret_ref = 'vault://storage/sk-legacy'
@@ -568,4 +932,72 @@ func mustFindProfileForTest(t *testing.T, profiles []StorageProfile, id string) 
 	}
 	t.Fatalf("profile %q not found", id)
 	return StorageProfile{}
+}
+
+type storageSecretVersionStateForTest struct {
+	version int
+	status  string
+}
+
+func storageSecretRotationProfileForTest(profileID, secret string) StorageProfile {
+	return StorageProfile{
+		ID:       profileID,
+		Name:     "Rotation",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak-rotation",
+			storageSecretAccessKeyName: secret,
+			"bucket_name":              "bucket-rotation",
+			"endpoint":                 "s3.example.com",
+			"access_domain":            "https://bucket-rotation.s3.example.com",
+		},
+	}
+}
+
+func loadStorageSecretVersionStatesForTest(t *testing.T, repo *StorageProfileRepository, profileID string) []storageSecretVersionStateForTest {
+	t.Helper()
+	rows, err := repo.db.QueryContext(context.Background(), `
+SELECT version_number, status
+FROM storage_profile_secret_versions
+WHERE profile_id = $1 AND secret_name = $2
+ORDER BY version_number ASC`,
+		profileID, storageSecretAccessKeyName)
+	if err != nil {
+		t.Fatalf("list secret versions failed: %v", err)
+	}
+	defer rows.Close()
+
+	var states []storageSecretVersionStateForTest
+	for rows.Next() {
+		var state storageSecretVersionStateForTest
+		if err := rows.Scan(&state.version, &state.status); err != nil {
+			t.Fatalf("scan secret version failed: %v", err)
+		}
+		states = append(states, state)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate secret versions failed: %v", err)
+	}
+	return states
+}
+
+func assertSerialStorageSecretVersionsForTest(t *testing.T, states []storageSecretVersionStateForTest, wantCount int) {
+	t.Helper()
+	if len(states) != wantCount {
+		t.Fatalf("secret version count = %d, want %d; states=%#v", len(states), wantCount, states)
+	}
+	for i, state := range states {
+		wantVersion := i + 1
+		if state.version != wantVersion {
+			t.Fatalf("secret version at index %d = %d, want %d; states=%#v", i, state.version, wantVersion, states)
+		}
+		wantStatus := StorageSecretVersionStatusRetired
+		if i == len(states)-1 {
+			wantStatus = StorageSecretVersionStatusActive
+		}
+		if state.status != wantStatus {
+			t.Fatalf("secret version %d status = %q, want %q; states=%#v", state.version, state.status, wantStatus, states)
+		}
+	}
 }

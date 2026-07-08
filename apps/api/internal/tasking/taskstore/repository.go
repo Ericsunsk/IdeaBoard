@@ -22,24 +22,28 @@ type Repository struct {
 	q  *dbsqlc.Queries
 }
 
-type TaskStatisticLite struct {
-	TaskID         string
-	UserID         int64
-	AccountID      *int64
-	Status         string
-	Result         string
-	FeatureSlug    string
-	RequestedModel string
-	ResolvedModel  string
-	APIType        string
-	CreatedAt      time.Time
-	CompletedAt    *time.Time
-}
-
 type RunningTaskLease struct {
 	TaskID     string
 	AccountID  int64
 	LeaseToken string
+}
+
+type ActiveTaskLease struct {
+	TaskID                  string
+	LeaseToken              string
+	RiverJobID              int64
+	AccountID               int64
+	ProviderEndpointID      int64
+	CredentialID            int64
+	FeatureSlug             string
+	RequestedModel          string
+	ResolvedModel           string
+	APIType                 string
+	ProviderEndpointName    string
+	ProviderEndpointBaseURL string
+	CredentialFingerprint   string
+	CredentialKeyVersion    string
+	AcquiredAt              time.Time
 }
 
 type DailyStatAggregate struct {
@@ -52,12 +56,44 @@ type DailyStatAggregate struct {
 	Cancelled         int64
 	LatencySecondsSum float64
 	LatencyCount      int64
+	CostMicrosSum     int64
 }
 
 type BackfillDailyStatsResult struct {
 	InsertedEvents int64
 	TouchedGroups  int64
 	MarkedDays     int64
+}
+
+type RebuildDailyStatsResult struct {
+	DeletedGroups int64
+	RebuiltGroups int64
+}
+
+type TaskStatEventCorrection struct {
+	TaskID             string
+	OccurredAt         time.Time
+	UserID             int64
+	AccountID          int64
+	ProviderEndpointID int64
+	CredentialID       int64
+	FeatureSlug        string
+	APIType            string
+	ModelName          string
+	UserKey            string
+	Status             string
+	LatencySeconds     float64
+	CostMicros         int64
+}
+
+type StatEventTrendRow struct {
+	OccurredAt     time.Time
+	StatDate       time.Time
+	ModelName      string
+	UserKey        string
+	Status         string
+	LatencySeconds float64
+	CostMicros     int64
 }
 
 type StatEventLatencySample struct {
@@ -93,16 +129,16 @@ const (
 
 const createTaskPGXSQL = `
 INSERT INTO tasks (
-  task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
-  feature_slug, requested_model, resolved_model, api_type,
+  task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+  feature_slug, requested_model,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
-  $1, $2, $3, $4,
-  $5, $6, $7,
-  $8, $9, $10, $11,
-  $12, $13, $14, $15, $16, $17, $18, $19,
-  $20, $21, $22
+  $1, $2, $3, $4, $5,
+  $6, $7, $8,
+  $9, $10,
+  $11, $12, $13, $14, $15, $16, $17, $18,
+  $19, $20, $21
 )
 RETURNING id`
 
@@ -128,15 +164,14 @@ func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks
 	err := tx.QueryRow(ctx, createTaskPGXSQL,
 		params.TaskID,
 		params.UserID,
-		nullableInt64(params.AssignedChannelID),
+		nullableInt64(params.AssignedProviderEndpointID),
+		nullableInt64(params.AssignedCredentialID),
 		nullableInt64(params.AccountID),
 		params.Prompt,
 		params.UserPrompt,
 		params.Params,
 		params.FeatureSlug,
 		params.RequestedModel,
-		params.ResolvedModel,
-		params.ApiType,
 		params.Status,
 		params.LeaseToken,
 		params.RetryCount,
@@ -164,28 +199,27 @@ func createTaskParams(task *tasks.Task) dbsqlc.CreateTaskParams {
 		task.UpdatedAt = task.CreatedAt
 	}
 	return dbsqlc.CreateTaskParams{
-		TaskID:            task.TaskID,
-		UserID:            task.UserID,
-		AssignedChannelID: dbutil.NullInt64(task.AssignedChannelID),
-		AccountID:         dbutil.NullInt64(task.AccountID),
-		Prompt:            task.Prompt,
-		UserPrompt:        task.UserPrompt,
-		Params:            task.Params,
-		FeatureSlug:       task.FeatureSlug,
-		RequestedModel:    task.RequestedModel,
-		ResolvedModel:     task.ResolvedModel,
-		ApiType:           task.APIType,
-		Status:            task.Status,
-		LeaseToken:        task.LeaseToken,
-		RetryCount:        int32(task.RetryCount),
-		ErrorMsg:          task.ErrorMsg,
-		Result:            task.Result,
-		CreatedAt:         task.CreatedAt,
-		UpdatedAt:         task.UpdatedAt,
-		CompletedAt:       dbutil.NullTime(task.CompletedAt),
-		CancelledAt:       dbutil.NullTime(task.CancelledAt),
-		CancelledBy:       dbutil.NullInt64(task.CancelledBy),
-		CancelReason:      task.CancelReason,
+		TaskID:                     task.TaskID,
+		UserID:                     task.UserID,
+		AssignedProviderEndpointID: dbutil.NullInt64(task.AssignedProviderEndpointID),
+		AssignedCredentialID:       dbutil.NullInt64(task.AssignedCredentialID),
+		AccountID:                  dbutil.NullInt64(task.AccountID),
+		Prompt:                     task.Prompt,
+		UserPrompt:                 task.UserPrompt,
+		Params:                     task.Params,
+		FeatureSlug:                task.FeatureSlug,
+		RequestedModel:             task.RequestedModel,
+		Status:                     task.Status,
+		LeaseToken:                 task.LeaseToken,
+		RetryCount:                 int32(task.RetryCount),
+		ErrorMsg:                   task.ErrorMsg,
+		Result:                     task.Result,
+		CreatedAt:                  task.CreatedAt,
+		UpdatedAt:                  task.UpdatedAt,
+		CompletedAt:                dbutil.NullTime(task.CompletedAt),
+		CancelledAt:                dbutil.NullTime(task.CancelledAt),
+		CancelledBy:                dbutil.NullInt64(task.CancelledBy),
+		CancelReason:               task.CancelReason,
 	}
 }
 
@@ -237,7 +271,7 @@ func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses
 		if err != nil || updated == 0 {
 			return err
 		}
-		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID); err != nil {
+		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
 			return err
 		}
 		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
@@ -321,9 +355,17 @@ func (r *Repository) GetByUserID(ctx context.Context, userID int64, page, pageSi
 }
 
 func (r *Repository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error {
-	return r.q.DeleteTaskByTaskIDAndUserID(ctx, dbsqlc.DeleteTaskByTaskIDAndUserIDParams{
-		TaskID: taskID,
-		UserID: userID,
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		if err := q.DeleteTaskOutputMediaRefsByUserTaskID(ctx, dbsqlc.DeleteTaskOutputMediaRefsByUserTaskIDParams{
+			TaskID: taskID,
+			UserID: userID,
+		}); err != nil {
+			return err
+		}
+		return q.DeleteTaskByTaskIDAndUserID(ctx, dbsqlc.DeleteTaskByTaskIDAndUserIDParams{
+			TaskID: taskID,
+			UserID: userID,
+		})
 	})
 }
 
@@ -358,7 +400,7 @@ func (r *Repository) attachExecutionMetrics(ctx context.Context, items []*tasks.
 	return nil
 }
 
-func tasksFromSQLC(rows []dbsqlc.Task) []*tasks.Task {
+func tasksFromSQLC[T any](rows []T) []*tasks.Task {
 	result := make([]*tasks.Task, 0, len(rows))
 	for _, row := range rows {
 		task := taskFromSQLC(row)
@@ -389,11 +431,12 @@ func taskExecutionMetricsFromSQLC(row dbsqlc.TaskExecutionMetric) tasks.TaskExec
 	}
 }
 
-func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
+func taskOutputFromSQLC(row dbsqlc.ListOutputsByTaskIDsRow) tasks.TaskOutput {
 	return tasks.TaskOutput{
 		ID:             row.ID,
 		TaskID:         row.TaskID,
 		MediaAssetID:   dbutil.Int64Ptr(row.MediaAssetID),
+		OutputKind:     row.OutputKind,
 		Role:           row.Role,
 		URL:            row.Url,
 		StorageKey:     row.StorageKey,

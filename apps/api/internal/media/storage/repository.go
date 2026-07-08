@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -18,12 +19,18 @@ import (
 
 const storageSecretAccessKeyName = "secret_access_key"
 
+var ErrStorageSecretVersionConflict = errors.New("storage secret version rotation conflict: retry the request")
+
 type storageProfileSecretPolicy int
 
 const (
 	storageProfileSecretMetadataOnly storageProfileSecretPolicy = iota
 	storageProfileSecretPlaintext
 )
+
+type storageProfileSaveOptions struct {
+	rotateSecret bool
+}
 
 type StorageProfileRepository struct {
 	db *sql.DB
@@ -59,16 +66,28 @@ func (r *StorageProfileRepository) listProfiles(ctx context.Context, includeDele
 }
 
 func (r *StorageProfileRepository) SaveProfile(ctx context.Context, profile StorageProfile) error {
+	return r.saveProfile(ctx, profile, storageProfileSaveOptions{
+		rotateSecret: storageProfileHasRealSecret(profile),
+	})
+}
+
+func (r *StorageProfileRepository) saveProfile(ctx context.Context, profile StorageProfile, options storageProfileSaveOptions) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		return saveProfileTx(ctx, q, profile)
+		return saveProfileTx(ctx, q, profile, options)
 	})
 }
 
 func (r *StorageProfileRepository) SaveAndApplyProfile(ctx context.Context, profile StorageProfile) error {
+	return r.saveAndApplyProfile(ctx, profile, storageProfileSaveOptions{
+		rotateSecret: storageProfileHasRealSecret(profile),
+	})
+}
+
+func (r *StorageProfileRepository) saveAndApplyProfile(ctx context.Context, profile StorageProfile, options storageProfileSaveOptions) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		saved := profile
 		saved.IsCurrent = false
-		if err := saveProfileTx(ctx, q, saved); err != nil {
+		if err := saveProfileTx(ctx, q, saved, options); err != nil {
 			return err
 		}
 		return applyStorageProfileTx(ctx, q, profile.ID)
@@ -117,7 +136,7 @@ func applyStorageProfileTx(ctx context.Context, q *dbsqlc.Queries, id string) er
 	return nil
 }
 
-func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfile) error {
+func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfile, options storageProfileSaveOptions) error {
 	id := strings.TrimSpace(profile.ID)
 	if id == "" {
 		return nil
@@ -129,6 +148,24 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 	status := "active"
 	if !profile.Enabled {
 		status = "disabled"
+	}
+	rotateSecret := options.rotateSecret && secret != ""
+	fingerprint := ""
+	if rotateSecret {
+		fingerprint = storageSecretFingerprint(secret)
+		if err := lockStorageProfileSecretVersionRotation(ctx, q, id, storageSecretAccessKeyName); err != nil {
+			return err
+		}
+		active, err := q.GetActiveStorageProfileSecretVersion(ctx, dbsqlc.GetActiveStorageProfileSecretVersionParams{
+			ProfileID:  id,
+			SecretName: storageSecretAccessKeyName,
+		})
+		if err != nil && !database.IsNotFound(err) {
+			return err
+		}
+		if err == nil && active.Fingerprint == fingerprint {
+			rotateSecret = false
+		}
 	}
 	if err := q.UpsertStorageProfile(ctx, dbsqlc.UpsertStorageProfileParams{
 		ProfileID: id,
@@ -144,15 +181,20 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 	}); err != nil {
 		return err
 	}
-	if secret == "" {
+	if !rotateSecret {
 		return nil
 	}
-	fingerprint := storageSecretFingerprint(secret)
 	encrypted, err := secrets.EncryptString(secret)
 	if err != nil {
 		return fmt.Errorf("加密存储密钥失败: %w", err)
 	}
-	return q.UpsertStorageProfileSecret(ctx, dbsqlc.UpsertStorageProfileSecretParams{
+	if _, err := q.RetireActiveStorageProfileSecretVersion(ctx, dbsqlc.RetireActiveStorageProfileSecretVersionParams{
+		ProfileID:  id,
+		SecretName: storageSecretAccessKeyName,
+	}); err != nil {
+		return err
+	}
+	_, err = q.InsertStorageProfileSecretVersion(ctx, dbsqlc.InsertStorageProfileSecretVersionParams{
 		ProfileID:          id,
 		SecretName:         storageSecretAccessKeyName,
 		SecretMaterialKind: secrets.MaterialKindEncrypted,
@@ -160,11 +202,27 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 		SecretPayload:      encrypted,
 		Fingerprint:        fingerprint,
 		KeyVersion:         "",
-		Status:             "active",
 		RotatedAt:          sql.NullTime{Time: time.Now(), Valid: true},
 		ExpiresAt:          sql.NullTime{},
-		RetiredAt:          sql.NullTime{},
 	})
+	if database.IsDuplicateConstraintError(err) {
+		return ErrStorageSecretVersionConflict
+	}
+	return err
+}
+
+func lockStorageProfileSecretVersionRotation(ctx context.Context, q *dbsqlc.Queries, profileID, secretName string) error {
+	locked, err := q.LockStorageProfileSecretVersionRotation(ctx, dbsqlc.LockStorageProfileSecretVersionRotationParams{
+		ProfileID:  profileID,
+		SecretName: secretName,
+	})
+	if err != nil {
+		return fmt.Errorf("lock storage secret version rotation: %w", err)
+	}
+	if !locked {
+		return ErrStorageSecretVersionConflict
+	}
+	return nil
 }
 
 func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsqlc.StorageProfile, secretPolicy storageProfileSecretPolicy) (StorageProfile, error) {
@@ -178,10 +236,22 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 		config = map[string]interface{}{}
 	}
 
+	versionRows, err := r.q.ListStorageProfileSecretVersions(ctx, dbsqlc.ListStorageProfileSecretVersionsParams{
+		ProfileID:  row.ProfileID,
+		SecretName: storageSecretAccessKeyName,
+	})
+	if err != nil {
+		return StorageProfile{}, err
+	}
+	secretVersions := make([]StorageSecretVersion, 0, len(versionRows))
+	for _, versionRow := range versionRows {
+		secretVersions = append(secretVersions, storageSecretVersionFromRow(versionRow))
+	}
+
 	secretConfigured := false
 	switch secretPolicy {
 	case storageProfileSecretPlaintext:
-		secret, err := r.q.GetStorageProfileSecret(ctx, dbsqlc.GetStorageProfileSecretParams{
+		secret, err := r.q.GetActiveStorageProfileSecretVersion(ctx, dbsqlc.GetActiveStorageProfileSecretVersionParams{
 			ProfileID:  row.ProfileID,
 			SecretName: storageSecretAccessKeyName,
 		})
@@ -199,7 +269,7 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 			}
 		}
 	case storageProfileSecretMetadataOnly:
-		configured, err := r.q.HasStorageProfileSecret(ctx, dbsqlc.HasStorageProfileSecretParams{
+		configured, err := r.q.HasActiveStorageProfileSecretVersion(ctx, dbsqlc.HasActiveStorageProfileSecretVersionParams{
 			ProfileID:  row.ProfileID,
 			SecretName: storageSecretAccessKeyName,
 		})
@@ -219,8 +289,33 @@ func (r *StorageProfileRepository) profileFromRow(ctx context.Context, row dbsql
 		IsCurrent:        row.IsCurrent,
 		Builtin:          row.Builtin,
 		SecretConfigured: secretConfigured,
+		SecretVersions:   secretVersions,
 		Config:           config,
 	}, nil
+}
+
+func storageSecretVersionFromRow(row dbsqlc.StorageProfileSecretVersion) StorageSecretVersion {
+	return StorageSecretVersion{
+		ID:             row.ID,
+		SecretName:     row.SecretName,
+		VersionNumber:  row.VersionNumber,
+		Status:         row.Status,
+		RotatedAt:      row.RotatedAt,
+		ExpiresAt:      timePtr(row.ExpiresAt),
+		RetiredAt:      timePtr(row.RetiredAt),
+		RevokedAt:      timePtr(row.RevokedAt),
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		HasSecretValue: strings.TrimSpace(row.SecretPayload) != "" || strings.TrimSpace(row.SecretRef) != "",
+	}
+}
+
+func timePtr(value sql.NullTime) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	out := value.Time
+	return &out
 }
 
 func storageProfileConfigForDB(profile StorageProfile) (json.RawMessage, string, error) {
@@ -235,6 +330,21 @@ func storageProfileConfigForDB(profile StorageProfile) (json.RawMessage, string,
 		return nil, "", err
 	}
 	return json.RawMessage(raw), secret, nil
+}
+
+func storageProfileHasRealSecret(profile StorageProfile) bool {
+	return storageProfileRealSecretValue(profile) != ""
+}
+
+func storageProfileRealSecretValue(profile StorageProfile) string {
+	if canonicalizeStorageProvider(profile.Provider) != StorageProviderS3Compatible {
+		return ""
+	}
+	secret := strings.TrimSpace(configString(profile.Config, storageSecretAccessKeyName))
+	if secret == "" || strings.Contains(secret, "*") {
+		return ""
+	}
+	return secret
 }
 
 func storageSecretFingerprint(secret string) string {

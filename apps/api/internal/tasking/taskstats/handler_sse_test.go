@@ -58,11 +58,11 @@ func (s fakeStatsStore) ListExecutionFailureCategoryStatsByCreatedRange(context.
 	return nil, errors.New("not implemented")
 }
 
-func (s fakeStatsStore) ListStatEventLatencySamplesByDateRange(context.Context, time.Time, time.Time) ([]taskstore.StatEventLatencySample, error) {
+func (s fakeStatsStore) ListStatEventsByOccurredRange(context.Context, time.Time, time.Time) ([]taskstore.StatEventTrendRow, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s fakeStatsStore) ListStatisticsByCreatedAtRange(context.Context, time.Time, time.Time) ([]taskstore.TaskStatisticLite, error) {
+func (s fakeStatsStore) ListStatEventLatencySamplesByDateRange(context.Context, time.Time, time.Time) ([]taskstore.StatEventLatencySample, error) {
 	return nil, errors.New("not implemented")
 }
 

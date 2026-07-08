@@ -157,9 +157,9 @@ func (q *RiverQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*task
 	if err != nil {
 		return nil, err
 	}
-	running, err := q.countRunningTaskAttempts(ctx)
+	running, err := q.countActiveTaskLeases(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("river monitor info running attempts: %w", err)
+		return nil, fmt.Errorf("river monitor info active leases: %w", err)
 	}
 	loads := map[int64]*tasks.AccountLoad{}
 	if q != nil && q.accountLoadStore != nil {
@@ -186,15 +186,15 @@ WHERE queue = $1
 	return count, err
 }
 
-func (q *RiverQueue) countRunningTaskAttempts(ctx context.Context) (int64, error) {
+func (q *RiverQueue) countActiveTaskLeases(ctx context.Context) (int64, error) {
 	if q == nil || q.db == nil {
 		return 0, nil
 	}
 	var count int64
 	err := q.db.QueryRowContext(ctx, `
 SELECT COUNT(*)
-FROM task_attempts
-WHERE status = $1`, tasks.TaskAttemptStatusRunning).Scan(&count)
+FROM task_leases
+WHERE released_at IS NULL`).Scan(&count)
 	return count, err
 }
 

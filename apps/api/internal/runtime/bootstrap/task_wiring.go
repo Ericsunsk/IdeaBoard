@@ -208,7 +208,7 @@ func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context,
 	if err != nil {
 		return 0, err
 	}
-	return board.UserID, nil
+	return board.OwnerUserID, nil
 }
 
 type uploadOwnerStorageUIDResolver struct {

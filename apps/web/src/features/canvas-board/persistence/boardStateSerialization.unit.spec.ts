@@ -9,7 +9,7 @@ describe('boardStateSerialization', () => {
   it('serializes a local preview fallback without preview data', () => {
     const state = makeCanvasBoardState({
       updatedAt: 200,
-      mediaRefs: [{ url: 'https://example.com/source.png', role: 'source' }],
+      mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
       previewSnapshotDataUrl: 'data:image/webp;base64,preview',
       previewSnapshotUpdatedAt: 201,
       previewSnapshotVersion: 3,
@@ -18,7 +18,7 @@ describe('boardStateSerialization', () => {
     const fallback = serializeCanvasBoardState(state, 'local-preview-fallback')
 
     expect(fallback.updatedAt).toBe(200)
-    expect(fallback.mediaRefs).toEqual([{ url: 'https://example.com/source.png', role: 'source' }])
+    expect(fallback.mediaRefs).toEqual([{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }])
     expect(fallback).not.toHaveProperty('previewSnapshotDataUrl')
     expect(fallback).not.toHaveProperty('previewSnapshotUpdatedAt')
     expect(fallback).not.toHaveProperty('previewSnapshotVersion')
@@ -28,7 +28,7 @@ describe('boardStateSerialization', () => {
   it('serializes a board session snapshot without local or preview metadata', () => {
     const state = makeCanvasBoardState({
       updatedAt: 200,
-      mediaRefs: [{ url: 'https://example.com/source.png' }],
+      mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }],
       previewSnapshotDataUrl: 'data:image/webp;base64,preview',
       previewSnapshotUpdatedAt: 201,
       previewSnapshotVersion: 3,
@@ -36,7 +36,7 @@ describe('boardStateSerialization', () => {
 
     const snapshot = serializeCanvasBoardState(state, 'session-snapshot')
 
-    expect(snapshot.mediaRefs).toEqual([{ url: 'https://example.com/source.png' }])
+    expect(snapshot.mediaRefs).toEqual([{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }])
     expect(snapshot).not.toHaveProperty('updatedAt')
     expect(snapshot).not.toHaveProperty('previewSnapshotDataUrl')
     expect(snapshot).not.toHaveProperty('viewport')

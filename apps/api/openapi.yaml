@@ -15,7 +15,7 @@ tags:
   - name: AdminTasks
   - name: AdminMonitor
   - name: AdminStatistics
-  - name: AdminChannels
+  - name: AdminProviderEndpoints
   - name: AdminStorage
   - name: AdminFeaturePrompts
   - name: UserAssets
@@ -700,7 +700,7 @@ paths:
         - name: keyword
           in: query
           schema: { type: string }
-        - name: platform
+        - name: api_type
           in: query
           schema: { type: string }
         - $ref: '#/components/parameters/Page'
@@ -782,6 +782,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/accounts/{id}/models:
+    patch:
+      tags: [AdminAccounts]
+      operationId: patchAdminAccountModel
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAccountModelPatchRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminAccount'
+    delete:
+      tags: [AdminAccounts]
+      operationId: deleteAdminAccountModel
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - name: model_name
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminAccount'
   /admin/accounts/{id}/queue:
     get:
       tags: [AdminAccounts]
@@ -970,37 +1005,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseUploadImage'
 
-  /admin/channels:
+  /admin/provider-endpoints:
     get:
-      tags: [AdminChannels]
-      operationId: listAdminChannels
+      tags: [AdminProviderEndpoints]
+      operationId: listAdminProviderEndpoints
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseChannelList'
+                $ref: '#/components/schemas/ApiResponseProviderEndpointList'
     post:
-      tags: [AdminChannels]
-      operationId: createAdminChannel
+      tags: [AdminProviderEndpoints]
+      operationId: createAdminProviderEndpoint
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChannelFormData'
+              $ref: '#/components/schemas/ProviderEndpointFormData'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseChannel'
-  /admin/channels/detect-models:
+                $ref: '#/components/schemas/ApiResponseProviderEndpoint'
+  /admin/provider-endpoints/detect-models:
     post:
-      tags: [AdminChannels]
-      operationId: detectAdminChannelModels
+      tags: [AdminProviderEndpoints]
+      operationId: detectAdminProviderEndpointModels
       requestBody:
         required: true
         content:
@@ -1014,10 +1049,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseDetectModels'
-  /admin/channels/{id}:
+  /admin/provider-endpoints/{id}:
     put:
-      tags: [AdminChannels]
-      operationId: updateAdminChannel
+      tags: [AdminProviderEndpoints]
+      operationId: updateAdminProviderEndpoint
       parameters:
         - $ref: '#/components/parameters/IdPath'
       requestBody:
@@ -1025,17 +1060,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChannelFormData'
+              $ref: '#/components/schemas/ProviderEndpointFormData'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseChannel'
+                $ref: '#/components/schemas/ApiResponseProviderEndpoint'
     delete:
-      tags: [AdminChannels]
-      operationId: deleteAdminChannel
+      tags: [AdminProviderEndpoints]
+      operationId: deleteAdminProviderEndpoint
       parameters:
         - $ref: '#/components/parameters/IdPath'
       responses:
@@ -1242,22 +1277,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseFeaturePromptList'
-  /admin/feature-prompts/{slug}/revisions:
-    get:
-      tags: [AdminFeaturePrompts]
-      operationId: listAdminFeaturePromptRevisions
-      parameters:
-        - name: slug
-          in: path
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseFeaturePromptRevisions'
   /admin/feature-prompts/{slug}:
     get:
       tags: [AdminFeaturePrompts]
@@ -1298,6 +1317,10 @@ paths:
                   type: array
                   items:
                     $ref: '#/components/schemas/FeaturePromptVariable'
+                model_defaults:
+                  $ref: '#/components/schemas/FeaturePromptModelDefaults'
+                user_prompt_merge_policy:
+                  $ref: '#/components/schemas/FeaturePromptMergePolicy'
       responses:
         '200':
           description: OK
@@ -1449,10 +1472,14 @@ components:
 
     BoardStateMediaRef:
       type: object
-      required: [url]
+      required: [mediaAssetId, refType, refId]
       additionalProperties: false
       properties:
-        url: { type: string, minLength: 1 }
+        mediaAssetId: { type: integer, minimum: 1 }
+        refType:
+          type: string
+          enum: [board, board_node]
+        refId: { type: string, minLength: 1, maxLength: 128 }
         role: { type: string, minLength: 1 }
 
     BoardMemberItem:
@@ -1535,7 +1562,10 @@ components:
         id: { type: integer }
         task_id: { type: string }
         user_id: { type: integer }
-        assigned_channel_id:
+        assigned_provider_endpoint_id:
+          type: integer
+          nullable: true
+        assigned_credential_id:
           type: integer
           nullable: true
         account_id:
@@ -1548,6 +1578,10 @@ components:
         requested_model: { type: string }
         resolved_model: { type: string }
         api_type: { type: string }
+        provider_endpoint_name: { type: string }
+        provider_endpoint_base_url: { type: string }
+        credential_fingerprint: { type: string }
+        credential_key_version: { type: string }
         status: { type: string }
         retry_count: { type: integer }
         error_msg: { type: string }
@@ -1628,6 +1662,7 @@ components:
       required:
         - id
         - task_id
+        - output_kind
         - role
         - url
         - mime_type
@@ -1643,6 +1678,9 @@ components:
         media_asset_id:
           type: integer
           nullable: true
+        output_kind:
+          type: string
+          enum: [asset, remote]
         role: { type: string }
         url: { type: string }
         storage_key: { type: string }
@@ -1928,14 +1966,13 @@ components:
 
     AdminAccount:
       type: object
-      required: [id, name, channel_id, platform, api_type, proxy_url, models, secret_configured, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
+      required: [id, name, provider_endpoint_id, provider_endpoint_api_type, provider_endpoint_base_url, models, secret_configured, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
       properties:
         id: { type: integer }
         name: { type: string }
-        channel_id: { type: integer }
-        platform: { type: string }
-        api_type: { type: string }
-        proxy_url: { type: string }
+        provider_endpoint_id: { type: integer }
+        provider_endpoint_api_type: { type: string }
+        provider_endpoint_base_url: { type: string }
         models:
           type: array
           items:
@@ -1979,20 +2016,32 @@ components:
           type: array
           items: { type: string }
 
-    AdminAccountCreateRequest:
+    AdminAccountModelPatchRequest:
       type: object
-      required: [name, channel_id, platform, api_type, secret, models]
+      required: [name]
       properties:
         name: { type: string }
-        channel_id: { type: integer }
-        platform: { type: string }
-        api_type: { type: string }
+        enabled: { type: boolean }
+        weight: { type: integer }
+        max_concurrent:
+          type: integer
+          nullable: true
+        feature_slugs:
+          type: array
+          items: { type: string }
+        sort_order: { type: integer }
+
+    AdminAccountCreateRequest:
+      type: object
+      required: [name, provider_endpoint_id, secret, models]
+      properties:
+        name: { type: string }
+        provider_endpoint_id: { type: integer }
         secret: { type: string }
         models:
           type: array
           items:
             $ref: '#/components/schemas/AdminAccountModelInput'
-        proxy_url: { type: string }
         max_concurrent: { type: integer }
         timeout: { type: integer }
         weight: { type: integer }
@@ -2000,17 +2049,13 @@ components:
 
     AdminAccountUpdateRequest:
       type: object
-      required: [models]
       properties:
         name: { type: string }
-        platform: { type: string }
-        api_type: { type: string }
         secret: { type: string }
         models:
           type: array
           items:
             $ref: '#/components/schemas/AdminAccountModelInput'
-        proxy_url: { type: string }
         max_concurrent: { type: integer }
         timeout: { type: integer }
         weight: { type: integer }
@@ -2253,27 +2298,28 @@ components:
         scanned_days: { type: integer }
         backfilled_days: { type: integer }
 
-    Channel:
+    ProviderEndpoint:
       type: object
-      required: [id, type, name, api_url, status, created_at, updated_at]
+      required: [id, api_type, name, base_url, status, created_at, updated_at]
       properties:
         id: { type: integer }
-        type:
+        api_type:
           $ref: '#/components/schemas/ProviderAPIType'
         name: { type: string }
-        api_url: { type: string }
+        base_url: { type: string }
         status: { type: integer }
         created_at: { type: string }
         updated_at: { type: string }
 
-    ChannelFormData:
+    ProviderEndpointFormData:
       type: object
-      required: [type, name, api_url]
+      required: [api_type, name, base_url, status]
       properties:
-        type:
+        api_type:
           $ref: '#/components/schemas/ProviderAPIType'
         name: { type: string }
-        api_url: { type: string }
+        base_url: { type: string }
+        status: { type: integer }
 
     ProviderAPIType:
       type: string
@@ -2431,7 +2477,7 @@ components:
 
     FeaturePrompt:
       type: object
-      required: [slug, prompt, enabled, variables, schema_version]
+      required: [slug, prompt, enabled, variables, model_defaults, user_prompt_merge_policy, schema_version]
       properties:
         slug: { type: string }
         prompt: { type: string }
@@ -2440,6 +2486,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FeaturePromptVariable'
+        model_defaults:
+          $ref: '#/components/schemas/FeaturePromptModelDefaults'
+        user_prompt_merge_policy:
+          $ref: '#/components/schemas/FeaturePromptMergePolicy'
         schema_version: { type: integer }
         published_at:
           type: string
@@ -2447,24 +2497,6 @@ components:
         updated_at:
           type: string
           nullable: true
-
-    FeaturePromptRevision:
-      type: object
-      required: [id, slug, prompt, enabled, variables, schema_version, created_at]
-      properties:
-        id: { type: integer }
-        slug: { type: string }
-        prompt: { type: string }
-        enabled: { type: boolean }
-        variables:
-          type: array
-          items:
-            $ref: '#/components/schemas/FeaturePromptVariable'
-        schema_version: { type: integer }
-        published_at:
-          type: string
-          nullable: true
-        created_at: { type: string }
 
     FeaturePromptVariable:
       type: object
@@ -2474,6 +2506,20 @@ components:
         tone:
           type: string
           enum: [prompt, control, context]
+
+    FeaturePromptModelDefaults:
+      type: object
+      additionalProperties: false
+      properties:
+        model:
+          type: string
+
+    FeaturePromptMergePolicy:
+      type: object
+      required: [append_user_prompt_when_template_misses_placeholder, append_base_prompt_without_template]
+      properties:
+        append_user_prompt_when_template_misses_placeholder: { type: boolean }
+        append_base_prompt_without_template: { type: boolean }
 
     ApiResponseUserInfo:
       allOf:
@@ -2803,7 +2849,7 @@ components:
             data:
               $ref: '#/components/schemas/AdminStatisticsBackfillResult'
 
-    ApiResponseChannelList:
+    ApiResponseProviderEndpointList:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
@@ -2815,19 +2861,19 @@ components:
                 list:
                   type: array
                   items:
-                    $ref: '#/components/schemas/Channel'
+                    $ref: '#/components/schemas/ProviderEndpoint'
 
-    ApiResponseChannel:
+    ApiResponseProviderEndpoint:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
           properties:
             data:
               type: object
-              required: [channel]
+              required: [provider_endpoint]
               properties:
-                channel:
-                  $ref: '#/components/schemas/Channel'
+                provider_endpoint:
+                  $ref: '#/components/schemas/ProviderEndpoint'
 
     ApiResponseDetectModels:
       allOf:
@@ -2964,20 +3010,6 @@ components:
                   type: array
                   items:
                     $ref: '#/components/schemas/FeaturePrompt'
-
-    ApiResponseFeaturePromptRevisions:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [revisions]
-              properties:
-                revisions:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/FeaturePromptRevision'
 
     ApiResponseFeaturePrompt:
       allOf:

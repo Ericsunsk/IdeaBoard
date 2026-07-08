@@ -6,11 +6,11 @@
  */
 import type { ProviderAPIType } from './providerAPIType'
 
-export interface Channel {
+export interface ProviderEndpoint {
   id: number
-  type: ProviderAPIType
+  api_type: ProviderAPIType
   name: string
-  api_url: string
+  base_url: string
   status: number
   created_at: string
   updated_at: string

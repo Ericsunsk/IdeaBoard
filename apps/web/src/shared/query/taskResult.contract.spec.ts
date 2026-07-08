@@ -15,6 +15,7 @@ describe('taskResult image result helpers', () => {
             width: '1024',
             height: 768,
             mime_type: ' image/png ',
+            media_asset_id: '42',
           },
         ],
         result: JSON.stringify({ image_url: 'https://cdn.example.com/fallback.png' }),
@@ -25,6 +26,7 @@ describe('taskResult image result helpers', () => {
         width: 1024,
         height: 768,
         mimeType: 'image/png',
+        mediaAssetId: 42,
       },
     ])
   })

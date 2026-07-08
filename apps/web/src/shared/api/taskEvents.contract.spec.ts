@@ -67,6 +67,7 @@ function makeImageOutput(url: string): NonNullable<Task['outputs']>[number] {
   return {
     id: 1,
     task_id: 'task-1',
+    output_kind: 'asset',
     role: 'image',
     url,
     storage_key: 'tasks/task-1/image.png',

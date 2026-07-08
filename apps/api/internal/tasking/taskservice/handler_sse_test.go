@@ -30,7 +30,7 @@ func seedTaskServiceSSEAccount(t testing.TB, ctx context.Context, db *sql.DB, su
 
 	var channelID int64
 	if err := db.QueryRowContext(ctx, `
-INSERT INTO channels (type, name, api_url, status)
+INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', $1, $2, 1)
 RETURNING id`,
 		"taskservice-sse-channel-"+suffix,
@@ -40,14 +40,13 @@ RETURNING id`,
 	}
 
 	account := &accounts.ApiAccount{
-		Name:      "taskservice-sse-account-" + suffix,
-		ChannelID: channelID,
-		Platform:  "openai-compatible",
-		ApiType:   "openai-compatible",
-		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:    "test",
-		ProxyURL:  "https://example.com/taskservice-sse-" + suffix,
-		Status:    1,
+		Name:               "taskservice-sse-account-" + suffix,
+		ProviderEndpointID: channelID,
+		ApiType:            "openai-compatible",
+		Models:             []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:             "test",
+		ProxyURL:           "https://example.com/taskservice-sse-" + suffix,
+		Status:             1,
 	}
 	if err := accounts.NewAccountRepository(db).Create(ctx, account); err != nil {
 		t.Fatalf("create SSE account failed: %v", err)
@@ -331,7 +330,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 		Prompt:     "internal prompt",
 		UserPrompt: "user prompt",
 		Status:     tasks.StatusCompleted,
-		Result:     `{"status":"success","image_url":"https://example.com/out.png","account_id":11,"channel_id":9}`,
+		Result:     `{"status":"success","image_url":"https://example.com/out.png","account_id":11,"provider_endpoint_id":9}`,
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -361,7 +360,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	if !strings.Contains(body, `"status":"completed"`) {
 		t.Fatalf("body missing completed status: %s", body)
 	}
-	if strings.Contains(body, "internal prompt") || strings.Contains(body, "account_id") || strings.Contains(body, "channel_id") {
+	if strings.Contains(body, "internal prompt") || strings.Contains(body, "account_id") || strings.Contains(body, "provider_endpoint_id") {
 		t.Fatalf("body leaked internal task fields: %s", body)
 	}
 }
@@ -377,14 +376,14 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	seedTaskServiceSSEUser(t, ctx, db, 8)
 
 	task := &tasks.Task{
-		TaskID:            "task-sse-live",
-		UserID:            8,
-		AssignedChannelID: tasks.IDPtr(account.ChannelID),
-		AccountID:         tasks.IDPtr(account.ID),
-		Prompt:            "internal prompt",
-		UserPrompt:        "user prompt",
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-sse-live",
+		TaskID:                     "task-sse-live",
+		UserID:                     8,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		Prompt:                     "internal prompt",
+		UserPrompt:                 "user prompt",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-sse-live",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -418,7 +417,7 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	go func() {
 		time.Sleep(80 * time.Millisecond)
 		now := time.Now()
-		rows, updateErr := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ChannelID, task.LeaseToken, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`, now, nil, nil)
+		rows, updateErr := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ProviderEndpointID, loadTaskServiceSSECredentialID(t, db, account.ID), task.LeaseToken, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"provider_endpoint_id":99}`, now, nil, nil)
 		if updateErr != nil {
 			done <- updateErr
 			return
@@ -448,7 +447,7 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 		payload.WriteString(line)
 		body := payload.String()
 		if strings.Contains(body, `"status":"running"`) && strings.Contains(body, `"status":"completed"`) {
-			if strings.Contains(body, "internal prompt") || strings.Contains(body, "account_id") || strings.Contains(body, "channel_id") {
+			if strings.Contains(body, "internal prompt") || strings.Contains(body, "account_id") || strings.Contains(body, "provider_endpoint_id") {
 				t.Fatalf("stream leaked internal task fields: %s", body)
 			}
 			if err := <-done; err != nil {
@@ -470,13 +469,13 @@ func TestStreamUserTaskReturnsJSONWhenConnectionLimitReached(t *testing.T) {
 	seedTaskServiceSSEUser(t, ctx, db, 9)
 
 	task := &tasks.Task{
-		TaskID:            "task-sse-limit",
-		UserID:            9,
-		AssignedChannelID: tasks.IDPtr(account.ChannelID),
-		AccountID:         tasks.IDPtr(account.ID),
-		UserPrompt:        "user prompt",
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-sse-limit",
+		TaskID:                     "task-sse-limit",
+		UserID:                     9,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		UserPrompt:                 "user prompt",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-sse-limit",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -529,13 +528,13 @@ func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.
 	seedTaskServiceSSEUser(t, ctx, db, 10)
 
 	task := &tasks.Task{
-		TaskID:            "task-sse-heartbeat",
-		UserID:            10,
-		AssignedChannelID: tasks.IDPtr(account.ChannelID),
-		AccountID:         tasks.IDPtr(account.ID),
-		UserPrompt:        "user prompt",
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-sse-heartbeat",
+		TaskID:                     "task-sse-heartbeat",
+		UserID:                     10,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		UserPrompt:                 "user prompt",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-sse-heartbeat",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -606,4 +605,18 @@ func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.
 			return
 		}
 	}
+}
+
+func loadTaskServiceSSECredentialID(t testing.TB, db *sql.DB, accountID int64) int64 {
+	t.Helper()
+	var credentialID int64
+	if err := db.QueryRow(`
+SELECT id
+FROM api_account_secrets
+WHERE account_id = $1 AND status = 'active'
+ORDER BY rotated_at DESC, id DESC
+LIMIT 1`, accountID).Scan(&credentialID); err != nil {
+		t.Fatalf("load SSE account %d credential failed: %v", accountID, err)
+	}
+	return credentialID
 }

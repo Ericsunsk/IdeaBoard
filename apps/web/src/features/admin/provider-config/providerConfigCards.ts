@@ -2,21 +2,21 @@ import type {
   AccountModelRow,
   ProviderAccountRecord,
   ProviderAccountView,
-  ProviderChannelCard,
-  ProviderChannelRecord,
-  ProviderChannelView,
+  ProviderEndpointCard,
+  ProviderEndpointRecord,
+  ProviderEndpointView,
 } from './providerConfigTypes'
-import { getAdminChannelApiTypeLabel } from './providerConfigPayload'
+import { getAdminProviderEndpointApiTypeLabel } from './providerConfigPayload'
 
-export function groupAccountsByChannelId(accounts: ProviderAccountRecord[]) {
+export function groupAccountsByProviderEndpointId(accounts: ProviderAccountRecord[]) {
   const grouped = new Map<number, ProviderAccountRecord[]>()
   accounts.forEach((account) => {
-    const group = grouped.get(account.channelId)
+    const group = grouped.get(account.providerEndpointId)
     if (group) {
       group.push(account)
       return
     }
-    grouped.set(account.channelId, [account])
+    grouped.set(account.providerEndpointId, [account])
   })
   return grouped
 }
@@ -28,22 +28,22 @@ export function createAccountModelRows(account: ProviderAccountView): AccountMod
   }))
 }
 
-export function createProviderChannelCards(
-  channels: ProviderChannelRecord[],
+export function createProviderEndpointCards(
+  providerEndpoints: ProviderEndpointRecord[],
   accounts: ProviderAccountRecord[],
-): ProviderChannelCard[] {
-  const groupedAccounts = groupAccountsByChannelId(accounts)
+): ProviderEndpointCard[] {
+  const groupedAccounts = groupAccountsByProviderEndpointId(accounts)
 
-  return channels.map((channel) => {
-    const channelAccounts = groupedAccounts.get(channel.id) || []
+  return providerEndpoints.map((providerEndpoint) => {
+    const providerEndpointAccounts = groupedAccounts.get(providerEndpoint.id) || []
     const models = new Set<string>()
-    channelAccounts.forEach((account) => {
+    providerEndpointAccounts.forEach((account) => {
       account.models.forEach((model) => models.add(model.name))
     })
 
     return {
-      channel: createProviderChannelView(channel),
-      accounts: channelAccounts.map(createProviderAccountView),
+      providerEndpoint: createProviderEndpointView(providerEndpoint),
+      accounts: providerEndpointAccounts.map(createProviderAccountView),
       modelCount: models.size,
     }
   })
@@ -57,16 +57,17 @@ export function countUniqueAccountModels(accounts: ProviderAccountRecord[]) {
   return models.size
 }
 
-export function createProviderChannelView(channel: ProviderChannelRecord): ProviderChannelView {
+export function createProviderEndpointView(providerEndpoint: ProviderEndpointRecord): ProviderEndpointView {
   return {
-    id: channel.id,
-    name: channel.name,
-    baseUrl: channel.baseUrl,
-    apiType: channel.apiType,
-    apiTypeLabel: getAdminChannelApiTypeLabel(channel.apiType),
+    id: providerEndpoint.id,
+    name: providerEndpoint.name,
+    baseUrl: providerEndpoint.baseUrl,
+    apiType: providerEndpoint.apiType,
+    apiTypeLabel: getAdminProviderEndpointApiTypeLabel(providerEndpoint.apiType),
+    status: providerEndpoint.status,
     commandTarget: {
-      kind: 'channel',
-      id: channel.id,
+      kind: 'providerEndpoint',
+      id: providerEndpoint.id,
     },
   }
 }

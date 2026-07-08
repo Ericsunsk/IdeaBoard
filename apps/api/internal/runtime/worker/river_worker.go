@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/accountpool/channels"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -31,12 +31,12 @@ type RiverTaskWorker struct {
 
 type WorkerAccountStore interface {
 	taskruntime.AccountStore
-	GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*accounts.ApiAccount, error)
+	GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*accounts.RuntimeCredential, error)
 }
 
 type RiverTaskWorkerDeps struct {
 	AccountRepo        WorkerAccountStore
-	ChannelRepo        *channels.ChannelRepository
+	ChannelRepo        *providerendpoints.ProviderEndpointRepository
 	TaskRepo           taskruntime.TaskStore
 	Enqueuer           taskqueue.TaskEnqueuer
 	Assigner           taskqueue.TaskAssigner

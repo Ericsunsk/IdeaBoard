@@ -2,6 +2,7 @@ package taskservice
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"math"
@@ -19,6 +20,7 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
@@ -588,7 +590,7 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 	outsider := mustCreateTaskUploadUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
 	boardRepo := boards.NewBoardRepository(db)
 	now := time.Now()
-	if err := boardRepo.Upsert(ctx, &boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := boardRepo.Upsert(ctx, &boards.UserBoard{BoardID: "board-1", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
 	if err := boardRepo.UpsertMember(ctx, owner.ID, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
@@ -695,6 +697,118 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	}
 	if len(taskEvents.events) != 1 || taskEvents.events[0].TaskID != taskID || taskEvents.events[0].Status != tasks.StatusPending {
 		t.Fatalf("unexpected task events: %+v", taskEvents.events)
+	}
+}
+
+func TestSubmitTaskAppliesFeaturePromptModelDefaultBeforeRouting(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+		{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name:         "gpt-image-1",
+				Enabled:      true,
+				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+			}},
+		},
+		{
+			ID: 202,
+			Models: []accounts.AccountModel{{
+				Name:         "image-alpha",
+				Enabled:      true,
+				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+			}},
+		},
+	}}
+	submissionStore := &recordingSubmissionStore{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		FeaturePrompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
+			workflow.FeatureSlugPatternGen: {
+				Prompt:                "{{user_prompt}}",
+				ModelDefaults:         prompts.FeaturePromptModelDefaults{Model: "image-alpha"},
+				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
+			},
+		}},
+	}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:  "draw a chair",
+		Feature: workflow.FeatureSlugPatternGen,
+	})
+	if err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if len(submissionStore.calls) != 1 {
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+	call := submissionStore.calls[0]
+	if call.task.RequestedModel != "image-alpha" {
+		t.Fatalf("requested model=%q, want image-alpha", call.task.RequestedModel)
+	}
+	if !slices.Equal(call.queueTask.AccountIDs, []int64{202}) {
+		t.Fatalf("queue account ids=%v, want [202]", call.queueTask.AccountIDs)
+	}
+	typedParams, err := tasks.UnmarshalParams(call.task.Params)
+	if err != nil {
+		t.Fatalf("unmarshal task params: %v", err)
+	}
+	if typedParams.Model != "image-alpha" {
+		t.Fatalf("typed model=%q, want image-alpha", typedParams.Model)
+	}
+}
+
+func TestSubmitTaskExplicitModelOverridesFeaturePromptModelDefault(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+		{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name:         "gpt-image-1",
+				Enabled:      true,
+				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+			}},
+		},
+		{
+			ID: 202,
+			Models: []accounts.AccountModel{{
+				Name:         "image-alpha",
+				Enabled:      true,
+				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+			}},
+		},
+	}}
+	submissionStore := &recordingSubmissionStore{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		FeaturePrompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
+			workflow.FeatureSlugPatternGen: {
+				Prompt:                "{{user_prompt}}",
+				ModelDefaults:         prompts.FeaturePromptModelDefaults{Model: "image-alpha"},
+				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
+			},
+		}},
+	}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:  "draw a chair",
+		Feature: workflow.FeatureSlugPatternGen,
+		Params:  map[string]interface{}{"model": "gpt-image-1"},
+	})
+	if err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if len(submissionStore.calls) != 1 {
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+	call := submissionStore.calls[0]
+	if call.task.RequestedModel != "gpt-image-1" {
+		t.Fatalf("requested model=%q, want gpt-image-1", call.task.RequestedModel)
+	}
+	if !slices.Equal(call.queueTask.AccountIDs, []int64{101}) {
+		t.Fatalf("queue account ids=%v, want [101]", call.queueTask.AccountIDs)
 	}
 }
 
@@ -872,7 +986,7 @@ func (r testTaskUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.
 	if err != nil {
 		return 0, err
 	}
-	return board.UserID, nil
+	return board.OwnerUserID, nil
 }
 
 type testTaskUploadOwnerStorageUIDResolver struct {
@@ -912,6 +1026,33 @@ func (s *fakeSubmitAccountStore) GetAllEnabled(context.Context) ([]*accounts.Api
 		return nil, s.err
 	}
 	return s.accounts, nil
+}
+
+type fakeFeaturePromptStore struct {
+	configs map[string]prompts.FeaturePromptRuntimeConfig
+	err     error
+}
+
+func (s fakeFeaturePromptStore) GetPrompt(ctx context.Context, slug string) (string, error) {
+	config, err := s.GetPromptRuntimeConfig(ctx, slug)
+	if err != nil {
+		return "", err
+	}
+	return config.Prompt, nil
+}
+
+func (s fakeFeaturePromptStore) GetPromptRuntimeConfig(_ context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error) {
+	if s.err != nil {
+		return prompts.FeaturePromptRuntimeConfig{}, s.err
+	}
+	if s.configs == nil {
+		return prompts.FeaturePromptRuntimeConfig{}, errors.New("feature prompt not found")
+	}
+	config, ok := s.configs[slug]
+	if !ok {
+		return prompts.FeaturePromptRuntimeConfig{}, errors.New("feature prompt not found")
+	}
+	return config, nil
 }
 
 type recordingSubmissionStore struct {
@@ -980,39 +1121,38 @@ func TestDeleteUserTaskCleansOutputsAndTaskOutputObjects(t *testing.T) {
 	owner := mustCreateTaskUploadUser(t, userRepo, "delete-output-owner", "auth-delete-output-owner", "DTO042")
 	var channelID int64
 	if err := db.QueryRowContext(ctx, `
-INSERT INTO channels (type, name, api_url, status)
+INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', 'taskservice-delete-channel', 'https://example.com/taskservice-delete', 1)
 RETURNING id`).Scan(&channelID); err != nil {
 		t.Fatalf("create channel failed: %v", err)
 	}
 	account := &accounts.ApiAccount{
-		Name:      "taskservice-delete-account",
-		ChannelID: channelID,
-		Platform:  "openai-compatible",
-		ApiType:   "openai-compatible",
-		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:    "test",
-		ProxyURL:  "https://example.com/taskservice-delete",
-		Status:    1,
+		Name:               "taskservice-delete-account",
+		ProviderEndpointID: channelID,
+		ApiType:            "openai-compatible",
+		Models:             []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:             "test",
+		ProxyURL:           "https://example.com/taskservice-delete",
+		Status:             1,
 	}
 	if err := accountRepo.Create(ctx, account); err != nil {
 		t.Fatalf("create account failed: %v", err)
 	}
 
 	task := &tasks.Task{
-		TaskID:            "delete-with-outputs",
-		UserID:            owner.ID,
-		AssignedChannelID: tasks.IDPtr(account.ChannelID),
-		AccountID:         tasks.IDPtr(account.ID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-delete",
+		TaskID:                     "delete-with-outputs",
+		UserID:                     owner.ID,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-delete",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
 	taskOutputPath := "uploads/tasks/" + strconv.FormatInt(task.UserID, 10) + "/delete-with-outputs/2026/06/03/result.png"
-	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ChannelID, task.LeaseToken, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
+	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ProviderEndpointID, loadTaskServiceCredentialID(t, db, account.ID), task.LeaseToken, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
 		{
 			Role:       "image",
 			URL:        "/" + taskOutputPath,
@@ -1049,6 +1189,13 @@ RETURNING id`).Scan(&channelID); err != nil {
 	}
 	if len(outputsByTask[task.TaskID]) != 0 {
 		t.Fatalf("outputs after delete=%+v, want none", outputsByTask[task.TaskID])
+	}
+	var mediaRefCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_refs WHERE task_id = $1 AND ref_type = 'task_output'`, task.TaskID).Scan(&mediaRefCount); err != nil {
+		t.Fatalf("count task output media refs failed: %v", err)
+	}
+	if mediaRefCount != 0 {
+		t.Fatalf("task output media refs after delete=%d, want 0", mediaRefCount)
 	}
 	if _, err := taskRepo.GetByTaskID(ctx, task.TaskID); err == nil {
 		t.Fatal("deleted task is still queryable")
@@ -1091,4 +1238,18 @@ func TestDeleteUserTaskSucceedsWhenOutputCleanupFails(t *testing.T) {
 	if _, err := taskRepo.GetByTaskID(ctx, "task_delete_output_fail"); err == nil {
 		t.Fatal("task row should be deleted after DeleteUserTask")
 	}
+}
+
+func loadTaskServiceCredentialID(t testing.TB, db *sql.DB, accountID int64) int64 {
+	t.Helper()
+	var credentialID int64
+	if err := db.QueryRow(`
+SELECT id
+FROM api_account_secrets
+WHERE account_id = $1 AND status = 'active'
+ORDER BY rotated_at DESC, id DESC
+LIMIT 1`, accountID).Scan(&credentialID); err != nil {
+		t.Fatalf("load account %d credential failed: %v", accountID, err)
+	}
+	return credentialID
 }

@@ -35,6 +35,41 @@ func TestTaskOutputCascadesWithTaskDelete(t *testing.T) {
 	}
 }
 
+func TestTaskOutputSchemaStoresRelationOnly(t *testing.T) {
+	schema := readDBSchema(t)
+	taskOutputsStart := strings.Index(schema, "CREATE TABLE task_outputs")
+	if taskOutputsStart < 0 {
+		t.Fatal("task_outputs table missing")
+	}
+	taskOutputsEnd := strings.Index(schema[taskOutputsStart:], ");")
+	if taskOutputsEnd < 0 {
+		t.Fatal("task_outputs table block missing terminator")
+	}
+	taskOutputs := schema[taskOutputsStart : taskOutputsStart+taskOutputsEnd]
+	for _, forbidden := range []string{
+		"storage_key",
+		"mime_type",
+		"width INTEGER",
+		"height INTEGER",
+		"size_bytes",
+		"checksum_sha256",
+		"storage_profile",
+	} {
+		if strings.Contains(taskOutputs, forbidden) {
+			t.Fatalf("task_outputs should not store MediaAsset field %q", forbidden)
+		}
+	}
+	for _, expected := range []string{
+		"output_kind VARCHAR(32) NOT NULL DEFAULT 'asset'",
+		"CONSTRAINT ck_task_outputs_output_kind CHECK (output_kind IN ('asset', 'remote'))",
+		"CONSTRAINT ck_task_outputs_output_kind_shape CHECK",
+	} {
+		if !strings.Contains(taskOutputs, expected) {
+			t.Fatalf("task_outputs missing relation-only contract: %s", expected)
+		}
+	}
+}
+
 func TestTaskUserViewIncludesCancelReason(t *testing.T) {
 	task := &Task{
 		ID:           1,
@@ -66,7 +101,7 @@ func TestTaskUserViewResultUsesAllowlist(t *testing.T) {
 			"model":"gpt-image-1",
 			"prompt":"secret prompt",
 			"account_id":7,
-			"channel_id":8,
+			"provider_endpoint_id":8,
 			"platform":"openai"
 		}`,
 		Outputs: []TaskOutput{{
@@ -88,7 +123,7 @@ func TestTaskUserViewResultUsesAllowlist(t *testing.T) {
 
 	if strings.Contains(view.Result, "prompt") ||
 		strings.Contains(view.Result, "account_id") ||
-		strings.Contains(view.Result, "channel_id") ||
+		strings.Contains(view.Result, "provider_endpoint_id") ||
 		strings.Contains(view.Result, "platform") {
 		t.Fatalf("result leaked non-allowlisted provider metadata: %s", view.Result)
 	}

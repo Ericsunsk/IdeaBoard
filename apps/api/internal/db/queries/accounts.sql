@@ -1,91 +1,96 @@
 -- name: CreateAccount :one
 INSERT INTO api_accounts (
-  name, channel_id, platform, api_type, proxy_url,
+  name, provider_endpoint_id,
   max_concurrent, timeout, extra_config, status, fail_count, weight
 ) VALUES (
-  sqlc.arg(name), sqlc.arg(channel_id), sqlc.arg(platform), sqlc.arg(api_type),
-  sqlc.arg(proxy_url),
+  sqlc.arg(name), sqlc.arg(provider_endpoint_id),
   sqlc.arg(max_concurrent), sqlc.arg(timeout), sqlc.arg(extra_config),
   sqlc.arg(status), sqlc.arg(fail_count), sqlc.arg(weight)
 )
 RETURNING id;
 
 -- name: GetAccountByID :one
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.id = sqlc.arg(id)
   AND a.deleted_at IS NULL;
 
 -- name: GetRuntimeAccountByIDWithSecret :one
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 INNER JOIN LATERAL (
   SELECT secret_payload, secret_material_kind
   FROM api_account_secrets
   WHERE account_id = a.id
     AND status = 'active'
-    AND (
-      (secret_material_kind = 'encrypted' AND btrim(secret_payload) <> '')
-      OR (secret_material_kind = 'external_ref' AND btrim(secret_ref) <> '')
-    )
+    AND secret_material_kind = 'encrypted'
+    AND btrim(secret_payload) <> ''
   ORDER BY rotated_at DESC, id DESC
   LIMIT 1
 ) AS secret ON TRUE
 WHERE a.id = sqlc.arg(id)
   AND a.status = 1
+  AND pe.status = 1
   AND a.deleted_at IS NULL;
 
 -- name: CountAccounts :one
 SELECT COUNT(*)
-FROM api_accounts
-WHERE deleted_at IS NULL
-  AND (NOT sqlc.arg(has_keyword)::boolean OR name ILIKE sqlc.arg(keyword_like) OR platform ILIKE sqlc.arg(keyword_like) OR api_type ILIKE sqlc.arg(keyword_like))
-  AND (NOT sqlc.arg(has_platform)::boolean OR platform = sqlc.arg(platform));
+FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
+WHERE a.deleted_at IS NULL
+  AND (NOT sqlc.arg(has_keyword)::boolean OR a.name ILIKE sqlc.arg(keyword_like) OR pe.name ILIKE sqlc.arg(keyword_like) OR pe.api_type ILIKE sqlc.arg(keyword_like) OR pe.base_url ILIKE sqlc.arg(keyword_like))
+  AND (NOT sqlc.arg(has_api_type)::boolean OR pe.api_type = sqlc.arg(api_type));
 
 -- name: ListAccounts :many
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.deleted_at IS NULL
-  AND (NOT sqlc.arg(has_keyword)::boolean OR a.name ILIKE sqlc.arg(keyword_like) OR a.platform ILIKE sqlc.arg(keyword_like) OR a.api_type ILIKE sqlc.arg(keyword_like))
-  AND (NOT sqlc.arg(has_platform)::boolean OR a.platform = sqlc.arg(platform))
+  AND (NOT sqlc.arg(has_keyword)::boolean OR a.name ILIKE sqlc.arg(keyword_like) OR pe.name ILIKE sqlc.arg(keyword_like) OR pe.api_type ILIKE sqlc.arg(keyword_like) OR pe.base_url ILIKE sqlc.arg(keyword_like))
+  AND (NOT sqlc.arg(has_api_type)::boolean OR pe.api_type = sqlc.arg(api_type))
 ORDER BY a.id DESC
 LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: ListEnabledAccounts :many
-SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
        ''::text AS api_key,
        TRUE::boolean AS secret_configured,
-       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
        a.fail_count, a.weight, a.created_at, a.updated_at
 FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.status = 1
+  AND pe.status = 1
   AND a.deleted_at IS NULL
   AND EXISTS (
     SELECT 1
-    FROM api_account_secrets AS active_secret
-    WHERE active_secret.account_id = a.id
-      AND active_secret.status = 'active'
-      AND btrim(active_secret.secret_payload) <> ''
-  )
+	    FROM api_account_secrets AS active_secret
+	    WHERE active_secret.account_id = a.id
+	      AND active_secret.status = 'active'
+	      AND active_secret.secret_material_kind = 'encrypted'
+	      AND btrim(active_secret.secret_payload) <> ''
+	  )
 ORDER BY a.id ASC;
 
 -- name: ListAccountIDs :many
@@ -99,7 +104,8 @@ SELECT
   m.account_id AS id,
   (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
 FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.deleted_at IS NULL
+INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
 WHERE m.account_id = ANY(sqlc.arg(ids)::bigint[])
   AND m.enabled = TRUE
 GROUP BY m.account_id
@@ -109,7 +115,8 @@ ORDER BY m.account_id ASC;
 -- name: GetSingleEnabledModelByAccountID :one
 SELECT (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
 FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.deleted_at IS NULL
+INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
 WHERE m.account_id = sqlc.arg(id)
   AND m.enabled = TRUE
 HAVING COUNT(*) = 1;
@@ -192,8 +199,7 @@ WHERE account_id = sqlc.arg(account_id)
 -- name: RetireActiveAccountSecrets :exec
 UPDATE api_account_secrets
 SET status = 'retired',
-    retired_at = now(),
-    secret_payload = ''
+    retired_at = now()
 WHERE account_id = sqlc.arg(account_id)
   AND status = 'active'
   AND EXISTS (
@@ -205,7 +211,6 @@ WHERE account_id = sqlc.arg(account_id)
 -- name: RevokeAccountSecretsForArchive :exec
 UPDATE api_account_secrets
 SET status = 'revoked',
-    secret_ref = '',
     secret_payload = '',
     retired_at = COALESCE(retired_at, now())
 WHERE account_id = sqlc.arg(account_id)
@@ -213,9 +218,9 @@ WHERE account_id = sqlc.arg(account_id)
 
 -- name: CreateAccountSecret :one
 INSERT INTO api_account_secrets (
-  account_id, secret_material_kind, secret_ref, secret_payload, key_version, fingerprint, status, rotated_at, expires_at
+  account_id, secret_material_kind, secret_payload, key_version, fingerprint, status, rotated_at, expires_at
 ) SELECT
-  sqlc.arg(account_id), sqlc.arg(secret_material_kind), sqlc.arg(secret_ref), sqlc.arg(secret_payload),
+  sqlc.arg(account_id), sqlc.arg(secret_material_kind), sqlc.arg(secret_payload),
   sqlc.arg(key_version), sqlc.arg(fingerprint), sqlc.arg(status), now(), sqlc.narg(expires_at)
 WHERE EXISTS (
   SELECT 1 FROM api_accounts
@@ -225,7 +230,7 @@ WHERE EXISTS (
 RETURNING id;
 
 -- name: GetActiveAccountSecretByAccountID :one
-SELECT id, account_id, secret_material_kind, secret_ref, secret_payload, key_version, fingerprint,
+SELECT id, account_id, secret_material_kind, secret_payload, key_version, fingerprint,
        status, rotated_at, expires_at, retired_at, created_at, updated_at
 FROM api_account_secrets
 WHERE account_id = sqlc.arg(account_id)
@@ -233,12 +238,24 @@ WHERE account_id = sqlc.arg(account_id)
 ORDER BY rotated_at DESC, id DESC
 LIMIT 1;
 
+-- name: GetRuntimeCredentialByID :one
+SELECT s.id, s.account_id, s.secret_material_kind, s.secret_payload, s.key_version, s.fingerprint,
+       s.status, s.rotated_at, s.expires_at, s.retired_at, s.created_at, s.updated_at
+FROM api_account_secrets AS s
+JOIN api_accounts AS a ON a.id = s.account_id
+  AND a.status = 1
+  AND a.deleted_at IS NULL
+JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
+  AND pe.status = 1
+WHERE s.id = sqlc.arg(id)
+  AND s.account_id = sqlc.arg(account_id)
+  AND s.status = 'active'
+  AND s.secret_material_kind = 'encrypted'
+  AND btrim(s.secret_payload) <> '';
+
 -- name: UpdateAccount :execrows
 UPDATE api_accounts
 SET name = sqlc.arg(name),
-    platform = sqlc.arg(platform),
-    api_type = sqlc.arg(api_type),
-    proxy_url = sqlc.arg(proxy_url),
     max_concurrent = sqlc.arg(max_concurrent),
     timeout = sqlc.arg(timeout),
     extra_config = sqlc.arg(extra_config),

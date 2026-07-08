@@ -19,12 +19,14 @@ import type { MaybeRef } from 'vue'
 
 import type {
   AdminAccountCreateRequest,
+  AdminAccountModelPatchRequest,
   AdminAccountUpdateRequest,
   ApiResponseAccountLimits,
   ApiResponseAccountList,
   ApiResponseAdminAccount,
   ApiResponseEmpty,
   ApiResponseMonitorAccountLoad,
+  DeleteAdminAccountModelParams,
   ListAdminAccountsParams,
 } from '../model'
 
@@ -457,6 +459,191 @@ export function useDeleteAdminAccount<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getDeleteAdminAccountQueryOptions(id, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getPatchAdminAccountModelUrl = (id: number) => {
+  return `/admin/accounts/${encodeURIComponent(String(id))}/models`
+}
+
+export const patchAdminAccountModel = async (
+  id: number,
+  adminAccountModelPatchRequest: AdminAccountModelPatchRequest,
+  options?: RequestInit,
+): Promise<ApiResponseAdminAccount> => {
+  return orvalMutator<ApiResponseAdminAccount>(getPatchAdminAccountModelUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminAccountModelPatchRequest),
+  })
+}
+
+export const getPatchAdminAccountModelQueryKey = (
+  id: MaybeRef<number>,
+  adminAccountModelPatchRequest?: MaybeRef<AdminAccountModelPatchRequest>,
+) => {
+  return ['PATCH', 'admin', 'accounts', id, 'models', adminAccountModelPatchRequest] as const
+}
+
+export const getPatchAdminAccountModelQueryOptions = <
+  TData = Awaited<ReturnType<typeof patchAdminAccountModel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  adminAccountModelPatchRequest: MaybeRef<AdminAccountModelPatchRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof patchAdminAccountModel>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getPatchAdminAccountModelQueryKey(id, adminAccountModelPatchRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof patchAdminAccountModel>>> = ({ signal }) =>
+    patchAdminAccountModel(unref(id), unref(adminAccountModelPatchRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof patchAdminAccountModel>>, TError, TData>
+}
+
+export type PatchAdminAccountModelQueryResult = NonNullable<
+  Awaited<ReturnType<typeof patchAdminAccountModel>>
+>
+export type PatchAdminAccountModelQueryError = ErrorType<unknown>
+
+export function usePatchAdminAccountModel<
+  TData = Awaited<ReturnType<typeof patchAdminAccountModel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  adminAccountModelPatchRequest: MaybeRef<AdminAccountModelPatchRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof patchAdminAccountModel>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getPatchAdminAccountModelQueryOptions(
+    id,
+    adminAccountModelPatchRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getDeleteAdminAccountModelUrl = (
+  id: number,
+  params: DeleteAdminAccountModelParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/accounts/${encodeURIComponent(String(id))}/models?${stringifiedParams}`
+    : `/admin/accounts/${encodeURIComponent(String(id))}/models`
+}
+
+export const deleteAdminAccountModel = async (
+  id: number,
+  params: DeleteAdminAccountModelParams,
+  options?: RequestInit,
+): Promise<ApiResponseAdminAccount> => {
+  return orvalMutator<ApiResponseAdminAccount>(getDeleteAdminAccountModelUrl(id, params), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getDeleteAdminAccountModelQueryKey = (
+  id: MaybeRef<number>,
+  params?: MaybeRef<DeleteAdminAccountModelParams>,
+) => {
+  return ['DELETE', 'admin', 'accounts', id, 'models', ...(params ? [params] : [])] as const
+}
+
+export const getDeleteAdminAccountModelQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteAdminAccountModel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  params: MaybeRef<DeleteAdminAccountModelParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminAccountModel>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDeleteAdminAccountModelQueryKey(id, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminAccountModel>>> = ({
+    signal,
+  }) => deleteAdminAccountModel(unref(id), unref(params), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminAccountModel>>, TError, TData>
+}
+
+export type DeleteAdminAccountModelQueryResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAdminAccountModel>>
+>
+export type DeleteAdminAccountModelQueryError = ErrorType<unknown>
+
+export function useDeleteAdminAccountModel<
+  TData = Awaited<ReturnType<typeof deleteAdminAccountModel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  params: MaybeRef<DeleteAdminAccountModelParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminAccountModel>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteAdminAccountModelQueryOptions(id, params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

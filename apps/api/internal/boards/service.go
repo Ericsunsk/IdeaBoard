@@ -136,7 +136,8 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 	}
 	board := &UserBoard{
 		BoardID:            normalizedID,
-		UserID:             userID,
+		OwnerUserID:        userID,
+		CreatedBy:          userID,
 		Name:               name,
 		State:              state,
 		Revision:           1,
@@ -154,7 +155,7 @@ func (s *BoardService) DeleteBoard(ctx context.Context, userID int64, boardID st
 		return err
 	}
 	if s.canvasCleaner != nil {
-		owner, err := s.userRepo.GetByID(ctx, board.UserID)
+		owner, err := s.userRepo.GetByID(ctx, board.OwnerUserID)
 		if err != nil {
 			return err
 		}
@@ -162,7 +163,7 @@ func (s *BoardService) DeleteBoard(ctx context.Context, userID int64, boardID st
 			return fmt.Errorf("%w: %w", ErrBoardCanvasCleanupFailed, err)
 		}
 	}
-	return s.repo.DeleteBoardCascade(ctx, board.UserID, board.BoardID)
+	return s.repo.DeleteBoardCascade(ctx, board.OwnerUserID, board.BoardID)
 }
 
 func (s *BoardService) ListMembers(ctx context.Context, ownerUserID int64, boardID string) ([]BoardMemberWithUser, error) {
@@ -170,7 +171,7 @@ func (s *BoardService) ListMembers(ctx context.Context, ownerUserID int64, board
 	if err != nil {
 		return nil, err
 	}
-	ownerUser, err := s.userRepo.GetByID(ctx, board.UserID)
+	ownerUser, err := s.userRepo.GetByID(ctx, board.OwnerUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -180,12 +181,12 @@ func (s *BoardService) ListMembers(ctx context.Context, ownerUserID int64, board
 		Username:  ownerUser.Username,
 		Role:      BoardAccessRoleOwner,
 	}}
-	members, err := s.repo.ListMembers(ctx, board.UserID, board.BoardID)
+	members, err := s.repo.ListMembers(ctx, board.OwnerUserID, board.BoardID)
 	if err != nil {
 		return nil, err
 	}
 	for _, member := range members {
-		if member.UserID == board.UserID {
+		if member.UserID == board.OwnerUserID {
 			continue
 		}
 		result = append(result, member)
@@ -213,10 +214,10 @@ func (s *BoardService) InviteMember(ctx context.Context, ownerUserID int64, boar
 		}
 		return nil, err
 	}
-	if memberUser.ID == board.UserID {
+	if memberUser.ID == board.OwnerUserID {
 		return nil, ErrBoardMemberInviteSelf
 	}
-	if err := s.repo.UpsertMember(ctx, board.UserID, board.BoardID, memberUser.ID, targetRole); err != nil {
+	if err := s.repo.UpsertMember(ctx, board.OwnerUserID, board.BoardID, memberUser.ID, targetRole); err != nil {
 		return nil, err
 	}
 	return &BoardMemberWithUser{
@@ -247,10 +248,10 @@ func (s *BoardService) RemoveMember(ctx context.Context, ownerUserID int64, boar
 		}
 		return err
 	}
-	if memberUser.ID == board.UserID {
+	if memberUser.ID == board.OwnerUserID {
 		return ErrBoardMemberInviteSelf
 	}
-	member, err := s.repo.GetMemberByUserID(ctx, board.UserID, board.BoardID, memberUser.ID)
+	member, err := s.repo.GetMemberByUserID(ctx, board.OwnerUserID, board.BoardID, memberUser.ID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return ErrBoardMemberNotFound
@@ -260,7 +261,7 @@ func (s *BoardService) RemoveMember(ctx context.Context, ownerUserID int64, boar
 	if member == nil {
 		return ErrBoardMemberNotFound
 	}
-	return s.repo.DeleteMember(ctx, board.UserID, board.BoardID, memberUser.ID)
+	return s.repo.DeleteMember(ctx, board.OwnerUserID, board.BoardID, memberUser.ID)
 }
 
 func (s *BoardService) CreateShareToken(ctx context.Context, ownerUserID int64, boardID string, role string, expiresAt *int64) (*BoardShareToken, error) {
@@ -288,7 +289,7 @@ func (s *BoardService) CreateShareToken(ctx context.Context, ownerUserID int64, 
 		TokenHash:   tokenHash,
 		TokenPrefix: boardShareTokenPrefix(token),
 		Role:        string(targetRole),
-		CreatedBy:   board.UserID,
+		CreatedBy:   ownerUserID,
 		Revoked:     false,
 		ExpiresAt:   expiresAtTime,
 	}
@@ -303,7 +304,7 @@ func (s *BoardService) ListShareTokens(ctx context.Context, ownerUserID int64, b
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ListShareTokens(ctx, board.UserID, board.BoardID)
+	return s.repo.ListShareTokens(ctx, board.OwnerUserID, board.BoardID)
 }
 
 func (s *BoardService) RevokeShareToken(ctx context.Context, ownerUserID int64, boardID string, tokenID int64) error {
@@ -314,7 +315,7 @@ func (s *BoardService) RevokeShareToken(ctx context.Context, ownerUserID int64, 
 	if tokenID <= 0 {
 		return ErrInvalidBoardInput
 	}
-	if err := s.repo.RevokeShareTokenByID(ctx, board.UserID, board.BoardID, tokenID); err != nil {
+	if err := s.repo.RevokeShareTokenByID(ctx, ownerUserID, board.BoardID, tokenID); err != nil {
 		if database.IsNotFound(err) {
 			return ErrShareTokenNotFound
 		}
@@ -343,12 +344,11 @@ func (s *BoardService) JoinBoardByShareToken(ctx context.Context, userID int64, 
 	if role == "" {
 		return nil, ErrShareTokenInvalid
 	}
-	ownerAccess, err := s.resolveOwnerBoardByNormalizedID(ctx, shareToken.CreatedBy, shareToken.BoardID)
+	board, err := s.resolveBoardByNormalizedID(ctx, shareToken.BoardID)
 	if err != nil {
 		return nil, err
 	}
-	board := ownerAccess.Board
-	if board.UserID == userID {
+	if board.OwnerUserID == userID {
 		return &BoardWithRole{Board: board, Role: BoardAccessRoleOwner}, nil
 	}
 	consumedToken, err := s.repo.ConsumeShareTokenAndUpsertMember(ctx, tokenHash, userID)
@@ -521,6 +521,20 @@ func (s *BoardService) resolveOwnerBoard(ctx context.Context, userID int64, boar
 	return s.resolveOwnerBoardByNormalizedID(ctx, userID, normalizedID)
 }
 
+func (s *BoardService) resolveBoardByNormalizedID(ctx context.Context, normalizedBoardID string) (UserBoard, error) {
+	board, err := s.repo.GetByBoardID(ctx, normalizedBoardID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return UserBoard{}, ErrBoardNotFound
+		}
+		return UserBoard{}, err
+	}
+	if board == nil {
+		return UserBoard{}, ErrBoardNotFound
+	}
+	return *board, nil
+}
+
 func (s *BoardService) resolveOwnerBoardByNormalizedID(ctx context.Context, userID int64, normalizedBoardID string) (*BoardWithRole, error) {
 	board, err := s.repo.GetByOwnerAndBoardID(ctx, userID, normalizedBoardID)
 	if err != nil {
@@ -532,7 +546,7 @@ func (s *BoardService) resolveOwnerBoardByNormalizedID(ctx context.Context, user
 	if board == nil {
 		return nil, ErrBoardNotFound
 	}
-	if board.UserID != userID {
+	if board.OwnerUserID != userID {
 		return nil, ErrBoardPermissionDenied
 	}
 	return &BoardWithRole{Board: *board, Role: BoardAccessRoleOwner}, nil
@@ -550,7 +564,7 @@ func (s *BoardService) ensureBoardNameAvailable(ctx context.Context, ownerUserID
 }
 
 func (s *BoardService) ensureBoardIDAvailable(ctx context.Context, ownerUserID int64, boardID string) error {
-	conflicted, err := s.repo.BoardIDExistsForOtherOwner(ctx, ownerUserID, boardID)
+	conflicted, err := s.repo.BoardIDExists(ctx, boardID)
 	if err != nil {
 		return err
 	}
@@ -573,7 +587,7 @@ func (s *BoardService) saveAndReloadBoardForActor(ctx context.Context, actorUser
 		}
 		return nil, err
 	}
-	if board.UserID == actorUserID {
+	if board.OwnerUserID == actorUserID {
 		return s.resolveOwnerBoardByNormalizedID(ctx, actorUserID, board.BoardID)
 	}
 	return s.resolveAccessibleBoardByNormalizedID(ctx, actorUserID, board.BoardID)

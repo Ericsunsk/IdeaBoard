@@ -138,10 +138,24 @@ WHERE media_asset_id = sqlc.arg(media_asset_id)
   AND ref_id = sqlc.arg(ref_id)
   AND role = sqlc.arg(role);
 
+-- name: DeleteBoardMediaRefsByOwnerAndBoardID :exec
+DELETE FROM media_refs
+WHERE owner_user_id = sqlc.arg(owner_user_id)
+  AND board_id = sqlc.arg(board_id)
+  AND ref_type IN ('board', 'board_node');
+
 -- name: DeleteTaskOutputMediaRefsByTaskID :exec
 DELETE FROM media_refs
 WHERE task_id = sqlc.arg(task_id)
   AND ref_type = 'task_output';
+
+-- name: DeleteTaskOutputMediaRefsByUserTaskID :exec
+DELETE FROM media_refs AS mr
+USING tasks AS t
+WHERE mr.task_id = sqlc.arg(task_id)
+  AND mr.ref_type = 'task_output'
+  AND t.task_id = mr.task_id
+  AND t.user_id = sqlc.arg(user_id);
 
 -- name: CountMediaRefsByAssetID :one
 SELECT COUNT(*)

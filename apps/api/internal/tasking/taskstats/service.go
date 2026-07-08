@@ -20,8 +20,8 @@ type Store interface {
 	ListDailyStatsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]taskstore.DailyStatAggregate, error)
 	ListExecutionBottleneckStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionBottleneckAggregate, error)
 	ListExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionFailureCategoryAggregate, error)
+	ListStatEventsByOccurredRange(ctx context.Context, start, end time.Time) ([]taskstore.StatEventTrendRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]taskstore.StatEventLatencySample, error)
-	ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]taskstore.TaskStatisticLite, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, start, now time.Time) ([]taskstore.MonitorExecutionPressureAggregate, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, startedAt, endedAt, statDate time.Time, markDone bool) (taskstore.BackfillDailyStatsResult, error)
 }
@@ -440,7 +440,7 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 	const bucketHours = 4
 
 	dayEnd := dayStart.AddDate(0, 0, 1)
-	rows, err := s.store.ListStatisticsByCreatedAtRange(ctx, dayStart, dayEnd)
+	rows, err := s.store.ListStatEventsByOccurredRange(ctx, dayStart, dayEnd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -462,11 +462,11 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 		if row.Status != tasks.StatusCompleted && row.Status != tasks.StatusFailed && row.Status != tasks.StatusCancelled {
 			continue
 		}
-		createdAt := row.CreatedAt.In(loc)
-		if createdAt.Before(dayStart) || !createdAt.Before(dayEnd) {
+		occurredAt := row.OccurredAt.In(loc)
+		if occurredAt.Before(dayStart) || !occurredAt.Before(dayEnd) {
 			continue
 		}
-		bucketHour := (createdAt.Hour() / bucketHours) * bucketHours
+		bucketHour := (occurredAt.Hour() / bucketHours) * bucketHours
 		key := fmt.Sprintf("%sT%02d", dayKey, bucketHour)
 		bucket := buckets[key]
 		if bucket == nil {
@@ -480,21 +480,14 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 		case tasks.StatusFailed:
 			bucket.fail++
 		}
-		model := statisticLiteModel(row)
+		model := strings.TrimSpace(row.ModelName)
+		if model == "" {
+			model = "未识别模型"
+		}
 		bucket.models[model]++
 	}
 
 	return buildTrendItems(orderedKeys, buckets), buildQualityTrendItems(orderedKeys, buckets), nil
-}
-
-func statisticLiteModel(row taskstore.TaskStatisticLite) string {
-	if model := strings.TrimSpace(row.ResolvedModel); model != "" {
-		return model
-	}
-	if model := strings.TrimSpace(row.RequestedModel); model != "" {
-		return model
-	}
-	return taskstore.ExtractTaskModel(row.Result)
 }
 
 func buildTrendItems(orderedKeys []string, buckets map[string]*statisticsTrendBucket) []AdminStatisticsTrendItem {

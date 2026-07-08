@@ -54,6 +54,8 @@ func registerAdminAccountRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/accounts/:id", h.AccountHandler.GetAccount)
 	adminAPI.POST("/accounts", h.AccountHandler.CreateAccount)
 	adminAPI.PUT("/accounts/:id", h.AccountHandler.UpdateAccount)
+	adminAPI.PATCH("/accounts/:id/models", h.AccountHandler.PatchAccountModel)
+	adminAPI.DELETE("/accounts/:id/models", h.AccountHandler.DeleteAccountModel)
 	adminAPI.DELETE("/accounts/:id", h.AccountHandler.DeleteAccount)
 	adminAPI.POST("/accounts/:id/start", h.AccountHandler.StartAccount)
 	adminAPI.POST("/accounts/:id/stop", h.AccountHandler.StopAccount)
@@ -86,11 +88,11 @@ func registerAdminStorageRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 }
 
 func registerAdminChannelRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.GET("/channels", h.ChannelHandler.List)
-	adminAPI.POST("/channels", h.ChannelHandler.Create)
-	adminAPI.PUT("/channels/:id", h.ChannelHandler.Update)
-	adminAPI.DELETE("/channels/:id", h.ChannelHandler.Delete)
-	adminAPI.POST("/channels/detect-models", h.ChannelHandler.DetectModels)
+	adminAPI.GET("/provider-endpoints", h.ProviderEndpointHandler.List)
+	adminAPI.POST("/provider-endpoints", h.ProviderEndpointHandler.Create)
+	adminAPI.PUT("/provider-endpoints/:id", h.ProviderEndpointHandler.Update)
+	adminAPI.DELETE("/provider-endpoints/:id", h.ProviderEndpointHandler.Delete)
+	adminAPI.POST("/provider-endpoints/detect-models", h.ProviderEndpointHandler.DetectModels)
 }
 
 func registerAdminLineDraftRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
@@ -102,7 +104,6 @@ func registerAdminLineDraftRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 
 func registerAdminFeaturePromptRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/feature-prompts", h.FeaturePromptHandler.ListPrompts)
-	adminAPI.GET("/feature-prompts/:slug/revisions", h.FeaturePromptHandler.ListRevisions)
 	adminAPI.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)
 	adminAPI.PUT("/feature-prompts/:slug", h.FeaturePromptHandler.SetPrompt)
 }

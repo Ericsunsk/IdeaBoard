@@ -25,7 +25,7 @@ export type AdminNavigationItem = AdminNavigationRouteDef & {
 
 const adminNavigationIcons = {
   users: Group,
-  channels: Link,
+  'provider-endpoints': Link,
   statistics: DashboardSpeed,
   'task-monitor': StatsDownSquare,
   'feature-prompts': ChatBubble,

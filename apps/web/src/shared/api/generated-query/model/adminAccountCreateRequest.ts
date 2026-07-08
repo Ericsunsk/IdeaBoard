@@ -8,12 +8,9 @@ import type { AdminAccountModelInput } from './adminAccountModelInput'
 
 export interface AdminAccountCreateRequest {
   name: string
-  channel_id: number
-  platform: string
-  api_type: string
+  provider_endpoint_id: number
   secret: string
   models: AdminAccountModelInput[]
-  proxy_url?: string
   max_concurrent?: number
   timeout?: number
   weight?: number

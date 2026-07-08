@@ -4,7 +4,7 @@ import (
 	iofs "io/fs"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/accountpool/channels"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
@@ -59,16 +59,16 @@ type UserRouteDeps struct {
 }
 
 type AdminRouteDeps struct {
-	AdminHandler         *users.AdminHandler
-	AccountHandler       *accounts.AccountHandler
-	TaskHandler          *taskservice.Handler
-	TaskStatsHandler     *taskstats.Handler
-	ChannelHandler       *channels.ChannelHandler
-	StorageHandler       *storage.StorageHandler
-	LineDraftHandler     *assets.LineDraftHandler
-	FeaturePromptHandler *prompts.FeaturePromptHandler
-	StorageService       *storage.StorageService
-	UploadSettings       settings.MediaUploadSettingProvider
+	AdminHandler            *users.AdminHandler
+	AccountHandler          *accounts.AccountHandler
+	TaskHandler             *taskservice.Handler
+	TaskStatsHandler        *taskstats.Handler
+	ProviderEndpointHandler *providerendpoints.ProviderEndpointHandler
+	StorageHandler          *storage.StorageHandler
+	LineDraftHandler        *assets.LineDraftHandler
+	FeaturePromptHandler    *prompts.FeaturePromptHandler
+	StorageService          *storage.StorageService
+	UploadSettings          settings.MediaUploadSettingProvider
 }
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024

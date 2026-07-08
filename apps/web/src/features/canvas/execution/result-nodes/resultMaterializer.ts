@@ -116,6 +116,7 @@ export function materializeResolvedImageResults(
     transaction.updateNode(result.resultNodeId, {
       width: resolved.width,
       sourceImageUrl: result.url,
+      sourceMediaAssetId: result.mediaAssetId,
       sourceImageRatio: resolved.ratio,
       pendingTaskId: undefined,
       outputStatus: 'ready',

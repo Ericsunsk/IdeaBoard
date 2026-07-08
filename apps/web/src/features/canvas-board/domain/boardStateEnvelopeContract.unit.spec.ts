@@ -7,7 +7,7 @@ describe('boardStateEnvelopeContract', () => {
   it('accepts the canonical remote envelope fields', () => {
     const envelope = makeCanvasBoardState({
       updatedAt: 123,
-      mediaRefs: [{ url: 'https://example.com/source.png', role: 'source' }],
+      mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
       previewSnapshotDataUrl: 'data:image/webp;base64,preview',
       previewSnapshotUpdatedAt: 124,
       previewSnapshotVersion: 2,
@@ -22,7 +22,7 @@ describe('boardStateEnvelopeContract', () => {
         promptNodes: expect.any(Array),
         fusionNodes: expect.any(Array),
         connections: expect.any(Array),
-        mediaRefs: [{ url: 'https://example.com/source.png', role: 'source' }],
+        mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }],
         previewSnapshotDataUrl: 'data:image/webp;base64,preview',
         previewSnapshotUpdatedAt: 124,
         previewSnapshotVersion: 2,
@@ -72,14 +72,14 @@ describe('boardStateEnvelopeContract', () => {
     expect(
       parseBoardStateEnvelopeContract({
         ...makeCanvasBoardState(),
-        mediaRefs: [{ url: 'https://example.com/a.png', unknown: true }],
+        mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', unknown: true }],
       }),
     ).toBeNull()
 
     expect(
       parseBoardStateEnvelopeContract({
         ...makeCanvasBoardState(),
-        mediaRefs: [{ url: 'https://example.com/a.png', role: '' }],
+        mediaRefs: [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: '' }],
       }),
     ).toBeNull()
   })

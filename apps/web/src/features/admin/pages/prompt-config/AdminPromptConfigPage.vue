@@ -156,12 +156,14 @@
                 severity="secondary"
                 rounded
               />
-              <Button
-                size="small"
-                label="保存"
-                :loading="saving[item.slug]"
-                @click="savePrompt(item.slug)"
-              />
+              <div class="flex flex-wrap justify-end gap-2">
+                <Button
+                  size="small"
+                  label="保存"
+                  :loading="saving[item.slug]"
+                  @click="savePrompt(item.slug)"
+                />
+              </div>
             </div>
           </div>
         </Panel>
@@ -177,8 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import type { ButtonPassThroughOptions } from 'primevue/button'
 import Card from 'primevue/card'
@@ -200,30 +201,36 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
 } from '../../shared/lib/adminUiClasses'
-import {
-  getListAdminFeaturePromptsQueryKey,
-  saveFeaturePrompt,
-  useListAdminFeaturePrompts,
-} from '../../prompt-config/promptConfigResource'
+import { usePromptConfigResource } from '../../prompt-config/promptConfigResource'
 import type {
-  FeaturePrompt,
   FeaturePromptVariable,
   FeaturePromptVariableTone,
 } from '../../prompt-config/promptConfigResource'
 import {
   featureMap,
   groupedFeatureGroups,
-  getGroupFilledCount as calcGroupFilledCount,
   type FeatureGroup,
   type FeatureSlug,
 } from './featurePromptMeta'
 
 const adminFeedback = useAdminFeedback()
-const queryClient = useQueryClient()
 const { isScrolling: isPromptPanelScrolling, handleScroll: handlePromptPanelScroll } =
   useTransientScrolling()
 const { isScrolling: isPromptDialogScrolling, handleScroll: handlePromptDialogScroll } =
   useTransientScrolling()
+const promptConfigResource = usePromptConfigResource({
+  feedback: adminFeedback.promptConfig,
+  getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,
+})
+const {
+  enabledMap,
+  getPromptVariables,
+  getSavedPrompt,
+  promptMap,
+  resetDrafts,
+  savePrompt,
+  saving,
+} = promptConfigResource
 
 // textarea 引用 + 插入逻辑
 type TextareaRefLike = HTMLTextAreaElement | { $el?: Element }
@@ -278,7 +285,7 @@ function getGroupVariableCount(group: FeatureGroup) {
 }
 
 function getGroupFilledCount(group: FeatureGroup) {
-  return calcGroupFilledCount(group, savedPromptMap)
+  return group.items.filter((item) => getSavedPrompt(item.slug).trim().length > 0).length
 }
 
 function getVariableTokenButtonClass(tone?: FeaturePromptVariableTone) {
@@ -286,7 +293,7 @@ function getVariableTokenButtonClass(tone?: FeaturePromptVariableTone) {
 }
 
 function getVarsForSlug(slug: FeatureSlug): FeaturePromptVariable[] {
-  return promptConfigMap[slug]?.variables ?? []
+  return getPromptVariables(slug)
 }
 
 function insertVar(slug: FeatureSlug, varKey: string) {
@@ -315,73 +322,8 @@ function bindTextareaRef(slug: FeatureSlug, el: unknown) {
   delete textareaRefs[slug]
 }
 
-const promptMap = reactive<Record<string, string>>({})
-const savedPromptMap = reactive<Record<string, string>>({})
-const enabledMap = reactive<Record<string, boolean>>({})
-const promptConfigMap = reactive<Record<string, FeaturePrompt>>({})
-const saving = reactive<Record<string, boolean>>({})
-const promptsQuery = useListAdminFeaturePrompts()
-const featurePrompts = computed(() => promptsQuery.data.value?.data?.prompts)
-const savePromptMutation = useMutation({
-  mutationFn: saveFeaturePrompt,
-  onSuccess: async (config) => {
-    promptConfigMap[config.slug] = config
-    savedPromptMap[config.slug] = config.prompt
-    promptMap[config.slug] = config.prompt
-    enabledMap[config.slug] = config.enabled
-    await queryClient.invalidateQueries({ queryKey: getListAdminFeaturePromptsQueryKey() })
-  },
-})
-watch(
-  () => promptsQuery.error.value,
-  (error) => {
-    if (error) {
-      adminFeedback.promptConfig.loadPromptsFailed(error)
-    }
-  },
-)
-
 function resetGroupDraftFromSaved(group: FeatureGroup) {
-  for (const item of group.items) {
-    promptMap[item.slug] = savedPromptMap[item.slug] || ''
-    enabledMap[item.slug] = promptConfigMap[item.slug]?.enabled ?? true
-  }
+  resetDrafts(group.items.map((item) => item.slug))
 }
 
-watch(
-  () => featurePrompts.value,
-  (prompts) => {
-    if (!prompts) return
-    for (const config of prompts) {
-      const slug = config.slug
-      promptConfigMap[slug] = config
-      const val = config.prompt || ''
-      const hadDraft = Object.prototype.hasOwnProperty.call(promptMap, slug)
-      const currentDraft = promptMap[slug] || ''
-      const previousSaved = savedPromptMap[slug] || ''
-      savedPromptMap[slug] = val
-      if (!hadDraft || currentDraft === previousSaved) {
-        promptMap[slug] = val
-        enabledMap[slug] = config.enabled
-      }
-    }
-  },
-  { immediate: true },
-)
-
-async function savePrompt(slug: FeatureSlug) {
-  saving[slug] = true
-  try {
-    await savePromptMutation.mutateAsync({
-      slug,
-      prompt: promptMap[slug] || '',
-      enabled: enabledMap[slug] ?? true,
-    })
-    adminFeedback.promptConfig.promptSaved(featureMap[slug].title)
-  } catch (error) {
-    adminFeedback.promptConfig.savePromptFailed(error)
-  } finally {
-    saving[slug] = false
-  }
-}
 </script>

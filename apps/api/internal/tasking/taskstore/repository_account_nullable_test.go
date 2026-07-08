@@ -48,12 +48,12 @@ func TestCreateTaskRejectsUnknownAccountID(t *testing.T) {
 	repo := NewRepository(db)
 
 	err := repo.Create(ctx, &tasks.Task{
-		TaskID:            "task-unknown-account",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(199999),
-		AccountID:         tasks.IDPtr(99999),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-unknown-account",
+		TaskID:                     "task-unknown-account",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(199999),
+		AccountID:                  tasks.IDPtr(99999),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-unknown-account",
 	})
 	if err == nil {
 		t.Fatal("create task with unknown account_id succeeded")
@@ -68,12 +68,12 @@ func TestCreateTaskAcceptsKnownAccountID(t *testing.T) {
 	channelID := accountID + 10000
 
 	task := &tasks.Task{
-		TaskID:            "task-known-account",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-known-account",
+		TaskID:                     "task-known-account",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-known-account",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task with known account failed: %v", err)
@@ -85,8 +85,8 @@ func TestCreateTaskAcceptsKnownAccountID(t *testing.T) {
 	if tasks.IDValue(loaded.AccountID) != accountID {
 		t.Fatalf("account_id=%d, want %d", tasks.IDValue(loaded.AccountID), accountID)
 	}
-	if tasks.IDValue(loaded.AssignedChannelID) != channelID {
-		t.Fatalf("assigned_channel_id=%d, want %d", tasks.IDValue(loaded.AssignedChannelID), channelID)
+	if tasks.IDValue(loaded.AssignedProviderEndpointID) != channelID {
+		t.Fatalf("assigned_provider_endpoint_id=%d, want %d", tasks.IDValue(loaded.AssignedProviderEndpointID), channelID)
 	}
 }
 
@@ -96,34 +96,41 @@ func TestTaskAttemptRequiresKnownAccountAndChannel(t *testing.T) {
 	repo := NewRepository(db)
 	accountID := seedRepositoryTestAccount(t, db, 89)
 	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 
 	task := &tasks.Task{
-		TaskID:            "task-attempt-fk",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-attempt-fk",
+		TaskID:                     "task-attempt-fk",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10089",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-attempt-fk",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
 
 	if _, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            task.TaskID,
-		LeaseToken:        "lease-invalid-attempt",
-		AccountID:         0,
-		ChannelID:         channelID,
-		ProviderStartedAt: time.Now(),
+		TaskID:             task.TaskID,
+		LeaseToken:         "lease-invalid-attempt",
+		AccountID:          0,
+		ProviderEndpointID: channelID,
+		ProviderStartedAt:  time.Now(),
 	}); err == nil {
 		t.Fatal("task attempt without account_id succeeded")
 	}
 	if _, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            task.TaskID,
-		LeaseToken:        task.LeaseToken,
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		ProviderStartedAt: time.Now(),
+		TaskID:             task.TaskID,
+		LeaseToken:         task.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  time.Now(),
 	}); err != nil {
 		t.Fatalf("task attempt with known account/channel failed: %v", err)
 	}
@@ -135,6 +142,7 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	repo := NewRepository(db)
 	accountID := seedRepositoryTestAccount(t, db, 90)
 	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 	now := time.Now().Truncate(time.Millisecond)
 
 	pendingTask := &tasks.Task{
@@ -160,22 +168,28 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	}
 
 	runningTask := &tasks.Task{
-		TaskID:            "attempt-pressure-running",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-attempt-pressure-running",
+		TaskID:                     "attempt-pressure-running",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10090",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-attempt-pressure-running",
 	}
 	if err := repo.Create(ctx, runningTask); err != nil {
 		t.Fatalf("create running task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, runningTask.TaskID, accountID, channelID, credentialID, runningTask.LeaseToken)
 	runningRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            runningTask.TaskID,
-		LeaseToken:        runningTask.LeaseToken,
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		ProviderStartedAt: now.Add(-30 * time.Second),
+		TaskID:             runningTask.TaskID,
+		LeaseToken:         runningTask.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  now.Add(-30 * time.Second),
 	})
 	if err != nil {
 		t.Fatalf("create running attempt failed: %v", err)
@@ -185,22 +199,28 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	}
 
 	failedTask := &tasks.Task{
-		TaskID:            "attempt-pressure-failed",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-attempt-pressure-failed",
+		TaskID:                     "attempt-pressure-failed",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10090",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-attempt-pressure-failed",
 	}
 	if err := repo.Create(ctx, failedTask); err != nil {
 		t.Fatalf("create failed task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, failedTask.TaskID, accountID, channelID, credentialID, failedTask.LeaseToken)
 	failedRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            failedTask.TaskID,
-		LeaseToken:        failedTask.LeaseToken,
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		ProviderStartedAt: now.Add(-2 * time.Minute),
+		TaskID:             failedTask.TaskID,
+		LeaseToken:         failedTask.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  now.Add(-2 * time.Minute),
 	})
 	if err != nil {
 		t.Fatalf("create failed attempt failed: %v", err)
@@ -215,22 +235,28 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	}
 
 	retryTask := &tasks.Task{
-		TaskID:            "attempt-pressure-requeued",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-attempt-pressure-requeued",
+		TaskID:                     "attempt-pressure-requeued",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10090",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-attempt-pressure-requeued",
 	}
 	if err := repo.Create(ctx, retryTask); err != nil {
 		t.Fatalf("create retry task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, retryTask.TaskID, accountID, channelID, credentialID, retryTask.LeaseToken)
 	retryRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            retryTask.TaskID,
-		LeaseToken:        retryTask.LeaseToken,
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		ProviderStartedAt: now.Add(-45 * time.Second),
+		TaskID:             retryTask.TaskID,
+		LeaseToken:         retryTask.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  now.Add(-45 * time.Second),
 	})
 	if err != nil {
 		t.Fatalf("create retry attempt failed: %v", err)
@@ -275,25 +301,32 @@ func TestCreateTaskAttemptRequiresCurrentLeaseIdentity(t *testing.T) {
 	repo := NewRepository(db)
 	accountID := seedRepositoryTestAccount(t, db, 93)
 	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 
 	task := &tasks.Task{
-		TaskID:            "task-attempt-lease-identity",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-attempt-current",
+		TaskID:                     "task-attempt-lease-identity",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10093",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-attempt-current",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
 
 	_, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            task.TaskID,
-		LeaseToken:        "lease-attempt-stale",
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		ProviderStartedAt: time.Now(),
+		TaskID:             task.TaskID,
+		LeaseToken:         "lease-attempt-stale",
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  time.Now(),
 	})
 	if !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("stale lease attempt error=%v, want sql.ErrNoRows", err)
@@ -307,11 +340,12 @@ func TestCreateTaskAttemptRequiresCurrentLeaseIdentity(t *testing.T) {
 	}
 
 	ref, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            task.TaskID,
-		LeaseToken:        task.LeaseToken,
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		ProviderStartedAt: time.Now(),
+		TaskID:             task.TaskID,
+		LeaseToken:         task.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  time.Now(),
 	})
 	if err != nil {
 		t.Fatalf("current lease attempt failed: %v", err)
@@ -327,24 +361,31 @@ func TestFinishTaskAttemptOnlyUpdatesRunningAttempt(t *testing.T) {
 	repo := NewRepository(db)
 	accountID := seedRepositoryTestAccount(t, db, 95)
 	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 
 	task := &tasks.Task{
-		TaskID:            "task-attempt-terminal-guard",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-attempt-terminal-guard",
+		TaskID:                     "task-attempt-terminal-guard",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10095",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-attempt-terminal-guard",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
 	ref, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
-		TaskID:            task.TaskID,
-		LeaseToken:        task.LeaseToken,
-		AccountID:         accountID,
-		ChannelID:         channelID,
-		ProviderStartedAt: time.Now(),
+		TaskID:             task.TaskID,
+		LeaseToken:         task.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  time.Now(),
 	})
 	if err != nil {
 		t.Fatalf("create attempt failed: %v", err)
@@ -376,6 +417,123 @@ func TestFinishTaskAttemptOnlyUpdatesRunningAttempt(t *testing.T) {
 	}
 }
 
+func TestRetryAttemptHistoryUsesReleasedLeaseThenNewLease(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 96)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	now := time.Now().Truncate(time.Millisecond)
+
+	task := &tasks.Task{
+		TaskID:                     "task-attempt-retry-history",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    "https://example.com/repository-test-channel-10096",
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-retry-history-a",
+	}
+	if err := repo.Create(ctx, task); err != nil {
+		t.Fatalf("create task failed: %v", err)
+	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
+
+	firstRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:             task.TaskID,
+		LeaseToken:         task.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  now.Add(-2 * time.Second),
+	})
+	if err != nil {
+		t.Fatalf("create first attempt failed: %v", err)
+	}
+	rows, err := repo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry provider", &tasks.TaskAttemptFinish{
+		ID:              firstRef.ID,
+		Status:          tasks.TaskAttemptStatusRequeued,
+		FailureStage:    tasks.ExecutionStageProvider,
+		FailureCategory: tasks.FailureCategoryProviderError,
+		ErrorMsg:        "retry provider",
+		CompletedAt:     now,
+	})
+	if err != nil || rows != 1 {
+		t.Fatalf("requeue first attempt rows=%d err=%v, want rows=1 nil err", rows, err)
+	}
+
+	secondLease := "lease-retry-history-b"
+	if _, err := db.ExecContext(ctx, `
+UPDATE tasks
+SET status = 'running',
+    account_id = $2,
+    assigned_provider_endpoint_id = $3,
+    assigned_credential_id = $4,
+    resolved_model = 'gpt-image-1',
+    api_type = 'openai-compatible',
+    provider_endpoint_base_url = $5,
+    lease_token = $6
+WHERE task_id = $1`,
+		task.TaskID,
+		accountID,
+		channelID,
+		credentialID,
+		task.ProviderEndpointBaseURL,
+		secondLease,
+	); err != nil {
+		t.Fatalf("assign second lease snapshot failed: %v", err)
+	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, secondLease)
+
+	secondRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:             task.TaskID,
+		LeaseToken:         secondLease,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  now.Add(time.Second),
+	})
+	if err != nil {
+		t.Fatalf("create second attempt failed: %v", err)
+	}
+	if secondRef.AttemptNo != 2 {
+		t.Fatalf("second attempt_no=%d, want 2", secondRef.AttemptNo)
+	}
+	if firstRef.LeaseID == 0 || secondRef.LeaseID == 0 || firstRef.LeaseID == secondRef.LeaseID {
+		t.Fatalf("lease ids first=%d second=%d, want distinct non-zero", firstRef.LeaseID, secondRef.LeaseID)
+	}
+
+	var firstStatus, secondStatus string
+	var firstCompletedValid, firstCancelledValid, secondCompletedValid bool
+	if err := db.QueryRowContext(ctx, `
+SELECT
+  MAX(status) FILTER (WHERE id = $1),
+  bool_or(completed_at IS NOT NULL) FILTER (WHERE id = $1),
+  bool_or(cancelled_at IS NOT NULL) FILTER (WHERE id = $1),
+  MAX(status) FILTER (WHERE id = $2),
+  bool_or(completed_at IS NOT NULL) FILTER (WHERE id = $2)
+FROM task_attempts
+WHERE task_id = $3`, firstRef.ID, secondRef.ID, task.TaskID).Scan(
+		&firstStatus,
+		&firstCompletedValid,
+		&firstCancelledValid,
+		&secondStatus,
+		&secondCompletedValid,
+	); err != nil {
+		t.Fatalf("read attempt history failed: %v", err)
+	}
+	if firstStatus != tasks.TaskAttemptStatusRequeued || !firstCompletedValid || firstCancelledValid {
+		t.Fatalf("first attempt status=%q completed=%v cancelled=%v, want requeued completed only", firstStatus, firstCompletedValid, firstCancelledValid)
+	}
+	if secondStatus != tasks.TaskAttemptStatusRunning || secondCompletedValid {
+		t.Fatalf("second attempt status=%q completed=%v, want running without completed_at", secondStatus, secondCompletedValid)
+	}
+}
+
 func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
@@ -384,12 +542,12 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 	channelID := accountID + 10000
 
 	task := &tasks.Task{
-		TaskID:            "task-complete-attempt-rollback",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-complete-attempt-rollback",
+		TaskID:                     "task-complete-attempt-rollback",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-complete-attempt-rollback",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
@@ -401,6 +559,7 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		[]string{tasks.StatusRunning},
 		accountID,
 		channelID,
+		loadRepositoryTestCredentialID(t, db, accountID),
 		task.LeaseToken,
 		`{"status":"success"}`,
 		time.Now(),
@@ -438,12 +597,12 @@ func TestRequeueWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 	channelID := accountID + 10000
 
 	task := &tasks.Task{
-		TaskID:            "task-requeue-attempt-rollback",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-requeue-attempt-rollback",
+		TaskID:                     "task-requeue-attempt-rollback",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-requeue-attempt-rollback",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
@@ -455,6 +614,7 @@ func TestRequeueWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		[]string{tasks.StatusRunning},
 		accountID,
 		channelID,
+		loadRepositoryTestCredentialID(t, db, accountID),
 		task.LeaseToken,
 		"retry",
 		&tasks.TaskAttemptFinish{
@@ -490,17 +650,17 @@ func TestResetRunningTaskClearsAssignedAccountAndChannel(t *testing.T) {
 	channelID := accountID + 10000
 
 	task := &tasks.Task{
-		TaskID:            "task-reset-assigned-channel",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-reset-assigned-channel",
+		TaskID:                     "task-reset-assigned-channel",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-reset-assigned-channel",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
-	rows, err := repo.ResetTaskRunningToPendingWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, task.LeaseToken, "retry", nil)
+	rows, err := repo.ResetTaskRunningToPendingWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, "retry", nil)
 	if err != nil {
 		t.Fatalf("reset task failed: %v", err)
 	}
@@ -514,8 +674,8 @@ func TestResetRunningTaskClearsAssignedAccountAndChannel(t *testing.T) {
 	if loaded.AccountID != nil {
 		t.Fatalf("account_id=%d, want nil", tasks.IDValue(loaded.AccountID))
 	}
-	if loaded.AssignedChannelID != nil {
-		t.Fatalf("assigned_channel_id=%d, want nil", tasks.IDValue(loaded.AssignedChannelID))
+	if loaded.AssignedProviderEndpointID != nil {
+		t.Fatalf("assigned_provider_endpoint_id=%d, want nil", tasks.IDValue(loaded.AssignedProviderEndpointID))
 	}
 }
 
@@ -557,12 +717,12 @@ func TestMarkTaskCancelledRetainsAssignmentSnapshot(t *testing.T) {
 	channelID := accountID + 10000
 
 	task := &tasks.Task{
-		TaskID:            "task-cancel-retains-assignment",
-		UserID:            1,
-		AssignedChannelID: tasks.IDPtr(channelID),
-		AccountID:         tasks.IDPtr(accountID),
-		Status:            tasks.StatusRunning,
-		LeaseToken:        "lease-cancel-retains-assignment",
+		TaskID:                     "task-cancel-retains-assignment",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-cancel-retains-assignment",
 	}
 	if err := repo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
@@ -585,8 +745,8 @@ func TestMarkTaskCancelledRetainsAssignmentSnapshot(t *testing.T) {
 	if tasks.IDValue(loaded.AccountID) != accountID {
 		t.Fatalf("account_id=%d, want %d", tasks.IDValue(loaded.AccountID), accountID)
 	}
-	if tasks.IDValue(loaded.AssignedChannelID) != channelID {
-		t.Fatalf("assigned_channel_id=%d, want %d", tasks.IDValue(loaded.AssignedChannelID), channelID)
+	if tasks.IDValue(loaded.AssignedProviderEndpointID) != channelID {
+		t.Fatalf("assigned_provider_endpoint_id=%d, want %d", tasks.IDValue(loaded.AssignedProviderEndpointID), channelID)
 	}
 	if loaded.ExecutionMetrics == nil {
 		t.Fatal("execution metrics missing after cancellation")

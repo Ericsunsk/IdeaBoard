@@ -18,30 +18,35 @@ type Handler struct {
 }
 
 type adminTaskDTO struct {
-	ID                int64                       `json:"id"`
-	TaskID            string                      `json:"task_id"`
-	UserID            int64                       `json:"user_id"`
-	AssignedChannelID *int64                      `json:"assigned_channel_id"`
-	AccountID         *int64                      `json:"account_id"`
-	Prompt            string                      `json:"prompt"`
-	UserPrompt        string                      `json:"user_prompt"`
-	Params            string                      `json:"params"`
-	FeatureSlug       string                      `json:"feature_slug"`
-	RequestedModel    string                      `json:"requested_model"`
-	ResolvedModel     string                      `json:"resolved_model"`
-	APIType           string                      `json:"api_type"`
-	Status            string                      `json:"status"`
-	RetryCount        int                         `json:"retry_count"`
-	ErrorMsg          string                      `json:"error_msg"`
-	Result            string                      `json:"result"`
-	Outputs           []tasks.TaskOutput          `json:"outputs,omitempty"`
-	ExecutionMetrics  *tasks.TaskExecutionMetrics `json:"execution_metrics,omitempty"`
-	CreatedAt         time.Time                   `json:"created_at"`
-	UpdatedAt         time.Time                   `json:"updated_at"`
-	CompletedAt       *time.Time                  `json:"completed_at"`
-	CancelledAt       *time.Time                  `json:"cancelled_at"`
-	CancelledBy       *int64                      `json:"cancelled_by"`
-	CancelReason      string                      `json:"cancel_reason"`
+	ID                         int64                       `json:"id"`
+	TaskID                     string                      `json:"task_id"`
+	UserID                     int64                       `json:"user_id"`
+	AssignedProviderEndpointID *int64                      `json:"assigned_provider_endpoint_id"`
+	AssignedCredentialID       *int64                      `json:"assigned_credential_id"`
+	AccountID                  *int64                      `json:"account_id"`
+	Prompt                     string                      `json:"prompt"`
+	UserPrompt                 string                      `json:"user_prompt"`
+	Params                     string                      `json:"params"`
+	FeatureSlug                string                      `json:"feature_slug"`
+	RequestedModel             string                      `json:"requested_model"`
+	ResolvedModel              string                      `json:"resolved_model"`
+	APIType                    string                      `json:"api_type"`
+	ProviderEndpointName       string                      `json:"provider_endpoint_name"`
+	ProviderEndpointBaseURL    string                      `json:"provider_endpoint_base_url"`
+	CredentialFingerprint      string                      `json:"credential_fingerprint"`
+	CredentialKeyVersion       string                      `json:"credential_key_version"`
+	Status                     string                      `json:"status"`
+	RetryCount                 int                         `json:"retry_count"`
+	ErrorMsg                   string                      `json:"error_msg"`
+	Result                     string                      `json:"result"`
+	Outputs                    []tasks.TaskOutput          `json:"outputs,omitempty"`
+	ExecutionMetrics           *tasks.TaskExecutionMetrics `json:"execution_metrics,omitempty"`
+	CreatedAt                  time.Time                   `json:"created_at"`
+	UpdatedAt                  time.Time                   `json:"updated_at"`
+	CompletedAt                *time.Time                  `json:"completed_at"`
+	CancelledAt                *time.Time                  `json:"cancelled_at"`
+	CancelledBy                *int64                      `json:"cancelled_by"`
+	CancelReason               string                      `json:"cancel_reason"`
 }
 
 type submitTaskResponse struct {
@@ -278,30 +283,35 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 		return adminTaskDTO{}
 	}
 	return adminTaskDTO{
-		ID:                task.ID,
-		TaskID:            task.TaskID,
-		UserID:            task.UserID,
-		AssignedChannelID: task.AssignedChannelID,
-		AccountID:         task.AccountID,
-		Prompt:            task.Prompt,
-		UserPrompt:        task.UserPrompt,
-		Params:            task.Params,
-		FeatureSlug:       task.FeatureSlug,
-		RequestedModel:    task.RequestedModel,
-		ResolvedModel:     task.ResolvedModel,
-		APIType:           task.APIType,
-		Status:            task.Status,
-		RetryCount:        task.RetryCount,
-		ErrorMsg:          task.ErrorMsg,
-		Result:            task.Result,
-		Outputs:           task.Outputs,
-		ExecutionMetrics:  task.ExecutionMetrics,
-		CreatedAt:         task.CreatedAt,
-		UpdatedAt:         task.UpdatedAt,
-		CompletedAt:       task.CompletedAt,
-		CancelledAt:       task.CancelledAt,
-		CancelledBy:       task.CancelledBy,
-		CancelReason:      task.CancelReason,
+		ID:                         task.ID,
+		TaskID:                     task.TaskID,
+		UserID:                     task.UserID,
+		AssignedProviderEndpointID: task.AssignedProviderEndpointID,
+		AssignedCredentialID:       task.AssignedCredentialID,
+		AccountID:                  task.AccountID,
+		Prompt:                     task.Prompt,
+		UserPrompt:                 task.UserPrompt,
+		Params:                     task.Params,
+		FeatureSlug:                task.FeatureSlug,
+		RequestedModel:             task.RequestedModel,
+		ResolvedModel:              task.ResolvedModel,
+		APIType:                    task.APIType,
+		ProviderEndpointName:       task.ProviderEndpointName,
+		ProviderEndpointBaseURL:    task.ProviderEndpointBaseURL,
+		CredentialFingerprint:      task.CredentialFingerprint,
+		CredentialKeyVersion:       task.CredentialKeyVersion,
+		Status:                     task.Status,
+		RetryCount:                 task.RetryCount,
+		ErrorMsg:                   task.ErrorMsg,
+		Result:                     task.Result,
+		Outputs:                    task.Outputs,
+		ExecutionMetrics:           task.ExecutionMetrics,
+		CreatedAt:                  task.CreatedAt,
+		UpdatedAt:                  task.UpdatedAt,
+		CompletedAt:                task.CompletedAt,
+		CancelledAt:                task.CancelledAt,
+		CancelledBy:                task.CancelledBy,
+		CancelReason:               task.CancelReason,
 	}
 }
 

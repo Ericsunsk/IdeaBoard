@@ -10,15 +10,15 @@ type AdminToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'warning' | '
 export type AdminProviderConfigFeedback = {
   accountLimitsFallback: (error: unknown) => void
   loadFailed: (error: unknown) => void
-  staleChannel: () => void
+  staleProviderEndpoint: () => void
   staleAccount: () => void
   staleModel: () => void
-  channelFormInvalid: () => void
+  providerEndpointFormInvalid: () => void
   accountFormInvalid: () => void
-  channelSaved: (isEditing: boolean) => void
-  channelSaveFailed: (error: unknown) => void
-  channelDeleted: () => void
-  channelDeleteFailed: (error: unknown) => void
+  providerEndpointSaved: (isEditing: boolean) => void
+  providerEndpointSaveFailed: (error: unknown) => void
+  providerEndpointDeleted: () => void
+  providerEndpointDeleteFailed: (error: unknown) => void
   accountSaved: (isEditing: boolean) => void
   accountSaveFailed: (error: unknown) => void
   accountDeleted: () => void
@@ -100,7 +100,7 @@ export type AdminFeedback = {
     nonAdminAccount: () => void
     failed: (error: unknown) => void
   }
-  channels: {
+  providerEndpoints: {
     providerConfig: AdminProviderConfigFeedback
   }
   users: {
@@ -140,7 +140,7 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
         appToast.error(formatDisplayErrorMessage(error, '管理员登录失败'))
       },
     },
-    channels: {
+    providerEndpoints: {
       providerConfig: {
         accountLimitsFallback(error) {
           appToast.warning(
@@ -150,8 +150,8 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
         loadFailed(error) {
           appToast.error(extractSafeApiErrorMessage(error, '加载数据失败'))
         },
-        staleChannel() {
-          appToast.warning('渠道商已刷新，请重新选择')
+        staleProviderEndpoint() {
+          appToast.warning('供应商端点已刷新，请重新选择')
         },
         staleAccount() {
           appToast.warning('账号已刷新，请重新选择')
@@ -159,23 +159,23 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
         staleModel() {
           appToast.warning('模型已刷新，请重新选择')
         },
-        channelFormInvalid() {
-          appToast.warning('请修正渠道商表单错误')
+        providerEndpointFormInvalid() {
+          appToast.warning('请修正供应商端点表单错误')
         },
         accountFormInvalid() {
           appToast.warning('请修正 APIKey 表单错误')
         },
-        channelSaved(isEditing) {
-          appToast.success(isEditing ? '渠道商已更新' : '渠道商已创建')
+        providerEndpointSaved(isEditing) {
+          appToast.success(isEditing ? '供应商端点已更新' : '供应商端点已创建')
         },
-        channelSaveFailed(error) {
-          appToast.error(extractSafeApiErrorMessage(error, '保存渠道商失败'))
+        providerEndpointSaveFailed(error) {
+          appToast.error(extractSafeApiErrorMessage(error, '保存供应商端点失败'))
         },
-        channelDeleted() {
+        providerEndpointDeleted() {
           appToast.success('删除成功')
         },
-        channelDeleteFailed(error) {
-          appToast.error(extractSafeApiErrorMessage(error, '删除渠道商失败'))
+        providerEndpointDeleteFailed(error) {
+          appToast.error(extractSafeApiErrorMessage(error, '删除供应商端点失败'))
         },
         accountSaved(isEditing) {
           appToast.success(isEditing ? '账号已更新' : '账号已创建')

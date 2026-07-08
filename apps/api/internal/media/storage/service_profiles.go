@@ -89,6 +89,7 @@ func (s *StorageService) saveProfile(ctx context.Context, profile *StorageProfil
 		}
 	}
 
+	rotateSecret := storageProfileHasRealSecret(*profile)
 	next := s.normalizeProfile(*existing, *profile)
 	if apply {
 		next.IsCurrent = true
@@ -109,11 +110,11 @@ func (s *StorageService) saveProfile(ctx context.Context, profile *StorageProfil
 		next.IsCurrent = false
 	}
 	if apply {
-		if err := s.profileRepo.SaveAndApplyProfile(ctx, next); err != nil {
+		if err := s.profileRepo.saveAndApplyProfile(ctx, next, storageProfileSaveOptions{rotateSecret: rotateSecret}); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := s.profileRepo.SaveProfile(ctx, next); err != nil {
+		if err := s.profileRepo.saveProfile(ctx, next, storageProfileSaveOptions{rotateSecret: rotateSecret}); err != nil {
 			return nil, err
 		}
 	}

@@ -1,31 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import type { ProviderAccountRecord, ProviderChannelRecord } from './providerConfigTypes'
+import type { ProviderAccountRecord, ProviderEndpointRecord } from './providerConfigTypes'
 import {
   countUniqueAccountModels,
-  createProviderChannelCards,
-  groupAccountsByChannelId,
+  createProviderEndpointCards,
+  groupAccountsByProviderEndpointId,
 } from './providerConfigCards'
 
 describe('provider config cards', () => {
-  it('groups accounts by channel and builds card model counts', () => {
-    const cards = createProviderChannelCards(
-      [makeChannel({ id: 1, name: 'A' }), makeChannel({ id: 2, name: 'B' })],
+  it('groups accounts by providerEndpoint and builds card model counts', () => {
+    const cards = createProviderEndpointCards(
+      [makeProviderEndpoint({ id: 1, name: 'A' }), makeProviderEndpoint({ id: 2, name: 'B' })],
       [
-        makeAccount({ id: 11, channelId: 1, models: [makeModel({ name: 'gpt-4o' })] }),
+        makeAccount({ id: 11, providerEndpointId: 1, models: [makeModel({ name: 'gpt-4o' })] }),
         makeAccount({
           id: 12,
-          channelId: 1,
+          providerEndpointId: 1,
           models: [makeModel({ name: 'gpt-4o', enabled: false }), makeModel({ name: 'imagen' })],
         }),
-        makeAccount({ id: 21, channelId: 2, models: [makeModel({ name: 'gemini' })] }),
+        makeAccount({ id: 21, providerEndpointId: 2, models: [makeModel({ name: 'gemini' })] }),
       ],
     )
 
     expect(
       cards.map((card) => [
-        card.channel.id,
-        card.channel.baseUrl,
-        card.channel.apiTypeLabel,
+        card.providerEndpoint.id,
+        card.providerEndpoint.baseUrl,
+        card.providerEndpoint.apiTypeLabel,
         card.accounts.length,
         card.modelCount,
       ]),
@@ -39,13 +39,13 @@ describe('provider config cards', () => {
       concurrencyPercent: 0,
       commandTarget: { kind: 'account', id: 11 },
     })
-    expect(cards[0]?.channel.commandTarget).toEqual({ kind: 'channel', id: 1 })
+    expect(cards[0]?.providerEndpoint.commandTarget).toEqual({ kind: 'providerEndpoint', id: 1 })
   })
 
   it('returns grouped account map for direct lookup', () => {
-    const grouped = groupAccountsByChannelId([
-      makeAccount({ id: 11, channelId: 1 }),
-      makeAccount({ id: 21, channelId: 2 }),
+    const grouped = groupAccountsByProviderEndpointId([
+      makeAccount({ id: 11, providerEndpointId: 1 }),
+      makeAccount({ id: 21, providerEndpointId: 2 }),
     ])
 
     expect(grouped.get(1)?.map((account) => account.id)).toEqual([11])
@@ -64,11 +64,11 @@ describe('provider config cards', () => {
   })
 })
 
-function makeChannel(overrides: Partial<ProviderChannelRecord> = {}): ProviderChannelRecord {
+function makeProviderEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): ProviderEndpointRecord {
   return {
     id: 1,
     apiType: 'openai-compatible',
-    name: 'Channel',
+    name: 'ProviderEndpoint',
     baseUrl: 'https://api.example.com/v1',
     status: 1,
     createdAt: '',
@@ -83,8 +83,7 @@ function makeAccount(
   return {
     id: 11,
     name: 'Account',
-    channelId: 1,
-    platform: 'openai-compatible',
+    providerEndpointId: 1,
     apiType: 'openai-compatible',
     baseUrl: 'https://api.example.com/v1',
     models: [],

@@ -94,5 +94,6 @@ export async function resolveTaskImageResultDisplay(
     ratio,
     ...(size ? { width: size.width, height: size.height } : {}),
     ...(normalized.mimeType ? { mimeType: normalized.mimeType } : {}),
+    ...(normalized.mediaAssetId ? { mediaAssetId: normalized.mediaAssetId } : {}),
   }
 }

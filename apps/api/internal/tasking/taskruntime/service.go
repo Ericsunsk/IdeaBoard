@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/tasking/taskstore"
 )
 
 const (
@@ -36,13 +37,14 @@ type AccountStore interface {
 }
 
 type TaskStore interface {
-	CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
+	GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string) (*taskstore.ActiveTaskLease, error)
 	PatchExecutionMetrics(ctx context.Context, patch tasks.TaskExecutionMetricsPatch) error
 	PatchExecutionSnapshot(ctx context.Context, snapshot tasks.TaskExecutionSnapshot) (int64, error)
 	CreateTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error)
@@ -136,6 +138,9 @@ func (s *Service) ConfirmTaskLease(ctx context.Context, assignment taskqueue.Tas
 		return ErrTaskStateConflict
 	}
 	if err := s.queue.ConfirmTaskLease(ctx, assignment); err != nil {
+		if errors.Is(err, taskqueue.ErrTaskLeaseConflict) {
+			return fmt.Errorf("%w: %v", ErrTaskStateConflict, err)
+		}
 		return err
 	}
 	s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusRunning)
@@ -193,7 +198,7 @@ func (s *Service) CompleteTask(ctx context.Context, input CompleteTaskInput) err
 	if err := validateTaskOutputs(assignment.TaskID, input.Outputs); err != nil {
 		return err
 	}
-	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Result, now, input.Outputs, input.AttemptFinish)
+	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Result, now, input.Outputs, input.AttemptFinish)
 	if err != nil {
 		return err
 	}
@@ -236,13 +241,27 @@ func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID
 		return ErrTaskStateConflict
 	}
 
-	assignment := taskqueue.TaskAssignment{
-		TaskID:     task.TaskID,
-		AccountID:  tasks.IDValue(task.AccountID),
-		ChannelID:  tasks.IDValue(task.AssignedChannelID),
-		LeaseToken: task.LeaseToken,
+	lease, err := s.taskRepo.GetActiveTaskLeaseByTaskID(ctx, taskID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return ErrTaskStateConflict
+		}
+		return err
 	}
-	if !assignment.HasLeaseIdentity() || !taskqueue.LeaseBelongsToRiverJob(task.LeaseToken, riverJobID) {
+	assignment := taskqueue.TaskAssignment{
+		TaskID:                  lease.TaskID,
+		AccountID:               lease.AccountID,
+		ProviderEndpointID:      lease.ProviderEndpointID,
+		CredentialID:            lease.CredentialID,
+		ResolvedModel:           lease.ResolvedModel,
+		APIType:                 lease.APIType,
+		ProviderEndpointName:    lease.ProviderEndpointName,
+		ProviderEndpointBaseURL: lease.ProviderEndpointBaseURL,
+		CredentialFingerprint:   lease.CredentialFingerprint,
+		CredentialKeyVersion:    lease.CredentialKeyVersion,
+		LeaseToken:              lease.LeaseToken,
+	}
+	if !assignment.HasLeaseIdentity() || !taskqueue.LeaseBelongsToRiverJob(lease.LeaseToken, riverJobID) {
 		return ErrTaskStateConflict
 	}
 	return s.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: reason})
@@ -295,7 +314,7 @@ func (s *Service) failRunningTaskWithLease(ctx context.Context, input FailTaskIn
 		return ErrTaskStateConflict
 	}
 	now := taskTerminalTime(input.AttemptFinish)
-	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.AttemptFinish)
+	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.AttemptFinish)
 	if err != nil {
 		return err
 	}
@@ -331,7 +350,7 @@ func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskIn
 		errMsg = input.Reason
 	}
 
-	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, input.AttemptFinish)
+	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, errMsg, input.AttemptFinish)
 	if err != nil {
 		return err
 	}
@@ -377,12 +396,15 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 		}
 		return false, ErrTaskStateConflict
 	}
-	if tasks.IDValue(task.AccountID) != assignment.AccountID || tasks.IDValue(task.AssignedChannelID) != assignment.ChannelID || task.LeaseToken != assignment.LeaseToken {
+	if tasks.IDValue(task.AccountID) != assignment.AccountID || tasks.IDValue(task.AssignedProviderEndpointID) != assignment.ProviderEndpointID || task.LeaseToken != assignment.LeaseToken {
+		return false, ErrTaskStateConflict
+	}
+	if assignment.CredentialID > 0 && tasks.IDValue(task.AssignedCredentialID) != assignment.CredentialID {
 		return false, ErrTaskStateConflict
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Reason, input.RequeuedAttemptFinish)
+		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, input.RequeuedAttemptFinish)
 		if err != nil {
 			return false, err
 		}
@@ -394,7 +416,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 	}
 
 	now := taskTerminalTime(input.FinalFailAttemptFinish)
-	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.FinalFailAttemptFinish)
+	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.FinalFailAttemptFinish)
 	if err != nil {
 		return false, err
 	}
@@ -470,11 +492,21 @@ func validateTaskOutputs(taskID string, outputs []tasks.TaskOutput) error {
 		if strings.TrimSpace(output.TaskID) != "" && strings.TrimSpace(output.TaskID) != taskID {
 			return fmt.Errorf("任务结果包含非本任务的输出")
 		}
+		outputKind := strings.TrimSpace(output.OutputKind)
+		if outputKind == "" {
+			outputKind = "asset"
+		}
+		if outputKind != "asset" && outputKind != "remote" {
+			return fmt.Errorf("任务结果输出类型不支持")
+		}
 		if strings.TrimSpace(output.URL) == "" {
 			return fmt.Errorf("任务结果输出缺少 URL")
 		}
-		if strings.TrimSpace(output.StorageKey) == "" {
+		if outputKind == "asset" && strings.TrimSpace(output.StorageKey) == "" {
 			return fmt.Errorf("任务结果输出缺少 storage_key")
+		}
+		if outputKind == "remote" && strings.TrimSpace(output.StorageKey) != "" {
+			return fmt.Errorf("remote 任务结果不能包含 storage_key")
 		}
 	}
 	return nil

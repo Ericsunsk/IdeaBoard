@@ -8,11 +8,8 @@ import type { AdminAccountModelInput } from './adminAccountModelInput'
 
 export interface AdminAccountUpdateRequest {
   name?: string
-  platform?: string
-  api_type?: string
   secret?: string
-  models: AdminAccountModelInput[]
-  proxy_url?: string
+  models?: AdminAccountModelInput[]
   max_concurrent?: number
   timeout?: number
   weight?: number

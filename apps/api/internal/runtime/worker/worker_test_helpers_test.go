@@ -23,15 +23,19 @@ func (f *fakeRequeuer) Enqueue(context.Context, *tasks.TaskPayload) error {
 }
 
 type fakeAssigner struct {
-	assignAccount  int64
-	assignChannel  int64
-	assignModel    string
-	assignStatus   string
-	assignToken    string
-	assignErr      error
-	confirmErr     error
-	confirmCalls   int
-	lastRiverJobID int64
+	assignAccount         int64
+	assignChannel         int64
+	assignCredential      int64
+	assignModel           string
+	assignAPIType         string
+	assignEndpointName    string
+	assignEndpointBaseURL string
+	assignStatus          string
+	assignToken           string
+	assignErr             error
+	confirmErr            error
+	confirmCalls          int
+	lastRiverJobID        int64
 }
 
 func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *tasks.TaskPayload) (taskqueue.TaskAssignment, error) {
@@ -43,13 +47,33 @@ func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *tasks.TaskPayl
 	if channelID == 0 && f.assignAccount != 0 {
 		channelID = f.assignAccount * 10
 	}
+	credentialID := f.assignCredential
+	if credentialID == 0 && f.assignAccount != 0 {
+		credentialID = f.assignAccount * 100
+	}
+	apiType := f.assignAPIType
+	if apiType == "" {
+		apiType = "openai-compatible"
+	}
+	endpointName := f.assignEndpointName
+	if endpointName == "" {
+		endpointName = "fake-provider-endpoint"
+	}
+	endpointBaseURL := f.assignEndpointBaseURL
+	if endpointBaseURL == "" {
+		endpointBaseURL = "https://example.com/fake-provider"
+	}
 	return taskqueue.TaskAssignment{
-		TaskID:        task.TaskID,
-		AccountID:     f.assignAccount,
-		ChannelID:     channelID,
-		ResolvedModel: f.assignModel,
-		Status:        f.assignStatus,
-		LeaseToken:    f.leaseToken(),
+		TaskID:                  task.TaskID,
+		AccountID:               f.assignAccount,
+		ProviderEndpointID:      channelID,
+		CredentialID:            credentialID,
+		ResolvedModel:           f.assignModel,
+		APIType:                 apiType,
+		ProviderEndpointName:    endpointName,
+		ProviderEndpointBaseURL: endpointBaseURL,
+		Status:                  f.assignStatus,
+		LeaseToken:              f.leaseToken(),
 	}, nil
 }
 
@@ -137,17 +161,16 @@ func createRiverTestAccount(t *testing.T, db testDB, repo *accounts.AccountRepos
 	secretstest.EnableEncryption(t)
 	channelID := createRiverTestChannel(t, db, name)
 	acc := &accounts.ApiAccount{
-		Name:          name,
-		ChannelID:     channelID,
-		Platform:      "openai-compatible",
-		ApiType:       "openai-compatible",
-		Models:        []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:        "k",
-		ProxyURL:      "https://example.com/" + name,
-		MaxConcurrent: 3,
-		Timeout:       120,
-		Weight:        1,
-		Status:        1,
+		Name:               name,
+		ProviderEndpointID: channelID,
+		ApiType:            "openai-compatible",
+		Models:             []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:             "k",
+		ProxyURL:           "https://example.com/" + name,
+		MaxConcurrent:      3,
+		Timeout:            120,
+		Weight:             1,
+		Status:             1,
 	}
 	if err := repo.Create(context.Background(), acc); err != nil {
 		t.Fatalf("create account failed: %v", err)
@@ -159,11 +182,16 @@ type testDB interface {
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 }
 
+type testRuntimeDB interface {
+	testDB
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+}
+
 func createRiverTestChannel(t *testing.T, db testDB, suffix string) int64 {
 	t.Helper()
 	var id int64
 	err := db.QueryRowContext(context.Background(), `
-INSERT INTO channels (type, name, api_url, status)
+INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ('openai-compatible', $1, $2, 1)
 RETURNING id`,
 		"river-test-channel-"+suffix,
@@ -173,4 +201,63 @@ RETURNING id`,
 		t.Fatalf("create river test channel failed: %v", err)
 	}
 	return id
+}
+
+func riverTestAssignment(t testing.TB, db testRuntimeDB, account *accounts.ApiAccount, taskID string, leaseToken string) taskqueue.TaskAssignment {
+	t.Helper()
+	credentialID := loadRiverTestCredentialID(t, db, account.ID)
+	var endpointName string
+	var endpointBaseURL string
+	var apiType string
+	if err := db.QueryRowContext(context.Background(), `
+SELECT name, base_url, api_type
+FROM provider_endpoints
+WHERE id = $1`, account.ProviderEndpointID).Scan(&endpointName, &endpointBaseURL, &apiType); err != nil {
+		t.Fatalf("load provider endpoint snapshot failed: %v", err)
+	}
+	assignment := taskqueue.TaskAssignment{
+		TaskID:                  taskID,
+		AccountID:               account.ID,
+		ProviderEndpointID:      account.ProviderEndpointID,
+		CredentialID:            credentialID,
+		ResolvedModel:           "gpt-image-1",
+		APIType:                 apiType,
+		ProviderEndpointName:    endpointName,
+		ProviderEndpointBaseURL: endpointBaseURL,
+		Status:                  taskqueue.AssignStatusAssigned,
+		LeaseToken:              leaseToken,
+	}
+	if _, err := db.ExecContext(context.Background(), `
+UPDATE tasks
+SET assigned_credential_id = $2,
+    resolved_model = $3,
+    api_type = $4,
+    provider_endpoint_name = $5,
+    provider_endpoint_base_url = $6
+WHERE task_id = $1`,
+		taskID,
+		assignment.CredentialID,
+		assignment.ResolvedModel,
+		assignment.APIType,
+		assignment.ProviderEndpointName,
+		assignment.ProviderEndpointBaseURL,
+	); err != nil {
+		t.Fatalf("write task assignment snapshot failed: %v", err)
+	}
+	return assignment
+}
+
+func loadRiverTestCredentialID(t testing.TB, db testDB, accountID int64) int64 {
+	t.Helper()
+	var credentialID int64
+	if err := db.QueryRowContext(context.Background(), `
+SELECT id
+FROM api_account_secrets
+WHERE account_id = $1
+  AND status = 'active'
+ORDER BY rotated_at DESC, id DESC
+LIMIT 1`, accountID).Scan(&credentialID); err != nil {
+		t.Fatalf("load runtime credential id failed: %v", err)
+	}
+	return credentialID
 }

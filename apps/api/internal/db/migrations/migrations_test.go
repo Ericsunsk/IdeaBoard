@@ -354,22 +354,27 @@ func TestBaselineMigrationHasCleanSchemaContract(t *testing.T) {
 		"CREATE TABLE media_assets",
 		"CREATE TABLE storage_profiles",
 		"CREATE TABLE feature_prompts",
-		"CREATE TABLE user_boards",
+		"CREATE TABLE boards",
 		"CREATE TABLE board_share_tokens",
 		"stat_date DATE NOT NULL",
 		"account_id BIGINT",
-		"assigned_channel_id BIGINT",
+		"assigned_provider_endpoint_id BIGINT",
 		"state JSONB NOT NULL",
 		"revision BIGINT NOT NULL DEFAULT 1",
 		"state_schema_version INTEGER NOT NULL DEFAULT 1",
+		"owner_user_id BIGINT NOT NULL",
+		"created_by BIGINT NOT NULL",
 		"last_saved_by BIGINT",
 		"token_hash VARCHAR(128) NOT NULL",
 		"token_prefix VARCHAR(16) NOT NULL",
-		"CONSTRAINT uq_api_accounts_id_channel_id UNIQUE (id, channel_id)",
-		"CONSTRAINT fk_tasks_account_channel FOREIGN KEY (account_id, assigned_channel_id) REFERENCES api_accounts(id, channel_id)",
-		"CONSTRAINT uq_user_boards_board_id UNIQUE (board_id)",
-		"CONSTRAINT fk_user_boards_last_saved_by FOREIGN KEY (last_saved_by) REFERENCES users(id) ON DELETE SET NULL",
-		"CONSTRAINT fk_board_members_board FOREIGN KEY (owner_user_id, board_id) REFERENCES user_boards(user_id, board_id)",
+		"CONSTRAINT uq_api_accounts_id_provider_endpoint_id UNIQUE (id, provider_endpoint_id)",
+		"CONSTRAINT fk_tasks_account_provider_endpoint FOREIGN KEY (account_id, assigned_provider_endpoint_id) REFERENCES api_accounts(id, provider_endpoint_id)",
+		"CONSTRAINT uq_boards_board_id UNIQUE (board_id)",
+		"CONSTRAINT fk_boards_owner_user_id FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE",
+		"CONSTRAINT fk_boards_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT",
+		"CONSTRAINT fk_boards_last_saved_by FOREIGN KEY (last_saved_by) REFERENCES users(id) ON DELETE SET NULL",
+		"CONSTRAINT fk_board_members_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE",
+		"CONSTRAINT fk_board_share_tokens_board FOREIGN KEY (board_id) REFERENCES boards(board_id) ON DELETE CASCADE",
 		"CREATE INDEX idx_tasks_account_id ON tasks (account_id) WHERE account_id IS NOT NULL",
 		"CREATE INDEX idx_tasks_terminal_created_at ON tasks (created_at) WHERE status IN ('completed', 'failed', 'cancelled')",
 		"VALUES ('builtin-local', '本地存储', 'local', TRUE, TRUE, TRUE, 'active', '{}'::jsonb)",
@@ -380,8 +385,9 @@ func TestBaselineMigrationHasCleanSchemaContract(t *testing.T) {
 	}
 
 	for _, forbidden := range []string{
-		"ALTER TABLE user_boards ADD COLUMN",
-		"UPDATE user_boards SET",
+		"ALTER TABLE boards ADD COLUMN",
+		"UPDATE boards SET",
+		"CREATE TABLE user_boards",
 		"ALTER COLUMN stat_date TYPE DATE",
 		"ALTER COLUMN state TYPE JSONB",
 		"TRUNCATE TABLE board_share_tokens",
@@ -479,7 +485,7 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertColumnDataType(t, ctx, conn, "task_daily_stats", "stat_date", "date")
 	assertColumnDataType(t, ctx, conn, "task_stat_events", "stat_date", "date")
 	assertColumnDataType(t, ctx, conn, "task_daily_stat_backfills", "stat_date", "date")
-	assertColumnDataType(t, ctx, conn, "user_boards", "state", "jsonb")
+	assertColumnDataType(t, ctx, conn, "boards", "state", "jsonb")
 	assertIndexValid(t, ctx, conn, "idx_tasks_terminal_created_at")
 	assertIndexValid(t, ctx, conn, "idx_tasks_pending_updated_at")
 	assertIndexValid(t, ctx, conn, "idx_task_attempts_running_created_at")
@@ -489,9 +495,12 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertStorageProfileSeed(t, ctx, conn)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_channel_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
-	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_channel")
+	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_provider_endpoint")
 	assertConstraintExists(t, ctx, conn, "media_assets", "fk_media_assets_storage_profile_id")
-	assertConstraintExists(t, ctx, conn, "user_boards", "uq_user_boards_board_id")
+	assertConstraintExists(t, ctx, conn, "boards", "uq_boards_board_id")
+	assertConstraintExists(t, ctx, conn, "boards", "fk_boards_created_by")
+	assertConstraintExists(t, ctx, conn, "board_members", "fk_board_members_board")
+	assertConstraintExists(t, ctx, conn, "board_share_tokens", "fk_board_share_tokens_board")
 }
 
 func TestMigrationsRejectUnknownAppliedVersions(t *testing.T) {

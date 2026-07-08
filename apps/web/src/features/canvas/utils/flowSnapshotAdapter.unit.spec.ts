@@ -15,6 +15,7 @@ function makeImageFlowNode(params: {
   id: number
   outputStatus: 'idle' | 'running' | 'ready' | 'stale'
   sourceImageUrl: string
+  sourceMediaAssetId?: number
   pendingTaskId?: string
   outputImages?: Array<{ url: string; ratio: number }>
 }): FlowAdapterNode {
@@ -25,6 +26,7 @@ function makeImageFlowNode(params: {
     y: 80,
     width: 320,
     sourceImageUrl: params.sourceImageUrl,
+    sourceMediaAssetId: params.sourceMediaAssetId,
     sourceImageRatio: 1,
     outputStatus: params.outputStatus,
     outputImages: params.outputImages ?? [],
@@ -554,9 +556,9 @@ describe('flowSnapshotAdapter', () => {
     expect(restored.fusionNodes[0]?.blendPoint.y).toBe(0.41)
   })
 
-  it('preserves base media refs while exporting flow state', () => {
+  it('drops stale board node media refs while exporting flow state', () => {
     const base = createEmptyCanvasBoardSnapshot()
-    base.mediaRefs = [{ url: 'https://example.com/source.png', role: 'source' }]
+    base.mediaRefs = [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }]
 
     const snapshot = flowToCanvasBoardSnapshot(
       {
@@ -566,7 +568,37 @@ describe('flowSnapshotAdapter', () => {
       base,
     )
 
-    expect(snapshot.mediaRefs).toEqual([{ url: 'https://example.com/source.png', role: 'source' }])
+    expect(snapshot.mediaRefs).toBeUndefined()
+  })
+
+  it('rebuilds current image node media refs while exporting flow state', () => {
+    const base = createEmptyCanvasBoardSnapshot()
+    base.mediaRefs = [
+      { mediaAssetId: 99, refType: 'board', refId: 'cover', role: 'preview' },
+      { mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'result' },
+      { mediaAssetId: 13, refType: 'board_node', refId: 'image-2', role: 'source' },
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot(
+      {
+        nodes: [
+          makeImageFlowNode({
+            flowId: 'image-1',
+            id: 1,
+            outputStatus: 'ready',
+            sourceImageUrl: 'https://example.com/source.png',
+            sourceMediaAssetId: 12,
+          }),
+        ],
+        edges: [],
+      },
+      base,
+    )
+
+    expect(snapshot.mediaRefs).toEqual([
+      { mediaAssetId: 99, refType: 'board', refId: 'cover', role: 'preview' },
+      { mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'result' },
+    ])
     expect(snapshot.mediaRefs).not.toBe(base.mediaRefs)
   })
 

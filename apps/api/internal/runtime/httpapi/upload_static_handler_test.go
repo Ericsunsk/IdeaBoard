@@ -222,7 +222,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 
 	boardRepo := boards.NewBoardRepository(db)
 	now := time.Now()
-	if err := boardRepo.Upsert(context.Background(), &boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := boardRepo.Upsert(context.Background(), &boards.UserBoard{BoardID: "board-1", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
 	if err := boardRepo.UpsertMember(context.Background(), owner.ID, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {

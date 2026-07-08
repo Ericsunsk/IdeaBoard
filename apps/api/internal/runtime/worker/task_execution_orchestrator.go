@@ -19,7 +19,8 @@ import (
 type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
 
 type accountLookupStore interface {
-	GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*accounts.ApiAccount, error)
+	GetByID(ctx context.Context, id int64) (*accounts.ApiAccount, error)
+	GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*accounts.RuntimeCredential, error)
 }
 
 type taskExecutionOrchestrator struct {
@@ -53,7 +54,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	slog.Info("worker executing task", "task_id", task.TaskID, "account_id", accountID)
 	startTime := time.Now()
 
-	account, err := o.accountRepo.GetRuntimeByIDWithSecret(ctx, accountID)
+	account, err := o.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		if requeueErr := o.requeueTask(ctx, task, assignment, "账号不存在，重新调度"); requeueErr != nil {
 			return requeueErr
@@ -66,7 +67,20 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 		}
 		return nil
 	}
-	account.ChannelID = assignment.ChannelID
+	if account.ProviderEndpointID != assignment.ProviderEndpointID {
+		if requeueErr := o.requeueTask(ctx, task, assignment, "账号服务端点已变更，重新调度"); requeueErr != nil {
+			return requeueErr
+		}
+		return nil
+	}
+	credential, err := o.accountRepo.GetRuntimeCredentialByID(ctx, accountID, assignment.CredentialID)
+	if err != nil {
+		if requeueErr := o.requeueTask(ctx, task, assignment, "凭据不可用，重新调度"); requeueErr != nil {
+			return requeueErr
+		}
+		return nil
+	}
+	account = runtimeAccountFromAssignment(account, assignment, credential.APIKey)
 
 	cancelled, err := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
@@ -87,6 +101,10 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 
 	if err := o.taskRuntime.ConfirmTaskLease(ctx, assignment); err != nil {
 		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
+		if isTaskConvergedError(err) {
+			o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
+			return nil
+		}
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
 		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
@@ -109,7 +127,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	o.recordExecutionSnapshot(ctx, task.TaskID, snapshot)
 
 	providerStartAt := time.Now()
-	attemptRef, err := o.startTaskAttempt(ctx, task, assignment, snapshot, providerStartAt)
+	attemptRef, err := o.startTaskAttempt(ctx, task, assignment, providerStartAt)
 	if err != nil {
 		slog.Warn("start task attempt failed", "task_id", task.TaskID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
@@ -183,6 +201,19 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 		}
 	}
 	return nil
+}
+
+func runtimeAccountFromAssignment(account *accounts.ApiAccount, assignment taskqueue.TaskAssignment, apiKey string) *accounts.ApiAccount {
+	if account == nil {
+		return nil
+	}
+	runtimeAccount := *account
+	runtimeAccount.ProviderEndpointID = assignment.ProviderEndpointID
+	runtimeAccount.ApiType = strings.TrimSpace(assignment.APIType)
+	runtimeAccount.ProxyURL = strings.TrimSpace(assignment.ProviderEndpointBaseURL)
+	runtimeAccount.ApiKey = strings.TrimSpace(apiKey)
+	runtimeAccount.SecretConfigured = runtimeAccount.ApiKey != ""
+	return &runtimeAccount
 }
 
 func (o *taskExecutionOrchestrator) handleProviderFailure(
@@ -597,7 +628,6 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 	ctx context.Context,
 	task *tasks.TaskPayload,
 	assignment taskqueue.TaskAssignment,
-	snapshot tasks.TaskExecutionSnapshot,
 	providerStartedAt time.Time,
 ) (tasks.TaskAttemptRef, error) {
 	if task == nil || strings.TrimSpace(task.TaskID) == "" {
@@ -606,16 +636,13 @@ func (o *taskExecutionOrchestrator) startTaskAttempt(
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 	ref, err := o.taskRuntime.StartTaskAttempt(cleanupCtx, tasks.TaskAttemptStart{
-		TaskID:            task.TaskID,
-		RiverJobID:        task.RiverJobID,
-		LeaseToken:        assignment.LeaseToken,
-		AccountID:         assignment.AccountID,
-		ChannelID:         assignment.ChannelID,
-		FeatureSlug:       snapshot.FeatureSlug,
-		RequestedModel:    snapshot.RequestedModel,
-		ResolvedModel:     snapshot.ResolvedModel,
-		APIType:           snapshot.APIType,
-		ProviderStartedAt: providerStartedAt,
+		TaskID:             task.TaskID,
+		RiverJobID:         task.RiverJobID,
+		LeaseToken:         assignment.LeaseToken,
+		AccountID:          assignment.AccountID,
+		ProviderEndpointID: assignment.ProviderEndpointID,
+		CredentialID:       assignment.CredentialID,
+		ProviderStartedAt:  providerStartedAt,
 	})
 	if err != nil {
 		return tasks.TaskAttemptRef{}, err
@@ -710,6 +737,10 @@ func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.ApiAccount
 	if apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL); ok {
 		snapshot.APIType = apiType
 	}
+	snapshot.ProviderEndpointName = strings.TrimSpace(assignment.ProviderEndpointName)
+	snapshot.ProviderEndpointBaseURL = strings.TrimSpace(assignment.ProviderEndpointBaseURL)
+	snapshot.CredentialFingerprint = strings.TrimSpace(assignment.CredentialFingerprint)
+	snapshot.CredentialKeyVersion = strings.TrimSpace(assignment.CredentialKeyVersion)
 	if resolvedModel := strings.TrimSpace(assignment.ResolvedModel); resolvedModel != "" {
 		snapshot.ResolvedModel = resolvedModel
 		return snapshot

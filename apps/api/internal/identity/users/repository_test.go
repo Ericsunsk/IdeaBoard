@@ -98,17 +98,17 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 	}
 
 	ownedBoardID := "board-owned"
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO user_boards (board_id, user_id, name, state) VALUES ($1, $2, $3, $4)`, ownedBoardID, first.ID, "Owned", "{}"); err != nil {
-		t.Fatalf("seed user_boards failed: %v", err)
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO boards (board_id, owner_user_id, created_by, name, state) VALUES ($1, $2, $3, $4, $5)`, ownedBoardID, first.ID, first.ID, "Owned", "{}"); err != nil {
+		t.Fatalf("seed boards failed: %v", err)
 	}
 	sharedBoardID := "board-shared"
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO user_boards (board_id, user_id, name, state) VALUES ($1, $2, $3, $4)`, sharedBoardID, first.ID, "Shared", "{}"); err != nil {
-		t.Fatalf("seed shared user_boards failed: %v", err)
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO boards (board_id, owner_user_id, created_by, name, state) VALUES ($1, $2, $3, $4, $5)`, sharedBoardID, first.ID, first.ID, "Shared", "{}"); err != nil {
+		t.Fatalf("seed shared boards failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (owner_user_id, board_id, user_id, role) VALUES ($1, $2, $3, $4)`, first.ID, ownedBoardID, first.ID, "viewer"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3)`, ownedBoardID, first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members owned failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (owner_user_id, board_id, user_id, role) VALUES ($1, $2, $3, $4)`, first.ID, sharedBoardID, first.ID, "viewer"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3)`, sharedBoardID, first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members shared failed: %v", err)
 	}
 	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token_hash, token_prefix, role, created_by) VALUES ($1, $2, $3, $4, $5)`, ownedBoardID, "owned-token-hash", "owned", "viewer", first.ID); err != nil {
@@ -131,7 +131,7 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 
 	for name, query := range map[string]string{
 		"user":              `SELECT COUNT(*) FROM users WHERE id = $1`,
-		"owned board":       `SELECT COUNT(*) FROM user_boards WHERE user_id = $1`,
+		"owned board":       `SELECT COUNT(*) FROM boards WHERE owner_user_id = $1`,
 		"board member":      `SELECT COUNT(*) FROM board_members WHERE user_id = $1`,
 		"board share token": `SELECT COUNT(*) FROM board_share_tokens WHERE created_by = $1`,
 		"task":              `SELECT COUNT(*) FROM tasks WHERE user_id = $1`,

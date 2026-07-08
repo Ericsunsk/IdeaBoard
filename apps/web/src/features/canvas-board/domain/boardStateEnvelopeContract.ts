@@ -13,7 +13,9 @@ const nonEmptyStringSchema = v.pipe(v.string(), v.minLength(1))
 const positiveIntegerSchema = v.pipe(finiteNumberSchema, v.integer(), v.minValue(1))
 
 export const boardStateMediaRefEnvelopeSchema = v.strictObject({
-  url: nonEmptyStringSchema,
+  mediaAssetId: positiveIntegerSchema,
+  refType: v.picklist(['board', 'board_node']),
+  refId: v.pipe(nonEmptyStringSchema, v.maxLength(128)),
   role: v.optional(nonEmptyStringSchema),
 }) satisfies v.GenericSchema<unknown, BoardStateMediaRef>
 

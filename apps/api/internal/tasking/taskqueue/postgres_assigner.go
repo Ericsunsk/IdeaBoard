@@ -82,12 +82,15 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 		return TaskAssignment{}, err
 	}
 	assignedAt := time.Now()
-	updated, err := markTaskAssignedTx(ctx, tx, task.TaskID, selectedAccount.AccountID, selectedAccount.ChannelID, leaseToken, selectedAccount.ResolvedModel)
+	updated, err := markTaskAssignedTx(ctx, tx, task.TaskID, selectedAccount, leaseToken)
 	if err != nil {
 		return TaskAssignment{}, err
 	}
 	decision := policy.decideAssignedTask(task.TaskID, selectedAccount, leaseToken, updated)
 	if updated > 0 {
+		if err := acquireTaskLeaseTx(ctx, tx, task.TaskID, task.RiverJobID, featureSlug, requestedModel, selectedAccount, leaseToken, assignedAt); err != nil {
+			return TaskAssignment{}, err
+		}
 		if err := patchTaskAssignmentMetricsTx(ctx, tx, task.TaskID, taskState.CreatedAt, assignedAt); err != nil {
 			return TaskAssignment{}, err
 		}
@@ -96,31 +99,39 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 }
 
 func (a *PostgresTaskAssigner) ConfirmTaskLease(ctx context.Context, assignment TaskAssignment) error {
-	if assignment.AccountID == 0 || assignment.ChannelID == 0 || strings.TrimSpace(assignment.LeaseToken) == "" {
+	if assignment.AccountID == 0 || assignment.ProviderEndpointID == 0 || assignment.CredentialID == 0 || strings.TrimSpace(assignment.LeaseToken) == "" {
 		return fmt.Errorf("confirm task lease: invalid assignment")
 	}
 	var count int64
 	err := a.db.QueryRowContext(ctx, `
-SELECT COUNT(*)
-FROM tasks
-WHERE task_id = $1
-  AND account_id = $2
-  AND assigned_channel_id = $3
-  AND lease_token = $4
-  AND status = $5
-  AND ($6 = '' OR resolved_model = $6)`,
+	SELECT COUNT(*)
+	FROM tasks t
+	JOIN task_leases tl ON tl.task_id = t.task_id
+	WHERE t.task_id = $1
+	  AND t.status = $7
+	  AND t.account_id = $2
+	  AND t.assigned_provider_endpoint_id = $3
+	  AND t.assigned_credential_id = $6
+	  AND t.lease_token = $4
+	  AND tl.account_id = $2
+	  AND tl.provider_endpoint_id = $3
+	  AND tl.credential_id = $6
+	  AND tl.lease_token = $4
+	  AND tl.released_at IS NULL
+	  AND ($5 = '' OR tl.resolved_model = $5)`,
 		assignment.TaskID,
 		assignment.AccountID,
-		assignment.ChannelID,
+		assignment.ProviderEndpointID,
 		assignment.LeaseToken,
-		tasks.StatusRunning,
 		strings.TrimSpace(assignment.ResolvedModel),
+		assignment.CredentialID,
+		tasks.StatusRunning,
 	).Scan(&count)
 	if err != nil {
 		return err
 	}
 	if count == 0 {
-		return fmt.Errorf("confirm task lease: lease not found")
+		return fmt.Errorf("%w: confirm task lease mismatch for task_id=%s", ErrTaskLeaseConflict, assignment.TaskID)
 	}
 	return nil
 }
@@ -128,15 +139,44 @@ WHERE task_id = $1
 func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (taskAssignmentTaskState, error) {
 	var status string
 	var accountID sql.NullInt64
-	var channelID sql.NullInt64
+	var providerEndpointID sql.NullInt64
+	var credentialID sql.NullInt64
 	var leaseToken string
 	var resolvedModel string
+	var apiType string
+	var providerEndpointName string
+	var providerEndpointBaseURL string
+	var credentialFingerprint string
+	var credentialKeyVersion string
 	var createdAt time.Time
 	err := tx.QueryRowContext(ctx, `
-SELECT status, account_id, assigned_channel_id, lease_token, resolved_model, created_at
-FROM tasks
-WHERE task_id = $1
-FOR UPDATE`, taskID).Scan(&status, &accountID, &channelID, &leaseToken, &resolvedModel, &createdAt)
+SELECT t.status, tl.account_id, tl.provider_endpoint_id, tl.credential_id,
+       COALESCE(tl.lease_token, '') AS lease_token,
+       COALESCE(tl.resolved_model, '') AS resolved_model,
+       COALESCE(tl.api_type, '') AS api_type,
+       COALESCE(tl.provider_endpoint_name, '') AS provider_endpoint_name,
+       COALESCE(tl.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
+       COALESCE(tl.credential_fingerprint, '') AS credential_fingerprint,
+       COALESCE(tl.credential_key_version, '') AS credential_key_version,
+       t.created_at
+FROM tasks t
+LEFT JOIN task_leases tl ON tl.task_id = t.task_id
+  AND tl.released_at IS NULL
+WHERE t.task_id = $1
+FOR UPDATE OF t`, taskID).Scan(
+		&status,
+		&accountID,
+		&providerEndpointID,
+		&credentialID,
+		&leaseToken,
+		&resolvedModel,
+		&apiType,
+		&providerEndpointName,
+		&providerEndpointBaseURL,
+		&credentialFingerprint,
+		&credentialKeyVersion,
+		&createdAt,
+	)
 	if err != nil {
 		return taskAssignmentTaskState{}, err
 	}
@@ -144,37 +184,47 @@ FOR UPDATE`, taskID).Scan(&status, &accountID, &channelID, &leaseToken, &resolve
 	if accountID.Valid {
 		currentAccountID = accountID.Int64
 	}
-	currentChannelID := int64(0)
-	if channelID.Valid {
-		currentChannelID = channelID.Int64
+	currentProviderEndpointID := int64(0)
+	if providerEndpointID.Valid {
+		currentProviderEndpointID = providerEndpointID.Int64
+	}
+	currentCredentialID := int64(0)
+	if credentialID.Valid {
+		currentCredentialID = credentialID.Int64
 	}
 	return taskAssignmentTaskState{
-		Status:        status,
-		AccountID:     currentAccountID,
-		ChannelID:     currentChannelID,
-		LeaseToken:    leaseToken,
-		ResolvedModel: resolvedModel,
-		CreatedAt:     createdAt,
+		Status:                  status,
+		AccountID:               currentAccountID,
+		ProviderEndpointID:      currentProviderEndpointID,
+		CredentialID:            currentCredentialID,
+		LeaseToken:              leaseToken,
+		ResolvedModel:           resolvedModel,
+		APIType:                 apiType,
+		ProviderEndpointName:    providerEndpointName,
+		ProviderEndpointBaseURL: providerEndpointBaseURL,
+		CredentialFingerprint:   credentialFingerprint,
+		CredentialKeyVersion:    credentialKeyVersion,
+		CreatedAt:               createdAt,
 	}, nil
 }
 
-func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, accountID int64, channelID int64, leaseToken string, resolvedModel string) (int64, error) {
+func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, selected taskAssignmentSelectedAccount, leaseToken string) (int64, error) {
 	result, err := tx.ExecContext(ctx, `
 	UPDATE tasks
 	SET status = $1,
 	    account_id = $2,
-	    assigned_channel_id = $3,
-	    lease_token = $4,
-	    resolved_model = CASE WHEN btrim($5) = '' THEN resolved_model ELSE $5 END,
+	    assigned_provider_endpoint_id = $3,
+	    assigned_credential_id = $4,
+	    lease_token = $5,
 	    error_msg = '',
 	    completed_at = NULL
 	WHERE task_id = $6
 	  AND status = $7`,
 		tasks.StatusRunning,
-		accountID,
-		channelID,
+		selected.AccountID,
+		selected.ProviderEndpointID,
+		selected.CredentialID,
 		leaseToken,
-		strings.TrimSpace(resolvedModel),
 		taskID,
 		tasks.StatusPending,
 	)
@@ -182,6 +232,49 @@ func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, accountI
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJobID int64, featureSlug string, requestedModel string, selected taskAssignmentSelectedAccount, leaseToken string, acquiredAt time.Time) error {
+	result, err := tx.ExecContext(ctx, `
+	INSERT INTO task_leases (
+	  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
+	  feature_slug, requested_model, resolved_model, api_type,
+	  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
+	  acquired_at
+	) VALUES (
+	  $1, $2, $3, $4, $5, $6,
+	  $7, $8, $9, $10,
+	  $11, $12, $13, $14,
+	  $15
+	)
+	ON CONFLICT (task_id) WHERE released_at IS NULL DO NOTHING`,
+		taskID,
+		leaseToken,
+		riverJobID,
+		selected.AccountID,
+		selected.ProviderEndpointID,
+		selected.CredentialID,
+		strings.TrimSpace(featureSlug),
+		strings.TrimSpace(requestedModel),
+		strings.TrimSpace(selected.ResolvedModel),
+		strings.TrimSpace(selected.APIType),
+		strings.TrimSpace(selected.ProviderEndpointName),
+		strings.TrimSpace(selected.ProviderEndpointBaseURL),
+		strings.TrimSpace(selected.CredentialFingerprint),
+		strings.TrimSpace(selected.CredentialKeyVersion),
+		acquiredAt,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("acquire task lease: active lease already exists")
+	}
+	return nil
 }
 
 func patchTaskAssignmentMetricsTx(ctx context.Context, tx *sql.Tx, taskID string, createdAt time.Time, assignedAt time.Time) error {
@@ -213,22 +306,55 @@ SET current_stage = EXCLUDED.current_stage,
 
 func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []int64, requestedModel string, featureSlug string) (taskAssignmentSelectedAccount, error) {
 	var accountID int64
-	var channelID int64
+	var providerEndpointID int64
+	var credentialID int64
 	var modelName string
+	var apiType string
+	var providerEndpointName string
+	var providerEndpointBaseURL string
+	var credentialFingerprint string
+	var credentialKeyVersion string
 	err := tx.QueryRowContext(ctx, `
 	WITH locked_accounts AS (
-	  SELECT id, channel_id, CASE WHEN max_concurrent <= 0 THEN 3 ELSE max_concurrent END AS max_concurrent
-  FROM api_accounts
-  WHERE status = 1
-    AND deleted_at IS NULL
-	    AND id = ANY($1::bigint[])
+	  SELECT
+	    a.id,
+	    a.provider_endpoint_id,
+	    pe.api_type,
+	    pe.name AS provider_endpoint_name,
+	    pe.base_url AS provider_endpoint_base_url,
+	    credential.id AS credential_id,
+	    credential.fingerprint AS credential_fingerprint,
+	    credential.key_version AS credential_key_version,
+	    CASE WHEN a.max_concurrent <= 0 THEN 3 ELSE a.max_concurrent END AS max_concurrent
+	  FROM api_accounts AS a
+	  JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
+	    AND pe.status = 1
+	  JOIN LATERAL (
+	    SELECT id, fingerprint, key_version
+	    FROM api_account_secrets
+	    WHERE account_id = a.id
+	      AND status = 'active'
+	      AND secret_material_kind = 'encrypted'
+	      AND btrim(secret_payload) <> ''
+	    ORDER BY rotated_at DESC, id DESC
+	    LIMIT 1
+	  ) AS credential ON TRUE
+	  WHERE a.status = 1
+	    AND a.deleted_at IS NULL
+	    AND a.id = ANY($1::bigint[])
 	  ORDER BY id ASC
-	  FOR UPDATE SKIP LOCKED
+	  FOR UPDATE OF a SKIP LOCKED
 	),
 	eligible_models AS (
 	  SELECT
 	    a.id,
-	    a.channel_id,
+	    a.provider_endpoint_id,
+	    a.api_type,
+	    a.provider_endpoint_name,
+	    a.provider_endpoint_base_url,
+	    a.credential_id,
+	    a.credential_fingerprint,
+	    a.credential_key_version,
 	    a.max_concurrent AS account_max_concurrent,
 	    m.model_name,
 	    COALESCE(m.max_concurrent, a.max_concurrent) AS model_max_concurrent,
@@ -237,28 +363,37 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	  FROM locked_accounts a
 	  JOIN api_account_models AS m ON m.account_id = a.id
 	    AND m.enabled = TRUE
-	    AND ($3 = '' OR lower(m.model_name) = lower($3))
-	    AND ($4 = '' OR jsonb_array_length(m.feature_slugs) = 0 OR m.feature_slugs ? $4)
+	    AND ($2 = '' OR lower(m.model_name) = lower($2))
+	    AND ($3 = '' OR jsonb_array_length(m.feature_slugs) = 0 OR m.feature_slugs ? $3)
 	),
 	account_load AS (
 	  SELECT
 	    em.id,
-	    em.channel_id,
+	    em.provider_endpoint_id,
+	    em.api_type,
+	    em.provider_endpoint_name,
+	    em.provider_endpoint_base_url,
+	    em.credential_id,
+	    em.credential_fingerprint,
+	    em.credential_key_version,
 	    em.account_max_concurrent,
 	    em.model_name,
 	    em.model_max_concurrent,
 	    em.model_sort_order,
 	    em.model_id,
-	    COUNT(t.id) AS running_count,
-	    COUNT(t.id) FILTER (
-	      WHERE lower(COALESCE(NULLIF(btrim(t.resolved_model), ''), NULLIF(btrim(t.requested_model), ''), '')) = lower(em.model_name)
+	    COUNT(tl.id) AS running_count,
+	    COUNT(tl.id) FILTER (
+	      WHERE lower(COALESCE(NULLIF(btrim(tl.resolved_model), ''), NULLIF(btrim(tl.requested_model), ''), '')) = lower(em.model_name)
 	    ) AS model_running_count
 	  FROM eligible_models em
-	  LEFT JOIN tasks t ON t.account_id = em.id
-	    AND t.status = $2
-	  GROUP BY em.id, em.channel_id, em.account_max_concurrent, em.model_name, em.model_max_concurrent, em.model_sort_order, em.model_id
+	  LEFT JOIN task_leases tl ON tl.account_id = em.id
+	    AND tl.released_at IS NULL
+	  GROUP BY em.id, em.provider_endpoint_id, em.api_type, em.provider_endpoint_name, em.provider_endpoint_base_url,
+	    em.credential_id, em.credential_fingerprint, em.credential_key_version,
+	    em.account_max_concurrent, em.model_name, em.model_max_concurrent, em.model_sort_order, em.model_id
 	)
-	SELECT id, channel_id, model_name
+	SELECT id, provider_endpoint_id, credential_id, model_name, api_type,
+	       provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version
 	FROM account_load
 	WHERE running_count < account_max_concurrent
 	  AND model_running_count < model_max_concurrent
@@ -271,17 +406,32 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	id ASC
 	LIMIT 1`,
 		pq.Array(accountIDs),
-		tasks.StatusRunning,
 		strings.TrimSpace(requestedModel),
 		strings.TrimSpace(featureSlug),
-	).Scan(&accountID, &channelID, &modelName)
+	).Scan(
+		&accountID,
+		&providerEndpointID,
+		&credentialID,
+		&modelName,
+		&apiType,
+		&providerEndpointName,
+		&providerEndpointBaseURL,
+		&credentialFingerprint,
+		&credentialKeyVersion,
+	)
 	if err != nil {
 		return taskAssignmentSelectedAccount{}, err
 	}
 	return taskAssignmentSelectedAccount{
-		AccountID:     accountID,
-		ChannelID:     channelID,
-		ResolvedModel: modelName,
+		AccountID:               accountID,
+		ProviderEndpointID:      providerEndpointID,
+		CredentialID:            credentialID,
+		ResolvedModel:           modelName,
+		APIType:                 apiType,
+		ProviderEndpointName:    providerEndpointName,
+		ProviderEndpointBaseURL: providerEndpointBaseURL,
+		CredentialFingerprint:   credentialFingerprint,
+		CredentialKeyVersion:    credentialKeyVersion,
 	}, nil
 }
 

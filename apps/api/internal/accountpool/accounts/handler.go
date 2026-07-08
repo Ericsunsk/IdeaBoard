@@ -91,16 +91,19 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 	}
 	account, err := h.accountService.CreateAccount(c.Request.Context(), &req)
 	if err != nil {
-		response.InternalError(c, 500, "创建失败", err)
+		if errors.Is(err, ErrAccountNameConflict) {
+			response.Error(c, 409, "同一 ProviderEndpoint 下已存在同名 APIKey")
+			return
+		}
+		response.Error(c, 400, err.Error())
 		return
 	}
 	response.SuccessDTO(c, accountResponse{Account: account})
 }
 
 func (h *AccountHandler) UpdateAccount(c *gin.Context) {
-	idStr := c.Param("id")
-	var id int64
-	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
+	id, ok := parseAccountIDParam(c)
+	if !ok {
 		response.Error(c, 400, "无效的账号ID")
 		return
 	}
@@ -114,16 +117,65 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 			response.Error(c, 404, "账号不存在")
 			return
 		}
+		if errors.Is(err, ErrAccountNameConflict) {
+			response.Error(c, 409, "同一 ProviderEndpoint 下已存在同名 APIKey")
+			return
+		}
 		response.Error(c, 400, err.Error())
 		return
 	}
 	response.Success(c, nil)
 }
 
+func (h *AccountHandler) PatchAccountModel(c *gin.Context) {
+	id, ok := parseAccountIDParam(c)
+	if !ok {
+		response.Error(c, 400, "无效的账号ID")
+		return
+	}
+	var req PatchAccountModelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	account, err := h.accountService.PatchAccountModel(c.Request.Context(), id, &req)
+	if err != nil {
+		if errors.Is(err, ErrAccountNotFound) {
+			response.Error(c, 404, "账号不存在")
+			return
+		}
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.SuccessDTO(c, accountResponse{Account: account})
+}
+
+func (h *AccountHandler) DeleteAccountModel(c *gin.Context) {
+	id, ok := parseAccountIDParam(c)
+	if !ok {
+		response.Error(c, 400, "无效的账号ID")
+		return
+	}
+	modelName := c.Query("model_name")
+	account, err := h.accountService.DeleteAccountModel(c.Request.Context(), id, modelName)
+	if err != nil {
+		if errors.Is(err, ErrAccountNotFound) {
+			response.Error(c, 404, "账号不存在")
+			return
+		}
+		if errors.Is(err, ErrAccountModelNotFound) {
+			response.Error(c, 404, "模型不存在")
+			return
+		}
+		response.Error(c, 400, err.Error())
+		return
+	}
+	response.SuccessDTO(c, accountResponse{Account: account})
+}
+
 func (h *AccountHandler) DeleteAccount(c *gin.Context) {
-	idStr := c.Param("id")
-	var id int64
-	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
+	id, ok := parseAccountIDParam(c)
+	if !ok {
 		response.Error(c, 400, "无效的账号ID")
 		return
 	}
@@ -187,4 +239,13 @@ func (h *AccountHandler) GetAccountQueue(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, accountQueueResponse{CurrentConcurrent: concurrent, MaxConcurrent: maxConcurrent})
+}
+
+func parseAccountIDParam(c *gin.Context) (int64, bool) {
+	idStr := c.Param("id")
+	var id int64
+	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
+		return 0, false
+	}
+	return id, true
 }
