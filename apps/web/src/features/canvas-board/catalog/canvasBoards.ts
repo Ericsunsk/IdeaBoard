@@ -1,4 +1,4 @@
-import { getAuthStorageUserScope } from '../../../shared/utils/auth'
+import { getRecoverableAuthStorageUserScope } from '../../../shared/utils/auth'
 
 export interface CanvasBoardMeta {
   id: string
@@ -41,7 +41,7 @@ function toValidBoardMeta(item: unknown): CanvasBoardMeta | null {
 }
 
 function getScopedStorageKey(): string | null {
-  const scope = getAuthStorageUserScope()
+  const scope = getRecoverableAuthStorageUserScope()
   if (!scope) return null
   return `${STORAGE_KEY_PREFIX}.${scope}`
 }

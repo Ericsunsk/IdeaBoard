@@ -180,4 +180,26 @@ describe('boardPersistenceSession', () => {
     expect(harness.onGraphCommitted).toHaveBeenCalledOnce()
     expect(harness.isSavingBoard.value).toBe(false)
   })
+
+  it('keeps the board dirty and failed when remote sync fails after local save', async () => {
+    const harness = createSessionHarness()
+    const savedSnapshot = createEmptyCanvasBoardSnapshot()
+    savedSnapshot.promptNodes = [makePromptSnapshot(2)]
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: savedSnapshot,
+      remoteSync: { ok: false, error: new Error('auth unavailable') },
+    })
+
+    const saved = await harness.session.saveCurrentBoardSnapshot()
+
+    expect(saved).toBe(false)
+    expect(harness.boardBaseSnapshot.value).toEqual(savedSnapshot)
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('failed')
+    expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
+    expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+    expect(harness.onGraphCommitted).toHaveBeenCalledOnce()
+    expect(harness.isSavingBoard.value).toBe(false)
+  })
 })

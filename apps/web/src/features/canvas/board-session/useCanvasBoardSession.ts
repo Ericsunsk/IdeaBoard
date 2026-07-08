@@ -17,6 +17,19 @@ type BoardSessionIdentity = {
   userUid: string
 }
 
+function createAuthUnavailableError(): Error {
+  return new Error('保存失败：缺少用户信息，请重新登录后重试')
+}
+
+function normalizeBoardSessionIdentity(
+  identity: BoardSessionIdentity,
+): BoardSessionIdentity | null {
+  const userId = identity.userId
+  const userUid = typeof identity.userUid === 'string' ? identity.userUid.trim() : ''
+  if (!Number.isFinite(userId) || userId <= 0 || !userUid) return null
+  return { userId, userUid }
+}
+
 export type CanvasBoardSessionMessage = {
   warning: (message: string) => void
 }
@@ -55,9 +68,7 @@ export type CanvasBoardSessionTestOptions = UseCanvasBoardSessionOptions & {
   createUploadLifecycle?: BoardSessionUploadLifecycleFactory
 }
 
-export function useCanvasBoardSession(
-  options: CanvasBoardSessionTestOptions,
-): CanvasBoardSession {
+export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): CanvasBoardSession {
   const repository = options.repository ?? createBoardSessionRepository()
   const previewRenderer = options.previewRenderer ?? defaultBoardSessionPreviewRenderer
   const createUploadLifecycle = options.createUploadLifecycle ?? createBoardSessionUploadLifecycle
@@ -95,19 +106,29 @@ export function useCanvasBoardSession(
     if (!exists(boardId)) {
       throw new Error('BOARD_NOT_FOUND')
     }
-    const { userId, userUid } = options.getUserIdentity()
-    if (!Number.isFinite(userId) || userId <= 0 || !userUid) {
-      throw new Error('保存失败：缺少用户信息，请刷新后重试')
+    const identity = normalizeBoardSessionIdentity(options.getUserIdentity())
+    if (!identity) {
+      await repository.saveLocal(boardId, snapshot)
+      return {
+        snapshot,
+        remoteSync: { ok: false, error: createAuthUnavailableError() },
+      }
     }
 
     const uploadLifecycle = createUploadLifecycle({
-      userId,
-      userUid,
+      userId: identity.userId,
+      userUid: identity.userUid,
       boardId,
       warning: options.message.warning,
     })
     const previousSnapshot = uploadLifecycle.readPreviousSnapshot()
-    const stabilizedSnapshot = await uploadLifecycle.stabilizeSnapshotForSave(snapshot)
+    let stabilizedSnapshot: CanvasBoardSnapshot
+    try {
+      stabilizedSnapshot = await uploadLifecycle.stabilizeSnapshotForSave(snapshot)
+    } catch (error) {
+      await repository.saveLocal(boardId, snapshot)
+      throw error
+    }
     try {
       await repository.save(boardId, stabilizedSnapshot)
     } catch (error) {

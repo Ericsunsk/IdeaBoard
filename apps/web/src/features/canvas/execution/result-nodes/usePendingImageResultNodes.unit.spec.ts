@@ -2,6 +2,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { shallowRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { TaskResultPendingError, isTaskResultPendingError } from '../../../../shared/api/taskEvents'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
 import { readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
@@ -459,6 +460,42 @@ describe('usePendingImageResultExecution', () => {
       sourceImageUrl: '',
       outputStatus: 'running',
       pendingTaskId: 'task-1',
+    })
+  })
+
+  it('keeps storage materialization failures as pending retry result nodes', async () => {
+    const harness = createHarness([makeAnchorNode()])
+    const storageFailure = new TaskResultPendingError(
+      '图片已生成，但结果保存暂时失败，请稍后重试',
+    )
+    let reservedNodeIds: string[] = []
+
+    const summary = await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'anchor',
+      outputCount: 1,
+      submitTask: async () => ({ taskId: 'task-storage' }),
+      resolveResult: async () => {
+        throw storageFailure
+      },
+      isCurrent: () => true,
+      isPendingError: isTaskResultPendingError,
+      onReserved: (ids) => {
+        reservedNodeIds = ids
+      },
+    })
+
+    const resultNodeId = reservedNodeIds[0]
+    expect(summary).toMatchObject({
+      successCount: 0,
+      pendingCount: 1,
+      failureCount: 0,
+      firstFailure: storageFailure,
+    })
+    expect(readImageSnapshot(harness.nodes.value, resultNodeId)).toMatchObject({
+      sourceImageUrl: '',
+      outputStatus: 'running',
+      pendingTaskId: 'task-storage',
     })
   })
 

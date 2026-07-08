@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   clearStoredAuth,
+  getAuthStorageUserScope,
+  getRecoverableAuthStorageUserScope,
   getStoredUser,
   handleAuthFailure,
   setStoredAuth,
@@ -19,11 +21,22 @@ const adminUser: User = {
 }
 
 beforeEach(() => {
-  clearStoredAuth()
+  localStorage.clear()
   window.history.pushState({}, '', '/user/home')
 })
 
 describe('handleAuthFailure', () => {
+  it('keeps the last storage scope available for local draft recovery', () => {
+    setStoredAuth(adminUser)
+
+    expect(getAuthStorageUserScope()).toBe('uid_ADMIN1')
+
+    clearStoredAuth()
+
+    expect(getAuthStorageUserScope()).toBeNull()
+    expect(getRecoverableAuthStorageUserScope()).toBe('uid_ADMIN1')
+  })
+
   it('clears stored admin user state after an admin API 403', () => {
     setStoredAuth(adminUser)
     window.history.pushState({}, '', '/admin/task-monitor')

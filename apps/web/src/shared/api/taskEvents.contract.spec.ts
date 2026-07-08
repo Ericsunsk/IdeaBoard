@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseTask, Task } from './generated-query/model'
 import { queryClient } from '../query/queryClient'
-import { waitTaskImageResultsWithSse } from './taskEvents'
+import { TaskResultPendingError, waitTaskImageResultsWithSse } from './taskEvents'
 
 const mocks = vi.hoisted(() => ({
   getTask: vi.fn(),
@@ -78,6 +78,26 @@ function makeImageOutput(url: string): NonNullable<Task['outputs']>[number] {
     sort_index: 0,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
+  }
+}
+
+function makeFinalizingFailureMetrics(
+  overrides: Partial<NonNullable<Task['execution_metrics']>> = {},
+): NonNullable<Task['execution_metrics']> {
+  return {
+    task_id: 'task-1',
+    current_stage: 'failed',
+    bottleneck_source: 'storage',
+    failure_stage: 'finalizing',
+    failure_category: 'storage_error',
+    queue_wait_ms: 0,
+    worker_overhead_ms: 0,
+    provider_latency_ms: 100,
+    finalize_latency_ms: 20,
+    total_latency_ms: 120,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    ...overrides,
   }
 }
 
@@ -171,6 +191,23 @@ describe('waitTaskImageResultsWithSse', () => {
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
 
+  it('treats storage materialization failures from SSE as pending retry', async () => {
+    vi.stubGlobal('EventSource', MockEventSource)
+
+    const result = waitTaskImageResultsWithSse('task-1')
+    MockEventSource.instances[0]?.emit('task', {
+      task_id: 'task-1',
+      status: 'failed',
+      error_msg: ' 图片结果保存失败，请检查存储配置 ',
+      execution_metrics: makeFinalizingFailureMetrics(),
+    })
+
+    await expect(result).rejects.toThrow(TaskResultPendingError)
+    await expect(result).rejects.toThrow('图片已生成，但结果保存暂时失败，请稍后重试')
+    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(MockEventSource.instances[0]?.closed).toBe(true)
+  })
+
   it('falls back to polling with backoff after an EventSource error', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('EventSource', MockEventSource)
@@ -239,5 +276,20 @@ describe('waitTaskImageResultsWithSse', () => {
     )
 
     await expect(waitTaskImageResultsWithSse('task-1')).rejects.toThrow('账号已停用')
+  })
+
+  it('treats storage materialization failures from polling as pending retry', async () => {
+    vi.stubGlobal('EventSource', undefined)
+    mocks.getTask.mockResolvedValueOnce(
+      makeTaskResponse('failed', {
+        error_msg: '图片结果保存失败，请检查存储配置',
+        execution_metrics: makeFinalizingFailureMetrics(),
+      }),
+    )
+
+    const result = waitTaskImageResultsWithSse('task-1')
+
+    await expect(result).rejects.toThrow(TaskResultPendingError)
+    await expect(result).rejects.toThrow('图片已生成，但结果保存暂时失败，请稍后重试')
   })
 })

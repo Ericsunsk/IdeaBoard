@@ -2,10 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
 import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
 import type { BoardSessionPreviewRenderer } from './boardSessionPreview'
-import {
-  BoardSessionRemoteSyncError,
-  type BoardSessionRepository,
-} from './boardSessionRepository'
+import { BoardSessionRemoteSyncError, type BoardSessionRepository } from './boardSessionRepository'
 import { useCanvasBoardSession } from './useCanvasBoardSession'
 
 function makeSnapshot(marker: string | number): CanvasBoardSnapshot {
@@ -50,6 +47,9 @@ function createRepository(overrides: Partial<BoardSessionRepository> = {}): Boar
   return {
     exists: vi.fn(() => true),
     load: vi.fn(async () => makeSnapshot(100)),
+    saveLocal: vi.fn(async (_boardId: string, snapshot: CanvasBoardSnapshot) =>
+      makeState(snapshot),
+    ),
     save: vi.fn(async (_boardId: string, snapshot: CanvasBoardSnapshot) => makeState(snapshot)),
     setPreview: vi.fn(() => makeState(makeSnapshot(100))),
     sync: vi.fn(async () => undefined),
@@ -176,9 +176,10 @@ describe('useCanvasBoardSession', () => {
     expect(repository.save).not.toHaveBeenCalled()
   })
 
-  it('rejects when user identity is incomplete', async () => {
+  it('keeps a local draft and reports auth recovery when user identity is incomplete', async () => {
     const createUploadLifecycle = vi.fn()
     const repository = createRepository()
+    const snapshot = makeSnapshot(100)
     const session = useCanvasBoardSession({
       getBoardIdQuery: () => 'board-a',
       getUserIdentity: () => ({ userId: 0, userUid: '' }),
@@ -191,10 +192,47 @@ describe('useCanvasBoardSession', () => {
       createUploadLifecycle,
     })
 
-    await expect(session.save(makeSnapshot(100))).rejects.toThrow('缺少用户信息')
+    const result = await session.save(snapshot)
 
+    expect(result.snapshot).toBe(snapshot)
+    expect(result.remoteSync.ok).toBe(false)
+    if (!result.remoteSync.ok) {
+      expect(result.remoteSync.error).toBeInstanceOf(Error)
+      expect((result.remoteSync.error as Error).message).toContain('缺少用户信息')
+    }
     expect(createUploadLifecycle).not.toHaveBeenCalled()
+    expect(repository.saveLocal).toHaveBeenCalledWith('board-a', snapshot)
     expect(repository.save).not.toHaveBeenCalled()
+  })
+
+  it('keeps a local draft before surfacing upload stabilization failures', async () => {
+    const snapshot = makeSnapshot(100)
+    const uploadError = new Error('upload auth expired')
+    const lifecycle = {
+      readPreviousSnapshot: vi.fn(() => makeSnapshot(50)),
+      stabilizeSnapshotForSave: vi.fn(async () => {
+        throw uploadError
+      }),
+      recycleRemovedUploadsAfterSave: vi.fn(async () => undefined),
+    }
+    const repository = createRepository()
+    const session = useCanvasBoardSession({
+      getBoardIdQuery: () => 'board-a',
+      getUserIdentity: () => ({ userId: 1, userUid: 'user-uid' }),
+      repository,
+      previewRenderer: {
+        rendererVersion: 1,
+        render: vi.fn(async () => 'data:image/webp;base64,preview'),
+      },
+      message: { warning: vi.fn() },
+      createUploadLifecycle: vi.fn(() => lifecycle),
+    })
+
+    await expect(session.save(snapshot)).rejects.toBe(uploadError)
+
+    expect(repository.saveLocal).toHaveBeenCalledWith('board-a', snapshot)
+    expect(repository.save).not.toHaveBeenCalled()
+    expect(lifecycle.recycleRemovedUploadsAfterSave).not.toHaveBeenCalled()
   })
 
   it('waits for preview renderer and repository sync when waitForPreview is enabled', async () => {

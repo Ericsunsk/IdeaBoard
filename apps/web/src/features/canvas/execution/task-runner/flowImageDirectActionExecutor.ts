@@ -1,5 +1,6 @@
-import { taskApi, type SubmitTaskData } from '../../../../shared/api/task'
+import { taskApi, type SubmitTaskData, type Task } from '../../../../shared/api/task'
 import {
+  createTaskResultFailureError,
   createTaskCancelledError,
   waitTaskImageResultsWithSse,
 } from '../../../../shared/api/taskEvents'
@@ -32,19 +33,10 @@ export async function waitExistingOrLiveTaskImageResults(
   taskId: string,
 ): Promise<TaskImageResult[]> {
   let task:
-    | {
-        status?: string
-        outputs?: Array<{
-          role?: string
-          url?: string
-          width?: number
-          height?: number
-          mime_type?: string
-        }>
-        result?: string | null
-        error_msg?: string
-        cancel_reason?: string
-      }
+    | Pick<
+        Task,
+        'status' | 'outputs' | 'result' | 'error_msg' | 'cancel_reason' | 'execution_metrics'
+      >
     | undefined
   try {
     const taskRes = await taskApi.get(taskId)
@@ -61,7 +53,7 @@ export async function waitExistingOrLiveTaskImageResults(
     throw new Error('任务完成但未返回图片')
   }
   if (task?.status === 'failed') {
-    throw new Error(sanitizeApiErrorMessage(task.error_msg, '生成失败'))
+    throw createTaskResultFailureError(task)
   }
   if (task?.status === 'cancelled') {
     throw createTaskCancelledError(task)

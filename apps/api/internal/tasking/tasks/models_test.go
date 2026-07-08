@@ -86,6 +86,34 @@ func TestTaskUserViewIncludesCancelReason(t *testing.T) {
 	}
 }
 
+func TestTaskUserViewIncludesExecutionFailureMetadata(t *testing.T) {
+	task := &Task{
+		ID:         1,
+		TaskID:     "task-storage-failed",
+		UserID:     42,
+		UserPrompt: "draw",
+		Status:     StatusFailed,
+		ErrorMsg:   "图片结果保存失败，请检查存储配置",
+		ExecutionMetrics: &TaskExecutionMetrics{
+			TaskID:          "task-storage-failed",
+			CurrentStage:    ExecutionStageFailed,
+			FailureStage:    ExecutionStageFinalizing,
+			FailureCategory: FailureCategoryStorageError,
+		},
+	}
+
+	view := task.ToUserView()
+	if view.ExecutionMetrics == nil {
+		t.Fatal("execution_metrics missing from user view")
+	}
+	if got := view.ExecutionMetrics.FailureStage; got != ExecutionStageFinalizing {
+		t.Fatalf("failure_stage = %#v, want %#v", got, ExecutionStageFinalizing)
+	}
+	if got := view.ExecutionMetrics.FailureCategory; got != FailureCategoryStorageError {
+		t.Fatalf("failure_category = %#v, want %#v", got, FailureCategoryStorageError)
+	}
+}
+
 func TestTaskUserViewResultUsesAllowlist(t *testing.T) {
 	task := &Task{
 		ID:         1,

@@ -14,6 +14,7 @@ import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/d
 export type BoardSessionRepository = {
   exists: (boardId: string) => boolean
   load: (boardId: string) => Promise<CanvasBoardSnapshot | null>
+  saveLocal: (boardId: string, snapshot: CanvasBoardSnapshot) => Promise<CanvasBoardState>
   save: (boardId: string, snapshot: CanvasBoardSnapshot) => Promise<CanvasBoardState>
   setPreview: (
     boardId: string,
@@ -51,7 +52,7 @@ export function createBoardSessionRepository(): BoardSessionRepository {
     return state ? serializeCanvasBoardState(state, 'session-snapshot') : null
   }
 
-  async function save(
+  async function saveLocal(
     boardId: string,
     snapshot: CanvasBoardSnapshot,
   ): Promise<CanvasBoardState> {
@@ -71,6 +72,12 @@ export function createBoardSessionRepository(): BoardSessionRepository {
     if (!touched) {
       throw new Error('TOUCH_BOARD_FAILED')
     }
+    return saved
+  }
+
+  async function save(boardId: string, snapshot: CanvasBoardSnapshot): Promise<CanvasBoardState> {
+    const normalized = normalizeBoardId(boardId)
+    const saved = await saveLocal(normalized, snapshot)
     try {
       await syncCanvasBoardToServer(normalized, saved)
     } catch (error) {
@@ -85,6 +92,7 @@ export function createBoardSessionRepository(): BoardSessionRepository {
       return !!normalized && !!getCanvasBoardById(normalized)
     },
     load,
+    saveLocal,
     save,
     setPreview: setCanvasBoardPreviewSnapshot,
     sync: syncCanvasBoardToServer,

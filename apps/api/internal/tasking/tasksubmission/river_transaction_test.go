@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"slices"
+	"sync/atomic"
 	"testing"
 
 	"ideaboard/api/internal/tasking/taskqueue"
@@ -121,8 +122,63 @@ func TestStoreSubmitTaskReturnsExistingTaskForDuplicateClientActionID(t *testing
 	assertTaskRowCount(t, db, "task_action_duplicate", 0)
 	assertRiverJobRowCount(t, db, first.TaskID, 1)
 	assertRiverJobRowCount(t, db, "task_action_duplicate", 0)
-	if client.insertCount != 1 {
-		t.Fatalf("River InsertTx count=%d, want 1", client.insertCount)
+	if got := client.InsertCount(); got != 1 {
+		t.Fatalf("River InsertTx count=%d, want 1", got)
+	}
+}
+
+func TestStoreSubmitTaskSerializesConcurrentDuplicateClientActionID(t *testing.T) {
+	ctx := context.Background()
+	db, pool := testdb.OpenWithPool(t)
+	client := &countingRiverTxClient{
+		inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts),
+	}
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+
+	start := make(chan struct{})
+	results := make(chan tasks.TaskSubmissionResult, 2)
+	errs := make(chan error, 2)
+	for _, taskID := range []string{"task_action_concurrent_a", "task_action_concurrent_b"} {
+		taskID := taskID
+		go func() {
+			<-start
+			task := newTaskSubmissionTask(taskID)
+			task.ClientActionID = "canvas-action-concurrent"
+			result, err := store.SubmitTask(ctx, task, newTaskSubmissionQueueTask(task))
+			results <- result
+			errs <- err
+		}()
+	}
+
+	close(start)
+	for i := 0; i < 2; i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("concurrent SubmitTask failed: %v", err)
+		}
+	}
+	first := <-results
+	second := <-results
+	if first.TaskID == "" || second.TaskID == "" || first.TaskID != second.TaskID {
+		t.Fatalf("results=(%+v,%+v), want same existing task id", first, second)
+	}
+	if first.Created == second.Created {
+		t.Fatalf("results=(%+v,%+v), want one created and one existing", first, second)
+	}
+
+	assertTaskRowCount(t, db, first.TaskID, 1)
+	assertRiverJobRowCount(t, db, first.TaskID, 1)
+	var duplicateRows int
+	if err := db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM tasks
+WHERE user_id = $1 AND client_action_id = $2`, int64(42), "canvas-action-concurrent").Scan(&duplicateRows); err != nil {
+		t.Fatalf("count duplicate client_action_id tasks failed: %v", err)
+	}
+	if duplicateRows != 1 {
+		t.Fatalf("duplicate client_action_id row count=%d, want 1", duplicateRows)
+	}
+	if got := client.InsertCount(); got != 1 {
+		t.Fatalf("River InsertTx count=%d, want 1", got)
 	}
 }
 
@@ -163,12 +219,16 @@ func (c insertThenFailRiverTxClient) InsertTx(ctx context.Context, tx pgx.Tx, ar
 
 type countingRiverTxClient struct {
 	inner       taskqueue.RiverTxClient
-	insertCount int
+	insertCount atomic.Int64
 }
 
 func (c *countingRiverTxClient) InsertTx(ctx context.Context, tx pgx.Tx, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error) {
-	c.insertCount++
+	c.insertCount.Add(1)
 	return c.inner.InsertTx(ctx, tx, args, opts)
+}
+
+func (c *countingRiverTxClient) InsertCount() int64 {
+	return c.insertCount.Load()
 }
 
 type noopDrawingWorker struct {

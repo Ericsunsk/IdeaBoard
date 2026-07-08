@@ -12,13 +12,20 @@ import { resolveApiUrl } from '../config/runtimeUrls'
 
 type TaskEventPayload = Pick<
   Task,
-  'task_id' | 'status' | 'result' | 'error_msg' | 'outputs' | 'cancel_reason'
+  | 'task_id'
+  | 'status'
+  | 'result'
+  | 'error_msg'
+  | 'outputs'
+  | 'cancel_reason'
+  | 'execution_metrics'
 >
 
 const SSE_TIMEOUT_MS = 6 * 60 * 1000
 const POLL_INITIAL_DELAY_MS = 1200
 const POLL_MAX_DELAY_MS = 8000
 const POLL_BACKOFF_FACTOR = 1.6
+const RESULT_FINALIZATION_PENDING_MESSAGE = '图片已生成，但结果保存暂时失败，请稍后重试'
 
 type WaitTaskResultOptions = {
   timeoutMs?: number
@@ -35,6 +42,38 @@ export class TaskResultPendingError extends Error {
 
 export function isTaskResultPendingError(error: unknown): error is TaskResultPendingError {
   return error instanceof TaskResultPendingError
+}
+
+type TaskFailurePayload = Pick<TaskEventPayload, 'error_msg' | 'execution_metrics'>
+
+function normalizeTaskFailureValue(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function isResultFinalizationFailure(task: TaskFailurePayload): boolean {
+  const metrics = task.execution_metrics
+  const failureStage = normalizeTaskFailureValue(metrics?.failure_stage)
+  const failureCategory = normalizeTaskFailureValue(metrics?.failure_category)
+  if (
+    failureStage === 'finalizing' &&
+    (failureCategory === 'storage_error' || failureCategory === 'finalize_error')
+  ) {
+    return true
+  }
+
+  const message = normalizeTaskFailureValue(task.error_msg)
+  return message.includes('图片结果保存失败') || message.includes('任务结果保存失败')
+}
+
+export function createTaskResultFailureError(
+  task: TaskFailurePayload,
+  fallbackMessage = '生成失败',
+): Error {
+  if (isResultFinalizationFailure(task)) {
+    return new TaskResultPendingError(RESULT_FINALIZATION_PENDING_MESSAGE)
+  }
+  const msg = task.error_msg?.trim() || fallbackMessage
+  return new Error(sanitizeApiErrorMessage(msg, fallbackMessage))
 }
 
 export function waitTaskImageResultsWithSse(
@@ -123,8 +162,7 @@ function waitWithEventSource(
         return
       }
       if (task.status === 'failed') {
-        const msg = task.error_msg?.trim() || '生成失败'
-        settleReject(new Error(sanitizeApiErrorMessage(msg, '生成失败')))
+        settleReject(createTaskResultFailureError(task))
         return
       }
       if (task.status === 'cancelled') {
@@ -176,8 +214,7 @@ async function waitWithPolling(
       return extractImageResultsFromTaskEvent(task)
     }
     if (task?.status === 'failed') {
-      const msg = task.error_msg?.trim() || '生成失败'
-      throw new Error(sanitizeApiErrorMessage(msg, '生成失败'))
+      throw createTaskResultFailureError(task)
     }
     if (task?.status === 'cancelled') {
       throw createTaskCancelledError(task)

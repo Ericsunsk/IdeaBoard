@@ -61,18 +61,19 @@ type TaskOutput struct {
 }
 
 type TaskUserView struct {
-	ID           int64                `json:"id"`
-	TaskID       string               `json:"task_id"`
-	UserID       int64                `json:"user_id"`
-	Prompt       string               `json:"prompt"`
-	Status       string               `json:"status"`
-	ErrorMsg     string               `json:"error_msg"`
-	CancelReason string               `json:"cancel_reason"`
-	Result       string               `json:"result"`
-	Outputs      []TaskOutputUserView `json:"outputs,omitempty"`
-	CreatedAt    time.Time            `json:"created_at"`
-	UpdatedAt    time.Time            `json:"updated_at"`
-	CompletedAt  *time.Time           `json:"completed_at"`
+	ID               int64                 `json:"id"`
+	TaskID           string                `json:"task_id"`
+	UserID           int64                 `json:"user_id"`
+	Prompt           string                `json:"prompt"`
+	Status           string                `json:"status"`
+	ErrorMsg         string                `json:"error_msg"`
+	CancelReason     string                `json:"cancel_reason"`
+	Result           string                `json:"result"`
+	Outputs          []TaskOutputUserView  `json:"outputs,omitempty"`
+	ExecutionMetrics *TaskExecutionMetrics `json:"execution_metrics,omitempty"`
+	CreatedAt        time.Time             `json:"created_at"`
+	UpdatedAt        time.Time             `json:"updated_at"`
+	CompletedAt      *time.Time            `json:"completed_at"`
 }
 
 type TaskOutputUserView struct {
@@ -100,18 +101,19 @@ type TaskResultUserView struct {
 
 func (t *Task) ToUserView() TaskUserView {
 	return TaskUserView{
-		ID:           t.ID,
-		TaskID:       t.TaskID,
-		UserID:       t.UserID,
-		Prompt:       t.UserPrompt,
-		Status:       t.Status,
-		ErrorMsg:     t.ErrorMsg,
-		CancelReason: t.CancelReason,
-		Result:       SafeTaskResultJSON(t.Result),
-		Outputs:      taskOutputsUserView(t.Outputs),
-		CreatedAt:    t.CreatedAt,
-		UpdatedAt:    t.UpdatedAt,
-		CompletedAt:  t.CompletedAt,
+		ID:               t.ID,
+		TaskID:           t.TaskID,
+		UserID:           t.UserID,
+		Prompt:           t.UserPrompt,
+		Status:           t.Status,
+		ErrorMsg:         t.ErrorMsg,
+		CancelReason:     t.CancelReason,
+		Result:           SafeTaskResultJSON(t.Result),
+		Outputs:          taskOutputsUserView(t.Outputs),
+		ExecutionMetrics: t.ExecutionMetrics,
+		CreatedAt:        t.CreatedAt,
+		UpdatedAt:        t.UpdatedAt,
+		CompletedAt:      t.CompletedAt,
 	}
 }
 

@@ -144,6 +144,23 @@ describe('createBoardSessionRepository', () => {
     }
   })
 
+  it('keeps saving local board drafts when stored auth is temporarily missing', async () => {
+    const board = createCanvasBoard('Session Recovery')
+    replaceCanvasBoardStateMap({ [board.id]: makeState(1_000, 'initial') })
+    clearStoredAuth()
+    const repository = createBoardSessionRepository()
+
+    const savedState = await repository.saveLocal(
+      board.id,
+      makeSnapshot('saved-without-stored-auth'),
+    )
+
+    expect(repository.exists(board.id)).toBe(true)
+    expect(savedState.promptNodes[0]?.text).toBe('saved-without-stored-auth')
+    expect(getCanvasBoardState(board.id)?.promptNodes[0]?.text).toBe('saved-without-stored-auth')
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
+
   it('loads a session snapshot without preview or local metadata', async () => {
     const board = createCanvasBoard('Load Snapshot')
     replaceCanvasBoardStateMap({

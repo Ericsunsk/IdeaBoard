@@ -9,6 +9,7 @@ export {
 export type { AuthFailureAction, SafeInternalRedirectPath } from '../auth/sessionPolicy'
 
 const USER_KEY = 'user'
+const LAST_AUTH_STORAGE_SCOPE_KEY = 'ideaboard.auth.lastStorageScope.v1'
 
 export function getStoredUser(): User | null {
   const raw = localStorage.getItem(USER_KEY)
@@ -24,6 +25,8 @@ export function getStoredUser(): User | null {
 
 export function setStoredAuth(user: User) {
   localStorage.setItem(USER_KEY, JSON.stringify(user))
+  const scope = resolveAuthStorageUserScope(user)
+  if (scope) rememberAuthStorageUserScope(scope)
 }
 
 export function clearStoredAuth() {
@@ -39,8 +42,7 @@ function normalizeScopePart(value: string): string {
   return value.trim().replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
-export function getAuthStorageUserScope(): string | null {
-  const user = getStoredUser()
+function resolveAuthStorageUserScope(user: User | null): string | null {
   if (!user) return null
 
   const uid = typeof user.uid === 'string' ? user.uid.trim() : ''
@@ -58,6 +60,33 @@ export function getAuthStorageUserScope(): string | null {
   }
 
   return null
+}
+
+function rememberAuthStorageUserScope(scope: string) {
+  try {
+    if (localStorage.getItem(LAST_AUTH_STORAGE_SCOPE_KEY) === scope) return
+    localStorage.setItem(LAST_AUTH_STORAGE_SCOPE_KEY, scope)
+  } catch (error) {
+    console.warn('[auth] remember storage scope failed', error)
+  }
+}
+
+export function getAuthStorageUserScope(): string | null {
+  const scope = resolveAuthStorageUserScope(getStoredUser())
+  if (scope) rememberAuthStorageUserScope(scope)
+  return scope
+}
+
+export function getRecoverableAuthStorageUserScope(): string | null {
+  const activeScope = getAuthStorageUserScope()
+  if (activeScope) return activeScope
+  try {
+    const scope = localStorage.getItem(LAST_AUTH_STORAGE_SCOPE_KEY)
+    return scope?.trim() || null
+  } catch (error) {
+    console.warn('[auth] read recovery storage scope failed', error)
+    return null
+  }
 }
 
 function getCurrentAuthFailureContext(params: {
