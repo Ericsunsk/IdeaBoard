@@ -8,10 +8,12 @@ import (
 
 type taskAssignmentTaskState struct {
 	Status                  string
+	UserID                  int64
 	AccountID               int64
 	ProviderEndpointID      int64
 	CredentialID            int64
 	LeaseToken              string
+	Priority                int
 	ResolvedModel           string
 	APIType                 string
 	ProviderEndpointName    string
