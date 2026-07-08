@@ -222,6 +222,48 @@ describe('createBoardSessionRepository', () => {
     expect(snapshot).not.toHaveProperty('updatedAt')
   })
 
+  it('rejects invalid local state with recoverable validation context instead of returning an empty session snapshot', async () => {
+    const board = createCanvasBoard('Invalid Local Snapshot')
+    localStorage.setItem(
+      'ideaboard.canvas.boardStates.v2.uid_ABC123',
+      JSON.stringify({
+        [board.id]: {
+          ...makeCanvasBoardState(),
+          imageNodes: [
+            {
+              id: 1,
+              type: 'image-node',
+              x: 0,
+              y: 0,
+              width: 280,
+              sourceImageUrl: 'https://example.com/source.png',
+              sourceImageRatio: 0,
+              outputStatus: 'ready',
+              outputImages: [],
+            },
+          ],
+        },
+      }),
+    )
+    const repository = createBoardSessionRepository()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await expect(repository.load(board.id)).rejects.toMatchObject({
+        code: 'INVALID_BOARD_STATE',
+        boundary: 'local-state-read',
+        recoverable: true,
+        issues: [
+          expect.objectContaining({
+            path: 'imageNodes.0.sourceImageRatio',
+          }),
+        ],
+      })
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
   it('rejects invalid save snapshots with recoverable validation context', async () => {
     const board = createCanvasBoard('Invalid Save')
     const repository = createBoardSessionRepository()

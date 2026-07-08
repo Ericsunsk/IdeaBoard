@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createEmptyCanvasBoardSnapshot,
+  InvalidBoardStateError,
   type CanvasBoardSnapshot,
   type ImageNodeItem,
 } from '../../canvas-board/domain'
@@ -102,6 +103,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
     session,
     routeBoardId,
     fullNodes,
+    fullEdges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,
@@ -162,6 +164,34 @@ describe('boardPersistenceSession', () => {
     )
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('idle')
+  })
+
+  it('keeps the current graph when a selected board snapshot fails validation during load', async () => {
+    const harness = createSessionHarness()
+    harness.fullNodes.value = [{ id: 'existing-node' }]
+    harness.fullEdges.value = [{ id: 'existing-edge' }]
+    harness.saveStatus.value = 'saved'
+    harness.isDirty.value = true
+    vi.mocked(harness.boardSession.load).mockRejectedValueOnce(
+      new InvalidBoardStateError({
+        code: 'INVALID_BOARD_STATE',
+        boundary: 'local-state-read',
+        recoverable: true,
+        issues: [{ path: 'imageNodes.0.sourceImageRatio', message: 'Invalid ratio' }],
+      }),
+    )
+
+    await harness.session.loadInitialOrRouteBoard()
+
+    expect(harness.commitGraph).not.toHaveBeenCalled()
+    expect(harness.fullNodes.value).toEqual([{ id: 'existing-node' }])
+    expect(harness.fullEdges.value).toEqual([{ id: 'existing-edge' }])
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('saved')
+    expect(harness.onError).toHaveBeenCalledWith(
+      '画布数据校验失败，已保留当前画布，请稍后重试',
+    )
+    expect(harness.isLoadingBoardSnapshot.value).toBe(false)
   })
 
   it('does not replace the graph baseline when saving while unresolved pending result nodes exist', async () => {

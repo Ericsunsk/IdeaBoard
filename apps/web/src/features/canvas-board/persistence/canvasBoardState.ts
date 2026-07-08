@@ -45,7 +45,7 @@ function stripPreviewSnapshotsFromStateMap(
   )
 }
 
-function readRawStateMap(): Record<string, CanvasBoardState> {
+function readRawStateMap(options: { throwOnInvalidBoardId?: string } = {}): Record<string, CanvasBoardState> {
   if (typeof window === 'undefined') return {}
   const scopedKey = getScopedStorageKey()
   if (!scopedKey) return {}
@@ -56,12 +56,18 @@ function readRawStateMap(): Record<string, CanvasBoardState> {
     if (!parsed || typeof parsed !== 'object') return {}
     const result: Record<string, CanvasBoardState> = {}
     Object.entries(parsed as Record<string, unknown>).forEach(([boardId, stateLike]) => {
-      const state = toValidBoardState(stateLike, 'local-state-read', { boardId })
+      const normalizedBoardId = normalizeBoardId(boardId)
+      const state = toValidBoardState(stateLike, 'local-state-read', {
+        boardId: normalizedBoardId,
+        throwOnInvalid: normalizedBoardId === options.throwOnInvalidBoardId,
+      })
       if (!state) return
-      result[boardId] = state
+      result[normalizedBoardId] = state
     })
     return result
-  } catch {
+  } catch (error) {
+    console.warn('[canvas] read board states failed', error)
+    if (options.throwOnInvalidBoardId) throw error
     return {}
   }
 }
@@ -142,6 +148,13 @@ export function getCanvasBoardState(boardId: string): CanvasBoardState | null {
   const id = normalizeBoardId(boardId)
   if (!id) return null
   const stateMap = readRawStateMap()
+  return stateMap[id] || null
+}
+
+export function loadCanvasBoardState(boardId: string): CanvasBoardState | null {
+  const id = normalizeBoardId(boardId)
+  if (!id) return null
+  const stateMap = readRawStateMap({ throwOnInvalidBoardId: id })
   return stateMap[id] || null
 }
 

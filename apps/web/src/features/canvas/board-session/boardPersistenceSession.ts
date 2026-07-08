@@ -5,7 +5,11 @@ import {
   type FlowAdapterNode,
 } from '../utils/flowSnapshotAdapter'
 import { isBoardNameConflictError } from '../../canvas-board/catalog/boardSync'
-import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
+import {
+  createEmptyCanvasBoardSnapshot,
+  InvalidBoardStateError,
+  type CanvasBoardSnapshot,
+} from '../../canvas-board/domain'
 import type { CanvasBoardSession } from './useCanvasBoardSession'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
@@ -110,6 +114,14 @@ export function createBoardPersistenceSession(
     applyBoardSnapshot(createEmptyCanvasBoardSnapshot())
   }
 
+  function notifyLoadFailure(error: unknown) {
+    if (error instanceof InvalidBoardStateError) {
+      options.onError('画布数据校验失败，已保留当前画布，请稍后重试')
+      return
+    }
+    options.onError('导入画布快照失败，请稍后重试')
+  }
+
   async function importBoardSnapshot() {
     const boardId = readBoardIdFromQuery()
     if (!boardId) {
@@ -133,7 +145,7 @@ export function createBoardPersistenceSession(
     } catch (error) {
       if (!isLoadStillCurrent()) return
       console.warn('[canvas] load board snapshot failed', error)
-      options.onError('导入画布快照失败，请稍后重试')
+      notifyLoadFailure(error)
     } finally {
       if (loadToken === loadSequence) {
         options.isLoadingBoardSnapshot.value = false
