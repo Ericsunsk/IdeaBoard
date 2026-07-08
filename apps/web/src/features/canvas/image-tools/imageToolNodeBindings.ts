@@ -156,11 +156,13 @@ export function createImageToolNodeBindings(
     const hasCommittedMask = !!session.maskEditor.getCommittedMaskData(nodeId)
     const actionMenuVisible = options.isImageActionPanelVisible(nodeId)
     const activeStrengthAction = options.strengthControl.activeAction.value
+    const directGenerating =
+      !options.isGenerationAvailable() || options.isDirectActionRunning(nodeId)
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
       promptComposerVisible: options.isImagePromptComposerVisible(nodeId),
       promptPlaceholder: hasCommittedMask ? '描述如何重绘选区' : '输入提示词改造这张图',
-      directGenerating: options.isDirectActionRunning(nodeId),
+      directGenerating,
       strengthControl: {
         visible: !!activeStrengthAction && actionMenuVisible,
         activeAction: activeStrengthAction,

@@ -102,6 +102,7 @@ export function useCanvasWorkspaceRuntime(
         getFlowNodeUiStateCached: runtime.graphEditing.getFlowNodeUiStateCached,
       },
       imageWorkflow: {
+        isGenerationAvailable: runtime.imageWorkflow.isGenerationAvailable,
         runImageDirectAction: runtime.imageWorkflow.runImageDirectAction,
         runCanvasExtendAction: runtime.imageWorkflow.runCanvasExtendAction,
         createImageTools: runtime.imageWorkflow.createImageTools,

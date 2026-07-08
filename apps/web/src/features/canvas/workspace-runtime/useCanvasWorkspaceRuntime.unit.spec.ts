@@ -93,6 +93,7 @@ function createRuntimeParts() {
       getFlowNodeUiStateCached: vi.fn(),
     },
     imageWorkflow: {
+      isGenerationAvailable: vi.fn(() => true),
       runImageDirectAction: vi.fn(),
       runCanvasExtendAction: vi.fn(),
       createImageTools: vi.fn(),
@@ -130,6 +131,9 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     )
     expect(workspace.commands.imageWorkflow.runImageDirectAction).toBe(
       runtimeParts.imageWorkflow.runImageDirectAction,
+    )
+    expect(workspace.commands.imageWorkflow.isGenerationAvailable).toBe(
+      runtimeParts.imageWorkflow.isGenerationAvailable,
     )
     expect(workspace.commands.imageWorkflow.createImageTools).toBe(
       runtimeParts.imageWorkflow.createImageTools,

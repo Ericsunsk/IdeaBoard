@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@vue-flow/core'
-import { ref, type Ref } from 'vue'
+import { onScopeDispose, ref, type Ref } from 'vue'
 import {
   createImageExecutionPlanner,
   createImageWorkflowCommands,
@@ -50,18 +50,41 @@ function isProviderUnavailableMessage(message: string): boolean {
 export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): CanvasTaskRuntime {
   const generationUnavailableUntilMs = ref(0)
   const generationUnavailableMessage = ref(DEFAULT_GENERATION_UNAVAILABLE_MESSAGE)
+  let generationAvailabilityTimer: ReturnType<typeof setTimeout> | null = null
 
   function isGenerationAvailable(): boolean {
     return Date.now() >= generationUnavailableUntilMs.value
+  }
+
+  function clearGenerationAvailabilityTimer() {
+    if (!generationAvailabilityTimer) return
+    clearTimeout(generationAvailabilityTimer)
+    generationAvailabilityTimer = null
+  }
+
+  function refreshGenerationAvailabilityAfter(delayMs: number) {
+    clearGenerationAvailabilityTimer()
+    generationAvailabilityTimer = setTimeout(() => {
+      generationAvailabilityTimer = null
+      if (!isGenerationAvailable()) {
+        refreshGenerationAvailabilityAfter(generationUnavailableUntilMs.value - Date.now())
+        return
+      }
+      generationUnavailableUntilMs.value = 0
+      generationUnavailableMessage.value = DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
+    }, Math.max(0, delayMs))
   }
 
   function handleWorkflowWarning(message: string) {
     if (isProviderUnavailableMessage(message) && isGenerationAvailable()) {
       generationUnavailableUntilMs.value = Date.now() + GENERATION_UNAVAILABLE_RETRY_MS
       generationUnavailableMessage.value = message.trim() || DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
+      refreshGenerationAvailabilityAfter(GENERATION_UNAVAILABLE_RETRY_MS)
     }
     options.feedback.warning(message)
   }
+
+  onScopeDispose(clearGenerationAvailabilityTimer)
 
   const planner = createImageExecutionPlanner(() => ({
     nodes: options.nodes.value,

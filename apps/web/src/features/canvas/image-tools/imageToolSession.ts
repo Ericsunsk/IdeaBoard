@@ -73,6 +73,7 @@ export type UseCanvasImageToolsOptions = {
   runPromptGeneration: (nodeId: string, prompt: string, outputCount: number) => Promise<void> | void
   isImageActionPanelVisible: (nodeId: string) => boolean
   isImagePromptComposerVisible: (nodeId: string) => boolean
+  isGenerationAvailable: () => boolean
   isDirectActionRunning: (nodeId: string) => boolean
   strengthControl: ImageActionStrengthControlSource
   clearSelectedFlowElements: () => void

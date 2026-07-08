@@ -24,6 +24,7 @@ export type CanvasImageWorkflowToolsOptions = Omit<
   | 'updateOutputCount'
   | 'runInpaintAction'
   | 'runPromptGeneration'
+  | 'isGenerationAvailable'
   | 'isDirectActionRunning'
   | 'clearSelectedFlowElements'
   | 'startCanvasInteraction'
@@ -55,6 +56,7 @@ type CanvasImageWorkflowTaskPort = Pick<
   | 'runFusionPromptGeneration'
   | 'runImageDirectAction'
   | 'runCanvasExtendAction'
+  | 'isGenerationAvailable'
   | 'isNodeDirectActionRunning'
 >
 
@@ -120,6 +122,7 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions) {
       updateOutputCount: markImageWorkflowNodeDirty,
       runInpaintAction: task.runImageInpaintAction,
       runPromptGeneration: task.runImagePromptGeneration,
+      isGenerationAvailable: task.isGenerationAvailable,
       isDirectActionRunning: task.isNodeDirectActionRunning,
       clearSelectedFlowElements: graph.clearSelectedFlowElements,
       startCanvasInteraction: graph.startCanvasInteraction,
@@ -171,6 +174,7 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions) {
   }
 
   return {
+    isGenerationAvailable: task.isGenerationAvailable,
     runImageDirectAction: task.runImageDirectAction,
     runCanvasExtendAction: task.runCanvasExtendAction,
     createImageTools,

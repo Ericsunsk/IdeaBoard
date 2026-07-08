@@ -111,6 +111,7 @@ function createTaskRuntime() {
     runFusionPromptGeneration: vi.fn(),
     runImageDirectAction: vi.fn(),
     runCanvasExtendAction: vi.fn(),
+    isGenerationAvailable: vi.fn(() => true),
     isNodeDirectActionRunning: vi.fn(),
     reattachPendingImageResults: vi.fn(),
   }
@@ -272,6 +273,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         getImageNodeSnapshot: graph.getImageNodeSnapshot,
         runInpaintAction: task.runImageInpaintAction,
         runPromptGeneration: task.runImagePromptGeneration,
+        isGenerationAvailable: task.isGenerationAvailable,
         isDirectActionRunning: task.isNodeDirectActionRunning,
         clearSelectedFlowElements: graph.clearSelectedFlowElementsSync,
         feedback: mocks.feedback.imageTools,

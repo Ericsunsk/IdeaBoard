@@ -42,7 +42,7 @@
         placeholder="输入融合提示词"
         :aspect-ratio="aspectRatio"
         :output-count="outputCountValue"
-        :submit-disabled="!canGenerate"
+        :submit-disabled="!canGenerate || props.generationAvailable === false"
         @update:aspect-ratio="emit('update:aspect-ratio', $event)"
         @update:output-count="selectOutputCount"
         @submit="submitPrompt"
@@ -68,6 +68,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   promptComposerVisible?: boolean
+  generationAvailable?: boolean
   uiState?: NodeUiState
 }>()
 
@@ -101,7 +102,7 @@ watch(
 )
 
 function submitPrompt(prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) {
-  if (!canGenerate.value) return
+  if (!canGenerate.value || props.generationAvailable === false) return
   emit('prompt-generate', prompt, outputCount, aspectRatio)
   promptDraft.value = ''
 }

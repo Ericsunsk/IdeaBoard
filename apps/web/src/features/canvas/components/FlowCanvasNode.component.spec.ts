@@ -55,6 +55,7 @@ function renderFlowCanvasNode(
   input: {
     selected?: boolean
     dragging?: boolean
+    generationAvailable?: boolean
   } = {},
 ) {
   const snapshot = createPromptSnapshot()
@@ -65,6 +66,7 @@ function renderFlowCanvasNode(
       selected: input.selected ?? false,
       dragging: input.dragging ?? false,
       copyMode: false,
+      generationAvailable: input.generationAvailable ?? true,
       imageActionBinding: createImageActionBinding(),
     },
     global: {
@@ -80,6 +82,7 @@ describe('FlowCanvasNode prompt rendering', () => {
     const view = renderFlowCanvasNode()
 
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
+    expect(view.getByLabelText('发送')).not.toBeDisabled()
   })
 
   it('keeps the full prompt body for selected nodes at rest', () => {
@@ -97,5 +100,13 @@ describe('FlowCanvasNode prompt rendering', () => {
     })
 
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
+  })
+
+  it('disables prompt submission while generation is unavailable', () => {
+    const view = renderFlowCanvasNode({
+      generationAvailable: false,
+    })
+
+    expect(view.getByLabelText('发送')).toBeDisabled()
   })
 })

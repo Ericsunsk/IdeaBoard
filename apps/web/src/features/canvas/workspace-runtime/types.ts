@@ -78,6 +78,7 @@ export type CanvasWorkspaceRuntimeCommands = {
   >
   imageWorkflow: Pick<
     CanvasWorkspaceRuntimeParts['imageWorkflow'],
+    | 'isGenerationAvailable'
     | 'runImageDirectAction'
     | 'runCanvasExtendAction'
     | 'createImageTools'

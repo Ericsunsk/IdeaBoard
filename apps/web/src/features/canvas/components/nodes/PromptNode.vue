@@ -56,7 +56,7 @@
             :model-value="node.text"
             :output-count="outputCount"
             :aspect-ratio="aspectRatio"
-            :submit-disabled="!canGenerate"
+            :submit-disabled="!canGenerate || props.generationAvailable === false"
             class="flex-auto"
             @update:model-value="emit('update:text', $event)"
             @update:output-count="emit('update:output-count', $event)"
@@ -88,6 +88,7 @@ const props = defineProps<{
   active: boolean
   dragging: boolean
   copyMode: boolean
+  generationAvailable?: boolean
   uiState?: PromptNodeUiState
 }>()
 

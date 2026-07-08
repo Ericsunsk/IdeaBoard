@@ -83,6 +83,7 @@
             :copy-mode="duplicateModifierPressed"
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
             :image-action-binding="imageToolActionBindingFor(nodeProps.id)"
+            :generation-available="isGenerationAvailable"
             :fusion-prompt-composer-visible="
               isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeProps.id)
             "
@@ -241,6 +242,7 @@ const workspace = useCanvasWorkspaceRuntime({
 })
 const viewModel = workspace.viewModel
 const commands = workspace.commands
+const isGenerationAvailable = computed(() => commands.imageWorkflow.isGenerationAvailable())
 
 const { nodes, edges } = viewModel.flowPane
 

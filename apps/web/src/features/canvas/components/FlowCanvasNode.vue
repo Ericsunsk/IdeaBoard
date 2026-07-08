@@ -20,6 +20,7 @@
         :dragging="props.dragging"
         :copy-mode="props.copyMode"
         :ui-state="promptUiState"
+        :generation-available="props.generationAvailable"
         @update:text="onPromptTextUpdate"
         @update:output-count="emitNodeParam('outputCount', $event)"
         @update:aspect-ratio="emitNodeParam('aspectRatio', $event)"
@@ -124,6 +125,7 @@
           :dragging="props.dragging"
           :copy-mode="props.copyMode"
           :prompt-composer-visible="!!props.fusionPromptComposerVisible"
+          :generation-available="props.generationAvailable"
           :ui-state="props.uiState"
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
@@ -186,6 +188,7 @@ const props = withDefaults(
     copyMode?: boolean
     uiState?: NodeUiState | PromptNodeUiState
     fusionPromptComposerVisible?: boolean
+    generationAvailable?: boolean
     imageActionBinding: ImageActionBinding
     setImageStageRef?: (nodeId: string, element: Element | null) => void
     clearImageStageRef?: (nodeId: string, element?: Element | null) => void
@@ -201,6 +204,7 @@ const props = withDefaults(
     copyMode: false,
     uiState: undefined,
     fusionPromptComposerVisible: false,
+    generationAvailable: true,
     setImageStageRef: () => undefined,
     clearImageStageRef: () => undefined,
     expandModeActive: false,

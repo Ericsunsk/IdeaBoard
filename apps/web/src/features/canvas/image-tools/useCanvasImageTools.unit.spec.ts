@@ -124,6 +124,7 @@ function mountCanvasImageTools() {
   const canvasWrapRef = ref<HTMLElement | null>(null)
   const isCanvasInteractionLocked = ref(false)
   const currentBoardId = ref('board-1')
+  const generationAvailable = ref(true)
   const nodes: Ref<Node[]> = shallowRef(
     Object.keys(imageNodeFixtures).map((id) => ({ id, data: { kind: 'image' } })) as Node[],
   )
@@ -179,6 +180,7 @@ function mountCanvasImageTools() {
           runPromptGeneration,
           isImageActionPanelVisible: (nodeId) => nodeId === 'node-1',
           isImagePromptComposerVisible: (nodeId) => nodeId === 'node-1',
+          isGenerationAvailable: () => generationAvailable.value,
           isDirectActionRunning: () => false,
           strengthControl: {
             activeAction: activeStrengthAction,
@@ -209,6 +211,7 @@ function mountCanvasImageTools() {
     connectImageNodes,
     createImageNodeFromFile,
     currentBoardId,
+    generationAvailable,
     host,
     isCanvasInteractionLocked,
     runInpaintAction,
@@ -483,6 +486,35 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(actionAfter.strengthControl.activeAction).toBe(IMAGE_STRENGTH_ACTIONS[0])
       expect(actionAfter.strengthControl.visible).toBe(true)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1')).toBe(actionAfter)
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('disables generation controls while the generation provider is unavailable', () => {
+    const harness = mountCanvasImageTools()
+
+    try {
+      expect(harness.runtime.commands.lifecycle.enter('node-1', 'inpaint')).toBe(true)
+
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1').directGenerating).toBe(
+        false,
+      )
+      expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
+
+      const actionBefore = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+      harness.generationAvailable.value = false
+      const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+
+      expect(actionAfter).not.toBe(actionBefore)
+      expect(actionAfter.directGenerating).toBe(true)
+      expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(true)
+
+      harness.generationAvailable.value = true
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1').directGenerating).toBe(
+        false,
+      )
+      expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
     } finally {
       harness.unmount()
     }
