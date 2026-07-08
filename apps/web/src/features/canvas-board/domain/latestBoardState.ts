@@ -267,20 +267,56 @@ function toValidationErrorContext(
   }
 }
 
-function isSerializableEqual(left: unknown, right: unknown): boolean {
-  try {
-    return JSON.stringify(left) === JSON.stringify(right)
-  } catch {
-    return false
+function toSerializationErrorContext(
+  error: unknown,
+  boundary: string,
+): BoardStateValidationErrorContext {
+  return {
+    code: 'INVALID_BOARD_STATE',
+    boundary,
+    recoverable: true,
+    issues: [
+      {
+        path: '$',
+        message: 'BoardState must be JSON serializable',
+        received: error instanceof Error ? error.message : String(error),
+      },
+    ],
   }
+}
+
+function serializeJson(
+  value: unknown,
+  boundary: string,
+): LatestBoardStateValidationResult<string> {
+  try {
+    return { ok: true, value: JSON.stringify(value) ?? 'null' }
+  } catch (error) {
+    return { ok: false, error: toSerializationErrorContext(error, boundary) }
+  }
+}
+
+function serializableEquality(
+  left: unknown,
+  right: unknown,
+  boundary: string,
+): LatestBoardStateValidationResult<boolean> {
+  const leftJson = serializeJson(left, boundary)
+  if (!leftJson.ok) return leftJson
+  const rightJson = serializeJson(right, boundary)
+  if (!rightJson.ok) return rightJson
+  return { ok: true, value: leftJson.value === rightJson.value }
 }
 
 function successResult<T>(
   input: unknown,
   output: T,
   options: LatestBoardStateNormalizationOptions | undefined,
-): T | LatestBoardStateValidationResult<T> {
-  const value = isSerializableEqual(input, output) ? (input as T) : output
+  boundary: string,
+): T | null | LatestBoardStateValidationResult<T> {
+  const equality = serializableEquality(input, output, boundary)
+  if (!equality.ok) return options?.mode === 'result' ? equality : null
+  const value = equality.value ? (input as T) : output
   return options?.mode === 'result' ? { ok: true, value } : value
 }
 
@@ -293,11 +329,11 @@ function normalizeWithLatestSchema<T>(
   const boundary = options?.boundary ?? DEFAULT_VALIDATION_BOUNDARY
   const directParsed = v.safeParse(schema, stateLike)
   if (directParsed.success) {
-    return successResult(stateLike, directParsed.output, options)
+    return successResult(stateLike, directParsed.output, options, boundary)
   }
   const parsed = v.safeParse(schema, canonicalBoardSnapshotLike(stateLike, includeStateMetadata))
   if (parsed.success) {
-    return successResult(stateLike, parsed.output, options)
+    return successResult(stateLike, parsed.output, options, boundary)
   }
   const error = toValidationErrorContext(parsed.issues, boundary)
   return options?.mode === 'result' ? { ok: false, error } : null

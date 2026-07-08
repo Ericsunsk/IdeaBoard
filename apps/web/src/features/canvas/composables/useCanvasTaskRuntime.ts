@@ -35,6 +35,7 @@ type UseCanvasTaskRuntimeOptions = {
 export type CanvasTaskRuntime = ImageWorkflowCommands
 
 const DEFAULT_GENERATION_UNAVAILABLE_MESSAGE = '生成服务暂不可用，请稍后重试'
+const GENERATION_UNAVAILABLE_RETRY_MS = 15_000
 
 function isProviderUnavailableMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase()
@@ -47,11 +48,16 @@ function isProviderUnavailableMessage(message: string): boolean {
 }
 
 export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): CanvasTaskRuntime {
-  const isGenerationAvailable = ref(true)
+  const generationUnavailableUntilMs = ref(0)
   const generationUnavailableMessage = ref(DEFAULT_GENERATION_UNAVAILABLE_MESSAGE)
+
+  function isGenerationAvailable(): boolean {
+    return Date.now() >= generationUnavailableUntilMs.value
+  }
+
   function handleWorkflowWarning(message: string) {
-    if (isProviderUnavailableMessage(message)) {
-      isGenerationAvailable.value = false
+    if (isProviderUnavailableMessage(message) && isGenerationAvailable()) {
+      generationUnavailableUntilMs.value = Date.now() + GENERATION_UNAVAILABLE_RETRY_MS
       generationUnavailableMessage.value = message.trim() || DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
     }
     options.feedback.warning(message)
@@ -77,7 +83,7 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
   return createImageWorkflowCommands({
     planner,
     workflow,
-    isGenerationAvailable: () => isGenerationAvailable.value,
+    isGenerationAvailable,
     generationUnavailableMessage: () => generationUnavailableMessage.value,
     onWarning: handleWorkflowWarning,
   })

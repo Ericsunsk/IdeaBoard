@@ -176,4 +176,38 @@ describe('boardStateSerialization', () => {
       }),
     )
   })
+
+  it('returns recoverable validation context for non-serializable board state', () => {
+    const nonSerializableState = makeCanvasBoardState() as ReturnType<
+      typeof makeCanvasBoardState
+    > & {
+      toJSON?: () => unknown
+    }
+    Object.defineProperty(nonSerializableState, 'toJSON', {
+      value: () => {
+        throw new Error('serialization failed')
+      },
+    })
+
+    const result = normalizeCanvasBoardState(nonSerializableState, {
+      mode: 'result',
+      boundary: 'unit-test',
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toEqual(
+      expect.objectContaining({
+        code: 'INVALID_BOARD_STATE',
+        boundary: 'unit-test',
+        recoverable: true,
+      }),
+    )
+    expect(result.error.issues[0]).toEqual(
+      expect.objectContaining({
+        path: '$',
+        message: 'BoardState must be JSON serializable',
+      }),
+    )
+  })
 })

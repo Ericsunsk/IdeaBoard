@@ -127,6 +127,60 @@ func TestStoreSubmitTaskReturnsExistingTaskForDuplicateClientActionID(t *testing
 	}
 }
 
+func TestStoreSubmitTaskCreatesDistinctTaskForNewClientActionID(t *testing.T) {
+	ctx := context.Background()
+	db, pool := testdb.OpenWithPool(t)
+	client := &countingRiverTxClient{
+		inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts),
+	}
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+
+	first := newTaskSubmissionTask("task_action_rerun_first")
+	first.ClientActionID = "canvas-action-rerun-1"
+	firstQueueTask := newTaskSubmissionQueueTask(first)
+
+	firstResult, err := store.SubmitTask(ctx, first, firstQueueTask)
+	if err != nil {
+		t.Fatalf("first SubmitTask failed: %v", err)
+	}
+	if firstResult.TaskID != first.TaskID || !firstResult.Created {
+		t.Fatalf("first SubmitTask result=%+v, want created task %q", firstResult, first.TaskID)
+	}
+
+	rerun := newTaskSubmissionTask("task_action_rerun_second")
+	rerun.UserID = first.UserID
+	rerun.ClientActionID = "canvas-action-rerun-2"
+	rerunQueueTask := newTaskSubmissionQueueTask(rerun)
+
+	rerunResult, err := store.SubmitTask(ctx, rerun, rerunQueueTask)
+	if err != nil {
+		t.Fatalf("rerun SubmitTask failed: %v", err)
+	}
+	if rerunResult.TaskID != rerun.TaskID || !rerunResult.Created {
+		t.Fatalf("rerun SubmitTask result=%+v, want created task %q", rerunResult, rerun.TaskID)
+	}
+	if firstResult.TaskID == rerunResult.TaskID {
+		t.Fatalf("rerun task_id=%q, want distinct from first task_id", rerunResult.TaskID)
+	}
+
+	assertTaskRowCount(t, db, first.TaskID, 1)
+	assertTaskRowCount(t, db, rerun.TaskID, 1)
+	assertRiverJobRowCount(t, db, first.TaskID, 1)
+	assertRiverJobRowCount(t, db, rerun.TaskID, 1)
+	if got := client.InsertCount(); got != 2 {
+		t.Fatalf("River InsertTx count=%d, want 2", got)
+	}
+
+	firstJob := loadRiverJobForTask(t, db, first.TaskID)
+	if !slices.Equal(firstJob.tags, []string{first.TaskID}) {
+		t.Fatalf("first River job tags=%v, want [%s]", firstJob.tags, first.TaskID)
+	}
+	rerunJob := loadRiverJobForTask(t, db, rerun.TaskID)
+	if !slices.Equal(rerunJob.tags, []string{rerun.TaskID}) {
+		t.Fatalf("rerun River job tags=%v, want [%s]", rerunJob.tags, rerun.TaskID)
+	}
+}
+
 func TestStoreSubmitTaskSerializesConcurrentDuplicateClientActionID(t *testing.T) {
 	ctx := context.Background()
 	db, pool := testdb.OpenWithPool(t)

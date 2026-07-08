@@ -75,6 +75,7 @@ export type UseFlowCanvasRuntimeOptions = {
   saveStatus: Ref<SaveStatus>
   isLoadingBoardSnapshot: Ref<boolean>
   isSavingBoard: Ref<boolean>
+  autosaveResumeSignal?: Ref<unknown>
   boardSession: CanvasBoardSession
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
@@ -231,6 +232,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const { markDirtyAndSchedule, flushAutosave } = useCanvasBoardAutosave({
     isDirty: options.isDirty,
     isSaving: options.isSavingBoard,
+    resumeSignal: options.autosaveResumeSignal,
     canRun: () => !isNodeDragActive,
     save: (autosaveOptions) =>
       saveCurrentBoardSnapshot({ waitForPreview: false, silent: autosaveOptions?.silent }),

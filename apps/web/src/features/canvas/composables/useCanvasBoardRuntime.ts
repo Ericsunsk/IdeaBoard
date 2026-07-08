@@ -1,4 +1,4 @@
-import { ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { EdgeChange, NodeChange } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
@@ -32,6 +32,12 @@ type UseCanvasBoardRuntimeOptions = {
 }
 
 type BoardOption = { id: string; name: string }
+
+function boardSessionIdentityKey(identity: { userId: number; userUid: string }): string {
+  const userUid = typeof identity.userUid === 'string' ? identity.userUid.trim() : ''
+  if (!Number.isFinite(identity.userId) || identity.userId <= 0 || !userUid) return ''
+  return `${identity.userId}:${userUid}`
+}
 
 type CanvasBoardRuntime = {
   nodes: Ref<Node[]>
@@ -79,6 +85,9 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
   const isSavingBoard: Ref<boolean> = ref(false)
   const isDirty: Ref<boolean> = ref(false)
   const saveStatus: Ref<SaveStatus> = ref('idle')
+  const autosaveResumeSignal = computed(() =>
+    boardSessionIdentityKey(options.getUserIdentity()),
+  )
 
   const boardSession = useCanvasBoardSession({
     getBoardIdQuery: () => options.route.query.boardId,
@@ -105,6 +114,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     saveStatus,
     isLoadingBoardSnapshot,
     isSavingBoard,
+    autosaveResumeSignal,
     boardSession,
     onWarning: options.feedback.warning,
     onSuccess: options.feedback.saveSucceeded,

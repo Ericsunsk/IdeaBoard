@@ -136,6 +136,9 @@ describe('useCanvasBoardRuntime', () => {
         onWarning: options.feedback.warning,
         onSuccess: options.feedback.saveSucceeded,
         onError: options.feedback.saveFailed,
+        autosaveResumeSignal: expect.objectContaining({
+          value: '1:user-a',
+        }),
       }),
     )
   })

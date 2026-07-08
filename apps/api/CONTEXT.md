@@ -28,6 +28,7 @@
 ## Current Design Rules
 
 - Task submission is transactional: insert the business task and enqueue the River job in the same PostgreSQL transaction.
+- Task submission idempotency uses `client_action_id` as the user-action boundary: retries of the same user action return the existing Task, while intentional reruns send a new `client_action_id`.
 - River + PostgreSQL are the task queue and task state fact source.
 - NATS JetStream is an event layer for task status, audit and realtime fanout; it is not a task queue.
 - Worker implementation stays in `internal/runtime/worker` as an execution adapter.

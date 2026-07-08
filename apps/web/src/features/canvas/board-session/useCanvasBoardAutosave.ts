@@ -7,6 +7,7 @@ export type UseCanvasBoardAutosaveOptions = {
   isSaving: Ref<boolean>
   save: (options?: { silent?: boolean }) => Promise<boolean>
   canRun?: () => boolean
+  resumeSignal?: Ref<unknown>
   delay?: number
 }
 
@@ -34,7 +35,10 @@ export function useCanvasBoardAutosave(options: UseCanvasBoardAutosaveOptions) {
       const saveVersion = dirtyVersion.value
       recordCanvasInteractionCount('autosaveSaveCount')
       const saved = await options.save({ silent: nextSilent })
-      if (!saved) return
+      if (!saved) {
+        hasPendingSave.value = true
+        return
+      }
       if (dirtyVersion.value > saveVersion) {
         options.isDirty.value = true
         hasPendingSave.value = true
@@ -82,6 +86,19 @@ export function useCanvasBoardAutosave(options: UseCanvasBoardAutosaveOptions) {
       void flushAutosave()
     }
   })
+
+  if (options.resumeSignal) {
+    watch(
+      options.resumeSignal,
+      (next, prev) => {
+        if (next === prev || !next) return
+        if (options.isDirty.value || hasPendingSave.value) {
+          void flushAutosave()
+        }
+      },
+      { flush: 'sync' },
+    )
+  }
 
   return {
     markDirtyAndSchedule,

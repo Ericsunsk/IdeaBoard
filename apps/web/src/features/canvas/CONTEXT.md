@@ -96,6 +96,14 @@ _Avoid_: Task, execution plan
 **Image Workflow Execution**:
 准备 image action request、提交 Task，并 materialize pending 或 completed image result 的能力。
 
+**client_action_id**:
+Canvas Workspace 为一次用户 generation action 生成的 idempotency key。同一次点击/网络重试复用它以避免重复 Task/provider cost；用户主动 rerun 必须生成新的 `client_action_id`。
+_Avoid_: content fingerprint, Task ID
+
+**Generation Degradation**:
+provider unavailable 等外部能力不可用时的 Canvas recovery state。Generation command 可以短暂禁用并提示 retry，但 Canvas editing、selection、layout 和 local draft 保存必须继续可用。
+_Avoid_: Canvas disabled state, permanent workflow shutdown
+
 **Image Editing**:
 image node 的非破坏性 adjustment mode，包含 adjustment layers 和 rendered previews。
 _Avoid_: Mask editing
