@@ -331,6 +331,86 @@ func TestRuntimeCredentialReadRequiresActiveAccountEndpointAndCredential(t *test
 	})
 }
 
+func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t *testing.T) {
+	ctx := context.Background()
+	db := newAccountServiceTestDB(t)
+	repo := NewAccountRepository(db)
+
+	t.Run("active assignment", func(t *testing.T) {
+		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-active")
+		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("load active secret failed: %v", err)
+		}
+		runtimeAccount, err := repo.GetRuntimeAccountForAssignment(ctx, account.ID, account.ProviderEndpointID, secretRow.ID)
+		if err != nil {
+			t.Fatalf("GetRuntimeAccountForAssignment returned error: %v", err)
+		}
+		if runtimeAccount.ApiKey != "runtime-secret" {
+			t.Fatalf("runtime api key = %q, want runtime-secret", runtimeAccount.ApiKey)
+		}
+		if runtimeAccount.ProviderEndpointID != account.ProviderEndpointID || runtimeAccount.ApiType != "openai-compatible" {
+			t.Fatalf("runtime account = %+v, want assignment endpoint facts", runtimeAccount)
+		}
+		if len(runtimeAccount.Models) != 1 || runtimeAccount.Models[0].Name != "gpt-image-1" {
+			t.Fatalf("runtime models = %+v, want account models attached", runtimeAccount.Models)
+		}
+	})
+
+	t.Run("provider endpoint mismatch", func(t *testing.T) {
+		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-endpoint-mismatch")
+		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("load active secret failed: %v", err)
+		}
+		if _, err := repo.GetRuntimeAccountForAssignment(ctx, account.ID, account.ProviderEndpointID+1000, secretRow.ID); err == nil {
+			t.Fatal("endpoint mismatch should not be readable by runtime assignment")
+		}
+	})
+
+	t.Run("retired credential", func(t *testing.T) {
+		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-retired-credential")
+		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("load active secret failed: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `UPDATE api_account_secrets SET status = 'retired', retired_at = now() WHERE id = $1`, secretRow.ID); err != nil {
+			t.Fatalf("retire secret failed: %v", err)
+		}
+		if _, err := repo.GetRuntimeAccountForAssignment(ctx, account.ID, account.ProviderEndpointID, secretRow.ID); err == nil {
+			t.Fatal("retired credential should not be readable by runtime assignment")
+		}
+	})
+
+	t.Run("disabled account", func(t *testing.T) {
+		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-disabled-account")
+		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("load active secret failed: %v", err)
+		}
+		if err := repo.UpdateStatus(ctx, account.ID, 0); err != nil {
+			t.Fatalf("disable account failed: %v", err)
+		}
+		if _, err := repo.GetRuntimeAccountForAssignment(ctx, account.ID, account.ProviderEndpointID, secretRow.ID); err == nil {
+			t.Fatal("disabled account should not be readable by runtime assignment")
+		}
+	})
+
+	t.Run("disabled provider endpoint", func(t *testing.T) {
+		account := seedRepositoryTestAccount(t, ctx, repo, db, "runtime-assignment-disabled-endpoint")
+		secretRow, err := repo.q.GetActiveAccountSecretByAccountID(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("load active secret failed: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `UPDATE provider_endpoints SET status = 0 WHERE id = $1`, account.ProviderEndpointID); err != nil {
+			t.Fatalf("disable provider endpoint failed: %v", err)
+		}
+		if _, err := repo.GetRuntimeAccountForAssignment(ctx, account.ID, account.ProviderEndpointID, secretRow.ID); err == nil {
+			t.Fatal("disabled provider endpoint should not be readable by runtime assignment")
+		}
+	})
+}
+
 func TestPatchAccountModelTogglesSingleModelWithoutReplacingSiblings(t *testing.T) {
 	ctx := context.Background()
 	db := newAccountServiceTestDB(t)

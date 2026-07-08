@@ -77,16 +77,16 @@ func newAppTaskRuntime(
 		TaskEvents: taskEvents,
 	})
 	riverTaskWorker := worker.NewRiverTaskWorker(worker.RiverTaskWorkerDeps{
-		AccountRepo:        repos.accountRepo,
-		ChannelRepo:        repos.channelRepo,
-		TaskRepo:           repos.taskRepo,
-		Enqueuer:           riverQueue,
-		Assigner:           postgresAssigner,
-		CancelStore:        postgresRuntimeStore,
-		MediaReader:        runtimeTaskMediaStore,
-		ResultMaterializer: runtimeTaskMediaStore,
-		TaskEvents:         taskEvents,
-		PublicURLs:         services.runtimeSettings,
+		AccountRepo:          repos.accountRepo,
+		ProviderEndpointRepo: repos.providerEndpointRepo,
+		TaskRepo:             repos.taskRepo,
+		Enqueuer:             riverQueue,
+		Assigner:             postgresAssigner,
+		CancelStore:          postgresRuntimeStore,
+		MediaReader:          runtimeTaskMediaStore,
+		ResultMaterializer:   runtimeTaskMediaStore,
+		TaskEvents:           taskEvents,
+		PublicURLs:           services.runtimeSettings,
 	})
 	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{

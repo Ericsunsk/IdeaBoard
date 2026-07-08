@@ -16,7 +16,7 @@ import (
 // ErrTaskLeaseStateConflict means the task row matched, but its active lease fact did not.
 var ErrTaskLeaseStateConflict = errors.New("task lease state conflict")
 
-func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.MarkTaskFailedWithLease(ctx, dbsqlc.MarkTaskFailedWithLeaseParams{
@@ -26,14 +26,14 @@ func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string,
 			TaskID:                     taskID,
 			Statuses:                   statuses,
 			AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-			AssignedProviderEndpointID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+			AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
 			AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
 			LeaseToken:                 leaseToken,
 		})
 		if err != nil || updated == 0 {
 			return err
 		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, channelID, credentialID, leaseToken, tasks.TaskAttemptStatusFailed, completedAt); err != nil {
+		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusFailed, completedAt); err != nil {
 			return err
 		}
 		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
@@ -51,13 +51,13 @@ func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string,
 	return rowsAffected, err
 }
 
-func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	params := dbsqlc.ResetTaskRunningToPendingWithLeaseParams{
 		ErrorMsg:                   errMsg,
 		TaskID:                     taskID,
 		Statuses:                   statuses,
 		AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-		AssignedProviderEndpointID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+		AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
 		AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
 		LeaseToken:                 leaseToken,
 	}
@@ -67,7 +67,7 @@ func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, tas
 		if err != nil || updated == 0 {
 			return err
 		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, channelID, credentialID, leaseToken, "reset", time.Now()); err != nil {
+		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, "reset", time.Now()); err != nil {
 			return err
 		}
 		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
@@ -79,13 +79,13 @@ func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, tas
 	return rowsAffected, err
 }
 
-func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	params := dbsqlc.RequeueTaskRunningWithLeaseParams{
 		ErrorMsg:                   errMsg,
 		TaskID:                     taskID,
 		Statuses:                   statuses,
 		AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-		AssignedProviderEndpointID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+		AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
 		AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
 		LeaseToken:                 leaseToken,
 	}
@@ -99,7 +99,7 @@ func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID str
 		if attemptFinish != nil && !attemptFinish.CompletedAt.IsZero() {
 			releasedAt = attemptFinish.CompletedAt
 		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, channelID, credentialID, leaseToken, tasks.TaskAttemptStatusRequeued, releasedAt); err != nil {
+		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusRequeued, releasedAt); err != nil {
 			return err
 		}
 		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
@@ -111,7 +111,7 @@ func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID str
 	return rowsAffected, err
 }
 
-func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.FinalFailTaskRunningWithLease(ctx, dbsqlc.FinalFailTaskRunningWithLeaseParams{
@@ -121,14 +121,14 @@ func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID s
 			TaskID:                     taskID,
 			Statuses:                   statuses,
 			AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-			AssignedProviderEndpointID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+			AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
 			AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
 			LeaseToken:                 leaseToken,
 		})
 		if err != nil || updated == 0 {
 			return err
 		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, channelID, credentialID, leaseToken, tasks.TaskAttemptStatusFailed, completedAt); err != nil {
+		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusFailed, completedAt); err != nil {
 			return err
 		}
 		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
@@ -146,7 +146,7 @@ func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID s
 	return rowsAffected, err
 }
 
-func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, credentialID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
@@ -155,14 +155,14 @@ func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskI
 			TaskID:                     taskID,
 			Statuses:                   statuses,
 			AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-			AssignedProviderEndpointID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+			AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
 			AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
 			LeaseToken:                 leaseToken,
 		})
 		if err != nil || updated == 0 {
 			return err
 		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, channelID, credentialID, leaseToken, tasks.TaskAttemptStatusCompleted, completedAt); err != nil {
+		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusCompleted, completedAt); err != nil {
 			return err
 		}
 		if err := q.DeleteTaskOutputMediaRefsByTaskID(ctx, taskID); err != nil {
@@ -256,7 +256,7 @@ func normalizeTaskOutputKind(output tasks.TaskOutput) string {
 	}
 }
 
-func releaseTaskLeaseTx(ctx context.Context, q *dbsqlc.Queries, taskID string, accountID int64, channelID int64, credentialID int64, leaseToken string, reason string, releasedAt time.Time) error {
+func releaseTaskLeaseTx(ctx context.Context, q *dbsqlc.Queries, taskID string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, reason string, releasedAt time.Time) error {
 	if q == nil {
 		return fmt.Errorf("queries is nil")
 	}
@@ -274,7 +274,7 @@ func releaseTaskLeaseTx(ctx context.Context, q *dbsqlc.Queries, taskID string, a
 		TaskID:             taskID,
 		LeaseToken:         leaseToken,
 		AccountID:          accountID,
-		ProviderEndpointID: channelID,
+		ProviderEndpointID: providerEndpointID,
 		CredentialID:       credentialID,
 	})
 	if err != nil {

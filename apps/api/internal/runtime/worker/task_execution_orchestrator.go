@@ -19,8 +19,7 @@ import (
 type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
 
 type accountLookupStore interface {
-	GetByID(ctx context.Context, id int64) (*accounts.ApiAccount, error)
-	GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*accounts.RuntimeCredential, error)
+	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.ApiAccount, error)
 }
 
 type taskExecutionOrchestrator struct {
@@ -54,33 +53,14 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	slog.Info("worker executing task", "task_id", task.TaskID, "account_id", accountID)
 	startTime := time.Now()
 
-	account, err := o.accountRepo.GetByID(ctx, accountID)
+	account, err := o.accountRepo.GetRuntimeAccountForAssignment(ctx, accountID, assignment.ProviderEndpointID, assignment.CredentialID)
 	if err != nil {
-		if requeueErr := o.requeueTask(ctx, task, assignment, "账号不存在，重新调度"); requeueErr != nil {
+		if requeueErr := o.requeueTask(ctx, task, assignment, "运行时账号、服务端点或凭据不可用，重新调度"); requeueErr != nil {
 			return requeueErr
 		}
 		return nil
 	}
-	if account.Status != 1 {
-		if requeueErr := o.requeueTask(ctx, task, assignment, "账号已停用，重新调度"); requeueErr != nil {
-			return requeueErr
-		}
-		return nil
-	}
-	if account.ProviderEndpointID != assignment.ProviderEndpointID {
-		if requeueErr := o.requeueTask(ctx, task, assignment, "账号服务端点已变更，重新调度"); requeueErr != nil {
-			return requeueErr
-		}
-		return nil
-	}
-	credential, err := o.accountRepo.GetRuntimeCredentialByID(ctx, accountID, assignment.CredentialID)
-	if err != nil {
-		if requeueErr := o.requeueTask(ctx, task, assignment, "凭据不可用，重新调度"); requeueErr != nil {
-			return requeueErr
-		}
-		return nil
-	}
-	account = runtimeAccountFromAssignment(account, assignment, credential.APIKey)
+	account = runtimeAccountFromAssignment(account, assignment)
 
 	cancelled, err := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
@@ -203,7 +183,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	return nil
 }
 
-func runtimeAccountFromAssignment(account *accounts.ApiAccount, assignment taskqueue.TaskAssignment, apiKey string) *accounts.ApiAccount {
+func runtimeAccountFromAssignment(account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) *accounts.ApiAccount {
 	if account == nil {
 		return nil
 	}
@@ -211,7 +191,7 @@ func runtimeAccountFromAssignment(account *accounts.ApiAccount, assignment taskq
 	runtimeAccount.ProviderEndpointID = assignment.ProviderEndpointID
 	runtimeAccount.ApiType = strings.TrimSpace(assignment.APIType)
 	runtimeAccount.ProxyURL = strings.TrimSpace(assignment.ProviderEndpointBaseURL)
-	runtimeAccount.ApiKey = strings.TrimSpace(apiKey)
+	runtimeAccount.ApiKey = strings.TrimSpace(account.ApiKey)
 	runtimeAccount.SecretConfigured = runtimeAccount.ApiKey != ""
 	return &runtimeAccount
 }

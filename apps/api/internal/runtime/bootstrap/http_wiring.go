@@ -57,7 +57,7 @@ func newAppRouter(
 			AccountHandler:          accountHandler,
 			TaskHandler:             taskHandler,
 			TaskStatsHandler:        taskStatsHandler,
-			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(repos.channelRepo, cfg.App.Env),
+			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(repos.providerEndpointRepo, cfg.App.Env),
 			StorageHandler:          storage.NewStorageHandler(services.storageService),
 			LineDraftHandler:        assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),

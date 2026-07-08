@@ -18,7 +18,7 @@ import (
 )
 
 func TestUserFacingProviderErrorRecognizesWrappedDeadlineExceeded(t *testing.T) {
-	err := fmt.Errorf("调用 API 失败 (渠道: gptnb): %w",
+	err := fmt.Errorf("调用 API 失败 (服务端点: gptnb): %w",
 		fmt.Errorf("HTTP 请求失败: %w", context.DeadlineExceeded),
 	)
 
@@ -29,7 +29,7 @@ func TestUserFacingProviderErrorRecognizesWrappedDeadlineExceeded(t *testing.T) 
 }
 
 func TestUserFacingProviderErrorFallsBackForNonTimeout(t *testing.T) {
-	err := fmt.Errorf("调用 API 失败 (渠道: gptnb): %w", fmt.Errorf("HTTP 请求失败: boom"))
+	err := fmt.Errorf("调用 API 失败 (服务端点: gptnb): %w", fmt.Errorf("HTTP 请求失败: boom"))
 
 	got := userFacingProviderError(err)
 	if got != "上游图像服务调用失败" {

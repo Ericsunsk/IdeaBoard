@@ -95,6 +95,26 @@ func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int
 	return &account, nil
 }
 
+func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*ApiAccount, error) {
+	row, err := r.q.GetRuntimeAccountForAssignment(ctx, dbsqlc.GetRuntimeAccountForAssignmentParams{
+		AccountID:          accountID,
+		ProviderEndpointID: providerEndpointID,
+		CredentialID:       credentialID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	projection, err := accountProjectionFromRuntimeAssignment(row)
+	if err != nil {
+		return nil, err
+	}
+	account := accountFromProjection(projection)
+	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
 func (r *AccountRepository) GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*RuntimeCredential, error) {
 	row, err := r.q.GetRuntimeCredentialByID(ctx, dbsqlc.GetRuntimeCredentialByIDParams{
 		ID:        credentialID,
@@ -417,6 +437,30 @@ func accountProjectionFromGet(row dbsqlc.GetAccountByIDRow) accountProjection {
 }
 
 func accountProjectionFromRuntimeGet(row dbsqlc.GetRuntimeAccountByIDWithSecretRow) (accountProjection, error) {
+	apiKey, err := decryptAPIKey(row.ApiKey, row.ApiKeyMaterialKind)
+	if err != nil {
+		return accountProjection{}, err
+	}
+	return accountProjection{
+		ID:                 row.ID,
+		Name:               row.Name,
+		ProviderEndpointID: row.ProviderEndpointID,
+		ApiType:            row.ApiType,
+		ApiKey:             apiKey,
+		SecretConfigured:   row.SecretConfigured,
+		ProxyURL:           row.ProxyUrl,
+		MaxConcurrent:      row.MaxConcurrent,
+		Timeout:            row.Timeout,
+		ExtraConfig:        row.ExtraConfig,
+		Status:             row.Status,
+		FailCount:          row.FailCount,
+		Weight:             row.Weight,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
+	}, nil
+}
+
+func accountProjectionFromRuntimeAssignment(row dbsqlc.GetRuntimeAccountForAssignmentRow) (accountProjection, error) {
 	apiKey, err := decryptAPIKey(row.ApiKey, row.ApiKeyMaterialKind)
 	if err != nil {
 		return accountProjection{}, err

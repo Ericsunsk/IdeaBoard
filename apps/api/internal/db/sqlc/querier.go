@@ -77,6 +77,7 @@ type Querier interface {
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (ProviderEndpoint, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
+	GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error)
 	GetRuntimeCredentialByID(ctx context.Context, arg GetRuntimeCredentialByIDParams) (ApiAccountSecret, error)
 	GetSingleEnabledModelByAccountID(ctx context.Context, id int64) (string, error)
 	GetStorageProfile(ctx context.Context, profileID string) (StorageProfile, error)

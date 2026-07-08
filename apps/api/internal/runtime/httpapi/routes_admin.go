@@ -19,7 +19,7 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminTaskRoutes(adminAPI, h)
 	registerAdminUploadRoutes(adminAPI, h)
 	registerAdminStorageRoutes(adminAPI, h)
-	registerAdminChannelRoutes(adminAPI, h)
+	registerAdminProviderEndpointRoutes(adminAPI, h)
 	registerAdminLineDraftRoutes(adminAPI, h)
 	registerAdminFeaturePromptRoutes(adminAPI, h)
 }
@@ -87,7 +87,7 @@ func registerAdminStorageRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/storage/profiles/:id/bucket-info", h.StorageHandler.GetBucketInfo)
 }
 
-func registerAdminChannelRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+func registerAdminProviderEndpointRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/provider-endpoints", h.ProviderEndpointHandler.List)
 	adminAPI.POST("/provider-endpoints", h.ProviderEndpointHandler.Create)
 	adminAPI.PUT("/provider-endpoints/:id", h.ProviderEndpointHandler.Update)

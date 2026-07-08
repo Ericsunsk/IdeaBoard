@@ -28,15 +28,15 @@ type appDatabases struct {
 }
 
 type appRepositories struct {
-	userRepo           *users.UserRepository
-	accountRepo        *accounts.AccountRepository
-	taskRepo           *taskstore.Repository
-	channelRepo        *providerendpoints.ProviderEndpointRepository
-	systemConfigRepo   *settings.SystemConfigRepository
-	featurePromptRepo  *prompts.FeaturePromptRepository
-	storageProfileRepo *storage.StorageProfileRepository
-	lineDraftModeRepo  *assets.LineDraftModeRepository
-	boardRepo          *boards.BoardRepository
+	userRepo             *users.UserRepository
+	accountRepo          *accounts.AccountRepository
+	taskRepo             *taskstore.Repository
+	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
+	systemConfigRepo     *settings.SystemConfigRepository
+	featurePromptRepo    *prompts.FeaturePromptRepository
+	storageProfileRepo   *storage.StorageProfileRepository
+	lineDraftModeRepo    *assets.LineDraftModeRepository
+	boardRepo            *boards.BoardRepository
 }
 
 func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, error) {
@@ -64,15 +64,15 @@ func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, er
 func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error) {
 	taskRepo := taskstore.NewRepository(db)
 	repos := appRepositories{
-		userRepo:           users.NewUserRepository(db),
-		accountRepo:        accounts.NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo),
-		taskRepo:           taskRepo,
-		channelRepo:        providerendpoints.NewProviderEndpointRepository(db),
-		systemConfigRepo:   settings.NewSystemConfigRepository(db),
-		featurePromptRepo:  prompts.NewFeaturePromptRepository(db),
-		storageProfileRepo: storage.NewStorageProfileRepository(db),
-		lineDraftModeRepo:  assets.NewLineDraftModeRepository(db),
-		boardRepo:          boards.NewBoardRepository(db),
+		userRepo:             users.NewUserRepository(db),
+		accountRepo:          accounts.NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo),
+		taskRepo:             taskRepo,
+		providerEndpointRepo: providerendpoints.NewProviderEndpointRepository(db),
+		systemConfigRepo:     settings.NewSystemConfigRepository(db),
+		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
+		storageProfileRepo:   storage.NewStorageProfileRepository(db),
+		lineDraftModeRepo:    assets.NewLineDraftModeRepository(db),
+		boardRepo:            boards.NewBoardRepository(db),
 	}
 	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {
 		return appRepositories{}, err

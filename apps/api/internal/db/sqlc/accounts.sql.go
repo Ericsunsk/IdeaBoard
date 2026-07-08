@@ -330,6 +330,76 @@ func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64)
 	return i, err
 }
 
+const getRuntimeAccountForAssignment = `-- name: GetRuntimeAccountForAssignment :one
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+       secret.secret_payload::text AS api_key,
+       secret.secret_material_kind AS api_key_material_kind,
+       TRUE::boolean AS secret_configured,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       a.fail_count, a.weight, a.created_at, a.updated_at
+FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
+INNER JOIN api_account_secrets AS secret ON secret.id = $1
+  AND secret.account_id = a.id
+  AND secret.status = 'active'
+  AND secret.secret_material_kind = 'encrypted'
+  AND btrim(secret.secret_payload) <> ''
+WHERE a.id = $2
+  AND a.provider_endpoint_id = $3
+  AND a.status = 1
+  AND pe.status = 1
+  AND a.deleted_at IS NULL
+`
+
+type GetRuntimeAccountForAssignmentParams struct {
+	CredentialID       int64 `json:"credential_id"`
+	AccountID          int64 `json:"account_id"`
+	ProviderEndpointID int64 `json:"provider_endpoint_id"`
+}
+
+type GetRuntimeAccountForAssignmentRow struct {
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	ApiType            string    `json:"api_type"`
+	ApiKey             string    `json:"api_key"`
+	ApiKeyMaterialKind string    `json:"api_key_material_kind"`
+	SecretConfigured   bool      `json:"secret_configured"`
+	ProxyUrl           string    `json:"proxy_url"`
+	MaxConcurrent      int32     `json:"max_concurrent"`
+	Timeout            int32     `json:"timeout"`
+	ExtraConfig        string    `json:"extra_config"`
+	Status             int16     `json:"status"`
+	FailCount          int32     `json:"fail_count"`
+	Weight             int32     `json:"weight"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error) {
+	row := q.db.QueryRowContext(ctx, getRuntimeAccountForAssignment, arg.CredentialID, arg.AccountID, arg.ProviderEndpointID)
+	var i GetRuntimeAccountForAssignmentRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.ProviderEndpointID,
+		&i.ApiType,
+		&i.ApiKey,
+		&i.ApiKeyMaterialKind,
+		&i.SecretConfigured,
+		&i.ProxyUrl,
+		&i.MaxConcurrent,
+		&i.Timeout,
+		&i.ExtraConfig,
+		&i.Status,
+		&i.FailCount,
+		&i.Weight,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getRuntimeCredentialByID = `-- name: GetRuntimeCredentialByID :one
 SELECT s.id, s.account_id, s.secret_material_kind, s.secret_payload, s.key_version, s.fingerprint,
        s.status, s.rotated_at, s.expires_at, s.retired_at, s.created_at, s.updated_at

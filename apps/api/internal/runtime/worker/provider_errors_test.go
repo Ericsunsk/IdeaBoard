@@ -9,7 +9,7 @@ import (
 )
 
 func TestProviderHTTPStatusRecognizesWrappedError(t *testing.T) {
-	err := fmt.Errorf("调用 API 失败 (渠道: test): %w", newUpstreamHTTPError(422, "invalid_image_request"))
+	err := fmt.Errorf("调用 API 失败 (服务端点: test): %w", newUpstreamHTTPError(422, "invalid_image_request"))
 
 	status, ok := providerHTTPStatus(err)
 	if !ok {
@@ -48,14 +48,14 @@ func TestShouldFailoverProviderErrorByHTTPStatus(t *testing.T) {
 }
 
 func TestShouldFailoverProviderErrorRecognizesWrappedDeadlineExceeded(t *testing.T) {
-	err := fmt.Errorf("调用 API 失败 (渠道: test): %w", fmt.Errorf("HTTP 请求失败: %w", context.DeadlineExceeded))
+	err := fmt.Errorf("调用 API 失败 (服务端点: test): %w", fmt.Errorf("HTTP 请求失败: %w", context.DeadlineExceeded))
 	if !shouldFailoverProviderError(err) {
 		t.Fatalf("expected deadline exceeded to be retryable")
 	}
 }
 
 func TestShouldFailoverProviderErrorDoesNotRetryContextCanceled(t *testing.T) {
-	err := fmt.Errorf("调用 API 失败 (渠道: test): %w", context.Canceled)
+	err := fmt.Errorf("调用 API 失败 (服务端点: test): %w", context.Canceled)
 	if shouldFailoverProviderError(err) {
 		t.Fatalf("expected context canceled to be non-retryable")
 	}

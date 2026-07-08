@@ -47,6 +47,26 @@ WHERE a.id = sqlc.arg(id)
   AND pe.status = 1
   AND a.deleted_at IS NULL;
 
+-- name: GetRuntimeAccountForAssignment :one
+SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+       secret.secret_payload::text AS api_key,
+       secret.secret_material_kind AS api_key_material_kind,
+       TRUE::boolean AS secret_configured,
+       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       a.fail_count, a.weight, a.created_at, a.updated_at
+FROM api_accounts AS a
+INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
+INNER JOIN api_account_secrets AS secret ON secret.id = sqlc.arg(credential_id)
+  AND secret.account_id = a.id
+  AND secret.status = 'active'
+  AND secret.secret_material_kind = 'encrypted'
+  AND btrim(secret.secret_payload) <> ''
+WHERE a.id = sqlc.arg(account_id)
+  AND a.provider_endpoint_id = sqlc.arg(provider_endpoint_id)
+  AND a.status = 1
+  AND pe.status = 1
+  AND a.deleted_at IS NULL;
+
 -- name: CountAccounts :one
 SELECT COUNT(*)
 FROM api_accounts AS a

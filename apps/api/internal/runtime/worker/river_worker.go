@@ -31,30 +31,30 @@ type RiverTaskWorker struct {
 
 type WorkerAccountStore interface {
 	taskruntime.AccountStore
-	GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*accounts.RuntimeCredential, error)
+	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.ApiAccount, error)
 }
 
 type RiverTaskWorkerDeps struct {
-	AccountRepo        WorkerAccountStore
-	ChannelRepo        *providerendpoints.ProviderEndpointRepository
-	TaskRepo           taskruntime.TaskStore
-	Enqueuer           taskqueue.TaskEnqueuer
-	Assigner           taskqueue.TaskAssigner
-	CancelStore        taskqueue.TaskCancellationStore
-	MediaReader        taskmedia.UploadReader
-	ResultMaterializer taskmedia.ResultMaterializer
-	TaskEvents         events.TaskStatusPublisher
-	PublicURLs         settings.PublicURLSettingProvider
+	AccountRepo          WorkerAccountStore
+	ProviderEndpointRepo *providerendpoints.ProviderEndpointRepository
+	TaskRepo             taskruntime.TaskStore
+	Enqueuer             taskqueue.TaskEnqueuer
+	Assigner             taskqueue.TaskAssigner
+	CancelStore          taskqueue.TaskCancellationStore
+	MediaReader          taskmedia.UploadReader
+	ResultMaterializer   taskmedia.ResultMaterializer
+	TaskEvents           events.TaskStatusPublisher
+	PublicURLs           settings.PublicURLSettingProvider
 }
 
 func NewRiverTaskWorker(
 	deps RiverTaskWorkerDeps,
 ) *RiverTaskWorker {
 	executor := &ProviderExecutor{
-		channelRepo:        deps.ChannelRepo,
-		mediaReader:        deps.MediaReader,
-		resultMaterializer: deps.ResultMaterializer,
-		publicURLs:         deps.PublicURLs,
+		providerEndpointRepo: deps.ProviderEndpointRepo,
+		mediaReader:          deps.MediaReader,
+		resultMaterializer:   deps.ResultMaterializer,
+		publicURLs:           deps.PublicURLs,
 	}
 	taskRuntime := taskruntime.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
 	taskRuntime.SetTaskStatusPublisher(deps.TaskEvents)
