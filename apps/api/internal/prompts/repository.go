@@ -60,6 +60,7 @@ type FeaturePromptConfig struct {
 	ModelDefaults         FeaturePromptModelDefaults `json:"model_defaults"`
 	UserPromptMergePolicy FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
 	SchemaVersion         int32                      `json:"schema_version"`
+	EvalReport            *FeaturePromptEvalReport   `json:"eval_report,omitempty"`
 	PublishedAt           *time.Time                 `json:"published_at,omitempty"`
 	UpdatedAt             *time.Time                 `json:"updated_at,omitempty"`
 }
@@ -118,7 +119,7 @@ func (r *FeaturePromptRepository) GetPromptConfig(ctx context.Context, slug stri
 	if err != nil {
 		if database.IsNotFound(err) {
 			cfg := defaultPromptConfig(slug)
-			return &cfg, nil
+			return r.withCurrentDraftEvalReport(ctx, cfg)
 		}
 		return nil, err
 	}
@@ -126,7 +127,7 @@ func (r *FeaturePromptRepository) GetPromptConfig(ctx context.Context, slug stri
 	if err != nil {
 		return nil, err
 	}
-	return &cfg, nil
+	return r.withCurrentDraftEvalReport(ctx, cfg)
 }
 
 func (r *FeaturePromptRepository) ListPromptConfigs(ctx context.Context) ([]FeaturePromptConfig, error) {
@@ -146,39 +147,51 @@ func (r *FeaturePromptRepository) ListPromptConfigs(ctx context.Context) ([]Feat
 			if err != nil {
 				return nil, err
 			}
-			configs = append(configs, cfg)
+			withReport, err := r.withCurrentDraftEvalReport(ctx, cfg)
+			if err != nil {
+				return nil, err
+			}
+			configs = append(configs, *withReport)
 			continue
 		}
-		configs = append(configs, defaultPromptConfig(slug))
+		cfg := defaultPromptConfig(slug)
+		withReport, err := r.withCurrentDraftEvalReport(ctx, cfg)
+		if err != nil {
+			return nil, err
+		}
+		configs = append(configs, *withReport)
 	}
 	return configs, nil
 }
 
 func (r *FeaturePromptRepository) SetPromptConfig(ctx context.Context, slug string, input FeaturePromptSaveInput, updatedBy *int64) (*FeaturePromptConfig, error) {
+	normalized, err := normalizeFeaturePromptSaveInput(slug, input)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.ensurePromptEvalGate(ctx, slug, normalized, updatedBy); err != nil {
+		return nil, err
+	}
+
 	var updatedByValue sql.NullInt64
 	if updatedBy != nil {
 		updatedByValue = sql.NullInt64{Int64: *updatedBy, Valid: true}
 	}
 
-	variables := normalizePromptVariables(input.Variables)
-	variablesJSON, err := json.Marshal(variables)
+	variablesJSON, err := json.Marshal(normalized.Variables)
 	if err != nil {
 		return nil, err
 	}
-	modelDefaultsJSON, err := json.Marshal(input.ModelDefaults)
+	modelDefaultsJSON, err := json.Marshal(normalized.ModelDefaults)
 	if err != nil {
 		return nil, err
 	}
-	mergePolicy := DefaultFeaturePromptMergePolicy(slug)
-	if input.UserPromptMergePolicy != nil {
-		mergePolicy = *input.UserPromptMergePolicy
-	}
-	mergePolicyJSON, err := json.Marshal(mergePolicy)
+	mergePolicyJSON, err := json.Marshal(normalized.UserPromptMergePolicy)
 	if err != nil {
 		return nil, err
 	}
 	publishedAt := sql.NullTime{}
-	if input.Enabled {
+	if normalized.Enabled {
 		publishedAt = sql.NullTime{Time: time.Now(), Valid: true}
 	}
 	err = dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
@@ -190,8 +203,8 @@ func (r *FeaturePromptRepository) SetPromptConfig(ctx context.Context, slug stri
 		}
 		revision, err := q.CreateFeaturePromptRevision(ctx, dbsqlc.CreateFeaturePromptRevisionParams{
 			FeatureSlug:           slug,
-			Prompt:                input.Prompt,
-			Enabled:               input.Enabled,
+			Prompt:                normalized.Prompt,
+			Enabled:               normalized.Enabled,
 			Variables:             variablesJSON,
 			ModelDefaults:         modelDefaultsJSON,
 			UserPromptMergePolicy: mergePolicyJSON,
@@ -211,6 +224,50 @@ func (r *FeaturePromptRepository) SetPromptConfig(ctx context.Context, slug stri
 		return nil, err
 	}
 	return r.GetPromptConfig(ctx, slug)
+}
+
+func (r *FeaturePromptRepository) ensurePromptEvalGate(ctx context.Context, slug string, input normalizedFeaturePromptSaveInput, updatedBy *int64) error {
+	if !promptEvalRequiredForDraft(slug, input) {
+		return nil
+	}
+	draftHash, err := featurePromptDraftHash(slug, input)
+	if err != nil {
+		return err
+	}
+	if report, err := r.getPassingPromptEvalReportByDraftHash(ctx, slug, draftHash); err != nil {
+		return err
+	} else if report != nil {
+		return nil
+	}
+
+	report, err := r.evaluateNormalizedPromptDraft(ctx, slug, input, updatedBy)
+	if err != nil {
+		return err
+	}
+	if !report.Passed {
+		return promptEvalGateError(report)
+	}
+	return nil
+}
+
+func (r *FeaturePromptRepository) withCurrentDraftEvalReport(ctx context.Context, cfg FeaturePromptConfig) (*FeaturePromptConfig, error) {
+	input := normalizedFeaturePromptSaveInput{
+		Prompt:                cfg.Prompt,
+		Enabled:               cfg.Enabled,
+		Variables:             cfg.Variables,
+		ModelDefaults:         cfg.ModelDefaults,
+		UserPromptMergePolicy: cfg.UserPromptMergePolicy,
+	}
+	draftHash, err := featurePromptDraftHash(cfg.Slug, input)
+	if err != nil {
+		return nil, err
+	}
+	report, err := r.getPromptEvalReportByDraftHash(ctx, cfg.Slug, draftHash)
+	if err != nil {
+		return nil, err
+	}
+	cfg.EvalReport = report
+	return &cfg, nil
 }
 
 func defaultPromptConfig(slug string) FeaturePromptConfig {

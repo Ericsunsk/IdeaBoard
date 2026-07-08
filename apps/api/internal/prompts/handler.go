@@ -1,6 +1,9 @@
 package prompts
 
 import (
+	"errors"
+	"net/http"
+
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/workflow"
 
@@ -50,12 +53,7 @@ func (h *FeaturePromptHandler) GetPrompt(c *gin.Context) {
 
 // SetPrompt 设置某功能的系统提示词
 func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
-	rawSlug := c.Param("slug")
-	if rawSlug == "" {
-		response.Error(c, 400, "缺少 slug 参数")
-		return
-	}
-	slug, err := workflow.ValidateWorkflowFeatureSlug(rawSlug)
+	slug, err := featurePromptSlugFromRequest(c)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
@@ -71,10 +69,102 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 		return
 	}
 
-	current, err := h.promptRepo.GetPromptConfig(c.Request.Context(), slug)
+	saveInput, err := h.featurePromptSaveInput(c, slug, req)
 	if err != nil {
 		response.InternalError(c, 500, "读取当前配置失败", err)
 		return
+	}
+	config, err := h.promptRepo.SetPromptConfig(c.Request.Context(), slug, saveInput, promptUpdatedBy(c))
+	if err != nil {
+		if gateErr, ok := isPromptEvalGateError(err); ok {
+			c.JSON(http.StatusConflict, response.Response{
+				Code: http.StatusConflict,
+				Msg:  "Prompt eval 未通过，发布已阻止",
+				Data: gateErr.Report,
+			})
+			return
+		}
+		response.InternalError(c, 500, "保存失败", err)
+		return
+	}
+
+	response.Success(c, config)
+}
+
+func (h *FeaturePromptHandler) EvaluatePrompt(c *gin.Context) {
+	slug, err := featurePromptSlugFromRequest(c)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	if !promptEvalSupportedForFeature(slug) {
+		response.Error(c, 404, "该功能暂未配置 Prompt eval")
+		return
+	}
+
+	var req featurePromptPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	if req.Prompt == nil {
+		response.Error(c, 400, "缺少 prompt 参数")
+		return
+	}
+
+	saveInput, err := h.featurePromptSaveInput(c, slug, req)
+	if err != nil {
+		response.InternalError(c, 500, "读取当前配置失败", err)
+		return
+	}
+	report, err := h.promptRepo.EvaluatePromptDraft(c.Request.Context(), slug, saveInput, promptUpdatedBy(c))
+	if err != nil {
+		if err == ErrPromptEvalUnsupported {
+			response.Error(c, 404, "该功能暂未配置 Prompt eval")
+			return
+		}
+		response.InternalError(c, 500, "Eval 失败", err)
+		return
+	}
+	response.Success(c, report)
+}
+
+func (h *FeaturePromptHandler) GetLatestPromptEvalReport(c *gin.Context) {
+	slug, err := featurePromptSlugFromRequest(c)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	report, err := h.promptRepo.GetLatestPromptEvalReport(c.Request.Context(), slug)
+	if err != nil {
+		response.InternalError(c, 500, "获取 Eval 结果失败", err)
+		return
+	}
+	response.Success(c, report)
+}
+
+// ListPrompts 获取所有功能的系统提示词
+func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
+	prompts, err := h.promptRepo.ListPromptConfigs(c.Request.Context())
+	if err != nil {
+		response.InternalError(c, 500, "获取失败", err)
+		return
+	}
+	response.SuccessDTO(c, featurePromptListResponse{Prompts: prompts})
+}
+
+func featurePromptSlugFromRequest(c *gin.Context) (string, error) {
+	rawSlug := c.Param("slug")
+	if rawSlug == "" {
+		return "", errors.New("缺少 slug 参数")
+	}
+	return workflow.ValidateWorkflowFeatureSlug(rawSlug)
+}
+
+func (h *FeaturePromptHandler) featurePromptSaveInput(c *gin.Context, slug string, req featurePromptPayload) (FeaturePromptSaveInput, error) {
+	current, err := h.promptRepo.GetPromptConfig(c.Request.Context(), slug)
+	if err != nil {
+		return FeaturePromptSaveInput{}, err
 	}
 	enabled := current.Enabled
 	if req.Enabled != nil {
@@ -92,30 +182,13 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 	if mergePolicy == nil {
 		mergePolicy = &current.UserPromptMergePolicy
 	}
-
-	config, err := h.promptRepo.SetPromptConfig(c.Request.Context(), slug, FeaturePromptSaveInput{
+	return FeaturePromptSaveInput{
 		Prompt:                *req.Prompt,
 		Enabled:               enabled,
 		Variables:             variables,
 		ModelDefaults:         modelDefaults,
 		UserPromptMergePolicy: mergePolicy,
-	}, promptUpdatedBy(c))
-	if err != nil {
-		response.InternalError(c, 500, "保存失败", err)
-		return
-	}
-
-	response.Success(c, config)
-}
-
-// ListPrompts 获取所有功能的系统提示词
-func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
-	prompts, err := h.promptRepo.ListPromptConfigs(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, 500, "获取失败", err)
-		return
-	}
-	response.SuccessDTO(c, featurePromptListResponse{Prompts: prompts})
+	}, nil
 }
 
 func promptUpdatedBy(c *gin.Context) *int64 {

@@ -82,3 +82,25 @@ func TestSetPromptAcceptsTypedModelDefaults(t *testing.T) {
 		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 }
+
+func TestSetPromptBlocksFailingPromptEval(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := testdb.Open(t)
+	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(db))
+	router := gin.New()
+	router.PUT("/admin/feature-prompts/:slug", handler.SetPrompt)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/pattern-gen", strings.NewReader(`{"prompt":"Create {{missing_token}}","enabled":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusConflict, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"passed":false`) {
+		t.Fatalf("body = %s, want failing eval report", rec.Body.String())
+	}
+}

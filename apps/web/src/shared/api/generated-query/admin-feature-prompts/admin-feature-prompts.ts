@@ -19,7 +19,9 @@ import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseFeaturePrompt,
+  ApiResponseFeaturePromptEvalReport,
   ApiResponseFeaturePromptList,
+  EvaluateAdminFeaturePromptBody,
   SetAdminFeaturePromptBody,
 } from '../model'
 
@@ -248,6 +250,188 @@ export function useSetAdminFeaturePrompt<
   const queryOptions = getSetAdminFeaturePromptQueryOptions(
     slug,
     setAdminFeaturePromptBody,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetLatestAdminFeaturePromptEvalReportUrl = (slug: string) => {
+  return `/admin/feature-prompts/${encodeURIComponent(String(slug))}/eval`
+}
+
+export const getLatestAdminFeaturePromptEvalReport = async (
+  slug: string,
+  options?: RequestInit,
+): Promise<ApiResponseFeaturePromptEvalReport> => {
+  return orvalMutator<ApiResponseFeaturePromptEvalReport>(
+    getGetLatestAdminFeaturePromptEvalReportUrl(slug),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetLatestAdminFeaturePromptEvalReportQueryKey = (slug: MaybeRef<string>) => {
+  return ['admin', 'feature-prompts', slug, 'eval'] as const
+}
+
+export const getGetLatestAdminFeaturePromptEvalReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLatestAdminFeaturePromptEvalReport>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getLatestAdminFeaturePromptEvalReport>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetLatestAdminFeaturePromptEvalReportQueryKey(slug)
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLatestAdminFeaturePromptEvalReport>>
+  > = ({ signal }) =>
+    getLatestAdminFeaturePromptEvalReport(unref(slug), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLatestAdminFeaturePromptEvalReport>>,
+    TError,
+    TData
+  >
+}
+
+export type GetLatestAdminFeaturePromptEvalReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLatestAdminFeaturePromptEvalReport>>
+>
+export type GetLatestAdminFeaturePromptEvalReportQueryError = ErrorType<unknown>
+
+export function useGetLatestAdminFeaturePromptEvalReport<
+  TData = Awaited<ReturnType<typeof getLatestAdminFeaturePromptEvalReport>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getLatestAdminFeaturePromptEvalReport>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetLatestAdminFeaturePromptEvalReportQueryOptions(slug, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getEvaluateAdminFeaturePromptUrl = (slug: string) => {
+  return `/admin/feature-prompts/${encodeURIComponent(String(slug))}/eval`
+}
+
+export const evaluateAdminFeaturePrompt = async (
+  slug: string,
+  evaluateAdminFeaturePromptBody: EvaluateAdminFeaturePromptBody,
+  options?: RequestInit,
+): Promise<ApiResponseFeaturePromptEvalReport> => {
+  return orvalMutator<ApiResponseFeaturePromptEvalReport>(getEvaluateAdminFeaturePromptUrl(slug), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(evaluateAdminFeaturePromptBody),
+  })
+}
+
+export const getEvaluateAdminFeaturePromptQueryKey = (
+  slug: MaybeRef<string>,
+  evaluateAdminFeaturePromptBody?: MaybeRef<EvaluateAdminFeaturePromptBody>,
+) => {
+  return ['POST', 'admin', 'feature-prompts', slug, 'eval', evaluateAdminFeaturePromptBody] as const
+}
+
+export const getEvaluateAdminFeaturePromptQueryOptions = <
+  TData = Awaited<ReturnType<typeof evaluateAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  evaluateAdminFeaturePromptBody: MaybeRef<EvaluateAdminFeaturePromptBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof evaluateAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getEvaluateAdminFeaturePromptQueryKey(slug, evaluateAdminFeaturePromptBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof evaluateAdminFeaturePrompt>>> = ({
+    signal,
+  }) =>
+    evaluateAdminFeaturePrompt(unref(slug), unref(evaluateAdminFeaturePromptBody), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof evaluateAdminFeaturePrompt>>, TError, TData>
+}
+
+export type EvaluateAdminFeaturePromptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof evaluateAdminFeaturePrompt>>
+>
+export type EvaluateAdminFeaturePromptQueryError = ErrorType<unknown>
+
+export function useEvaluateAdminFeaturePrompt<
+  TData = Awaited<ReturnType<typeof evaluateAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  evaluateAdminFeaturePromptBody: MaybeRef<EvaluateAdminFeaturePromptBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof evaluateAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getEvaluateAdminFeaturePromptQueryOptions(
+    slug,
+    evaluateAdminFeaturePromptBody,
     options,
   )
 

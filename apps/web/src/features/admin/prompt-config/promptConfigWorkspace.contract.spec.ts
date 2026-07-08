@@ -1,13 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import type { AdminPromptConfigResource, FeaturePrompt } from './promptConfigResource'
+import type {
+  AdminPromptConfigResource,
+  FeaturePrompt,
+  FeaturePromptEvalReport,
+} from './promptConfigResource'
 import { createAdminPromptConfigWorkspace } from './promptConfigWorkspace'
 
 const promptSlug = 'sketch-to-image'
+const evalPromptSlug = 'pattern-gen'
 const promptTitle = '草图成图'
 
 const mockResource = {
+  evaluatePrompt: vi.fn(),
   fetchPrompts: vi.fn(),
+  fetchLatestEvalReport: vi.fn(),
   publishPrompt: vi.fn(),
 }
 
@@ -15,6 +22,8 @@ describe('prompt config workspace facade', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockResource.fetchPrompts.mockResolvedValue([makePrompt({ prompt: 'Initial prompt' })])
+    mockResource.evaluatePrompt.mockResolvedValue(makeEvalReport({ passed: true }))
+    mockResource.fetchLatestEvalReport.mockResolvedValue(null)
     mockResource.publishPrompt.mockResolvedValue(makePrompt({ prompt: 'Published prompt' }))
   })
 
@@ -31,7 +40,9 @@ describe('prompt config workspace facade', () => {
     expect(workspace.promptMap[promptSlug]).toBe('Initial prompt')
     expect(workspace.enabledMap[promptSlug]).toBe(true)
     expect(workspace.getSavedPrompt(promptSlug)).toBe('Initial prompt')
-    expect(workspace.getPromptVariables(promptSlug)).toEqual([{ key: '{{prompt}}', tone: 'prompt' }])
+    expect(workspace.getPromptVariables(promptSlug)).toEqual([
+      { key: '{{prompt}}', tone: 'prompt' },
+    ])
     expect(workspace.getCurrentRevision(promptSlug)).toEqual({
       schemaVersion: 1,
       publishedAt: null,
@@ -43,6 +54,69 @@ describe('prompt config workspace facade', () => {
       message: '无未保存更改',
       severity: 'neutral',
     })
+  })
+
+  it('loads and exposes the latest prompt eval report from the workspace state', async () => {
+    const { workspace } = createWorkspace()
+    const report = makeEvalReport({ passed: false, summary: '0/1 golden fixtures passed' })
+    mockResource.fetchPrompts.mockResolvedValueOnce([
+      makePrompt({
+        slug: evalPromptSlug,
+        prompt: 'Initial eval prompt',
+        eval_report: report,
+      }),
+    ])
+
+    await workspace.loadPrompts()
+
+    expect(workspace.canEvaluatePrompt(evalPromptSlug)).toBe(true)
+    expect(workspace.getPromptEvalReport(evalPromptSlug)).toEqual(report)
+  })
+
+  it('hides a loaded prompt eval report once the local draft changes', async () => {
+    const { workspace } = createWorkspace()
+    const report = makeEvalReport({ passed: true })
+    mockResource.fetchPrompts.mockResolvedValueOnce([
+      makePrompt({
+        slug: evalPromptSlug,
+        prompt: 'Initial eval prompt',
+        eval_report: report,
+      }),
+    ])
+
+    await workspace.loadPrompts()
+
+    expect(workspace.getPromptEvalReport(evalPromptSlug)).toEqual(report)
+
+    workspace.updatePromptDraft(evalPromptSlug, 'Edited eval prompt')
+
+    expect(workspace.getPromptEvalReport(evalPromptSlug)).toBeNull()
+
+    workspace.resetDrafts([evalPromptSlug])
+
+    expect(workspace.getPromptEvalReport(evalPromptSlug)).toEqual(report)
+  })
+
+  it('does not attach an eval response to a draft that changed while eval was running', async () => {
+    const { workspace } = createWorkspace()
+    let resolveEval: ((report: FeaturePromptEvalReport) => void) | undefined
+    mockResource.fetchPrompts.mockResolvedValueOnce([
+      makePrompt({ slug: evalPromptSlug, prompt: 'Initial eval prompt' }),
+    ])
+    mockResource.evaluatePrompt.mockReturnValueOnce(
+      new Promise<FeaturePromptEvalReport>((resolve) => {
+        resolveEval = resolve
+      }),
+    )
+
+    await workspace.loadPrompts()
+    workspace.updatePromptDraft(evalPromptSlug, 'Eval prompt v1')
+    const evalPromise = workspace.runPromptEval(evalPromptSlug)
+    workspace.updatePromptDraft(evalPromptSlug, 'Eval prompt v2')
+    resolveEval?.(makeEvalReport({ passed: true }))
+    await evalPromise
+
+    expect(workspace.getPromptEvalReport(evalPromptSlug)).toBeNull()
   })
 
   it('edits draft state and exposes validation feedback', async () => {
@@ -110,6 +184,89 @@ describe('prompt config workspace facade', () => {
     expect(workspace.getSavedPrompt(promptSlug)).toBe('Published prompt')
     expect(workspace.enabledMap[promptSlug]).toBe(false)
     expect(workspace.getCurrentRevision(promptSlug)?.schemaVersion).toBe(2)
+  })
+
+  it('runs prompt eval and blocks publish when the required report fails', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const failingReport = makeEvalReport({
+      passed: false,
+      summary: '0/1 golden fixtures passed',
+      fixture_results: [
+        {
+          fixture_id: 'pattern-gen-user-intent',
+          name: 'Pattern fixture',
+          passed: false,
+          expected_contains: ['red floral silk scarf pattern, flat lay'],
+          missing_expected: [],
+          forbidden_contains: ['{{'],
+          found_forbidden: ['{{'],
+          rendered_prompt: 'Create {{missing_token}} red floral silk scarf pattern, flat lay',
+        },
+      ],
+    })
+    mockResource.fetchPrompts.mockResolvedValueOnce([
+      makePrompt({ slug: evalPromptSlug, prompt: 'Initial eval prompt' }),
+    ])
+    mockResource.evaluatePrompt.mockResolvedValueOnce(failingReport)
+
+    await workspace.loadPrompts()
+    workspace.updatePromptDraft(evalPromptSlug, 'Create {{missing_token}}')
+
+    const result = await workspace.publishPrompt(evalPromptSlug)
+
+    expect(result).toBeNull()
+    expect(mockResource.evaluatePrompt).toHaveBeenCalledWith({
+      slug: evalPromptSlug,
+      prompt: 'Create {{missing_token}}',
+      enabled: true,
+    })
+    expect(mockResource.publishPrompt).not.toHaveBeenCalled()
+    expect(workspace.getPromptEvalReport(evalPromptSlug)).toEqual(failingReport)
+    expect(feedback.promptDraftInvalid).toHaveBeenCalledWith(
+      'Prompt eval 未通过：0/1 golden fixtures passed',
+    )
+  })
+
+  it('runs prompt eval and allows publish when the required report passes', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const passingReport = makeEvalReport({ passed: true, summary: '1/1 golden fixtures passed' })
+    mockResource.fetchPrompts
+      .mockResolvedValueOnce([makePrompt({ slug: evalPromptSlug, prompt: 'Initial eval prompt' })])
+      .mockResolvedValueOnce([
+        makePrompt({
+          slug: evalPromptSlug,
+          prompt: 'Create {{user_prompt}}',
+          schema_version: 2,
+          eval_report: passingReport,
+        }),
+      ])
+    mockResource.evaluatePrompt.mockResolvedValueOnce(passingReport)
+    mockResource.publishPrompt.mockResolvedValueOnce(
+      makePrompt({
+        slug: evalPromptSlug,
+        prompt: 'Create {{user_prompt}}',
+        schema_version: 2,
+        eval_report: passingReport,
+      }),
+    )
+
+    await workspace.loadPrompts()
+    workspace.updatePromptDraft(evalPromptSlug, 'Create {{user_prompt}}')
+
+    const result = await workspace.publishPrompt(evalPromptSlug)
+
+    expect(result?.schema_version).toBe(2)
+    expect(mockResource.evaluatePrompt).toHaveBeenCalledWith({
+      slug: evalPromptSlug,
+      prompt: 'Create {{user_prompt}}',
+      enabled: true,
+    })
+    expect(mockResource.publishPrompt).toHaveBeenCalledWith({
+      slug: evalPromptSlug,
+      prompt: 'Create {{user_prompt}}',
+      enabled: true,
+    })
+    expect(feedback.promptSaved).toHaveBeenCalledWith(promptTitle)
   })
 
   it('keeps the draft in place when publish fails', async () => {
@@ -191,6 +348,31 @@ function makePrompt(overrides: Partial<FeaturePrompt> = {}): FeaturePrompt {
     schema_version: 1,
     published_at: null,
     updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function makeEvalReport(overrides: Partial<FeaturePromptEvalReport> = {}): FeaturePromptEvalReport {
+  return {
+    id: 1,
+    feature_slug: evalPromptSlug,
+    draft_hash: 'a'.repeat(64),
+    suite_id: 'pattern-gen-golden-v1',
+    passed: true,
+    summary: '1/1 golden fixtures passed',
+    fixture_results: [
+      {
+        fixture_id: 'pattern-gen-user-intent',
+        name: 'Pattern fixture',
+        passed: true,
+        expected_contains: ['red floral silk scarf pattern, flat lay'],
+        missing_expected: [],
+        forbidden_contains: ['{{'],
+        found_forbidden: [],
+        rendered_prompt: 'Create red floral silk scarf pattern, flat lay',
+      },
+    ],
+    created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }
 }

@@ -248,6 +248,178 @@ func TestFeaturePromptDefaultConfigHDUpscaleUsesSingleControlVariable(t *testing
 	}
 }
 
+func TestFeaturePromptEvalDraftPersistsPassingReport(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugPatternGen
+
+	report, err := repo.EvaluatePromptDraft(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
+	}
+	if !report.Passed {
+		t.Fatalf("report Passed = false, want true: %#v", report)
+	}
+	if report.ID <= 0 || report.DraftHash == "" || report.SuiteID != promptEvalSuitePatternGenV1 {
+		t.Fatalf("report metadata = %#v, want persisted report metadata", report)
+	}
+	if len(report.FixtureResults) != 1 || !report.FixtureResults[0].Passed {
+		t.Fatalf("fixture results = %#v, want one passing fixture", report.FixtureResults)
+	}
+
+	latest, err := repo.GetLatestPromptEvalReport(ctx, slug)
+	if err != nil {
+		t.Fatalf("GetLatestPromptEvalReport returned error: %v", err)
+	}
+	if latest == nil || latest.ID != report.ID || !latest.Passed {
+		t.Fatalf("latest report = %#v, want persisted passing report", latest)
+	}
+}
+
+func TestFeaturePromptConfigOnlyIncludesEvalReportForCurrentDraft(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugPatternGen
+
+	report, err := repo.EvaluatePromptDraft(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
+	}
+
+	config, err := repo.GetPromptConfig(ctx, slug)
+	if err != nil {
+		t.Fatalf("GetPromptConfig returned error: %v", err)
+	}
+	if config.EvalReport != nil {
+		t.Fatalf("default config eval report = %#v, want nil for a different draft", config.EvalReport)
+	}
+
+	configs, err := repo.ListPromptConfigs(ctx)
+	if err != nil {
+		t.Fatalf("ListPromptConfigs returned error: %v", err)
+	}
+	for _, cfg := range configs {
+		if cfg.Slug == slug && cfg.EvalReport != nil {
+			t.Fatalf("listed config eval report = %#v, want nil for a different draft", cfg.EvalReport)
+		}
+	}
+
+	published, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SetPromptConfig returned error: %v", err)
+	}
+	if published.EvalReport == nil || published.EvalReport.ID != report.ID {
+		t.Fatalf("published config eval report = %#v, want matching report %d", published.EvalReport, report.ID)
+	}
+}
+
+func TestFeaturePromptEvalDraftPersistsFailingReport(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugPatternGen
+
+	report, err := repo.EvaluatePromptDraft(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "Create a seamless commercial pattern for {{missing_token}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
+	}
+	if report.Passed {
+		t.Fatalf("report Passed = true, want false")
+	}
+	if len(report.FixtureResults) != 1 {
+		t.Fatalf("fixture results len = %d, want 1", len(report.FixtureResults))
+	}
+	result := report.FixtureResults[0]
+	if len(result.FoundForbidden) == 0 || result.FoundForbidden[0] != "{{" {
+		t.Fatalf("found forbidden = %#v, want unresolved template marker", result.FoundForbidden)
+	}
+}
+
+func TestFeaturePromptPublishBlockedWhenRequiredEvalFails(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugPatternGen
+
+	_, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "Create a seamless commercial pattern for {{missing_token}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err == nil {
+		t.Fatal("SetPromptConfig succeeded, want eval gate error")
+	}
+	var gateErr *PromptEvalGateError
+	if !errors.As(err, &gateErr) {
+		t.Fatalf("SetPromptConfig error = %v, want PromptEvalGateError", err)
+	}
+	if gateErr.Report == nil || gateErr.Report.Passed {
+		t.Fatalf("gate report = %#v, want failing report", gateErr.Report)
+	}
+	if revisionCount := countFeaturePromptRevisionsForTest(t, ctx, db, slug); revisionCount != 0 {
+		t.Fatalf("revision count = %d, want blocked publish to create no revision", revisionCount)
+	}
+	latest, latestErr := repo.GetLatestPromptEvalReport(ctx, slug)
+	if latestErr != nil {
+		t.Fatalf("GetLatestPromptEvalReport returned error: %v", latestErr)
+	}
+	if latest == nil || latest.ID != gateErr.Report.ID {
+		t.Fatalf("latest report = %#v, want gate report", latest)
+	}
+}
+
+func TestFeaturePromptPublishAllowedWhenRequiredEvalPasses(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugPatternGen
+	input := FeaturePromptSaveInput{
+		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}
+
+	report, err := repo.EvaluatePromptDraft(ctx, slug, input, nil)
+	if err != nil {
+		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
+	}
+	if !report.Passed {
+		t.Fatalf("pre-publish report Passed = false, want true")
+	}
+
+	config, err := repo.SetPromptConfig(ctx, slug, input, nil)
+	if err != nil {
+		t.Fatalf("SetPromptConfig returned error: %v", err)
+	}
+	if config.CurrentRevisionID <= 0 || config.SchemaVersion != 1 || config.PublishedAt == nil {
+		t.Fatalf("published config = %#v, want current published revision", config)
+	}
+	if config.EvalReport == nil || config.EvalReport.ID != report.ID {
+		t.Fatalf("config eval report = %#v, want previously passing report", config.EvalReport)
+	}
+	if reportCount := countFeaturePromptEvalDraftReportsForTest(t, ctx, db, slug); reportCount != 1 {
+		t.Fatalf("eval draft report count = %d, want existing passing report reused", reportCount)
+	}
+}
+
 func hasPromptVariable(variables []FeaturePromptVariable, key string, tone string) bool {
 	for _, variable := range variables {
 		if variable.Key == key && variable.Tone == tone {
@@ -341,4 +513,22 @@ ORDER BY schema_version DESC, id DESC`, slug)
 		t.Fatalf("iterate feature prompt revisions failed: %v", err)
 	}
 	return revisions
+}
+
+func countFeaturePromptRevisionsForTest(t *testing.T, ctx context.Context, db queryDB, slug string) int {
+	t.Helper()
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM feature_prompt_revisions WHERE feature_slug = $1`, slug).Scan(&count); err != nil {
+		t.Fatalf("count feature prompt revisions failed: %v", err)
+	}
+	return count
+}
+
+func countFeaturePromptEvalDraftReportsForTest(t *testing.T, ctx context.Context, db queryDB, slug string) int {
+	t.Helper()
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM system_configs WHERE config_key LIKE $1`, promptEvalDraftConfigKeyPrefix+slug+":%").Scan(&count); err != nil {
+		t.Fatalf("count feature prompt eval draft reports failed: %v", err)
+	}
+	return count
 }

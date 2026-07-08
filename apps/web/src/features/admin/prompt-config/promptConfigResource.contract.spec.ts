@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { createAdminPromptConfigResource } from './promptConfigResource'
-import type { FeaturePrompt } from './promptConfigResource'
+import type { FeaturePrompt, FeaturePromptEvalReport } from './promptConfigResource'
 
 const promptSlug = 'sketch-to-image'
 
@@ -33,6 +33,24 @@ describe('prompt config resource', () => {
           }),
         })
       }),
+      http.post('/api/admin/feature-prompts/:slug/eval', async ({ request }) => {
+        const body = await readRequestJson(request)
+        const url = new URL(request.url)
+        requests.push({ method: request.method, path: url.pathname, body })
+
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: makeEvalReport({ passed: true }),
+        })
+      }),
+      http.get('/api/admin/feature-prompts/:slug/eval', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: makeEvalReport({ passed: false }),
+        }),
+      ),
     )
 
     const resource = createAdminPromptConfigResource()
@@ -42,6 +60,12 @@ describe('prompt config resource', () => {
       prompt: 'Published prompt',
       enabled: false,
     })
+    const evalReport = await resource.evaluatePrompt({
+      slug: promptSlug,
+      prompt: 'Eval prompt',
+      enabled: true,
+    })
+    const latestEvalReport = await resource.fetchLatestEvalReport(promptSlug)
 
     expect(prompts[0]?.prompt).toBe('Initial prompt')
     expect(requests).toEqual([
@@ -53,10 +77,20 @@ describe('prompt config resource', () => {
           enabled: false,
         },
       },
+      {
+        method: 'POST',
+        path: `/api/admin/feature-prompts/${promptSlug}/eval`,
+        body: {
+          prompt: 'Eval prompt',
+          enabled: true,
+        },
+      },
     ])
     expect(published.prompt).toBe('Published prompt')
     expect(published.enabled).toBe(false)
     expect(published.schema_version).toBe(2)
+    expect(evalReport.passed).toBe(true)
+    expect(latestEvalReport?.passed).toBe(false)
   })
 })
 
@@ -79,6 +113,31 @@ function makePrompt(overrides: Partial<FeaturePrompt> = {}): FeaturePrompt {
     schema_version: 1,
     published_at: null,
     updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function makeEvalReport(overrides: Partial<FeaturePromptEvalReport> = {}): FeaturePromptEvalReport {
+  return {
+    id: 1,
+    feature_slug: promptSlug,
+    draft_hash: 'a'.repeat(64),
+    suite_id: 'pattern-gen-golden-v1',
+    passed: true,
+    summary: '1/1 golden fixtures passed',
+    fixture_results: [
+      {
+        fixture_id: 'pattern-gen-user-intent',
+        name: 'Pattern fixture',
+        passed: true,
+        expected_contains: ['red floral silk scarf pattern, flat lay'],
+        missing_expected: [],
+        forbidden_contains: ['{{'],
+        found_forbidden: [],
+        rendered_prompt: 'Create red floral silk scarf pattern, flat lay',
+      },
+    ],
+    created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }
 }

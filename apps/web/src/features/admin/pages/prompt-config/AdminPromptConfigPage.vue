@@ -150,6 +150,56 @@
               :disabled="saving[item.slug]"
             />
 
+            <div
+              v-if="canEvaluatePrompt(item.slug) || getPromptEvalReport(item.slug)"
+              class="rounded-lg border border-admin-border-soft bg-admin-surface-muted px-3 py-2.5"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                  <Tag value="Prompt eval" severity="secondary" rounded />
+                  <Tag
+                    :value="getPromptEvalLabel(item.slug)"
+                    :severity="getPromptEvalSeverity(item.slug)"
+                    rounded
+                  />
+                </div>
+                <Button
+                  size="small"
+                  label="运行 Eval"
+                  severity="secondary"
+                  outlined
+                  :loading="evaluating[item.slug]"
+                  :disabled="saving[item.slug]"
+                  @click="runPromptEval(item.slug)"
+                />
+              </div>
+
+              <div
+                v-if="getPromptEvalReport(item.slug)"
+                class="mt-2 min-w-0 text-admin-meta text-admin-text-2"
+              >
+                <div class="break-words">
+                  {{ getPromptEvalReport(item.slug)?.summary }}
+                  <span class="font-mono text-admin-caption text-admin-subtitle-color">
+                    {{ getPromptEvalReport(item.slug)?.suite_id }}
+                  </span>
+                </div>
+                <div
+                  v-for="fixture in getPromptEvalFailedFixtures(item.slug)"
+                  :key="fixture.fixture_id"
+                  class="mt-1 rounded border border-admin-border-soft bg-admin-card px-2 py-1"
+                >
+                  <div class="font-semibold text-admin-title-color">{{ fixture.name }}</div>
+                  <div v-if="fixture.missing_expected.length > 0">
+                    缺少：{{ fixture.missing_expected.join('、') }}
+                  </div>
+                  <div v-if="fixture.found_forbidden.length > 0">
+                    未解析：{{ fixture.found_forbidden.join('、') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="flex items-center justify-between gap-2.5">
               <Tag
                 :value="`${(promptMap[item.slug] || '').length} 字`"
@@ -224,10 +274,14 @@ const promptConfigWorkspace = useAdminPromptConfigWorkspace({
 })
 const {
   enabledMap,
+  canEvaluatePrompt,
+  evaluating,
+  getPromptEvalReport,
   getPromptVariables,
   getSavedPrompt,
   promptMap,
   resetDrafts,
+  runPromptEval,
   savePrompt,
   saving,
   insertVariableIntoDraft,
@@ -297,6 +351,22 @@ function getVarsForSlug(slug: FeatureSlug): FeaturePromptVariable[] {
   return getPromptVariables(slug)
 }
 
+function getPromptEvalLabel(slug: FeatureSlug) {
+  const report = getPromptEvalReport(slug)
+  if (!report) return '未运行'
+  return report.passed ? '通过' : '未通过'
+}
+
+function getPromptEvalSeverity(slug: FeatureSlug): 'success' | 'danger' | 'secondary' {
+  const report = getPromptEvalReport(slug)
+  if (!report) return 'secondary'
+  return report.passed ? 'success' : 'danger'
+}
+
+function getPromptEvalFailedFixtures(slug: FeatureSlug) {
+  return getPromptEvalReport(slug)?.fixture_results.filter((fixture) => !fixture.passed) ?? []
+}
+
 function insertVar(slug: FeatureSlug, varKey: string) {
   const current = promptMap[slug] || ''
   const ref = textareaRefs[slug]
@@ -326,5 +396,4 @@ function bindTextareaRef(slug: FeatureSlug, el: unknown) {
 function resetGroupDraftFromSaved(group: FeatureGroup) {
   resetDrafts(group.items.map((item) => item.slug))
 }
-
 </script>

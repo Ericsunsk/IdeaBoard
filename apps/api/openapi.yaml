@@ -1328,6 +1328,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseFeaturePrompt'
+  /admin/feature-prompts/{slug}/eval:
+    get:
+      tags: [AdminFeaturePrompts]
+      operationId: getLatestAdminFeaturePromptEvalReport
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseFeaturePromptEvalReport'
+    post:
+      tags: [AdminFeaturePrompts]
+      operationId: evaluateAdminFeaturePrompt
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                enabled:
+                  type: boolean
+                variables:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FeaturePromptVariable'
+                model_defaults:
+                  $ref: '#/components/schemas/FeaturePromptModelDefaults'
+                user_prompt_merge_policy:
+                  $ref: '#/components/schemas/FeaturePromptMergePolicy'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseFeaturePromptEvalReport'
 
 components:
   securitySchemes:
@@ -2556,12 +2607,57 @@ components:
         user_prompt_merge_policy:
           $ref: '#/components/schemas/FeaturePromptMergePolicy'
         schema_version: { type: integer }
+        eval_report:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FeaturePromptEvalReport'
         published_at:
           type: string
           nullable: true
         updated_at:
           type: string
           nullable: true
+
+    FeaturePromptEvalReport:
+      type: object
+      required: [id, feature_slug, draft_hash, suite_id, passed, summary, fixture_results, created_at]
+      properties:
+        id: { type: integer }
+        feature_slug: { type: string }
+        draft_hash: { type: string }
+        suite_id: { type: string }
+        passed: { type: boolean }
+        summary: { type: string }
+        fixture_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeaturePromptEvalFixtureResult'
+        created_by:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+
+    FeaturePromptEvalFixtureResult:
+      type: object
+      required: [fixture_id, name, passed, expected_contains, missing_expected, forbidden_contains, found_forbidden, rendered_prompt]
+      properties:
+        fixture_id: { type: string }
+        name: { type: string }
+        passed: { type: boolean }
+        expected_contains:
+          type: array
+          items: { type: string }
+        missing_expected:
+          type: array
+          items: { type: string }
+        forbidden_contains:
+          type: array
+          items: { type: string }
+        found_forbidden:
+          type: array
+          items: { type: string }
+        rendered_prompt: { type: string }
 
     FeaturePromptVariable:
       type: object
@@ -3083,3 +3179,13 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/FeaturePrompt'
+
+    ApiResponseFeaturePromptEvalReport:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/FeaturePromptEvalReport'
