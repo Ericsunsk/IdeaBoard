@@ -99,6 +99,7 @@ function makeTask(overrides: Partial<Task>): Task {
     task_id: 'task_1',
     user_id: 1,
     prompt: 'Prompt',
+    priority: 2,
     status: adminTaskStatuses.completed,
     created_at: '2026-07-06T00:00:00Z',
     updated_at: '2026-07-06T00:00:00Z',

@@ -38,6 +38,11 @@ export function getTaskModelLabel(row: Task) {
   return row.resolved_model || row.requested_model || ''
 }
 
+export function getTaskPriorityLabel(row: Task) {
+  const priority = Number(row.priority || 2)
+  return `P${Number.isFinite(priority) ? priority : 2}`
+}
+
 function formatIDLabel(prefix: string, id: number | null | undefined) {
   return id ? `${prefix} #${id}` : ''
 }

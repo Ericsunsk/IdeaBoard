@@ -16,6 +16,12 @@ export interface SubmitTaskRequest {
    * @pattern ^[A-Za-z0-9_.:-]+$
    */
   client_action_id?: string
+  /**
+   * Optional River-compatible task priority. Defaults to 2 when omitted.
+   * @minimum 1
+   * @maximum 4
+   */
+  priority?: number
   feature?: WorkflowFeatureSlug
   image_urls?: string[]
   params?: SubmitTaskRequestParams

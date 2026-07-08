@@ -421,6 +421,7 @@ type taskSQLCFields struct {
 	Params                     string
 	FeatureSlug                string
 	RequestedModel             string
+	Priority                   int32
 	ResolvedModel              string
 	APIType                    string
 	ProviderEndpointName       string
@@ -456,6 +457,7 @@ func taskFromSQLC(row any) tasks.Task {
 			Params:                     r.Params,
 			FeatureSlug:                r.FeatureSlug,
 			RequestedModel:             r.RequestedModel,
+			Priority:                   r.Priority,
 			ResolvedModel:              r.ResolvedModel,
 			APIType:                    r.ApiType,
 			ProviderEndpointName:       r.ProviderEndpointName,
@@ -488,6 +490,7 @@ func taskFromSQLC(row any) tasks.Task {
 			Params:                     r.Params,
 			FeatureSlug:                r.FeatureSlug,
 			RequestedModel:             r.RequestedModel,
+			Priority:                   r.Priority,
 			ResolvedModel:              r.ResolvedModel,
 			APIType:                    r.ApiType,
 			ProviderEndpointName:       r.ProviderEndpointName,
@@ -520,6 +523,7 @@ func taskFromSQLC(row any) tasks.Task {
 			Params:                     r.Params,
 			FeatureSlug:                r.FeatureSlug,
 			RequestedModel:             r.RequestedModel,
+			Priority:                   r.Priority,
 			ResolvedModel:              r.ResolvedModel,
 			APIType:                    r.ApiType,
 			ProviderEndpointName:       r.ProviderEndpointName,
@@ -552,6 +556,7 @@ func taskFromSQLC(row any) tasks.Task {
 			Params:                     r.Params,
 			FeatureSlug:                r.FeatureSlug,
 			RequestedModel:             r.RequestedModel,
+			Priority:                   r.Priority,
 			ResolvedModel:              r.ResolvedModel,
 			APIType:                    r.ApiType,
 			ProviderEndpointName:       r.ProviderEndpointName,
@@ -584,6 +589,7 @@ func taskFromSQLC(row any) tasks.Task {
 			Params:                     r.Params,
 			FeatureSlug:                r.FeatureSlug,
 			RequestedModel:             r.RequestedModel,
+			Priority:                   r.Priority,
 			Status:                     r.Status,
 			LeaseToken:                 r.LeaseToken,
 			RetryCount:                 r.RetryCount,
@@ -615,6 +621,7 @@ func taskFromSQLCFields(row taskSQLCFields) tasks.Task {
 		Params:                     row.Params,
 		FeatureSlug:                row.FeatureSlug,
 		RequestedModel:             row.RequestedModel,
+		Priority:                   int(row.Priority),
 		ResolvedModel:              row.ResolvedModel,
 		APIType:                    row.APIType,
 		ProviderEndpointName:       row.ProviderEndpointName,

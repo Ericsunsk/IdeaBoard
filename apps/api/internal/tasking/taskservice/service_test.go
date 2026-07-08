@@ -693,6 +693,9 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	if call.task.ClientActionID != "canvas-action-1" {
 		t.Fatalf("client_action_id=%q, want normalized canvas-action-1", call.task.ClientActionID)
 	}
+	if call.task.Priority != tasks.TaskPriorityDefault || call.queueTask.Priority != tasks.TaskPriorityDefault {
+		t.Fatalf("priority task=%d queue=%d, want default %d", call.task.Priority, call.queueTask.Priority, tasks.TaskPriorityDefault)
+	}
 	if call.queueTask.TaskID != taskID || call.queueTask.UserID != 42 {
 		t.Fatalf("unexpected queue task: %+v", call.queueTask)
 	}
@@ -701,6 +704,48 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	}
 	if len(taskEvents.events) != 1 || taskEvents.events[0].TaskID != taskID || taskEvents.events[0].Status != tasks.StatusPending {
 		t.Fatalf("unexpected task events: %+v", taskEvents.events)
+	}
+}
+
+func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+		{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
+	}}
+	submissionStore := &recordingSubmissionStore{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+	}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:   "draw a chair",
+		Priority: tasks.TaskPriorityInteractive,
+		Params:   map[string]interface{}{"size": "1024x1024"},
+	})
+	if err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if len(submissionStore.calls) != 1 {
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+	call := submissionStore.calls[0]
+	if call.task.Priority != tasks.TaskPriorityInteractive || call.queueTask.Priority != tasks.TaskPriorityInteractive {
+		t.Fatalf("priority task=%d queue=%d, want interactive %d", call.task.Priority, call.queueTask.Priority, tasks.TaskPriorityInteractive)
+	}
+}
+
+func TestSubmitTaskRejectsInvalidPriority(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService(ServiceDeps{}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:   "draw a chair",
+		Priority: tasks.TaskPriorityLowest + 1,
+		Params:   map[string]interface{}{"size": "1024x1024"},
+	})
+	if err == nil {
+		t.Fatalf("expected priority validation error")
 	}
 }
 
@@ -1109,9 +1154,9 @@ func (s fakeFeaturePromptStore) GetPromptRuntimeConfig(_ context.Context, slug s
 }
 
 type recordingSubmissionStore struct {
-	calls []submitCall
+	calls  []submitCall
 	result tasks.TaskSubmissionResult
-	err   error
+	err    error
 }
 
 type submitCall struct {

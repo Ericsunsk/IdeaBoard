@@ -6,6 +6,7 @@ type TaskPayload struct {
 	UserID     int64   `json:"user_id"`
 	Prompt     string  `json:"prompt"`
 	Params     string  `json:"params"`
+	Priority   int     `json:"priority"`
 	AccountIDs []int64 `json:"account_ids"`
 	RetryCount int     `json:"retry_count"`
 	CreatedAt  int64   `json:"created_at"`

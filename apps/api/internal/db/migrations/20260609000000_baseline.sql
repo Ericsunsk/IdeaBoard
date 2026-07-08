@@ -149,6 +149,7 @@ CREATE TABLE tasks (
   params TEXT NOT NULL,
   feature_slug VARCHAR(64) NOT NULL DEFAULT '',
   requested_model VARCHAR(128) NOT NULL DEFAULT '',
+  priority INTEGER NOT NULL DEFAULT 2,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   lease_token VARCHAR(128) NOT NULL DEFAULT '',
   retry_count INTEGER NOT NULL DEFAULT 0,
@@ -164,6 +165,7 @@ CREATE TABLE tasks (
   CONSTRAINT uq_tasks_task_id UNIQUE (task_id),
   CONSTRAINT ck_tasks_client_action_id_trimmed CHECK (client_action_id = btrim(client_action_id)),
   CONSTRAINT ck_tasks_status CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+  CONSTRAINT ck_tasks_priority CHECK (priority BETWEEN 1 AND 4),
   CONSTRAINT ck_tasks_retry_count_non_negative CHECK (retry_count >= 0),
   CONSTRAINT ck_tasks_attempt_seq_non_negative CHECK (attempt_seq >= 0),
   CONSTRAINT ck_tasks_assignment_pair CHECK (

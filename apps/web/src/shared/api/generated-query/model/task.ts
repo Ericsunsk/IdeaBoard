@@ -22,6 +22,12 @@ export interface Task {
   params?: string
   feature_slug?: string
   requested_model?: string
+  /**
+   * River-compatible task priority; 1 is highest and 4 is lowest.
+   * @minimum 1
+   * @maximum 4
+   */
+  priority?: number
   resolved_model?: string
   api_type?: string
   provider_endpoint_name?: string

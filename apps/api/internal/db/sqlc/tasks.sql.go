@@ -174,17 +174,17 @@ func (q *Queries) CountTasksByUserID(ctx context.Context, userID int64) (int64, 
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (
   task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-  feature_slug, requested_model,
+  feature_slug, requested_model, priority,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
   $1, $2, $3, $4, $5, $6,
   $7, $8, $9,
-  $10, $11,
-  $12,
-  $13, $14, $15, $16,
-  $17, $18, $19,
-  $20, $21, $22
+  $10, $11, COALESCE(NULLIF($12::integer, 0), 2),
+  $13,
+  $14, $15, $16, $17,
+  $18, $19, $20,
+  $21, $22, $23
 )
 RETURNING id
 `
@@ -201,6 +201,7 @@ type CreateTaskParams struct {
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
 	RequestedModel             string        `json:"requested_model"`
+	Priority                   int32         `json:"priority"`
 	Status                     string        `json:"status"`
 	LeaseToken                 string        `json:"lease_token"`
 	RetryCount                 int32         `json:"retry_count"`
@@ -227,6 +228,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.Params,
 		arg.FeatureSlug,
 		arg.RequestedModel,
+		arg.Priority,
 		arg.Status,
 		arg.LeaseToken,
 		arg.RetryCount,
@@ -614,7 +616,7 @@ func (q *Queries) GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string)
 
 const getTaskByTaskID = `-- name: GetTaskByTaskID :one
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -648,6 +650,7 @@ type GetTaskByTaskIDRow struct {
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
 	RequestedModel             string        `json:"requested_model"`
+	Priority                   int32         `json:"priority"`
 	ResolvedModel              string        `json:"resolved_model"`
 	ApiType                    string        `json:"api_type"`
 	ProviderEndpointName       string        `json:"provider_endpoint_name"`
@@ -684,6 +687,7 @@ func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskBy
 		&i.Params,
 		&i.FeatureSlug,
 		&i.RequestedModel,
+		&i.Priority,
 		&i.ResolvedModel,
 		&i.ApiType,
 		&i.ProviderEndpointName,
@@ -708,7 +712,7 @@ func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskBy
 
 const getTaskByTaskIDAndUserID = `-- name: GetTaskByTaskIDAndUserID :one
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -747,6 +751,7 @@ type GetTaskByTaskIDAndUserIDRow struct {
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
 	RequestedModel             string        `json:"requested_model"`
+	Priority                   int32         `json:"priority"`
 	ResolvedModel              string        `json:"resolved_model"`
 	ApiType                    string        `json:"api_type"`
 	ProviderEndpointName       string        `json:"provider_endpoint_name"`
@@ -783,6 +788,7 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 		&i.Params,
 		&i.FeatureSlug,
 		&i.RequestedModel,
+		&i.Priority,
 		&i.ResolvedModel,
 		&i.ApiType,
 		&i.ProviderEndpointName,
@@ -1316,7 +1322,7 @@ func (q *Queries) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg Lis
 
 const listTasks = `-- name: ListTasks :many
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -1368,6 +1374,7 @@ type ListTasksRow struct {
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
 	RequestedModel             string        `json:"requested_model"`
+	Priority                   int32         `json:"priority"`
 	ResolvedModel              string        `json:"resolved_model"`
 	ApiType                    string        `json:"api_type"`
 	ProviderEndpointName       string        `json:"provider_endpoint_name"`
@@ -1421,6 +1428,7 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 			&i.Params,
 			&i.FeatureSlug,
 			&i.RequestedModel,
+			&i.Priority,
 			&i.ResolvedModel,
 			&i.ApiType,
 			&i.ProviderEndpointName,
@@ -1455,7 +1463,7 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 
 const listTasksByUserID = `-- name: ListTasksByUserID :many
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -1497,6 +1505,7 @@ type ListTasksByUserIDRow struct {
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
 	RequestedModel             string        `json:"requested_model"`
+	Priority                   int32         `json:"priority"`
 	ResolvedModel              string        `json:"resolved_model"`
 	ApiType                    string        `json:"api_type"`
 	ProviderEndpointName       string        `json:"provider_endpoint_name"`
@@ -1539,6 +1548,7 @@ func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDPa
 			&i.Params,
 			&i.FeatureSlug,
 			&i.RequestedModel,
+			&i.Priority,
 			&i.ResolvedModel,
 			&i.ApiType,
 			&i.ProviderEndpointName,

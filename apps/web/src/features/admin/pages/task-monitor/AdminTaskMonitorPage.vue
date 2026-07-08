@@ -210,7 +210,7 @@
           data-key="task_id"
           size="small"
           :pt="adminDenseDataTablePt"
-          :table-style="{ minWidth: '1460px' }"
+          :table-style="{ minWidth: '1536px' }"
         >
           <template #empty>
             <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
@@ -303,6 +303,12 @@
               >
                 {{ getTaskModelLabel(data) || '-' }}
               </span>
+            </template>
+          </Column>
+
+          <Column header="优先级" :style="{ width: '88px' }">
+            <template #body="{ data }">
+              <Tag :value="getTaskPriorityLabel(data)" severity="secondary" rounded />
             </template>
           </Column>
 
@@ -491,6 +497,14 @@
                   </template>
                 </Button>
               </div>
+            </div>
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
+            >
+              <span class="text-admin-caption font-bold text-admin-text-3">优先级</span>
+              <span class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1">
+                {{ getTaskPriorityLabel(detailTask) }}
+              </span>
             </div>
             <div
               class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
@@ -715,6 +729,7 @@ import {
   getTaskCredentialLabel,
   getTaskEndpointLabel,
   getTaskModelLabel,
+  getTaskPriorityLabel,
   getTaskResultImageUrl,
   getTaskSanitizedError,
   getTaskUserIdentifier,

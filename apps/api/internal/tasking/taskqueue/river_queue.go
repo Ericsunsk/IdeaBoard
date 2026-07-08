@@ -83,6 +83,11 @@ func (q *RiverQueue) Enqueue(ctx context.Context, task *tasks.TaskPayload) error
 	if strings.TrimSpace(task.TaskID) == "" {
 		return fmt.Errorf("river enqueue: empty task_id")
 	}
+	priority := tasks.EffectiveTaskPriority(task.Priority)
+	if !tasks.IsValidTaskPriority(priority) {
+		return fmt.Errorf("river enqueue: invalid priority %d", task.Priority)
+	}
+	task.Priority = priority
 	client := q.getClient()
 	if client == nil {
 		return fmt.Errorf("river enqueue: client not configured")
@@ -116,6 +121,11 @@ func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, t
 	if tx == nil {
 		return fmt.Errorf("river enqueue tx: tx is nil")
 	}
+	priority := tasks.EffectiveTaskPriority(task.Priority)
+	if !tasks.IsValidTaskPriority(priority) {
+		return fmt.Errorf("river enqueue tx: invalid priority %d", task.Priority)
+	}
+	task.Priority = priority
 	_, err := client.InsertTx(ctx, tx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, queueName, maxRetry))
 	if err != nil {
 		return fmt.Errorf("river enqueue tx: %w", err)
@@ -131,12 +141,15 @@ func drawingTaskInsertOpts(task *tasks.TaskPayload, queueName string, maxRetry i
 		maxRetry = RiverMaxAttemptsDefault
 	}
 	taskID := ""
+	priority := tasks.TaskPriorityDefault
 	if task != nil {
 		taskID = task.TaskID
+		priority = tasks.EffectiveTaskPriority(task.Priority)
 	}
 	return &river.InsertOpts{
 		Queue:       queueName,
 		MaxAttempts: maxRetry,
+		Priority:    priority,
 		Tags:        []string{taskID},
 	}
 }

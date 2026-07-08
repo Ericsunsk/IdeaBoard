@@ -112,6 +112,10 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		return "", err
 	}
+	priority := tasks.EffectiveTaskPriority(req.Priority)
+	if !tasks.IsValidTaskPriority(priority) {
+		return "", validation.New("priority 仅支持 1-4")
+	}
 	apiAccounts, typedParams, sourceParams, featureSlug, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
@@ -135,6 +139,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		Params:         paramsJSON,
 		FeatureSlug:    featureSlug,
 		RequestedModel: requestedModel,
+		Priority:       priority,
 		Status:         tasks.StatusPending,
 	}
 
@@ -148,6 +153,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		UserID:     userID,
 		Prompt:     fullPrompt,
 		Params:     paramsJSON,
+		Priority:   priority,
 		AccountIDs: accountIDs,
 		RetryCount: 0,
 		CreatedAt:  time.Now().Unix(),

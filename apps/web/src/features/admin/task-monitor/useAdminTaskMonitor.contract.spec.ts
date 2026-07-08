@@ -217,6 +217,7 @@ function makeTask(status: string, id: number): Task {
     task_id: `task-${id}`,
     user_id: 1,
     prompt: `prompt-${id}`,
+    priority: 2,
     status,
     created_at: '2026-06-10T00:00:00.000Z',
     updated_at: '2026-06-10T00:00:00.000Z',

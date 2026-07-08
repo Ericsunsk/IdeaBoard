@@ -1,13 +1,13 @@
 -- name: CreateTask :one
 INSERT INTO tasks (
   task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-  feature_slug, requested_model,
+  feature_slug, requested_model, priority,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
   sqlc.arg(task_id), sqlc.arg(user_id), sqlc.arg(client_action_id), sqlc.narg(assigned_provider_endpoint_id), sqlc.narg(assigned_credential_id), sqlc.narg(account_id),
   sqlc.arg(prompt), sqlc.arg(user_prompt), sqlc.arg(params),
-  sqlc.arg(feature_slug), sqlc.arg(requested_model),
+  sqlc.arg(feature_slug), sqlc.arg(requested_model), COALESCE(NULLIF(sqlc.arg(priority)::integer, 0), 2),
   sqlc.arg(status),
   sqlc.arg(lease_token), sqlc.arg(retry_count), sqlc.arg(error_msg), sqlc.arg(result),
   sqlc.arg(created_at), sqlc.arg(updated_at), sqlc.arg(completed_at),
@@ -17,7 +17,7 @@ RETURNING id;
 
 -- name: GetTaskByTaskID :one
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -39,7 +39,7 @@ WHERE t.task_id = sqlc.arg(task_id);
 
 -- name: GetTaskByTaskIDAndUserID :one
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -76,7 +76,7 @@ WHERE (NOT sqlc.arg(has_user_id)::boolean OR user_id = sqlc.arg(user_id))
 
 -- name: ListTasks :many
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -441,7 +441,7 @@ WHERE user_id = sqlc.arg(user_id);
 
 -- name: ListTasksByUserID :many
 SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model,
+       feature_slug, requested_model, priority,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,

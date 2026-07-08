@@ -228,6 +228,7 @@ type Task struct {
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
 	RequestedModel             string        `json:"requested_model"`
+	Priority                   int32         `json:"priority"`
 	Status                     string        `json:"status"`
 	LeaseToken                 string        `json:"lease_token"`
 	RetryCount                 int32         `json:"retry_count"`

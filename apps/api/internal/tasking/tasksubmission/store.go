@@ -53,6 +53,25 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	if queueTask == nil {
 		return emptyResult, fmt.Errorf("submit task: queue task is nil")
 	}
+	if task.Priority == 0 && queueTask.Priority != 0 {
+		task.Priority = queueTask.Priority
+	} else {
+		task.Priority = tasks.EffectiveTaskPriority(task.Priority)
+	}
+	if !tasks.IsValidTaskPriority(task.Priority) {
+		return emptyResult, fmt.Errorf("submit task: invalid priority %d", task.Priority)
+	}
+	if queueTask.Priority == 0 {
+		queueTask.Priority = task.Priority
+	} else {
+		queueTask.Priority = tasks.EffectiveTaskPriority(queueTask.Priority)
+	}
+	if !tasks.IsValidTaskPriority(queueTask.Priority) {
+		return emptyResult, fmt.Errorf("submit task: invalid queue priority %d", queueTask.Priority)
+	}
+	if queueTask.Priority != task.Priority {
+		return emptyResult, fmt.Errorf("submit task: priority mismatch task=%d queue=%d", task.Priority, queueTask.Priority)
+	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

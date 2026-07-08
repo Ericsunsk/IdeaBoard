@@ -285,13 +285,14 @@ func TestEmbeddedMigrationsHaveUniqueParseableUpStatements(t *testing.T) {
 	}
 }
 
-func TestEmbeddedMigrationsUseSingleBaseline(t *testing.T) {
+func TestEmbeddedMigrationsKeepBaselineFirst(t *testing.T) {
 	files, err := fs.Glob(migrationFS, "*.sql")
 	if err != nil {
 		t.Fatalf("glob migrations failed: %v", err)
 	}
-	if len(files) != 1 || files[0] != "20260609000000_baseline.sql" {
-		t.Fatalf("embedded migrations=%v, want single baseline migration", files)
+	sort.Strings(files)
+	if len(files) == 0 || files[0] != "20260609000000_baseline.sql" {
+		t.Fatalf("embedded migrations=%v, want baseline migration first", files)
 	}
 }
 

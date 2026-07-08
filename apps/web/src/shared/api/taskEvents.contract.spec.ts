@@ -56,6 +56,7 @@ function makeTask(status: string, task: Partial<Task> = {}): Task {
     task_id: 'task-1',
     user_id: 1,
     prompt: '',
+    priority: 2,
     status,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',

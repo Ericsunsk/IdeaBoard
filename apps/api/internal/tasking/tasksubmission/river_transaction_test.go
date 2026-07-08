@@ -39,6 +39,8 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	queueTask.AccountIDs = []int64{101, 42}
 	queueTask.RetryCount = 2
 	queueTask.CreatedAt = 1710000000
+	task.Priority = tasks.TaskPriorityInteractive
+	queueTask.Priority = tasks.TaskPriorityInteractive
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 
 	result, err := store.SubmitTask(ctx, task, queueTask)
@@ -60,9 +62,13 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	if job.maxAttempts != submissionRiverTestMaxAttempts {
 		t.Fatalf("river job max_attempts=%d, want %d", job.maxAttempts, submissionRiverTestMaxAttempts)
 	}
+	if job.priority != tasks.TaskPriorityInteractive {
+		t.Fatalf("river job priority=%d, want %d", job.priority, tasks.TaskPriorityInteractive)
+	}
 	if !slices.Equal(job.tags, []string{task.TaskID}) {
 		t.Fatalf("river job tags=%v, want [%s]", job.tags, task.TaskID)
 	}
+	assertStoredTaskPriority(t, db, task.TaskID, tasks.TaskPriorityInteractive)
 
 	var args taskqueue.DrawingTaskArgs
 	if err := json.Unmarshal(job.args, &args); err != nil {
@@ -79,6 +85,9 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	}
 	if args.Task.RetryCount != queueTask.RetryCount || args.Task.CreatedAt != queueTask.CreatedAt {
 		t.Fatalf("river args retry/created=(%d,%d), want (%d,%d)", args.Task.RetryCount, args.Task.CreatedAt, queueTask.RetryCount, queueTask.CreatedAt)
+	}
+	if args.Task.Priority != tasks.TaskPriorityInteractive {
+		t.Fatalf("river args priority=%d, want %d", args.Task.Priority, tasks.TaskPriorityInteractive)
 	}
 }
 
@@ -358,6 +367,7 @@ type storedRiverJob struct {
 	kind        string
 	queue       string
 	maxAttempts int
+	priority    int
 	tags        []string
 	args        []byte
 }
@@ -367,12 +377,13 @@ func loadRiverJobForTask(t testing.TB, db *sql.DB, taskID string) storedRiverJob
 	var job storedRiverJob
 	var tagsJSON string
 	err := db.QueryRowContext(t.Context(), `
-SELECT kind, queue, max_attempts, args, COALESCE(array_to_json(tags), '[]'::json)::text
+SELECT kind, queue, max_attempts, priority, args, COALESCE(array_to_json(tags), '[]'::json)::text
 FROM river_job
 WHERE args->'task'->>'task_id' = $1`, taskID).Scan(
 		&job.kind,
 		&job.queue,
 		&job.maxAttempts,
+		&job.priority,
 		&job.args,
 		&tagsJSON,
 	)
@@ -383,6 +394,17 @@ WHERE args->'task'->>'task_id' = $1`, taskID).Scan(
 		t.Fatalf("decode River job tags failed: %v", err)
 	}
 	return job
+}
+
+func assertStoredTaskPriority(t testing.TB, db *sql.DB, taskID string, want int) {
+	t.Helper()
+	var priority int
+	if err := db.QueryRowContext(t.Context(), `SELECT priority FROM tasks WHERE task_id = $1`, taskID).Scan(&priority); err != nil {
+		t.Fatalf("load task priority for %q failed: %v", taskID, err)
+	}
+	if priority != want {
+		t.Fatalf("task priority for %q=%d, want %d", taskID, priority, want)
+	}
 }
 
 func assertTaskRowCount(t testing.TB, db *sql.DB, taskID string, want int) {

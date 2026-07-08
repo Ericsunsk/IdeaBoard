@@ -29,6 +29,7 @@ type adminTaskDTO struct {
 	Params                     string                      `json:"params"`
 	FeatureSlug                string                      `json:"feature_slug"`
 	RequestedModel             string                      `json:"requested_model"`
+	Priority                   int                         `json:"priority"`
 	ResolvedModel              string                      `json:"resolved_model"`
 	APIType                    string                      `json:"api_type"`
 	ProviderEndpointName       string                      `json:"provider_endpoint_name"`
@@ -294,6 +295,7 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 		Params:                     task.Params,
 		FeatureSlug:                task.FeatureSlug,
 		RequestedModel:             task.RequestedModel,
+		Priority:                   task.Priority,
 		ResolvedModel:              task.ResolvedModel,
 		APIType:                    task.APIType,
 		ProviderEndpointName:       task.ProviderEndpointName,

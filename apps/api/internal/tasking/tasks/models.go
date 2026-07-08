@@ -18,6 +18,7 @@ type Task struct {
 	Params                     string                `json:"params"`
 	FeatureSlug                string                `json:"feature_slug"`
 	RequestedModel             string                `json:"requested_model"`
+	Priority                   int                   `json:"priority"`
 	ResolvedModel              string                `json:"resolved_model"`
 	APIType                    string                `json:"api_type"`
 	ProviderEndpointName       string                `json:"provider_endpoint_name"`
@@ -180,6 +181,7 @@ type SubmitTaskRequest struct {
 	Prompt         string                 `json:"prompt"`
 	Feature        string                 `json:"feature"`
 	ClientActionID string                 `json:"client_action_id"`
+	Priority       int                    `json:"priority"`
 	ImageURLs      []string               `json:"image_urls"`
 	Params         map[string]interface{} `json:"params"`
 }

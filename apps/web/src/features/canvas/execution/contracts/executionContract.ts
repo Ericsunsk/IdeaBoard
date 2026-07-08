@@ -63,6 +63,7 @@ interface BuildExecutionTaskRequestOptions {
   params?: SubmitTaskParams
 }
 
+const CANVAS_INTERACTIVE_TASK_PRIORITY = 1
 const MEDIA_STRING_PARAM_KEYS = new Set(['original_image_url', 'mask_image_url'])
 const MEDIA_LIST_PARAM_KEYS = new Set(['reference_image_urls'])
 
@@ -83,6 +84,7 @@ export function buildExecutionTaskRequest(
 ): SubmitTaskData {
   const request: SubmitTaskData = {
     prompt: options.prompt,
+    priority: CANVAS_INTERACTIVE_TASK_PRIORITY,
   }
 
   if (options.feature) {

@@ -39,6 +39,7 @@ func TestRiverPayloadEncodeDecodeRoundTrip(t *testing.T) {
 		UserID:     42,
 		Prompt:     "draw",
 		Params:     `{"size":"1024x1024"}`,
+		Priority:   tasks.TaskPriorityInteractive,
 		AccountIDs: []int64{1, 2},
 		RetryCount: 1,
 		CreatedAt:  time.Now().Unix(),
@@ -52,7 +53,7 @@ func TestRiverPayloadEncodeDecodeRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodeRiverPayload failed: %v", err)
 	}
-	if decoded.TaskID != task.TaskID || decoded.UserID != task.UserID || len(decoded.AccountIDs) != 2 {
+	if decoded.TaskID != task.TaskID || decoded.UserID != task.UserID || decoded.Priority != task.Priority || len(decoded.AccountIDs) != 2 {
 		t.Fatalf("decoded=%+v, want %+v", decoded, task)
 	}
 }
@@ -60,7 +61,7 @@ func TestRiverPayloadEncodeDecodeRoundTrip(t *testing.T) {
 func TestRiverQueueEnqueueUsesDrawingArgs(t *testing.T) {
 	client := &fakeRiverClient{}
 	queue := NewRiverQueueWithClient(client, nil, nil, RiverQueueDefault, 7)
-	task := &tasks.TaskPayload{TaskID: "task_123", UserID: 42}
+	task := &tasks.TaskPayload{TaskID: "task_123", UserID: 42, Priority: tasks.TaskPriorityInteractive}
 
 	if err := queue.Enqueue(context.Background(), task); err != nil {
 		t.Fatalf("Enqueue failed: %v", err)
@@ -78,6 +79,9 @@ func TestRiverQueueEnqueueUsesDrawingArgs(t *testing.T) {
 	if client.opts == nil || client.opts.Queue != RiverQueueDefault || client.opts.MaxAttempts != 7 {
 		t.Fatalf("opts=%+v", client.opts)
 	}
+	if client.opts.Priority != tasks.TaskPriorityInteractive {
+		t.Fatalf("priority=%d, want %d", client.opts.Priority, tasks.TaskPriorityInteractive)
+	}
 }
 
 func TestDrawingTaskInsertOptsUsesRiverDefaults(t *testing.T) {
@@ -88,6 +92,9 @@ func TestDrawingTaskInsertOptsUsesRiverDefaults(t *testing.T) {
 	}
 	if opts.MaxAttempts != RiverMaxAttemptsDefault {
 		t.Fatalf("max attempts=%d, want %d", opts.MaxAttempts, RiverMaxAttemptsDefault)
+	}
+	if opts.Priority != tasks.TaskPriorityDefault {
+		t.Fatalf("priority=%d, want %d", opts.Priority, tasks.TaskPriorityDefault)
 	}
 }
 
