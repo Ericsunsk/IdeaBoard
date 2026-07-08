@@ -325,7 +325,7 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	    credential.id AS credential_id,
 	    credential.fingerprint AS credential_fingerprint,
 	    credential.key_version AS credential_key_version,
-	    CASE WHEN a.max_concurrent <= 0 THEN 3 ELSE a.max_concurrent END AS max_concurrent
+	    GREATEST(LEAST(a.max_concurrent, 64), 0) AS max_concurrent
 	  FROM api_accounts AS a
 	  JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 	    AND pe.status = 1
@@ -357,7 +357,7 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	    a.credential_key_version,
 	    a.max_concurrent AS account_max_concurrent,
 	    m.model_name,
-	    COALESCE(m.max_concurrent, a.max_concurrent) AS model_max_concurrent,
+	    GREATEST(LEAST(COALESCE(m.max_concurrent, a.max_concurrent), 64), 0) AS model_max_concurrent,
 	    m.sort_order AS model_sort_order,
 	    m.id AS model_id
 	  FROM locked_accounts a

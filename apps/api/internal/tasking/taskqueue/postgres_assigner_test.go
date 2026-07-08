@@ -125,6 +125,7 @@ func TestPostgresTaskAssignerAssignReturnsNoCapacityWhenAllAccountsFull(t *testi
 	if assignment.Status != AssignStatusNoCapacity || assignment.AccountID != 0 {
 		t.Fatalf("assignment=%+v, want no_capacity", assignment)
 	}
+	assertTaskPendingWithoutLease(t, db, "pending-no-capacity")
 }
 
 func TestPostgresTaskAssignerAssignReturnsNoCapacityWithoutCandidates(t *testing.T) {
@@ -593,6 +594,27 @@ func assertTaskLease(t *testing.T, db *sql.DB, taskID string, wantAccountID int6
 	if accountID != wantAccountID || assignedProviderEndpointID != wantProviderEndpointID || leaseToken != wantLeaseToken || status != tasks.StatusRunning {
 		t.Fatalf("task %q state account=%d assigned_channel=%d lease=%q status=%q, want account=%d assigned_channel=%d lease=%q status=%q",
 			taskID, accountID, assignedProviderEndpointID, leaseToken, status, wantAccountID, wantProviderEndpointID, wantLeaseToken, tasks.StatusRunning)
+	}
+}
+
+func assertTaskPendingWithoutLease(t *testing.T, db *sql.DB, taskID string) {
+	t.Helper()
+	var status string
+	var accountID sql.NullInt64
+	var leaseToken string
+	err := db.QueryRow(`SELECT status, account_id, lease_token FROM tasks WHERE task_id = $1`, taskID).Scan(&status, &accountID, &leaseToken)
+	if err != nil {
+		t.Fatalf("load task %q failed: %v", taskID, err)
+	}
+	if status != tasks.StatusPending || accountID.Valid || leaseToken != "" {
+		t.Fatalf("task %q status=%q account_valid=%v lease=%q, want pending without lease", taskID, status, accountID.Valid, leaseToken)
+	}
+	var activeLeaseCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM task_leases WHERE task_id = $1 AND released_at IS NULL`, taskID).Scan(&activeLeaseCount); err != nil {
+		t.Fatalf("count task %q active leases failed: %v", taskID, err)
+	}
+	if activeLeaseCount != 0 {
+		t.Fatalf("task %q active leases=%d, want 0", taskID, activeLeaseCount)
 	}
 }
 

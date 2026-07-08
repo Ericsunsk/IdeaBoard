@@ -10,6 +10,27 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 )
 
+func TestRuntimeMaxConcurrentTreatsNonPositiveValuesAsNoCapacity(t *testing.T) {
+	tests := []struct {
+		name  string
+		value int
+		want  int
+	}{
+		{name: "negative", value: -1, want: 0},
+		{name: "zero", value: 0, want: 0},
+		{name: "configured", value: 5, want: 5},
+		{name: "too high", value: accountlimits.MaxMaxConcurrent + 1, want: accountlimits.MaxMaxConcurrent},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := runtimeMaxConcurrent(tt.value); got != tt.want {
+				t.Fatalf("runtimeMaxConcurrent(%d)=%d, want %d", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPostgresTaskRuntimeStoreGetAccountLoadInfoUsesActiveTaskLeases(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	store := NewPostgresTaskRuntimeStore(db)

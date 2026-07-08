@@ -22,6 +22,16 @@ func NewPostgresTaskRuntimeStore(db *sql.DB) *PostgresTaskRuntimeStore {
 	return &PostgresTaskRuntimeStore{db: db}
 }
 
+func runtimeMaxConcurrent(value int) int {
+	if value <= 0 {
+		return 0
+	}
+	if value > accountlimits.MaxMaxConcurrent {
+		return accountlimits.MaxMaxConcurrent
+	}
+	return value
+}
+
 func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*tasks.AccountLoad, error) {
 	loads := make(map[int64]*tasks.AccountLoad, len(accountIDs))
 	if s == nil || s.db == nil {
@@ -56,7 +66,7 @@ func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accou
 		}
 		loads[accountID] = &tasks.AccountLoad{
 			CurrentConcurrent: running,
-			MaxConcurrent:     accountlimits.NormalizeMaxConcurrent(maxConcurrent),
+			MaxConcurrent:     runtimeMaxConcurrent(maxConcurrent),
 		}
 	}
 	return loads, rows.Err()
@@ -88,7 +98,7 @@ func (s *PostgresTaskRuntimeStore) GetAccountMaxConcurrent(ctx context.Context, 
 	if err != nil {
 		return 0, err
 	}
-	return accountlimits.NormalizeMaxConcurrent(maxConcurrent), nil
+	return runtimeMaxConcurrent(maxConcurrent), nil
 }
 
 func (s *PostgresTaskRuntimeStore) MarkCancelled(ctx context.Context, taskID string, ttl time.Duration) error {
