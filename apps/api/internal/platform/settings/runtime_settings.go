@@ -3,6 +3,8 @@ package settings
 import (
 	"context"
 	"errors"
+	"fmt"
+	"hash/fnv"
 	"net/url"
 	"strconv"
 	"strings"
@@ -42,6 +44,19 @@ type MediaUploadSetting struct {
 	UploadMaxConcurrent int `json:"upload_max_concurrent"`
 }
 
+type GoogleNativeGenerationSetting struct {
+	Mode          string `json:"mode"`
+	CanaryPercent int    `json:"canary_percent"`
+}
+
+type GoogleNativeGenerationEvaluation struct {
+	Allowed       bool
+	Mode          string
+	CanaryPercent int
+	Bucket        int
+	Message       string
+}
+
 type RuntimeSettingsService struct {
 	repo           *SystemConfigRepository
 	mu             sync.RWMutex
@@ -62,6 +77,10 @@ type RateLimitSettingProvider interface {
 
 type BrandingSettingProvider interface {
 	GetBranding(ctx context.Context) (BrandingSetting, error)
+}
+
+type GoogleNativeGenerationSettingProvider interface {
+	GetGoogleNativeGeneration(ctx context.Context) (GoogleNativeGenerationSetting, error)
 }
 
 var ErrRuntimeSettingsRepositoryUnavailable = errors.New("runtime settings repository unavailable")
@@ -106,6 +125,15 @@ const (
 	maxTaskMonitorListPageSize            = 50
 	minTaskMonitorRefreshIntervalSecs     = 2
 	maxTaskMonitorRefreshIntervalSecs     = 60
+
+	GoogleNativeGenerationModeDisabled = "disabled"
+	GoogleNativeGenerationModeEnabled  = "enabled"
+	GoogleNativeGenerationModeCanary   = "canary"
+
+	googleNativeGenerationModeKey          = "generation_google_native_mode"
+	googleNativeGenerationCanaryPercentKey = "generation_google_native_canary_percent"
+	googleNativeGenerationCanaryMinPercent = 0
+	googleNativeGenerationCanaryMaxPercent = 100
 )
 
 type cachedRateLimitSetting struct {
@@ -148,6 +176,13 @@ func DefaultPublicURLSetting() PublicURLSetting {
 func DefaultMediaUploadSetting() MediaUploadSetting {
 	return MediaUploadSetting{
 		UploadMaxConcurrent: defaultUploadMaxConcurrent,
+	}
+}
+
+func DefaultGoogleNativeGenerationSetting() GoogleNativeGenerationSetting {
+	return GoogleNativeGenerationSetting{
+		Mode:          GoogleNativeGenerationModeEnabled,
+		CanaryPercent: 0,
 	}
 }
 
@@ -259,6 +294,39 @@ func (s *RuntimeSettingsService) UpdateMediaUpload(ctx context.Context, setting 
 		{Key: mediaUploadMaxConcurrentKey, Value: strconv.Itoa(normalized.UploadMaxConcurrent)},
 	}); err != nil {
 		return MediaUploadSetting{}, err
+	}
+	return normalized, nil
+}
+
+func (s *RuntimeSettingsService) GetGoogleNativeGeneration(ctx context.Context) (GoogleNativeGenerationSetting, error) {
+	setting := DefaultGoogleNativeGenerationSetting()
+	values, err := s.getMany(ctx, googleNativeGenerationModeKey, googleNativeGenerationCanaryPercentKey)
+	if err != nil {
+		return setting, err
+	}
+	if mode := strings.TrimSpace(values[googleNativeGenerationModeKey]); mode != "" {
+		setting.Mode = mode
+	}
+	if parsed, ok := parseBoundedInt(values[googleNativeGenerationCanaryPercentKey], googleNativeGenerationCanaryMinPercent, googleNativeGenerationCanaryMaxPercent); ok {
+		setting.CanaryPercent = parsed
+	}
+	normalized, err := NormalizeGoogleNativeGenerationSetting(setting)
+	if err != nil {
+		return DefaultGoogleNativeGenerationSetting(), nil
+	}
+	return normalized, nil
+}
+
+func (s *RuntimeSettingsService) UpdateGoogleNativeGeneration(ctx context.Context, setting GoogleNativeGenerationSetting) (GoogleNativeGenerationSetting, error) {
+	normalized, err := NormalizeGoogleNativeGenerationSetting(setting)
+	if err != nil {
+		return GoogleNativeGenerationSetting{}, err
+	}
+	if err := s.setMany(ctx, []SystemConfigValue{
+		{Key: googleNativeGenerationModeKey, Value: normalized.Mode},
+		{Key: googleNativeGenerationCanaryPercentKey, Value: strconv.Itoa(normalized.CanaryPercent)},
+	}); err != nil {
+		return GoogleNativeGenerationSetting{}, err
 	}
 	return normalized, nil
 }
@@ -392,6 +460,57 @@ func NormalizeMediaUploadSetting(setting MediaUploadSetting) (MediaUploadSetting
 		return MediaUploadSetting{}, validation.New("upload_max_concurrent 必须在 1 到 64 之间")
 	}
 	return setting, nil
+}
+
+func NormalizeGoogleNativeGenerationSetting(setting GoogleNativeGenerationSetting) (GoogleNativeGenerationSetting, error) {
+	normalized := GoogleNativeGenerationSetting{
+		Mode:          strings.ToLower(strings.TrimSpace(setting.Mode)),
+		CanaryPercent: setting.CanaryPercent,
+	}
+	if normalized.Mode == "" {
+		normalized.Mode = GoogleNativeGenerationModeEnabled
+	}
+	switch normalized.Mode {
+	case GoogleNativeGenerationModeDisabled, GoogleNativeGenerationModeEnabled, GoogleNativeGenerationModeCanary:
+	default:
+		return GoogleNativeGenerationSetting{}, validation.New("mode 仅支持 disabled、enabled 或 canary")
+	}
+	if normalized.CanaryPercent < googleNativeGenerationCanaryMinPercent || normalized.CanaryPercent > googleNativeGenerationCanaryMaxPercent {
+		return GoogleNativeGenerationSetting{}, validation.New("canary_percent 必须在 0 到 100 之间")
+	}
+	return normalized, nil
+}
+
+func EvaluateGoogleNativeGeneration(setting GoogleNativeGenerationSetting, userID int64) GoogleNativeGenerationEvaluation {
+	normalized, err := NormalizeGoogleNativeGenerationSetting(setting)
+	if err != nil {
+		normalized = DefaultGoogleNativeGenerationSetting()
+	}
+	evaluation := GoogleNativeGenerationEvaluation{
+		Allowed:       true,
+		Mode:          normalized.Mode,
+		CanaryPercent: normalized.CanaryPercent,
+		Bucket:        googleNativeGenerationBucket(userID),
+	}
+	switch normalized.Mode {
+	case GoogleNativeGenerationModeDisabled:
+		evaluation.Allowed = false
+		evaluation.Message = "Google AI 原生生成通道当前已关闭，请联系管理员"
+	case GoogleNativeGenerationModeCanary:
+		evaluation.Allowed = evaluation.Bucket < normalized.CanaryPercent
+		if !evaluation.Allowed {
+			evaluation.Message = "Google AI 原生生成通道当前处于灰度开放，当前账号暂未命中灰度"
+		}
+	default:
+		evaluation.Allowed = true
+	}
+	return evaluation
+}
+
+func googleNativeGenerationBucket(userID int64) int {
+	hash := fnv.New64a()
+	_, _ = hash.Write([]byte(fmt.Sprintf("google-native-generation:%d", userID)))
+	return int(hash.Sum64() % 100)
 }
 
 func ResolvePublicBaseURL(ctx context.Context, provider PublicURLSettingProvider, requestScheme, requestHost string) string {

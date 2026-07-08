@@ -53,6 +53,12 @@ type adminMediaUploadSettingsResponse struct {
 	Data settings.MediaUploadSetting `json:"data"`
 }
 
+type adminGoogleNativeGenerationSettingsResponse struct {
+	Code int                                    `json:"code"`
+	Msg  string                                 `json:"msg"`
+	Data settings.GoogleNativeGenerationSetting `json:"data"`
+}
+
 func (f *fakeAdminAuthManager) DeleteUser(_ context.Context, authUserID string) error {
 	f.deletedAuthUserID = authUserID
 	return f.deleteErr
@@ -151,6 +157,13 @@ func TestAdminRuntimeSettingsGetFailsWhenRepositoryUnavailable(t *testing.T) {
 			path: "/admin/settings/task-monitor",
 			register: func(router *gin.Engine) {
 				router.GET("/admin/settings/task-monitor", handler.GetTaskMonitorSettings)
+			},
+		},
+		{
+			name: "google native generation",
+			path: "/admin/settings/generation/google-native",
+			register: func(router *gin.Engine) {
+				router.GET("/admin/settings/generation/google-native", handler.GetGoogleNativeGenerationSettings)
 			},
 		},
 	}
@@ -604,6 +617,99 @@ func TestAdminMediaUploadSettingsRejectsInvalidPayload(t *testing.T) {
 		}
 		if !strings.Contains(rec.Body.String(), "upload_max_concurrent 必须在 1 到 64 之间") {
 			t.Fatalf("body = %s, want upload_max_concurrent validation message", rec.Body.String())
+		}
+	}
+}
+
+func TestAdminGoogleNativeGenerationSettingsDefaultsWhenConfigMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/generation/google-native", handler.GetGoogleNativeGenerationSettings)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/settings/generation/google-native", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var got adminGoogleNativeGenerationSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	if got.Data != settings.DefaultGoogleNativeGenerationSetting() {
+		t.Fatalf("google native generation settings = %+v, want %+v", got.Data, settings.DefaultGoogleNativeGenerationSetting())
+	}
+}
+
+func TestAdminGoogleNativeGenerationSettingsUpdatePersists(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.GET("/admin/settings/generation/google-native", handler.GetGoogleNativeGenerationSettings)
+	router.PUT("/admin/settings/generation/google-native", handler.UpdateGoogleNativeGenerationSettings)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings/generation/google-native", strings.NewReader(`{"mode":"canary","canary_percent":35}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var updated adminGoogleNativeGenerationSettingsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode update response failed: %v", err)
+	}
+	want := settings.GoogleNativeGenerationSetting{Mode: settings.GoogleNativeGenerationModeCanary, CanaryPercent: 35}
+	if updated.Data != want {
+		t.Fatalf("updated google native generation settings = %+v, want %+v", updated.Data, want)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/admin/settings/generation/google-native", nil)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+
+	var got adminGoogleNativeGenerationSettingsResponse
+	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode get response failed: %v", err)
+	}
+	if got.Data != want {
+		t.Fatalf("persisted google native generation settings = %+v, want %+v", got.Data, want)
+	}
+}
+
+func TestAdminGoogleNativeGenerationSettingsRejectsInvalidPayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	handler := newAdminHandlerForRuntimeSettings(db)
+	router := gin.New()
+	router.PUT("/admin/settings/generation/google-native", handler.UpdateGoogleNativeGenerationSettings)
+
+	tests := []struct {
+		body string
+		want string
+	}{
+		{body: `{"mode":"rollout","canary_percent":10}`, want: "mode 仅支持 disabled、enabled 或 canary"},
+		{body: `{"mode":"canary","canary_percent":101}`, want: "canary_percent 必须在 0 到 100 之间"},
+	}
+	for _, tt := range tests {
+		req := httptest.NewRequest(http.MethodPut, "/admin/settings/generation/google-native", strings.NewReader(tt.body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), tt.want) {
+			t.Fatalf("body = %s, want %q", rec.Body.String(), tt.want)
 		}
 	}
 }

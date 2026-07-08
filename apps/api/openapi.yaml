@@ -522,6 +522,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMediaUploadSetting'
+  /admin/settings/generation/google-native:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminGoogleNativeGenerationSetting
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGoogleNativeGenerationSetting'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminGoogleNativeGenerationSetting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleNativeGenerationSetting'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseGoogleNativeGenerationSetting'
   /admin/settings/rate-limit:
     get:
       tags: [AdminSettings]
@@ -2044,6 +2071,19 @@ components:
           minimum: 1
           maximum: 64
 
+    GoogleNativeGenerationSetting:
+      type: object
+      required: [mode, canary_percent]
+      properties:
+        mode:
+          type: string
+          enum: [disabled, enabled, canary]
+          description: disabled blocks the google-ai native route, enabled allows all users, canary allows users with a stable user bucket below canary_percent.
+        canary_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+
     TaskMonitorSetting:
       type: object
       required: [list_page_size, auto_refresh_enabled, refresh_interval_seconds, result_preview_enabled]
@@ -2964,6 +3004,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/MediaUploadSetting'
+
+    ApiResponseGoogleNativeGenerationSetting:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/GoogleNativeGenerationSetting'
 
     ApiResponseTaskMonitorSetting:
       allOf:

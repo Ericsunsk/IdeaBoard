@@ -194,6 +194,72 @@
       <template #title>
         <div class="flex min-w-0 items-center justify-between gap-3">
           <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
+            生成策略灰度
+          </span>
+          <Tag
+            :value="googleNativeGenerationStatusLabel"
+            class="shrink-0"
+            :severity="googleNativeGenerationStatusSeverity"
+            rounded
+          />
+        </div>
+      </template>
+
+      <template #content>
+        <div :class="settingCardBodyClass">
+          <AdminFormField label="Google AI 原生通道">
+            <SelectButton
+              v-model="googleNativeGenerationForm.mode"
+              :options="googleNativeGenerationModeOptions"
+              option-label="label"
+              option-value="value"
+              :allow-empty="false"
+              size="small"
+              :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
+            />
+          </AdminFormField>
+
+          <AdminFormField label="灰度比例 (%)">
+            <InputNumber
+              v-model="googleNativeGenerationForm.canary_percent"
+              :min="GOOGLE_NATIVE_GENERATION_CANARY_MIN_PERCENT"
+              :max="GOOGLE_NATIVE_GENERATION_CANARY_MAX_PERCENT"
+              suffix="%"
+              fluid
+              :disabled="
+                googleNativeGenerationLoading ||
+                googleNativeGenerationSaving ||
+                googleNativeGenerationCanaryDisabled
+              "
+            />
+          </AdminFormField>
+
+          <div :class="settingActionRowClass">
+            <Button
+              :class="adminActionButtonClass"
+              label="保存"
+              severity="contrast"
+              :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
+              :loading="googleNativeGenerationSaving"
+              @click="handleSaveGoogleNativeGenerationSettings"
+            />
+            <Button
+              :class="adminActionButtonClass"
+              label="重置"
+              severity="secondary"
+              outlined
+              :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
+              @click="resetGoogleNativeGenerationForm"
+            />
+          </div>
+        </div>
+      </template>
+    </Card>
+
+    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
+      <template #title>
+        <div class="flex min-w-0 items-center justify-between gap-3">
+          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
             任务监控展示
           </span>
           <Tag
@@ -394,6 +460,7 @@ import Button from 'primevue/button'
 import Card from 'primevue/card'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
+import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
@@ -408,6 +475,12 @@ import {
   useAdminAccessSettings,
 } from '../../system-settings/useAdminAccessSettings'
 import { useAdminBrandingSettings } from '../../system-settings/useAdminBrandingSettings'
+import {
+  GOOGLE_NATIVE_GENERATION_CANARY_MAX_PERCENT,
+  GOOGLE_NATIVE_GENERATION_CANARY_MIN_PERCENT,
+  googleNativeGenerationModeOptions,
+  useAdminGoogleNativeGenerationSettings,
+} from '../../system-settings/useAdminGoogleNativeGenerationSettings'
 import {
   MEDIA_UPLOAD_MAX_CONCURRENT,
   MEDIA_UPLOAD_MIN_CONCURRENT,
@@ -492,6 +565,17 @@ const {
   resetMediaUploadForm,
   saving: mediaUploadSaving,
 } = useAdminMediaUploadSettings({ feedback: adminFeedback.systemSettings.mediaUpload })
+const {
+  form: googleNativeGenerationForm,
+  handleSaveGoogleNativeGenerationSettings,
+  loading: googleNativeGenerationLoading,
+  resetGoogleNativeGenerationForm,
+  saving: googleNativeGenerationSaving,
+  statusLabel: googleNativeGenerationStatusLabel,
+  statusSeverity: googleNativeGenerationStatusSeverity,
+} = useAdminGoogleNativeGenerationSettings({
+  feedback: adminFeedback.systemSettings.googleNativeGeneration,
+})
 
 const publicURLStatusLabel = computed(() => {
   const hasPublicBaseURL = Boolean(publicURLForm.value.public_base_url.trim())
@@ -500,6 +584,10 @@ const publicURLStatusLabel = computed(() => {
   if (hasPublicBaseURL || hasPublicAssetBaseURL) return '部分配置'
   return '使用默认'
 })
+
+const googleNativeGenerationCanaryDisabled = computed(
+  () => googleNativeGenerationForm.value.mode !== 'canary',
+)
 
 watch(logoCropDialogVisible, (visible) => {
   if (!visible) {

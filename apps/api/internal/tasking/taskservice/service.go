@@ -13,6 +13,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -23,15 +24,16 @@ import (
 )
 
 type Service struct {
-	accountRepo       AccountStore
-	taskRepo          TaskStore
-	submissionStore   TaskSubmissionStore
-	cancelStore       taskqueue.TaskCancellationStore
-	featurePrompts    FeaturePromptStore
-	mediaValidator    taskmedia.Validator
-	taskOutputCleaner taskmedia.TaskOutputCleaner
-	eventHub          *EventHub
-	taskEvents        events.TaskStatusPublisher
+	accountRepo        AccountStore
+	taskRepo           TaskStore
+	submissionStore    TaskSubmissionStore
+	cancelStore        taskqueue.TaskCancellationStore
+	featurePrompts     FeaturePromptStore
+	mediaValidator     taskmedia.Validator
+	taskOutputCleaner  taskmedia.TaskOutputCleaner
+	generationSettings settings.GoogleNativeGenerationSettingProvider
+	eventHub           *EventHub
+	taskEvents         events.TaskStatusPublisher
 }
 
 type AccountStore interface {
@@ -57,13 +59,14 @@ type FeaturePromptStore interface {
 }
 
 type ServiceDeps struct {
-	AccountRepo       AccountStore
-	TaskRepo          TaskStore
-	SubmissionStore   TaskSubmissionStore
-	CancelStore       taskqueue.TaskCancellationStore
-	FeaturePrompts    FeaturePromptStore
-	MediaValidator    taskmedia.Validator
-	TaskOutputCleaner taskmedia.TaskOutputCleaner
+	AccountRepo        AccountStore
+	TaskRepo           TaskStore
+	SubmissionStore    TaskSubmissionStore
+	CancelStore        taskqueue.TaskCancellationStore
+	FeaturePrompts     FeaturePromptStore
+	MediaValidator     taskmedia.Validator
+	TaskOutputCleaner  taskmedia.TaskOutputCleaner
+	GenerationSettings settings.GoogleNativeGenerationSettingProvider
 }
 
 type ServiceOptions struct {
@@ -84,15 +87,16 @@ const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加�
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
-		accountRepo:       deps.AccountRepo,
-		taskRepo:          deps.TaskRepo,
-		submissionStore:   deps.SubmissionStore,
-		cancelStore:       deps.CancelStore,
-		featurePrompts:    deps.FeaturePrompts,
-		mediaValidator:    deps.MediaValidator,
-		taskOutputCleaner: deps.TaskOutputCleaner,
-		eventHub:          opts.EventHub,
-		taskEvents:        opts.TaskEvents,
+		accountRepo:        deps.AccountRepo,
+		taskRepo:           deps.TaskRepo,
+		submissionStore:    deps.SubmissionStore,
+		cancelStore:        deps.CancelStore,
+		featurePrompts:     deps.FeaturePrompts,
+		mediaValidator:     deps.MediaValidator,
+		taskOutputCleaner:  deps.TaskOutputCleaner,
+		generationSettings: deps.GenerationSettings,
+		eventHub:           opts.EventHub,
+		taskEvents:         opts.TaskEvents,
 	}
 }
 
@@ -287,6 +291,10 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 		return nil, nil, nil, "", "", err
 	}
 	apiAccounts = accounts.FilterAccountsForRequest(apiAccounts, featureSlug, req.Params)
+	apiAccounts, err = s.filterGoogleNativeAccountsForSubmit(ctx, userID, apiAccounts)
+	if err != nil {
+		return nil, nil, nil, "", "", err
+	}
 	if len(apiAccounts) == 0 {
 		return nil, nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
@@ -303,6 +311,44 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 	}
 
 	return apiAccounts, typedParams, req.Params, featureSlug, fullPrompt, nil
+}
+
+func (s *Service) filterGoogleNativeAccountsForSubmit(ctx context.Context, userID int64, apiAccounts []*accounts.ApiAccount) ([]*accounts.ApiAccount, error) {
+	if len(apiAccounts) == 0 || s.generationSettings == nil {
+		return apiAccounts, nil
+	}
+	hasGoogleNative := false
+	for _, account := range apiAccounts {
+		if accountUsesGoogleNativeAPI(account) {
+			hasGoogleNative = true
+			break
+		}
+	}
+	if !hasGoogleNative {
+		return apiAccounts, nil
+	}
+
+	setting, err := s.generationSettings.GetGoogleNativeGeneration(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("生成策略设置读取失败，请稍后重试")
+	}
+	evaluation := settings.EvaluateGoogleNativeGeneration(setting, userID)
+	if evaluation.Allowed {
+		return apiAccounts, nil
+	}
+
+	if evaluation.Message != "" {
+		return nil, errors.New(evaluation.Message)
+	}
+	return nil, errors.New(noAvailableAPIAccountMessage)
+}
+
+func accountUsesGoogleNativeAPI(account *accounts.ApiAccount) bool {
+	if account == nil {
+		return false
+	}
+	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
+	return ok && workflow.IsGoogleNativeAPIType(apiType)
 }
 
 func applyFeaturePromptModelDefaults(params map[string]interface{}, defaults prompts.FeaturePromptModelDefaults) {

@@ -45,6 +45,7 @@ type RiverTaskWorkerDeps struct {
 	ResultMaterializer   taskmedia.ResultMaterializer
 	TaskEvents           events.TaskStatusPublisher
 	PublicURLs           settings.PublicURLSettingProvider
+	GenerationSettings   settings.GoogleNativeGenerationSettingProvider
 }
 
 func NewRiverTaskWorker(
@@ -55,6 +56,7 @@ func NewRiverTaskWorker(
 		mediaReader:          deps.MediaReader,
 		resultMaterializer:   deps.ResultMaterializer,
 		publicURLs:           deps.PublicURLs,
+		generationSettings:   deps.GenerationSettings,
 	}
 	taskRuntime := taskruntime.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
 	taskRuntime.SetTaskStatusPublisher(deps.TaskEvents)

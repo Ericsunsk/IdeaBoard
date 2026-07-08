@@ -104,25 +104,28 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 	adminGroup.GET(RouteAdminSettingsPublicURLs, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsRateLimit, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsTaskMonitor, func(c *gin.Context) {})
+	adminGroup.GET(RouteAdminSettingsGoogleNativeGeneration, func(c *gin.Context) {})
 
 	want := map[string]bool{
-		http.MethodGet + " /api/settings/branding":                     false,
-		http.MethodPost + " /api/user/profile/avatar":                  false,
-		http.MethodPost + " /api/user/boards/:board_id/uploads":        false,
-		http.MethodGet + " /api/user/download":                         false,
-		http.MethodPost + " /api/admin/upload":                         false,
-		http.MethodGet + " /api/admin/settings/branding":               false,
-		http.MethodGet + " /api/admin/settings/media-upload":           false,
-		http.MethodGet + " /api/admin/settings/public-urls":            false,
-		http.MethodGet + " /api/admin/settings/rate-limit":             false,
-		http.MethodGet + " /api/admin/settings/task-monitor":           false,
-		http.MethodPost + " /api/user/api/user/profile/avatar":         true,
-		http.MethodPost + " /api/admin/api/admin/upload":               true,
-		http.MethodGet + " /api/admin/api/admin/settings/branding":     true,
-		http.MethodGet + " /api/admin/api/admin/settings/media-upload": true,
-		http.MethodGet + " /api/admin/api/admin/settings/public-urls":  true,
-		http.MethodGet + " /api/admin/api/admin/settings/rate-limit":   true,
-		http.MethodGet + " /api/admin/api/admin/settings/task-monitor": true,
+		http.MethodGet + " /api/settings/branding":                                 false,
+		http.MethodPost + " /api/user/profile/avatar":                              false,
+		http.MethodPost + " /api/user/boards/:board_id/uploads":                    false,
+		http.MethodGet + " /api/user/download":                                     false,
+		http.MethodPost + " /api/admin/upload":                                     false,
+		http.MethodGet + " /api/admin/settings/branding":                           false,
+		http.MethodGet + " /api/admin/settings/media-upload":                       false,
+		http.MethodGet + " /api/admin/settings/public-urls":                        false,
+		http.MethodGet + " /api/admin/settings/rate-limit":                         false,
+		http.MethodGet + " /api/admin/settings/task-monitor":                       false,
+		http.MethodGet + " /api/admin/settings/generation/google-native":           false,
+		http.MethodPost + " /api/user/api/user/profile/avatar":                     true,
+		http.MethodPost + " /api/admin/api/admin/upload":                           true,
+		http.MethodGet + " /api/admin/api/admin/settings/branding":                 true,
+		http.MethodGet + " /api/admin/api/admin/settings/media-upload":             true,
+		http.MethodGet + " /api/admin/api/admin/settings/public-urls":              true,
+		http.MethodGet + " /api/admin/api/admin/settings/rate-limit":               true,
+		http.MethodGet + " /api/admin/api/admin/settings/task-monitor":             true,
+		http.MethodGet + " /api/admin/api/admin/settings/generation/google-native": true,
 	}
 	for _, route := range router.Routes() {
 		key := route.Method + " " + route.Path
@@ -340,6 +343,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/settings/rate-limit":               false,
 		"GET /api/admin/settings/registration":             false,
 		"GET /api/admin/settings/task-monitor":             false,
+		"GET /api/admin/settings/generation/google-native": false,
 		"GET /api/admin/statistics":                        false,
 		"GET /api/admin/storage/profiles":                  false,
 		"GET /api/admin/storage/profiles/:id/bucket-info":  false,
@@ -375,6 +379,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/settings/rate-limit":               false,
 		"PUT /api/admin/settings/registration":             false,
 		"PUT /api/admin/settings/task-monitor":             false,
+		"PUT /api/admin/settings/generation/google-native": false,
 		"PUT /api/admin/storage/profiles/:id":              false,
 		"PUT /api/admin/users/:id/role":                    false,
 	}

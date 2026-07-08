@@ -100,6 +100,13 @@ export type AdminMediaUploadSettingsFeedback = {
   saveFailed: (error: unknown) => void
 }
 
+export type AdminGoogleNativeGenerationSettingsFeedback = {
+  loadFailed: (error: unknown) => void
+  validationFailed: (message: string) => void
+  saved: () => void
+  saveFailed: (error: unknown) => void
+}
+
 export type AdminFeedback = {
   login: {
     succeeded: () => void
@@ -120,6 +127,7 @@ export type AdminFeedback = {
     taskMonitor: AdminTaskMonitorSettingsFeedback
     publicURL: AdminPublicURLSettingsFeedback
     mediaUpload: AdminMediaUploadSettingsFeedback
+    googleNativeGeneration: AdminGoogleNativeGenerationSettingsFeedback
     unsupportedLogoFile: () => void
   }
   taskMonitor: {
@@ -146,9 +154,7 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
     providerEndpoints: {
       providerConfig: {
         accountLimitsFallback(error) {
-          appToast.warning(
-            extractSafeApiErrorMessage(error, '账号限制加载失败，已使用默认限制'),
-          )
+          appToast.warning(extractSafeApiErrorMessage(error, '账号限制加载失败，已使用默认限制'))
         },
         loadFailed(error) {
           appToast.error(extractSafeApiErrorMessage(error, '加载数据失败'))
@@ -353,6 +359,20 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
         },
         saveFailed(error) {
           appToast.error(formatDisplayErrorMessage(error, '保存上传设置失败'))
+        },
+      },
+      googleNativeGeneration: {
+        loadFailed(error) {
+          appToast.error(formatDisplayErrorMessage(error, '加载生成策略灰度失败'))
+        },
+        validationFailed(message) {
+          appToast.error(message)
+        },
+        saved() {
+          appToast.success('生成策略灰度已保存')
+        },
+        saveFailed(error) {
+          appToast.error(formatDisplayErrorMessage(error, '保存生成策略灰度失败'))
         },
       },
       unsupportedLogoFile() {
