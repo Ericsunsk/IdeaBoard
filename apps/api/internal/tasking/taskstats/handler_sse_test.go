@@ -29,9 +29,11 @@ func (p fakeMonitorProvider) GetMonitorInfo(context.Context) (*tasks.MonitorInfo
 }
 
 type fakeStatsStore struct {
-	counts       map[string]int64
-	pressureRows []taskstore.MonitorExecutionPressureAggregate
-	pressureErr  error
+	counts           map[string]int64
+	pressureRows     []taskstore.MonitorExecutionPressureAggregate
+	pressureErr      error
+	goldenSignalRows []taskstore.MonitorGoldenSignalSample
+	goldenSignalsErr error
 }
 
 func (s fakeStatsStore) CountByStatus(_ context.Context, status string) (int64, error) {
@@ -71,6 +73,13 @@ func (s fakeStatsStore) ListMonitorExecutionPressureByRange(context.Context, tim
 		return nil, s.pressureErr
 	}
 	return s.pressureRows, nil
+}
+
+func (s fakeStatsStore) ListMonitorGoldenSignalSamplesByRange(context.Context, time.Time, time.Time) ([]taskstore.MonitorGoldenSignalSample, error) {
+	if s.goldenSignalsErr != nil {
+		return nil, s.goldenSignalsErr
+	}
+	return s.goldenSignalRows, nil
 }
 
 func (s fakeStatsStore) BackfillDailyStatsByCreatedRange(context.Context, time.Time, time.Time, time.Time, bool) (taskstore.BackfillDailyStatsResult, error) {
@@ -127,15 +136,65 @@ func TestGetMonitorExecutionPressureBuildsStableBuckets(t *testing.T) {
 	}
 }
 
+func TestGetMonitorGoldenSignalsCalculatesSuccessAndFailureSignals(t *testing.T) {
+	svc := NewService(fakeStatsStore{
+		goldenSignalRows: []taskstore.MonitorGoldenSignalSample{
+			{
+				Status:            tasks.StatusCompleted,
+				QueueWaitMS:       100,
+				ProviderLatencyMS: 900,
+				FinalizeLatencyMS: 40,
+				ProviderObserved:  true,
+				ProviderAttempts:  1,
+			},
+			{
+				Status:            tasks.StatusFailed,
+				FailureStage:      tasks.ExecutionStageProvider,
+				FailureCategory:   tasks.FailureCategoryTimeout,
+				QueueWaitMS:       300,
+				ProviderLatencyMS: 1200,
+				FinalizeLatencyMS: 0,
+				ProviderObserved:  true,
+				ProviderError:     true,
+				ProviderAttempts:  1,
+				ProviderErrors:    1,
+			},
+		},
+	})
+
+	signals, err := svc.GetMonitorGoldenSignals(context.Background())
+	if err != nil {
+		t.Fatalf("GetMonitorGoldenSignals failed: %v", err)
+	}
+	if signals.SampleCount != 2 || signals.ProviderAttempts != 2 || signals.ProviderErrorCount != 1 {
+		t.Fatalf("signals counts mismatch: %+v", signals)
+	}
+	if signals.ProviderErrorRate != 0.5 {
+		t.Fatalf("provider_error_rate=%v, want 0.5", signals.ProviderErrorRate)
+	}
+	if signals.QueueDelayMS.Samples != 2 || signals.QueueDelayMS.AvgMS != 200 || signals.QueueDelayMS.MaxMS != 300 {
+		t.Fatalf("queue signal mismatch: %+v", signals.QueueDelayMS)
+	}
+	if signals.ProviderLatencyMS.Samples != 2 || signals.ProviderLatencyMS.MaxMS != 1200 {
+		t.Fatalf("provider latency signal mismatch: %+v", signals.ProviderLatencyMS)
+	}
+	if signals.FinalizeLatencyMS.Samples != 1 || signals.FinalizeLatencyMS.AvgMS != 40 {
+		t.Fatalf("finalize latency signal mismatch: %+v", signals.FinalizeLatencyMS)
+	}
+}
+
 func TestAdminMonitorDataFromRuntimeNormalizesNilCollections(t *testing.T) {
 	data := adminMonitorDataFromRuntime(&tasks.MonitorInfo{
 		GlobalQueueLen:  4,
 		WaitQueueLen:    1,
 		RunningAttempts: 2,
-	}, nil)
+	}, nil, MonitorGoldenSignals{SampleCount: 3})
 
 	if data.RunningAttempts != 2 {
 		t.Fatalf("running attempts=%d, want 2", data.RunningAttempts)
+	}
+	if data.GoldenSignals.SampleCount != 3 {
+		t.Fatalf("golden signal sample count=%d, want 3", data.GoldenSignals.SampleCount)
 	}
 	if data.AccountLoads == nil {
 		t.Fatal("account loads should be an empty object map, got nil")
@@ -144,7 +203,7 @@ func TestAdminMonitorDataFromRuntimeNormalizesNilCollections(t *testing.T) {
 		t.Fatal("execution pressure should be an empty array, got nil")
 	}
 
-	empty := adminMonitorDataFromRuntime(nil, nil)
+	empty := adminMonitorDataFromRuntime(nil, nil, MonitorGoldenSignals{})
 	if empty.AccountLoads == nil {
 		t.Fatal("nil runtime info should still return an empty account loads map")
 	}
@@ -248,6 +307,9 @@ func TestStreamMonitorSendsInitialSnapshot(t *testing.T) {
 			}
 			if !strings.Contains(body, `"execution_pressure"`) || !strings.Contains(body, `"normal_running"`) {
 				t.Fatalf("body missing execution pressure: %s", body)
+			}
+			if !strings.Contains(body, `"golden_signals"`) {
+				t.Fatalf("body missing golden signals: %s", body)
 			}
 			return
 		}

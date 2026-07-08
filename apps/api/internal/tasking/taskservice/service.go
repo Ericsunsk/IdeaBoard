@@ -122,6 +122,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	}
 
 	taskID := generateSecureTaskID("task")
+	correlationID := tasks.CorrelationIDForTaskID(taskID)
 
 	paramsJSON, err := marshalWorkflowTaskParams(typedParams, sourceParams)
 	if err != nil {
@@ -132,6 +133,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 
 	task := &tasks.Task{
 		TaskID:         taskID,
+		CorrelationID:  correlationID,
 		UserID:         userID,
 		ClientActionID: clientActionID,
 		Prompt:         fullPrompt,
@@ -149,14 +151,15 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	}
 
 	queueTask := &tasks.TaskPayload{
-		TaskID:     taskID,
-		UserID:     userID,
-		Prompt:     fullPrompt,
-		Params:     paramsJSON,
-		Priority:   priority,
-		AccountIDs: accountIDs,
-		RetryCount: 0,
-		CreatedAt:  time.Now().Unix(),
+		TaskID:        taskID,
+		CorrelationID: correlationID,
+		UserID:        userID,
+		Prompt:        fullPrompt,
+		Params:        paramsJSON,
+		Priority:      priority,
+		AccountIDs:    accountIDs,
+		RetryCount:    0,
+		CreatedAt:     time.Now().Unix(),
 	}
 
 	if s.submissionStore == nil {
@@ -164,7 +167,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	}
 	result, err := s.submissionStore.SubmitTask(ctx, task, queueTask)
 	if err != nil {
-		slog.Warn("submit task transaction failed", "task_id", taskID, "err", err)
+		slog.Warn("submit task transaction failed", "task_id", taskID, "correlation_id", correlationID, "err", err)
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 

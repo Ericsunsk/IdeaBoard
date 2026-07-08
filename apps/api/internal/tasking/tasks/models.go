@@ -2,12 +2,14 @@ package tasks
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
 type Task struct {
 	ID                         int64                 `json:"id"`
 	TaskID                     string                `json:"task_id"`
+	CorrelationID              string                `json:"correlation_id"`
 	UserID                     int64                 `json:"user_id"`
 	ClientActionID             string                `json:"client_action_id"`
 	AssignedProviderEndpointID *int64                `json:"assigned_provider_endpoint_id"`
@@ -64,6 +66,7 @@ type TaskOutput struct {
 type TaskUserView struct {
 	ID               int64                 `json:"id"`
 	TaskID           string                `json:"task_id"`
+	CorrelationID    string                `json:"correlation_id"`
 	UserID           int64                 `json:"user_id"`
 	Prompt           string                `json:"prompt"`
 	Status           string                `json:"status"`
@@ -104,6 +107,7 @@ func (t *Task) ToUserView() TaskUserView {
 	return TaskUserView{
 		ID:               t.ID,
 		TaskID:           t.TaskID,
+		CorrelationID:    t.EffectiveCorrelationID(),
 		UserID:           t.UserID,
 		Prompt:           t.UserPrompt,
 		Status:           t.Status,
@@ -116,6 +120,24 @@ func (t *Task) ToUserView() TaskUserView {
 		UpdatedAt:        t.UpdatedAt,
 		CompletedAt:      t.CompletedAt,
 	}
+}
+
+func (t *Task) EffectiveCorrelationID() string {
+	if t == nil {
+		return ""
+	}
+	if correlationID := NormalizeCorrelationID(t.CorrelationID); correlationID != "" {
+		return correlationID
+	}
+	return CorrelationIDForTaskID(t.TaskID)
+}
+
+func CorrelationIDForTaskID(taskID string) string {
+	return NormalizeCorrelationID(taskID)
+}
+
+func NormalizeCorrelationID(correlationID string) string {
+	return strings.TrimSpace(correlationID)
 }
 
 func taskOutputsUserView(outputs []TaskOutput) []TaskOutputUserView {

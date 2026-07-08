@@ -20,6 +20,7 @@ type Handler struct {
 type adminTaskDTO struct {
 	ID                         int64                       `json:"id"`
 	TaskID                     string                      `json:"task_id"`
+	CorrelationID              string                      `json:"correlation_id"`
 	UserID                     int64                       `json:"user_id"`
 	AssignedProviderEndpointID *int64                      `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       *int64                      `json:"assigned_credential_id"`
@@ -286,6 +287,7 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 	return adminTaskDTO{
 		ID:                         task.ID,
 		TaskID:                     task.TaskID,
+		CorrelationID:              task.EffectiveCorrelationID(),
 		UserID:                     task.UserID,
 		AssignedProviderEndpointID: task.AssignedProviderEndpointID,
 		AssignedCredentialID:       task.AssignedCredentialID,

@@ -49,6 +49,7 @@ type adminMonitorData struct {
 	RunningAttempts   int64                           `json:"running_attempts"`
 	AccountLoads      map[int64]*tasks.AccountLoad    `json:"account_loads"`
 	ExecutionPressure []MonitorExecutionPressurePoint `json:"execution_pressure"`
+	GoldenSignals     MonitorGoldenSignals            `json:"golden_signals"`
 }
 
 func NewHandler(service *Service, monitor MonitorInfoProvider) *Handler {
@@ -136,10 +137,14 @@ func (h *Handler) buildMonitorSnapshot(ctx context.Context) (*adminMonitorSnapsh
 	if err != nil {
 		return nil, fmt.Errorf("get monitor execution pressure: %w", err)
 	}
-	return &adminMonitorSnapshot{Monitor: adminMonitorDataFromRuntime(info, pressure), Stats: stats}, nil
+	goldenSignals, err := h.service.GetMonitorGoldenSignals(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get monitor golden signals: %w", err)
+	}
+	return &adminMonitorSnapshot{Monitor: adminMonitorDataFromRuntime(info, pressure, goldenSignals), Stats: stats}, nil
 }
 
-func adminMonitorDataFromRuntime(info *tasks.MonitorInfo, pressure []MonitorExecutionPressurePoint) *adminMonitorData {
+func adminMonitorDataFromRuntime(info *tasks.MonitorInfo, pressure []MonitorExecutionPressurePoint, goldenSignals MonitorGoldenSignals) *adminMonitorData {
 	if pressure == nil {
 		pressure = []MonitorExecutionPressurePoint{}
 	}
@@ -148,6 +153,7 @@ func adminMonitorDataFromRuntime(info *tasks.MonitorInfo, pressure []MonitorExec
 		return &adminMonitorData{
 			AccountLoads:      accountLoads,
 			ExecutionPressure: pressure,
+			GoldenSignals:     goldenSignals,
 		}
 	}
 	if info.AccountLoads != nil {
@@ -159,6 +165,7 @@ func adminMonitorDataFromRuntime(info *tasks.MonitorInfo, pressure []MonitorExec
 		RunningAttempts:   info.RunningAttempts,
 		AccountLoads:      accountLoads,
 		ExecutionPressure: pressure,
+		GoldenSignals:     goldenSignals,
 	}
 }
 

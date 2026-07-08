@@ -124,6 +124,19 @@ type MonitorExecutionPressureAggregate struct {
 	Retry              int64
 }
 
+type MonitorGoldenSignalSample struct {
+	Status            string
+	FailureStage      string
+	FailureCategory   string
+	QueueWaitMS       int64
+	ProviderLatencyMS int64
+	FinalizeLatencyMS int64
+	ProviderObserved  bool
+	ProviderError     bool
+	ProviderAttempts  int64
+	ProviderErrors    int64
+}
+
 const (
 	defaultStorageProfileID = "builtin-local"
 )

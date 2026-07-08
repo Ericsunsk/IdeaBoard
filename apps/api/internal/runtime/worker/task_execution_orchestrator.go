@@ -49,8 +49,9 @@ func newTaskExecutionOrchestrator(
 
 func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) error {
 	// ── Phase 1: pre-flight (account + cancellation check) ──
+	correlationID := task.EnsureCorrelationID()
 	accountID := assignment.AccountID
-	slog.Info("worker executing task", "task_id", task.TaskID, "account_id", accountID)
+	slog.Info("worker executing task", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", accountID)
 	startTime := time.Now()
 
 	account, err := o.accountRepo.GetRuntimeAccountForAssignment(ctx, accountID, assignment.ProviderEndpointID, assignment.CredentialID)
@@ -64,7 +65,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 
 	cancelled, err := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
-		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		if requeueErr := o.requeueTask(ctx, task, assignment, "检查任务取消状态失败"); requeueErr != nil {
 			return requeueErr
 		}
@@ -80,7 +81,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	defer stop()
 
 	if err := o.taskRuntime.ConfirmTaskLease(ctx, assignment); err != nil {
-		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
+		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "correlation_id", correlationID, "account_id", accountID, "err", err)
 		if isTaskConvergedError(err) {
 			o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 			return nil
@@ -109,7 +110,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	providerStartAt := time.Now()
 	attemptRef, err := o.startTaskAttempt(ctx, task, assignment, providerStartAt)
 	if err != nil {
-		slog.Warn("start task attempt failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("start task attempt failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
 		if resetErr := o.taskRuntime.ResetRunningTask(cleanupCtx, taskruntime.ResetRunningTaskInput{
@@ -149,7 +150,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 	cancelled, err = o.taskRuntime.IsTaskCancelled(checkCtx, task.TaskID)
 	checkCancel()
 	if err != nil {
-		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		if requeueErr := o.requeueTask(ctx, task, assignment, "检查任务取消状态失败"); requeueErr != nil {
 			return requeueErr
 		}
@@ -233,7 +234,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 		}
 	}
 
-	slog.Warn("upstream provider call failed", "task_id", attempt.task.TaskID, "account_id", attempt.accountID, "err", err)
+	slog.Warn("upstream provider call failed", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID(), "account_id", attempt.accountID, "err", err)
 	elapsed := attempt.elapsedSeconds()
 	reason := userFacingProviderError(err)
 	failureStage, failureCategory := classifyProviderFailure(err, attempt.providerOutput.Timeline)
@@ -314,7 +315,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
 			o.dropTask(ctx, attempt.task, "任务状态已收敛，丢弃脏队列任务")
 			return nil
 		case taskExecutionConvergenceFinalFail, taskExecutionConvergenceFailoverExhaustedOrNoCapacity:
-			slog.Warn("reset task for failover retry failed", "task_id", attempt.task.TaskID, "err", requeueErr)
+			slog.Warn("reset task for failover retry failed", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID(), "err", requeueErr)
 			failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, requeueFailureDecision.Reason, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, time.Now())
 			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, requeueFailureDecision.Reason, elapsed, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, &failFinish); markErr != nil {
 				return markErr
@@ -336,7 +337,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
 		if exhaustedDecision.Outcome != taskExecutionConvergenceFailoverExhaustedOrNoCapacity {
 			slog.Warn("unexpected task execution convergence outcome after failover retry exhausted", "task_id", attempt.task.TaskID, "outcome", exhaustedDecision.Outcome)
 		}
-		slog.Info("task reached failover retry limit", "task_id", attempt.task.TaskID)
+		slog.Info("task reached failover retry limit", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID())
 		o.recordExecutionTerminal(ctx, attempt.task.TaskID, tasks.ExecutionStageFailed, exhaustedDecision.FailureStage, exhaustedDecision.FailureCategory, finalFailFinish.CompletedAt)
 		return nil
 	}
@@ -411,19 +412,19 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 	})
 	if err != nil {
 		if isTaskConvergedError(err) {
-			slog.Info("task converged before completion writeback", "task_id", task.TaskID, "err", err)
+			slog.Info("task converged before completion writeback", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 			return false, nil
 		}
-		slog.Warn("mark task completed failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("mark task completed failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 		if failErr := o.taskRuntime.FailTask(cleanupCtx, taskruntime.FailTaskInput{
 			Assignment: assignment,
 			Reason:     "任务结果保存失败，请稍后重试",
 		}); failErr != nil {
-			slog.Warn("mark task failed after completion writeback failed", "task_id", task.TaskID, "err", failErr)
+			slog.Warn("mark task failed after completion writeback failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", failErr)
 		}
 		return false, err
 	}
-	slog.Info("task completed", "task_id", task.TaskID, "elapsed_sec", elapsedSec)
+	slog.Info("task completed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "elapsed_sec", elapsedSec)
 	return true, nil
 }
 
@@ -464,10 +465,10 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	})
 	if err != nil {
 		if isTaskConvergedError(err) {
-			slog.Info("task converged before failure writeback", "task_id", task.TaskID, "err", err)
+			slog.Info("task converged before failure writeback", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 			return nil
 		}
-		slog.Warn("mark task failed failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("mark task failed failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 		return err
 	}
 	terminalAt := time.Now()
@@ -475,7 +476,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 		terminalAt = attemptFinish.CompletedAt
 	}
 	o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, terminalAt)
-	slog.Warn("task failed", "task_id", task.TaskID, "elapsed_sec", elapsedSec, "reason", reason)
+	slog.Warn("task failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "elapsed_sec", elapsedSec, "reason", reason)
 	return nil
 }
 
@@ -503,16 +504,16 @@ func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task 
 		err = o.taskRuntime.RecordTaskCancelled(cleanupCtx, snapshot)
 	}
 	if err != nil {
-		slog.Warn("record task cancellation snapshot failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("record task cancellation snapshot failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 	}
 	if err := o.taskRuntime.ClearTaskCancelled(cleanupCtx, task.TaskID); err != nil {
-		slog.Warn("clear task cancellation marker failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("clear task cancellation marker failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 	}
-	slog.Info("task cancelled; stop execution", "task_id", task.TaskID)
+	slog.Info("task cancelled; stop execution", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID())
 }
 
 func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
-	slog.Info("task dropped", "task_id", task.TaskID, "reason", reason)
+	slog.Info("task dropped", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "reason", reason)
 }
 
 func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {

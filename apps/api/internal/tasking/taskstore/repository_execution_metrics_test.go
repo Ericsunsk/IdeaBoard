@@ -394,3 +394,204 @@ func TestListExecutionFailureCategoryStatsByCreatedRangeOnlyUsesFailedTasks(t *t
 		t.Fatalf("missing metrics should be grouped as unknown with zero latency, got %+v", byCategory[tasks.FailureCategoryUnknown])
 	}
 }
+
+func TestListMonitorGoldenSignalSamplesByRangeUsesExecutionMetrics(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, _ := newRepositoryTestDB(t)
+	now := time.Now()
+	completedAt := now.Add(-30 * time.Second)
+	seedTasks(t, taskRepo, ctx,
+		&tasks.Task{
+			TaskID:      "golden-success",
+			UserID:      10,
+			Status:      tasks.StatusCompleted,
+			CreatedAt:   now.Add(-2 * time.Minute),
+			CompletedAt: &completedAt,
+		},
+		&tasks.Task{
+			TaskID:      "golden-provider-failure",
+			UserID:      10,
+			Status:      tasks.StatusFailed,
+			ErrorMsg:    "provider timeout",
+			CreatedAt:   now.Add(-90 * time.Second),
+			CompletedAt: &completedAt,
+		},
+	)
+
+	providerStage := tasks.ExecutionStageProvider
+	timeoutCategory := tasks.FailureCategoryTimeout
+	providerStartedAt := now.Add(-80 * time.Second)
+	for _, item := range []struct {
+		taskID            string
+		queueWaitMS       int64
+		providerLatencyMS int64
+		finalizeLatencyMS int64
+		failureStage      *string
+		failureCategory   *string
+	}{
+		{taskID: "golden-success", queueWaitMS: 120, providerLatencyMS: 900, finalizeLatencyMS: 40},
+		{taskID: "golden-provider-failure", queueWaitMS: 300, providerLatencyMS: 1100, failureStage: &providerStage, failureCategory: &timeoutCategory},
+	} {
+		if err := taskRepo.PatchExecutionMetrics(ctx, tasks.TaskExecutionMetricsPatch{
+			TaskID:            item.taskID,
+			FailureStage:      item.failureStage,
+			FailureCategory:   item.failureCategory,
+			ProviderStartedAt: &providerStartedAt,
+			QueueWaitMS:       &item.queueWaitMS,
+			ProviderLatencyMS: &item.providerLatencyMS,
+			FinalizeLatencyMS: &item.finalizeLatencyMS,
+		}); err != nil {
+			t.Fatalf("patch %s metrics failed: %v", item.taskID, err)
+		}
+	}
+
+	rows, err := taskRepo.ListMonitorGoldenSignalSamplesByRange(ctx, now.Add(-10*time.Minute), now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("ListMonitorGoldenSignalSamplesByRange failed: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("samples=%d, want 2: %+v", len(rows), rows)
+	}
+	var providerErrors int
+	var providerObserved int
+	for _, row := range rows {
+		if row.ProviderObserved {
+			providerObserved++
+		}
+		if row.ProviderError {
+			providerErrors++
+		}
+	}
+	if providerObserved != 2 || providerErrors != 1 {
+		t.Fatalf("provider observed/errors=%d/%d, want 2/1 rows=%+v", providerObserved, providerErrors, rows)
+	}
+}
+
+func TestListMonitorGoldenSignalSamplesByRangeCountsFailedAttemptBeforeSuccessfulFailover(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, db := newRepositoryTestDB(t)
+	accountID := seedRepositoryTestAccount(t, db, 97)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	now := time.Now().Truncate(time.Millisecond)
+	baseURL := "https://example.com/repository-test-channel-10097"
+	task := &tasks.Task{
+		TaskID:                     "golden-failover-success",
+		UserID:                     10,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		ResolvedModel:              "gpt-image-1",
+		APIType:                    "openai-compatible",
+		ProviderEndpointBaseURL:    baseURL,
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-golden-a",
+		CreatedAt:                  now.Add(-2 * time.Minute),
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("create task failed: %v", err)
+	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
+
+	firstProviderFinishedAt := now.Add(-80 * time.Second)
+	firstRef, err := taskRepo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:             task.TaskID,
+		LeaseToken:         task.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  now.Add(-90 * time.Second),
+	})
+	if err != nil {
+		t.Fatalf("create first attempt failed: %v", err)
+	}
+	rowsUpdated, err := taskRepo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry provider", &tasks.TaskAttemptFinish{
+		ID:                 firstRef.ID,
+		Status:             tasks.TaskAttemptStatusRequeued,
+		FailureStage:       tasks.ExecutionStageProvider,
+		FailureCategory:    tasks.FailureCategoryProviderError,
+		ErrorMsg:           "retry provider",
+		ProviderFinishedAt: &firstProviderFinishedAt,
+		ProviderLatencyMS:  1000,
+		CompletedAt:        firstProviderFinishedAt,
+	})
+	if err != nil || rowsUpdated != 1 {
+		t.Fatalf("requeue first attempt rows=%d err=%v, want rows=1 nil err", rowsUpdated, err)
+	}
+
+	secondLease := "lease-golden-b"
+	if _, err := db.ExecContext(ctx, `
+UPDATE tasks
+SET status = 'running',
+    account_id = $2,
+    assigned_provider_endpoint_id = $3,
+    assigned_credential_id = $4,
+    resolved_model = 'gpt-image-1',
+    api_type = 'openai-compatible',
+    provider_endpoint_base_url = $5,
+    lease_token = $6
+WHERE task_id = $1`,
+		task.TaskID,
+		accountID,
+		channelID,
+		credentialID,
+		baseURL,
+		secondLease,
+	); err != nil {
+		t.Fatalf("assign second lease snapshot failed: %v", err)
+	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, secondLease)
+
+	secondProviderFinishedAt := now.Add(-60 * time.Second)
+	finalizeStartedAt := now.Add(-59 * time.Second)
+	finalizeFinishedAt := now.Add(-58 * time.Second)
+	completedAt := now.Add(-57 * time.Second)
+	secondRef, err := taskRepo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:             task.TaskID,
+		LeaseToken:         secondLease,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  now.Add(-70 * time.Second),
+	})
+	if err != nil {
+		t.Fatalf("create second attempt failed: %v", err)
+	}
+	rowsUpdated, err = taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, secondLease, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
+		ID:                 secondRef.ID,
+		Status:             tasks.TaskAttemptStatusCompleted,
+		ProviderFinishedAt: &secondProviderFinishedAt,
+		FinalizeStartedAt:  &finalizeStartedAt,
+		FinalizeFinishedAt: &finalizeFinishedAt,
+		ProviderLatencyMS:  1000,
+		FinalizeLatencyMS:  1000,
+		TotalLatencyMS:     2000,
+		CompletedAt:        completedAt,
+	})
+	if err != nil || rowsUpdated != 1 {
+		t.Fatalf("complete second attempt rows=%d err=%v, want rows=1 nil err", rowsUpdated, err)
+	}
+
+	queueWaitMS := int64(100)
+	providerLatencyMS := int64(2000)
+	finalizeLatencyMS := int64(1000)
+	if err := taskRepo.PatchExecutionMetrics(ctx, tasks.TaskExecutionMetricsPatch{
+		TaskID:            task.TaskID,
+		QueueWaitMS:       &queueWaitMS,
+		ProviderLatencyMS: &providerLatencyMS,
+		FinalizeLatencyMS: &finalizeLatencyMS,
+	}); err != nil {
+		t.Fatalf("patch execution metrics failed: %v", err)
+	}
+
+	rows, err := taskRepo.ListMonitorGoldenSignalSamplesByRange(ctx, now.Add(-10*time.Minute), now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("ListMonitorGoldenSignalSamplesByRange failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("samples=%d, want 1: %+v", len(rows), rows)
+	}
+	if rows[0].ProviderAttempts != 2 || rows[0].ProviderErrors != 1 {
+		t.Fatalf("provider attempts/errors=%d/%d, want 2/1 row=%+v", rows[0].ProviderAttempts, rows[0].ProviderErrors, rows[0])
+	}
+}

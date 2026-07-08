@@ -611,6 +611,7 @@ func taskFromSQLCFields(row taskSQLCFields) tasks.Task {
 	return tasks.Task{
 		ID:                         row.ID,
 		TaskID:                     row.TaskID,
+		CorrelationID:              tasks.CorrelationIDForTaskID(row.TaskID),
 		UserID:                     row.UserID,
 		ClientActionID:             row.ClientActionID,
 		AssignedProviderEndpointID: dbutil.Int64Ptr(row.AssignedProviderEndpointID),

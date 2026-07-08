@@ -45,6 +45,30 @@ func TestRiverWorkerRejectsNilJob(t *testing.T) {
 	}
 }
 
+func TestRiverWorkerPropagatesCorrelationIDToProcessor(t *testing.T) {
+	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
+	runtime := &fakeRuntime{}
+	var gotCorrelationID string
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, runtime, func(_ context.Context, task *tasks.TaskPayload, _ taskqueue.TaskAssignment) error {
+		gotCorrelationID = task.EffectiveCorrelationID()
+		return nil
+	}))
+
+	err := worker.Work(context.Background(), &river.Job[taskqueue.DrawingTaskArgs]{
+		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{
+			TaskID:        "trace-task",
+			CorrelationID: "corr-custom",
+			AccountIDs:    []int64{9},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Work returned error: %v", err)
+	}
+	if gotCorrelationID != "corr-custom" {
+		t.Fatalf("correlation_id=%q, want corr-custom", gotCorrelationID)
+	}
+}
+
 func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T) {
 	runtime := &fakeRuntime{}
 	handler := newRiverFinalFailureHandler(runtime)

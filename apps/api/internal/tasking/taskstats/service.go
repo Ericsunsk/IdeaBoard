@@ -23,6 +23,7 @@ type Store interface {
 	ListStatEventsByOccurredRange(ctx context.Context, start, end time.Time) ([]taskstore.StatEventTrendRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]taskstore.StatEventLatencySample, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, start, now time.Time) ([]taskstore.MonitorExecutionPressureAggregate, error)
+	ListMonitorGoldenSignalSamplesByRange(ctx context.Context, start, now time.Time) ([]taskstore.MonitorGoldenSignalSample, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, startedAt, endedAt, statDate time.Time, markDone bool) (taskstore.BackfillDailyStatsResult, error)
 }
 
@@ -56,6 +57,7 @@ type MonitorExecutionPressurePoint struct {
 
 const statisticsDateLayout = "2006-01-02"
 const monitorExecutionPressureWindow = 6 * time.Hour
+const monitorGoldenSignalsWindow = time.Hour
 
 func NewService(store Store) *Service {
 	return &Service{store: store}
@@ -124,6 +126,85 @@ func (s *Service) GetMonitorExecutionPressure(ctx context.Context) ([]MonitorExe
 		return nil, err
 	}
 	return buildMonitorExecutionPressure(rows), nil
+}
+
+func (s *Service) GetMonitorGoldenSignals(ctx context.Context) (MonitorGoldenSignals, error) {
+	now := time.Now()
+	rows, err := s.store.ListMonitorGoldenSignalSamplesByRange(ctx, now.Add(-monitorGoldenSignalsWindow), now)
+	if err != nil {
+		return MonitorGoldenSignals{}, err
+	}
+	return buildMonitorGoldenSignals(rows, monitorGoldenSignalsWindow), nil
+}
+
+func buildMonitorGoldenSignals(rows []taskstore.MonitorGoldenSignalSample, window time.Duration) MonitorGoldenSignals {
+	signals := MonitorGoldenSignals{
+		WindowSeconds: int64(window.Seconds()),
+		SampleCount:   int64(len(rows)),
+	}
+	queueLatencies := make([]int64, 0, len(rows))
+	providerLatencies := make([]int64, 0, len(rows))
+	finalizeLatencies := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		queueLatencies = appendNonNegativeLatency(queueLatencies, row.QueueWaitMS)
+		providerLatencies = appendPositiveLatency(providerLatencies, row.ProviderLatencyMS)
+		finalizeLatencies = appendPositiveLatency(finalizeLatencies, row.FinalizeLatencyMS)
+		providerAttempts := row.ProviderAttempts
+		if providerAttempts == 0 && row.ProviderObserved {
+			providerAttempts = 1
+		}
+		providerErrors := row.ProviderErrors
+		if providerErrors == 0 && row.ProviderError {
+			providerErrors = 1
+		}
+		signals.ProviderAttempts += providerAttempts
+		signals.ProviderErrorCount += providerErrors
+	}
+	if signals.ProviderAttempts > 0 {
+		signals.ProviderErrorRate = float64(signals.ProviderErrorCount) / float64(signals.ProviderAttempts)
+	}
+	signals.QueueDelayMS = buildMonitorLatencySignal(queueLatencies)
+	signals.ProviderLatencyMS = buildMonitorLatencySignal(providerLatencies)
+	signals.FinalizeLatencyMS = buildMonitorLatencySignal(finalizeLatencies)
+	return signals
+}
+
+func appendNonNegativeLatency(values []int64, value int64) []int64 {
+	if value < 0 {
+		return values
+	}
+	return append(values, value)
+}
+
+func appendPositiveLatency(values []int64, value int64) []int64 {
+	if value <= 0 {
+		return values
+	}
+	return append(values, value)
+}
+
+func buildMonitorLatencySignal(values []int64) MonitorLatencySignal {
+	if len(values) == 0 {
+		return MonitorLatencySignal{}
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
+	var total int64
+	for _, value := range values {
+		total += value
+	}
+	p95Index := int(math.Ceil(float64(len(values))*0.95)) - 1
+	if p95Index < 0 {
+		p95Index = 0
+	}
+	if p95Index >= len(values) {
+		p95Index = len(values) - 1
+	}
+	return MonitorLatencySignal{
+		Samples: int64(len(values)),
+		AvgMS:   float64(total) / float64(len(values)),
+		P95MS:   float64(values[p95Index]),
+		MaxMS:   values[len(values)-1],
+	}
 }
 
 func buildMonitorExecutionPressure(rows []taskstore.MonitorExecutionPressureAggregate) []MonitorExecutionPressurePoint {

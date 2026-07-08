@@ -54,6 +54,7 @@ function makeTask(status: string, task: Partial<Task> = {}): Task {
   return {
     id: 1,
     task_id: 'task-1',
+    correlation_id: 'task-1',
     user_id: 1,
     prompt: '',
     priority: 2,

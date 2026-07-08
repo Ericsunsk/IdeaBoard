@@ -37,14 +37,15 @@ func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) er
 	if task == nil {
 		return nil
 	}
+	correlationID := task.EnsureCorrelationID()
 
 	if err := p.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
-		slog.Warn("refresh task accounts failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("refresh task accounts failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		return err
 	}
 
 	if len(task.AccountIDs) == 0 {
-		slog.Info("no available account for task", "task_id", task.TaskID)
+		slog.Info("no available account for task", "task_id", task.TaskID, "correlation_id", correlationID)
 		p.failTask(ctx, task, "没有可用账号")
 		return nil
 	}
@@ -57,13 +58,13 @@ func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) er
 		if isContextInterrupted(err) {
 			return err
 		}
-		slog.Warn("assign task failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("assign task failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
 		return err
 	}
 
 	switch assignment.Status {
 	case taskqueue.AssignStatusDiscard:
-		slog.Info("task converged; discard queued task", "task_id", task.TaskID)
+		slog.Info("task converged; discard queued task", "task_id", task.TaskID, "correlation_id", correlationID)
 		return nil
 	case taskqueue.AssignStatusNoCapacity:
 		return fmt.Errorf("%w: task=%s", taskqueue.ErrNoAccountCapacity, task.TaskID)
@@ -86,7 +87,7 @@ func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) er
 
 func (p *taskProcessor) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
 	if err := p.taskRuntime.FailTask(ctx, taskruntime.FailTaskInput{TaskID: task.TaskID, Reason: reason}); err != nil {
-		slog.Warn("mark task failed failed", "task_id", task.TaskID, "err", err)
+		slog.Warn("mark task failed failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
 	}
-	slog.Warn("task failed", "task_id", task.TaskID, "reason", reason)
+	slog.Warn("task failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "reason", reason)
 }

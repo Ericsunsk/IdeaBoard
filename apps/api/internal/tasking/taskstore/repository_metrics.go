@@ -277,6 +277,110 @@ func (r *Repository) ListMonitorExecutionPressureByRange(ctx context.Context, st
 	return result, nil
 }
 
+func (r *Repository) ListMonitorGoldenSignalSamplesByRange(ctx context.Context, start, now time.Time) ([]MonitorGoldenSignalSample, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("monitor golden signal store not configured")
+	}
+	if start.IsZero() || now.IsZero() {
+		return nil, fmt.Errorf("monitor golden signal date range is required")
+	}
+	if !now.After(start) {
+		return nil, fmt.Errorf("monitor golden signal now_at must be after started_at")
+	}
+	rows, err := r.db.QueryContext(ctx, `
+WITH task_samples AS (
+  SELECT
+    t.task_id,
+    t.created_at,
+    t.status,
+    COALESCE(m.failure_stage, '') AS failure_stage,
+    COALESCE(m.failure_category, '') AS failure_category,
+    COALESCE(m.queue_wait_ms, 0) AS queue_wait_ms,
+    COALESCE(m.provider_latency_ms, 0) AS provider_latency_ms,
+    COALESCE(m.finalize_latency_ms, 0) AS finalize_latency_ms,
+    (
+      m.provider_started_at IS NOT NULL
+      OR m.provider_finished_at IS NOT NULL
+      OR COALESCE(m.provider_latency_ms, 0) > 0
+      OR m.failure_stage = 'provider'
+      OR m.failure_category IN ('auth', 'quota', 'timeout', 'provider_error')
+    ) AS provider_observed,
+    (
+      t.status = 'failed'
+      AND (
+        m.failure_stage = 'provider'
+        OR m.failure_category IN ('auth', 'quota', 'timeout', 'provider_error')
+      )
+    ) AS provider_error
+  FROM tasks t
+  JOIN task_execution_metrics m ON m.task_id = t.task_id
+  WHERE t.created_at >= $1 AND t.created_at < $2
+),
+attempt_samples AS (
+  SELECT
+    ta.task_id,
+    COUNT(*) FILTER (
+      WHERE ta.provider_started_at IS NOT NULL
+        OR ta.provider_finished_at IS NOT NULL
+        OR ta.provider_latency_ms > 0
+        OR ta.status IN ('completed', 'failed', 'requeued')
+    ) AS provider_attempts,
+    COUNT(*) FILTER (
+      WHERE ta.status IN ('failed', 'requeued')
+        AND (
+          ta.failure_stage = 'provider'
+          OR ta.failure_category IN ('auth', 'quota', 'timeout', 'provider_error')
+        )
+    ) AS provider_errors
+  FROM task_attempts ta
+  JOIN task_samples s ON s.task_id = ta.task_id
+  GROUP BY ta.task_id
+)
+SELECT
+  s.status,
+  s.failure_stage,
+  s.failure_category,
+  s.queue_wait_ms,
+  s.provider_latency_ms,
+  s.finalize_latency_ms,
+  s.provider_observed,
+  s.provider_error,
+  COALESCE(a.provider_attempts, CASE WHEN s.provider_observed THEN 1 ELSE 0 END) AS provider_attempts,
+  COALESCE(a.provider_errors, CASE WHEN s.provider_error THEN 1 ELSE 0 END) AS provider_errors
+FROM task_samples s
+LEFT JOIN attempt_samples a ON a.task_id = s.task_id
+ORDER BY s.created_at DESC
+LIMIT 500`, start, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	samples := []MonitorGoldenSignalSample{}
+	for rows.Next() {
+		var sample MonitorGoldenSignalSample
+		if err := rows.Scan(
+			&sample.Status,
+			&sample.FailureStage,
+			&sample.FailureCategory,
+			&sample.QueueWaitMS,
+			&sample.ProviderLatencyMS,
+			&sample.FinalizeLatencyMS,
+			&sample.ProviderObserved,
+			&sample.ProviderError,
+			&sample.ProviderAttempts,
+			&sample.ProviderErrors,
+		); err != nil {
+			return nil, err
+		}
+		samples = append(samples, sample)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return samples, nil
+}
+
 func (r *Repository) ListExecutionMetricsByTaskIDs(ctx context.Context, taskIDs []string) (map[string]*tasks.TaskExecutionMetrics, error) {
 	result := make(map[string]*tasks.TaskExecutionMetrics, len(taskIDs))
 	if len(taskIDs) == 0 {

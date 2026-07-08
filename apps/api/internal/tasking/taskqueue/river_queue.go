@@ -83,6 +83,7 @@ func (q *RiverQueue) Enqueue(ctx context.Context, task *tasks.TaskPayload) error
 	if strings.TrimSpace(task.TaskID) == "" {
 		return fmt.Errorf("river enqueue: empty task_id")
 	}
+	correlationID := task.EnsureCorrelationID()
 	priority := tasks.EffectiveTaskPriority(task.Priority)
 	if !tasks.IsValidTaskPriority(priority) {
 		return fmt.Errorf("river enqueue: invalid priority %d", task.Priority)
@@ -94,7 +95,7 @@ func (q *RiverQueue) Enqueue(ctx context.Context, task *tasks.TaskPayload) error
 	}
 	_, err := client.Insert(ctx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, q.queueName, q.maxRetry))
 	if err != nil {
-		return fmt.Errorf("river enqueue: %w", err)
+		return fmt.Errorf("river enqueue: correlation_id=%s: %w", correlationID, err)
 	}
 	return nil
 }
@@ -115,6 +116,7 @@ func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, t
 	if strings.TrimSpace(task.TaskID) == "" {
 		return fmt.Errorf("river enqueue tx: empty task_id")
 	}
+	correlationID := task.EnsureCorrelationID()
 	if client == nil {
 		return fmt.Errorf("river enqueue tx: client not configured")
 	}
@@ -128,7 +130,7 @@ func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, t
 	task.Priority = priority
 	_, err := client.InsertTx(ctx, tx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, queueName, maxRetry))
 	if err != nil {
-		return fmt.Errorf("river enqueue tx: %w", err)
+		return fmt.Errorf("river enqueue tx: correlation_id=%s: %w", correlationID, err)
 	}
 	return nil
 }
@@ -144,6 +146,7 @@ func drawingTaskInsertOpts(task *tasks.TaskPayload, queueName string, maxRetry i
 	priority := tasks.TaskPriorityDefault
 	if task != nil {
 		taskID = task.TaskID
+		task.EnsureCorrelationID()
 		priority = tasks.EffectiveTaskPriority(task.Priority)
 	}
 	return &river.InsertOpts{

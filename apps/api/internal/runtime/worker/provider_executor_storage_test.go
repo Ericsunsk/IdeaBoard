@@ -1,10 +1,12 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -47,7 +49,7 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 		}},
 	}
 
-	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", &accounts.ApiAccount{
+	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", "corr-owned", &accounts.ApiAccount{
 		ProxyURL: "https://provider.example.test/v1",
 	}, []string{dataURL})
 	if err != nil {
@@ -69,6 +71,45 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 		if !containsString(materializer.remoteOpts.AllowHosts, wantHost) {
 			t.Fatalf("AllowHosts=%#v missing %q", materializer.remoteOpts.AllowHosts, wantHost)
 		}
+	}
+}
+
+func TestMaterializeProviderResultImagesLogsProvidedCorrelationID(t *testing.T) {
+	var logBuffer bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logBuffer, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() {
+		slog.SetDefault(previousLogger)
+	})
+
+	executor := &ProviderExecutor{
+		resultMaterializer: &captureResultMaterializer{
+			remoteResult: taskmedia.MaterializedResults{
+				Items: []taskmedia.MaterializedResult{{
+					ImageURL: "/uploads/tasks/42/task-owned/result.png",
+					Output: tasks.TaskOutput{
+						TaskID: "task-owned",
+						Role:   "image",
+						URL:    "/uploads/tasks/42/task-owned/result.png",
+					},
+				}},
+			},
+		},
+	}
+
+	_, _, err := executor.materializeProviderResultImages(
+		context.Background(),
+		42,
+		"task-owned",
+		"corr-custom",
+		&accounts.ApiAccount{},
+		[]string{"https://cdn.example/image.png"},
+	)
+	if err != nil {
+		t.Fatalf("materializeProviderResultImages returned error: %v", err)
+	}
+	if !strings.Contains(logBuffer.String(), "correlation_id=corr-custom") {
+		t.Fatalf("materialization logs should include provided correlation id, got: %s", logBuffer.String())
 	}
 }
 
@@ -169,7 +210,7 @@ func TestOpenAIRejectsHugeRelativeCanvasUploadFromStorage(t *testing.T) {
 func TestMaterializeProviderResultImagesFailsWhenMaterializerMissing(t *testing.T) {
 	executor := &ProviderExecutor{}
 
-	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{}, []string{"data:image/png;base64,abc"})
+	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", "corr-fail", &accounts.ApiAccount{}, []string{"data:image/png;base64,abc"})
 	if err == nil {
 		t.Fatal("expected materializeProviderResultImages to fail")
 	}
@@ -191,7 +232,7 @@ func TestMaterializeProviderResultImagesWrapsMaterializerFailure(t *testing.T) {
 		resultMaterializer: &captureResultMaterializer{remoteErr: storeErr},
 	}
 
-	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{}, []string{"https://cdn.example/image.png"})
+	_, _, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", "corr-fail", &accounts.ApiAccount{}, []string{"https://cdn.example/image.png"})
 	if err == nil {
 		t.Fatal("expected materializeProviderResultImages to fail")
 	}

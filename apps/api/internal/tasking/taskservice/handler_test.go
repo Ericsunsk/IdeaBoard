@@ -100,6 +100,9 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 	if call.task.TaskID != body.Data.TaskID || call.queueTask.TaskID != body.Data.TaskID {
 		t.Fatalf("task ids do not match response: task=%q queue=%q response=%q", call.task.TaskID, call.queueTask.TaskID, body.Data.TaskID)
 	}
+	if call.task.EffectiveCorrelationID() != body.Data.TaskID || call.queueTask.EffectiveCorrelationID() != body.Data.TaskID {
+		t.Fatalf("correlation ids task=%q queue=%q, want response task_id %q", call.task.EffectiveCorrelationID(), call.queueTask.EffectiveCorrelationID(), body.Data.TaskID)
+	}
 	if call.task.UserID != 42 || call.queueTask.UserID != 42 {
 		t.Fatalf("user ids task=%d queue=%d, want 42", call.task.UserID, call.queueTask.UserID)
 	}

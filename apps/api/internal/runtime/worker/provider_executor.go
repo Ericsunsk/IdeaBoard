@@ -123,7 +123,8 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 }
 
 func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
-	slog.Info("calling provider API", "account_name", account.Name, "provider_endpoint_id", account.ProviderEndpointID, "task_id", task.TaskID)
+	correlationID := task.EnsureCorrelationID()
+	slog.Info("calling provider API", "account_name", account.Name, "provider_endpoint_id", account.ProviderEndpointID, "task_id", task.TaskID, "correlation_id", correlationID)
 
 	exec, err := c.prepareProviderExecution(ctx, account, task, assignment)
 	if err != nil {
@@ -161,9 +162,17 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 
 	finalizeStartedAt := time.Now()
 	output.Timeline.FinalizeStartedAt = &finalizeStartedAt
+	markFinalizeFinished := func() {
+		if output.Timeline.FinalizeFinishedAt != nil {
+			return
+		}
+		finalizeFinishedAt := time.Now()
+		output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
+	}
 	if exec.LocalRedrawCtx != nil {
 		imageURL, taskOutputs, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, exec.LocalRedrawCtx, imageURL, exec.Timeout)
 		if err != nil {
+			markFinalizeFinished()
 			if errors.Is(err, context.Canceled) {
 				return output, err
 			}
@@ -176,8 +185,9 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	}
 
 	if !localRedrawStored {
-		imageURLs, taskOutputs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, account, imageURLs)
+		imageURLs, taskOutputs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, correlationID, account, imageURLs)
 		if err != nil {
+			markFinalizeFinished()
 			if errors.Is(err, context.Canceled) {
 				return output, err
 			}
@@ -190,6 +200,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 
 	result := map[string]interface{}{
 		"task_id":                task.TaskID,
+		"correlation_id":         correlationID,
 		"account_id":             account.ID,
 		"provider_endpoint_id":   account.ProviderEndpointID,
 		"provider_endpoint_name": exec.ProviderEndpointName,
@@ -354,7 +365,7 @@ func resolveAccountModelForExecution(account *accounts.ApiAccount, params provid
 	return accounts.ResolveAccountModel(account, params.featureSlug(), params.requestedModel())
 }
 
-func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, []tasks.TaskOutput, error) {
+func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, correlationID string, account *accounts.ApiAccount, imageURLs []string) ([]string, []tasks.TaskOutput, error) {
 	if len(imageURLs) == 0 {
 		return imageURLs, nil, nil
 	}
@@ -366,7 +377,11 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		)
 	}
 
-	slog.Info("provider result materialization started", "image_count", len(imageURLs))
+	correlationID = tasks.NormalizeCorrelationID(correlationID)
+	if correlationID == "" {
+		correlationID = tasks.CorrelationIDForTaskID(taskID)
+	}
+	slog.Info("provider result materialization started", "task_id", taskID, "correlation_id", correlationID, "image_count", len(imageURLs))
 
 	materialized, storeErr := c.resultMaterializer.MaterializeRemoteResults(ctx, userID, taskID, imageURLs, taskmedia.ResultMaterializeOptions{
 		AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicURLs),
@@ -396,7 +411,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		)
 	}
 	for index, sourceURL := range imageURLs {
-		slog.Info("provider image materialized", "source_url", redactLogURL(sourceURL), "stored_url", redactLogURL(materialized.Items[index].ImageURL))
+		slog.Info("provider image materialized", "task_id", taskID, "correlation_id", correlationID, "source_url", redactLogURL(sourceURL), "stored_url", redactLogURL(materialized.Items[index].ImageURL))
 	}
 	return materialized.ImageURLs(), materialized.Outputs(), nil
 }

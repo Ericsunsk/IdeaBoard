@@ -53,6 +53,16 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	if queueTask == nil {
 		return emptyResult, fmt.Errorf("submit task: queue task is nil")
 	}
+	if task.CorrelationID = tasks.NormalizeCorrelationID(task.CorrelationID); task.CorrelationID == "" {
+		task.CorrelationID = tasks.CorrelationIDForTaskID(task.TaskID)
+	}
+	queueTask.CorrelationID = tasks.NormalizeCorrelationID(queueTask.CorrelationID)
+	if queueTask.CorrelationID == "" {
+		queueTask.CorrelationID = task.CorrelationID
+	}
+	if queueTask.CorrelationID != task.CorrelationID {
+		return emptyResult, fmt.Errorf("submit task: correlation id mismatch task=%q queue=%q", task.CorrelationID, queueTask.CorrelationID)
+	}
 	if task.Priority == 0 && queueTask.Priority != 0 {
 		task.Priority = queueTask.Priority
 	} else {
@@ -92,6 +102,8 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 		return emptyResult, fmt.Errorf("submit task: insert task: %w", err)
 	}
 	if !created {
+		task.CorrelationID = tasks.CorrelationIDForTaskID(task.TaskID)
+		queueTask.CorrelationID = task.CorrelationID
 		if err := tx.Commit(ctx); err != nil {
 			return emptyResult, fmt.Errorf("submit task: commit existing task lookup: %w", err)
 		}

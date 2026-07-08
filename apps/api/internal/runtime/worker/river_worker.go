@@ -78,6 +78,7 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 		return errors.New("river job is nil")
 	}
 	task := job.Args.Task
+	task.EnsureCorrelationID()
 	if job.JobRow != nil {
 		task.RiverJobID = job.ID
 	}

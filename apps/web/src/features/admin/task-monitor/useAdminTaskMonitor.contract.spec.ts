@@ -215,6 +215,7 @@ function makeTask(status: string, id: number): Task {
   return {
     id,
     task_id: `task-${id}`,
+    correlation_id: `task-${id}`,
     user_id: 1,
     prompt: `prompt-${id}`,
     priority: 2,
@@ -266,6 +267,16 @@ function makeMonitorData(globalQueueLen: number): MonitorData {
     running_attempts: 0,
     account_loads: {},
     execution_pressure: [],
+    golden_signals: {
+      window_seconds: 3600,
+      sample_count: 0,
+      provider_attempts: 0,
+      provider_error_count: 0,
+      provider_error_rate: 0,
+      queue_delay_ms: { samples: 0, avg_ms: 0, p95_ms: 0, max_ms: 0 },
+      provider_latency_ms: { samples: 0, avg_ms: 0, p95_ms: 0, max_ms: 0 },
+      finalize_latency_ms: { samples: 0, avg_ms: 0, p95_ms: 0, max_ms: 0 },
+    },
   }
 }
 

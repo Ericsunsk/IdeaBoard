@@ -86,6 +86,19 @@ func TestTaskUserViewIncludesCancelReason(t *testing.T) {
 	}
 }
 
+func TestTaskCorrelationIDFallsBackToTaskID(t *testing.T) {
+	task := &Task{TaskID: "task-trace"}
+
+	if got := task.EffectiveCorrelationID(); got != "task-trace" {
+		t.Fatalf("correlation_id=%q, want task id", got)
+	}
+
+	view := task.ToUserView()
+	if view.CorrelationID != "task-trace" {
+		t.Fatalf("user view correlation_id=%q, want task id", view.CorrelationID)
+	}
+}
+
 func TestTaskUserViewIncludesExecutionFailureMetadata(t *testing.T) {
 	task := &Task{
 		ID:         1,

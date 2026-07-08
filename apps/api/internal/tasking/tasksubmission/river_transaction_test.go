@@ -77,6 +77,9 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	if args.Task.TaskID != queueTask.TaskID {
 		t.Fatalf("river args task_id=%q, want %q", args.Task.TaskID, queueTask.TaskID)
 	}
+	if args.Task.EffectiveCorrelationID() != task.TaskID {
+		t.Fatalf("river args correlation_id=%q, want task_id %q", args.Task.EffectiveCorrelationID(), task.TaskID)
+	}
 	if args.Task.UserID != queueTask.UserID || args.Task.Prompt != queueTask.Prompt || args.Task.Params != queueTask.Params {
 		t.Fatalf("river args task=%+v, want submitted task %+v", args.Task, *queueTask)
 	}

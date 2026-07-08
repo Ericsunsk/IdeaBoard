@@ -97,6 +97,7 @@ function makeTask(overrides: Partial<Task>): Task {
   return {
     id: 1,
     task_id: 'task_1',
+    correlation_id: 'task_1',
     user_id: 1,
     prompt: 'Prompt',
     priority: 2,

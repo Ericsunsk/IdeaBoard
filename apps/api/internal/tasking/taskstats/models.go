@@ -105,3 +105,21 @@ type AdminStatisticsFailureCategory struct {
 	Total        int64   `json:"total"`
 	AvgLatencyMS float64 `json:"avg_latency_ms"`
 }
+
+type MonitorGoldenSignals struct {
+	WindowSeconds      int64                `json:"window_seconds"`
+	SampleCount        int64                `json:"sample_count"`
+	ProviderAttempts   int64                `json:"provider_attempts"`
+	ProviderErrorCount int64                `json:"provider_error_count"`
+	ProviderErrorRate  float64              `json:"provider_error_rate"`
+	QueueDelayMS       MonitorLatencySignal `json:"queue_delay_ms"`
+	ProviderLatencyMS  MonitorLatencySignal `json:"provider_latency_ms"`
+	FinalizeLatencyMS  MonitorLatencySignal `json:"finalize_latency_ms"`
+}
+
+type MonitorLatencySignal struct {
+	Samples int64   `json:"samples"`
+	AvgMS   float64 `json:"avg_ms"`
+	P95MS   float64 `json:"p95_ms"`
+	MaxMS   int64   `json:"max_ms"`
+}

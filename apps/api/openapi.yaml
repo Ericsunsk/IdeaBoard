@@ -1557,10 +1557,11 @@ components:
 
     Task:
       type: object
-      required: [id, task_id, user_id, prompt, status, created_at, updated_at]
+      required: [id, task_id, correlation_id, user_id, prompt, status, created_at, updated_at]
       properties:
         id: { type: integer }
         task_id: { type: string }
+        correlation_id: { type: string }
         user_id: { type: integer }
         assigned_provider_endpoint_id:
           type: integer
@@ -2147,9 +2148,52 @@ components:
         failed_count: { type: integer }
         retry_count: { type: integer }
 
+    MonitorLatencySignal:
+      type: object
+      required: [samples, avg_ms, p95_ms, max_ms]
+      properties:
+        samples: { type: integer }
+        avg_ms: { type: number }
+        p95_ms: { type: number }
+        max_ms: { type: integer }
+
+    MonitorGoldenSignals:
+      type: object
+      required:
+        - window_seconds
+        - sample_count
+        - provider_attempts
+        - provider_error_count
+        - provider_error_rate
+        - queue_delay_ms
+        - provider_latency_ms
+        - finalize_latency_ms
+      properties:
+        window_seconds:
+          type: integer
+          description: Rolling observation window in seconds.
+        sample_count:
+          type: integer
+          description: Recent task execution metrics sampled for this snapshot.
+        provider_attempts:
+          type: integer
+          description: Recent tasks that reached provider execution.
+        provider_error_count:
+          type: integer
+          description: Recent provider-stage failures.
+        provider_error_rate:
+          type: number
+          description: provider_error_count / provider_attempts.
+        queue_delay_ms:
+          $ref: '#/components/schemas/MonitorLatencySignal'
+        provider_latency_ms:
+          $ref: '#/components/schemas/MonitorLatencySignal'
+        finalize_latency_ms:
+          $ref: '#/components/schemas/MonitorLatencySignal'
+
     MonitorData:
       type: object
-      required: [global_queue_len, wait_queue_len, running_attempts, account_loads, execution_pressure]
+      required: [global_queue_len, wait_queue_len, running_attempts, account_loads, execution_pressure, golden_signals]
       properties:
         global_queue_len:
           type: integer
@@ -2168,6 +2212,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MonitorExecutionPressurePoint'
+        golden_signals:
+          $ref: '#/components/schemas/MonitorGoldenSignals'
 
     MonitorStats:
       type: object

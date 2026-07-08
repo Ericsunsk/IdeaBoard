@@ -10,6 +10,7 @@ import type { TaskOutput } from './taskOutput'
 export interface Task {
   id: number
   task_id: string
+  correlation_id: string
   user_id: number
   /** @nullable */
   assigned_provider_endpoint_id?: number | null

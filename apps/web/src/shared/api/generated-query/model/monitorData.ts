@@ -6,6 +6,7 @@
  */
 import type { MonitorDataAccountLoads } from './monitorDataAccountLoads'
 import type { MonitorExecutionPressurePoint } from './monitorExecutionPressurePoint'
+import type { MonitorGoldenSignals } from './monitorGoldenSignals'
 
 export interface MonitorData {
   /** River jobs waiting to be processed. */
@@ -16,4 +17,5 @@ export interface MonitorData {
   running_attempts: number
   account_loads: MonitorDataAccountLoads
   execution_pressure: MonitorExecutionPressurePoint[]
+  golden_signals: MonitorGoldenSignals
 }
