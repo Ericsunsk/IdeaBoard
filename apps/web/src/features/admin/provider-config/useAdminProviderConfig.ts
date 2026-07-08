@@ -12,6 +12,7 @@ import {
   createAdminProviderConfigWorkspace,
   type AdminProviderConfigWorkspace,
 } from './providerConfigWorkspace'
+import type { AdminProviderConfigResource } from './providerConfigResource'
 import type {
   AdminProviderAccountLimits,
   ProviderAccountCommandTarget,
@@ -26,6 +27,7 @@ import type {
 export type UseAdminProviderConfigOptions = {
   feedback: AdminProviderConfigFeedback
   confirm: AdminConfirmPort
+  resource?: AdminProviderConfigResource
 }
 
 export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
@@ -34,6 +36,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
     feedback: options.feedback,
     confirm: options.confirm,
     runAsyncAction,
+    resource: options.resource,
   })
 
   const providerEndpointEditor = createProviderEndpointEditor({
@@ -71,7 +74,9 @@ function createProviderEndpointEditor(options: {
   const saveLoading = options.workspace.providerEndpointSaveLoading
   const currentProviderEndpointId = ref(0)
   const form = ref<ProviderEndpointFormData>(createEmptyProviderEndpointForm())
-  const errors = ref<Record<ProviderEndpointFormField, string>>(createEmptyProviderEndpointFormErrors())
+  const errors = ref<Record<ProviderEndpointFormField, string>>(
+    createEmptyProviderEndpointFormErrors(),
+  )
 
   function openCreate() {
     isEditing.value = false
@@ -173,7 +178,9 @@ function createAccountEditor(options: {
   const currentAccountId = ref(0)
   const selectedProviderEndpoint = ref<ProviderEndpointRecord | null>(null)
   const selectedProviderEndpointView = computed(() =>
-    selectedProviderEndpoint.value ? options.workspace.getProviderEndpointView(selectedProviderEndpoint.value) : null,
+    selectedProviderEndpoint.value
+      ? options.workspace.getProviderEndpointView(selectedProviderEndpoint.value)
+      : null,
   )
   const accountLimits = options.workspace.accountLimits
   const form = ref(createEmptyAccountForm(accountLimits.value, 0))
@@ -196,7 +203,9 @@ function createAccountEditor(options: {
       providerEndpoint.id,
       createUniqueAccountName(
         `${providerEndpoint.name} APIKey`,
-        options.workspace.getProviderEndpointAccounts(providerEndpoint.id).map((account) => account.name),
+        options.workspace
+          .getProviderEndpointAccounts(providerEndpoint.id)
+          .map((account) => account.name),
       ),
     )
     detectedModelValues.value = []
@@ -213,7 +222,9 @@ function createAccountEditor(options: {
 
     isEditing.value = true
     currentAccountId.value = account.id
-    selectedProviderEndpoint.value = options.workspace.findProviderEndpointById(account.providerEndpointId)
+    selectedProviderEndpoint.value = options.workspace.findProviderEndpointById(
+      account.providerEndpointId,
+    )
     form.value = {
       providerEndpointId: account.providerEndpointId,
       name: account.name,
@@ -416,7 +427,10 @@ function createUniqueAccountName(baseName: string, existingNames: string[]) {
   return `${trimmedBaseName} ${suffix}`
 }
 
-function resolveProviderEndpointFieldError(form: ProviderEndpointFormData, field: ProviderEndpointFormField) {
+function resolveProviderEndpointFieldError(
+  form: ProviderEndpointFormData,
+  field: ProviderEndpointFormField,
+) {
   if (field === 'name' && !form.name.trim()) return '请输入供应商端点名称'
   if (field === 'apiType' && !form.apiType) return '请选择接口类型'
   if (field === 'baseUrl') {

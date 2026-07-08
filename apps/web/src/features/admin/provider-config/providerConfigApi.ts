@@ -24,6 +24,7 @@ import type {
   ProviderEndpoint as ProviderEndpointDto,
 } from '../../../shared/api/generated-query/model'
 import { assertApiOk, requireApiData } from '../shared/queries/adminApiResponse'
+import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
 import type {
   AdminProviderAccountLimits,
   ProviderModelDetectionInput,
@@ -33,11 +34,6 @@ import type {
   ProviderEndpointRecord,
 } from './providerConfigTypes'
 import { createProviderEndpointSavePayload } from './providerConfigPayload'
-
-export const FALLBACK_ADMIN_ACCOUNT_LIMITS: AdminProviderAccountLimits = {
-  maxConcurrent: { min: 1, max: 64, default: 3 },
-  timeoutSeconds: { min: 1, max: 600, default: 120 },
-}
 
 type SaveAdminProviderEndpointInput = {
   id?: number
@@ -52,7 +48,9 @@ export async function fetchAdminProviderEndpoints(): Promise<ProviderEndpointRec
   return (data.list ?? []).map(toProviderEndpointRecord)
 }
 
-export async function saveAdminProviderEndpoint(input: SaveAdminProviderEndpointInput): Promise<void> {
+export async function saveAdminProviderEndpoint(
+  input: SaveAdminProviderEndpointInput,
+): Promise<void> {
   const payload = createProviderEndpointSavePayload(input.data)
   const res =
     input.id != null
@@ -66,7 +64,9 @@ export async function deleteAdminProviderEndpoint(id: number): Promise<void> {
   assertApiOk(res, '删除供应商端点失败')
 }
 
-export async function detectAdminProviderEndpointModels(input: ProviderModelDetectionInput): Promise<string[]> {
+export async function detectAdminProviderEndpointModels(
+  input: ProviderModelDetectionInput,
+): Promise<string[]> {
   const res = await detectAdminProviderEndpointModelsRequest(toDetectModelsRequest(input))
   const data = requireApiData(res, '自动检测模型失败')
   return data.models ?? []

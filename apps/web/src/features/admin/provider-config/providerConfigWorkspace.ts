@@ -3,24 +3,12 @@ import type { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
-  createAdminAccountRecord,
-  deleteAdminAccountRecord,
-  deleteAdminProviderEndpoint,
-  detectAdminProviderEndpointModels,
-  FALLBACK_ADMIN_ACCOUNT_LIMITS,
-  fetchAdminAccountLimits,
-  fetchAllAdminAccounts,
-  fetchAdminProviderEndpoints,
-  patchAdminAccountModelRecord,
-  saveAdminProviderEndpoint,
-  updateAdminAccountRecord,
-} from './providerConfigApi'
-import {
   countUniqueAccountModels,
   createAccountModelRows,
   createProviderEndpointCards,
   createProviderEndpointView,
 } from './providerConfigCards'
+import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
 import {
   ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS,
   createAccountCreatePayload,
@@ -28,6 +16,10 @@ import {
   getAdminProviderEndpointApiTypeLabel,
   normalizeModelKey,
 } from './providerConfigPayload'
+import {
+  createAdminProviderConfigResource,
+  type AdminProviderConfigResource,
+} from './providerConfigResource'
 import {
   MAX_DETECTED_MODELS,
   mergeDetectedModelValues,
@@ -50,6 +42,7 @@ export type AdminProviderConfigWorkspaceOptions = {
   feedback: AdminProviderConfigFeedback
   confirm: AdminConfirmPort
   runAsyncAction: RunAsyncAction
+  resource?: AdminProviderConfigResource
 }
 
 export type SaveProviderEndpointCommand = {
@@ -87,9 +80,8 @@ const activeProgressPt = { value: { class: '!bg-admin-success' } } as const
 const mutedProgressPt = { value: { class: '!bg-admin-text-3' } } as const
 const DEFAULT_PROVIDER_API_TYPE = ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS[0].value
 
-export function createAdminProviderConfigWorkspace(
-  options: AdminProviderConfigWorkspaceOptions,
-) {
+export function createAdminProviderConfigWorkspace(options: AdminProviderConfigWorkspaceOptions) {
+  const resource = options.resource ?? createAdminProviderConfigResource()
   const loading = ref(false)
   const providerEndpointSaveLoading = ref(false)
   const accountSaveLoading = ref(false)
@@ -130,7 +122,7 @@ export function createAdminProviderConfigWorkspace(
 
   async function loadAccountLimits() {
     try {
-      accountLimits.value = await fetchAdminAccountLimits()
+      accountLimits.value = await resource.fetchAccountLimits()
     } catch (error) {
       accountLimits.value = FALLBACK_ADMIN_ACCOUNT_LIMITS
       options.feedback.accountLimitsFallback(error)
@@ -139,14 +131,14 @@ export function createAdminProviderConfigWorkspace(
   }
 
   async function loadAccounts() {
-    const [nextAccounts] = await Promise.all([fetchAllAdminAccounts(), loadAccountLimits()])
+    const [nextAccounts] = await Promise.all([resource.fetchAccounts(), loadAccountLimits()])
     accounts.value = nextAccounts
   }
 
   async function loadData() {
     await options.runAsyncAction(
       async () => {
-        providerEndpoints.value = await fetchAdminProviderEndpoints()
+        providerEndpoints.value = await resource.fetchProviderEndpoints()
         await loadAccounts()
       },
       {
@@ -161,7 +153,7 @@ export function createAdminProviderConfigWorkspace(
   async function saveProviderEndpoint(command: SaveProviderEndpointCommand) {
     await options.runAsyncAction(
       async () => {
-        await saveAdminProviderEndpoint({
+        await resource.saveProviderEndpoint({
           id: command.id,
           data: { ...command.data },
         })
@@ -186,7 +178,7 @@ export function createAdminProviderConfigWorkspace(
           : undefined
 
         if (command.isEditing) {
-          await updateAdminAccountRecord(
+          await resource.updateAccountRecord(
             command.accountId,
             createAccountUpdatePayload({
               form: command.form,
@@ -198,7 +190,7 @@ export function createAdminProviderConfigWorkspace(
           )
           options.feedback.accountSaved(true)
         } else {
-          await createAdminAccountRecord(
+          await resource.createAccountRecord(
             createAccountCreatePayload({
               form: command.form,
               providerEndpoint: command.selectedProviderEndpoint,
@@ -232,7 +224,7 @@ export function createAdminProviderConfigWorkspace(
       intent: 'danger',
       onConfirm: async () => {
         try {
-          await deleteAdminProviderEndpoint(providerEndpoint.id)
+          await resource.deleteProviderEndpoint(providerEndpoint.id)
           options.feedback.providerEndpointDeleted()
           await loadData()
         } catch (error) {
@@ -253,7 +245,7 @@ export function createAdminProviderConfigWorkspace(
       intent: 'danger',
       onConfirm: async () => {
         try {
-          await deleteAdminAccountRecord(account.id)
+          await resource.deleteAccountRecord(account.id)
           options.feedback.accountDeleted()
           await loadData()
         } catch (error) {
@@ -290,13 +282,12 @@ export function createAdminProviderConfigWorkspace(
     const sessionKey = `${apiType}::${baseURL}::${secret}`
     if (command.sessionCache.has(sessionKey)) return result
 
-    const nextSessionCache = new Set(command.sessionCache)
-    nextSessionCache.add(sessionKey)
     let nextDetectedValues = command.detectedValues
+    let nextSessionCache = command.sessionCache
 
     await options.runAsyncAction(
       async () => {
-        const detectedModels = await detectAdminProviderEndpointModels({
+        const detectedModels = await resource.detectProviderEndpointModels({
           baseUrl: baseURL,
           apiKey: secret,
           apiType,
@@ -310,6 +301,8 @@ export function createAdminProviderConfigWorkspace(
             MAX_DETECTED_MODELS,
           )
         }
+        nextSessionCache = new Set(command.sessionCache)
+        nextSessionCache.add(sessionKey)
       },
       {
         loading: detectModelsLoading,
@@ -343,7 +336,7 @@ export function createAdminProviderConfigWorkspace(
 
     await options.runAsyncAction(
       async () => {
-        const nextAccount = await patchAdminAccountModelRecord(account.id, {
+        const nextAccount = await resource.patchAccountModelRecord(account.id, {
           name: targetModel.name,
           enabled: nextEnabled,
         })
@@ -377,7 +370,11 @@ export function createAdminProviderConfigWorkspace(
   }
 
   function findProviderEndpointById(providerEndpointId: number) {
-    return providerEndpoints.value.find((providerEndpoint) => providerEndpoint.id === providerEndpointId) || null
+    return (
+      providerEndpoints.value.find(
+        (providerEndpoint) => providerEndpoint.id === providerEndpointId,
+      ) || null
+    )
   }
 
   function getProviderEndpointAccounts(providerEndpointId: number) {
@@ -444,6 +441,4 @@ function findAccountByTarget(
   return accounts.find((account) => account.id === target.id)
 }
 
-export type AdminProviderConfigWorkspace = ReturnType<
-  typeof createAdminProviderConfigWorkspace
->
+export type AdminProviderConfigWorkspace = ReturnType<typeof createAdminProviderConfigWorkspace>

@@ -1,40 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAdminProviderConfig } from './useAdminProviderConfig'
-import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigApi'
+import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
+import type { AdminProviderConfigResource } from './providerConfigResource'
 
-const mockApi = vi.hoisted(() => ({
-  createAdminAccountRecord: vi.fn(),
-  deleteAdminAccountRecord: vi.fn(),
-  deleteAdminProviderEndpoint: vi.fn(),
-  detectAdminProviderEndpointModels: vi.fn(),
-  fetchAdminAccountLimits: vi.fn(),
-  fetchAllAdminAccounts: vi.fn(),
-  fetchAdminProviderEndpoints: vi.fn(),
-  patchAdminAccountModelRecord: vi.fn(),
-  saveAdminProviderEndpoint: vi.fn(),
-  updateAdminAccountRecord: vi.fn(),
-}))
-
-vi.mock('./providerConfigApi', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./providerConfigApi')>()),
-  createAdminAccountRecord: mockApi.createAdminAccountRecord,
-  deleteAdminAccountRecord: mockApi.deleteAdminAccountRecord,
-  deleteAdminProviderEndpoint: mockApi.deleteAdminProviderEndpoint,
-  detectAdminProviderEndpointModels: mockApi.detectAdminProviderEndpointModels,
-  fetchAdminAccountLimits: mockApi.fetchAdminAccountLimits,
-  fetchAllAdminAccounts: mockApi.fetchAllAdminAccounts,
-  fetchAdminProviderEndpoints: mockApi.fetchAdminProviderEndpoints,
-  patchAdminAccountModelRecord: mockApi.patchAdminAccountModelRecord,
-  saveAdminProviderEndpoint: mockApi.saveAdminProviderEndpoint,
-  updateAdminAccountRecord: mockApi.updateAdminAccountRecord,
-}))
+const mockResource = {
+  createAccountRecord: vi.fn(),
+  deleteAccountRecord: vi.fn(),
+  deleteProviderEndpoint: vi.fn(),
+  detectProviderEndpointModels: vi.fn(),
+  fetchAccountLimits: vi.fn(),
+  fetchAccounts: vi.fn(),
+  fetchProviderEndpoints: vi.fn(),
+  patchAccountModelRecord: vi.fn(),
+  saveProviderEndpoint: vi.fn(),
+  updateAccountRecord: vi.fn(),
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockApi.fetchAdminProviderEndpoints.mockResolvedValue([])
-  mockApi.fetchAllAdminAccounts.mockResolvedValue([])
-  mockApi.fetchAdminAccountLimits.mockResolvedValue(FALLBACK_ADMIN_ACCOUNT_LIMITS)
-  mockApi.patchAdminAccountModelRecord.mockResolvedValue(undefined)
+  mockResource.fetchProviderEndpoints.mockResolvedValue([])
+  mockResource.fetchAccounts.mockResolvedValue([])
+  mockResource.fetchAccountLimits.mockResolvedValue(FALLBACK_ADMIN_ACCOUNT_LIMITS)
+  mockResource.patchAccountModelRecord.mockResolvedValue(undefined)
+  mockResource.createAccountRecord.mockResolvedValue(undefined)
+  mockResource.updateAccountRecord.mockResolvedValue(undefined)
+  mockResource.saveProviderEndpoint.mockResolvedValue(undefined)
+  mockResource.deleteProviderEndpoint.mockResolvedValue(undefined)
+  mockResource.deleteAccountRecord.mockResolvedValue(undefined)
+  mockResource.detectProviderEndpointModels.mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -46,12 +39,9 @@ describe('useAdminProviderConfig', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const feedback = createProviderConfigFeedback()
     const error = new Error('limits failed')
-    mockApi.fetchAdminAccountLimits.mockRejectedValueOnce(error)
+    mockResource.fetchAccountLimits.mockRejectedValueOnce(error)
 
-    const context = useAdminProviderConfig({
-      feedback,
-      confirm: { request: vi.fn() },
-    })
+    const context = createContext(feedback)
 
     await context.commands.loadData()
 
@@ -64,7 +54,7 @@ describe('useAdminProviderConfig', () => {
   })
 
   it('fills empty-query model suggestions when opening the model selector detects models', async () => {
-    mockApi.fetchAdminProviderEndpoints.mockResolvedValueOnce([
+    mockResource.fetchProviderEndpoints.mockResolvedValueOnce([
       {
         id: 1,
         apiType: 'openai-compatible',
@@ -75,11 +65,8 @@ describe('useAdminProviderConfig', () => {
         updatedAt: '',
       },
     ])
-    mockApi.detectAdminProviderEndpointModels.mockResolvedValueOnce(['gpt-4o', 'imagen-4'])
-    const context = useAdminProviderConfig({
-      feedback: createProviderConfigFeedback(),
-      confirm: { request: vi.fn() },
-    })
+    mockResource.detectProviderEndpointModels.mockResolvedValueOnce(['gpt-4o', 'imagen-4'])
+    const context = createContext()
 
     await context.commands.loadData()
     context.accountEditor.openCreate({ kind: 'providerEndpoint', id: 1 })
@@ -87,7 +74,7 @@ describe('useAdminProviderConfig', () => {
 
     await context.accountEditor.handleModelSelectShow(true)
 
-    expect(mockApi.detectAdminProviderEndpointModels).toHaveBeenCalledWith({
+    expect(mockResource.detectProviderEndpointModels).toHaveBeenCalledWith({
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'sk-live',
       apiType: 'openai-compatible',
@@ -96,7 +83,7 @@ describe('useAdminProviderConfig', () => {
   })
 
   it('creates a uniquely named APIKey account with multiple assigned models per providerEndpoint', async () => {
-    mockApi.fetchAdminProviderEndpoints.mockResolvedValueOnce([
+    mockResource.fetchProviderEndpoints.mockResolvedValueOnce([
       {
         id: 1,
         apiType: 'openai-compatible',
@@ -107,7 +94,7 @@ describe('useAdminProviderConfig', () => {
         updatedAt: '',
       },
     ])
-    mockApi.fetchAllAdminAccounts.mockResolvedValueOnce([
+    mockResource.fetchAccounts.mockResolvedValueOnce([
       {
         id: 11,
         name: 'OpenAI ProviderEndpoint APIKey',
@@ -129,11 +116,8 @@ describe('useAdminProviderConfig', () => {
         updatedAt: '',
       },
     ])
-    mockApi.createAdminAccountRecord.mockResolvedValueOnce(undefined)
-    const context = useAdminProviderConfig({
-      feedback: createProviderConfigFeedback(),
-      confirm: { request: vi.fn() },
-    })
+    mockResource.createAccountRecord.mockResolvedValueOnce(undefined)
+    const context = createContext()
 
     await context.commands.loadData()
     context.accountEditor.openCreate({ kind: 'providerEndpoint', id: 1 })
@@ -144,7 +128,7 @@ describe('useAdminProviderConfig', () => {
     context.accountEditor.form.value.modelValues = ['gpt-4o', 'imagen-4']
     await context.accountEditor.save()
 
-    expect(mockApi.createAdminAccountRecord).toHaveBeenCalledWith(
+    expect(mockResource.createAccountRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'OpenAI ProviderEndpoint APIKey 2',
         models: [
@@ -155,6 +139,14 @@ describe('useAdminProviderConfig', () => {
     )
   })
 })
+
+function createContext(feedback = createProviderConfigFeedback()) {
+  return useAdminProviderConfig({
+    feedback,
+    confirm: { request: vi.fn() },
+    resource: mockResource as unknown as AdminProviderConfigResource,
+  })
+}
 
 function createProviderConfigFeedback() {
   return {

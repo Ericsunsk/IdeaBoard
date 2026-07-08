@@ -1,61 +1,48 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigApi'
+import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
 import { createAdminProviderConfigWorkspace } from './providerConfigWorkspace'
+import type { AdminProviderConfigResource } from './providerConfigResource'
 import type {
   AdminProviderAccountLimits,
   ProviderAccountRecord,
   ProviderEndpointRecord,
 } from './providerConfigTypes'
 
-const mockApi = vi.hoisted(() => ({
-  createAdminAccountRecord: vi.fn(),
-  deleteAdminAccountRecord: vi.fn(),
-  deleteAdminProviderEndpoint: vi.fn(),
-  detectAdminProviderEndpointModels: vi.fn(),
-  fetchAdminAccountLimits: vi.fn(),
-  fetchAllAdminAccounts: vi.fn(),
-  fetchAdminProviderEndpoints: vi.fn(),
-  patchAdminAccountModelRecord: vi.fn(),
-  saveAdminProviderEndpoint: vi.fn(),
-  updateAdminAccountRecord: vi.fn(),
-}))
-
-vi.mock('./providerConfigApi', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./providerConfigApi')>()),
-  createAdminAccountRecord: mockApi.createAdminAccountRecord,
-  deleteAdminAccountRecord: mockApi.deleteAdminAccountRecord,
-  deleteAdminProviderEndpoint: mockApi.deleteAdminProviderEndpoint,
-  detectAdminProviderEndpointModels: mockApi.detectAdminProviderEndpointModels,
-  fetchAdminAccountLimits: mockApi.fetchAdminAccountLimits,
-  fetchAllAdminAccounts: mockApi.fetchAllAdminAccounts,
-  fetchAdminProviderEndpoints: mockApi.fetchAdminProviderEndpoints,
-  patchAdminAccountModelRecord: mockApi.patchAdminAccountModelRecord,
-  saveAdminProviderEndpoint: mockApi.saveAdminProviderEndpoint,
-  updateAdminAccountRecord: mockApi.updateAdminAccountRecord,
-}))
+const mockResource = {
+  createAccountRecord: vi.fn(),
+  deleteAccountRecord: vi.fn(),
+  deleteProviderEndpoint: vi.fn(),
+  detectProviderEndpointModels: vi.fn(),
+  fetchAccountLimits: vi.fn(),
+  fetchAccounts: vi.fn(),
+  fetchProviderEndpoints: vi.fn(),
+  patchAccountModelRecord: vi.fn(),
+  saveProviderEndpoint: vi.fn(),
+  updateAccountRecord: vi.fn(),
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockApi.fetchAdminProviderEndpoints.mockResolvedValue([makeProviderEndpoint()])
-  mockApi.fetchAllAdminAccounts.mockResolvedValue([
+  mockResource.fetchProviderEndpoints.mockResolvedValue([makeProviderEndpoint()])
+  mockResource.fetchAccounts.mockResolvedValue([
     makeAccount({
       models: [makeModel({ name: 'gpt-4o', enabled: true, weight: 7 })],
     }),
   ])
-  mockApi.fetchAdminAccountLimits.mockResolvedValue(makeAccountLimits())
-  mockApi.createAdminAccountRecord.mockResolvedValue(undefined)
-  mockApi.deleteAdminAccountRecord.mockResolvedValue(undefined)
-  mockApi.deleteAdminProviderEndpoint.mockResolvedValue(undefined)
-  mockApi.detectAdminProviderEndpointModels.mockResolvedValue([])
-  mockApi.patchAdminAccountModelRecord.mockResolvedValue(
+  mockResource.fetchAccountLimits.mockResolvedValue(makeAccountLimits())
+  mockResource.createAccountRecord.mockResolvedValue(undefined)
+  mockResource.deleteAccountRecord.mockResolvedValue(undefined)
+  mockResource.deleteProviderEndpoint.mockResolvedValue(undefined)
+  mockResource.detectProviderEndpointModels.mockResolvedValue([])
+  mockResource.patchAccountModelRecord.mockResolvedValue(
     makeAccount({
       models: [makeModel({ name: 'gpt-4o', enabled: false, weight: 7 })],
       updatedAt: 'patched-at',
     }),
   )
-  mockApi.saveAdminProviderEndpoint.mockResolvedValue(undefined)
-  mockApi.updateAdminAccountRecord.mockResolvedValue(undefined)
+  mockResource.saveProviderEndpoint.mockResolvedValue(undefined)
+  mockResource.updateAccountRecord.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -68,9 +55,9 @@ describe('provider config workspace facade', () => {
 
     await workspace.loadData()
 
-    expect(mockApi.fetchAdminProviderEndpoints).toHaveBeenCalledTimes(1)
-    expect(mockApi.fetchAllAdminAccounts).toHaveBeenCalledTimes(1)
-    expect(mockApi.fetchAdminAccountLimits).toHaveBeenCalledTimes(1)
+    expect(mockResource.fetchProviderEndpoints).toHaveBeenCalledTimes(1)
+    expect(mockResource.fetchAccounts).toHaveBeenCalledTimes(1)
+    expect(mockResource.fetchAccountLimits).toHaveBeenCalledTimes(1)
     expect(workspace.accountLimits.value).toEqual(makeAccountLimits())
     expect(workspace.cards.items.value).toHaveLength(1)
     expect(workspace.cards.items.value[0]?.providerEndpoint.name).toBe('OpenAI ProviderEndpoint')
@@ -104,10 +91,38 @@ describe('provider config workspace facade', () => {
       afterSaved,
     })
 
-    expect(mockApi.saveAdminProviderEndpoint).toHaveBeenCalledWith({ id: 1, data })
+    expect(mockResource.saveProviderEndpoint).toHaveBeenCalledWith({ id: 1, data })
     expect(feedback.providerEndpointSaved).toHaveBeenCalledWith(true)
     expect(afterSaved).toHaveBeenCalledTimes(1)
-    expect(mockApi.fetchAdminProviderEndpoints).toHaveBeenCalledTimes(2)
+    expect(mockResource.fetchProviderEndpoints).toHaveBeenCalledTimes(2)
+    expect(mockResource.fetchAccounts).toHaveBeenCalledTimes(2)
+    expect(mockResource.fetchAccountLimits).toHaveBeenCalledTimes(2)
+  })
+
+  it('maps providerEndpoint save failures without closing or refreshing the workspace', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const afterSaved = vi.fn()
+    const error = new Error('save failed')
+    mockResource.saveProviderEndpoint.mockRejectedValueOnce(error)
+
+    await workspace.loadData()
+    await workspace.saveProviderEndpoint({
+      data: {
+        apiType: 'openai-compatible',
+        name: 'Broken ProviderEndpoint',
+        baseUrl: 'https://api.broken.example/v1',
+        status: 1,
+      },
+      isEditing: false,
+      afterSaved,
+    })
+
+    expect(feedback.providerEndpointSaveFailed).toHaveBeenCalledWith(error)
+    expect(feedback.providerEndpointSaved).not.toHaveBeenCalled()
+    expect(afterSaved).not.toHaveBeenCalled()
+    expect(mockResource.fetchProviderEndpoints).toHaveBeenCalledTimes(1)
+    expect(mockResource.fetchAccounts).toHaveBeenCalledTimes(1)
+    expect(mockResource.fetchAccountLimits).toHaveBeenCalledTimes(1)
   })
 
   it('saves an account while preserving existing model settings', async () => {
@@ -133,7 +148,7 @@ describe('provider config workspace facade', () => {
       afterSaved,
     })
 
-    expect(mockApi.updateAdminAccountRecord).toHaveBeenCalledWith(
+    expect(mockResource.updateAccountRecord).toHaveBeenCalledWith(
       11,
       expect.objectContaining({
         name: 'OpenAI Account',
@@ -148,13 +163,19 @@ describe('provider config workspace facade', () => {
     )
     expect(feedback.accountSaved).toHaveBeenCalledWith(true)
     expect(afterSaved).toHaveBeenCalledTimes(1)
-    expect(mockApi.fetchAdminProviderEndpoints).toHaveBeenCalledTimes(2)
+    expect(mockResource.fetchProviderEndpoints).toHaveBeenCalledTimes(2)
+    expect(mockResource.fetchAccounts).toHaveBeenCalledTimes(2)
+    expect(mockResource.fetchAccountLimits).toHaveBeenCalledTimes(2)
   })
 
   it('detects models with missing-key feedback and per-session caching', async () => {
     const { workspace, feedback } = createWorkspace()
     const providerEndpoint = makeProviderEndpoint()
-    mockApi.detectAdminProviderEndpointModels.mockResolvedValueOnce(['gpt-4o', ' GPT-4o ', 'imagen-4'])
+    mockResource.detectProviderEndpointModels.mockResolvedValueOnce([
+      'gpt-4o',
+      ' GPT-4o ',
+      'imagen-4',
+    ])
 
     const missingKeyResult = await workspace.detectModels({
       providerEndpoint,
@@ -166,7 +187,7 @@ describe('provider config workspace facade', () => {
 
     expect(feedback.missingApiKeyForModelDetection).toHaveBeenCalledTimes(1)
     expect(missingKeyResult.hasShownApiKeyHint).toBe(true)
-    expect(mockApi.detectAdminProviderEndpointModels).not.toHaveBeenCalled()
+    expect(mockResource.detectProviderEndpointModels).not.toHaveBeenCalled()
 
     const detectedResult = await workspace.detectModels({
       providerEndpoint,
@@ -176,16 +197,12 @@ describe('provider config workspace facade', () => {
       hasShownApiKeyHint: false,
     })
 
-    expect(mockApi.detectAdminProviderEndpointModels).toHaveBeenCalledWith({
+    expect(mockResource.detectProviderEndpointModels).toHaveBeenCalledWith({
       baseUrl: 'https://api.example.com/v1',
       apiKey: 'sk-live',
       apiType: 'openai-compatible',
     })
-    expect(detectedResult.detectedValues).toEqual([
-      'existing-model',
-      'gpt-4o',
-      'imagen-4',
-    ])
+    expect(detectedResult.detectedValues).toEqual(['existing-model', 'gpt-4o', 'imagen-4'])
 
     await workspace.detectModels({
       providerEndpoint,
@@ -195,7 +212,39 @@ describe('provider config workspace facade', () => {
       hasShownApiKeyHint: false,
     })
 
-    expect(mockApi.detectAdminProviderEndpointModels).toHaveBeenCalledTimes(1)
+    expect(mockResource.detectProviderEndpointModels).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not cache failed model detection attempts', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const providerEndpoint = makeProviderEndpoint()
+    const error = new Error('detect failed')
+    mockResource.detectProviderEndpointModels
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(['gpt-4o'])
+
+    const failedResult = await workspace.detectModels({
+      providerEndpoint,
+      secret: 'sk-live',
+      detectedValues: [],
+      sessionCache: new Set(),
+      hasShownApiKeyHint: false,
+    })
+
+    expect(feedback.modelDetectionFailed).toHaveBeenCalledWith(error)
+    expect(failedResult.sessionCache.size).toBe(0)
+
+    const retryResult = await workspace.detectModels({
+      providerEndpoint,
+      secret: 'sk-live',
+      detectedValues: failedResult.detectedValues,
+      sessionCache: failedResult.sessionCache,
+      hasShownApiKeyHint: false,
+    })
+
+    expect(mockResource.detectProviderEndpointModels).toHaveBeenCalledTimes(2)
+    expect(retryResult.detectedValues).toEqual(['gpt-4o'])
+    expect(retryResult.sessionCache.size).toBe(1)
   })
 
   it('toggles account model status and updates local card rows', async () => {
@@ -204,15 +253,15 @@ describe('provider config workspace facade', () => {
     await workspace.loadData()
     await workspace.toggleAccountModelStatus({ kind: 'account', id: 11 }, 'GPT-4O')
 
-    expect(mockApi.patchAdminAccountModelRecord).toHaveBeenCalledWith(11, {
+    expect(mockResource.patchAccountModelRecord).toHaveBeenCalledWith(11, {
       name: 'gpt-4o',
       enabled: false,
     })
-    expect(mockApi.updateAdminAccountRecord).not.toHaveBeenCalled()
+    expect(mockResource.updateAccountRecord).not.toHaveBeenCalled()
     expect(feedback.modelStatusChanged).toHaveBeenCalledWith(false)
-    expect(
-      workspace.getAccountModelRows(workspace.cards.items.value[0]!.accounts[0]!),
-    ).toEqual([{ name: 'gpt-4o', disabled: true }])
+    expect(workspace.getAccountModelRows(workspace.cards.items.value[0]!.accounts[0]!)).toEqual([
+      { name: 'gpt-4o', disabled: true },
+    ])
   })
 
   it('keeps stale target feedback and delete confirmation in the facade', async () => {
@@ -237,7 +286,7 @@ describe('provider config workspace facade', () => {
 
     await confirm.request.mock.calls[0]?.[0].onConfirm()
 
-    expect(mockApi.deleteAdminProviderEndpoint).toHaveBeenCalledWith(1)
+    expect(mockResource.deleteProviderEndpoint).toHaveBeenCalledWith(1)
     expect(feedback.providerEndpointDeleted).toHaveBeenCalledTimes(1)
   })
 
@@ -245,7 +294,7 @@ describe('provider config workspace facade', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { workspace, feedback } = createWorkspace()
     const error = new Error('limits failed')
-    mockApi.fetchAdminAccountLimits.mockRejectedValueOnce(error)
+    mockResource.fetchAccountLimits.mockRejectedValueOnce(error)
 
     await workspace.loadData()
 
@@ -266,6 +315,7 @@ function createWorkspace() {
     feedback,
     confirm,
     runAsyncAction,
+    resource: mockResource as unknown as AdminProviderConfigResource,
   })
   return { workspace, feedback, confirm }
 }
@@ -301,7 +351,9 @@ function makeAccountLimits(): AdminProviderAccountLimits {
   }
 }
 
-function makeProviderEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): ProviderEndpointRecord {
+function makeProviderEndpoint(
+  overrides: Partial<ProviderEndpointRecord> = {},
+): ProviderEndpointRecord {
   return {
     id: 1,
     apiType: 'openai-compatible',
