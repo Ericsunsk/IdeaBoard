@@ -4,6 +4,7 @@ import {
   createImageExecutionPlanner,
   createImageWorkflowCommands,
   type ImageWorkflowCommands,
+  useCanvasExecutionWorkspace,
   useFlowImageWorkflowExecution,
 } from '../execution'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
@@ -90,6 +91,18 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
     nodes: options.nodes.value,
     edges: options.edges.value,
   }))
+  const executionWorkspace = useCanvasExecutionWorkspace({
+    nodes: options.nodes,
+    edges: options.edges,
+    graphAdapter: options.graphAdapter,
+    createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    flushAutosave: options.flushAutosave,
+    refreshNodeInternals: options.refreshNodeInternals,
+    getCurrentBoardId: () => options.currentBoardId.value ?? '',
+    onSuccess: options.feedback.succeeded,
+    onWarning: handleWorkflowWarning,
+  })
   const workflow = useFlowImageWorkflowExecution({
     nodes: options.nodes,
     edges: options.edges,
@@ -101,6 +114,7 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
     getCurrentBoardId: () => options.currentBoardId.value ?? '',
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,
+    executionWorkspace,
   })
 
   return createImageWorkflowCommands({

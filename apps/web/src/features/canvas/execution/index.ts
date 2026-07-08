@@ -54,3 +54,10 @@ export {
   createImageWorkflowCommands,
   type ImageWorkflowCommands,
 } from './runtime/imageWorkflowCommandRuntime'
+export {
+  useCanvasExecutionWorkspace,
+  type CanvasExecutionWorkspace,
+  type CanvasExecutionWorkspaceCommands,
+  type CanvasExecutionWorkspaceState,
+  type UseCanvasExecutionWorkspaceOptions,
+} from './workspace/useCanvasExecutionWorkspace'
