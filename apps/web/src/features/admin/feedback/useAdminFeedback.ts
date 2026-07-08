@@ -54,6 +54,13 @@ export type AdminTaskResultFeedback = {
   copyFailed: () => void
 }
 
+export type AdminPromptConfigFeedback = {
+  loadPromptsFailed: (error: unknown) => void
+  promptDraftInvalid: (message: string) => void
+  promptSaved: (featureTitle: string) => void
+  savePromptFailed: (error: unknown) => void
+}
+
 export type AdminBrandingSettingsFeedback = {
   loadFailed: (error: unknown) => void
   validationFailed: (message: string) => void
@@ -106,11 +113,7 @@ export type AdminFeedback = {
   users: {
     management: AdminUsersFeedback
   }
-  promptConfig: {
-    loadPromptsFailed: (error: unknown) => void
-    promptSaved: (featureTitle: string) => void
-    savePromptFailed: (error: unknown) => void
-  }
+  promptConfig: AdminPromptConfigFeedback
   systemSettings: {
     branding: AdminBrandingSettingsFeedback
     access: AdminAccessSettingsFeedback
@@ -258,6 +261,9 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
     promptConfig: {
       loadPromptsFailed(error) {
         appToast.error(formatDisplayErrorMessage(error, '加载提示词失败'))
+      },
+      promptDraftInvalid(message) {
+        appToast.warning(message)
       },
       promptSaved(featureTitle) {
         appToast.success(`「${featureTitle}」提示词已保存`)

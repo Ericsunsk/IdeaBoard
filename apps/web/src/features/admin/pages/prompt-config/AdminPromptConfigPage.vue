@@ -201,11 +201,11 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
 } from '../../shared/lib/adminUiClasses'
-import { usePromptConfigResource } from '../../prompt-config/promptConfigResource'
+import { useAdminPromptConfigWorkspace } from '../../prompt-config/promptConfigWorkspace'
 import type {
   FeaturePromptVariable,
   FeaturePromptVariableTone,
-} from '../../prompt-config/promptConfigResource'
+} from '../../prompt-config/promptConfigWorkspace'
 import {
   featureMap,
   groupedFeatureGroups,
@@ -218,7 +218,7 @@ const { isScrolling: isPromptPanelScrolling, handleScroll: handlePromptPanelScro
   useTransientScrolling()
 const { isScrolling: isPromptDialogScrolling, handleScroll: handlePromptDialogScroll } =
   useTransientScrolling()
-const promptConfigResource = usePromptConfigResource({
+const promptConfigWorkspace = useAdminPromptConfigWorkspace({
   feedback: adminFeedback.promptConfig,
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,
 })
@@ -230,7 +230,8 @@ const {
   resetDrafts,
   savePrompt,
   saving,
-} = promptConfigResource
+  insertVariableIntoDraft,
+} = promptConfigWorkspace
 
 // textarea 引用 + 插入逻辑
 type TextareaRefLike = HTMLTextAreaElement | { $el?: Element }
@@ -304,7 +305,7 @@ function insertVar(slug: FeatureSlug, varKey: string) {
   if (textareaEl instanceof HTMLTextAreaElement) {
     pos = textareaEl.selectionStart ?? current.length
   }
-  promptMap[slug] = current.slice(0, pos) + varKey + current.slice(pos)
+  insertVariableIntoDraft(slug, varKey, pos)
 }
 
 function resolveTextareaElement(ref: TextareaRefLike | undefined) {
