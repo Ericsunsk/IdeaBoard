@@ -63,6 +63,9 @@ function createBoardRuntime() {
     fullNodes: ref([]),
     fullEdges: ref([]),
     currentBoardId: ref('board-a'),
+    isDirty: ref(true),
+    isSavingBoard: ref(false),
+    saveStatus: ref('retry' as const),
     flushAutosave: vi.fn(),
     graphRuntime: {
       captureHistory: vi.fn(),
@@ -224,6 +227,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.boardChrome.rollbackBoardRename).toBe(board.rollbackBoardRename)
     expect(runtime.boardChrome.onNavigateRequest).toBe(board.onNavigateRequest)
     expect(runtime.boardChrome.onLogoutRequest).toBe(board.onLogoutRequest)
+    expect(runtime.persistence.isDirty).toBe(board.isDirty)
+    expect(runtime.persistence.isSavingBoard).toBe(board.isSavingBoard)
+    expect(runtime.persistence.saveStatus).toBe(board.saveStatus)
     expect(runtime.persistence.flushAutosave).not.toBe(board.flushAutosave)
     expect(runtime.persistence.reattachPendingImageResults).toBe(task.reattachPendingImageResults)
     expect(runtime.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)

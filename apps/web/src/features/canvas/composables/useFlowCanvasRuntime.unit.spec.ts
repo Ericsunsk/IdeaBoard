@@ -1,7 +1,7 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { CanvasBoardSession } from '../board-session'
+import type { CanvasBoardSession, SaveStatus } from '../board-session'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
@@ -146,7 +146,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     ),
   }
   const isDirty = ref(false)
-  const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
+  const saveStatus = ref<SaveStatus>('idle')
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => 'board-a'),
     exists: vi.fn(() => true),
@@ -306,6 +306,7 @@ describe('useFlowCanvasRuntime', () => {
     )
 
     expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('pending')
     expect(harness.fullNodes.value.map((node) => node.id)).toContain('prompt-99')
 
     harness.runtime.flowHistory.undo()
@@ -613,6 +614,83 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.isDirty.value).toBe(true)
     expect(harness.savedSnapshots).toHaveLength(0)
+  })
+
+  it('does not commit a stale save snapshot over active node drag progress', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    let resolveSave:
+      | ((result: Awaited<ReturnType<CanvasBoardSession['save']>>) => void)
+      | undefined
+    let shouldDeferSave = true
+    harness.boardSession.save = vi.fn((nextSnapshot: CanvasBoardSnapshot) => {
+      harness.savedSnapshots.push(nextSnapshot)
+      if (!shouldDeferSave) {
+        return Promise.resolve({
+          snapshot: nextSnapshot,
+          remoteSync: { ok: true as const },
+        })
+      }
+      shouldDeferSave = false
+      return (
+        new Promise<Awaited<ReturnType<CanvasBoardSession['save']>>>((resolve) => {
+          resolveSave = resolve
+        })
+      )
+    })
+
+    harness.runtime.graphRuntime.markDirty()
+    const savePromise = harness.runtime.flushAutosave({ silent: true })
+    await nextTick()
+
+    expect(harness.boardSession.save).toHaveBeenCalledOnce()
+    expect(harness.savedSnapshots[0]?.promptNodes.find((node) => node.id === 1)).toMatchObject({
+      x: 400,
+      y: 40,
+    })
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 720, y: 96 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.flushAnimationFrames()
+    await nextTick()
+
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 720,
+      y: 96,
+    })
+
+    resolveSave?.({
+      snapshot: harness.savedSnapshots[0] as CanvasBoardSnapshot,
+      remoteSync: { ok: true },
+    })
+    await savePromise
+    await nextTick()
+
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 720,
+      y: 96,
+    })
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('pending')
+
+    harness.runtime.graphRuntime.nodeDrag.commit()
+    await nextTick()
+    await harness.runtime.flushAutosave({ silent: true })
+
+    expect(harness.savedSnapshots[1]?.promptNodes.find((node) => node.id === 1)).toMatchObject({
+      x: 720,
+      y: 96,
+    })
   })
 
   it('cancels queued node drag progress without mutating the graph', async () => {

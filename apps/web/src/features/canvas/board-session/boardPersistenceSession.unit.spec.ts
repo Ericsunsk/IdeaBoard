@@ -7,8 +7,8 @@ import {
   type ImageNodeItem,
 } from '../../canvas-board/domain'
 import type { FlowAdapterNode } from '../utils/flowSnapshotAdapter'
-import type { CanvasBoardSession } from './useCanvasBoardSession'
-import { createBoardPersistenceSession } from './boardPersistenceSession'
+import type { CanvasBoardSession, CanvasBoardSessionSaveResult } from './useCanvasBoardSession'
+import { createBoardPersistenceSession, type SaveStatus } from './boardPersistenceSession'
 
 function makePromptSnapshot(id = 1) {
   return {
@@ -55,7 +55,8 @@ function createSessionHarness(initialBoardId = 'board-a') {
   const fullEdges = ref<unknown[]>([])
   const boardBaseSnapshot = ref(createEmptyCanvasBoardSnapshot())
   const isDirty = ref(true)
-  const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
+  const saveStatus = ref<SaveStatus>('idle')
+  const localEditVersion = ref(0)
   const isLoadingBoardSnapshot = ref(false)
   const isSavingBoard = ref(false)
   const canSaveBoard = ref(true)
@@ -87,6 +88,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
     boardBaseSnapshot,
     isDirty,
     saveStatus,
+    localEditVersion,
     isLoadingBoardSnapshot,
     isSavingBoard,
     boardSession,
@@ -107,6 +109,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
     boardBaseSnapshot,
     isDirty,
     saveStatus,
+    localEditVersion,
     isLoadingBoardSnapshot,
     isSavingBoard,
     canSaveBoard,
@@ -117,6 +120,22 @@ function createSessionHarness(initialBoardId = 'board-a') {
     clearFlowHistoryBaseline,
     onGraphCommitted,
     boardSession,
+  }
+}
+
+function makePromptFlowNode(id = 1, x = 40): FlowAdapterNode {
+  const snapshotNode = makePromptSnapshot(id)
+  snapshotNode.x = x
+  return {
+    id: `prompt-${id}`,
+    type: 'canvas',
+    position: { x, y: snapshotNode.y },
+    data: {
+      kind: 'prompt',
+      nodeType: 'prompt',
+      title: `Prompt ${id}`,
+      snapshotNode,
+    },
   }
 }
 
@@ -217,7 +236,11 @@ describe('boardPersistenceSession', () => {
     savedSnapshot.promptNodes = [makePromptSnapshot(2)]
     vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
       snapshot: savedSnapshot,
-      remoteSync: { ok: false, error: new Error('auth unavailable') },
+      remoteSync: {
+        ok: false,
+        reason: 'sync-failed',
+        error: new Error('auth unavailable'),
+      },
     })
 
     const saved = await harness.session.saveCurrentBoardSnapshot()
@@ -225,11 +248,48 @@ describe('boardPersistenceSession', () => {
     expect(saved).toBe(false)
     expect(harness.boardBaseSnapshot.value).toEqual(savedSnapshot)
     expect(harness.isDirty.value).toBe(true)
-    expect(harness.saveStatus.value).toBe('failed')
+    expect(harness.saveStatus.value).toBe('retry')
     expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
     expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
     expect(harness.onSuccess).not.toHaveBeenCalled()
     expect(harness.onGraphCommitted).toHaveBeenCalledOnce()
     expect(harness.isSavingBoard.value).toBe(false)
+  })
+
+  it('preserves local draft edits when an older save completes', async () => {
+    const harness = createSessionHarness()
+    harness.fullNodes.value = [makePromptFlowNode(1, 40)]
+    const savedSnapshot = createEmptyCanvasBoardSnapshot()
+    savedSnapshot.promptNodes = [makePromptSnapshot(1)]
+    let resolveSave: () => void = () => {
+      throw new Error('save did not start')
+    }
+    vi.mocked(harness.boardSession.save).mockImplementationOnce(
+      () =>
+        new Promise<CanvasBoardSessionSaveResult>((resolve) => {
+          resolveSave = () => {
+            resolve({
+              snapshot: savedSnapshot,
+              remoteSync: { ok: true as const },
+            })
+          }
+        }),
+    )
+
+    const savePromise = harness.session.saveCurrentBoardSnapshot()
+    await Promise.resolve()
+    harness.commitGraph.mockClear()
+    harness.localEditVersion.value += 1
+    const draftNode = makePromptFlowNode(2, 520)
+    harness.fullNodes.value = [draftNode]
+    resolveSave()
+
+    const saved = await savePromise
+
+    expect(saved).toBe(true)
+    expect(harness.commitGraph).not.toHaveBeenCalled()
+    expect(harness.fullNodes.value).toEqual([draftNode])
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('pending')
   })
 })

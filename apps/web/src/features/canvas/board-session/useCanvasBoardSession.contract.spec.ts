@@ -197,6 +197,7 @@ describe('useCanvasBoardSession', () => {
     expect(result.snapshot).toBe(snapshot)
     expect(result.remoteSync.ok).toBe(false)
     if (!result.remoteSync.ok) {
+      expect(result.remoteSync.reason).toBe('sync-failed')
       expect(result.remoteSync.error).toBeInstanceOf(Error)
       expect((result.remoteSync.error as Error).message).toContain('缺少用户信息')
     }
@@ -310,7 +311,7 @@ describe('useCanvasBoardSession', () => {
 
     expect(result).toEqual({
       snapshot: stabilizedSnapshot,
-      remoteSync: { ok: false, error: remoteError },
+      remoteSync: { ok: false, reason: 'sync-failed', error: remoteError },
     })
     expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()

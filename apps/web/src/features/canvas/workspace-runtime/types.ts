@@ -16,7 +16,10 @@ export type CanvasWorkspaceRuntimeViewModel = {
     | 'boardOptions'
   >
   flowPane: Pick<CanvasWorkspaceRuntimeParts['flowPane'], 'nodes' | 'edges'>
-  persistence: Pick<CanvasWorkspaceRuntimeParts['persistence'], 'history'>
+  persistence: Pick<
+    CanvasWorkspaceRuntimeParts['persistence'],
+    'isDirty' | 'isSavingBoard' | 'saveStatus' | 'history'
+  >
   viewportControls: Pick<CanvasWorkspaceRuntimeParts['viewportControls'], 'zoomLevel'>
   graphEditing: Pick<
     CanvasWorkspaceRuntimeParts['graphEditing'],

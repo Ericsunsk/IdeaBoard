@@ -1,5 +1,6 @@
 import { computed, type ComputedRef } from 'vue'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import { isBoardNameConflictError } from '../../canvas-board/catalog/boardSync'
 import {
   createBoardSessionRepository,
   isBoardSessionRemoteSyncError,
@@ -38,9 +39,15 @@ export type CanvasBoardSessionSaveOptions = {
   waitForPreview?: boolean
 }
 
+export type CanvasBoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict'
+
+export type CanvasBoardSessionRemoteSyncResult =
+  | { ok: true }
+  | { ok: false; reason: CanvasBoardSessionRemoteSyncFailureReason; error: unknown }
+
 export type CanvasBoardSessionSaveResult = {
   snapshot: CanvasBoardSnapshot
-  remoteSync: { ok: true } | { ok: false; error: unknown }
+  remoteSync: CanvasBoardSessionRemoteSyncResult
 }
 
 export type CanvasBoardSession = {
@@ -66,6 +73,10 @@ type BoardSessionUploadLifecycleFactory = typeof createBoardSessionUploadLifecyc
 
 export type CanvasBoardSessionTestOptions = UseCanvasBoardSessionOptions & {
   createUploadLifecycle?: BoardSessionUploadLifecycleFactory
+}
+
+function classifyRemoteSyncFailure(error: unknown): CanvasBoardSessionRemoteSyncFailureReason {
+  return isBoardNameConflictError(error) ? 'conflict' : 'sync-failed'
 }
 
 export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): CanvasBoardSession {
@@ -111,7 +122,11 @@ export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): C
       await repository.saveLocal(boardId, snapshot)
       return {
         snapshot,
-        remoteSync: { ok: false, error: createAuthUnavailableError() },
+        remoteSync: {
+          ok: false,
+          reason: 'sync-failed',
+          error: createAuthUnavailableError(),
+        },
       }
     }
 
@@ -135,9 +150,14 @@ export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): C
       if (!isBoardSessionRemoteSyncError(error)) {
         throw error
       }
+      const cause = error.cause ?? error
       return {
         snapshot: stabilizedSnapshot,
-        remoteSync: { ok: false, error: error.cause ?? error },
+        remoteSync: {
+          ok: false,
+          reason: classifyRemoteSyncFailure(cause),
+          error: cause,
+        },
       }
     }
     const previewRefreshTask = refreshPreview(boardId, stabilizedSnapshot).catch((error) => {

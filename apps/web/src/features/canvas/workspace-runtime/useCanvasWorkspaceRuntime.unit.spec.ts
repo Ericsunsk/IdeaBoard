@@ -47,6 +47,9 @@ function createRuntimeParts() {
       },
     },
     persistence: {
+      isDirty: ref(true),
+      isSavingBoard: ref(false),
+      saveStatus: ref('retry' as const),
       flushAutosave: vi.fn(),
       history: {},
       loadCanvasBoardAndProbe: vi.fn(),
@@ -141,6 +144,12 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     expect(workspace.commands.boardSession.rollbackBoardRename).toBe(
       runtimeParts.boardChrome.rollbackBoardRename,
     )
+    expect(workspace.viewModel.persistence).toEqual({
+      isDirty: runtimeParts.persistence.isDirty,
+      isSavingBoard: runtimeParts.persistence.isSavingBoard,
+      saveStatus: runtimeParts.persistence.saveStatus,
+      history: runtimeParts.persistence.history,
+    })
     expect(workspace.commands.imageWorkflow.runImageDirectAction).toBe(
       runtimeParts.imageWorkflow.runImageDirectAction,
     )

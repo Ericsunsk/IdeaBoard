@@ -1,7 +1,11 @@
-import type { Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useFlowHistory, type FlowHistorySnapshot } from './useFlowHistory'
-import { useCanvasBoardAutosave, useCanvasBoardPersistence } from '../board-session'
+import {
+  useCanvasBoardAutosave,
+  useCanvasBoardPersistence,
+  type SaveStatus,
+} from '../board-session'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphActions,
@@ -33,8 +37,6 @@ import {
   type CanvasGraphNodeId,
   type CanvasGraphTransaction,
 } from '../graph-runtime'
-
-type SaveStatus = 'idle' | 'saved' | 'failed'
 
 type SelectableFlowItem = {
   id: string
@@ -95,6 +97,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   let pendingNodeDragChanges: NodeDragChange[] = []
   let latestNodeDragChanges: NodeDragChange[] = []
   let pendingNodeDragFrameId: number | null = null
+  let hasAdvancedNodeDragLocalEdit = false
   let nativeRemoveHistoryBefore: FlowHistorySnapshot | null = null
   let isNativeRemoveCommitScheduled = false
   let pendingNativeRemoveNodeChanges: NodeChange[] = []
@@ -106,6 +109,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     ((callback: FrameRequestCallback) => window.requestAnimationFrame(callback))
   const cancelAnimationFrame =
     options.cancelAnimationFrame ?? ((handle: number) => window.cancelAnimationFrame(handle))
+  const localEditVersion = ref(0)
 
   function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
     const ids = new Set<string>()
@@ -207,6 +211,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     boardBaseSnapshot: options.boardBaseSnapshot,
     isDirty: options.isDirty,
     saveStatus: options.saveStatus,
+    localEditVersion,
     isLoadingBoardSnapshot: options.isLoadingBoardSnapshot,
     isSavingBoard: options.isSavingBoard,
     boardSession: options.boardSession,
@@ -240,9 +245,17 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function markDirty() {
     if (!canSaveBoard.value) return
+    localEditVersion.value += 1
     options.isDirty.value = true
-    if (options.saveStatus.value !== 'failed') options.saveStatus.value = 'idle'
+    if (options.saveStatus.value === 'idle' || options.saveStatus.value === 'saved') {
+      options.saveStatus.value = 'pending'
+    }
     markDirtyAndSchedule()
+  }
+
+  function advanceLocalEditVersion() {
+    if (!canSaveBoard.value) return
+    localEditVersion.value += 1
   }
 
   function isNodeDragChange(change: NodeChange): change is NodeDragChange {
@@ -324,6 +337,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function queueNodeDragChanges(changes: NodeDragChange[]) {
+    if (!hasAdvancedNodeDragLocalEdit && changes.some((change) => change.type === 'position')) {
+      advanceLocalEditVersion()
+      hasAdvancedNodeDragLocalEdit = true
+    }
     changes.forEach(stageNodeDragChange)
     pendingNodeDragChanges = mergeNodeDragChanges(pendingNodeDragChanges, changes)
     latestNodeDragChanges = mergeNodeDragChanges(latestNodeDragChanges, changes)
@@ -351,6 +368,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     } finally {
       pendingNodeDragChanges = []
       latestNodeDragChanges = []
+      hasAdvancedNodeDragLocalEdit = false
       clearPendingNodeDragFrame()
       activeNodeDrag = null
       isNodeDragActive = false
@@ -360,6 +378,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   function cancelNodeDragTransaction() {
     pendingNodeDragChanges = []
     latestNodeDragChanges = []
+    hasAdvancedNodeDragLocalEdit = false
     clearPendingNodeDragFrame()
     activeNodeDrag?.transaction.cancel()
     activeNodeDrag = null

@@ -4,7 +4,7 @@ import type { EdgeChange, NodeChange } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
-import { useCanvasBoardSession } from '../board-session'
+import { useCanvasBoardSession, type SaveStatus } from '../board-session'
 import {
   useFlowBoardHeaderActions,
   type BoardRenameRecoveryState,
@@ -19,8 +19,6 @@ import type {
   CanvasVueFlowGraphAdapter,
 } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-
-type SaveStatus = 'idle' | 'saved' | 'failed'
 
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 
@@ -49,6 +47,9 @@ type CanvasBoardRuntime = {
   fullEdges: Ref<Edge[]>
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   currentBoardId: ComputedRef<string | null>
+  isDirty: Ref<boolean>
+  isSavingBoard: Ref<boolean>
+  saveStatus: Ref<SaveStatus>
   loadInitialOrRouteBoard: () => Promise<void>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   flowHistory: FlowHistory
@@ -154,6 +155,9 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     fullEdges,
     boardBaseSnapshot,
     currentBoardId,
+    isDirty,
+    isSavingBoard,
+    saveStatus,
     loadInitialOrRouteBoard,
     flushAutosave,
     flowHistory,

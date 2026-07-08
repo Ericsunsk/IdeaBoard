@@ -78,4 +78,34 @@ describe('useCanvasBoardAutosave', () => {
       vi.useRealTimers()
     }
   })
+
+  it('keeps a failed save pending for explicit retry', async () => {
+    vi.useFakeTimers()
+    try {
+      const isDirty = ref(false)
+      const isSaving = ref(false)
+      const save = vi.fn(async () => false)
+      const autosave = useCanvasBoardAutosave({
+        isDirty,
+        isSaving,
+        save,
+        delay: 20,
+      })
+
+      isDirty.value = true
+      autosave.markDirtyAndSchedule()
+      await vi.advanceTimersByTimeAsync(20)
+      await flushPromises()
+
+      expect(save).toHaveBeenCalledOnce()
+      expect(isDirty.value).toBe(true)
+
+      await autosave.flushAutosave({ silent: false })
+
+      expect(save).toHaveBeenCalledTimes(2)
+      expect(save).toHaveBeenLastCalledWith({ silent: false })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

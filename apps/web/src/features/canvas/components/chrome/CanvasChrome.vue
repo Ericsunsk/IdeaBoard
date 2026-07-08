@@ -196,6 +196,37 @@
     :inert="inert"
     @wheel.prevent.stop
   >
+    <Transition name="canvas-chrome-board-recovery">
+      <div
+        v-if="autosaveStatusLabel"
+        class="canvas-chrome-autosave"
+        :class="`is-${status.autosave.status}`"
+        aria-live="polite"
+        @mousedown.stop
+        @click.stop
+      >
+        <span class="canvas-chrome-autosave-label">{{ autosaveStatusLabel }}</span>
+        <div v-if="autosaveStatusHasActions" class="canvas-chrome-autosave-actions">
+          <button
+            v-if="status.autosave.status === 'conflict'"
+            type="button"
+            class="canvas-chrome-autosave-action"
+            aria-label="更换画布名称以恢复保存"
+            @click="emit('start-board-rename')"
+          >
+            改名
+          </button>
+          <button
+            type="button"
+            class="canvas-chrome-autosave-action"
+            aria-label="重试画布自动保存"
+            @click="emit('retry-autosave')"
+          >
+            重试
+          </button>
+        </div>
+      </div>
+    </Transition>
     <div class="canvas-chrome-status-control">
       <button
         type="button"
@@ -266,6 +297,7 @@ const emit = defineEmits<{
   'confirm-board-rename': []
   'retry-board-rename': []
   'rollback-board-rename': []
+  'retry-autosave': []
   'select-board': [boardId: string]
   export: []
   'navigate-back': []
@@ -303,6 +335,29 @@ const boardRenameRecoveryLabel = computed(() => {
 })
 const boardRenameRecoveryHasActions = computed(() =>
   ['failed', 'conflict'].includes(props.board.renameRecovery.status),
+)
+const autosaveStatusLabel = computed(() => {
+  if (props.status.autosave.isSaving) {
+    return props.status.autosave.status === 'recover' ? '恢复保存中' : '保存中'
+  }
+  switch (props.status.autosave.status) {
+    case 'pending':
+      return '保存中'
+    case 'recover':
+      return '恢复保存中'
+    case 'retry':
+      return '远端未同步'
+    case 'conflict':
+      return '保存冲突'
+    case 'idle':
+      return props.status.autosave.isDirty ? '未保存' : ''
+    case 'saved':
+      return ''
+  }
+  return ''
+})
+const autosaveStatusHasActions = computed(() =>
+  ['retry', 'conflict'].includes(props.status.autosave.status),
 )
 
 function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null) {

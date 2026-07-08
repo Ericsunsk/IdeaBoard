@@ -4,7 +4,6 @@ import {
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from '../utils/flowSnapshotAdapter'
-import { isBoardNameConflictError } from '../../canvas-board/catalog/boardSync'
 import {
   createEmptyCanvasBoardSnapshot,
   InvalidBoardStateError,
@@ -13,7 +12,7 @@ import {
 import type { CanvasBoardSession } from './useCanvasBoardSession'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
-export type SaveStatus = 'idle' | 'saved' | 'failed'
+export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover'
 export type ValueRef<T> = { value: T }
 export type ArrayRef = { value: unknown[] }
 
@@ -44,6 +43,7 @@ export type BoardPersistenceSessionOptions = {
   boardBaseSnapshot: ValueRef<CanvasBoardSnapshot>
   isDirty: ValueRef<boolean>
   saveStatus: ValueRef<SaveStatus>
+  localEditVersion?: ValueRef<number>
   isLoadingBoardSnapshot: ValueRef<boolean>
   isSavingBoard: ValueRef<boolean>
   boardSession: CanvasBoardSession
@@ -82,6 +82,10 @@ function hasPendingImageResultNode(nodes: unknown[]): boolean {
       snapshotNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage && !pendingTaskId
     )
   })
+}
+
+function isRecoverableSaveStatus(status: SaveStatus): boolean {
+  return status === 'retry' || status === 'conflict' || status === 'recover'
 }
 
 export function createBoardPersistenceSession(
@@ -181,9 +185,17 @@ export function createBoardPersistenceSession(
     )
   }
 
-  function notifyRemoteSyncFailure(error: unknown, silent: boolean) {
+  function readLocalEditVersion(): number {
+    return Number(options.localEditVersion?.value ?? 0)
+  }
+
+  function notifyRemoteSyncFailure(
+    reason: 'sync-failed' | 'conflict',
+    _error: unknown,
+    silent: boolean,
+  ) {
     if (silent) return
-    if (isBoardNameConflictError(error)) {
+    if (reason === 'conflict') {
       options.onError('已保存到本地，但画布名称已存在，请更换后再试')
       return
     }
@@ -200,7 +212,12 @@ export function createBoardPersistenceSession(
     }
     const saveToken = ++saveSequence
     const isSaveStillCurrent = () => options.boardSession.currentBoardId.value === boardId
+    const saveEditVersion = readLocalEditVersion()
+    const previousSaveStatus = options.saveStatus.value
     options.isSavingBoard.value = true
+    options.saveStatus.value = isRecoverableSaveStatus(options.saveStatus.value)
+      ? 'recover'
+      : 'pending'
     try {
       const snapshot = buildCurrentBoardSnapshot()
       const { snapshot: stabilizedSnapshot, remoteSync } = await measureCanvasPerfAsync(
@@ -220,10 +237,11 @@ export function createBoardPersistenceSession(
       )
       const shouldCommitToCurrentGraph = isSaveStillCurrent()
       if (shouldCommitToCurrentGraph) {
+        const hasLocalDraftAdvanced = readLocalEditVersion() > saveEditVersion
         options.boardBaseSnapshot.value = stabilizedSnapshot
         const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
         const isRemoteSynced = remoteSync.ok
-        if (!hasPendingImageResultNode(options.fullNodes.value)) {
+        if (!hasLocalDraftAdvanced && !hasPendingImageResultNode(options.fullNodes.value)) {
           options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] }, {
             preserveSelection: true,
           })
@@ -232,16 +250,21 @@ export function createBoardPersistenceSession(
           }
         }
         if (isRemoteSynced) {
-          options.isDirty.value = false
-          options.saveStatus.value = 'saved'
-          if (!saveOptions.silent) {
+          options.isDirty.value = hasLocalDraftAdvanced
+          options.saveStatus.value = hasLocalDraftAdvanced ? 'pending' : 'saved'
+          if (!saveOptions.silent && !hasLocalDraftAdvanced) {
             options.onSuccess('已保存')
           }
         } else {
           options.isDirty.value = true
-          options.saveStatus.value = 'failed'
-          notifyRemoteSyncFailure(remoteSync.error, !!saveOptions.silent)
+          options.saveStatus.value = remoteSync.reason === 'conflict' ? 'conflict' : 'retry'
+          notifyRemoteSyncFailure(remoteSync.reason, remoteSync.error, !!saveOptions.silent)
         }
+      } else if (
+        saveToken === saveSequence &&
+        (options.saveStatus.value === 'pending' || options.saveStatus.value === 'recover')
+      ) {
+        options.saveStatus.value = previousSaveStatus
       }
       if (isSaveStillCurrent()) {
         options.onGraphCommitted?.()
@@ -249,7 +272,7 @@ export function createBoardPersistenceSession(
       return remoteSync.ok
     } catch (error) {
       if (isSaveStillCurrent()) {
-        options.saveStatus.value = 'failed'
+        options.saveStatus.value = 'retry'
       }
       console.warn('[canvas] save board snapshot failed', error)
       if (isSaveStillCurrent()) {

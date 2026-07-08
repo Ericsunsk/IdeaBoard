@@ -12,6 +12,7 @@ export {
 } from './useCanvasBoardAutosave'
 export {
   useCanvasBoardPersistence,
+  type SaveStatus,
   type SaveCurrentBoardSnapshotOptions,
   type UseCanvasBoardPersistenceOptions,
 } from './useCanvasBoardPersistence'
