@@ -272,6 +272,11 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 	if err := workflow.NormalizeStructuredPromptContractParams(req.Params, featureSlug); err != nil {
 		return nil, nil, nil, "", "", err
 	}
+	if featureSlug == workflow.FeatureSlugPatternGen {
+		if err := workflow.ValidatePatternGenSubmitContract(req.Prompt, req.Params); err != nil {
+			return nil, nil, nil, "", "", err
+		}
+	}
 	if featureSlug == workflow.FeatureSlugStyleFusion {
 		if err := normalizeStyleFusionParams(req.Params); err != nil {
 			return nil, nil, nil, "", "", err

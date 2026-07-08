@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { ref, type Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { SubmitTaskData } from '../../../../shared/api/task'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphNodeId, CanvasGraphStore } from '../../graph-runtime'
@@ -157,8 +158,13 @@ export function useCanvasExecutionWorkspace(
 
   async function runTextPromptGeneration(plan: TextPromptExecutionPlan): Promise<void> {
     const boardId = readBoardId()
+    let taskRequest: SubmitTaskData | null = null
+    const buildTaskRequest = () => {
+      taskRequest ??= buildImageExecutionTaskRequest(plan)
+      return taskRequest
+    }
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
-      buildRequest: () => buildImageExecutionTaskRequest(plan),
+      buildRequest: buildTaskRequest,
       taskAdapter: options.taskAdapter,
     })
     await workflowRunner.run({
@@ -174,6 +180,9 @@ export function useCanvasExecutionWorkspace(
         aspectRatio: plan.aspectRatio,
         resultOptions: plan.resultOptions,
       }),
+      preflight: async () => {
+        buildTaskRequest()
+      },
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, 1),
       fallbackErrorMessage: '生成失败',

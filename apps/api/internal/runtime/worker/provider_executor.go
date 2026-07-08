@@ -243,6 +243,15 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 	}
 
 	taskParams := c.parseAndNormalizeTaskParams(ctx, task)
+	if taskParams.featureSlug() == workflow.FeatureSlugPatternGen {
+		if err := workflow.ValidatePatternGenTaskContract(task.Prompt, taskParams.Canonical); err != nil {
+			return providerExecutionConfig{}, newExecutionFailureError(
+				tasks.ExecutionStageAssigned,
+				tasks.FailureCategoryInputInvalid,
+				err,
+			)
+		}
+	}
 	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
 	if !ok {
 		return providerExecutionConfig{}, newExecutionFailureError(

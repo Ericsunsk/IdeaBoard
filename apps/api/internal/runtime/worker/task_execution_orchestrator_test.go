@@ -37,6 +37,19 @@ func TestUserFacingProviderErrorFallsBackForNonTimeout(t *testing.T) {
 	}
 }
 
+func TestUserFacingProviderErrorPreservesInputInvalidDetails(t *testing.T) {
+	err := newExecutionFailureError(
+		tasks.ExecutionStageAssigned,
+		tasks.FailureCategoryInputInvalid,
+		errors.New("图案生成不需要输入图片，请移除图片输入后重试"),
+	)
+
+	got := userFacingProviderError(err)
+	if got != "图案生成不需要输入图片，请移除图片输入后重试" {
+		t.Fatalf("expected specific input validation message, got %q", got)
+	}
+}
+
 func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)

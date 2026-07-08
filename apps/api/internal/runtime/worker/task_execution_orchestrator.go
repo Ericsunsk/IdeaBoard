@@ -824,6 +824,9 @@ func userFacingProviderError(err error) string {
 		case tasks.FailureCategoryAuth:
 			return "上游服务鉴权失败，请联系管理员"
 		case tasks.FailureCategoryInputInvalid:
+			if reason := strings.TrimSpace(err.Error()); reason != "" {
+				return reason
+			}
 			return "请求参数不合法，请检查输入后重试"
 		case tasks.FailureCategoryQuota:
 			return "上游服务额度不足或未开通，请联系管理员"

@@ -37,6 +37,13 @@ export {
 } from './contracts/executionSizeParams'
 export { buildPromptAspectRatioTaskParams } from './contracts/promptAspectRatioTaskParams'
 export {
+  PATTERN_GEN_NODE_IO_CONTRACT,
+  PatternGenContractError,
+  assertPatternGenTaskRequest,
+  type PatternGenInputContract,
+  type PatternGenOutputContract,
+} from './contracts/patternGenContract'
+export {
   createImageExecutionPlanner,
   isImageExecutionPlanError,
   prepareFusionExecutionPlan,

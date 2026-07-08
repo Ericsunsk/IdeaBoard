@@ -4,10 +4,13 @@ import (
 	"context"
 	"image"
 	"reflect"
+	"strings"
 	"testing"
 
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestNewProviderRequestCollectsProviderMediaRefs(t *testing.T) {
@@ -182,6 +185,94 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 	}
 	if _, exists := req.Params["media"]; exists {
 		t.Fatalf("provider request should not expose canonical media object: %#v", req.Params)
+	}
+}
+
+func TestPrepareProviderExecutionRejectsInvalidPatternGenTaskContract(t *testing.T) {
+	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       workflow.FeatureSlugPatternGen,
+		Media: &tasks.MediaInputs{
+			Inputs: []tasks.MediaRef{{URL: "https://img.example/source.png", Role: "input"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("MarshalParams: %v", err)
+	}
+
+	_, err = (&ProviderExecutor{}).prepareProviderExecution(
+		context.Background(),
+		&accounts.ApiAccount{
+			Name:    "pattern-gen-provider",
+			ApiKey:  "key",
+			ApiType: workflow.ProviderOpenAICompatible,
+		},
+		&tasks.TaskPayload{
+			TaskID: "task-invalid-pattern-gen",
+			UserID: 42,
+			Prompt: "repeatable textile pattern",
+			Params: raw,
+		},
+		taskqueue.TaskAssignment{},
+	)
+	if err == nil {
+		t.Fatal("expected pattern-gen provider validation error")
+	}
+	stage, category, ok := executionFailureDetails(err)
+	if !ok {
+		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
+	}
+	if stage != tasks.ExecutionStageAssigned || category != tasks.FailureCategoryInputInvalid {
+		t.Fatalf("details=%s/%s, want %s/%s", stage, category, tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid)
+	}
+	if !strings.Contains(err.Error(), "图案生成不需要输入图片，请移除图片输入后重试") {
+		t.Fatalf("error=%q, want actionable pattern-gen media message", err.Error())
+	}
+}
+
+func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *testing.T) {
+	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       workflow.FeatureSlugPatternGen,
+		Model:         "gpt-image-1",
+		Controls: &tasks.GenerationControls{
+			Ratio:       "4:3",
+			OutputCount: 2,
+		},
+		Extra: map[string]interface{}{
+			"provider_hint": "keep",
+		},
+	})
+	if err != nil {
+		t.Fatalf("MarshalParams: %v", err)
+	}
+
+	exec, err := (&ProviderExecutor{}).prepareProviderExecution(
+		context.Background(),
+		&accounts.ApiAccount{
+			Name:    "pattern-gen-provider",
+			ApiKey:  "key",
+			ApiType: workflow.ProviderOpenAICompatible,
+			Models: []accounts.AccountModel{
+				{Name: "gpt-image-1", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugPatternGen}},
+			},
+		},
+		&tasks.TaskPayload{
+			TaskID: "task-pattern-gen-provider-hints",
+			UserID: 42,
+			Prompt: "repeatable textile pattern",
+			Params: raw,
+		},
+		taskqueue.TaskAssignment{},
+	)
+	if err != nil {
+		t.Fatalf("prepareProviderExecution returned error: %v", err)
+	}
+	if exec.Request.Params["provider_hint"] != "keep" {
+		t.Fatalf("provider_hint = %#v, want keep", exec.Request.Params["provider_hint"])
+	}
+	if exec.Request.Params["output_count"] != 2 {
+		t.Fatalf("output_count = %#v, want 2", exec.Request.Params["output_count"])
 	}
 }
 

@@ -68,6 +68,49 @@ func TestBuildProviderPromptParamsDerivesProviderFieldsFromNestedContract(t *tes
 	}
 }
 
+func TestValidatePatternGenSubmitContract(t *testing.T) {
+	if PatternGenIOContract.Feature != FeatureSlugPatternGen {
+		t.Fatalf("pattern-gen contract feature=%q", PatternGenIOContract.Feature)
+	}
+	if PatternGenIOContract.Output.Kind != "image-results" || PatternGenIOContract.Output.MinCount != 1 {
+		t.Fatalf("pattern-gen output contract=%+v", PatternGenIOContract.Output)
+	}
+
+	if err := ValidatePatternGenSubmitContract("repeatable textile pattern", map[string]interface{}{
+		"feature":       FeatureSlugPatternGen,
+		"ratio":         "1:1",
+		"provider_hint": "keep",
+		"output_count":  2,
+	}); err != nil {
+		t.Fatalf("ValidatePatternGenSubmitContract returned error: %v", err)
+	}
+
+	err := ValidatePatternGenSubmitContract("repeatable textile pattern", map[string]interface{}{
+		"feature":    FeatureSlugPatternGen,
+		"image_urls": []string{"https://img.example/source.png"},
+	})
+	if err == nil {
+		t.Fatalf("expected pattern-gen image input validation error")
+	}
+}
+
+func TestValidatePatternGenTaskContractAllowsProviderHintsAndControls(t *testing.T) {
+	err := ValidatePatternGenTaskContract("repeatable textile pattern", &tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       FeatureSlugPatternGen,
+		Controls: &tasks.GenerationControls{
+			Ratio:       "16:9",
+			OutputCount: 2,
+		},
+		Extra: map[string]interface{}{
+			"provider_hint": "keep",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ValidatePatternGenTaskContract returned error: %v", err)
+	}
+}
+
 func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
 	useMask := true
 	params := &tasks.WorkflowTaskParams{

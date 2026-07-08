@@ -707,6 +707,42 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	}
 }
 
+func TestSubmitTaskRejectsInvalidPatternGenContractBeforeSubmission(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+		{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name:         "gpt-image-1",
+				Enabled:      true,
+				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+			}},
+		},
+	}}
+	submissionStore := &recordingSubmissionStore{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+	}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:  "repeatable textile pattern",
+		Feature: workflow.FeatureSlugPatternGen,
+		Params: map[string]interface{}{
+			"ratio": "2:1",
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected pattern-gen contract validation error")
+	}
+	if !strings.Contains(err.Error(), "图案生成尺寸比例仅支持 auto、1:1、3:4、4:3、9:16、16:9") {
+		t.Fatalf("error=%q, want actionable pattern-gen ratio message", err.Error())
+	}
+	if len(submissionStore.calls) != 0 {
+		t.Fatalf("submission calls=%d, want 0", len(submissionStore.calls))
+	}
+}
+
 func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{

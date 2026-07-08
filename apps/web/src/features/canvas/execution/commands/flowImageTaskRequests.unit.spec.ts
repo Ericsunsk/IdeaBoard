@@ -25,6 +25,7 @@ import {
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
   buildPreparedImageInpaintTaskRequest,
+  buildTextPromptTaskRequest,
 } from './flowImageTaskRequests'
 
 const source = {
@@ -56,6 +57,20 @@ describe('flowImageTaskRequests', () => {
           clarity_strength: 50,
         },
       },
+    })
+  })
+
+  it('builds pattern-gen text prompt requests from the typed node IO contract', () => {
+    const request = buildTextPromptTaskRequest({
+      prompt: '  repeatable textile pattern  ',
+      aspectRatio: '1:1',
+    })
+
+    expect(request).toEqual({
+      prompt: 'repeatable textile pattern',
+      priority: 1,
+      feature: EXECUTION_FEATURE.patternGen,
+      params: { ratio: '1:1' },
     })
   })
 

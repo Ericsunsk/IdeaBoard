@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
+import type { TextPromptExecutionPlan } from '../planning/ImageExecutionPlan'
 import type { ResultMaterializerResult } from '../result-nodes/resultMaterializer'
 import type {
   PendingImageResultExecution,
@@ -41,9 +42,11 @@ function makeMaterializerResult(
   }
 }
 
-function makeTextPromptPlan() {
+function makeTextPromptPlan(
+  overrides: Partial<TextPromptExecutionPlan> = {},
+): TextPromptExecutionPlan {
   return {
-    kind: 'text-prompt' as const,
+    kind: 'text-prompt',
     sourceNodeId: 'prompt-1',
     source: {
       url: '',
@@ -60,6 +63,7 @@ function makeTextPromptPlan() {
         outputAnchorNodeId: 'prompt-1',
       },
     },
+    ...overrides,
   }
 }
 
@@ -211,6 +215,24 @@ describe('useCanvasExecutionWorkspace', () => {
     expect(waitTaskImageResults).toHaveBeenCalledWith('task-1')
     expect(onSuccess).toHaveBeenCalledWith('生成完成')
     expect(onWarning).not.toHaveBeenCalled()
+  })
+
+  it('reports pattern-gen preflight errors without submitting a task', async () => {
+    const { workspace, pendingResults, taskAdapter, onSuccess, onWarning } =
+      createWorkspaceHarness({
+        runPendingResults: async () => makeRunSummary(),
+      })
+
+    await workspace.commands.runTextPromptGeneration(
+      makeTextPromptPlan({ aspectRatio: '2:1' as never }),
+    )
+
+    expect(pendingResults.runPendingResults).not.toHaveBeenCalled()
+    expect(taskAdapter.submitTaskRequest).not.toHaveBeenCalled()
+    expect(onWarning).toHaveBeenCalledWith(
+      '图案生成参数错误：图案生成尺寸比例仅支持 auto、1:1、3:4、4:3、9:16、16:9',
+    )
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 
   it('reuses the reserved pending result client action id across retries', async () => {

@@ -16,6 +16,7 @@ import {
   EXECUTION_META,
   EXECUTION_PARTIAL_EDIT_META,
 } from '../contracts/executionContract'
+import { assertPatternGenTaskRequest } from '../contracts/patternGenContract'
 import {
   buildExecutionSizeParams,
   extendExecutionImageSize,
@@ -122,11 +123,13 @@ export function buildTextPromptTaskRequest(input: {
   prompt: string
   aspectRatio: PromptAspectRatio
 }): SubmitTaskData {
-  return buildExecutionTaskRequest({
-    prompt: input.prompt,
+  const request = buildExecutionTaskRequest({
+    prompt: `${input.prompt ?? ''}`.trim(),
     feature: EXECUTION_META[EXECUTION_FEATURE.patternGen].feature,
     params: buildPromptAspectRatioTaskParams(input.aspectRatio),
   })
+  assertPatternGenTaskRequest(request)
+  return request
 }
 
 export function buildDirectActionTaskRequest(input: {
