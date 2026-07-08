@@ -8,4 +8,5 @@ export interface FlowNodeData {
   title: string
   summary?: string
   snapshotNode?: unknown
+  pendingClientActionKey?: string
 }

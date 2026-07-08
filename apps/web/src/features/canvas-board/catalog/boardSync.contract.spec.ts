@@ -273,7 +273,9 @@ describe('boardSync', () => {
     )
   })
 
-  it('skips invalid remote board state with recoverable validation context', async () => {
+  it('returns hydrate failure for invalid remote board state without clearing local boards', async () => {
+    replaceCanvasBoards([{ id: 'local-board', name: 'Local Board', createdAt: 100, updatedAt: 2_000 }])
+    replaceCanvasBoardStateMap({ 'local-board': makeState(2_000, 'local-state') })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       mocks.state.listResponse = {
@@ -305,11 +307,20 @@ describe('boardSync', () => {
         },
       }
 
-      await hydrateCanvasBoardsFromServer()
+      const result = await hydrateCanvasBoardsFromServer()
 
+      expect(result).toMatchObject({
+        ok: false,
+        error: expect.objectContaining({
+          code: 'INVALID_BOARD_STATE',
+          boundary: 'server-hydration',
+          recoverable: true,
+        }),
+      })
       expect(getCanvasBoardState('board-invalid')).toBeNull()
+      expect(getPromptText('local-board')).toBe('local-state')
       expect(warnSpy).toHaveBeenCalledWith(
-        '[boards] invalid remote board state skipped',
+        '[boards] invalid remote board state rejected',
         'board-invalid',
         expect.objectContaining({
           code: 'INVALID_BOARD_STATE',

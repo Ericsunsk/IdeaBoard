@@ -31,7 +31,7 @@ function createPendingResults(
 }
 
 describe('pendingImageWorkflowRunner', () => {
-  it('reuses a client action id for the same pending result submission and rotates it per run', async () => {
+  it('reuses a client action id for the same pending result submission across repeated runs', async () => {
     const submittedClientActionIds: string[] = []
     const pendingResults = createPendingResults(async (params) => {
       params.onReserved?.(['image-2'])
@@ -43,10 +43,7 @@ describe('pendingImageWorkflowRunner', () => {
       pendingResults,
       isBoardCurrent: () => true,
       setNodeRunning: vi.fn(),
-      createClientActionId: vi
-        .fn()
-        .mockReturnValueOnce('client-action-1')
-        .mockReturnValueOnce('client-action-2'),
+      createClientActionId: vi.fn().mockReturnValueOnce('client-action-1'),
       onSuccess: vi.fn(),
       onWarning: vi.fn(),
     })
@@ -70,8 +67,8 @@ describe('pendingImageWorkflowRunner', () => {
     expect(submittedClientActionIds).toEqual([
       'client-action-1',
       'client-action-1',
-      'client-action-2',
-      'client-action-2',
+      'client-action-1',
+      'client-action-1',
     ])
   })
 

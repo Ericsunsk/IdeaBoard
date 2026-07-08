@@ -56,6 +56,7 @@ export type PendingImageResultReservationParams = {
   sourceNodeId: string
   outputCount: number
   resultOptions?: PendingImageResultOptions
+  clientActionKey?: string
 }
 
 export type PendingImageResultExecution = {
@@ -229,6 +230,16 @@ export function usePendingImageResultExecution(
     return !sourceUrl && outputImages.length === 0 && snapshot.outputStatus !== 'running'
   }
 
+  function isRunningPendingImageNodeForAction(node: Node, clientActionKey: string): boolean {
+    if (node.data?.kind !== 'image') return false
+    if (node.data.pendingClientActionKey !== clientActionKey) return false
+    const snapshot = node.data.snapshotNode as ImageNodeItem | undefined
+    if (!snapshot || typeof snapshot !== 'object') return false
+    const sourceUrl = `${snapshot.sourceImageUrl ?? ''}`.trim()
+    const outputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+    return !sourceUrl && outputImages.length === 0 && snapshot.outputStatus === 'running'
+  }
+
   function findReusableOutputImageNodeId(
     anchorNodeId: string,
     lookup: PendingImageResultLookup,
@@ -239,6 +250,25 @@ export function usePendingImageResultExecution(
       if (node && isEmptyReusableImageNode(node)) return candidateId
     }
     return null
+  }
+
+  function findRunningPendingOutputImageNodeIds(
+    anchorNodeId: string,
+    lookup: PendingImageResultLookup,
+    clientActionKey: string | undefined,
+    count: number,
+  ): string[] {
+    const normalizedKey = `${clientActionKey ?? ''}`.trim()
+    if (!normalizedKey) return []
+    const candidateIds = lookup.imageChildIdsBySource.get(anchorNodeId) ?? []
+    const result: string[] = []
+    for (const candidateId of candidateIds) {
+      const node = lookup.nodeById.get(candidateId)
+      if (!node || !isRunningPendingImageNodeForAction(node, normalizedKey)) continue
+      result.push(candidateId)
+      if (result.length >= count) break
+    }
+    return result
   }
 
   function resolvePendingImageResultPosition(
@@ -323,14 +353,14 @@ export function usePendingImageResultExecution(
 
   function buildPendingImageNodeSnapshot(
     base: ImageNodeItem,
-    params: { sourceImageRatio: number; width: number },
+    params: { sourceImageRatio: number; width: number; preservePendingTaskId?: boolean },
   ): ImageNodeItem {
     return {
       ...base,
       sourceImageUrl: '',
       sourceImageRatio: params.sourceImageRatio,
       width: params.width,
-      pendingTaskId: undefined,
+      pendingTaskId: params.preservePendingTaskId ? base.pendingTaskId : undefined,
       outputStatus: 'running',
       outputImages: [],
     }
@@ -402,6 +432,7 @@ export function usePendingImageResultExecution(
     lookup: PendingImageResultLookup,
     optionsOverride?: PendingImageResultPlacementOptions,
     preferredNodeId?: string | null,
+    clientActionKey?: string,
   ): PendingImageResultReservationPlan {
     const sourceRatio = source.ratio > 0 ? source.ratio : 1
     const fallbackAnchor: ImageResultLayout = {
@@ -439,13 +470,18 @@ export function usePendingImageResultExecution(
       if (currentNode?.data?.kind === 'image') {
         const snapshot = currentNode.data.snapshotNode
         if (snapshot && typeof snapshot === 'object') {
+          const currentSnapshot = snapshot as ImageNodeItem
           updatedNode = {
             ...currentNode,
             data: {
               ...currentNode.data,
-              snapshotNode: buildPendingImageNodeSnapshot(snapshot as ImageNodeItem, {
+              pendingClientActionKey: clientActionKey,
+              snapshotNode: buildPendingImageNodeSnapshot(currentSnapshot, {
                 sourceImageRatio: pendingImageNode.sourceImageRatio,
                 width: pendingImageNode.width,
+                preservePendingTaskId:
+                  currentSnapshot.outputStatus === 'running' &&
+                  currentNode.data.pendingClientActionKey === clientActionKey,
               }),
             },
           }
@@ -479,6 +515,7 @@ export function usePendingImageResultExecution(
         nodeType: 'image',
         title: `Image #${pendingImageNode.id}`,
         summary: 'Canvas image node',
+        pendingClientActionKey: clientActionKey,
         snapshotNode: pendingImageNode,
       },
     }
@@ -513,6 +550,12 @@ export function usePendingImageResultExecution(
     const resultOptions = params.resultOptions ?? {}
     const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? params.sourceNodeId
     const lookup = buildPendingResultLookup()
+    const runningNodeIds = findRunningPendingOutputImageNodeIds(
+      anchorNodeId,
+      lookup,
+      params.clientActionKey,
+      count,
+    )
     const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId, lookup)
     pruneResultNodeLayouts()
     const plans = Array.from({ length: count }, (_, index) =>
@@ -526,7 +569,8 @@ export function usePendingImageResultExecution(
           targetRatio: resultOptions.targetRatio,
           targetWidth: resultOptions.targetWidth,
         },
-        index === 0 ? reusableNodeId : null,
+        runningNodeIds[index] ?? (index === 0 ? reusableNodeId : null),
+        params.clientActionKey,
       ),
     )
     const plannedNodesById = new Map(plans.map((plan) => [plan.resultNodeId, plan.nextNode]))
@@ -575,6 +619,15 @@ export function usePendingImageResultExecution(
       },
       createPendingResultCommandOptions({ recordHistory: false }),
     )
+  }
+
+  function readPendingTaskId(resultNodeId: string): string | null {
+    const targetNode = options.nodes.value.find((item) => item.id === resultNodeId)
+    if (targetNode?.data?.kind !== 'image') return null
+    const snapshot = targetNode.data.snapshotNode
+    if (!snapshot || typeof snapshot !== 'object') return null
+    const taskId = `${(snapshot as ImageNodeItem).pendingTaskId ?? ''}`.trim()
+    return taskId || null
   }
 
   function applyResultMaterializerProjection(
@@ -661,8 +714,11 @@ export function usePendingImageResultExecution(
     await Promise.allSettled(
       resultNodeIds.map(async (resultNodeId, index) => {
         try {
-          const { taskId } = await params.submitTask(resultNodeId)
-          if (persistPendingTaskIds && params.isCurrent()) {
+          const existingTaskId = persistPendingTaskIds ? readPendingTaskId(resultNodeId) : null
+          const { taskId } = existingTaskId
+            ? { taskId: existingTaskId }
+            : await params.submitTask(resultNodeId)
+          if (!existingTaskId && persistPendingTaskIds && params.isCurrent()) {
             attachPendingTaskId({ resultNodeId, taskId })
             await params.afterTaskIdAttached?.({ resultNodeId, taskId })
           }

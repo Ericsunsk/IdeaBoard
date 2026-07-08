@@ -26,6 +26,7 @@ export type PendingImageWorkflowBatchParams = {
   sourceNodeId: string
   boardId: string
   outputCount: number
+  clientActionKey?: string
   resultOptions?: PendingImageResultOptions
   preflight?: () => Promise<void>
   assertReady?: () => Promise<void>
@@ -111,13 +112,14 @@ function reportPendingImageRunSummary(
 export function createPendingImageWorkflowRunner(
   options: PendingImageWorkflowRunnerOptions,
 ): PendingImageWorkflowRunner {
+  const clientActionIds = createPendingTaskClientActionIds(options.createClientActionId)
+
   function warnIfBoardCurrent(boardId: string, message: string) {
     if (options.isBoardCurrent(boardId)) options.onWarning(message)
   }
 
   async function run(params: PendingImageWorkflowBatchParams): Promise<void> {
     let resultNodeIds: string[] = []
-    const clientActionIds = createPendingTaskClientActionIds(options.createClientActionId)
     try {
       await params.preflight?.()
       const prepared = await params.prepare?.()
@@ -126,6 +128,7 @@ export function createPendingImageWorkflowRunner(
         source: prepared?.source ?? params.source,
         sourceNodeId: prepared?.sourceNodeId ?? params.sourceNodeId,
         outputCount: params.outputCount,
+        clientActionKey: params.clientActionKey,
         resultOptions: prepared?.resultOptions ?? params.resultOptions,
         submitTask: (resultNodeId) =>
           params.submitTask(resultNodeId, clientActionIds.getForResultNode(resultNodeId)),

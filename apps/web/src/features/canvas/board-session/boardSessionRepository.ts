@@ -10,6 +10,7 @@ import {
   setCanvasBoardState,
 } from '../../canvas-board/persistence'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
+import { InvalidBoardStateError } from '../../canvas-board/domain'
 
 export type BoardSessionRepository = {
   exists: (boardId: string) => boolean
@@ -48,7 +49,10 @@ export function createBoardSessionRepository(): BoardSessionRepository {
     const normalized = normalizeBoardId(boardId)
     if (!normalized) return null
     loadCanvasBoardState(normalized)
-    await hydrateCanvasBoardsFromServer()
+    const hydrateResult = await hydrateCanvasBoardsFromServer()
+    if (!hydrateResult.ok && hydrateResult.error instanceof InvalidBoardStateError) {
+      throw hydrateResult.error
+    }
     const state = loadCanvasBoardState(normalized)
     return state ? serializeCanvasBoardState(state, 'session-snapshot') : null
   }

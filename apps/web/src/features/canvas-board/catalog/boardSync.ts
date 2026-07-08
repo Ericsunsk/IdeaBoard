@@ -18,7 +18,12 @@ import {
   replaceCanvasBoardStateMap,
   serializeCanvasBoardState,
 } from '../persistence'
-import { createEmptyCanvasBoardState, type CanvasBoardState } from '../domain'
+import {
+  createEmptyCanvasBoardState,
+  InvalidBoardStateError,
+  type BoardStateValidationErrorContext,
+  type CanvasBoardState,
+} from '../domain'
 
 export type HydrateCanvasBoardsFromServerResult = { ok: true } | { ok: false; error: unknown }
 
@@ -54,8 +59,18 @@ function toLocalState(board: UserBoardItem): CanvasBoardState | null {
   })
   if (result.ok) return result.value
   const boardId = board.board_id?.trim() || ''
-  console.warn('[boards] invalid remote board state skipped', boardId, result.error)
-  return null
+  console.warn('[boards] invalid remote board state rejected', boardId, result.error)
+  throw new RemoteBoardStateError(boardId, result.error)
+}
+
+export class RemoteBoardStateError extends InvalidBoardStateError {
+  readonly boardId: string
+
+  constructor(boardId: string, context: BoardStateValidationErrorContext) {
+    super(context)
+    this.name = 'RemoteBoardStateError'
+    this.boardId = boardId
+  }
 }
 
 function toGeneratedBoardStateProjection(state: CanvasBoardState): BoardStateEnvelope {

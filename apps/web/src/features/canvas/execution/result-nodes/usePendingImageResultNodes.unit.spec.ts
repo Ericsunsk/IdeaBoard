@@ -463,6 +463,59 @@ describe('usePendingImageResultExecution', () => {
     })
   })
 
+  it('reattaches repeated clicks to the existing pending result for the same client action', async () => {
+    const harness = createHarness([makeAnchorNode()])
+    const pendingError = new Error('任务进度推送超时，请稍后查看结果')
+    let firstReservedNodeIds: string[] = []
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'anchor',
+      outputCount: 1,
+      clientActionKey: 'text-prompt:action-1',
+      submitTask: async () => ({ taskId: 'task-1' }),
+      resolveResult: async () => {
+        throw pendingError
+      },
+      isCurrent: () => true,
+      isPendingError: (error) => error === pendingError,
+      onReserved: (ids) => {
+        firstReservedNodeIds = ids
+      },
+    })
+
+    const resultNodeId = firstReservedNodeIds[0]
+    const submitTask = vi.fn(async () => ({ taskId: 'task-2' }))
+    const resolvedTaskIds: string[] = []
+    let secondReservedNodeIds: string[] = []
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'anchor',
+      outputCount: 1,
+      clientActionKey: 'text-prompt:action-1',
+      submitTask,
+      resolveResult: async (taskId) => {
+        resolvedTaskIds.push(taskId)
+        throw pendingError
+      },
+      isCurrent: () => true,
+      isPendingError: (error) => error === pendingError,
+      onReserved: (ids) => {
+        secondReservedNodeIds = ids
+      },
+    })
+
+    expect(secondReservedNodeIds).toEqual([resultNodeId])
+    expect(submitTask).not.toHaveBeenCalled()
+    expect(resolvedTaskIds).toEqual(['task-1'])
+    expect(harness.nodes.value.filter((node) => node.data?.kind === 'image')).toHaveLength(1)
+    expect(readImageSnapshot(harness.nodes.value, resultNodeId)).toMatchObject({
+      outputStatus: 'running',
+      pendingTaskId: 'task-1',
+    })
+  })
+
   it('keeps storage materialization failures as pending retry result nodes', async () => {
     const harness = createHarness([makeAnchorNode()])
     const storageFailure = new TaskResultPendingError(

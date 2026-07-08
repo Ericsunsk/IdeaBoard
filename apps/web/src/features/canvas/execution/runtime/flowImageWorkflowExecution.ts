@@ -98,6 +98,19 @@ function requirePreparedTaskRequest(
   return request
 }
 
+function hashWorkflowActionKey(value: string): string {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+function createWorkflowClientActionKey(kind: string, payload: unknown): string {
+  return `${kind}:${hashWorkflowActionKey(JSON.stringify(payload) ?? '')}`
+}
+
 export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecutionOptions) {
   const runningNodeIds = ref<Set<string>>(new Set())
   const activeReattachKeys = new Set<string>()
@@ -250,6 +263,13 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       resultOptions: plan.resultOptions,
       boardId,
       outputCount: 1,
+      clientActionKey: createWorkflowClientActionKey(plan.kind, {
+        sourceNodeId: plan.sourceNodeId,
+        sourceUrl: plan.source.url,
+        action: plan.action,
+        strength: plan.strength,
+        resultOptions: plan.resultOptions,
+      }),
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
@@ -271,6 +291,16 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
+      clientActionKey: createWorkflowClientActionKey(plan.kind, {
+        sourceNodeId: plan.sourceNodeId,
+        sourceUrl: plan.source.url,
+        prompt: plan.prompt,
+        outputCount: plan.outputCount,
+        extendPercent: plan.extendPercent,
+        targetRatio: plan.targetRatio,
+        targetWidth: plan.targetWidth,
+        resultOptions: plan.resultOptions,
+      }),
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.targetRatio),
@@ -292,6 +322,15 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
+      clientActionKey: createWorkflowClientActionKey(plan.kind, {
+        sourceNodeId: plan.sourceNodeId,
+        sourceUrl: plan.source.url,
+        prompt: plan.prompt,
+        mask: hashWorkflowActionKey(plan.rawMaskDataUrl),
+        outputCount: plan.outputCount,
+        referenceImageUrls: plan.referenceImageUrls,
+        resultOptions: plan.resultOptions,
+      }),
       preflight: () => assertTaskRequestReady(buildPromptImageReadinessRequest()),
       prepare: async () => {
         localInpaint = await prepareFlowLocalInpaintMedia({
@@ -354,6 +393,14 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
+      clientActionKey: createWorkflowClientActionKey(plan.kind, {
+        sourceNodeId: plan.sourceNodeId,
+        sourceUrl: plan.source.url,
+        prompt: plan.prompt,
+        outputCount: plan.outputCount,
+        aspectRatio: plan.aspectRatio,
+        resultOptions: plan.resultOptions,
+      }),
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
@@ -372,6 +419,13 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
+      clientActionKey: createWorkflowClientActionKey(plan.kind, {
+        sourceNodeId: plan.sourceNodeId,
+        prompt: plan.prompt,
+        outputCount: plan.outputCount,
+        aspectRatio: plan.aspectRatio,
+        resultOptions: plan.resultOptions,
+      }),
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, 1),
       fallbackErrorMessage: '生成失败',
@@ -392,6 +446,16 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       boardId,
       outputCount: plan.outputCount,
+      clientActionKey: createWorkflowClientActionKey(plan.kind, {
+        sourceNodeId: plan.sourceNodeId,
+        taskPrompt: plan.taskPrompt,
+        outputCount: plan.outputCount,
+        aspectRatio: plan.aspectRatio,
+        imageUrls: plan.imageUrls,
+        blendPoint: plan.blendPoint,
+        stageWidth: plan.stageWidth,
+        resultOptions: plan.resultOptions,
+      }),
       prepare: async () => {
         const imageSizes = await Promise.all(
           plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)),

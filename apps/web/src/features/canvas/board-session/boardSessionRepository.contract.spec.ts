@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { UserBoardItem } from '../../../shared/api/generated-query/model'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { createCanvasBoard, getCanvasBoardById } from '../../canvas-board/catalog/canvasBoards'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas-board/persistence'
@@ -16,7 +17,7 @@ import {
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
   const state = {
-    listResponse: { data: { list: [] } },
+    listResponse: { data: { list: [] as UserBoardItem[] } },
     upsertResponse: { code: 0, data: null },
   }
   return { request, state }
@@ -252,6 +253,57 @@ describe('createBoardSessionRepository', () => {
       await expect(repository.load(board.id)).rejects.toMatchObject({
         code: 'INVALID_BOARD_STATE',
         boundary: 'local-state-read',
+        recoverable: true,
+        issues: [
+          expect.objectContaining({
+            path: 'imageNodes.0.sourceImageRatio',
+          }),
+        ],
+      })
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('rejects invalid remote hydration state with recoverable validation context', async () => {
+    const board = createCanvasBoard('Invalid Remote Snapshot')
+    mocks.state.listResponse = {
+      data: {
+        list: [
+          {
+            board_id: board.id,
+            name: board.name,
+            created_at: board.createdAt,
+            updated_at: board.updatedAt,
+            revision: 1,
+            state_schema_version: 1,
+            state: {
+              ...makeCanvasBoardState(),
+              imageNodes: [
+                {
+                  id: 1,
+                  type: 'image-node',
+                  x: 0,
+                  y: 0,
+                  width: 280,
+                  sourceImageUrl: 'https://example.com/source.png',
+                  sourceImageRatio: 0,
+                  outputStatus: 'ready',
+                  outputImages: [],
+                },
+              ],
+            } as never,
+          },
+        ],
+      },
+    }
+    const repository = createBoardSessionRepository()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await expect(repository.load(board.id)).rejects.toMatchObject({
+        code: 'INVALID_BOARD_STATE',
+        boundary: 'server-hydration',
         recoverable: true,
         issues: [
           expect.objectContaining({
