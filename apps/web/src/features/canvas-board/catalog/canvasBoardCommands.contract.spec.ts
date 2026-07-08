@@ -21,6 +21,7 @@ function makeBoard(id: string, name = 'Board'): CanvasBoardMeta {
 function makeDeps(): CanvasBoardCommandDependencies {
   return {
     createBoard: vi.fn(() => makeBoard('created-board', 'Untitled')),
+    getBoard: vi.fn((boardId: string) => makeBoard(boardId, 'Board')),
     renameBoard: vi.fn((boardId: string, nextName: string) => makeBoard(boardId, nextName.trim())),
     duplicateBoard: vi.fn(() => makeBoard('copy-board', 'Source Copy')),
     deleteBoard: vi.fn(() => true),
@@ -36,6 +37,7 @@ function makeDeps(): CanvasBoardCommandDependencies {
     isNotFoundError: vi.fn((error: unknown) => {
       return typeof error === 'object' && !!error && 'status' in error && error.status === 404
     }),
+    clearSyncRollback: vi.fn(),
   }
 }
 
@@ -78,6 +80,65 @@ describe('canvasBoardCommands', () => {
       preserveLocalNewer: false,
       rollbackBoardIds: ['board-a'],
     })
+  })
+
+  it('returns an optimistic rename before remote confirmation resolves', async () => {
+    const commands = createCanvasBoardCommands(deps)
+
+    const result = commands.renameOptimistic({
+      boardId: 'board-a',
+      nextName: 'New Local',
+    })
+
+    expect(result).toMatchObject({
+      ok: true,
+      board: { id: 'board-a', name: 'New Local' },
+      previousBoard: { id: 'board-a', name: 'Board' },
+    })
+    expect(deps.renameBoard).toHaveBeenCalledWith('board-a', 'New Local')
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+
+    if (!result.ok) throw new Error('expected optimistic rename to succeed')
+    await expect(result.confirm()).resolves.toMatchObject({
+      ok: true,
+      board: { id: 'board-a', name: 'New Local' },
+    })
+    expect(deps.syncBoard).toHaveBeenCalledWith('board-a')
+  })
+
+  it('keeps optimistic rename local when remote conflict needs caller recovery', async () => {
+    const error = { status: 409, msg: '画布名称已存在' }
+    vi.mocked(deps.syncBoard).mockRejectedValueOnce(error)
+    const commands = createCanvasBoardCommands(deps)
+
+    const result = commands.renameOptimistic({
+      boardId: 'board-a',
+      nextName: 'Taken Remote',
+    })
+    if (!result.ok) throw new Error('expected optimistic rename to succeed')
+
+    await expect(result.confirm()).resolves.toMatchObject({
+      ok: false,
+      reason: 'remote-name-conflict',
+      boardId: 'board-a',
+      board: { id: 'board-a', name: 'Taken Remote' },
+      previousBoard: { id: 'board-a', name: 'Board' },
+      error,
+    })
+    expect(deps.hydrateBoards).not.toHaveBeenCalled()
+  })
+
+  it('rolls back an optimistic rename locally and clears the pending rollback marker', () => {
+    const commands = createCanvasBoardCommands(deps)
+
+    const result = commands.rollbackOptimisticRename({
+      boardId: 'board-a',
+      previousName: 'Board',
+    })
+
+    expect(result).toMatchObject({ ok: true, board: { id: 'board-a', name: 'Board' } })
+    expect(deps.renameBoard).toHaveBeenCalledWith('board-a', 'Board')
+    expect(deps.clearSyncRollback).toHaveBeenCalledWith('board-a')
   })
 
   it('stops rename before local mutation when the name is already taken locally', async () => {

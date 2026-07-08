@@ -77,6 +77,9 @@ function createBoardRuntime() {
     onNodesChange: vi.fn(),
     onEdgesChange: vi.fn(),
     closeBoardHeaderEditing: vi.fn(),
+    boardRenameRecovery: ref({ status: 'idle' as const }),
+    retryBoardRename: vi.fn(),
+    rollbackBoardRename: vi.fn(),
     onNavigateRequest: vi.fn(),
     onLogoutRequest: vi.fn(),
   }
@@ -216,6 +219,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.flowPane.onEdgeUpdate).toBe(graph.onEdgeUpdate)
     expect(runtime.flowPane.nodeDragTransactions.begin).toBe(board.graphRuntime.nodeDrag.begin)
     expect(runtime.boardChrome.currentBoardId).toBe(board.currentBoardId)
+    expect(runtime.boardChrome.boardRenameRecovery).toBe(board.boardRenameRecovery)
+    expect(runtime.boardChrome.retryBoardRename).toBe(board.retryBoardRename)
+    expect(runtime.boardChrome.rollbackBoardRename).toBe(board.rollbackBoardRename)
     expect(runtime.boardChrome.onNavigateRequest).toBe(board.onNavigateRequest)
     expect(runtime.boardChrome.onLogoutRequest).toBe(board.onLogoutRequest)
     expect(runtime.persistence.flushAutosave).not.toBe(board.flushAutosave)

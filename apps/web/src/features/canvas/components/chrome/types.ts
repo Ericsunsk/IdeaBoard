@@ -5,12 +5,22 @@ export type CanvasChromeBoardOption = {
   name: string
 }
 
+export type CanvasChromeBoardRenameRecoveryState =
+  | { status: 'idle' }
+  | {
+      status: 'pending' | 'failed' | 'conflict'
+      boardId: string
+      previousName: string
+      nextName: string
+    }
+
 export type CanvasChromeBoardState = {
   currentName: string
   options: CanvasChromeBoardOption[]
   currentId: string | null
   isMenuOpen: boolean
   isRenaming: boolean
+  renameRecovery: CanvasChromeBoardRenameRecoveryState
   setNameInputRef: (el: HTMLElement | null) => void
 }
 

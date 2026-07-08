@@ -237,12 +237,19 @@ export async function syncCanvasBoardToServer(
       created_at: board.createdAt,
       updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
     })
+    pendingRollbackBoardIds.delete(boardId.trim())
   } catch (error) {
     if (isBoardNameConflictError(error)) {
       pendingRollbackBoardIds.add(boardId.trim())
     }
     throw error
   }
+}
+
+export function clearPendingBoardSyncRollback(boardId: string) {
+  const normalized = boardId.trim()
+  if (!normalized) return
+  pendingRollbackBoardIds.delete(normalized)
 }
 
 export async function syncDeleteCanvasBoardToServer(boardId: string) {

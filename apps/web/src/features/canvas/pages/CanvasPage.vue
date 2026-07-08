@@ -22,6 +22,8 @@
       @start-board-rename="startBoardRename"
       @cancel-board-rename="cancelBoardRename"
       @confirm-board-rename="onConfirmBoardRename"
+      @retry-board-rename="retryBoardRename"
+      @rollback-board-rename="rollbackBoardRename"
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
       @navigate-back="onNavigateRequest(USER_BOARDS_PATH)"
@@ -286,6 +288,7 @@ const {
   isBoardMenuOpen,
   isRenamingBoard,
   boardNameDraft,
+  boardRenameRecovery,
   currentBoardName,
   boardOptions,
 } = viewModel.boardChrome
@@ -297,6 +300,8 @@ const {
   cancelBoardRename,
   closeBoardHeaderEditing,
   onConfirmBoardRename,
+  retryBoardRename,
+  rollbackBoardRename,
   onSelectBoard,
   onNavigateRequest,
   onLogoutRequest,
@@ -322,6 +327,7 @@ const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
   currentId: currentBoardId.value,
   isMenuOpen: isBoardMenuOpen.value,
   isRenaming: isRenamingBoard.value,
+  renameRecovery: boardRenameRecovery.value,
   setNameInputRef: setBoardNameInputRef,
 }))
 const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({

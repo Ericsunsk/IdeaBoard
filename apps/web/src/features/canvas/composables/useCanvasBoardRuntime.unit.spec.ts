@@ -65,6 +65,7 @@ function createHeaderRuntime() {
     isBoardMenuOpen: ref(false),
     isRenamingBoard: ref(false),
     boardNameDraft: ref(''),
+    boardRenameRecovery: ref({ status: 'idle' as const }),
     currentBoardName: computed(() => 'Board A'),
     boardOptions: computed(() => []),
     setBoardNameInputRef: vi.fn(),
@@ -74,6 +75,8 @@ function createHeaderRuntime() {
     cancelBoardRename: vi.fn(),
     closeBoardHeaderEditing: vi.fn(),
     onConfirmBoardRename: vi.fn(),
+    retryBoardRename: vi.fn(),
+    rollbackBoardRename: vi.fn(),
     onSelectBoard: vi.fn(),
   }
 }

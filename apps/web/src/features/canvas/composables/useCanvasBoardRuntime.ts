@@ -5,7 +5,10 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardSession } from '../board-session'
-import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
+import {
+  useFlowBoardHeaderActions,
+  type BoardRenameRecoveryState,
+} from './useFlowBoardHeaderActions'
 import type { FlowHistory } from './useFlowHistory'
 import {
   useFlowCanvasRuntime,
@@ -58,6 +61,7 @@ type CanvasBoardRuntime = {
   isBoardMenuOpen: Ref<boolean>
   isRenamingBoard: Ref<boolean>
   boardNameDraft: Ref<string>
+  boardRenameRecovery: Ref<BoardRenameRecoveryState>
   currentBoardName: ComputedRef<string>
   boardOptions: ComputedRef<BoardOption[]>
   setBoardNameInputRef: (el: HTMLElement | null) => void
@@ -67,6 +71,8 @@ type CanvasBoardRuntime = {
   cancelBoardRename: () => void
   closeBoardHeaderEditing: () => void
   onConfirmBoardRename: () => Promise<void>
+  retryBoardRename: () => Promise<void>
+  rollbackBoardRename: () => void
   onSelectBoard: (boardId: string) => void
 }
 
@@ -160,6 +166,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     isBoardMenuOpen: boardHeader.isBoardMenuOpen,
     isRenamingBoard: boardHeader.isRenamingBoard,
     boardNameDraft: boardHeader.boardNameDraft,
+    boardRenameRecovery: boardHeader.boardRenameRecovery,
     currentBoardName: boardHeader.currentBoardName,
     boardOptions: boardHeader.boardOptions,
     setBoardNameInputRef: boardHeader.setBoardNameInputRef,
@@ -169,6 +176,8 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     cancelBoardRename: boardHeader.cancelBoardRename,
     closeBoardHeaderEditing: boardHeader.closeBoardHeaderEditing,
     onConfirmBoardRename: boardHeader.onConfirmBoardRename,
+    retryBoardRename: boardHeader.retryBoardRename,
+    rollbackBoardRename: boardHeader.rollbackBoardRename,
     onSelectBoard: boardHeader.onSelectBoard,
   }
 }

@@ -11,6 +11,7 @@ export type CanvasWorkspaceRuntimeViewModel = {
     | 'isBoardMenuOpen'
     | 'isRenamingBoard'
     | 'boardNameDraft'
+    | 'boardRenameRecovery'
     | 'currentBoardName'
     | 'boardOptions'
   >
@@ -39,6 +40,8 @@ export type CanvasWorkspaceRuntimeCommands = {
     | 'cancelBoardRename'
     | 'closeBoardHeaderEditing'
     | 'onConfirmBoardRename'
+    | 'retryBoardRename'
+    | 'rollbackBoardRename'
     | 'onSelectBoard'
     | 'onNavigateRequest'
     | 'onLogoutRequest'

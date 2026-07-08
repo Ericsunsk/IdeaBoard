@@ -17,6 +17,7 @@ function createRuntimeParts() {
       isBoardMenuOpen: ref(false),
       isRenamingBoard: ref(false),
       boardNameDraft: ref('Board A'),
+      boardRenameRecovery: ref({ status: 'idle' as const }),
       currentBoardName: ref('Board A'),
       boardOptions: ref([]),
       setBoardNameInputRef: vi.fn(),
@@ -26,6 +27,8 @@ function createRuntimeParts() {
       cancelBoardRename: vi.fn(),
       closeBoardHeaderEditing: vi.fn(),
       onConfirmBoardRename: vi.fn(),
+      retryBoardRename: vi.fn(),
+      rollbackBoardRename: vi.fn(),
       onSelectBoard: vi.fn(),
       onNavigateRequest: vi.fn(),
       onLogoutRequest: vi.fn(),
@@ -128,6 +131,15 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     })
     expect(workspace.commands.boardSession.onNavigateRequest).toBe(
       runtimeParts.boardChrome.onNavigateRequest,
+    )
+    expect(workspace.viewModel.boardChrome.boardRenameRecovery).toBe(
+      runtimeParts.boardChrome.boardRenameRecovery,
+    )
+    expect(workspace.commands.boardSession.retryBoardRename).toBe(
+      runtimeParts.boardChrome.retryBoardRename,
+    )
+    expect(workspace.commands.boardSession.rollbackBoardRename).toBe(
+      runtimeParts.boardChrome.rollbackBoardRename,
     )
     expect(workspace.commands.imageWorkflow.runImageDirectAction).toBe(
       runtimeParts.imageWorkflow.runImageDirectAction,
