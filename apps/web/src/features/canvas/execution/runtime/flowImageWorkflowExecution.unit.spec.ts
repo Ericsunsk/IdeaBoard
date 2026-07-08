@@ -272,6 +272,12 @@ describe('flowImageWorkflowExecution', () => {
 
     expect(executorMocks.assertTaskRequestReady).toHaveBeenCalledTimes(1)
     expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(1)
+    expect(executorMocks.submitTaskRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client_action_id: expect.stringMatching(/^canvas:[A-Za-z0-9_.:-]+$/),
+      }),
+      undefined,
+    )
     expect(executorMocks.waitExistingOrLiveTaskImageResults).toHaveBeenCalledWith('task-1')
     expect(onSuccess).toHaveBeenCalledWith('处理完成')
     expect(onWarning).not.toHaveBeenCalled()
@@ -344,6 +350,25 @@ describe('flowImageWorkflowExecution', () => {
       outputStatus: 'running',
     })
     expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
+  })
+
+  it('keeps the canvas editable without creating result nodes when provider readiness is unavailable', async () => {
+    executorMocks.assertTaskRequestReady.mockRejectedValueOnce(
+      new Error('暂无可用生成服务，请稍后重试'),
+    )
+    const { execution, nodes, onSuccess, onWarning } = createExecutionHarness()
+
+    await execution.executeImageWorkflow(imageActionPlan())
+
+    expect(executorMocks.assertTaskRequestReady).toHaveBeenCalledTimes(1)
+    expect(executorMocks.submitTaskRequest).not.toHaveBeenCalled()
+    expect(nodes.value).toHaveLength(1)
+    expect(readImageSnapshot(nodes.value, 'image-1')).toMatchObject({
+      sourceImageUrl: 'https://example.com/source.png',
+      outputStatus: 'ready',
+    })
+    expect(onWarning).toHaveBeenCalledWith('暂无可用生成服务，请稍后重试')
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 
   it('reattaches pending image results through the workflow public API', async () => {

@@ -1,5 +1,6 @@
 export * from './canvasBoardStateSchema'
 export * from './boardStateEnvelopeContract'
+export * from './latestBoardState'
 export * from './canvasNodeRegistry'
 export * from './canvasNodes'
 export * from './fusionBlend'

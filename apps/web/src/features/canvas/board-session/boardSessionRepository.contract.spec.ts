@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
-import {
-  createCanvasBoard,
-  getCanvasBoardById,
-} from '../../canvas-board/catalog/canvasBoards'
-import {
-  getCanvasBoardState,
-  replaceCanvasBoardStateMap,
-} from '../../canvas-board/persistence'
+import { createCanvasBoard, getCanvasBoardById } from '../../canvas-board/catalog/canvasBoards'
+import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas-board/persistence'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
+import {
+  DEFAULT_PROMPT_ASPECT_RATIO,
+  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
+} from '../../canvas-board/domain'
 import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
 import {
   createBoardSessionRepository,
@@ -163,10 +161,75 @@ describe('createBoardSessionRepository', () => {
     const snapshot = await repository.load(board.id)
 
     expect(snapshot?.promptNodes[0]?.text).toBe('loaded')
-    expect(snapshot?.mediaRefs).toEqual([{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1' }])
+    expect(snapshot?.mediaRefs).toEqual([
+      { mediaAssetId: 12, refType: 'board_node', refId: 'image-1' },
+    ])
     expect(snapshot).not.toHaveProperty('updatedAt')
     expect(snapshot).not.toHaveProperty('previewSnapshotDataUrl')
     expect(snapshot).not.toHaveProperty('viewport')
+  })
+
+  it('loads a normalizable older local state as a latest-schema session snapshot', async () => {
+    const board = createCanvasBoard('Older Local Snapshot')
+    replaceCanvasBoardStateMap({
+      [board.id]: {
+        schemaVersion: 1,
+        imageNodes: [],
+        promptNodes: [
+          {
+            id: 1,
+            type: 'prompt',
+            x: 0,
+            y: 0,
+            width: 280,
+            text: 'older local',
+          },
+        ],
+        fusionNodes: [],
+        connections: [],
+        updatedAt: 2_000,
+      } as unknown as CanvasBoardState,
+    })
+    const repository = createBoardSessionRepository()
+
+    const snapshot = await repository.load(board.id)
+
+    expect(snapshot?.promptNodes[0]).toEqual(
+      expect.objectContaining({
+        text: 'older local',
+        outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
+        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
+        inputImages: [],
+      }),
+    )
+    expect(snapshot).not.toHaveProperty('updatedAt')
+  })
+
+  it('rejects invalid save snapshots with recoverable validation context', async () => {
+    const board = createCanvasBoard('Invalid Save')
+    const repository = createBoardSessionRepository()
+    const invalidSnapshot = {
+      ...makeCanvasBoardSnapshot(),
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'https://example.com/source.png',
+          sourceImageRatio: 1,
+          outputStatus: 'not-a-status',
+          outputImages: [],
+        } as unknown as CanvasBoardSnapshot['imageNodes'][number],
+      ],
+    } as CanvasBoardSnapshot
+
+    await expect(repository.save(board.id, invalidSnapshot)).rejects.toMatchObject({
+      code: 'INVALID_BOARD_STATE',
+      boundary: 'board-save',
+      recoverable: true,
+    })
   })
 })
 

@@ -15,7 +15,7 @@ import (
 const rollbackTimeout = 5 * time.Second
 
 type TaskInserter interface {
-	CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) error
+	CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error)
 }
 
 type Store struct {
@@ -36,26 +36,27 @@ func NewStore(pool *pgxpool.Pool, tasks TaskInserter, client taskqueue.RiverTxCl
 	}
 }
 
-func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) error {
+func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error) {
+	var emptyResult tasks.TaskSubmissionResult
 	if s == nil || s.pool == nil {
-		return fmt.Errorf("submit task: pgx pool not configured")
+		return emptyResult, fmt.Errorf("submit task: pgx pool not configured")
 	}
 	if s.client == nil {
-		return fmt.Errorf("submit task: river client not configured")
+		return emptyResult, fmt.Errorf("submit task: river client not configured")
 	}
 	if s.tasks == nil {
-		return fmt.Errorf("submit task: task inserter not configured")
+		return emptyResult, fmt.Errorf("submit task: task inserter not configured")
 	}
 	if task == nil {
-		return fmt.Errorf("submit task: task is nil")
+		return emptyResult, fmt.Errorf("submit task: task is nil")
 	}
 	if queueTask == nil {
-		return fmt.Errorf("submit task: queue task is nil")
+		return emptyResult, fmt.Errorf("submit task: queue task is nil")
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("submit task: begin tx: %w", err)
+		return emptyResult, fmt.Errorf("submit task: begin tx: %w", err)
 	}
 	committed := false
 	defer func() {
@@ -67,15 +68,23 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 		_ = tx.Rollback(rollbackCtx)
 	}()
 
-	if err := s.tasks.CreateWithPGXTx(ctx, tx, task); err != nil {
-		return fmt.Errorf("submit task: insert task: %w", err)
+	created, err := s.tasks.CreateWithPGXTx(ctx, tx, task)
+	if err != nil {
+		return emptyResult, fmt.Errorf("submit task: insert task: %w", err)
+	}
+	if !created {
+		if err := tx.Commit(ctx); err != nil {
+			return emptyResult, fmt.Errorf("submit task: commit existing task lookup: %w", err)
+		}
+		committed = true
+		return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: false}, nil
 	}
 	if err := taskqueue.InsertDrawingTaskTx(ctx, s.client, tx, queueTask, s.queueName, s.maxRetry); err != nil {
-		return fmt.Errorf("submit task: enqueue river job: %w", err)
+		return emptyResult, fmt.Errorf("submit task: enqueue river job: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("submit task: commit tx: %w", err)
+		return emptyResult, fmt.Errorf("submit task: commit tx: %w", err)
 	}
 	committed = true
-	return nil
+	return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: true}, nil
 }

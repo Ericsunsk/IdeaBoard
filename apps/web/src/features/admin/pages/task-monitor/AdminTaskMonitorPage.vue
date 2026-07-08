@@ -8,7 +8,20 @@
       {{ monitorErrorMessage }}
     </Message>
 
-    <template v-else>
+    <Message v-if="isMonitorStale" severity="warn" :closable="false">
+      <div class="flex flex-wrap items-center gap-2">
+        <span>任务监控连接不稳定，当前显示上次成功数据。</span>
+        <Button
+          text
+          size="small"
+          :class="adminTextButtonClass"
+          label="重试连接"
+          @click="retryMonitorSnapshot"
+        />
+      </div>
+    </Message>
+
+    <template v-if="!isMonitorError">
       <div :class="adminSummaryGridClass">
         <AdminSummaryCard label="执行中" :value="liveRunningCount" :footer="runningFoot" />
         <AdminSummaryCard label="队列等待" :value="liveQueueTotal" :footer="queueFoot" />
@@ -767,8 +780,10 @@ const {
   monitorData,
   monitorStats,
   monitorStreamStatus,
+  isStale: isMonitorStale,
   isError: isMonitorError,
   error: monitorError,
+  retry: retryMonitorSnapshot,
 } = useAdminTaskRuntimeSnapshot()
 
 const selectedTasks = ref<AdminTaskRow[]>([])

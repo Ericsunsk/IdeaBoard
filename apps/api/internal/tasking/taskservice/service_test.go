@@ -673,8 +673,9 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	})
 
 	taskID, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt: "draw a chair",
-		Params: map[string]interface{}{"size": "1024x1024"},
+		Prompt:         "draw a chair",
+		ClientActionID: " canvas-action-1 ",
+		Params:         map[string]interface{}{"size": "1024x1024"},
 	})
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
@@ -689,6 +690,9 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	if call.task.TaskID != taskID || call.task.UserID != 42 || call.task.Status != tasks.StatusPending {
 		t.Fatalf("unexpected task: %+v", call.task)
 	}
+	if call.task.ClientActionID != "canvas-action-1" {
+		t.Fatalf("client_action_id=%q, want normalized canvas-action-1", call.task.ClientActionID)
+	}
 	if call.queueTask.TaskID != taskID || call.queueTask.UserID != 42 {
 		t.Fatalf("unexpected queue task: %+v", call.queueTask)
 	}
@@ -697,6 +701,55 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	}
 	if len(taskEvents.events) != 1 || taskEvents.events[0].TaskID != taskID || taskEvents.events[0].Status != tasks.StatusPending {
 		t.Fatalf("unexpected task events: %+v", taskEvents.events)
+	}
+}
+
+func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+		{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
+	}}
+	submissionStore := &recordingSubmissionStore{
+		result: tasks.TaskSubmissionResult{TaskID: "task_existing_action", Created: false},
+	}
+	taskEvents := &recordingTaskStatusPublisher{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+	}, ServiceOptions{
+		TaskEvents: taskEvents,
+	})
+
+	taskID, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:         "draw a chair",
+		ClientActionID: "canvas-action-repeat",
+		Params:         map[string]interface{}{"size": "1024x1024"},
+	})
+	if err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if taskID != "task_existing_action" {
+		t.Fatalf("task_id=%q, want existing task id", taskID)
+	}
+	if len(submissionStore.calls) != 1 {
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+	if len(taskEvents.events) != 0 {
+		t.Fatalf("task events=%+v, want none for existing task", taskEvents.events)
+	}
+}
+
+func TestSubmitTaskRejectsInvalidClientActionID(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService(ServiceDeps{}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:         "draw a chair",
+		ClientActionID: strings.Repeat("x", maxSubmitTaskClientActionIDBytes+1),
+		Params:         map[string]interface{}{"size": "1024x1024"},
+	})
+	if err == nil {
+		t.Fatalf("expected client_action_id validation error")
 	}
 }
 
@@ -1057,6 +1110,7 @@ func (s fakeFeaturePromptStore) GetPromptRuntimeConfig(_ context.Context, slug s
 
 type recordingSubmissionStore struct {
 	calls []submitCall
+	result tasks.TaskSubmissionResult
 	err   error
 }
 
@@ -1065,12 +1119,15 @@ type submitCall struct {
 	queueTask *tasks.TaskPayload
 }
 
-func (s *recordingSubmissionStore) SubmitTask(_ context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) error {
+func (s *recordingSubmissionStore) SubmitTask(_ context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error) {
 	if s.err != nil {
-		return s.err
+		return tasks.TaskSubmissionResult{}, s.err
 	}
 	s.calls = append(s.calls, submitCall{task: task, queueTask: queueTask})
-	return nil
+	if s.result.TaskID != "" {
+		return s.result, nil
+	}
+	return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: true}, nil
 }
 
 type recordingTaskStatusPublisher struct {

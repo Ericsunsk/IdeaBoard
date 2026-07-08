@@ -219,6 +219,7 @@ type Task struct {
 	ID                         int64         `json:"id"`
 	TaskID                     string        `json:"task_id"`
 	UserID                     int64         `json:"user_id"`
+	ClientActionID             string        `json:"client_action_id"`
 	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`

@@ -35,7 +35,7 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 	}
 	store := NewStore(pool, taskstore.NewRepository(db), failingRiverTxClient{err: errors.New("river insert failed")}, "drawing_default", 3)
 
-	if err := store.SubmitTask(ctx, task, queueTask); err == nil {
+	if _, err := store.SubmitTask(ctx, task, queueTask); err == nil {
 		t.Fatalf("expected submit to fail")
 	}
 

@@ -191,33 +191,25 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 
 func (s *Service) CompleteTask(ctx context.Context, input CompleteTaskInput) error {
 	assignment := input.Assignment
-	if !assignment.HasLeaseIdentity() {
-		return ErrTaskStateConflict
+	if err := requireTaskTransitionLease(taskTransitionComplete, assignment); err != nil {
+		return err
 	}
 	now := taskTerminalTime(input.AttemptFinish)
 	if err := validateTaskOutputs(assignment.TaskID, input.Outputs); err != nil {
 		return err
 	}
 	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Result, now, input.Outputs, input.AttemptFinish)
+	if err := normalizeTaskTransitionWriteError(err); err != nil {
+		return err
+	}
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionComplete, assignment.TaskID, assignment, rows)
 	if err != nil {
 		return err
 	}
-	if rows > 0 {
+	if applied {
 		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusCompleted)
-		return nil
 	}
-
-	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return ErrTaskNotFound
-		}
-		return err
-	}
-	if tasks.IsTerminalStatus(task.Status) {
-		return ErrTaskTerminal
-	}
-	return ErrTaskStateConflict
+	return nil
 }
 
 func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error {
@@ -284,65 +276,43 @@ func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) erro
 	}
 	now := taskTerminalTime(input.AttemptFinish)
 	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, pendingOnly(), input.Reason, formatTaskFailureResult(taskID, input.Reason), now, input.AttemptFinish)
+	if err := normalizeTaskTransitionWriteError(err); err != nil {
+		return err
+	}
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFailPending, taskID, taskqueue.TaskAssignment{}, rows)
 	if err != nil {
 		return err
 	}
-	if rows > 0 {
+	if applied {
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
-		return nil
 	}
-
-	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return ErrTaskNotFound
-		}
-		return err
-	}
-	if task.Status == tasks.StatusFailed {
-		return nil
-	}
-	if task.Status == tasks.StatusCompleted {
-		return ErrTaskTerminal
-	}
-	return ErrTaskStateConflict
+	return nil
 }
 
 func (s *Service) failRunningTaskWithLease(ctx context.Context, input FailTaskInput) error {
 	assignment := input.Assignment
-	if !assignment.HasLeaseIdentity() {
-		return ErrTaskStateConflict
+	if err := requireTaskTransitionLease(taskTransitionFailRunning, assignment); err != nil {
+		return err
 	}
 	now := taskTerminalTime(input.AttemptFinish)
 	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.AttemptFinish)
+	if err := normalizeTaskTransitionWriteError(err); err != nil {
+		return err
+	}
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFailRunning, assignment.TaskID, assignment, rows)
 	if err != nil {
 		return err
 	}
-	if rows > 0 {
+	if applied {
 		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusFailed)
-		return nil
 	}
-
-	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return ErrTaskNotFound
-		}
-		return err
-	}
-	if task.Status == tasks.StatusFailed {
-		return nil
-	}
-	if task.Status == tasks.StatusCompleted {
-		return ErrTaskTerminal
-	}
-	return ErrTaskStateConflict
+	return nil
 }
 
 func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskInput) error {
 	assignment := input.Assignment
-	if !assignment.HasLeaseIdentity() {
-		return ErrTaskStateConflict
+	if err := requireTaskTransitionLease(taskTransitionReset, assignment); err != nil {
+		return err
 	}
 
 	errMsg := ""
@@ -351,34 +321,23 @@ func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskIn
 	}
 
 	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, errMsg, input.AttemptFinish)
+	if err := normalizeTaskTransitionWriteError(err); err != nil {
+		return err
+	}
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionReset, assignment.TaskID, assignment, rows)
 	if err != nil {
 		return err
 	}
-	if rows > 0 {
+	if applied {
 		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusPending)
-		return nil
 	}
-
-	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return ErrTaskNotFound
-		}
-		return err
-	}
-	if task.Status == tasks.StatusPending {
-		return nil
-	}
-	if tasks.IsTerminalStatus(task.Status) {
-		return ErrTaskTerminal
-	}
-	return ErrTaskStateConflict
+	return nil
 }
 
 func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFailoverInput) (bool, error) {
 	assignment := input.Assignment
-	if !assignment.HasLeaseIdentity() {
-		return false, ErrTaskStateConflict
+	if err := requireTaskTransitionLease(taskTransitionRequeue, assignment); err != nil {
+		return false, err
 	}
 	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
 	if err != nil {
@@ -387,58 +346,43 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 		}
 		return false, err
 	}
-	if tasks.IsTerminalStatus(task.Status) {
-		return false, ErrTaskTerminal
+	current, err := evaluateTaskTransitionCurrent(taskTransitionRequeue, task, assignment)
+	if err != nil {
+		return false, err
 	}
-	if task.Status != tasks.StatusRunning {
-		if task.Status == tasks.StatusPending {
-			return true, nil
-		}
-		return false, ErrTaskStateConflict
-	}
-	if tasks.IDValue(task.AccountID) != assignment.AccountID || tasks.IDValue(task.AssignedProviderEndpointID) != assignment.ProviderEndpointID || task.LeaseToken != assignment.LeaseToken {
-		return false, ErrTaskStateConflict
-	}
-	if assignment.CredentialID > 0 && tasks.IDValue(task.AssignedCredentialID) != assignment.CredentialID {
-		return false, ErrTaskStateConflict
+	if current.idempotent {
+		return true, nil
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
 		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, input.RequeuedAttemptFinish)
+		if err := normalizeTaskTransitionWriteError(err); err != nil {
+			return false, err
+		}
+		applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionRequeue, assignment.TaskID, assignment, rows)
 		if err != nil {
 			return false, err
 		}
-		if rows > 0 {
+		if applied {
 			s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusPending)
-			return true, nil
 		}
-		return false, ErrTaskStateConflict
+		return true, nil
 	}
 
 	now := taskTerminalTime(input.FinalFailAttemptFinish)
 	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.FinalFailAttemptFinish)
+	if err := normalizeTaskTransitionWriteError(err); err != nil {
+		return false, err
+	}
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionFinalFail, assignment.TaskID, assignment, rows)
 	if err != nil {
 		return false, err
 	}
-	if rows > 0 {
+	if applied {
 		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusFailed)
 		return false, nil
 	}
-
-	latest, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return false, ErrTaskNotFound
-		}
-		return false, err
-	}
-	if latest.Status == tasks.StatusPending {
-		return true, nil
-	}
-	if tasks.IsTerminalStatus(latest.Status) {
-		return false, ErrTaskTerminal
-	}
-	return false, ErrTaskStateConflict
+	return true, nil
 }
 
 func pendingOnly() []string {

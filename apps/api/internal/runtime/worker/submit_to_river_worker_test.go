@@ -65,8 +65,12 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 		t.Fatalf("new task status=%q, want %q", task.Status, tasks.StatusPending)
 	}
 	store := tasksubmission.NewStore(pool, taskRepo, client, submitToRiverWorkerQueue, submitToRiverWorkerMaxAttempts)
-	if err := store.SubmitTask(ctx, task, queueTask); err != nil {
+	result, err := store.SubmitTask(ctx, task, queueTask)
+	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if result.TaskID != task.TaskID || !result.Created {
+		t.Fatalf("SubmitTask result=%+v, want created task %q", result, task.TaskID)
 	}
 
 	pending := loadSubmitToRiverWorkerTask(t, taskRepo, task.TaskID)

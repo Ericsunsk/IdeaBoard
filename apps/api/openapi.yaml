@@ -1701,6 +1701,15 @@ components:
       required: [prompt]
       properties:
         prompt: { type: string }
+        client_action_id:
+          type: string
+          maxLength: 128
+          pattern: '^[A-Za-z0-9_.:-]+$'
+          description: >
+            Optional client-generated idempotency key for a single task submission
+            action. Reuse the same value when retrying the same action after a
+            network failure or duplicate click; generate a new value for an
+            intentional rerun.
         feature:
           $ref: '#/components/schemas/WorkflowFeatureSlug'
         image_urls:

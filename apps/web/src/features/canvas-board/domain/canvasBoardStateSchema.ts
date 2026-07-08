@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import {
   DEFAULT_FUSION_BLEND_POINT,
   DEFAULT_FUSION_NODE_OUTPUT_COUNT,
+  DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
   DEFAULT_PROMPT_ASPECT_RATIO,
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   MAX_IMAGE_NODE_OUTPUT_COUNT,
@@ -75,7 +76,7 @@ const imageNodeItemSchema = v.strictObject({
   sourceImageUrl: v.string(),
   sourceMediaAssetId: v.optional(positiveIntegerSchema),
   sourceImageRatio: positiveFiniteNumberSchema,
-  outputCount: v.optional(outputCountSchema),
+  outputCount: v.optional(outputCountSchema, DEFAULT_IMAGE_NODE_OUTPUT_COUNT),
   pendingTaskId: v.optional(nonEmptyStringSchema),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: v.array(imageNodeOutputItemSchema),

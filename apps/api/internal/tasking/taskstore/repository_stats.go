@@ -412,6 +412,7 @@ type taskSQLCFields struct {
 	ID                         int64
 	TaskID                     string
 	UserID                     int64
+	ClientActionID             string
 	AssignedProviderEndpointID sql.NullInt64
 	AssignedCredentialID       sql.NullInt64
 	AccountID                  sql.NullInt64
@@ -446,6 +447,7 @@ func taskFromSQLC(row any) tasks.Task {
 			ID:                         r.ID,
 			TaskID:                     r.TaskID,
 			UserID:                     r.UserID,
+			ClientActionID:             r.ClientActionID,
 			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
 			AssignedCredentialID:       r.AssignedCredentialID,
 			AccountID:                  r.AccountID,
@@ -477,6 +479,7 @@ func taskFromSQLC(row any) tasks.Task {
 			ID:                         r.ID,
 			TaskID:                     r.TaskID,
 			UserID:                     r.UserID,
+			ClientActionID:             r.ClientActionID,
 			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
 			AssignedCredentialID:       r.AssignedCredentialID,
 			AccountID:                  r.AccountID,
@@ -508,6 +511,7 @@ func taskFromSQLC(row any) tasks.Task {
 			ID:                         r.ID,
 			TaskID:                     r.TaskID,
 			UserID:                     r.UserID,
+			ClientActionID:             r.ClientActionID,
 			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
 			AssignedCredentialID:       r.AssignedCredentialID,
 			AccountID:                  r.AccountID,
@@ -539,6 +543,7 @@ func taskFromSQLC(row any) tasks.Task {
 			ID:                         r.ID,
 			TaskID:                     r.TaskID,
 			UserID:                     r.UserID,
+			ClientActionID:             r.ClientActionID,
 			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
 			AssignedCredentialID:       r.AssignedCredentialID,
 			AccountID:                  r.AccountID,
@@ -570,6 +575,7 @@ func taskFromSQLC(row any) tasks.Task {
 			ID:                         r.ID,
 			TaskID:                     r.TaskID,
 			UserID:                     r.UserID,
+			ClientActionID:             r.ClientActionID,
 			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
 			AssignedCredentialID:       r.AssignedCredentialID,
 			AccountID:                  r.AccountID,
@@ -600,6 +606,7 @@ func taskFromSQLCFields(row taskSQLCFields) tasks.Task {
 		ID:                         row.ID,
 		TaskID:                     row.TaskID,
 		UserID:                     row.UserID,
+		ClientActionID:             row.ClientActionID,
 		AssignedProviderEndpointID: dbutil.Int64Ptr(row.AssignedProviderEndpointID),
 		AssignedCredentialID:       dbutil.Int64Ptr(row.AssignedCredentialID),
 		AccountID:                  dbutil.Int64Ptr(row.AccountID),

@@ -173,18 +173,18 @@ func (q *Queries) CountTasksByUserID(ctx context.Context, userID int64) (int64, 
 
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (
-  task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+  task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
   feature_slug, requested_model,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
-  $1, $2, $3, $4, $5,
-  $6, $7, $8,
-  $9, $10,
-  $11,
-  $12, $13, $14, $15,
-  $16, $17, $18,
-  $19, $20, $21
+  $1, $2, $3, $4, $5, $6,
+  $7, $8, $9,
+  $10, $11,
+  $12,
+  $13, $14, $15, $16,
+  $17, $18, $19,
+  $20, $21, $22
 )
 RETURNING id
 `
@@ -192,6 +192,7 @@ RETURNING id
 type CreateTaskParams struct {
 	TaskID                     string        `json:"task_id"`
 	UserID                     int64         `json:"user_id"`
+	ClientActionID             string        `json:"client_action_id"`
 	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
@@ -217,6 +218,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 	row := q.db.QueryRowContext(ctx, createTask,
 		arg.TaskID,
 		arg.UserID,
+		arg.ClientActionID,
 		arg.AssignedProviderEndpointID,
 		arg.AssignedCredentialID,
 		arg.AccountID,
@@ -611,7 +613,7 @@ func (q *Queries) GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string)
 }
 
 const getTaskByTaskID = `-- name: GetTaskByTaskID :one
-SELECT id, task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
        feature_slug, requested_model,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
@@ -637,6 +639,7 @@ type GetTaskByTaskIDRow struct {
 	ID                         int64         `json:"id"`
 	TaskID                     string        `json:"task_id"`
 	UserID                     int64         `json:"user_id"`
+	ClientActionID             string        `json:"client_action_id"`
 	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
@@ -672,6 +675,7 @@ func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskBy
 		&i.ID,
 		&i.TaskID,
 		&i.UserID,
+		&i.ClientActionID,
 		&i.AssignedProviderEndpointID,
 		&i.AssignedCredentialID,
 		&i.AccountID,
@@ -703,7 +707,7 @@ func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskBy
 }
 
 const getTaskByTaskIDAndUserID = `-- name: GetTaskByTaskIDAndUserID :one
-SELECT id, task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
        feature_slug, requested_model,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
@@ -734,6 +738,7 @@ type GetTaskByTaskIDAndUserIDRow struct {
 	ID                         int64         `json:"id"`
 	TaskID                     string        `json:"task_id"`
 	UserID                     int64         `json:"user_id"`
+	ClientActionID             string        `json:"client_action_id"`
 	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
@@ -769,6 +774,7 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 		&i.ID,
 		&i.TaskID,
 		&i.UserID,
+		&i.ClientActionID,
 		&i.AssignedProviderEndpointID,
 		&i.AssignedCredentialID,
 		&i.AccountID,
@@ -1309,7 +1315,7 @@ func (q *Queries) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg Lis
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
        feature_slug, requested_model,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
@@ -1353,6 +1359,7 @@ type ListTasksRow struct {
 	ID                         int64         `json:"id"`
 	TaskID                     string        `json:"task_id"`
 	UserID                     int64         `json:"user_id"`
+	ClientActionID             string        `json:"client_action_id"`
 	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
@@ -1405,6 +1412,7 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 			&i.ID,
 			&i.TaskID,
 			&i.UserID,
+			&i.ClientActionID,
 			&i.AssignedProviderEndpointID,
 			&i.AssignedCredentialID,
 			&i.AccountID,
@@ -1446,7 +1454,7 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 }
 
 const listTasksByUserID = `-- name: ListTasksByUserID :many
-SELECT id, task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
        feature_slug, requested_model,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
@@ -1480,6 +1488,7 @@ type ListTasksByUserIDRow struct {
 	ID                         int64         `json:"id"`
 	TaskID                     string        `json:"task_id"`
 	UserID                     int64         `json:"user_id"`
+	ClientActionID             string        `json:"client_action_id"`
 	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
@@ -1521,6 +1530,7 @@ func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDPa
 			&i.ID,
 			&i.TaskID,
 			&i.UserID,
+			&i.ClientActionID,
 			&i.AssignedProviderEndpointID,
 			&i.AssignedCredentialID,
 			&i.AccountID,

@@ -9,6 +9,13 @@ import type { WorkflowFeatureSlug } from './workflowFeatureSlug'
 
 export interface SubmitTaskRequest {
   prompt: string
+  /**
+   * Optional client-generated idempotency key for a single task submission action. Reuse the same value when retrying the same action after a network failure or duplicate click; generate a new value for an intentional rerun.
+   *
+   * @maxLength 128
+   * @pattern ^[A-Za-z0-9_.:-]+$
+   */
+  client_action_id?: string
   feature?: WorkflowFeatureSlug
   image_urls?: string[]
   params?: SubmitTaskRequestParams

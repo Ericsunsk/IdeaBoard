@@ -3,10 +3,7 @@ import {
   listUserBoards,
   upsertUserBoard,
 } from '../../../shared/api/generated-query/boards/boards'
-import type {
-  BoardStateEnvelope,
-  UserBoardItem,
-} from '../../../shared/api/generated-query/model'
+import type { BoardStateEnvelope, UserBoardItem } from '../../../shared/api/generated-query/model'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import {
   getCanvasBoardById,
@@ -16,8 +13,8 @@ import {
   type CanvasBoardMeta,
 } from './canvasBoards'
 import {
-  deserializeRemoteBoardStateEnvelope,
   getCanvasBoardState,
+  normalizeCanvasBoardState,
   replaceCanvasBoardStateMap,
   serializeCanvasBoardState,
 } from '../persistence'
@@ -51,7 +48,14 @@ function toLocalMeta(board: UserBoardItem): CanvasBoardMeta | null {
 }
 
 function toLocalState(board: UserBoardItem): CanvasBoardState | null {
-  return deserializeRemoteBoardStateEnvelope(board.state)
+  const result = normalizeCanvasBoardState(board.state, {
+    mode: 'result',
+    boundary: 'server-hydration',
+  })
+  if (result.ok) return result.value
+  const boardId = board.board_id?.trim() || ''
+  console.warn('[boards] invalid remote board state skipped', boardId, result.error)
+  return null
 }
 
 function toGeneratedBoardStateProjection(state: CanvasBoardState): BoardStateEnvelope {

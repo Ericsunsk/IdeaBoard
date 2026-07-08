@@ -9,6 +9,7 @@ type Task struct {
 	ID                         int64                 `json:"id"`
 	TaskID                     string                `json:"task_id"`
 	UserID                     int64                 `json:"user_id"`
+	ClientActionID             string                `json:"client_action_id"`
 	AssignedProviderEndpointID *int64                `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       *int64                `json:"assigned_credential_id"`
 	AccountID                  *int64                `json:"account_id"`
@@ -174,10 +175,16 @@ func SafeTaskResultJSON(raw string) string {
 }
 
 type SubmitTaskRequest struct {
-	Prompt    string                 `json:"prompt"`
-	Feature   string                 `json:"feature"`
-	ImageURLs []string               `json:"image_urls"`
-	Params    map[string]interface{} `json:"params"`
+	Prompt         string                 `json:"prompt"`
+	Feature        string                 `json:"feature"`
+	ClientActionID string                 `json:"client_action_id"`
+	ImageURLs      []string               `json:"image_urls"`
+	Params         map[string]interface{} `json:"params"`
+}
+
+type TaskSubmissionResult struct {
+	TaskID  string
+	Created bool
 }
 
 type TaskListRequest struct {

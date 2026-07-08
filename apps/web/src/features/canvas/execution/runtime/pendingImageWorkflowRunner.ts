@@ -8,6 +8,10 @@ import type {
   PendingImageResultExecution,
   PendingImageResultRunSummary,
 } from '../result-nodes/usePendingImageResultNodes'
+import {
+  createPendingTaskClientActionIds,
+  type ClientActionIdFactory,
+} from '../task-runner/taskClientActionIds'
 
 type PendingImageResultOptions = ImageExecutionResultOptions
 
@@ -26,7 +30,7 @@ export type PendingImageWorkflowBatchParams = {
   preflight?: () => Promise<void>
   assertReady?: () => Promise<void>
   prepare?: () => Promise<PendingImageWorkflowPrepared | void>
-  submitTask: (resultNodeId: string) => Promise<{ taskId: string }>
+  submitTask: (resultNodeId: string, clientActionId: string) => Promise<{ taskId: string }>
   resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
   persistPendingTaskIds?: boolean
   cleanup?: () => Promise<void>
@@ -44,6 +48,7 @@ export type PendingImageWorkflowRunnerOptions = {
   isBoardCurrent: (boardId: string) => boolean
   setNodeRunning: (nodeId: string, running: boolean) => void
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
+  createClientActionId?: ClientActionIdFactory
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
 }
@@ -112,6 +117,7 @@ export function createPendingImageWorkflowRunner(
 
   async function run(params: PendingImageWorkflowBatchParams): Promise<void> {
     let resultNodeIds: string[] = []
+    const clientActionIds = createPendingTaskClientActionIds(options.createClientActionId)
     try {
       await params.preflight?.()
       const prepared = await params.prepare?.()
@@ -121,7 +127,8 @@ export function createPendingImageWorkflowRunner(
         sourceNodeId: prepared?.sourceNodeId ?? params.sourceNodeId,
         outputCount: params.outputCount,
         resultOptions: prepared?.resultOptions ?? params.resultOptions,
-        submitTask: params.submitTask,
+        submitTask: (resultNodeId) =>
+          params.submitTask(resultNodeId, clientActionIds.getForResultNode(resultNodeId)),
         resolveResult: params.resolveResult,
         persistPendingTaskIds: params.persistPendingTaskIds,
         isCurrent: () => options.isBoardCurrent(params.boardId),

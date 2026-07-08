@@ -1,4 +1,6 @@
 import {
+  assertLatestCanvasBoardSnapshot,
+  assertLatestCanvasBoardState,
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
@@ -44,19 +46,32 @@ export function makePendingImageNodeSnapshot(
 export function makeCanvasBoardSnapshot(
   overrides: Partial<CanvasBoardSnapshot> = {},
 ): CanvasBoardSnapshot {
-  return {
-    ...createEmptyCanvasBoardSnapshot(),
-    ...overrides,
-  }
+  return assertLatestCanvasBoardSnapshot(
+    {
+      ...createEmptyCanvasBoardSnapshot(),
+      ...overrides,
+    },
+    'test-fixture-snapshot',
+  )
 }
 
 export function makeCanvasBoardState(overrides: Partial<CanvasBoardState> = {}): CanvasBoardState {
-  return {
-    ...makeCanvasBoardSnapshot(overrides),
-    updatedAt: overrides.updatedAt ?? 1,
-    mediaRefs: overrides.mediaRefs,
-    previewSnapshotDataUrl: overrides.previewSnapshotDataUrl,
-    previewSnapshotUpdatedAt: overrides.previewSnapshotUpdatedAt,
-    previewSnapshotVersion: overrides.previewSnapshotVersion,
-  }
+  const {
+    updatedAt,
+    previewSnapshotDataUrl,
+    previewSnapshotUpdatedAt,
+    previewSnapshotVersion,
+    ...snapshotOverrides
+  } = overrides
+  return assertLatestCanvasBoardState(
+    {
+      ...createEmptyCanvasBoardSnapshot(),
+      ...snapshotOverrides,
+      updatedAt: updatedAt ?? 1,
+      previewSnapshotDataUrl,
+      previewSnapshotUpdatedAt,
+      previewSnapshotVersion,
+    },
+    'test-fixture-state',
+  )
 }

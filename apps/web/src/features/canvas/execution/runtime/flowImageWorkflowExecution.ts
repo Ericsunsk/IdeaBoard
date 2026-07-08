@@ -46,11 +46,12 @@ import {
   submitTaskRequest,
   waitExistingOrLiveTaskImageResults,
 } from '../task-runner/flowImageDirectActionExecutor'
+import { withTaskClientActionId } from '../task-runner/taskClientActionIds'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
 
 type TaskSubmissionCallbacks = {
   assertReady?: () => Promise<void>
-  submitTask: () => Promise<{ taskId: string }>
+  submitTask: (clientActionId?: string) => Promise<{ taskId: string }>
 }
 
 export type FlowImageWorkflowExecutionPlan = ImageExecutionPlan
@@ -81,8 +82,11 @@ function createTaskSubmissionCallbacks(options: {
     : undefined
   return {
     assertReady,
-    submitTask: async () =>
-      submitTaskRequest(await options.buildRequest(), options.fallbackMessage),
+    submitTask: async (clientActionId) =>
+      submitTaskRequest(
+        withTaskClientActionId(await options.buildRequest(), clientActionId),
+        options.fallbackMessage,
+      ),
   }
 }
 
@@ -247,7 +251,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: 1,
       assertReady: taskSubmission.assertReady,
-      submitTask: () => taskSubmission.submitTask(),
+      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
       successMessage: '处理完成',
       fallbackErrorMessage: '执行失败',
@@ -268,7 +272,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       assertReady: taskSubmission.assertReady,
-      submitTask: taskSubmission.submitTask,
+      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.targetRatio),
       fallbackErrorMessage: '扩图失败',
     })
@@ -302,7 +306,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
           cropSize: localInpaint.crop.cropSize,
         })
       },
-      submitTask: taskSubmission.submitTask,
+      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: async (taskId) => {
         if (!localInpaint) throw new Error('局部重绘任务未准备完成')
         async function waitLocalInpaintTaskResults() {
@@ -351,7 +355,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       assertReady: taskSubmission.assertReady,
-      submitTask: taskSubmission.submitTask,
+      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
       fallbackErrorMessage: '生成失败',
     })
@@ -368,7 +372,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      submitTask: taskSubmission.submitTask,
+      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, 1),
       fallbackErrorMessage: '生成失败',
     })
@@ -401,7 +405,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
         }
       },
       assertReady: taskSubmission.assertReady,
-      submitTask: taskSubmission.submitTask,
+      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, targetRatio),
       fallbackErrorMessage: 'Fusion 生成失败',
       formatErrorMessage: (error) => sanitizeApiErrorMessage(error.message, 'Fusion 生成失败'),

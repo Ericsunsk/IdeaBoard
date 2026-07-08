@@ -1,5 +1,11 @@
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
-import { BOARD_PREVIEW_RENDERER_VERSION, renderBoardPreviewDataUrl } from '../../canvas-board/preview'
+import {
+  assertLatestCanvasBoardSnapshot,
+  type CanvasBoardSnapshot,
+} from '../../canvas-board/domain'
+import {
+  BOARD_PREVIEW_RENDERER_VERSION,
+  renderBoardPreviewDataUrl,
+} from '../../canvas-board/preview'
 import type { BoardSessionRepository } from './boardSessionRepository'
 
 export type BoardSessionPreviewRenderer = {
@@ -23,7 +29,8 @@ export async function refreshBoardSessionPreview(
   options: RefreshBoardSessionPreviewOptions,
 ): Promise<void> {
   const renderer = options.renderer ?? defaultBoardSessionPreviewRenderer
-  const snapshotDataUrl = await renderer.render(options.snapshot)
+  const snapshot = assertLatestCanvasBoardSnapshot(options.snapshot, 'session-preview-refresh')
+  const snapshotDataUrl = await renderer.render(snapshot)
   options.repository.setPreview(
     options.boardId,
     snapshotDataUrl || undefined,

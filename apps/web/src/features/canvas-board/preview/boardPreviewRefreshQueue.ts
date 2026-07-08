@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import type { CanvasBoardState } from '../domain'
+import { normalizeLatestCanvasBoardState, type CanvasBoardState } from '../domain'
 import { getCanvasBoardState, setCanvasBoardPreviewSnapshot } from '../persistence'
 import { renderBoardPreviewDataUrl } from './boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from './boardPreviewVersion'
@@ -50,21 +50,35 @@ export function createBoardPreviewRefreshQueue(
   let isInFlight = false
   let isDisposed = false
 
+  function readLatestBoardState(boardId: string, boundary: string): CanvasBoardState | null {
+    const state = deps.getBoardState(boardId)
+    const result = normalizeLatestCanvasBoardState(state, { mode: 'result', boundary })
+    if (result.ok) return result.value
+    if (state) {
+      deps.warn('[boards] invalid board state for preview refresh', boardId, result.error)
+    }
+    return null
+  }
+
   function reloadFromLocal(boards: CanvasBoardMeta[]) {
     const nextMap: Record<string, string> = {}
     boards.forEach((board) => {
-      nextMap[board.id] = deps.getBoardState(board.id)?.previewSnapshotDataUrl || ''
+      nextMap[board.id] =
+        readLatestBoardState(board.id, 'preview-reload')?.previewSnapshotDataUrl || ''
     })
     previewMap.value = nextMap
   }
 
-  function isPreviewStale(boardId: string): boolean {
-    const state = deps.getBoardState(boardId)
+  function isPreviewStaleState(state: CanvasBoardState | null): boolean {
     if (!state) return false
     if (!state.previewSnapshotDataUrl) return true
     if (!Number.isFinite(state.previewSnapshotUpdatedAt)) return true
     if (state.previewSnapshotVersion !== deps.rendererVersion) return true
     return (state.previewSnapshotUpdatedAt || 0) < state.updatedAt
+  }
+
+  function isPreviewStale(boardId: string): boolean {
+    return isPreviewStaleState(readLatestBoardState(boardId, 'preview-stale-check'))
   }
 
   function enqueue(boardId: string) {
@@ -74,8 +88,8 @@ export function createBoardPreviewRefreshQueue(
   }
 
   async function refreshInBackground(boardId: string) {
-    const startState = deps.getBoardState(boardId)
-    if (!startState || !isPreviewStale(boardId)) return
+    const startState = readLatestBoardState(boardId, 'preview-render')
+    if (!startState || !isPreviewStaleState(startState)) return
     const baseUpdatedAt = startState.updatedAt
     let snapshotDataUrl: string | undefined
     let snapshotUpdatedAt: number | undefined
@@ -88,7 +102,7 @@ export function createBoardPreviewRefreshQueue(
       return
     }
 
-    const latestState = deps.getBoardState(boardId)
+    const latestState = readLatestBoardState(boardId, 'preview-write')
     if (!latestState) return
     if (latestState.updatedAt !== baseUpdatedAt) {
       enqueue(boardId)

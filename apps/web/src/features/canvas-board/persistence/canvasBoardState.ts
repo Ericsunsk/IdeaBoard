@@ -1,13 +1,11 @@
 import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  InvalidBoardStateError,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
 } from '../domain'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
-import {
-  normalizeCanvasBoardState,
-  serializeCanvasBoardState,
-} from './boardStateSerialization'
+import { normalizeCanvasBoardState, serializeCanvasBoardState } from './boardStateSerialization'
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boardStates.v2'
 
@@ -22,8 +20,18 @@ function getScopedStorageKey(): string | null {
   return `${STORAGE_KEY_PREFIX}.${scope}`
 }
 
-function toValidBoardState(item: unknown): CanvasBoardState | null {
-  return normalizeCanvasBoardState(item)
+function toValidBoardState(
+  item: unknown,
+  boundary: string,
+  options: { throwOnInvalid?: boolean; boardId?: string } = {},
+): CanvasBoardState | null {
+  const result = normalizeCanvasBoardState(item, { mode: 'result', boundary })
+  if (result.ok) return result.value
+  console.warn('[canvas] invalid board state rejected', options.boardId, result.error)
+  if (options.throwOnInvalid) {
+    throw new InvalidBoardStateError(result.error)
+  }
+  return null
 }
 
 function stripPreviewSnapshotsFromStateMap(
@@ -48,7 +56,7 @@ function readRawStateMap(): Record<string, CanvasBoardState> {
     if (!parsed || typeof parsed !== 'object') return {}
     const result: Record<string, CanvasBoardState> = {}
     Object.entries(parsed as Record<string, unknown>).forEach(([boardId, stateLike]) => {
-      const state = toValidBoardState(stateLike)
+      const state = toValidBoardState(stateLike, 'local-state-read', { boardId })
       if (!state) return
       result[boardId] = state
     })
@@ -86,7 +94,7 @@ function writeRawStateMapWithPreviewFallback(
 export function replaceCanvasBoardStateMap(stateMap: Record<string, CanvasBoardState>) {
   const normalized: Record<string, CanvasBoardState> = {}
   Object.entries(stateMap).forEach(([boardId, state]) => {
-    const validState = toValidBoardState(state)
+    const validState = toValidBoardState(state, 'local-state-replace', { boardId })
     if (!validState) return
     normalized[normalizeBoardId(boardId)] = validState
   })
@@ -145,14 +153,18 @@ export function setCanvasBoardState(
   if (!id) return null
   const stateMap = readRawStateMap()
   const existing = stateMap[id]
-  const validState = toValidBoardState({
-    ...state,
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    previewSnapshotDataUrl: existing?.previewSnapshotDataUrl,
-    previewSnapshotUpdatedAt: existing?.previewSnapshotUpdatedAt,
-    previewSnapshotVersion: existing?.previewSnapshotVersion,
-    updatedAt: Date.now(),
-  })
+  const validState = toValidBoardState(
+    {
+      ...state,
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+      previewSnapshotDataUrl: existing?.previewSnapshotDataUrl,
+      previewSnapshotUpdatedAt: existing?.previewSnapshotUpdatedAt,
+      previewSnapshotVersion: existing?.previewSnapshotVersion,
+      updatedAt: Date.now(),
+    },
+    'board-save',
+    { boardId: id, throwOnInvalid: true },
+  )
   if (!validState) return null
   stateMap[id] = validState
   const persistedStateMap = writeRawStateMapWithPreviewFallback(stateMap)
@@ -170,13 +182,17 @@ export function setCanvasBoardPreviewSnapshot(
   const stateMap = readRawStateMap()
   const existing = stateMap[id]
   if (!existing) return null
-  const validState = toValidBoardState({
-    ...existing,
-    previewSnapshotDataUrl,
-    previewSnapshotUpdatedAt,
-    previewSnapshotVersion,
-    updatedAt: existing.updatedAt,
-  })
+  const validState = toValidBoardState(
+    {
+      ...existing,
+      previewSnapshotDataUrl,
+      previewSnapshotUpdatedAt,
+      previewSnapshotVersion,
+      updatedAt: existing.updatedAt,
+    },
+    'preview-refresh',
+    { boardId: id },
+  )
   if (!validState) return null
   stateMap[id] = validState
   writeRawStateMap(stateMap)
@@ -200,10 +216,14 @@ export function duplicateCanvasBoardState(sourceBoardId: string, targetBoardId: 
   const stateMap = readRawStateMap()
   const sourceState = stateMap[sourceId]
   if (!sourceState) return false
-  const copiedState = toValidBoardState({
-    ...sourceState,
-    updatedAt: Date.now(),
-  })
+  const copiedState = toValidBoardState(
+    {
+      ...sourceState,
+      updatedAt: Date.now(),
+    },
+    'board-duplicate',
+    { boardId: sourceId },
+  )
   if (!copiedState) return false
   stateMap[targetId] = copiedState
   writeRawStateMap(stateMap)

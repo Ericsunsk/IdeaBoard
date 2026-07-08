@@ -31,6 +31,50 @@ function createPendingResults(
 }
 
 describe('pendingImageWorkflowRunner', () => {
+  it('reuses a client action id for the same pending result submission and rotates it per run', async () => {
+    const submittedClientActionIds: string[] = []
+    const pendingResults = createPendingResults(async (params) => {
+      params.onReserved?.(['image-2'])
+      await params.submitTask('image-2')
+      await params.submitTask('image-2')
+      return makeRunSummary({ successCount: 0 })
+    })
+    const runner = createPendingImageWorkflowRunner({
+      pendingResults,
+      isBoardCurrent: () => true,
+      setNodeRunning: vi.fn(),
+      createClientActionId: vi
+        .fn()
+        .mockReturnValueOnce('client-action-1')
+        .mockReturnValueOnce('client-action-2'),
+      onSuccess: vi.fn(),
+      onWarning: vi.fn(),
+    })
+
+    const runParams = {
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      boardId: 'board-a',
+      outputCount: 1,
+      submitTask: vi.fn(async (_resultNodeId: string, clientActionId?: string) => {
+        submittedClientActionIds.push(clientActionId ?? '')
+        return { taskId: 'task-1' }
+      }),
+      resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
+      fallbackErrorMessage: '生成失败',
+    }
+
+    await runner.run(runParams)
+    await runner.run(runParams)
+
+    expect(submittedClientActionIds).toEqual([
+      'client-action-1',
+      'client-action-1',
+      'client-action-2',
+      'client-action-2',
+    ])
+  })
+
   it('runs the prepared pending workflow lifecycle and always clears running state', async () => {
     const events: string[] = []
     const afterTaskIdAttached = vi.fn(async ({ resultNodeId, taskId }) => {

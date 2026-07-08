@@ -48,7 +48,7 @@ type TaskStore interface {
 }
 
 type TaskSubmissionStore interface {
-	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) error
+	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error)
 }
 
 type FeaturePromptStore interface {
@@ -77,6 +77,7 @@ const maxSubmitTaskPromptBytes = 8 * 1024
 const maxSubmitTaskFinalPromptBytes = 32 * 1024
 const maxSubmitTaskImageURLs = 16
 const maxSubmitTaskImageURLBytes = 4096
+const maxSubmitTaskClientActionIDBytes = 128
 const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
 const maxSubmitTaskParamsDepth = 24
 const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加账号"
@@ -107,6 +108,10 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
+	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
+	if err != nil {
+		return "", err
+	}
 	apiAccounts, typedParams, sourceParams, featureSlug, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
@@ -124,6 +129,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	task := &tasks.Task{
 		TaskID:         taskID,
 		UserID:         userID,
+		ClientActionID: clientActionID,
 		Prompt:         fullPrompt,
 		UserPrompt:     req.Prompt,
 		Params:         paramsJSON,
@@ -150,24 +156,58 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if s.submissionStore == nil {
 		return "", fmt.Errorf("任务提交服务未配置")
 	}
-	if err := s.submissionStore.SubmitTask(ctx, task, queueTask); err != nil {
+	result, err := s.submissionStore.SubmitTask(ctx, task, queueTask)
+	if err != nil {
 		slog.Warn("submit task transaction failed", "task_id", taskID, "err", err)
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
-	s.publishTaskStatusEvent(ctx, taskID, tasks.StatusPending)
-	return taskID, nil
+	if result.Created {
+		s.publishTaskStatusEvent(ctx, result.TaskID, tasks.StatusPending)
+	}
+	return result.TaskID, nil
 }
 
 func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
+	if _, err := normalizeSubmitTaskClientActionID(req.ClientActionID); err != nil {
+		return "", err
+	}
 	_, _, _, featureSlug, _, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
 	return featureSlug, nil
+}
+
+func normalizeSubmitTaskClientActionID(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", nil
+	}
+	if len(value) > maxSubmitTaskClientActionIDBytes {
+		return "", fmt.Errorf("client_action_id 过长")
+	}
+	for _, r := range value {
+		if r >= 'a' && r <= 'z' {
+			continue
+		}
+		if r >= 'A' && r <= 'Z' {
+			continue
+		}
+		if r >= '0' && r <= '9' {
+			continue
+		}
+		switch r {
+		case '-', '_', '.', ':':
+			continue
+		default:
+			return "", fmt.Errorf("client_action_id 只能包含字母、数字、横线、下划线、点或冒号")
+		}
+	}
+	return value, nil
 }
 
 func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) ([]*accounts.ApiAccount, *tasks.WorkflowTaskParams, map[string]interface{}, string, string, error) {

@@ -77,6 +77,11 @@ export function useAdminTaskMonitorStream() {
     }
   }
 
+  function reconnect() {
+    closeStream('idle')
+    if (isPageVisible.value) connectStream()
+  }
+
   watch(
     isPageVisible,
     (visible) => {
@@ -93,6 +98,7 @@ export function useAdminTaskMonitorStream() {
 
   return {
     isConnected,
+    reconnect,
     snapshot,
     status,
   }

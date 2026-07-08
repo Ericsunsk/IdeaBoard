@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@vue-flow/core'
-import type { Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import {
   createImageExecutionPlanner,
   createImageWorkflowCommands,
@@ -34,7 +34,29 @@ type UseCanvasTaskRuntimeOptions = {
 
 export type CanvasTaskRuntime = ImageWorkflowCommands
 
+const DEFAULT_GENERATION_UNAVAILABLE_MESSAGE = '生成服务暂不可用，请稍后重试'
+
+function isProviderUnavailableMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase()
+  if (!normalized) return false
+  return (
+    /provider.*unavailable/.test(normalized) ||
+    /no available/.test(normalized) ||
+    /暂无可用|没有可用|无可用|服务暂不可用|服务暂时不可用/.test(message)
+  )
+}
+
 export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): CanvasTaskRuntime {
+  const isGenerationAvailable = ref(true)
+  const generationUnavailableMessage = ref(DEFAULT_GENERATION_UNAVAILABLE_MESSAGE)
+  function handleWorkflowWarning(message: string) {
+    if (isProviderUnavailableMessage(message)) {
+      isGenerationAvailable.value = false
+      generationUnavailableMessage.value = message.trim() || DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
+    }
+    options.feedback.warning(message)
+  }
+
   const planner = createImageExecutionPlanner(() => ({
     nodes: options.nodes.value,
     edges: options.edges.value,
@@ -49,12 +71,14 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
     refreshNodeInternals: options.refreshNodeInternals,
     getCurrentBoardId: () => options.currentBoardId.value ?? '',
     onSuccess: options.feedback.succeeded,
-    onWarning: options.feedback.warning,
+    onWarning: handleWorkflowWarning,
   })
 
   return createImageWorkflowCommands({
     planner,
     workflow,
-    onWarning: options.feedback.warning,
+    isGenerationAvailable: () => isGenerationAvailable.value,
+    generationUnavailableMessage: () => generationUnavailableMessage.value,
+    onWarning: handleWorkflowWarning,
   })
 }

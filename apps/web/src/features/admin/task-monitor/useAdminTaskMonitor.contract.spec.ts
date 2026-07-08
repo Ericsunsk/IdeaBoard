@@ -146,41 +146,49 @@ describe('useTaskMonitor polling', () => {
 })
 
 describe('useTaskRuntimeMonitor SSE fallback', () => {
-  it('falls back to fresh REST data and clears stale SSE snapshot when stream degrades', async () => {
-    const restResponse = makeMonitorResponse(3, 1, 2)
+  it('keeps stale monitor data and exposes retry when both stream and REST are degraded', async () => {
     const sseResponse = makeMonitorResponse(50, 20, 30)
-    const monitorData = ref<ApiResponseMonitor>(restResponse)
+    const monitorData = ref<ApiResponseMonitor>()
     const refetch = vi.fn()
+    const reconnect = vi.fn()
     const streamStatus = ref('connected')
     const streamSnapshot = ref<ApiResponseMonitor | null>(sseResponse)
     mockState.getAdminMonitorReturn = {
       data: monitorData,
-      error: ref(null),
-      isError: ref(false),
+      error: ref(new Error('monitor failed')),
+      isError: ref(true),
       refetch,
     }
     mockState.streamReturn = {
       isConnected: computed(() => streamStatus.value === 'connected'),
       snapshot: streamSnapshot,
       status: streamStatus,
+      reconnect,
     }
 
     const monitor = useAdminTaskRuntimeSnapshot()
 
     expect(monitor.monitorData.value?.global_queue_len).toBe(50)
     expect(monitor.monitorStats.value?.pending).toBe(20)
+    expect(monitor.isStale.value).toBe(false)
 
-    monitorData.value = makeMonitorResponse(4, 2, 2)
     streamStatus.value = 'degraded'
     await nextTick()
 
-    expect(streamSnapshot.value).toBeNull()
     expect(refetch).toHaveBeenCalledTimes(1)
-    expect(monitor.monitorData.value?.global_queue_len).toBe(4)
-    expect(monitor.monitorStats.value?.pending).toBe(2)
+    expect(streamSnapshot.value).toStrictEqual(sseResponse)
+    expect(monitor.monitorData.value?.global_queue_len).toBe(50)
+    expect(monitor.monitorStats.value?.pending).toBe(20)
+    expect(monitor.isError.value).toBe(false)
+    expect(monitor.isStale.value).toBe(true)
+
+    await monitor.retry()
+
+    expect(refetch).toHaveBeenCalledTimes(2)
+    expect(reconnect).toHaveBeenCalledTimes(1)
   })
 
-  it('exposes REST monitor errors when the stream cannot provide live data', () => {
+  it('exposes REST monitor errors when no stale stream data is available', () => {
     const error = new Error('monitor failed')
     const streamStatus = ref('degraded')
     mockState.getAdminMonitorReturn = {
@@ -193,6 +201,7 @@ describe('useTaskRuntimeMonitor SSE fallback', () => {
       isConnected: computed(() => streamStatus.value === 'connected'),
       snapshot: ref<ApiResponseMonitor | null>(null),
       status: streamStatus,
+      reconnect: vi.fn(),
     }
 
     const monitor = useAdminTaskRuntimeSnapshot()

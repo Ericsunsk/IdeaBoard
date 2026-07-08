@@ -5,6 +5,7 @@ import {
   type CanvasBoardState,
 } from './canvasNodes'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
+import { normalizeLatestCanvasBoardState } from './latestBoardState'
 
 export type BoardStateEnvelopeContract = CanvasBoardState
 
@@ -35,12 +36,9 @@ export const boardStateEnvelopeMetadataSchema = v.strictObject({
 export function parseBoardStateEnvelopeContract(
   envelope: unknown,
 ): BoardStateEnvelopeContract | null {
-  const parsed = v.safeParse(boardStateEnvelopeContractSchema, envelope)
-  return parsed.success ? parsed.output : null
+  return normalizeLatestCanvasBoardState(envelope, { boundary: 'remote-envelope-contract' })
 }
 
-export function assertBoardStateEnvelopeContract(
-  envelope: unknown,
-): BoardStateEnvelopeContract {
+export function assertBoardStateEnvelopeContract(envelope: unknown): BoardStateEnvelopeContract {
   return v.parse(boardStateEnvelopeContractSchema, envelope)
 }

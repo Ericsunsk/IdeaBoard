@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -129,18 +130,19 @@ const (
 
 const createTaskPGXSQL = `
 INSERT INTO tasks (
-  task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+  task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
   feature_slug, requested_model,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
-  $1, $2, $3, $4, $5,
-  $6, $7, $8,
-  $9, $10,
-  $11, $12, $13, $14, $15, $16, $17, $18,
-  $19, $20, $21
+  $1, $2, $3, $4, $5, $6,
+  $7, $8, $9,
+  $10, $11,
+  $12, $13, $14, $15, $16, $17, $18, $19,
+  $20, $21, $22
 )
-RETURNING id`
+ON CONFLICT (user_id, client_action_id) WHERE client_action_id <> '' DO NOTHING
+RETURNING id, task_id`
 
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
@@ -156,14 +158,16 @@ func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
 	return nil
 }
 
-func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) error {
+func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error) {
 	if tx == nil {
-		return fmt.Errorf("taskstore: pgx tx is nil")
+		return false, fmt.Errorf("taskstore: pgx tx is nil")
 	}
 	params := createTaskParams(task)
+	var taskID string
 	err := tx.QueryRow(ctx, createTaskPGXSQL,
 		params.TaskID,
 		params.UserID,
+		params.ClientActionID,
 		nullableInt64(params.AssignedProviderEndpointID),
 		nullableInt64(params.AssignedCredentialID),
 		nullableInt64(params.AccountID),
@@ -183,11 +187,30 @@ func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks
 		nullableTime(params.CancelledAt),
 		nullableInt64(params.CancelledBy),
 		params.CancelReason,
-	).Scan(&task.ID)
-	if err != nil {
-		return fmt.Errorf("taskstore: create task with pgx tx: %w", err)
+	).Scan(&task.ID, &taskID)
+	if errors.Is(err, pgx.ErrNoRows) && strings.TrimSpace(task.ClientActionID) != "" {
+		return r.loadIdempotentTaskWithPGXTx(ctx, tx, task)
 	}
-	return nil
+	if err != nil {
+		return false, fmt.Errorf("taskstore: create task with pgx tx: %w", err)
+	}
+	task.TaskID = taskID
+	return true, nil
+}
+
+func (r *Repository) loadIdempotentTaskWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error) {
+	err := tx.QueryRow(ctx, `
+SELECT id, task_id
+FROM tasks
+WHERE user_id = $1 AND client_action_id = $2
+FOR UPDATE`,
+		task.UserID,
+		strings.TrimSpace(task.ClientActionID),
+	).Scan(&task.ID, &task.TaskID)
+	if err != nil {
+		return false, fmt.Errorf("taskstore: load idempotent task with pgx tx: %w", err)
+	}
+	return false, nil
 }
 
 func createTaskParams(task *tasks.Task) dbsqlc.CreateTaskParams {
@@ -201,6 +224,7 @@ func createTaskParams(task *tasks.Task) dbsqlc.CreateTaskParams {
 	return dbsqlc.CreateTaskParams{
 		TaskID:                     task.TaskID,
 		UserID:                     task.UserID,
+		ClientActionID:             strings.TrimSpace(task.ClientActionID),
 		AssignedProviderEndpointID: dbutil.NullInt64(task.AssignedProviderEndpointID),
 		AssignedCredentialID:       dbutil.NullInt64(task.AssignedCredentialID),
 		AccountID:                  dbutil.NullInt64(task.AccountID),

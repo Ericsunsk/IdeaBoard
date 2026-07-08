@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 )
 
@@ -65,10 +66,14 @@ func (s *Service) recordTaskCancelled(ctx context.Context, snapshot tasks.TaskCa
 		return fmt.Errorf("task runtime cancellation store not configured")
 	}
 	rows, err := s.taskRepo.MarkTaskCancelled(ctx, snapshot, attemptFinish)
+	if err := normalizeTaskTransitionWriteError(err); err != nil {
+		return err
+	}
+	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionCancel, snapshot.TaskID, taskqueue.TaskAssignment{}, rows)
 	if err != nil {
 		return err
 	}
-	if rows > 0 {
+	if applied {
 		s.publishTaskStatusEvent(ctx, snapshot.TaskID, tasks.StatusCancelled)
 	}
 	return nil

@@ -1,19 +1,18 @@
-import * as v from 'valibot'
 import {
-  boardStateEnvelopeContractSchema,
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  canvasBoardSnapshotSchema,
-  parseBoardStateEnvelopeContract,
+  assertLatestCanvasBoardSnapshot,
+  assertLatestCanvasBoardState,
+  normalizeLatestCanvasBoardState,
+  type LatestBoardStateNullableOptions,
+  type LatestBoardStateResultOptions,
+  type LatestBoardStateValidationResult,
   type BoardStateEnvelopeContract,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
 } from '../domain'
 
 export type BoardStateSerializationTarget =
-  | 'local-state'
-  | 'local-preview-fallback'
-  | 'session-snapshot'
-  | 'remote-envelope'
+  'local-state' | 'local-preview-fallback' | 'session-snapshot' | 'remote-envelope'
 
 export type BoardStateSerializationResult<Target extends BoardStateSerializationTarget> =
   Target extends 'session-snapshot'
@@ -41,41 +40,65 @@ export function serializeCanvasBoardState<Target extends BoardStateSerialization
 
 export function deserializeRemoteBoardStateEnvelope(envelope: unknown): CanvasBoardState | null {
   if (!envelope || typeof envelope !== 'object') return null
-  return parseBoardStateEnvelopeContract(envelope)
+  return normalizeLatestCanvasBoardState(envelope)
 }
 
-export function normalizeCanvasBoardState(stateLike: unknown): CanvasBoardState | null {
-  const parsed = v.safeParse(boardStateEnvelopeContractSchema, stateLike)
-  return parsed.success ? parsed.output : null
+export function normalizeCanvasBoardState(stateLike: unknown): CanvasBoardState | null
+export function normalizeCanvasBoardState(
+  stateLike: unknown,
+  options: LatestBoardStateNullableOptions,
+): CanvasBoardState | null
+export function normalizeCanvasBoardState(
+  stateLike: unknown,
+  options: LatestBoardStateResultOptions,
+): LatestBoardStateValidationResult<CanvasBoardState>
+export function normalizeCanvasBoardState(
+  stateLike: unknown,
+  options?: LatestBoardStateNullableOptions | LatestBoardStateResultOptions,
+): CanvasBoardState | null | LatestBoardStateValidationResult<CanvasBoardState> {
+  if (options?.mode === 'result') {
+    return normalizeLatestCanvasBoardState(stateLike, options)
+  }
+  return options
+    ? normalizeLatestCanvasBoardState(stateLike, options)
+    : normalizeLatestCanvasBoardState(stateLike)
 }
 
 function normalizeLocalState(state: CanvasBoardState): CanvasBoardState {
-  return v.parse(boardStateEnvelopeContractSchema, state)
+  return assertLatestCanvasBoardState(state, 'local-state')
 }
 
 function toRemoteEnvelope(state: CanvasBoardState): BoardStateEnvelopeContract {
-  return v.parse(boardStateEnvelopeContractSchema, state)
+  return assertLatestCanvasBoardState(state, 'remote-envelope')
 }
 
 function toSessionSnapshot(state: CanvasBoardState): CanvasBoardSnapshot {
-  return v.parse(canvasBoardSnapshotSchema, {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    imageNodes: state.imageNodes,
-    promptNodes: state.promptNodes,
-    fusionNodes: state.fusionNodes,
-    connections: state.connections,
-    mediaRefs: state.mediaRefs,
-  })
+  const normalized = assertLatestCanvasBoardState(state, 'session-snapshot')
+  return assertLatestCanvasBoardSnapshot(
+    {
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+      imageNodes: normalized.imageNodes,
+      promptNodes: normalized.promptNodes,
+      fusionNodes: normalized.fusionNodes,
+      connections: normalized.connections,
+      mediaRefs: normalized.mediaRefs,
+    },
+    'session-snapshot',
+  )
 }
 
 function stripPreviewSnapshot(state: CanvasBoardState): CanvasBoardState {
-  return v.parse(boardStateEnvelopeContractSchema, {
-    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-    imageNodes: state.imageNodes,
-    promptNodes: state.promptNodes,
-    fusionNodes: state.fusionNodes,
-    connections: state.connections,
-    mediaRefs: state.mediaRefs,
-    updatedAt: state.updatedAt,
-  })
+  const normalized = assertLatestCanvasBoardState(state, 'local-preview-fallback')
+  return assertLatestCanvasBoardState(
+    {
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+      imageNodes: normalized.imageNodes,
+      promptNodes: normalized.promptNodes,
+      fusionNodes: normalized.fusionNodes,
+      connections: normalized.connections,
+      mediaRefs: normalized.mediaRefs,
+      updatedAt: normalized.updatedAt,
+    },
+    'local-preview-fallback',
+  )
 }

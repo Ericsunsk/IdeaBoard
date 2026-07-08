@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserBoardItem } from '../../../shared/api/generated-query/model'
 import type { CanvasBoardState } from '../domain'
-import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
+import {
+  CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  DEFAULT_PROMPT_ASPECT_RATIO,
+  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
+} from '../domain'
 import { makeCanvasBoardState } from '../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../persistence'
@@ -213,6 +217,111 @@ describe('boardSync', () => {
     expect(listCanvasBoards()[0]?.name).toBe('Local Board')
   })
 
+  it('hydrates normalizable older remote board state through the latest schema', async () => {
+    mocks.state.listResponse = {
+      data: {
+        list: [
+          makeRemoteBoard({
+            id: 'board-older',
+            name: 'Older Remote',
+            createdAt: 100,
+            updatedAt: 1_500,
+            state: {
+              schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
+              imageNodes: [
+                {
+                  id: 1,
+                  type: 'image-node',
+                  x: 0,
+                  y: 0,
+                  width: 280,
+                  sourceImageUrl: 'https://example.com/source.png',
+                  sourceImageRatio: 1,
+                  outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
+                },
+              ],
+              promptNodes: [
+                {
+                  id: 2,
+                  type: 'prompt',
+                  x: 300,
+                  y: 0,
+                  width: 280,
+                  text: 'older remote prompt',
+                },
+              ],
+              fusionNodes: [],
+              connections: [],
+              updatedAt: 1_500,
+            } as unknown as CanvasBoardState,
+          }),
+        ],
+      },
+    }
+
+    await hydrateCanvasBoardsFromServer()
+
+    const state = getCanvasBoardState('board-older')
+    expect(state?.imageNodes[0]?.outputStatus).toBe('ready')
+    expect(state?.imageNodes[0]?.outputCount).toBe(1)
+    expect(state?.promptNodes[0]).toEqual(
+      expect.objectContaining({
+        outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
+        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
+        inputImages: [],
+      }),
+    )
+  })
+
+  it('skips invalid remote board state with recoverable validation context', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mocks.state.listResponse = {
+        data: {
+          list: [
+            makeRemoteBoard({
+              id: 'board-invalid',
+              name: 'Invalid Remote',
+              createdAt: 100,
+              updatedAt: 1_500,
+              state: {
+                ...makeState(1_500, 'invalid remote'),
+                imageNodes: [
+                  {
+                    id: 1,
+                    type: 'image-node',
+                    x: 0,
+                    y: 0,
+                    width: 280,
+                    sourceImageUrl: 'https://example.com/source.png',
+                    sourceImageRatio: 0,
+                    outputStatus: 'ready',
+                    outputImages: [],
+                  },
+                ],
+              },
+            }),
+          ],
+        },
+      }
+
+      await hydrateCanvasBoardsFromServer()
+
+      expect(getCanvasBoardState('board-invalid')).toBeNull()
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[boards] invalid remote board state skipped',
+        'board-invalid',
+        expect.objectContaining({
+          code: 'INVALID_BOARD_STATE',
+          boundary: 'server-hydration',
+          recoverable: true,
+        }),
+      )
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
   it('syncs a rename with the board metadata timestamp when state is older', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Local Rename', createdAt: 100, updatedAt: 3_000 }])
     replaceCanvasBoardStateMap({ 'board-1': makeState(1_000, 'remote-older') })
@@ -228,7 +337,9 @@ describe('boardSync', () => {
   })
 
   it('syncs the shared remote envelope shape without viewport', async () => {
-    replaceCanvasBoards([{ id: 'board-1', name: 'Envelope Board', createdAt: 100, updatedAt: 3_000 }])
+    replaceCanvasBoards([
+      { id: 'board-1', name: 'Envelope Board', createdAt: 100, updatedAt: 3_000 },
+    ])
     replaceCanvasBoardStateMap({
       'board-1': makeCanvasBoardState({
         updatedAt: 2_000,

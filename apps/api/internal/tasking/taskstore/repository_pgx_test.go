@@ -28,8 +28,12 @@ func TestCreateWithPGXTxMatchesTaskInsertSchema(t *testing.T) {
 	}
 	defer tx.Rollback(ctx)
 
-	if err := repo.CreateWithPGXTx(ctx, tx, task); err != nil {
+	created, err := repo.CreateWithPGXTx(ctx, tx, task)
+	if err != nil {
 		t.Fatalf("CreateWithPGXTx: %v", err)
+	}
+	if !created {
+		t.Fatal("CreateWithPGXTx reported existing task for a new task")
 	}
 	if task.ID == 0 {
 		t.Fatal("CreateWithPGXTx left task.ID unset")
@@ -51,9 +55,14 @@ func TestCreateWithPGXTxRollsBackWithCallerTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
-	if err := repo.CreateWithPGXTx(ctx, tx, task); err != nil {
+	created, err := repo.CreateWithPGXTx(ctx, tx, task)
+	if err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatalf("CreateWithPGXTx: %v", err)
+	}
+	if !created {
+		_ = tx.Rollback(ctx)
+		t.Fatal("CreateWithPGXTx reported existing task for a new task")
 	}
 	if err := tx.Rollback(ctx); err != nil {
 		t.Fatalf("rollback tx: %v", err)

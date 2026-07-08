@@ -40,8 +40,12 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	queueTask.CreatedAt = 1710000000
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 
-	if err := store.SubmitTask(ctx, task, queueTask); err != nil {
+	result, err := store.SubmitTask(ctx, task, queueTask)
+	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if result.TaskID != task.TaskID || !result.Created {
+		t.Fatalf("SubmitTask result=%+v, want created task %q", result, task.TaskID)
 	}
 
 	assertTaskRowCount(t, db, task.TaskID, 1)
@@ -77,6 +81,51 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	}
 }
 
+func TestStoreSubmitTaskReturnsExistingTaskForDuplicateClientActionID(t *testing.T) {
+	ctx := context.Background()
+	db, pool := testdb.OpenWithPool(t)
+	client := &countingRiverTxClient{
+		inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts),
+	}
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+
+	first := newTaskSubmissionTask("task_action_first")
+	first.ClientActionID = "canvas-action-1"
+	firstQueueTask := newTaskSubmissionQueueTask(first)
+
+	firstResult, err := store.SubmitTask(ctx, first, firstQueueTask)
+	if err != nil {
+		t.Fatalf("first SubmitTask failed: %v", err)
+	}
+	if firstResult.TaskID != first.TaskID || !firstResult.Created {
+		t.Fatalf("first SubmitTask result=%+v, want created task %q", firstResult, first.TaskID)
+	}
+
+	duplicate := newTaskSubmissionTask("task_action_duplicate")
+	duplicate.UserID = first.UserID
+	duplicate.ClientActionID = first.ClientActionID
+	duplicateQueueTask := newTaskSubmissionQueueTask(duplicate)
+
+	duplicateResult, err := store.SubmitTask(ctx, duplicate, duplicateQueueTask)
+	if err != nil {
+		t.Fatalf("duplicate SubmitTask failed: %v", err)
+	}
+	if duplicateResult.TaskID != first.TaskID || duplicateResult.Created {
+		t.Fatalf("duplicate SubmitTask result=%+v, want existing task %q", duplicateResult, first.TaskID)
+	}
+	if duplicate.TaskID != first.TaskID {
+		t.Fatalf("duplicate task_id after submit=%q, want existing %q", duplicate.TaskID, first.TaskID)
+	}
+
+	assertTaskRowCount(t, db, first.TaskID, 1)
+	assertTaskRowCount(t, db, "task_action_duplicate", 0)
+	assertRiverJobRowCount(t, db, first.TaskID, 1)
+	assertRiverJobRowCount(t, db, "task_action_duplicate", 0)
+	if client.insertCount != 1 {
+		t.Fatalf("River InsertTx count=%d, want 1", client.insertCount)
+	}
+}
+
 func TestStoreSubmitTaskRollsBackTaskAndRiverJobWhenRealInsertReportsFailure(t *testing.T) {
 	ctx := context.Background()
 	db, pool := testdb.OpenWithPool(t)
@@ -90,7 +139,7 @@ func TestStoreSubmitTaskRollsBackTaskAndRiverJobWhenRealInsertReportsFailure(t *
 		err:   forcedErr,
 	}, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 
-	err := store.SubmitTask(ctx, task, queueTask)
+	_, err := store.SubmitTask(ctx, task, queueTask)
 	if !errors.Is(err, forcedErr) {
 		t.Fatalf("SubmitTask error=%v, want forced error %v", err, forcedErr)
 	}
@@ -110,6 +159,16 @@ func (c insertThenFailRiverTxClient) InsertTx(ctx context.Context, tx pgx.Tx, ar
 		return result, err
 	}
 	return result, c.err
+}
+
+type countingRiverTxClient struct {
+	inner       taskqueue.RiverTxClient
+	insertCount int
+}
+
+func (c *countingRiverTxClient) InsertTx(ctx context.Context, tx pgx.Tx, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error) {
+	c.insertCount++
+	return c.inner.InsertTx(ctx, tx, args, opts)
 }
 
 type noopDrawingWorker struct {

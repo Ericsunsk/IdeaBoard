@@ -73,6 +73,7 @@ export type ImageWorkflowExecutionPort = {
 }
 
 export type ImageWorkflowCommands = {
+  isGenerationAvailable: () => boolean
   isNodeDirectActionRunning: ImageWorkflowExecutionPort['isNodeDirectActionRunning']
   reattachPendingImageResults: ImageWorkflowExecutionPort['reattachPendingImageResults']
   runImageDirectAction: (
@@ -123,9 +124,23 @@ function warnPlanningError(error: unknown, onWarning: (message: string) => void)
 export function createImageWorkflowCommands(options: {
   planner: ImageWorkflowPlanner
   workflow: ImageWorkflowExecutionPort
+  isGenerationAvailable?: () => boolean
+  generationUnavailableMessage?: () => string
   onWarning: (message: string) => void
 }): ImageWorkflowCommands {
+  function isGenerationAvailable() {
+    return options.isGenerationAvailable?.() ?? true
+  }
+
+  function warnGenerationUnavailable() {
+    options.onWarning(options.generationUnavailableMessage?.() ?? '生成服务暂不可用，请稍后重试')
+  }
+
   async function executePlannedAction(planAction: () => ImageExecutionPlan) {
+    if (!isGenerationAvailable()) {
+      warnGenerationUnavailable()
+      return
+    }
     try {
       await options.workflow.executeImageWorkflow(planAction())
     } catch (error) {
@@ -212,6 +227,7 @@ export function createImageWorkflowCommands(options: {
   }
 
   return {
+    isGenerationAvailable,
     isNodeDirectActionRunning: options.workflow.isNodeDirectActionRunning,
     reattachPendingImageResults: options.workflow.reattachPendingImageResults,
     runImageDirectAction,
