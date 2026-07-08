@@ -6,6 +6,7 @@ import {
   type AdminPromptConfigResource,
   type FeaturePrompt,
   type FeaturePromptEvalReport,
+  type FeaturePromptRevision,
   type FeaturePromptVariable,
 } from './promptConfigResource'
 
@@ -13,6 +14,7 @@ export type {
   FeaturePrompt,
   FeaturePromptEvalFixtureResult,
   FeaturePromptEvalReport,
+  FeaturePromptRevision,
   FeaturePromptVariable,
   FeaturePromptVariableTone,
 } from './promptConfigResource'
@@ -21,6 +23,7 @@ type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']
 const promptEvalFeatureSlug = 'pattern-gen'
 
 export type PromptRevisionState = {
+  id: number
   schemaVersion: number
   publishedAt: string | null
   updatedAt: string | null
@@ -71,6 +74,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
   const evalReportDraftKeyMap = reactive<Record<string, string>>({})
   const publishing = reactive<Record<string, boolean>>({})
   const evaluating = reactive<Record<string, boolean>>({})
+  const rollingBack = reactive<Record<string, boolean>>({})
   const promptList = ref<FeaturePrompt[]>([])
 
   const validations = computed<Record<string, PromptDraftValidation>>(() => {
@@ -177,10 +181,15 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     const config = promptConfigMap[slug]
     if (!config) return null
     return {
+      id: config.current_revision_id ?? 0,
       schemaVersion: config.schema_version,
       publishedAt: config.published_at ?? null,
       updatedAt: config.updated_at ?? null,
     }
+  }
+
+  function getRecentRevisions(slug: string): FeaturePromptRevision[] {
+    return promptConfigMap[slug]?.recent_revisions ?? []
   }
 
   function canEvaluatePrompt(slug: string): boolean {
@@ -269,6 +278,35 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     }
   }
 
+  async function rollbackPrompt(slug: string, revisionID: number): Promise<FeaturePrompt | null> {
+    if (!promptConfigMap[slug]) {
+      options.feedback.promptDraftInvalid('提示词配置已刷新，请重新选择')
+      return null
+    }
+    if (!Number.isFinite(revisionID) || revisionID <= 0) {
+      options.feedback.promptDraftInvalid('请选择有效的回滚版本')
+      return null
+    }
+    if (rollingBack[slug]) return null
+
+    rollingBack[slug] = true
+    try {
+      const config = await resource.rollbackPrompt({
+        slug,
+        revision_id: revisionID,
+      })
+      syncPromptConfig(config, { preserveDirtyDraft: false })
+      options.feedback.promptSaved(getFeatureTitle(slug))
+      await refreshPrompts()
+      return config
+    } catch (error) {
+      options.feedback.savePromptFailed(error)
+      return null
+    } finally {
+      rollingBack[slug] = false
+    }
+  }
+
   function resolveDraftValidation(slug: string): PromptDraftValidation {
     if (!promptConfigMap[slug]) {
       return {
@@ -342,6 +380,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     getDraftValidation,
     getPromptEvalReport,
     getPromptVariables,
+    getRecentRevisions,
     getSavedPrompt,
     insertVariableIntoDraft,
     loadPrompts,
@@ -351,6 +390,8 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     publishPrompt,
     refreshPrompts,
     resetDrafts,
+    rollbackPrompt,
+    rollingBack,
     runPromptEval,
     savePrompt: publishPrompt,
     saving: publishing,

@@ -2,12 +2,14 @@ import {
   evaluateAdminFeaturePrompt,
   getLatestAdminFeaturePromptEvalReport,
   listAdminFeaturePrompts,
+  rollbackAdminFeaturePrompt,
   setAdminFeaturePrompt,
 } from '../../../shared/api/generated-query/admin-feature-prompts/admin-feature-prompts'
 import type {
   EvaluateAdminFeaturePromptBody,
   FeaturePrompt,
   FeaturePromptEvalReport,
+  RollbackAdminFeaturePromptBody,
   SetAdminFeaturePromptBody,
 } from '../../../shared/api/generated-query/model'
 import { assertApiOk, requireApiData } from '../shared/queries/adminApiResponse'
@@ -28,6 +30,18 @@ export async function publishAdminFeaturePrompt(
   const { slug, ...payload } = input
   const res = await setAdminFeaturePrompt(slug, payload)
   return requireApiData(res, '保存提示词失败')
+}
+
+export type RollbackFeaturePromptInput = {
+  slug: string
+} & RollbackAdminFeaturePromptBody
+
+export async function rollbackAdminFeaturePromptRevision(
+  input: RollbackFeaturePromptInput,
+): Promise<FeaturePrompt> {
+  const { slug, ...payload } = input
+  const res = await rollbackAdminFeaturePrompt(slug, payload)
+  return requireApiData(res, '回滚提示词失败')
 }
 
 export type EvaluateFeaturePromptInput = {

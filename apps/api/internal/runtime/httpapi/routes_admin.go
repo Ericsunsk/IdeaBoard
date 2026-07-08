@@ -107,5 +107,6 @@ func registerAdminFeaturePromptRoutes(adminAPI *gin.RouterGroup, h AdminRouteDep
 	adminAPI.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)
 	adminAPI.GET("/feature-prompts/:slug/eval", h.FeaturePromptHandler.GetLatestPromptEvalReport)
 	adminAPI.POST("/feature-prompts/:slug/eval", h.FeaturePromptHandler.EvaluatePrompt)
+	adminAPI.POST("/feature-prompts/:slug/rollback", h.FeaturePromptHandler.RollbackPrompt)
 	adminAPI.PUT("/feature-prompts/:slug", h.FeaturePromptHandler.SetPrompt)
 }

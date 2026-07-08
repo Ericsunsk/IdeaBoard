@@ -1379,6 +1379,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseFeaturePromptEvalReport'
+  /admin/feature-prompts/{slug}/rollback:
+    post:
+      tags: [AdminFeaturePrompts]
+      operationId: rollbackAdminFeaturePrompt
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision_id]
+              properties:
+                revision_id:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseFeaturePrompt'
 
 components:
   securitySchemes:
@@ -2596,6 +2622,7 @@ components:
       required: [slug, prompt, enabled, variables, model_defaults, user_prompt_merge_policy, schema_version]
       properties:
         slug: { type: string }
+        current_revision_id: { type: integer }
         prompt: { type: string }
         enabled: { type: boolean }
         variables:
@@ -2611,12 +2638,43 @@ components:
           nullable: true
           allOf:
             - $ref: '#/components/schemas/FeaturePromptEvalReport'
+        recent_revisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeaturePromptRevision'
         published_at:
           type: string
           nullable: true
         updated_at:
           type: string
           nullable: true
+
+    FeaturePromptRevision:
+      type: object
+      required: [id, prompt, enabled, variables, model_defaults, user_prompt_merge_policy, schema_version, is_current, created_at]
+      properties:
+        id: { type: integer }
+        prompt: { type: string }
+        enabled: { type: boolean }
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeaturePromptVariable'
+        model_defaults:
+          $ref: '#/components/schemas/FeaturePromptModelDefaults'
+        user_prompt_merge_policy:
+          $ref: '#/components/schemas/FeaturePromptMergePolicy'
+        schema_version: { type: integer }
+        is_current: { type: boolean }
+        eval_report:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FeaturePromptEvalReport'
+        published_at:
+          type: string
+          nullable: true
+        created_at:
+          type: string
 
     FeaturePromptEvalReport:
       type: object

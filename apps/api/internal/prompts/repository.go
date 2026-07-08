@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,6 +20,13 @@ type FeaturePromptRepository struct {
 	db *sql.DB
 	q  *dbsqlc.Queries
 }
+
+const featurePromptRevisionHistoryLimit = 6
+
+var (
+	ErrPromptRevisionNotFound      = errors.New("prompt revision not found")
+	ErrPromptRollbackTargetCurrent = errors.New("prompt rollback target is current revision")
+)
 
 type FeaturePromptVariable struct {
 	Key  string `json:"key"`
@@ -53,7 +61,7 @@ func (d *FeaturePromptModelDefaults) UnmarshalJSON(raw []byte) error {
 
 type FeaturePromptConfig struct {
 	Slug                  string                     `json:"slug"`
-	CurrentRevisionID     int64                      `json:"-"`
+	CurrentRevisionID     int64                      `json:"current_revision_id"`
 	Prompt                string                     `json:"prompt"`
 	Enabled               bool                       `json:"enabled"`
 	Variables             []FeaturePromptVariable    `json:"variables"`
@@ -61,8 +69,23 @@ type FeaturePromptConfig struct {
 	UserPromptMergePolicy FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
 	SchemaVersion         int32                      `json:"schema_version"`
 	EvalReport            *FeaturePromptEvalReport   `json:"eval_report,omitempty"`
+	RecentRevisions       []FeaturePromptRevision    `json:"recent_revisions"`
 	PublishedAt           *time.Time                 `json:"published_at,omitempty"`
 	UpdatedAt             *time.Time                 `json:"updated_at,omitempty"`
+}
+
+type FeaturePromptRevision struct {
+	ID                    int64                      `json:"id"`
+	Prompt                string                     `json:"prompt"`
+	Enabled               bool                       `json:"enabled"`
+	Variables             []FeaturePromptVariable    `json:"variables"`
+	ModelDefaults         FeaturePromptModelDefaults `json:"model_defaults"`
+	UserPromptMergePolicy FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
+	SchemaVersion         int32                      `json:"schema_version"`
+	IsCurrent             bool                       `json:"is_current"`
+	EvalReport            *FeaturePromptEvalReport   `json:"eval_report,omitempty"`
+	PublishedAt           *time.Time                 `json:"published_at,omitempty"`
+	CreatedAt             time.Time                  `json:"created_at"`
 }
 
 type FeaturePromptSaveInput struct {
@@ -119,7 +142,7 @@ func (r *FeaturePromptRepository) GetPromptConfig(ctx context.Context, slug stri
 	if err != nil {
 		if database.IsNotFound(err) {
 			cfg := defaultPromptConfig(slug)
-			return r.withCurrentDraftEvalReport(ctx, cfg)
+			return r.hydrateAdminPromptConfig(ctx, cfg)
 		}
 		return nil, err
 	}
@@ -127,7 +150,7 @@ func (r *FeaturePromptRepository) GetPromptConfig(ctx context.Context, slug stri
 	if err != nil {
 		return nil, err
 	}
-	return r.withCurrentDraftEvalReport(ctx, cfg)
+	return r.hydrateAdminPromptConfig(ctx, cfg)
 }
 
 func (r *FeaturePromptRepository) ListPromptConfigs(ctx context.Context) ([]FeaturePromptConfig, error) {
@@ -147,19 +170,19 @@ func (r *FeaturePromptRepository) ListPromptConfigs(ctx context.Context) ([]Feat
 			if err != nil {
 				return nil, err
 			}
-			withReport, err := r.withCurrentDraftEvalReport(ctx, cfg)
+			withHistory, err := r.hydrateAdminPromptConfig(ctx, cfg)
 			if err != nil {
 				return nil, err
 			}
-			configs = append(configs, *withReport)
+			configs = append(configs, *withHistory)
 			continue
 		}
 		cfg := defaultPromptConfig(slug)
-		withReport, err := r.withCurrentDraftEvalReport(ctx, cfg)
+		withHistory, err := r.hydrateAdminPromptConfig(ctx, cfg)
 		if err != nil {
 			return nil, err
 		}
-		configs = append(configs, *withReport)
+		configs = append(configs, *withHistory)
 	}
 	return configs, nil
 }
@@ -226,6 +249,47 @@ func (r *FeaturePromptRepository) SetPromptConfig(ctx context.Context, slug stri
 	return r.GetPromptConfig(ctx, slug)
 }
 
+func (r *FeaturePromptRepository) RollbackPromptConfig(ctx context.Context, slug string, revisionID int64) (*FeaturePromptConfig, error) {
+	if revisionID <= 0 {
+		return nil, ErrPromptRevisionNotFound
+	}
+
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx dbutil.DBTX) error {
+		current, err := q.GetFeaturePromptForUpdate(ctx, slug)
+		if err != nil {
+			if database.IsNotFound(err) {
+				return ErrPromptRevisionNotFound
+			}
+			return err
+		}
+		if current.CurrentRevisionID.Valid && current.CurrentRevisionID.Int64 == revisionID {
+			return ErrPromptRollbackTargetCurrent
+		}
+
+		var targetSlug string
+		if err := tx.QueryRowContext(ctx, `
+SELECT feature_slug
+FROM feature_prompt_revisions
+WHERE id = $1 AND feature_slug = $2
+`, revisionID, slug).Scan(&targetSlug); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrPromptRevisionNotFound
+			}
+			return err
+		}
+
+		_, err = q.SetFeaturePromptCurrentRevision(ctx, dbsqlc.SetFeaturePromptCurrentRevisionParams{
+			FeatureSlug: slug,
+			RevisionID:  sql.NullInt64{Int64: revisionID, Valid: true},
+		})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.GetPromptConfig(ctx, slug)
+}
+
 func (r *FeaturePromptRepository) ensurePromptEvalGate(ctx context.Context, slug string, input normalizedFeaturePromptSaveInput, updatedBy *int64) error {
 	if !promptEvalRequiredForDraft(slug, input) {
 		return nil
@@ -250,6 +314,19 @@ func (r *FeaturePromptRepository) ensurePromptEvalGate(ctx context.Context, slug
 	return nil
 }
 
+func (r *FeaturePromptRepository) hydrateAdminPromptConfig(ctx context.Context, cfg FeaturePromptConfig) (*FeaturePromptConfig, error) {
+	withReport, err := r.withCurrentDraftEvalReport(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	revisions, err := r.listRecentPromptRevisions(ctx, cfg.Slug, cfg.CurrentRevisionID, featurePromptRevisionHistoryLimit)
+	if err != nil {
+		return nil, err
+	}
+	withReport.RecentRevisions = revisions
+	return withReport, nil
+}
+
 func (r *FeaturePromptRepository) withCurrentDraftEvalReport(ctx context.Context, cfg FeaturePromptConfig) (*FeaturePromptConfig, error) {
 	input := normalizedFeaturePromptSaveInput{
 		Prompt:                cfg.Prompt,
@@ -270,6 +347,101 @@ func (r *FeaturePromptRepository) withCurrentDraftEvalReport(ctx context.Context
 	return &cfg, nil
 }
 
+func (r *FeaturePromptRepository) listRecentPromptRevisions(ctx context.Context, slug string, currentRevisionID int64, limit int) ([]FeaturePromptRevision, error) {
+	if limit <= 0 {
+		limit = featurePromptRevisionHistoryLimit
+	}
+	rows, err := r.db.QueryContext(ctx, `
+WITH recent_revisions AS (
+  SELECT id
+  FROM feature_prompt_revisions
+  WHERE feature_slug = $1
+  ORDER BY schema_version DESC, id DESC
+  LIMIT $2
+)
+SELECT
+  id, prompt, enabled, variables, model_defaults,
+  user_prompt_merge_policy, schema_version, published_at, created_at
+FROM feature_prompt_revisions
+WHERE feature_slug = $1
+  AND (id IN (SELECT id FROM recent_revisions) OR id = $3)
+ORDER BY
+  CASE WHEN id = $3 THEN 0 ELSE 1 END,
+  schema_version DESC,
+  id DESC
+`, slug, limit, currentRevisionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	revisions := []FeaturePromptRevision{}
+	for rows.Next() {
+		var revision FeaturePromptRevision
+		var variablesJSON json.RawMessage
+		var modelDefaultsJSON json.RawMessage
+		var mergePolicyJSON json.RawMessage
+		var publishedAt sql.NullTime
+		if err := rows.Scan(
+			&revision.ID,
+			&revision.Prompt,
+			&revision.Enabled,
+			&variablesJSON,
+			&modelDefaultsJSON,
+			&mergePolicyJSON,
+			&revision.SchemaVersion,
+			&publishedAt,
+			&revision.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		variables, err := variablesFromJSON(variablesJSON)
+		if err != nil {
+			return nil, fmt.Errorf("decode feature prompt %q revision %d variables: %w", slug, revision.ID, err)
+		}
+		modelDefaults, err := modelDefaultsFromJSON(modelDefaultsJSON)
+		if err != nil {
+			return nil, fmt.Errorf("decode feature prompt %q revision %d model defaults: %w", slug, revision.ID, err)
+		}
+		mergePolicy, err := mergePolicyFromJSON(mergePolicyJSON, slug)
+		if err != nil {
+			return nil, fmt.Errorf("decode feature prompt %q revision %d merge policy: %w", slug, revision.ID, err)
+		}
+		revision.Variables = variables
+		revision.ModelDefaults = modelDefaults
+		revision.UserPromptMergePolicy = mergePolicy
+		revision.IsCurrent = revision.ID == currentRevisionID
+		revision.PublishedAt = dbutil.TimePtr(publishedAt)
+
+		report, err := r.promptEvalReportForRevision(ctx, slug, revision)
+		if err != nil {
+			return nil, err
+		}
+		revision.EvalReport = report
+		revisions = append(revisions, revision)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return revisions, nil
+}
+
+func (r *FeaturePromptRepository) promptEvalReportForRevision(ctx context.Context, slug string, revision FeaturePromptRevision) (*FeaturePromptEvalReport, error) {
+	input := normalizedFeaturePromptSaveInput{
+		Prompt:                revision.Prompt,
+		Enabled:               revision.Enabled,
+		Variables:             revision.Variables,
+		ModelDefaults:         revision.ModelDefaults,
+		UserPromptMergePolicy: revision.UserPromptMergePolicy,
+	}
+	draftHash, err := featurePromptDraftHash(slug, input)
+	if err != nil {
+		return nil, err
+	}
+	return r.getPromptEvalReportByDraftHash(ctx, slug, draftHash)
+}
+
 func defaultPromptConfig(slug string) FeaturePromptConfig {
 	return FeaturePromptConfig{
 		Slug:                  slug,
@@ -279,6 +451,7 @@ func defaultPromptConfig(slug string) FeaturePromptConfig {
 		ModelDefaults:         FeaturePromptModelDefaults{},
 		UserPromptMergePolicy: DefaultFeaturePromptMergePolicy(slug),
 		SchemaVersion:         1,
+		RecentRevisions:       []FeaturePromptRevision{},
 	}
 }
 

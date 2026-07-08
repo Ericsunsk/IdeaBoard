@@ -353,6 +353,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/provider-endpoints":               false,
 		"POST /api/admin/provider-endpoints/detect-models": false,
 		"POST /api/admin/feature-prompts/:slug/eval":       false,
+		"POST /api/admin/feature-prompts/:slug/rollback":   false,
 		"POST /api/admin/line-draft-modes":                 false,
 		"POST /api/admin/statistics/backfill":              false,
 		"POST /api/admin/storage/profiles":                 false,

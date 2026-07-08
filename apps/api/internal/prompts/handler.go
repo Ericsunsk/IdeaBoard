@@ -22,6 +22,10 @@ type featurePromptPayload struct {
 	UserPromptMergePolicy *FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
 }
 
+type featurePromptRollbackPayload struct {
+	RevisionID int64 `json:"revision_id"`
+}
+
 type featurePromptListResponse struct {
 	Prompts []FeaturePromptConfig `json:"prompts"`
 }
@@ -85,6 +89,39 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 			return
 		}
 		response.InternalError(c, 500, "保存失败", err)
+		return
+	}
+
+	response.Success(c, config)
+}
+
+func (h *FeaturePromptHandler) RollbackPrompt(c *gin.Context) {
+	slug, err := featurePromptSlugFromRequest(c)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+
+	var req featurePromptRollbackPayload
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	if req.RevisionID <= 0 {
+		response.Error(c, 400, "缺少 revision_id 参数")
+		return
+	}
+
+	config, err := h.promptRepo.RollbackPromptConfig(c.Request.Context(), slug, req.RevisionID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrPromptRevisionNotFound):
+			response.Error(c, 404, "回滚目标版本不存在")
+		case errors.Is(err, ErrPromptRollbackTargetCurrent):
+			response.Error(c, 409, "目标版本已是当前版本")
+		default:
+			response.InternalError(c, 500, "回滚失败", err)
+		}
 		return
 	}
 

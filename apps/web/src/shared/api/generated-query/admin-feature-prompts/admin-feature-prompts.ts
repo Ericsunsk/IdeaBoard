@@ -22,6 +22,7 @@ import type {
   ApiResponseFeaturePromptEvalReport,
   ApiResponseFeaturePromptList,
   EvaluateAdminFeaturePromptBody,
+  RollbackAdminFeaturePromptBody,
   SetAdminFeaturePromptBody,
 } from '../model'
 
@@ -432,6 +433,104 @@ export function useEvaluateAdminFeaturePrompt<
   const queryOptions = getEvaluateAdminFeaturePromptQueryOptions(
     slug,
     evaluateAdminFeaturePromptBody,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getRollbackAdminFeaturePromptUrl = (slug: string) => {
+  return `/admin/feature-prompts/${encodeURIComponent(String(slug))}/rollback`
+}
+
+export const rollbackAdminFeaturePrompt = async (
+  slug: string,
+  rollbackAdminFeaturePromptBody: RollbackAdminFeaturePromptBody,
+  options?: RequestInit,
+): Promise<ApiResponseFeaturePrompt> => {
+  return orvalMutator<ApiResponseFeaturePrompt>(getRollbackAdminFeaturePromptUrl(slug), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(rollbackAdminFeaturePromptBody),
+  })
+}
+
+export const getRollbackAdminFeaturePromptQueryKey = (
+  slug: MaybeRef<string>,
+  rollbackAdminFeaturePromptBody?: MaybeRef<RollbackAdminFeaturePromptBody>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'feature-prompts',
+    slug,
+    'rollback',
+    rollbackAdminFeaturePromptBody,
+  ] as const
+}
+
+export const getRollbackAdminFeaturePromptQueryOptions = <
+  TData = Awaited<ReturnType<typeof rollbackAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  rollbackAdminFeaturePromptBody: MaybeRef<RollbackAdminFeaturePromptBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof rollbackAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getRollbackAdminFeaturePromptQueryKey(slug, rollbackAdminFeaturePromptBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof rollbackAdminFeaturePrompt>>> = ({
+    signal,
+  }) =>
+    rollbackAdminFeaturePrompt(unref(slug), unref(rollbackAdminFeaturePromptBody), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof rollbackAdminFeaturePrompt>>, TError, TData>
+}
+
+export type RollbackAdminFeaturePromptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof rollbackAdminFeaturePrompt>>
+>
+export type RollbackAdminFeaturePromptQueryError = ErrorType<unknown>
+
+export function useRollbackAdminFeaturePrompt<
+  TData = Awaited<ReturnType<typeof rollbackAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  rollbackAdminFeaturePromptBody: MaybeRef<RollbackAdminFeaturePromptBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof rollbackAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRollbackAdminFeaturePromptQueryOptions(
+    slug,
+    rollbackAdminFeaturePromptBody,
     options,
   )
 

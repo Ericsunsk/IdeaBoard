@@ -7,10 +7,12 @@
 import type { FeaturePromptEvalReport } from './featurePromptEvalReport'
 import type { FeaturePromptMergePolicy } from './featurePromptMergePolicy'
 import type { FeaturePromptModelDefaults } from './featurePromptModelDefaults'
+import type { FeaturePromptRevision } from './featurePromptRevision'
 import type { FeaturePromptVariable } from './featurePromptVariable'
 
 export interface FeaturePrompt {
   slug: string
+  current_revision_id?: number
   prompt: string
   enabled: boolean
   variables: FeaturePromptVariable[]
@@ -18,6 +20,7 @@ export interface FeaturePrompt {
   user_prompt_merge_policy: FeaturePromptMergePolicy
   schema_version: number
   eval_report?: FeaturePromptEvalReport | null
+  recent_revisions?: FeaturePromptRevision[]
   /** @nullable */
   published_at?: string | null
   /** @nullable */

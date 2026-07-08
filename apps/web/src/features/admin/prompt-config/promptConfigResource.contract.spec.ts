@@ -44,6 +44,21 @@ describe('prompt config resource', () => {
           data: makeEvalReport({ passed: true }),
         })
       }),
+      http.post('/api/admin/feature-prompts/:slug/rollback', async ({ request }) => {
+        const body = await readRequestJson(request)
+        const url = new URL(request.url)
+        requests.push({ method: request.method, path: url.pathname, body })
+
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: makePrompt({
+            prompt: 'Rollback prompt',
+            schema_version: 1,
+            current_revision_id: 11,
+          }),
+        })
+      }),
       http.get('/api/admin/feature-prompts/:slug/eval', () =>
         HttpResponse.json({
           code: 0,
@@ -65,6 +80,10 @@ describe('prompt config resource', () => {
       prompt: 'Eval prompt',
       enabled: true,
     })
+    const rolledBack = await resource.rollbackPrompt({
+      slug: promptSlug,
+      revision_id: 11,
+    })
     const latestEvalReport = await resource.fetchLatestEvalReport(promptSlug)
 
     expect(prompts[0]?.prompt).toBe('Initial prompt')
@@ -85,11 +104,20 @@ describe('prompt config resource', () => {
           enabled: true,
         },
       },
+      {
+        method: 'POST',
+        path: `/api/admin/feature-prompts/${promptSlug}/rollback`,
+        body: {
+          revision_id: 11,
+        },
+      },
     ])
     expect(published.prompt).toBe('Published prompt')
     expect(published.enabled).toBe(false)
     expect(published.schema_version).toBe(2)
     expect(evalReport.passed).toBe(true)
+    expect(rolledBack.current_revision_id).toBe(11)
+    expect(rolledBack.prompt).toBe('Rollback prompt')
     expect(latestEvalReport?.passed).toBe(false)
   })
 })

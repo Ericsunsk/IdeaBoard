@@ -4,6 +4,7 @@ import type {
   AdminPromptConfigResource,
   FeaturePrompt,
   FeaturePromptEvalReport,
+  FeaturePromptRevision,
 } from './promptConfigResource'
 import { createAdminPromptConfigWorkspace } from './promptConfigWorkspace'
 
@@ -16,6 +17,7 @@ const mockResource = {
   fetchPrompts: vi.fn(),
   fetchLatestEvalReport: vi.fn(),
   publishPrompt: vi.fn(),
+  rollbackPrompt: vi.fn(),
 }
 
 describe('prompt config workspace facade', () => {
@@ -25,6 +27,7 @@ describe('prompt config workspace facade', () => {
     mockResource.evaluatePrompt.mockResolvedValue(makeEvalReport({ passed: true }))
     mockResource.fetchLatestEvalReport.mockResolvedValue(null)
     mockResource.publishPrompt.mockResolvedValue(makePrompt({ prompt: 'Published prompt' }))
+    mockResource.rollbackPrompt.mockResolvedValue(makePrompt({ prompt: 'Rollback prompt' }))
   })
 
   afterEach(() => {
@@ -44,6 +47,7 @@ describe('prompt config workspace facade', () => {
       { key: '{{prompt}}', tone: 'prompt' },
     ])
     expect(workspace.getCurrentRevision(promptSlug)).toEqual({
+      id: 1,
       schemaVersion: 1,
       publishedAt: null,
       updatedAt: '2026-01-01T00:00:00Z',
@@ -184,6 +188,79 @@ describe('prompt config workspace facade', () => {
     expect(workspace.getSavedPrompt(promptSlug)).toBe('Published prompt')
     expect(workspace.enabledMap[promptSlug]).toBe(false)
     expect(workspace.getCurrentRevision(promptSlug)?.schemaVersion).toBe(2)
+  })
+
+  it('rolls back a prompt then refreshes active revision and saved draft state', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const currentRevision = makeRevision({
+      id: 22,
+      prompt: 'Current prompt',
+      schema_version: 2,
+      is_current: true,
+    })
+    const safeRevision = makeRevision({
+      id: 11,
+      prompt: 'Safe prompt',
+      schema_version: 1,
+      is_current: false,
+      eval_report: makeEvalReport({ passed: true }),
+    })
+    mockResource.fetchPrompts
+      .mockResolvedValueOnce([
+        makePrompt({
+          prompt: 'Current prompt',
+          current_revision_id: 22,
+          schema_version: 2,
+          recent_revisions: [currentRevision, safeRevision],
+        }),
+      ])
+      .mockResolvedValueOnce([
+        makePrompt({
+          prompt: 'Safe prompt',
+          current_revision_id: 11,
+          schema_version: 1,
+          recent_revisions: [
+            { ...safeRevision, is_current: true },
+            { ...currentRevision, is_current: false },
+          ],
+        }),
+      ])
+    mockResource.rollbackPrompt.mockResolvedValueOnce(
+      makePrompt({
+        prompt: 'Safe prompt',
+        current_revision_id: 11,
+        schema_version: 1,
+        recent_revisions: [
+          { ...safeRevision, is_current: true },
+          { ...currentRevision, is_current: false },
+        ],
+      }),
+    )
+
+    await workspace.loadPrompts()
+    workspace.updatePromptDraft(promptSlug, 'Dirty local draft')
+
+    const result = await workspace.rollbackPrompt(promptSlug, 11)
+
+    expect(result?.current_revision_id).toBe(11)
+    expect(mockResource.rollbackPrompt).toHaveBeenCalledWith({
+      slug: promptSlug,
+      revision_id: 11,
+    })
+    expect(mockResource.fetchPrompts).toHaveBeenCalledTimes(2)
+    expect(workspace.promptMap[promptSlug]).toBe('Safe prompt')
+    expect(workspace.getSavedPrompt(promptSlug)).toBe('Safe prompt')
+    expect(workspace.getCurrentRevision(promptSlug)).toMatchObject({
+      id: 11,
+      schemaVersion: 1,
+    })
+    expect(workspace.getRecentRevisions(promptSlug)[0]).toMatchObject({
+      id: 11,
+      is_current: true,
+      eval_report: expect.objectContaining({ passed: true }),
+    })
+    expect(feedback.promptSaved).toHaveBeenCalledWith(promptTitle)
+    expect(workspace.rollingBack[promptSlug]).toBe(false)
   })
 
   it('runs prompt eval and blocks publish when the required report fails', async () => {
@@ -346,8 +423,28 @@ function makePrompt(overrides: Partial<FeaturePrompt> = {}): FeaturePrompt {
       append_user_prompt_when_template_misses_placeholder: true,
     },
     schema_version: 1,
+    current_revision_id: 1,
     published_at: null,
     updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function makeRevision(overrides: Partial<FeaturePromptRevision> = {}): FeaturePromptRevision {
+  return {
+    id: 1,
+    prompt: '',
+    enabled: true,
+    variables: [{ key: '{{prompt}}', tone: 'prompt' }],
+    model_defaults: {},
+    user_prompt_merge_policy: {
+      append_base_prompt_without_template: true,
+      append_user_prompt_when_template_misses_placeholder: true,
+    },
+    schema_version: 1,
+    is_current: false,
+    published_at: null,
+    created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }
 }

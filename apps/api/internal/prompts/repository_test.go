@@ -420,6 +420,121 @@ func TestFeaturePromptPublishAllowedWhenRequiredEvalPasses(t *testing.T) {
 	}
 }
 
+func TestFeaturePromptRollbackMovesCurrentPointerAndPreservesHistory(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugStyleFusion
+
+	first, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "safe prompt v1 {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SetPromptConfig first returned error: %v", err)
+	}
+	if _, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "prompt v2 {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil); err != nil {
+		t.Fatalf("SetPromptConfig second returned error: %v", err)
+	}
+	third, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "prompt v3 {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SetPromptConfig third returned error: %v", err)
+	}
+	if third.CurrentRevisionID == first.CurrentRevisionID {
+		t.Fatalf("test setup current revision did not advance")
+	}
+
+	rolledBack, err := repo.RollbackPromptConfig(ctx, slug, first.CurrentRevisionID)
+	if err != nil {
+		t.Fatalf("RollbackPromptConfig returned error: %v", err)
+	}
+
+	if rolledBack.CurrentRevisionID != first.CurrentRevisionID {
+		t.Fatalf("current revision id = %d, want rolled back target %d", rolledBack.CurrentRevisionID, first.CurrentRevisionID)
+	}
+	if rolledBack.Prompt != first.Prompt || rolledBack.SchemaVersion != first.SchemaVersion {
+		t.Fatalf("rolled back config = %#v, want first revision prompt/version", rolledBack)
+	}
+	assertFeaturePromptCurrentPointer(t, ctx, db, slug, first.CurrentRevisionID)
+	if revisionCount := countFeaturePromptRevisionsForTest(t, ctx, db, slug); revisionCount != 3 {
+		t.Fatalf("revision count = %d, want rollback to preserve all 3 revisions", revisionCount)
+	}
+	assertPromptRevisionHistoryEntry(t, rolledBack.RecentRevisions, first.CurrentRevisionID, true)
+	assertPromptRevisionHistoryEntry(t, rolledBack.RecentRevisions, third.CurrentRevisionID, false)
+}
+
+func TestFeaturePromptRollbackRejectsInvalidTargetAndLeavesCurrentPointer(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugImageExtend
+
+	current, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt:    "current prompt {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}, nil)
+	if err != nil {
+		t.Fatalf("SetPromptConfig current returned error: %v", err)
+	}
+	other, err := repo.SetPromptConfig(ctx, workflow.FeatureSlugStyleVariation, FeaturePromptSaveInput{
+		Prompt:    "other prompt",
+		Enabled:   true,
+		Variables: []FeaturePromptVariable{},
+	}, nil)
+	if err != nil {
+		t.Fatalf("SetPromptConfig other returned error: %v", err)
+	}
+
+	if _, err := repo.RollbackPromptConfig(ctx, slug, other.CurrentRevisionID); !errors.Is(err, ErrPromptRevisionNotFound) {
+		t.Fatalf("RollbackPromptConfig cross-feature error = %v, want ErrPromptRevisionNotFound", err)
+	}
+	assertFeaturePromptCurrentPointer(t, ctx, db, slug, current.CurrentRevisionID)
+
+	if _, err := repo.RollbackPromptConfig(ctx, slug, current.CurrentRevisionID); !errors.Is(err, ErrPromptRollbackTargetCurrent) {
+		t.Fatalf("RollbackPromptConfig current target error = %v, want ErrPromptRollbackTargetCurrent", err)
+	}
+	assertFeaturePromptCurrentPointer(t, ctx, db, slug, current.CurrentRevisionID)
+}
+
+func TestFeaturePromptRevisionHistoryIncludesEvalReportForRevisionDraft(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewFeaturePromptRepository(db)
+	slug := workflow.FeatureSlugPatternGen
+	input := FeaturePromptSaveInput{
+		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
+		Enabled:   true,
+		Variables: promptVariables("{{user_prompt}}"),
+	}
+
+	report, err := repo.EvaluatePromptDraft(ctx, slug, input, nil)
+	if err != nil {
+		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
+	}
+	published, err := repo.SetPromptConfig(ctx, slug, input, nil)
+	if err != nil {
+		t.Fatalf("SetPromptConfig returned error: %v", err)
+	}
+
+	revision := findPromptRevisionHistoryEntry(published.RecentRevisions, published.CurrentRevisionID)
+	if revision == nil {
+		t.Fatalf("revision history = %#v, want current revision", published.RecentRevisions)
+	}
+	if revision.EvalReport == nil || revision.EvalReport.ID != report.ID || !revision.EvalReport.Passed {
+		t.Fatalf("revision eval report = %#v, want passing report %d", revision.EvalReport, report.ID)
+	}
+}
+
 func hasPromptVariable(variables []FeaturePromptVariable, key string, tone string) bool {
 	for _, variable := range variables {
 		if variable.Key == key && variable.Tone == tone {
@@ -427,6 +542,26 @@ func hasPromptVariable(variables []FeaturePromptVariable, key string, tone strin
 		}
 	}
 	return false
+}
+
+func assertPromptRevisionHistoryEntry(t *testing.T, revisions []FeaturePromptRevision, revisionID int64, isCurrent bool) {
+	t.Helper()
+	revision := findPromptRevisionHistoryEntry(revisions, revisionID)
+	if revision == nil {
+		t.Fatalf("revision history = %#v, want revision %d", revisions, revisionID)
+	}
+	if revision.IsCurrent != isCurrent {
+		t.Fatalf("revision %d IsCurrent = %v, want %v", revisionID, revision.IsCurrent, isCurrent)
+	}
+}
+
+func findPromptRevisionHistoryEntry(revisions []FeaturePromptRevision, revisionID int64) *FeaturePromptRevision {
+	for i := range revisions {
+		if revisions[i].ID == revisionID {
+			return &revisions[i]
+		}
+	}
+	return nil
 }
 
 func assertFeaturePromptCurrentPointer(t *testing.T, ctx context.Context, db queryDB, slug string, revisionID int64) {
