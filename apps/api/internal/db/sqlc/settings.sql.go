@@ -26,20 +26,36 @@ func (q *Queries) ClearCurrentStorageProfiles(ctx context.Context) error {
 }
 
 const createFeaturePromptRevision = `-- name: CreateFeaturePromptRevision :one
+WITH input AS (
+  SELECT
+    $1::varchar(64) AS feature_slug,
+    $2::text AS prompt,
+    $3::boolean AS enabled,
+    $4::jsonb AS variables,
+    $5::jsonb AS model_defaults,
+    $6::jsonb AS user_prompt_merge_policy,
+    $7::bigint AS updated_by,
+    $8::timestamptz AS published_at
+)
 INSERT INTO feature_prompt_revisions (
   feature_slug, prompt, enabled, variables, model_defaults,
   user_prompt_merge_policy, schema_version, updated_by, published_at
 )
-VALUES (
-  $1, $2, $3, $4,
-  $5, $6,
+SELECT
+  input.feature_slug,
+  input.prompt,
+  input.enabled,
+  input.variables,
+  input.model_defaults,
+  input.user_prompt_merge_policy,
   COALESCE((
     SELECT MAX(schema_version) + 1
     FROM feature_prompt_revisions
-    WHERE feature_slug = $1
+    WHERE feature_slug = input.feature_slug
   ), 1),
-  $7, $8
-)
+  input.updated_by,
+  input.published_at
+FROM input
 RETURNING
   id, feature_slug, prompt, enabled, variables, model_defaults,
   user_prompt_merge_policy, schema_version, updated_by, published_at, created_at
@@ -276,30 +292,42 @@ func (q *Queries) HasActiveStorageProfileSecretVersion(ctx context.Context, arg 
 }
 
 const insertStorageProfileSecretVersion = `-- name: InsertStorageProfileSecretVersion :one
+WITH input AS (
+  SELECT
+    $1::varchar(64) AS profile_id,
+    $2::varchar(64) AS secret_name,
+    $3::varchar(20) AS secret_material_kind,
+    $4::text AS secret_ref,
+    $5::text AS secret_payload,
+    $6::varchar(128) AS fingerprint,
+    $7::varchar(64) AS key_version,
+    $8::timestamptz AS rotated_at,
+    $9::timestamptz AS expires_at
+)
 INSERT INTO storage_profile_secret_versions (
   profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
   fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at
 )
-VALUES (
-  $1,
-  $2,
+SELECT
+  input.profile_id,
+  input.secret_name,
   COALESCE((
     SELECT MAX(version_number) + 1
     FROM storage_profile_secret_versions
-    WHERE profile_id = $1
-      AND secret_name = $2
+    WHERE profile_id = input.profile_id
+      AND secret_name = input.secret_name
   ), 1),
-  $3,
-  $4,
-  $5,
-  $6,
-  $7,
+  input.secret_material_kind,
+  input.secret_ref,
+  input.secret_payload,
+  input.fingerprint,
+  input.key_version,
   'active',
-  COALESCE($8, now()),
-  $9,
+  COALESCE(input.rotated_at, now()),
+  input.expires_at,
   NULL,
   NULL
-)
+FROM input
 RETURNING
   id, profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
   fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at, created_at, updated_at
@@ -313,7 +341,7 @@ type InsertStorageProfileSecretVersionParams struct {
 	SecretPayload      string       `json:"secret_payload"`
 	Fingerprint        string       `json:"fingerprint"`
 	KeyVersion         string       `json:"key_version"`
-	RotatedAt          interface{}  `json:"rotated_at"`
+	RotatedAt          sql.NullTime `json:"rotated_at"`
 	ExpiresAt          sql.NullTime `json:"expires_at"`
 }
 
@@ -766,14 +794,35 @@ func (q *Queries) SetFeaturePromptCurrentRevision(ctx context.Context, arg SetFe
 }
 
 const upsertStorageProfile = `-- name: UpsertStorageProfile :exec
+WITH input AS (
+  SELECT
+    $1::varchar(64) AS profile_id,
+    $2::varchar(100) AS name,
+    $3::varchar(50) AS provider,
+    $4::boolean AS enabled,
+    $5::boolean AS is_current,
+    $6::boolean AS builtin,
+    $7::varchar(32) AS status,
+    $8::jsonb AS config,
+    $9::bigint AS created_by,
+    $10::bigint AS updated_by
+)
 INSERT INTO storage_profiles (
   profile_id, name, provider, enabled, is_current,
   builtin, status, config, created_by, updated_by
 )
-VALUES (
-  $1, $2, $3, $4, $5,
-  $6, $7, $8, $9, $10
-)
+SELECT
+  input.profile_id,
+  input.name,
+  input.provider,
+  input.enabled,
+  input.is_current,
+  input.builtin,
+  input.status,
+  input.config,
+  input.created_by,
+  input.updated_by
+FROM input
 ON CONFLICT (profile_id) DO UPDATE
 SET name = EXCLUDED.name,
     enabled = EXCLUDED.enabled,

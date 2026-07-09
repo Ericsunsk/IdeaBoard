@@ -22,14 +22,35 @@ ON CONFLICT (config_key) DO UPDATE
 SET value = EXCLUDED.value;
 
 -- name: UpsertStorageProfile :exec
+WITH input AS (
+  SELECT
+    sqlc.arg(profile_id)::varchar(64) AS profile_id,
+    sqlc.arg(name)::varchar(100) AS name,
+    sqlc.arg(provider)::varchar(50) AS provider,
+    sqlc.arg(enabled)::boolean AS enabled,
+    sqlc.arg(is_current)::boolean AS is_current,
+    sqlc.arg(builtin)::boolean AS builtin,
+    sqlc.arg(status)::varchar(32) AS status,
+    sqlc.arg(config)::jsonb AS config,
+    sqlc.narg(created_by)::bigint AS created_by,
+    sqlc.narg(updated_by)::bigint AS updated_by
+)
 INSERT INTO storage_profiles (
   profile_id, name, provider, enabled, is_current,
   builtin, status, config, created_by, updated_by
 )
-VALUES (
-  sqlc.arg(profile_id), sqlc.arg(name), sqlc.arg(provider), sqlc.arg(enabled), sqlc.arg(is_current),
-  sqlc.arg(builtin), sqlc.arg(status), sqlc.arg(config), sqlc.narg(created_by), sqlc.narg(updated_by)
-)
+SELECT
+  input.profile_id,
+  input.name,
+  input.provider,
+  input.enabled,
+  input.is_current,
+  input.builtin,
+  input.status,
+  input.config,
+  input.created_by,
+  input.updated_by
+FROM input
 ON CONFLICT (profile_id) DO UPDATE
 SET name = EXCLUDED.name,
     enabled = EXCLUDED.enabled,
@@ -102,30 +123,42 @@ WHERE profile_id = sqlc.arg(profile_id)
   AND status = 'active';
 
 -- name: InsertStorageProfileSecretVersion :one
+WITH input AS (
+  SELECT
+    sqlc.arg(profile_id)::varchar(64) AS profile_id,
+    sqlc.arg(secret_name)::varchar(64) AS secret_name,
+    sqlc.arg(secret_material_kind)::varchar(20) AS secret_material_kind,
+    sqlc.arg(secret_ref)::text AS secret_ref,
+    sqlc.arg(secret_payload)::text AS secret_payload,
+    sqlc.arg(fingerprint)::varchar(128) AS fingerprint,
+    sqlc.arg(key_version)::varchar(64) AS key_version,
+    sqlc.narg(rotated_at)::timestamptz AS rotated_at,
+    sqlc.narg(expires_at)::timestamptz AS expires_at
+)
 INSERT INTO storage_profile_secret_versions (
   profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
   fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at
 )
-VALUES (
-  sqlc.arg(profile_id),
-  sqlc.arg(secret_name),
+SELECT
+  input.profile_id,
+  input.secret_name,
   COALESCE((
     SELECT MAX(version_number) + 1
     FROM storage_profile_secret_versions
-    WHERE profile_id = sqlc.arg(profile_id)
-      AND secret_name = sqlc.arg(secret_name)
+    WHERE profile_id = input.profile_id
+      AND secret_name = input.secret_name
   ), 1),
-  sqlc.arg(secret_material_kind),
-  sqlc.arg(secret_ref),
-  sqlc.arg(secret_payload),
-  sqlc.arg(fingerprint),
-  sqlc.arg(key_version),
+  input.secret_material_kind,
+  input.secret_ref,
+  input.secret_payload,
+  input.fingerprint,
+  input.key_version,
   'active',
-  COALESCE(sqlc.narg(rotated_at), now()),
-  sqlc.narg(expires_at),
+  COALESCE(input.rotated_at, now()),
+  input.expires_at,
   NULL,
   NULL
-)
+FROM input
 RETURNING
   id, profile_id, secret_name, version_number, secret_material_kind, secret_ref, secret_payload,
   fingerprint, key_version, status, rotated_at, expires_at, retired_at, revoked_at, created_at, updated_at;
@@ -223,20 +256,36 @@ JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
 ORDER BY p.feature_slug ASC;
 
 -- name: CreateFeaturePromptRevision :one
+WITH input AS (
+  SELECT
+    sqlc.arg(feature_slug)::varchar(64) AS feature_slug,
+    sqlc.arg(prompt)::text AS prompt,
+    sqlc.arg(enabled)::boolean AS enabled,
+    sqlc.arg(variables)::jsonb AS variables,
+    sqlc.arg(model_defaults)::jsonb AS model_defaults,
+    sqlc.arg(user_prompt_merge_policy)::jsonb AS user_prompt_merge_policy,
+    sqlc.narg(updated_by)::bigint AS updated_by,
+    sqlc.narg(published_at)::timestamptz AS published_at
+)
 INSERT INTO feature_prompt_revisions (
   feature_slug, prompt, enabled, variables, model_defaults,
   user_prompt_merge_policy, schema_version, updated_by, published_at
 )
-VALUES (
-  sqlc.arg(feature_slug), sqlc.arg(prompt), sqlc.arg(enabled), sqlc.arg(variables),
-  sqlc.arg(model_defaults), sqlc.arg(user_prompt_merge_policy),
+SELECT
+  input.feature_slug,
+  input.prompt,
+  input.enabled,
+  input.variables,
+  input.model_defaults,
+  input.user_prompt_merge_policy,
   COALESCE((
     SELECT MAX(schema_version) + 1
     FROM feature_prompt_revisions
-    WHERE feature_slug = sqlc.arg(feature_slug)
+    WHERE feature_slug = input.feature_slug
   ), 1),
-  sqlc.narg(updated_by), sqlc.narg(published_at)
-)
+  input.updated_by,
+  input.published_at
+FROM input
 RETURNING
   id, feature_slug, prompt, enabled, variables, model_defaults,
   user_prompt_merge_policy, schema_version, updated_by, published_at, created_at;
