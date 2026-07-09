@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import type { EdgeChange } from '@vue-flow/core'
-import { useFlowSelectionController } from './useFlowSelectionController'
+import { useFlowPaneSelectionAdapter } from './useFlowPaneSelectionAdapter'
 
 type TestFlowItem = {
   id: string
@@ -26,19 +26,20 @@ vi.mock('@vue-flow/core', () => ({
   }),
 }))
 
-function createHarness(
-  activeTool = ref<string>('select'),
-) {
+function createHarness(activeTool = ref<string>('select')) {
   const dismissTransientCanvasUi = vi.fn()
-  const controller = useFlowSelectionController({
+  const onEdgesChange = vi.fn()
+  const adapter = useFlowPaneSelectionAdapter({
     activeTool,
     dismissTransientCanvasUi,
+    onEdgesChange,
   })
 
   return {
     activeTool,
-    controller,
+    adapter,
     dismissTransientCanvasUi,
+    onEdgesChange,
   }
 }
 
@@ -59,7 +60,7 @@ function createPanePointerEvent(options: MouseEventInit = {}) {
   return event
 }
 
-describe('useFlowSelectionController', () => {
+describe('useFlowPaneSelectionAdapter', () => {
   beforeEach(() => {
     vueFlowMocks.selectedElements = []
     vueFlowMocks.removeSelectedElements.mockReset()
@@ -70,7 +71,7 @@ describe('useFlowSelectionController', () => {
   it('dismisses transient UI on pane click with board and context surfaces', () => {
     const harness = createHarness()
 
-    harness.controller.onPaneClick()
+    harness.adapter.commands.onPaneClick()
 
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
       closeExpand: true,
@@ -82,7 +83,7 @@ describe('useFlowSelectionController', () => {
   it('leaves selection cleanup to Vue Flow when nothing is selected', () => {
     const harness = createHarness()
 
-    expect(harness.controller.clearFlowSelection()).toBe(false)
+    expect(harness.adapter.commands.clearSelection()).toBe(false)
 
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
   })
@@ -92,7 +93,10 @@ describe('useFlowSelectionController', () => {
     const node = { id: 'node-a' }
     vueFlowMocks.findNode.mockReturnValue(node)
 
-    harness.controller.onFlowNodeMouseDown('node-a', new MouseEvent('mousedown', { button: 0 }))
+    harness.adapter.commands.onFlowNodeMouseDown(
+      'node-a',
+      new MouseEvent('mousedown', { button: 0 }),
+    )
 
     expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
@@ -107,7 +111,7 @@ describe('useFlowSelectionController', () => {
     vueFlowMocks.selectedElements.push(previousNode)
     vueFlowMocks.findNode.mockReturnValue(mountedNode)
 
-    harness.controller.selectFlowNodeForContextMenu('node-b')
+    harness.adapter.commands.selectNodeForContextMenu('node-b')
 
     expect(vueFlowMocks.removeSelectedElements).toHaveBeenCalledWith([previousNode])
     expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([mountedNode])
@@ -118,7 +122,7 @@ describe('useFlowSelectionController', () => {
     const mountedNode: TestFlowItem = { id: 'node-b' }
     vueFlowMocks.findNode.mockReturnValue(mountedNode)
 
-    harness.controller.selectFlowNodeForContextMenu('node-b')
+    harness.adapter.commands.selectNodeForContextMenu('node-b')
 
     expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([mountedNode])
   })
@@ -129,7 +133,7 @@ describe('useFlowSelectionController', () => {
     vueFlowMocks.selectedElements.push(mountedNode)
     vueFlowMocks.findNode.mockReturnValue(mountedNode)
 
-    harness.controller.selectFlowNodeForContextMenu('node-a')
+    harness.adapter.commands.selectNodeForContextMenu('node-a')
 
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
@@ -139,7 +143,10 @@ describe('useFlowSelectionController', () => {
     const activeTool = ref('hand')
     const harness = createHarness(activeTool)
 
-    harness.controller.onFlowNodeMouseDown('node-a', new MouseEvent('mousedown', { button: 0 }))
+    harness.adapter.commands.onFlowNodeMouseDown(
+      'node-a',
+      new MouseEvent('mousedown', { button: 0 }),
+    )
 
     expect(vueFlowMocks.findNode).not.toHaveBeenCalled()
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
@@ -152,7 +159,9 @@ describe('useFlowSelectionController', () => {
     const selectedEdge: TestFlowItem = { id: 'edge-a', source: 'node-a', target: 'node-b' }
     setSelectedElements(selectedNode, selectedEdge)
 
-    harness.controller.onSelectionEnd(new MouseEvent('mouseup', { clientX: 30, clientY: 30 }))
+    harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
+      new MouseEvent('mouseup', { clientX: 30, clientY: 30 }),
+    )
 
     expect(vueFlowMocks.removeSelectedElements).toHaveBeenCalledWith([selectedEdge])
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
@@ -167,9 +176,13 @@ describe('useFlowSelectionController', () => {
       nodeId === previousNode.id ? previousNode : undefined,
     )
 
-    harness.controller.onCanvasPointerDownCapture(createPanePointerEvent({ shiftKey: true }))
+    harness.adapter.paneSelectionBindings.onPointerDownCapture(
+      createPanePointerEvent({ shiftKey: true }),
+    )
     setSelectedElements(marqueeNode)
-    harness.controller.onSelectionEnd(new MouseEvent('mouseup', { clientX: 60, clientY: 60 }))
+    harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
+      new MouseEvent('mouseup', { clientX: 60, clientY: 60 }),
+    )
 
     expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([previousNode])
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
@@ -186,9 +199,13 @@ describe('useFlowSelectionController', () => {
       nodeId === previousOutsideNode.id ? previousOutsideNode : undefined,
     )
 
-    harness.controller.onCanvasPointerDownCapture(createPanePointerEvent({ shiftKey: true }))
+    harness.adapter.paneSelectionBindings.onPointerDownCapture(
+      createPanePointerEvent({ shiftKey: true }),
+    )
     setSelectedElements(previousInsideNode, newMarqueeNode, selectedEdge)
-    harness.controller.onSelectionEnd(new MouseEvent('mouseup', { clientX: 60, clientY: 60 }))
+    harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
+      new MouseEvent('mouseup', { clientX: 60, clientY: 60 }),
+    )
 
     expect(vueFlowMocks.removeSelectedElements).toHaveBeenNthCalledWith(1, [selectedEdge])
     expect(vueFlowMocks.removeSelectedElements).toHaveBeenNthCalledWith(2, [previousInsideNode])
@@ -200,9 +217,13 @@ describe('useFlowSelectionController', () => {
     const previousNode: TestFlowItem = { id: 'node-a' }
     setSelectedElements(previousNode)
 
-    harness.controller.onCanvasPointerDownCapture(createPanePointerEvent({ shiftKey: true }))
+    harness.adapter.paneSelectionBindings.onPointerDownCapture(
+      createPanePointerEvent({ shiftKey: true }),
+    )
     setSelectedElements()
-    harness.controller.onSelectionEnd(new MouseEvent('mouseup', { clientX: 10, clientY: 10 }))
+    harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
+      new MouseEvent('mouseup', { clientX: 10, clientY: 10 }),
+    )
 
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
     expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
@@ -220,20 +241,25 @@ describe('useFlowSelectionController', () => {
       targetHandle: null,
     }
 
-    expect(harness.controller.filterMarqueeEdgeChanges([edgeSelectChange])).toEqual([
-      edgeSelectChange,
-    ])
+    harness.adapter.vueFlowSelectionBindings.onEdgesChange([edgeSelectChange])
+    expect(harness.onEdgesChange).toHaveBeenLastCalledWith([edgeSelectChange])
 
-    harness.controller.onSelectionStart(new MouseEvent('mousedown', { clientX: 10, clientY: 10 }))
+    harness.adapter.vueFlowSelectionBindings.onSelectionStart(
+      new MouseEvent('mousedown', { clientX: 10, clientY: 10 }),
+    )
+    harness.onEdgesChange.mockClear()
 
-    expect(
-      harness.controller.filterMarqueeEdgeChanges([edgeSelectChange, edgeRemoveChange]),
-    ).toEqual([edgeRemoveChange])
+    harness.adapter.vueFlowSelectionBindings.onEdgesChange([edgeSelectChange, edgeRemoveChange])
 
-    harness.controller.onSelectionEnd(new MouseEvent('mouseup', { clientX: 20, clientY: 20 }))
+    expect(harness.onEdgesChange).toHaveBeenCalledWith([edgeRemoveChange])
 
-    expect(harness.controller.filterMarqueeEdgeChanges([edgeSelectChange])).toEqual([
-      edgeSelectChange,
-    ])
+    harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
+      new MouseEvent('mouseup', { clientX: 20, clientY: 20 }),
+    )
+    harness.onEdgesChange.mockClear()
+
+    harness.adapter.vueFlowSelectionBindings.onEdgesChange([edgeSelectChange])
+
+    expect(harness.onEdgesChange).toHaveBeenLastCalledWith([edgeSelectChange])
   })
 })

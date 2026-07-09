@@ -39,7 +39,7 @@
       class="canvas-flow-wrap ib-page-dot-bg"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
-      @pointerdown.capture="onCanvasPointerDownCapture"
+      @pointerdown.capture="paneSelectionBindings.onPointerDownCapture"
       @wheel="onCanvasWheel"
     >
       <VueFlow
@@ -64,7 +64,7 @@
         :only-render-visible-elements="true"
         :is-valid-connection="commands.flowPane.isValidConnection"
         @nodes-change="commands.flowPane.onNodesChange"
-        @edges-change="onFlowEdgesChange"
+        @edges-change="vueFlowSelectionBindings.onEdgesChange"
         @connect="commands.flowPane.onConnect"
         @connect-end="onFlowConnectEnd"
         @edge-update="commands.flowPane.onEdgeUpdate"
@@ -72,12 +72,12 @@
         @move="onFlowMove"
         @move-end="onFlowMoveEnd"
         @viewport-change-end="onViewportChangeEnd"
-        @node-click="onFlowNodeClick"
+        @node-click="selectionCommands.onFlowNodeClick"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
-        @selection-start="onSelectionStart"
-        @selection-end="onSelectionEnd"
-        @pane-click="onPaneClick"
+        @selection-start="vueFlowSelectionBindings.onSelectionStart"
+        @selection-end="vueFlowSelectionBindings.onSelectionEnd"
+        @pane-click="selectionCommands.onPaneClick"
         @pane-context-menu="onPaneContextMenu"
       >
         <template #node-canvas="nodeProps">
@@ -114,7 +114,7 @@
             @image-open-preview="onFlowImageOpenPreview"
             @image-append-to-canvas="onFlowImageAppendToCanvas"
             @image-reset="onFlowImageReset"
-            @node-mousedown="onFlowNodeMouseDown"
+            @node-mousedown="selectionCommands.onFlowNodeMouseDown"
             @request-internals-update="onFlowNodeInternalsUpdate"
             @image-contextmenu="onFlowImageContextMenu"
             @image-prompt-generate="onFlowImagePromptGenerate"
@@ -160,14 +160,13 @@ import { useDismissableLayer } from '../../../shared/composables/useDismissableL
 import { ADMIN_ROOT_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
-import { PanOnScrollMode, VueFlow, type EdgeChange } from '@vue-flow/core'
+import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
-import { useFlowSelectionController } from '../composables/useFlowSelectionController'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
@@ -182,7 +181,7 @@ import {
   type DismissTransientCanvasUi,
 } from '../composables/useFlowTransientUiDismissal'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
-import { useVueFlowPaneAdapter } from '../flow-pane'
+import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
@@ -587,25 +586,14 @@ const { onFlowPromptGenerate } = commands.imageWorkflow.createPromptGenerationHa
 })
 
 const {
-  clearFlowSelection,
-  selectFlowNodeForContextMenu,
-  onPaneClick,
-  onFlowNodeClick,
-  onFlowNodeMouseDown,
-  onCanvasPointerDownCapture,
-  onSelectionStart,
-  onSelectionEnd,
-  filterMarqueeEdgeChanges,
-} = useFlowSelectionController({
+  paneSelectionBindings,
+  vueFlowSelectionBindings,
+  commands: selectionCommands,
+} = useFlowPaneSelectionAdapter({
   activeTool: activeTool as Ref<string>,
   dismissTransientCanvasUi,
+  onEdgesChange: (changes) => commands.flowPane.onEdgesChange(changes),
 })
-
-function onFlowEdgesChange(changes: EdgeChange[]) {
-  const filteredChanges = filterMarqueeEdgeChanges(changes)
-  if (filteredChanges.length === 0) return
-  commands.flowPane.onEdgesChange(filteredChanges)
-}
 
 const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
   useFlowNodeDragInteractions({
@@ -632,7 +620,7 @@ const {
   openNodeContextMenu,
   createNodeAtPosition,
   dismissTransientCanvasUi,
-  clearFlowSelection,
+  clearFlowSelection: selectionCommands.clearSelection,
   onCanvasDropDragOver: onFlowCanvasDropDragOver,
   isFlowExpandActive: () => !!flowExpandNodeId.value,
   isBoardHeaderEditingActive: () => isBoardMenuOpen.value || isRenamingBoard.value,
@@ -650,7 +638,7 @@ const {
   openActiveNodePanel,
   clearActiveNodePanel,
   hideStrengthControl,
-  selectFlowNodeForContextMenu,
+  selectFlowNodeForContextMenu: selectionCommands.selectNodeForContextMenu,
   cancelFlowExpandMode,
   cancelFlowMaskEditorMode,
   enterFlowExpandMode,

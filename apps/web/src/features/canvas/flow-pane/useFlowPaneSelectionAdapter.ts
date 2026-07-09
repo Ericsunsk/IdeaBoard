@@ -1,10 +1,11 @@
 import type { Ref } from 'vue'
 import { useVueFlow, type EdgeChange, type Elements } from '@vue-flow/core'
-import type { DismissTransientCanvasUi } from './useFlowTransientUiDismissal'
+import type { DismissTransientCanvasUi } from '../composables/useFlowTransientUiDismissal'
 
-type UseFlowSelectionControllerOptions = {
+type UseFlowPaneSelectionAdapterOptions = {
   activeTool: Ref<string>
   dismissTransientCanvasUi: DismissTransientCanvasUi
+  onEdgesChange: (changes: EdgeChange[]) => void
 }
 
 type FlowElement = Elements[number]
@@ -38,7 +39,7 @@ function isPointerMoved(snapshot: MarqueeSelectionSnapshot, event: MouseEvent): 
   )
 }
 
-export function useFlowSelectionController(options: UseFlowSelectionControllerOptions) {
+export function useFlowPaneSelectionAdapter(options: UseFlowPaneSelectionAdapterOptions) {
   const { getSelectedElements, removeSelectedElements, addSelectedNodes, findNode } = useVueFlow()
   let marqueeSelectionSnapshot: MarqueeSelectionSnapshot | null = null
   let isMarqueeSelectionActive = false
@@ -47,7 +48,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     return [...getSelectedElements.value]
   }
 
-  function clearFlowSelection(elements?: Elements): boolean {
+  function clearSelection(elements?: Elements): boolean {
     const targetElements = elements ?? readSelectedElements()
     if (targetElements.length > 0) {
       removeSelectedElements(targetElements)
@@ -59,7 +60,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     return new Set(elements.filter(isFlowNodeElement).map((element) => element.id))
   }
 
-  function selectFlowNode(nodeId: string, selectionOptions?: { keepExisting?: boolean }): boolean {
+  function selectNode(nodeId: string, selectionOptions?: { keepExisting?: boolean }): boolean {
     const targetNode = findNode(nodeId)
     if (!targetNode) return false
     const selectedElements = readSelectedElements()
@@ -83,12 +84,12 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     return true
   }
 
-  function selectFlowNodeForContextMenu(nodeId: string): boolean {
-    return selectFlowNode(nodeId, { keepExisting: false })
+  function selectNodeForContextMenu(nodeId: string): boolean {
+    return selectNode(nodeId, { keepExisting: false })
   }
 
   function onPaneClick() {
-    clearFlowSelection()
+    clearSelection()
     options.dismissTransientCanvasUi({
       closeExpand: true,
       closeBoardHeader: true,
@@ -108,7 +109,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     }
   }
 
-  function onCanvasPointerDownCapture(event: PointerEvent) {
+  function onPointerDownCapture(event: PointerEvent) {
     marqueeSelectionSnapshot = null
     if (options.activeTool.value !== 'select') return
     if (event.button !== 0 || event.pointerType === 'touch') return
@@ -184,15 +185,27 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     return changes.filter((change) => change.type !== 'select')
   }
 
+  function onEdgesChange(changes: EdgeChange[]) {
+    const filteredChanges = filterMarqueeEdgeChanges(changes)
+    if (filteredChanges.length === 0) return
+    options.onEdgesChange(filteredChanges)
+  }
+
   return {
-    clearFlowSelection,
-    selectFlowNodeForContextMenu,
-    onPaneClick,
-    onFlowNodeClick,
-    onFlowNodeMouseDown,
-    onCanvasPointerDownCapture,
-    onSelectionStart,
-    onSelectionEnd,
-    filterMarqueeEdgeChanges,
+    paneSelectionBindings: {
+      onPointerDownCapture,
+    },
+    vueFlowSelectionBindings: {
+      onSelectionStart,
+      onSelectionEnd,
+      onEdgesChange,
+    },
+    commands: {
+      clearSelection,
+      selectNodeForContextMenu,
+      onPaneClick,
+      onFlowNodeClick,
+      onFlowNodeMouseDown,
+    },
   }
 }
