@@ -303,6 +303,21 @@ func (r *Repository) GetByTaskIDAndUserID(ctx context.Context, taskID string, us
 	return &task, nil
 }
 
+func (r *Repository) ListByTaskIDs(ctx context.Context, taskIDs []string) ([]*tasks.Task, error) {
+	if len(taskIDs) == 0 {
+		return []*tasks.Task{}, nil
+	}
+	rows, err := r.q.ListTasksByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return nil, err
+	}
+	items := tasksFromSQLC(rows)
+	if err := r.attachExecutionMetrics(ctx, items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
@@ -412,6 +427,25 @@ func (r *Repository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string,
 			UserID: userID,
 		})
 	})
+}
+
+func (r *Repository) DeleteByTaskIDs(ctx context.Context, taskIDs []string) (int64, error) {
+	if len(taskIDs) == 0 {
+		return 0, nil
+	}
+	var rowsAffected int64
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		if err := q.DeleteTaskOutputMediaRefsByTaskIDs(ctx, taskIDs); err != nil {
+			return err
+		}
+		rows, err := q.DeleteTasksByTaskIDs(ctx, taskIDs)
+		if err != nil {
+			return err
+		}
+		rowsAffected = rows
+		return nil
+	})
+	return rowsAffected, err
 }
 
 // FailRunningByAccountID 将指定账号下所有 running 状态的任务标记为 failed

@@ -1708,6 +1708,97 @@ func TestDeleteUserTaskSucceedsWhenOutputCleanupFails(t *testing.T) {
 	}
 }
 
+func TestDeleteTasksCancelsActiveTasksAndDeletesRows(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	runningTask := &tasks.Task{
+		TaskID: "admin_delete_running",
+		UserID: 42,
+		Prompt: "running",
+		Status: tasks.StatusRunning,
+		Params: "{}",
+	}
+	completedAt := time.Now()
+	completedTask := &tasks.Task{
+		TaskID:      "admin_delete_completed",
+		UserID:      43,
+		Prompt:      "completed",
+		Status:      tasks.StatusCompleted,
+		Params:      "{}",
+		CompletedAt: &completedAt,
+	}
+	for _, task := range []*tasks.Task{runningTask, completedTask} {
+		if err := taskRepo.Create(ctx, task); err != nil {
+			t.Fatalf("create task %q: %v", task.TaskID, err)
+		}
+	}
+
+	cancelStore := &fakeCancelStore{}
+	cleaner := &recordingTaskOutputCleaner{}
+	svc := NewService(ServiceDeps{
+		TaskRepo:          taskRepo,
+		CancelStore:       cancelStore,
+		TaskOutputCleaner: cleaner,
+	}, ServiceOptions{})
+
+	result, err := svc.DeleteTasks(ctx, []string{" " + runningTask.TaskID + " ", completedTask.TaskID, runningTask.TaskID})
+	if err != nil {
+		t.Fatalf("DeleteTasks failed: %v", err)
+	}
+	if result.DeletedCount != 2 {
+		t.Fatalf("deleted_count=%d, want 2", result.DeletedCount)
+	}
+	if len(cancelStore.marked) != 1 || cancelStore.marked[0] != runningTask.TaskID {
+		t.Fatalf("cancel markers=%+v, want running task only", cancelStore.marked)
+	}
+	if len(cleaner.calls) != 2 {
+		t.Fatalf("cleaner calls=%+v, want both existing tasks", cleaner.calls)
+	}
+	for _, taskID := range []string{runningTask.TaskID, completedTask.TaskID} {
+		if _, err := taskRepo.GetByTaskID(ctx, taskID); err == nil {
+			t.Fatalf("task %q should be deleted", taskID)
+		}
+	}
+}
+
+func TestDeleteTasksDoesNotDeleteWhenCancellationMarkerFails(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	task := &tasks.Task{
+		TaskID: "admin_delete_marker_failed",
+		UserID: 42,
+		Prompt: "running",
+		Status: tasks.StatusRunning,
+		Params: "{}",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	markerErr := errors.New("marker failed")
+	svc := NewService(ServiceDeps{
+		TaskRepo:    taskRepo,
+		CancelStore: &fakeCancelStore{markErr: markerErr},
+	}, ServiceOptions{})
+
+	if _, err := svc.DeleteTasks(ctx, []string{task.TaskID}); !errors.Is(err, markerErr) {
+		t.Fatalf("DeleteTasks error=%v, want marker error", err)
+	}
+	if _, err := taskRepo.GetByTaskID(ctx, task.TaskID); err != nil {
+		t.Fatalf("task should remain after marker failure: %v", err)
+	}
+}
+
+func TestDeleteTasksRejectsEmptySelection(t *testing.T) {
+	svc := NewService(ServiceDeps{}, ServiceOptions{})
+
+	if _, err := svc.DeleteTasks(context.Background(), []string{" "}); !validation.Is(err) {
+		t.Fatalf("DeleteTasks error=%v, want validation error", err)
+	}
+}
+
 func loadTaskServiceCredentialID(t testing.TB, db *sql.DB, accountID int64) int64 {
 	t.Helper()
 	var credentialID int64

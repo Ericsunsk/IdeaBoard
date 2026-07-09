@@ -178,7 +178,27 @@
           </template>
 
           <template #actions="{ iconButtonClass }">
-            <Button text :class="iconButtonClass" aria-label="刷新任务列表" @click="loadTasks">
+            <Button
+              label="删除选中"
+              severity="danger"
+              outlined
+              :class="adminActionButtonClass"
+              :disabled="!canDeleteSelectedTasks"
+              :loading="isDeletingSelectedTasks"
+              aria-label="删除选中的任务"
+              @click="requestDeleteSelectedTasks"
+            >
+              <template #icon>
+                <Trash class="size-4" />
+              </template>
+            </Button>
+            <Button
+              text
+              :class="iconButtonClass"
+              aria-label="刷新任务列表"
+              :disabled="isDeletingSelectedTasks"
+              @click="loadTasks"
+            >
               <template #icon>
                 <Refresh class="size-4 text-admin-text-2" />
               </template>
@@ -698,6 +718,7 @@ import {
   MediaImage,
   Refresh,
   Terminal,
+  Trash,
   WarningTriangle,
   XmarkCircle,
 } from '@iconoir/vue'
@@ -715,12 +736,14 @@ import { adminChartPlugins } from '../../shared/lib/adminChart'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import { createAdminDialogPt } from '../../shared/lib/adminOverlayPt'
 import {
+  adminActionButtonClass,
   adminChartCanvasClass,
   adminChartGridClass,
   adminDashboardRootClass,
   adminSummaryGridClass,
   adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {
   formatTaskCreatedAt,
@@ -742,9 +765,11 @@ import {
 import { useTaskResultDetail } from '../../task-monitor/useTaskResultDetail'
 import { useTaskMonitorCharts } from '../../task-monitor/useTaskMonitorCharts'
 import { type AdminTaskRow, useAdminTaskList } from '../../task-monitor/useAdminTaskList'
+import { useAdminTaskSelectionDelete } from '../../task-monitor/useAdminTaskSelectionDelete'
 import { useAdminTaskRuntimeSnapshot } from '../../task-monitor/useAdminTaskRuntimeSnapshot'
 
 const adminFeedback = useAdminFeedback()
+const adminConfirm = useAdminConfirm()
 const taskCards = adminCards.taskMonitor
 const taskDetailDialogPt = createAdminDialogPt({
   rootClass:
@@ -802,6 +827,12 @@ const {
 } = useAdminTaskRuntimeSnapshot()
 
 const selectedTasks = ref<AdminTaskRow[]>([])
+const { canDeleteSelectedTasks, isDeletingSelectedTasks, requestDeleteSelectedTasks } =
+  useAdminTaskSelectionDelete({
+    selectedTasks,
+    confirm: adminConfirm,
+    feedback: adminFeedback.taskMonitor.taskDeletion,
+  })
 const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
   useTransientScrolling()
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))

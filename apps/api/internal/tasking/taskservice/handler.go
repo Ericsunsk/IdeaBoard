@@ -89,6 +89,10 @@ type taskDeleteResponse struct {
 	Message string `json:"message"`
 }
 
+type adminDeleteTasksRequest struct {
+	TaskIDs []string `json:"task_ids"`
+}
+
 func NewHandler(taskService *Service) *Handler {
 	return &Handler{taskService: taskService}
 }
@@ -177,6 +181,24 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		OtherCount:     counts.OtherCount,
 		List:           toAdminTaskDTOs(taskItems),
 	})
+}
+
+func (h *Handler) DeleteTasks(c *gin.Context) {
+	var req adminDeleteTasksRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	result, err := h.taskService.DeleteTasks(c.Request.Context(), req.TaskIDs)
+	if err != nil {
+		if validation.Is(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.InternalError(c, 500, "删除任务失败", err)
+		return
+	}
+	response.SuccessDTO(c, result)
 }
 
 func validateTaskListQueryIDs(c *gin.Context, userID int64, accountID int64) error {

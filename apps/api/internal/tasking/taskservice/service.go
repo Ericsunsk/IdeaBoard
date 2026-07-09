@@ -43,9 +43,11 @@ type AccountStore interface {
 type TaskStore interface {
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
 	GetByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) (*tasks.Task, error)
+	ListByTaskIDs(ctx context.Context, taskIDs []string) ([]*tasks.Task, error)
 	List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error)
 	GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error)
 	DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error
+	DeleteByTaskIDs(ctx context.Context, taskIDs []string) (int64, error)
 	MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error)
 }
@@ -78,6 +80,7 @@ type ServiceOptions struct {
 const taskCancelTTL = 24 * time.Hour
 const userDeletedTaskCancelReason = "用户删除节点"
 const maxTaskKeywordLength = 200
+const maxDeleteTaskIDs = 200
 const maxSubmitTaskPromptBytes = 8 * 1024
 const maxSubmitTaskFinalPromptBytes = 32 * 1024
 const maxSubmitTaskImageURLs = 16
@@ -445,6 +448,84 @@ func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int6
 		}
 	}
 	return nil
+}
+
+type DeleteTasksResult struct {
+	DeletedCount int64 `json:"deleted_count"`
+}
+
+func (s *Service) DeleteTasks(ctx context.Context, rawTaskIDs []string) (DeleteTasksResult, error) {
+	taskIDs, err := normalizeDeleteTaskIDs(rawTaskIDs)
+	if err != nil {
+		return DeleteTasksResult{}, err
+	}
+	items, err := s.taskRepo.ListByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return DeleteTasksResult{}, err
+	}
+	activeTaskIDs := make([]string, 0, len(items))
+	for _, task := range items {
+		if task == nil || tasks.IsTerminalStatus(task.Status) {
+			continue
+		}
+		activeTaskIDs = append(activeTaskIDs, task.TaskID)
+	}
+	if len(activeTaskIDs) > 0 {
+		if s.cancelStore == nil {
+			return DeleteTasksResult{}, fmt.Errorf("task cancellation store not configured")
+		}
+		for _, taskID := range activeTaskIDs {
+			if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
+				return DeleteTasksResult{}, err
+			}
+		}
+	}
+	deletedCount, err := s.taskRepo.DeleteByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return DeleteTasksResult{}, err
+	}
+	s.cleanupDeletedTaskOutputs(ctx, items)
+	return DeleteTasksResult{DeletedCount: deletedCount}, nil
+}
+
+func normalizeDeleteTaskIDs(rawTaskIDs []string) ([]string, error) {
+	if len(rawTaskIDs) == 0 {
+		return nil, validation.New("请选择要删除的任务")
+	}
+	taskIDs := make([]string, 0, len(rawTaskIDs))
+	seen := make(map[string]struct{}, len(rawTaskIDs))
+	for _, raw := range rawTaskIDs {
+		taskID := strings.TrimSpace(raw)
+		if taskID == "" {
+			continue
+		}
+		if _, exists := seen[taskID]; exists {
+			continue
+		}
+		seen[taskID] = struct{}{}
+		taskIDs = append(taskIDs, taskID)
+	}
+	if len(taskIDs) == 0 {
+		return nil, validation.New("请选择要删除的任务")
+	}
+	if len(taskIDs) > maxDeleteTaskIDs {
+		return nil, validation.New("单次最多删除 200 个任务")
+	}
+	return taskIDs, nil
+}
+
+func (s *Service) cleanupDeletedTaskOutputs(ctx context.Context, items []*tasks.Task) {
+	if s.taskOutputCleaner == nil {
+		return
+	}
+	for _, task := range items {
+		if task == nil {
+			continue
+		}
+		if err := s.taskOutputCleaner.DeleteTaskOutputsByUserTask(ctx, task.UserID, task.TaskID); err != nil {
+			slog.Warn("delete task outputs after task row deleted", "task_id", task.TaskID, "user_id", task.UserID, "err", err)
+		}
+	}
 }
 
 func (s *Service) CancelUserTask(ctx context.Context, taskID string, userID int64) error {

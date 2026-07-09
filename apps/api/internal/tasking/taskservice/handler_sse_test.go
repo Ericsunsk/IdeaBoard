@@ -105,6 +105,10 @@ func (s *streamTaskStore) GetByTaskIDAndUserID(context.Context, string, int64) (
 	return &task, nil
 }
 
+func (s *streamTaskStore) ListByTaskIDs(context.Context, []string) ([]*tasks.Task, error) {
+	return nil, errors.New("unexpected ListByTaskIDs call")
+}
+
 func (s *streamTaskStore) List(context.Context, int64, int64, string, string, int, int) ([]*tasks.Task, tasks.TaskListCounts, error) {
 	return nil, tasks.TaskListCounts{}, errors.New("unexpected List call")
 }
@@ -115,6 +119,10 @@ func (s *streamTaskStore) GetByUserID(context.Context, int64, int, int) ([]*task
 
 func (s *streamTaskStore) DeleteByTaskIDAndUserID(context.Context, string, int64) error {
 	return errors.New("unexpected DeleteByTaskIDAndUserID call")
+}
+
+func (s *streamTaskStore) DeleteByTaskIDs(context.Context, []string) (int64, error) {
+	return 0, errors.New("unexpected DeleteByTaskIDs call")
 }
 
 func (s *streamTaskStore) MarkTaskCancelled(context.Context, tasks.TaskCancellationSnapshot, *tasks.TaskAttemptFinish) (int64, error) {

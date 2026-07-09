@@ -54,6 +54,12 @@ export type AdminTaskResultFeedback = {
   copyFailed: () => void
 }
 
+export type AdminTaskDeletionFeedback = {
+  noTasksSelected: () => void
+  tasksDeleted: (deletedCount: number) => void
+  deleteTasksFailed: (error: unknown) => void
+}
+
 export type AdminPromptConfigFeedback = {
   loadPromptsFailed: (error: unknown) => void
   promptDraftInvalid: (message: string) => void
@@ -132,6 +138,7 @@ export type AdminFeedback = {
   }
   taskMonitor: {
     resultDetail: AdminTaskResultFeedback
+    taskDeletion: AdminTaskDeletionFeedback
   }
 }
 
@@ -389,6 +396,21 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
         },
         copyFailed() {
           appToast.error('复制失败')
+        },
+      },
+      taskDeletion: {
+        noTasksSelected() {
+          appToast.warning('请选择要删除的任务')
+        },
+        tasksDeleted(deletedCount) {
+          if (deletedCount <= 0) {
+            appToast.warning('没有可删除的任务，列表已刷新')
+            return
+          }
+          appToast.success(`已删除 ${deletedCount} 个任务`)
+        },
+        deleteTasksFailed(error) {
+          appToast.error(formatDisplayErrorMessage(error, '删除任务失败'))
         },
       },
     },

@@ -18,9 +18,11 @@ import { computed, unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
 import type {
+  ApiResponseAdminTaskDeleteResult,
   ApiResponseTask,
   ApiResponseTaskId,
   ApiResponseTaskList,
+  DeleteAdminTasksRequest,
   ListAdminTasksParams,
   SubmitTaskRequest,
 } from '../model'
@@ -97,6 +99,77 @@ export function useListAdminTasks<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminTasksQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getDeleteAdminTasksUrl = () => {
+  return `/admin/tasks/bulk-delete`
+}
+
+export const deleteAdminTasks = async (
+  deleteAdminTasksRequest: DeleteAdminTasksRequest,
+  options?: RequestInit,
+): Promise<ApiResponseAdminTaskDeleteResult> => {
+  return orvalMutator<ApiResponseAdminTaskDeleteResult>(getDeleteAdminTasksUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(deleteAdminTasksRequest),
+  })
+}
+
+export const getDeleteAdminTasksQueryKey = (
+  deleteAdminTasksRequest?: MaybeRef<DeleteAdminTasksRequest>,
+) => {
+  return ['POST', 'admin', 'tasks', 'bulk-delete', deleteAdminTasksRequest] as const
+}
+
+export const getDeleteAdminTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteAdminTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  deleteAdminTasksRequest: MaybeRef<DeleteAdminTasksRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminTasks>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDeleteAdminTasksQueryKey(deleteAdminTasksRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminTasks>>> = ({ signal }) =>
+    deleteAdminTasks(unref(deleteAdminTasksRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof deleteAdminTasks>>,
+    TError,
+    TData
+  >
+}
+
+export type DeleteAdminTasksQueryResult = NonNullable<Awaited<ReturnType<typeof deleteAdminTasks>>>
+export type DeleteAdminTasksQueryError = ErrorType<unknown>
+
+export function useDeleteAdminTasks<
+  TData = Awaited<ReturnType<typeof deleteAdminTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  deleteAdminTasksRequest: MaybeRef<DeleteAdminTasksRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminTasks>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteAdminTasksQueryOptions(deleteAdminTasksRequest, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

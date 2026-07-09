@@ -1,5 +1,4 @@
 import { computed, ref, watch } from 'vue'
-import { useListAdminTasks } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import {
   type ApiResponseTaskListData,
   type ListAdminTasksParams,
@@ -7,6 +6,7 @@ import {
 } from '../../../shared/api/generated-query/model'
 import { useAdminTaskMonitorSettingQuery } from '../system-settings/taskMonitorSettingsResource'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
+import { useAdminTaskListResource } from './taskMonitorResource'
 
 type TaskStatusStats = {
   running: number
@@ -55,7 +55,7 @@ export function useAdminTaskList() {
     isEnabled: () => hasActiveTasks.value,
   })
 
-  const tasksQuery = useListAdminTasks(computed(resolveParams), {
+  const tasksQuery = useAdminTaskListResource(computed(resolveParams), {
     query: {
       placeholderData: (prev) => prev,
       refetchInterval: polling.refetchInterval,

@@ -8,6 +8,8 @@ package dbsqlc
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/lib/pq"
 )
 
 const countMediaRefsByAssetID = `-- name: CountMediaRefsByAssetID :one
@@ -110,6 +112,17 @@ WHERE task_id = $1
 
 func (q *Queries) DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByTaskID, taskID)
+	return err
+}
+
+const deleteTaskOutputMediaRefsByTaskIDs = `-- name: DeleteTaskOutputMediaRefsByTaskIDs :exec
+DELETE FROM media_refs
+WHERE task_id = ANY($1::text[])
+  AND ref_type = 'task_output'
+`
+
+func (q *Queries) DeleteTaskOutputMediaRefsByTaskIDs(ctx context.Context, taskIds []string) error {
+	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByTaskIDs, pq.Array(taskIds))
 	return err
 }
 

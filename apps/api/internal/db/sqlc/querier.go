@@ -53,7 +53,9 @@ type Querier interface {
 	DeleteProviderEndpoint(ctx context.Context, id int64) (int64, error)
 	DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTaskByTaskIDAndUserIDParams) error
 	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
+	DeleteTaskOutputMediaRefsByTaskIDs(ctx context.Context, taskIds []string) error
 	DeleteTaskOutputMediaRefsByUserTaskID(ctx context.Context, arg DeleteTaskOutputMediaRefsByUserTaskIDParams) error
+	DeleteTasksByTaskIDs(ctx context.Context, taskIds []string) (int64, error)
 	DeleteTasksByUserID(ctx context.Context, userID int64) error
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
@@ -132,6 +134,7 @@ type Querier interface {
 	ListTaskIDsByAccountID(ctx context.Context, accountID sql.NullInt64) ([]string, error)
 	ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg ListTaskIDsByAccountIDAndStatusesParams) ([]string, error)
 	ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTasksRow, error)
+	ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]ListTasksByTaskIDsRow, error)
 	ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDParams) ([]ListTasksByUserIDRow, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)

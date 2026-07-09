@@ -455,6 +455,19 @@ func (q *Queries) DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTas
 	return err
 }
 
+const deleteTasksByTaskIDs = `-- name: DeleteTasksByTaskIDs :execrows
+DELETE FROM tasks
+WHERE task_id = ANY($1::text[])
+`
+
+func (q *Queries) DeleteTasksByTaskIDs(ctx context.Context, taskIds []string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteTasksByTaskIDs, pq.Array(taskIds))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteTasksByUserID = `-- name: DeleteTasksByUserID :exec
 DELETE FROM tasks
 WHERE user_id = $1
@@ -1543,6 +1556,119 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 	var items []ListTasksRow
 	for rows.Next() {
 		var i ListTasksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TaskID,
+			&i.UserID,
+			&i.ClientActionID,
+			&i.AssignedProviderEndpointID,
+			&i.AssignedCredentialID,
+			&i.AccountID,
+			&i.Prompt,
+			&i.UserPrompt,
+			&i.Params,
+			&i.FeatureSlug,
+			&i.RequestedModel,
+			&i.Priority,
+			&i.ResolvedModel,
+			&i.ApiType,
+			&i.ProviderEndpointName,
+			&i.ProviderEndpointBaseUrl,
+			&i.CredentialFingerprint,
+			&i.CredentialKeyVersion,
+			&i.Status,
+			&i.LeaseToken,
+			&i.RetryCount,
+			&i.AttemptSeq,
+			&i.ErrorMsg,
+			&i.Result,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.CompletedAt,
+			&i.CancelledAt,
+			&i.CancelledBy,
+			&i.CancelReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTasksByTaskIDs = `-- name: ListTasksByTaskIDs :many
+SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+       feature_slug, requested_model, priority,
+       COALESCE(latest_lease.resolved_model, '') AS resolved_model,
+       COALESCE(latest_lease.api_type, '') AS api_type,
+       COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
+       COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
+       COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
+       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
+       cancelled_at, cancelled_by, cancel_reason
+FROM tasks t
+LEFT JOIN LATERAL (
+  SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
+         credential_fingerprint, credential_key_version
+  FROM task_leases
+  WHERE task_id = t.task_id
+  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+  LIMIT 1
+) AS latest_lease ON TRUE
+WHERE t.task_id = ANY($1::text[])
+ORDER BY array_position($1::text[], t.task_id)
+`
+
+type ListTasksByTaskIDsRow struct {
+	ID                         int64         `json:"id"`
+	TaskID                     string        `json:"task_id"`
+	UserID                     int64         `json:"user_id"`
+	ClientActionID             string        `json:"client_action_id"`
+	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
+	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
+	AccountID                  sql.NullInt64 `json:"account_id"`
+	Prompt                     string        `json:"prompt"`
+	UserPrompt                 string        `json:"user_prompt"`
+	Params                     string        `json:"params"`
+	FeatureSlug                string        `json:"feature_slug"`
+	RequestedModel             string        `json:"requested_model"`
+	Priority                   int32         `json:"priority"`
+	ResolvedModel              string        `json:"resolved_model"`
+	ApiType                    string        `json:"api_type"`
+	ProviderEndpointName       string        `json:"provider_endpoint_name"`
+	ProviderEndpointBaseUrl    string        `json:"provider_endpoint_base_url"`
+	CredentialFingerprint      string        `json:"credential_fingerprint"`
+	CredentialKeyVersion       string        `json:"credential_key_version"`
+	Status                     string        `json:"status"`
+	LeaseToken                 string        `json:"lease_token"`
+	RetryCount                 int32         `json:"retry_count"`
+	AttemptSeq                 int32         `json:"attempt_seq"`
+	ErrorMsg                   string        `json:"error_msg"`
+	Result                     string        `json:"result"`
+	CreatedAt                  time.Time     `json:"created_at"`
+	UpdatedAt                  time.Time     `json:"updated_at"`
+	CompletedAt                sql.NullTime  `json:"completed_at"`
+	CancelledAt                sql.NullTime  `json:"cancelled_at"`
+	CancelledBy                sql.NullInt64 `json:"cancelled_by"`
+	CancelReason               string        `json:"cancel_reason"`
+}
+
+func (q *Queries) ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]ListTasksByTaskIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTasksByTaskIDs, pq.Array(taskIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTasksByTaskIDsRow
+	for rows.Next() {
+		var i ListTasksByTaskIDsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.TaskID,

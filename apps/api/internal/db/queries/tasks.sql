@@ -59,6 +59,29 @@ LEFT JOIN LATERAL (
 ) AS latest_lease ON TRUE
 WHERE t.task_id = sqlc.arg(task_id) AND t.user_id = sqlc.arg(user_id);
 
+-- name: ListTasksByTaskIDs :many
+SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
+       feature_slug, requested_model, priority,
+       COALESCE(latest_lease.resolved_model, '') AS resolved_model,
+       COALESCE(latest_lease.api_type, '') AS api_type,
+       COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
+       COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
+       COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
+       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
+       cancelled_at, cancelled_by, cancel_reason
+FROM tasks t
+LEFT JOIN LATERAL (
+  SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
+         credential_fingerprint, credential_key_version
+  FROM task_leases
+  WHERE task_id = t.task_id
+  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+  LIMIT 1
+) AS latest_lease ON TRUE
+WHERE t.task_id = ANY(sqlc.arg(task_ids)::text[])
+ORDER BY array_position(sqlc.arg(task_ids)::text[], t.task_id);
+
 -- name: SummarizeTasks :one
 SELECT
   COUNT(*) AS total,
@@ -641,6 +664,10 @@ WHERE task_id = sqlc.arg(task_id)
 -- name: DeleteTaskByTaskIDAndUserID :exec
 DELETE FROM tasks
 WHERE task_id = sqlc.arg(task_id) AND user_id = sqlc.arg(user_id);
+
+-- name: DeleteTasksByTaskIDs :execrows
+DELETE FROM tasks
+WHERE task_id = ANY(sqlc.arg(task_ids)::text[]);
 
 -- name: DeleteTasksByUserID :exec
 DELETE FROM tasks

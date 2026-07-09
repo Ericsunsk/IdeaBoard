@@ -929,6 +929,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskList'
+  /admin/tasks/bulk-delete:
+    post:
+      tags: [AdminTasks]
+      operationId: deleteAdminTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAdminTasksRequest'
+      responses:
+        '200':
+          description: Deleted selected admin tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminTaskDeleteResult'
   /admin/tasks/submit:
     post:
       tags: [AdminTasks]
@@ -2561,6 +2578,25 @@ components:
       properties:
         url: { type: string }
 
+    DeleteAdminTasksRequest:
+      type: object
+      required: [task_ids]
+      properties:
+        task_ids:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: string
+
+    AdminTaskDeleteResult:
+      type: object
+      required: [deleted_count]
+      properties:
+        deleted_count:
+          type: integer
+          minimum: 0
+
     UserLineDraftMode:
       type: object
       required: [id, name, cover_image]
@@ -2809,6 +2845,14 @@ components:
               properties:
                 task:
                   $ref: '#/components/schemas/Task'
+
+    ApiResponseAdminTaskDeleteResult:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AdminTaskDeleteResult'
 
     ApiResponseMessage:
       allOf:
