@@ -55,7 +55,7 @@ const taskStatusDefinitions: Record<ListAdminTasksStatusValue, TaskStatusDefinit
   },
   [ListAdminTasksStatus.cancelled]: {
     severity: 'secondary',
-    text: '已取消',
+    text: '已停止',
     color: DEFAULT_STATUS_COLOR,
     bannerClass: DEFAULT_BANNER_CLASS,
     dotClass: DEFAULT_DOT_CLASS,

@@ -117,6 +117,10 @@ func (s *streamTaskStore) DeleteByTaskIDAndUserID(context.Context, string, int64
 	return errors.New("unexpected DeleteByTaskIDAndUserID call")
 }
 
+func (s *streamTaskStore) MarkTaskCancelled(context.Context, tasks.TaskCancellationSnapshot, *tasks.TaskAttemptFinish) (int64, error) {
+	return 0, errors.New("unexpected MarkTaskCancelled call")
+}
+
 func (s *streamTaskStore) ListOutputsByTaskIDs(context.Context, []string) (map[string][]tasks.TaskOutput, error) {
 	return map[string][]tasks.TaskOutput{}, nil
 }

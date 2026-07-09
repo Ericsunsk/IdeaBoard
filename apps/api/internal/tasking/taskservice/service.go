@@ -46,6 +46,7 @@ type TaskStore interface {
 	List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error)
 	GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error)
 	DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error
+	MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error)
 }
 
@@ -75,6 +76,7 @@ type ServiceOptions struct {
 }
 
 const taskCancelTTL = 24 * time.Hour
+const userDeletedTaskCancelReason = "用户删除节点"
 const maxTaskKeywordLength = 200
 const maxSubmitTaskPromptBytes = 8 * 1024
 const maxSubmitTaskFinalPromptBytes = 32 * 1024
@@ -443,6 +445,48 @@ func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int6
 		}
 	}
 	return nil
+}
+
+func (s *Service) CancelUserTask(ctx context.Context, taskID string, userID int64) error {
+	taskID = strings.TrimSpace(taskID)
+	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
+	if err != nil {
+		return err
+	}
+	if tasks.IsTerminalStatus(task.Status) {
+		return nil
+	}
+
+	if s.cancelStore == nil {
+		return fmt.Errorf("task cancellation store not configured")
+	}
+	if err := s.cancelStore.MarkCancelled(ctx, task.TaskID, taskCancelTTL); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	rows, err := s.taskRepo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
+		TaskID:      task.TaskID,
+		CancelledAt: now,
+		CancelledBy: &userID,
+		Reason:      userDeletedTaskCancelReason,
+	}, nil)
+	if err != nil {
+		return err
+	}
+	if rows > 0 {
+		s.publishTaskStatusEvent(ctx, task.TaskID, tasks.StatusCancelled)
+		return nil
+	}
+
+	latest, err := s.taskRepo.GetByTaskIDAndUserID(ctx, task.TaskID, userID)
+	if err != nil {
+		return err
+	}
+	if tasks.IsTerminalStatus(latest.Status) {
+		return nil
+	}
+	return fmt.Errorf("task cancellation did not apply")
 }
 
 func (s *Service) GetUserTasks(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {

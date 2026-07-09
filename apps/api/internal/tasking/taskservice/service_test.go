@@ -1409,15 +1409,157 @@ func (p *recordingTaskStatusPublisher) PublishTaskStatus(_ context.Context, even
 }
 
 type fakeCancelStore struct {
-	marked []string
+	marked  []string
+	markErr error
 }
 
 func (f *fakeCancelStore) MarkCancelled(_ context.Context, taskID string, _ time.Duration) error {
+	if f.markErr != nil {
+		return f.markErr
+	}
 	f.marked = append(f.marked, taskID)
 	return nil
 }
 func (f *fakeCancelStore) IsCancelled(context.Context, string) (bool, error) { return false, nil }
 func (f *fakeCancelStore) ClearCancelled(context.Context, string) error      { return nil }
+
+func TestCancelUserTaskMarksRunningTaskCancelledWithoutDeletingRow(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	task := &tasks.Task{
+		TaskID:     "task_cancel_running",
+		UserID:     42,
+		UserPrompt: "test",
+		Prompt:     "test",
+		Status:     tasks.StatusRunning,
+		Params:     "{}",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	cancelStore := &fakeCancelStore{}
+	publisher := &recordingTaskStatusPublisher{}
+	svc := NewService(ServiceDeps{
+		TaskRepo:    taskRepo,
+		CancelStore: cancelStore,
+	}, ServiceOptions{TaskEvents: publisher})
+
+	if err := svc.CancelUserTask(ctx, task.TaskID, task.UserID); err != nil {
+		t.Fatalf("CancelUserTask failed: %v", err)
+	}
+
+	if len(cancelStore.marked) != 1 || cancelStore.marked[0] != task.TaskID {
+		t.Fatalf("cancel markers=%+v, want %q", cancelStore.marked, task.TaskID)
+	}
+	stopped, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("load stopped task: %v", err)
+	}
+	if stopped.Status != tasks.StatusCancelled {
+		t.Fatalf("status=%q, want cancelled", stopped.Status)
+	}
+	if stopped.CancelledAt == nil || stopped.CompletedAt == nil {
+		t.Fatalf("cancelled_at=%v completed_at=%v, want terminal timestamps", stopped.CancelledAt, stopped.CompletedAt)
+	}
+	if stopped.CancelledBy == nil || *stopped.CancelledBy != task.UserID {
+		t.Fatalf("cancelled_by=%v, want %d", stopped.CancelledBy, task.UserID)
+	}
+	if stopped.CancelReason != userDeletedTaskCancelReason {
+		t.Fatalf("cancel_reason=%q, want %q", stopped.CancelReason, userDeletedTaskCancelReason)
+	}
+	if len(publisher.events) != 1 || publisher.events[0].TaskID != task.TaskID || publisher.events[0].Status != tasks.StatusCancelled {
+		t.Fatalf("published events=%+v, want one cancelled event", publisher.events)
+	}
+}
+
+func TestCancelUserTaskDoesNotMarkTaskCancelledWhenCancellationMarkerFails(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	task := &tasks.Task{
+		TaskID:     "task_cancel_marker_failed",
+		UserID:     42,
+		UserPrompt: "test",
+		Prompt:     "test",
+		Status:     tasks.StatusRunning,
+		Params:     "{}",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	markerErr := errors.New("marker failed")
+	cancelStore := &fakeCancelStore{markErr: markerErr}
+	publisher := &recordingTaskStatusPublisher{}
+	svc := NewService(ServiceDeps{
+		TaskRepo:    taskRepo,
+		CancelStore: cancelStore,
+	}, ServiceOptions{TaskEvents: publisher})
+
+	if err := svc.CancelUserTask(ctx, task.TaskID, task.UserID); !errors.Is(err, markerErr) {
+		t.Fatalf("CancelUserTask error=%v, want marker error", err)
+	}
+
+	loaded, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("load task: %v", err)
+	}
+	if loaded.Status != tasks.StatusRunning {
+		t.Fatalf("status=%q, want running", loaded.Status)
+	}
+	if loaded.CancelledAt != nil || loaded.CompletedAt != nil {
+		t.Fatalf("cancelled_at=%v completed_at=%v, want unchanged task", loaded.CancelledAt, loaded.CompletedAt)
+	}
+	if len(publisher.events) != 0 {
+		t.Fatalf("published events=%+v, want none", publisher.events)
+	}
+}
+
+func TestCancelUserTaskIsIdempotentForTerminalTask(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	completedAt := time.Now()
+	task := &tasks.Task{
+		TaskID:      "task_cancel_completed",
+		UserID:      42,
+		UserPrompt:  "test",
+		Prompt:      "test",
+		Status:      tasks.StatusCompleted,
+		Params:      "{}",
+		CompletedAt: &completedAt,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	cancelStore := &fakeCancelStore{}
+	publisher := &recordingTaskStatusPublisher{}
+	svc := NewService(ServiceDeps{
+		TaskRepo:    taskRepo,
+		CancelStore: cancelStore,
+	}, ServiceOptions{TaskEvents: publisher})
+
+	if err := svc.CancelUserTask(ctx, task.TaskID, task.UserID); err != nil {
+		t.Fatalf("CancelUserTask should be idempotent for terminal task: %v", err)
+	}
+
+	if len(cancelStore.marked) != 0 {
+		t.Fatalf("cancel markers=%+v, want none for terminal task", cancelStore.marked)
+	}
+	loaded, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("load task: %v", err)
+	}
+	if loaded.Status != tasks.StatusCompleted {
+		t.Fatalf("status=%q, want completed", loaded.Status)
+	}
+	if len(publisher.events) != 0 {
+		t.Fatalf("published events=%+v, want none", publisher.events)
+	}
+}
 
 type recordingTaskOutputCleaner struct {
 	calls []taskOutputCleanerCall

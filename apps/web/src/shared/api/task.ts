@@ -1,4 +1,5 @@
 import {
+  cancelUserTask,
   checkUserTaskSubmitReadiness,
   deleteUserTask,
   getUserTask,
@@ -19,10 +20,12 @@ export const taskApi = {
   checkSubmitReadiness: checkUserTaskSubmitReadiness,
   get: getUserTask,
   list: listUserTasks,
+  cancel: cancelUserTask,
   delete: deleteUserTask,
 }
 
 export {
+  cancelUserTask as cancelTask,
   checkUserTaskSubmitReadiness as checkSubmitReadiness,
   deleteUserTask as deleteTask,
   getUserTask,

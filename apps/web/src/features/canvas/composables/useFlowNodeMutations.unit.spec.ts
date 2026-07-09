@@ -108,6 +108,7 @@ function createMutationsHarness(initialNodes: Node[], initialEdges: Edge[]) {
     afterCommand: graphCommand,
   })
   const onWarning = vi.fn()
+  const stopDeletedRunningTasks = vi.fn()
 
   const mutations = useFlowNodeMutations({
     nodes,
@@ -115,9 +116,10 @@ function createMutationsHarness(initialNodes: Node[], initialEdges: Edge[]) {
     createNodeKind: shallowRef<CanvasCreatableNodeKind>('prompt'),
     graphAdapter,
     onWarning,
+    stopDeletedRunningTasks,
   })
 
-  return { nodes, edges, graphActions, graphCommand, onWarning, mutations }
+  return { nodes, edges, graphActions, graphCommand, onWarning, stopDeletedRunningTasks, mutations }
 }
 
 function getOutputStatus(nodes: Node[], nodeId: string) {
@@ -263,23 +265,44 @@ describe('useFlowNodeMutations', () => {
   })
 
   it('deletes a canvas node and connected edges through the graph adapter', () => {
-    const { nodes, edges, graphActions, graphCommand, mutations } = createMutationsHarness(
-      [
-        makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1, 'idle')),
-      ],
-      [makeEdge('e-1', 'prompt-1', 'fusion-1')],
-    )
+    const { nodes, edges, graphActions, graphCommand, stopDeletedRunningTasks, mutations } =
+      createMutationsHarness(
+        [
+          makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
+          makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1, 'idle')),
+        ],
+        [makeEdge('e-1', 'prompt-1', 'fusion-1')],
+      )
 
     mutations.onFlowDeleteNode('prompt-1')
 
     expect(nodes.value.map((node) => node.id)).toEqual(['fusion-1'])
     expect(edges.value).toHaveLength(0)
+    expect(stopDeletedRunningTasks).not.toHaveBeenCalled()
     expect(graphActions.removeNodes).toHaveBeenCalledWith(['prompt-1'], true, undefined)
     expect(graphCommand).toHaveBeenCalledWith(
       expect.objectContaining({ command: 'removeNodes', didChange: true }),
       undefined,
     )
+  })
+
+  it('stops the pending task when deleting a running image node', () => {
+    const runningImage = {
+      ...makeImageSnapshot(1),
+      outputStatus: 'running' as const,
+      pendingTaskId: ' task-1 ',
+    }
+    const { stopDeletedRunningTasks, mutations } = createMutationsHarness(
+      [
+        makeFlowNode('image-1', 'image', runningImage),
+        makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
+      ],
+      [makeEdge('e-1', 'image-1', 'prompt-1')],
+    )
+
+    mutations.onFlowDeleteNode('image-1')
+
+    expect(stopDeletedRunningTasks).toHaveBeenCalledWith(['task-1'])
   })
 
   it('creates valid connections through the graph adapter and marks ready targets stale', () => {

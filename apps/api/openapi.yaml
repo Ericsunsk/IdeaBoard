@@ -358,6 +358,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMessage'
+  /user/tasks/{task_id}/cancel:
+    post:
+      tags: [Tasks]
+      operationId: cancelUserTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMessage'
   /user/tasks/{task_id}/events:
     get:
       tags: [Tasks]

@@ -147,6 +147,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   }
   const isDirty = ref(false)
   const saveStatus = ref<SaveStatus>('idle')
+  const stopDeletedRunningTasks = vi.fn()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => 'board-a'),
     exists: vi.fn(() => true),
@@ -171,6 +172,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     onSuccess: vi.fn(),
     onError: vi.fn(),
     onNativeRemove,
+    stopDeletedRunningTasks,
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
     },
@@ -226,6 +228,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     boardSession,
     onWarning,
     onNativeRemove,
+    stopDeletedRunningTasks,
     graphActions,
     isDirty,
     saveStatus,
@@ -829,6 +832,23 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.savedSnapshots[0]?.imageNodes.map((node) => node.id)).toEqual([1])
     expect(harness.savedSnapshots[0]?.connections.map((connection) => connection.id)).toEqual([3])
+  })
+
+  it('stops pending task when native delete removes a running image node', async () => {
+    const snapshot = createSnapshot()
+    snapshot.imageNodes[0] = {
+      ...snapshot.imageNodes[0]!,
+      outputStatus: 'running',
+      pendingTaskId: 'task-native-delete',
+      outputImages: [],
+    }
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    await harness.applyNativeNodeChanges([{ id: 'image-1', type: 'remove' }])
+
+    expect(harness.stopDeletedRunningTasks).toHaveBeenCalledWith(['task-native-delete'])
   })
 
   it('records native edge remove before node remove as one cleanup', async () => {

@@ -26,6 +26,7 @@ import {
   resolveFlowEdgeCanvasConnectionId,
   type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
+import { collectDeletedRunningTaskIds } from '../utils/flowDeletedRunningTasks'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   commitCanvasGraphDeleteIntent,
@@ -83,6 +84,7 @@ export type UseFlowCanvasRuntimeOptions = {
   onSuccess: (message: string) => void
   onError: (message: string) => void
   onNativeRemove?: () => void
+  stopDeletedRunningTasks?: (taskIds: string[]) => void
   scheduleMicrotask?: (callback: () => void) => void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
@@ -534,15 +536,18 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     edgeChanges: EdgeChange[],
   ): boolean {
     const nodeIds: CanvasGraphNodeId[] = []
+    const flowNodeIds: string[] = []
     const removedNodeIds = new Set<string>()
     for (const change of nodeChanges) {
       if (change.type !== 'remove') continue
       const graphNodeId = resolveGraphNodeIdForFlowNodeId(change.id)
       if (!graphNodeId) return false
       nodeIds.push(graphNodeId)
+      flowNodeIds.push(change.id)
       removedNodeIds.add(change.id)
       removedNodeIds.add(graphNodeId)
     }
+    const runningTaskIds = collectDeletedRunningTaskIds(options.nodes.value, flowNodeIds)
 
     const store = createCurrentCanvasGraphStore()
     const edgeIds = resolveNativeRemovedEdgeIds(store, edgeChanges, removedNodeIds)
@@ -559,7 +564,12 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       { nodes: nodeChanges, edges: edgeChanges },
       createFlowGraphCommandOptionsFromTransactionSummary(summary, { historyBefore }),
     )
-    if (result.didChange) options.onNativeRemove?.()
+    if (result.didChange) {
+      options.onNativeRemove?.()
+      if (runningTaskIds.length > 0) {
+        options.stopDeletedRunningTasks?.(runningTaskIds)
+      }
+    }
     return true
   }
 

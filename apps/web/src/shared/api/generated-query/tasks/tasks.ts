@@ -392,6 +392,74 @@ export function useDeleteUserTask<
   return query
 }
 
+export const getCancelUserTaskUrl = (taskId: string) => {
+  return `/user/tasks/${encodeURIComponent(String(taskId))}/cancel`
+}
+
+export const cancelUserTask = async (
+  taskId: string,
+  options?: RequestInit,
+): Promise<ApiResponseMessage> => {
+  return orvalMutator<ApiResponseMessage>(getCancelUserTaskUrl(taskId), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getCancelUserTaskQueryKey = (taskId: MaybeRef<string>) => {
+  return ['POST', 'user', 'tasks', taskId, 'cancel'] as const
+}
+
+export const getCancelUserTaskQueryOptions = <
+  TData = Awaited<ReturnType<typeof cancelUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCancelUserTaskQueryKey(taskId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof cancelUserTask>>> = ({ signal }) =>
+    cancelUserTask(unref(taskId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof cancelUserTask>>, TError, TData>
+}
+
+export type CancelUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof cancelUserTask>>>
+export type CancelUserTaskQueryError = ErrorType<unknown>
+
+export function useCancelUserTask<
+  TData = Awaited<ReturnType<typeof cancelUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cancelUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCancelUserTaskQueryOptions(taskId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getStreamUserTaskEventsUrl = (taskId: string) => {
   return `/user/tasks/${encodeURIComponent(String(taskId))}/events`
 }

@@ -55,7 +55,7 @@ describe('useTaskMonitorCharts builders', () => {
 
     const rows = buildTaskDistributionRows(snapshot)
 
-    expect(rows.map((row) => row.label)).toEqual(['等待中', '执行中', '已完成', '失败', '已取消'])
+    expect(rows.map((row) => row.label)).toEqual(['等待中', '执行中', '已完成', '失败', '已停止'])
     expect(rows.find((row) => row.key === 'completed')).toMatchObject({
       count: 5,
       sharePercent: 50,

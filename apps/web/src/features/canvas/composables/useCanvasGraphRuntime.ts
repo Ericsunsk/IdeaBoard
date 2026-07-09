@@ -61,6 +61,7 @@ type UseCanvasGraphRuntimeOptions = {
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   feedback: CanvasGraphRuntimeFeedback
+  stopDeletedRunningTasks?: (taskIds: string[]) => void
 }
 
 export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
@@ -88,6 +89,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     onWarning: (text) => {
       options.feedback.operationWarning(text)
     },
+    stopDeletedRunningTasks: options.stopDeletedRunningTasks,
   })
 
   function updateSnapshotNode(

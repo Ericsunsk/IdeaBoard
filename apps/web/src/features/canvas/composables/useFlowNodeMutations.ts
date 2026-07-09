@@ -30,6 +30,7 @@ import {
   createCanvasGraphStore,
   isCanvasGraphNodeId,
 } from '../graph-runtime'
+import { collectDeletedRunningTaskIds } from '../utils/flowDeletedRunningTasks'
 import { flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 
 type UseFlowNodeMutationsOptions = {
@@ -41,6 +42,7 @@ type UseFlowNodeMutationsOptions = {
   createNodeKind: Ref<CanvasCreatableNodeKind>
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
+  stopDeletedRunningTasks?: (taskIds: string[]) => void
 }
 
 type UpdateSnapshotNodeOptions = {
@@ -310,10 +312,14 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       removeConnectedEdges: true,
     })
     if (!summary.didChange) return
-    options.graphAdapter.removeNodes(nodeId, {
+    const runningTaskIds = collectDeletedRunningTaskIds(flowNodes, [nodeId])
+    const result = options.graphAdapter.removeNodes(nodeId, {
       ...createFlowGraphCommandOptionsFromTransactionSummary(summary),
       removeConnectedEdges: true,
     })
+    if (result.didChange && runningTaskIds.length > 0) {
+      options.stopDeletedRunningTasks?.(runningTaskIds)
+    }
   }
 
   function updateSnapshotNode(

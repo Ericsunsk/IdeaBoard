@@ -10,6 +10,9 @@ import { useFlowNodeMediaInputs } from '../../composables/useFlowNodeMediaInputs
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'
 import { useCanvasImageWorkflow } from '../../image-workflow'
+import { cancelTask } from '../../../../shared/api/task'
+
+const STOP_DELETED_TASK_RETRY_DELAYS_MS = [0, 1000, 3000] as const
 
 type CanvasGraphUploadApi = {
   upload: (
@@ -63,6 +66,29 @@ export type UseCanvasWorkspaceRuntimeOptions = {
 export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
   const feedback = useCanvasFeedback()
 
+  function stopDeletedRunningTask(taskId: string, attempt = 0) {
+    void cancelTask(taskId).catch((error: unknown) => {
+      const nextAttempt = attempt + 1
+      const retryDelay = STOP_DELETED_TASK_RETRY_DELAYS_MS[nextAttempt]
+      if (retryDelay !== undefined) {
+        window.setTimeout(() => {
+          stopDeletedRunningTask(taskId, nextAttempt)
+        }, retryDelay)
+        return
+      }
+      console.warn('[canvas] failed to stop deleted task', { taskId, error })
+    })
+  }
+
+  function stopDeletedRunningTasks(taskIds: string[]) {
+    const uniqueTaskIds = Array.from(
+      new Set(taskIds.map((taskId) => taskId.trim()).filter(Boolean)),
+    )
+    if (uniqueTaskIds.length === 0) return
+
+    uniqueTaskIds.forEach((taskId) => stopDeletedRunningTask(taskId))
+  }
+
   const board = useCanvasBoardRuntime({
     route: options.route,
     router: options.router,
@@ -70,6 +96,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
+    stopDeletedRunningTasks,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
   })
 
@@ -89,6 +116,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     openNodeImagePreview: options.openNodeImagePreview,
     openImageUrlPreview: options.openImageUrlPreview,
     feedback: feedback.graph,
+    stopDeletedRunningTasks,
   })
 
   const viewport = useCanvasViewportRuntime({

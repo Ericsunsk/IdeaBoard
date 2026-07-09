@@ -331,3 +331,16 @@ func (h *Handler) DeleteUserTask(c *gin.Context) {
 	}
 	response.SuccessDTO(c, taskDeleteResponse{Message: "删除成功"})
 }
+
+func (h *Handler) CancelUserTask(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	taskID := c.Param("task_id")
+	if err := h.taskService.CancelUserTask(c.Request.Context(), taskID, userID); err != nil {
+		response.Error(c, 500, "停止失败")
+		return
+	}
+	response.SuccessDTO(c, taskDeleteResponse{Message: "停止成功"})
+}
