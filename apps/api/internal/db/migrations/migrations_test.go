@@ -278,6 +278,9 @@ func TestEmbeddedMigrationsHaveUniqueParseableUpStatements(t *testing.T) {
 			if strings.Contains(statement.SQL, "-- migrate:down") {
 				t.Fatalf("migration %s up statements include down migration: %q", file, statement.SQL)
 			}
+			if strings.Count(statement.SQL, "$$")%2 != 0 {
+				t.Fatalf("migration %s has split dollar-quoted statement: %q", file, statement.SQL)
+			}
 			if strings.Contains(strings.ToUpper(statement.SQL), "CONCURRENTLY") && !statement.NoTx {
 				t.Fatalf("migration %s has concurrent statement without %s: %q", file, statementNoTx, statement.SQL)
 			}
