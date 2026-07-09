@@ -79,9 +79,41 @@
   cursor: default;
 }
 
+.canvas-flow-wrap {
+  --canvas-selection-active-surface: var(--canvas-accent-soft);
+  --canvas-selection-active-border: var(--canvas-accent);
+  --canvas-selection-group-surface: var(--canvas-accent-soft);
+  --canvas-selection-group-border: var(--canvas-accent);
+  --canvas-selection-group-outset: 10px;
+  --canvas-selection-group-radius: 6px;
+  --canvas-selection-group-z: 1;
+}
+
 .canvas-flow-wrap .vue-flow__selection {
-  border: 1px solid var(--canvas-accent);
-  background: var(--canvas-accent-soft);
+  border: 1px solid var(--canvas-selection-active-border);
+  background: var(--canvas-selection-active-surface);
+  box-shadow: none;
+}
+
+.canvas-flow-wrap .vue-flow__nodesselection-rect {
+  position: absolute;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.canvas-flow-wrap .vue-flow__nodesselection-rect::before {
+  position: absolute;
+  inset: calc(var(--canvas-selection-group-outset) * -1);
+  pointer-events: none;
+  content: '';
+  border: 1px solid var(--canvas-selection-group-border);
+  border-radius: var(--canvas-selection-group-radius);
+  background: var(--canvas-selection-group-surface);
+}
+
+.canvas-flow-wrap .vue-flow__nodesselection {
+  z-index: var(--canvas-selection-group-z);
 }
 
 .canvas-flow-wrap .vue-flow__pane {
