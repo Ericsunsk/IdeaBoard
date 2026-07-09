@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { createAdminPromptConfigResource } from './promptConfigResource'
-import type { FeaturePrompt, FeaturePromptEvalReport } from './promptConfigResource'
+import type { FeaturePrompt } from './promptConfigResource'
 
 const promptSlug = 'sketch-to-image'
 
@@ -28,63 +28,20 @@ describe('prompt config resource', () => {
           msg: 'ok',
           data: makePrompt({
             enabled: false,
-            prompt: 'Published prompt',
+            prompt: 'Saved prompt',
             schema_version: 2,
           }),
         })
       }),
-      http.post('/api/admin/feature-prompts/:slug/eval', async ({ request }) => {
-        const body = await readRequestJson(request)
-        const url = new URL(request.url)
-        requests.push({ method: request.method, path: url.pathname, body })
-
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: makeEvalReport({ passed: true }),
-        })
-      }),
-      http.post('/api/admin/feature-prompts/:slug/rollback', async ({ request }) => {
-        const body = await readRequestJson(request)
-        const url = new URL(request.url)
-        requests.push({ method: request.method, path: url.pathname, body })
-
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: makePrompt({
-            prompt: 'Rollback prompt',
-            schema_version: 1,
-            current_revision_id: 11,
-          }),
-        })
-      }),
-      http.get('/api/admin/feature-prompts/:slug/eval', () =>
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: makeEvalReport({ passed: false }),
-        }),
-      ),
     )
 
     const resource = createAdminPromptConfigResource()
     const prompts = await resource.fetchPrompts()
-    const published = await resource.publishPrompt({
+    const saved = await resource.savePrompt({
       slug: promptSlug,
-      prompt: 'Published prompt',
+      prompt: 'Saved prompt',
       enabled: false,
     })
-    const evalReport = await resource.evaluatePrompt({
-      slug: promptSlug,
-      prompt: 'Eval prompt',
-      enabled: true,
-    })
-    const rolledBack = await resource.rollbackPrompt({
-      slug: promptSlug,
-      revision_id: 11,
-    })
-    const latestEvalReport = await resource.fetchLatestEvalReport(promptSlug)
 
     expect(prompts[0]?.prompt).toBe('Initial prompt')
     expect(requests).toEqual([
@@ -92,33 +49,14 @@ describe('prompt config resource', () => {
         method: 'PUT',
         path: `/api/admin/feature-prompts/${promptSlug}`,
         body: {
-          prompt: 'Published prompt',
+          prompt: 'Saved prompt',
           enabled: false,
         },
       },
-      {
-        method: 'POST',
-        path: `/api/admin/feature-prompts/${promptSlug}/eval`,
-        body: {
-          prompt: 'Eval prompt',
-          enabled: true,
-        },
-      },
-      {
-        method: 'POST',
-        path: `/api/admin/feature-prompts/${promptSlug}/rollback`,
-        body: {
-          revision_id: 11,
-        },
-      },
     ])
-    expect(published.prompt).toBe('Published prompt')
-    expect(published.enabled).toBe(false)
-    expect(published.schema_version).toBe(2)
-    expect(evalReport.passed).toBe(true)
-    expect(rolledBack.current_revision_id).toBe(11)
-    expect(rolledBack.prompt).toBe('Rollback prompt')
-    expect(latestEvalReport?.passed).toBe(false)
+    expect(saved.prompt).toBe('Saved prompt')
+    expect(saved.enabled).toBe(false)
+    expect(saved.schema_version).toBe(2)
   })
 })
 
@@ -141,31 +79,6 @@ function makePrompt(overrides: Partial<FeaturePrompt> = {}): FeaturePrompt {
     schema_version: 1,
     published_at: null,
     updated_at: '2026-01-01T00:00:00Z',
-    ...overrides,
-  }
-}
-
-function makeEvalReport(overrides: Partial<FeaturePromptEvalReport> = {}): FeaturePromptEvalReport {
-  return {
-    id: 1,
-    feature_slug: promptSlug,
-    draft_hash: 'a'.repeat(64),
-    suite_id: 'pattern-gen-golden-v1',
-    passed: true,
-    summary: '1/1 golden fixtures passed',
-    fixture_results: [
-      {
-        fixture_id: 'pattern-gen-user-intent',
-        name: 'Pattern fixture',
-        passed: true,
-        expected_contains: ['red floral silk scarf pattern, flat lay'],
-        missing_expected: [],
-        forbidden_contains: ['{{'],
-        found_forbidden: [],
-        rendered_prompt: 'Create red floral silk scarf pattern, flat lay',
-      },
-    ],
-    created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }
 }

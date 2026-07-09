@@ -248,290 +248,25 @@ func TestFeaturePromptDefaultConfigHDUpscaleUsesSingleControlVariable(t *testing
 	}
 }
 
-func TestFeaturePromptEvalDraftPersistsPassingReport(t *testing.T) {
+func TestFeaturePromptPatternGenSaveDoesNotRequirePublishGate(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewFeaturePromptRepository(db)
 	slug := workflow.FeatureSlugPatternGen
 
-	report, err := repo.EvaluatePromptDraft(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil)
-	if err != nil {
-		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
-	}
-	if !report.Passed {
-		t.Fatalf("report Passed = false, want true: %#v", report)
-	}
-	if report.ID <= 0 || report.DraftHash == "" || report.SuiteID != promptEvalSuitePatternGenV1 {
-		t.Fatalf("report metadata = %#v, want persisted report metadata", report)
-	}
-	if len(report.FixtureResults) != 1 || !report.FixtureResults[0].Passed {
-		t.Fatalf("fixture results = %#v, want one passing fixture", report.FixtureResults)
-	}
-
-	latest, err := repo.GetLatestPromptEvalReport(ctx, slug)
-	if err != nil {
-		t.Fatalf("GetLatestPromptEvalReport returned error: %v", err)
-	}
-	if latest == nil || latest.ID != report.ID || !latest.Passed {
-		t.Fatalf("latest report = %#v, want persisted passing report", latest)
-	}
-}
-
-func TestFeaturePromptConfigOnlyIncludesEvalReportForCurrentDraft(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	repo := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugPatternGen
-
-	report, err := repo.EvaluatePromptDraft(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil)
-	if err != nil {
-		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
-	}
-
-	config, err := repo.GetPromptConfig(ctx, slug)
-	if err != nil {
-		t.Fatalf("GetPromptConfig returned error: %v", err)
-	}
-	if config.EvalReport != nil {
-		t.Fatalf("default config eval report = %#v, want nil for a different draft", config.EvalReport)
-	}
-
-	configs, err := repo.ListPromptConfigs(ctx)
-	if err != nil {
-		t.Fatalf("ListPromptConfigs returned error: %v", err)
-	}
-	for _, cfg := range configs {
-		if cfg.Slug == slug && cfg.EvalReport != nil {
-			t.Fatalf("listed config eval report = %#v, want nil for a different draft", cfg.EvalReport)
-		}
-	}
-
-	published, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil)
-	if err != nil {
-		t.Fatalf("SetPromptConfig returned error: %v", err)
-	}
-	if published.EvalReport == nil || published.EvalReport.ID != report.ID {
-		t.Fatalf("published config eval report = %#v, want matching report %d", published.EvalReport, report.ID)
-	}
-}
-
-func TestFeaturePromptEvalDraftPersistsFailingReport(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	repo := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugPatternGen
-
-	report, err := repo.EvaluatePromptDraft(ctx, slug, FeaturePromptSaveInput{
+	config, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
 		Prompt:    "Create a seamless commercial pattern for {{missing_token}}",
 		Enabled:   true,
 		Variables: promptVariables("{{user_prompt}}"),
 	}, nil)
-	if err != nil {
-		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
-	}
-	if report.Passed {
-		t.Fatalf("report Passed = true, want false")
-	}
-	if len(report.FixtureResults) != 1 {
-		t.Fatalf("fixture results len = %d, want 1", len(report.FixtureResults))
-	}
-	result := report.FixtureResults[0]
-	if len(result.FoundForbidden) == 0 || result.FoundForbidden[0] != "{{" {
-		t.Fatalf("found forbidden = %#v, want unresolved template marker", result.FoundForbidden)
-	}
-}
-
-func TestFeaturePromptPublishBlockedWhenRequiredEvalFails(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	repo := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugPatternGen
-
-	_, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "Create a seamless commercial pattern for {{missing_token}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil)
-	if err == nil {
-		t.Fatal("SetPromptConfig succeeded, want eval gate error")
-	}
-	var gateErr *PromptEvalGateError
-	if !errors.As(err, &gateErr) {
-		t.Fatalf("SetPromptConfig error = %v, want PromptEvalGateError", err)
-	}
-	if gateErr.Report == nil || gateErr.Report.Passed {
-		t.Fatalf("gate report = %#v, want failing report", gateErr.Report)
-	}
-	if revisionCount := countFeaturePromptRevisionsForTest(t, ctx, db, slug); revisionCount != 0 {
-		t.Fatalf("revision count = %d, want blocked publish to create no revision", revisionCount)
-	}
-	latest, latestErr := repo.GetLatestPromptEvalReport(ctx, slug)
-	if latestErr != nil {
-		t.Fatalf("GetLatestPromptEvalReport returned error: %v", latestErr)
-	}
-	if latest == nil || latest.ID != gateErr.Report.ID {
-		t.Fatalf("latest report = %#v, want gate report", latest)
-	}
-}
-
-func TestFeaturePromptPublishAllowedWhenRequiredEvalPasses(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	repo := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugPatternGen
-	input := FeaturePromptSaveInput{
-		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}
-
-	report, err := repo.EvaluatePromptDraft(ctx, slug, input, nil)
-	if err != nil {
-		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
-	}
-	if !report.Passed {
-		t.Fatalf("pre-publish report Passed = false, want true")
-	}
-
-	config, err := repo.SetPromptConfig(ctx, slug, input, nil)
 	if err != nil {
 		t.Fatalf("SetPromptConfig returned error: %v", err)
 	}
 	if config.CurrentRevisionID <= 0 || config.SchemaVersion != 1 || config.PublishedAt == nil {
-		t.Fatalf("published config = %#v, want current published revision", config)
+		t.Fatalf("saved config = %#v, want current saved revision", config)
 	}
-	if config.EvalReport == nil || config.EvalReport.ID != report.ID {
-		t.Fatalf("config eval report = %#v, want previously passing report", config.EvalReport)
-	}
-	if reportCount := countFeaturePromptEvalDraftReportsForTest(t, ctx, db, slug); reportCount != 1 {
-		t.Fatalf("eval draft report count = %d, want existing passing report reused", reportCount)
-	}
-}
-
-func TestFeaturePromptRollbackMovesCurrentPointerAndPreservesHistory(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	repo := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugStyleFusion
-
-	first, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "safe prompt v1 {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil)
-	if err != nil {
-		t.Fatalf("SetPromptConfig first returned error: %v", err)
-	}
-	if _, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "prompt v2 {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil); err != nil {
-		t.Fatalf("SetPromptConfig second returned error: %v", err)
-	}
-	third, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "prompt v3 {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil)
-	if err != nil {
-		t.Fatalf("SetPromptConfig third returned error: %v", err)
-	}
-	if third.CurrentRevisionID == first.CurrentRevisionID {
-		t.Fatalf("test setup current revision did not advance")
-	}
-
-	rolledBack, err := repo.RollbackPromptConfig(ctx, slug, first.CurrentRevisionID)
-	if err != nil {
-		t.Fatalf("RollbackPromptConfig returned error: %v", err)
-	}
-
-	if rolledBack.CurrentRevisionID != first.CurrentRevisionID {
-		t.Fatalf("current revision id = %d, want rolled back target %d", rolledBack.CurrentRevisionID, first.CurrentRevisionID)
-	}
-	if rolledBack.Prompt != first.Prompt || rolledBack.SchemaVersion != first.SchemaVersion {
-		t.Fatalf("rolled back config = %#v, want first revision prompt/version", rolledBack)
-	}
-	assertFeaturePromptCurrentPointer(t, ctx, db, slug, first.CurrentRevisionID)
-	if revisionCount := countFeaturePromptRevisionsForTest(t, ctx, db, slug); revisionCount != 3 {
-		t.Fatalf("revision count = %d, want rollback to preserve all 3 revisions", revisionCount)
-	}
-	assertPromptRevisionHistoryEntry(t, rolledBack.RecentRevisions, first.CurrentRevisionID, true)
-	assertPromptRevisionHistoryEntry(t, rolledBack.RecentRevisions, third.CurrentRevisionID, false)
-}
-
-func TestFeaturePromptRollbackRejectsInvalidTargetAndLeavesCurrentPointer(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	repo := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugImageExtend
-
-	current, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "current prompt {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}, nil)
-	if err != nil {
-		t.Fatalf("SetPromptConfig current returned error: %v", err)
-	}
-	other, err := repo.SetPromptConfig(ctx, workflow.FeatureSlugStyleVariation, FeaturePromptSaveInput{
-		Prompt:    "other prompt",
-		Enabled:   true,
-		Variables: []FeaturePromptVariable{},
-	}, nil)
-	if err != nil {
-		t.Fatalf("SetPromptConfig other returned error: %v", err)
-	}
-
-	if _, err := repo.RollbackPromptConfig(ctx, slug, other.CurrentRevisionID); !errors.Is(err, ErrPromptRevisionNotFound) {
-		t.Fatalf("RollbackPromptConfig cross-feature error = %v, want ErrPromptRevisionNotFound", err)
-	}
-	assertFeaturePromptCurrentPointer(t, ctx, db, slug, current.CurrentRevisionID)
-
-	if _, err := repo.RollbackPromptConfig(ctx, slug, current.CurrentRevisionID); !errors.Is(err, ErrPromptRollbackTargetCurrent) {
-		t.Fatalf("RollbackPromptConfig current target error = %v, want ErrPromptRollbackTargetCurrent", err)
-	}
-	assertFeaturePromptCurrentPointer(t, ctx, db, slug, current.CurrentRevisionID)
-}
-
-func TestFeaturePromptRevisionHistoryIncludesEvalReportForRevisionDraft(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	repo := NewFeaturePromptRepository(db)
-	slug := workflow.FeatureSlugPatternGen
-	input := FeaturePromptSaveInput{
-		Prompt:    "Create a seamless commercial pattern for {{user_prompt}}",
-		Enabled:   true,
-		Variables: promptVariables("{{user_prompt}}"),
-	}
-
-	report, err := repo.EvaluatePromptDraft(ctx, slug, input, nil)
-	if err != nil {
-		t.Fatalf("EvaluatePromptDraft returned error: %v", err)
-	}
-	published, err := repo.SetPromptConfig(ctx, slug, input, nil)
-	if err != nil {
-		t.Fatalf("SetPromptConfig returned error: %v", err)
-	}
-
-	revision := findPromptRevisionHistoryEntry(published.RecentRevisions, published.CurrentRevisionID)
-	if revision == nil {
-		t.Fatalf("revision history = %#v, want current revision", published.RecentRevisions)
-	}
-	if revision.EvalReport == nil || revision.EvalReport.ID != report.ID || !revision.EvalReport.Passed {
-		t.Fatalf("revision eval report = %#v, want passing report %d", revision.EvalReport, report.ID)
+	if revisionCount := countFeaturePromptRevisionsForTest(t, ctx, db, slug); revisionCount != 1 {
+		t.Fatalf("revision count = %d, want saved prompt revision", revisionCount)
 	}
 }
 
@@ -542,26 +277,6 @@ func hasPromptVariable(variables []FeaturePromptVariable, key string, tone strin
 		}
 	}
 	return false
-}
-
-func assertPromptRevisionHistoryEntry(t *testing.T, revisions []FeaturePromptRevision, revisionID int64, isCurrent bool) {
-	t.Helper()
-	revision := findPromptRevisionHistoryEntry(revisions, revisionID)
-	if revision == nil {
-		t.Fatalf("revision history = %#v, want revision %d", revisions, revisionID)
-	}
-	if revision.IsCurrent != isCurrent {
-		t.Fatalf("revision %d IsCurrent = %v, want %v", revisionID, revision.IsCurrent, isCurrent)
-	}
-}
-
-func findPromptRevisionHistoryEntry(revisions []FeaturePromptRevision, revisionID int64) *FeaturePromptRevision {
-	for i := range revisions {
-		if revisions[i].ID == revisionID {
-			return &revisions[i]
-		}
-	}
-	return nil
 }
 
 func assertFeaturePromptCurrentPointer(t *testing.T, ctx context.Context, db queryDB, slug string, revisionID int64) {
@@ -655,15 +370,6 @@ func countFeaturePromptRevisionsForTest(t *testing.T, ctx context.Context, db qu
 	var count int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM feature_prompt_revisions WHERE feature_slug = $1`, slug).Scan(&count); err != nil {
 		t.Fatalf("count feature prompt revisions failed: %v", err)
-	}
-	return count
-}
-
-func countFeaturePromptEvalDraftReportsForTest(t *testing.T, ctx context.Context, db queryDB, slug string) int {
-	t.Helper()
-	var count int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM system_configs WHERE config_key LIKE $1`, promptEvalDraftConfigKeyPrefix+slug+":%").Scan(&count); err != nil {
-		t.Fatalf("count feature prompt eval draft reports failed: %v", err)
 	}
 	return count
 }

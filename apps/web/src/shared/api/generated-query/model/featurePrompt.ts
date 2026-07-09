@@ -4,10 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { FeaturePromptEvalReport } from './featurePromptEvalReport'
 import type { FeaturePromptMergePolicy } from './featurePromptMergePolicy'
 import type { FeaturePromptModelDefaults } from './featurePromptModelDefaults'
-import type { FeaturePromptRevision } from './featurePromptRevision'
 import type { FeaturePromptVariable } from './featurePromptVariable'
 
 export interface FeaturePrompt {
@@ -19,8 +17,6 @@ export interface FeaturePrompt {
   model_defaults: FeaturePromptModelDefaults
   user_prompt_merge_policy: FeaturePromptMergePolicy
   schema_version: number
-  eval_report?: FeaturePromptEvalReport | null
-  recent_revisions?: FeaturePromptRevision[]
   /** @nullable */
   published_at?: string | null
   /** @nullable */

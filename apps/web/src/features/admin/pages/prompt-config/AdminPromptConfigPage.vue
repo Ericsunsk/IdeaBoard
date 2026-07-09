@@ -150,125 +150,6 @@
               :disabled="saving[item.slug]"
             />
 
-            <div
-              v-if="canEvaluatePrompt(item.slug) || getPromptEvalReport(item.slug)"
-              class="rounded-lg border border-admin-border-soft bg-admin-surface-muted px-3 py-2.5"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <Tag value="Prompt eval" severity="secondary" rounded />
-                  <Tag
-                    :value="getPromptEvalLabel(item.slug)"
-                    :severity="getPromptEvalSeverity(item.slug)"
-                    rounded
-                  />
-                </div>
-                <Button
-                  size="small"
-                  label="运行 Eval"
-                  severity="secondary"
-                  outlined
-                  :loading="evaluating[item.slug]"
-                  :disabled="saving[item.slug]"
-                  @click="runPromptEval(item.slug)"
-                />
-              </div>
-
-              <div
-                v-if="getPromptEvalReport(item.slug)"
-                class="mt-2 min-w-0 text-admin-meta text-admin-text-2"
-              >
-                <div class="break-words">
-                  {{ getPromptEvalReport(item.slug)?.summary }}
-                  <span class="font-mono text-admin-caption text-admin-subtitle-color">
-                    {{ getPromptEvalReport(item.slug)?.suite_id }}
-                  </span>
-                </div>
-                <div
-                  v-for="fixture in getPromptEvalFailedFixtures(item.slug)"
-                  :key="fixture.fixture_id"
-                  class="mt-1 rounded border border-admin-border-soft bg-admin-card px-2 py-1"
-                >
-                  <div class="font-semibold text-admin-title-color">{{ fixture.name }}</div>
-                  <div v-if="fixture.missing_expected.length > 0">
-                    缺少：{{ fixture.missing_expected.join('、') }}
-                  </div>
-                  <div v-if="fixture.found_forbidden.length > 0">
-                    未解析：{{ fixture.found_forbidden.join('、') }}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div
-              class="rounded-lg border border-admin-border-soft bg-admin-surface-muted px-3 py-2.5"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <Tag value="Revision history" severity="secondary" rounded />
-                  <Tag :value="getActiveRevisionLabel(item.slug)" severity="info" rounded />
-                </div>
-                <span class="text-admin-meta text-admin-subtitle-color">
-                  {{ getRecentRevisions(item.slug).length }} 条记录
-                </span>
-              </div>
-
-              <div v-if="getRecentRevisions(item.slug).length > 0" class="mt-2 flex flex-col gap-2">
-                <div
-                  v-for="revision in getRecentRevisions(item.slug)"
-                  :key="revision.id"
-                  :class="[
-                    'rounded border px-2.5 py-2',
-                    revision.is_current
-                      ? 'border-admin-info bg-admin-card'
-                      : 'border-admin-border-soft bg-admin-card',
-                  ]"
-                >
-                  <div class="flex flex-wrap items-start justify-between gap-2">
-                    <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-                      <Tag
-                        :value="`v${revision.schema_version}`"
-                        :severity="revision.is_current ? 'info' : 'secondary'"
-                        rounded
-                      />
-                      <Tag v-if="revision.is_current" value="当前" severity="success" rounded />
-                      <Tag
-                        :value="revision.enabled ? '启用' : '停用'"
-                        :severity="revision.enabled ? 'success' : 'secondary'"
-                        rounded
-                      />
-                      <Tag
-                        :value="getRevisionEvalLabel(item.slug, revision)"
-                        :severity="getRevisionEvalSeverity(item.slug, revision)"
-                        rounded
-                      />
-                    </div>
-                    <Button
-                      v-if="!revision.is_current"
-                      size="small"
-                      label="回滚"
-                      severity="secondary"
-                      outlined
-                      :loading="isRollbackRevisionLoading(item.slug, revision.id)"
-                      :disabled="!canRollbackRevision(item.slug, revision)"
-                      @click="confirmRollbackPrompt(item.slug, revision)"
-                    />
-                  </div>
-                  <div class="mt-1 text-admin-caption text-admin-subtitle-color">
-                    {{ getRevisionTimeLabel(revision) }}
-                  </div>
-                  <div
-                    class="mt-1 max-h-12 overflow-hidden break-words text-admin-meta text-admin-text-2"
-                  >
-                    {{ getRevisionPromptPreview(revision) }}
-                  </div>
-                </div>
-              </div>
-              <div v-else class="mt-2 text-admin-meta text-admin-subtitle-color">
-                尚无已发布 revision。
-              </div>
-            </div>
-
             <div class="flex items-center justify-between gap-2.5">
               <Tag
                 :value="`${(promptMap[item.slug] || '').length} 字`"
@@ -322,7 +203,6 @@ import {
 } from '../../shared/lib/adminUiClasses'
 import { useAdminPromptConfigWorkspace } from '../../prompt-config/promptConfigWorkspace'
 import type {
-  FeaturePromptRevision,
   FeaturePromptVariable,
   FeaturePromptVariableTone,
 } from '../../prompt-config/promptConfigWorkspace'
@@ -344,18 +224,10 @@ const promptConfigWorkspace = useAdminPromptConfigWorkspace({
 })
 const {
   enabledMap,
-  canEvaluatePrompt,
-  evaluating,
-  getCurrentRevision,
-  getPromptEvalReport,
   getPromptVariables,
-  getRecentRevisions,
   getSavedPrompt,
   promptMap,
   resetDrafts,
-  rollbackPrompt,
-  rollingBack,
-  runPromptEval,
   savePrompt,
   saving,
   insertVariableIntoDraft,
@@ -364,7 +236,6 @@ const {
 // textarea 引用 + 插入逻辑
 type TextareaRefLike = HTMLTextAreaElement | { $el?: Element }
 const textareaRefs = reactive<Record<string, TextareaRefLike>>({})
-const rollbackRevisionIdMap = reactive<Record<string, number | null>>({})
 const activeGroupKey = ref<string | null>(null)
 const featureGroups = computed<FeatureGroup[]>(() =>
   groupedFeatureGroups.filter((group) => group.items.length > 0),
@@ -424,94 +295,6 @@ function getVariableTokenButtonClass(tone?: FeaturePromptVariableTone) {
 
 function getVarsForSlug(slug: FeatureSlug): FeaturePromptVariable[] {
   return getPromptVariables(slug)
-}
-
-function getPromptEvalLabel(slug: FeatureSlug) {
-  const report = getPromptEvalReport(slug)
-  if (!report) return '未运行'
-  return report.passed ? '通过' : '未通过'
-}
-
-function getPromptEvalSeverity(slug: FeatureSlug): 'success' | 'danger' | 'secondary' {
-  const report = getPromptEvalReport(slug)
-  if (!report) return 'secondary'
-  return report.passed ? 'success' : 'danger'
-}
-
-function getPromptEvalFailedFixtures(slug: FeatureSlug) {
-  return getPromptEvalReport(slug)?.fixture_results.filter((fixture) => !fixture.passed) ?? []
-}
-
-function getActiveRevisionLabel(slug: FeatureSlug) {
-  const revision = getCurrentRevision(slug)
-  if (!revision?.id) return '未发布'
-  return `当前 v${revision.schemaVersion}`
-}
-
-function getRevisionEvalLabel(slug: FeatureSlug, revision: FeaturePromptRevision) {
-  if (!canEvaluatePrompt(slug)) return '未配置 Eval'
-  if (!revision.eval_report) return '无 Eval 记录'
-  return revision.eval_report.passed ? 'Eval 通过' : 'Eval 未通过'
-}
-
-function getRevisionEvalSeverity(
-  slug: FeatureSlug,
-  revision: FeaturePromptRevision,
-): 'success' | 'danger' | 'secondary' | 'warn' {
-  if (!canEvaluatePrompt(slug)) return 'secondary'
-  if (!revision.eval_report) return 'warn'
-  return revision.eval_report.passed ? 'success' : 'danger'
-}
-
-function getRevisionTimeLabel(revision: FeaturePromptRevision) {
-  const published = formatRevisionTime(revision.published_at)
-  if (published) return `发布于 ${published}`
-  const created = formatRevisionTime(revision.created_at)
-  return created ? `创建于 ${created}` : '时间未知'
-}
-
-function getRevisionPromptPreview(revision: FeaturePromptRevision) {
-  const prompt = revision.prompt.trim()
-  return prompt || '空模板'
-}
-
-function canRollbackRevision(slug: FeatureSlug, revision: FeaturePromptRevision) {
-  return !revision.is_current && !rollingBack[slug] && !saving[slug]
-}
-
-function isRollbackRevisionLoading(slug: FeatureSlug, revisionID: number) {
-  return rollingBack[slug] && rollbackRevisionIdMap[slug] === revisionID
-}
-
-async function confirmRollbackPrompt(slug: FeatureSlug, revision: FeaturePromptRevision) {
-  if (!canRollbackRevision(slug, revision)) return
-  const evalWarning =
-    canEvaluatePrompt(slug) && !revision.eval_report?.passed
-      ? '\n\n注意：该 revision 没有通过的 Eval 记录，请确认它仍是安全目标。'
-      : ''
-  const confirmed = window.confirm(
-    `确认回滚到 v${revision.schema_version}？当前 active revision 会切换到该版本，revision history 会保留。${evalWarning}`,
-  )
-  if (!confirmed) return
-
-  rollbackRevisionIdMap[slug] = revision.id
-  try {
-    await rollbackPrompt(slug, revision.id)
-  } finally {
-    rollbackRevisionIdMap[slug] = null
-  }
-}
-
-function formatRevisionTime(value?: string | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
 }
 
 function insertVar(slug: FeatureSlug, varKey: string) {

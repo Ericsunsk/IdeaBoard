@@ -5,32 +5,19 @@ import {
   createAdminPromptConfigResource,
   type AdminPromptConfigResource,
   type FeaturePrompt,
-  type FeaturePromptEvalReport,
-  type FeaturePromptRevision,
   type FeaturePromptVariable,
 } from './promptConfigResource'
 
 export type {
   FeaturePrompt,
-  FeaturePromptEvalFixtureResult,
-  FeaturePromptEvalReport,
-  FeaturePromptRevision,
   FeaturePromptVariable,
   FeaturePromptVariableTone,
 } from './promptConfigResource'
 
 type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']
-const promptEvalFeatureSlug = 'pattern-gen'
-
-export type PromptRevisionState = {
-  id: number
-  schemaVersion: number
-  publishedAt: string | null
-  updatedAt: string | null
-}
 
 export type PromptDraftValidation = {
-  canPublish: boolean
+  canSave: boolean
   isDirty: boolean
   message: string
   severity: 'neutral' | 'warning' | 'error'
@@ -70,11 +57,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
   const enabledMap = reactive<Record<string, boolean>>({})
   const savedEnabledMap = reactive<Record<string, boolean>>({})
   const promptConfigMap = reactive<Record<string, FeaturePrompt>>({})
-  const evalReportMap = reactive<Record<string, FeaturePromptEvalReport | null>>({})
-  const evalReportDraftKeyMap = reactive<Record<string, string>>({})
-  const publishing = reactive<Record<string, boolean>>({})
-  const evaluating = reactive<Record<string, boolean>>({})
-  const rollingBack = reactive<Record<string, boolean>>({})
+  const saving = reactive<Record<string, boolean>>({})
   const promptList = ref<FeaturePrompt[]>([])
 
   const validations = computed<Record<string, PromptDraftValidation>>(() => {
@@ -136,36 +119,29 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     if (!shouldPreserveDraft) {
       promptMap[slug] = prompt
       enabledMap[slug] = config.enabled
-      setPromptEvalReport(slug, config.eval_report ?? null)
-      return
     }
-    clearPromptEvalReport(slug)
   }
 
   function updatePromptDraft(slug: string, prompt: string) {
     if (promptMap[slug] === prompt) return
     promptMap[slug] = prompt
-    clearPromptEvalReport(slug)
   }
 
   function updateEnabledDraft(slug: string, enabled: boolean) {
     if (enabledMap[slug] === enabled) return
     enabledMap[slug] = enabled
-    clearPromptEvalReport(slug)
   }
 
   function insertVariableIntoDraft(slug: string, variableKey: string, position?: number) {
     const current = promptMap[slug] || ''
     const insertAt = normalizeInsertPosition(position, current.length)
     promptMap[slug] = current.slice(0, insertAt) + variableKey + current.slice(insertAt)
-    clearPromptEvalReport(slug)
   }
 
   function resetDrafts(slugs: readonly string[]) {
     for (const slug of slugs) {
       promptMap[slug] = savedPromptMap[slug] || ''
       enabledMap[slug] = getSavedEnabled(slug)
-      setPromptEvalReport(slug, promptConfigMap[slug]?.eval_report ?? null)
     }
   }
 
@@ -177,91 +153,21 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     return promptConfigMap[slug]?.variables ?? []
   }
 
-  function getCurrentRevision(slug: string): PromptRevisionState | null {
-    const config = promptConfigMap[slug]
-    if (!config) return null
-    return {
-      id: config.current_revision_id ?? 0,
-      schemaVersion: config.schema_version,
-      publishedAt: config.published_at ?? null,
-      updatedAt: config.updated_at ?? null,
-    }
-  }
-
-  function getRecentRevisions(slug: string): FeaturePromptRevision[] {
-    return promptConfigMap[slug]?.recent_revisions ?? []
-  }
-
-  function canEvaluatePrompt(slug: string): boolean {
-    return slug === promptEvalFeatureSlug
-  }
-
-  function getPromptEvalReport(slug: string): FeaturePromptEvalReport | null {
-    const report = evalReportMap[slug] ?? null
-    if (!report) return null
-    return evalReportDraftKeyMap[slug] === createPromptEvalDraftKey(slug) ? report : null
-  }
-
   function getDraftValidation(slug: string): PromptDraftValidation {
     return validations.value[slug] ?? resolveDraftValidation(slug)
   }
 
-  async function runPromptEval(slug: string): Promise<FeaturePromptEvalReport | null> {
-    if (!canEvaluatePrompt(slug)) {
-      options.feedback.promptDraftInvalid('该功能暂未配置 Prompt eval')
-      return null
-    }
-    if (!promptConfigMap[slug]) {
-      options.feedback.promptDraftInvalid('提示词配置已刷新，请重新选择')
-      return null
-    }
-    if (evaluating[slug]) return null
-
-    const evalDraftKey = createPromptEvalDraftKey(slug)
-    evaluating[slug] = true
-    try {
-      const report = await resource.evaluatePrompt({
-        slug,
-        prompt: promptMap[slug] || '',
-        enabled: enabledMap[slug] ?? true,
-      })
-      if (createPromptEvalDraftKey(slug) === evalDraftKey) {
-        setPromptEvalReport(slug, report, evalDraftKey)
-      }
-      return report
-    } catch (error) {
-      options.feedback.savePromptFailed(error)
-      return null
-    } finally {
-      evaluating[slug] = false
-    }
-  }
-
-  async function publishPrompt(slug: string): Promise<FeaturePrompt | null> {
+  async function savePrompt(slug: string): Promise<FeaturePrompt | null> {
     const validation = getDraftValidation(slug)
-    if (!validation.canPublish) {
+    if (!validation.canSave) {
       options.feedback.promptDraftInvalid(validation.message)
       return null
     }
-    if (publishing[slug]) return null
+    if (saving[slug]) return null
 
-    publishing[slug] = true
+    saving[slug] = true
     try {
-      if (shouldRunPromptEvalBeforePublish(slug)) {
-        const evalDraftKey = createPromptEvalDraftKey(slug)
-        const report = await runPromptEval(slug)
-        if (!report) return null
-        if (createPromptEvalDraftKey(slug) !== evalDraftKey) {
-          options.feedback.promptDraftInvalid('Prompt eval 已过期，请重新运行后发布')
-          return null
-        }
-        if (!report.passed) {
-          options.feedback.promptDraftInvalid(`Prompt eval 未通过：${report.summary}`)
-          return null
-        }
-      }
-
-      const config = await resource.publishPrompt({
+      const config = await resource.savePrompt({
         slug,
         prompt: promptMap[slug] || '',
         enabled: enabledMap[slug] ?? true,
@@ -274,43 +180,14 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
       options.feedback.savePromptFailed(error)
       return null
     } finally {
-      publishing[slug] = false
-    }
-  }
-
-  async function rollbackPrompt(slug: string, revisionID: number): Promise<FeaturePrompt | null> {
-    if (!promptConfigMap[slug]) {
-      options.feedback.promptDraftInvalid('提示词配置已刷新，请重新选择')
-      return null
-    }
-    if (!Number.isFinite(revisionID) || revisionID <= 0) {
-      options.feedback.promptDraftInvalid('请选择有效的回滚版本')
-      return null
-    }
-    if (rollingBack[slug]) return null
-
-    rollingBack[slug] = true
-    try {
-      const config = await resource.rollbackPrompt({
-        slug,
-        revision_id: revisionID,
-      })
-      syncPromptConfig(config, { preserveDirtyDraft: false })
-      options.feedback.promptSaved(getFeatureTitle(slug))
-      await refreshPrompts()
-      return config
-    } catch (error) {
-      options.feedback.savePromptFailed(error)
-      return null
-    } finally {
-      rollingBack[slug] = false
+      saving[slug] = false
     }
   }
 
   function resolveDraftValidation(slug: string): PromptDraftValidation {
     if (!promptConfigMap[slug]) {
       return {
-        canPublish: false,
+        canSave: false,
         isDirty: false,
         message: '提示词配置已刷新，请重新选择',
         severity: 'error',
@@ -324,17 +201,17 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
 
     if (!prompt.trim()) {
       return {
-        canPublish: true,
+        canSave: true,
         isDirty,
-        message: '提示词为空，发布后将使用空模板',
+        message: '提示词为空，保存后将使用空模板',
         severity: 'warning',
       }
     }
 
     return {
-      canPublish: true,
+      canSave: true,
       isDirty,
-      message: isDirty ? '可发布' : '无未保存更改',
+      message: isDirty ? '可保存' : '无未保存更改',
       severity: 'neutral',
     }
   }
@@ -347,54 +224,20 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     return savedEnabledMap[slug] ?? promptConfigMap[slug]?.enabled ?? true
   }
 
-  function shouldRunPromptEvalBeforePublish(slug: string) {
-    return canEvaluatePrompt(slug) && (enabledMap[slug] ?? true)
-  }
-
-  function createPromptEvalDraftKey(slug: string) {
-    return JSON.stringify({
-      enabled: enabledMap[slug] ?? true,
-      prompt: promptMap[slug] || '',
-    })
-  }
-
-  function setPromptEvalReport(
-    slug: string,
-    report: FeaturePromptEvalReport | null,
-    draftKey = createPromptEvalDraftKey(slug),
-  ) {
-    evalReportMap[slug] = report
-    evalReportDraftKeyMap[slug] = draftKey
-  }
-
-  function clearPromptEvalReport(slug: string) {
-    evalReportMap[slug] = null
-    delete evalReportDraftKeyMap[slug]
-  }
-
   return {
-    canEvaluatePrompt,
     enabledMap,
-    evaluating,
-    getCurrentRevision,
     getDraftValidation,
-    getPromptEvalReport,
     getPromptVariables,
-    getRecentRevisions,
     getSavedPrompt,
     insertVariableIntoDraft,
     loadPrompts,
     loading,
     promptMap,
     prompts: computed(() => promptList.value),
-    publishPrompt,
     refreshPrompts,
     resetDrafts,
-    rollbackPrompt,
-    rollingBack,
-    runPromptEval,
-    savePrompt: publishPrompt,
-    saving: publishing,
+    savePrompt,
+    saving,
     updateEnabledDraft,
     updatePromptDraft,
     validationMap: validations,
