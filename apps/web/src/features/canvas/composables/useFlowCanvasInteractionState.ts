@@ -9,7 +9,8 @@ export type CanvasInteractionKey =
   | 'node-drag'
 
 const CANVAS_LOCKING_INTERACTIONS = new Set<CanvasInteractionKey>([
-  'canvas-extend-overlay',
+  // Pixel-editing modes bind pointer input to image-local coordinates, so viewport changes
+  // are locked only while those tools are active.
   'image-editor-raster',
   'image-mask-editor',
 ])
