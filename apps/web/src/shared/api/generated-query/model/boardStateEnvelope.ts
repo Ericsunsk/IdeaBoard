@@ -6,6 +6,7 @@
  */
 import type { BoardStateConnection } from './boardStateConnection'
 import type { BoardStateEnvelopeSchemaVersion } from './boardStateEnvelopeSchemaVersion'
+import type { BoardStateGroup } from './boardStateGroup'
 import type { BoardStateMediaRef } from './boardStateMediaRef'
 import type { BoardStateNode } from './boardStateNode'
 
@@ -15,6 +16,7 @@ export interface BoardStateEnvelope {
   promptNodes: BoardStateNode[]
   fusionNodes: BoardStateNode[]
   connections: BoardStateConnection[]
+  groups: BoardStateGroup[]
   mediaRefs?: BoardStateMediaRef[]
   /** @minLength 1 */
   previewSnapshotDataUrl?: string

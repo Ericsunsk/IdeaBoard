@@ -68,7 +68,7 @@ describe('boardStateEnvelopeContract', () => {
     expect(
       parseBoardStateEnvelopeContract({
         ...makeCanvasBoardState(),
-        schemaVersion: 2,
+        schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION + 1,
       }),
     ).toBeNull()
 

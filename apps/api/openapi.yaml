@@ -1487,12 +1487,12 @@ components:
 
     BoardStateEnvelope:
       type: object
-      required: [schemaVersion, imageNodes, promptNodes, fusionNodes, connections, updatedAt]
+      required: [schemaVersion, imageNodes, promptNodes, fusionNodes, connections, groups, updatedAt]
       additionalProperties: false
       properties:
         schemaVersion:
           type: integer
-          enum: [1]
+          enum: [2]
         imageNodes:
           type: array
           items:
@@ -1509,6 +1509,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BoardStateConnection'
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardStateGroup'
         mediaRefs:
           type: array
           items:
@@ -1525,6 +1529,21 @@ components:
     BoardStateConnection:
       type: object
       additionalProperties: true
+
+    BoardStateGroup:
+      type: object
+      required: [id, nodeIds]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          pattern: '^group-[0-9]+$'
+        nodeIds:
+          type: array
+          minItems: 2
+          items:
+            type: string
+            pattern: '^(image|prompt|fusion)-[0-9]+$'
 
     BoardStateMediaRef:
       type: object

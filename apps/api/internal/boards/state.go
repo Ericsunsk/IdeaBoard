@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const CurrentBoardStateSchemaVersion = 1
+const CurrentBoardStateSchemaVersion = 2
 
 var allowedBoardStateEnvelopeFields = map[string]struct{}{
 	"schemaVersion":            {},
@@ -14,6 +14,7 @@ var allowedBoardStateEnvelopeFields = map[string]struct{}{
 	"promptNodes":              {},
 	"fusionNodes":              {},
 	"connections":              {},
+	"groups":                   {},
 	"mediaRefs":                {},
 	"previewSnapshotDataUrl":   {},
 	"previewSnapshotUpdatedAt": {},
@@ -29,6 +30,7 @@ type BoardStateEnvelope struct {
 	PromptNodes   []json.RawMessage    `json:"promptNodes"`
 	FusionNodes   []json.RawMessage    `json:"fusionNodes"`
 	Connections   []json.RawMessage    `json:"connections"`
+	Groups        []json.RawMessage    `json:"groups"`
 	MediaRefs     []BoardStateMediaRef `json:"mediaRefs,omitempty"`
 }
 
@@ -95,6 +97,10 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 	if err != nil {
 		return BoardStateEnvelope{}, err
 	}
+	groups, err := requiredArrayField(raw, "groups")
+	if err != nil {
+		return BoardStateEnvelope{}, err
+	}
 	if _, err := requiredNumberField(raw, "updatedAt"); err != nil {
 		return BoardStateEnvelope{}, err
 	}
@@ -118,6 +124,7 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 		PromptNodes:   promptNodes,
 		FusionNodes:   fusionNodes,
 		Connections:   connections,
+		Groups:        groups,
 		MediaRefs:     mediaRefs,
 	}, nil
 }

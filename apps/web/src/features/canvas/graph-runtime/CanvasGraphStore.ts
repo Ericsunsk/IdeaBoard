@@ -3,6 +3,7 @@ import {
   type CanvasBoardSnapshot,
   type CanvasConnection,
   type CanvasConnectionNodeType,
+  type CanvasGroup,
   type CanvasNodeItem,
   type FusionNodeItem,
   type ImageNodeItem,
@@ -12,6 +13,7 @@ import {
 export type CanvasGraphNodeKind = CanvasConnectionNodeType
 export type CanvasGraphNodeId = `${CanvasGraphNodeKind}-${number}`
 export type CanvasGraphEdgeId = `connection-${number}`
+export type CanvasGraphGroupId = CanvasGroup['id']
 
 export type CanvasGraphTransactionReason =
   | 'node-drag'
@@ -21,6 +23,8 @@ export type CanvasGraphTransactionReason =
   | 'batch-delete'
   | 'node-update'
   | 'result-materialize'
+  | 'group'
+  | 'ungroup'
   | 'hydrate'
 
 export type CanvasGraphNodeRecord = {
@@ -36,6 +40,11 @@ export type CanvasGraphEdgeRecord = {
   selected: boolean
 }
 
+export type CanvasGraphGroupRecord = {
+  id: CanvasGraphGroupId
+  nodeIds: CanvasGraphNodeId[]
+}
+
 export type CanvasGraphProjectionPatch = {
   nodes: {
     added: CanvasGraphNodeRecord[]
@@ -49,6 +58,11 @@ export type CanvasGraphProjectionPatch = {
     removedIds: CanvasGraphEdgeId[]
     selectionChanged: Array<{ id: CanvasGraphEdgeId; selected: boolean }>
   }
+  groups: {
+    added: CanvasGraphGroupRecord[]
+    updated: CanvasGraphGroupRecord[]
+    removedIds: CanvasGraphGroupId[]
+  }
 }
 
 export type CanvasGraphTransactionSummary = {
@@ -58,8 +72,10 @@ export type CanvasGraphTransactionSummary = {
   hasDomainChanges: boolean
   changedNodeIds: CanvasGraphNodeId[]
   changedEdgeIds: CanvasGraphEdgeId[]
+  changedGroupIds: CanvasGraphGroupId[]
   removedNodeIds: CanvasGraphNodeId[]
   removedEdgeIds: CanvasGraphEdgeId[]
+  removedGroupIds: CanvasGraphGroupId[]
   selectedNodeIds: CanvasGraphNodeId[]
   selectedEdgeIds: CanvasGraphEdgeId[]
   didChangeOrder: boolean
@@ -90,8 +106,10 @@ export type CanvasGraphRemoveNodeOptions = {
 type CanvasGraphStoreState = {
   nodesById: Map<CanvasGraphNodeId, CanvasGraphNodeRecord>
   edgesById: Map<CanvasGraphEdgeId, CanvasGraphEdgeRecord>
+  groupsById: Map<CanvasGraphGroupId, CanvasGraphGroupRecord>
   nodeOrder: CanvasGraphNodeId[]
   edgeOrder: CanvasGraphEdgeId[]
+  groupOrder: CanvasGraphGroupId[]
   indexes: CanvasGraphIndexes
 }
 
@@ -99,6 +117,7 @@ type CanvasGraphIndexes = {
   outgoingEdgesByNodeId: Map<CanvasGraphNodeId, Set<CanvasGraphEdgeId>>
   incomingEdgesByNodeId: Map<CanvasGraphNodeId, Set<CanvasGraphEdgeId>>
   nodeIdsByKind: Map<CanvasGraphNodeKind, Set<CanvasGraphNodeId>>
+  groupIdByNodeId: Map<CanvasGraphNodeId, CanvasGraphGroupId>
 }
 
 type MutableTransactionState = CanvasGraphStoreState
@@ -112,8 +131,12 @@ type TransactionChangeSet = {
   updatedEdgeIds: Set<CanvasGraphEdgeId>
   removedEdgeIds: Set<CanvasGraphEdgeId>
   selectedEdgeIds: Set<CanvasGraphEdgeId>
+  addedGroupIds: Set<CanvasGraphGroupId>
+  updatedGroupIds: Set<CanvasGraphGroupId>
+  removedGroupIds: Set<CanvasGraphGroupId>
   didChangeNodeOrder: boolean
   didChangeEdgeOrder: boolean
+  didChangeGroupOrder: boolean
   hasDomainChanges: boolean
 }
 
@@ -132,6 +155,10 @@ export function toCanvasGraphNodeId(
 
 export function toCanvasGraphEdgeId(id: number): CanvasGraphEdgeId {
   return `connection-${id}` as CanvasGraphEdgeId
+}
+
+export function toCanvasGraphGroupId(id: number): CanvasGraphGroupId {
+  return `group-${id}` as CanvasGraphGroupId
 }
 
 function getNodeKind(node: CanvasNodeItem): CanvasGraphNodeKind {
@@ -165,6 +192,7 @@ function createEmptyIndexes(): CanvasGraphIndexes {
       ['prompt', new Set()],
       ['fusion', new Set()],
     ]),
+    groupIdByNodeId: new Map(),
   }
 }
 
@@ -185,21 +213,39 @@ function rebuildIndexes(state: Omit<CanvasGraphStoreState, 'indexes'>): CanvasGr
     addToSetMap(indexes.outgoingEdgesByNodeId, sourceId, edgeId)
     addToSetMap(indexes.incomingEdgesByNodeId, targetId, edgeId)
   }
+  for (const groupId of state.groupOrder) {
+    const group = state.groupsById.get(groupId)
+    if (!group) continue
+    group.nodeIds.forEach((nodeId) => {
+      if (state.nodesById.has(nodeId)) indexes.groupIdByNodeId.set(nodeId, groupId)
+    })
+  }
   return indexes
 }
 
 function createState(
   nodesById: Map<CanvasGraphNodeId, CanvasGraphNodeRecord>,
   edgesById: Map<CanvasGraphEdgeId, CanvasGraphEdgeRecord>,
+  groupsById: Map<CanvasGraphGroupId, CanvasGraphGroupRecord>,
   nodeOrder: CanvasGraphNodeId[],
   edgeOrder: CanvasGraphEdgeId[],
+  groupOrder: CanvasGraphGroupId[],
 ): CanvasGraphStoreState {
   return {
     nodesById,
     edgesById,
+    groupsById,
     nodeOrder,
     edgeOrder,
-    indexes: rebuildIndexes({ nodesById, edgesById, nodeOrder, edgeOrder }),
+    groupOrder,
+    indexes: rebuildIndexes({
+      nodesById,
+      edgesById,
+      groupsById,
+      nodeOrder,
+      edgeOrder,
+      groupOrder,
+    }),
   }
 }
 
@@ -220,6 +266,13 @@ function cloneEdgeRecord(record: CanvasGraphEdgeRecord): CanvasGraphEdgeRecord {
   }
 }
 
+function cloneGroupRecord(record: CanvasGraphGroupRecord): CanvasGraphGroupRecord {
+  return {
+    id: record.id,
+    nodeIds: [...record.nodeIds],
+  }
+}
+
 function cloneState(state: CanvasGraphStoreState): CanvasGraphStoreState {
   return createState(
     new Map(
@@ -228,16 +281,22 @@ function cloneState(state: CanvasGraphStoreState): CanvasGraphStoreState {
     new Map(
       Array.from(state.edgesById.entries(), ([id, record]) => [id, cloneEdgeRecord(record)]),
     ),
+    new Map(
+      Array.from(state.groupsById.entries(), ([id, record]) => [id, cloneGroupRecord(record)]),
+    ),
     [...state.nodeOrder],
     [...state.edgeOrder],
+    [...state.groupOrder],
   )
 }
 
 function createStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStoreState {
   const nodesById = new Map<CanvasGraphNodeId, CanvasGraphNodeRecord>()
   const edgesById = new Map<CanvasGraphEdgeId, CanvasGraphEdgeRecord>()
+  const groupsById = new Map<CanvasGraphGroupId, CanvasGraphGroupRecord>()
   const nodeOrder: CanvasGraphNodeId[] = []
   const edgeOrder: CanvasGraphEdgeId[] = []
+  const groupOrder: CanvasGraphGroupId[] = []
 
   const appendNode = (node: CanvasNodeItem) => {
     const kind = getNodeKind(node)
@@ -270,7 +329,28 @@ function createStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStor
     edgeOrder.push(id)
   }
 
-  return createState(nodesById, edgesById, nodeOrder, edgeOrder)
+  const groupedNodeIds = new Set<CanvasGraphNodeId>()
+  for (const group of snapshot.groups) {
+    if (groupsById.has(group.id)) continue
+    const nodeIds: CanvasGraphNodeId[] = []
+    const seenNodeIds = new Set<CanvasGraphNodeId>()
+    for (const nodeId of group.nodeIds as CanvasGraphNodeId[]) {
+      if (!nodesById.has(nodeId) || groupedNodeIds.has(nodeId) || seenNodeIds.has(nodeId)) {
+        continue
+      }
+      seenNodeIds.add(nodeId)
+      nodeIds.push(nodeId)
+    }
+    if (nodeIds.length < 2) continue
+    nodeIds.forEach((nodeId) => groupedNodeIds.add(nodeId))
+    groupsById.set(group.id, {
+      id: group.id,
+      nodeIds,
+    })
+    groupOrder.push(group.id)
+  }
+
+  return createState(nodesById, edgesById, groupsById, nodeOrder, edgeOrder, groupOrder)
 }
 
 function exportSnapshotFromState(
@@ -303,6 +383,17 @@ function exportSnapshotFromState(
     snapshot.connections.push(cloneJson(record.connection))
   }
 
+  for (const groupId of state.groupOrder) {
+    const record = state.groupsById.get(groupId)
+    if (!record) continue
+    const nodeIds = record.nodeIds.filter((nodeId) => state.nodesById.has(nodeId))
+    if (nodeIds.length < 2) continue
+    snapshot.groups.push({
+      id: record.id,
+      nodeIds: nodeIds as CanvasGroup['nodeIds'],
+    })
+  }
+
   return snapshot
 }
 
@@ -316,8 +407,12 @@ function createChangeSet(): TransactionChangeSet {
     updatedEdgeIds: new Set(),
     removedEdgeIds: new Set(),
     selectedEdgeIds: new Set(),
+    addedGroupIds: new Set(),
+    updatedGroupIds: new Set(),
+    removedGroupIds: new Set(),
     didChangeNodeOrder: false,
     didChangeEdgeOrder: false,
+    didChangeGroupOrder: false,
     hasDomainChanges: false,
   }
 }
@@ -378,6 +473,28 @@ function markEdgeChanged(
   if (!changes.addedEdgeIds.has(edgeId)) changes.updatedEdgeIds.add(edgeId)
 }
 
+function markGroupChanged(
+  changes: TransactionChangeSet,
+  groupId: CanvasGraphGroupId,
+  type: 'added' | 'updated' | 'removed',
+) {
+  setDomainChanged(changes)
+  if (type === 'removed') {
+    changes.addedGroupIds.delete(groupId)
+    changes.updatedGroupIds.delete(groupId)
+    changes.removedGroupIds.add(groupId)
+    changes.didChangeGroupOrder = true
+    return
+  }
+  if (type === 'added') {
+    changes.removedGroupIds.delete(groupId)
+    changes.addedGroupIds.add(groupId)
+    changes.didChangeGroupOrder = true
+    return
+  }
+  if (!changes.addedGroupIds.has(groupId)) changes.updatedGroupIds.add(groupId)
+}
+
 function applyNodeUpdate(
   current: CanvasNodeItem,
   update: CanvasGraphNodeUpdate,
@@ -413,12 +530,16 @@ function createSummary(
   const updatedNodeIds = Array.from(changes.updatedNodeIds)
   const addedEdgeIds = Array.from(changes.addedEdgeIds)
   const updatedEdgeIds = Array.from(changes.updatedEdgeIds)
+  const addedGroupIds = Array.from(changes.addedGroupIds)
+  const updatedGroupIds = Array.from(changes.updatedGroupIds)
   const selectedNodeIds = Array.from(changes.selectedNodeIds)
   const selectedEdgeIds = Array.from(changes.selectedEdgeIds)
   const removedNodeIds = Array.from(changes.removedNodeIds)
   const removedEdgeIds = Array.from(changes.removedEdgeIds)
+  const removedGroupIds = Array.from(changes.removedGroupIds)
   const changedNodeIds = [...addedNodeIds, ...updatedNodeIds]
   const changedEdgeIds = [...addedEdgeIds, ...updatedEdgeIds]
+  const changedGroupIds = [...addedGroupIds, ...updatedGroupIds]
   const didChange =
     changes.hasDomainChanges || selectedNodeIds.length > 0 || selectedEdgeIds.length > 0
 
@@ -429,11 +550,14 @@ function createSummary(
     hasDomainChanges: changes.hasDomainChanges,
     changedNodeIds,
     changedEdgeIds,
+    changedGroupIds,
     removedNodeIds,
     removedEdgeIds,
+    removedGroupIds,
     selectedNodeIds,
     selectedEdgeIds,
-    didChangeOrder: changes.didChangeNodeOrder || changes.didChangeEdgeOrder,
+    didChangeOrder:
+      changes.didChangeNodeOrder || changes.didChangeEdgeOrder || changes.didChangeGroupOrder,
     shouldRecordHistory: changes.hasDomainChanges && options.recordHistory,
     shouldMarkDirty: changes.hasDomainChanges && options.markDirty,
     projectionPatch: {
@@ -466,6 +590,17 @@ function createSummary(
           .map((id) => state.edgesById.get(id))
           .filter((record): record is CanvasGraphEdgeRecord => !!record)
           .map((record) => ({ id: record.id, selected: record.selected })),
+      },
+      groups: {
+        added: addedGroupIds
+          .map((id) => state.groupsById.get(id))
+          .filter((record): record is CanvasGraphGroupRecord => !!record)
+          .map(cloneGroupRecord),
+        updated: updatedGroupIds
+          .map((id) => state.groupsById.get(id))
+          .filter((record): record is CanvasGraphGroupRecord => !!record)
+          .map(cloneGroupRecord),
+        removedIds: removedGroupIds,
       },
     },
   }
@@ -508,6 +643,10 @@ export class CanvasGraphStore {
     return [...this.state.edgeOrder]
   }
 
+  getGroupIds(): CanvasGraphGroupId[] {
+    return [...this.state.groupOrder]
+  }
+
   getNode(id: CanvasGraphNodeId): CanvasGraphNodeRecord | undefined {
     const record = this.state.nodesById.get(id)
     return record ? cloneNodeRecord(record) : undefined
@@ -516,6 +655,15 @@ export class CanvasGraphStore {
   getEdge(id: CanvasGraphEdgeId): CanvasGraphEdgeRecord | undefined {
     const record = this.state.edgesById.get(id)
     return record ? cloneEdgeRecord(record) : undefined
+  }
+
+  getGroup(id: CanvasGraphGroupId): CanvasGraphGroupRecord | undefined {
+    const record = this.state.groupsById.get(id)
+    return record ? cloneGroupRecord(record) : undefined
+  }
+
+  getGroupIdForNode(nodeId: CanvasGraphNodeId): CanvasGraphGroupId | undefined {
+    return this.state.indexes.groupIdByNodeId.get(nodeId)
   }
 
   getNodeIdsByKind(kind: CanvasGraphNodeKind): CanvasGraphNodeId[] {
@@ -542,7 +690,14 @@ export class CanvasGraphStore {
   }
 
   _commitDraftState(state: MutableTransactionState) {
-    this.state = createState(state.nodesById, state.edgesById, state.nodeOrder, state.edgeOrder)
+    this.state = createState(
+      state.nodesById,
+      state.edgesById,
+      state.groupsById,
+      state.nodeOrder,
+      state.edgeOrder,
+      state.groupOrder,
+    )
   }
 }
 
@@ -612,6 +767,7 @@ export class CanvasGraphTransaction {
         this.removeEdge(edgeId)
       })
     }
+    this.removeNodeFromGroups(nodeId)
     this.draft.nodesById.delete(nodeId)
     this.draft.nodeOrder = this.draft.nodeOrder.filter((id) => id !== nodeId)
     markNodeChanged(this.changes, nodeId, 'removed')
@@ -628,6 +784,31 @@ export class CanvasGraphTransaction {
       selected,
     })
     markNodeChanged(this.changes, nodeId, 'selected')
+    return this
+  }
+
+  createGroup(nodeIds: CanvasGraphNodeId[], groupId?: CanvasGraphGroupId): this {
+    this.assertOpen()
+    const resolvedGroupId = groupId ?? this.createNextGroupId()
+    if (this.draft.groupsById.has(resolvedGroupId)) {
+      throw new Error(`CanvasGraphStore group already exists: ${resolvedGroupId}`)
+    }
+    const normalizedNodeIds = this.normalizeNewGroupNodeIds(nodeIds)
+    this.draft.groupsById.set(resolvedGroupId, {
+      id: resolvedGroupId,
+      nodeIds: normalizedNodeIds,
+    })
+    this.draft.groupOrder.push(resolvedGroupId)
+    markGroupChanged(this.changes, resolvedGroupId, 'added')
+    this.rebuildDraftIndexes()
+    return this
+  }
+
+  ungroup(groupId: CanvasGraphGroupId): this {
+    this.assertOpen()
+    if (!this.draft.groupsById.has(groupId)) return this
+    this.removeGroup(groupId)
+    this.rebuildDraftIndexes()
     return this
   }
 
@@ -728,6 +909,60 @@ export class CanvasGraphTransaction {
     const targetId = toCanvasGraphNodeId(connection.toNodeType, connection.toNodeId)
     if (!this.draft.nodesById.has(sourceId) || !this.draft.nodesById.has(targetId)) {
       throw new Error(`CanvasGraphStore connection has missing endpoint: ${connection.id}`)
+    }
+  }
+
+  private createNextGroupId(): CanvasGraphGroupId {
+    let maxId = 0
+    for (const groupId of this.draft.groupOrder) {
+      const match = /^group-(\d+)$/.exec(groupId)
+      if (!match) continue
+      maxId = Math.max(maxId, Number(match[1]))
+    }
+    return toCanvasGraphGroupId(maxId + 1)
+  }
+
+  private normalizeNewGroupNodeIds(nodeIds: CanvasGraphNodeId[]): CanvasGraphNodeId[] {
+    const normalizedNodeIds: CanvasGraphNodeId[] = []
+    const seenNodeIds = new Set<CanvasGraphNodeId>()
+    for (const nodeId of nodeIds) {
+      if (seenNodeIds.has(nodeId)) continue
+      if (!this.draft.nodesById.has(nodeId)) {
+        throw new Error(`CanvasGraphStore group node does not exist: ${nodeId}`)
+      }
+      const existingGroupId = this.draft.indexes.groupIdByNodeId.get(nodeId)
+      if (existingGroupId) {
+        throw new Error(`CanvasGraphStore node already belongs to group: ${nodeId}`)
+      }
+      seenNodeIds.add(nodeId)
+      normalizedNodeIds.push(nodeId)
+    }
+    if (normalizedNodeIds.length < 2) {
+      throw new Error('CanvasGraphStore group requires at least two nodes')
+    }
+    return normalizedNodeIds
+  }
+
+  private removeGroup(groupId: CanvasGraphGroupId) {
+    this.draft.groupsById.delete(groupId)
+    this.draft.groupOrder = this.draft.groupOrder.filter((id) => id !== groupId)
+    markGroupChanged(this.changes, groupId, 'removed')
+  }
+
+  private removeNodeFromGroups(nodeId: CanvasGraphNodeId) {
+    for (const groupId of [...this.draft.groupOrder]) {
+      const group = this.draft.groupsById.get(groupId)
+      if (!group?.nodeIds.includes(nodeId)) continue
+      const nextNodeIds = group.nodeIds.filter((id) => id !== nodeId)
+      if (nextNodeIds.length < 2) {
+        this.removeGroup(groupId)
+        continue
+      }
+      this.draft.groupsById.set(groupId, {
+        ...group,
+        nodeIds: nextNodeIds,
+      })
+      markGroupChanged(this.changes, groupId, 'updated')
     }
   }
 

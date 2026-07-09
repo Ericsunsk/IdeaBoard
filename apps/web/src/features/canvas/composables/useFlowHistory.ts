@@ -21,6 +21,7 @@ export type FlowHistorySnapshot = {
 type FlowHistorySnapshotState = {
   nodeIndex: FlowHistoryItemIndex
   edgeIndex: FlowHistoryItemIndex
+  groupIndex: FlowHistoryItemIndex
 }
 
 type FlowHistoryPatch = {
@@ -32,10 +33,13 @@ type FlowHistoryPatch = {
 type FlowHistoryEntry = {
   nodePatches: FlowHistoryPatch[]
   edgePatches: FlowHistoryPatch[]
+  groupPatches: FlowHistoryPatch[]
   beforeNodeOrder: string[]
   afterNodeOrder: string[]
   beforeEdgeOrder: string[]
   afterEdgeOrder: string[]
+  beforeGroupOrder: string[]
+  afterGroupOrder: string[]
 }
 
 type ArrayRef<T> = { value: T[] }
@@ -47,6 +51,8 @@ type UseFlowHistoryOptions = {
   onRestore?: () => void
   commitNodes: (nodes: unknown[]) => void
   commitEdges: (edges: unknown[]) => void
+  groups?: ArrayRef<unknown>
+  commitGroups?: (groups: unknown[]) => void
 }
 
 const snapshotStates = new WeakMap<FlowHistorySnapshot, FlowHistorySnapshotState>()
@@ -87,11 +93,16 @@ function createHistoryItemIndex(items: unknown[]): FlowHistoryItemIndex {
   return { itemsById, order }
 }
 
-function createFlowHistorySnapshot(nodes: unknown[], edges: unknown[]): FlowHistorySnapshot {
+function createFlowHistorySnapshot(
+  nodes: unknown[],
+  edges: unknown[],
+  groups: unknown[],
+): FlowHistorySnapshot {
   const snapshot = Object.freeze({}) as FlowHistorySnapshot
   snapshotStates.set(snapshot, {
     nodeIndex: createHistoryItemIndex(nodes),
     edgeIndex: createHistoryItemIndex(edges),
+    groupIndex: createHistoryItemIndex(groups),
   })
   return snapshot
 }
@@ -169,11 +180,13 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
       () => ({
         nodes: options.nodes.value.length,
         edges: options.edges.value.length,
+        groups: options.groups?.value.length ?? 0,
       }),
       () => {
         const nodes = options.nodes.value as unknown[]
         const edges = options.edges.value as unknown[]
-        return createFlowHistorySnapshot(nodes, edges)
+        const groups = (options.groups?.value ?? []) as unknown[]
+        return createFlowHistorySnapshot(nodes, edges, groups)
       },
     )
   }
@@ -188,20 +201,34 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
     const afterNodeIndex = afterState.nodeIndex
     const beforeEdgeIndex = beforeState.edgeIndex
     const afterEdgeIndex = afterState.edgeIndex
+    const beforeGroupIndex = beforeState.groupIndex
+    const afterGroupIndex = afterState.groupIndex
     const nodePatches = createCollectionPatches(beforeNodeIndex, afterNodeIndex)
     const edgePatches = createCollectionPatches(beforeEdgeIndex, afterEdgeIndex)
+    const groupPatches = createCollectionPatches(beforeGroupIndex, afterGroupIndex)
     const hasOrderChange =
       !isSameOrder(beforeNodeIndex.order, afterNodeIndex.order) ||
-      !isSameOrder(beforeEdgeIndex.order, afterEdgeIndex.order)
+      !isSameOrder(beforeEdgeIndex.order, afterEdgeIndex.order) ||
+      !isSameOrder(beforeGroupIndex.order, afterGroupIndex.order)
 
-    if (nodePatches.length === 0 && edgePatches.length === 0 && !hasOrderChange) return null
+    if (
+      nodePatches.length === 0 &&
+      edgePatches.length === 0 &&
+      groupPatches.length === 0 &&
+      !hasOrderChange
+    ) {
+      return null
+    }
     return {
       nodePatches,
       edgePatches,
+      groupPatches,
       beforeNodeOrder: beforeNodeIndex.order,
       afterNodeOrder: afterNodeIndex.order,
       beforeEdgeOrder: beforeEdgeIndex.order,
       afterEdgeOrder: afterEdgeIndex.order,
+      beforeGroupOrder: beforeGroupIndex.order,
+      afterGroupOrder: afterGroupIndex.order,
     }
   }
 
@@ -226,6 +253,8 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
         afterNodes: readFlowHistorySnapshotState(after).nodeIndex.order.length,
         beforeEdges: readFlowHistorySnapshotState(before).edgeIndex.order.length,
         afterEdges: readFlowHistorySnapshotState(after).edgeIndex.order.length,
+        beforeGroups: readFlowHistorySnapshotState(before).groupIndex.order.length,
+        afterGroups: readFlowHistorySnapshotState(after).groupIndex.order.length,
       }),
       () => {
         const entry = createHistoryPatches(before, after)
@@ -278,8 +307,15 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
       direction === 'forward' ? entry.afterEdgeOrder : entry.beforeEdgeOrder,
       direction,
     )
+    const nextGroups = applyCollectionPatches(
+      (options.groups?.value ?? []) as unknown[],
+      entry.groupPatches,
+      direction === 'forward' ? entry.afterGroupOrder : entry.beforeGroupOrder,
+      direction,
+    )
     options.commitNodes(nextNodes)
     options.commitEdges(nextEdges)
+    options.commitGroups?.(nextGroups)
     options.onRestore?.()
   }
 

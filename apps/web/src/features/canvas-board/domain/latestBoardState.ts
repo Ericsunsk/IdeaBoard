@@ -206,6 +206,7 @@ function canonicalBoardSnapshotLike(snapshotLike: unknown, includeStateMetadata:
       canonicalFusionNode,
     ),
     connections: withArrayDefault(snapshotLike, 'connections'),
+    groups: snapshotLike.groups,
   }
   if (includeStateMetadata) {
     const previewSnapshotDataUrl = canonicalOptionalNonEmptyString(

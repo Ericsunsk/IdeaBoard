@@ -5,6 +5,7 @@ import { createCanvasBoard, getCanvasBoardById } from '../../canvas-board/catalo
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas-board/persistence'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
 import {
+  CANVAS_BOARD_STATE_SCHEMA_VERSION,
   DEFAULT_PROMPT_ASPECT_RATIO,
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
 } from '../../canvas-board/domain'
@@ -205,6 +206,7 @@ describe('createBoardSessionRepository', () => {
         ],
         fusionNodes: [],
         connections: [],
+        groups: [],
         updatedAt: 2_000,
       } as unknown as CanvasBoardState,
     })
@@ -276,7 +278,7 @@ describe('createBoardSessionRepository', () => {
             created_at: board.createdAt,
             updated_at: board.updatedAt,
             revision: 1,
-            state_schema_version: 1,
+            state_schema_version: CANVAS_BOARD_STATE_SCHEMA_VERSION,
             state: {
               ...makeCanvasBoardState(),
               imageNodes: [

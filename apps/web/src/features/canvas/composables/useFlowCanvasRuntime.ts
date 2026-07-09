@@ -112,6 +112,21 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const cancelAnimationFrame =
     options.cancelAnimationFrame ?? ((handle: number) => window.cancelAnimationFrame(handle))
   const localEditVersion = ref(0)
+  const historyGroups: { value: unknown[] } = {
+    get value() {
+      return options.boardBaseSnapshot.value.groups
+    },
+    set value(nextGroups) {
+      commitHistoryGroups(nextGroups)
+    },
+  }
+
+  function commitHistoryGroups(groups: unknown[]) {
+    options.boardBaseSnapshot.value = {
+      ...options.boardBaseSnapshot.value,
+      groups: groups as CanvasBoardSnapshot['groups'],
+    }
+  }
 
   function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
     const ids = new Set<string>()
@@ -205,6 +220,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       graphAdapter.replaceNodes(nodes as Node[], createRestoreGraphCommandOptions()),
     commitEdges: (edges) =>
       graphAdapter.replaceEdges(edges as Edge[], createRestoreGraphCommandOptions()),
+    groups: historyGroups,
+    commitGroups: commitHistoryGroups,
   })
 
   const boardPersistence = useCanvasBoardPersistence({

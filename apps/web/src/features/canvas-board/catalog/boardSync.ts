@@ -81,6 +81,10 @@ function toGeneratedBoardStateProjection(state: CanvasBoardState): BoardStateEnv
     promptNodes: envelope.promptNodes.map((node) => ({ ...node })),
     fusionNodes: envelope.fusionNodes.map((node) => ({ ...node })),
     connections: envelope.connections.map((connection) => ({ ...connection })),
+    groups: envelope.groups.map((group) => ({
+      ...group,
+      nodeIds: [...group.nodeIds],
+    })),
     mediaRefs: envelope.mediaRefs?.map((ref) => ({ ...ref })),
     previewSnapshotDataUrl: envelope.previewSnapshotDataUrl,
     previewSnapshotUpdatedAt: envelope.previewSnapshotUpdatedAt,

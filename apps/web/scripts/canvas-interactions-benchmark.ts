@@ -534,11 +534,12 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
 
   const connections = createStructureHeavyConnections(refs, Math.floor(nodeCount * DEFAULT_EDGE_DENSITY))
   const state: CanvasBoardState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     imageNodes,
     promptNodes,
     fusionNodes,
     connections,
+    groups: [],
     updatedAt: MOCK_UPDATED_AT,
   }
   const board = {
@@ -547,7 +548,7 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
     state: toBoardStateEnvelope(state),
     access_role: 'owner',
     revision: 1,
-    state_schema_version: 1,
+    state_schema_version: 2,
     created_at: MOCK_UPDATED_AT - 86_400_000,
     updated_at: MOCK_UPDATED_AT,
   } satisfies UserBoardItem
@@ -582,6 +583,7 @@ function toBoardStateEnvelope(state: CanvasBoardState): BoardStateEnvelope {
     promptNodes: state.promptNodes.map((node) => ({ ...node })),
     fusionNodes: state.fusionNodes.map((node) => ({ ...node })),
     connections: state.connections.map((connection) => ({ ...connection })),
+    groups: state.groups.map((group) => ({ ...group, nodeIds: [...group.nodeIds] })),
     mediaRefs: state.mediaRefs?.map((ref) => ({ ...ref })),
     previewSnapshotDataUrl: state.previewSnapshotDataUrl,
     previewSnapshotUpdatedAt: state.previewSnapshotUpdatedAt,
@@ -748,11 +750,12 @@ function isCanvasBoardState(value: unknown): value is CanvasBoardState {
   if (!value || typeof value !== 'object') return false
   const record = value as Partial<CanvasBoardState>
   return (
-    record.schemaVersion === 1 &&
+    record.schemaVersion === 2 &&
     Array.isArray(record.imageNodes) &&
     Array.isArray(record.promptNodes) &&
     Array.isArray(record.fusionNodes) &&
-    Array.isArray(record.connections)
+    Array.isArray(record.connections) &&
+    Array.isArray(record.groups)
   )
 }
 

@@ -20,7 +20,7 @@ export const DEFAULT_IMAGE_NODE_OUTPUT_COUNT = 1
 export const IMAGE_OUTPUT_COUNT_PRESET_OPTIONS = [1, 2, 4, 8] as const
 export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
 export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
-export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 1
+export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 2
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
 export { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint }
 
@@ -125,6 +125,8 @@ export type CanvasExecutionOutputNodeItem = FusionNodeItem
 export type CanvasConnectionNodeType = 'image' | 'prompt' | 'fusion'
 
 export type CanvasConnectionPort = 'image' | 'prompt'
+export type CanvasGroupId = `group-${number}`
+export type CanvasGroupNodeId = `${CanvasConnectionNodeType}-${number}`
 
 export interface CanvasConnection {
   id: number
@@ -134,6 +136,11 @@ export interface CanvasConnection {
   toNodeType: CanvasConnectionNodeType
   toNodeId: number
   toPort: CanvasConnectionPort
+}
+
+export interface CanvasGroup {
+  id: CanvasGroupId
+  nodeIds: CanvasGroupNodeId[]
 }
 
 export type CanvasNodeItem = PromptNodeItem | ImageNodeItem | FusionNodeItem
@@ -150,6 +157,7 @@ export interface CanvasBoardSnapshot {
   promptNodes: PromptNodeItem[]
   fusionNodes: FusionNodeItem[]
   connections: CanvasConnection[]
+  groups: CanvasGroup[]
   mediaRefs?: BoardStateMediaRef[]
 }
 
@@ -167,6 +175,7 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
     promptNodes: [],
     fusionNodes: [],
     connections: [],
+    groups: [],
   }
 }
 

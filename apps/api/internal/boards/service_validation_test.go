@@ -28,15 +28,15 @@ func TestNormalizeBoardID(t *testing.T) {
 
 func TestMarshalStateLimits(t *testing.T) {
 	t.Run("valid envelope", func(t *testing.T) {
-		raw, version, err := marshalState(validBoardState(1, 100))
+		raw, version, err := marshalState(validBoardState(CurrentBoardStateSchemaVersion, 100))
 		if err != nil {
 			t.Fatalf("marshalState returned error: %v", err)
 		}
 		if raw == "" {
 			t.Fatal("raw state should not be empty")
 		}
-		if version != 1 {
-			t.Fatalf("schema version = %d, want 1", version)
+		if version != CurrentBoardStateSchemaVersion {
+			t.Fatalf("schema version = %d, want 2", version)
 		}
 	})
 
@@ -54,7 +54,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("reject unknown top-level field", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["unexpected"] = true
 		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {
@@ -63,7 +63,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("reject viewport", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["viewport"] = map[string]interface{}{"x": 1, "y": 2, "zoom": 1}
 		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {
@@ -72,7 +72,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("valid optional envelope metadata", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["mediaRefs"] = []interface{}{
 			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "role": "source"},
 		}
@@ -85,7 +85,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("reject invalid media ref", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["mediaRefs"] = []interface{}{
 			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "unexpected": true},
 		}
@@ -96,7 +96,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("reject empty media ref role", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["mediaRefs"] = []interface{}{
 			map[string]interface{}{"mediaAssetId": 12, "refType": "board_node", "refId": "image-1", "role": ""},
 		}
@@ -107,7 +107,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("reject task output ref in board state", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["mediaRefs"] = []interface{}{
 			map[string]interface{}{"mediaAssetId": 12, "refType": "task_output", "refId": "output-1", "role": "image"},
 		}
@@ -118,7 +118,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("reject invalid preview metadata", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["previewSnapshotVersion"] = 1.25
 		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {
@@ -127,7 +127,7 @@ func TestMarshalStateLimits(t *testing.T) {
 	})
 
 	t.Run("reject non-positive preview snapshot version", func(t *testing.T) {
-		state := validBoardState(1, 100)
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["previewSnapshotVersion"] = 0
 		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {
@@ -168,6 +168,7 @@ func validBoardState(schemaVersion int, marker int) map[string]interface{} {
 		},
 		"fusionNodes": []interface{}{},
 		"connections": []interface{}{},
+		"groups":      []interface{}{},
 		"updatedAt":   1,
 	}
 }

@@ -105,6 +105,7 @@ describe('boardStateSerialization', () => {
         },
       ],
       connections: [],
+      groups: [],
       updatedAt: 123,
     }
 

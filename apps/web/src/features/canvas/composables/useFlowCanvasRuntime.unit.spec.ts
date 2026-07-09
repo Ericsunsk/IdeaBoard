@@ -224,6 +224,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     edges,
     fullNodes,
     fullEdges,
+    boardBaseSnapshot,
     savedSnapshots,
     boardSession,
     onWarning,
@@ -324,6 +325,34 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.flushAutosave({ silent: true })
 
     expect(harness.savedSnapshots[0]?.promptNodes.map((node) => node.id)).toContain(99)
+  })
+
+  it('records board groups in the shared undo and redo history', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const before = harness.runtime.flowHistory.capture()
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+    }
+
+    expect(harness.runtime.flowHistory.push(before)).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
+    ])
+
+    await harness.runtime.flushAutosave({ silent: true })
+
+    expect(harness.savedSnapshots[0]?.groups).toEqual([
+      { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
+    ])
   })
 
   it('does not mark dirty for selection-only graph adapter commands without side effects', async () => {

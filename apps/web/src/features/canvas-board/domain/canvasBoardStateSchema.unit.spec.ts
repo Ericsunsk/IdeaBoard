@@ -48,6 +48,43 @@ describe('canvasBoardStateSchema', () => {
     }
   })
 
+  it('accepts persistent canvas groups', () => {
+    const state = makeCanvasBoardState({
+      groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+    })
+
+    const parsed = v.safeParse(canvasBoardStateSchema, state)
+
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.output.groups).toEqual([
+        { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
+      ])
+    }
+  })
+
+  it('rejects invalid canvas groups', () => {
+    const parsed = v.safeParse(
+      canvasBoardStateSchema,
+      makeCanvasBoardState({
+        groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+      }),
+    )
+    expect(parsed.success).toBe(true)
+
+    const invalidIdParsed = v.safeParse(canvasBoardStateSchema, {
+      ...makeCanvasBoardState(),
+      groups: [{ id: 'group-a', nodeIds: ['image-1', 'prompt-1'] }],
+    })
+    expect(invalidIdParsed.success).toBe(false)
+
+    const tooSmallParsed = v.safeParse(canvasBoardStateSchema, {
+      ...makeCanvasBoardState(),
+      groups: [{ id: 'group-1', nodeIds: ['image-1'] }],
+    })
+    expect(tooSmallParsed.success).toBe(false)
+  })
+
   it('rejects invalid state', () => {
     const parsed = v.safeParse(canvasBoardStateSchema, {
       ...makeCanvasBoardState(),

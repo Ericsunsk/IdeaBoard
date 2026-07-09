@@ -8,6 +8,7 @@ import {
   type CanvasBoardSnapshot,
   type CanvasConnection,
   type CanvasConnectionNodeType,
+  type CanvasGroupNodeId,
   type CanvasNodeItem,
   type ImageNodeItem,
 } from '../../canvas-board/domain'
@@ -106,6 +107,21 @@ function appendCurrentImageNodeMediaRefs(
   } else {
     delete snapshot.mediaRefs
   }
+}
+
+function appendCurrentGroups(
+  snapshot: CanvasBoardSnapshot,
+  base: CanvasBoardSnapshot | undefined,
+  persistedCanvasNodeIds: ReadonlySet<string>,
+) {
+  snapshot.groups = (base ? base.groups : [])
+    .map((group) => ({
+      id: group.id,
+      nodeIds: group.nodeIds.filter((nodeId) =>
+        persistedCanvasNodeIds.has(nodeId),
+      ) as CanvasGroupNodeId[],
+    }))
+    .filter((group) => group.nodeIds.length >= 2)
 }
 
 export function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
@@ -289,6 +305,7 @@ export function flowToCanvasBoardSnapshot(
     string,
     { nodeType: CanvasConnectionNodeType; id: number }
   >()
+  const persistedCanvasNodeIds = new Set<string>()
   const flowNodeDataMap = new Map<string, FlowNodeData>()
 
   input.nodes.forEach((node) => {
@@ -305,6 +322,7 @@ export function flowToCanvasBoardSnapshot(
 
     snapshotNodeCollections.get(ref.nodeType)?.push(positionedNode)
     persistedFlowNodeRefs.set(node.id, ref)
+    persistedCanvasNodeIds.add(toFlowNodeId(ref.nodeType, ref.id))
     flowNodeDataMap.set(node.id, data)
   })
 
@@ -314,6 +332,7 @@ export function flowToCanvasBoardSnapshot(
     persistedFlowNodeRefs,
     lookupData: (nodeId) => flowNodeDataMap.get(nodeId),
   })
+  appendCurrentGroups(snapshot, base, persistedCanvasNodeIds)
   appendCurrentImageNodeMediaRefs(snapshot, base)
 
   return snapshot

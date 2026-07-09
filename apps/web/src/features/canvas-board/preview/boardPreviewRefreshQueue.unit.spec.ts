@@ -224,6 +224,7 @@ describe('boardPreviewRefreshQueue', () => {
           },
         ],
         connections: [],
+        groups: [],
         updatedAt: 100,
       } as unknown as CanvasBoardState,
     }

@@ -73,7 +73,7 @@ const SITE_BRANDING_SETTING = {
 }
 
 const MOCK_BOARD_STATE = {
-  schemaVersion: 1 as const,
+  schemaVersion: 2 as const,
   imageNodes: [],
   promptNodes: [
     {
@@ -91,6 +91,7 @@ const MOCK_BOARD_STATE = {
   ],
   fusionNodes: [],
   connections: [],
+  groups: [],
   updatedAt: MOCK_UPDATED_AT,
 }
 
@@ -100,7 +101,7 @@ const MOCK_BOARD = {
   state: MOCK_BOARD_STATE,
   access_role: 'owner',
   revision: 1,
-  state_schema_version: 1,
+  state_schema_version: 2,
   created_at: MOCK_UPDATED_AT - 86_400_000,
   updated_at: MOCK_UPDATED_AT,
 } satisfies UserBoardItem

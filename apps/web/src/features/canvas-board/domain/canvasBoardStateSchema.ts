@@ -10,6 +10,8 @@ import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
+  type CanvasGroupId,
+  type CanvasGroupNodeId,
 } from './canvasNodes'
 import { PROMPT_ASPECT_RATIO_OPTIONS } from './promptAspectRatio'
 
@@ -31,6 +33,16 @@ const nonEmptyStringSchema = v.pipe(v.string(), v.minLength(1))
 const workflowNodeOutputStatusSchema = v.picklist(['idle', 'running', 'ready', 'stale'])
 const canvasConnectionNodeTypeSchema = v.picklist(['image', 'prompt', 'fusion'])
 const canvasConnectionPortSchema = v.picklist(['image', 'prompt'])
+const canvasGroupIdSchema = v.pipe(
+  v.string(),
+  v.regex(/^group-\d+$/),
+  v.transform((value) => value as CanvasGroupId),
+)
+const canvasGroupNodeIdSchema = v.pipe(
+  v.string(),
+  v.regex(/^(?:image|prompt|fusion)-\d+$/),
+  v.transform((value) => value as CanvasGroupNodeId),
+)
 
 const imageNodeOutputItemSchema = v.strictObject({
   url: nonEmptyStringSchema,
@@ -114,12 +126,18 @@ const canvasConnectionSchema = v.strictObject({
   toPort: canvasConnectionPortSchema,
 })
 
+const canvasGroupSchema = v.strictObject({
+  id: canvasGroupIdSchema,
+  nodeIds: v.pipe(v.array(canvasGroupNodeIdSchema), v.minLength(2)),
+})
+
 const canvasBoardSnapshotShape = v.strictObject({
   schemaVersion: v.literal(CANVAS_BOARD_STATE_SCHEMA_VERSION),
   imageNodes: v.array(imageNodeItemSchema),
   promptNodes: v.array(promptNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),
   connections: v.array(canvasConnectionSchema),
+  groups: v.array(canvasGroupSchema),
   mediaRefs: v.optional(v.array(boardStateMediaRefSchema)),
 })
 
@@ -134,6 +152,7 @@ const canvasBoardStateShape = v.strictObject({
   promptNodes: v.array(promptNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),
   connections: v.array(canvasConnectionSchema),
+  groups: v.array(canvasGroupSchema),
   mediaRefs: v.optional(v.array(boardStateMediaRefSchema)),
   previewSnapshotDataUrl: v.optional(nonEmptyStringSchema),
   previewSnapshotUpdatedAt: v.optional(finiteNumberSchema),

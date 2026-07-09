@@ -317,7 +317,7 @@ func seedBoardMediaAsset(t *testing.T, q *dbsqlc.Queries, ownerID int64, assetID
 
 func boardStateWithMediaRefs(t *testing.T, refs []BoardStateMediaRef) string {
 	t.Helper()
-	state := validBoardState(1, 100)
+	state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 	state["mediaRefs"] = refs
 	payload, err := json.Marshal(state)
 	if err != nil {

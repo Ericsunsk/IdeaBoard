@@ -550,10 +550,38 @@ describe('flowSnapshotAdapter', () => {
         },
       ],
       connections: [],
+      groups: [],
     })
     const restored = flowToCanvasBoardSnapshot(flow)
     expect(restored.fusionNodes[0]?.blendPoint.x).toBe(0.62)
     expect(restored.fusionNodes[0]?.blendPoint.y).toBe(0.41)
+  })
+
+  it('preserves current groups while exporting flow state', () => {
+    const base = createEmptyCanvasBoardSnapshot()
+    base.groups = [
+      { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
+      { id: 'group-2', nodeIds: ['image-1', 'prompt-2'] },
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot(
+      {
+        nodes: [
+          makeImageFlowNode({
+            flowId: 'image-1',
+            id: 1,
+            outputStatus: 'ready',
+            sourceImageUrl: 'https://example.com/source.png',
+          }),
+          makePromptFlowNode({ flowId: 'prompt-1', id: 1, text: 'prompt' }),
+        ],
+        edges: [],
+      },
+      base,
+    )
+
+    expect(snapshot.groups).toEqual([{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }])
+    expect(snapshot.groups).not.toBe(base.groups)
   })
 
   it('drops stale board node media refs while exporting flow state', () => {
@@ -633,6 +661,7 @@ describe('flowSnapshotAdapter', () => {
       ],
       fusionNodes: [],
       connections: [],
+      groups: [],
     })
 
     expect(flow.nodes.find((node) => node.id === 'image-1')?.dimensions).toEqual({
