@@ -76,8 +76,14 @@ func NewStorageService(profileRepo *StorageProfileRepository, publicURLs setting
 }
 
 func (s *StorageService) ListProviderMeta() []StorageProviderMeta {
-	return []StorageProviderMeta{
+	providers := []StorageProviderMeta{
 		s.providerMeta[StorageProviderLocal],
 		s.providerMeta[StorageProviderS3Compatible],
 	}
+	for i := range providers {
+		if providers[i].Fields == nil {
+			providers[i].Fields = []StorageProviderField{}
+		}
+	}
+	return providers
 }

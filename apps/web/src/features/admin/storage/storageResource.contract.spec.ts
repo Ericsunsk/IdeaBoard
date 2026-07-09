@@ -105,6 +105,39 @@ describe('createAdminStorageResource', () => {
       '存储名称已存在',
     )
   })
+
+  it('normalizes provider field lists when the API returns null for providers without fields', async () => {
+    useMswHandlers(
+      http.get('/api/admin/storage/providers', () => {
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            providers: [
+              {
+                provider: 'local',
+                label: '本地存储',
+                description: 'Local uploads',
+                builtin: true,
+                create_allowed: false,
+                supports_test: false,
+                supports_bucket_info: false,
+                fields: null,
+              },
+            ],
+          },
+        })
+      }),
+    )
+    const resource = createAdminStorageResource()
+
+    await expect(resource.fetchProviders()).resolves.toEqual([
+      expect.objectContaining({
+        provider: 'local',
+        fields: [],
+      }),
+    ])
+  })
 })
 
 function storageQueryHandlers() {

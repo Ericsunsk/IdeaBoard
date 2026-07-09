@@ -1,8 +1,29 @@
 package storage
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 )
+
+func TestListProviderMetaUsesEmptyFieldSlices(t *testing.T) {
+	service := NewStorageService(nil, nil)
+
+	providers := service.ListProviderMeta()
+	for _, provider := range providers {
+		if provider.Fields == nil {
+			t.Fatalf("provider %q fields = nil, want empty slice", provider.Provider)
+		}
+	}
+
+	payload, err := json.Marshal(providers)
+	if err != nil {
+		t.Fatalf("marshal provider metadata failed: %v", err)
+	}
+	if strings.Contains(string(payload), `"fields":null`) {
+		t.Fatalf("provider metadata JSON contains null fields: %s", payload)
+	}
+}
 
 func TestCanonicalizeStorageProfileKeepsCurrentS3CompatibleConfig(t *testing.T) {
 	original := map[string]interface{}{

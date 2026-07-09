@@ -118,7 +118,7 @@ function normalizeGeneratedProvider(provider: GeneratedStorageProviderMeta): Sto
     create_allowed: provider.create_allowed,
     supports_test: provider.supports_test,
     supports_bucket_info: provider.supports_bucket_info,
-    fields: provider.fields.map((field) => ({ ...field })),
+    fields: (provider.fields ?? []).map((field) => ({ ...field })),
   }
 }
 
