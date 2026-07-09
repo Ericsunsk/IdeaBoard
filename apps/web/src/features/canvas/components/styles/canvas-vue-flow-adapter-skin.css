@@ -79,6 +79,11 @@
   cursor: default;
 }
 
+.canvas-flow-wrap .vue-flow__selection {
+  border: 1px solid var(--canvas-accent);
+  background: var(--canvas-accent-soft);
+}
+
 .canvas-flow-wrap .vue-flow__pane {
   cursor: default;
 }

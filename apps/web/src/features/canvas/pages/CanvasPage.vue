@@ -39,6 +39,7 @@
       class="canvas-flow-wrap ib-page-dot-bg"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
+      @pointerdown.capture="onCanvasPointerDownCapture"
       @wheel="onCanvasWheel"
     >
       <VueFlow
@@ -63,7 +64,7 @@
         :only-render-visible-elements="true"
         :is-valid-connection="commands.flowPane.isValidConnection"
         @nodes-change="commands.flowPane.onNodesChange"
-        @edges-change="commands.flowPane.onEdgesChange"
+        @edges-change="onFlowEdgesChange"
         @connect="commands.flowPane.onConnect"
         @connect-end="onFlowConnectEnd"
         @edge-update="commands.flowPane.onEdgeUpdate"
@@ -74,6 +75,8 @@
         @node-click="onFlowNodeClick"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
+        @selection-start="onSelectionStart"
+        @selection-end="onSelectionEnd"
         @pane-click="onPaneClick"
         @pane-context-menu="onPaneContextMenu"
       >
@@ -157,7 +160,7 @@ import { useDismissableLayer } from '../../../shared/composables/useDismissableL
 import { ADMIN_ROOT_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
-import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
+import { PanOnScrollMode, VueFlow, type EdgeChange } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
@@ -589,10 +592,20 @@ const {
   onPaneClick,
   onFlowNodeClick,
   onFlowNodeMouseDown,
+  onCanvasPointerDownCapture,
+  onSelectionStart,
+  onSelectionEnd,
+  filterMarqueeEdgeChanges,
 } = useFlowSelectionController({
   activeTool: activeTool as Ref<string>,
   dismissTransientCanvasUi,
 })
+
+function onFlowEdgesChange(changes: EdgeChange[]) {
+  const filteredChanges = filterMarqueeEdgeChanges(changes)
+  if (filteredChanges.length === 0) return
+  commands.flowPane.onEdgesChange(filteredChanges)
+}
 
 const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
   useFlowNodeDragInteractions({
