@@ -142,6 +142,19 @@
           </template>
 
           <template #filters>
+            <Button
+              text
+              :class="adminToolbarIconButtonClass"
+              :disabled="!canDeleteSelectedTasks"
+              :loading="isDeletingSelectedTasks"
+              aria-label="删除"
+              title="删除"
+              @click="requestDeleteSelectedTasks"
+            >
+              <template #icon>
+                <Trash class="size-4 text-admin-danger" />
+              </template>
+            </Button>
             <AdminFilterPopover
               :active="hasTaskFilter"
               filter-label="筛选任务"
@@ -178,20 +191,6 @@
           </template>
 
           <template #actions="{ iconButtonClass }">
-            <Button
-              label="删除选中"
-              severity="danger"
-              outlined
-              :class="adminActionButtonClass"
-              :disabled="!canDeleteSelectedTasks"
-              :loading="isDeletingSelectedTasks"
-              aria-label="删除选中的任务"
-              @click="requestDeleteSelectedTasks"
-            >
-              <template #icon>
-                <Trash class="size-4" />
-              </template>
-            </Button>
             <Button
               text
               :class="iconButtonClass"
@@ -736,12 +735,12 @@ import { adminChartPlugins } from '../../shared/lib/adminChart'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import { createAdminDialogPt } from '../../shared/lib/adminOverlayPt'
 import {
-  adminActionButtonClass,
   adminChartCanvasClass,
   adminChartGridClass,
   adminDashboardRootClass,
   adminSummaryGridClass,
   adminTextButtonClass,
+  adminToolbarIconButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
