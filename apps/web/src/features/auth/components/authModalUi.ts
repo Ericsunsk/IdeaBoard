@@ -10,7 +10,7 @@ import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 export const authDialogPt = {
   ...ibDialogMaskPt,
   root: {
-    class: 'm-5 w-[min(420px,calc(100vw-32px))] overflow-visible bg-transparent p-0',
+    class: 'm-5 w-[min(460px,calc(100vw-32px))] overflow-visible bg-transparent p-0',
   },
   content: {
     class: 'overflow-visible bg-transparent p-0',
