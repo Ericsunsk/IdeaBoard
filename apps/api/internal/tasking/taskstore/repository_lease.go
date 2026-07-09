@@ -79,9 +79,10 @@ func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, tas
 	return rowsAffected, err
 }
 
-func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	params := dbsqlc.RequeueTaskRunningWithLeaseParams{
 		ErrorMsg:                   errMsg,
+		Result:                     result,
 		TaskID:                     taskID,
 		Statuses:                   statuses,
 		AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},

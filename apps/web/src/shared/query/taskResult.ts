@@ -46,6 +46,7 @@ function extractImageResultsFromTaskResult(result: string | null | undefined): T
   if (!result) return []
   try {
     const parsed = JSON.parse(result)
+    if (!isSuccessfulTaskResult(parsed)) return []
     if (Array.isArray(parsed?.image_urls)) {
       return parsed.image_urls
         .filter((url: unknown): url is string => typeof url === 'string' && url.trim().length > 0)
@@ -57,6 +58,13 @@ function extractImageResultsFromTaskResult(result: string | null | undefined): T
   } catch {
     return []
   }
+}
+
+function isSuccessfulTaskResult(parsed: unknown): boolean {
+  if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) return false
+  const status = (parsed as { status?: unknown }).status
+  if (status == null || status === '') return true
+  return status === 'success' || status === 'completed'
 }
 
 export function normalizeTaskImageResult(result: TaskImageResultInput): TaskImageResult | null {

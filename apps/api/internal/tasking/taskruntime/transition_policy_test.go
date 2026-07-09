@@ -302,7 +302,7 @@ func (f *fakeTaskRuntimeTransitionStore) ResetTaskRunningToPendingWithLease(cont
 	return f.resetRows, f.writeErr
 }
 
-func (f *fakeTaskRuntimeTransitionStore) RequeueTaskRunningWithLease(context.Context, string, []string, int64, int64, int64, string, string, *tasks.TaskAttemptFinish) (int64, error) {
+func (f *fakeTaskRuntimeTransitionStore) RequeueTaskRunningWithLease(context.Context, string, []string, int64, int64, int64, string, string, string, *tasks.TaskAttemptFinish) (int64, error) {
 	f.writeCount++
 	return f.requeueRows, f.writeErr
 }

@@ -30,6 +30,17 @@ const (
 	maxRemoteImageRefBytes = 10 * 1024 * 1024
 	// maxErrorBodyLen caps error messages stored in task records.
 	maxErrorBodyLen = 500
+	// maxProviderRawOutputPreviewLen keeps task result envelopes inspectable without
+	// storing full image payloads or oversized provider responses.
+	maxProviderRawOutputPreviewLen = 2000
+	maxProviderRawOutputStringLen  = 300
+	maxProviderRawOutputDepth      = 4
+	maxProviderRawOutputArrayItems = 5
+)
+
+const (
+	parsedOutputStatusValid   = "valid"
+	parsedOutputStatusInvalid = "invalid"
 )
 
 func readLimitedBody(body io.Reader) ([]byte, error) {
@@ -66,6 +77,97 @@ func truncateErrorBody(body string) string {
 	return body
 }
 
+func providerRawOutputPreview(raw []byte) string {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return ""
+	}
+
+	var parsed interface{}
+	if err := json.Unmarshal(raw, &parsed); err == nil {
+		sanitized := sanitizeProviderRawOutputValue("", parsed, 0)
+		if preview, err := json.Marshal(sanitized); err == nil {
+			return truncateProviderRawOutputPreview(string(preview))
+		}
+	}
+	return truncateProviderRawOutputPreview(trimmed)
+}
+
+func sanitizeProviderRawOutputValue(key string, value interface{}, depth int) interface{} {
+	if depth >= maxProviderRawOutputDepth {
+		switch typed := value.(type) {
+		case map[string]interface{}:
+			return fmt.Sprintf("[object:%d keys]", len(typed))
+		case []interface{}:
+			return fmt.Sprintf("[array:%d items]", len(typed))
+		}
+	}
+
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		sanitized := make(map[string]interface{}, len(typed))
+		for nestedKey, nestedValue := range typed {
+			sanitized[nestedKey] = sanitizeProviderRawOutputValue(nestedKey, nestedValue, depth+1)
+		}
+		return sanitized
+	case []interface{}:
+		limit := len(typed)
+		if limit > maxProviderRawOutputArrayItems {
+			limit = maxProviderRawOutputArrayItems
+		}
+		sanitized := make([]interface{}, 0, limit+1)
+		for i := 0; i < limit; i++ {
+			sanitized = append(sanitized, sanitizeProviderRawOutputValue(key, typed[i], depth+1))
+		}
+		if len(typed) > limit {
+			sanitized = append(sanitized, fmt.Sprintf("...(+%d items)", len(typed)-limit))
+		}
+		return sanitized
+	case string:
+		return sanitizeProviderRawOutputString(key, typed)
+	case float64, bool, nil:
+		return typed
+	default:
+		return fmt.Sprint(typed)
+	}
+}
+
+func sanitizeProviderRawOutputString(key string, value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return trimmed
+	}
+	if isProviderRawOutputImagePayloadKey(key) {
+		return fmt.Sprintf("[redacted:%d chars]", len(value))
+	}
+	if isInlineDataImageURL(trimmed) {
+		return redactLogURL(trimmed)
+	}
+	if parsed, err := url.Parse(trimmed); err == nil && parsed.Scheme != "" && parsed.Host != "" {
+		return redactLogURL(trimmed)
+	}
+	if len(trimmed) > maxProviderRawOutputStringLen {
+		return trimmed[:maxProviderRawOutputStringLen] + fmt.Sprintf("...(+%d chars)", len(trimmed)-maxProviderRawOutputStringLen)
+	}
+	return trimmed
+}
+
+func isProviderRawOutputImagePayloadKey(key string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(key), "-", "_"))
+	switch normalized {
+	case "b64_json", "bytesbase64encoded", "data":
+		return true
+	}
+	return strings.Contains(normalized, "base64")
+}
+
+func truncateProviderRawOutputPreview(value string) string {
+	if len(value) <= maxProviderRawOutputPreviewLen {
+		return value
+	}
+	return value[:maxProviderRawOutputPreviewLen] + fmt.Sprintf("...(+%d chars)", len(value)-maxProviderRawOutputPreviewLen)
+}
+
 type ProviderExecutor struct {
 	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
 	mediaReader          taskmedia.UploadReader
@@ -93,9 +195,12 @@ func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref str
 }
 
 type providerCallResult struct {
-	ImageURL  string
-	ImageURLs []string
-	Model     string
+	ImageURL          string
+	ImageURLs         []string
+	Model             string
+	RawOutputPreview  string
+	ParsedOutputKind  string
+	ParsedOutputCount int
 }
 
 type providerCallTimeline struct {
@@ -142,10 +247,19 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	callResult, err := c.callProviderWithRequest(ctx, account, exec)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
+	featureSlug := providerRequestFeatureSlug(exec.Request)
 
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return output, err
+		}
+		if featureSlug == workflow.FeatureSlugPatternGen && isProviderOutputParseError(err) {
+			output.Result = buildProviderParseFailureResult(task, account, exec, callResult, nil, err)
+			return output, newExecutionFailureError(
+				tasks.ExecutionStageProvider,
+				tasks.FailureCategoryProviderError,
+				err,
+			)
 		}
 		return output, newExecutionFailureError(
 			tasks.ExecutionStageProvider,
@@ -154,7 +268,16 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
-	if len(imageURLs) == 0 {
+	if featureSlug == workflow.FeatureSlugPatternGen {
+		if err := validateProviderParsedOutput(featureSlug, resolvedProviderParsedOutputKind(callResult), imageURLs); err != nil {
+			output.Result = buildProviderParseFailureResult(task, account, exec, callResult, imageURLs, err)
+			return output, newExecutionFailureError(
+				tasks.ExecutionStageProvider,
+				tasks.FailureCategoryProviderError,
+				err,
+			)
+		}
+	} else if len(imageURLs) == 0 {
 		return output, newExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,
@@ -202,17 +325,10 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	finalizeFinishedAt := time.Now()
 	output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 
-	result := map[string]interface{}{
-		"task_id":                task.TaskID,
-		"correlation_id":         correlationID,
-		"account_id":             account.ID,
-		"provider_endpoint_id":   account.ProviderEndpointID,
-		"provider_endpoint_name": exec.ProviderEndpointName,
-		"api_type":               exec.APIType,
-		"status":                 tasks.ResultStatusSuccess,
-		"image_url":              imageURL,
-		"image_urls":             imageURLs,
-	}
+	result := baseProviderTaskResult(task, account, exec, callResult, imageURLs, parsedOutputStatusValid, featureSlug == workflow.FeatureSlugPatternGen)
+	result["status"] = tasks.ResultStatusSuccess
+	result["image_url"] = imageURL
+	result["image_urls"] = imageURLs
 	if strings.TrimSpace(callResult.Model) != "" {
 		result["model"] = strings.TrimSpace(callResult.Model)
 	}
@@ -224,6 +340,93 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	output.Result = resultJSON
 	output.Outputs = taskOutputs
 	return output, nil
+}
+
+func baseProviderTaskResult(task *tasks.TaskPayload, account *accounts.ApiAccount, exec providerExecutionConfig, callResult providerCallResult, imageURLs []string, parsedStatus string, includeOutputFacts bool) map[string]interface{} {
+	result := map[string]interface{}{
+		"task_id":                task.TaskID,
+		"correlation_id":         task.EffectiveCorrelationID(),
+		"account_id":             account.ID,
+		"provider_endpoint_id":   account.ProviderEndpointID,
+		"provider_endpoint_name": exec.ProviderEndpointName,
+		"api_type":               exec.APIType,
+	}
+	if !includeOutputFacts {
+		return result
+	}
+	result["parsed_output_status"] = parsedStatus
+	result["parsed_output"] = map[string]interface{}{
+		"kind":        resolvedProviderParsedOutputKind(callResult),
+		"image_count": resolvedProviderParsedOutputCount(callResult, imageURLs),
+	}
+	if strings.TrimSpace(callResult.RawOutputPreview) != "" {
+		result["raw_provider_output_preview"] = strings.TrimSpace(callResult.RawOutputPreview)
+	}
+	return result
+}
+
+func buildProviderParseFailureResult(task *tasks.TaskPayload, account *accounts.ApiAccount, exec providerExecutionConfig, callResult providerCallResult, imageURLs []string, parseErr error) string {
+	result := baseProviderTaskResult(task, account, exec, callResult, imageURLs, parsedOutputStatusInvalid, true)
+	result["status"] = tasks.StatusFailed
+	result["error"] = parseErr.Error()
+	result["failure_stage"] = tasks.ExecutionStageProvider
+	result["failure_category"] = tasks.FailureCategoryProviderError
+	if strings.TrimSpace(callResult.Model) != "" {
+		result["model"] = strings.TrimSpace(callResult.Model)
+	}
+	resultJSON, err := marshalProviderTaskResult(task.TaskID, result)
+	if err != nil {
+		return formatProviderParseFallbackResult(task.TaskID, task.EffectiveCorrelationID(), parseErr)
+	}
+	return resultJSON
+}
+
+func formatProviderParseFallbackResult(taskID string, correlationID string, parseErr error) string {
+	result := map[string]string{
+		"task_id":              taskID,
+		"correlation_id":       correlationID,
+		"status":               tasks.StatusFailed,
+		"parsed_output_status": parsedOutputStatusInvalid,
+		"failure_stage":        tasks.ExecutionStageProvider,
+		"failure_category":     tasks.FailureCategoryProviderError,
+		"error":                parseErr.Error(),
+	}
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Sprintf(`{"task_id":"%s","status":"failed","parsed_output_status":"invalid","error":"provider output parse failed"}`, taskID)
+	}
+	return string(resultJSON)
+}
+
+func validateProviderParsedOutput(featureSlug string, outputKind string, imageURLs []string) error {
+	if featureSlug == workflow.FeatureSlugPatternGen {
+		return workflow.ValidatePatternGenOutputContract(outputKind, imageURLs)
+	}
+	if len(imageURLs) == 0 {
+		return fmt.Errorf("API 未返回图片")
+	}
+	return nil
+}
+
+func resolvedProviderParsedOutputKind(callResult providerCallResult) string {
+	if strings.TrimSpace(callResult.ParsedOutputKind) != "" {
+		return strings.TrimSpace(callResult.ParsedOutputKind)
+	}
+	return "image-results"
+}
+
+func resolvedProviderParsedOutputCount(callResult providerCallResult, imageURLs []string) int {
+	if callResult.ParsedOutputCount > 0 {
+		return callResult.ParsedOutputCount
+	}
+	return len(imageURLs)
+}
+
+func providerRequestFeatureSlug(req providerRequest) string {
+	if slug, err := workflow.ResolveWorkflowFeatureSlug(req.Params); err == nil {
+		return slug
+	}
+	return ""
 }
 
 func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerExecutionConfig, error) {

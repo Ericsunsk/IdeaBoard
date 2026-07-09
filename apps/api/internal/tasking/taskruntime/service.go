@@ -41,7 +41,7 @@ type TaskStore interface {
 	MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
 	GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string) (*taskstore.ActiveTaskLease, error)
@@ -71,6 +71,7 @@ type FailTaskInput struct {
 	TaskID        string
 	Assignment    taskqueue.TaskAssignment
 	Reason        string
+	Result        string
 	AttemptFinish *tasks.TaskAttemptFinish
 }
 
@@ -83,6 +84,7 @@ type ResetRunningTaskInput struct {
 type RequeueForFailoverInput struct {
 	Assignment             taskqueue.TaskAssignment
 	Reason                 string
+	Result                 string
 	RequeuedAttemptFinish  *tasks.TaskAttemptFinish
 	FinalFailAttemptFinish *tasks.TaskAttemptFinish
 }
@@ -275,7 +277,7 @@ func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) erro
 		return ErrTaskStateConflict
 	}
 	now := taskTerminalTime(input.AttemptFinish)
-	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, pendingOnly(), input.Reason, formatTaskFailureResult(taskID, input.Reason), now, input.AttemptFinish)
+	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, pendingOnly(), input.Reason, resolveTaskFailureResult(taskID, input.Reason, input.Result), now, input.AttemptFinish)
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
@@ -295,7 +297,7 @@ func (s *Service) failRunningTaskWithLease(ctx context.Context, input FailTaskIn
 		return err
 	}
 	now := taskTerminalTime(input.AttemptFinish)
-	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.AttemptFinish)
+	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result), now, input.AttemptFinish)
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
@@ -355,7 +357,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, input.RequeuedAttemptFinish)
+		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, strings.TrimSpace(input.Result), input.RequeuedAttemptFinish)
 		if err := normalizeTaskTransitionWriteError(err); err != nil {
 			return false, err
 		}
@@ -370,7 +372,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 	}
 
 	now := taskTerminalTime(input.FinalFailAttemptFinish)
-	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, formatTaskFailureResult(assignment.TaskID, input.Reason), now, input.FinalFailAttemptFinish)
+	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result), now, input.FinalFailAttemptFinish)
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return false, err
 	}
@@ -467,4 +469,11 @@ func formatTaskFailureResult(taskID string, reason string) string {
 		return fmt.Sprintf(`{"task_id":"%s","status":"failed","error":"任务失败"}`, taskID)
 	}
 	return string(resultJSON)
+}
+
+func resolveTaskFailureResult(taskID string, reason string, result string) string {
+	if strings.TrimSpace(result) != "" {
+		return strings.TrimSpace(result)
+	}
+	return formatTaskFailureResult(taskID, reason)
 }

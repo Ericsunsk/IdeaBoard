@@ -308,12 +308,19 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 
 	imageURLs, err := extractOpenAIImageResponses(respBody, providerReq.Params)
 	if err != nil {
-		return providerCallResult{}, err
+		return providerCallResult{
+			Model:            model,
+			RawOutputPreview: providerRawOutputPreview(respBody),
+			ParsedOutputKind: "image-results",
+		}, newProviderOutputParseError(err)
 	}
 	return providerCallResult{
-		ImageURL:  imageURLs[0],
-		ImageURLs: imageURLs,
-		Model:     model,
+		ImageURL:          imageURLs[0],
+		ImageURLs:         imageURLs,
+		Model:             model,
+		RawOutputPreview:  providerRawOutputPreview(respBody),
+		ParsedOutputKind:  "image-results",
+		ParsedOutputCount: len(imageURLs),
 	}, nil
 }
 

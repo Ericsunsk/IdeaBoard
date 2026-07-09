@@ -130,6 +130,22 @@ func ValidatePatternGenTaskContract(prompt string, params *tasks.WorkflowTaskPar
 	return validatePatternGenControls(params.Controls)
 }
 
+func ValidatePatternGenOutputContract(kind string, imageURLs []string) error {
+	if strings.TrimSpace(kind) != PatternGenIOContract.Output.Kind {
+		return fmt.Errorf("图案生成输出不符合 workflow contract: 输出类型必须是 %s", PatternGenIOContract.Output.Kind)
+	}
+	validCount := 0
+	for _, imageURL := range imageURLs {
+		if strings.TrimSpace(imageURL) != "" {
+			validCount++
+		}
+	}
+	if validCount < PatternGenIOContract.Output.MinCount {
+		return fmt.Errorf("图案生成输出不符合 workflow contract: 至少需要 %d 张图片", PatternGenIOContract.Output.MinCount)
+	}
+	return nil
+}
+
 func validatePatternGenControls(controls *tasks.GenerationControls) error {
 	if controls == nil {
 		return nil

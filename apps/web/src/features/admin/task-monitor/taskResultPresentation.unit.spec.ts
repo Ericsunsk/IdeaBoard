@@ -91,6 +91,38 @@ describe('task result presentation', () => {
     expect(getTaskSanitizedError(failedFromError)).not.toContain('secret')
     expect(getTaskErrorReason(failedFromResult)).not.toContain('secret')
   })
+
+  it('summarizes provider parsed-output failures for monitor detail views', () => {
+    const result = JSON.stringify({
+      status: 'failed',
+      parsed_output_status: 'invalid',
+      error: '图案生成输出不符合 workflow contract',
+      failure_stage: 'provider',
+      failure_category: 'provider_error',
+      raw_provider_output_preview: '{"data":[]}',
+      parsed_output: {
+        kind: 'image-results',
+        image_count: 0,
+      },
+    })
+    const summary = JSON.parse(formatTaskResultSummary(result))
+
+    expect(summary).toMatchObject({
+      status: 'failed',
+      parsed_output_status: 'invalid',
+      error: '图案生成输出不符合 workflow contract',
+      failure_stage: 'provider',
+      failure_category: 'provider_error',
+      raw_provider_output_preview: '{"data":[]}',
+      parsed_output: {
+        kind: 'image-results',
+        image_count: 0,
+      },
+    })
+    expect(getTaskErrorReason(makeTask({ status: adminTaskStatuses.failed, result }))).toBe(
+      '图案生成输出不符合 workflow contract',
+    )
+  })
 })
 
 function makeTask(overrides: Partial<Task>): Task {

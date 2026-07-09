@@ -123,3 +123,30 @@ func providerFailureCategory(err error) string {
 	}
 	return tasks.FailureCategoryProviderError
 }
+
+type providerOutputParseError struct {
+	err error
+}
+
+func newProviderOutputParseError(err error) error {
+	return &providerOutputParseError{err: err}
+}
+
+func (e *providerOutputParseError) Error() string {
+	if e == nil || e.err == nil {
+		return "provider output parse failed"
+	}
+	return e.err.Error()
+}
+
+func (e *providerOutputParseError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.err
+}
+
+func isProviderOutputParseError(err error) bool {
+	var parseErr *providerOutputParseError
+	return errors.As(err, &parseErr)
+}

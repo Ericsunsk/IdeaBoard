@@ -454,7 +454,7 @@ func TestRetryAttemptHistoryUsesReleasedLeaseThenNewLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create first attempt failed: %v", err)
 	}
-	rows, err := repo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry provider", &tasks.TaskAttemptFinish{
+	rows, err := repo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry provider", "", &tasks.TaskAttemptFinish{
 		ID:              firstRef.ID,
 		Status:          tasks.TaskAttemptStatusRequeued,
 		FailureStage:    tasks.ExecutionStageProvider,
@@ -617,6 +617,7 @@ func TestRequeueWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		loadRepositoryTestCredentialID(t, db, accountID),
 		task.LeaseToken,
 		"retry",
+		"",
 		&tasks.TaskAttemptFinish{
 			ID:          999999,
 			Status:      tasks.TaskAttemptStatusRequeued,

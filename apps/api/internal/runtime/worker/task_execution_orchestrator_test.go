@@ -604,6 +604,127 @@ WHERE task_id = $1`, task.TaskID).Scan(&attemptStatus, &attemptReason, &attemptF
 	}
 }
 
+func TestExecuteTemporaryProviderFailureRequeuesWithoutFailureResult(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionOrchestratorTestDB(t)
+	accountRepo := accounts.NewAccountRepository(db)
+	taskRepo := taskstore.NewRepository(db)
+	account := createRiverTestAccount(t, db, accountRepo, "retry-primary-account")
+	fallbackAccount := createRiverTestAccount(t, db, accountRepo, "retry-fallback-account")
+
+	task := &tasks.Task{
+		TaskID:                     "temporary-provider-failure-task",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-temporary-provider-failure",
+		RetryCount:                 0,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	assigner := &fakeAssigner{}
+	requeuer := &fakeRequeuer{}
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.ApiAccount, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+		return providerOutputJSON(""), newUpstreamHTTPError(429, "rate limited")
+	})
+
+	assignment := riverTestAssignment(t, db, account, task.TaskID, task.LeaseToken)
+	err := orchestrator.execute(ctx, &tasks.TaskPayload{
+		TaskID:     task.TaskID,
+		AccountIDs: []int64{account.ID, fallbackAccount.ID},
+	}, assignment)
+	if err != nil {
+		t.Fatalf("execute returned error: %v", err)
+	}
+	if requeuer.calls != 1 {
+		t.Fatalf("requeue calls = %d, want 1", requeuer.calls)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+	if updated.Result != "" {
+		t.Fatalf("result = %q, want empty while retrying", updated.Result)
+	}
+	if updated.RetryCount != 1 {
+		t.Fatalf("retry_count = %d, want 1", updated.RetryCount)
+	}
+	if updated.CompletedAt != nil {
+		t.Fatalf("completed_at should remain nil, got %v", updated.CompletedAt)
+	}
+}
+
+func TestExecuteProviderParseFailureRequeuesWithFailureResultEnvelope(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionOrchestratorTestDB(t)
+	accountRepo := accounts.NewAccountRepository(db)
+	taskRepo := taskstore.NewRepository(db)
+	account := createRiverTestAccount(t, db, accountRepo, "parse-primary-account")
+	fallbackAccount := createRiverTestAccount(t, db, accountRepo, "parse-fallback-account")
+
+	task := &tasks.Task{
+		TaskID:                     "provider-parse-retry-task",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-provider-parse-retry",
+		RetryCount:                 0,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	failureResult := `{"task_id":"provider-parse-retry-task","status":"failed","parsed_output_status":"invalid","error":"图案生成输出不符合 workflow contract"}`
+	assigner := &fakeAssigner{}
+	requeuer := &fakeRequeuer{}
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.ApiAccount, *tasks.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+		return providerOutputJSON(failureResult), newExecutionFailureError(
+			tasks.ExecutionStageProvider,
+			tasks.FailureCategoryProviderError,
+			newProviderOutputParseError(errors.New("图案生成输出不符合 workflow contract")),
+		)
+	})
+
+	assignment := riverTestAssignment(t, db, account, task.TaskID, task.LeaseToken)
+	err := orchestrator.execute(ctx, &tasks.TaskPayload{
+		TaskID:     task.TaskID,
+		AccountIDs: []int64{account.ID, fallbackAccount.ID},
+	}, assignment)
+	if err != nil {
+		t.Fatalf("execute returned error: %v", err)
+	}
+	if requeuer.calls != 1 {
+		t.Fatalf("requeue calls = %d, want 1", requeuer.calls)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+	if updated.Result != failureResult {
+		t.Fatalf("result = %q, want parse failure envelope", updated.Result)
+	}
+	if !strings.Contains(updated.ErrorMsg, "workflow contract") {
+		t.Fatalf("error_msg = %q, want parse contract reason", updated.ErrorMsg)
+	}
+	if updated.CompletedAt != nil {
+		t.Fatalf("completed_at should remain nil, got %v", updated.CompletedAt)
+	}
+}
+
 func newTaskExecutionOrchestratorTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	return testdb.Open(t)

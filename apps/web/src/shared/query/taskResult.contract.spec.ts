@@ -44,4 +44,18 @@ describe('taskResult image result helpers', () => {
       },
     ])
   })
+
+  it('does not surface failed provider parsed-output envelopes as Canvas image results', () => {
+    expect(
+      extractImageResultsFromTaskPayload({
+        result: JSON.stringify({
+          status: 'failed',
+          parsed_output_status: 'invalid',
+          image_url: '/uploads/tasks/1/task/should-not-render.png',
+          image_urls: ['/uploads/tasks/1/task/should-not-render.png'],
+          error: '图案生成输出不符合 workflow contract',
+        }),
+      }),
+    ).toEqual([])
+  })
 })

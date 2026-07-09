@@ -111,6 +111,19 @@ func TestValidatePatternGenTaskContractAllowsProviderHintsAndControls(t *testing
 	}
 }
 
+func TestValidatePatternGenOutputContract(t *testing.T) {
+	if err := ValidatePatternGenOutputContract("image-results", []string{"/uploads/tasks/1/task/out.png"}); err != nil {
+		t.Fatalf("ValidatePatternGenOutputContract returned error: %v", err)
+	}
+
+	if err := ValidatePatternGenOutputContract("text", []string{"/uploads/tasks/1/task/out.png"}); err == nil {
+		t.Fatalf("expected output kind validation error")
+	}
+	if err := ValidatePatternGenOutputContract("image-results", []string{" "}); err == nil {
+		t.Fatalf("expected output count validation error")
+	}
+}
+
 func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testing.T) {
 	useMask := true
 	params := &tasks.WorkflowTaskParams{

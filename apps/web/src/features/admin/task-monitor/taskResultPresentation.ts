@@ -115,19 +115,26 @@ export function formatTaskResultSummary(result: string | null | undefined): stri
   const summary: Record<string, unknown> = {}
   const preferredKeys = [
     'status',
+    'parsed_output_status',
     'platform',
+    'api_type',
     'model',
     'request_id',
     'task_id',
+    'correlation_id',
     'code',
     'message',
     'error',
+    'failure_stage',
+    'failure_category',
     'duration',
     'image_url',
+    'raw_provider_output_preview',
   ]
   preferredKeys.forEach((key) => {
     if (key in parsed) summary[key] = sanitizeValue(parsed[key], 0)
   })
+  if ('parsed_output' in parsed) summary.parsed_output = sanitizeValue(parsed.parsed_output, 0)
   if ('images' in parsed) summary.images = Array.isArray(parsed.images) ? parsed.images.length : 0
   if (Object.keys(summary).length === 0) {
     summary.keys = Object.keys(parsed).slice(0, 12)

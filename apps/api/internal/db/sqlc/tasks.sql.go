@@ -1915,17 +1915,19 @@ SET status = 'pending',
     assigned_credential_id = NULL,
     lease_token = '',
     error_msg = $1,
+    result = $2,
     retry_count = retry_count + 1
-WHERE task_id = $2
-  AND status = ANY($3::text[])
-  AND account_id = $4
-  AND assigned_provider_endpoint_id = $5
-  AND assigned_credential_id = $6
-  AND lease_token = $7
+WHERE task_id = $3
+  AND status = ANY($4::text[])
+  AND account_id = $5
+  AND assigned_provider_endpoint_id = $6
+  AND assigned_credential_id = $7
+  AND lease_token = $8
 `
 
 type RequeueTaskRunningWithLeaseParams struct {
 	ErrorMsg                   string        `json:"error_msg"`
+	Result                     string        `json:"result"`
 	TaskID                     string        `json:"task_id"`
 	Statuses                   []string      `json:"statuses"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
@@ -1937,6 +1939,7 @@ type RequeueTaskRunningWithLeaseParams struct {
 func (q *Queries) RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, requeueTaskRunningWithLease,
 		arg.ErrorMsg,
+		arg.Result,
 		arg.TaskID,
 		pq.Array(arg.Statuses),
 		arg.AccountID,

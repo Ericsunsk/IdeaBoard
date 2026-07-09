@@ -33,6 +33,7 @@
 - NATS JetStream is an event layer for task status, audit and realtime fanout; it is not a task queue.
 - Worker implementation stays in `internal/runtime/worker` as an execution adapter.
 - Workflow owns executable feature contracts; Prompts owns template storage and rendering.
+- `tasks.result` may hold a durable result envelope. Successful image tasks keep top-level `image_url`/`image_urls` for Canvas compatibility; workflow-specific parse failures may store `parsed_output_status`, `parsed_output` and a bounded `raw_provider_output_preview` so Admin/Canvas can diagnose retry or failed states without treating them as successful outputs.
 - Unless schema or query contracts change, do not edit migrations or generated sqlc code.
 
 ## When To Expand A Context

@@ -568,6 +568,7 @@ SET status = 'pending',
     assigned_credential_id = NULL,
     lease_token = '',
     error_msg = sqlc.arg(error_msg),
+    result = sqlc.arg(result),
     retry_count = retry_count + 1
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])

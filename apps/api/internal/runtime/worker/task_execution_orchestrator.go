@@ -267,7 +267,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 	switch decision.Outcome {
 	case taskExecutionConvergenceFinalFail, taskExecutionConvergenceFailoverExhaustedOrNoCapacity:
 		failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
-		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, decision.Reason, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish); markErr != nil {
+		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, decision.Reason, attempt.providerOutput.Result, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish); markErr != nil {
 			return markErr
 		}
 		return nil
@@ -280,7 +280,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 	default:
 		slog.Warn("unexpected task execution convergence outcome for provider failure", "task_id", attempt.task.TaskID, "outcome", decision.Outcome)
 		failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, time.Now())
-		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, reason, elapsed, failureStage, failureCategory, &failFinish); markErr != nil {
+		if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, reason, attempt.providerOutput.Result, elapsed, failureStage, failureCategory, &failFinish); markErr != nil {
 			return markErr
 		}
 		return nil
@@ -299,6 +299,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
 	requeued, requeueErr := o.taskRuntime.RequeueTaskForFailover(ctx, taskruntime.RequeueForFailoverInput{
 		Assignment:             attempt.assignment,
 		Reason:                 decision.Reason,
+		Result:                 attempt.providerOutput.Result,
 		RequeuedAttemptFinish:  &requeueFinish,
 		FinalFailAttemptFinish: &finalFailFinish,
 	})
@@ -317,14 +318,14 @@ func (o *taskExecutionOrchestrator) handleProviderFailoverRequeue(
 		case taskExecutionConvergenceFinalFail, taskExecutionConvergenceFailoverExhaustedOrNoCapacity:
 			slog.Warn("reset task for failover retry failed", "task_id", attempt.task.TaskID, "correlation_id", attempt.task.EffectiveCorrelationID(), "err", requeueErr)
 			failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, requeueFailureDecision.Reason, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, time.Now())
-			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, requeueFailureDecision.Reason, elapsed, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, &failFinish); markErr != nil {
+			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, requeueFailureDecision.Reason, attempt.providerOutput.Result, elapsed, requeueFailureDecision.FailureStage, requeueFailureDecision.FailureCategory, &failFinish); markErr != nil {
 				return markErr
 			}
 			return nil
 		default:
 			slog.Warn("unexpected task execution convergence outcome after failover requeue failure", "task_id", attempt.task.TaskID, "outcome", requeueFailureDecision.Outcome, "err", requeueErr)
 			failFinish, _ := attempt.buildAttemptFinish(tasks.TaskAttemptStatusFailed, decision.Reason, decision.FailureStage, decision.FailureCategory, time.Now())
-			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, decision.Reason, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish); markErr != nil {
+			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, attempt.task, attempt.assignment, decision.Reason, attempt.providerOutput.Result, elapsed, decision.FailureStage, decision.FailureCategory, &failFinish); markErr != nil {
 				return markErr
 			}
 			return nil
@@ -429,7 +430,7 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *task
 }
 
 func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment, reason string, elapsedSec float64) error {
-	return o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, elapsedSec, tasks.ExecutionStageAssigned, tasks.FailureCategoryUnknown)
+	return o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, "", elapsedSec, tasks.ExecutionStageAssigned, tasks.FailureCategoryUnknown)
 }
 
 func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
@@ -437,11 +438,12 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 	task *tasks.TaskPayload,
 	assignment taskqueue.TaskAssignment,
 	reason string,
+	result string,
 	elapsedSec float64,
 	failureStage string,
 	failureCategory string,
 ) error {
-	return o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsedSec, failureStage, failureCategory, nil)
+	return o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, result, elapsedSec, failureStage, failureCategory, nil)
 }
 
 func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
@@ -449,6 +451,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 	task *tasks.TaskPayload,
 	assignment taskqueue.TaskAssignment,
 	reason string,
+	result string,
 	elapsedSec float64,
 	failureStage string,
 	failureCategory string,
@@ -461,6 +464,7 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
 		TaskID:        task.TaskID,
 		Assignment:    assignment,
 		Reason:        reason,
+		Result:        result,
 		AttemptFinish: attemptFinish,
 	})
 	if err != nil {
@@ -819,7 +823,16 @@ func userFacingProviderError(err error) string {
 	}
 	if _, category, ok := executionFailureDetails(err); ok {
 		switch category {
-		case tasks.FailureCategoryStorageError, tasks.FailureCategoryFinalizeError:
+		case tasks.FailureCategoryProviderError:
+			if reason := strings.TrimSpace(err.Error()); reason != "" && (isProviderOutputParseError(err) || strings.Contains(reason, "workflow contract")) {
+				return reason
+			}
+		case tasks.FailureCategoryStorageError:
+			return "图片结果保存失败，请检查存储配置"
+		case tasks.FailureCategoryFinalizeError:
+			if reason := strings.TrimSpace(err.Error()); reason != "" && (isProviderOutputParseError(err) || strings.Contains(reason, "workflow contract")) {
+				return reason
+			}
 			return "图片结果保存失败，请检查存储配置"
 		case tasks.FailureCategoryAuth:
 			return "上游服务鉴权失败，请联系管理员"

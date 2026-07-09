@@ -257,12 +257,19 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 
 	imageURLs, extractErr := extractGoogleGeminiImageResponses(respBody)
 	if extractErr != nil {
-		return providerCallResult{}, extractErr
+		return providerCallResult{
+			Model:            model,
+			RawOutputPreview: providerRawOutputPreview(respBody),
+			ParsedOutputKind: "image-results",
+		}, newProviderOutputParseError(extractErr)
 	}
 	return providerCallResult{
-		ImageURL:  imageURLs[0],
-		ImageURLs: imageURLs,
-		Model:     model,
+		ImageURL:          imageURLs[0],
+		ImageURLs:         imageURLs,
+		Model:             model,
+		RawOutputPreview:  providerRawOutputPreview(respBody),
+		ParsedOutputKind:  "image-results",
+		ParsedOutputCount: len(imageURLs),
 	}, nil
 }
 
@@ -434,12 +441,19 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 
 	imageURLs, err := extractGoogleImagenResponses(respBody)
 	if err != nil {
-		return providerCallResult{}, err
+		return providerCallResult{
+			Model:            model,
+			RawOutputPreview: providerRawOutputPreview(respBody),
+			ParsedOutputKind: "image-results",
+		}, newProviderOutputParseError(err)
 	}
 	return providerCallResult{
-		ImageURL:  imageURLs[0],
-		ImageURLs: imageURLs,
-		Model:     model,
+		ImageURL:          imageURLs[0],
+		ImageURLs:         imageURLs,
+		Model:             model,
+		RawOutputPreview:  providerRawOutputPreview(respBody),
+		ParsedOutputKind:  "image-results",
+		ParsedOutputCount: len(imageURLs),
 	}, nil
 }
 

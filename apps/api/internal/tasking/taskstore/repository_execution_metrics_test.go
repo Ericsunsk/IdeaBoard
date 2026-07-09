@@ -505,7 +505,7 @@ func TestListMonitorGoldenSignalSamplesByRangeCountsFailedAttemptBeforeSuccessfu
 	if err != nil {
 		t.Fatalf("create first attempt failed: %v", err)
 	}
-	rowsUpdated, err := taskRepo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry provider", &tasks.TaskAttemptFinish{
+	rowsUpdated, err := taskRepo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry provider", "", &tasks.TaskAttemptFinish{
 		ID:                 firstRef.ID,
 		Status:             tasks.TaskAttemptStatusRequeued,
 		FailureStage:       tasks.ExecutionStageProvider,

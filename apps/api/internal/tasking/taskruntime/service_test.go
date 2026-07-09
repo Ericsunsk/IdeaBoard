@@ -101,6 +101,87 @@ func TestResetRunningTaskRejectsTerminalTask(t *testing.T) {
 	}
 }
 
+func TestFailTaskPersistsProvidedResultEnvelope(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID: "task-fail-custom-result",
+		UserID: 1,
+		Status: tasks.StatusPending,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	result := `{"task_id":"task-fail-custom-result","status":"failed","parsed_output_status":"invalid","error":"contract failed"}`
+	if err := service.FailTask(ctx, FailTaskInput{
+		TaskID: task.TaskID,
+		Reason: "contract failed",
+		Result: result,
+	}); err != nil {
+		t.Fatalf("FailTask returned error: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusFailed {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusFailed)
+	}
+	if updated.Result != result {
+		t.Fatalf("result = %q, want provided envelope", updated.Result)
+	}
+}
+
+func TestRequeueTaskForFailoverPersistsProvidedResultEnvelope(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	accountID := seedTaskRuntimeAccount(t, db, 101)
+
+	task := &tasks.Task{
+		TaskID:                     "task-requeue-custom-result",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-requeue-custom-result",
+		RetryCount:                 0,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	result := `{"task_id":"task-requeue-custom-result","status":"failed","parsed_output_status":"invalid","error":"contract failed"}`
+	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{
+		Assignment: taskRuntimeAssignment(task),
+		Reason:     "contract failed",
+		Result:     result,
+	})
+	if err != nil {
+		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
+	}
+	if !requeued {
+		t.Fatalf("expected task to be requeued")
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+	if updated.Result != result {
+		t.Fatalf("result = %q, want provided envelope", updated.Result)
+	}
+}
+
 func ptrTime(t time.Time) *time.Time {
 	return &t
 }
@@ -586,7 +667,8 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(task), Reason: "retry limit reached"})
+	result := `{"task_id":"task-retry-limit","status":"failed","parsed_output_status":"invalid","error":"retry limit reached"}`
+	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(task), Reason: "retry limit reached", Result: result})
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
 	}
@@ -613,8 +695,8 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	if updated.CompletedAt == nil {
 		t.Fatalf("completed_at should be set when retry limit reached")
 	}
-	if updated.Result == "" {
-		t.Fatalf("result should be populated for failed task")
+	if updated.Result != result {
+		t.Fatalf("result = %q, want provided envelope", updated.Result)
 	}
 
 	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, updated.CreatedAt, updated.CreatedAt)
