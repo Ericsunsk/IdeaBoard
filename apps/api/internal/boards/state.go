@@ -3,10 +3,16 @@ package boards
 import (
 	"encoding/json"
 	"math"
+	"regexp"
 	"strings"
 )
 
-const CurrentBoardStateSchemaVersion = 2
+const CurrentBoardStateSchemaVersion = 3
+
+var (
+	boardStateGroupIDPattern     = regexp.MustCompile(`^group-[0-9]+$`)
+	boardStateGroupNodeIDPattern = regexp.MustCompile(`^(image|prompt|fusion)-[0-9]+(?:\.[0-9]+)?$`)
+)
 
 var allowedBoardStateEnvelopeFields = map[string]struct{}{
 	"schemaVersion":            {},
@@ -99,6 +105,9 @@ func validateBoardStateEnvelopeJSON(payload []byte) (BoardStateEnvelope, error) 
 	}
 	groups, err := requiredArrayField(raw, "groups")
 	if err != nil {
+		return BoardStateEnvelope{}, err
+	}
+	if err := validateBoardStateGroups(groups); err != nil {
 		return BoardStateEnvelope{}, err
 	}
 	if _, err := requiredNumberField(raw, "updatedAt"); err != nil {
@@ -224,6 +233,55 @@ func optionalMediaRefsField(raw map[string]json.RawMessage, key string) ([]Board
 	return refs, nil
 }
 
+func validateBoardStateGroups(items []json.RawMessage) error {
+	for _, item := range items {
+		if err := validateBoardStateGroup(item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateBoardStateGroup(payload json.RawMessage) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil || raw == nil {
+		return ErrInvalidBoardInput
+	}
+	for key := range raw {
+		if key != "id" && key != "nodeIds" && key != "x" && key != "y" && key != "width" && key != "height" {
+			return ErrInvalidBoardInput
+		}
+	}
+	id, err := requiredStringField(raw, "id")
+	if err != nil || !boardStateGroupIDPattern.MatchString(id) {
+		return ErrInvalidBoardInput
+	}
+	nodeIDs, err := requiredStringArrayField(raw, "nodeIds")
+	if err != nil {
+		return err
+	}
+	for _, nodeID := range nodeIDs {
+		if !boardStateGroupNodeIDPattern.MatchString(nodeID) {
+			return ErrInvalidBoardInput
+		}
+	}
+	if _, err := requiredNumberField(raw, "x"); err != nil {
+		return err
+	}
+	if _, err := requiredNumberField(raw, "y"); err != nil {
+		return err
+	}
+	width, err := requiredNumberField(raw, "width")
+	if err != nil || width <= 0 {
+		return ErrInvalidBoardInput
+	}
+	height, err := requiredNumberField(raw, "height")
+	if err != nil || height <= 0 {
+		return ErrInvalidBoardInput
+	}
+	return nil
+}
+
 func validateBoardStateMediaRef(payload json.RawMessage) (BoardStateMediaRef, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &raw); err != nil || raw == nil {
@@ -299,4 +357,16 @@ func requiredStringField(raw map[string]json.RawMessage, key string) (string, er
 		return "", ErrInvalidBoardInput
 	}
 	return text, nil
+}
+
+func requiredStringArrayField(raw map[string]json.RawMessage, key string) ([]string, error) {
+	value, ok := raw[key]
+	if !ok {
+		return nil, ErrInvalidBoardInput
+	}
+	var items []string
+	if err := json.Unmarshal(value, &items); err != nil || items == nil {
+		return nil, ErrInvalidBoardInput
+	}
+	return items, nil
 }

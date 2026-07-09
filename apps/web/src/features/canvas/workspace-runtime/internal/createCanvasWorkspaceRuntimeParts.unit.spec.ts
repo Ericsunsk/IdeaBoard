@@ -70,6 +70,9 @@ function createBoardRuntime() {
     graphRuntime: {
       captureHistory: vi.fn(),
       markDirty: vi.fn(),
+      grouping: {
+        groupFrames: ref([]),
+      },
       nodeDrag: {
         begin: vi.fn(),
         commit: vi.fn(),
@@ -232,6 +235,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.persistence.saveStatus).toBe(board.saveStatus)
     expect(runtime.persistence.flushAutosave).not.toBe(board.flushAutosave)
     expect(runtime.persistence.reattachPendingImageResults).toBe(task.reattachPendingImageResults)
+    expect(runtime.graphEditing.grouping).toBe(board.graphRuntime.grouping)
     expect(runtime.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
     expect(runtime.imageWorkflow.runCanvasExtendAction).toBe(task.runCanvasExtendAction)
 

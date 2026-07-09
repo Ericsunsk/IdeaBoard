@@ -8,6 +8,7 @@ export function useCanvasWorkspaceRuntime(
   options: UseCanvasWorkspaceRuntimeOptions,
 ): CanvasWorkspaceRuntime {
   const runtime = createCanvasWorkspaceRuntimeParts(options)
+  const grouping = runtime.graphEditing.grouping
 
   return {
     viewModel: {
@@ -35,6 +36,7 @@ export function useCanvasWorkspaceRuntime(
       },
       graphEditing: {
         graphAdapter: runtime.graphEditing.graphAdapter,
+        grouping: grouping.view,
         hasSelectedFlowNodes: runtime.graphEditing.hasSelectedFlowNodes,
         isFlowInteractionActive: runtime.graphEditing.isFlowInteractionActive,
         isFlowViewportPanInteractionActive: runtime.graphEditing.isFlowViewportPanInteractionActive,
@@ -89,6 +91,7 @@ export function useCanvasWorkspaceRuntime(
         loadCanvasBoardAndProbe: runtime.viewportControls.loadCanvasBoardAndProbe,
       },
       graphEditing: {
+        grouping: grouping.commands,
         scheduleFlowNodeInternalsRefresh: runtime.graphEditing.scheduleFlowNodeInternalsRefresh,
         createNodeAtPosition: runtime.graphEditing.createNodeAtPosition,
         onExportSelectedImages: runtime.graphEditing.onExportSelectedImages,

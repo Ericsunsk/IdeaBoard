@@ -84,9 +84,20 @@
   --canvas-selection-active-border: var(--canvas-accent);
   --canvas-selection-group-surface: var(--canvas-accent-soft);
   --canvas-selection-group-border: var(--canvas-accent);
+  --canvas-group-frame-surface: var(--canvas-selection-group-surface);
+  --canvas-group-frame-border: var(--canvas-selection-group-border);
   --canvas-selection-group-outset: 10px;
   --canvas-selection-group-radius: 6px;
+  --canvas-vue-flow-z: 1;
   --canvas-selection-group-z: 1;
+  --canvas-group-frame-body-z: 0;
+  --canvas-group-frame-selected-body-z: 1;
+  --canvas-group-frame-controls-z: 4;
+}
+
+.canvas-flow-wrap > .vue-flow {
+  position: relative;
+  z-index: var(--canvas-vue-flow-z);
 }
 
 .canvas-flow-wrap .vue-flow__selection {

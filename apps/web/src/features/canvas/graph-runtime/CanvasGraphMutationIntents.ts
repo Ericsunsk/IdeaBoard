@@ -2,6 +2,7 @@ import type { CanvasConnection, CanvasPoint } from '../../canvas-board/domain'
 import {
   toCanvasGraphEdgeId,
   type CanvasGraphEdgeId,
+  type CanvasGraphGroupId,
   type CanvasGraphNodeId,
   type CanvasGraphStore,
   type CanvasGraphTransaction,
@@ -20,7 +21,7 @@ export type CanvasGraphNodeDragIntent = {
 }
 
 export function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
-  return /^(?:image|prompt|fusion)-\d+$/.test(nodeId)
+  return /^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/.test(nodeId)
 }
 
 export function isSameCanvasConnectionEndpoint(left: CanvasConnection, right: CanvasConnection) {
@@ -183,6 +184,32 @@ export function commitCanvasGraphDeleteIntent(
       edgeIds,
       removeConnectedEdges: intent.removeConnectedEdges ?? true,
     })
+    return transaction.commit()
+  } catch (error) {
+    transaction.cancel()
+    throw error
+  }
+}
+
+export function commitCanvasGraphDeleteGroupIntent(
+  store: CanvasGraphStore,
+  intent: {
+    groupId: CanvasGraphGroupId
+    deleteMembers?: boolean
+    removeConnectedEdges?: boolean
+  },
+): CanvasGraphTransactionSummary {
+  const group = store.getGroup(intent.groupId)
+  const nodeIds = intent.deleteMembers ? [...(group?.nodeIds ?? [])] : []
+  const transaction = store.beginTransaction('group-delete')
+  try {
+    transaction.ungroup(intent.groupId)
+    if (nodeIds.length > 0) {
+      transaction.batchDelete({
+        nodeIds,
+        removeConnectedEdges: intent.removeConnectedEdges ?? true,
+      })
+    }
     return transaction.commit()
   } catch (error) {
     transaction.cancel()

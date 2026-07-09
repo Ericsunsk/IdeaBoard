@@ -1,0 +1,72 @@
+import { describe, expect, it, vi } from 'vitest'
+import { render } from '../../../test/render'
+import CanvasSelectionGroupActionButton from './CanvasSelectionGroupActionButton.vue'
+
+describe('CanvasSelectionGroupActionButton', () => {
+  it('renders the group action as an icon-only accessible button', () => {
+    const onActivate = vi.fn()
+    const { container } = render(CanvasSelectionGroupActionButton, {
+      props: {
+        action: { kind: 'group', label: '组合', nodeIds: ['prompt-1', 'prompt-2'] },
+        position: { x: 420, y: 88 },
+        onActivate,
+      },
+    })
+
+    const button = container.querySelector('button')
+    expect(button?.getAttribute('aria-label')).toBe('组合')
+    expect(button?.getAttribute('title')).toBe('组合')
+    expect(button?.getAttribute('class')).toContain('ib-round-control')
+    expect(button?.getAttribute('class')).toContain('canvas-chrome-icon-button')
+    expect(button?.style.left).toBe('420px')
+    expect(button?.style.top).toBe('88px')
+    expect(container.querySelector('.node-tool-tooltip')?.textContent).toBe('组合')
+
+    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(onActivate).toHaveBeenCalledOnce()
+  })
+
+  it('renders the ungroup action and hides when no action is available', () => {
+    const visible = render(CanvasSelectionGroupActionButton, {
+      props: {
+        action: {
+          kind: 'ungroup',
+          label: '解组',
+          groupId: 'group-1',
+          nodeIds: ['prompt-1', 'prompt-2'],
+        },
+        position: { x: 270, y: 88 },
+      },
+    })
+
+    expect(visible.container.querySelector('button')?.getAttribute('aria-label')).toBe('解组')
+    expect(visible.container.querySelector('.node-tool-tooltip')?.textContent).toBe('解组')
+    expect(visible.container.querySelector('button')?.style.left).toBe('270px')
+    expect(visible.container.querySelector('button')?.style.top).toBe('88px')
+
+    const hidden = render(CanvasSelectionGroupActionButton, {
+      props: {
+        action: null,
+        position: { x: 270, y: 88 },
+      },
+    })
+
+    expect(hidden.container.querySelector('button')).toBeNull()
+  })
+
+  it('hides when no viewport position is available', () => {
+    const { container } = render(CanvasSelectionGroupActionButton, {
+      props: {
+        action: {
+          kind: 'ungroup',
+          label: '解组',
+          groupId: 'group-1',
+          nodeIds: [],
+        },
+        position: null,
+      },
+    })
+
+    expect(container.querySelector('button')).toBeNull()
+  })
+})

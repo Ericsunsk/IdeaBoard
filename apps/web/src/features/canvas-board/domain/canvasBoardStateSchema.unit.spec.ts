@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION, type CanvasGroup } from './canvasNodes'
+import { normalizeLatestCanvasBoardState } from './latestBoardState'
 import { makeCanvasBoardState, makePendingImageNodeSnapshot } from '../testing'
+
+function makeCanvasGroup(overrides: Partial<CanvasGroup> = {}): CanvasGroup {
+  return {
+    id: 'group-1',
+    nodeIds: ['image-1', 'prompt-1'],
+    x: 20,
+    y: 20,
+    width: 700,
+    height: 360,
+    ...overrides,
+  }
+}
 
 describe('canvasBoardStateSchema', () => {
   it('accepts an empty snapshot', () => {
@@ -50,7 +64,11 @@ describe('canvasBoardStateSchema', () => {
 
   it('accepts persistent canvas groups', () => {
     const state = makeCanvasBoardState({
-      groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+      groups: [
+        makeCanvasGroup(),
+        makeCanvasGroup({ id: 'group-2', nodeIds: ['image-1'] }),
+        makeCanvasGroup({ id: 'group-3', nodeIds: [] }),
+      ],
     })
 
     const parsed = v.safeParse(canvasBoardStateSchema, state)
@@ -58,7 +76,48 @@ describe('canvasBoardStateSchema', () => {
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       expect(parsed.output.groups).toEqual([
-        { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
+        makeCanvasGroup(),
+        makeCanvasGroup({ id: 'group-2', nodeIds: ['image-1'] }),
+        makeCanvasGroup({ id: 'group-3', nodeIds: [] }),
+      ])
+    }
+  })
+
+  it('accepts persistent canvas groups that reference decimal draft node ids', () => {
+    const state = makeCanvasBoardState({
+      promptNodes: [
+        {
+          id: 1000.25,
+          type: 'prompt',
+          x: 0,
+          y: 0,
+          width: 200,
+          text: 'draft prompt',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          inputImages: [],
+        },
+        {
+          id: 1001.5,
+          type: 'prompt',
+          x: 320,
+          y: 0,
+          width: 200,
+          text: 'draft prompt 2',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          inputImages: [],
+        },
+      ],
+      groups: [makeCanvasGroup({ nodeIds: ['prompt-1000.25', 'prompt-1001.5'] })],
+    })
+
+    const parsed = v.safeParse(canvasBoardStateSchema, state)
+
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.output.groups).toEqual([
+        makeCanvasGroup({ nodeIds: ['prompt-1000.25', 'prompt-1001.5'] }),
       ])
     }
   })
@@ -67,22 +126,86 @@ describe('canvasBoardStateSchema', () => {
     const parsed = v.safeParse(
       canvasBoardStateSchema,
       makeCanvasBoardState({
-        groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+        groups: [makeCanvasGroup()],
       }),
     )
     expect(parsed.success).toBe(true)
 
     const invalidIdParsed = v.safeParse(canvasBoardStateSchema, {
       ...makeCanvasBoardState(),
-      groups: [{ id: 'group-a', nodeIds: ['image-1', 'prompt-1'] }],
+      groups: [{ ...makeCanvasGroup(), id: 'group-a' }],
     })
     expect(invalidIdParsed.success).toBe(false)
 
-    const tooSmallParsed = v.safeParse(canvasBoardStateSchema, {
+    const invalidNodeIdParsed = v.safeParse(canvasBoardStateSchema, {
       ...makeCanvasBoardState(),
-      groups: [{ id: 'group-1', nodeIds: ['image-1'] }],
+      groups: [{ ...makeCanvasGroup(), nodeIds: ['node-1'] }],
     })
-    expect(tooSmallParsed.success).toBe(false)
+    expect(invalidNodeIdParsed.success).toBe(false)
+
+    const missingGeometryParsed = v.safeParse(canvasBoardStateSchema, {
+      ...makeCanvasBoardState(),
+      groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+    })
+    expect(missingGeometryParsed.success).toBe(false)
+
+    const invalidGeometryParsed = v.safeParse(canvasBoardStateSchema, {
+      ...makeCanvasBoardState(),
+      groups: [makeCanvasGroup({ width: 0 })],
+    })
+    expect(invalidGeometryParsed.success).toBe(false)
+
+    const nonFiniteGeometryParsed = v.safeParse(canvasBoardStateSchema, {
+      ...makeCanvasBoardState(),
+      groups: [makeCanvasGroup({ x: Number.NaN })],
+    })
+    expect(nonFiniteGeometryParsed.success).toBe(false)
+  })
+
+  it('rejects old schema versions during latest-state normalization', () => {
+    const parsed = normalizeLatestCanvasBoardState({
+      ...makeCanvasBoardState(),
+      schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+    })
+
+    expect(parsed).toBeNull()
+  })
+
+  it('rejects missing schema versions during latest-state normalization', () => {
+    const { schemaVersion: _schemaVersion, ...stateWithoutVersion } = makeCanvasBoardState()
+
+    const parsed = normalizeLatestCanvasBoardState(stateWithoutVersion)
+
+    expect(parsed).toBeNull()
+  })
+
+  it('rejects old node shape during latest-state normalization', () => {
+    const parsed = normalizeLatestCanvasBoardState({
+      ...makeCanvasBoardState(),
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'https://example.com/source.png',
+          sourceImageRatio: 1,
+          outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
+        },
+      ],
+    })
+
+    expect(parsed).toBeNull()
+  })
+
+  it('rejects old group shape during latest-state normalization', () => {
+    const parsed = normalizeLatestCanvasBoardState({
+      ...makeCanvasBoardState(),
+      groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+    })
+
+    expect(parsed).toBeNull()
   })
 
   it('rejects invalid state', () => {

@@ -8,7 +8,27 @@ import {
 import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   createEmptyCanvasBoardSnapshot,
+  type CanvasGroup,
 } from '../../canvas-board/domain'
+
+const GROUP_GEOMETRY = {
+  x: 20,
+  y: 20,
+  width: 700,
+  height: 420,
+}
+
+function makeGroup(
+  id: CanvasGroup['id'],
+  nodeIds: CanvasGroup['nodeIds'],
+  geometry: Pick<CanvasGroup, 'x' | 'y' | 'width' | 'height'> = GROUP_GEOMETRY,
+): CanvasGroup {
+  return {
+    id,
+    nodeIds,
+    ...geometry,
+  }
+}
 
 function makeImageFlowNode(params: {
   flowId: string
@@ -560,8 +580,8 @@ describe('flowSnapshotAdapter', () => {
   it('preserves current groups while exporting flow state', () => {
     const base = createEmptyCanvasBoardSnapshot()
     base.groups = [
-      { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
-      { id: 'group-2', nodeIds: ['image-1', 'prompt-2'] },
+      makeGroup('group-1', ['image-1', 'prompt-1']),
+      makeGroup('group-2', ['image-1', 'prompt-2']),
     ]
 
     const snapshot = flowToCanvasBoardSnapshot(
@@ -580,7 +600,10 @@ describe('flowSnapshotAdapter', () => {
       base,
     )
 
-    expect(snapshot.groups).toEqual([{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }])
+    expect(snapshot.groups).toEqual([
+      makeGroup('group-1', ['image-1', 'prompt-1']),
+      makeGroup('group-2', []),
+    ])
     expect(snapshot.groups).not.toBe(base.groups)
   })
 

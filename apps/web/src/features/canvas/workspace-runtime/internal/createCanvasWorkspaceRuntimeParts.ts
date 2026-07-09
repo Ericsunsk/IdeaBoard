@@ -257,6 +257,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     viewportControls: viewport,
     graphEditing: {
       graphAdapter: board.graphAdapter,
+      grouping: board.graphRuntime.grouping,
       scheduleFlowNodeInternalsRefresh: graph.scheduleFlowNodeInternalsRefresh,
       createNodeAtPosition: graph.createNodeAtPosition,
       hasSelectedFlowNodes: graph.hasSelectedFlowNodes,

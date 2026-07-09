@@ -5,8 +5,13 @@ import {
   type CanvasPoint,
 } from '../../canvas-board/domain'
 
+let lastCanvasEntityId = 0
+
 function createCanvasEntityId(): number {
-  return Date.now() + Math.random()
+  const timestampId = Date.now() * 1000
+  const nextId = Math.max(timestampId, lastCanvasEntityId + 1)
+  lastCanvasEntityId = nextId
+  return nextId
 }
 
 export function createCanvasNodeAt<T extends CanvasCreatableNodeKind>(

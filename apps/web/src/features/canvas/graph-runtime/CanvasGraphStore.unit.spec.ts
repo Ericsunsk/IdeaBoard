@@ -3,6 +3,7 @@ import {
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
   type CanvasConnection,
+  type CanvasGroup,
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../canvas-board/domain'
@@ -14,12 +15,32 @@ import {
 } from './CanvasGraphStore'
 import {
   commitCanvasGraphConnectIntent,
+  commitCanvasGraphDeleteGroupIntent,
   commitCanvasGraphDeleteIntent,
   commitCanvasGraphEdgeUpdateIntent,
   findCanvasGraphEdgeIdByEndpoint,
   isSameCanvasConnectionEndpoint,
   stageCanvasGraphNodeDragIntent,
 } from '.'
+
+const GROUP_GEOMETRY = {
+  x: 20,
+  y: 20,
+  width: 700,
+  height: 360,
+}
+
+function createGroup(
+  id: CanvasGroup['id'],
+  nodeIds: CanvasGroup['nodeIds'],
+  geometry: Pick<CanvasGroup, 'x' | 'y' | 'width' | 'height'> = GROUP_GEOMETRY,
+): CanvasGroup {
+  return {
+    id,
+    nodeIds,
+    ...geometry,
+  }
+}
 
 function createImageNode(id: number, x: number, y: number): ImageNodeItem {
   return {
@@ -68,7 +89,9 @@ function createSampleSnapshot(): CanvasBoardSnapshot {
   snapshot.imageNodes = [createImageNode(1, 40, 80)]
   snapshot.promptNodes = [createPromptNode(1, 420, 80), createPromptNode(2, 820, 80)]
   snapshot.connections = [createConnection(1, 1, 1)]
-  snapshot.mediaRefs = [{ mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' }]
+  snapshot.mediaRefs = [
+    { mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'source' },
+  ]
   return snapshot
 }
 
@@ -108,15 +131,35 @@ describe('CanvasGraphStore', () => {
     const groupId = toCanvasGraphGroupId(1)
     const imageId = toCanvasGraphNodeId('image', 1)
     const promptId = toCanvasGraphNodeId('prompt', 1)
-    snapshot.groups = [{ id: groupId, nodeIds: [imageId, promptId] }]
+    snapshot.groups = [createGroup(groupId, [imageId, promptId])]
 
     const store = CanvasGraphStore.fromSnapshot(snapshot)
 
     expect(store.getGroupIds()).toEqual([groupId])
-    expect(store.getGroup(groupId)).toEqual({ id: groupId, nodeIds: [imageId, promptId] })
+    expect(store.getGroup(groupId)).toEqual(createGroup(groupId, [imageId, promptId]))
     expect(store.getGroupIdForNode(imageId)).toBe(groupId)
     expect(store.exportSnapshot()).toMatchObject({
-      groups: [{ id: groupId, nodeIds: [imageId, promptId] }],
+      groups: [createGroup(groupId, [imageId, promptId])],
+    })
+  })
+
+  it('round trips persistent groups with zero or one member as graph frames', () => {
+    const snapshot = createSampleSnapshot()
+    const firstGroupId = toCanvasGraphGroupId(1)
+    const secondGroupId = toCanvasGraphGroupId(2)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    snapshot.groups = [
+      createGroup(firstGroupId, [imageId]),
+      createGroup(secondGroupId, []),
+    ]
+
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    expect(store.getGroupIds()).toEqual([firstGroupId, secondGroupId])
+    expect(store.getGroup(firstGroupId)).toEqual(createGroup(firstGroupId, [imageId]))
+    expect(store.getGroup(secondGroupId)).toEqual(createGroup(secondGroupId, []))
+    expect(store.exportSnapshot()).toMatchObject({
+      groups: [createGroup(firstGroupId, [imageId]), createGroup(secondGroupId, [])],
     })
   })
 
@@ -203,7 +246,7 @@ describe('CanvasGraphStore', () => {
 
     const groupSummary = store
       .beginTransaction('group')
-      .createGroup([imageId, promptId])
+      .createGroup([imageId, promptId], GROUP_GEOMETRY)
       .commit()
 
     expect(groupSummary).toMatchObject({
@@ -216,9 +259,9 @@ describe('CanvasGraphStore', () => {
       shouldMarkDirty: true,
     })
     expect(groupSummary.projectionPatch.groups.added).toEqual([
-      { id: groupId, nodeIds: [imageId, promptId] },
+      createGroup(groupId, [imageId, promptId]),
     ])
-    expect(store.exportSnapshot().groups).toEqual([{ id: groupId, nodeIds: [imageId, promptId] }])
+    expect(store.exportSnapshot().groups).toEqual([createGroup(groupId, [imageId, promptId])])
 
     const ungroupSummary = store.beginTransaction('ungroup').ungroup(groupId).commit()
 
@@ -235,26 +278,89 @@ describe('CanvasGraphStore', () => {
     expect(store.exportSnapshot().groups).toEqual([])
   })
 
+  it('commits group-delete intents for empty frames without touching nodes or edges', () => {
+    const snapshot = createSampleSnapshot()
+    const groupId = toCanvasGraphGroupId(1)
+    snapshot.groups = [createGroup(groupId, [])]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    const summary = commitCanvasGraphDeleteGroupIntent(store, { groupId })
+
+    expect(summary).toMatchObject({
+      reason: 'group-delete',
+      didChange: true,
+      hasDomainChanges: true,
+      changedNodeIds: [],
+      changedEdgeIds: [],
+      removedNodeIds: [],
+      removedEdgeIds: [],
+      changedGroupIds: [],
+      removedGroupIds: [groupId],
+      shouldRecordHistory: true,
+      shouldMarkDirty: true,
+    })
+    expect(summary.projectionPatch.groups.removedIds).toEqual([groupId])
+    expect(store.exportSnapshot()).toMatchObject({
+      imageNodes: [expect.objectContaining({ id: 1 })],
+      promptNodes: [expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 2 })],
+      connections: [expect.objectContaining({ id: 1 })],
+      groups: [],
+    })
+  })
+
+  it('commits group-delete intents for member nodes and connected edges', () => {
+    const snapshot = createSampleSnapshot()
+    const groupId = toCanvasGraphGroupId(1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const edgeId = toCanvasGraphEdgeId(1)
+    snapshot.groups = [createGroup(groupId, [imageId, promptId])]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    const summary = commitCanvasGraphDeleteGroupIntent(store, {
+      groupId,
+      deleteMembers: true,
+    })
+
+    expect(summary).toMatchObject({
+      reason: 'group-delete',
+      removedNodeIds: [imageId, promptId],
+      removedEdgeIds: [edgeId],
+      removedGroupIds: [groupId],
+      shouldRecordHistory: true,
+      shouldMarkDirty: true,
+    })
+    expect(store.exportSnapshot()).toMatchObject({
+      imageNodes: [],
+      promptNodes: [expect.objectContaining({ id: 2 })],
+      connections: [],
+      groups: [],
+    })
+  })
+
   it('rejects missing or already grouped nodes when creating a group', () => {
     const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
     const imageId = toCanvasGraphNodeId('image', 1)
     const promptId = toCanvasGraphNodeId('prompt', 1)
     const secondPromptId = toCanvasGraphNodeId('prompt', 2)
 
-    store.beginTransaction('group').createGroup([imageId, promptId]).commit()
+    store.beginTransaction('group').createGroup([imageId, promptId], GROUP_GEOMETRY).commit()
 
     expect(() =>
-      store.beginTransaction('group').createGroup([imageId, secondPromptId]).commit(),
+      store
+        .beginTransaction('group')
+        .createGroup([imageId, secondPromptId], GROUP_GEOMETRY)
+        .commit(),
     ).toThrow('node already belongs to group')
     expect(() =>
       store
         .beginTransaction('group')
-        .createGroup([secondPromptId, toCanvasGraphNodeId('image', 999)])
+        .createGroup([secondPromptId, toCanvasGraphNodeId('image', 999)], GROUP_GEOMETRY)
         .commit(),
     ).toThrow('group node does not exist')
-    expect(() => store.beginTransaction('group').createGroup([secondPromptId]).commit()).toThrow(
-      'requires at least two nodes',
-    )
+    expect(() =>
+      store.beginTransaction('group').createGroup([secondPromptId], GROUP_GEOMETRY).commit(),
+    ).toThrow('requires at least two nodes')
   })
 
   it('removes stale group membership when deleting nodes', () => {
@@ -263,7 +369,7 @@ describe('CanvasGraphStore', () => {
     const imageId = toCanvasGraphNodeId('image', 1)
     const promptId = toCanvasGraphNodeId('prompt', 1)
     const secondPromptId = toCanvasGraphNodeId('prompt', 2)
-    snapshot.groups = [{ id: groupId, nodeIds: [imageId, promptId, secondPromptId] }]
+    snapshot.groups = [createGroup(groupId, [imageId, promptId, secondPromptId])]
     const store = CanvasGraphStore.fromSnapshot(snapshot)
 
     const updateSummary = store
@@ -273,16 +379,106 @@ describe('CanvasGraphStore', () => {
 
     expect(updateSummary.changedGroupIds).toEqual([groupId])
     expect(updateSummary.projectionPatch.groups.updated).toEqual([
-      { id: groupId, nodeIds: [promptId, secondPromptId] },
+      createGroup(groupId, [promptId, secondPromptId]),
     ])
     expect(store.exportSnapshot().groups).toEqual([
-      { id: groupId, nodeIds: [promptId, secondPromptId] },
+      createGroup(groupId, [promptId, secondPromptId]),
     ])
 
     const removeSummary = store.beginTransaction('delete').removeNode(promptId).commit()
 
-    expect(removeSummary.removedGroupIds).toEqual([groupId])
-    expect(store.exportSnapshot().groups).toEqual([])
+    expect(removeSummary.changedGroupIds).toEqual([groupId])
+    expect(removeSummary.removedGroupIds).toEqual([])
+    expect(store.exportSnapshot().groups).toEqual([createGroup(groupId, [secondPromptId])])
+
+    const emptySummary = store.beginTransaction('delete').removeNode(secondPromptId).commit()
+
+    expect(emptySummary.changedGroupIds).toEqual([groupId])
+    expect(emptySummary.removedGroupIds).toEqual([])
+    expect(store.exportSnapshot().groups).toEqual([createGroup(groupId, [])])
+  })
+
+  it('moves nodes in and out of groups through membership transactions', () => {
+    const snapshot = createSampleSnapshot()
+    const groupId = toCanvasGraphGroupId(1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const secondPromptId = toCanvasGraphNodeId('prompt', 2)
+    snapshot.groups = [createGroup(groupId, [imageId, promptId])]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    const addSummary = store
+      .beginTransaction('group-membership')
+      .moveNodeToGroup(secondPromptId, groupId)
+      .commit()
+
+    expect(addSummary.changedGroupIds).toEqual([groupId])
+    expect(addSummary.projectionPatch.groups.updated).toEqual([
+      createGroup(groupId, [imageId, promptId, secondPromptId]),
+    ])
+    expect(store.exportSnapshot().groups).toEqual([
+      createGroup(groupId, [imageId, promptId, secondPromptId]),
+    ])
+
+    const removeSummary = store
+      .beginTransaction('group-membership')
+      .moveNodeToGroup(secondPromptId, null)
+      .commit()
+
+    expect(removeSummary.changedGroupIds).toEqual([groupId])
+    expect(store.exportSnapshot().groups).toEqual([createGroup(groupId, [imageId, promptId])])
+  })
+
+  it('keeps groups when moveNodeToGroup removes their final members', () => {
+    const snapshot = createSampleSnapshot()
+    const groupId = toCanvasGraphGroupId(1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    snapshot.groups = [createGroup(groupId, [imageId, promptId])]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    const singleMemberSummary = store
+      .beginTransaction('group-membership')
+      .moveNodeToGroup(imageId, null)
+      .commit()
+
+    expect(singleMemberSummary.changedGroupIds).toEqual([groupId])
+    expect(singleMemberSummary.removedGroupIds).toEqual([])
+    expect(store.getGroupIdForNode(imageId)).toBeUndefined()
+    expect(store.getGroup(groupId)).toEqual(createGroup(groupId, [promptId]))
+
+    const emptySummary = store
+      .beginTransaction('group-membership')
+      .moveNodeToGroup(promptId, null)
+      .commit()
+
+    expect(emptySummary.changedGroupIds).toEqual([groupId])
+    expect(emptySummary.removedGroupIds).toEqual([])
+    expect(store.getGroupIdForNode(promptId)).toBeUndefined()
+    expect(store.getGroupIds()).toEqual([groupId])
+    expect(store.exportSnapshot().groups).toEqual([createGroup(groupId, [])])
+  })
+
+  it('updates group geometry without changing membership', () => {
+    const snapshot = createSampleSnapshot()
+    const groupId = toCanvasGraphGroupId(1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    snapshot.groups = [createGroup(groupId, [imageId, promptId])]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+
+    const summary = store
+      .beginTransaction('group-resize')
+      .updateGroupGeometry(groupId, { x: 10, y: 12, width: 540, height: 260 })
+      .commit()
+
+    expect(summary.changedGroupIds).toEqual([groupId])
+    expect(summary.projectionPatch.groups.updated).toEqual([
+      createGroup(groupId, [imageId, promptId], { x: 10, y: 12, width: 540, height: 260 }),
+    ])
+    expect(store.exportSnapshot().groups).toEqual([
+      createGroup(groupId, [imageId, promptId], { x: 10, y: 12, width: 540, height: 260 }),
+    ])
   })
 
   it('supports transaction cancel without mutating committed graph state', () => {
@@ -331,9 +527,7 @@ describe('CanvasGraphStore', () => {
     const sameEndpoint = createConnection(99, 1, 1)
 
     expect(isSameCanvasConnectionEndpoint(createConnection(1, 1, 1), sameEndpoint)).toBe(true)
-    expect(findCanvasGraphEdgeIdByEndpoint(store, sameEndpoint)).toBe(
-      toCanvasGraphEdgeId(1),
-    )
+    expect(findCanvasGraphEdgeIdByEndpoint(store, sameEndpoint)).toBe(toCanvasGraphEdgeId(1))
   })
 
   it('commits connect intents with single-input last-write-wins policy', () => {

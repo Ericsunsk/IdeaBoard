@@ -36,7 +36,19 @@ func TestMarshalStateLimits(t *testing.T) {
 			t.Fatal("raw state should not be empty")
 		}
 		if version != CurrentBoardStateSchemaVersion {
-			t.Fatalf("schema version = %d, want 2", version)
+			t.Fatalf("schema version = %d, want %d", version, CurrentBoardStateSchemaVersion)
+		}
+	})
+
+	t.Run("valid v3 group", func(t *testing.T) {
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
+		state["groups"] = []interface{}{
+			validBoardStateGroup(map[string]interface{}{
+				"nodeIds": []interface{}{"image-1", "prompt-1000.25"},
+			}),
+		}
+		if _, _, err := marshalState(state); err != nil {
+			t.Fatalf("marshalState returned error: %v", err)
 		}
 	})
 
@@ -48,6 +60,14 @@ func TestMarshalStateLimits(t *testing.T) {
 			"connections": []interface{}{},
 			"updatedAt":   1,
 		})
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject old schema version", func(t *testing.T) {
+		state := validBoardState(CurrentBoardStateSchemaVersion-1, 100)
+		_, _, err := marshalState(state)
 		if !errors.Is(err, ErrInvalidBoardInput) {
 			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
 		}
@@ -126,6 +146,41 @@ func TestMarshalStateLimits(t *testing.T) {
 		}
 	})
 
+	t.Run("reject missing group geometry", func(t *testing.T) {
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
+		state["groups"] = []interface{}{
+			map[string]interface{}{"id": "group-1", "nodeIds": []interface{}{"image-1", "prompt-1"}},
+		}
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject invalid group geometry", func(t *testing.T) {
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
+		state["groups"] = []interface{}{validBoardStateGroup(map[string]interface{}{"width": 0})}
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
+	t.Run("reject old group shape", func(t *testing.T) {
+		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
+		state["groups"] = []interface{}{
+			map[string]interface{}{
+				"id":      "group-1",
+				"nodeIds": []interface{}{"image-1", "prompt-1"},
+				"bounds":  map[string]interface{}{"x": 20, "y": 20, "width": 700, "height": 360},
+			},
+		}
+		_, _, err := marshalState(state)
+		if !errors.Is(err, ErrInvalidBoardInput) {
+			t.Fatalf("err = %v, want ErrInvalidBoardInput", err)
+		}
+	})
+
 	t.Run("reject non-positive preview snapshot version", func(t *testing.T) {
 		state := validBoardState(CurrentBoardStateSchemaVersion, 100)
 		state["previewSnapshotVersion"] = 0
@@ -171,4 +226,19 @@ func validBoardState(schemaVersion int, marker int) map[string]interface{} {
 		"groups":      []interface{}{},
 		"updatedAt":   1,
 	}
+}
+
+func validBoardStateGroup(overrides map[string]interface{}) map[string]interface{} {
+	group := map[string]interface{}{
+		"id":      "group-1",
+		"nodeIds": []interface{}{"image-1", "prompt-1"},
+		"x":       20,
+		"y":       20,
+		"width":   700,
+		"height":  360,
+	}
+	for key, value := range overrides {
+		group[key] = value
+	}
+	return group
 }

@@ -40,7 +40,7 @@ const canvasGroupIdSchema = v.pipe(
 )
 const canvasGroupNodeIdSchema = v.pipe(
   v.string(),
-  v.regex(/^(?:image|prompt|fusion)-\d+$/),
+  v.regex(/^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/),
   v.transform((value) => value as CanvasGroupNodeId),
 )
 
@@ -128,7 +128,11 @@ const canvasConnectionSchema = v.strictObject({
 
 const canvasGroupSchema = v.strictObject({
   id: canvasGroupIdSchema,
-  nodeIds: v.pipe(v.array(canvasGroupNodeIdSchema), v.minLength(2)),
+  nodeIds: v.array(canvasGroupNodeIdSchema),
+  x: finiteNumberSchema,
+  y: finiteNumberSchema,
+  width: positiveFiniteNumberSchema,
+  height: positiveFiniteNumberSchema,
 })
 
 const canvasBoardSnapshotShape = v.strictObject({

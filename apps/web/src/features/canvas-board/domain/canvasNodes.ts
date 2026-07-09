@@ -20,7 +20,7 @@ export const DEFAULT_IMAGE_NODE_OUTPUT_COUNT = 1
 export const IMAGE_OUTPUT_COUNT_PRESET_OPTIONS = [1, 2, 4, 8] as const
 export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
 export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
-export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 2
+export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 3
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
 export { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint }
 
@@ -141,6 +141,10 @@ export interface CanvasConnection {
 export interface CanvasGroup {
   id: CanvasGroupId
   nodeIds: CanvasGroupNodeId[]
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 export type CanvasNodeItem = PromptNodeItem | ImageNodeItem | FusionNodeItem

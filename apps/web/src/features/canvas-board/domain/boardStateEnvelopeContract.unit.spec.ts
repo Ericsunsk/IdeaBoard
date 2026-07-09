@@ -47,21 +47,14 @@ describe('boardStateEnvelopeContract', () => {
     ).toBeNull()
   })
 
-  it('normalizes invalid optional preview metadata', () => {
+  it('rejects invalid optional preview metadata', () => {
     const parsed = parseBoardStateEnvelopeContract({
       ...makeCanvasBoardState(),
       previewSnapshotUpdatedAt: Number.NaN,
       previewSnapshotVersion: 0,
     })
 
-    expect(parsed).toEqual(
-      expect.objectContaining({
-        schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-        updatedAt: 1,
-      }),
-    )
-    expect(parsed).not.toHaveProperty('previewSnapshotUpdatedAt')
-    expect(parsed).not.toHaveProperty('previewSnapshotVersion')
+    expect(parsed).toBeNull()
   })
 
   it('rejects invalid schema version, graph arrays, and media refs', () => {

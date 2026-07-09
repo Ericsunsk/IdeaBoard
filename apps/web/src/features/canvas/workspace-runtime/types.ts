@@ -1,4 +1,8 @@
 import type { createCanvasWorkspaceRuntimeParts } from './internal/createCanvasWorkspaceRuntimeParts'
+import type {
+  CanvasGroupRuntimeCommands,
+  CanvasGroupRuntimeView,
+} from '../composables/useCanvasGroupRuntime'
 
 export type { UseCanvasWorkspaceRuntimeOptions } from './internal/createCanvasWorkspaceRuntimeParts'
 
@@ -30,7 +34,9 @@ export type CanvasWorkspaceRuntimeViewModel = {
     | 'isFlowInteractionLocked'
     | 'nodeContextMenu'
     | 'canvasNodeMenuItems'
-  >
+  > & {
+    grouping: CanvasGroupRuntimeView
+  }
 }
 
 export type CanvasWorkspaceRuntimeCommands = {
@@ -81,7 +87,9 @@ export type CanvasWorkspaceRuntimeCommands = {
     | 'beginFlowNodeDragDuplicateTracking'
     | 'finishFlowNodeDragDuplicateTracking'
     | 'getFlowNodeUiStateCached'
-  >
+  > & {
+    grouping: CanvasGroupRuntimeCommands
+  }
   imageWorkflow: Pick<
     CanvasWorkspaceRuntimeParts['imageWorkflow'],
     | 'isGenerationAvailable'

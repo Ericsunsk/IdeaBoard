@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import type { CanvasBoardState } from '../domain'
-import {
-  createEmptyCanvasBoardState,
-  DEFAULT_FUSION_BLEND_POINT,
-  DEFAULT_FUSION_NODE_OUTPUT_COUNT,
-  DEFAULT_PROMPT_ASPECT_RATIO,
-  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-} from '../domain'
+import { createEmptyCanvasBoardState } from '../domain'
 import {
   createBoardPreviewRefreshQueue,
   type BoardPreviewRefreshQueueDependencies,
@@ -127,12 +121,12 @@ describe('boardPreviewRefreshQueue', () => {
     expect(queue.previewMap.value).toMatchObject({
       fresh: 'fresh-url',
       missingDataUrl: 'data:image/png;base64,preview',
-      invalidUpdatedAt: 'data:image/png;base64,preview',
+      invalidUpdatedAt: '',
       oldVersion: 'data:image/png;base64,preview',
       oldSnapshot: 'data:image/png;base64,preview',
     })
-    expect(deps.renderPreview).toHaveBeenCalledTimes(4)
-    expect(deps.setPreviewSnapshot).toHaveBeenCalledTimes(4)
+    expect(deps.renderPreview).toHaveBeenCalledTimes(3)
+    expect(deps.setPreviewSnapshot).toHaveBeenCalledTimes(3)
     expect(deps.setPreviewSnapshot).not.toHaveBeenCalledWith(
       'fresh',
       expect.anything(),
@@ -186,8 +180,7 @@ describe('boardPreviewRefreshQueue', () => {
     expect(queue.previewMap.value.boardA).toBe('fresh-render')
   })
 
-  it('renders preview refresh from a canonicalized latest board state', async () => {
-    let renderedState: CanvasBoardState | null = null
+  it('warns and skips preview refresh for non-latest board state', async () => {
     const states = {
       boardA: {
         schemaVersion: 1,
@@ -229,41 +222,23 @@ describe('boardPreviewRefreshQueue', () => {
       } as unknown as CanvasBoardState,
     }
     const deps = makeDeps(states)
-    vi.mocked(deps.renderPreview).mockImplementation(async (state) => {
-      renderedState = state
-      return 'canonical-preview'
-    })
     const queue = createBoardPreviewRefreshQueue(deps)
 
     queue.schedule([makeBoard('boardA')])
     await flushPromises()
 
-    expect(deps.renderPreview).toHaveBeenCalledTimes(1)
-    const rendered = renderedState as unknown as CanvasBoardState
-    expect(rendered.imageNodes[0]).toEqual(
+    expect(deps.renderPreview).not.toHaveBeenCalled()
+    expect(deps.setPreviewSnapshot).not.toHaveBeenCalled()
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+    expect(deps.warn).toHaveBeenCalledWith(
+      '[boards] invalid board state for preview refresh',
+      'boardA',
       expect.objectContaining({
-        outputCount: 1,
-        outputStatus: 'ready',
+        code: 'INVALID_BOARD_STATE',
+        boundary: 'preview-stale-check',
       }),
     )
-    expect(rendered.promptNodes[0]).toEqual(
-      expect.objectContaining({
-        outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-        inputImages: [],
-      }),
-    )
-    expect(rendered.fusionNodes[0]).toEqual(
-      expect.objectContaining({
-        prompt: '',
-        outputCount: DEFAULT_FUSION_NODE_OUTPUT_COUNT,
-        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-        blendPoint: DEFAULT_FUSION_BLEND_POINT,
-        inputImages: [],
-        outputStatus: 'idle',
-      }),
-    )
-    expect(queue.previewMap.value.boardA).toBe('canonical-preview')
+    expect(queue.previewMap.value.boardA).toBeUndefined()
   })
 
   it('warns and skips snapshot writes when render fails', async () => {

@@ -5,13 +5,14 @@ import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium, type BrowserContext, type Page, type Route } from 'playwright'
-import type {
-  CanvasBoardState,
-  CanvasConnection,
-  CanvasConnectionNodeType,
-  FusionNodeItem,
-  ImageNodeItem,
-  PromptNodeItem,
+import {
+  CANVAS_BOARD_STATE_SCHEMA_VERSION,
+  type CanvasBoardState,
+  type CanvasConnection,
+  type CanvasConnectionNodeType,
+  type FusionNodeItem,
+  type ImageNodeItem,
+  type PromptNodeItem,
 } from '../src/features/canvas-board/domain'
 import type { BoardStateEnvelope, User, UserBoardItem } from '../src/shared/api/generated-query/model'
 import { createMockSmokeRuntime } from './mock-smoke-utils'
@@ -534,7 +535,7 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
 
   const connections = createStructureHeavyConnections(refs, Math.floor(nodeCount * DEFAULT_EDGE_DENSITY))
   const state: CanvasBoardState = {
-    schemaVersion: 2,
+    schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     imageNodes,
     promptNodes,
     fusionNodes,
@@ -548,7 +549,7 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
     state: toBoardStateEnvelope(state),
     access_role: 'owner',
     revision: 1,
-    state_schema_version: 2,
+    state_schema_version: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     created_at: MOCK_UPDATED_AT - 86_400_000,
     updated_at: MOCK_UPDATED_AT,
   } satisfies UserBoardItem
@@ -750,7 +751,7 @@ function isCanvasBoardState(value: unknown): value is CanvasBoardState {
   if (!value || typeof value !== 'object') return false
   const record = value as Partial<CanvasBoardState>
   return (
-    record.schemaVersion === 2 &&
+    record.schemaVersion === CANVAS_BOARD_STATE_SCHEMA_VERSION &&
     Array.isArray(record.imageNodes) &&
     Array.isArray(record.promptNodes) &&
     Array.isArray(record.fusionNodes) &&

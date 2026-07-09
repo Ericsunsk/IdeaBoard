@@ -1,4 +1,5 @@
-import type { User, UserBoardItem } from '../src/shared/api/generated-query/model'
+import type { BoardStateEnvelope, User, UserBoardItem } from '../src/shared/api/generated-query/model'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../src/features/canvas-board/domain'
 import { assertNoConsoleErrors, createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 import { pageChromeBrowserAssertionHelpers } from './page-chrome-smoke-helpers'
 
@@ -73,7 +74,7 @@ const SITE_BRANDING_SETTING = {
 }
 
 const MOCK_BOARD_STATE = {
-  schemaVersion: 2 as const,
+  schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
   imageNodes: [],
   promptNodes: [
     {
@@ -93,7 +94,7 @@ const MOCK_BOARD_STATE = {
   connections: [],
   groups: [],
   updatedAt: MOCK_UPDATED_AT,
-}
+} satisfies BoardStateEnvelope
 
 const MOCK_BOARD = {
   board_id: MOCK_BOARD_ID,
@@ -101,7 +102,7 @@ const MOCK_BOARD = {
   state: MOCK_BOARD_STATE,
   access_role: 'owner',
   revision: 1,
-  state_schema_version: 2,
+  state_schema_version: CANVAS_BOARD_STATE_SCHEMA_VERSION,
   created_at: MOCK_UPDATED_AT - 86_400_000,
   updated_at: MOCK_UPDATED_AT,
 } satisfies UserBoardItem

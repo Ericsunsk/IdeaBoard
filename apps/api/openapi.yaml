@@ -1492,7 +1492,7 @@ components:
       properties:
         schemaVersion:
           type: integer
-          enum: [2]
+          enum: [3]
         imageNodes:
           type: array
           items:
@@ -1532,7 +1532,7 @@ components:
 
     BoardStateGroup:
       type: object
-      required: [id, nodeIds]
+      required: [id, nodeIds, x, y, width, height]
       additionalProperties: false
       properties:
         id:
@@ -1540,10 +1540,13 @@ components:
           pattern: '^group-[0-9]+$'
         nodeIds:
           type: array
-          minItems: 2
           items:
             type: string
-            pattern: '^(image|prompt|fusion)-[0-9]+$'
+            pattern: '^(image|prompt|fusion)-[0-9]+(?:\\.[0-9]+)?$'
+        x: { type: number }
+        y: { type: number }
+        width: { type: number, minimum: 0, exclusiveMinimum: true }
+        height: { type: number, minimum: 0, exclusiveMinimum: true }
 
     BoardStateMediaRef:
       type: object

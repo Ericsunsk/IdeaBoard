@@ -15,27 +15,24 @@ import {
 } from './useCanvasVueFlowGraphAdapter'
 import {
   createFlowGraphCommandOptions,
-  createFlowGraphCommandOptionsFromTransactionSummary,
   readFlowGraphCommandSideEffects,
 } from './flowGraphAdapterCommandSideEffects'
+import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
+import { useCanvasGroupRuntime, type CanvasGroupRuntimeControls } from './useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
 import {
   flowToCanvasBoardSnapshot,
-  resolveFlowNodeCanvasRef,
   resolveFlowEdgeCanvasConnectionId,
   type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
-import { collectDeletedRunningTaskIds } from '../utils/flowDeletedRunningTasks'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   commitCanvasGraphDeleteIntent,
   createCanvasGraphStore,
   resolveCanvasGraphEdgeId,
   stageCanvasGraphNodeDragIntent,
-  toCanvasGraphNodeId,
   type CanvasGraphEdgeId,
-  type CanvasGraphNodeId,
   type CanvasGraphTransaction,
 } from '../graph-runtime'
 
@@ -47,6 +44,8 @@ type SelectableFlowItem = {
 type FlowGraphCommitOptions = {
   preserveSelection?: boolean
 }
+
+export type { CanvasSelectionGroupAction } from './useCanvasGroupRuntime'
 
 type NodeDragChange = NodeChange & {
   id: string
@@ -63,6 +62,7 @@ export type CanvasFlowGraphRuntimeControls = {
     snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
   ) => ReturnType<typeof createCanvasGraphStore>
   markDirty: () => void
+  grouping: CanvasGroupRuntimeControls
   nodeDrag: {
     begin: () => void
     commit: () => void
@@ -126,6 +126,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       ...options.boardBaseSnapshot.value,
       groups: groups as CanvasBoardSnapshot['groups'],
     }
+    groupRuntime?.internal.handleCommittedGroupsChanged()
   }
 
   function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
@@ -192,9 +193,14 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     nextGraph: { nodes: Node[]; edges: Edge[] },
     commitOptions: FlowGraphCommitOptions = {},
   ) {
+    const projectedGraph = {
+      nodes:
+        groupRuntime?.internal.projectCurrentGroupNodeLayers(nextGraph.nodes) ?? nextGraph.nodes,
+      edges: nextGraph.edges,
+    }
     const resolvedGraph = commitOptions.preserveSelection
-      ? preserveCurrentSelection(nextGraph)
-      : nextGraph
+      ? preserveCurrentSelection(projectedGraph)
+      : projectedGraph
     graphAdapter.replaceGraph(resolvedGraph)
   }
 
@@ -249,7 +255,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   })
 
   const currentBoardId = boardPersistence.currentBoardId
-  const loadInitialOrRouteBoard = boardPersistence.loadInitialOrRouteBoard
+  const loadInitialOrRouteBoardBase = boardPersistence.loadInitialOrRouteBoard
+  const loadInitialOrRouteBoard: typeof loadInitialOrRouteBoardBase = async (...args) => {
+    groupRuntime?.internal.resetTransientSelectionState()
+    const result = await loadInitialOrRouteBoardBase(...args)
+    groupRuntime?.internal.handleCommittedGroupsChanged()
+    return result
+  }
   const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
   const canSaveBoard = boardPersistence.canSaveBoard
 
@@ -296,6 +308,20 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     )
     return createCanvasGraphStore(snapshot)
   }
+
+  const groupRuntime = useCanvasGroupRuntime({
+    nodes: options.nodes,
+    edges: options.edges,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    graphAdapter,
+    flowHistory,
+    createCurrentCanvasGraphStore,
+    commitGroups: commitHistoryGroups,
+    markDirty,
+    onWarning: options.onWarning,
+    onNativeRemove: options.onNativeRemove,
+    stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+  })
 
   function createNodeDragTransaction() {
     return createCurrentCanvasGraphStore().beginTransaction('node-drag')
@@ -371,6 +397,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function beginNodeDragTransaction() {
+    groupRuntime?.internal.onNodeDragStart()
     isNodeDragActive = true
     activeNodeDrag = { transaction: createNodeDragTransaction() }
     flowHistory.onNodeDragStart()
@@ -378,9 +405,11 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function commitNodeDragTransaction() {
     try {
+      const draggedChanges = [...pendingNodeDragChanges, ...latestNodeDragChanges]
       flushQueuedNodeDragChanges()
       syncProjectedNodeDragChanges()
       activeNodeDrag?.transaction.commit()
+      groupRuntime?.internal.applyDraggedNodeMembershipChanges(draggedChanges)
       flowHistory.onNodeDragStop(() => {
         markDirty()
       })
@@ -404,19 +433,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     isNodeDragActive = false
   }
 
-  const graphRuntime: CanvasFlowGraphRuntimeControls = {
-    captureHistory: captureFullGraphHistory,
-    createCurrentCanvasGraphStore,
-    markDirty: () => {
-      markDirty()
-    },
-    nodeDrag: {
-      begin: beginNodeDragTransaction,
-      commit: commitNodeDragTransaction,
-      cancel: cancelNodeDragTransaction,
-    },
-  }
-
   function hasRemoveChange(changes: Array<NodeChange | EdgeChange>): boolean {
     return changes.some((change) => change.type === 'remove')
   }
@@ -431,38 +447,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     })
   }
 
-  function createConnectedEdgeRemoveChanges(
-    nodeChanges: NodeChange[],
-    edgeChanges: EdgeChange[],
-  ): EdgeChange[] {
-    const removedNodeIds = new Set(
-      nodeChanges.filter((change) => change.type === 'remove').map((change) => change.id),
-    )
-    if (removedNodeIds.size === 0) return edgeChanges
-
-    const removedEdgeIds = new Set(
-      edgeChanges.filter((change) => change.type === 'remove').map((change) => change.id),
-    )
-    const cleanupEdgeChanges = options.edges.value
-      .filter(
-        (edge) =>
-          !removedEdgeIds.has(edge.id) &&
-          (removedNodeIds.has(edge.source) || removedNodeIds.has(edge.target)),
-      )
-      .map(
-        (edge): EdgeChange => ({
-          id: edge.id,
-          type: 'remove',
-          source: edge.source,
-          target: edge.target,
-          sourceHandle: edge.sourceHandle ?? null,
-          targetHandle: edge.targetHandle ?? null,
-        }),
-      )
-
-    return cleanupEdgeChanges.length > 0 ? edgeChanges.concat(cleanupEdgeChanges) : edgeChanges
-  }
-
   function hasApplicableRemoveChanges(nodeChanges: NodeChange[], edgeChanges: EdgeChange[]) {
     const currentNodeIds = new Set(options.nodes.value.map((node) => node.id))
     const currentEdgeIds = new Set(options.edges.value.map((edge) => edge.id))
@@ -470,12 +454,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       nodeChanges.some((change) => change.type === 'remove' && currentNodeIds.has(change.id)) ||
       edgeChanges.some((change) => change.type === 'remove' && currentEdgeIds.has(change.id))
     )
-  }
-
-  function resolveGraphNodeIdForFlowNodeId(flowNodeId: string): CanvasGraphNodeId | null {
-    const node = options.nodes.value.find((item) => item.id === flowNodeId)
-    const ref = resolveFlowNodeCanvasRef(node ?? { id: flowNodeId, data: undefined })
-    return ref ? toCanvasGraphNodeId(ref.nodeType, ref.id) : null
   }
 
   function resolveGraphEdgeIdByEndpoint(
@@ -552,19 +530,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     nodeChanges: NodeChange[],
     edgeChanges: EdgeChange[],
   ): boolean {
-    const nodeIds: CanvasGraphNodeId[] = []
-    const flowNodeIds: string[] = []
+    const removedNodes = groupRuntime?.internal.resolveRemovedFlowNodeChanges(nodeChanges) ?? null
+    if (!removedNodes) return false
+    const nodeIds = removedNodes.graphNodeIds
+    const flowNodeIds = removedNodes.flowNodeIds
     const removedNodeIds = new Set<string>()
-    for (const change of nodeChanges) {
-      if (change.type !== 'remove') continue
-      const graphNodeId = resolveGraphNodeIdForFlowNodeId(change.id)
-      if (!graphNodeId) return false
-      nodeIds.push(graphNodeId)
-      flowNodeIds.push(change.id)
-      removedNodeIds.add(change.id)
-      removedNodeIds.add(graphNodeId)
-    }
-    const runningTaskIds = collectDeletedRunningTaskIds(options.nodes.value, flowNodeIds)
+    flowNodeIds.forEach((flowNodeId) => removedNodeIds.add(flowNodeId))
+    nodeIds.forEach((graphNodeId) => removedNodeIds.add(graphNodeId))
 
     const store = createCurrentCanvasGraphStore()
     const edgeIds = resolveNativeRemovedEdgeIds(store, edgeChanges, removedNodeIds)
@@ -577,16 +549,19 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     })
     if (!summary.didChange) return true
 
-    const result = graphAdapter.applyGraphChanges(
-      { nodes: nodeChanges, edges: edgeChanges },
-      createFlowGraphCommandOptionsFromTransactionSummary(summary, { historyBefore }),
-    )
-    if (result.didChange) {
-      options.onNativeRemove?.()
-      if (runningTaskIds.length > 0) {
-        options.stopDeletedRunningTasks?.(runningTaskIds)
-      }
-    }
+    const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
+    commitHistoryGroups(snapshot.groups)
+    applyFlowGraphDeleteProjection({
+      graphAdapter,
+      nodes: options.nodes.value,
+      edges: options.edges.value,
+      summary,
+      historyBefore,
+      flowNodeIds,
+      edgeRemoveChanges: edgeChanges,
+      onNativeRemove: options.onNativeRemove,
+      stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+    })
     return true
   }
 
@@ -594,9 +569,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     isNativeRemoveCommitScheduled = false
     const historyBefore = nativeRemoveHistoryBefore
     const nodeChanges = dedupeRemoveChanges(pendingNativeRemoveNodeChanges)
-    const edgeChanges = dedupeRemoveChanges(
-      createConnectedEdgeRemoveChanges(nodeChanges, pendingNativeRemoveEdgeChanges),
-    )
+    const edgeChanges = dedupeRemoveChanges(pendingNativeRemoveEdgeChanges)
     nativeRemoveHistoryBefore = null
     pendingNativeRemoveNodeChanges = []
     pendingNativeRemoveEdgeChanges = []
@@ -621,6 +594,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function onNodesChange(changes: NodeChange[]) {
     if (changes.length === 0) return
+    groupRuntime?.internal.onBeforeNodesChange(changes)
     if (canQueueNodeDragChanges(changes)) {
       queueNodeDragChanges(changes)
       return
@@ -637,12 +611,27 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function onEdgesChange(changes: EdgeChange[]) {
     if (changes.length === 0) return
+    groupRuntime?.internal.onBeforeEdgesChange(changes)
     if (hasRemoveChange(changes)) {
       pendingNativeRemoveEdgeChanges = pendingNativeRemoveEdgeChanges.concat(changes)
       scheduleNativeRemoveCommit()
       return
     }
     graphAdapter.applyEdgeChanges(changes)
+  }
+
+  const graphRuntime: CanvasFlowGraphRuntimeControls = {
+    captureHistory: captureFullGraphHistory,
+    createCurrentCanvasGraphStore,
+    markDirty: () => {
+      markDirty()
+    },
+    grouping: groupRuntime,
+    nodeDrag: {
+      begin: beginNodeDragTransaction,
+      commit: commitNodeDragTransaction,
+      cancel: cancelNodeDragTransaction,
+    },
   }
 
   return {

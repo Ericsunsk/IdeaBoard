@@ -6,8 +6,6 @@ import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas-bo
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
 import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  DEFAULT_PROMPT_ASPECT_RATIO,
-  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
 } from '../../canvas-board/domain'
 import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
 import {
@@ -188,41 +186,52 @@ describe('createBoardSessionRepository', () => {
     expect(snapshot).not.toHaveProperty('viewport')
   })
 
-  it('loads a normalizable older local state as a latest-schema session snapshot', async () => {
+  it('rejects older local state instead of normalizing across schema versions', async () => {
     const board = createCanvasBoard('Older Local Snapshot')
-    replaceCanvasBoardStateMap({
-      [board.id]: {
-        schemaVersion: 1,
-        imageNodes: [],
-        promptNodes: [
-          {
-            id: 1,
-            type: 'prompt',
-            x: 0,
-            y: 0,
-            width: 280,
-            text: 'older local',
-          },
-        ],
-        fusionNodes: [],
-        connections: [],
-        groups: [],
-        updatedAt: 2_000,
-      } as unknown as CanvasBoardState,
-    })
-    const repository = createBoardSessionRepository()
-
-    const snapshot = await repository.load(board.id)
-
-    expect(snapshot?.promptNodes[0]).toEqual(
-      expect.objectContaining({
-        text: 'older local',
-        outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-        inputImages: [],
+    localStorage.setItem(
+      'ideaboard.canvas.boardStates.v2.uid_ABC123',
+      JSON.stringify({
+        [board.id]: {
+          schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+          imageNodes: [],
+          promptNodes: [
+            {
+              id: 1,
+              type: 'prompt',
+              x: 0,
+              y: 0,
+              width: 280,
+              text: 'older local',
+            },
+          ],
+          fusionNodes: [],
+          connections: [],
+          groups: [],
+          updatedAt: 2_000,
+        },
       }),
     )
-    expect(snapshot).not.toHaveProperty('updatedAt')
+    const repository = createBoardSessionRepository()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      await expect(repository.load(board.id)).rejects.toMatchObject({
+        code: 'INVALID_BOARD_STATE',
+        boundary: 'local-state-read',
+        recoverable: true,
+      })
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[canvas] invalid board state rejected',
+        board.id,
+        expect.objectContaining({
+          code: 'INVALID_BOARD_STATE',
+          boundary: 'local-state-read',
+          recoverable: true,
+        }),
+      )
+    } finally {
+      warnSpy.mockRestore()
+    }
   })
 
   it('rejects invalid local state with recoverable validation context instead of returning an empty session snapshot', async () => {

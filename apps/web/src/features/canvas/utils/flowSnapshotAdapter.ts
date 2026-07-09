@@ -114,14 +114,23 @@ function appendCurrentGroups(
   base: CanvasBoardSnapshot | undefined,
   persistedCanvasNodeIds: ReadonlySet<string>,
 ) {
-  snapshot.groups = (base ? base.groups : [])
-    .map((group) => ({
+  const assignedCanvasNodeIds = new Set<string>()
+  snapshot.groups = (base ? base.groups : []).map((group) => {
+    const nodeIds: CanvasGroupNodeId[] = []
+    group.nodeIds.forEach((nodeId) => {
+      if (!persistedCanvasNodeIds.has(nodeId) || assignedCanvasNodeIds.has(nodeId)) return
+      assignedCanvasNodeIds.add(nodeId)
+      nodeIds.push(nodeId)
+    })
+    return {
       id: group.id,
-      nodeIds: group.nodeIds.filter((nodeId) =>
-        persistedCanvasNodeIds.has(nodeId),
-      ) as CanvasGroupNodeId[],
-    }))
-    .filter((group) => group.nodeIds.length >= 2)
+      nodeIds,
+      x: group.x,
+      y: group.y,
+      width: group.width,
+      height: group.height,
+    }
+  })
 }
 
 export function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {

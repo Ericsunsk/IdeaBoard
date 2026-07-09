@@ -125,7 +125,11 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 		t.Fatalf("decode updated state failed: %v", err)
 	}
 	if state.SchemaVersion != CurrentBoardStateSchemaVersion {
-		t.Fatalf("updated schemaVersion = %d, want 2", state.SchemaVersion)
+		t.Fatalf(
+			"updated schemaVersion = %d, want %d",
+			state.SchemaVersion,
+			CurrentBoardStateSchemaVersion,
+		)
 	}
 	if len(state.PromptNodes) != 1 || state.PromptNodes[0].Marker != 250 {
 		t.Fatalf("updated prompt marker = %+v, want 250", state.PromptNodes)

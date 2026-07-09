@@ -39,7 +39,8 @@
       class="canvas-flow-wrap ib-page-dot-bg"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
-      @pointerdown.capture="paneSelectionBindings.onPointerDownCapture"
+      @pointerdown.capture="onCanvasPointerDownCapture"
+      @contextmenu.capture="onCanvasContextMenuCapture"
       @wheel="onCanvasWheel"
     >
       <VueFlow
@@ -72,14 +73,17 @@
         @move="onFlowMove"
         @move-end="onFlowMoveEnd"
         @viewport-change-end="onViewportChangeEnd"
-        @node-click="selectionCommands.onFlowNodeClick"
+        @node-click="onFlowNodeClick"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
         @selection-start="vueFlowSelectionBindings.onSelectionStart"
         @selection-end="vueFlowSelectionBindings.onSelectionEnd"
-        @pane-click="selectionCommands.onPaneClick"
+        @pane-click="onCanvasPaneClick"
         @pane-context-menu="onPaneContextMenu"
       >
+        <template #zoom-pane>
+          <CanvasGroupFramesOverlay :frames="groupFrames" @resize-start="onGroupResizeStart" />
+        </template>
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
             :node-id="nodeProps.id"
@@ -139,6 +143,12 @@
           @drag-end="onMiniMapDragEnd"
         />
       </VueFlow>
+      <CanvasSelectionGroupActionButton
+        v-if="isSelectionGroupActionVisible"
+        :action="selectionGroupAction"
+        :position="selectionGroupActionButtonPosition"
+        @activate="onSelectionGroupAction"
+      />
       <CanvasOverlays
         :image-tool-session="imageTools"
         :node-context-menu="nodeContextMenu"
@@ -160,7 +170,7 @@ import { useDismissableLayer } from '../../../shared/composables/useDismissableL
 import { ADMIN_ROOT_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
-import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
+import { PanOnScrollMode, VueFlow, type NodeMouseEvent } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
@@ -175,6 +185,7 @@ import {
   useFlowActiveNodePanels,
 } from '../composables/useFlowActiveNodePanels'
 import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
+import { useCanvasGroupInteractionShell } from '../composables/useCanvasGroupInteractionShell'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import {
   useFlowTransientUiDismissal,
@@ -185,6 +196,8 @@ import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
+import CanvasGroupFramesOverlay from '../components/CanvasGroupFramesOverlay.vue'
+import CanvasSelectionGroupActionButton from '../components/CanvasSelectionGroupActionButton.vue'
 import {
   CanvasChrome,
   CanvasChromeMiniMap,
@@ -202,7 +215,7 @@ const userStore = useUserStore()
 
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const flowPaneAdapter = useVueFlowPaneAdapter()
-const { screenToFlowCoordinate } = flowPaneAdapter
+const { screenToFlowCoordinate, viewport: flowViewport } = flowPaneAdapter
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const flowHandleVisibilityRefreshToken = ref(0)
@@ -364,15 +377,15 @@ const {
   onZoomIn,
   onZoomOut,
   onPanViewport,
-  onFlowMoveStart,
+  onFlowMoveStart: onFlowMoveStartBase,
   onFlowMove: syncFlowMove,
   onFlowMoveEnd,
   onViewportChangeEnd,
   onMiniMapCenterRequested,
-  onMiniMapDragStart,
+  onMiniMapDragStart: onMiniMapDragStartBase,
   onMiniMapDragMove,
   onMiniMapDragEnd,
-  onNodeDragStart,
+  onNodeDragStart: onNodeDragStartBase,
   onNodeDragStop,
 } = commands.viewportControls
 provideCanvasViewportContext({ zoomLevel })
@@ -385,6 +398,7 @@ const {
   nodeContextMenu,
   canvasNodeMenuItems,
 } = viewModel.graphEditing
+const { groupFrames, selectionGroupAction } = viewModel.graphEditing.grouping
 const {
   scheduleFlowNodeInternalsRefresh,
   createNodeAtPosition,
@@ -403,6 +417,16 @@ const {
   finishFlowNodeDragDuplicateTracking,
   getFlowNodeUiStateCached,
 } = commands.graphEditing
+const {
+  selectGroupAtPoint,
+  handlePaneClick,
+  handleNodeClick,
+  groupSelectedNodes,
+  ungroupSelectedGroup,
+  deleteSelectedGroup,
+  groupDrag,
+  groupResize,
+} = commands.graphEditing.grouping
 
 function onFlowConnectEnd() {
   refreshFlowHandleVisibility()
@@ -509,7 +533,7 @@ const {
       discardNodeEdits: discardFlowImageToolNodeEdits,
     },
     editor: {
-      onCanvasWheel,
+      onCanvasWheel: onCanvasWheelBase,
       focusAndShowChrome: focusImageEditorAndShowChrome,
       scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
     },
@@ -524,7 +548,39 @@ const nativeDeleteKeyCode = computed(() =>
   isFlowCanvasLocked.value || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
 )
 
-function toggleCanvasMinimap() {
+const isCanvasGroupInteractionEnabled = computed(
+  () =>
+    activeTool.value === 'select' &&
+    !isFlowCanvasLocked.value &&
+    !flowImageEditorNodeId.value &&
+    !flowMaskEditorNodeId.value &&
+    !flowExpandNodeId.value,
+)
+
+function onFlowNodeClick(payload: NodeMouseEvent) {
+  handleNodeClick({
+    node: payload.node,
+    selectNode: () => selectionCommands.onFlowNodeClick(),
+  })
+}
+
+function onDeleteInlineSelection() {
+  if (!isCanvasGroupInteractionEnabled.value) return false
+  return deleteSelectedGroup()
+}
+
+function performSelectionGroupAction() {
+  const action = selectionGroupAction.value
+  if (action?.kind === 'group') {
+    groupSelectedNodes()
+    return
+  }
+  if (action?.kind === 'ungroup') {
+    ungroupSelectedGroup()
+  }
+}
+
+function toggleCanvasMinimapBase() {
   isCanvasMinimapEnabled.value = !isCanvasMinimapEnabled.value
 }
 
@@ -595,6 +651,33 @@ const {
   onEdgesChange: (changes) => commands.flowPane.onEdgesChange(changes),
 })
 
+const groupInteractionShell = useCanvasGroupInteractionShell({
+  canvasWrapRef,
+  nodes,
+  groupFrames,
+  viewport: flowViewport,
+  selectionGroupAction,
+  isEnabled: isCanvasGroupInteractionEnabled,
+  screenToFlowCoordinate,
+  paneSelectionPointerDownCapture: paneSelectionBindings.onPointerDownCapture,
+  selectGroupAtPoint,
+  groupDrag,
+  groupResize,
+  dismissTransientCanvasUi: (options) => dismissTransientCanvasUi(options),
+})
+const {
+  isSelectionGroupActionVisible,
+  selectionGroupActionButtonPosition,
+  bindClosePolicyHandlers,
+  onCanvasContextMenuCapture,
+  onCanvasPointerDownCapture,
+  onGroupResizeStart,
+} = groupInteractionShell
+
+onBeforeUnmount(() => {
+  groupInteractionShell.cleanup()
+})
+
 const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
   useFlowNodeDragInteractions({
     beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
@@ -607,11 +690,11 @@ const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragI
   })
 
 const {
-  onPaneContextMenu,
+  onPaneContextMenu: onPaneContextMenuBase,
   handleNodeContextMenuCreate,
-  setActiveTool,
+  setActiveTool: setActiveToolBase,
   onEscapeShortcut,
-  onCanvasDragOver,
+  onCanvasDragOver: onCanvasDragOverBase,
 } = useFlowCanvasShellInteractions({
   canvasWrapRef,
   nodeContextMenu,
@@ -624,6 +707,30 @@ const {
   onCanvasDropDragOver: onFlowCanvasDropDragOver,
   isFlowExpandActive: () => !!flowExpandNodeId.value,
   isBoardHeaderEditingActive: () => isBoardMenuOpen.value || isRenamingBoard.value,
+})
+
+const {
+  onCanvasWheel,
+  onFlowMoveStart,
+  onMiniMapDragStart,
+  onNodeDragStart,
+  onCanvasPaneClick,
+  onSelectionGroupAction,
+  toggleCanvasMinimap,
+  onPaneContextMenu,
+  setActiveTool,
+  onCanvasDragOver,
+} = bindClosePolicyHandlers({
+  onCanvasWheel: onCanvasWheelBase,
+  onFlowMoveStart: onFlowMoveStartBase,
+  onMiniMapDragStart: onMiniMapDragStartBase,
+  onNodeDragStart: onNodeDragStartBase,
+  onCanvasPaneClick: () => handlePaneClick(selectionCommands.onPaneClick),
+  onSelectionGroupAction: performSelectionGroupAction,
+  toggleCanvasMinimap: toggleCanvasMinimapBase,
+  onPaneContextMenu: onPaneContextMenuBase,
+  setActiveTool: setActiveToolBase,
+  onCanvasDragOver: onCanvasDragOverBase,
 })
 
 const {
@@ -663,6 +770,7 @@ useFlowKeyboardShortcuts({
   },
   onUndo: flowHistory.undo,
   onRedo: flowHistory.redo,
+  onDeleteInlineSelection,
   isCanvasShortcutSuppressed: () => isCanvasShortcutSuppressed.value,
   onEscape: onEscapeShortcut,
   onPanViewport,

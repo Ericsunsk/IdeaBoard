@@ -2,7 +2,12 @@ import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardSession, SaveStatus } from '../board-session'
-import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
+import {
+  assertLatestCanvasBoardState,
+  createEmptyCanvasBoardSnapshot,
+  type CanvasBoardSnapshot,
+  type CanvasGroup,
+} from '../../canvas-board/domain'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 
@@ -13,6 +18,32 @@ type MutableHarnessNode = Node & {
 
 type MutableHarnessEdge = Edge & {
   selected?: boolean
+}
+
+const INITIAL_GROUP_GEOMETRY = {
+  x: 30,
+  y: 30,
+  width: 660,
+  height: 322,
+}
+
+const SAMPLE_GROUP_GEOMETRY = {
+  x: 20,
+  y: 20,
+  width: 700,
+  height: 420,
+}
+
+function createGroup(
+  id: CanvasGroup['id'],
+  nodeIds: CanvasGroup['nodeIds'],
+  geometry: Pick<CanvasGroup, 'x' | 'y' | 'width' | 'height'> = SAMPLE_GROUP_GEOMETRY,
+): CanvasGroup {
+  return {
+    id,
+    nodeIds,
+    ...geometry,
+  }
 }
 
 function createSnapshot(): CanvasBoardSnapshot {
@@ -130,6 +161,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const scheduledAnimationFrames = new Map<number, FrameRequestCallback>()
   let nextAnimationFrameId = 1
   const onWarning = vi.fn()
+  const onError = vi.fn()
   const onNativeRemove = vi.fn()
   const graphActions = {
     addNodes: vi.fn(),
@@ -153,6 +185,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     exists: vi.fn(() => true),
     load: vi.fn(async () => snapshot),
     save: vi.fn(async (nextSnapshot: CanvasBoardSnapshot) => {
+      assertLatestCanvasBoardState({ ...nextSnapshot, updatedAt: Date.now() }, 'board-save')
       savedSnapshots.push(nextSnapshot)
       return { snapshot: nextSnapshot, remoteSync: { ok: true as const } }
     }),
@@ -170,7 +203,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     boardSession,
     onWarning,
     onSuccess: vi.fn(),
-    onError: vi.fn(),
+    onError,
     onNativeRemove,
     stopDeletedRunningTasks,
     scheduleMicrotask: (callback) => {
@@ -228,6 +261,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     savedSnapshots,
     boardSession,
     onWarning,
+    onError,
     onNativeRemove,
     stopDeletedRunningTasks,
     graphActions,
@@ -273,13 +307,40 @@ function markFlowItemSelected<T extends Node | Edge>(items: T[], itemId: string)
   return items.map((item) => (item.id === itemId ? { ...item, selected: true } : item))
 }
 
+function selectFlowNodes(nodes: Node[], nodeIds: string[]): Node[] {
+  const selectedIds = new Set(nodeIds)
+  return nodes.map((node) => ({ ...node, selected: selectedIds.has(node.id) }))
+}
+
 function readNodeSelected(nodes: Node[], nodeId: string) {
   return readSelectedFlag(nodes.find((node) => node.id === nodeId))
+}
+
+function readNodePosition(nodes: Node[], nodeId: string) {
+  const node = nodes.find((item) => item.id === nodeId)
+  return node ? { ...node.position } : null
 }
 
 function readEdgeSelected(edges: Edge[], edgeId: string) {
   return (edges.find((edge) => edge.id === edgeId) as (Edge & { selected?: boolean }) | undefined)
     ?.selected
+}
+
+function clickPaneThroughGrouping(runtime: ReturnType<typeof useFlowCanvasRuntime>) {
+  const selectPane = vi.fn()
+  runtime.graphRuntime.grouping.commands.handlePaneClick(selectPane)
+  expect(selectPane).toHaveBeenCalledOnce()
+}
+
+function clickNodeThroughGrouping(runtime: ReturnType<typeof useFlowCanvasRuntime>, nodeId: string) {
+  const node = runtime.fullNodes.value.find((item) => item.id === nodeId)
+  expect(node).toBeDefined()
+  const selectNode = vi.fn()
+  runtime.graphRuntime.grouping.commands.handleNodeClick({
+    node: node as Node,
+    selectNode,
+  })
+  expect(selectNode).toHaveBeenCalledOnce()
 }
 
 describe('useFlowCanvasRuntime', () => {
@@ -335,7 +396,7 @@ describe('useFlowCanvasRuntime', () => {
     const before = harness.runtime.flowHistory.capture()
     harness.boardBaseSnapshot.value = {
       ...harness.boardBaseSnapshot.value,
-      groups: [{ id: 'group-1', nodeIds: ['image-1', 'prompt-1'] }],
+      groups: [createGroup('group-1', ['image-1', 'prompt-1'])],
     }
 
     expect(harness.runtime.flowHistory.push(before)).toBe(true)
@@ -345,13 +406,733 @@ describe('useFlowCanvasRuntime', () => {
 
     harness.runtime.flowHistory.redo()
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
-      { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
+      createGroup('group-1', ['image-1', 'prompt-1']),
     ])
 
     await harness.runtime.flushAutosave({ silent: true })
 
     expect(harness.savedSnapshots[0]?.groups).toEqual([
-      { id: 'group-1', nodeIds: ['image-1', 'prompt-1'] },
+      createGroup('group-1', ['image-1', 'prompt-1']),
+    ])
+  })
+
+  it('exposes a group action for two or more selected ungrouped nodes', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toBeNull()
+
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1'])
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toBeNull()
+
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toEqual({
+      kind: 'group',
+      label: '组合',
+      nodeIds: ['image-1', 'prompt-1'],
+    })
+
+    harness.fullEdges.value = markFlowItemSelected(harness.fullEdges.value, 'connection-3')
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toBeNull()
+  })
+
+  it('hides the group action for nodes that are already partly grouped', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-2'])
+
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toBeNull()
+  })
+
+  it('groups selected nodes into a fixed selected frame and participates in undo and redo', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+
+    expect(harness.runtime.graphRuntime.grouping.commands.groupSelectedNodes()).toBe(true)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], INITIAL_GROUP_GEOMETRY),
+    ])
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toEqual({
+      kind: 'ungroup',
+      label: '解组',
+      groupId: 'group-1',
+      nodeIds: ['image-1', 'prompt-1'],
+    })
+    expect(readNodeSelected(harness.fullNodes.value, 'image-1')).toBe(false)
+    expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(false)
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
+    expect(harness.runtime.graphRuntime.grouping.view.groupFrames.value[0]).toMatchObject({
+      id: 'group-1',
+      bounds: {
+        left: INITIAL_GROUP_GEOMETRY.x,
+        top: INITIAL_GROUP_GEOMETRY.y,
+        width: INITIAL_GROUP_GEOMETRY.width,
+        height: INITIAL_GROUP_GEOMETRY.height,
+      },
+      selected: true,
+    })
+    expect(harness.isDirty.value).toBe(true)
+
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, [])
+
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toEqual({
+      kind: 'ungroup',
+      label: '解组',
+      groupId: 'group-1',
+      nodeIds: ['image-1', 'prompt-1'],
+    })
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], INITIAL_GROUP_GEOMETRY),
+    ])
+  })
+
+  it('clears group selection when Vue Flow selects a node', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+
+    expect(harness.runtime.graphRuntime.grouping.commands.groupSelectedNodes()).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
+
+    await harness.applyNativeNodeChanges([
+      { id: 'prompt-2', type: 'select', selected: true },
+    ])
+
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBeNull()
+    expect(harness.runtime.graphRuntime.grouping.view.groupFrames.value[0]?.selected).toBe(false)
+  })
+
+  it('saves groups that reference decimal canvas node ids from active drafts', async () => {
+    const snapshot = createEmptyCanvasBoardSnapshot()
+    snapshot.promptNodes = [
+      {
+        id: 1000.25,
+        type: 'prompt',
+        x: 40,
+        y: 40,
+        width: 280,
+        text: 'first draft node',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+      {
+        id: 1001.5,
+        type: 'prompt',
+        x: 400,
+        y: 40,
+        width: 280,
+        text: 'second draft node',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    ]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, [
+      'prompt-1000.25',
+      'prompt-1001.5',
+    ])
+
+    expect(harness.runtime.graphRuntime.grouping.commands.groupSelectedNodes()).toBe(true)
+    await harness.runtime.flushAutosave({ silent: true })
+
+    expect(harness.onError).not.toHaveBeenCalled()
+    expect(harness.savedSnapshots[0]?.groups).toEqual([
+      createGroup('group-1', ['prompt-1000.25', 'prompt-1001.5'], INITIAL_GROUP_GEOMETRY),
+    ])
+  })
+
+  it('ungroups selected group members without deleting or moving nodes', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
+
+    expect(harness.runtime.graphRuntime.grouping.commands.ungroupSelectedGroup()).toBe(true)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1']),
+    ])
+  })
+
+  it.each([
+    ['single-member', ['image-1']],
+    ['empty', []],
+  ] as const)('ungroups a selected %s group frame without touching nodes', async (_, nodeIds) => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', [...nodeIds])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toEqual({
+      kind: 'ungroup',
+      label: '解组',
+      groupId: 'group-1',
+      nodeIds,
+    })
+
+    expect(harness.runtime.graphRuntime.grouping.commands.ungroupSelectedGroup()).toBe(true)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+  })
+
+  it('selects a group by frame point without marking the board dirty', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
+    expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toEqual({
+      kind: 'ungroup',
+      label: '解组',
+      groupId: 'group-1',
+      nodeIds: ['image-1', 'prompt-1'],
+    })
+    expect(harness.isDirty.value).toBe(false)
+  })
+
+  it('deletes a selected group with member nodes, connected edges, running task cancellation, and undo redo', async () => {
+    const snapshot = createSnapshot()
+    snapshot.imageNodes[0].pendingTaskId = 'task-running-1'
+    snapshot.imageNodes[0].outputStatus = 'running'
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })
+
+    expect(harness.runtime.graphRuntime.grouping.commands.deleteSelectedGroup()).toBe(true)
+
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-2'])
+    expect(harness.fullEdges.value).toEqual([])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+    expect(harness.stopDeletedRunningTasks).toHaveBeenCalledWith(['task-running-1'])
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.isDirty.value).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1']),
+    ])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-2'])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+  })
+
+  it('deletes a selected empty group frame without touching nodes or edges', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', [])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+
+    expect(harness.runtime.graphRuntime.grouping.commands.deleteSelectedGroup()).toBe(true)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBeNull()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+    expect(harness.onNativeRemove).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', [])])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([])
+  })
+
+  it('derives grouped node z-index without changing edge layering', async () => {
+    const snapshot = createSnapshot()
+    snapshot.promptNodes.push(
+      {
+        id: 3,
+        type: 'prompt',
+        x: 2600,
+        y: 40,
+        width: 280,
+        text: 'grouped peer',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+      {
+        id: 4,
+        type: 'prompt',
+        x: 3000,
+        y: 40,
+        width: 280,
+        text: 'ungrouped peer',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    )
+    snapshot.groups = [
+      createGroup('group-1', ['image-1', 'prompt-1']),
+      createGroup('group-2', ['prompt-2', 'prompt-3']),
+    ]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.fullNodes.value.find((node) => node.id === 'image-1')?.zIndex).toBe(2)
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.zIndex).toBe(2)
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-2')?.zIndex).toBe(2)
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-3')?.zIndex).toBe(2)
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-4')?.zIndex).toBe(1)
+    expect(harness.fullEdges.value[0]?.zIndex).toBeUndefined()
+  })
+
+  it('drags selected group empty space as one undoable movement', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.commit()).toBe(true)
+
+    expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 140, y: 80 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 500, y: 80 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-2')).toEqual({ x: 2200, y: 40 })
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: SAMPLE_GROUP_GEOMETRY.x + 100,
+        y: SAMPLE_GROUP_GEOMETRY.y + 40,
+        width: SAMPLE_GROUP_GEOMETRY.width,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+
+    harness.runtime.flowHistory.undo()
+    expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 40, y: 40 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 400, y: 40 })
+  })
+
+  it('does not auto-join covered external nodes on group drag and joins a pending node only after click', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 2150, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.commit()).toBe(true)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: SAMPLE_GROUP_GEOMETRY.x + 1800,
+        y: SAMPLE_GROUP_GEOMETRY.y,
+        width: SAMPLE_GROUP_GEOMETRY.width,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value).toEqual([
+      'prompt-2',
+    ])
+
+    clickPaneThroughGrouping(harness.runtime)
+
+    clickNodeThroughGrouping(harness.runtime, 'prompt-2')
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1', 'prompt-2'], {
+        x: SAMPLE_GROUP_GEOMETRY.x + 1800,
+        y: SAMPLE_GROUP_GEOMETRY.y,
+        width: SAMPLE_GROUP_GEOMETRY.width,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+    expect(readNodeSelected(harness.fullNodes.value, 'prompt-2')).toBe(true)
+    expect(readNodeSelected(harness.fullNodes.value, 'image-1')).not.toBe(true)
+    expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).not.toBe(true)
+  })
+
+  it('clears pending group join when a candidate node starts moving', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: 2100,
+        y: 20,
+        width: 700,
+        height: 420,
+      }),
+    ]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 2300, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value).toEqual([
+      'prompt-2',
+    ])
+    clickPaneThroughGrouping(harness.runtime)
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+
+    clickNodeThroughGrouping(harness.runtime, 'prompt-2')
+    harness.runtime.graphRuntime.nodeDrag.cancel()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: 2100,
+        y: 20,
+        width: 700,
+        height: 420,
+      }),
+    ])
+  })
+
+  it('drags an empty group frame without moving nodes or reconciling membership', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', [])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.commit()).toBe(true)
+
+    expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 40, y: 40 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 400, y: 40 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-2')).toEqual({ x: 2200, y: 40 })
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', [], {
+        x: SAMPLE_GROUP_GEOMETRY.x + 100,
+        y: SAMPLE_GROUP_GEOMETRY.y + 40,
+        width: SAMPLE_GROUP_GEOMETRY.width,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+  })
+
+  it('resizes a selected group frame without auto-joining covered external nodes', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 }),
+    ).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupResize.move({ x: 2520, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupResize.commit()).toBe(true)
+
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-2')).toEqual({ x: 2200, y: 40 })
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: SAMPLE_GROUP_GEOMETRY.x,
+        y: SAMPLE_GROUP_GEOMETRY.y,
+        width: SAMPLE_GROUP_GEOMETRY.width + 1800,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value).toEqual([
+      'prompt-2',
+    ])
+
+    clickPaneThroughGrouping(harness.runtime)
+
+    clickNodeThroughGrouping(harness.runtime, 'prompt-2')
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1', 'prompt-2'], {
+        x: SAMPLE_GROUP_GEOMETRY.x,
+        y: SAMPLE_GROUP_GEOMETRY.y,
+        width: SAMPLE_GROUP_GEOMETRY.width + 1800,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+    expect(readNodeSelected(harness.fullNodes.value, 'prompt-2')).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: SAMPLE_GROUP_GEOMETRY.x,
+        y: SAMPLE_GROUP_GEOMETRY.y,
+        width: SAMPLE_GROUP_GEOMETRY.width + 1800,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-2')).toEqual({ x: 2200, y: 40 })
+  })
+
+  it('removes existing members that fully leave a resized group frame', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 }),
+    ).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupResize.move({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupResize.commit()).toBe(true)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1'], {
+        x: SAMPLE_GROUP_GEOMETRY.x,
+        y: SAMPLE_GROUP_GEOMETRY.y,
+        width: SAMPLE_GROUP_GEOMETRY.width - 370,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
+    expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 40, y: 40 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 400, y: 40 })
+  })
+
+  it('updates group membership when a node is dragged out or in', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'image-1',
+        type: 'position',
+        from: { x: 40, y: 40 },
+        position: { x: -1000, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.flushAnimationFrames()
+    harness.runtime.graphRuntime.nodeDrag.commit()
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['prompt-1']),
+    ])
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1']),
+    ])
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-2',
+        type: 'position',
+        from: { x: 2200, y: 40 },
+        position: { x: 200, y: 80 },
+        dragging: true,
+      },
+    ])
+    harness.flushAnimationFrames()
+    harness.runtime.graphRuntime.nodeDrag.commit()
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1', 'prompt-2']),
+    ])
+  })
+
+  it('keeps a dragged member in its group until the node fully leaves the frame', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'image-1',
+        type: 'position',
+        from: { x: 40, y: 40 },
+        position: { x: -100, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.flushAnimationFrames()
+    harness.runtime.graphRuntime.nodeDrag.commit()
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1']),
+    ])
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'image-1',
+        type: 'position',
+        from: { x: -100, y: 40 },
+        position: { x: -400, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.flushAnimationFrames()
+    harness.runtime.graphRuntime.nodeDrag.commit()
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['prompt-1']),
+    ])
+  })
+
+  it('moves selection to dragged nodes when they leave the selected group', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'image-1',
+        type: 'position',
+        from: { x: 40, y: 40 },
+        position: { x: -1000, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.flushAnimationFrames()
+    harness.runtime.graphRuntime.nodeDrag.commit()
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['prompt-1']),
+    ])
+    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBeNull()
+    expect(harness.runtime.graphRuntime.grouping.view.groupFrames.value[0]?.selected).toBe(false)
+    expect(readNodeSelected(harness.fullNodes.value, 'image-1')).toBe(true)
+    expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).not.toBe(true)
+  })
+
+  it('does not auto-join a node when drag end lands inside overlapping groups', async () => {
+    const snapshot = createSnapshot()
+    snapshot.promptNodes.push(
+      {
+        id: 3,
+        type: 'prompt',
+        x: 80,
+        y: 80,
+        width: 280,
+        text: 'overlap-a',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+      {
+        id: 4,
+        type: 'prompt',
+        x: 400,
+        y: 80,
+        width: 280,
+        text: 'overlap-b',
+        outputCount: 1,
+        aspectRatio: 'auto',
+        inputImages: [],
+      },
+    )
+    snapshot.groups = [
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: 20,
+        y: 20,
+        width: 700,
+        height: 420,
+      }),
+      createGroup('group-2', ['prompt-3', 'prompt-4'], {
+        x: 60,
+        y: 40,
+        width: 700,
+        height: 420,
+      }),
+    ]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.graphRuntime.nodeDrag.begin()
+    harness.runtime.onNodesChange([
+      {
+        id: 'prompt-2',
+        type: 'position',
+        from: { x: 2200, y: 40 },
+        position: { x: 200, y: 80 },
+        dragging: true,
+      },
+    ])
+    harness.flushAnimationFrames()
+    harness.runtime.graphRuntime.nodeDrag.commit()
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1'], {
+        x: 20,
+        y: 20,
+        width: 700,
+        height: 420,
+      }),
+      createGroup('group-2', ['prompt-3', 'prompt-4'], {
+        x: 60,
+        y: 40,
+        width: 700,
+        height: 420,
+      }),
     ])
   })
 
@@ -653,9 +1434,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    let resolveSave:
-      | ((result: Awaited<ReturnType<CanvasBoardSession['save']>>) => void)
-      | undefined
+    let resolveSave: ((result: Awaited<ReturnType<CanvasBoardSession['save']>>) => void) | undefined
     let shouldDeferSave = true
     harness.boardSession.save = vi.fn((nextSnapshot: CanvasBoardSnapshot) => {
       harness.savedSnapshots.push(nextSnapshot)
@@ -666,11 +1445,9 @@ describe('useFlowCanvasRuntime', () => {
         })
       }
       shouldDeferSave = false
-      return (
-        new Promise<Awaited<ReturnType<CanvasBoardSession['save']>>>((resolve) => {
-          resolveSave = resolve
-        })
-      )
+      return new Promise<Awaited<ReturnType<CanvasBoardSession['save']>>>((resolve) => {
+        resolveSave = resolve
+      })
     })
 
     harness.runtime.graphRuntime.markDirty()
@@ -961,9 +1738,7 @@ describe('useFlowCanvasRuntime', () => {
       },
     ])
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith(
-      '删除操作未能应用，请刷新画布后重试',
-    )
+    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -995,9 +1770,7 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith(
-      '删除操作未能应用，请刷新画布后重试',
-    )
+    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
@@ -1030,9 +1803,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.onNodesChange([{ id: 'image-1', type: 'remove' }])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith(
-      '删除操作未能应用，请刷新画布后重试',
-    )
+    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
@@ -1066,9 +1837,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.onNodesChange([{ id: driftedImageNode.id, type: 'remove' }])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onWarning).not.toHaveBeenCalledWith(
-      '删除操作未能应用，请刷新画布后重试',
-    )
+    expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)

@@ -5,14 +5,15 @@ This directory is for durable Web app maintenance scripts. Prefer adding a
 
 ## Script Inventory
 
-| File                                      | Entry                                          | Purpose                                                                                       |
-| ----------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `check-api-generated-drift.ts`            | `npm run api:check-generated`                  | Checks whether generated API wrappers are in sync with `orval.config.ts`.                     |
-| `check-test-guardrails.ts`                | `npm run test:guardrails`                      | Enforces frontend test naming, component render helper, and generated-query mock guardrails.  |
-| `check-style-governance.ts`               | `npm run lint:style-governance`                | Enforces frontend style ownership, selector, token, and raw-value guardrails.                 |
-| `canvas-interactions-benchmark.ts`         | `npm run benchmark:canvas-interactions`        | Runs mocked Canvas interaction benchmarks and writes JSON reports under `.benchmark-reports`. |
-| `user-route-smoke.ts`                     | `npm run smoke:user`                           | Runs mocked user route smoke coverage through Playwright.                                     |
-| `mock-smoke-utils.ts`                     | Internal helper                                | Shared mocked browser smoke runtime helpers.                                                  |
+| File                                  | Entry                                   | Purpose                                                                                       |
+| ------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `check-api-generated-drift.ts`        | `npm run api:check-generated`           | Checks whether generated API wrappers are in sync with `orval.config.ts`.                     |
+| `check-board-state-contract-drift.ts` | `npm run board-state:check-contract`    | Checks BoardStateGroup contract alignment across FE schema, Go, OpenAPI, and generated model. |
+| `check-test-guardrails.ts`            | `npm run test:guardrails`               | Enforces frontend test naming, component render helper, and generated-query mock guardrails.  |
+| `check-style-governance.ts`           | `npm run lint:style-governance`         | Enforces frontend style ownership, selector, token, and raw-value guardrails.                 |
+| `canvas-interactions-benchmark.ts`    | `npm run benchmark:canvas-interactions` | Runs mocked Canvas interaction benchmarks and writes JSON reports under `.benchmark-reports`. |
+| `user-route-smoke.ts`                 | `npm run smoke:user`                    | Runs mocked user route smoke coverage through Playwright.                                     |
+| `mock-smoke-utils.ts`                 | Internal helper                         | Shared mocked browser smoke runtime helpers.                                                  |
 
 ## Canvas Interaction Benchmark
 

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeCanvasBoardState } from '../testing'
-import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  DEFAULT_FUSION_BLEND_POINT,
-  DEFAULT_FUSION_NODE_OUTPUT_COUNT,
-  DEFAULT_PROMPT_ASPECT_RATIO,
-  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-} from '../domain'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
 import {
   deserializeRemoteBoardStateEnvelope,
   normalizeCanvasBoardState,
@@ -68,7 +62,7 @@ describe('boardStateSerialization', () => {
     ).toBeNull()
   })
 
-  it('canonicalizes normalizable older persisted state to the latest schema', () => {
+  it('rejects old-shape persisted state instead of canonicalizing it', () => {
     const olderState = {
       schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
       imageNodes: [
@@ -111,34 +105,7 @@ describe('boardStateSerialization', () => {
 
     const normalized = normalizeCanvasBoardState(olderState)
 
-    expect(normalized).toEqual(
-      expect.objectContaining({
-        schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-        updatedAt: 123,
-      }),
-    )
-    expect(normalized?.imageNodes[0]).toEqual(
-      expect.objectContaining({
-        outputStatus: 'ready',
-        outputImages: [{ url: 'https://example.com/out.png', ratio: 1 }],
-      }),
-    )
-    expect(normalized?.promptNodes[0]).toEqual(
-      expect.objectContaining({
-        outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-        inputImages: [],
-      }),
-    )
-    expect(normalized?.fusionNodes[0]).toEqual(
-      expect.objectContaining({
-        prompt: '',
-        outputCount: DEFAULT_FUSION_NODE_OUTPUT_COUNT,
-        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-        blendPoint: DEFAULT_FUSION_BLEND_POINT,
-        inputImages: [],
-      }),
-    )
+    expect(normalized).toBeNull()
   })
 
   it('returns recoverable validation context for invalid board state', () => {

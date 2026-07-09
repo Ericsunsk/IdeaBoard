@@ -7,6 +7,7 @@
     "dev": "vite",
     "api:generate": "orval --config orval.config.ts",
     "api:check-generated": "tsx scripts/check-api-generated-drift.ts",
+    "board-state:check-contract": "tsx scripts/check-board-state-contract-drift.ts",
     "build": "vue-tsc -b && vite build",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
@@ -18,7 +19,7 @@
     "preview": "vite preview",
     "smoke:user": "tsx scripts/user-route-smoke.ts",
     "test": "vitest",
-    "test:guardrails": "tsx scripts/check-test-guardrails.ts",
+    "test:guardrails": "tsx scripts/check-test-guardrails.ts && tsx scripts/check-board-state-contract-drift.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts --passWithNoTests",
     "test:run": "vitest run"
   },

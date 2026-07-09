@@ -8,9 +8,12 @@
 export interface BoardStateGroup {
   /** @pattern ^group-[0-9]+$ */
   id: string
-  /**
-   * @minItems 2
-   * @items.pattern ^(image|prompt|fusion)-[0-9]+$
-   */
+  /** @items.pattern ^(image|prompt|fusion)-[0-9]+(?:\\.[0-9]+)?$ */
   nodeIds: string[]
+  x: number
+  y: number
+  /** @exclusiveMinimum 0 */
+  width: number
+  /** @exclusiveMinimum 0 */
+  height: number
 }

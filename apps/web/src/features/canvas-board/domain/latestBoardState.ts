@@ -1,17 +1,9 @@
 import * as v from 'valibot'
 import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  DEFAULT_FUSION_NODE_OUTPUT_COUNT,
-  DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
-  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-  resolveWorkflowNodeOutputStatus,
   type CanvasBoardSnapshot,
   type CanvasBoardState,
-  type WorkflowNodeOutputStatus,
 } from './canvasNodes'
 import { canvasBoardSnapshotSchema, canvasBoardStateSchema } from './canvasBoardStateSchema'
-import { DEFAULT_FUSION_BLEND_POINT } from './fusionBlend'
-import { DEFAULT_PROMPT_ASPECT_RATIO } from './promptAspectRatio'
 
 export type BoardStateValidationIssue = {
   path: string
@@ -43,8 +35,6 @@ export type LatestBoardStateResultOptions = {
 export type LatestBoardStateNormalizationOptions =
   LatestBoardStateNullableOptions | LatestBoardStateResultOptions
 
-type RecordLike = Record<string, unknown>
-
 type IssueLike = {
   message: string
   path?: readonly { key?: unknown }[]
@@ -66,173 +56,6 @@ export class InvalidBoardStateError extends Error {
     this.boundary = context.boundary
     this.issues = context.issues
   }
-}
-
-function isRecord(value: unknown): value is RecordLike {
-  return !!value && typeof value === 'object' && !Array.isArray(value)
-}
-
-function hasOwn(record: RecordLike, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(record, key)
-}
-
-function withDefault<T>(record: RecordLike, key: string, value: T): unknown {
-  return hasOwn(record, key) && record[key] !== undefined ? record[key] : value
-}
-
-function withArrayDefault(record: RecordLike, key: string): unknown {
-  return withDefault(record, key, [])
-}
-
-function canonicalSchemaVersion(value: unknown): unknown {
-  if (value === undefined) return CANVAS_BOARD_STATE_SCHEMA_VERSION
-  if (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= 0 &&
-    value < CANVAS_BOARD_STATE_SCHEMA_VERSION
-  ) {
-    return CANVAS_BOARD_STATE_SCHEMA_VERSION
-  }
-  return value
-}
-
-function canonicalOutputImages(value: unknown): unknown {
-  if (value === undefined) return []
-  if (!Array.isArray(value)) return value
-  return value.map((item) => {
-    if (!isRecord(item)) return item
-    return {
-      ...item,
-      ratio: withDefault(item, 'ratio', 1),
-    }
-  })
-}
-
-function canonicalOutputStatus(
-  record: RecordLike,
-  outputImages: unknown,
-): WorkflowNodeOutputStatus | unknown {
-  if (hasOwn(record, 'outputStatus') && record.outputStatus !== undefined) {
-    return record.outputStatus
-  }
-  return resolveWorkflowNodeOutputStatus(
-    undefined,
-    Array.isArray(outputImages) ? outputImages : undefined,
-  )
-}
-
-function canonicalPromptNode(node: unknown): unknown {
-  if (!isRecord(node)) return node
-  return {
-    ...node,
-    text: withDefault(node, 'text', ''),
-    outputCount: withDefault(node, 'outputCount', DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
-    aspectRatio: withDefault(node, 'aspectRatio', DEFAULT_PROMPT_ASPECT_RATIO),
-    inputImages: withArrayDefault(node, 'inputImages'),
-  }
-}
-
-function canonicalImageNode(node: unknown): unknown {
-  if (!isRecord(node)) return node
-  const outputImages = canonicalOutputImages(node.outputImages)
-  return {
-    ...node,
-    sourceImageUrl: withDefault(node, 'sourceImageUrl', ''),
-    sourceImageRatio: withDefault(node, 'sourceImageRatio', 1),
-    outputCount: withDefault(node, 'outputCount', DEFAULT_IMAGE_NODE_OUTPUT_COUNT),
-    outputStatus: canonicalOutputStatus(node, outputImages),
-    outputImages,
-  }
-}
-
-function canonicalFusionBlendPoint(value: unknown): unknown {
-  if (value === undefined) {
-    return { ...DEFAULT_FUSION_BLEND_POINT }
-  }
-  return value
-}
-
-function canonicalFusionNode(node: unknown): unknown {
-  if (!isRecord(node)) return node
-  const outputImages = canonicalOutputImages(node.outputImages)
-  return {
-    ...node,
-    prompt: withDefault(node, 'prompt', ''),
-    outputCount: withDefault(node, 'outputCount', DEFAULT_FUSION_NODE_OUTPUT_COUNT),
-    aspectRatio: withDefault(node, 'aspectRatio', DEFAULT_PROMPT_ASPECT_RATIO),
-    blendPoint: canonicalFusionBlendPoint(node.blendPoint),
-    inputImages: withArrayDefault(node, 'inputImages'),
-    outputStatus: canonicalOutputStatus(node, outputImages),
-    outputImages,
-  }
-}
-
-function canonicalNodeArray(value: unknown, normalizeNode: (node: unknown) => unknown): unknown {
-  if (!Array.isArray(value)) return value
-  return value.map(normalizeNode)
-}
-
-function canonicalOptionalNonEmptyString(record: RecordLike, key: string): string | undefined {
-  if (!hasOwn(record, key) || record[key] === undefined) return undefined
-  return typeof record[key] === 'string' && record[key].length > 0 ? record[key] : undefined
-}
-
-function canonicalOptionalFiniteNumber(record: RecordLike, key: string): number | undefined {
-  if (!hasOwn(record, key) || record[key] === undefined) return undefined
-  return typeof record[key] === 'number' && Number.isFinite(record[key]) ? record[key] : undefined
-}
-
-function canonicalOptionalPositiveInteger(record: RecordLike, key: string): number | undefined {
-  const value = canonicalOptionalFiniteNumber(record, key)
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : undefined
-}
-
-function canonicalBoardSnapshotLike(snapshotLike: unknown, includeStateMetadata: boolean): unknown {
-  if (!isRecord(snapshotLike)) return snapshotLike
-  const canonical: RecordLike = {
-    ...snapshotLike,
-    schemaVersion: canonicalSchemaVersion(snapshotLike.schemaVersion),
-    imageNodes: canonicalNodeArray(
-      withArrayDefault(snapshotLike, 'imageNodes'),
-      canonicalImageNode,
-    ),
-    promptNodes: canonicalNodeArray(
-      withArrayDefault(snapshotLike, 'promptNodes'),
-      canonicalPromptNode,
-    ),
-    fusionNodes: canonicalNodeArray(
-      withArrayDefault(snapshotLike, 'fusionNodes'),
-      canonicalFusionNode,
-    ),
-    connections: withArrayDefault(snapshotLike, 'connections'),
-    groups: snapshotLike.groups,
-  }
-  if (includeStateMetadata) {
-    const previewSnapshotDataUrl = canonicalOptionalNonEmptyString(
-      snapshotLike,
-      'previewSnapshotDataUrl',
-    )
-    const previewSnapshotUpdatedAt = canonicalOptionalFiniteNumber(
-      snapshotLike,
-      'previewSnapshotUpdatedAt',
-    )
-    const previewSnapshotVersion = canonicalOptionalPositiveInteger(
-      snapshotLike,
-      'previewSnapshotVersion',
-    )
-    if (previewSnapshotDataUrl) canonical.previewSnapshotDataUrl = previewSnapshotDataUrl
-    else delete canonical.previewSnapshotDataUrl
-    if (previewSnapshotUpdatedAt !== undefined) {
-      canonical.previewSnapshotUpdatedAt = previewSnapshotUpdatedAt
-    } else {
-      delete canonical.previewSnapshotUpdatedAt
-    }
-    if (previewSnapshotVersion !== undefined)
-      canonical.previewSnapshotVersion = previewSnapshotVersion
-    else delete canonical.previewSnapshotVersion
-  }
-  return canonical
 }
 
 function issuePath(issue: IssueLike): string {
@@ -324,7 +147,6 @@ function successResult<T>(
 function normalizeWithLatestSchema<T>(
   schema: v.GenericSchema<unknown, T>,
   stateLike: unknown,
-  includeStateMetadata: boolean,
   options: LatestBoardStateNormalizationOptions | undefined,
 ): T | null | LatestBoardStateValidationResult<T> {
   const boundary = options?.boundary ?? DEFAULT_VALIDATION_BOUNDARY
@@ -332,11 +154,7 @@ function normalizeWithLatestSchema<T>(
   if (directParsed.success) {
     return successResult(stateLike, directParsed.output, options, boundary)
   }
-  const parsed = v.safeParse(schema, canonicalBoardSnapshotLike(stateLike, includeStateMetadata))
-  if (parsed.success) {
-    return successResult(stateLike, parsed.output, options, boundary)
-  }
-  const error = toValidationErrorContext(parsed.issues, boundary)
+  const error = toValidationErrorContext(directParsed.issues, boundary)
   return options?.mode === 'result' ? { ok: false, error } : null
 }
 
@@ -355,7 +173,7 @@ export function normalizeLatestCanvasBoardSnapshot(
   snapshotLike: unknown,
   options?: LatestBoardStateNormalizationOptions,
 ): CanvasBoardSnapshot | null | LatestBoardStateValidationResult<CanvasBoardSnapshot> {
-  return normalizeWithLatestSchema(canvasBoardSnapshotSchema, snapshotLike, false, options)
+  return normalizeWithLatestSchema(canvasBoardSnapshotSchema, snapshotLike, options)
 }
 
 export function normalizeLatestCanvasBoardState(stateLike: unknown): CanvasBoardState | null
@@ -371,7 +189,7 @@ export function normalizeLatestCanvasBoardState(
   stateLike: unknown,
   options?: LatestBoardStateNormalizationOptions,
 ): CanvasBoardState | null | LatestBoardStateValidationResult<CanvasBoardState> {
-  return normalizeWithLatestSchema(canvasBoardStateSchema, stateLike, true, options)
+  return normalizeWithLatestSchema(canvasBoardStateSchema, stateLike, options)
 }
 
 export function assertLatestCanvasBoardSnapshot(

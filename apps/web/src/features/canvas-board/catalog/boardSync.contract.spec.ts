@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserBoardItem } from '../../../shared/api/generated-query/model'
 import type { CanvasBoardState } from '../domain'
-import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
-  DEFAULT_PROMPT_ASPECT_RATIO,
-  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-} from '../domain'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
 import { makeCanvasBoardState } from '../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../persistence'
@@ -217,60 +213,74 @@ describe('boardSync', () => {
     expect(listCanvasBoards()[0]?.name).toBe('Local Board')
   })
 
-  it('hydrates normalizable older remote board state through the latest schema', async () => {
-    mocks.state.listResponse = {
-      data: {
-        list: [
-          makeRemoteBoard({
-            id: 'board-older',
-            name: 'Older Remote',
-            createdAt: 100,
-            updatedAt: 1_500,
-            state: {
-              schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
-              imageNodes: [
-                {
-                  id: 1,
-                  type: 'image-node',
-                  x: 0,
-                  y: 0,
-                  width: 280,
-                  sourceImageUrl: 'https://example.com/source.png',
-                  sourceImageRatio: 1,
-                  outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
-                },
-              ],
-              promptNodes: [
-                {
-                  id: 2,
-                  type: 'prompt',
-                  x: 300,
-                  y: 0,
-                  width: 280,
-                  text: 'older remote prompt',
-                },
-              ],
-              fusionNodes: [],
-              connections: [],
+  it('returns hydrate failure for old-shape remote board state without upgrading it', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mocks.state.listResponse = {
+        data: {
+          list: [
+            makeRemoteBoard({
+              id: 'board-older',
+              name: 'Older Remote',
+              createdAt: 100,
               updatedAt: 1_500,
-            } as unknown as CanvasBoardState,
-          }),
-        ],
-      },
+              state: {
+                schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
+                imageNodes: [
+                  {
+                    id: 1,
+                    type: 'image-node',
+                    x: 0,
+                    y: 0,
+                    width: 280,
+                    sourceImageUrl: 'https://example.com/source.png',
+                    sourceImageRatio: 1,
+                    outputImages: [{ url: 'https://example.com/output.png', ratio: 1 }],
+                  },
+                ],
+                promptNodes: [
+                  {
+                    id: 2,
+                    type: 'prompt',
+                    x: 300,
+                    y: 0,
+                    width: 280,
+                    text: 'older remote prompt',
+                  },
+                ],
+                fusionNodes: [],
+                connections: [],
+                groups: [],
+                updatedAt: 1_500,
+              } as unknown as CanvasBoardState,
+            }),
+          ],
+        },
+      }
+
+      const result = await hydrateCanvasBoardsFromServer()
+
+      expect(result).toMatchObject({
+        ok: false,
+        error: expect.objectContaining({
+          code: 'INVALID_BOARD_STATE',
+          boundary: 'server-hydration',
+          recoverable: true,
+        }),
+      })
+      expect(getCanvasBoardState('board-older')).toBeNull()
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[boards] invalid remote board state rejected',
+        'board-older',
+        expect.objectContaining({
+          code: 'INVALID_BOARD_STATE',
+          boundary: 'server-hydration',
+          recoverable: true,
+        }),
+      )
+    } finally {
+      warnSpy.mockRestore()
     }
-
-    await hydrateCanvasBoardsFromServer()
-
-    const state = getCanvasBoardState('board-older')
-    expect(state?.imageNodes[0]?.outputStatus).toBe('ready')
-    expect(state?.imageNodes[0]?.outputCount).toBe(1)
-    expect(state?.promptNodes[0]).toEqual(
-      expect.objectContaining({
-        outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
-        aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
-        inputImages: [],
-      }),
-    )
   })
 
   it('returns hydrate failure for invalid remote board state without clearing local boards', async () => {
