@@ -83,7 +83,7 @@ SET status = 'completed',
     lease_token = '',
     result = $1,
     error_msg = '',
-    completed_at = $2
+    completed_at = $2::timestamptz
 WHERE task_id = $3
   AND status = ANY($4::text[])
   AND account_id = $5
@@ -343,7 +343,7 @@ SET status = 'failed',
     failure_stage = $1,
     failure_category = $2,
     error_msg = $3,
-    completed_at = $4
+    completed_at = $4::timestamptz
 WHERE lease_id IN (
     SELECT id
     FROM task_leases
@@ -383,7 +383,7 @@ WITH updated_tasks AS (
   SET status = 'failed',
       lease_token = '',
       error_msg = $1,
-      completed_at = $2
+      completed_at = $2::timestamptz
   WHERE t.account_id = $3 AND t.status = 'running'
   RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
             t.feature_slug, t.requested_model, t.created_at, t.completed_at
@@ -467,7 +467,7 @@ SET status = 'failed',
     error_msg = $1,
     result = $2,
     retry_count = retry_count + 1,
-    completed_at = $3
+    completed_at = $3::timestamptz
 WHERE task_id = $4
   AND status = ANY($5::text[])
   AND account_id = $6
@@ -521,18 +521,18 @@ SET status = $1,
       WHEN $1 = 'completed' THEN ''
       ELSE $4
     END,
-    provider_finished_at = $5,
-    finalize_started_at = $6,
-    finalize_finished_at = $7,
+    provider_finished_at = $5::timestamptz,
+    finalize_started_at = $6::timestamptz,
+    finalize_finished_at = $7::timestamptz,
     provider_latency_ms = $8,
     finalize_latency_ms = $9,
     total_latency_ms = $10,
     completed_at = CASE
       WHEN $1 = 'cancelled' THEN NULL
-      ELSE $11
+      ELSE $11::timestamptz
     END,
     cancelled_at = CASE
-      WHEN $1 = 'cancelled' THEN $11
+      WHEN $1 = 'cancelled' THEN $11::timestamptz
       ELSE NULL
     END
 WHERE id = $12
@@ -1585,8 +1585,8 @@ const markTaskCancelled = `-- name: MarkTaskCancelled :execrows
 UPDATE tasks
 SET status = 'cancelled',
     lease_token = '',
-    completed_at = $1,
-    cancelled_at = $1,
+    completed_at = $1::timestamptz,
+    cancelled_at = $1::timestamptz,
     cancelled_by = $2,
     cancel_reason = $3,
     updated_at = now()
@@ -1620,7 +1620,7 @@ SET status = 'failed',
     lease_token = '',
     error_msg = $1,
     result = $2,
-    completed_at = $3
+    completed_at = $3::timestamptz
 WHERE task_id = $4
   AND status = ANY($5::text[])
 `
@@ -1653,7 +1653,7 @@ SET status = 'failed',
     lease_token = '',
     error_msg = $1,
     result = $2,
-    completed_at = $3
+    completed_at = $3::timestamptz
 WHERE task_id = $4
   AND status = ANY($5::text[])
   AND account_id = $6

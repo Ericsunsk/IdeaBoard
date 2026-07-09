@@ -269,8 +269,8 @@ WHERE task_id = sqlc.arg(task_id)
 UPDATE tasks
 SET status = 'cancelled',
     lease_token = '',
-    completed_at = sqlc.arg(cancelled_at),
-    cancelled_at = sqlc.arg(cancelled_at),
+    completed_at = sqlc.narg(cancelled_at)::timestamptz,
+    cancelled_at = sqlc.narg(cancelled_at)::timestamptz,
     cancelled_by = sqlc.narg(cancelled_by),
     cancel_reason = sqlc.arg(cancel_reason),
     updated_at = now()
@@ -326,18 +326,18 @@ SET status = sqlc.arg(status),
       WHEN sqlc.arg(status) = 'completed' THEN ''
       ELSE sqlc.arg(error_msg)
     END,
-    provider_finished_at = sqlc.arg(provider_finished_at),
-    finalize_started_at = sqlc.arg(finalize_started_at),
-    finalize_finished_at = sqlc.arg(finalize_finished_at),
+    provider_finished_at = sqlc.narg(provider_finished_at)::timestamptz,
+    finalize_started_at = sqlc.narg(finalize_started_at)::timestamptz,
+    finalize_finished_at = sqlc.narg(finalize_finished_at)::timestamptz,
     provider_latency_ms = sqlc.arg(provider_latency_ms),
     finalize_latency_ms = sqlc.arg(finalize_latency_ms),
     total_latency_ms = sqlc.arg(total_latency_ms),
     completed_at = CASE
       WHEN sqlc.arg(status) = 'cancelled' THEN NULL
-      ELSE sqlc.arg(completed_at)
+      ELSE sqlc.narg(completed_at)::timestamptz
     END,
     cancelled_at = CASE
-      WHEN sqlc.arg(status) = 'cancelled' THEN sqlc.arg(completed_at)
+      WHEN sqlc.arg(status) = 'cancelled' THEN sqlc.narg(completed_at)::timestamptz
       ELSE NULL
     END
 WHERE id = sqlc.arg(id)
@@ -513,7 +513,7 @@ SET status = 'completed',
     lease_token = '',
     result = sqlc.arg(result),
     error_msg = '',
-    completed_at = sqlc.arg(completed_at)
+    completed_at = sqlc.narg(completed_at)::timestamptz
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
   AND account_id = sqlc.arg(account_id)
@@ -527,7 +527,7 @@ SET status = 'failed',
     lease_token = '',
     error_msg = sqlc.arg(error_msg),
     result = sqlc.arg(result),
-    completed_at = sqlc.arg(completed_at)
+    completed_at = sqlc.narg(completed_at)::timestamptz
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[]);
 
@@ -537,7 +537,7 @@ SET status = 'failed',
     lease_token = '',
     error_msg = sqlc.arg(error_msg),
     result = sqlc.arg(result),
-    completed_at = sqlc.arg(completed_at)
+    completed_at = sqlc.narg(completed_at)::timestamptz
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
   AND account_id = sqlc.arg(account_id)
@@ -584,7 +584,7 @@ SET status = 'failed',
     error_msg = sqlc.arg(error_msg),
     result = sqlc.arg(result),
     retry_count = retry_count + 1,
-    completed_at = sqlc.arg(completed_at)
+    completed_at = sqlc.narg(completed_at)::timestamptz
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
   AND account_id = sqlc.arg(account_id)
@@ -606,7 +606,7 @@ WITH updated_tasks AS (
   SET status = 'failed',
       lease_token = '',
       error_msg = sqlc.arg(error_msg),
-      completed_at = sqlc.arg(completed_at)
+      completed_at = sqlc.narg(completed_at)::timestamptz
   WHERE t.account_id = sqlc.arg(account_id) AND t.status = 'running'
   RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
             t.feature_slug, t.requested_model, t.created_at, t.completed_at
@@ -631,7 +631,7 @@ SET status = 'failed',
     failure_stage = sqlc.arg(failure_stage),
     failure_category = sqlc.arg(failure_category),
     error_msg = sqlc.arg(error_msg),
-    completed_at = sqlc.arg(completed_at)
+    completed_at = sqlc.narg(completed_at)::timestamptz
 WHERE lease_id IN (
     SELECT id
     FROM task_leases
