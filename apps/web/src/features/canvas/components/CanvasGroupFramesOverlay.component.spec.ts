@@ -1,7 +1,21 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { render } from '../../../test/render'
 import CanvasGroupFramesOverlay from './CanvasGroupFramesOverlay.vue'
 import type { CanvasGroupFrame } from '../utils/canvasGroupGeometry'
+
+const adapterSkinCss = readFileSync(
+  path.join(
+    process.cwd(),
+    'src/features/canvas/components/styles/canvas-vue-flow-adapter-skin.css',
+  ),
+  'utf8',
+)
+const overlayVue = readFileSync(
+  path.join(process.cwd(), 'src/features/canvas/components/CanvasGroupFramesOverlay.vue'),
+  'utf8',
+)
 
 function createFrame(
   id: string,
@@ -26,6 +40,26 @@ function createFrame(
 }
 
 describe('CanvasGroupFramesOverlay', () => {
+  it('uses the cursor selection stroke width for the selected group frame ring', () => {
+    expect(adapterSkinCss).toContain('--canvas-selection-stroke-width: 1px')
+    expect(adapterSkinCss).toContain(
+      '--canvas-group-frame-selected-ring-width: var(--canvas-selection-stroke-width)',
+    )
+    expect(adapterSkinCss).toContain(
+      '--canvas-group-frame-selected-ring-color: var(--canvas-selection-group-border)',
+    )
+    expect(adapterSkinCss).toContain(
+      'border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-active-border)',
+    )
+    expect(adapterSkinCss).toContain(
+      'border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-group-border)',
+    )
+    expect(overlayVue).toContain(
+      'box-shadow: 0 0 0 var(--canvas-group-frame-selected-ring-width)',
+    )
+    expect(overlayVue).toContain('var(--canvas-group-frame-selected-ring-color)')
+  })
+
   it('projects persistent group frame bodies in the Vue Flow zoom plane', () => {
     const { container } = render(CanvasGroupFramesOverlay, {
       props: {

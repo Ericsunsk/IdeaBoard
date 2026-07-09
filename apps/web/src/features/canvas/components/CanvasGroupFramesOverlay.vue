@@ -109,8 +109,8 @@ function onResizePointerDown(
 
 .canvas-group-frame-body.is-selected {
   z-index: var(--canvas-group-frame-selected-body-z);
-  border-color: var(--canvas-selection-group-border);
-  background: var(--canvas-selection-group-surface);
+  box-shadow: 0 0 0 var(--canvas-group-frame-selected-ring-width)
+    var(--canvas-group-frame-selected-ring-color);
   pointer-events: auto;
 }
 

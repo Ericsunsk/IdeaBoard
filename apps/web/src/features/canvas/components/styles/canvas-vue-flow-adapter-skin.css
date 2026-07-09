@@ -84,6 +84,9 @@
   --canvas-selection-active-border: var(--canvas-accent);
   --canvas-selection-group-surface: var(--canvas-accent-soft);
   --canvas-selection-group-border: var(--canvas-accent);
+  --canvas-selection-stroke-width: 1px;
+  --canvas-group-frame-selected-ring-width: var(--canvas-selection-stroke-width);
+  --canvas-group-frame-selected-ring-color: var(--canvas-selection-group-border);
   --canvas-group-frame-surface: var(--canvas-selection-group-surface);
   --canvas-group-frame-border: var(--canvas-selection-group-border);
   --canvas-selection-group-outset: 10px;
@@ -101,7 +104,7 @@
 }
 
 .canvas-flow-wrap .vue-flow__selection {
-  border: 1px solid var(--canvas-selection-active-border);
+  border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-active-border);
   background: var(--canvas-selection-active-surface);
   box-shadow: none;
 }
@@ -118,7 +121,7 @@
   inset: calc(var(--canvas-selection-group-outset) * -1);
   pointer-events: none;
   content: '';
-  border: 1px solid var(--canvas-selection-group-border);
+  border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-group-border);
   border-radius: var(--canvas-selection-group-radius);
   background: var(--canvas-selection-group-surface);
 }

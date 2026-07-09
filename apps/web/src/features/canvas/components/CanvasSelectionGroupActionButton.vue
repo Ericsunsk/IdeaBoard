@@ -19,7 +19,7 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue'
-import { ArrowSeparate, Group } from '@iconoir/vue'
+import { KeyframesMinus, KeyframesPlus } from '@iconoir/vue'
 import { createPageChromeRoundControlClass } from '../../../shared/lib/pageChrome'
 import type { CanvasSelectionGroupAction } from '../composables/useFlowCanvasRuntime'
 
@@ -47,7 +47,9 @@ const buttonStyle = computed<CSSProperties | null>(() => {
   }
 })
 
-const actionIcon = computed(() => (props.action?.kind === 'ungroup' ? ArrowSeparate : Group))
+const actionIcon = computed(() =>
+  props.action?.kind === 'ungroup' ? KeyframesMinus : KeyframesPlus,
+)
 </script>
 
 <style scoped>
