@@ -30,6 +30,7 @@
 - Task submission is transactional: insert the business task and enqueue the River job in the same PostgreSQL transaction.
 - Task submission idempotency uses `client_action_id` as the user-action boundary: retries of the same user action return the existing Task, while intentional reruns send a new `client_action_id`.
 - River + PostgreSQL are the task queue and task state fact source.
+- API 启动会在 River worker 启动前取消遗留的 `running` tasks；`pending` tasks 保持队列语义，active leases 会释放，旧 River jobs 通过 River public API 做 best-effort cleanup。
 - NATS JetStream is an event layer for task status, audit and realtime fanout; it is not a task queue.
 - Worker implementation stays in `internal/runtime/worker` as an execution adapter.
 - Workflow owns executable feature contracts; Prompts owns template storage and rendering.

@@ -36,6 +36,18 @@ type appWorkerRuntime struct {
 	concurrency int
 }
 
+type riverStartupJobCanceller struct {
+	client *river.Client[pgx.Tx]
+}
+
+func (c riverStartupJobCanceller) CancelJob(ctx context.Context, jobID int64) error {
+	if c.client == nil || jobID <= 0 {
+		return nil
+	}
+	_, err := c.client.JobCancel(ctx, jobID)
+	return err
+}
+
 func (r appWorkerRuntime) close() error {
 	if r.eventBus == nil {
 		return nil
@@ -101,6 +113,12 @@ func newAppTaskRuntime(
 			_ = eventBus.Close()
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
+	}
+	if _, err := recoverRunningTasksAfterStartup(ctx, repos.taskRepo, riverStartupJobCanceller{client: riverClient}, taskEvents, time.Now()); err != nil {
+		if eventBus != nil {
+			_ = eventBus.Close()
+		}
+		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to recover running tasks after startup: %w", err)
 	}
 	riverQueue.SetClient(riverClient)
 

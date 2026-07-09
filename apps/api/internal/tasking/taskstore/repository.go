@@ -29,6 +29,11 @@ type RunningTaskLease struct {
 	LeaseToken string
 }
 
+type StartupRecoveredTask struct {
+	TaskID     string
+	RiverJobID int64
+}
+
 type ActiveTaskLease struct {
 	TaskID                  string
 	LeaseToken              string

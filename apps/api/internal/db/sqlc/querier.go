@@ -14,6 +14,8 @@ type Querier interface {
 	AcquireTaskLease(ctx context.Context, arg AcquireTaskLeaseParams) (int64, error)
 	ArchiveAccount(ctx context.Context, id int64) (int64, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
+	CancelRunningTaskAttemptsByTaskIDs(ctx context.Context, arg CancelRunningTaskAttemptsByTaskIDsParams) (int64, error)
+	CancelRunningTasksForStartupRecovery(ctx context.Context, arg CancelRunningTasksForStartupRecoveryParams) ([]CancelRunningTasksForStartupRecoveryRow, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error)
 	ConsumeBoardShareToken(ctx context.Context, tokenHash string) (BoardShareToken, error)

@@ -429,6 +429,84 @@ func (r *Repository) MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskC
 	return rowsAffected, err
 }
 
+func (r *Repository) CancelRunningTasksForStartupRecovery(ctx context.Context, reason string, cancelledAt time.Time) ([]StartupRecoveredTask, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, fmt.Errorf("cancel_reason is required")
+	}
+	if cancelledAt.IsZero() {
+		cancelledAt = time.Now()
+	}
+	var taskIDs []string
+	var recoveredTasks []StartupRecoveredTask
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.CancelRunningTasksForStartupRecovery(ctx, dbsqlc.CancelRunningTasksForStartupRecoveryParams{
+			CancelledAt:  sql.NullTime{Time: cancelledAt, Valid: true},
+			CancelReason: reason,
+		})
+		if err != nil || len(updated) == 0 {
+			return err
+		}
+		taskIDs = make([]string, 0, len(updated))
+		recoveredTasks = make([]StartupRecoveredTask, 0, len(updated))
+		for _, task := range updated {
+			taskIDs = append(taskIDs, task.TaskID)
+			recoveredTasks = append(recoveredTasks, StartupRecoveredTask{
+				TaskID:     task.TaskID,
+				RiverJobID: task.RiverJobID,
+			})
+		}
+		if err := releaseActiveTaskLeasesByTaskIDsTx(ctx, q, taskIDs, tasks.TaskAttemptStatusCancelled, cancelledAt); err != nil {
+			return err
+		}
+		if _, err := q.CancelRunningTaskAttemptsByTaskIDs(ctx, dbsqlc.CancelRunningTaskAttemptsByTaskIDsParams{
+			FailureStage:    tasks.ExecutionStageAssigned,
+			FailureCategory: tasks.FailureCategoryCancelled,
+			ErrorMsg:        reason,
+			CancelledAt:     sql.NullTime{Time: cancelledAt, Valid: true},
+			TaskIds:         taskIDs,
+		}); err != nil {
+			return err
+		}
+		metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, taskIDs)
+		if err != nil {
+			return err
+		}
+		for _, c := range updated {
+			terminalAt := cancelledAt
+			if c.CancelledAt.Valid {
+				terminalAt = c.CancelledAt.Time
+			}
+			task := &tasks.Task{
+				TaskID:                     c.TaskID,
+				UserID:                     c.UserID,
+				AssignedProviderEndpointID: dbutil.Int64Ptr(c.AssignedProviderEndpointID),
+				AssignedCredentialID:       dbutil.Int64Ptr(c.AssignedCredentialID),
+				AccountID:                  dbutil.Int64Ptr(c.AccountID),
+				Status:                     tasks.StatusCancelled,
+				FeatureSlug:                c.FeatureSlug,
+				RequestedModel:             c.RequestedModel,
+				ResolvedModel:              c.ResolvedModel,
+				APIType:                    c.ApiType,
+				CreatedAt:                  c.CreatedAt,
+				CompletedAt:                &terminalAt,
+				CancelledAt:                &terminalAt,
+			}
+			if err := upsertDailyStatByTaskTx(ctx, q, task, nil); err != nil {
+				return fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)
+			}
+			if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, c.TaskID, c.CreatedAt, metricsByTaskID[c.TaskID], tasks.ExecutionStageCancelled, tasks.ExecutionStageAssigned, tasks.FailureCategoryCancelled, terminalAt); err != nil {
+				return fmt.Errorf("patch terminal execution metrics for task %s: %w", c.TaskID, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return recoveredTasks, nil
+}
+
 func (r *Repository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, accountID int64, statuses ...string) ([]string, error) {
 	if len(statuses) == 0 {
 		return r.q.ListTaskIDsByAccountID(ctx, sql.NullInt64{Int64: accountID, Valid: accountID > 0})
