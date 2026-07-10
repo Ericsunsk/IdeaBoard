@@ -18,6 +18,11 @@ type Config struct {
 	Events   EventBusConfig
 	App      AppConfig
 	Auth     AuthServiceConfig
+	Credits  CreditsConfig
+}
+
+type CreditsConfig struct {
+	WelcomeIdentityKey string
 }
 
 type DatabaseConfig struct {
@@ -104,6 +109,7 @@ type envConfig struct {
 	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
 	AuthServiceInternalAPIKey string `env:"AUTH_INTERNAL_KEY"`
 	AuthServiceTimeoutSeconds string `env:"AUTH_SERVICE_TIMEOUT_SECONDS"`
+	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
 }
 
 var loadEnvOnce sync.Once
@@ -169,6 +175,7 @@ func Load() *Config {
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
 			TimeoutSeconds: parsePositiveIntEnv("AUTH_SERVICE_TIMEOUT_SECONDS", raw.AuthServiceTimeoutSeconds, 5),
 		},
+		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 	}
 }
 

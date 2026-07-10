@@ -8,7 +8,7 @@ import (
 
 func registerAuthenticatedAdminRoutes(r *gin.Engine, authDeps AuthDeps, h AdminRouteDeps) {
 	adminAPI := r.Group("/api/admin")
-	adminAPI.Use(auth.AuthMiddleware(authDeps.AuthServiceClient, authDeps.UserRepo), auth.AdminMiddleware())
+	adminAPI.Use(auth.AuthMiddleware(authDeps.AuthServiceClient, authDeps.UserRepo, authDeps.UserLifecycle), auth.AdminMiddleware())
 	registerAdminRoutes(adminAPI, h)
 }
 

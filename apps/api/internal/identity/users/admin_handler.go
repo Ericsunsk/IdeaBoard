@@ -476,28 +476,13 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	authUserID := strings.TrimSpace(derefString(targetUser.AuthUserID))
-	if authUserID == "" {
-		response.Error(c, 400, "目标用户缺少 auth_user_id，已拒绝删除以避免状态漂移")
-		return
-	}
 	if h.authService == nil {
 		response.InternalError(c, 500, "认证服务未配置", errors.New("admin auth service client not configured"))
 		return
 	}
 
-	if err := h.userService.DeleteUser(c.Request.Context(), targetUser.ID); err != nil {
-		response.InternalError(c, 500, "业务侧数据清理失败，已保留 Auth 用户以便重试", err)
-		return
-	}
-
-	if err := h.authService.DeleteUser(c.Request.Context(), authUserID); err != nil {
-		if errors.Is(err, autherrors.ErrAuthUserNotFound) {
-			slog.Warn("auth user already missing after local admin delete", "user_id", targetUser.ID, "auth_user_id", authUserID)
-			response.Success(c, nil)
-			return
-		}
-		response.InternalError(c, 502, "业务侧已清理，但删除 Auth 用户失败，请按运维流程补偿处理", err)
+	if err := h.userService.DeleteUser(c.Request.Context(), targetUser.ID, h.authService); err != nil {
+		response.InternalError(c, 500, "用户删除流程已安全冻结，可重试以继续收敛", err)
 		return
 	}
 

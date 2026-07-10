@@ -111,6 +111,8 @@ func mapCreditDatabaseError(err error) error {
 		return ErrRefundExceedsCharge
 	case "IB009":
 		return ErrInvalidCommand
+	case "IB010":
+		return ErrWelcomeIdentityKeyMismatch
 	default:
 		return fmt.Errorf("credits service: execute command: %w", err)
 	}

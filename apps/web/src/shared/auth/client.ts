@@ -1,6 +1,6 @@
 import { createAuthClient } from 'better-auth/vue'
 import { adminClient, usernameClient } from 'better-auth/client/plugins'
-import { AUTH_BASE_URL } from '../config/runtimeUrls'
+import { AUTH_BASE_URL, resolveAuthUrl } from '../config/runtimeUrls'
 
 export const authClient = createAuthClient({
   baseURL: AUTH_BASE_URL,
@@ -42,4 +42,28 @@ export function extractBetterAuthErrorMessage(error: unknown, fallback: string) 
   if (dataMsg) return dataMsg
 
   return fallback
+}
+
+export async function registerUsername(username: string, password: string): Promise<string> {
+  const response = await fetch(resolveAuthUrl('/api/auth/register/username'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  if (!response.ok) {
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      payload = null
+    }
+    throw new Error(extractBetterAuthErrorMessage(payload, '注册失败'))
+  }
+  const payload = (await response.json()) as { data?: { user?: { username?: unknown } } }
+  const canonicalUsername = getTrimmedString(payload.data?.user?.username)
+  if (!canonicalUsername) {
+    throw new Error('注册成功，但服务端未返回 canonical username')
+  }
+  return canonicalUsername
 }

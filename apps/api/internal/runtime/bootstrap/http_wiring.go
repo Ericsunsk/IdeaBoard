@@ -34,6 +34,7 @@ func newAppRouter(
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: services.authServiceClient,
 		UserRepo:          repos.userRepo,
+		UserLifecycle:     services.userLifecycle,
 	}
 	uploadDeps := httpapi.UploadDeps{
 		StorageService: services.storageService,

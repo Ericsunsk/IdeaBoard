@@ -5,6 +5,7 @@ import { getAuthGuardSettings } from './authGuardSettings.js'
 import {
   deleteAuthUserSessions,
   findUserByUsernameOrEmail,
+  finalizeTrustedRegistrationIdentity,
   removeAuthUserCascade,
   updateAuthUserBanState,
   updateAuthUserRole,
@@ -29,6 +30,7 @@ const app = createAuthApp({
   },
   repository: {
     findUserByUsernameOrEmail,
+    finalizeTrustedRegistrationIdentity,
     updateAuthUserRole,
     updateAuthUserBanState,
     deleteAuthUserSessions,

@@ -3,11 +3,12 @@ package users
 import (
 	"context"
 	"errors"
-	"log/slog"
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/validation"
 )
@@ -17,13 +18,25 @@ const maxUserKeywordLength = 64
 type UserService struct {
 	repo          *UserRepository
 	uploadCleaner UserUploadCleaner
+	lifecycle     UserLifecycle
+}
+
+type UserLifecycle interface {
+	SetUserStatus(context.Context, int64, int16) error
+	BeginUserDeletion(context.Context, int64) (*DeletionProgress, error)
+	AdvanceUserDeletion(context.Context, int64, DeletionPhase, DeletionPhase) error
+	TombstoneUser(context.Context, int64) error
+}
+
+type AuthUserDeleter interface {
+	DeleteUser(context.Context, string) error
 }
 
 type UserUploadCleaner interface {
 	DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error
 }
 
-func NewUserService(repo *UserRepository, uploadCleaner ...UserUploadCleaner) *UserService {
+func NewUserService(repo *UserRepository, lifecycle UserLifecycle, uploadCleaner ...UserUploadCleaner) *UserService {
 	var cleaner UserUploadCleaner
 	if len(uploadCleaner) > 0 {
 		cleaner = uploadCleaner[0]
@@ -31,6 +44,7 @@ func NewUserService(repo *UserRepository, uploadCleaner ...UserUploadCleaner) *U
 	return &UserService{
 		repo:          repo,
 		uploadCleaner: cleaner,
+		lifecycle:     lifecycle,
 	}
 }
 
@@ -93,7 +107,11 @@ func (s *UserService) UpdateStatus(ctx context.Context, userID int64, status int
 		return errors.New("状态值无效，仅支持0或1")
 	}
 
-	if err := s.repo.UpdateStatus(ctx, userID, status); err != nil {
+	if s.lifecycle == nil {
+		return errors.New("用户生命周期服务未配置")
+	}
+	err := s.lifecycle.SetUserStatus(ctx, userID, status)
+	if err != nil {
 		if database.IsNotFound(err) {
 			return errors.New("用户不存在")
 		}
@@ -118,24 +136,42 @@ func (s *UserService) UpdateRole(ctx context.Context, userID int64, role string)
 }
 
 // DeleteUser 删除用户
-func (s *UserService) DeleteUser(ctx context.Context, userID int64) error {
-	targetUser, err := s.repo.GetByID(ctx, userID)
+func (s *UserService) DeleteUser(ctx context.Context, userID int64, authDeleter AuthUserDeleter) error {
+	if s.lifecycle == nil || authDeleter == nil || s.uploadCleaner == nil {
+		return errors.New("用户删除依赖未配置")
+	}
+	progress, err := s.lifecycle.BeginUserDeletion(ctx, userID)
 	if err != nil {
-		return errors.New("用户不存在")
-	}
-
-	if s.uploadCleaner != nil {
-		if err := s.uploadCleaner.DeleteUserUploads(ctx, targetUser.ID, targetUser.StorageUID); err != nil {
-			slog.Warn("delete user uploads failed", "user_id", targetUser.ID, "storage_uid", targetUser.StorageUID, "err", err)
-			return errors.New("删除失败：用户文件清理失败，请查看服务日志")
-		}
-	}
-
-	if err := s.repo.Delete(ctx, userID); err != nil {
 		if database.IsNotFound(err) {
 			return errors.New("用户不存在")
 		}
 		return err
+	}
+
+	if progress.Phase == DeletionPendingAuth {
+		if err := authDeleter.DeleteUser(ctx, progress.AuthUserID); err != nil && !errors.Is(err, autherrors.ErrAuthUserNotFound) {
+			return fmt.Errorf("删除 Auth 用户失败: %w", err)
+		}
+		if err := s.lifecycle.AdvanceUserDeletion(ctx, userID, DeletionPendingAuth, DeletionPendingStorage); err != nil {
+			return fmt.Errorf("记录 Auth 用户已删除失败: %w", err)
+		}
+		progress.Phase = DeletionPendingStorage
+	}
+
+	if progress.Phase == DeletionPendingStorage {
+		if err := s.uploadCleaner.DeleteUserUploads(ctx, progress.UserID, progress.StorageUID); err != nil {
+			return fmt.Errorf("删除用户文件失败: %w", err)
+		}
+		if err := s.lifecycle.AdvanceUserDeletion(ctx, userID, DeletionPendingStorage, DeletionPendingTombstone); err != nil {
+			return fmt.Errorf("记录用户文件已清理失败: %w", err)
+		}
+		progress.Phase = DeletionPendingTombstone
+	}
+
+	if progress.Phase == DeletionPendingTombstone {
+		if err := s.lifecycle.TombstoneUser(ctx, userID); err != nil {
+			return fmt.Errorf("匿名化用户失败: %w", err)
+		}
 	}
 	return nil
 }

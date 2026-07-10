@@ -32,6 +32,12 @@ func (s *Service) InTx(tx pgx.Tx) Commands {
 	return &transactionCommands{tx: tx}
 }
 
+// LifecycleInTx lets Identity compose Wallet changes with user writes.
+// The caller owns commit and rollback.
+func (s *Service) LifecycleInTx(tx pgx.Tx) WalletLifecycle {
+	return &transactionCommands{tx: tx}
+}
+
 func (s *Service) Grant(ctx context.Context, command GrantCommand) (CommandResult, error) {
 	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
 		return commands.Grant(ctx, command)
@@ -102,6 +108,64 @@ func (c *transactionCommands) Grant(ctx context.Context, command GrantCommand) (
 		return CommandResult{}, ErrInvalidCommand
 	}
 	return executeCreditCommand(ctx, c.tx, CommandGrant, command.UserID, command.Amount.Int64(), "", metadata)
+}
+
+func (c *transactionCommands) ProvisionWallet(ctx context.Context, userID int64) error {
+	if c == nil || c.tx == nil || userID <= 0 {
+		return ErrInvalidCommand
+	}
+	if _, err := c.tx.Exec(ctx, `SELECT provision_credit_wallet($1)`, userID); err != nil {
+		return mapCreditDatabaseError(err)
+	}
+	return nil
+}
+
+func (c *transactionCommands) BindWelcomeIdentityKey(ctx context.Context, keyFingerprint string) error {
+	keyFingerprint = strings.TrimSpace(keyFingerprint)
+	if c == nil || c.tx == nil || len(keyFingerprint) != 64 {
+		return ErrInvalidCommand
+	}
+	if _, err := c.tx.Exec(ctx, `SELECT bind_credit_welcome_identity_key($1)`, keyFingerprint); err != nil {
+		return mapCreditDatabaseError(err)
+	}
+	return nil
+}
+
+func (c *transactionCommands) SetWalletFrozen(ctx context.Context, userID int64, frozen bool) error {
+	if c == nil || c.tx == nil || userID <= 0 {
+		return ErrInvalidCommand
+	}
+	status := "active"
+	if frozen {
+		status = "frozen"
+	}
+	if _, err := c.tx.Exec(ctx, `SELECT set_credit_wallet_status($1, $2)`, userID, status); err != nil {
+		return mapCreditDatabaseError(err)
+	}
+	return nil
+}
+
+func (c *transactionCommands) ClaimWelcomeGrant(
+	ctx context.Context,
+	identityFingerprint string,
+	command GrantCommand,
+) (CommandResult, bool, error) {
+	identityFingerprint = strings.TrimSpace(identityFingerprint)
+	if c == nil || c.tx == nil || len(identityFingerprint) != 64 || command.UserID <= 0 {
+		return CommandResult{}, false, ErrInvalidCommand
+	}
+	var claimed bool
+	if err := c.tx.QueryRow(ctx, `SELECT claim_credit_welcome($1, $2)`, identityFingerprint, command.UserID).Scan(&claimed); err != nil {
+		return CommandResult{}, false, mapCreditDatabaseError(err)
+	}
+	if !claimed {
+		return CommandResult{}, false, nil
+	}
+	result, err := c.Grant(ctx, command)
+	if err != nil {
+		return CommandResult{}, false, err
+	}
+	return result, true, nil
 }
 
 func (c *transactionCommands) Hold(ctx context.Context, command HoldCommand) (CommandResult, error) {

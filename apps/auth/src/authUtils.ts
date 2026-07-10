@@ -2,6 +2,7 @@ export type InternalUserShape = {
   id: string
   username?: string | null
   email?: string | null
+  emailVerified?: boolean | null
   name?: string | null
   role?: string | null
 }
@@ -28,13 +29,14 @@ export function normalizeAuthPath(rawPath: string): string {
 }
 
 export function isSignUpPath(path: string): boolean {
-  return path === '/sign-up' || path === '/sign-up/email' || path.startsWith('/sign-up/')
+  return path === '/register/username' || path === '/sign-up' || path === '/sign-up/email' || path.startsWith('/sign-up/')
 }
 
 export function isRateLimitedAuthPath(path: string): boolean {
   return (
     path === '/sign-in' ||
     path === '/sign-up' ||
+    path === '/register/username' ||
     path.startsWith('/sign-in/') ||
     path.startsWith('/sign-up/')
   )
@@ -58,6 +60,15 @@ export function normalizeUsername(raw: unknown): string {
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '')
   return text.slice(0, 50)
+}
+
+export function normalizeRegistrationUsername(raw: unknown): string {
+  return normalizeUsername(raw).toLowerCase()
+}
+
+export function isReservedRegistrationUsername(raw: unknown): boolean {
+  const username = normalizeRegistrationUsername(raw)
+  return username === 'admin' || username.startsWith('deleted-user-')
 }
 
 export function normalizeAuthRole(raw: unknown): 'admin' | 'user' | null {

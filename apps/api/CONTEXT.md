@@ -39,6 +39,8 @@
 - Unless schema or query contracts change, do not edit migrations or generated sqlc code.
 - Credits Ledger 与 Tasking 共用 PostgreSQL；其他 context 只能通过 `credits.Commands` 写账，禁止直接改 balance projection 或 Ledger。
 - Credit Commands 需要与 caller 的业务状态原子提交时，使用 `credits.Service.InTx(pgx.Tx)`，不得外部双写。
+- Identity 的用户生命周期可通过 `credits.WalletLifecycle` typed seam 原子 provision/freeze Wallet 与领取 Welcome Grant；该 seam 仍由 Credits 独占 Ledger 写入和 runtime privilege。
+- 用户删除以 `user_deletion_requests` 为 durable state：先冻结业务用户与 Wallet，再按 Auth → Storage → tombstone phase 幂等收敛；跨服务失败不得恢复 active Wallet。
 
 ## When To Expand A Context
 

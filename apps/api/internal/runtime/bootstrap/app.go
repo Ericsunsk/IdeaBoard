@@ -2,16 +2,18 @@ package bootstrap
 
 import (
 	"context"
-	"fmt"
+	"encoding/base64"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"strings"
 
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
-	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/runtime/worker"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,6 +26,9 @@ func Run(args []string) {
 			return
 		case "migrate":
 			runMigrate()
+			return
+		case "init-credit-wallets":
+			runInitCreditWallets(args[2:])
 			return
 		case "preflight":
 			runPreflight(args[2:])
@@ -59,6 +64,48 @@ func Run(args []string) {
 	}
 }
 
+func runInitCreditWallets(args []string) {
+	if len(args) != 1 || strings.TrimSpace(args[0]) == "" {
+		fatal("usage: ideaboard init-credit-wallets <verified-identities.json>")
+	}
+	cfg := config.Load()
+	configureRuntimeLogging(cfg)
+	rawKey, err := base64.StdEncoding.DecodeString(cfg.Credits.WelcomeIdentityKey)
+	if err != nil || len(rawKey) != 32 {
+		fatal("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
+	}
+	contents, err := os.ReadFile(args[0])
+	if err != nil {
+		fatal("failed to read verified identities", "err", err)
+	}
+	var identities []users.VerifiedIdentity
+	if err := json.Unmarshal(contents, &identities); err != nil {
+		fatal("failed to parse verified identities", "err", err)
+	}
+	ctx := context.Background()
+	pool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
+	if err != nil {
+		fatal("failed to connect to database", "err", err)
+	}
+	defer pool.Close()
+	creditService := credits.NewService(pool)
+	service := users.NewLifecycleService(pool, creditService, rawKey)
+	if err := service.VerifyWelcomeIdentityKey(ctx); err != nil {
+		fatal("failed to verify Welcome identity key", "err", err)
+	}
+	results, err := service.InitializeExistingIdentities(ctx, identities)
+	if err != nil {
+		fatal("failed to initialize Credit Wallets", "err", err)
+	}
+	granted := 0
+	for _, result := range results {
+		if result.WelcomeGranted {
+			granted++
+		}
+	}
+	slog.Info("Credit Wallet initialization completed", "identities", len(results), "welcome_grants", granted)
+}
+
 func runMigrate() {
 	cfg := config.Load()
 	configureRuntimeLogging(cfg)
@@ -72,14 +119,20 @@ func runInitAdmin() {
 	cfg := config.Load()
 	configureRuntimeLogging(cfg)
 	requireAuthInternalKeyForProduction(cfg)
-	db, err := database.NewPostgres(cfg.Database)
+	rawKey, err := base64.StdEncoding.DecodeString(cfg.Credits.WelcomeIdentityKey)
+	if err != nil || len(rawKey) != 32 {
+		fatal("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
+	}
+	ctx := context.Background()
+	pool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
 		fatal("failed to connect to database", "err", err)
 	}
-	userRepo := users.NewUserRepository(db)
-	ctx := context.Background()
-	if err := userRepo.EnsureStorageUIDs(ctx); err != nil {
-		fatal("failed to ensure user storage uid", "err", err)
+	defer pool.Close()
+	creditService := credits.NewService(pool)
+	lifecycle := users.NewLifecycleService(pool, creditService, rawKey)
+	if err := lifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
+		fatal("failed to verify Welcome identity key", "err", err)
 	}
 	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
 	if adminPassword == "" {
@@ -91,71 +144,18 @@ func runInitAdmin() {
 	if err != nil {
 		fatal("failed to ensure Better Auth admin user", "err", err)
 	}
-
-	ensureLocalAdminRole := func(user *users.User) error {
-		if user == nil {
-			return fmt.Errorf("local admin user is nil")
-		}
-		changed := false
-		if strings.TrimSpace(valueOrEmpty(user.AuthUserID)) == "" {
-			user.AuthUserID = tasks.StringPtr(provisioned.AuthUserID)
-			changed = true
-		}
-		if user.Role != "admin" {
-			user.Role = "admin"
-			changed = true
-		}
-		if user.Status != 1 {
-			user.Status = 1
-			changed = true
-		}
-		if changed {
-			return userRepo.Update(ctx, user)
-		}
-		return nil
+	result, err := lifecycle.ProvisionIdentity(ctx, users.VerifiedIdentity{
+		AuthUserID: provisioned.AuthUserID, Username: provisioned.Username,
+		ClaimIdentity: provisioned.ClaimIdentity, ClaimIdentityKind: provisioned.ClaimIdentityKind,
+		ClaimIdentityVerified: provisioned.ClaimIdentityVerified, Role: "admin", EnsureActive: true,
+	})
+	if err != nil {
+		fatal("failed to atomically provision local admin, Wallet, and Welcome Grant", "err", err)
 	}
-
-	localAdmin, err := userRepo.GetByAuthUserID(ctx, provisioned.AuthUserID)
-	if err == nil {
-		if err := ensureLocalAdminRole(localAdmin); err != nil {
-			fatal("failed to update local admin profile by auth_user_id", "err", err)
-		}
-		slog.Info("Better Auth admin user verified; local admin profile is ready")
-		return
-	}
-	if err != nil && !database.IsNotFound(err) {
-		fatal("failed to query local admin by auth_user_id", "err", err)
-	}
-
-	localAdminByName, err := userRepo.GetByUsername(ctx, "admin")
-	if err == nil {
-		fatal("local username admin already exists without matching Better Auth user", "auth_user_id", strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)))
-	}
-	if !database.IsNotFound(err) {
-		fatal("failed to query local admin username", "err", err)
-	}
-
-	localAdmin = &users.User{
-		Username:   "admin",
-		AuthUserID: tasks.StringPtr(provisioned.AuthUserID),
-		Role:       "admin",
-		Status:     1,
-	}
-	if err := userRepo.Create(ctx, localAdmin); err != nil {
-		fatal("failed to create local admin profile", "err", err)
-	}
-
-	slog.Info("created Better Auth admin account and local admin profile")
+	slog.Info("Better Auth admin user and local Credit Wallet lifecycle are ready", "user_id", result.User.ID, "welcome_granted", result.WelcomeGranted)
 }
 
 func fatal(msg string, attrs ...any) {
 	slog.Error(msg, attrs...)
 	os.Exit(1)
-}
-
-func valueOrEmpty(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }

@@ -102,6 +102,8 @@ VALUES ('ctx_runtime_bypass', 42, 'grant', 'runtime-role:bypass', repeat('0', 64
 		assertRuntimeCreditStatementDenied(t, ctx, pool, roleSQL,
 			`INSERT INTO `+pgx.Identifier{tableName}.Sanitize()+` (id) VALUES ('api-bypass')`)
 	}
+	assertRuntimeCreditStatementDenied(t, ctx, pool, roleSQL,
+		`DELETE FROM user_deletion_requests WHERE user_id = 42`)
 
 	assertTemporaryCreditTablesCannotShadowLedger(t, ctx, pool, roleSQL)
 

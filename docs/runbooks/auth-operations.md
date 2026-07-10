@@ -18,7 +18,7 @@
 
 - 用户封禁与解封（`status` 软控制）。
 - 角色升降级：由 Go Admin API 校验后同步 Better Auth `user.role` 与业务侧 `users.role`。
-- 受控彻底注销：仅允许删除非管理员、非当前登录管理员账号；由 Go Admin API 先调用 Auth Service internal endpoint 清理身份、会话与凭据，再清理业务侧用户数据。
+- 受控彻底注销：仅允许删除非管理员、非当前登录管理员账号；Go Admin API 先在 PostgreSQL 冻结业务用户与 Credit Wallet 并记录 durable deletion phase，再依次清理 Auth、Storage 和业务侧 PII。
 - 配额、业务权限分配。
 - 业务配置维护（画板、渠道、系统提示词、存储配置等）。
 
@@ -48,7 +48,9 @@
 
 3. **生产环境默认建议关闭公开注册。** 可在管理后台 `用户管理` 页的"开放注册"开关控制，仅在明确运营窗口内开启。
 
-4. **高风险动作保留审计记录。** 建议记录操作人、时间、原因、影响用户与回滚策略。
+4. **公开注册只使用 `/api/auth/register/username`。** Client 只提交 username/password；Auth 服务生成 canonical synthetic claim identity 并标记 trusted。`/api/auth/sign-up/email` 被拒绝，不能作为替代入口。
+
+5. **高风险动作保留审计记录。** 建议记录操作人、时间、原因、影响用户与回滚策略。
 
 
 ## 推荐流程
@@ -77,8 +79,10 @@
 
 1. 先确认目标账号不是管理员账号，也不是当前登录管理员自己。
 2. 在 `用户管理` 页执行"彻底注销用户"。
-3. Go Admin API 会先调用 Auth Service `/internal/users/:id` 删除身份记录、会话与凭据；Auth 删除失败时不会继续删除业务侧数据。
-4. 若业务侧清理失败，按接口错误与服务日志进行补偿处理，避免重复手工删除造成二次漂移。
+3. Go Admin API 先在单个 PostgreSQL transaction 中把业务用户设为 inactive、冻结 Credit Wallet，并创建 `user_deletion_requests` 的 `pending_auth` 记录。
+4. 请求随后按 `pending_auth` → `pending_storage` → `pending_tombstone` → `completed` 执行；Auth 404 与 Storage cleanup 都按幂等结果处理。
+5. 任一步失败都保持 Wallet frozen；直接重试同一删除 API 会从持久 phase 继续，不需要手工改数据库。
+6. 完成后保留匿名化 user tombstone，并永久保留 Task、Credit Ledger 与 Welcome Grant claim。只有持续重试仍失败时才依据日志排查对应外部依赖，不要跳过 phase 手工物理删除。
 
 
 ## 上线与安全基线

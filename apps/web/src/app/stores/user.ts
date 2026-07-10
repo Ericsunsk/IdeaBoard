@@ -1,6 +1,10 @@
 import { ref, computed, reactive } from 'vue'
 import { fetchCurrentUserInfo, type User } from '../../shared/api/userSession'
-import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/client'
+import {
+  authClient,
+  extractBetterAuthErrorMessage,
+  registerUsername,
+} from '../../shared/auth/client'
 import { getStoredUser, setStoredAuth, clearStoredAuthState } from '../../shared/utils/auth'
 import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
 import { resolveAuthUrl } from '../../shared/config/runtimeUrls'
@@ -102,26 +106,9 @@ function createUserSessionStore(): UserSessionStore {
 
   async function register(username: string, password: string) {
     const normalizedUsername = username.trim()
-    const safeLocalPart = username
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, '_')
-    const email = `${safeLocalPart || 'user'}@ideaboard.local`
 
-    const result = await authClient.signUp.email({
-      email,
-      password,
-      name: normalizedUsername,
-      username: normalizedUsername,
-    })
-    if (result?.error) {
-      throw new Error(extractBetterAuthErrorMessage(result.error, '注册失败'))
-    }
-
-    await fetchUserInfo(true)
-    if (!user.value) {
-      await login(normalizedUsername, password)
-    }
+    const canonicalUsername = await registerUsername(normalizedUsername, password)
+    await login(canonicalUsername, password)
     if (!user.value) {
       throw new Error('注册成功，但登录状态恢复失败')
     }

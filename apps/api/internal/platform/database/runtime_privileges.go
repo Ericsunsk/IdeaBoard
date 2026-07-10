@@ -43,6 +43,8 @@ var apiOwnedTableNames = []string{
 	"users_used_uids",
 }
 
+const userDeletionRequestsTable = "user_deletion_requests"
+
 var apiOwnedSequenceNames = []string{
 	"api_account_models_id_seq",
 	"api_account_secrets_id_seq",
@@ -92,6 +94,8 @@ func ConfigureRuntimePrivileges(ctx context.Context, db RuntimePrivilegeDBTX, ru
 		`GRANT USAGE, SELECT, UPDATE ON ` + qualifiedIdentifiers(schemaName, apiOwnedSequenceNames) + ` TO ` + roleSQL,
 		`REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ` + schemaSQL + `.schema_migrations FROM ` + roleSQL,
 		`GRANT SELECT ON ` + schemaSQL + `.schema_migrations TO ` + roleSQL,
+		`REVOKE ALL PRIVILEGES ON TABLE ` + schemaSQL + `.` + userDeletionRequestsTable + ` FROM ` + roleSQL,
+		`GRANT SELECT, INSERT, UPDATE ON ` + schemaSQL + `.` + userDeletionRequestsTable + ` TO ` + roleSQL,
 	}
 	for _, tableName := range protectedAuthTableNames {
 		var exists bool
@@ -135,6 +139,24 @@ SELECT COALESCE(has_table_privilege(current_user, to_regclass($1), $2), FALSE)`,
 			if allowed {
 				return fmt.Errorf("verify API runtime privileges: role %q has forbidden %s on Auth table %s", currentUser, privilege, tableName)
 			}
+		}
+	}
+	for _, privilege := range []string{"SELECT", "INSERT", "UPDATE"} {
+		var allowed bool
+		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, userDeletionRequestsTable, privilege).Scan(&allowed); err != nil {
+			return fmt.Errorf("verify API runtime privileges: check deletion requests %s: %w", privilege, err)
+		}
+		if !allowed {
+			return fmt.Errorf("verify API runtime privileges: role %q lacks required %s on %s", currentUser, privilege, userDeletionRequestsTable)
+		}
+	}
+	for _, privilege := range []string{"DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"} {
+		var allowed bool
+		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, userDeletionRequestsTable, privilege).Scan(&allowed); err != nil {
+			return fmt.Errorf("verify API runtime privileges: check deletion requests %s: %w", privilege, err)
+		}
+		if allowed {
+			return fmt.Errorf("verify API runtime privileges: role %q has forbidden %s on %s", currentUser, privilege, userDeletionRequestsTable)
 		}
 	}
 	return nil

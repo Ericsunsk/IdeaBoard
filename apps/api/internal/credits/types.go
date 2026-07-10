@@ -36,15 +36,16 @@ const (
 )
 
 var (
-	ErrInvalidCommand      = errors.New("invalid credit command")
-	ErrWalletNotFound      = errors.New("credit wallet not found")
-	ErrWalletFrozen        = errors.New("credit wallet is frozen")
-	ErrInsufficientCredits = errors.New("insufficient credits")
-	ErrIdempotencyConflict = errors.New("credit idempotency key conflicts with a different request")
-	ErrHoldNotFound        = errors.New("credit hold not found")
-	ErrHoldSettled         = errors.New("credit hold is already settled")
-	ErrChargeNotFound      = errors.New("credit charge not found")
-	ErrRefundExceedsCharge = errors.New("credit refund exceeds remaining charge")
+	ErrInvalidCommand             = errors.New("invalid credit command")
+	ErrWalletNotFound             = errors.New("credit wallet not found")
+	ErrWalletFrozen               = errors.New("credit wallet is frozen")
+	ErrInsufficientCredits        = errors.New("insufficient credits")
+	ErrIdempotencyConflict        = errors.New("credit idempotency key conflicts with a different request")
+	ErrHoldNotFound               = errors.New("credit hold not found")
+	ErrHoldSettled                = errors.New("credit hold is already settled")
+	ErrChargeNotFound             = errors.New("credit charge not found")
+	ErrRefundExceedsCharge        = errors.New("credit refund exceeds remaining charge")
+	ErrWelcomeIdentityKeyMismatch = errors.New("Welcome identity key does not match the permanently bound key")
 )
 
 type Actor struct {
@@ -102,6 +103,13 @@ type Commands interface {
 	Capture(context.Context, CaptureCommand) (CommandResult, error)
 	Release(context.Context, ReleaseCommand) (CommandResult, error)
 	Refund(context.Context, RefundCommand) (CommandResult, error)
+}
+
+type WalletLifecycle interface {
+	BindWelcomeIdentityKey(context.Context, string) error
+	ProvisionWallet(context.Context, int64) error
+	SetWalletFrozen(context.Context, int64, bool) error
+	ClaimWelcomeGrant(context.Context, string, GrantCommand) (CommandResult, bool, error)
 }
 
 type WalletReader interface {

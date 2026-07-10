@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/autherrors"
-	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
@@ -92,7 +91,7 @@ func TestAdminListUsersRejectsInvalidFilters(t *testing.T) {
 
 	db := newUserRepoTestDB(t)
 	repo := NewUserRepository(db)
-	handler := NewAdminHandler(NewUserService(repo), nil, nil)
+	handler := NewAdminHandler(NewUserService(repo, nil), nil, nil)
 	router := gin.New()
 	router.GET("/admin/users", handler.ListUsers)
 
@@ -729,16 +728,9 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	if err := repo.Create(context.Background(), targetUser); err != nil {
 		t.Fatalf("create target user failed: %v", err)
 	}
-	if _, err := db.ExecContext(
-		context.Background(),
-		`INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		"admin-delete-task", targetUser.ID, "", "", "", "pending", "", "",
-	); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-
 	authManager := &fakeAdminAuthManager{deleteErr: autherrors.ErrAuthUserNotFound}
-	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
+	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
+	handler := NewAdminHandler(NewUserService(repo, lifecycle, &recordingUserUploadCleaner{}), nil, authManager)
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
 		c.Set("user_id", int64(999))
@@ -756,19 +748,12 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 		t.Fatalf("deleted auth user id = %q, want %q", authManager.deletedAuthUserID, authUserID)
 	}
 
-	if _, err := repo.GetByID(context.Background(), targetUser.ID); !database.IsNotFound(err) {
-		t.Fatalf("target user lookup err = %v, want record not found", err)
-	}
-	var taskCount int64
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, targetUser.ID).Scan(&taskCount); err != nil {
-		t.Fatalf("count tasks failed: %v", err)
-	}
-	if taskCount != 0 {
-		t.Fatalf("task count = %d, want 0", taskCount)
+	if lifecycle.tombstoneCalls != 1 {
+		t.Fatalf("tombstone calls = %d, want 1", lifecycle.tombstoneCalls)
 	}
 }
 
-func TestAdminDeleteUserSkipsAuthDeleteWhenLocalCleanupFails(t *testing.T) {
+func TestAdminDeleteUserReportsLocalCleanupFailureAfterAuthDelete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := newUserRepoTestDB(t)
@@ -786,7 +771,8 @@ func TestAdminDeleteUserSkipsAuthDeleteWhenLocalCleanupFails(t *testing.T) {
 	}
 
 	authManager := &fakeAdminAuthManager{}
-	userService := NewUserService(repo, &recordingUserUploadCleaner{err: errors.New("storage down")})
+	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
+	userService := NewUserService(repo, lifecycle, &recordingUserUploadCleaner{err: errors.New("storage down")})
 	handler := NewAdminHandler(userService, nil, authManager)
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
@@ -801,11 +787,51 @@ func TestAdminDeleteUserSkipsAuthDeleteWhenLocalCleanupFails(t *testing.T) {
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
 	}
-	if authManager.deletedAuthUserID != "" {
-		t.Fatalf("auth delete was called for %q, want skipped", authManager.deletedAuthUserID)
+	if authManager.deletedAuthUserID != authUserID {
+		t.Fatalf("auth delete was called for %q, want %q", authManager.deletedAuthUserID, authUserID)
 	}
 	if _, err := repo.GetByID(context.Background(), targetUser.ID); err != nil {
 		t.Fatalf("target user should remain after cleanup failure: %v", err)
+	}
+}
+
+func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	authUserID := "auth-delete-fails"
+	targetUser := &User{
+		Username:   "auth_delete_fail_user",
+		AuthUserID: &authUserID,
+		Role:       "user",
+		Status:     1,
+	}
+	if err := repo.Create(context.Background(), targetUser); err != nil {
+		t.Fatalf("create target user failed: %v", err)
+	}
+
+	authManager := &fakeAdminAuthManager{deleteErr: errors.New("auth unavailable")}
+	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
+	handler := NewAdminHandler(NewUserService(repo, lifecycle, &recordingUserUploadCleaner{}), nil, authManager)
+	router := gin.New()
+	router.DELETE("/admin/users/:id", func(c *gin.Context) {
+		c.Set("user_id", int64(999))
+		handler.DeleteUser(c)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10), nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if authManager.deletedAuthUserID != authUserID {
+		t.Fatalf("deleted auth user id = %q, want %q", authManager.deletedAuthUserID, authUserID)
+	}
+	if _, err := repo.GetByID(context.Background(), targetUser.ID); err != nil {
+		t.Fatalf("local user changed after Auth delete failure: %v", err)
 	}
 }
 
@@ -826,7 +852,8 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 	}
 
 	authManager := &fakeAdminAuthManager{}
-	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
+	lifecycle := &recordingUserLifecycle{}
+	handler := NewAdminHandler(NewUserService(repo, lifecycle), nil, authManager)
 	router := gin.New()
 	router.POST("/admin/users/:id/ban", func(c *gin.Context) {
 		c.Set("user_id", int64(999))
@@ -845,12 +872,8 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 		t.Fatalf("banned auth user id = %q, want %q", authManager.bannedAuthUserID, authUserID)
 	}
 
-	updated, err := repo.GetByID(context.Background(), targetUser.ID)
-	if err != nil {
-		t.Fatalf("reload target user failed: %v", err)
-	}
-	if updated.Status != 0 {
-		t.Fatalf("updated status = %d, want 0", updated.Status)
+	if len(lifecycle.statusCalls) != 1 || lifecycle.statusCalls[0] != 0 {
+		t.Fatalf("status lifecycle calls = %v, want [0]", lifecycle.statusCalls)
 	}
 }
 
@@ -871,7 +894,7 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 	}
 
 	authManager := &fakeAdminAuthManager{}
-	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
+	handler := NewAdminHandler(NewUserService(repo, nil), nil, authManager)
 	router := gin.New()
 	router.POST("/admin/users/:id/revoke-sessions", func(c *gin.Context) {
 		c.Set("user_id", int64(999))

@@ -55,6 +55,14 @@ cd apps/api
 INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 ```
 
+初始化已有开发身份的 Credit Wallet 时，传入 Auth 导出的 trusted canonical registration identity JSON；该命令幂等，普通 API startup 不会扫描用户。`CREDITS_WELCOME_IDENTITY_KEY` 首次使用后会在数据库绑定 fingerprint，误更换会 fail closed，不能当作普通可轮换 secret：
+
+```bash
+cd apps/api
+CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
+  go run ./cmd init-credit-wallets verified-identities.json
+```
+
 开发代理：
 
 | Path | Target |

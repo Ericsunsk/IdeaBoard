@@ -6,10 +6,12 @@ import {
   normalizeAuthRole,
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
+  normalizeRegistrationUsername,
   normalizeUsername,
 } from './authUtils.js'
 import { runUpdateAuthUserRoleCommand } from './authInternalCommands.js'
 import { getHeaderValue, sendError, sendSuccess, toHeaders } from './httpResponse.js'
+import { provisionTrustedCanonicalIdentity, trustedCanonicalClaimIdentity } from './publicRegistration.js'
 
 type EnsureUserBody = {
   username?: unknown
@@ -58,8 +60,10 @@ export type AuthUserRepository = {
     email?: string | null
     name?: string | null
     role?: string | null
+    emailVerified?: boolean | null
   } | null>
   updateAuthUserRole(authUserID: string, role: 'admin' | 'user'): Promise<boolean>
+  finalizeTrustedRegistrationIdentity(authUserID: string, claimIdentity: string, role: 'admin' | 'user'): Promise<boolean>
   updateAuthUserBanState(
     authUserID: string,
     banned: boolean,
@@ -102,11 +106,17 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
         sendError(reply, 401, 'unauthorized')
         return
       }
+      const username = normalizeRegistrationUsername(user.username || user.name || '')
+      const claimIdentity = String(user.email || '').toLowerCase()
+      const isTrustedClaimIdentity =
+        Boolean(user.emailVerified) && claimIdentity === trustedCanonicalClaimIdentity(username)
       sendSuccess(reply, {
         session: {
           auth_user_id: user.id,
-          username: normalizeUsername(user.username || user.name || ''),
-          email: String(user.email || ''),
+          username,
+          claim_identity: claimIdentity,
+          claim_identity_kind: isTrustedClaimIdentity ? 'trusted_canonical_registration' : 'untrusted',
+          claim_identity_verified: isTrustedClaimIdentity,
         },
       })
     } catch (error) {
@@ -118,7 +128,7 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
     '/internal/users/ensure',
     { preHandler: requireInternalKey },
     async (request, reply) => {
-      const username = normalizeUsername(request.body?.username)
+      const username = normalizeRegistrationUsername(request.body?.username)
       const password = String(request.body?.password || '')
       const allowExisting = Boolean(request.body?.allow_existing)
       const role = normalizeAuthRole(request.body?.role)
@@ -136,27 +146,19 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
         return
       }
 
-      const email = `${username}@ideaboard.local`
+      const email = trustedCanonicalClaimIdentity(username)
       try {
-        const created = await options.authApi.signUpEmail({
-          body: {
-            email,
-            password,
-            name: username,
-            username,
-          },
-        })
-        const user = extractAuthUser(created)
-        if (!user) {
-          sendError(reply, 500, 'auth user creation succeeded but user payload is empty')
-          return
-        }
-        await options.repository.updateAuthUserRole(user.id, role)
+        const user = await provisionTrustedCanonicalIdentity(
+          options.authApi, options.repository, username, password, role,
+        )
         sendSuccess(reply, {
           user: {
             auth_user_id: user.id,
             username: normalizeUsername(user.username || user.name || username),
             email: String(user.email || email),
+            claim_identity: email,
+            claim_identity_kind: 'trusted_canonical_registration',
+            claim_identity_verified: true,
             role,
             existing: false,
           },
@@ -166,12 +168,20 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
           try {
             const existing = await options.repository.findUserByUsernameOrEmail(username, email)
             if (existing) {
-              await options.repository.updateAuthUserRole(existing.id, role)
+              const existingUsername = normalizeRegistrationUsername(existing.username || existing.name || '')
+              const existingEmail = String(existing.email || '').toLowerCase()
+              if (!existing.emailVerified || existingUsername !== username || existingEmail !== email || existing.role !== role) {
+                sendError(reply, 409, 'existing identity conflicts with requested trusted user')
+                return
+              }
               sendSuccess(reply, {
                 user: {
                   auth_user_id: existing.id,
                   username: normalizeUsername(existing.username || existing.name || username),
                   email: String(existing.email || email),
+                  claim_identity: email,
+                  claim_identity_kind: 'trusted_canonical_registration',
+                  claim_identity_verified: true,
                   role,
                   existing: true,
                 },

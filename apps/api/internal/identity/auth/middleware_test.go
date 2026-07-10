@@ -29,7 +29,7 @@ func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 		t.Fatalf("seed auth-bound user failed: %v", err)
 	}
 
-	resolved, err := resolveLocalUserByAuthIdentity(context.Background(), userRepo, &SessionIdentity{
+	resolved, err := resolveLocalUserByAuthIdentity(context.Background(), userRepo, nil, &SessionIdentity{
 		AuthUserID: "auth-1234567890",
 		Username:   "alice",
 	})
@@ -43,7 +43,7 @@ func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 		t.Fatalf("resolved auth_user_id = %#v, want auth-1234567890", resolved.AuthUserID)
 	}
 
-	_, err = resolveLocalUserByAuthIdentity(context.Background(), userRepo, &SessionIdentity{
+	_, err = resolveLocalUserByAuthIdentity(context.Background(), userRepo, nil, &SessionIdentity{
 		AuthUserID: "auth-missing-123",
 		Username:   "ghost",
 	})
@@ -64,7 +64,7 @@ func TestAuthMiddlewareReturnsServiceUnavailableWhenLocalLookupFails(t *testing.
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-db-error","username":"alice"}}}`))
+		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-db-error","username":"alice","claim_identity":"alice@users.ideaboard.local","claim_identity_kind":"trusted_canonical_registration","claim_identity_verified":true}}}`))
 	}))
 	defer authServer.Close()
 
@@ -78,7 +78,7 @@ func TestAuthMiddlewareReturnsServiceUnavailableWhenLocalLookupFails(t *testing.
 	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
 		BaseURL:        authServer.URL,
 		TimeoutSeconds: 1,
-	}), userRepo))
+	}), userRepo, nil))
 	router.GET("/api/user/info", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -108,7 +108,7 @@ func TestAuthMiddlewareAbortsQuietlyWhenSessionRequestIsCanceled(t *testing.T) {
 	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
 		BaseURL:        authServer.URL,
 		TimeoutSeconds: 1,
-	}), userRepo))
+	}), userRepo, nil))
 	router.GET("/api/user/info", func(c *gin.Context) {
 		t.Fatal("handler should not run after request cancellation")
 		c.Status(http.StatusOK)
@@ -146,7 +146,7 @@ func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Header:     make(http.Header),
 			Body: io.NopCloser(strings.NewReader(
-				`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-canceled","username":"alice"}}}`,
+				`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-canceled","username":"alice","claim_identity":"alice@users.ideaboard.local","claim_identity_kind":"trusted_canonical_registration","claim_identity_verified":true}}}`,
 			)),
 		}, nil
 	})
@@ -157,7 +157,7 @@ func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
 		cancelRequest = cancel
 		c.Request = c.Request.WithContext(ctx)
 	})
-	router.Use(AuthMiddleware(authService, userRepo))
+	router.Use(AuthMiddleware(authService, userRepo, nil))
 	router.GET("/api/user/info", func(c *gin.Context) {
 		t.Fatal("handler should not run after request cancellation")
 		c.Status(http.StatusOK)

@@ -8,7 +8,7 @@ import (
 
 func registerAuthenticatedUserRoutes(r *gin.Engine, authDeps AuthDeps, h UserRouteDeps) {
 	userAPI := r.Group("/api/user")
-	userAPI.Use(auth.AuthMiddleware(authDeps.AuthServiceClient, authDeps.UserRepo))
+	userAPI.Use(auth.AuthMiddleware(authDeps.AuthServiceClient, authDeps.UserRepo, authDeps.UserLifecycle))
 	registerUserRoutes(userAPI, h)
 }
 

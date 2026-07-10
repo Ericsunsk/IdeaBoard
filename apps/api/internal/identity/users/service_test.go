@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/validation"
 )
 
@@ -20,6 +19,46 @@ type userUploadCleanupCall struct {
 	storageUID string
 }
 
+type recordingUserLifecycle struct {
+	progress       DeletionProgress
+	statusCalls    []int16
+	advanceCalls   [][2]DeletionPhase
+	tombstoneCalls int
+}
+
+func (l *recordingUserLifecycle) SetUserStatus(_ context.Context, _ int64, status int16) error {
+	l.statusCalls = append(l.statusCalls, status)
+	return nil
+}
+
+func (l *recordingUserLifecycle) BeginUserDeletion(_ context.Context, userID int64) (*DeletionProgress, error) {
+	l.progress.UserID = userID
+	progress := l.progress
+	return &progress, nil
+}
+
+func (l *recordingUserLifecycle) AdvanceUserDeletion(_ context.Context, _ int64, from, to DeletionPhase) error {
+	l.advanceCalls = append(l.advanceCalls, [2]DeletionPhase{from, to})
+	l.progress.Phase = to
+	return nil
+}
+
+func (l *recordingUserLifecycle) TombstoneUser(_ context.Context, _ int64) error {
+	l.tombstoneCalls++
+	l.progress.Phase = DeletionCompleted
+	return nil
+}
+
+type recordingAuthUserDeleter struct {
+	authUserIDs []string
+	err         error
+}
+
+func (d *recordingAuthUserDeleter) DeleteUser(_ context.Context, authUserID string) error {
+	d.authUserIDs = append(d.authUserIDs, authUserID)
+	return d.err
+}
+
 func (c *recordingUserUploadCleaner) DeleteUserUploads(_ context.Context, userID int64, storageUID string) error {
 	c.calls = append(c.calls, userUploadCleanupCall{userID: userID, storageUID: storageUID})
 	return c.err
@@ -28,7 +67,7 @@ func (c *recordingUserUploadCleaner) DeleteUserUploads(_ context.Context, userID
 func TestListUsersRejectsOverlongKeyword(t *testing.T) {
 	db := newUserRepoTestDB(t)
 	repo := NewUserRepository(db)
-	service := NewUserService(repo)
+	service := NewUserService(repo, nil)
 
 	_, err := service.ListUsers(context.Background(), &UserListRequest{
 		Keyword:  strings.Repeat("a", maxUserKeywordLength+1),
@@ -43,7 +82,7 @@ func TestListUsersRejectsOverlongKeyword(t *testing.T) {
 func TestListUsersRejectsInvalidFilters(t *testing.T) {
 	db := newUserRepoTestDB(t)
 	repo := NewUserRepository(db)
-	service := NewUserService(repo)
+	service := NewUserService(repo, nil)
 
 	tests := []struct {
 		name    string
@@ -86,69 +125,41 @@ func TestListUsersRejectsInvalidFilters(t *testing.T) {
 	}
 }
 
-func TestDeleteUserCleansUploadsBeforeDeletingLocalRecords(t *testing.T) {
+func TestDeleteUserRunsDurablePhasesInOrder(t *testing.T) {
 	ctx := context.Background()
-	db := newUserRepoTestDB(t)
-	repo := NewUserRepository(db)
 	cleaner := &recordingUserUploadCleaner{}
-	service := NewUserService(repo, cleaner)
+	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{
+		UserID: 42, AuthUserID: "auth-42", StorageUID: "CLN123", Phase: DeletionPendingAuth,
+	}}
+	authDeleter := &recordingAuthUserDeleter{}
+	service := NewUserService(nil, lifecycle, cleaner)
 
-	user := &User{
-		Username:   "cleanup_user",
-		StorageUID: "CLN123",
-		Role:       "user",
-		Status:     1,
-	}
-	if err := repo.Create(ctx, user); err != nil {
-		t.Fatalf("create user failed: %v", err)
-	}
-	if _, err := db.ExecContext(
-		ctx,
-		`INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		"delete-user-cleanup-task", user.ID, "", "", "", "pending", "", "",
-	); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-
-	if err := service.DeleteUser(ctx, user.ID); err != nil {
+	if err := service.DeleteUser(ctx, 42, authDeleter); err != nil {
 		t.Fatalf("DeleteUser failed: %v", err)
 	}
-
-	if len(cleaner.calls) != 1 || cleaner.calls[0].userID != user.ID || cleaner.calls[0].storageUID != user.StorageUID {
+	if len(authDeleter.authUserIDs) != 1 || authDeleter.authUserIDs[0] != "auth-42" {
+		t.Fatalf("auth delete calls=%v", authDeleter.authUserIDs)
+	}
+	if len(cleaner.calls) != 1 || cleaner.calls[0].userID != 42 || cleaner.calls[0].storageUID != "CLN123" {
 		t.Fatalf("cleaner calls=%+v, want one call for user uploads", cleaner.calls)
 	}
-	if _, err := repo.GetByID(ctx, user.ID); !database.IsNotFound(err) {
-		t.Fatalf("user lookup err = %v, want record not found", err)
-	}
-	var taskCount int64
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, user.ID).Scan(&taskCount); err != nil {
-		t.Fatalf("count tasks failed: %v", err)
-	}
-	if taskCount != 0 {
-		t.Fatalf("task count = %d, want 0", taskCount)
+	if len(lifecycle.advanceCalls) != 2 || lifecycle.tombstoneCalls != 1 {
+		t.Fatalf("advance calls=%v tombstone calls=%d", lifecycle.advanceCalls, lifecycle.tombstoneCalls)
 	}
 }
 
-func TestDeleteUserStopsWhenUploadCleanupFails(t *testing.T) {
+func TestDeleteUserRetryResumesAtPendingStorage(t *testing.T) {
 	ctx := context.Background()
-	db := newUserRepoTestDB(t)
-	repo := NewUserRepository(db)
-	service := NewUserService(repo, &recordingUserUploadCleaner{err: errors.New("storage down")})
-
-	user := &User{
-		Username:   "cleanup_failure_user",
-		StorageUID: "FAIL42",
-		Role:       "user",
-		Status:     1,
-	}
-	if err := repo.Create(ctx, user); err != nil {
-		t.Fatalf("create user failed: %v", err)
-	}
-
-	if err := service.DeleteUser(ctx, user.ID); err == nil {
+	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{
+		UserID: 42, AuthUserID: "auth-42", StorageUID: "FAIL42", Phase: DeletionPendingStorage,
+	}}
+	cleaner := &recordingUserUploadCleaner{err: errors.New("storage down")}
+	authDeleter := &recordingAuthUserDeleter{}
+	service := NewUserService(nil, lifecycle, cleaner)
+	if err := service.DeleteUser(ctx, 42, authDeleter); err == nil {
 		t.Fatal("expected DeleteUser to fail when upload cleanup fails")
 	}
-	if _, err := repo.GetByID(ctx, user.ID); err != nil {
-		t.Fatalf("user should remain after cleanup failure, lookup err = %v", err)
+	if len(authDeleter.authUserIDs) != 0 || lifecycle.progress.Phase != DeletionPendingStorage {
+		t.Fatalf("retry should skip Auth and remain pending storage: auth=%v phase=%s", authDeleter.authUserIDs, lifecycle.progress.Phase)
 	}
 }

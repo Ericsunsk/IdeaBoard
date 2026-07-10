@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"ideaboard/api/internal/boards"
@@ -22,6 +23,7 @@ type appDomainServices struct {
 	userService       *users.UserService
 	boardService      *boards.BoardService
 	creditService     *credits.Service
+	userLifecycle     *users.LifecycleService
 }
 
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, creditPool *pgxpool.Pool) (appDomainServices, error) {
@@ -31,12 +33,23 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)
 	}
 
+	welcomeIdentityKey, err := base64.StdEncoding.DecodeString(cfg.Credits.WelcomeIdentityKey)
+	if err != nil || len(welcomeIdentityKey) != 32 {
+		return appDomainServices{}, fmt.Errorf("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
+	}
+	creditService := credits.NewService(creditPool)
+	userLifecycle := users.NewLifecycleService(creditPool, creditService, welcomeIdentityKey)
+	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
+		return appDomainServices{}, err
+	}
+	userService := users.NewUserService(repos.userRepo, userLifecycle, storageService)
 	return appDomainServices{
 		authServiceClient: auth.NewServiceClient(cfg.Auth),
 		runtimeSettings:   runtimeSettings,
 		storageService:    storageService,
-		userService:       users.NewUserService(repos.userRepo, storageService),
+		userService:       userService,
 		boardService:      boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
-		creditService:     credits.NewService(creditPool),
+		creditService:     creditService,
+		userLifecycle:     userLifecycle,
 	}, nil
 }

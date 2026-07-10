@@ -15,7 +15,7 @@ import (
 )
 
 // AuthMiddleware 认证中间件：通过 Better Auth session 校验并映射本地业务用户。
-func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) gin.HandlerFunc {
+func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository, lifecycle *users.LifecycleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if authService == nil || userRepo == nil {
 			response.InternalError(c, http.StatusInternalServerError, "认证服务未配置", fmt.Errorf("auth middleware dependencies missing"))
@@ -45,7 +45,7 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 			return
 		}
 
-		user, err := resolveLocalUserByAuthIdentity(c.Request.Context(), userRepo, identity)
+		user, err := resolveLocalUserByAuthIdentity(c.Request.Context(), userRepo, lifecycle, identity)
 		if err != nil {
 			if abortIfRequestCanceled(c, err) {
 				return
@@ -84,7 +84,7 @@ func isRequestCanceled(ctx context.Context, err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled)
 }
 
-func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRepository, identity *SessionIdentity) (*users.User, error) {
+func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRepository, lifecycle *users.LifecycleService, identity *SessionIdentity) (*users.User, error) {
 	if userRepo == nil || identity == nil {
 		return nil, fmt.Errorf("invalid auth identity mapping input")
 	}
@@ -94,6 +94,16 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRep
 	}
 
 	user, err := userRepo.GetByAuthUserID(ctx, authUserID)
+	if database.IsNotFound(err) && lifecycle != nil {
+		result, provisionErr := lifecycle.ProvisionIdentity(ctx, users.VerifiedIdentity{
+			AuthUserID: authUserID, Username: identity.Username, ClaimIdentity: identity.ClaimIdentity,
+			ClaimIdentityKind: identity.ClaimIdentityKind, ClaimIdentityVerified: identity.ClaimIdentityVerified, Role: "user",
+		})
+		if provisionErr != nil {
+			return nil, provisionErr
+		}
+		return &result.User, nil
+	}
 	if err != nil {
 		return nil, err
 	}

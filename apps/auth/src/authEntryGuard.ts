@@ -187,7 +187,7 @@ function normalizeCORSOrigin(raw: string): string {
 }
 
 function buildRateLimitKey(req: AuthMiddlewareRequest, path: string, requestIP: string): string {
-  const bucket = path.startsWith('/sign-up/') ? 'signup' : 'signin'
+  const bucket = isSignUpPath(path) ? 'signup' : 'signin'
   const ip = requestIP.trim() || String(req.socket?.remoteAddress || '').trim() || 'unknown'
   return `${bucket}:${ip}`
 }

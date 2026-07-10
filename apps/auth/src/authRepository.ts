@@ -7,6 +7,7 @@ type UserRow = {
   email?: unknown
   name?: unknown
   role?: unknown
+  emailVerified?: unknown
 }
 
 export async function findUserByUsernameOrEmail(
@@ -14,7 +15,7 @@ export async function findUserByUsernameOrEmail(
   email: string,
 ): Promise<InternalUserShape | null> {
   const result = await authDB.query(
-    'SELECT id, username, email, name, role FROM "user" WHERE username = $1 OR email = $2 LIMIT 1',
+    'SELECT id, username, email, name, role, "emailVerified" FROM "user" WHERE username = $1 OR email = $2 LIMIT 1',
     [username, email],
   )
   if (result.rows.length === 0) {
@@ -28,6 +29,18 @@ export async function updateAuthUserRole(
   role: 'admin' | 'user',
 ): Promise<boolean> {
   const result = await authDB.query('UPDATE "user" SET role = $1 WHERE id = $2', [role, authUserID])
+  return Number(result.rowCount || 0) > 0
+}
+
+export async function finalizeTrustedRegistrationIdentity(
+  authUserID: string,
+  claimIdentity: string,
+  role: 'admin' | 'user',
+): Promise<boolean> {
+  const result = await authDB.query(
+    'UPDATE "user" SET "emailVerified" = TRUE, role = $1, "updatedAt" = $2 WHERE id = $3 AND email = $4',
+    [role, new Date(), authUserID, claimIdentity],
+  )
   return Number(result.rowCount || 0) > 0
 }
 
@@ -106,5 +119,6 @@ function normalizeUserRow(row: UserRow): InternalUserShape | null {
     email: typeof row.email === 'string' ? row.email : null,
     name: typeof row.name === 'string' ? row.name : null,
     role: typeof row.role === 'string' ? row.role : null,
+    emailVerified: row.emailVerified === true,
   }
 }

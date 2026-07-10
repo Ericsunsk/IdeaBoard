@@ -25,9 +25,11 @@ func TestServiceClientContractValidateSessionSuccess(t *testing.T) {
 			"msg":  "success",
 			"data": map[string]any{
 				"session": map[string]any{
-					"auth_user_id": "auth-123",
-					"username":     "alice",
-					"email":        "alice@example.test",
+					"auth_user_id":            "auth-123",
+					"username":                "alice",
+					"claim_identity":          "alice@users.ideaboard.local",
+					"claim_identity_kind":     "trusted_canonical_registration",
+					"claim_identity_verified": true,
 				},
 			},
 		})
@@ -38,8 +40,8 @@ func TestServiceClientContractValidateSessionSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateSession returned error: %v", err)
 	}
-	if session.AuthUserID != "auth-123" || session.Username != "alice" || session.Email != "alice@example.test" {
-		t.Fatalf("session = %+v, want auth_user_id/username/email from envelope", session)
+	if session.AuthUserID != "auth-123" || session.Username != "alice" || session.ClaimIdentity != "alice@users.ideaboard.local" || !session.ClaimIdentityVerified {
+		t.Fatalf("session = %+v, want trusted claim identity from envelope", session)
 	}
 }
 
@@ -59,6 +61,25 @@ func TestServiceClientContractValidateSessionUnauthorized(t *testing.T) {
 	}
 }
 
+func TestServiceClientContractValidateSessionRejectsUntrustedClaimIdentity(t *testing.T) {
+	server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
+		assertContractRequest(t, r, http.MethodGet, "/internal/session")
+		writeContractJSON(w, http.StatusOK, map[string]any{
+			"code": 0,
+			"data": map[string]any{"session": map[string]any{
+				"auth_user_id": "auth-untrusted", "username": "alice",
+				"claim_identity": "attacker@example.com", "claim_identity_kind": "untrusted",
+				"claim_identity_verified": false,
+			}},
+		})
+	})
+	defer server.Close()
+
+	if _, err := newContractClient(server).ValidateSession(context.Background(), "session=untrusted"); err == nil || !strings.Contains(err.Error(), "untrusted") {
+		t.Fatalf("ValidateSession error = %v, want untrusted identity rejection", err)
+	}
+}
+
 func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 	server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
 		assertContractRequest(t, r, http.MethodPost, "/internal/users/ensure")
@@ -74,11 +95,13 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 			"msg":  "success",
 			"data": map[string]any{
 				"user": map[string]any{
-					"auth_user_id": "auth-alice",
-					"username":     "alice",
-					"email":        "alice@ideaboard.local",
-					"role":         "admin",
-					"existing":     true,
+					"auth_user_id":            "auth-alice",
+					"username":                "alice",
+					"claim_identity":          "alice@users.ideaboard.local",
+					"claim_identity_kind":     "trusted_canonical_registration",
+					"claim_identity_verified": true,
+					"role":                    "admin",
+					"existing":                true,
 				},
 			},
 		})
@@ -89,7 +112,7 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureUser returned error: %v", err)
 	}
-	if user.AuthUserID != "auth-alice" || user.Username != "alice" || user.Email != "alice@ideaboard.local" || user.Role != "admin" || !user.Existing {
+	if user.AuthUserID != "auth-alice" || user.Username != "alice" || user.ClaimIdentity != "alice@users.ideaboard.local" || !user.ClaimIdentityVerified || user.Role != "admin" || !user.Existing {
 		t.Fatalf("user = %+v, want provisioned auth user from envelope", user)
 	}
 }

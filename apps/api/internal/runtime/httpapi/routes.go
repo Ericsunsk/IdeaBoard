@@ -36,6 +36,7 @@ type FrontendRouteOptions struct {
 type AuthDeps struct {
 	AuthServiceClient *auth.ServiceClient
 	UserRepo          *users.UserRepository
+	UserLifecycle     *users.LifecycleService
 }
 
 type UploadDeps struct {

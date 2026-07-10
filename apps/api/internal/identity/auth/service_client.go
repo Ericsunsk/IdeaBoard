@@ -22,17 +22,21 @@ var (
 )
 
 type SessionIdentity struct {
-	AuthUserID string `json:"auth_user_id"`
-	Username   string `json:"username"`
-	Email      string `json:"email"`
+	AuthUserID            string `json:"auth_user_id"`
+	Username              string `json:"username"`
+	ClaimIdentity         string `json:"claim_identity"`
+	ClaimIdentityKind     string `json:"claim_identity_kind"`
+	ClaimIdentityVerified bool   `json:"claim_identity_verified"`
 }
 
 type ProvisionedAuthUser struct {
-	AuthUserID string `json:"auth_user_id"`
-	Username   string `json:"username"`
-	Email      string `json:"email"`
-	Role       string `json:"role"`
-	Existing   bool   `json:"existing"`
+	AuthUserID            string `json:"auth_user_id"`
+	Username              string `json:"username"`
+	ClaimIdentity         string `json:"claim_identity"`
+	ClaimIdentityKind     string `json:"claim_identity_kind"`
+	ClaimIdentityVerified bool   `json:"claim_identity_verified"`
+	Role                  string `json:"role"`
+	Existing              bool   `json:"existing"`
 }
 
 type ServiceClient struct {
@@ -94,6 +98,9 @@ func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string
 	if strings.TrimSpace(session.AuthUserID) == "" {
 		return nil, fmt.Errorf("auth service returned empty auth_user_id")
 	}
+	if strings.TrimSpace(session.ClaimIdentity) == "" || session.ClaimIdentityKind != "trusted_canonical_registration" || !session.ClaimIdentityVerified {
+		return nil, fmt.Errorf("%w: auth service returned an untrusted session identity", ErrSessionUnauthorized)
+	}
 	return &session, nil
 }
 
@@ -135,6 +142,9 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, username, password strin
 	user := resp.Data.User
 	if strings.TrimSpace(user.AuthUserID) == "" {
 		return nil, fmt.Errorf("auth service returned empty auth_user_id")
+	}
+	if strings.TrimSpace(user.ClaimIdentity) == "" || user.ClaimIdentityKind != "trusted_canonical_registration" || !user.ClaimIdentityVerified {
+		return nil, fmt.Errorf("auth service returned an untrusted claim identity")
 	}
 	return &user, nil
 }

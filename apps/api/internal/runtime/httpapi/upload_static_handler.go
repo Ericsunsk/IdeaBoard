@@ -55,7 +55,7 @@ func serveLocalUploadFile(c *gin.Context, objectKey string) {
 }
 
 func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {
-	auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo)(c)
+	auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo, deps.UserLifecycle)(c)
 	if c.IsAborted() {
 		return false
 	}

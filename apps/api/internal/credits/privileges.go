@@ -16,6 +16,8 @@ var creditTableNames = []string{
 	"credit_postings",
 	"credit_holds",
 	"credit_charges",
+	"credit_welcome_claims",
+	"credit_welcome_identity_key_guard",
 }
 
 var creditInternalFunctionSignatures = []string{
@@ -31,6 +33,13 @@ type runtimePrivilegeQuerier interface {
 }
 
 const creditCommandFunctionSignature = "execute_credit_command(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+
+var creditLifecycleFunctionSignatures = []string{
+	"bind_credit_welcome_identity_key(TEXT)",
+	"provision_credit_wallet(BIGINT)",
+	"set_credit_wallet_status(BIGINT, TEXT)",
+	"claim_credit_welcome(TEXT, BIGINT)",
+}
 
 type privilegeDBTX interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
@@ -61,6 +70,10 @@ func ConfigureRuntimePrivileges(ctx context.Context, db privilegeDBTX, runtimeRo
 	}
 	statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+creditCommandFunctionSignature+` FROM PUBLIC`)
 	statements = append(statements, `GRANT EXECUTE ON FUNCTION `+creditCommandFunctionSignature+` TO `+roleSQL)
+	for _, functionSignature := range creditLifecycleFunctionSignatures {
+		statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+functionSignature+` FROM PUBLIC`)
+		statements = append(statements, `GRANT EXECUTE ON FUNCTION `+functionSignature+` TO `+roleSQL)
+	}
 
 	rows, err := db.QueryContext(ctx, `
 SELECT sequence_name
@@ -114,6 +127,15 @@ SELECT current_user,
 	}
 	if !canExecuteCommand {
 		return fmt.Errorf("verify Credits runtime privileges: role %q cannot execute typed Credit Commands", currentUser)
+	}
+	for _, functionSignature := range creditLifecycleFunctionSignatures {
+		var allowed bool
+		if err := db.QueryRowContext(ctx, `SELECT has_function_privilege(current_user, $1, 'EXECUTE')`, functionSignature).Scan(&allowed); err != nil {
+			return fmt.Errorf("verify Credits runtime privileges: check lifecycle function %s: %w", functionSignature, err)
+		}
+		if !allowed {
+			return fmt.Errorf("verify Credits runtime privileges: role %q cannot execute wallet lifecycle function %s", currentUser, functionSignature)
+		}
 	}
 	for _, tableName := range creditTableNames {
 		for _, privilege := range []string{"INSERT", "UPDATE", "DELETE", "TRUNCATE", "TRIGGER"} {

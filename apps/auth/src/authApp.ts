@@ -8,6 +8,7 @@ import {
   registerInternalRoutes,
 } from './internalRoutes.js'
 import { getErrorStatus, sendError, sendSuccess } from './httpResponse.js'
+import { createAuthDispatchHandler } from './publicRegistration.js'
 
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions['trustProxy']
@@ -33,7 +34,7 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
   const authEntryGuard = createAuthEntryGuard({
     trustedOrigins: deps.config.trustedOrigins,
     getAuthGuardSettings: deps.getAuthGuardSettings,
-    authHandler: deps.authHandler,
+    authHandler: createAuthDispatchHandler(deps.authHandler, deps.authApi, deps.repository),
   })
 
   app.setErrorHandler((error, _request, reply) => {

@@ -5,7 +5,7 @@ import {
   extractAuthUser,
   extractErrorMessage,
   getAuthSubpath,
-  isDuplicateUserError,
+	isDuplicateUserError,
   isRateLimitedAuthPath,
   isSignUpPath,
   normalizeAuthPath,

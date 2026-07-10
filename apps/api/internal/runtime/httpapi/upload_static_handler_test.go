@@ -257,9 +257,9 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 func newUploadStaticAuthServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	sessionAuthUsers := map[string]auth.SessionIdentity{
-		"owner":    {AuthUserID: "owner-auth", Username: "owner"},
-		"member":   {AuthUserID: "member-auth", Username: "member"},
-		"outsider": {AuthUserID: "outsider-auth", Username: "outsider"},
+		"owner":    trustedTestSessionIdentity("owner-auth", "owner"),
+		"member":   trustedTestSessionIdentity("member-auth", "member"),
+		"outsider": trustedTestSessionIdentity("outsider-auth", "outsider"),
 	}
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +282,16 @@ func newUploadStaticAuthServer(t *testing.T) *httptest.Server {
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": http.StatusUnauthorized, "msg": "unauthorized"})
 	}))
+}
+
+func trustedTestSessionIdentity(authUserID, username string) auth.SessionIdentity {
+	return auth.SessionIdentity{
+		AuthUserID:            authUserID,
+		Username:              username,
+		ClaimIdentity:         username + "@users.ideaboard.local",
+		ClaimIdentityKind:     "trusted_canonical_registration",
+		ClaimIdentityVerified: true,
+	}
 }
 
 func performUploadStaticRequest(router http.Handler, method string, target string, cookie string) *httptest.ResponseRecorder {
