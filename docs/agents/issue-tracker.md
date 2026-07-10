@@ -1,39 +1,43 @@
 # Issue Tracker Protocol
 
-Issues, PRDs, and external PR triage live in GitHub for `Ericsunsk/IdeaBoard`. Use `gh` from inside this clone whenever possible.
+Issues and PRDs for this repository live in GitHub Issues for `Ericsunsk/IdeaBoard`. Use the `gh` CLI from inside this clone.
 
 ## Repository
 
 - Repo: `Ericsunsk/IdeaBoard`
 - Remote: `https://github.com/Ericsunsk/IdeaBoard`
 
-Prefer inferring the repo from `git remote -v`; `gh` does this automatically inside the clone.
+Prefer inferring the repository from `git remote -v`; `gh` does this automatically inside the clone.
 
-## Issues
+## Issue Operations
 
 - Create: `gh issue create --title "..." --body "..."`
 - View: `gh issue view <number> --comments`
 - List: `gh issue list --state open --json number,title,body,labels,comments`
 - Comment: `gh issue comment <number> --body "..."`
-- Label: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
+- Label: `gh issue edit <number> --add-label "..."` or `--remove-label "..."`
 - Close: `gh issue close <number> --comment "..."`
 
-Use a heredoc or a file for multi-line bodies.
+Use a heredoc or file for multi-line bodies.
 
-## Pull Requests
+## Pull Requests as a Triage Surface
 
-Treat external PRs as a triage surface.
+**PRs as a request surface: no.**
 
-- View: `gh pr view <number> --comments`
-- Diff: `gh pr diff <number>`
-- List: `gh pr list --state open --json number,title,body,labels,author,authorAssociation,comments`
-- Comment/label/close: `gh pr comment`, `gh pr edit --add-label` / `--remove-label`, `gh pr close`
-
-For external PR triage, keep only `authorAssociation` values of `CONTRIBUTOR`, `FIRST_TIME_CONTRIBUTOR`, or `NONE`. Drop `OWNER`, `MEMBER`, and `COLLABORATOR`.
-
-GitHub shares one number space for issues and PRs. Resolve `#42` with `gh pr view 42`; if that fails, use `gh issue view 42`.
+Do not include pull requests in the `triage` queue. If this repository later accepts external PRs as feature requests, update this setting before triaging them.
 
 ## Skill Phrases
 
 - "Publish to the issue tracker" means create a GitHub issue.
-- "Fetch the relevant ticket" means view the issue or PR with comments.
+- "Fetch the relevant ticket" means view the GitHub issue and its comments.
+
+## Wayfinding Operations
+
+The `wayfinder` skill uses one map issue with child issues as tickets.
+
+- Map: label it `wayfinder:map`.
+- Child ticket: use a GitHub sub-issue when available; otherwise link it from the map task list and add `Part of #<map>` to the child.
+- Ticket type: use `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling`, or `wayfinder:task`.
+- Blocking: prefer GitHub native issue dependencies; otherwise add `Blocked by: #<number>` to the ticket.
+- Claim: `gh issue edit <number> --add-assignee @me`.
+- Resolve: comment with the outcome, close the ticket, and update the map's Decisions-so-far.

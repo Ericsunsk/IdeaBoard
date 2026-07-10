@@ -59,8 +59,16 @@ Use the smallest relevant check:
 
 If you cannot run a relevant check, say so and explain the residual risk.
 
-## Agent Workflows
+## Agent skills
 
-- Issue tracker: GitHub Issues for `Ericsunsk/IdeaBoard`; see [docs/agents/issue-tracker.md](./docs/agents/issue-tracker.md).
-- Triage labels: use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`; see [docs/agents/triage-labels.md](./docs/agents/triage-labels.md).
-- Domain docs: use `DESIGN.md` as the context map and local `CONTEXT.md` files for vocabulary; see [docs/agents/domain.md](./docs/agents/domain.md).
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `Ericsunsk/IdeaBoard`; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a multi-context repo: use `DESIGN.md` as the context map, then read the relevant local `CONTEXT.md` and ADRs. See `docs/agents/domain.md`.

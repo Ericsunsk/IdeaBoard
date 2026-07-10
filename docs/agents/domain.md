@@ -2,17 +2,33 @@
 
 Use this only when a task depends on domain language, context boundaries, ADRs, or issue/refactor wording.
 
+## Layout
+
+IdeaBoard is a multi-context repository.
+
+- `DESIGN.md` is the canonical system context map and contract.
+- `apps/api/CONTEXT.md` defines Backend context language and boundaries.
+- `apps/web/src/features/canvas/CONTEXT.md` defines Canvas Workspace language and boundaries.
+- `docs/adr/` contains system-wide architecture decisions.
+- Context-local `docs/adr/` directories contain scoped decisions when present.
+
+Do not create a duplicate `CONTEXT-MAP.md`; extend `DESIGN.md` when the context map changes.
+
 ## Read Path
 
-1. Read [../../DESIGN.md](../../DESIGN.md) for the context map.
+1. Read `DESIGN.md`.
 2. Read the relevant local `CONTEXT.md`.
-3. Read relevant ADRs under `docs/adr/` or a context-local `docs/adr/`, if they exist.
+3. Read applicable ADRs under `docs/adr/` and any context-local `docs/adr/`.
 
-If a file does not exist, continue silently. Do not propose creating domain docs unless the task actually resolves new terms or decisions.
+If a referenced context or ADR file does not exist, continue silently. Create domain documentation only when a task resolves new terminology or architectural decisions.
 
-## Usage Rules
+## Vocabulary Rules
 
-- Use the canonical terms from the relevant `CONTEXT.md`.
-- Avoid synonyms explicitly rejected by the glossary.
-- If a needed concept is missing, either avoid naming it as a domain term or note it as a domain-modeling gap.
-- If your output conflicts with an existing ADR, surface the conflict instead of silently overriding it.
+- Use canonical terms from the relevant `CONTEXT.md`.
+- Avoid synonyms explicitly rejected by its glossary.
+- If a required concept is missing, reconsider the wording or record it as a domain-modeling gap.
+- Update the relevant `CONTEXT.md` when a change intentionally alters domain language.
+
+## ADR Conflicts
+
+If proposed work conflicts with an existing ADR, surface the conflict explicitly instead of silently overriding it.

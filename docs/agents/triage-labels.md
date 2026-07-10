@@ -1,13 +1,15 @@
 # Triage Labels
 
-Use exactly these five tracker labels when a skill mentions triage state:
+Map the five canonical triage roles to these GitHub labels:
 
-| Role | Label | Meaning |
-| ---- | ----- | ------- |
-| Needs triage | `needs-triage` | Maintainer evaluation required |
-| Needs info | `needs-info` | Waiting on reporter |
-| Ready for agent | `ready-for-agent` | Fully specified for an AFK agent |
-| Ready for human | `ready-for-human` | Requires human implementation |
-| Won't fix | `wontfix` | Will not be actioned |
+| Canonical role | Tracker label | Meaning |
+| --- | --- | --- |
+| `needs-triage` | `needs-triage` | Maintainer evaluation required |
+| `needs-info` | `needs-info` | Waiting on reporter |
+| `ready-for-agent` | `ready-for-agent` | Fully specified and AFK-ready |
+| `ready-for-human` | `ready-for-human` | Requires human implementation |
+| `wontfix` | `wontfix` | Will not be actioned |
 
-If the tracker vocabulary changes, update this file and [../../AGENTS.md](../../AGENTS.md) together.
+When a skill mentions a canonical role, apply the corresponding tracker label exactly as written.
+
+If the GitHub label vocabulary changes, update this file and `AGENTS.md` together.
