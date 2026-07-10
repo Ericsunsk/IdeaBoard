@@ -11,6 +11,8 @@ var configEnvKeys = []string{
 	"DB_PORT",
 	"DB_USER",
 	"DB_PASSWORD",
+	"DB_MIGRATION_USER",
+	"DB_MIGRATION_PASSWORD",
 	"DB_NAME",
 	"DB_SSLMODE",
 	"DB_CONNECT_MAX_RETRIES",
@@ -110,6 +112,22 @@ func TestLoadDatabaseConfig(t *testing.T) {
 		}
 		if cfg.Database.ConnectRetryIntervalMS != 250 {
 			t.Fatalf("expected ConnectRetryIntervalMS=250, got %d", cfg.Database.ConnectRetryIntervalMS)
+		}
+	})
+
+	t.Run("separate migration credentials", func(t *testing.T) {
+		resetConfigEnv(t)
+		t.Setenv("DB_USER", "ideaboard_api")
+		t.Setenv("DB_PASSWORD", "runtime-secret")
+		t.Setenv("DB_MIGRATION_USER", "ideaboard_owner")
+		t.Setenv("DB_MIGRATION_PASSWORD", "owner-secret")
+
+		cfg := Load()
+		if cfg.Database.User != "ideaboard_api" || cfg.Database.Password != "runtime-secret" {
+			t.Fatalf("runtime database credentials were not loaded")
+		}
+		if cfg.Database.MigrationUser != "ideaboard_owner" || cfg.Database.MigrationPassword != "owner-secret" {
+			t.Fatalf("migration database credentials were not loaded")
 		}
 	})
 }

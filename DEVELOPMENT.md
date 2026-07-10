@@ -17,7 +17,7 @@
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 POSTGRES_PASSWORD
+# 至少修改 POSTGRES_PASSWORD、API_DB_PASSWORD 与 AUTH_DB_PASSWORD
 docker compose -f compose.local.yml up -d
 ```
 
@@ -79,6 +79,7 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 | API build | `cd apps/api && go build ./...` |
 | sqlc regeneration | `cd apps/api && go tool sqlc generate` |
 | Auth build | `cd apps/auth && npm run build` |
+| Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
 
 修改 `apps/api/internal/db/queries` 或 schema 后：
 
@@ -131,6 +132,14 @@ git diff --exit-code -- internal/db/sqlc
 | [user.ts](./apps/web/src/app/stores/user.ts) | User session store |
 | [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md) | Auth operation rules |
 
+### Credits
+
+| 入口 | 用途 |
+| ---- | ---- |
+| [service.go](./apps/api/internal/credits/service.go) | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter |
+| [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md) | Credits domain language 与 invariants |
+| [credits-million.md](./docs/benchmarks/credits-million.md) | 显式百万流水 harness 与参考结果 |
+
 ## Workflow Feature Contract
 
 | Feature | 语义 |
@@ -173,7 +182,10 @@ sqlc:
 
 | 变量 | 说明 |
 | ---- | ---- |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | PostgreSQL 连接 |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | API runtime PostgreSQL 连接；runtime role 不拥有 schema |
+| `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` | 仅 `go run ./cmd migrate` 使用的 schema owner；必须与 `DB_USER` 不同 |
+
+Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。
 | `AUTH_SERVICE_BASE_URL` | Go 调用 Auth service 的地址 |
 | `AUTH_INTERNAL_KEY` | API/Auth internal endpoint 共享密钥 |
 | `APP_SECRETS_ENCRYPTION_KEY` | API key 和 storage secret 静态加密主密钥 |

@@ -317,7 +317,7 @@ ensure_env_file() {
 
   chmod 600 "$ENV_FILE"
 
-  for key in POSTGRES_PASSWORD AUTH_INTERNAL_KEY APP_SECRETS_ENCRYPTION_KEY BETTER_AUTH_SECRET; do
+  for key in POSTGRES_PASSWORD API_DB_PASSWORD AUTH_DB_PASSWORD AUTH_INTERNAL_KEY APP_SECRETS_ENCRYPTION_KEY BETTER_AUTH_SECRET; do
     if is_placeholder "$(env_value "$key")"; then
       set_env_value "$key" "$(generate_secret)"
       echo "Generated $key"
@@ -340,6 +340,8 @@ validate_env_file() {
     IDEABOARD_AUTH_IMAGE \
     IDEABOARD_AUTH_MIGRATE_IMAGE \
     POSTGRES_PASSWORD \
+    API_DB_PASSWORD \
+    AUTH_DB_PASSWORD \
     AUTH_INTERNAL_KEY \
     APP_SECRETS_ENCRYPTION_KEY \
     BETTER_AUTH_SECRET \

@@ -6,6 +6,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
@@ -54,6 +55,7 @@ func newAppRouter(
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler:            users.NewAdminHandler(services.userService, services.runtimeSettings, services.authServiceClient),
+			CreditHandler:           credits.NewHandler(services.creditService),
 			AccountHandler:          accountHandler,
 			TaskHandler:             taskHandler,
 			TaskStatsHandler:        taskStatsHandler,

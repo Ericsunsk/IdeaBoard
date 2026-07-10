@@ -3,11 +3,14 @@ package bootstrap
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
@@ -44,21 +47,82 @@ func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, er
 	if err != nil {
 		return appDatabases{}, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	if err := migrations.Up(ctx, db); err != nil {
+	if err := database.VerifyRuntimePrivileges(ctx, db); err != nil {
 		_ = db.Close()
-		return appDatabases{}, fmt.Errorf("failed to migrate database schema: %w", err)
+		return appDatabases{}, err
+	}
+	if err := credits.VerifyRuntimePrivileges(ctx, db); err != nil {
+		_ = db.Close()
+		return appDatabases{}, err
 	}
 	riverPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
 		_ = db.Close()
 		return appDatabases{}, fmt.Errorf("failed to connect River database pool: %w", err)
 	}
-	if err := worker.MigrateRiver(ctx, riverPool); err != nil {
-		riverPool.Close()
-		_ = db.Close()
-		return appDatabases{}, fmt.Errorf("failed to migrate River schema: %w", err)
-	}
 	return appDatabases{db: db, riverPool: riverPool}, nil
+}
+
+func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("database config is nil")
+	}
+	migrationConfig, err := separatedMigrationDatabaseConfig(cfg.Database)
+	if err != nil {
+		return err
+	}
+	migrationDB, err := database.NewPostgres(migrationConfig)
+	if err != nil {
+		return fmt.Errorf("failed to connect migration database: %w", err)
+	}
+	defer migrationDB.Close()
+	if err := migrations.Up(ctx, migrationDB); err != nil {
+		return fmt.Errorf("failed to migrate database schema: %w", err)
+	}
+	migrationPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(migrationConfig))
+	if err != nil {
+		return fmt.Errorf("failed to connect River migration pool: %w", err)
+	}
+	defer migrationPool.Close()
+	if err := worker.MigrateRiver(ctx, migrationPool); err != nil {
+		return fmt.Errorf("failed to migrate River schema: %w", err)
+	}
+	privilegeTx, err := migrationDB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin runtime privilege transaction: %w", err)
+	}
+	if err := database.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
+		return rollbackPrivilegeTransaction(privilegeTx, err)
+	}
+	if err := credits.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
+		return rollbackPrivilegeTransaction(privilegeTx, err)
+	}
+	if err := privilegeTx.Commit(); err != nil {
+		return fmt.Errorf("commit runtime privileges: %w", err)
+	}
+	return nil
+}
+
+func rollbackPrivilegeTransaction(tx *sql.Tx, cause error) error {
+	rollbackErr := tx.Rollback()
+	if rollbackErr == nil || errors.Is(rollbackErr, sql.ErrTxDone) {
+		return cause
+	}
+	return errors.Join(cause, fmt.Errorf("rollback runtime privileges: %w", rollbackErr))
+}
+
+func separatedMigrationDatabaseConfig(runtimeConfig config.DatabaseConfig) (config.DatabaseConfig, error) {
+	migrationUser := strings.TrimSpace(runtimeConfig.MigrationUser)
+	if migrationUser == "" || runtimeConfig.MigrationPassword == "" {
+		return config.DatabaseConfig{}, fmt.Errorf("DB_MIGRATION_USER and DB_MIGRATION_PASSWORD are required for migrations")
+	}
+	if migrationUser == strings.TrimSpace(runtimeConfig.User) {
+		return config.DatabaseConfig{}, fmt.Errorf("DB_MIGRATION_USER must differ from DB_USER so runtime cannot own schema objects")
+	}
+	migrationConfig := runtimeConfig
+	migrationConfig.User = migrationUser
+	migrationConfig.Password = runtimeConfig.MigrationPassword
+	return migrationConfig, nil
 }
 
 func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error) {

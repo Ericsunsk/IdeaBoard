@@ -14,6 +14,7 @@
 | Boards | `internal/boards` | Board ownership、access checks、board management API | `boards.BoardService`, board handler/repository |
 | Media | `internal/media/storage`, `internal/media/assets`, `internal/media/imageformat`, `internal/media/mediarefs` | Object storage、upload serving、upload authorization、media references、image format validation、bundled business assets | `storage.Service`, media stores/authorizers, media reference helpers |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | Executable workflow feature contract、task parameter shaping、prompt templates、prompt assembly | Workflow helpers, prompt engine/repository/handler |
+| Credits | `internal/credits` | 平台点子 Wallet、Double-entry Ledger、余额 projection、幂等 Commands | `credits.Commands`, `credits.WalletReader`, `credits.Service.InTx` |
 
 ## Dependency Direction
 
@@ -36,6 +37,8 @@
 - Workflow owns executable feature contracts; Prompts owns template storage and rendering.
 - `tasks.result` may hold a durable result envelope. Successful image tasks keep top-level `image_url`/`image_urls` for Canvas compatibility; workflow-specific parse failures may store `parsed_output_status`, `parsed_output` and a bounded `raw_provider_output_preview` so Admin/Canvas can diagnose retry or failed states without treating them as successful outputs.
 - Unless schema or query contracts change, do not edit migrations or generated sqlc code.
+- Credits Ledger 与 Tasking 共用 PostgreSQL；其他 context 只能通过 `credits.Commands` 写账，禁止直接改 balance projection 或 Ledger。
+- Credit Commands 需要与 caller 的业务状态原子提交时，使用 `credits.Service.InTx(pgx.Tx)`，不得外部双写。
 
 ## When To Expand A Context
 

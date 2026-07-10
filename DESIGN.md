@@ -171,6 +171,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Boards | `internal/boards` | board ownership、access checks、board management API |
 | Media | `internal/media` | storage、assets、media refs、image format validation |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | executable feature contract、task params、prompt templates、prompt assembly |
+| Credits | `internal/credits` | 平台点子 Wallet、Double-entry Ledger、余额 projection、幂等 Credit Commands |
 
 Dependency direction:
 
@@ -179,6 +180,7 @@ Dependency direction:
 - Business contexts may depend on `internal/platform` and `internal/db/sqlc` through local repositories/adapters.
 - `internal/platform` must not import business contexts.
 - Cross-context collaboration should use small service/repository interfaces at the caller boundary.
+- Products consume Credits through the `credits.Commands` seam; only Credits owns Ledger writes and balance projections.
 
 ## Frontend Context Map
 
@@ -195,6 +197,7 @@ Frontend context rules:
 ## Operational Invariants
 
 - Production must set high-entropy `BETTER_AUTH_SECRET`, matching `AUTH_INTERNAL_KEY` on API/Auth, and `APP_SECRETS_ENCRYPTION_KEY`.
+- PostgreSQL migration owner credentials must only enter migration processes; API/Auth runtimes use distinct limited roles and fail startup if their effective privileges can bypass the Credits boundary.
 - API/Auth should listen on loopback behind reverse proxy in production.
 - Cloudflare proxied API domains need explicit cache bypass for API/Auth/SSE/upload writes and careful real-client-IP handling.
 - PostgreSQL backup contains credentials and user/session data; treat `postgres-*.dump[.age|.gpg]` as secret artifacts.

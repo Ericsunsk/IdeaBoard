@@ -78,7 +78,7 @@ Canvas 节点编排 -> Workflow feature contract -> Task 提交 -> River Worker 
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 POSTGRES_PASSWORD
+# 至少修改 POSTGRES_PASSWORD、API_DB_PASSWORD 与 AUTH_DB_PASSWORD
 docker compose -f compose.local.yml up -d
 ```
 

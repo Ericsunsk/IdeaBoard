@@ -40,7 +40,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		return nil, fmt.Errorf("failed to ensure user storage uid: %w", err)
 	}
 
-	services, err := newAppDomainServices(ctx, cfg, repos)
+	services, err := newAppDomainServices(ctx, cfg, repos, dbs.riverPool)
 	if err != nil {
 		closeStartupResources(dbs.db, dbs.riverPool)
 		return nil, err

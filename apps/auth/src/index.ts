@@ -10,6 +10,7 @@ import {
   updateAuthUserRole,
 } from './authRepository.js'
 import { env } from './env.js'
+import { verifyAuthRuntimePrivileges } from './runtime-privileges.js'
 
 const app = createAuthApp({
   config: {
@@ -37,6 +38,7 @@ const app = createAuthApp({
 })
 
 try {
+  await verifyAuthRuntimePrivileges(authDB)
   await app.listen({ port: env.auth.port, host: env.auth.host })
   if (!env.auth.internalKey) {
     console.warn(

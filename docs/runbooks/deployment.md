@@ -166,6 +166,8 @@ GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh --ref "${REF}"
 - `IDEABOARD_AUTH_IMAGE`
 - `IDEABOARD_AUTH_MIGRATE_IMAGE`
 - `POSTGRES_PASSWORD`
+- `API_DB_PASSWORD`
+- `AUTH_DB_PASSWORD`
 - `AUTH_INTERNAL_KEY`
 - `APP_SECRETS_ENCRYPTION_KEY`
 - `BETTER_AUTH_SECRET`
@@ -211,11 +213,15 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 
 ### 5. API 业务库 baseline
 
-Go API 业务表使用单 baseline migration。空 PostgreSQL 库会在 API migration 或 API 启动时自动初始化业务 schema，并写入当前 baseline 版本 `20260609000000`。Docker 部署会先运行 `api-migrate`，再运行 Auth migration。
+`POSTGRES_USER` 是 schema owner；`API_DB_USER`（默认 `ideaboard_api`）与 `AUTH_DB_USER`（默认 `ideaboard_auth`）是彼此独立的 limited runtime roles。三个 roles 必须使用不同密码；长期运行的 API/Auth 容器只接收各自 runtime credential，只有一次性的 `api-migrate` / `auth-migrate` 容器接收 owner credential。
+
+空 PostgreSQL 库由 API migration 初始化业务 schema 并写入当前 migration 版本；API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + `execute_credit_command`，再运行 Auth migration和启动 API。
 
 非空数据库不能直接套用该 baseline。若你从其他形态迁入数据，标准做法是先导出需要保留的数据，再在空库上初始化当前 baseline，最后用受控脚本导入业务数据；不要手动修改 `schema_migrations` 绕过 baseline 校验。
 
 当前 API migration 保护会拒绝三类风险状态：未知历史 migration 版本；baseline 未应用但 schema 已有 API-owned 业务表；baseline 已标记应用但当前 schema 缺少 baseline 业务表。Better Auth 的认证表可以先存在，不计入 API baseline 冲突；不过标准部署顺序仍是 API baseline first、Better Auth migration second。
+
+PostgreSQL init script 只在空 volume 创建 API/Auth runtime roles。项目尚未上线时若本地 volume 早于该角色分离方案，直接删除并重建开发 volume；不要把 owner credential 配回任何长期运行的应用 runtime。
 
 ### 6. 初始化管理员
 

@@ -95,6 +95,74 @@ type BoardShareToken struct {
 	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
+type CreditAccount struct {
+	ID           int64           `json:"id"`
+	WalletUserID sql.NullInt64   `json:"wallet_user_id"`
+	AssetCode    string          `json:"asset_code"`
+	AccountRole  string          `json:"account_role"`
+	ShardKey     string          `json:"shard_key"`
+	Balance      int64           `json:"balance"`
+	Metadata     json.RawMessage `json:"metadata"`
+	CreatedAt    time.Time       `json:"created_at"`
+}
+
+type CreditCharge struct {
+	CaptureTransactionID string    `json:"capture_transaction_id"`
+	WalletUserID         int64     `json:"wallet_user_id"`
+	Amount               int64     `json:"amount"`
+	RefundedAmount       int64     `json:"refunded_amount"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+type CreditHold struct {
+	HoldTransactionID     string         `json:"hold_transaction_id"`
+	WalletUserID          int64          `json:"wallet_user_id"`
+	Amount                int64          `json:"amount"`
+	Status                string         `json:"status"`
+	TerminalTransactionID sql.NullString `json:"terminal_transaction_id"`
+	CreatedAt             time.Time      `json:"created_at"`
+	SettledAt             sql.NullTime   `json:"settled_at"`
+}
+
+type CreditPosting struct {
+	ID            int64     `json:"id"`
+	TransactionID string    `json:"transaction_id"`
+	AccountID     int64     `json:"account_id"`
+	AssetCode     string    `json:"asset_code"`
+	Amount        int64     `json:"amount"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type CreditTransaction struct {
+	ID                    int64          `json:"id"`
+	TransactionID         string         `json:"transaction_id"`
+	WalletUserID          int64          `json:"wallet_user_id"`
+	CommandType           string         `json:"command_type"`
+	AssetCode             string         `json:"asset_code"`
+	IdempotencyKey        string         `json:"idempotency_key"`
+	RequestHash           string         `json:"request_hash"`
+	ActorType             string         `json:"actor_type"`
+	ActorID               string         `json:"actor_id"`
+	Source                string         `json:"source"`
+	Reason                string         `json:"reason"`
+	BusinessReferenceType string         `json:"business_reference_type"`
+	BusinessReferenceID   string         `json:"business_reference_id"`
+	RelatedTransactionID  sql.NullString `json:"related_transaction_id"`
+	CommandAmount         int64          `json:"command_amount"`
+	PostingCount          int16          `json:"posting_count"`
+	AvailableBalanceAfter int64          `json:"available_balance_after"`
+	ReservedBalanceAfter  int64          `json:"reserved_balance_after"`
+	CreatedAt             time.Time      `json:"created_at"`
+}
+
+type CreditWallet struct {
+	UserID    int64     `json:"user_id"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type FeaturePrompt struct {
 	FeatureSlug       string        `json:"feature_slug"`
 	CurrentRevisionID sql.NullInt64 `json:"current_revision_id"`

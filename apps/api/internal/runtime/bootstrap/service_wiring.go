@@ -5,11 +5,14 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type appDomainServices struct {
@@ -18,9 +21,10 @@ type appDomainServices struct {
 	storageService    *storage.StorageService
 	userService       *users.UserService
 	boardService      *boards.BoardService
+	creditService     *credits.Service
 }
 
-func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories) (appDomainServices, error) {
+func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, creditPool *pgxpool.Pool) (appDomainServices, error) {
 	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
 	storageService := storage.NewStorageService(repos.storageProfileRepo, runtimeSettings)
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
@@ -33,5 +37,6 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		storageService:    storageService,
 		userService:       users.NewUserService(repos.userRepo, storageService),
 		boardService:      boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
+		creditService:     credits.NewService(creditPool),
 	}, nil
 }

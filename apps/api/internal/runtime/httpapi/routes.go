@@ -6,6 +6,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
@@ -60,6 +61,7 @@ type UserRouteDeps struct {
 
 type AdminRouteDeps struct {
 	AdminHandler            *users.AdminHandler
+	CreditHandler           *credits.Handler
 	AccountHandler          *accounts.AccountHandler
 	TaskHandler             *taskservice.Handler
 	TaskStatsHandler        *taskstats.Handler

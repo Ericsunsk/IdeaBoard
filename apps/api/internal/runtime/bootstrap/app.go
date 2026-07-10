@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/config"
@@ -63,16 +62,7 @@ func Run(args []string) {
 func runMigrate() {
 	cfg := config.Load()
 	configureRuntimeLogging(cfg)
-	db, err := database.NewPostgres(cfg.Database)
-	if err != nil {
-		fatal("failed to connect to database", "err", err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			slog.Warn("failed to close database", "err", err)
-		}
-	}()
-	if err := migrations.Up(context.Background(), db); err != nil {
+	if err := migrateAppDatabases(context.Background(), cfg); err != nil {
 		fatal("failed to migrate database schema", "err", err)
 	}
 	slog.Info("database schema migration completed")
@@ -86,10 +76,6 @@ func runInitAdmin() {
 	if err != nil {
 		fatal("failed to connect to database", "err", err)
 	}
-	if err := migrations.Up(context.Background(), db); err != nil {
-		fatal("failed to migrate database schema", "err", err)
-	}
-
 	userRepo := users.NewUserRepository(db)
 	ctx := context.Background()
 	if err := userRepo.EnsureStorageUIDs(ctx); err != nil {

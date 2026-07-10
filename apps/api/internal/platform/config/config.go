@@ -25,6 +25,8 @@ type DatabaseConfig struct {
 	Port                   string
 	User                   string
 	Password               string
+	MigrationUser          string
+	MigrationPassword      string
 	Database               string
 	SSLMode                string
 	ConnectMaxRetries      int
@@ -70,6 +72,8 @@ type envConfig struct {
 	DBPort                   string `env:"DB_PORT"`
 	DBUser                   string `env:"DB_USER"`
 	DBPassword               string `env:"DB_PASSWORD"`
+	DBMigrationUser          string `env:"DB_MIGRATION_USER"`
+	DBMigrationPassword      string `env:"DB_MIGRATION_PASSWORD"`
 	DBName                   string `env:"DB_NAME"`
 	DBSSLMode                string `env:"DB_SSLMODE"`
 	DBConnectMaxRetries      string `env:"DB_CONNECT_MAX_RETRIES"`
@@ -116,6 +120,7 @@ func Load() *Config {
 	if raw.DBPassword == "" {
 		slog.Warn("DB_PASSWORD is not set; database connection may fail")
 	}
+	raw.DBMigrationPassword = strings.TrimSpace(raw.DBMigrationPassword)
 
 	appEnv := normalizeAppEnv(raw.AppEnv)
 	ginMode := normalizeGinMode(raw.AppGinMode)
@@ -127,6 +132,8 @@ func Load() *Config {
 			Port:                   stringEnvDefault(raw.DBPort, "5432"),
 			User:                   stringEnvDefault(raw.DBUser, "ideaboard"),
 			Password:               raw.DBPassword,
+			MigrationUser:          strings.TrimSpace(raw.DBMigrationUser),
+			MigrationPassword:      raw.DBMigrationPassword,
 			Database:               stringEnvDefault(raw.DBName, "ideaboard"),
 			SSLMode:                stringEnvDefault(raw.DBSSLMode, "disable"),
 			ConnectMaxRetries:      parsePositiveIntEnv("DB_CONNECT_MAX_RETRIES", raw.DBConnectMaxRetries, 60),

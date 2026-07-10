@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
@@ -270,6 +271,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 		},
 		AdminRoutes: AdminRouteDeps{
 			AdminHandler:            users.NewAdminHandler(nil, nil, nil),
+			CreditHandler:           credits.NewHandler(nil),
 			AccountHandler:          accounts.NewAccountHandler(nil),
 			TaskHandler:             taskservice.NewHandler(nil),
 			TaskStatsHandler:        taskstats.NewHandler(nil, nil),
@@ -333,6 +335,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/provider-endpoints":                false,
 		"GET /api/admin/feature-prompts":                   false,
 		"GET /api/admin/feature-prompts/:slug":             false,
+		"GET /api/admin/credits/wallets/:user_id":          false,
+		"GET /api/admin/credits/wallets/:user_id/ledger":   false,
 		"GET /api/admin/line-draft-modes":                  false,
 		"GET /api/admin/monitor":                           false,
 		"GET /api/admin/monitor/stream":                    false,
@@ -351,6 +355,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/tasks/:task_id":                    false,
 		"GET /api/admin/users":                             false,
 		"POST /api/admin/accounts":                         false,
+		"POST /api/admin/credits/grants":                   false,
 		"POST /api/admin/accounts/:id/start":               false,
 		"POST /api/admin/accounts/:id/stop":                false,
 		"POST /api/admin/provider-endpoints":               false,
@@ -361,6 +366,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/storage/profiles/:id/apply":       false,
 		"POST /api/admin/storage/profiles/:id/test":        false,
 		"POST /api/admin/tasks/submit":                     false,
+		"POST /api/admin/tasks/bulk-delete":                false,
 		"POST /api/admin/upload":                           false,
 		"POST /api/admin/users/:id/ban":                    false,
 		"POST /api/admin/users/:id/revoke-sessions":        false,
@@ -439,6 +445,8 @@ func sampleAdminRouteParam(name string) string {
 		return "text-to-image"
 	case "task_id":
 		return "task-123"
+	case "user_id":
+		return "42"
 	default:
 		return "sample"
 	}
