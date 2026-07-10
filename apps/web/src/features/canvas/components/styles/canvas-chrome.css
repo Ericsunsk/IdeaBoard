@@ -320,64 +320,6 @@
   color: var(--canvas-text-strong);
 }
 
-.canvas-chrome-autosave {
-  display: flex;
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: min(260px, calc(100vw - 150px));
-  min-height: 33px;
-  align-items: center;
-  gap: 8px;
-  border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--canvas-surface-bg-soft) 92%, transparent);
-  padding: 4px 5px 4px 11px;
-  color: var(--canvas-text-body);
-  backdrop-filter: blur(var(--canvas-surface-blur));
-}
-
-.canvas-chrome-autosave.is-retry,
-.canvas-chrome-autosave.is-conflict {
-  border-color: color-mix(in srgb, var(--color-canvas-accent) 34%, var(--canvas-surface-border));
-}
-
-.canvas-chrome-autosave-label {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 1.2;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.canvas-chrome-autosave-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-}
-
-.canvas-chrome-autosave-action {
-  height: 23px;
-  cursor: pointer;
-  border: 0;
-  border-radius: 999px;
-  background: var(--canvas-surface-muted);
-  padding: 0 8px;
-  color: var(--canvas-text-strong);
-  font-size: 12px;
-  line-height: 1;
-  font-weight: 600;
-}
-
-.canvas-chrome-autosave-action:hover,
-.canvas-chrome-autosave-action:focus-visible {
-  background: var(--canvas-accent-soft);
-  color: var(--canvas-accent-strong);
-  outline: none;
-}
-
 .canvas-chrome-status-button {
   display: flex;
   width: 23px;

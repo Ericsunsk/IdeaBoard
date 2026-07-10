@@ -256,6 +256,225 @@ describe('boardPersistenceSession', () => {
     expect(harness.isSavingBoard.value).toBe(false)
   })
 
+  it('warns when a silent autosave cannot sync remotely after the local save', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: createEmptyCanvasBoardSnapshot(),
+      remoteSync: {
+        ok: false,
+        reason: 'sync-failed',
+        error: new Error('auth unavailable'),
+      },
+    })
+
+    const saved = await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(saved).toBe(false)
+    expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('suppresses repeated silent autosave warnings for the same remote sync failure state', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save).mockResolvedValue({
+      snapshot: createEmptyCanvasBoardSnapshot(),
+      remoteSync: {
+        ok: false,
+        reason: 'sync-failed',
+        error: new Error('auth unavailable'),
+      },
+    })
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.saveStatus.value).toBe('retry')
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+  })
+
+  it('notifies the same silent remote sync failure after switching boards', async () => {
+    const harness = createSessionHarness('board-a')
+    vi.mocked(harness.boardSession.save).mockResolvedValue({
+      snapshot: createEmptyCanvasBoardSnapshot(),
+      remoteSync: {
+        ok: false,
+        reason: 'sync-failed',
+        error: new Error('auth unavailable'),
+      },
+    })
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    harness.routeBoardId.value = 'board-b'
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.onWarning).toHaveBeenCalledTimes(2)
+  })
+
+  it('notifies repeated non-silent remote sync failures', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save).mockResolvedValue({
+      snapshot: createEmptyCanvasBoardSnapshot(),
+      remoteSync: {
+        ok: false,
+        reason: 'sync-failed',
+        error: new Error('auth unavailable'),
+      },
+    })
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: false })
+    await harness.session.saveCurrentBoardSnapshot({ silent: false })
+
+    expect(harness.onWarning).toHaveBeenCalledTimes(2)
+  })
+
+  it('notifies when a silent autosave failure changes from retry to conflict', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save)
+      .mockResolvedValueOnce({
+        snapshot: createEmptyCanvasBoardSnapshot(),
+        remoteSync: {
+          ok: false,
+          reason: 'sync-failed',
+          error: new Error('auth unavailable'),
+        },
+      })
+      .mockResolvedValueOnce({
+        snapshot: createEmptyCanvasBoardSnapshot(),
+        remoteSync: {
+          ok: false,
+          reason: 'conflict',
+          error: new Error('name exists'),
+        },
+      })
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.saveStatus.value).toBe('conflict')
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+    expect(harness.onError).toHaveBeenCalledWith('已保存到本地，但画布名称已存在，请更换后再试')
+  })
+
+  it('reports a general silent save failure after a remote sync warning', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save)
+      .mockResolvedValueOnce({
+        snapshot: createEmptyCanvasBoardSnapshot(),
+        remoteSync: {
+          ok: false,
+          reason: 'sync-failed',
+          error: new Error('auth unavailable'),
+        },
+      })
+      .mockRejectedValueOnce(new Error('保存服务不可用'))
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.onWarning).toHaveBeenCalledOnce()
+    expect(harness.onError).toHaveBeenCalledWith('保存服务不可用')
+  })
+
+  it('reports a remote sync warning after a general silent save failure', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save)
+      .mockRejectedValueOnce(new Error('保存服务不可用'))
+      .mockResolvedValueOnce({
+        snapshot: createEmptyCanvasBoardSnapshot(),
+        remoteSync: {
+          ok: false,
+          reason: 'sync-failed',
+          error: new Error('auth unavailable'),
+        },
+      })
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.onError).toHaveBeenCalledOnce()
+    expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
+  })
+
+  it('reports a remote name conflict from a silent autosave as an error', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save).mockResolvedValueOnce({
+      snapshot: createEmptyCanvasBoardSnapshot(),
+      remoteSync: {
+        ok: false,
+        reason: 'conflict',
+        error: new Error('name exists'),
+      },
+    })
+
+    const saved = await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(saved).toBe(false)
+    expect(harness.onError).toHaveBeenCalledWith('已保存到本地，但画布名称已存在，请更换后再试')
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('reports an unexpected silent autosave failure as an error', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save).mockRejectedValueOnce(new Error('保存服务不可用'))
+
+    const saved = await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(saved).toBe(false)
+    expect(harness.onError).toHaveBeenCalledWith('保存服务不可用')
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('suppresses repeated silent autosave errors in the retry state', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save).mockRejectedValue(new Error('保存服务不可用'))
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.saveStatus.value).toBe('retry')
+    expect(harness.onError).toHaveBeenCalledOnce()
+  })
+
+  it('notifies again when the same silent failure returns after a remote sync succeeds', async () => {
+    const harness = createSessionHarness()
+    vi.mocked(harness.boardSession.save)
+      .mockResolvedValueOnce({
+        snapshot: createEmptyCanvasBoardSnapshot(),
+        remoteSync: {
+          ok: false,
+          reason: 'sync-failed',
+          error: new Error('auth unavailable'),
+        },
+      })
+      .mockResolvedValueOnce({
+        snapshot: createEmptyCanvasBoardSnapshot(),
+        remoteSync: { ok: true },
+      })
+      .mockResolvedValueOnce({
+        snapshot: createEmptyCanvasBoardSnapshot(),
+        remoteSync: {
+          ok: false,
+          reason: 'sync-failed',
+          error: new Error('auth unavailable'),
+        },
+      })
+
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+    await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(harness.onWarning).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps a successful silent autosave without a success toast', async () => {
+    const harness = createSessionHarness()
+
+    const saved = await harness.session.saveCurrentBoardSnapshot({ silent: true })
+
+    expect(saved).toBe(true)
+    expect(harness.onSuccess).not.toHaveBeenCalled()
+  })
+
   it('preserves local draft edits when an older save completes', async () => {
     const harness = createSessionHarness()
     harness.fullNodes.value = [makePromptFlowNode(1, 40)]

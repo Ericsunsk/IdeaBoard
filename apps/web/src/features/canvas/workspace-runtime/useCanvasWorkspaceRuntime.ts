@@ -26,9 +26,6 @@ export function useCanvasWorkspaceRuntime(
         edges: runtime.flowPane.edges,
       },
       persistence: {
-        isDirty: runtime.persistence.isDirty,
-        isSavingBoard: runtime.persistence.isSavingBoard,
-        saveStatus: runtime.persistence.saveStatus,
         history: runtime.persistence.history,
       },
       viewportControls: {

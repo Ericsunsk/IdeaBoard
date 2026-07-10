@@ -246,9 +246,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     },
     persistence: {
       flushAutosave: flushAutosaveWithViewportPersistence,
-      isDirty: board.isDirty,
-      isSavingBoard: board.isSavingBoard,
-      saveStatus: board.saveStatus,
       history: board.flowHistory,
       loadCanvasBoardAndProbe: viewport.loadCanvasBoardAndProbe,
       reattachPendingImageResults: task.reattachPendingImageResults,

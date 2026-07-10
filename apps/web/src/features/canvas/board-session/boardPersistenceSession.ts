@@ -13,6 +13,8 @@ import type { CanvasBoardSession } from './useCanvasBoardSession'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
 
 export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover'
+
+type SaveFailureKind = 'sync-failed' | 'conflict' | 'save-failed'
 export type ValueRef<T> = { value: T }
 export type ArrayRef = { value: unknown[] }
 
@@ -93,6 +95,27 @@ export function createBoardPersistenceSession(
 ): BoardPersistenceSession {
   let saveSequence = 0
   let loadSequence = 0
+  let lastNotifiedSaveFailure: { boardId: string; kind: SaveFailureKind } | null = null
+
+  function shouldNotifySaveFailure(
+    silent: boolean | undefined,
+    boardId: string,
+    kind: SaveFailureKind,
+  ): boolean {
+    const isRepeatedSilentFailure =
+      silent &&
+      lastNotifiedSaveFailure?.boardId === boardId &&
+      lastNotifiedSaveFailure.kind === kind
+    if (isRepeatedSilentFailure) return false
+    lastNotifiedSaveFailure = { boardId, kind }
+    return true
+  }
+
+  function clearNotifiedSaveFailure(boardId: string) {
+    if (lastNotifiedSaveFailure?.boardId === boardId) {
+      lastNotifiedSaveFailure = null
+    }
+  }
 
   function readBoardIdFromQuery() {
     return options.boardSession.currentBoardId.value
@@ -191,10 +214,7 @@ export function createBoardPersistenceSession(
 
   function notifyRemoteSyncFailure(
     reason: 'sync-failed' | 'conflict',
-    _error: unknown,
-    silent: boolean,
   ) {
-    if (silent) return
     if (reason === 'conflict') {
       options.onError('已保存到本地，但画布名称已存在，请更换后再试')
       return
@@ -235,6 +255,9 @@ export function createBoardPersistenceSession(
           }),
         50,
       )
+      if (remoteSync.ok) {
+        clearNotifiedSaveFailure(boardId)
+      }
       const shouldCommitToCurrentGraph = isSaveStillCurrent()
       if (shouldCommitToCurrentGraph) {
         const hasLocalDraftAdvanced = readLocalEditVersion() > saveEditVersion
@@ -257,8 +280,11 @@ export function createBoardPersistenceSession(
           }
         } else {
           options.isDirty.value = true
-          options.saveStatus.value = remoteSync.reason === 'conflict' ? 'conflict' : 'retry'
-          notifyRemoteSyncFailure(remoteSync.reason, remoteSync.error, !!saveOptions.silent)
+          const failureStatus = remoteSync.reason === 'conflict' ? 'conflict' : 'retry'
+          options.saveStatus.value = failureStatus
+          if (shouldNotifySaveFailure(saveOptions.silent, boardId, remoteSync.reason)) {
+            notifyRemoteSyncFailure(remoteSync.reason)
+          }
         }
       } else if (
         saveToken === saveSequence &&
@@ -275,7 +301,10 @@ export function createBoardPersistenceSession(
         options.saveStatus.value = 'retry'
       }
       console.warn('[canvas] save board snapshot failed', error)
-      if (isSaveStillCurrent()) {
+      if (
+        isSaveStillCurrent() &&
+        shouldNotifySaveFailure(saveOptions.silent, boardId, 'save-failed')
+      ) {
         options.onError(error instanceof Error ? error.message : '保存失败，请稍后重试')
       }
       return false

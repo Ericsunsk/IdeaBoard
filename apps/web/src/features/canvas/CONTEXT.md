@@ -50,8 +50,8 @@ _Avoid_: Vue Flow graph, canvas state
 单个 Canvas Board 的打开、保存、autosave、preview 和导航生命周期。
 
 **Board Save Recovery**:
-Board Session 保存时 local state/meta 已写入，但 remote sync 失败后的可恢复状态。UI 必须继续暴露 dirty/retry/failed signal，不能把它当成完整保存成功；名称冲突等不可重试失败要显示具体错误。
-_Avoid_: Silent save success, server-only failure
+Board Session 保存时 local state/meta 已写入，但 remote sync 失败后的可恢复状态。actionable failure 必须通过 Toast 暴露：remote sync failure 是 warning，名称冲突或一般保存失败是 error；silent autosave success 保持无提示。dirty/retry/conflict state 继续驱动 network/re-auth automatic recovery，但不再要求 persistent autosave status block。
+_Avoid_: Silent save success, invisible actionable failure, persistent autosave status block
 
 **Vue Flow Pane**:
 Vue Flow 提供的 graph interaction plane，负责节点布局、viewport movement、selection 和 native graph events。

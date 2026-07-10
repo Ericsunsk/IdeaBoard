@@ -34,14 +34,7 @@ export type CanvasChromeToolState = {
   minimapEnabled: boolean
 }
 
-export type CanvasChromeAutosaveState = {
-  status: 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | 'recover'
-  isDirty: boolean
-  isSaving: boolean
-}
-
 export type CanvasChromeStatusState = {
   exportDisabled: boolean
   zoomLevel: number
-  autosave: CanvasChromeAutosaveState
 }

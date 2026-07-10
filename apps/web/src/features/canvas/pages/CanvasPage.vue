@@ -24,7 +24,6 @@
       @confirm-board-rename="onConfirmBoardRename"
       @retry-board-rename="retryBoardRename"
       @rollback-board-rename="rollbackBoardRename"
-      @retry-autosave="retryAutosave"
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
       @navigate-back="onNavigateRequest(USER_BOARDS_PATH)"
@@ -353,20 +352,10 @@ const canvasChromeTools = computed<CanvasChromeToolState>(() => ({
   activeTool: activeTool.value,
   minimapEnabled: isCanvasMinimapEnabled.value,
 }))
-const {
-  isDirty: isBoardDirty,
-  isSavingBoard,
-  saveStatus,
-  history: flowHistory,
-} = viewModel.persistence
+const { history: flowHistory } = viewModel.persistence
 const canvasChromeStatus = computed<CanvasChromeStatusState>(() => ({
   exportDisabled: !hasSelectedFlowNodes.value,
   zoomLevel: zoomLevel.value,
-  autosave: {
-    status: saveStatus.value,
-    isDirty: isBoardDirty.value,
-    isSaving: isSavingBoard.value,
-  },
 }))
 
 const { flushAutosave, loadCanvasBoardAndProbe, reattachPendingImageResults } = commands.persistence
@@ -581,10 +570,6 @@ function performSelectionGroupAction() {
 
 function toggleCanvasMinimapBase() {
   isCanvasMinimapEnabled.value = !isCanvasMinimapEnabled.value
-}
-
-function retryAutosave() {
-  void flushAutosave({ silent: false })
 }
 
 dismissTransientCanvasUi = useFlowTransientUiDismissal({
