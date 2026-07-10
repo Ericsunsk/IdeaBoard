@@ -120,7 +120,7 @@ function createSourceImageSignature(node: FlowMediaInputNode) {
     return display ? `${display.url},${display.ratio}` : ''
   }
   const outputImages = Array.isArray((snapshot as { outputImages?: unknown }).outputImages)
-    ? ((snapshot as { outputImages: Array<{ url?: unknown; ratio?: unknown }> }).outputImages)
+    ? (snapshot as { outputImages: Array<{ url?: unknown; ratio?: unknown }> }).outputImages
     : []
   const latest = outputImages[outputImages.length - 1]
   return latest ? `${latest.url ?? ''},${latest.ratio ?? ''}` : ''
@@ -183,7 +183,9 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
 
     flowNodes.forEach((node) => {
       if (isMediaInputFlowNode(node)) {
-        parts.push(`target:${node.id}:${createMediaInputSnapshotSignature(node.data?.snapshotNode)}`)
+        parts.push(
+          `target:${node.id}:${createMediaInputSnapshotSignature(node.data?.snapshotNode)}`,
+        )
         return
       }
       if (sourceIds.has(node.id)) {

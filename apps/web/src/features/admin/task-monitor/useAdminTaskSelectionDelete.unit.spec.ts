@@ -63,7 +63,9 @@ describe('useAdminTaskSelectionDelete', () => {
       'task-completed',
     ])
     expect(queryClientMock.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['admin', 'tasks'] })
-    expect(queryClientMock.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['admin', 'monitor'] })
+    expect(queryClientMock.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['admin', 'monitor'],
+    })
     expect(selectedTasks.value).toEqual([])
     expect(feedback.tasksDeleted).toHaveBeenCalledWith(2)
   })

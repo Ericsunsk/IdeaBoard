@@ -18,10 +18,7 @@
     margin: 0;
     background: transparent;
     cursor: pointer;
-    accent-color: var(
-      --canvas-range-fill-color,
-      var(--canvas-accent, var(--color-canvas-accent))
-    );
+    accent-color: var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)));
   }
 
   .canvas-range-input::-webkit-slider-runnable-track {

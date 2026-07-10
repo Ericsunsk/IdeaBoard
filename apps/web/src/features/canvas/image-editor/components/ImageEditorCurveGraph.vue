@@ -259,9 +259,7 @@ watch(
     const pendingDrag = pendingCreatedPointDrag.value
     if (!pendingDrag) return
 
-    const point = props.points.find(
-      (item) => !item.endpoint && item.id === props.selectedPointId,
-    )
+    const point = props.points.find((item) => !item.endpoint && item.id === props.selectedPointId)
     if (!point) return
 
     activeDragPointId.value = point.id

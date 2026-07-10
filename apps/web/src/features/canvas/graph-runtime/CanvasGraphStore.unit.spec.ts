@@ -148,10 +148,7 @@ describe('CanvasGraphStore', () => {
     const firstGroupId = toCanvasGraphGroupId(1)
     const secondGroupId = toCanvasGraphGroupId(2)
     const imageId = toCanvasGraphNodeId('image', 1)
-    snapshot.groups = [
-      createGroup(firstGroupId, [imageId]),
-      createGroup(secondGroupId, []),
-    ]
+    snapshot.groups = [createGroup(firstGroupId, [imageId]), createGroup(secondGroupId, [])]
 
     const store = CanvasGraphStore.fromSnapshot(snapshot)
 

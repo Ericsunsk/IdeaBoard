@@ -1,7 +1,4 @@
-import {
-  resolveImageNodeFrameSize,
-  type ImageNodeItem,
-} from '../../../canvas-board/domain'
+import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../canvas-board/domain'
 import {
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
@@ -16,10 +13,7 @@ export type ResultMaterializerImageResult = ResolvedTaskImageResult & {
 }
 
 export type ResultMaterializerSkipReason =
-  | 'missing-node'
-  | 'stale-task'
-  | 'non-image-node'
-  | 'detached-node'
+  'missing-node' | 'stale-task' | 'non-image-node' | 'detached-node'
 
 export type ResultMaterializerSkippedResult = {
   resultNodeId: CanvasGraphNodeId

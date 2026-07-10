@@ -470,7 +470,10 @@ function clickPaneThroughGrouping(runtime: ReturnType<typeof useFlowCanvasRuntim
   expect(selectPane).toHaveBeenCalledOnce()
 }
 
-function clickNodeThroughGrouping(runtime: ReturnType<typeof useFlowCanvasRuntime>, nodeId: string) {
+function clickNodeThroughGrouping(
+  runtime: ReturnType<typeof useFlowCanvasRuntime>,
+  nodeId: string,
+) {
   const node = runtime.fullNodes.value.find((item) => item.id === nodeId)
   expect(node).toBeDefined()
   const selectNode = vi.fn()
@@ -658,13 +661,10 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots).toHaveLength(0)
 
     harness.runtime.flowHistory.undo()
-    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual([
-      staleEdge.id,
-      'connection-1',
-    ])
-    expect(exportCurrentBoardSnapshot(harness).connections.map((connection) => connection.id)).toEqual([
-      1,
-    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual([staleEdge.id, 'connection-1'])
+    expect(
+      exportCurrentBoardSnapshot(harness).connections.map((connection) => connection.id),
+    ).toEqual([1])
 
     harness.runtime.flowHistory.redo()
     expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-2'])
@@ -728,10 +728,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots).toHaveLength(0)
 
     harness.runtime.flowHistory.undo()
-    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual([
-      'connection-1',
-      staleEdge.id,
-    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-1', staleEdge.id])
     expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
       expect.objectContaining({ id: 2, fromNodeId: 2 }),
     ])
@@ -1063,9 +1060,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.runtime.graphRuntime.grouping.commands.groupSelectedNodes()).toBe(true)
     expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
 
-    await harness.applyNativeNodeChanges([
-      { id: 'prompt-2', type: 'select', selected: true },
-    ])
+    await harness.applyNativeNodeChanges([{ id: 'prompt-2', type: 'select', selected: true }])
 
     expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBeNull()
     expect(harness.runtime.graphRuntime.grouping.view.groupFrames.value[0]?.selected).toBe(false)
@@ -1148,7 +1143,9 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 }),
+    ).toBe(true)
     expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toEqual({
       kind: 'ungroup',
       label: '解组',
@@ -1173,8 +1170,12 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
-    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 }),
+    ).toBe(true)
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 }),
+    ).toBe(true)
 
     expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
     expect(harness.runtime.graphRuntime.grouping.view.selectionGroupAction.value).toEqual({
@@ -1229,7 +1230,9 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 }),
+    ).toBe(true)
 
     expect(harness.runtime.graphRuntime.grouping.commands.deleteSelectedGroup()).toBe(true)
 
@@ -1300,8 +1303,12 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
-    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(
+      true,
+    )
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(
+      true,
+    )
     expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.commit()).toBe(true)
 
     expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 140, y: 80 })
@@ -1328,8 +1335,12 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
-    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 2150, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(
+      true,
+    )
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 2150, y: 80 })).toBe(
+      true,
+    )
     expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.commit()).toBe(true)
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
@@ -1340,9 +1351,9 @@ describe('useFlowCanvasRuntime', () => {
         height: SAMPLE_GROUP_GEOMETRY.height,
       }),
     ])
-    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value).toEqual([
-      'prompt-2',
-    ])
+    expect(
+      harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value,
+    ).toEqual(['prompt-2'])
 
     clickPaneThroughGrouping(harness.runtime)
 
@@ -1375,10 +1386,12 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 2300, y: 80 })).toBe(true)
-    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value).toEqual([
-      'prompt-2',
-    ])
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 2300, y: 80 }),
+    ).toBe(true)
+    expect(
+      harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value,
+    ).toEqual(['prompt-2'])
     clickPaneThroughGrouping(harness.runtime)
 
     harness.runtime.graphRuntime.nodeDrag.begin()
@@ -1402,8 +1415,12 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
-    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(
+      true,
+    )
+    expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(
+      true,
+    )
     expect(harness.runtime.graphRuntime.grouping.commands.groupDrag.commit()).toBe(true)
 
     expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 40, y: 40 })
@@ -1427,9 +1444,14 @@ describe('useFlowCanvasRuntime', () => {
     await nextTick()
 
     expect(
-      harness.runtime.graphRuntime.grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 }),
+      harness.runtime.graphRuntime.grouping.commands.groupResize.begin('group-1', 'e', {
+        x: 720,
+        y: 80,
+      }),
     ).toBe(true)
-    expect(harness.runtime.graphRuntime.grouping.commands.groupResize.move({ x: 2520, y: 80 })).toBe(true)
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.groupResize.move({ x: 2520, y: 80 }),
+    ).toBe(true)
     expect(harness.runtime.graphRuntime.grouping.commands.groupResize.commit()).toBe(true)
 
     expect(readNodePosition(harness.fullNodes.value, 'prompt-2')).toEqual({ x: 2200, y: 40 })
@@ -1441,9 +1463,9 @@ describe('useFlowCanvasRuntime', () => {
         height: SAMPLE_GROUP_GEOMETRY.height,
       }),
     ])
-    expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value).toEqual([
-      'prompt-2',
-    ])
+    expect(
+      harness.runtime.graphRuntime.grouping.internal.selectedGroupCoveredExternalNodeIds.value,
+    ).toEqual(['prompt-2'])
 
     clickPaneThroughGrouping(harness.runtime)
 
@@ -1479,9 +1501,14 @@ describe('useFlowCanvasRuntime', () => {
     await nextTick()
 
     expect(
-      harness.runtime.graphRuntime.grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 }),
+      harness.runtime.graphRuntime.grouping.commands.groupResize.begin('group-1', 'e', {
+        x: 720,
+        y: 80,
+      }),
     ).toBe(true)
-    expect(harness.runtime.graphRuntime.grouping.commands.groupResize.move({ x: 350, y: 80 })).toBe(true)
+    expect(harness.runtime.graphRuntime.grouping.commands.groupResize.move({ x: 350, y: 80 })).toBe(
+      true,
+    )
     expect(harness.runtime.graphRuntime.grouping.commands.groupResize.commit()).toBe(true)
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
@@ -1516,9 +1543,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.flushAnimationFrames()
     harness.runtime.graphRuntime.nodeDrag.commit()
 
-    expect(harness.boardBaseSnapshot.value.groups).toEqual([
-      createGroup('group-1', ['prompt-1']),
-    ])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
 
     harness.runtime.flowHistory.undo()
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
@@ -1580,9 +1605,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.flushAnimationFrames()
     harness.runtime.graphRuntime.nodeDrag.commit()
 
-    expect(harness.boardBaseSnapshot.value.groups).toEqual([
-      createGroup('group-1', ['prompt-1']),
-    ])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
   })
 
   it('moves selection to dragged nodes when they leave the selected group', async () => {
@@ -1592,7 +1615,9 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.loadInitialOrRouteBoard()
     await nextTick()
 
-    expect(harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 })).toBe(true)
+    expect(
+      harness.runtime.graphRuntime.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 }),
+    ).toBe(true)
     expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBe('group-1')
 
     harness.runtime.graphRuntime.nodeDrag.begin()
@@ -1608,9 +1633,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.flushAnimationFrames()
     harness.runtime.graphRuntime.nodeDrag.commit()
 
-    expect(harness.boardBaseSnapshot.value.groups).toEqual([
-      createGroup('group-1', ['prompt-1']),
-    ])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
     expect(harness.runtime.graphRuntime.grouping.internal.selectedGroupId.value).toBeNull()
     expect(harness.runtime.graphRuntime.grouping.view.groupFrames.value[0]?.selected).toBe(false)
     expect(readNodeSelected(harness.fullNodes.value, 'image-1')).toBe(true)

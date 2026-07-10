@@ -37,7 +37,8 @@ const slots = useSlots()
 
 const toolbarStartGroupClass = 'flex min-w-0 flex-wrap items-center gap-3'
 const toolbarMetricGroupClass = 'flex min-w-0 flex-wrap items-center gap-3'
-const toolbarEndGroupClass = 'flex min-w-0 flex-wrap items-center justify-start gap-3 sm:justify-end'
+const toolbarEndGroupClass =
+  'flex min-w-0 flex-wrap items-center justify-start gap-3 sm:justify-end'
 const toolbarEndSlotGroupClass = 'flex min-w-0 flex-wrap items-center gap-3'
 const toolbarPagerGroupClass = 'flex shrink-0 items-center'
 

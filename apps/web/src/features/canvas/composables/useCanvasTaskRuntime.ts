@@ -65,15 +65,18 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
 
   function refreshGenerationAvailabilityAfter(delayMs: number) {
     clearGenerationAvailabilityTimer()
-    generationAvailabilityTimer = setTimeout(() => {
-      generationAvailabilityTimer = null
-      if (!isGenerationAvailable()) {
-        refreshGenerationAvailabilityAfter(generationUnavailableUntilMs.value - Date.now())
-        return
-      }
-      generationUnavailableUntilMs.value = 0
-      generationUnavailableMessage.value = DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
-    }, Math.max(0, delayMs))
+    generationAvailabilityTimer = setTimeout(
+      () => {
+        generationAvailabilityTimer = null
+        if (!isGenerationAvailable()) {
+          refreshGenerationAvailabilityAfter(generationUnavailableUntilMs.value - Date.now())
+          return
+        }
+        generationUnavailableUntilMs.value = 0
+        generationUnavailableMessage.value = DEFAULT_GENERATION_UNAVAILABLE_MESSAGE
+      },
+      Math.max(0, delayMs),
+    )
   }
 
   function handleWorkflowWarning(message: string) {

@@ -116,7 +116,9 @@ const viewportOverlay = computed<MiniMapViewportOverlay | null>(() => {
   }
   const initializedNodes = getNodesInitialized.value.filter((node) => !node.hidden)
   const nodeBounds = initializedNodes.length ? getRectOfNodes(initializedNodes) : viewBounds
-  const visibleBounds = initializedNodes.length ? getBoundsofRects(nodeBounds, viewBounds) : viewBounds
+  const visibleBounds = initializedNodes.length
+    ? getBoundsofRects(nodeBounds, viewBounds)
+    : viewBounds
   const viewBoxRect = dragViewBoxOverride.value ?? resolveMiniMapViewBoxRect(visibleBounds)
 
   if (!viewBoxRect) return null

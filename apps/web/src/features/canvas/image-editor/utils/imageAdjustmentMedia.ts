@@ -68,7 +68,7 @@ function readAscii(bytes: Uint8Array, offset: number, length: number) {
 function readUint32BigEndian(bytes: Uint8Array, offset: number) {
   if (offset + 4 > bytes.length) return 0
   return (
-    ((bytes[offset] ?? 0) * 0x1000000) +
+    (bytes[offset] ?? 0) * 0x1000000 +
     ((bytes[offset + 1] ?? 0) << 16) +
     ((bytes[offset + 2] ?? 0) << 8) +
     (bytes[offset + 3] ?? 0)
@@ -81,6 +81,6 @@ function readUint32LittleEndian(bytes: Uint8Array, offset: number) {
     (bytes[offset] ?? 0) +
     ((bytes[offset + 1] ?? 0) << 8) +
     ((bytes[offset + 2] ?? 0) << 16) +
-    ((bytes[offset + 3] ?? 0) * 0x1000000)
+    (bytes[offset + 3] ?? 0) * 0x1000000
   )
 }

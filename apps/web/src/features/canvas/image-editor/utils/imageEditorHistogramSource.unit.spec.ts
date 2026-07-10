@@ -32,10 +32,7 @@ function createThresholdLayer(id = 'adjustment:threshold'): ImageEditorAdjustmen
   }
 }
 
-function createCurvesLayer(
-  id = 'adjustment:curves',
-  output = 50,
-): ImageEditorAdjustmentLayer {
+function createCurvesLayer(id = 'adjustment:curves', output = 50): ImageEditorAdjustmentLayer {
   return {
     id,
     type: 'adjustment',

@@ -1,13 +1,7 @@
 export type ImageEditorMode = 'inpaint' | 'adjust'
 
 export type ImageEditorTool =
-  | 'move'
-  | 'selection'
-  | 'brush'
-  | 'eraser'
-  | 'eyedropper'
-  | 'crop'
-  | 'zoom'
+  'move' | 'selection' | 'brush' | 'eraser' | 'eyedropper' | 'crop' | 'zoom'
 
 export type ImageAdjustmentKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'sharpen'
 
@@ -149,9 +143,7 @@ export type ImageEditorMergedLayer = {
 }
 
 export type ImageEditorEditableLayer =
-  | ImageEditorAdjustmentLayer
-  | ImageEditorPaintLayer
-  | ImageEditorMergedLayer
+  ImageEditorAdjustmentLayer | ImageEditorPaintLayer | ImageEditorMergedLayer
 
 export type ImageEditorLayer = ImageEditorSourceLayer | ImageEditorEditableLayer
 

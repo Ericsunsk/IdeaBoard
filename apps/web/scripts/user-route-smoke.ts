@@ -1,4 +1,8 @@
-import type { BoardStateEnvelope, User, UserBoardItem } from '../src/shared/api/generated-query/model'
+import type {
+  BoardStateEnvelope,
+  User,
+  UserBoardItem,
+} from '../src/shared/api/generated-query/model'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../src/features/canvas-board/domain'
 import { assertNoConsoleErrors, createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 import { pageChromeBrowserAssertionHelpers } from './page-chrome-smoke-helpers'

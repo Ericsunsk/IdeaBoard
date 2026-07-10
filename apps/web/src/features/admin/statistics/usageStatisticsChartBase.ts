@@ -1,8 +1,4 @@
-import {
-  adminChartLegend,
-  adminChartTheme,
-  type AdminChartOptions,
-} from '../shared/lib/adminChart'
+import { adminChartLegend, adminChartTheme, type AdminChartOptions } from '../shared/lib/adminChart'
 
 export const defaultModelColors = [
   adminChartTheme.brand,

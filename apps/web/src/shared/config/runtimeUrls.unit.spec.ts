@@ -20,8 +20,8 @@ describe('runtime URL helpers', () => {
         'https://assets.example.com/uploads/canvas/U123/board/content/a.png',
       ),
     ).toBe('/uploads/canvas/U123/board/content/a.png')
-    expect(
-      canonicalizeRuntimeUploadRef('https://cdn.example.com/uploads/canvas/U123/a.png'),
-    ).toBe('https://cdn.example.com/uploads/canvas/U123/a.png')
+    expect(canonicalizeRuntimeUploadRef('https://cdn.example.com/uploads/canvas/U123/a.png')).toBe(
+      'https://cdn.example.com/uploads/canvas/U123/a.png',
+    )
   })
 })

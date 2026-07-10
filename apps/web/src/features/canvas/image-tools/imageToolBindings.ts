@@ -54,14 +54,8 @@ export type ImageToolStageBinding = {
 
 type ImageActionStrengthControlHandlers = {
   getValue: (action: ImageStrengthAction) => number
-  setRangeRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
-  setTriggerRef: (
-    action: ImageStrengthAction,
-    el: Element | ComponentPublicInstance | null,
-  ) => void
+  setRangeRef: (action: ImageStrengthAction, el: Element | ComponentPublicInstance | null) => void
+  setTriggerRef: (action: ImageStrengthAction, el: Element | ComponentPublicInstance | null) => void
   onRangePointerDown: (action: ImageStrengthAction, event: PointerEvent) => void
   onInput: (action: ImageStrengthAction, event: Event) => void
   onChange: (action: ImageStrengthAction, event: Event) => void
@@ -185,11 +179,7 @@ export type CanvasImageTools = {
       scheduleChromeAnchorUpdate: () => void
     }
     prompt: {
-      runPromptAction: (
-        nodeId: string,
-        prompt: string,
-        outputCount: number,
-      ) => Promise<void> | void
+      runPromptAction: (nodeId: string, prompt: string, outputCount: number) => Promise<void> | void
     }
     chrome: ImageToolChromeCommands
   }

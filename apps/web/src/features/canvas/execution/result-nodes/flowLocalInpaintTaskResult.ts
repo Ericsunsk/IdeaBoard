@@ -1,5 +1,8 @@
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
-import { composeFlowLocalInpaint, type PreparedFlowLocalInpaintMedia } from '../media/flowLocalInpaint'
+import {
+  composeFlowLocalInpaint,
+  type PreparedFlowLocalInpaintMedia,
+} from '../media/flowLocalInpaint'
 import {
   resolveFirstTaskImageResultDisplay,
   resolveTaskImageRatio,

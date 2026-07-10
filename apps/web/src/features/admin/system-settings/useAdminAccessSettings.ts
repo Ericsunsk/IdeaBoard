@@ -12,10 +12,7 @@ import type {
   RateLimitSetting,
 } from '../../../shared/api/generated-query/model'
 import type { AdminAccessSettingsFeedback } from '../feedback/useAdminFeedback'
-import {
-  updateRateLimitSettings,
-  updateRegistrationSetting,
-} from './systemSettingsCommands'
+import { updateRateLimitSettings, updateRegistrationSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
 export const RATE_LIMIT_MAX_REQUESTS = 10_000
@@ -187,7 +184,6 @@ function isSameRateLimitSetting(
   synced: AdminAccessRateLimitForm,
 ): boolean {
   return (
-    current.window_seconds === synced.window_seconds &&
-    current.max_requests === synced.max_requests
+    current.window_seconds === synced.window_seconds && current.max_requests === synced.max_requests
   )
 }

@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
-import { closeAccountManagementDialog, openAccountManagementDialog } from '../useAccountManagementDialogController'
+import {
+  closeAccountManagementDialog,
+  openAccountManagementDialog,
+} from '../useAccountManagementDialogController'
 import AccountManagementDialogHost from './AccountManagementDialogHost.vue'
 
 const routes: RouteRecordRaw[] = [

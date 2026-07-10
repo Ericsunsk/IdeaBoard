@@ -25,9 +25,7 @@ import {
   resolveFlowEdgeProjectionReplacement,
   type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
-import {
-  createCanvasFlowPaneConnectionAdapter,
-} from '../flow-pane'
+import { createCanvasFlowPaneConnectionAdapter } from '../flow-pane'
 
 type UseFlowConnectionMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node data is an open Record; narrowing breaks vue-flow's internal type expectations
@@ -308,13 +306,11 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     onEdgeUpdateTransaction(event, resolvedConnection)
   }
 
-  const connectionAdapter = createCanvasFlowPaneConnectionAdapter(
-    {
-      canConnect: options.isValidConnection,
-      connect,
-      updateEdge,
-    },
-  )
+  const connectionAdapter = createCanvasFlowPaneConnectionAdapter({
+    canConnect: options.isValidConnection,
+    connect,
+    updateEdge,
+  })
 
   return {
     connectionAdapter,

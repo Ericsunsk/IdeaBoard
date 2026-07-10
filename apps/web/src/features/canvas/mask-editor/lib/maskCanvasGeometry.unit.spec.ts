@@ -30,8 +30,7 @@ describe('maskCanvasGeometry', () => {
   it('reuses a captured layout projection for subsequent pointer moves', () => {
     const canvas = createCanvas({ left: 10, top: 20, width: 100, height: 50 })
     const project = createMaskCanvasPointerProjection(canvas)
-    canvas.getBoundingClientRect = () =>
-      ({ left: 999, top: 999, width: 1, height: 1 }) as DOMRect
+    canvas.getBoundingClientRect = () => ({ left: 999, top: 999, width: 1, height: 1 }) as DOMRect
 
     expect(project(60, 45)).toEqual({ x: 100, y: 50 })
   })

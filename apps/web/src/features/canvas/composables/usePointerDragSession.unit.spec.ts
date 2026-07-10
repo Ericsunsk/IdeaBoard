@@ -19,11 +19,7 @@ function createPointerEvent(type: string, init: Partial<PointerEvent> = {}) {
   })
 }
 
-function dispatchPointerEvent(
-  target: EventTarget,
-  type: string,
-  init: Partial<PointerEvent> = {},
-) {
+function dispatchPointerEvent(target: EventTarget, type: string, init: Partial<PointerEvent> = {}) {
   const event = createPointerEvent(type, init)
   target.dispatchEvent(event)
   return event
@@ -53,7 +49,9 @@ function createCaptureTarget(hasCapture = true) {
   return target
 }
 
-function createScopedDragController(options: Parameters<typeof usePointerDragSession<DragPayload>>[0]) {
+function createScopedDragController(
+  options: Parameters<typeof usePointerDragSession<DragPayload>>[0],
+) {
   const scope = effectScope()
   const controller = scope.run(() => usePointerDragSession<DragPayload>(options))
   if (!controller) throw new Error('expected drag controller')

@@ -1,9 +1,6 @@
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
-import {
-  EXECUTION_META,
-  type ExecutionFeature,
-} from './executionContract'
+import { EXECUTION_META, type ExecutionFeature } from './executionContract'
 
 export const IMAGE_EXECUTION_MODE = {
   directTask: 'direct-task',
@@ -38,8 +35,7 @@ export type ImageActionStrengthConfig = {
 }
 
 export type ImageStrengthAction =
-  | typeof IMAGE_NODE_ACTION.styleVariation
-  | typeof IMAGE_HD_UPSCALE_ACTION
+  typeof IMAGE_NODE_ACTION.styleVariation | typeof IMAGE_HD_UPSCALE_ACTION
 
 export const IMAGE_STRENGTH_ACTIONS = [
   IMAGE_NODE_ACTION.styleVariation,
@@ -122,9 +118,7 @@ const IMAGE_TASK_ACTION_SET: ReadonlySet<string> = new Set([
   ...IMAGE_DIRECT_TASK_ACTIONS,
   IMAGE_HD_UPSCALE_ACTION,
 ])
-const IMAGE_STRENGTH_ACTION_SET: ReadonlySet<string> = new Set(
-  IMAGE_STRENGTH_ACTIONS,
-)
+const IMAGE_STRENGTH_ACTION_SET: ReadonlySet<string> = new Set(IMAGE_STRENGTH_ACTIONS)
 
 export function isImageDirectTaskAction(action: string): action is ImageDirectTaskAction {
   return IMAGE_DIRECT_TASK_ACTION_SET.has(action)

@@ -122,7 +122,9 @@ function isAdminApiRequest(requestUrl: string) {
 }
 
 function buildLoginRedirectPath(currentPathname: string, currentFullPath: string) {
-  const loginPath = isPathUnderRoute(currentPathname, ADMIN_ROOT_PATH) ? ADMIN_LOGIN_PATH : USER_LOGIN_PATH
+  const loginPath = isPathUnderRoute(currentPathname, ADMIN_ROOT_PATH)
+    ? ADMIN_LOGIN_PATH
+    : USER_LOGIN_PATH
   return loginPath + '?redirect=' + encodeURIComponent(currentFullPath)
 }
 

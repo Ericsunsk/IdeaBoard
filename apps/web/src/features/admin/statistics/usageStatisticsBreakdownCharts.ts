@@ -18,9 +18,7 @@ import {
   toNonNegativeNumber,
 } from './usageStatisticsChartBase'
 
-export function useUsageStatisticsBreakdownCharts(
-  adminStatistics: Ref<AdminStatistics | null>,
-) {
+export function useUsageStatisticsBreakdownCharts(adminStatistics: Ref<AdminStatistics | null>) {
   const bottleneckSourceRows = computed(() =>
     (adminStatistics.value?.bottleneck_sources || [])
       .map((item, idx) => ({

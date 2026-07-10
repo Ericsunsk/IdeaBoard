@@ -212,9 +212,7 @@ export function createBoardPersistenceSession(
     return Number(options.localEditVersion?.value ?? 0)
   }
 
-  function notifyRemoteSyncFailure(
-    reason: 'sync-failed' | 'conflict',
-  ) {
+  function notifyRemoteSyncFailure(reason: 'sync-failed' | 'conflict') {
     if (reason === 'conflict') {
       options.onError('已保存到本地，但画布名称已存在，请更换后再试')
       return

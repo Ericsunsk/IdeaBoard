@@ -227,36 +227,12 @@
    * from app semantics and expressive values from creative accent tokens.
    */
   --color-ib-auth-shell: color-mix(in srgb, var(--color-ib-surface) 75%, transparent);
-  --color-ib-auth-shell-border: color-mix(
-    in srgb,
-    var(--color-ib-surface) 40%,
-    transparent
-  );
-  --color-ib-auth-shell-glow: color-mix(
-    in srgb,
-    var(--color-ib-creative-accent) 18%,
-    transparent
-  );
-  --color-ib-auth-shell-highlight: color-mix(
-    in srgb,
-    var(--color-ib-surface) 60%,
-    transparent
-  );
-  --color-ib-auth-backdrop-from: color-mix(
-    in srgb,
-    var(--color-ib-surface) 30%,
-    transparent
-  );
-  --color-ib-auth-backdrop-via: color-mix(
-    in srgb,
-    var(--color-ib-surface) 70%,
-    transparent
-  );
-  --color-ib-auth-backdrop-to: color-mix(
-    in srgb,
-    var(--color-ib-surface) 90%,
-    transparent
-  );
+  --color-ib-auth-shell-border: color-mix(in srgb, var(--color-ib-surface) 40%, transparent);
+  --color-ib-auth-shell-glow: color-mix(in srgb, var(--color-ib-creative-accent) 18%, transparent);
+  --color-ib-auth-shell-highlight: color-mix(in srgb, var(--color-ib-surface) 60%, transparent);
+  --color-ib-auth-backdrop-from: color-mix(in srgb, var(--color-ib-surface) 30%, transparent);
+  --color-ib-auth-backdrop-via: color-mix(in srgb, var(--color-ib-surface) 70%, transparent);
+  --color-ib-auth-backdrop-to: color-mix(in srgb, var(--color-ib-surface) 90%, transparent);
   --color-ib-auth-text: var(--color-ib-text);
   --color-ib-auth-title: var(--color-ib-text);
   --color-ib-auth-muted: var(--color-ib-text-muted);
@@ -268,11 +244,7 @@
   --color-ib-auth-input-placeholder: var(--color-ib-text-subtle);
   --color-ib-auth-input-icon: var(--color-ib-text-subtle);
   --color-ib-auth-focus: var(--color-ib-creative-accent);
-  --color-ib-auth-focus-ring: color-mix(
-    in srgb,
-    var(--color-ib-creative-accent) 10%,
-    transparent
-  );
+  --color-ib-auth-focus-ring: color-mix(in srgb, var(--color-ib-creative-accent) 10%, transparent);
   --color-ib-auth-error: var(--color-ib-danger);
   --color-ib-auth-error-border: color-mix(
     in srgb,
@@ -310,17 +282,13 @@
   --radius-ib-pill: 999px;
 
   --shadow-ib-control: 0 3px 10px rgba(45, 64, 89, 0.05);
-  --shadow-ib-panel: 0 4px 20px -2px rgba(45, 64, 89, 0.02),
-    0 2px 6px -1px rgba(45, 64, 89, 0.01);
+  --shadow-ib-panel: 0 4px 20px -2px rgba(45, 64, 89, 0.02), 0 2px 6px -1px rgba(45, 64, 89, 0.01);
   --shadow-ib-overlay: 0 18px 42px rgba(45, 64, 89, 0.14);
   --shadow-ib-focus: 0 0 0 3px var(--color-ib-focus-ring);
-  --shadow-ib-auth-shell: 0 24px 50px -15px var(--color-ib-auth-shell-glow),
+  --shadow-ib-auth-shell:
+    0 24px 50px -15px var(--color-ib-auth-shell-glow),
     inset 0 1px 1px var(--color-ib-auth-shell-highlight);
-  --shadow-ib-auth-input: inset 0 1px 2px color-mix(
-      in srgb,
-      var(--color-ib-text) 2%,
-      transparent
-    );
+  --shadow-ib-auth-input: inset 0 1px 2px color-mix(in srgb, var(--color-ib-text) 2%, transparent);
   --shadow-ib-auth-primary: 0 4px 14px var(--color-ib-auth-primary-shadow);
   --shadow-ib-auth-primary-hover: 0 6px 20px var(--color-ib-auth-primary-shadow-hover);
   --shadow-ib-auth-focus: 0 0 0 3px var(--color-ib-auth-focus-ring);

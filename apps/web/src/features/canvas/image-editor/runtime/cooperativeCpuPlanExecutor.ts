@@ -39,12 +39,7 @@ export async function executeCooperativeCpuImageAdjustmentPlan(
 
       const endByte = Math.min(startByte + input.chunkBytes, output.data.length)
       executeImageAdjustmentPlanStepRange(output.data, step, startByte, endByte, state)
-      loaded += estimateImageAdjustmentPlanStepRangeWorkUnits(
-        output.data,
-        step,
-        startByte,
-        endByte,
-      )
+      loaded += estimateImageAdjustmentPlanStepRangeWorkUnits(output.data, step, startByte, endByte)
       input.onProgress?.({ phase: 'render', loaded, total })
       throwIfAborted(input.signal)
 

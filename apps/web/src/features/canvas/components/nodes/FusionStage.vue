@@ -22,12 +22,7 @@
         class="fusion-node-connection-layer"
         aria-hidden="true"
       >
-        <span
-          v-for="ray in fusionRays"
-          :key="ray.key"
-          class="fusion-node-ray"
-          :style="ray.style"
-        />
+        <span v-for="ray in fusionRays" :key="ray.key" class="fusion-node-ray" :style="ray.style" />
       </TransitionGroup>
       <NodeEmptyStateIcon v-if="showEmptyFusionMark" class="fusion-empty-mark" variant="fusion" />
       <div ref="thumbsRef" class="fusion-node-slots">

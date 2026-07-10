@@ -522,7 +522,9 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-1')).toBe(stageBinding)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1')).toBe(actionBinding)
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-2')).toBe(inactiveStageBinding)
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2')).toBe(inactiveActionBinding)
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2')).toBe(
+        inactiveActionBinding,
+      )
     } finally {
       harness.unmount()
     }
@@ -593,13 +595,9 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const node2StageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-2')
 
       expect(node1StageBindingAgain.setMaskCanvasRef).toBe(node1StageBinding.setMaskCanvasRef)
-      expect(node1StageBindingAgain.setRasterCanvasRef).toBe(
-        node1StageBinding.setRasterCanvasRef,
-      )
+      expect(node1StageBindingAgain.setRasterCanvasRef).toBe(node1StageBinding.setRasterCanvasRef)
       expect(node2StageBinding.setMaskCanvasRef).not.toBe(node1StageBinding.setMaskCanvasRef)
-      expect(node2StageBinding.setRasterCanvasRef).not.toBe(
-        node1StageBinding.setRasterCanvasRef,
-      )
+      expect(node2StageBinding.setRasterCanvasRef).not.toBe(node1StageBinding.setRasterCanvasRef)
 
       const rasterCanvas = document.createElement('canvas')
       node2StageBinding.setRasterCanvasRef(rasterCanvas)

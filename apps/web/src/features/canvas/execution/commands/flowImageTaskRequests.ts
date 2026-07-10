@@ -185,9 +185,7 @@ export function buildPromptImageTaskRequest(input: {
   })
 }
 
-export function buildImageInpaintTaskRequest(
-  input: ImageInpaintTaskRequestInput,
-): SubmitTaskData {
+export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput): SubmitTaskData {
   return buildExecutionTaskRequest({
     prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
     feature: EXECUTION_PARTIAL_EDIT_META.feature,

@@ -171,8 +171,7 @@ describe('useCanvasGroupInteractionShell', () => {
     expect(harness.groupDrag.begin).toHaveBeenCalledWith({ x: 120, y: 90 })
 
     const pointerCancel = addListener.mock.calls.find(([type]) => type === 'pointercancel')?.[1] as
-      | ((event: PointerEvent) => void)
-      | undefined
+      ((event: PointerEvent) => void) | undefined
     expect(pointerCancel).toBeDefined()
 
     pointerCancel?.(createPointerEvent(pane, { pointerId: 22 }))
@@ -197,8 +196,7 @@ describe('useCanvasGroupInteractionShell', () => {
 
     expect(harness.groupResize.begin).toHaveBeenCalledWith('group-1', 'e', { x: 120, y: 90 })
     const pointerCancel = addListener.mock.calls.find(([type]) => type === 'pointercancel')?.[1] as
-      | ((event: PointerEvent) => void)
-      | undefined
+      ((event: PointerEvent) => void) | undefined
     expect(pointerCancel).toBeDefined()
 
     pointerCancel?.(createPointerEvent(handle, { pointerId: 33 }))

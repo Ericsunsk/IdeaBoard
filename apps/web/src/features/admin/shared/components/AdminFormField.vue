@@ -11,13 +11,7 @@
       {{ hint }}
     </p>
 
-    <Message
-      v-if="hasError"
-      :id="errorElementId"
-      severity="error"
-      size="small"
-      :closable="false"
-    >
+    <Message v-if="hasError" :id="errorElementId" severity="error" size="small" :closable="false">
       {{ error }}
     </Message>
   </label>
@@ -65,8 +59,8 @@ const hasError = computed(() => Boolean(props.error))
 const hasHint = computed(() => Boolean(props.hint))
 const hintElementId = computed(() => (hasHint.value ? `${fieldId.value}-hint` : undefined))
 const errorElementId = computed(() => (hasError.value ? `${fieldId.value}-error` : undefined))
-const describedbyId = computed(() =>
-  [hintElementId.value, errorElementId.value].filter(Boolean).join(' ') || undefined,
+const describedbyId = computed(
+  () => [hintElementId.value, errorElementId.value].filter(Boolean).join(' ') || undefined,
 )
 const fieldClass = computed(() =>
   props.bodyClass ? ['flex min-w-0 flex-col', props.bodyClass] : 'flex min-w-0 flex-col gap-1.5',

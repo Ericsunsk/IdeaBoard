@@ -43,7 +43,7 @@ function createMaskCanvas() {
     height: canvas.height,
     data: new Uint8ClampedArray(canvas.width * canvas.height * 4),
   } as ImageData
-  const ctx = ({
+  const ctx = {
     clearRect: vi.fn(),
     drawImage: vi.fn(),
     getImageData: vi.fn(() => imageData),
@@ -64,7 +64,7 @@ function createMaskCanvas() {
     globalCompositeOperation: 'source-over',
     fillStyle: '',
     canvas,
-  }) as unknown as CanvasRenderingContext2D
+  } as unknown as CanvasRenderingContext2D
   vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
   canvas.hasPointerCapture = vi.fn(() => false)
   canvas.setPointerCapture = vi.fn()

@@ -4,9 +4,7 @@ import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { createCanvasBoard, getCanvasBoardById } from '../../canvas-board/catalog/canvasBoards'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas-board/persistence'
 import type { CanvasBoardSnapshot, CanvasBoardState } from '../../canvas-board/domain'
-import {
-  CANVAS_BOARD_STATE_SCHEMA_VERSION,
-} from '../../canvas-board/domain'
+import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../../canvas-board/domain'
 import { makeCanvasBoardSnapshot, makeCanvasBoardState } from '../../canvas-board/testing'
 import {
   createBoardSessionRepository,

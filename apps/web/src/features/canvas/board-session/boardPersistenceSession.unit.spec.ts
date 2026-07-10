@@ -207,9 +207,7 @@ describe('boardPersistenceSession', () => {
     expect(harness.fullEdges.value).toEqual([{ id: 'existing-edge' }])
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('saved')
-    expect(harness.onError).toHaveBeenCalledWith(
-      '画布数据校验失败，已保留当前画布，请稍后重试',
-    )
+    expect(harness.onError).toHaveBeenCalledWith('画布数据校验失败，已保留当前画布，请稍后重试')
     expect(harness.isLoadingBoardSnapshot.value).toBe(false)
   })
 

@@ -52,10 +52,7 @@ export type CanvasWorkspaceRuntimeCommands = {
   >
   flowPane: Pick<
     CanvasWorkspaceRuntimeParts['flowPane'],
-    | 'onNodesChange'
-    | 'onEdgesChange'
-    | 'connectionAdapter'
-    | 'nodeDragTransactions'
+    'onNodesChange' | 'onEdgesChange' | 'connectionAdapter' | 'nodeDragTransactions'
   >
   persistence: Pick<
     CanvasWorkspaceRuntimeParts['persistence'],

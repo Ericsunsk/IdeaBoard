@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createImageEditorHistogram,
-  sampleHistogramPath,
-} from './imageEditorHistogram'
+import { createImageEditorHistogram, sampleHistogramPath } from './imageEditorHistogram'
 
 function makeImageData(values: number[]) {
   class TestImageData {
@@ -23,12 +20,7 @@ function makeImageData(values: number[]) {
 describe('imageEditorHistogram', () => {
   it('creates RGB luminance bins', () => {
     const histogram = createImageEditorHistogram(
-      makeImageData([
-        255, 0, 0, 255,
-        0, 255, 0, 255,
-        0, 0, 255, 255,
-        255, 255, 255, 128,
-      ]),
+      makeImageData([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 128]),
       'rgb',
     )
 
@@ -43,11 +35,7 @@ describe('imageEditorHistogram', () => {
   })
 
   it('creates red, green, and blue channel bins', () => {
-    const imageData = makeImageData([
-      10, 20, 30, 255,
-      10, 40, 60, 255,
-      200, 40, 90, 255,
-    ])
+    const imageData = makeImageData([10, 20, 30, 255, 10, 40, 60, 255, 200, 40, 90, 255])
 
     const red = createImageEditorHistogram(imageData, 'red')
     const green = createImageEditorHistogram(imageData, 'green')
@@ -83,11 +71,7 @@ describe('imageEditorHistogram', () => {
 
   it('samples histogram paths across the bin range', () => {
     const histogram = createImageEditorHistogram(
-      makeImageData([
-        0, 0, 0, 255,
-        128, 128, 128, 255,
-        255, 255, 255, 255,
-      ]),
+      makeImageData([0, 0, 0, 255, 128, 128, 128, 255, 255, 255, 255, 255]),
       'red',
     )
 

@@ -1,11 +1,6 @@
 <template>
   <Transition name="node-tool-popover">
-    <div
-      v-if="visible"
-      v-bind="$attrs"
-      class="node-tool-output-count-popover"
-      :class="layoutClass"
-    >
+    <div v-if="visible" v-bind="$attrs" class="node-tool-output-count-popover" :class="layoutClass">
       <slot />
     </div>
   </Transition>

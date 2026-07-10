@@ -31,7 +31,9 @@ function readStoredViewport(boardId = 'board-a', userUid = 'user-uid') {
   return raw ? (JSON.parse(raw) as { x: number; y: number; zoom: number; updatedAt: number }) : null
 }
 
-function createViewportRuntimeHarness(options: { viewportPersistence?: CanvasViewportPersistence } = {}) {
+function createViewportRuntimeHarness(
+  options: { viewportPersistence?: CanvasViewportPersistence } = {},
+) {
   const currentBoardId = ref<string | null>('board-a')
   const userUid = ref('user-uid')
   const viewport = ref<CanvasFlowViewport>({ x: 0, y: 0, zoom: 1 })
@@ -287,7 +289,11 @@ describe('useCanvasViewportRuntime', () => {
 
     expect(viewportPersistence.restore).toHaveBeenCalledOnce()
     expect(viewportPersistence.scheduleDelayedPersist).toHaveBeenCalledTimes(2)
-    expect(viewportPersistence.persistViewportEnd).toHaveBeenCalledWith({ x: 24, y: 32, zoom: 1.25 })
+    expect(viewportPersistence.persistViewportEnd).toHaveBeenCalledWith({
+      x: 24,
+      y: 32,
+      zoom: 1.25,
+    })
     expect(viewportPersistence.persistNow).toHaveBeenCalledOnce()
     expect(viewportPersistence.dispose).toHaveBeenCalledOnce()
   })

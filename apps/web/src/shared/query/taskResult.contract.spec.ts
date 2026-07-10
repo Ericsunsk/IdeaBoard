@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  extractImageResultsFromTaskPayload,
-  normalizeTaskImageResults,
-} from './taskResult'
+import { extractImageResultsFromTaskPayload, normalizeTaskImageResults } from './taskResult'
 
 describe('taskResult image result helpers', () => {
   it('extracts normalized image output metadata before falling back to result json', () => {

@@ -6,9 +6,7 @@ import {
   formatSignedPercentPoint,
 } from './usageStatisticsChartBase'
 
-export function useUsageStatisticsSummaryMetrics(
-  adminStatistics: Ref<AdminStatistics | null>,
-) {
+export function useUsageStatisticsSummaryMetrics(adminStatistics: Ref<AdminStatistics | null>) {
   const todayCalls = computed(() => adminStatistics.value?.summary?.today_calls || 0)
   const todaySuccess = computed(() => adminStatistics.value?.summary?.today_success || 0)
   const todayFailed = computed(() => adminStatistics.value?.summary?.today_failed || 0)

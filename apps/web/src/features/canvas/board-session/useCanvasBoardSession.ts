@@ -42,8 +42,7 @@ export type CanvasBoardSessionSaveOptions = {
 export type CanvasBoardSessionRemoteSyncFailureReason = 'sync-failed' | 'conflict'
 
 export type CanvasBoardSessionRemoteSyncResult =
-  | { ok: true }
-  | { ok: false; reason: CanvasBoardSessionRemoteSyncFailureReason; error: unknown }
+  { ok: true } | { ok: false; reason: CanvasBoardSessionRemoteSyncFailureReason; error: unknown }
 
 export type CanvasBoardSessionSaveResult = {
   snapshot: CanvasBoardSnapshot

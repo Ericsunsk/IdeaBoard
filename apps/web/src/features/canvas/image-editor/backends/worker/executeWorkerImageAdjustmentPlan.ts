@@ -127,7 +127,11 @@ export function createWorkerImageProcessingClient(
         }
 
         const activeWorker = ensureWorker()
-        const executePayload = createWorkerExecutePayload(requestId, request.imageData, request.plan)
+        const executePayload = createWorkerExecutePayload(
+          requestId,
+          request.imageData,
+          request.plan,
+        )
 
         const pending: PendingWorkerImageProcessingRequest = {
           requestId,

@@ -47,11 +47,7 @@ type UseStrengthRangeEditSessionOptions<TKey> = {
     session: StrengthRangeEditSession<TKey>,
   ) => void
   isRangeEventIgnored?: (key: TKey) => boolean
-  isTriggerDisabled?: (
-    key: TKey,
-    trigger: HTMLElement,
-    input: HTMLInputElement,
-  ) => boolean
+  isTriggerDisabled?: (key: TKey, trigger: HTMLElement, input: HTMLInputElement) => boolean
 }
 
 function getElement(el: StrengthRangeRefTarget): Element | null {

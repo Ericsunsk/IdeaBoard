@@ -15,10 +15,7 @@ export type CanvasTaskSubmissionCallbacks = {
 }
 
 export type CanvasTaskSubmissionAdapter = {
-  assertTaskRequestReady: (
-    request: SubmitTaskData,
-    fallbackMessage?: string,
-  ) => Promise<void>
+  assertTaskRequestReady: (request: SubmitTaskData, fallbackMessage?: string) => Promise<void>
   submitTaskRequest: (
     request: SubmitTaskData,
     fallbackMessage?: string,

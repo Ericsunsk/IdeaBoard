@@ -6,11 +6,7 @@ import {
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../../canvas-board/domain'
-import {
-  CanvasGraphStore,
-  toCanvasGraphEdgeId,
-  toCanvasGraphNodeId,
-} from '../../graph-runtime'
+import { CanvasGraphStore, toCanvasGraphEdgeId, toCanvasGraphNodeId } from '../../graph-runtime'
 import { materializeResolvedImageResults } from './resultMaterializer'
 
 function createPromptNode(id: number): PromptNodeItem {

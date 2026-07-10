@@ -88,10 +88,7 @@ export interface CanvasBoardCommandDependencies {
 export interface CanvasBoardCommands {
   create(input?: { name?: string }): Promise<CanvasBoardCreateResult>
   rename(input: { boardId: string; nextName: string }): Promise<CanvasBoardRenameResult>
-  renameOptimistic(input: {
-    boardId: string
-    nextName: string
-  }): CanvasBoardOptimisticRenameResult
+  renameOptimistic(input: { boardId: string; nextName: string }): CanvasBoardOptimisticRenameResult
   rollbackOptimisticRename(input: {
     boardId: string
     previousName: string

@@ -226,7 +226,11 @@ describe('ImageSourceCache', () => {
 })
 
 async function waitForImageBitmapRequest() {
-  for (let attempt = 0; attempt < 10 && createImageBitmapMock.mock.calls.length === 0; attempt += 1) {
+  for (
+    let attempt = 0;
+    attempt < 10 && createImageBitmapMock.mock.calls.length === 0;
+    attempt += 1
+  ) {
     await new Promise((resolve) => window.setTimeout(resolve, 0))
   }
   expect(createImageBitmapMock).toHaveBeenCalledTimes(1)

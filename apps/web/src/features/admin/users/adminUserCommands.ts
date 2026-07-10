@@ -77,8 +77,7 @@ export function useAdminUserCommands(
 
   function invalidateAdminUsersQuery() {
     return (
-      queryClient?.invalidateQueries({ queryKey: getAdminUsersListQueryKey() }) ??
-      Promise.resolve()
+      queryClient?.invalidateQueries({ queryKey: getAdminUsersListQueryKey() }) ?? Promise.resolve()
     )
   }
 

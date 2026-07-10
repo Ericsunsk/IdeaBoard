@@ -1,8 +1,5 @@
 <template>
-  <section
-    :class="mainContentClass"
-    aria-label="账户管理"
-  >
+  <section :class="mainContentClass" aria-label="账户管理">
     <Button
       type="button"
       text
@@ -14,20 +11,26 @@
       <Xmark class="h-4 w-4" />
     </Button>
 
-    <aside
-      class="flex min-h-0 flex-col bg-ib-surface px-4 py-5 max-[820px]:px-4 max-[820px]:py-4"
-    >
+    <aside class="flex min-h-0 flex-col bg-ib-surface px-4 py-5 max-[820px]:px-4 max-[820px]:py-4">
       <div class="mb-7 flex min-w-0 items-center gap-2.5 px-1" :aria-label="projectName">
         <span :class="accountBrandMarkClass">
-          <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
+          <SiteBrandLogo
+            :src="logoURL"
+            :fallback-text="fallbackText"
+            :class="brandMarkClasses.logo"
+          />
         </span>
-        <span class="min-w-0 truncate text-[19px] leading-[29px] font-bold tracking-normal text-ib-text">
+        <span
+          class="min-w-0 truncate text-[19px] leading-[29px] font-bold tracking-normal text-ib-text"
+        >
           {{ projectName }}
         </span>
       </div>
 
       <nav class="min-w-0" aria-label="账户管理导航">
-        <p class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-subtle">
+        <p
+          class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-subtle"
+        >
           通用设置
         </p>
         <div class="grid gap-1.5 max-[820px]:grid-cols-2 max-[520px]:grid-cols-1">
@@ -80,10 +83,7 @@
         leave-to-class="opacity-0"
       >
         <div v-if="activeTab === 'profile'" key="profile" class="grid gap-7">
-          <section
-            class="min-w-0"
-            aria-label="账户资料概览"
-          >
+          <section class="min-w-0" aria-label="账户资料概览">
             <div class="flex min-w-0 items-center gap-5 max-[520px]:items-start">
               <div
                 class="relative size-[88px] shrink-0 overflow-visible rounded-[var(--radius-ib-pill)] bg-ib-surface-raised shadow-[var(--shadow-ib-control)] max-[520px]:size-20"
@@ -123,10 +123,14 @@
               </div>
 
               <div class="min-w-0">
-                <p class="m-0 truncate text-[30px] leading-tight font-bold tracking-normal text-ib-text max-[520px]:text-[24px]">
+                <p
+                  class="m-0 truncate text-[30px] leading-tight font-bold tracking-normal text-ib-text max-[520px]:text-[24px]"
+                >
                   {{ userStore.user?.username }}
                 </p>
-                <p class="mt-1 mb-0 truncate font-mono text-[14px] leading-6 font-semibold text-ib-text-subtle">
+                <p
+                  class="mt-1 mb-0 truncate font-mono text-[14px] leading-6 font-semibold text-ib-text-subtle"
+                >
                   {{ userStore.user?.uid || '-' }}
                 </p>
                 <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
@@ -147,10 +151,7 @@
             </div>
           </section>
 
-          <section
-            class="min-w-0"
-            aria-label="账号信息"
-          >
+          <section class="min-w-0" aria-label="账号信息">
             <dl class="m-0 border-y border-ib-border-soft">
               <div
                 v-for="field in profileFields"

@@ -127,7 +127,10 @@ describe('useCanvasGroupRuntime', () => {
     const harness = createHarness()
 
     expect(Object.keys(harness.runtime).sort()).toEqual(['commands', 'internal', 'view'])
-    expect(Object.keys(harness.runtime.view).sort()).toEqual(['groupFrames', 'selectionGroupAction'])
+    expect(Object.keys(harness.runtime.view).sort()).toEqual([
+      'groupFrames',
+      'selectionGroupAction',
+    ])
     expect(harness.runtime.view.selectionGroupAction.value).toEqual({
       kind: 'group',
       label: '组合',

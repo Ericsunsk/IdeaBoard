@@ -2,7 +2,9 @@ import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useDismissableLayer } from './useDismissableLayer'
 
-function mountDismissableLayer(options: { enabled?: boolean; ignore?: ReadonlyArray<string> } = {}) {
+function mountDismissableLayer(
+  options: { enabled?: boolean; ignore?: ReadonlyArray<string> } = {},
+) {
   const enabled = ref(options.enabled ?? true)
   const onDismiss = vi.fn()
   const host = document.createElement('div')

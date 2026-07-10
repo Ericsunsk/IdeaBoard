@@ -58,9 +58,7 @@ export function formatCanvasNodePortLabel(port: CanvasConnectionPort): string {
   return port
 }
 
-export const CANVAS_NODE_MENU_ITEMS = CANVAS_NODE_UI_REGISTRY_LIST.map(
-  (item) => ({
-    key: item.kind,
-    label: `+ ${item.defaultTitle} 节点`,
-  }),
-) as readonly CanvasNodeMenuItem[]
+export const CANVAS_NODE_MENU_ITEMS = CANVAS_NODE_UI_REGISTRY_LIST.map((item) => ({
+  key: item.kind,
+  label: `+ ${item.defaultTitle} 节点`,
+})) as readonly CanvasNodeMenuItem[]

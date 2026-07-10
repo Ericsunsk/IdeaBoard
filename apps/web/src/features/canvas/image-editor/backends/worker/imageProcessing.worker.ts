@@ -90,11 +90,14 @@ async function executeRequest(
       requestId: request.requestId,
       progress: { phase: 'complete' },
     })
-    postResponse({
-      type: 'success',
-      requestId: request.requestId,
-      imageData,
-    }, createWorkerSuccessResponseTransfer(imageData))
+    postResponse(
+      {
+        type: 'success',
+        requestId: request.requestId,
+        imageData,
+      },
+      createWorkerSuccessResponseTransfer(imageData),
+    )
   } catch (error) {
     postResponse({
       type: 'error',
@@ -121,7 +124,11 @@ async function executeWorkerImageAdjustmentPlanInChunks(
     if (!step) continue
 
     const state = createImageAdjustmentPlanStepExecutionState(output, step)
-    for (let startByte = 0; startByte < output.data.length; startByte += WORKER_RENDER_CHUNK_BYTES) {
+    for (
+      let startByte = 0;
+      startByte < output.data.length;
+      startByte += WORKER_RENDER_CHUNK_BYTES
+    ) {
       throwIfCancelled(request.requestId)
 
       const endByte = Math.min(startByte + WORKER_RENDER_CHUNK_BYTES, output.data.length)
@@ -201,7 +208,9 @@ function toWorkerImageProcessingError(error: unknown): WorkerImageProcessingErro
   }
 }
 
-function isWorkerImageProcessingErrorPayload(error: unknown): error is WorkerImageProcessingErrorPayload {
+function isWorkerImageProcessingErrorPayload(
+  error: unknown,
+): error is WorkerImageProcessingErrorPayload {
   if (!error || typeof error !== 'object') return false
   if (error instanceof Error) return false
   const payload = error as Partial<WorkerImageProcessingErrorPayload>

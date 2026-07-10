@@ -42,16 +42,18 @@ describe('flowPendingImageTaskSnapshot', () => {
   it('detects renderable image results from source or outputs', () => {
     expect(hasRenderableImageResult(makeImageSnapshot({ sourceImageUrl: ' out.png ' }))).toBe(true)
     expect(
-      hasRenderableImageResult(makeImageSnapshot({ outputImages: [{ url: ' out.png', ratio: 1 }] })),
+      hasRenderableImageResult(
+        makeImageSnapshot({ outputImages: [{ url: ' out.png', ratio: 1 }] }),
+      ),
     ).toBe(true)
     expect(hasRenderableImageResult(makeImageSnapshot())).toBe(false)
   })
 
   it('only treats running image snapshots without renderable results as pending tasks', () => {
     expect(isPendingImageTaskSnapshot(makeImageSnapshot(), 'task-1')).toBe(true)
-    expect(
-      isPendingImageTaskSnapshot(makeImageSnapshot({ outputStatus: 'ready' }), 'task-1'),
-    ).toBe(false)
+    expect(isPendingImageTaskSnapshot(makeImageSnapshot({ outputStatus: 'ready' }), 'task-1')).toBe(
+      false,
+    )
     expect(
       isPendingImageTaskSnapshot(makeImageSnapshot({ sourceImageUrl: 'out.png' }), 'task-1'),
     ).toBe(false)

@@ -247,11 +247,16 @@ function isAdminProductionStyleFile(file: SourceFile): boolean {
 }
 
 function isCanvasTokenAllowedFile(file: SourceFile): boolean {
-  return file.sourcePath === 'src/app/style.css' || file.sourcePath.startsWith('src/features/canvas/')
+  return (
+    file.sourcePath === 'src/app/style.css' || file.sourcePath.startsWith('src/features/canvas/')
+  )
 }
 
 function isPageDotBackgroundAllowedFile(file: SourceFile): boolean {
-  return file.sourcePath === 'src/app/style.css' || file.sourcePath.startsWith('src/features/canvas-board/preview/')
+  return (
+    file.sourcePath === 'src/app/style.css' ||
+    file.sourcePath.startsWith('src/features/canvas-board/preview/')
+  )
 }
 
 function checkAllowanceReasons<T extends string>(

@@ -17,7 +17,9 @@ type UseImageAdjustmentRenderedPreviewOptions = {
   sourceUrl?: MaybeRefOrGetter<string | null | undefined>
 }
 
-export function useImageAdjustmentRenderedPreview(options: UseImageAdjustmentRenderedPreviewOptions) {
+export function useImageAdjustmentRenderedPreview(
+  options: UseImageAdjustmentRenderedPreviewOptions,
+) {
   const imageEditorRenderedPreview = shallowRef<ImageEditorRenderedPreview | null>(null)
   const imageEditorPreviewSource = shallowRef<ImageEditorRenderedPreview | null>(null)
 

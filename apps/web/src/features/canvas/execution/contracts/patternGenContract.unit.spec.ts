@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
-import {
-  PATTERN_GEN_NODE_IO_CONTRACT,
-  assertPatternGenTaskRequest,
-} from './patternGenContract'
+import { PATTERN_GEN_NODE_IO_CONTRACT, assertPatternGenTaskRequest } from './patternGenContract'
 
 describe('patternGenContract', () => {
   it('accepts the text prompt node IO request contract', () => {

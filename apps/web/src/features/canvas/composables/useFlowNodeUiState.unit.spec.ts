@@ -86,8 +86,7 @@ describe('useFlowNodeUiState', () => {
     const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
     const fusionState = getFlowNodeUiStateCached('fusion-1')
     const pendingInputs = fusionState.connection.pending as
-      | Record<string, boolean | undefined>
-      | undefined
+      Record<string, boolean | undefined> | undefined
 
     expect(pendingInputs?.image).toBe(false)
     expect(fusionState.primaryAction).toEqual({ label: '融合', disabled: false })
@@ -135,8 +134,7 @@ describe('useFlowNodeUiState', () => {
     const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
     const fusionState = getFlowNodeUiStateCached('fusion-1')
     const pendingInputs = fusionState.connection.pending as
-      | Record<string, boolean | undefined>
-      | undefined
+      Record<string, boolean | undefined> | undefined
 
     expect(pendingInputs?.image).toBe(true)
     expect(fusionState.primaryAction).toEqual({ label: '等待 Image', disabled: true })
@@ -205,11 +203,9 @@ describe('useFlowNodeUiState', () => {
 
     const connectedFusionState = getFlowNodeUiStateCached('fusion-1')
     const connectedInputs = connectedFusionState.connection.connected as
-      | Record<string, boolean | undefined>
-      | undefined
+      Record<string, boolean | undefined> | undefined
     const pendingInputs = connectedFusionState.connection.pending as
-      | Record<string, boolean | undefined>
-      | undefined
+      Record<string, boolean | undefined> | undefined
 
     expect(connectedFusionState).not.toBe(disconnectedFusionState)
     expect(connectedInputs?.image).toBe(true)
@@ -238,8 +234,7 @@ describe('useFlowNodeUiState', () => {
 
     const connectedFusionState = getFlowNodeUiStateCached('fusion-1')
     const connectedInputs = connectedFusionState.connection.connected as
-      | Record<string, boolean | undefined>
-      | undefined
+      Record<string, boolean | undefined> | undefined
 
     expect(connectedFusionState).not.toBe(disconnectedFusionState)
     expect(connectedInputs?.image).toBe(true)

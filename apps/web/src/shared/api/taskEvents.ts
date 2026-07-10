@@ -1,10 +1,7 @@
 import { queryClient } from '../query/queryClient'
 import { getGetUserTaskQueryKey } from './generated-query/tasks/tasks'
 import type { ApiResponseTask } from './generated-query/model'
-import {
-  extractImageResultsFromTaskPayload,
-  type TaskImageResult,
-} from '../query/taskResult'
+import { extractImageResultsFromTaskPayload, type TaskImageResult } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
 import type { Task } from './task'
@@ -12,13 +9,7 @@ import { resolveApiUrl } from '../config/runtimeUrls'
 
 type TaskEventPayload = Pick<
   Task,
-  | 'task_id'
-  | 'status'
-  | 'result'
-  | 'error_msg'
-  | 'outputs'
-  | 'cancel_reason'
-  | 'execution_metrics'
+  'task_id' | 'status' | 'result' | 'error_msg' | 'outputs' | 'cancel_reason' | 'execution_metrics'
 >
 
 const SSE_TIMEOUT_MS = 6 * 60 * 1000

@@ -518,9 +518,7 @@ describe('usePendingImageResultExecution', () => {
 
   it('keeps storage materialization failures as pending retry result nodes', async () => {
     const harness = createHarness([makeAnchorNode()])
-    const storageFailure = new TaskResultPendingError(
-      '图片已生成，但结果保存暂时失败，请稍后重试',
-    )
+    const storageFailure = new TaskResultPendingError('图片已生成，但结果保存暂时失败，请稍后重试')
     let reservedNodeIds: string[] = []
 
     const summary = await harness.actions.runPendingResults({

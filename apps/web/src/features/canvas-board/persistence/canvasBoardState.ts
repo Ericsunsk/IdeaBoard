@@ -45,7 +45,9 @@ function stripPreviewSnapshotsFromStateMap(
   )
 }
 
-function readRawStateMap(options: { throwOnInvalidBoardId?: string } = {}): Record<string, CanvasBoardState> {
+function readRawStateMap(
+  options: { throwOnInvalidBoardId?: string } = {},
+): Record<string, CanvasBoardState> {
   if (typeof window === 'undefined') return {}
   const scopedKey = getScopedStorageKey()
   if (!scopedKey) return {}

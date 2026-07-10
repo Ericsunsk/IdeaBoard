@@ -1,11 +1,7 @@
 import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
 import { getWorkflowFeatureImageActionText } from '../../../shared/domain/workflowFeatureRegistry'
 import type { WorkflowFeature } from '../../../shared/domain/workflowFeatures'
-import {
-  IMAGE_EXECUTION_MODE,
-  isImageStrengthAction,
-  type ImageStrengthAction,
-} from '../execution'
+import { IMAGE_EXECUTION_MODE, isImageStrengthAction, type ImageStrengthAction } from '../execution'
 
 export const IMAGE_NODE_ACTION = {
   ...WORKFLOW_IMAGE_NODE_ACTION,

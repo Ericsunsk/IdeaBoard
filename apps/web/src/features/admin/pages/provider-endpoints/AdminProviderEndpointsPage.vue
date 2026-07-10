@@ -309,7 +309,11 @@
       <template #footer>
         <div :class="adminDialogCompactFooterActionsClass">
           <Button label="取消" severity="secondary" outlined @click="closeProviderEndpointModal" />
-          <Button label="确定" :loading="providerEndpointSaveLoading" @click="handleSaveProviderEndpoint" />
+          <Button
+            label="确定"
+            :loading="providerEndpointSaveLoading"
+            @click="handleSaveProviderEndpoint"
+          />
         </div>
       </template>
     </Dialog>
@@ -327,7 +331,9 @@
           class="mb-4 flex items-center gap-1.5 rounded-xl border border-admin-border bg-admin-surface-muted px-3 py-2 text-admin-meta text-admin-text-2"
         >
           <span>所属端点：</span>
-          <code class="font-semibold text-admin-text-1">{{ selectedProviderEndpointForAccount.name }}</code>
+          <code class="font-semibold text-admin-text-1">{{
+            selectedProviderEndpointForAccount.name
+          }}</code>
         </div>
 
         <AdminFormField
@@ -476,8 +482,10 @@ import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 const adminFeedback = useAdminFeedback()
 const adminConfirm = useAdminConfirm()
 
-const { isScrolling: isProviderEndpointPanelScrolling, handleScroll: handleProviderEndpointPanelScroll } =
-  useTransientScrolling()
+const {
+  isScrolling: isProviderEndpointPanelScrolling,
+  handleScroll: handleProviderEndpointPanelScroll,
+} = useTransientScrolling()
 
 const { cards, providerEndpointEditor, accountEditor, commands } = useAdminProviderConfig({
   feedback: adminFeedback.providerEndpoints.providerConfig,

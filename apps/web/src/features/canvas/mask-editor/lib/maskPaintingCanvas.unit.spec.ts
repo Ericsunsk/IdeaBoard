@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  MASK_EDITOR_PAINT_RGB,
-  MASK_EDITOR_PREVIEW_ALPHA,
-} from '../config/maskEditorConstants'
+import { MASK_EDITOR_PAINT_RGB, MASK_EDITOR_PREVIEW_ALPHA } from '../config/maskEditorConstants'
 import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
@@ -169,9 +166,7 @@ afterEach(() => {
 
 describe('maskPaintingCanvas', () => {
   it('inverts mask alpha with Canvas 2D compositing and keeps paint color on visible pixels', () => {
-    const canvas = createFixtureCanvas(3, 1, [
-      12, 34, 56, 0, 12, 34, 56, 128, 12, 34, 56, 255,
-    ])
+    const canvas = createFixtureCanvas(3, 1, [12, 34, 56, 0, 12, 34, 56, 128, 12, 34, 56, 255])
 
     invertMaskPreviewCanvas(canvas)
 
@@ -192,9 +187,7 @@ describe('maskPaintingCanvas', () => {
   })
 
   it('feathers mask alpha and tints the blurred output through source-in compositing', () => {
-    const canvas = createFixtureCanvas(3, 1, [
-      0, 0, 0, 0, 12, 34, 56, 255, 0, 0, 0, 0,
-    ])
+    const canvas = createFixtureCanvas(3, 1, [0, 0, 0, 0, 12, 34, 56, 255, 0, 0, 0, 0])
 
     expect(featherMaskPreviewCanvas(canvas, 1)).toBe(true)
 
@@ -215,9 +208,7 @@ describe('maskPaintingCanvas', () => {
   })
 
   it('builds execution and preview masks from source alpha without RGB pixel rewrites', () => {
-    const canvas = createFixtureCanvas(3, 1, [
-      10, 20, 30, 0, 10, 20, 30, 128, 10, 20, 30, 255,
-    ])
+    const canvas = createFixtureCanvas(3, 1, [10, 20, 30, 0, 10, 20, 30, 128, 10, 20, 30, 255])
 
     const result = buildMaskCommitResult(canvas)
 
@@ -248,9 +239,7 @@ describe('maskPaintingCanvas', () => {
   })
 
   it('reloads raster mask preview with alpha greater than zero as a fully painted pixel', () => {
-    const sourceImage = createFixtureCanvas(3, 1, [
-      10, 20, 30, 0, 10, 20, 30, 1, 10, 20, 30, 128,
-    ])
+    const sourceImage = createFixtureCanvas(3, 1, [10, 20, 30, 0, 10, 20, 30, 1, 10, 20, 30, 128])
     const targetCanvas = createFixtureCanvas(3, 1)
 
     drawMaskRasterPreviewToCanvas(sourceImage, targetCanvas)
@@ -370,16 +359,9 @@ function forEachPixelInRect(
 }
 
 function parseRgba(value: string): [number, number, number, number] {
-  const match = value.match(
-    /rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)/,
-  )
+  const match = value.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)/)
   if (!match) return [0, 0, 0, 255]
-  return [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-    Math.round(Number(match[4]) * 255),
-  ]
+  return [Number(match[1]), Number(match[2]), Number(match[3]), Math.round(Number(match[4]) * 255)]
 }
 
 function compositePixel(

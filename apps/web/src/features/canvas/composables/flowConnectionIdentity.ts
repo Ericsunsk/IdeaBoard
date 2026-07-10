@@ -1,8 +1,5 @@
 import type { Edge, EdgeUpdateEvent } from '@vue-flow/core'
-import type {
-  CanvasConnection,
-  CanvasConnectionEndpoint,
-} from '../../canvas-board/domain'
+import type { CanvasConnection, CanvasConnectionEndpoint } from '../../canvas-board/domain'
 import {
   shouldReplaceCanvasConnection,
   toCanvasGraphEdgeId,
@@ -114,9 +111,7 @@ export function createFlowEdgeProjectionIndex(
         resolveFlowEdgeFromIdentitySource(input),
       )
       if (!endpoint) return 'unresolved'
-      return shouldReplaceCanvasConnection(endpoint, nextConnection, policy)
-        ? 'replace'
-        : 'retain'
+      return shouldReplaceCanvasConnection(endpoint, nextConnection, policy) ? 'replace' : 'retain'
     },
   }
 }

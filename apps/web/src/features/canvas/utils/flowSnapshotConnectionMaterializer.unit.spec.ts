@@ -57,10 +57,7 @@ function fusionSnapshot(id: number): CanvasNodeItem {
   }
 }
 
-function nodeData(
-  kind: CanvasConnectionNodeType,
-  snapshotNode: CanvasNodeItem,
-): FlowNodeData {
+function nodeData(kind: CanvasConnectionNodeType, snapshotNode: CanvasNodeItem): FlowNodeData {
   return {
     kind,
     nodeType: kind,

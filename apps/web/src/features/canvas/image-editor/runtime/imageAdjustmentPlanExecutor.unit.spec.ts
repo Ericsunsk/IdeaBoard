@@ -62,10 +62,14 @@ describe('image adjustment plan executor', () => {
     })
 
     expect(result).toBe(workerOutput)
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(source, createChannelLutPlan(), {
-      signal,
-      onProgress,
-    })
+    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(
+      source,
+      createChannelLutPlan(),
+      {
+        signal,
+        onProgress,
+      },
+    )
     expect(onPlanExecutorEvent).toHaveBeenNthCalledWith(1, {
       kind: 'worker-plan-started',
       planLength: 1,
@@ -163,8 +167,8 @@ describe('image adjustment plan executor', () => {
 
   it('keeps cooperative sharpen execution identical to sync CPU execution', async () => {
     const values = [
-      30, 30, 30, 255, 30, 30, 30, 240, 220, 220, 220, 230, 220, 220, 220, 220, 30, 30, 30,
-      210, 30, 30, 30, 200, 220, 220, 220, 190, 220, 220, 220, 180,
+      30, 30, 30, 255, 30, 30, 30, 240, 220, 220, 220, 230, 220, 220, 220, 220, 30, 30, 30, 210, 30,
+      30, 30, 200, 220, 220, 220, 190, 220, 220, 220, 180,
     ]
     const source = makeImageData(values, 4, 2)
     const expected = await createCpuImageAdjustmentPlanExecutor().execute({
@@ -218,10 +222,14 @@ describe('image adjustment plan executor', () => {
 
     expect(result).toBe(workerOutput)
     expect(pixelValues(source)).toEqual([10, 20, 30, 255, 40, 50, 60, 255])
-    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(source, createChannelLutPlan(), {
-      signal,
-      onProgress: undefined,
-    })
+    expect(executeWorkerImageAdjustmentPlanMock).toHaveBeenCalledWith(
+      source,
+      createChannelLutPlan(),
+      {
+        signal,
+        onProgress: undefined,
+      },
+    )
   })
 
   it('does not fall back to the worker when cooperative CPU execution is cancelled', async () => {

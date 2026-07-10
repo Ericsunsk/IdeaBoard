@@ -97,10 +97,7 @@ export type ImageWorkflowCommands = {
     aspectRatio: PromptAspectRatio,
     optionsOverride?: { outputAnchorNodeId?: string; anchor?: ImageResultAnchor },
   ) => Promise<void>
-  runImageInpaintAction: (
-    nodeId: string,
-    inpaint: RunImageInpaintActionOptions,
-  ) => Promise<void>
+  runImageInpaintAction: (nodeId: string, inpaint: RunImageInpaintActionOptions) => Promise<void>
   runFusionPromptGeneration: (
     nodeId: string,
     prompt: string,

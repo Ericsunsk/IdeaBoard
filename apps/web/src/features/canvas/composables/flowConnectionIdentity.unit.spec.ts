@@ -46,10 +46,9 @@ describe('flowConnectionIdentity', () => {
       targetHandle: 'in:image',
     } as Edge
 
-    const projectionIndex = createFlowEdgeProjectionIndex(
-      createCanvasGraphStore(snapshot),
-      [generatedEdge],
-    )
+    const projectionIndex = createFlowEdgeProjectionIndex(createCanvasGraphStore(snapshot), [
+      generatedEdge,
+    ])
     const canvasEdgeId = toCanvasGraphEdgeId(42)
 
     expect(projectionIndex.resolveCanvasEdgeId(generatedEdge)).toBe(canvasEdgeId)
@@ -130,10 +129,10 @@ describe('flowConnectionIdentity', () => {
       data: { connectionSnapshot: { id: 7 } },
     } as Edge
 
-    const projectionIndex = createFlowEdgeProjectionIndex(
-      createCanvasGraphStore(snapshot),
-      [firstEdge, collidingEdge],
-    )
+    const projectionIndex = createFlowEdgeProjectionIndex(createCanvasGraphStore(snapshot), [
+      firstEdge,
+      collidingEdge,
+    ])
 
     expect(projectionIndex.resolveCanvasEdgeId(firstEdge)).toBe(toCanvasGraphEdgeId(7))
     expect(projectionIndex.resolveCanvasEdgeId(collidingEdge)).toBe(toCanvasGraphEdgeId(43))

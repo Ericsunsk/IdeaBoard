@@ -18,9 +18,7 @@ import { materializeFlowSnapshotConnections } from './flowSnapshotConnectionMate
 import { resolveImageNodeDisplayRatio } from './flowImageNodeSelectors'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
-export {
-  resolveNextCanvasConnectionId,
-} from './flowSnapshotConnectionMaterializer'
+export { resolveNextCanvasConnectionId } from './flowSnapshotConnectionMaterializer'
 
 export interface FlowAdapterNode {
   id: string
@@ -60,9 +58,7 @@ function createSnapshotShell(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
 }
 
 function collectBoardScopedMediaRefs(base?: CanvasBoardSnapshot): BoardStateMediaRef[] {
-  return (base?.mediaRefs ?? [])
-    .filter((ref) => ref.refType === 'board')
-    .map((ref) => ({ ...ref }))
+  return (base?.mediaRefs ?? []).filter((ref) => ref.refType === 'board').map((ref) => ({ ...ref }))
 }
 
 function resolveImageNodeMediaRefRole(

@@ -7,10 +7,7 @@ import type { CanvasImageTools } from './imageToolBindings'
 import { createImageToolChromeAdapter } from './imageToolChromeAdapter'
 import { createImageToolCommands } from './imageToolCommands'
 import { createImageToolNodeBindings } from './imageToolNodeBindings'
-import {
-  createImageToolSession,
-  type UseCanvasImageToolsOptions,
-} from './imageToolSession'
+import { createImageToolSession, type UseCanvasImageToolsOptions } from './imageToolSession'
 
 export type { UseCanvasImageToolsOptions } from './imageToolSession'
 

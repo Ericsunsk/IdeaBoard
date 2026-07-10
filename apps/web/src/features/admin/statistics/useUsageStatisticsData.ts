@@ -5,10 +5,7 @@ import {
   type GetAdminStatisticsRangeValue,
   useAdminStatisticsResource,
 } from './statisticsResource'
-import {
-  pickAdminTimeRangeOptions,
-  type AdminTimeRangeOption,
-} from '../shared/lib/adminTimeRange'
+import { pickAdminTimeRangeOptions, type AdminTimeRangeOption } from '../shared/lib/adminTimeRange'
 
 const usageTrendRanges: readonly GetAdminStatisticsRangeValue[] = [
   GetAdminStatisticsRange['7d'],
@@ -38,11 +35,11 @@ export function useUsageStatisticsData() {
     keepPreviousData: true,
   })
 
-  const adminStatistics = computed<AdminStatistics | null>(() => statisticsResource.statistics.value)
+  const adminStatistics = computed<AdminStatistics | null>(
+    () => statisticsResource.statistics.value,
+  )
   const qualityStatistics = computed<AdminStatistics | null>(() =>
-    isQualityRangeShared.value
-      ? adminStatistics.value
-      : qualityStatisticsResource.statistics.value,
+    isQualityRangeShared.value ? adminStatistics.value : qualityStatisticsResource.statistics.value,
   )
   const isStatisticsSettled = computed(() => statisticsResource.isSettled.value)
   const isQualityStatisticsSettled = computed(() =>

@@ -33,8 +33,7 @@ function makeMaterializerResult(
 ): ResultMaterializerResult {
   return {
     summary: {} as ResultMaterializerResult['summary'],
-    materializedNodeIds:
-      materializedNodeIds as ResultMaterializerResult['materializedNodeIds'],
+    materializedNodeIds: materializedNodeIds as ResultMaterializerResult['materializedNodeIds'],
     skipped: [],
     projection: {
       updatedEdges: [],
@@ -123,9 +122,7 @@ function createTaskAdapter(
 
 function createWorkspaceHarness(options: {
   nodes?: Node[]
-  runPendingResults: (
-    params: RunPendingImageResultsParams,
-  ) => Promise<PendingImageResultRunSummary>
+  runPendingResults: (params: RunPendingImageResultsParams) => Promise<PendingImageResultRunSummary>
   submitTaskRequest?: CanvasTaskSubmissionAdapter['submitTaskRequest']
   createClientActionId?: () => string
 }): {
@@ -218,10 +215,11 @@ describe('useCanvasExecutionWorkspace', () => {
   })
 
   it('reports pattern-gen preflight errors without submitting a task', async () => {
-    const { workspace, pendingResults, taskAdapter, onSuccess, onWarning } =
-      createWorkspaceHarness({
+    const { workspace, pendingResults, taskAdapter, onSuccess, onWarning } = createWorkspaceHarness(
+      {
         runPendingResults: async () => makeRunSummary(),
-      })
+      },
+    )
 
     await workspace.commands.runTextPromptGeneration(
       makeTextPromptPlan({ aspectRatio: '2:1' as never }),

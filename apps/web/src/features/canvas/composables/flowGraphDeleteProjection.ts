@@ -124,22 +124,20 @@ export function applyFlowGraphDeleteProjection(
     options.flowNodeIds,
   )
   const runningTaskIds = collectDeletedRunningTaskIds(options.nodes, removedFlowNodeIds)
-  const result = applyCanvasGraphCommitPolicy(
-    options.commitPolicy,
-    (commandOptions) =>
-      options.graphAdapter.applyGraphChanges(
-        {
-          nodes: createNodeRemoveChanges(removedFlowNodeIds),
-          edges: createEdgeRemoveChanges({
-            edges: options.edges,
-            removedGraphEdgeIds: summary.removedEdgeIds,
-            removedFlowNodeIds,
-            projectionIndex: options.projectionIndex,
-            edgeRemoveChanges: options.edgeRemoveChanges,
-          }),
-        },
-        commandOptions,
-      ),
+  const result = applyCanvasGraphCommitPolicy(options.commitPolicy, (commandOptions) =>
+    options.graphAdapter.applyGraphChanges(
+      {
+        nodes: createNodeRemoveChanges(removedFlowNodeIds),
+        edges: createEdgeRemoveChanges({
+          edges: options.edges,
+          removedGraphEdgeIds: summary.removedEdgeIds,
+          removedFlowNodeIds,
+          projectionIndex: options.projectionIndex,
+          edgeRemoveChanges: options.edgeRemoveChanges,
+        }),
+      },
+      commandOptions,
+    ),
   )
 
   if (result.didChange) {

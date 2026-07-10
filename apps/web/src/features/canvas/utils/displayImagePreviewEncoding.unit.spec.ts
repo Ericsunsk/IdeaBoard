@@ -7,30 +7,15 @@ import {
 describe('displayImagePreviewEncoding', () => {
   it('detects transparent and semitransparent pixels from alpha values', () => {
     expect(
-      imageDataHasTransparentPixels(
-        new Uint8ClampedArray([
-          255, 255, 255, 255,
-          255, 255, 255, 0,
-        ]),
-      ),
+      imageDataHasTransparentPixels(new Uint8ClampedArray([255, 255, 255, 255, 255, 255, 255, 0])),
     ).toBe(true)
 
     expect(
-      imageDataHasTransparentPixels(
-        new Uint8ClampedArray([
-          255, 255, 255, 255,
-          0, 0, 0, 254,
-        ]),
-      ),
+      imageDataHasTransparentPixels(new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 254])),
     ).toBe(true)
 
     expect(
-      imageDataHasTransparentPixels(
-        new Uint8ClampedArray([
-          255, 255, 255, 255,
-          0, 0, 0, 255,
-        ]),
-      ),
+      imageDataHasTransparentPixels(new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255])),
     ).toBe(false)
   })
 

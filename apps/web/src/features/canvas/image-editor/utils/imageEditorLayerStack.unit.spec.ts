@@ -69,7 +69,10 @@ describe('imageEditorLayerStack', () => {
 
   it('selects the nearest editable fallback after removing the selected layer', () => {
     const stack = applyLayerCommand(
-      applyLayerCommand(createInitialLayerStack(), { type: 'ensure-adjustment', kind: 'threshold' }),
+      applyLayerCommand(createInitialLayerStack(), {
+        type: 'ensure-adjustment',
+        kind: 'threshold',
+      }),
       { type: 'ensure-adjustment', kind: 'hsl' },
     )
 

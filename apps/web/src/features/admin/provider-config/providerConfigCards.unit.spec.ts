@@ -64,7 +64,9 @@ describe('provider config cards', () => {
   })
 })
 
-function makeProviderEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): ProviderEndpointRecord {
+function makeProviderEndpoint(
+  overrides: Partial<ProviderEndpointRecord> = {},
+): ProviderEndpointRecord {
   return {
     id: 1,
     apiType: 'openai-compatible',
@@ -77,9 +79,7 @@ function makeProviderEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): 
   }
 }
 
-function makeAccount(
-  overrides: Partial<ProviderAccountRecord> = {},
-): ProviderAccountRecord {
+function makeAccount(overrides: Partial<ProviderAccountRecord> = {}): ProviderAccountRecord {
   return {
     id: 11,
     name: 'Account',

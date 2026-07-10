@@ -1,5 +1,9 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
-import type { ImageEditorAdjustmentLayer, ImageEditorLayer, ImageEditorRenderedPreview } from '../types'
+import type {
+  ImageEditorAdjustmentLayer,
+  ImageEditorLayer,
+  ImageEditorRenderedPreview,
+} from '../types'
 import {
   resolveImageEditorHistogramSource,
   type ImageEditorHistogramSourceResolution,

@@ -30,21 +30,21 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue'
-import type {
-  CanvasGroupFrame,
-  CanvasGroupResizeHandle,
-} from '../utils/canvasGroupGeometry'
+import type { CanvasGroupFrame, CanvasGroupResizeHandle } from '../utils/canvasGroupGeometry'
 
 const props = defineProps<{
   frames: CanvasGroupFrame[]
 }>()
 
 const emit = defineEmits<{
-  (event: 'resize-start', payload: {
-    event: PointerEvent
-    groupId: CanvasGroupFrame['id']
-    handle: CanvasGroupResizeHandle
-  }): void
+  (
+    event: 'resize-start',
+    payload: {
+      event: PointerEvent
+      groupId: CanvasGroupFrame['id']
+      handle: CanvasGroupResizeHandle
+    },
+  ): void
 }>()
 
 const resizeHandles: CanvasGroupResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']

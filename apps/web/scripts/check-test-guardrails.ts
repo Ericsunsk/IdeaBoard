@@ -10,11 +10,7 @@ type Exception = {
 type ExceptionMap<T extends Exception> = Readonly<Record<string, readonly T[]>>
 
 type ComponentHarnessRule =
-  | 'raw-create-app'
-  | 'raw-mount-call'
-  | 'raw-unmount-call'
-  | 'document-div-host'
-  | 'vue-test-utils'
+  'raw-create-app' | 'raw-mount-call' | 'raw-unmount-call' | 'document-div-host' | 'vue-test-utils'
 
 type ComponentHarnessException = Exception & {
   rule: ComponentHarnessRule
@@ -25,11 +21,7 @@ type GeneratedQueryMockException = Exception & {
 }
 
 type ComponentClassAssertionRule =
-  | 'to-have-class'
-  | 'class-list'
-  | 'class-name'
-  | 'vue-test-utils-classes'
-  | 'class-attribute'
+  'to-have-class' | 'class-list' | 'class-name' | 'vue-test-utils-classes' | 'class-attribute'
 
 type Violation = {
   file: string

@@ -46,7 +46,10 @@ export function useAdminTaskMonitorSettings(options: {
   }
 }
 
-function isSameTaskMonitorSetting(current: TaskMonitorSetting, synced: TaskMonitorSetting): boolean {
+function isSameTaskMonitorSetting(
+  current: TaskMonitorSetting,
+  synced: TaskMonitorSetting,
+): boolean {
   return (
     current.list_page_size === synced.list_page_size &&
     current.auto_refresh_enabled === synced.auto_refresh_enabled &&

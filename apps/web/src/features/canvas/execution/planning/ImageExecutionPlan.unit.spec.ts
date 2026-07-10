@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
-import {
-  createImageExecutionPlanner,
-  prepareFusionExecutionPlan,
-} from './ImageExecutionPlan'
+import { createImageExecutionPlanner, prepareFusionExecutionPlan } from './ImageExecutionPlan'
 import {
   resolveFlowSourceImageRatio,
   resolveSourceImageFromNode,
@@ -44,7 +41,9 @@ describe('ImageExecutionPlan', () => {
       outputImages: [],
     })
 
-    expect(resolveSourceImageFromNode('image', snapshot)).toBe('https://example.com/source-only.png')
+    expect(resolveSourceImageFromNode('image', snapshot)).toBe(
+      'https://example.com/source-only.png',
+    )
     expect(resolveFlowSourceImageRatio('image', snapshot)).toBe(0.5)
   })
 

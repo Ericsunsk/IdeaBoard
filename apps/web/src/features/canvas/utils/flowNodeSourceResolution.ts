@@ -5,10 +5,7 @@ import {
   type ImageNodeItem,
   type ImageNodeOutputItem,
 } from '../../canvas-board/domain'
-import {
-  resolveImageNodeDisplayRatio,
-  resolveImageNodeDisplayUrl,
-} from './flowImageNodeSelectors'
+import { resolveImageNodeDisplayRatio, resolveImageNodeDisplayUrl } from './flowImageNodeSelectors'
 
 export interface FlowExecutionGraphOptions {
   nodes: Array<{

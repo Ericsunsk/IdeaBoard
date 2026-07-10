@@ -55,7 +55,9 @@ const emit = defineEmits<{
 }>()
 
 const ranges = IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.ranges
-const normalizedParams = computed(() => IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(props.params))
+const normalizedParams = computed(() =>
+  IMAGE_ADJUSTMENT_DEFINITIONS.sharpen.normalize(props.params),
+)
 
 function updateNumberParam(
   key: Exclude<keyof ImageEditorSharpenParams, 'protectColor'>,

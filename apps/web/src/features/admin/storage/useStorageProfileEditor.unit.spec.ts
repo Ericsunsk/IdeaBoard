@@ -119,24 +119,22 @@ describe('useStorageProfileEditor', () => {
       },
       providerMap.value,
     )
-    const saveProfile = vi.fn(
-      async (input: { payload: StorageProfilePayload; id?: string }) => ({
-        message: 'saved',
-        profile: {
-          id: input.id || savedProfile.id,
-          name: input.payload.name,
-          provider: input.payload.provider,
-          enabled: input.payload.enabled,
-          is_current: false,
-          builtin: false,
-          secret_configured: true,
-          config: {
-            ...input.payload.config,
-            secret_access_key: 'server-secret',
-          },
+    const saveProfile = vi.fn(async (input: { payload: StorageProfilePayload; id?: string }) => ({
+      message: 'saved',
+      profile: {
+        id: input.id || savedProfile.id,
+        name: input.payload.name,
+        provider: input.payload.provider,
+        enabled: input.payload.enabled,
+        is_current: false,
+        builtin: false,
+        secret_configured: true,
+        config: {
+          ...input.payload.config,
+          secret_access_key: 'server-secret',
         },
-      }),
-    )
+      },
+    }))
 
     const editor = useStorageProfileEditor({
       creatableProviders: computed(() =>

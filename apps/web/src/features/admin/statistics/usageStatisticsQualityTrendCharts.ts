@@ -1,8 +1,5 @@
 import { computed, type Ref } from 'vue'
-import type {
-  AdminStatistics,
-  GetAdminStatisticsRangeValue,
-} from './statisticsResource'
+import type { AdminStatistics, GetAdminStatisticsRangeValue } from './statisticsResource'
 import {
   adminChartStrokeWidth,
   adminChartTheme,

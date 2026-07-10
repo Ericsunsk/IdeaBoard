@@ -287,7 +287,10 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
     await startRouteBodyServer()
   }
 
-  function signalDevServer(server: ChildProcessByStdio<null, Readable, Readable>, signal: NodeJS.Signals) {
+  function signalDevServer(
+    server: ChildProcessByStdio<null, Readable, Readable>,
+    signal: NodeJS.Signals,
+  ) {
     if (server.pid == null) return
     if (USE_PROCESS_GROUP) {
       try {
@@ -317,8 +320,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
     const stdout = result.stdout || ''
     const stderr = result.stderr || ''
     if (result.error) {
-      const timedOut =
-        result.error && 'code' in result.error && result.error.code === 'ETIMEDOUT'
+      const timedOut = result.error && 'code' in result.error && result.error.code === 'ETIMEDOUT'
       if (runOptions.allowFailure) {
         return { stdout, stderr, status: result.status ?? 1 }
       }

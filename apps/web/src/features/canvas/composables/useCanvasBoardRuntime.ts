@@ -10,10 +10,7 @@ import {
   type BoardRenameRecoveryState,
 } from './useFlowBoardHeaderActions'
 import type { FlowHistory } from './useFlowHistory'
-import {
-  useFlowCanvasRuntime,
-  type CanvasFlowGraphRuntimeControls,
-} from './useFlowCanvasRuntime'
+import { useFlowCanvasRuntime, type CanvasFlowGraphRuntimeControls } from './useFlowCanvasRuntime'
 import type {
   CanvasVueFlowGraphActions,
   CanvasVueFlowGraphAdapter,
@@ -93,9 +90,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
   const isSavingBoard: Ref<boolean> = ref(false)
   const isDirty: Ref<boolean> = ref(false)
   const saveStatus: Ref<SaveStatus> = ref('idle')
-  const autosaveResumeSignal = computed(() =>
-    boardSessionIdentityKey(options.getUserIdentity()),
-  )
+  const autosaveResumeSignal = computed(() => boardSessionIdentityKey(options.getUserIdentity()))
 
   const boardSession = useCanvasBoardSession({
     getBoardIdQuery: () => options.route.query.boardId,

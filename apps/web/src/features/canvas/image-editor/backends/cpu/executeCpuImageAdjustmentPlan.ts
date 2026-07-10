@@ -1,4 +1,7 @@
-import { executeImageAdjustmentPlan, type ImageAdjustmentPlan } from '../../utils/imageAdjustmentEngine'
+import {
+  executeImageAdjustmentPlan,
+  type ImageAdjustmentPlan,
+} from '../../utils/imageAdjustmentEngine'
 
 export function executeCpuImageAdjustmentPlanInPlace(
   imageData: ImageData,

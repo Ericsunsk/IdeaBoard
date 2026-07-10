@@ -3,7 +3,11 @@
     <Card :class="loginCardClass" :pt="loginCardPt">
       <template #header>
         <router-link :class="brandMarkClass" to="/" :aria-label="projectName">
-          <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
+          <SiteBrandLogo
+            :src="logoURL"
+            :fallback-text="fallbackText"
+            :class="brandMarkClasses.logo"
+          />
         </router-link>
       </template>
 

@@ -57,7 +57,9 @@ export function countUniqueAccountModels(accounts: ProviderAccountRecord[]) {
   return models.size
 }
 
-export function createProviderEndpointView(providerEndpoint: ProviderEndpointRecord): ProviderEndpointView {
+export function createProviderEndpointView(
+  providerEndpoint: ProviderEndpointRecord,
+): ProviderEndpointView {
   return {
     id: providerEndpoint.id,
     name: providerEndpoint.name,

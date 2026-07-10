@@ -40,8 +40,7 @@ type CanvasGroupResizeControls = {
 type CanvasGroupClosePolicyHandler = (...args: never[]) => unknown
 type CanvasGroupClosePolicyHandlers = Record<string, CanvasGroupClosePolicyHandler>
 type CanvasGroupInteractionViewport =
-  | ComputedRef<CanvasFlowViewportTransform>
-  | Ref<CanvasFlowViewportTransform>
+  ComputedRef<CanvasFlowViewportTransform> | Ref<CanvasFlowViewportTransform>
 
 export type UseCanvasGroupInteractionShellOptions = {
   canvasWrapRef: Ref<HTMLElement | null>

@@ -124,10 +124,7 @@ describe('AccountManagementDialogContent', () => {
     renderAccountManagementDialogContent()
 
     expect(screen.getByRole('navigation', { name: '账户管理导航' })).toBeVisible()
-    expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
+    expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText('IdeaBoard')).toBeVisible()
     expect(screen.getByRole('button', { name: '退出登录' })).toBeVisible()
     expect(screen.getAllByText('mock-user')[0]).toBeVisible()
@@ -141,10 +138,7 @@ describe('AccountManagementDialogContent', () => {
 
     await user.click(screen.getByRole('button', { name: '账号安全' }))
 
-    expect(screen.getByRole('button', { name: '账号安全' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
+    expect(screen.getByRole('button', { name: '账号安全' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('textbox', { name: '当前原密码' })).toBeVisible()
     expect(screen.getByRole('textbox', { name: '设置新密码' })).toBeVisible()
     expect(screen.queryByText('auth-user-layout')).not.toBeInTheDocument()

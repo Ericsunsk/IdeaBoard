@@ -17,12 +17,7 @@ const overlayVue = readFileSync(
   'utf8',
 )
 
-function createFrame(
-  id: string,
-  selected: boolean,
-  left = 100,
-  top = 80,
-): CanvasGroupFrame {
+function createFrame(id: string, selected: boolean, left = 100, top = 80): CanvasGroupFrame {
   return {
     id: id as CanvasGroupFrame['id'],
     nodeIds: ['image-1', 'prompt-1'],
@@ -54,9 +49,7 @@ describe('CanvasGroupFramesOverlay', () => {
     expect(adapterSkinCss).toContain(
       'border: var(--canvas-selection-stroke-width) solid var(--canvas-selection-group-border)',
     )
-    expect(overlayVue).toContain(
-      'box-shadow: 0 0 0 var(--canvas-group-frame-selected-ring-width)',
-    )
+    expect(overlayVue).toContain('box-shadow: 0 0 0 var(--canvas-group-frame-selected-ring-width)')
     expect(overlayVue).toContain('var(--canvas-group-frame-selected-ring-color)')
   })
 
@@ -83,22 +76,14 @@ describe('CanvasGroupFramesOverlay', () => {
       },
     })
 
-    expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(
-      1,
-    )
-    const resizeZones = container.querySelectorAll<HTMLElement>(
-      '.canvas-group-frame-resize-handle',
-    )
+    expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(1)
+    const resizeZones = container.querySelectorAll<HTMLElement>('.canvas-group-frame-resize-handle')
     expect(resizeZones).toHaveLength(8)
     expect(
-      container.querySelectorAll<HTMLElement>(
-        '.canvas-group-frame-resize-handle.is-edge-handle',
-      ),
+      container.querySelectorAll<HTMLElement>('.canvas-group-frame-resize-handle.is-edge-handle'),
     ).toHaveLength(4)
     expect(
-      container.querySelectorAll<HTMLElement>(
-        '.canvas-group-frame-resize-handle.is-corner-handle',
-      ),
+      container.querySelectorAll<HTMLElement>('.canvas-group-frame-resize-handle.is-corner-handle'),
     ).toHaveLength(4)
     expect(
       Array.from(resizeZones).map((zone) =>
@@ -128,8 +113,6 @@ describe('CanvasGroupFramesOverlay', () => {
     })
 
     expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-body')).toHaveLength(1)
-    expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(
-      0,
-    )
+    expect(container.querySelectorAll<HTMLElement>('.canvas-group-frame-controls')).toHaveLength(0)
   })
 })

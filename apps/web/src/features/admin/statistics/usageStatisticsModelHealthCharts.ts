@@ -45,9 +45,7 @@ type SlowModelPoint = {
   samples: number
 }
 
-export function useUsageStatisticsModelHealthCharts(
-  adminStatistics: Ref<AdminStatistics | null>,
-) {
+export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminStatistics | null>) {
   function getModelColorByName(name: string) {
     const key = normalizeModelName(name)
     if (!key) return null

@@ -26,10 +26,7 @@ function mountKeyboardShortcuts(options: Parameters<typeof useFlowKeyboardShortc
   }
 }
 
-function dispatchKeydown(
-  init: KeyboardEventInit & { key: string },
-  target: EventTarget = window,
-) {
+function dispatchKeydown(init: KeyboardEventInit & { key: string }, target: EventTarget = window) {
   const event = new KeyboardEvent('keydown', {
     bubbles: true,
     cancelable: true,
@@ -47,10 +44,7 @@ function dispatchBackspace(target: EventTarget = window) {
   return dispatchKeydown({ key: 'Backspace' }, target)
 }
 
-function dispatchKeyup(
-  init: KeyboardEventInit & { key: string },
-  target: EventTarget = window,
-) {
+function dispatchKeyup(init: KeyboardEventInit & { key: string }, target: EventTarget = window) {
   const event = new KeyboardEvent('keyup', {
     bubbles: true,
     cancelable: true,

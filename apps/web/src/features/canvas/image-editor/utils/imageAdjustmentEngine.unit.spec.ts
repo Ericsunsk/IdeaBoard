@@ -95,12 +95,7 @@ describe('imageAdjustmentEngine', () => {
   it('keeps default adjustment layers visually neutral', () => {
     const source = makeImageData([32, 96, 160, 128])
 
-    const result = applyImageAdjustments(source, [
-      hslLayer,
-      curvesLayer,
-      levelsLayer,
-      sharpenLayer,
-    ])
+    const result = applyImageAdjustments(source, [hslLayer, curvesLayer, levelsLayer, sharpenLayer])
 
     expect(pixelValues(result)).toEqual([32, 96, 160, 128])
     expect(pixelValues(source)).toEqual([32, 96, 160, 128])
@@ -154,9 +149,9 @@ describe('imageAdjustmentEngine', () => {
 
   it('keeps ranged sharpen execution identical to whole-image execution', () => {
     const sourceValues = [
-      24, 24, 24, 50, 24, 24, 24, 60, 210, 210, 210, 70, 210, 210, 210, 80, 24, 24, 24, 90,
-      24, 24, 24, 100, 210, 210, 210, 110, 210, 210, 210, 120, 24, 24, 24, 130, 24, 24, 24,
-      140, 210, 210, 210, 150, 210, 210, 210, 160,
+      24, 24, 24, 50, 24, 24, 24, 60, 210, 210, 210, 70, 210, 210, 210, 80, 24, 24, 24, 90, 24, 24,
+      24, 100, 210, 210, 210, 110, 210, 210, 210, 120, 24, 24, 24, 130, 24, 24, 24, 140, 210, 210,
+      210, 150, 210, 210, 210, 160,
     ]
     const wholeImage = makeImageData(sourceValues, 4, 3)
     const rangedImage = makeImageData(sourceValues, 4, 3)
@@ -171,7 +166,13 @@ describe('imageAdjustmentEngine', () => {
       const state = createImageAdjustmentPlanStepExecutionState(rangedImage, step)
       executeImageAdjustmentPlanStepRange(rangedImage.data, step, 0, 12, state)
       executeImageAdjustmentPlanStepRange(rangedImage.data, step, 12, 28, state)
-      executeImageAdjustmentPlanStepRange(rangedImage.data, step, 28, rangedImage.data.length, state)
+      executeImageAdjustmentPlanStepRange(
+        rangedImage.data,
+        step,
+        28,
+        rangedImage.data.length,
+        state,
+      )
     }
 
     expect(pixelValues(rangedImage)).toEqual(pixelValues(wholeImage))
@@ -276,9 +277,7 @@ describe('imageAdjustmentEngine', () => {
 
   it('applies sharpen without touching alpha', () => {
     const source = makeImageData(
-      [
-        32, 32, 32, 11, 32, 32, 32, 22, 192, 192, 192, 33, 192, 192, 192, 44, 192, 192, 192, 55,
-      ],
+      [32, 32, 32, 11, 32, 32, 32, 22, 192, 192, 192, 33, 192, 192, 192, 44, 192, 192, 192, 55],
       5,
       1,
     )
@@ -290,17 +289,17 @@ describe('imageAdjustmentEngine', () => {
     ])
 
     expect(pixelValues(result)).not.toEqual(pixelValues(source))
-    expect([result.data[3], result.data[7], result.data[11], result.data[15], result.data[19]]).toEqual(
-      [11, 22, 33, 44, 55],
-    )
+    expect([
+      result.data[3],
+      result.data[7],
+      result.data[11],
+      result.data[15],
+      result.data[19],
+    ]).toEqual([11, 22, 33, 44, 55])
   })
 
   it('uses threshold to suppress low-contrast sharpen noise', () => {
-    const source = makeImageData(
-      [100, 100, 100, 255, 104, 104, 104, 255, 100, 100, 100, 255],
-      3,
-      1,
-    )
+    const source = makeImageData([100, 100, 100, 255, 104, 104, 104, 255, 100, 100, 100, 255], 3, 1)
 
     const suppressed = applyImageAdjustments(source, [
       makeLayer(sharpenLayer, {
@@ -320,8 +319,8 @@ describe('imageAdjustmentEngine', () => {
   it('lets sharpen radius widen the affected area', () => {
     const source = makeImageData(
       [
-        20, 20, 20, 255, 20, 20, 20, 255, 20, 20, 20, 255, 220, 220, 220, 255, 220, 220, 220,
-        255, 220, 220, 220, 255, 220, 220, 220, 255,
+        20, 20, 20, 255, 20, 20, 20, 255, 20, 20, 20, 255, 220, 220, 220, 255, 220, 220, 220, 255,
+        220, 220, 220, 255, 220, 220, 220, 255,
       ],
       7,
       1,
@@ -346,9 +345,7 @@ describe('imageAdjustmentEngine', () => {
 
   it('can protect color by injecting sharpened detail through luminance', () => {
     const source = makeImageData(
-      [
-        96, 80, 70, 255, 96, 80, 70, 255, 170, 95, 82, 255, 170, 95, 82, 255, 170, 95, 82, 255,
-      ],
+      [96, 80, 70, 255, 96, 80, 70, 255, 170, 95, 82, 255, 170, 95, 82, 255, 170, 95, 82, 255],
       5,
       1,
     )
@@ -394,11 +391,7 @@ describe('imageAdjustmentEngine', () => {
   })
 
   it('compiles neutral layers away and merges continuous channel LUT work', () => {
-    const plan = compileImageAdjustmentPlan([
-      hslLayer,
-      curvesLayer,
-      levelsLayer,
-    ])
+    const plan = compileImageAdjustmentPlan([hslLayer, curvesLayer, levelsLayer])
 
     expect(plan).toEqual([])
 

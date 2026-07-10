@@ -14,9 +14,7 @@ import { requireApiData } from '../shared/queries/adminApiResponse'
 
 export type AdminTaskListQueryParams = ListAdminTasksParams
 
-type UseAdminTaskListResourceOptions = Parameters<
-  typeof useListAdminTasks<ApiResponseTaskList>
->[1]
+type UseAdminTaskListResourceOptions = Parameters<typeof useListAdminTasks<ApiResponseTaskList>>[1]
 
 export function useAdminTaskListResource(
   params: MaybeRef<AdminTaskListQueryParams>,
@@ -33,9 +31,7 @@ export function getAdminMonitorQueryKey() {
   return getGetAdminMonitorQueryKey()
 }
 
-export async function deleteAdminTaskSelection(
-  taskIDs: string[],
-): Promise<AdminTaskDeleteResult> {
+export async function deleteAdminTaskSelection(taskIDs: string[]): Promise<AdminTaskDeleteResult> {
   const res = await deleteAdminTasks({ task_ids: taskIDs })
   return requireApiData(res, '删除任务失败')
 }

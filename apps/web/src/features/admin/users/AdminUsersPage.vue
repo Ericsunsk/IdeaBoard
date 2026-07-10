@@ -331,5 +331,4 @@ function handleActionSelect(key: UserActionKey) {
   selectUserAction(key)
   userActionPopoverRef.value?.hide?.()
 }
-
 </script>

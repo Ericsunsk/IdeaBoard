@@ -15,13 +15,13 @@ It is not a product design essay, system architecture doc, API contract, or loca
 
 MUST choose the target surface before styling.
 
-| Surface | Tone | Prefer | Avoid |
-| ------- | ---- | ------ | ----- |
-| Canvas Workspace | Creative tool, calm, precise, image-first | Compact nodes, clear tool states, low-interruption overlays | Marketing hero layout, decorative copy, form-heavy UI |
-| Image Editor | Instrument panel, exact, reversible | Stable controls, clear preview/commit distinction, readable histograms/sliders/curves | Dramatic visuals over control hierarchy |
-| Admin | Operational, dense, scannable, restrained | Tables, filters, cards, dialogs, charts using Admin shared patterns | Hero sections, large decorative cards, illustration-heavy layouts |
-| Boards | Gallery + file manager | Clear previews, quiet metadata, stable card actions | Hover layout shift, operations detached from board identity |
-| Auth/User Shell | Low-friction, trustworthy | Clear forms, stable avatar/menu/header controls, direct errors | Brand showcase pages, noisy visual effects |
+| Surface          | Tone                                      | Prefer                                                                                | Avoid                                                             |
+| ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Canvas Workspace | Creative tool, calm, precise, image-first | Compact nodes, clear tool states, low-interruption overlays                           | Marketing hero layout, decorative copy, form-heavy UI             |
+| Image Editor     | Instrument panel, exact, reversible       | Stable controls, clear preview/commit distinction, readable histograms/sliders/curves | Dramatic visuals over control hierarchy                           |
+| Admin            | Operational, dense, scannable, restrained | Tables, filters, cards, dialogs, charts using Admin shared patterns                   | Hero sections, large decorative cards, illustration-heavy layouts |
+| Boards           | Gallery + file manager                    | Clear previews, quiet metadata, stable card actions                                   | Hover layout shift, operations detached from board identity       |
+| Auth/User Shell  | Low-friction, trustworthy                 | Clear forms, stable avatar/menu/header controls, direct errors                        | Brand showcase pages, noisy visual effects                        |
 
 ## Hard UI Rules
 
@@ -56,13 +56,13 @@ Token ownership:
 
 Keep style ownership explicit. A selector should live at the narrowest layer that can own it without leaking implementation details.
 
-| Layer | Owns | Avoid |
-| ----- | ---- | ----- |
-| App global | Tailwind entry, app tokens, base reset, browser/app shell rules, tiny vendor-neutral mechanical resets | Feature/page skins, component variants, Admin visual semantics |
-| Third-party adapter skin | Vendor DOM that cannot be styled through props or pass-through APIs, such as Vue Flow pane/node/edge/minimap internals | Product business rules or component-private classes |
-| Surface skin | Stable surface-level layout and visual language for Canvas, Admin, Boards, Auth/User Shell, or Image Editor | Cross-surface tokens that only one feature understands |
-| Feature CSS contract | Classes intentionally shared by several components inside one feature, such as Canvas node/tool contracts | Styling private child implementation from unrelated parents |
-| Component private style | Markup and states owned by one component | Selectors relied on by parents unless promoted to a feature CSS contract |
+| Layer                    | Owns                                                                                                                   | Avoid                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| App global               | Tailwind entry, app tokens, base reset, browser/app shell rules, tiny vendor-neutral mechanical resets                 | Feature/page skins, component variants, Admin visual semantics           |
+| Third-party adapter skin | Vendor DOM that cannot be styled through props or pass-through APIs, such as Vue Flow pane/node/edge/minimap internals | Product business rules or component-private classes                      |
+| Surface skin             | Stable surface-level layout and visual language for Canvas, Admin, Boards, Auth/User Shell, or Image Editor            | Cross-surface tokens that only one feature understands                   |
+| Feature CSS contract     | Classes intentionally shared by several components inside one feature, such as Canvas node/tool contracts              | Styling private child implementation from unrelated parents              |
+| Component private style  | Markup and states owned by one component                                                                               | Selectors relied on by parents unless promoted to a feature CSS contract |
 
 Rules:
 

@@ -35,11 +35,7 @@ import type {
   ImageResultAnchor,
 } from './imageExecutionResultTypes'
 
-export type {
-  ImageExecutionInput,
-  ImageExecutionResultOptions,
-  ImageResultAnchor,
-}
+export type { ImageExecutionInput, ImageExecutionResultOptions, ImageResultAnchor }
 
 export type ImageActionExecutionPlan = {
   kind: 'image-action'
@@ -146,7 +142,9 @@ function normalizeExecutionRatio(value: unknown): number {
   return Number.isFinite(ratio) && ratio > 0 ? ratio : 1
 }
 
-function toImageExecutionInput(anchor: Pick<ImageNodeLayoutAnchor, 'url' | 'ratio'>): ImageExecutionInput {
+function toImageExecutionInput(
+  anchor: Pick<ImageNodeLayoutAnchor, 'url' | 'ratio'>,
+): ImageExecutionInput {
   return {
     url: anchor.url.trim(),
     ratio: normalizeExecutionRatio(anchor.ratio),

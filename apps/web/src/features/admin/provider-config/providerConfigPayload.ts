@@ -32,7 +32,9 @@ const adminProviderEndpointApiTypeLabelByValue = new Map(
 )
 
 export function getAdminProviderEndpointApiTypeLabel(value: string) {
-  return adminProviderEndpointApiTypeLabelByValue.get(value as ProviderApiTypeValue) || value || '未配置'
+  return (
+    adminProviderEndpointApiTypeLabelByValue.get(value as ProviderApiTypeValue) || value || '未配置'
+  )
 }
 
 export function createEmptyProviderEndpointForm(): ProviderEndpointFormData {
@@ -96,7 +98,8 @@ export function createAccountUpdatePayload(input: {
 }): AdminAccountUpdateRequest {
   const providerEndpoint = input.providerEndpoint
   const existingAccount = input.existingAccount
-  const name = input.form.name.trim() || existingAccount?.name || providerEndpoint?.name || 'Unknown'
+  const name =
+    input.form.name.trim() || existingAccount?.name || providerEndpoint?.name || 'Unknown'
 
   return {
     models: accountModelInputsFromValues(input.modelValues, existingAccount?.models),

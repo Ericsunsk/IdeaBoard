@@ -6,11 +6,7 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   test: {
     environment: 'happy-dom',
-    include: [
-      'src/**/*.unit.spec.ts',
-      'src/**/*.component.spec.ts',
-      'src/**/*.contract.spec.ts',
-    ],
+    include: ['src/**/*.unit.spec.ts', 'src/**/*.component.spec.ts', 'src/**/*.contract.spec.ts'],
     setupFiles: ['src/test/setup.ts'],
   },
   build: {

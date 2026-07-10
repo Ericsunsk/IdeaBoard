@@ -87,5 +87,7 @@ function resolveHistogramValue(
 }
 
 function formatPathNumber(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
 }

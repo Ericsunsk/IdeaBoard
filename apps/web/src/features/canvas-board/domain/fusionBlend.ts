@@ -13,12 +13,7 @@ export const FUSION_SLOT_LAYOUT = {
 
 type PointTuple = [number, number]
 type FusionSlotPosition =
-  | 'center'
-  | 'top-left'
-  | 'top-right'
-  | 'top-center'
-  | 'bottom-left'
-  | 'bottom-right'
+  'center' | 'top-left' | 'top-right' | 'top-center' | 'bottom-left' | 'bottom-right'
 
 const FUSION_SLOT_POSITION_TABLE: Record<number, readonly FusionSlotPosition[]> = {
   1: ['center', 'top-left', 'top-right', 'bottom-right'],

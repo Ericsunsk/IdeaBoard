@@ -28,9 +28,7 @@ describe('useUsageStatisticsCharts', () => {
     expect(charts.todaySuccessRate.value).toBe('0.0%')
     expect(charts.todaySuccessRateFoot.value).toBe('昨日无可比数据')
     expect(charts.monthCallsFoot.value).toBe('累计无调用')
-    expect(readDataset(charts.qualityTrendChartData.value, '成功率').data).toEqual(
-      Array(7).fill(0),
-    )
+    expect(readDataset(charts.qualityTrendChartData.value, '成功率').data).toEqual(Array(7).fill(0))
     expect(charts.bottleneckSourceChartData.value.labels).toEqual([])
     expect(charts.failureCategoryChartData.value.labels).toEqual([])
   })
@@ -91,9 +89,7 @@ describe('useUsageStatisticsCharts', () => {
     expect(readDataset(charts.trendChartData.value, 'gpt-image').data).toEqual([
       2, 0, 0, 0, 0, 0, 3,
     ])
-    expect(readDataset(charts.trendChartData.value, 'seedream').data).toEqual([
-      0, 0, 0, 0, 0, 0, 4,
-    ])
+    expect(readDataset(charts.trendChartData.value, 'seedream').data).toEqual([0, 0, 0, 0, 0, 0, 4])
     expect(charts.todayCallsFoot.value).toBe('+100.0% 较昨日')
     expect(charts.todayFailedFoot.value).toBe('-50.0% 低于昨日')
     expect(charts.todaySuccessRate.value).toBe('90.0%')
@@ -162,9 +158,9 @@ describe('useUsageStatisticsCharts', () => {
     expect(readDataset(providedQualityCharts.qualityTrendChartData.value, '失败率').data).toEqual([
       0, 0, 20, 0, 0, 0,
     ])
-    expect(qualityTooltipAfterBody(providedQualityCharts.qualityTrendChartOptions.value, 2)).toEqual(
-      ['总调用: 10', '成功: 8', '失败: 2'],
-    )
+    expect(
+      qualityTooltipAfterBody(providedQualityCharts.qualityTrendChartOptions.value, 2),
+    ).toEqual(['总调用: 10', '成功: 8', '失败: 2'])
   })
 
   it('normalizes bottleneck and failure category values before charting and tooltip output', () => {

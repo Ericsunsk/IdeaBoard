@@ -112,7 +112,12 @@ export function readFlowNodeBounds(node: Node): CanvasRect {
   }
 }
 
-export function createCanvasRect(left: number, top: number, width: number, height: number): CanvasRect {
+export function createCanvasRect(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+): CanvasRect {
   const right = left + width
   const bottom = top + height
   return {
@@ -224,8 +229,7 @@ export function resolveCanvasSelectionGroupActionBounds(options: {
   if (action.kind === 'ungroup') {
     const frame = options.frames.find(
       (item) =>
-        item.id === action.groupId &&
-        (options.requireSelectedGroupFrame !== true || item.selected),
+        item.id === action.groupId && (options.requireSelectedGroupFrame !== true || item.selected),
     )
     if (frame) return frame.bounds
   }

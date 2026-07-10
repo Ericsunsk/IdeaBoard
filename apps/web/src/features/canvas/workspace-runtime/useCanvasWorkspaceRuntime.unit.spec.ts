@@ -198,7 +198,9 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
       groupFrames: runtimeParts.graphEditing.grouping.view.groupFrames,
       selectionGroupAction: runtimeParts.graphEditing.grouping.view.selectionGroupAction,
     })
-    expect(workspace.commands.graphEditing.grouping).toBe(runtimeParts.graphEditing.grouping.commands)
+    expect(workspace.commands.graphEditing.grouping).toBe(
+      runtimeParts.graphEditing.grouping.commands,
+    )
     expect('groupFrames' in workspace.viewModel.graphEditing).toBe(false)
     expect('groupSelectedNodes' in workspace.commands.graphEditing).toBe(false)
     expect('selectedGroupId' in workspace.viewModel.graphEditing.grouping).toBe(false)

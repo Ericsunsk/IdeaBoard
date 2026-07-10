@@ -21,8 +21,7 @@ export type WorkerImageProcessingCancelRequest = {
 }
 
 export type WorkerImageProcessingRequest =
-  | WorkerImageProcessingExecuteRequest
-  | WorkerImageProcessingCancelRequest
+  WorkerImageProcessingExecuteRequest | WorkerImageProcessingCancelRequest
 
 export type WorkerImageProcessingSuccessResponse = {
   type: 'success'

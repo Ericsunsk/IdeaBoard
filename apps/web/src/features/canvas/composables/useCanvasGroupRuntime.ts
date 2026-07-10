@@ -251,7 +251,9 @@ export function useCanvasGroupRuntime(
     return true
   }
 
-  function resolveGraphNodeIdForFlowNode(node: Pick<Node, 'id' | 'data'>): CanvasGraphNodeId | null {
+  function resolveGraphNodeIdForFlowNode(
+    node: Pick<Node, 'id' | 'data'>,
+  ): CanvasGraphNodeId | null {
     const ref = resolveFlowNodeCanvasRef(node)
     return ref ? toCanvasGraphNodeId(ref.nodeType, ref.id) : null
   }
@@ -873,12 +875,10 @@ export function useCanvasGroupRuntime(
   ): CanvasGraphNodeId[] {
     const group = readGroup(groupId)
     if (!group) return []
-    return group.nodeIds
-      .filter(isCanvasGraphNodeId)
-      .filter((nodeId) => {
-        const node = options.nodes.value.find((item) => item.id === nodeId)
-        return !node || !rectsIntersect(bounds, readFlowNodeBounds(node))
-      })
+    return group.nodeIds.filter(isCanvasGraphNodeId).filter((nodeId) => {
+      const node = options.nodes.value.find((item) => item.id === nodeId)
+      return !node || !rectsIntersect(bounds, readFlowNodeBounds(node))
+    })
   }
 
   function applyDraggedNodeMembershipChanges(nodeIds: readonly CanvasGraphNodeId[]) {

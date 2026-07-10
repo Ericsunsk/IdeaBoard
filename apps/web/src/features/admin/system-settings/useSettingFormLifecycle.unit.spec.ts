@@ -132,13 +132,15 @@ describe('useSettingResourceLifecycle', () => {
   })
 })
 
-function mountSettingResource(options: {
-  extraInvalidateQueryKeys?: QueryKey[]
-  save?: (setting: TestSetting) => Promise<TestSetting>
-  source?: Partial<TestSetting> | null
-  validate?: (setting: TestSetting) => string
-  writeAdditionalQueryCache?: (queryClient: QueryClient, setting: TestSetting) => void
-} = {}) {
+function mountSettingResource(
+  options: {
+    extraInvalidateQueryKeys?: QueryKey[]
+    save?: (setting: TestSetting) => Promise<TestSetting>
+    source?: Partial<TestSetting> | null
+    validate?: (setting: TestSetting) => string
+    writeAdditionalQueryCache?: (queryClient: QueryClient, setting: TestSetting) => void
+  } = {},
+) {
   let resource: TestSettingResource | null = null
   const source = ref<Partial<TestSetting> | null | undefined>(options.source ?? null)
   const error = ref<unknown>(null)
@@ -214,9 +216,7 @@ function mountSettingResource(options: {
   }
 }
 
-function requireMountedSettingResource(
-  resource: TestSettingResource | null,
-): TestSettingResource {
+function requireMountedSettingResource(resource: TestSettingResource | null): TestSettingResource {
   if (!resource) throw new Error('expected setting resource to mount')
   return resource
 }

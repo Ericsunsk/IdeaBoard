@@ -1,7 +1,4 @@
-import type {
-  CanvasConnection,
-  CanvasConnectionEndpoint,
-} from '../../canvas-board/domain'
+import type { CanvasConnection, CanvasConnectionEndpoint } from '../../canvas-board/domain'
 import { toCanvasConnectionEndpointKey } from '../graph-runtime'
 
 const CANVAS_CONNECTION_EDGE_ID_PATTERN = /^connection-(\d+)$/
@@ -174,9 +171,8 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
       const explicitId = resolveFlowEdgeCanvasConnectionId(candidate.edge)
       if (explicitId !== null && baseConnectionIds.has(explicitId)) return explicitId
       return candidate.endpoint
-        ? (firstBaseConnectionIdByEndpoint.get(
-            toCanvasConnectionEndpointKey(candidate.endpoint),
-          ) ?? null)
+        ? (firstBaseConnectionIdByEndpoint.get(toCanvasConnectionEndpointKey(candidate.endpoint)) ??
+            null)
         : null
     },
     resolveFlowEdgeId(connectionId) {

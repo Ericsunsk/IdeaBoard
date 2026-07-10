@@ -13,7 +13,9 @@ function createStageElement() {
   return stage
 }
 
-function mountImageEditorMode(options: { nodeKind?: string; onBeforePointerCancel?: () => void } = {}) {
+function mountImageEditorMode(
+  options: { nodeKind?: string; onBeforePointerCancel?: () => void } = {},
+) {
   const stage = createStageElement()
   const activeTool = ref('select')
   const nodes: Ref<Node[]> = shallowRef([

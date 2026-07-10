@@ -2,12 +2,7 @@ import type { PreviewMimeType } from '../../utils/displayImagePreviewEncoding'
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
 
 export type ImageProcessingErrorCode =
-  | 'backend-failed'
-  | 'cancelled'
-  | 'encode-failed'
-  | 'invalid-source'
-  | 'stale'
-  | 'unknown'
+  'backend-failed' | 'cancelled' | 'encode-failed' | 'invalid-source' | 'stale' | 'unknown'
 
 export type ImageProcessingError = {
   code: ImageProcessingErrorCode

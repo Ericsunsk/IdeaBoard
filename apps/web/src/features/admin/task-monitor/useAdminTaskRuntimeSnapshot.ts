@@ -60,7 +60,9 @@ export function useAdminTaskRuntimeSnapshot() {
   const monitorData = computed(() => activeSnapshot.value?.data?.monitor || null)
   const monitorStats = computed(() => activeSnapshot.value?.data?.stats || null)
   const isStale = computed(() => !liveSnapshot.value && !!lastGoodSnapshot.value)
-  const isError = computed(() => !activeSnapshot.value && !stream.isConnected.value && monitorQuery.isError.value)
+  const isError = computed(
+    () => !activeSnapshot.value && !stream.isConnected.value && monitorQuery.isError.value,
+  )
   const error = computed(() => (isError.value ? (monitorQuery.error.value ?? null) : null))
 
   async function retry() {

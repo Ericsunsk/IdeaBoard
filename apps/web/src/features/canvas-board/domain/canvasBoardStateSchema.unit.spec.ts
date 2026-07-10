@@ -244,8 +244,11 @@ describe('canvasBoardStateSchema', () => {
       ],
     })
     const [fusionNode] = state.fusionNodes
-    const { aspectRatio: _aspectRatio, blendPoint: _blendPoint, ...fusionNodeWithoutDefaults } =
-      fusionNode!
+    const {
+      aspectRatio: _aspectRatio,
+      blendPoint: _blendPoint,
+      ...fusionNodeWithoutDefaults
+    } = fusionNode!
     const parsed = v.safeParse(canvasBoardStateSchema, {
       ...state,
       fusionNodes: [fusionNodeWithoutDefaults],

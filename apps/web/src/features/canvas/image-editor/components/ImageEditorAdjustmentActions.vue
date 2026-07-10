@@ -16,13 +16,7 @@
 
 <script setup lang="ts">
 import type { Component } from 'vue'
-import {
-  Brightness,
-  ColorFilter,
-  PrecisionTool,
-  ReportsSolid,
-  SineWave,
-} from '@iconoir/vue'
+import { Brightness, ColorFilter, PrecisionTool, ReportsSolid, SineWave } from '@iconoir/vue'
 import type { ImageAdjustmentKind } from '../types'
 import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 

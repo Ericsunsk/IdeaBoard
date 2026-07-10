@@ -487,5 +487,4 @@ function noopMouse() {}
   pointer-events: none;
   overflow: visible;
 }
-
 </style>

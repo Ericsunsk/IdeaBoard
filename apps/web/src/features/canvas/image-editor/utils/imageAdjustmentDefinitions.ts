@@ -58,7 +58,10 @@ type ImageAdjustmentRangeByKind = {
   threshold: Record<'threshold', ImageAdjustmentNumberRange>
   curves: Record<string, never>
   levels: Record<keyof ImageEditorLevelsParams, ImageAdjustmentNumberRange>
-  sharpen: Record<Exclude<keyof ImageEditorSharpenParams, 'protectColor'>, ImageAdjustmentNumberRange>
+  sharpen: Record<
+    Exclude<keyof ImageEditorSharpenParams, 'protectColor'>,
+    ImageAdjustmentNumberRange
+  >
 }
 
 type ImageAdjustmentDefinitionByKind = {
@@ -221,11 +224,7 @@ function normalizeSharpenAdjustment(params: ImageEditorSharpenParams): Normalize
 }
 
 function isNeutralHslAdjustment(params: NormalizedHslAdjustment) {
-  return (
-    params.hueShift === 0 &&
-    params.saturationScale === 1 &&
-    params.lightnessOffset === 0
-  )
+  return params.hueShift === 0 && params.saturationScale === 1 && params.lightnessOffset === 0
 }
 
 function isNeutralThresholdAdjustment(_params: NormalizedThresholdAdjustment) {

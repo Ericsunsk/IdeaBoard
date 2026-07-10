@@ -89,9 +89,7 @@ export function normalizeTaskImageResults(results: TaskImageResultInput[]): Task
     .filter((result): result is TaskImageResult => result !== null)
 }
 
-export function extractImageResultsFromTaskPayload(
-  task: TaskResultPayloadLike,
-): TaskImageResult[] {
+export function extractImageResultsFromTaskPayload(task: TaskResultPayloadLike): TaskImageResult[] {
   const outputResults = Array.isArray(task.outputs)
     ? task.outputs
         .filter((output) => output?.role === 'image' && typeof output.url === 'string')

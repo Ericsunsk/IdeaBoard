@@ -1,8 +1,5 @@
 import * as v from 'valibot'
-import {
-  type CanvasBoardSnapshot,
-  type CanvasBoardState,
-} from './canvasNodes'
+import { type CanvasBoardSnapshot, type CanvasBoardState } from './canvasNodes'
 import { canvasBoardSnapshotSchema, canvasBoardStateSchema } from './canvasBoardStateSchema'
 
 export type BoardStateValidationIssue = {
@@ -109,10 +106,7 @@ function toSerializationErrorContext(
   }
 }
 
-function serializeJson(
-  value: unknown,
-  boundary: string,
-): LatestBoardStateValidationResult<string> {
+function serializeJson(value: unknown, boundary: string): LatestBoardStateValidationResult<string> {
   try {
     return { ok: true, value: JSON.stringify(value) ?? 'null' }
   } catch (error) {

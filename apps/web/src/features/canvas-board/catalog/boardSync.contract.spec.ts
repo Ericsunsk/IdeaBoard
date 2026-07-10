@@ -284,7 +284,9 @@ describe('boardSync', () => {
   })
 
   it('returns hydrate failure for invalid remote board state without clearing local boards', async () => {
-    replaceCanvasBoards([{ id: 'local-board', name: 'Local Board', createdAt: 100, updatedAt: 2_000 }])
+    replaceCanvasBoards([
+      { id: 'local-board', name: 'Local Board', createdAt: 100, updatedAt: 2_000 },
+    ])
     replaceCanvasBoardStateMap({ 'local-board': makeState(2_000, 'local-state') })
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {

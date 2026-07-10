@@ -3,7 +3,11 @@
   <div v-else :class="layoutShellClass">
     <aside :class="siderClass" aria-label="后台导航">
       <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" :aria-label="brandAriaLabel">
-        <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
+        <SiteBrandLogo
+          :src="logoURL"
+          :fallback-text="fallbackText"
+          :class="brandMarkClasses.logo"
+        />
       </router-link>
 
       <nav :class="navRailClass" aria-label="后台功能">
@@ -179,7 +183,11 @@
               :aria-label="brandAriaLabel"
               @click="closeCallback"
             >
-              <SiteBrandLogo :src="logoURL" :fallback-text="fallbackText" :class="brandMarkClasses.logo" />
+              <SiteBrandLogo
+                :src="logoURL"
+                :fallback-text="fallbackText"
+                :class="brandMarkClasses.logo"
+              />
             </router-link>
             <Button
               :class="shellButtonClass"

@@ -52,9 +52,7 @@ function assertPatternGenParam(key: string, value: unknown) {
   if (key === 'ratio') {
     const ratio = `${value ?? ''}`.trim()
     if (!PATTERN_GEN_RATIO_OPTIONS.has(ratio)) {
-      throw new PatternGenContractError(
-        `图案生成尺寸比例仅支持 ${PATTERN_GEN_RATIO_LABEL}`,
-      )
+      throw new PatternGenContractError(`图案生成尺寸比例仅支持 ${PATTERN_GEN_RATIO_LABEL}`)
     }
   }
 }

@@ -16,15 +16,15 @@ import {
   type PromptNodeItem,
 } from '../src/features/canvas-board/domain'
 import type { CanvasGraphNodeId } from '../src/features/canvas/graph-runtime'
-import type { BoardStateEnvelope, User, UserBoardItem } from '../src/shared/api/generated-query/model'
+import type {
+  BoardStateEnvelope,
+  User,
+  UserBoardItem,
+} from '../src/shared/api/generated-query/model'
 import { createMockSmokeRuntime } from './mock-smoke-utils'
 
 type BenchmarkPath =
-  | 'initial-load'
-  | 'node-drag'
-  | 'viewport-pan'
-  | 'viewport-zoom'
-  | 'connect-delete'
+  'initial-load' | 'node-drag' | 'viewport-pan' | 'viewport-zoom' | 'connect-delete'
 
 type BenchmarkCounters = {
   graphCommandCount?: number
@@ -342,7 +342,9 @@ function parsePaths(rawValue: string): BenchmarkPath[] {
 
   for (const pathName of paths) {
     if (!isBenchmarkPath(pathName)) {
-      throw new Error(`Unknown benchmark path "${pathName}". Supported paths: ${ALL_BENCHMARK_PATHS.join(', ')}`)
+      throw new Error(
+        `Unknown benchmark path "${pathName}". Supported paths: ${ALL_BENCHMARK_PATHS.join(', ')}`,
+      )
     }
     benchmarkPaths.push(pathName)
   }
@@ -428,7 +430,9 @@ function parseArgs(args: string[]): BenchmarkOptions {
   }
 
   if (options.nodeCount < 3) {
-    throw new Error('--nodes must be at least 3 so connect-delete has source, target, and delete nodes')
+    throw new Error(
+      '--nodes must be at least 3 so connect-delete has source, target, and delete nodes',
+    )
   }
 
   return options
@@ -535,7 +539,10 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
     refs.push({ kind: 'fusion', id })
   }
 
-  const connections = createStructureHeavyConnections(refs, Math.floor(nodeCount * DEFAULT_EDGE_DENSITY))
+  const connections = createStructureHeavyConnections(
+    refs,
+    Math.floor(nodeCount * DEFAULT_EDGE_DENSITY),
+  )
   const state: CanvasBoardState = {
     schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION,
     imageNodes,
@@ -842,11 +849,13 @@ async function stopFrameProbe(page: Page): Promise<FrameProbeSnapshot> {
     const benchmarkWindow = window as typeof window & {
       __canvasBenchmarkStopFrameProbe?: () => FrameProbeSnapshot
     }
-    return benchmarkWindow.__canvasBenchmarkStopFrameProbe?.() ?? {
-      frames: [],
-      durationMs: 0,
-      counters: {},
-    }
+    return (
+      benchmarkWindow.__canvasBenchmarkStopFrameProbe?.() ?? {
+        frames: [],
+        durationMs: 0,
+        counters: {},
+      }
+    )
   })
 }
 
@@ -1042,7 +1051,10 @@ function normalizeCounters(counters: BenchmarkCounters): BenchmarkCounters {
 function percentile(values: number[], percentileValue: number): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentileValue) - 1))
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil(sorted.length * percentileValue) - 1),
+  )
   return sorted[index]
 }
 
@@ -1074,7 +1086,8 @@ function buildReport(
   return {
     schemaVersion: 4,
     generatedAt,
-    command: `cd apps/web && npm run benchmark:canvas-interactions -- ${process.argv.slice(2).join(' ')}`.trim(),
+    command:
+      `cd apps/web && npm run benchmark:canvas-interactions -- ${process.argv.slice(2).join(' ')}`.trim(),
     browser: {
       engine: 'chromium',
       source: 'playwright chromium browser launched by canvas-interactions-benchmark.ts',
@@ -1122,7 +1135,11 @@ function evaluateBudgetFailures(
         result.counters.edgeArrayReplacements ?? 0,
         budget.maxEdgeArrayReplacements,
       ],
-      ['historyCaptureCount', result.counters.historyCaptureCount ?? 0, budget.maxHistoryCaptureCount],
+      [
+        'historyCaptureCount',
+        result.counters.historyCaptureCount ?? 0,
+        budget.maxHistoryCaptureCount,
+      ],
       ['historyPushCount', result.counters.historyPushCount ?? 0, budget.maxHistoryPushCount],
       [
         'autosaveScheduleCount',

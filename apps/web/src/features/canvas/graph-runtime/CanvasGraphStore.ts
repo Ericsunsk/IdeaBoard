@@ -54,10 +54,7 @@ export type CanvasGraphGroupRecord = {
   height: number
 }
 
-export type CanvasGraphGroupGeometry = Pick<
-  CanvasGraphGroupRecord,
-  'x' | 'y' | 'width' | 'height'
->
+export type CanvasGraphGroupGeometry = Pick<CanvasGraphGroupRecord, 'x' | 'y' | 'width' | 'height'>
 
 export type CanvasGraphProjectionPatch = {
   nodes: {
@@ -110,8 +107,7 @@ export type CanvasGraphNodeUpdate =
   | ((node: CanvasNodeItem) => CanvasNodeItem)
 
 export type CanvasGraphEdgeUpdate =
-  | Partial<Omit<CanvasConnection, 'id'>>
-  | ((connection: CanvasConnection) => CanvasConnection)
+  Partial<Omit<CanvasConnection, 'id'>> | ((connection: CanvasConnection) => CanvasConnection)
 
 export type CanvasGraphRemoveNodeOptions = {
   removeConnectedEdges?: boolean

@@ -1,6 +1,10 @@
 import { computed, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
-import type { ImageEditorAdjustmentLayer, ImageEditorLayer, ImageEditorRenderedPreview } from '../types'
+import type {
+  ImageEditorAdjustmentLayer,
+  ImageEditorLayer,
+  ImageEditorRenderedPreview,
+} from '../types'
 import { useImageEditorHistogramSource } from './useImageEditorHistogramSource'
 
 function makeImageData(values: number[]) {
@@ -33,10 +37,7 @@ function createThresholdLayer(id = 'adjustment:threshold'): ImageEditorAdjustmen
   }
 }
 
-function createCurvesLayer(
-  id = 'adjustment:curves',
-  output = 50,
-): ImageEditorAdjustmentLayer {
+function createCurvesLayer(id = 'adjustment:curves', output = 50): ImageEditorAdjustmentLayer {
   return {
     id,
     type: 'adjustment',
@@ -103,11 +104,7 @@ describe('useImageEditorHistogramSource', () => {
     })
 
     const firstHistogramSource = imageEditorHistogramSource.value
-    layers.value = [
-      thresholdLayer,
-      createCurvesLayer('adjustment:curves', 20),
-      createSourceLayer(),
-    ]
+    layers.value = [thresholdLayer, createCurvesLayer('adjustment:curves', 20), createSourceLayer()]
 
     expect(imageEditorHistogramSource.value).toBe(firstHistogramSource)
   })

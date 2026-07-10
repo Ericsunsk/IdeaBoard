@@ -14,8 +14,7 @@ export type CanvasViewportContext = {
   zoomLevel: Readonly<Ref<number>>
 }
 
-const CANVAS_VIEWPORT_CONTEXT_KEY: InjectionKey<CanvasViewportContext> =
-  Symbol('canvas:viewport')
+const CANVAS_VIEWPORT_CONTEXT_KEY: InjectionKey<CanvasViewportContext> = Symbol('canvas:viewport')
 
 const defaultCanvasViewportContext: CanvasViewportContext = {
   zoomLevel: readonly(ref(DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL)),

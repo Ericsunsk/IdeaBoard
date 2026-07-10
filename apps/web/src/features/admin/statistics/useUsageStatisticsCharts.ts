@@ -1,8 +1,5 @@
 import { computed, type Ref } from 'vue'
-import type {
-  AdminStatistics,
-  GetAdminStatisticsRangeValue,
-} from './statisticsResource'
+import type { AdminStatistics, GetAdminStatisticsRangeValue } from './statisticsResource'
 import {
   adminChartStrokeWidth,
   adminChartTheme,
@@ -183,12 +180,8 @@ export function useUsageStatisticsCharts(options: {
   )
 
   const summaryMetrics = useUsageStatisticsSummaryMetrics(options.adminStatistics)
-  const {
-    modelRiskChartData,
-    modelRiskChartOptions,
-    slowModelsChartData,
-    slowModelsChartOptions,
-  } = useUsageStatisticsModelHealthCharts(options.adminStatistics)
+  const { modelRiskChartData, modelRiskChartOptions, slowModelsChartData, slowModelsChartOptions } =
+    useUsageStatisticsModelHealthCharts(options.adminStatistics)
 
   const qualityTrendCharts = useUsageStatisticsQualityTrendCharts(options)
 

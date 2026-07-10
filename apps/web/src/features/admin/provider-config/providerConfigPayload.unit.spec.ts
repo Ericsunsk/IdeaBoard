@@ -116,15 +116,21 @@ describe('provider config payload mapping', () => {
   })
 
   it('infers known provider api types from Base URL', () => {
-    expect(inferProviderEndpointApiTypeFromUrl('https://generativelanguage.googleapis.com/v1beta')).toBe(
+    expect(
+      inferProviderEndpointApiTypeFromUrl('https://generativelanguage.googleapis.com/v1beta'),
+    ).toBe('google-ai')
+    expect(inferProviderEndpointApiTypeFromUrl('https://api.openai.com/v1')).toBe(
+      'openai-compatible',
+    )
+    expect(inferProviderEndpointApiTypeFromUrl('https://example.com/custom', 'google-ai')).toBe(
       'google-ai',
     )
-    expect(inferProviderEndpointApiTypeFromUrl('https://api.openai.com/v1')).toBe('openai-compatible')
-    expect(inferProviderEndpointApiTypeFromUrl('https://example.com/custom', 'google-ai')).toBe('google-ai')
   })
 })
 
-function makeProviderEndpoint(overrides: Partial<ProviderEndpointRecord> = {}): ProviderEndpointRecord {
+function makeProviderEndpoint(
+  overrides: Partial<ProviderEndpointRecord> = {},
+): ProviderEndpointRecord {
   return {
     id: 7,
     apiType: 'google-ai',

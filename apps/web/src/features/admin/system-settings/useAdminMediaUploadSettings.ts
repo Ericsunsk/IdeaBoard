@@ -15,7 +15,9 @@ export const DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING: MediaUploadSetting = {
 export const MEDIA_UPLOAD_MIN_CONCURRENT = 1
 export const MEDIA_UPLOAD_MAX_CONCURRENT = 64
 
-export function useAdminMediaUploadSettings(options: { feedback: AdminMediaUploadSettingsFeedback }) {
+export function useAdminMediaUploadSettings(options: {
+  feedback: AdminMediaUploadSettingsFeedback
+}) {
   const query = useGetAdminMediaUploadSetting()
   const sourceSetting = computed(() => query.data.value?.data)
   const resource = useSettingResourceLifecycle<MediaUploadSetting>({
@@ -70,7 +72,10 @@ export function validateMediaUploadSetting(setting: MediaUploadSetting): string 
   return ''
 }
 
-function isSameMediaUploadSetting(current: MediaUploadSetting, synced: MediaUploadSetting): boolean {
+function isSameMediaUploadSetting(
+  current: MediaUploadSetting,
+  synced: MediaUploadSetting,
+): boolean {
   return current.upload_max_concurrent === synced.upload_max_concurrent
 }
 

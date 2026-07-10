@@ -29,7 +29,9 @@
             title="点击重命名画布"
             @click.stop="emit('start-board-rename')"
             @mousedown.stop
-            @input="emit('update:board-name-draft', ($event.target as HTMLElement).textContent ?? '')"
+            @input="
+              emit('update:board-name-draft', ($event.target as HTMLElement).textContent ?? '')
+            "
             @keydown.enter.prevent="emit('confirm-board-rename')"
             @keydown.esc.prevent="emit('cancel-board-rename')"
             @blur="emit('confirm-board-rename')"

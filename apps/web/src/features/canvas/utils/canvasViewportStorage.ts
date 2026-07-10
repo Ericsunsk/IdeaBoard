@@ -88,9 +88,7 @@ export function resolveCanvasViewportState(
   identity: CanvasViewportStorageIdentity,
 ): CanvasFlowViewportState {
   const stored = readCanvasViewportState(identity)
-  return stored
-    ? { x: stored.x, y: stored.y, zoom: stored.zoom }
-    : { ...DEFAULT_CANVAS_VIEWPORT }
+  return stored ? { x: stored.x, y: stored.y, zoom: stored.zoom } : { ...DEFAULT_CANVAS_VIEWPORT }
 }
 
 export function writeCanvasViewportState(

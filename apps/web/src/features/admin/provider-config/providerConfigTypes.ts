@@ -27,11 +27,7 @@ export type ProviderEndpointFormData = {
 export type ProviderEndpointFormField = keyof ProviderEndpointFormData
 
 export type ProviderAccountFormField =
-  | 'name'
-  | 'secret'
-  | 'modelValues'
-  | 'maxConcurrent'
-  | 'timeoutSeconds'
+  'name' | 'secret' | 'modelValues' | 'maxConcurrent' | 'timeoutSeconds'
 
 export type ProviderAccountForm = {
   providerEndpointId: number

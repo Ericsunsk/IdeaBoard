@@ -26,8 +26,10 @@ describe('site branding helpers', () => {
   })
 
   it('keeps persisted upload logo URLs canonical', () => {
-    const sameOriginLogoURL = new URL('/uploads/site/assets/logo.webp', window.location.origin)
-      .toString()
+    const sameOriginLogoURL = new URL(
+      '/uploads/site/assets/logo.webp',
+      window.location.origin,
+    ).toString()
 
     expect(
       normalizeSiteBrandingSetting({

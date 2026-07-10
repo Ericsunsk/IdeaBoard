@@ -41,7 +41,6 @@
         </button>
       </div>
     </div>
-
   </section>
 </template>
 
@@ -266,5 +265,4 @@ onBeforeUnmount(clearLayerListScrollTimer)
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 </style>

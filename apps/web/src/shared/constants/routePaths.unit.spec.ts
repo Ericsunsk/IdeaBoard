@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ADMIN_LOGIN_PATH,
-  ADMIN_ROOT_PATH,
-  isPathUnderRoute,
-  USER_LOGIN_PATH,
-} from './routePaths'
+import { ADMIN_LOGIN_PATH, ADMIN_ROOT_PATH, isPathUnderRoute, USER_LOGIN_PATH } from './routePaths'
 
 describe('isPathUnderRoute', () => {
   it('matches the route root itself', () => {

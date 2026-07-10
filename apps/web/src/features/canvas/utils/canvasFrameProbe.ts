@@ -1,17 +1,11 @@
 import { isCanvasPerfProbeEnabled } from './canvasPerfProbe'
 
-export type CanvasFrameProbeScene =
-  | 'pan'
-  | 'zoom'
-  | 'node-drag'
-  | 'load-hydrate'
-  | (string & {})
+export type CanvasFrameProbeScene = 'pan' | 'zoom' | 'node-drag' | 'load-hydrate' | (string & {})
 
 export type CanvasFrameProbeMetadata = Record<string, string | number | boolean | null | undefined>
 
 export type CanvasFrameProbeMetadataInput =
-  | CanvasFrameProbeMetadata
-  | (() => CanvasFrameProbeMetadata)
+  CanvasFrameProbeMetadata | (() => CanvasFrameProbeMetadata)
 
 export type CanvasFrameProbeMark = {
   name: string
@@ -80,9 +74,7 @@ function getAnimationFrameApis(): AnimationFrameApis | undefined {
   return apis
 }
 
-function createInertCanvasFrameProbeSession(
-  scene: CanvasFrameProbeScene,
-): CanvasFrameProbeSession {
+function createInertCanvasFrameProbeSession(scene: CanvasFrameProbeScene): CanvasFrameProbeSession {
   return {
     scene,
     mark() {},

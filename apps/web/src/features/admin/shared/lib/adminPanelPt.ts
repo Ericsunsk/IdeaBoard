@@ -6,8 +6,7 @@ export function createAdminPanelPt(density: AdminPanelDensity = 'default') {
   const compact = density === 'compact'
   return {
     root: {
-      class:
-        '!overflow-hidden !rounded-lg !border-ib-border-soft !bg-ib-surface !shadow-none',
+      class: '!overflow-hidden !rounded-lg !border-ib-border-soft !bg-ib-surface !shadow-none',
     },
     header: {
       class: [

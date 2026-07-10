@@ -20,15 +20,13 @@ export type ImageAdjustmentPlanStep =
 
 export type ImageAdjustmentPlan = readonly ImageAdjustmentPlanStep[]
 
-export type ImageAdjustmentPlanStepExecutionState =
-  | {
-      kind: 'sharpen'
-      width: number
-      height: number
-      sourceData: Uint8ClampedArray
-      blurredRgb: Float32Array
-    }
-  | null
+export type ImageAdjustmentPlanStepExecutionState = {
+  kind: 'sharpen'
+  width: number
+  height: number
+  sourceData: Uint8ClampedArray
+  blurredRgb: Float32Array
+} | null
 
 const SHARPEN_WORK_FACTOR = 3
 
