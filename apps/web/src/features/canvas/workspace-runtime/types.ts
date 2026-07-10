@@ -4,8 +4,6 @@ import type {
   CanvasGroupRuntimeView,
 } from '../composables/useCanvasGroupRuntime'
 
-export type { UseCanvasWorkspaceRuntimeOptions } from './internal/createCanvasWorkspaceRuntimeParts'
-
 type CanvasWorkspaceRuntimeParts = ReturnType<typeof createCanvasWorkspaceRuntimeParts>
 
 export type CanvasWorkspaceRuntimeViewModel = {

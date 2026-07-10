@@ -28,13 +28,6 @@ func Error(c *gin.Context, code int, msg string) {
 	})
 }
 
-func ErrorWithStatus(c *gin.Context, httpStatus int, code int, msg string) {
-	c.JSON(httpStatus, Response{
-		Code: code,
-		Msg:  msg,
-	})
-}
-
 // SuccessDTO is a typed variant of Success for callers that already have a
 // struct with json tags. It avoids the implicit serialisation of gin.H.
 func SuccessDTO[T any](c *gin.Context, data T) {

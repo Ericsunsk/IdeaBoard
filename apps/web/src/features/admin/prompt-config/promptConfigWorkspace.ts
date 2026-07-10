@@ -252,5 +252,3 @@ function normalizeInsertPosition(position: number | undefined, fallback: number)
   if (position == null || !Number.isFinite(position)) return fallback
   return Math.max(0, Math.min(Math.trunc(position), fallback))
 }
-
-export type AdminPromptConfigWorkspace = ReturnType<typeof createAdminPromptConfigWorkspace>

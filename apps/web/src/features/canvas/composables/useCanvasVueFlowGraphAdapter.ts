@@ -16,7 +16,6 @@ export type { CanvasVueFlowGraphActions } from './canvasVueFlowNativeChangeAdapt
 export type {
   CanvasVueFlowGraph,
   CanvasVueFlowGraphCommandContext,
-  CanvasVueFlowGraphCommandName,
   CanvasVueFlowGraphCommandOptions,
   CanvasVueFlowGraphCommandResult,
 } from './canvasVueFlowGraphCommandRunner'

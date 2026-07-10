@@ -221,12 +221,6 @@ function getCanvasNodeRegistryItem(nodeType: CanvasConnectionNodeType): CanvasNo
   return CANVAS_NODE_REGISTRY[nodeType]
 }
 
-export function getCanvasNodeSnapshotCollectionKey(
-  nodeType: CanvasConnectionNodeType,
-): CanvasSnapshotNodeCollectionKey {
-  return getCanvasNodeRegistryItem(nodeType).snapshotCollection
-}
-
 export function createTypedCanvasNodeSnapshot<T extends CanvasConnectionNodeType>(
   nodeType: T,
   point: CanvasPoint,

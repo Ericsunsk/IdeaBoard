@@ -16,10 +16,6 @@ type providerParamsEncoder struct{}
 
 var defaultProviderParamsEncoder ProviderParamsEncoder = providerParamsEncoder{}
 
-func NewProviderParamsEncoder() ProviderParamsEncoder {
-	return providerParamsEncoder{}
-}
-
 func (providerParamsEncoder) EncodeTaskParams(params *tasks.WorkflowTaskParams) map[string]interface{} {
 	return buildProviderTaskParams(params)
 }

@@ -4,7 +4,6 @@ import type {
   CanvasPoint,
 } from '../../canvas-board/domain'
 import {
-  toCanvasGraphEdgeId,
   type CanvasGraphEdgeId,
   type CanvasGraphGroupId,
   type CanvasGraphNodeId,
@@ -78,24 +77,6 @@ export function findCanvasGraphEdgeIdByEndpoint(
       return record ? isSameCanvasConnectionEndpoint(record.connection, connection) : false
     }) ?? null
   )
-}
-
-export function resolveCanvasGraphEdgeId(
-  store: CanvasGraphStore,
-  input: {
-    edgeId?: CanvasGraphEdgeId | null
-    connectionId?: number | null
-    endpointConnection?: CanvasConnectionEndpoint | null
-  },
-): CanvasGraphEdgeId | null {
-  if (input.edgeId && store.getEdge(input.edgeId)) return input.edgeId
-  if (input.connectionId !== undefined && input.connectionId !== null) {
-    const edgeId = toCanvasGraphEdgeId(input.connectionId)
-    if (store.getEdge(edgeId)) return edgeId
-  }
-  return input.endpointConnection
-    ? findCanvasGraphEdgeIdByEndpoint(store, input.endpointConnection)
-    : null
 }
 
 export function stageCanvasGraphNodeDragIntent(

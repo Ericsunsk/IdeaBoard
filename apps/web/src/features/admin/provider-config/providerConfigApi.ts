@@ -1,7 +1,6 @@
 import {
   createAdminAccount,
   deleteAdminAccount,
-  deleteAdminAccountModel,
   getAdminAccountLimits,
   listAdminAccounts,
   patchAdminAccountModel,
@@ -118,15 +117,6 @@ export async function patchAdminAccountModelRecord(
 ): Promise<ProviderAccountRecord> {
   const res = await patchAdminAccountModel(id, data)
   const responseData = requireApiData(res, '更新账号模型失败')
-  return toProviderAccountRecord(responseData.account)
-}
-
-export async function deleteAdminAccountModelRecord(
-  id: number,
-  modelName: string,
-): Promise<ProviderAccountRecord> {
-  const res = await deleteAdminAccountModel(id, { model_name: modelName })
-  const responseData = requireApiData(res, '删除账号模型失败')
   return toProviderAccountRecord(responseData.account)
 }
 

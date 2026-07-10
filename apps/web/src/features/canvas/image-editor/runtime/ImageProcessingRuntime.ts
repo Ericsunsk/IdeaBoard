@@ -10,10 +10,8 @@ import type {
   ImageProcessingRuntime,
   ImageProcessingTaskResult,
   RenderFinalInput,
-  RenderFinalOutput,
   RenderFinalResult,
   RenderPreviewInput,
-  RenderPreviewOutput,
   RenderPreviewResult,
 } from './types'
 
@@ -181,5 +179,3 @@ function isImageProcessingErrorCode(code: unknown): code is ImageProcessingError
 }
 
 function ignoreProgress() {}
-
-export type { RenderFinalInput, RenderFinalOutput, RenderPreviewInput, RenderPreviewOutput }

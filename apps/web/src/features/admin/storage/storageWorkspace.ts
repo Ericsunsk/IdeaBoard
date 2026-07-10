@@ -292,5 +292,3 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
 function findStorageByTarget(storages: StorageCard[], target: StorageProfileCommandTarget) {
   return storages.find((storage) => storage.id === target.id)
 }
-
-export type AdminStorageWorkspace = ReturnType<typeof createAdminStorageWorkspace>

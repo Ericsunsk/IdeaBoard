@@ -8,8 +8,6 @@ import type {
   WorkerImageProcessingResponse,
 } from './protocol'
 
-export type WorkerImageAdjustmentBackendId = 'cpu-worker'
-
 export type WorkerImageProcessingLike = {
   postMessage(message: WorkerImageProcessingRequest, transfer?: Transferable[]): void
   addEventListener(

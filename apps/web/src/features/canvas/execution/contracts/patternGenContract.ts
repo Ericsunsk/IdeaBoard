@@ -1,9 +1,6 @@
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
-import {
-  PROMPT_ASPECT_RATIO_OPTIONS,
-  type PromptAspectRatio,
-} from '../../../canvas-board/domain'
+import { PROMPT_ASPECT_RATIO_OPTIONS } from '../../../canvas-board/domain'
 
 const PATTERN_GEN_ALLOWED_PARAM_KEYS = new Set(['feature', 'model', 'ratio'])
 const PATTERN_GEN_MEDIA_PARAM_KEYS = new Set([
@@ -15,16 +12,6 @@ const PATTERN_GEN_MEDIA_PARAM_KEYS = new Set([
 ])
 const PATTERN_GEN_RATIO_OPTIONS = new Set<string>(PROMPT_ASPECT_RATIO_OPTIONS)
 const PATTERN_GEN_RATIO_LABEL = PROMPT_ASPECT_RATIO_OPTIONS.join('、')
-
-export type PatternGenInputContract = {
-  prompt: string
-  ratio?: PromptAspectRatio
-}
-
-export type PatternGenOutputContract = {
-  kind: 'image-results'
-  minCount: 1
-}
 
 export const PATTERN_GEN_NODE_IO_CONTRACT = {
   feature: WORKFLOW_FEATURE.patternGen,

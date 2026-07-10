@@ -1059,5 +1059,3 @@ export class CanvasGraphTransaction {
 export function createCanvasGraphStore(snapshot?: CanvasBoardSnapshot): CanvasGraphStore {
   return new CanvasGraphStore(snapshot)
 }
-
-export type CanvasGraphSnapshotNode = ImageNodeItem | PromptNodeItem | FusionNodeItem

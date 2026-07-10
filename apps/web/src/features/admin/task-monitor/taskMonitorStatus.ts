@@ -19,7 +19,6 @@ const DEFAULT_BANNER_CLASS =
 const DEFAULT_DOT_CLASS = 'bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]'
 
 export const adminTaskStatuses = ListAdminTasksStatus
-export type AdminTaskStatus = ListAdminTasksStatusValue
 
 const taskStatusDefinitions: Record<ListAdminTasksStatusValue, TaskStatusDefinition> = {
   [ListAdminTasksStatus.pending]: {

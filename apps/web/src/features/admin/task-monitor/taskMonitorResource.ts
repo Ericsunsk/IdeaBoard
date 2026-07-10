@@ -8,14 +8,11 @@ import {
 import type {
   AdminTaskDeleteResult,
   ApiResponseTaskList,
-  DeleteAdminTasksRequest,
   ListAdminTasksParams,
 } from '../../../shared/api/generated-query/model'
 import { requireApiData } from '../shared/queries/adminApiResponse'
 
 export type AdminTaskListQueryParams = ListAdminTasksParams
-export type AdminTaskListData = NonNullable<ApiResponseTaskList['data']>
-export type DeleteAdminTaskSelectionInput = DeleteAdminTasksRequest
 
 type UseAdminTaskListResourceOptions = Parameters<
   typeof useListAdminTasks<ApiResponseTaskList>

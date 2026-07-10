@@ -187,13 +187,6 @@ func optionalNumberField(raw map[string]json.RawMessage, key string) (float64, e
 	return requiredNumberField(raw, key)
 }
 
-func optionalIntegerField(raw map[string]json.RawMessage, key string) (int, error) {
-	if _, ok := raw[key]; !ok {
-		return 0, nil
-	}
-	return requiredIntegerField(raw, key)
-}
-
 func optionalPositiveIntegerField(raw map[string]json.RawMessage, key string) (int, error) {
 	if _, ok := raw[key]; !ok {
 		return 0, nil

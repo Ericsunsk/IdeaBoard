@@ -59,9 +59,6 @@ export const adminTextButtonClass = '!text-ib-text-muted hover:!text-admin-text-
 export const adminFilterPopoverClass =
   'flex w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-ib-surface p-4'
 
-export const adminConfigPopoverClass =
-  'flex w-[280px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-ib-surface p-4'
-
 export const adminAnomalyPopoverClass =
   'flex max-h-[calc(100dvh_-_24px)] w-[340px] max-w-[calc(100vw_-_28px)] flex-col overflow-hidden bg-ib-surface'
 

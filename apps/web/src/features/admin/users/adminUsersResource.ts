@@ -3,10 +3,7 @@ import {
   getListAdminUsersQueryKey,
   useListAdminUsers,
 } from '../../../shared/api/generated-query/admin-users/admin-users'
-import type {
-  ApiResponseUserList,
-  ListAdminUsersParams,
-} from '../../../shared/api/generated-query/model'
+import type { ListAdminUsersParams } from '../../../shared/api/generated-query/model'
 
 export type AdminUsersRoleFilterValue = 'admin' | 'user'
 export type AdminUsersStatusFilterValue = 0 | 1
@@ -34,5 +31,3 @@ export function getAdminUsersListQueryKey() {
 function toGeneratedListParams(params: MaybeRef<AdminUsersQueryParams>) {
   return params as MaybeRef<ListAdminUsersParams>
 }
-
-export type AdminUsersListData = NonNullable<ApiResponseUserList['data']>

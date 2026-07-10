@@ -456,5 +456,3 @@ function resolveNumberRangeError(value: number, min: number, max: number, label:
   if (value < min || value > max) return `${label}需在 ${min}-${max} 之间`
   return ''
 }
-
-export type AdminProviderConfigContext = ReturnType<typeof useAdminProviderConfig>

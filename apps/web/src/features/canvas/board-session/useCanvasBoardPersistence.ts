@@ -2,10 +2,8 @@ import { computed } from 'vue'
 import {
   createBoardPersistenceSession,
   type BoardPersistenceSessionOptions,
-  type SaveCurrentBoardSnapshotOptions,
 } from './boardPersistenceSession'
 
-export type { SaveCurrentBoardSnapshotOptions }
 export type { SaveStatus } from './boardPersistenceSession'
 
 export type UseCanvasBoardPersistenceOptions = Omit<BoardPersistenceSessionOptions, 'canSaveBoard'>

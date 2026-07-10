@@ -1,8 +1,6 @@
 import type { PreviewMimeType } from '../../utils/displayImagePreviewEncoding'
 import type { ImageAdjustmentPlan } from '../utils/imageAdjustmentEngine'
 
-export type ImageProcessingTaskStatus = 'completed' | 'stale' | 'cancelled' | 'failed'
-
 export type ImageProcessingErrorCode =
   | 'backend-failed'
   | 'cancelled'

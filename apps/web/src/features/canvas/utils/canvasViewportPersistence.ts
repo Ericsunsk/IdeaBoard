@@ -173,5 +173,3 @@ export function createCanvasViewportPersistence(
     dispose,
   }
 }
-
-export { DEFAULT_CANVAS_VIEWPORT } from './canvasViewportStorage'

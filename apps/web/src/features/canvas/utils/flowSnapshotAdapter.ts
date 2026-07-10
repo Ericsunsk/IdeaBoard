@@ -19,7 +19,6 @@ import { resolveImageNodeDisplayRatio } from './flowImageNodeSelectors'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
 export {
-  parsePortFromHandle,
   resolveNextCanvasConnectionId,
 } from './flowSnapshotConnectionMaterializer'
 

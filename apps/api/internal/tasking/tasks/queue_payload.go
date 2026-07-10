@@ -33,13 +33,6 @@ func (p *TaskPayload) EnsureCorrelationID() string {
 	return correlationID
 }
 
-func CorrelationIDFromPayload(task *TaskPayload) string {
-	if task == nil {
-		return ""
-	}
-	return task.EffectiveCorrelationID()
-}
-
 // AccountLoad describes current account concurrency state.
 type AccountLoad struct {
 	CurrentConcurrent int `json:"current_concurrent"`

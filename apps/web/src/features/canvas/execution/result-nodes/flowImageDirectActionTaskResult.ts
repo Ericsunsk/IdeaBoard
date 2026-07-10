@@ -62,15 +62,6 @@ export async function resolveTaskImageRatio(
   return fallbackRatio > 0 ? fallbackRatio : 1
 }
 
-export async function resolveTaskImageResultRatio(
-  result: TaskImageResult,
-  fallbackRatio: number,
-  loadImageSize: ImageSizeLoader,
-): Promise<number> {
-  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
-  return resolved?.ratio ?? (fallbackRatio > 0 ? fallbackRatio : 1)
-}
-
 export async function resolveTaskImageResultDisplay(
   result: TaskImageResult,
   fallbackRatio: number,

@@ -28,14 +28,3 @@ func IsDuplicateConstraintError(err error) bool {
 	}
 	return false
 }
-
-func IsMissingTableError(err error) bool {
-	if err == nil {
-		return false
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "42P01"
-	}
-	return false
-}

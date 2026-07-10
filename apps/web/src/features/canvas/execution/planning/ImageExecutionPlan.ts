@@ -36,7 +36,6 @@ import type {
 } from './imageExecutionResultTypes'
 
 export type {
-  CanvasExtendPercent,
   ImageExecutionInput,
   ImageExecutionResultOptions,
   ImageResultAnchor,

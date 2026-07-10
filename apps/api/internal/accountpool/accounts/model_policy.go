@@ -21,14 +21,6 @@ func FilterAccountsForRequestJSON(accounts []*ApiAccount, featureSlug string, pa
 	return FilterAccountsForRequest(accounts, featureSlug, paramsMapFromJSON(paramsJSON))
 }
 
-func FilterAccountsByRequestedModel(accounts []*ApiAccount, params map[string]interface{}) []*ApiAccount {
-	return FilterAccountsForRequest(accounts, "", params)
-}
-
-func FilterAccountsByRequestedModelJSON(accounts []*ApiAccount, paramsJSON string) []*ApiAccount {
-	return FilterAccountsForRequestJSON(accounts, "", paramsJSON)
-}
-
 func ResolveAccountModelForParams(account *ApiAccount, featureSlug string, params map[string]interface{}) (AccountModel, bool) {
 	return ResolveAccountModel(account, featureSlug, requestedModelFromParams(params))
 }
@@ -52,11 +44,6 @@ func ResolveAccountModel(account *ApiAccount, featureSlug, requestedModel string
 		return model, true
 	}
 	return AccountModel{}, false
-}
-
-func AccountSupportsModel(account *ApiAccount, requestedModel string) bool {
-	_, ok := ResolveAccountModel(account, "", requestedModel)
-	return ok
 }
 
 func EnabledModels(account *ApiAccount) []string {
