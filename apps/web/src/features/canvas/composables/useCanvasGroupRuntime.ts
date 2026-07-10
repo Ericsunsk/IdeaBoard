@@ -31,6 +31,7 @@ import {
   type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import type { FlowHistorySnapshot } from './useFlowHistory'
@@ -598,6 +599,7 @@ export function useCanvasGroupRuntime(
     const nodeIds = group.nodeIds.filter(isCanvasGraphNodeId)
     const historyBefore = options.flowHistory.capture()
     const store = options.createCurrentCanvasGraphStore()
+    const projectionIndex = createFlowEdgeProjectionIndex(store, options.edges.value)
     const shouldDeleteMembers = nodeIds.length > 0
     const summary = commitCanvasGraphDeleteGroupIntent(store, {
       groupId: group.id as CanvasGraphGroupId,
@@ -618,6 +620,7 @@ export function useCanvasGroupRuntime(
       edges: options.edges.value,
       summary,
       historyBefore,
+      projectionIndex,
       onNativeRemove: options.onNativeRemove,
       stopDeletedRunningTasks: options.stopDeletedRunningTasks,
     })

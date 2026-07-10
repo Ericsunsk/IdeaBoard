@@ -33,11 +33,10 @@ import {
   type CanvasGraphTransaction,
 } from '../graph-runtime'
 import {
-  canonicalizeFlowEdgeIdentity,
+  createFlowEdgeProjectionIndex,
   createFlowEdgeIdentityFromRemoveChange,
-  createProjectionEdgeIdLookup,
-  resolveFlowEdgeCanvasGraphEdgeId,
   type FlowEdgeIdentity,
+  type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
 
 type SelectableFlowItem = {
@@ -300,12 +299,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function createCurrentCanvasGraphStore(snapshotOptions?: FlowToCanvasBoardSnapshotOptions) {
-    const baseStore = createCanvasGraphStore(options.boardBaseSnapshot.value)
-    const edges = options.edges.value.map((edge) => canonicalizeFlowEdgeIdentity(edge, baseStore))
     const snapshot = flowToCanvasBoardSnapshot(
       {
         nodes: options.nodes.value,
-        edges: edges as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+        edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
       },
       options.boardBaseSnapshot.value,
       snapshotOptions,
@@ -461,18 +458,18 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function resolveNativeRemovedEdgeIds(
-    store: ReturnType<typeof createCurrentCanvasGraphStore>,
+    projectionIndex: FlowEdgeProjectionIndex,
     edgeChanges: EdgeChange[],
     removedNodeIds: Set<string>,
   ): CanvasGraphEdgeId[] | null {
     const edgeIds: CanvasGraphEdgeId[] = []
     for (const change of edgeChanges) {
       if (change.type !== 'remove') continue
-      const edge = options.edges.value.find((item) => item.id === change.id)
+      const edge = projectionIndex.getFlowEdge(change.id)
       if (edge && (removedNodeIds.has(edge.source) || removedNodeIds.has(edge.target))) continue
       const edgeIdentity: FlowEdgeIdentity =
         edge ?? createFlowEdgeIdentityFromRemoveChange(change as EdgeRemoveChange)
-      const edgeId = resolveFlowEdgeCanvasGraphEdgeId(store, edgeIdentity)
+      const edgeId = projectionIndex.resolveCanvasEdgeId(edgeIdentity)
       if (!edgeId) return null
       edgeIds.push(edgeId)
     }
@@ -493,8 +490,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     nodeIds.forEach((graphNodeId) => removedNodeIds.add(graphNodeId))
 
     const store = createCurrentCanvasGraphStore()
-    const projectionEdgeIds = createProjectionEdgeIdLookup(store, options.edges.value)
-    const edgeIds = resolveNativeRemovedEdgeIds(store, edgeChanges, removedNodeIds)
+    const projectionIndex = createFlowEdgeProjectionIndex(store, options.edges.value)
+    const edgeIds = resolveNativeRemovedEdgeIds(projectionIndex, edgeChanges, removedNodeIds)
     if (!edgeIds) return false
 
     const summary = commitCanvasGraphDeleteIntent(store, {
@@ -513,7 +510,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       summary,
       historyBefore,
       flowNodeIds,
-      projectionEdgeIds,
+      projectionIndex,
       edgeRemoveChanges: edgeChanges,
       onNativeRemove: options.onNativeRemove,
       stopDeletedRunningTasks: options.stopDeletedRunningTasks,

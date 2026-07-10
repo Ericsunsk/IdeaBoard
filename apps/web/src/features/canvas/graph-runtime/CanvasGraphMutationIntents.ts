@@ -1,4 +1,8 @@
-import type { CanvasConnection, CanvasPoint } from '../../canvas-board/domain'
+import type {
+  CanvasConnection,
+  CanvasConnectionEndpoint,
+  CanvasPoint,
+} from '../../canvas-board/domain'
 import {
   toCanvasGraphEdgeId,
   type CanvasGraphEdgeId,
@@ -24,15 +28,22 @@ export function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId
   return /^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/.test(nodeId)
 }
 
-export function isSameCanvasConnectionEndpoint(left: CanvasConnection, right: CanvasConnection) {
-  return (
-    left.fromNodeType === right.fromNodeType &&
-    left.fromNodeId === right.fromNodeId &&
-    left.fromPort === right.fromPort &&
-    left.toNodeType === right.toNodeType &&
-    left.toNodeId === right.toNodeId &&
-    left.toPort === right.toPort
-  )
+export function toCanvasConnectionEndpointKey(endpoint: CanvasConnectionEndpoint) {
+  return [
+    endpoint.fromNodeType,
+    endpoint.fromNodeId,
+    endpoint.fromPort,
+    endpoint.toNodeType,
+    endpoint.toNodeId,
+    endpoint.toPort,
+  ].join(':')
+}
+
+export function isSameCanvasConnectionEndpoint(
+  left: CanvasConnectionEndpoint,
+  right: CanvasConnectionEndpoint,
+) {
+  return toCanvasConnectionEndpointKey(left) === toCanvasConnectionEndpointKey(right)
 }
 
 export function targetsSameCanvasInput(left: CanvasConnection, right: CanvasConnection) {
@@ -56,7 +67,7 @@ export function shouldReplaceCanvasConnection(
 
 export function findCanvasGraphEdgeIdByEndpoint(
   store: CanvasGraphStore,
-  connection: CanvasConnection,
+  connection: CanvasConnectionEndpoint,
 ): CanvasGraphEdgeId | null {
   return (
     store.getEdgeIds().find((edgeId) => {
@@ -71,7 +82,7 @@ export function resolveCanvasGraphEdgeId(
   input: {
     edgeId?: CanvasGraphEdgeId | null
     connectionId?: number | null
-    endpointConnection?: CanvasConnection | null
+    endpointConnection?: CanvasConnectionEndpoint | null
   },
 ): CanvasGraphEdgeId | null {
   if (input.edgeId && store.getEdge(input.edgeId)) return input.edgeId

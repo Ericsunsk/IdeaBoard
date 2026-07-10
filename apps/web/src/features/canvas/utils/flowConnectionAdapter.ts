@@ -6,6 +6,7 @@ import {
   getCanvasNodeVisibleOutputPorts,
   isCanvasConnectionNodeType,
   type CanvasConnection,
+  type CanvasConnectionEndpoint,
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
   type CanvasConnectionContractNode,
@@ -183,10 +184,9 @@ export function normalizeFlowConnection(
   }
 }
 
-export function flowConnectionToCanvasConnection(
-  id: number,
+export function flowConnectionToCanvasConnectionEndpoint(
   connection: Connection,
-): CanvasConnection | null {
+): CanvasConnectionEndpoint | null {
   const sourceNodeRef = parseNodeRef(connection.source)
   const targetNodeRef = parseNodeRef(connection.target)
   const sourceHandle = parseHandleRef(connection.sourceHandle)
@@ -197,7 +197,6 @@ export function flowConnectionToCanvasConnection(
   if (!sourceHandle.port || !targetHandle.port) return null
 
   return {
-    id,
     fromNodeType: sourceNodeRef.nodeType,
     fromNodeId: sourceNodeRef.nodeId,
     fromPort: sourceHandle.port,
@@ -205,6 +204,14 @@ export function flowConnectionToCanvasConnection(
     toNodeId: targetNodeRef.nodeId,
     toPort: targetHandle.port,
   }
+}
+
+export function flowConnectionToCanvasConnection(
+  id: number,
+  connection: Connection,
+): CanvasConnection | null {
+  const endpoint = flowConnectionToCanvasConnectionEndpoint(connection)
+  return endpoint ? { ...endpoint, id } : null
 }
 
 export function isFlowConnectionAllowed(

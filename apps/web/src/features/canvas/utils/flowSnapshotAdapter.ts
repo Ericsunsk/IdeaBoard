@@ -20,7 +20,6 @@ import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
 export {
   parsePortFromHandle,
-  resolveFlowEdgeCanvasConnectionId,
   resolveNextCanvasConnectionId,
 } from './flowSnapshotConnectionMaterializer'
 

@@ -3,13 +3,16 @@ import {
   getCanvasNodePortInputLimit,
   type CanvasBoardSnapshot,
   type CanvasConnection,
+  type CanvasConnectionEndpoint,
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
 } from '../../canvas-board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
-
-const CANVAS_CONNECTION_EDGE_ID_PATTERN = /^connection-(\d+)$/
+import {
+  createFlowConnectionClaimIndex,
+  resolveNextFlowConnectionId,
+} from './flowConnectionIdentityResolver'
 
 export type FlowSnapshotConnectionNodeRef = {
   nodeType: CanvasConnectionNodeType
@@ -44,75 +47,11 @@ export function parsePortFromHandle(
   return port as CanvasConnectionPort
 }
 
-function getRestoredConnectionId(edge: Pick<FlowSnapshotConnectionEdge, 'id' | 'data'>) {
-  return resolveFlowEdgeCanvasConnectionId(edge)
-}
-
-export function resolveFlowEdgeCanvasConnectionId(
-  edge: Pick<FlowSnapshotConnectionEdge, 'id' | 'data'>,
-): number | null {
-  const data = edge.data
-  if (data && typeof data === 'object') {
-    const restoredId = (data as { connectionSnapshot?: { id?: unknown } }).connectionSnapshot?.id
-    if (typeof restoredId === 'number' && Number.isFinite(restoredId)) return restoredId
-  }
-
-  const edgeIdMatch = CANVAS_CONNECTION_EDGE_ID_PATTERN.exec(edge.id)
-  if (!edgeIdMatch) return null
-  const parsedId = Number(edgeIdMatch[1])
-  return Number.isInteger(parsedId) && parsedId >= 1 ? parsedId : null
-}
-
-function getInitialConnectionId(
-  baseConnections: readonly CanvasConnection[] | undefined,
-  edges: readonly FlowSnapshotConnectionEdge[],
-) {
-  let maxConnectionId = 0
-  if (baseConnections) {
-    for (const connection of baseConnections) {
-      if (Number.isFinite(connection.id) && connection.id > maxConnectionId) {
-        maxConnectionId = connection.id
-      }
-    }
-  }
-  for (const edge of edges) {
-    const restoredId = getRestoredConnectionId(edge)
-    if (restoredId !== null && restoredId > maxConnectionId) {
-      maxConnectionId = restoredId
-    }
-  }
-  return maxConnectionId + 1
-}
-
 export function resolveNextCanvasConnectionId(
   base: CanvasBoardSnapshot | undefined,
   edges: readonly FlowSnapshotConnectionEdge[],
 ) {
-  return getInitialConnectionId(base?.connections, edges)
-}
-
-function createConnectionIdAllocator(
-  baseConnections: readonly CanvasConnection[] | undefined,
-  edges: readonly FlowSnapshotConnectionEdge[],
-) {
-  const usedConnectionIds = new Set<number>()
-  let nextGeneratedConnectionId = getInitialConnectionId(baseConnections, edges)
-
-  return (edge: FlowSnapshotConnectionEdge) => {
-    const restoredId = getRestoredConnectionId(edge)
-    if (restoredId !== null && !usedConnectionIds.has(restoredId)) {
-      usedConnectionIds.add(restoredId)
-      return restoredId
-    }
-
-    while (usedConnectionIds.has(nextGeneratedConnectionId)) {
-      nextGeneratedConnectionId += 1
-    }
-    const connectionId = nextGeneratedConnectionId
-    usedConnectionIds.add(connectionId)
-    nextGeneratedConnectionId += 1
-    return connectionId
-  }
+  return resolveNextFlowConnectionId(base?.connections, edges)
 }
 
 function getTargetPortKey(
@@ -165,10 +104,12 @@ export function materializeFlowSnapshotConnections({
 }: FlowSnapshotConnectionMaterializerOptions): CanvasConnection[] {
   const normalizedEdgesByTarget = new Map<string, NormalizedFlowEdgeForResolution[]>()
   const emptyNormalizedEdges: readonly NormalizedFlowEdgeForResolution[] = []
-  const singleInputConnectionIndex = new Map<string, number>()
-  const allowsMultipleInputs = createInputLimitResolver()
-  const nextConnectionId = createConnectionIdAllocator(baseConnections, edges)
-  const connections: Array<CanvasConnection | null> = []
+  const candidates: Array<{
+    edge: FlowSnapshotConnectionEdge
+    endpoint: CanvasConnectionEndpoint
+    toRef: FlowSnapshotConnectionNodeRef
+    toPort: CanvasConnectionPort
+  }> = []
 
   for (const edge of edges) {
     const fromRef = persistedFlowNodeRefs.get(edge.source)
@@ -188,7 +129,30 @@ export function materializeFlowSnapshotConnections({
 
     rememberNormalizedTargetEdge(normalizedEdgesByTarget, edge, toPort)
 
-    const connectionId = nextConnectionId(edge)
+    const connectionEndpoint: CanvasConnectionEndpoint = {
+      fromNodeType: fromRef.nodeType,
+      fromNodeId: fromRef.id,
+      fromPort,
+      toNodeType: toRef.nodeType,
+      toNodeId: toRef.id,
+      toPort,
+    }
+    candidates.push({ edge, endpoint: connectionEndpoint, toRef, toPort })
+  }
+
+  const claimIndex = createFlowConnectionClaimIndex({
+    candidates,
+    baseConnections,
+    allocateGeneratedIds: true,
+  })
+  const singleInputConnectionIndex = new Map<string, number>()
+  const allowsMultipleInputs = createInputLimitResolver()
+  const connections: Array<CanvasConnection | null> = []
+
+  for (const candidate of candidates) {
+    const { endpoint, toRef, toPort } = candidate
+    const connectionId = claimIndex.resolveConnectionId(candidate)
+    if (connectionId === null) continue
     if (!allowsMultipleInputs(toRef.nodeType, toPort)) {
       const targetKey = getTargetPortKey(toRef.nodeType, toRef.id, toPort)
       const duplicateIndex = singleInputConnectionIndex.get(targetKey)
@@ -198,13 +162,8 @@ export function materializeFlowSnapshotConnections({
       singleInputConnectionIndex.set(targetKey, connections.length)
     }
     connections.push({
+      ...endpoint,
       id: connectionId,
-      fromNodeType: fromRef.nodeType,
-      fromNodeId: fromRef.id,
-      fromPort,
-      toNodeType: toRef.nodeType,
-      toNodeId: toRef.id,
-      toPort,
     })
   }
 

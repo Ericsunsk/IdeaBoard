@@ -128,14 +128,17 @@ export type CanvasConnectionPort = 'image' | 'prompt'
 export type CanvasGroupId = `group-${number}`
 export type CanvasGroupNodeId = `${CanvasConnectionNodeType}-${number}`
 
-export interface CanvasConnection {
-  id: number
+export interface CanvasConnectionEndpoint {
   fromNodeType: CanvasConnectionNodeType
   fromNodeId: number
   fromPort: CanvasConnectionPort
   toNodeType: CanvasConnectionNodeType
   toNodeId: number
   toPort: CanvasConnectionPort
+}
+
+export interface CanvasConnection extends CanvasConnectionEndpoint {
+  id: number
 }
 
 export interface CanvasGroup {

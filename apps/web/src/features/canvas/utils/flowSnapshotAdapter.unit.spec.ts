@@ -495,6 +495,52 @@ describe('flowSnapshotAdapter', () => {
     expect(snapshot.connections.map((connection) => connection.id)).toEqual([7, 43])
   })
 
+  it('preserves a base connection id when snapshotting a generated edge by endpoint', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-1.png',
+      }),
+      makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
+    ]
+    const base = createEmptyCanvasBoardSnapshot()
+    base.connections.push({
+      id: 42,
+      fromNodeType: 'image',
+      fromNodeId: 1,
+      fromPort: 'image',
+      toNodeType: 'prompt',
+      toNodeId: 3,
+      toPort: 'image',
+    })
+
+    const snapshot = flowToCanvasBoardSnapshot(
+      {
+        nodes,
+        edges: [
+          {
+            id: 'vueflow__edge-image-1out:image-prompt-3in:image',
+            source: 'image-1',
+            sourceHandle: 'out:image',
+            target: 'prompt-3',
+            targetHandle: 'in:image',
+          },
+        ],
+      },
+      base,
+    )
+
+    expect(snapshot.connections).toEqual([
+      expect.objectContaining({
+        id: 42,
+        fromNodeId: 1,
+        toNodeId: 3,
+      }),
+    ])
+  })
+
   it('keeps the last edge for single-input target ports', () => {
     const nodes: FlowAdapterNode[] = [
       makeImageFlowNode({

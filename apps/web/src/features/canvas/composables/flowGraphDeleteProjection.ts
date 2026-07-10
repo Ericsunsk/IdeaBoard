@@ -1,17 +1,14 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import {
-  toCanvasGraphEdgeId,
   toCanvasGraphNodeId,
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
 import { collectDeletedRunningTaskIds } from '../utils/flowDeletedRunningTasks'
-import {
-  resolveFlowEdgeCanvasConnectionId,
-  resolveFlowNodeCanvasRef,
-} from '../utils/flowSnapshotAdapter'
+import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
 import { applyCanvasGraphCommitPolicy } from './canvasGraphCommitPolicy'
+import type { FlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import type {
   CanvasVueFlowGraphAdapter,
   CanvasVueFlowGraphCommandResult,
@@ -24,7 +21,7 @@ type FlowGraphDeleteProjectionOptions = {
   summary: CanvasGraphTransactionSummary
   historyBefore?: unknown
   flowNodeIds?: readonly string[]
-  projectionEdgeIds?: ReadonlyMap<Edge, CanvasGraphEdgeId | null>
+  projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
   onNativeRemove?: () => void
   stopDeletedRunningTasks?: (taskIds: string[]) => void
@@ -37,12 +34,9 @@ function resolveGraphNodeIdForFlowNode(node: Pick<Node, 'id' | 'data'>): CanvasG
 
 function resolveGraphEdgeIdForFlowEdge(
   edge: Pick<Edge, 'id' | 'data'>,
-  projectionEdgeIds?: ReadonlyMap<Edge, CanvasGraphEdgeId | null>,
+  projectionIndex: FlowEdgeProjectionIndex,
 ): CanvasGraphEdgeId | null {
-  const projectionEdgeId = projectionEdgeIds?.get(edge as Edge)
-  if (projectionEdgeId !== undefined) return projectionEdgeId
-  const connectionId = resolveFlowEdgeCanvasConnectionId(edge)
-  return connectionId === null ? null : toCanvasGraphEdgeId(connectionId)
+  return projectionIndex.resolveCanvasEdgeId(edge)
 }
 
 function resolveRemovedFlowNodeIds(
@@ -87,7 +81,7 @@ function createEdgeRemoveChanges(options: {
   edges: readonly Edge[]
   removedGraphEdgeIds: readonly CanvasGraphEdgeId[]
   removedFlowNodeIds: readonly string[]
-  projectionEdgeIds?: ReadonlyMap<Edge, CanvasGraphEdgeId | null>
+  projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
 }): EdgeChange[] {
   const removedGraphEdgeIds = new Set(options.removedGraphEdgeIds)
@@ -105,7 +99,7 @@ function createEdgeRemoveChanges(options: {
   options.edgeRemoveChanges?.forEach(append)
 
   for (const edge of options.edges) {
-    const graphEdgeId = resolveGraphEdgeIdForFlowEdge(edge, options.projectionEdgeIds)
+    const graphEdgeId = resolveGraphEdgeIdForFlowEdge(edge, options.projectionIndex)
     const isRemovedDomainEdge = graphEdgeId ? removedGraphEdgeIds.has(graphEdgeId) : false
     const isConnectedToRemovedNode =
       removedFlowNodeIds.has(edge.source) || removedFlowNodeIds.has(edge.target)
@@ -141,7 +135,7 @@ export function applyFlowGraphDeleteProjection(
             edges: options.edges,
             removedGraphEdgeIds: options.summary.removedEdgeIds,
             removedFlowNodeIds,
-            projectionEdgeIds: options.projectionEdgeIds,
+            projectionIndex: options.projectionIndex,
             edgeRemoveChanges: options.edgeRemoveChanges,
           }),
         },

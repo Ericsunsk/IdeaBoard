@@ -378,6 +378,46 @@ describe('useFlowNodeMutations', () => {
     )
   })
 
+  it('updates a generated edge without consuming a later explicit connection id', () => {
+    const generatedEdge = makeEdge(
+      'vueflow__edge-image-1out:image-prompt-1in:image',
+      'image-1',
+      'prompt-1',
+    )
+    const explicitEdge = {
+      ...makeEdge('edge-explicit', 'image-2', 'prompt-1'),
+      data: { connectionSnapshot: { id: 1 } },
+    } as Edge
+    const { edges, onWarning, mutations } = createMutationsHarness(
+      [
+        makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
+        makeFlowNode('image-2', 'image', makeImageSnapshot(2)),
+        makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
+        makeFlowNode('prompt-2', 'prompt', makePromptSnapshot(2)),
+      ],
+      [generatedEdge, explicitEdge],
+    )
+
+    mutations.vueFlowConnectionBindings.onEdgeUpdate({
+      edge: generatedEdge,
+      connection: {
+        source: 'image-1',
+        target: 'prompt-2',
+        sourceHandle: 'out:image',
+        targetHandle: 'in:image',
+      },
+    } as EdgeUpdateEvent)
+
+    expect(onWarning).not.toHaveBeenCalled()
+    expect(edges.value.map((edge) => edge.id)).toEqual(['connection-2', 'edge-explicit'])
+    expect(edges.value[0]).toMatchObject({
+      source: 'image-1',
+      target: 'prompt-2',
+      data: { connectionSnapshot: { id: 2 } },
+    })
+    expect(edges.value[1]).toBe(explicitEdge)
+  })
+
   it('keeps single-input connections last-write-wins', () => {
     const { edges, graphActions, mutations } = createMutationsHarness(
       [

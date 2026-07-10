@@ -1,20 +1,22 @@
 import type { Edge, EdgeUpdateEvent } from '@vue-flow/core'
-import type { CanvasConnection } from '../../canvas-board/domain'
+import type {
+  CanvasConnection,
+  CanvasConnectionEndpoint,
+} from '../../canvas-board/domain'
 import {
-  resolveCanvasGraphEdgeId,
+  toCanvasGraphEdgeId,
   type CanvasGraphEdgeId,
   type CanvasGraphStore,
 } from '../graph-runtime'
-import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
+import { flowConnectionToCanvasConnectionEndpoint } from '../utils/flowConnectionAdapter'
 import {
-  canvasConnectionToFlowEdge,
-  resolveFlowEdgeCanvasConnectionId,
-} from '../utils/flowSnapshotAdapter'
+  createFlowConnectionClaimIndex,
+} from '../utils/flowConnectionIdentityResolver'
 
 export type FlowEdgeIdentity = Pick<Edge, 'id' | 'data'> &
   Partial<Pick<Edge, 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
 
-type FlowEdgeIdentitySource = FlowEdgeIdentity | Pick<EdgeUpdateEvent, 'edge'>
+export type FlowEdgeIdentitySource = FlowEdgeIdentity | Pick<EdgeUpdateEvent, 'edge'>
 
 type FlowEdgeRemoveChangeIdentity = Pick<Edge, 'id'> &
   Partial<Pick<Edge, 'data' | 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
@@ -23,12 +25,11 @@ function resolveFlowEdgeFromIdentitySource(input: FlowEdgeIdentitySource): FlowE
   return 'edge' in input ? input.edge : input
 }
 
-function flowEdgeIdentityToCanvasConnection(
-  connectionId: number,
+function flowEdgeIdentityToCanvasConnectionEndpoint(
   edge: FlowEdgeIdentity,
-): CanvasConnection | null {
+): CanvasConnectionEndpoint | null {
   if (!edge.source || !edge.target) return null
-  return flowConnectionToCanvasConnection(connectionId, {
+  return flowConnectionToCanvasConnectionEndpoint({
     source: edge.source,
     target: edge.target,
     sourceHandle: edge.sourceHandle ?? null,
@@ -36,40 +37,13 @@ function flowEdgeIdentityToCanvasConnection(
   })
 }
 
-function resolveBaseConnectionByEndpoint(
-  baseStore: CanvasGraphStore | null,
-  edge: FlowEdgeIdentity,
-): CanvasConnection | null {
-  if (!baseStore || resolveFlowEdgeCanvasConnectionId(edge) !== null) return null
-  const endpointConnection = flowEdgeIdentityToCanvasConnection(1, edge)
-  const edgeId = endpointConnection
-    ? resolveCanvasGraphEdgeId(baseStore, { endpointConnection })
-    : null
-  return edgeId ? (baseStore.getEdge(edgeId)?.connection ?? null) : null
-}
-
-export function canonicalizeFlowEdgeIdentity(edge: Edge, baseStore: CanvasGraphStore | null): Edge {
-  const baseConnection = resolveBaseConnectionByEndpoint(baseStore, edge)
-  if (!baseConnection) return edge
-  const canonicalEdge = canvasConnectionToFlowEdge(baseConnection)
-  return {
-    ...edge,
-    id: canonicalEdge.id,
-    data: canonicalEdge.data,
-  } as Edge
-}
-
-export function resolveFlowEdgeCanvasGraphEdgeId(
-  store: CanvasGraphStore,
-  input: FlowEdgeIdentitySource,
-): CanvasGraphEdgeId | null {
-  const edge = resolveFlowEdgeFromIdentitySource(input)
-  const restoredConnectionId = resolveFlowEdgeCanvasConnectionId(edge)
-  const endpointConnection = flowEdgeIdentityToCanvasConnection(restoredConnectionId ?? 1, edge)
-  return resolveCanvasGraphEdgeId(store, {
-    connectionId: restoredConnectionId,
-    endpointConnection,
-  })
+function collectStoreConnections(store: CanvasGraphStore) {
+  const connections: CanvasConnection[] = []
+  for (const edgeId of store.getEdgeIds()) {
+    const connection = store.getEdge(edgeId)?.connection
+    if (connection) connections.push(connection)
+  }
+  return connections
 }
 
 export function createFlowEdgeIdentityFromRemoveChange(
@@ -85,32 +59,59 @@ export function createFlowEdgeIdentityFromRemoveChange(
   }
 }
 
-export function createProjectionEdgeIdLookup(
+export type FlowEdgeProjectionIndex = {
+  resolveCanvasEdgeId: (input: FlowEdgeIdentitySource) => CanvasGraphEdgeId | null
+  resolveFlowEdgeId: (canvasEdgeId: CanvasGraphEdgeId) => string
+  getFlowEdge: (flowEdgeId: string) => Edge | null
+}
+
+export function createFlowEdgeProjectionIndex(
   store: CanvasGraphStore,
   existingEdges: readonly Edge[],
-) {
-  const edgeIds = new Map<Edge, CanvasGraphEdgeId | null>()
-  existingEdges.forEach((edge) => {
-    edgeIds.set(edge, resolveFlowEdgeCanvasGraphEdgeId(store, edge))
+): FlowEdgeProjectionIndex {
+  const connectionIdByCanvasEdgeId = new Map<CanvasGraphEdgeId, number>()
+  for (const canvasEdgeId of store.getEdgeIds()) {
+    const connectionId = store.getEdge(canvasEdgeId)?.connection.id
+    if (connectionId !== undefined) {
+      connectionIdByCanvasEdgeId.set(canvasEdgeId, connectionId)
+    }
+  }
+  const claimIndex = createFlowConnectionClaimIndex({
+    candidates: existingEdges.map((edge) => ({
+      edge,
+      endpoint: flowEdgeIdentityToCanvasConnectionEndpoint(edge),
+    })),
+    baseConnections: collectStoreConnections(store),
+    allocateGeneratedIds: false,
   })
-  return edgeIds
+
+  return {
+    resolveCanvasEdgeId(input) {
+      const edge = resolveFlowEdgeFromIdentitySource(input) as Edge
+      const connectionId = claimIndex.resolveConnectionId({
+        edge,
+        endpoint: flowEdgeIdentityToCanvasConnectionEndpoint(edge),
+      })
+      if (connectionId === null) return null
+      return toCanvasGraphEdgeId(connectionId)
+    },
+    resolveFlowEdgeId(canvasEdgeId) {
+      const connectionId = connectionIdByCanvasEdgeId.get(canvasEdgeId)
+      return connectionId === undefined
+        ? canvasEdgeId
+        : (claimIndex.resolveFlowEdgeId(connectionId) ?? canvasEdgeId)
+    },
+    getFlowEdge(flowEdgeId) {
+      return claimIndex.getFlowEdge(flowEdgeId)
+    },
+  }
 }
 
 export function isRemovedProjectionEdge(
   edge: Edge,
   removedEdgeIds: ReadonlySet<CanvasGraphEdgeId>,
-  projectionEdgeIds: ReadonlyMap<Edge, CanvasGraphEdgeId | null>,
+  projectionIndex: FlowEdgeProjectionIndex,
 ) {
-  const projectionEdgeId = projectionEdgeIds.get(edge)
+  const projectionEdgeId = projectionIndex.resolveCanvasEdgeId(edge)
   return projectionEdgeId ? removedEdgeIds.has(projectionEdgeId) : false
-}
-
-export function resolveProjectionFlowEdgeId(
-  projectionEdgeIds: ReadonlyMap<Edge, CanvasGraphEdgeId | null>,
-  canvasEdgeId: CanvasGraphEdgeId,
-) {
-  for (const [edge, edgeId] of projectionEdgeIds) {
-    if (edgeId === canvasEdgeId) return edge.id
-  }
-  return canvasEdgeId
 }

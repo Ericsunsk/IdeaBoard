@@ -21,11 +21,9 @@ import {
 } from '../graph-runtime'
 import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/domain'
 import {
-  canonicalizeFlowEdgeIdentity,
-  createProjectionEdgeIdLookup,
+  createFlowEdgeProjectionIndex,
   isRemovedProjectionEdge,
-  resolveFlowEdgeCanvasGraphEdgeId,
-  resolveProjectionFlowEdgeId,
+  type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
 import {
   createVueFlowConnectionBindings,
@@ -77,17 +75,11 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
   }
 
   function createCurrentGraphStore(): CanvasGraphStore {
-    const baseStore = options.boardBaseSnapshot?.value
-      ? createCanvasGraphStore(options.boardBaseSnapshot.value)
-      : null
-    const edges = (options.edges.value as unknown as Edge[]).map((edge) =>
-      canonicalizeFlowEdgeIdentity(edge, baseStore),
-    )
     return createCanvasGraphStore(
       flowToCanvasBoardSnapshot(
         {
           nodes: options.nodes.value as unknown as Node[],
-          edges: edges as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+          edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
         },
         options.boardBaseSnapshot?.value,
       ),
@@ -112,7 +104,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
   function commitConnectProjection(
     existingEdges: Edge[],
-    projectionEdgeIds: ReadonlyMap<Edge, CanvasGraphEdgeId | null>,
+    projectionIndex: FlowEdgeProjectionIndex,
     nextConnection: CanvasConnection,
     commitPolicy: CanvasGraphCommitPolicy,
   ) {
@@ -126,7 +118,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       }
 
       const filteredEdges = existingEdges.filter(
-        (edge) => !isRemovedProjectionEdge(edge, removedEdgeIds, projectionEdgeIds),
+        (edge) => !isRemovedProjectionEdge(edge, removedEdgeIds, projectionIndex),
       )
       options.graphAdapter.replaceEdges([...filteredEdges, nextEdge], commandOptions)
     })
@@ -143,7 +135,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     const allowsMultipleTargetConnections =
       options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
     const store = createCurrentGraphStore()
-    const projectionEdgeIds = createProjectionEdgeIdLookup(store, existingEdges)
+    const projectionIndex = createFlowEdgeProjectionIndex(store, existingEdges)
     let summary: CanvasGraphTransactionSummary
     try {
       summary = commitCanvasGraphConnectIntent(store, {
@@ -159,7 +151,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
     commitConnectProjection(
       existingEdges,
-      projectionEdgeIds,
+      projectionIndex,
       nextConnection,
       { summary },
     )
@@ -199,7 +191,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
   function commitEdgeUpdateProjection(
     existingEdges: Edge[],
-    projectionEdgeIds: ReadonlyMap<Edge, CanvasGraphEdgeId | null>,
+    projectionIndex: FlowEdgeProjectionIndex,
     updatedEdgeId: CanvasGraphEdgeId,
     nextConnection: CanvasConnection,
     commitPolicy: CanvasGraphCommitPolicy,
@@ -210,7 +202,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     applyCanvasGraphCommitPolicy(commitPolicy, (commandOptions) => {
       if (removedEdgeIds.size === 0) {
         options.graphAdapter.updateEdge(
-          resolveProjectionFlowEdgeId(projectionEdgeIds, updatedEdgeId),
+          projectionIndex.resolveFlowEdgeId(updatedEdgeId),
           createEdgeUpdatePatch(nextEdge),
           commandOptions,
         )
@@ -218,11 +210,13 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       }
 
       const filteredEdges = existingEdges.filter(
-        (edge) => !isRemovedProjectionEdge(edge, removedEdgeIds, projectionEdgeIds),
+        (edge) => !isRemovedProjectionEdge(edge, removedEdgeIds, projectionIndex),
       )
       options.graphAdapter.replaceEdges(
         filteredEdges.map((edge) =>
-          projectionEdgeIds.get(edge) === updatedEdgeId ? ({ ...edge, ...nextEdge } as Edge) : edge,
+          projectionIndex.resolveCanvasEdgeId(edge) === updatedEdgeId
+            ? ({ ...edge, ...nextEdge } as Edge)
+            : edge,
         ),
         commandOptions,
       )
@@ -231,7 +225,9 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
   function onEdgeUpdateTransaction(event: EdgeUpdateEvent, resolvedConnection: Connection) {
     const store = createCurrentGraphStore()
-    const transactionEdgeId = resolveFlowEdgeCanvasGraphEdgeId(store, event)
+    const existingEdges = options.edges.value as unknown as Edge[]
+    const projectionIndex = createFlowEdgeProjectionIndex(store, existingEdges)
+    const transactionEdgeId = projectionIndex.resolveCanvasEdgeId(event)
     if (!transactionEdgeId) {
       options.onWarning('连线更新未能写入画布，请刷新后重试')
       return
@@ -253,8 +249,6 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
     const allowsMultipleTargetConnections =
       options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
-    const existingEdges = options.edges.value as unknown as Edge[]
-    const projectionEdgeIds = createProjectionEdgeIdLookup(store, existingEdges)
 
     let summary: CanvasGraphTransactionSummary
     try {
@@ -272,7 +266,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
     commitEdgeUpdateProjection(
       existingEdges,
-      projectionEdgeIds,
+      projectionIndex,
       transactionEdgeId,
       nextConnection,
       { summary },

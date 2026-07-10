@@ -7,10 +7,10 @@ import {
 import type { FlowNodeData } from '../types/flowTypes'
 import {
   materializeFlowSnapshotConnections,
-  resolveFlowEdgeCanvasConnectionId,
   type FlowSnapshotConnectionEdge,
   type FlowSnapshotConnectionNodeRef,
 } from './flowSnapshotConnectionMaterializer'
+import { resolveFlowEdgeCanvasConnectionId } from './flowConnectionIdentityResolver'
 
 function imageSnapshot(id: number): CanvasNodeItem {
   return {
@@ -92,6 +92,72 @@ function createHarness() {
 }
 
 describe('flowSnapshotConnectionMaterializer', () => {
+  it('reuses the base connection id for a generated edge with matching endpoints', () => {
+    const harness = createHarness()
+    const base = createEmptyCanvasBoardSnapshot()
+    base.connections.push({
+      id: 42,
+      fromNodeType: 'image',
+      fromNodeId: 1,
+      fromPort: 'image',
+      toNodeType: 'prompt',
+      toNodeId: 4,
+      toPort: 'image',
+    })
+
+    const connections = materializeFlowSnapshotConnections({
+      ...harness,
+      baseConnections: base.connections,
+      edges: [
+        {
+          id: 'e1-2',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'prompt-4',
+          targetHandle: 'in:image',
+        },
+      ],
+    })
+
+    expect(connections).toEqual([
+      expect.objectContaining({
+        id: 42,
+        fromNodeId: 1,
+        toNodeId: 4,
+      }),
+    ])
+  })
+
+  it('prefers a canonical Flow Edge id over a matching base endpoint', () => {
+    const harness = createHarness()
+    const base = createEmptyCanvasBoardSnapshot()
+    base.connections.push({
+      id: 42,
+      fromNodeType: 'image',
+      fromNodeId: 1,
+      fromPort: 'image',
+      toNodeType: 'prompt',
+      toNodeId: 4,
+      toPort: 'image',
+    })
+
+    const connections = materializeFlowSnapshotConnections({
+      ...harness,
+      baseConnections: base.connections,
+      edges: [
+        {
+          id: 'connection-5',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'prompt-4',
+          targetHandle: 'in:image',
+        },
+      ],
+    })
+
+    expect(connections.map((connection) => connection.id)).toEqual([5])
+  })
+
   it('restores one duplicate connection id and generates the collision after base ids', () => {
     const harness = createHarness()
     const base = createEmptyCanvasBoardSnapshot()
@@ -129,6 +195,94 @@ describe('flowSnapshotConnectionMaterializer', () => {
     })
 
     expect(connections.map((connection) => connection.id)).toEqual([7, 43])
+  })
+
+  it('keeps repeated restored-id materialization stable against endpoint base ids', () => {
+    const harness = createHarness()
+    const base = createEmptyCanvasBoardSnapshot()
+    base.connections.push(
+      {
+        id: 7,
+        fromNodeType: 'image',
+        fromNodeId: 1,
+        fromPort: 'image',
+        toNodeType: 'prompt',
+        toNodeId: 4,
+        toPort: 'image',
+      },
+      {
+        id: 43,
+        fromNodeType: 'image',
+        fromNodeId: 2,
+        fromPort: 'image',
+        toNodeType: 'prompt',
+        toNodeId: 4,
+        toPort: 'image',
+      },
+    )
+
+    const connections = materializeFlowSnapshotConnections({
+      ...harness,
+      baseConnections: base.connections,
+      edges: [
+        {
+          id: 'edge-first',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'prompt-4',
+          targetHandle: 'in:image',
+          data: { connectionSnapshot: { id: 7 } },
+        },
+        {
+          id: 'edge-colliding',
+          source: 'image-2',
+          sourceHandle: 'out:image',
+          target: 'prompt-4',
+          targetHandle: 'in:image',
+          data: { connectionSnapshot: { id: 7 } },
+        },
+      ],
+    })
+
+    expect(connections.map((connection) => connection.id)).toEqual([7, 43])
+  })
+
+  it('reserves a later explicit id before an earlier generated edge claims its base endpoint', () => {
+    const harness = createHarness()
+    const base = createEmptyCanvasBoardSnapshot()
+    base.connections.push({
+      id: 7,
+      fromNodeType: 'image',
+      fromNodeId: 1,
+      fromPort: 'image',
+      toNodeType: 'prompt',
+      toNodeId: 4,
+      toPort: 'image',
+    })
+
+    const connections = materializeFlowSnapshotConnections({
+      ...harness,
+      baseConnections: base.connections,
+      edges: [
+        {
+          id: 'edge-generated',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'prompt-4',
+          targetHandle: 'in:image',
+        },
+        {
+          id: 'edge-explicit',
+          source: 'image-2',
+          sourceHandle: 'out:image',
+          target: 'prompt-4',
+          targetHandle: 'in:image',
+          data: { connectionSnapshot: { id: 7 } },
+        },
+      ],
+    })
+
+    expect(connections.map((connection) => connection.id)).toEqual([8, 7])
   })
 
   it('prefers restored snapshot ids over edge ids before allocating new ids', () => {

@@ -1,10 +1,13 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
-import type {
-  CanvasGraphEdgeId,
-  CanvasGraphNodeId,
-  CanvasGraphTransactionSummary,
+import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+import {
+  createCanvasGraphStore,
+  type CanvasGraphEdgeId,
+  type CanvasGraphNodeId,
+  type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
+import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 
@@ -108,6 +111,42 @@ function createGraphAdapter() {
   }
 }
 
+function createProjectionIndex(edges: Edge[]) {
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  snapshot.imageNodes.push({
+    id: 1,
+    type: 'image-node',
+    x: 0,
+    y: 0,
+    width: 280,
+    sourceImageUrl: 'https://example.com/image.png',
+    sourceImageRatio: 1,
+    outputStatus: 'ready',
+    outputImages: [],
+  })
+  snapshot.promptNodes.push({
+    id: 1,
+    type: 'prompt',
+    x: 320,
+    y: 0,
+    width: 280,
+    text: '',
+    outputCount: 1,
+    aspectRatio: 'auto',
+    inputImages: [],
+  })
+  snapshot.connections.push({
+    id: 3,
+    fromNodeType: 'image',
+    fromNodeId: 1,
+    fromPort: 'image',
+    toNodeType: 'prompt',
+    toNodeId: 1,
+    toPort: 'image',
+  })
+  return createFlowEdgeProjectionIndex(createCanvasGraphStore(snapshot), edges)
+}
+
 describe('flowGraphDeleteProjection', () => {
   it('projects native delete summaries to drifted Flow node ids and connected edge cleanup', () => {
     const imageNode = createImageNode('node-image-1', 'task-native')
@@ -133,6 +172,7 @@ describe('flowGraphDeleteProjection', () => {
         removedEdgeIds: ['connection-3'],
       }),
       flowNodeIds: [imageNode.id],
+      projectionIndex: createProjectionIndex([generatedEdge]),
       onNativeRemove,
       stopDeletedRunningTasks,
     })
@@ -174,6 +214,7 @@ describe('flowGraphDeleteProjection', () => {
         removedNodeIds: ['image-1', 'prompt-1'],
         removedEdgeIds: ['connection-3'],
       }),
+      projectionIndex: createProjectionIndex([edge]),
       onNativeRemove,
       stopDeletedRunningTasks,
     })
