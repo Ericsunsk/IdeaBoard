@@ -62,6 +62,10 @@ jobs:
         working-directory: apps/web
         run: npm run test:run
 
+      - name: Typecheck tests
+        working-directory: apps/web
+        run: npm run test:typecheck
+
       - name: User route smoke
         working-directory: apps/web
         timeout-minutes: 10

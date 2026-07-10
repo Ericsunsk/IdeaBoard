@@ -12,6 +12,7 @@ import {
   type CanvasImageAdjustmentFinalApplyContext,
 } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
 import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
+import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
 
 const rasterOverlayMocks = vi.hoisted(() => ({
@@ -144,7 +145,9 @@ function mountCanvasImageTools() {
     Object.keys(imageNodeFixtures).map((id) => ({ id, data: { kind: 'image' } })) as Node[],
   )
   const connectionAdapter = { connectIntent: vi.fn(() => true) }
-  const createImageNodeFromFile = vi.fn(async () => 'image-3')
+  const createImageNodeFromFile = vi.fn<UseCanvasImageToolsOptions['createImageNodeFromFile']>(
+    async () => 'image-3',
+  )
   const setViewport = vi.fn()
   const setCenter = vi.fn()
   const runInpaintAction = vi.fn()

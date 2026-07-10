@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
+import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
 
 const mocks = vi.hoisted(() => ({
@@ -185,7 +186,7 @@ describe('useFlowImageUploadActions', () => {
       currentBoardId,
       createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
         createdUrls.push(patch?.sourceImageUrl ?? '')
-        return `node-${createdUrls.length}`
+        return `image-${createdUrls.length}` as CanvasGraphNodeIdForKind<'image'>
       }),
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: vi.fn(),
@@ -196,9 +197,9 @@ describe('useFlowImageUploadActions', () => {
     })
     const file = makeFile('same.png')
 
-    await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, file)).resolves.toBe('node-1')
+    await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, file)).resolves.toBe('image-1')
     // The first node can now be deleted and its uploaded URL recycled by autosave.
-    await expect(actions.createImageNodeFromFile({ x: 30, y: 40 }, file)).resolves.toBe('node-2')
+    await expect(actions.createImageNodeFromFile({ x: 30, y: 40 }, file)).resolves.toBe('image-2')
 
     expect(uploadApi.upload).toHaveBeenCalledTimes(2)
     expect(createdUrls).toEqual([

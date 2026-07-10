@@ -21,6 +21,7 @@
     "test": "vitest",
     "test:guardrails": "tsx scripts/check-test-guardrails.ts && tsx scripts/check-board-state-contract-drift.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts --passWithNoTests",
+    "test:typecheck": "vue-tsc -p tsconfig.test.json --noEmit && vue-tsc -p tsconfig.test-node.json --noEmit",
     "test:run": "vitest run"
   },
   "dependencies": {
