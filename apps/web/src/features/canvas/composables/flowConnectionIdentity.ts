@@ -4,14 +4,14 @@ import type {
   CanvasConnectionEndpoint,
 } from '../../canvas-board/domain'
 import {
+  shouldReplaceCanvasConnection,
   toCanvasGraphEdgeId,
+  type CanvasGraphConnectionTargetPolicy,
   type CanvasGraphEdgeId,
   type CanvasGraphStore,
 } from '../graph-runtime'
 import { flowConnectionToCanvasConnectionEndpoint } from '../utils/flowConnectionAdapter'
-import {
-  createFlowConnectionClaimIndex,
-} from '../utils/flowConnectionIdentityResolver'
+import { createFlowConnectionClaimIndex } from '../utils/flowConnectionIdentityResolver'
 
 export type FlowEdgeIdentity = Pick<Edge, 'id' | 'data'> &
   Partial<Pick<Edge, 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
@@ -63,6 +63,11 @@ export type FlowEdgeProjectionIndex = {
   resolveCanvasEdgeId: (input: FlowEdgeIdentitySource) => CanvasGraphEdgeId | null
   resolveFlowEdgeId: (canvasEdgeId: CanvasGraphEdgeId) => string
   getFlowEdge: (flowEdgeId: string) => Edge | null
+  classifyReplacement: (
+    input: FlowEdgeIdentitySource,
+    nextConnection: CanvasConnectionEndpoint,
+    policy: CanvasGraphConnectionTargetPolicy,
+  ) => 'replace' | 'retain' | 'unresolved'
 }
 
 export function createFlowEdgeProjectionIndex(
@@ -104,14 +109,53 @@ export function createFlowEdgeProjectionIndex(
     getFlowEdge(flowEdgeId) {
       return claimIndex.getFlowEdge(flowEdgeId)
     },
+    classifyReplacement(input, nextConnection, policy) {
+      const endpoint = flowEdgeIdentityToCanvasConnectionEndpoint(
+        resolveFlowEdgeFromIdentitySource(input),
+      )
+      if (!endpoint) return 'unresolved'
+      return shouldReplaceCanvasConnection(endpoint, nextConnection, policy)
+        ? 'replace'
+        : 'retain'
+    },
   }
 }
 
-export function isRemovedProjectionEdge(
-  edge: Edge,
-  removedEdgeIds: ReadonlySet<CanvasGraphEdgeId>,
-  projectionIndex: FlowEdgeProjectionIndex,
-) {
-  const projectionEdgeId = projectionIndex.resolveCanvasEdgeId(edge)
-  return projectionEdgeId ? removedEdgeIds.has(projectionEdgeId) : false
+export function resolveFlowEdgeProjectionReplacement(options: {
+  edges: readonly Edge[]
+  projectionIndex: FlowEdgeProjectionIndex
+  removedEdgeIds: ReadonlySet<CanvasGraphEdgeId>
+  nextConnection: CanvasConnectionEndpoint
+  policy: CanvasGraphConnectionTargetPolicy
+  preserveFlowEdgeId?: string
+}): { retainedEdges: Edge[]; didReplace: boolean } | null {
+  const retainedEdges: Edge[] = []
+  let didReplace = false
+
+  for (const edge of options.edges) {
+    if (edge.id === options.preserveFlowEdgeId) {
+      retainedEdges.push(edge)
+      continue
+    }
+
+    const projectionEdgeId = options.projectionIndex.resolveCanvasEdgeId(edge)
+    if (projectionEdgeId !== null && options.removedEdgeIds.has(projectionEdgeId)) {
+      didReplace = true
+      continue
+    }
+
+    const replacement = options.projectionIndex.classifyReplacement(
+      edge,
+      options.nextConnection,
+      options.policy,
+    )
+    if (replacement === 'unresolved') return null
+    if (replacement === 'replace') {
+      didReplace = true
+    } else {
+      retainedEdges.push(edge)
+    }
+  }
+
+  return { retainedEdges, didReplace }
 }

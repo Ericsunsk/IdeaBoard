@@ -607,6 +607,184 @@ describe('useFlowCanvasRuntime', () => {
     })
   })
 
+  it('replaces stale duplicate projection edges with one single-input connection', async () => {
+    const snapshot = createSingleInputReplacementSnapshot()
+    snapshot.promptNodes.push({
+      ...snapshot.promptNodes[1]!,
+      id: 3,
+      text: 'new source prompt',
+      y: 760,
+    })
+    snapshot.fusionNodes = [snapshot.fusionNodes[0]!]
+    snapshot.connections = [snapshot.connections[0]!]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+    const staleEdge = {
+      id: 'vueflow__edge-prompt-2out:prompt-fusion-1in:prompt',
+      source: 'prompt-2',
+      target: 'fusion-1',
+      sourceHandle: 'out:prompt',
+      targetHandle: 'in:prompt',
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [staleEdge, ...harness.fullEdges.value]
+    clearGraphActionMocks(harness)
+
+    graphRuntime.vueFlowConnectionBindings.onConnect({
+      source: 'prompt-3',
+      target: 'fusion-1',
+      sourceHandle: 'out:prompt',
+      targetHandle: 'in:prompt',
+    })
+
+    expect(harness.onWarning).not.toHaveBeenCalled()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-2'])
+    expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
+      {
+        id: 2,
+        fromNodeType: 'prompt',
+        fromNodeId: 3,
+        fromPort: 'prompt',
+        toNodeType: 'fusion',
+        toNodeId: 1,
+        toPort: 'prompt',
+      },
+    ])
+    expect(harness.graphActions.setEdges).toHaveBeenCalledOnce()
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('pending')
+    expect(harness.savedSnapshots).toHaveLength(0)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual([
+      staleEdge.id,
+      'connection-1',
+    ])
+    expect(exportCurrentBoardSnapshot(harness).connections.map((connection) => connection.id)).toEqual([
+      1,
+    ])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-2'])
+
+    await harness.runtime.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots[0]?.connections.map((connection) => connection.id)).toEqual([2])
+  })
+
+  it('replaces a trailing stale projection edge when its generated id is reused', async () => {
+    const snapshot = createSingleInputReplacementSnapshot()
+    snapshot.promptNodes.push({
+      ...snapshot.promptNodes[1]!,
+      id: 3,
+      text: 'new source prompt',
+      y: 760,
+    })
+    snapshot.fusionNodes = [snapshot.fusionNodes[0]!]
+    snapshot.connections = [snapshot.connections[0]!]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+    const staleEdge = {
+      id: 'vueflow__edge-prompt-2out:prompt-fusion-1in:prompt',
+      source: 'prompt-2',
+      target: 'fusion-1',
+      sourceHandle: 'out:prompt',
+      targetHandle: 'in:prompt',
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [...harness.fullEdges.value, staleEdge]
+    clearGraphActionMocks(harness)
+
+    graphRuntime.vueFlowConnectionBindings.onConnect({
+      source: 'prompt-3',
+      target: 'fusion-1',
+      sourceHandle: 'out:prompt',
+      targetHandle: 'in:prompt',
+    })
+
+    expect(harness.onWarning).not.toHaveBeenCalled()
+    expect(harness.fullEdges.value).toHaveLength(1)
+    expect(harness.fullEdges.value[0]).toMatchObject({
+      id: 'connection-2',
+      source: 'prompt-3',
+      target: 'fusion-1',
+    })
+    expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
+      {
+        id: 2,
+        fromNodeType: 'prompt',
+        fromNodeId: 3,
+        fromPort: 'prompt',
+        toNodeType: 'fusion',
+        toNodeId: 1,
+        toPort: 'prompt',
+      },
+    ])
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('pending')
+    expect(harness.savedSnapshots).toHaveLength(0)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual([
+      'connection-1',
+      staleEdge.id,
+    ])
+    expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
+      expect.objectContaining({ id: 2, fromNodeId: 2 }),
+    ])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullEdges.value).toHaveLength(1)
+    expect(harness.fullEdges.value[0]).toMatchObject({
+      id: 'connection-2',
+      source: 'prompt-3',
+    })
+
+    await harness.runtime.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots[0]?.connections).toEqual([
+      expect.objectContaining({ id: 2, fromNodeId: 3 }),
+    ])
+  })
+
+  it('leaves connection state unchanged when stale projection endpoints are corrupt', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+    const corruptEdge = {
+      id: 'vueflow__edge-corrupt',
+      source: 'external-source',
+      target: 'external-target',
+      sourceHandle: null,
+      targetHandle: null,
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [corruptEdge, ...harness.fullEdges.value]
+    clearGraphActionMocks(harness)
+    const projectionBefore = readEdgeProjection(harness.fullEdges.value)
+    const snapshotBefore = exportCurrentBoardSnapshot(harness)
+    const saveStatusBefore = harness.saveStatus.value
+
+    graphRuntime.vueFlowConnectionBindings.onConnect({
+      source: 'image-1',
+      target: 'prompt-2',
+      sourceHandle: 'out:image',
+      targetHandle: 'in:image',
+    })
+
+    expect(harness.onWarning).toHaveBeenCalledWith('连线未能写入画布，请刷新后重试')
+    expect(readEdgeProjection(harness.fullEdges.value)).toEqual(projectionBefore)
+    expect(exportCurrentBoardSnapshot(harness)).toEqual(snapshotBefore)
+    expect(harness.graphActions.addEdges).not.toHaveBeenCalled()
+    expect(harness.graphActions.setEdges).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(false)
+    expect(harness.saveStatus.value).toBe(saveStatusBefore)
+    expect(harness.savedSnapshots).toHaveLength(0)
+  })
+
   it('updates an existing connection endpoint and replaces another single-input target connection', async () => {
     const harness = createRuntimeHarness(createSingleInputReplacementSnapshot())
     await harness.runtime.loadInitialOrRouteBoard()

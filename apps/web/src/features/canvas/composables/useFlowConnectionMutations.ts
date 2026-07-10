@@ -22,7 +22,7 @@ import {
 import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/domain'
 import {
   createFlowEdgeProjectionIndex,
-  isRemovedProjectionEdge,
+  resolveFlowEdgeProjectionReplacement,
   type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
 import {
@@ -106,22 +106,33 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     existingEdges: Edge[],
     projectionIndex: FlowEdgeProjectionIndex,
     nextConnection: CanvasConnection,
+    allowsMultipleTargetConnections: boolean,
     commitPolicy: CanvasGraphCommitPolicy,
   ) {
     const { summary } = commitPolicy
     const nextEdge = resolveAddedConnectEdge(summary, nextConnection)
     const removedEdgeIds = new Set(summary.projectionPatch.edges.removedIds)
+    const replacement = resolveFlowEdgeProjectionReplacement({
+      edges: existingEdges,
+      projectionIndex,
+      removedEdgeIds,
+      nextConnection,
+      policy: { allowsMultipleTargetConnections },
+    })
+    if (!replacement) {
+      options.onWarning('连线未能写入画布，请刷新后重试')
+      return false
+    }
+
     applyCanvasGraphCommitPolicy(commitPolicy, (commandOptions) => {
-      if (removedEdgeIds.size === 0) {
+      if (!replacement.didReplace) {
         options.graphAdapter.addEdges(nextEdge, commandOptions)
         return
       }
 
-      const filteredEdges = existingEdges.filter(
-        (edge) => !isRemovedProjectionEdge(edge, removedEdgeIds, projectionIndex),
-      )
-      options.graphAdapter.replaceEdges([...filteredEdges, nextEdge], commandOptions)
+      options.graphAdapter.replaceEdges([...replacement.retainedEdges, nextEdge], commandOptions)
     })
+    return true
   }
 
   function onConnectTransaction(resolvedConnection: Connection) {
@@ -149,12 +160,14 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     }
     if (!summary.didChange) return
 
-    commitConnectProjection(
+    const didCommitProjection = commitConnectProjection(
       existingEdges,
       projectionIndex,
       nextConnection,
+      allowsMultipleTargetConnections,
       { summary },
     )
+    if (!didCommitProjection) return
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
   }
 
@@ -193,14 +206,29 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     existingEdges: Edge[],
     projectionIndex: FlowEdgeProjectionIndex,
     updatedEdgeId: CanvasGraphEdgeId,
+    updatedFlowEdgeId: string,
     nextConnection: CanvasConnection,
+    allowsMultipleTargetConnections: boolean,
     commitPolicy: CanvasGraphCommitPolicy,
   ) {
     const { summary } = commitPolicy
     const nextEdge = resolveUpdatedEdge(summary, nextConnection)
     const removedEdgeIds = new Set(summary.projectionPatch.edges.removedIds)
+    const replacement = resolveFlowEdgeProjectionReplacement({
+      edges: existingEdges,
+      projectionIndex,
+      removedEdgeIds,
+      nextConnection,
+      policy: { allowsMultipleTargetConnections },
+      preserveFlowEdgeId: updatedFlowEdgeId,
+    })
+    if (!replacement) {
+      options.onWarning('连线更新未能写入画布，请刷新后重试')
+      return false
+    }
+
     applyCanvasGraphCommitPolicy(commitPolicy, (commandOptions) => {
-      if (removedEdgeIds.size === 0) {
+      if (!replacement.didReplace) {
         options.graphAdapter.updateEdge(
           projectionIndex.resolveFlowEdgeId(updatedEdgeId),
           createEdgeUpdatePatch(nextEdge),
@@ -209,11 +237,8 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
         return
       }
 
-      const filteredEdges = existingEdges.filter(
-        (edge) => !isRemovedProjectionEdge(edge, removedEdgeIds, projectionIndex),
-      )
       options.graphAdapter.replaceEdges(
-        filteredEdges.map((edge) =>
+        replacement.retainedEdges.map((edge) =>
           projectionIndex.resolveCanvasEdgeId(edge) === updatedEdgeId
             ? ({ ...edge, ...nextEdge } as Edge)
             : edge,
@@ -221,6 +246,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
         commandOptions,
       )
     })
+    return true
   }
 
   function onEdgeUpdateTransaction(event: EdgeUpdateEvent, resolvedConnection: Connection) {
@@ -264,13 +290,16 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     }
     if (!summary.didChange) return
 
-    commitEdgeUpdateProjection(
+    const didCommitProjection = commitEdgeUpdateProjection(
       existingEdges,
       projectionIndex,
       transactionEdgeId,
+      event.edge.id,
       nextConnection,
+      allowsMultipleTargetConnections,
       { summary },
     )
+    if (!didCommitProjection) return
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
   }
 

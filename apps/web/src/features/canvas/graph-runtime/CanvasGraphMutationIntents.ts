@@ -46,7 +46,10 @@ export function isSameCanvasConnectionEndpoint(
   return toCanvasConnectionEndpointKey(left) === toCanvasConnectionEndpointKey(right)
 }
 
-export function targetsSameCanvasInput(left: CanvasConnection, right: CanvasConnection) {
+export function targetsSameCanvasInput(
+  left: CanvasConnectionEndpoint,
+  right: CanvasConnectionEndpoint,
+) {
   return (
     left.toNodeType === right.toNodeType &&
     left.toNodeId === right.toNodeId &&
@@ -55,8 +58,8 @@ export function targetsSameCanvasInput(left: CanvasConnection, right: CanvasConn
 }
 
 export function shouldReplaceCanvasConnection(
-  current: CanvasConnection,
-  nextConnection: CanvasConnection,
+  current: CanvasConnectionEndpoint,
+  nextConnection: CanvasConnectionEndpoint,
   policy: CanvasGraphConnectionTargetPolicy,
 ) {
   if (!policy.allowsMultipleTargetConnections && targetsSameCanvasInput(current, nextConnection)) {
