@@ -167,10 +167,12 @@ describe('flowGraphDeleteProjection', () => {
       graphAdapter,
       nodes: [imageNode, promptNode],
       edges: [generatedEdge],
-      summary: createDeleteSummary({
-        removedNodeIds: ['image-1'],
-        removedEdgeIds: ['connection-3'],
-      }),
+      commitPolicy: {
+        summary: createDeleteSummary({
+          removedNodeIds: ['image-1'],
+          removedEdgeIds: ['connection-3'],
+        }),
+      },
       flowNodeIds: [imageNode.id],
       projectionIndex: createProjectionIndex([generatedEdge]),
       onNativeRemove,
@@ -209,11 +211,13 @@ describe('flowGraphDeleteProjection', () => {
       graphAdapter,
       nodes: [imageNode, promptNode],
       edges: [edge],
-      summary: createDeleteSummary({
-        reason: 'group-delete',
-        removedNodeIds: ['image-1', 'prompt-1'],
-        removedEdgeIds: ['connection-3'],
-      }),
+      commitPolicy: {
+        summary: createDeleteSummary({
+          reason: 'group-delete',
+          removedNodeIds: ['image-1', 'prompt-1'],
+          removedEdgeIds: ['connection-3'],
+        }),
+      },
       projectionIndex: createProjectionIndex([edge]),
       onNativeRemove,
       stopDeletedRunningTasks,

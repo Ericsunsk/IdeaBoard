@@ -369,6 +369,7 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
     currentBoardId: harness.runtime.currentBoardId,
     createNodeKind: ref('prompt'),
     graphAdapter: harness.runtime.graphAdapter,
+    deleteNode: harness.runtime.graphRuntime.deleteNode,
     updateNodeInternals: vi.fn(),
     screenToFlowCoordinate: (point) => point,
     getSelectedElements: computed(() => []),
@@ -383,7 +384,6 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
     openNodeImagePreview: vi.fn(async () => {}),
     openImageUrlPreview: vi.fn(async () => {}),
     feedback: graphFeedback,
-    stopDeletedRunningTasks: harness.stopDeletedRunningTasks,
   })
 
   return { graphRuntime, graphFeedback }
@@ -2135,6 +2135,133 @@ describe('useFlowCanvasRuntime', () => {
       y: 96,
     })
     expect(harness.nodes.value).toBe(nodesBeforeCommit)
+  })
+
+  it('routes UI node deletion through the shared delete contract', async () => {
+    const snapshot = createSnapshot()
+    snapshot.imageNodes[0] = {
+      ...snapshot.imageNodes[0]!,
+      outputStatus: 'running',
+      pendingTaskId: 'task-ui-delete',
+      outputImages: [],
+    }
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const currentEdge = harness.fullEdges.value[0]
+    expect(currentEdge).toBeDefined()
+    harness.fullEdges.value = [
+      {
+        ...(currentEdge as Edge),
+        id: 'vueflow__edge-image-1out:image-prompt-1in:image',
+        data: undefined,
+      },
+    ]
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+
+    graphRuntime.onFlowDeleteNode('image-1')
+
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.fullEdges.value).toEqual([])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
+    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
+    expect(harness.stopDeletedRunningTasks).toHaveBeenCalledWith(['task-ui-delete'])
+    expect(harness.isDirty.value).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
+      'image-1',
+      'prompt-1',
+      'prompt-2',
+    ])
+    expect(harness.fullEdges.value).toHaveLength(1)
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1']),
+    ])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
+    expect(harness.fullEdges.value).toEqual([])
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
+
+    await harness.runtime.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots[0]?.imageNodes).toEqual([])
+    expect(harness.savedSnapshots[0]?.connections).toEqual([])
+    expect(harness.savedSnapshots[0]?.groups).toEqual([createGroup('group-1', ['prompt-1'])])
+  })
+
+  it('warns without mutation when UI node deletion receives a non-canonical id', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const imageNode = harness.fullNodes.value.find((node) => node.id === 'image-1')
+    expect(imageNode).toBeDefined()
+    harness.fullNodes.value = harness.fullNodes.value.map((node) =>
+      node.id === 'image-1' ? ({ ...node, id: 'node-image-1' } as Node) : node,
+    )
+    const graphBefore = exportCurrentBoardSnapshot(harness)
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+
+    graphRuntime.onFlowDeleteNode('node-image-1')
+
+    expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能写入画布，请刷新后重试')
+    expect(exportCurrentBoardSnapshot(harness)).toEqual(graphBefore)
+    expect(harness.onNativeRemove).not.toHaveBeenCalled()
+    expect(harness.stopDeletedRunningTasks).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(false)
+  })
+
+  it('warns without mutation when a canonical UI delete target is absent from the graph store', async () => {
+    const snapshot = createSnapshot()
+    snapshot.imageNodes[0] = {
+      ...snapshot.imageNodes[0]!,
+      outputStatus: 'running',
+      pendingTaskId: 'task-corrupt-ui-delete',
+      outputImages: [],
+    }
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.fullNodes.value = harness.fullNodes.value.map((node) =>
+      node.id === 'image-1'
+        ? {
+            ...node,
+            data: {
+              kind: 'image',
+              nodeType: 'image',
+            },
+          }
+        : node,
+    )
+    const nodesBefore = harness.fullNodes.value
+    const edgesBefore = harness.fullEdges.value
+    const groupsBefore = harness.boardBaseSnapshot.value.groups
+    const saveStatusBefore = harness.saveStatus.value
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+
+    graphRuntime.onFlowDeleteNode('image-1')
+
+    expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能写入画布，请刷新后重试')
+    expect(harness.fullNodes.value).toBe(nodesBefore)
+    expect(harness.fullEdges.value).toBe(edgesBefore)
+    expect(harness.boardBaseSnapshot.value.groups).toBe(groupsBefore)
+    expect(harness.onNativeRemove).not.toHaveBeenCalled()
+    expect(harness.stopDeletedRunningTasks).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(false)
+    expect(harness.saveStatus.value).toBe(saveStatusBefore)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullNodes.value).toBe(nodesBefore)
+    expect(harness.fullEdges.value).toBe(edgesBefore)
+    expect(harness.boardBaseSnapshot.value.groups).toBe(groupsBefore)
+
+    await harness.runtime.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots).toEqual([])
   })
 
   it('records native node and edge remove changes through the graph adapter', async () => {

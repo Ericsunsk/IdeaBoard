@@ -28,6 +28,7 @@ import {
 import {
   commitCanvasGraphDeleteIntent,
   createCanvasGraphStore,
+  isCanvasGraphNodeId,
   stageCanvasGraphNodeDragIntent,
   type CanvasGraphEdgeId,
   type CanvasGraphTransaction,
@@ -62,6 +63,7 @@ export type CanvasFlowGraphRuntimeControls = {
   createCurrentCanvasGraphStore: (
     snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
   ) => ReturnType<typeof createCanvasGraphStore>
+  deleteNode: (nodeId: string) => boolean
   markDirty: () => void
   grouping: CanvasGroupRuntimeControls
   nodeDrag: {
@@ -324,6 +326,42 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     stopDeletedRunningTasks: options.stopDeletedRunningTasks,
   })
 
+  function deleteNode(nodeId: string): boolean {
+    if (!options.nodes.value.some((node) => node.id === nodeId)) return false
+    if (!isCanvasGraphNodeId(nodeId)) {
+      options.onWarning('删除操作未能写入画布，请刷新后重试')
+      return false
+    }
+
+    const store = createCurrentCanvasGraphStore()
+    if (!store.getNode(nodeId)) {
+      options.onWarning('删除操作未能写入画布，请刷新后重试')
+      return false
+    }
+
+    const historyBefore = captureFullGraphHistory()
+    const projectionIndex = createFlowEdgeProjectionIndex(store, options.edges.value)
+    const summary = commitCanvasGraphDeleteIntent(store, {
+      nodeIds: [nodeId],
+      removeConnectedEdges: true,
+    })
+    if (!summary.didChange) return false
+
+    const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
+    commitHistoryGroups(snapshot.groups)
+    const result = applyFlowGraphDeleteProjection({
+      graphAdapter,
+      nodes: options.nodes.value,
+      edges: options.edges.value,
+      commitPolicy: { summary, historyBefore },
+      flowNodeIds: [nodeId],
+      projectionIndex,
+      onNativeRemove: options.onNativeRemove,
+      stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+    })
+    return result?.didChange ?? false
+  }
+
   function createNodeDragTransaction() {
     return createCurrentCanvasGraphStore().beginTransaction('node-drag')
   }
@@ -507,8 +545,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       graphAdapter,
       nodes: options.nodes.value,
       edges: options.edges.value,
-      summary,
-      historyBefore,
+      commitPolicy: { summary, historyBefore },
       flowNodeIds,
       projectionIndex,
       edgeRemoveChanges: edgeChanges,
@@ -576,6 +613,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const graphRuntime: CanvasFlowGraphRuntimeControls = {
     captureHistory: captureFullGraphHistory,
     createCurrentCanvasGraphStore,
+    deleteNode,
     markDirty: () => {
       markDirty()
     },

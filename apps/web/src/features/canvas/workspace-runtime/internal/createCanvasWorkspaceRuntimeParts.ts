@@ -107,6 +107,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     currentBoardId: board.currentBoardId,
     createNodeKind: options.createNodeKind,
     graphAdapter: board.graphAdapter,
+    deleteNode: board.graphRuntime.deleteNode,
     updateNodeInternals: options.flowPaneAdapter.updateNodeInternals,
     screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
     getSelectedElements: options.flowPaneAdapter.getSelectedElements,
@@ -116,7 +117,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     openNodeImagePreview: options.openNodeImagePreview,
     openImageUrlPreview: options.openImageUrlPreview,
     feedback: feedback.graph,
-    stopDeletedRunningTasks,
   })
 
   const viewport = useCanvasViewportRuntime({
@@ -203,7 +203,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   function createNodeHandlers(handlerOptions: CanvasWorkspaceNodeHandlersOptions) {
     return useFlowCanvasNodeHandlers({
       ...handlerOptions,
-      _onFlowDeleteNode: graph._onFlowDeleteNode,
+      _onFlowDeleteNode: graph.onFlowDeleteNode,
       _onFlowPromptTextUpdate: graph._onFlowPromptTextUpdate,
       _onFlowNodeParamUpdate: graph._onFlowNodeParamUpdate,
       markFlowExecutionNodeDirty: graph.markFlowExecutionNodeDirty,

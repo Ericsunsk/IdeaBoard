@@ -3,11 +3,13 @@ import {
   toCanvasGraphNodeId,
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
-  type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
 import { collectDeletedRunningTaskIds } from '../utils/flowDeletedRunningTasks'
 import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
-import { applyCanvasGraphCommitPolicy } from './canvasGraphCommitPolicy'
+import {
+  applyCanvasGraphCommitPolicy,
+  type CanvasGraphCommitPolicy,
+} from './canvasGraphCommitPolicy'
 import type { FlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import type {
   CanvasVueFlowGraphAdapter,
@@ -18,8 +20,7 @@ type FlowGraphDeleteProjectionOptions = {
   graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyGraphChanges'>
   nodes: Node[]
   edges: Edge[]
-  summary: CanvasGraphTransactionSummary
-  historyBefore?: unknown
+  commitPolicy: CanvasGraphCommitPolicy
   flowNodeIds?: readonly string[]
   projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
@@ -114,26 +115,24 @@ function createEdgeRemoveChanges(options: {
 export function applyFlowGraphDeleteProjection(
   options: FlowGraphDeleteProjectionOptions,
 ): CanvasVueFlowGraphCommandResult | null {
-  if (!options.summary.didChange) return null
+  const { summary } = options.commitPolicy
+  if (!summary.didChange) return null
 
   const removedFlowNodeIds = resolveRemovedFlowNodeIds(
     options.nodes,
-    options.summary.removedNodeIds,
+    summary.removedNodeIds,
     options.flowNodeIds,
   )
   const runningTaskIds = collectDeletedRunningTaskIds(options.nodes, removedFlowNodeIds)
   const result = applyCanvasGraphCommitPolicy(
-    {
-      summary: options.summary,
-      historyBefore: options.historyBefore,
-    },
+    options.commitPolicy,
     (commandOptions) =>
       options.graphAdapter.applyGraphChanges(
         {
           nodes: createNodeRemoveChanges(removedFlowNodeIds),
           edges: createEdgeRemoveChanges({
             edges: options.edges,
-            removedGraphEdgeIds: options.summary.removedEdgeIds,
+            removedGraphEdgeIds: summary.removedEdgeIds,
             removedFlowNodeIds,
             projectionIndex: options.projectionIndex,
             edgeRemoveChanges: options.edgeRemoveChanges,

@@ -13,7 +13,6 @@ import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import {
   createFlowGraphCommandOptions,
-  createFlowGraphCommandOptionsFromTransactionSummary,
   type FlowGraphCommandSideEffectOptions,
 } from './flowGraphAdapterCommandSideEffects'
 import type { FlowHistorySnapshot } from './useFlowHistory'
@@ -25,14 +24,6 @@ import {
   type CanvasNodeItem,
   type CanvasNodeItemByKind,
 } from '../../canvas-board/domain'
-import {
-  commitCanvasGraphDeleteIntent,
-  createCanvasGraphStore,
-  isCanvasGraphNodeId,
-} from '../graph-runtime'
-import { collectDeletedRunningTaskIds } from '../utils/flowDeletedRunningTasks'
-import { flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
-
 type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   nodes: Ref<Array<Record<string, any>>>
@@ -42,7 +33,6 @@ type UseFlowNodeMutationsOptions = {
   createNodeKind: Ref<CanvasCreatableNodeKind>
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
-  stopDeletedRunningTasks?: (taskIds: string[]) => void
 }
 
 type UpdateSnapshotNodeOptions = {
@@ -202,18 +192,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return isFlowConnectionAllowed(connection, lookupData)
   }
 
-  function createCurrentGraphStore() {
-    return createCanvasGraphStore(
-      flowToCanvasBoardSnapshot(
-        {
-          nodes: options.nodes.value as unknown as Node[],
-          edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
-        },
-        options.boardBaseSnapshot?.value,
-      ),
-    )
-  }
-
   const connectionMutations = useFlowConnectionMutations({
     nodes: options.nodes,
     edges: options.edges,
@@ -297,31 +275,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return appendNodeAtPosition(kind, x, y, initialSnapshotPatch)
   }
 
-  function onFlowDeleteNode(nodeId: string) {
-    const flowNodes = options.nodes.value as Array<{ id: string; data?: unknown }>
-    const target = flowNodes.find((node) => node.id === nodeId)
-    if (!target) return
-    if (!isCanvasGraphNodeId(nodeId)) {
-      options.onWarning('删除操作未能写入画布，请刷新后重试')
-      return
-    }
-
-    const store = createCurrentGraphStore()
-    const summary = commitCanvasGraphDeleteIntent(store, {
-      nodeIds: [nodeId],
-      removeConnectedEdges: true,
-    })
-    if (!summary.didChange) return
-    const runningTaskIds = collectDeletedRunningTaskIds(flowNodes, [nodeId])
-    const result = options.graphAdapter.removeNodes(nodeId, {
-      ...createFlowGraphCommandOptionsFromTransactionSummary(summary),
-      removeConnectedEdges: true,
-    })
-    if (result.didChange && runningTaskIds.length > 0) {
-      options.stopDeletedRunningTasks?.(runningTaskIds)
-    }
-  }
-
   function updateSnapshotNode(
     nodeId: string,
     patcher: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
@@ -388,7 +341,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     vueFlowConnectionBindings: connectionMutations.vueFlowConnectionBindings,
     onAddNode,
     createNodeAtPosition,
-    onFlowDeleteNode,
     updateSnapshotNode,
     onFlowPromptTextUpdate,
     onFlowNodeParamUpdate,

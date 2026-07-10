@@ -52,6 +52,7 @@ type UseCanvasGraphRuntimeOptions = {
   currentBoardId: ValueRef<string | null | undefined>
   createNodeKind: Ref<CanvasCreatableNodeKind>
   graphAdapter: CanvasVueFlowGraphAdapter
+  deleteNode: (nodeId: string) => boolean
   updateNodeInternals: (nodeIds: string[]) => void
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   getSelectedElements: ValueRef<Array<Node | Edge>>
@@ -61,7 +62,6 @@ type UseCanvasGraphRuntimeOptions = {
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   feedback: CanvasGraphRuntimeFeedback
-  stopDeletedRunningTasks?: (taskIds: string[]) => void
 }
 
 export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
@@ -89,7 +89,6 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     onWarning: (text) => {
       options.feedback.operationWarning(text)
     },
-    stopDeletedRunningTasks: options.stopDeletedRunningTasks,
   })
 
   function updateSnapshotNode(
@@ -210,7 +209,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     connectNodes: flowNodeMutations.connectNodes,
     vueFlowConnectionBindings: flowNodeMutations.vueFlowConnectionBindings,
     createNodeAtPosition: flowNodeMutations.createNodeAtPosition,
-    _onFlowDeleteNode: flowNodeMutations.onFlowDeleteNode,
+    onFlowDeleteNode: options.deleteNode,
     _onFlowPromptTextUpdate: flowNodeMutations.onFlowPromptTextUpdate,
     _onFlowNodeParamUpdate: flowNodeMutations.onFlowNodeParamUpdate,
     markFlowExecutionNodeDirty: flowNodeMutations.markFlowExecutionNodeDirty,
