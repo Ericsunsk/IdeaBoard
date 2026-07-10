@@ -97,9 +97,13 @@ function createGraphRuntime() {
     getImageNodeDisplayPayload: vi.fn(),
     getImageNodeSnapshot: vi.fn(),
     createImageNodeFromFile: vi.fn(),
-    onConnect: vi.fn(),
-    onEdgeUpdate: vi.fn(),
-    isValidConnection: vi.fn(() => true),
+    connectImageNodes: vi.fn(),
+    connectNodes: vi.fn(),
+    vueFlowConnectionBindings: {
+      isValidConnection: vi.fn(() => true),
+      onConnect: vi.fn(),
+      onEdgeUpdate: vi.fn(),
+    },
     uploadImageToBoard: vi.fn(),
     _onFlowNodeParamUpdate: vi.fn(),
     markFlowExecutionNodeDirty: vi.fn(),
@@ -221,8 +225,11 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.flowPane.edges).toBe(board.edges)
     expect(runtime.flowPane.onNodesChange).toBe(board.onNodesChange)
     expect(runtime.flowPane.onEdgesChange).toBe(board.onEdgesChange)
-    expect(runtime.flowPane.onConnect).toBe(graph.onConnect)
-    expect(runtime.flowPane.onEdgeUpdate).toBe(graph.onEdgeUpdate)
+    expect(runtime.flowPane.connectNodes).toBe(graph.connectNodes)
+    expect(runtime.flowPane.vueFlowConnectionBindings).toBe(graph.vueFlowConnectionBindings)
+    expect('onConnect' in runtime.flowPane).toBe(false)
+    expect('onEdgeUpdate' in runtime.flowPane).toBe(false)
+    expect('isValidConnection' in runtime.flowPane).toBe(false)
     expect(runtime.flowPane.nodeDragTransactions.begin).toBe(board.graphRuntime.nodeDrag.begin)
     expect(runtime.boardChrome.currentBoardId).toBe(board.currentBoardId)
     expect(runtime.boardChrome.boardRenameRecovery).toBe(board.boardRenameRecovery)
@@ -287,6 +294,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         currentBoardId: board.currentBoardId,
         getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
         getImageNodeSnapshot: graph.getImageNodeSnapshot,
+        connectImageNodes: graph.connectImageNodes,
         runInpaintAction: task.runImageInpaintAction,
         runPromptGeneration: task.runImagePromptGeneration,
         isGenerationAvailable: task.isGenerationAvailable,

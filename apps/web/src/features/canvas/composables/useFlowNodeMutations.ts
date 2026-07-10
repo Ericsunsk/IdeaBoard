@@ -381,11 +381,11 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   }
 
   return {
-    isValidConnection,
     resolveNodePosition,
     createSnapshotNodeForKind,
-    onConnect: connectionMutations.onConnect,
-    onEdgeUpdate: connectionMutations.onEdgeUpdate,
+    connectImageNodes: connectionMutations.connect,
+    connectNodes: connectionMutations.connectNodes,
+    vueFlowConnectionBindings: connectionMutations.vueFlowConnectionBindings,
     onAddNode,
     createNodeAtPosition,
     onFlowDeleteNode,

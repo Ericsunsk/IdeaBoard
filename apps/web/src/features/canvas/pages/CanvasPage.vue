@@ -63,12 +63,10 @@
         :zoom-on-pinch="!isFlowCanvasLocked"
         :pan-on-scroll-mode="PanOnScrollMode.Free"
         :only-render-visible-elements="true"
-        :is-valid-connection="commands.flowPane.isValidConnection"
+        v-bind="vueFlowConnectionBindings"
         @nodes-change="commands.flowPane.onNodesChange"
         @edges-change="vueFlowSelectionBindings.onEdgesChange"
-        @connect="commands.flowPane.onConnect"
         @connect-end="onFlowConnectEnd"
-        @edge-update="commands.flowPane.onEdgeUpdate"
         @move-start="onFlowMoveStart"
         @move="onFlowMove"
         @move-end="onFlowMoveEnd"
@@ -263,6 +261,7 @@ const commands = workspace.commands
 const isGenerationAvailable = computed(() => commands.imageWorkflow.isGenerationAvailable())
 
 const { nodes, edges } = viewModel.flowPane
+const { connectNodes, vueFlowConnectionBindings } = commands.flowPane
 
 type CanvasBenchmarkConnectDeleteTarget = {
   sourceNodeId: string
@@ -284,9 +283,9 @@ if (import.meta.env.DEV && isCanvasBenchmarkActionsEnabled.value) {
   const benchmarkWindow = window as CanvasBenchmarkWindow
   benchmarkWindow.__ideaboardCanvasBenchmarkActions = {
     connectDelete: (target) => {
-      commands.flowPane.onConnect({
-        source: target.sourceNodeId,
-        target: target.targetNodeId,
+      connectNodes({
+        sourceNodeId: target.sourceNodeId,
+        targetNodeId: target.targetNodeId,
         sourceHandle: target.sourceHandle,
         targetHandle: target.targetHandle,
       })

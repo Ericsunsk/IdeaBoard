@@ -1,4 +1,4 @@
-import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
+import type { Edge, EdgeChange, EdgeUpdateEvent, Node, NodeChange } from '@vue-flow/core'
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardSession, SaveStatus } from '../board-session'
@@ -8,6 +8,7 @@ import {
   type CanvasBoardSnapshot,
   type CanvasGroup,
 } from '../../canvas-board/domain'
+import { useCanvasGraphRuntime } from './useCanvasGraphRuntime'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 
@@ -94,6 +95,85 @@ function createSnapshot(): CanvasBoardSnapshot {
       toNodeType: 'prompt',
       toNodeId: 1,
       toPort: 'image',
+    },
+  ]
+  return snapshot
+}
+
+function createSingleInputReplacementSnapshot(): CanvasBoardSnapshot {
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  snapshot.promptNodes = [
+    {
+      id: 1,
+      type: 'prompt',
+      x: 40,
+      y: 40,
+      width: 280,
+      text: 'source prompt',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      inputImages: [],
+    },
+    {
+      id: 2,
+      type: 'prompt',
+      x: 40,
+      y: 420,
+      width: 280,
+      text: 'replacement source prompt',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      inputImages: [],
+    },
+  ]
+  snapshot.fusionNodes = [
+    {
+      id: 1,
+      type: 'fusion',
+      x: 520,
+      y: 40,
+      width: 286,
+      prompt: '',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      blendPoint: { x: 0.5, y: 0.5 },
+      inputImages: [],
+      outputStatus: 'idle',
+      outputImages: [],
+    },
+    {
+      id: 2,
+      type: 'fusion',
+      x: 520,
+      y: 420,
+      width: 286,
+      prompt: '',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      blendPoint: { x: 0.5, y: 0.5 },
+      inputImages: [],
+      outputStatus: 'idle',
+      outputImages: [],
+    },
+  ]
+  snapshot.connections = [
+    {
+      id: 1,
+      fromNodeType: 'prompt',
+      fromNodeId: 1,
+      fromPort: 'prompt',
+      toNodeType: 'fusion',
+      toNodeId: 1,
+      toPort: 'prompt',
+    },
+    {
+      id: 2,
+      fromNodeType: 'prompt',
+      fromNodeId: 2,
+      fromPort: 'prompt',
+      toNodeType: 'fusion',
+      toNodeId: 2,
+      toPort: 'prompt',
     },
   ]
   return snapshot
@@ -274,6 +354,64 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   }
 }
 
+function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntimeHarness>) {
+  const graphFeedback = {
+    operationSucceeded: vi.fn(),
+    operationWarning: vi.fn((message: string) => {
+      harness.onWarning(message)
+    }),
+    operationLoading: vi.fn(),
+  }
+  const graphRuntime = useCanvasGraphRuntime({
+    nodes: harness.fullNodes,
+    edges: harness.fullEdges,
+    boardBaseSnapshot: harness.boardBaseSnapshot,
+    currentBoardId: harness.runtime.currentBoardId,
+    createNodeKind: ref('prompt'),
+    graphAdapter: harness.runtime.graphAdapter,
+    updateNodeInternals: vi.fn(),
+    screenToFlowCoordinate: (point) => point,
+    getSelectedElements: computed(() => []),
+    removeSelectedElements: vi.fn(),
+    uploadApi: {
+      upload: vi.fn(async () => ({
+        code: 0,
+        data: { url: 'https://example.com/upload.png' },
+      })),
+    },
+    sanitizeApiErrorMessage: (_message, fallback) => fallback,
+    openNodeImagePreview: vi.fn(async () => {}),
+    openImageUrlPreview: vi.fn(async () => {}),
+    feedback: graphFeedback,
+    stopDeletedRunningTasks: harness.stopDeletedRunningTasks,
+  })
+
+  return { graphRuntime, graphFeedback }
+}
+
+function clearGraphActionMocks(harness: ReturnType<typeof createRuntimeHarness>) {
+  Object.values(harness.graphActions).forEach((action) => {
+    action.mockClear()
+  })
+}
+
+function exportCurrentBoardSnapshot(harness: ReturnType<typeof createRuntimeHarness>) {
+  return harness.runtime.graphRuntime
+    .createCurrentCanvasGraphStore()
+    .exportSnapshot(harness.boardBaseSnapshot.value)
+}
+
+function readEdgeProjection(edges: Edge[]) {
+  return edges.map((edge) => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    sourceHandle: edge.sourceHandle,
+    targetHandle: edge.targetHandle,
+    data: edge.data,
+  }))
+}
+
 function createPromptFlowNode(id: number, x: number, y: number): Node {
   return {
     id: `prompt-${id}`,
@@ -386,6 +524,244 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.flushAutosave({ silent: true })
 
     expect(harness.savedSnapshots[0]?.promptNodes.map((node) => node.id)).toContain(99)
+  })
+
+  it('pins valid connection mutations through Canvas state, Vue Flow projection, history, and autosave', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+    clearGraphActionMocks(harness)
+
+    graphRuntime.vueFlowConnectionBindings.onConnect({
+      source: 'image-1',
+      target: 'prompt-2',
+      sourceHandle: 'out:image',
+      targetHandle: 'in:image',
+    })
+
+    expect(harness.onWarning).not.toHaveBeenCalled()
+    expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
+      {
+        id: 3,
+        fromNodeType: 'image',
+        fromNodeId: 1,
+        fromPort: 'image',
+        toNodeType: 'prompt',
+        toNodeId: 1,
+        toPort: 'image',
+      },
+      {
+        id: 4,
+        fromNodeType: 'image',
+        fromNodeId: 1,
+        fromPort: 'image',
+        toNodeType: 'prompt',
+        toNodeId: 2,
+        toPort: 'image',
+      },
+    ])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3', 'connection-4'])
+    expect(harness.fullEdges.value[1]).toMatchObject({
+      id: 'connection-4',
+      source: 'image-1',
+      target: 'prompt-2',
+      sourceHandle: 'out:image',
+      targetHandle: 'in:image',
+      animated: false,
+      data: {
+        connectionSnapshot: {
+          id: 4,
+          fromNodeType: 'image',
+          fromNodeId: 1,
+          fromPort: 'image',
+          toNodeType: 'prompt',
+          toNodeId: 2,
+          toPort: 'image',
+        },
+      },
+    })
+    expect(harness.graphActions.addEdges).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'connection-4' }),
+    )
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('pending')
+    expect(harness.savedSnapshots).toHaveLength(0)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3', 'connection-4'])
+
+    await harness.runtime.flushAutosave({ silent: true })
+
+    expect(harness.savedSnapshots[0]?.connections.map((connection) => connection.id)).toEqual([
+      3, 4,
+    ])
+    expect(harness.savedSnapshots[0]?.connections[1]).toMatchObject({
+      fromNodeType: 'image',
+      fromNodeId: 1,
+      toNodeType: 'prompt',
+      toNodeId: 2,
+    })
+  })
+
+  it('updates an existing connection endpoint and replaces another single-input target connection', async () => {
+    const harness = createRuntimeHarness(createSingleInputReplacementSnapshot())
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+    clearGraphActionMocks(harness)
+
+    const edgeToUpdate = harness.fullEdges.value.find((edge) => edge.id === 'connection-2')
+    expect(edgeToUpdate).toBeDefined()
+
+    graphRuntime.vueFlowConnectionBindings.onEdgeUpdate({
+      edge: edgeToUpdate as Edge,
+      connection: {
+        source: 'prompt-2',
+        target: 'fusion-1',
+        sourceHandle: 'out:prompt',
+        targetHandle: 'in:prompt',
+      },
+    } as unknown as EdgeUpdateEvent)
+
+    expect(harness.onWarning).not.toHaveBeenCalled()
+    expect(harness.fullEdges.value).toHaveLength(1)
+    expect(harness.fullEdges.value[0]).toMatchObject({
+      id: 'connection-2',
+      source: 'prompt-2',
+      target: 'fusion-1',
+      sourceHandle: 'out:prompt',
+      targetHandle: 'in:prompt',
+    })
+    expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
+      {
+        id: 2,
+        fromNodeType: 'prompt',
+        fromNodeId: 2,
+        fromPort: 'prompt',
+        toNodeType: 'fusion',
+        toNodeId: 1,
+        toPort: 'prompt',
+      },
+    ])
+    expect(harness.graphActions.setEdges).toHaveBeenCalledOnce()
+    expect(harness.isDirty.value).toBe(true)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-1', 'connection-2'])
+    expect(harness.fullEdges.value.find((edge) => edge.id === 'connection-2')).toMatchObject({
+      source: 'prompt-2',
+      target: 'fusion-2',
+    })
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-2'])
+    expect(harness.fullEdges.value[0]).toMatchObject({
+      source: 'prompt-2',
+      target: 'fusion-1',
+    })
+  })
+
+  it('updates a generated Vue Flow edge by endpoint fallback without changing the connection id', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+    clearGraphActionMocks(harness)
+
+    const currentEdge = harness.fullEdges.value[0]
+    expect(currentEdge).toBeDefined()
+    const generatedEdge = {
+      ...(currentEdge as Edge),
+      id: 'vueflow__edge-image-1out:image-prompt-1in:image',
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [generatedEdge]
+
+    graphRuntime.vueFlowConnectionBindings.onEdgeUpdate({
+      edge: generatedEdge,
+      connection: {
+        source: 'image-1',
+        target: 'prompt-2',
+        sourceHandle: 'out:image',
+        targetHandle: 'in:image',
+      },
+    } as unknown as EdgeUpdateEvent)
+
+    expect(harness.onWarning).not.toHaveBeenCalled()
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+    expect(harness.fullEdges.value[0]).toMatchObject({
+      id: 'connection-3',
+      source: 'image-1',
+      target: 'prompt-2',
+      sourceHandle: 'out:image',
+      targetHandle: 'in:image',
+      data: {
+        connectionSnapshot: {
+          id: 3,
+          fromNodeType: 'image',
+          fromNodeId: 1,
+          fromPort: 'image',
+          toNodeType: 'prompt',
+          toNodeId: 2,
+          toPort: 'image',
+        },
+      },
+    })
+    expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
+      {
+        id: 3,
+        fromNodeType: 'image',
+        fromNodeId: 1,
+        fromPort: 'image',
+        toNodeType: 'prompt',
+        toNodeId: 2,
+        toPort: 'image',
+      },
+    ])
+    expect(harness.graphActions.setEdges).toHaveBeenCalledOnce()
+    expect(harness.isDirty.value).toBe(true)
+  })
+
+  it('warns and leaves the graph unchanged when an edge update cannot resolve canonical edge data', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
+    clearGraphActionMocks(harness)
+    const edgeProjectionBefore = readEdgeProjection(harness.fullEdges.value)
+    const boardConnectionsBefore = exportCurrentBoardSnapshot(harness).connections
+    const saveStatusBefore = harness.saveStatus.value
+    const currentEdge = harness.fullEdges.value[0]
+    expect(currentEdge).toBeDefined()
+    expect(harness.isDirty.value).toBe(false)
+
+    graphRuntime.vueFlowConnectionBindings.onEdgeUpdate({
+      edge: {
+        ...(currentEdge as Edge),
+        id: 'vueflow__edge-image-1out:image-prompt-2in:image',
+        target: 'prompt-2',
+        data: { connectionSnapshot: { id: 999 } },
+      },
+      connection: {
+        source: 'image-1',
+        target: 'prompt-2',
+        sourceHandle: 'out:image',
+        targetHandle: 'in:image',
+      },
+    } as unknown as EdgeUpdateEvent)
+
+    expect(harness.onWarning).toHaveBeenCalledWith('连线更新未能写入画布，请刷新后重试')
+    expect(readEdgeProjection(harness.fullEdges.value)).toEqual(edgeProjectionBefore)
+    expect(exportCurrentBoardSnapshot(harness).connections).toEqual(boardConnectionsBefore)
+    expect(harness.graphActions.addEdges).not.toHaveBeenCalled()
+    expect(harness.graphActions.setEdges).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(false)
+    expect(harness.saveStatus.value).toBe(saveStatusBefore)
+    expect(harness.savedSnapshots).toHaveLength(0)
   })
 
   it('records board groups in the shared undo and redo history', async () => {
@@ -1741,6 +2117,44 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullEdges.value).toHaveLength(0)
+  })
+
+  it('warns and leaves the graph unchanged when native edge remove cannot resolve canonical edge data', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    harness.graphActions.applyEdgeChanges.mockClear()
+    const currentEdge = harness.fullEdges.value[0]
+    expect(currentEdge).toBeDefined()
+    const unresolvedEdge = {
+      ...(currentEdge as Edge),
+      id: 'vueflow__edge-external-source-external-target',
+      source: 'external-source',
+      target: 'external-target',
+      data: undefined,
+    } as Edge
+    harness.fullEdges.value = [unresolvedEdge]
+    const edgeProjectionBefore = readEdgeProjection(harness.fullEdges.value)
+    const saveStatusBefore = harness.saveStatus.value
+
+    await harness.applyNativeEdgeChanges([
+      {
+        id: unresolvedEdge.id,
+        type: 'remove',
+        source: unresolvedEdge.source,
+        target: unresolvedEdge.target,
+        sourceHandle: unresolvedEdge.sourceHandle ?? null,
+        targetHandle: unresolvedEdge.targetHandle ?? null,
+      },
+    ])
+
+    expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
+    expect(readEdgeProjection(harness.fullEdges.value)).toEqual(edgeProjectionBefore)
+    expect(harness.graphActions.applyEdgeChanges).not.toHaveBeenCalled()
+    expect(harness.onNativeRemove).not.toHaveBeenCalled()
+    expect(harness.isDirty.value).toBe(false)
+    expect(harness.saveStatus.value).toBe(saveStatusBefore)
+    expect(harness.savedSnapshots).toHaveLength(0)
   })
 
   it('deletes a node when connected Vue Flow edge metadata is missing', async () => {

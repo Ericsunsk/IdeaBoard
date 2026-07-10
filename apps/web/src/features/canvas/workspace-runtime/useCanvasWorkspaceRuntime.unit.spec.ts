@@ -38,9 +38,12 @@ function createRuntimeParts() {
       edges: ref([]),
       onNodesChange: vi.fn(),
       onEdgesChange: vi.fn(),
-      isValidConnection: vi.fn(() => true),
-      onConnect: vi.fn(),
-      onEdgeUpdate: vi.fn(),
+      connectNodes: vi.fn(),
+      vueFlowConnectionBindings: {
+        isValidConnection: vi.fn(() => true),
+        onConnect: vi.fn(),
+        onEdgeUpdate: vi.fn(),
+      },
       nodeDragTransactions: {
         begin: vi.fn(),
         commit: vi.fn(),
@@ -166,11 +169,13 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     expect(workspace.commands.flowPane).toEqual({
       onNodesChange: runtimeParts.flowPane.onNodesChange,
       onEdgesChange: runtimeParts.flowPane.onEdgesChange,
-      isValidConnection: runtimeParts.flowPane.isValidConnection,
-      onConnect: runtimeParts.flowPane.onConnect,
-      onEdgeUpdate: runtimeParts.flowPane.onEdgeUpdate,
+      connectNodes: runtimeParts.flowPane.connectNodes,
+      vueFlowConnectionBindings: runtimeParts.flowPane.vueFlowConnectionBindings,
       nodeDragTransactions: runtimeParts.flowPane.nodeDragTransactions,
     })
+    expect('isValidConnection' in workspace.commands.flowPane).toBe(false)
+    expect('onConnect' in workspace.commands.flowPane).toBe(false)
+    expect('onEdgeUpdate' in workspace.commands.flowPane).toBe(false)
     expect(workspace.commands.boardSession.onNavigateRequest).toBe(
       runtimeParts.boardChrome.onNavigateRequest,
     )

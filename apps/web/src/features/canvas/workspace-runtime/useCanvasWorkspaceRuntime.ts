@@ -63,9 +63,8 @@ export function useCanvasWorkspaceRuntime(
       flowPane: {
         onNodesChange: runtime.flowPane.onNodesChange,
         onEdgesChange: runtime.flowPane.onEdgesChange,
-        isValidConnection: runtime.flowPane.isValidConnection,
-        onConnect: runtime.flowPane.onConnect,
-        onEdgeUpdate: runtime.flowPane.onEdgeUpdate,
+        connectNodes: runtime.flowPane.connectNodes,
+        vueFlowConnectionBindings: runtime.flowPane.vueFlowConnectionBindings,
         nodeDragTransactions: runtime.flowPane.nodeDragTransactions,
       },
       persistence: {
