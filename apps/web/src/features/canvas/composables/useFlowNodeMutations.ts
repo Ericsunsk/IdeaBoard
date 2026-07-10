@@ -11,6 +11,7 @@ import {
 import { useFlowConnectionMutations } from './useFlowConnectionMutations'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import {
   createFlowGraphCommandOptions,
   type FlowGraphCommandSideEffectOptions,
@@ -238,14 +239,14 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     x: number,
     y: number,
     initialSnapshotPatch?: InitialSnapshotPatch<T>,
-  ) {
+  ): CanvasGraphNodeIdForKind<T> | null {
     const baseSnapshotNode = createSnapshotNodeForKind(kind, x, y)
     const snapshotNode = initialSnapshotPatch
       ? { ...baseSnapshotNode, ...initialSnapshotPatch }
       : baseSnapshotNode
     const snapshotId = Number(snapshotNode.id)
     if (!Number.isFinite(snapshotId) || snapshotId <= 0) return null
-    const flowNodeId = `${kind}-${snapshotId}`
+    const flowNodeId = `${kind}-${snapshotId}` as CanvasGraphNodeIdForKind<T>
     const flowNodeTitle =
       typeof snapshotNode.title === 'string' && snapshotNode.title.trim()
         ? snapshotNode.title.trim()
@@ -271,7 +272,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     x: number,
     y: number,
     initialSnapshotPatch?: InitialSnapshotPatch<T>,
-  ) {
+  ): CanvasGraphNodeIdForKind<T> | null {
     return appendNodeAtPosition(kind, x, y, initialSnapshotPatch)
   }
 
@@ -336,9 +337,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   return {
     resolveNodePosition,
     createSnapshotNodeForKind,
-    connectImageNodes: connectionMutations.connect,
-    connectNodes: connectionMutations.connectNodes,
-    vueFlowConnectionBindings: connectionMutations.vueFlowConnectionBindings,
+    connectionAdapter: connectionMutations.connectionAdapter,
     onAddNode,
     createNodeAtPosition,
     updateSnapshotNode,

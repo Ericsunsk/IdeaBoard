@@ -168,7 +168,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
       getImageNodeSnapshot: graph.getImageNodeSnapshot,
       createImageNodeFromFile: graph.createImageNodeFromFile,
-      connectImageNodes: graph.connectImageNodes,
+      connectionAdapter: graph.connectionAdapter,
       uploadImageToBoard: graph.uploadImageToBoard,
       clearSelectedFlowElements: graph.clearSelectedFlowElementsSync,
       startCanvasInteraction: graph.startFlowInteraction,
@@ -237,8 +237,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       edges: board.edges,
       onNodesChange: board.onNodesChange,
       onEdgesChange: board.onEdgesChange,
-      connectNodes: graph.connectNodes,
-      vueFlowConnectionBindings: graph.vueFlowConnectionBindings,
+      connectionAdapter: graph.connectionAdapter,
       nodeDragTransactions: {
         begin: board.graphRuntime.nodeDrag.begin,
         commit: board.graphRuntime.nodeDrag.commit,

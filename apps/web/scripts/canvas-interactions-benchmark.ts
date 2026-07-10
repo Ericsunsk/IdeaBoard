@@ -9,11 +9,13 @@ import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   type CanvasBoardState,
   type CanvasConnection,
+  type CanvasConnectionPort,
   type CanvasConnectionNodeType,
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../src/features/canvas-board/domain'
+import type { CanvasGraphNodeId } from '../src/features/canvas/graph-runtime'
 import type { BoardStateEnvelope, User, UserBoardItem } from '../src/shared/api/generated-query/model'
 import { createMockSmokeRuntime } from './mock-smoke-utils'
 
@@ -135,11 +137,11 @@ type FixtureNodeRef = {
 type BenchmarkFixture = {
   board: UserBoardItem
   connectDeleteTarget: {
-    sourceNodeId: string
-    targetNodeId: string
-    sourceHandle: string
-    targetHandle: string
-    deleteNodeId: string
+    sourceNodeId: CanvasGraphNodeId
+    targetNodeId: CanvasGraphNodeId
+    sourcePort: CanvasConnectionPort
+    targetPort: CanvasConnectionPort
+    deleteNodeId: CanvasGraphNodeId
   }
   reportFixture: BenchmarkReport['fixture']
   dragTargetId: number
@@ -559,8 +561,8 @@ function createStructureHeavyFixture(nodeCount: number): BenchmarkFixture {
     connectDeleteTarget: {
       sourceNodeId: 'image-1',
       targetNodeId: 'prompt-2',
-      sourceHandle: 'out:image',
-      targetHandle: 'in:image',
+      sourcePort: 'image',
+      targetPort: 'image',
       deleteNodeId: 'fusion-3',
     },
     dragTargetId: 1,

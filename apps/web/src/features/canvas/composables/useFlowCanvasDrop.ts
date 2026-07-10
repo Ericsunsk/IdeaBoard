@@ -2,11 +2,15 @@ import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
 } from '../../../shared/utils/imageUploadSupport'
+import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 
 type UseFlowCanvasDropOptions = {
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   onWarning: (msg: string) => void
-  createImageNodeFromFile: (point: { x: number; y: number }, file: File) => Promise<string | null>
+  createImageNodeFromFile: (
+    point: { x: number; y: number },
+    file: File,
+  ) => Promise<CanvasGraphNodeIdForKind<'image'> | null>
 }
 
 export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {

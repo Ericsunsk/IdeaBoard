@@ -38,11 +38,13 @@ function createRuntimeParts() {
       edges: ref([]),
       onNodesChange: vi.fn(),
       onEdgesChange: vi.fn(),
-      connectNodes: vi.fn(),
-      vueFlowConnectionBindings: {
-        isValidConnection: vi.fn(() => true),
-        onConnect: vi.fn(),
-        onEdgeUpdate: vi.fn(),
+      connectionAdapter: {
+        vueFlowBindings: {
+          isValidConnection: vi.fn(() => true),
+          onConnect: vi.fn(),
+          onEdgeUpdate: vi.fn(),
+        },
+        connectIntent: vi.fn(),
       },
       nodeDragTransactions: {
         begin: vi.fn(),
@@ -166,13 +168,14 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     expect(workspace.commands.flowPane).toEqual({
       onNodesChange: runtimeParts.flowPane.onNodesChange,
       onEdgesChange: runtimeParts.flowPane.onEdgesChange,
-      connectNodes: runtimeParts.flowPane.connectNodes,
-      vueFlowConnectionBindings: runtimeParts.flowPane.vueFlowConnectionBindings,
+      connectionAdapter: runtimeParts.flowPane.connectionAdapter,
       nodeDragTransactions: runtimeParts.flowPane.nodeDragTransactions,
     })
     expect('isValidConnection' in workspace.commands.flowPane).toBe(false)
     expect('onConnect' in workspace.commands.flowPane).toBe(false)
     expect('onEdgeUpdate' in workspace.commands.flowPane).toBe(false)
+    expect('connectNodes' in workspace.commands.flowPane).toBe(false)
+    expect('vueFlowConnectionBindings' in workspace.commands.flowPane).toBe(false)
     expect(workspace.commands.boardSession.onNavigateRequest).toBe(
       runtimeParts.boardChrome.onNavigateRequest,
     )

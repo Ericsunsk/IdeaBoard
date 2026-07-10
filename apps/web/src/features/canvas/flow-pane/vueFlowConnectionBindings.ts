@@ -1,15 +1,17 @@
 import type { Connection, EdgeUpdateEvent } from '@vue-flow/core'
+import type { CanvasConnectionPort } from '../../canvas-board/domain'
+import type { CanvasGraphNodeId } from '../graph-runtime'
 
 export type CanvasFlowPaneConnectIntent = {
-  sourceNodeId: string
-  targetNodeId: string
-  sourceHandle: string | null
-  targetHandle: string | null
+  sourceNodeId: CanvasGraphNodeId
+  targetNodeId: CanvasGraphNodeId
+  sourcePort: CanvasConnectionPort
+  targetPort: CanvasConnectionPort
 }
 
-type CanvasFlowPaneConnectionAdapter = {
+type CanvasFlowPaneConnectionHandlers = {
   canConnect: (connection: Connection) => boolean
-  connect: (connection: Connection) => void
+  connect: (connection: Connection) => boolean
   updateEdge: (event: EdgeUpdateEvent) => void
 }
 
@@ -19,23 +21,28 @@ export type CanvasFlowPaneConnectionBindings = {
   onEdgeUpdate: (event: EdgeUpdateEvent) => void
 }
 
-export function createVueFlowConnectionBindings(
-  adapter: CanvasFlowPaneConnectionAdapter,
-): CanvasFlowPaneConnectionBindings {
-  return {
-    isValidConnection: adapter.canConnect,
-    onConnect: adapter.connect,
-    onEdgeUpdate: adapter.updateEdge,
-  }
+export type CanvasFlowPaneConnectionAdapter = {
+  vueFlowBindings: CanvasFlowPaneConnectionBindings
+  connectIntent: (intent: CanvasFlowPaneConnectIntent) => boolean
 }
 
-export function createVueFlowConnectionFromIntent(
-  intent: CanvasFlowPaneConnectIntent,
-): Connection {
+export function createCanvasFlowPaneConnectionAdapter(
+  handlers: CanvasFlowPaneConnectionHandlers,
+): CanvasFlowPaneConnectionAdapter {
   return {
-    source: intent.sourceNodeId,
-    target: intent.targetNodeId,
-    sourceHandle: intent.sourceHandle,
-    targetHandle: intent.targetHandle,
+    vueFlowBindings: {
+      isValidConnection: handlers.canConnect,
+      onConnect: (connection) => {
+        void handlers.connect(connection)
+      },
+      onEdgeUpdate: handlers.updateEdge,
+    },
+    connectIntent: (intent) =>
+      handlers.connect({
+        source: intent.sourceNodeId,
+        target: intent.targetNodeId,
+        sourceHandle: `out:${intent.sourcePort}`,
+        targetHandle: `in:${intent.targetPort}`,
+      }),
   }
 }

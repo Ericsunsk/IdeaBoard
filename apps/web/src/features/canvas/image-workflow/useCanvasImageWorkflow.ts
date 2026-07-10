@@ -18,7 +18,7 @@ export type CanvasImageWorkflowToolsOptions = Omit<
   | 'setViewport'
   | 'setCenter'
   | 'createImageNodeFromFile'
-  | 'connectImageNodes'
+  | 'connectionAdapter'
   | 'uploadImageToBoard'
   | 'openImageUrlPreview'
   | 'updateOutputCount'
@@ -67,7 +67,7 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'getImageNodeDisplayPayload'
   | 'getImageNodeSnapshot'
   | 'createImageNodeFromFile'
-  | 'connectImageNodes'
+  | 'connectionAdapter'
   | 'uploadImageToBoard'
   | 'clearSelectedFlowElements'
   | 'startCanvasInteraction'
@@ -116,7 +116,7 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions) {
       setViewport: options.flowPaneAdapter.setViewport,
       setCenter: options.flowPaneAdapter.setCenter,
       createImageNodeFromFile: graph.createImageNodeFromFile,
-      connectImageNodes: graph.connectImageNodes,
+      connectionAdapter: graph.connectionAdapter,
       uploadImageToBoard: graph.uploadImageToBoard,
       openImageUrlPreview: options.openImageUrlPreview,
       updateOutputCount: markImageWorkflowNodeDirty,

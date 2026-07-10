@@ -97,12 +97,13 @@ function createGraphRuntime() {
     getImageNodeDisplayPayload: vi.fn(),
     getImageNodeSnapshot: vi.fn(),
     createImageNodeFromFile: vi.fn(),
-    connectImageNodes: vi.fn(),
-    connectNodes: vi.fn(),
-    vueFlowConnectionBindings: {
-      isValidConnection: vi.fn(() => true),
-      onConnect: vi.fn(),
-      onEdgeUpdate: vi.fn(),
+    connectionAdapter: {
+      vueFlowBindings: {
+        isValidConnection: vi.fn(() => true),
+        onConnect: vi.fn(),
+        onEdgeUpdate: vi.fn(),
+      },
+      connectIntent: vi.fn(),
     },
     uploadImageToBoard: vi.fn(),
     _onFlowNodeParamUpdate: vi.fn(),
@@ -225,8 +226,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.flowPane.edges).toBe(board.edges)
     expect(runtime.flowPane.onNodesChange).toBe(board.onNodesChange)
     expect(runtime.flowPane.onEdgesChange).toBe(board.onEdgesChange)
-    expect(runtime.flowPane.connectNodes).toBe(graph.connectNodes)
-    expect(runtime.flowPane.vueFlowConnectionBindings).toBe(graph.vueFlowConnectionBindings)
+    expect(runtime.flowPane.connectionAdapter).toBe(graph.connectionAdapter)
+    expect('connectNodes' in runtime.flowPane).toBe(false)
+    expect('vueFlowConnectionBindings' in runtime.flowPane).toBe(false)
     expect('onConnect' in runtime.flowPane).toBe(false)
     expect('onEdgeUpdate' in runtime.flowPane).toBe(false)
     expect('isValidConnection' in runtime.flowPane).toBe(false)
@@ -294,7 +296,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         currentBoardId: board.currentBoardId,
         getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
         getImageNodeSnapshot: graph.getImageNodeSnapshot,
-        connectImageNodes: graph.connectImageNodes,
+        connectionAdapter: graph.connectionAdapter,
         runInpaintAction: task.runImageInpaintAction,
         runPromptGeneration: task.runImagePromptGeneration,
         isGenerationAvailable: task.isGenerationAvailable,

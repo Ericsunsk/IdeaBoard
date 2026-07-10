@@ -12,6 +12,7 @@ import {
 
 export type CanvasGraphNodeKind = CanvasConnectionNodeType
 export type CanvasGraphNodeId = `${CanvasGraphNodeKind}-${number}`
+export type CanvasGraphNodeIdForKind<T extends CanvasGraphNodeKind> = `${T}-${number}`
 export type CanvasGraphEdgeId = `connection-${number}`
 export type CanvasGraphGroupId = CanvasGroup['id']
 

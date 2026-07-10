@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file */
-import type { Connection, Node } from '@vue-flow/core'
+import type { Node } from '@vue-flow/core'
 import { createApp, defineComponent, h, inject, nextTick, ref, shallowRef, type Ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
@@ -77,7 +77,7 @@ const imageNodeFixtures: Record<
     snapshot: ImageNodeItem
   }
 > = {
-  'node-1': {
+  'image-1': {
     display: { url: 'https://example.com/source.png', ratio: 1 },
     snapshot: {
       id: 1,
@@ -92,7 +92,7 @@ const imageNodeFixtures: Record<
       outputImages: [],
     },
   },
-  'node-2': {
+  'image-2': {
     display: { url: 'https://example.com/current.png', ratio: 1 },
     snapshot: {
       id: 2,
@@ -102,6 +102,21 @@ const imageNodeFixtures: Record<
       y: 30,
       width: 280,
       sourceImageUrl: 'https://example.com/current.png',
+      sourceImageRatio: 1,
+      outputStatus: 'ready',
+      outputImages: [],
+    },
+  },
+  'legacy-image': {
+    display: { url: 'https://example.com/legacy.png', ratio: 1 },
+    snapshot: {
+      id: 3,
+      type: 'image-node',
+      title: 'Legacy',
+      x: 30,
+      y: 40,
+      width: 260,
+      sourceImageUrl: 'https://example.com/legacy.png',
       sourceImageRatio: 1,
       outputStatus: 'ready',
       outputImages: [],
@@ -128,8 +143,8 @@ function mountCanvasImageTools() {
   const nodes: Ref<Node[]> = shallowRef(
     Object.keys(imageNodeFixtures).map((id) => ({ id, data: { kind: 'image' } })) as Node[],
   )
-  const connectImageNodes = vi.fn<(connection: Connection) => void>()
-  const createImageNodeFromFile = vi.fn(async () => 'node-created')
+  const connectionAdapter = { connectIntent: vi.fn(() => true) }
+  const createImageNodeFromFile = vi.fn(async () => 'image-3')
   const setViewport = vi.fn()
   const setCenter = vi.fn()
   const runInpaintAction = vi.fn()
@@ -170,7 +185,7 @@ function mountCanvasImageTools() {
           setViewport,
           setCenter,
           createImageNodeFromFile,
-          connectImageNodes,
+          connectionAdapter,
           uploadImageToBoard: async () => ({ url: 'https://example.com/ref.png', ratio: 1 }),
           openImageUrlPreview: vi.fn(),
           clearActiveNodePanel: vi.fn(),
@@ -178,8 +193,8 @@ function mountCanvasImageTools() {
           updateOutputCount,
           runInpaintAction,
           runPromptGeneration,
-          isImageActionPanelVisible: (nodeId) => nodeId === 'node-1',
-          isImagePromptComposerVisible: (nodeId) => nodeId === 'node-1',
+          isImageActionPanelVisible: (nodeId) => nodeId === 'image-1',
+          isImagePromptComposerVisible: (nodeId) => nodeId === 'image-1',
           isGenerationAvailable: () => generationAvailable.value,
           isDirectActionRunning: () => false,
           strengthControl: {
@@ -208,7 +223,7 @@ function mountCanvasImageTools() {
     activeTool,
     activeStrengthAction,
     app,
-    connectImageNodes,
+    connectionAdapter,
     createImageNodeFromFile,
     currentBoardId,
     generationAvailable,
@@ -233,7 +248,7 @@ function mountCanvasImageTools() {
 }
 
 function prepareRenderableAdjustmentSession(runtime: CanvasImageTools) {
-  expect(runtime.commands.lifecycle.enter('node-1', 'adjust')).toBe(true)
+  expect(runtime.commands.lifecycle.enter('image-1', 'adjust')).toBe(true)
   runtime.commands.chrome.selectAdjustmentLayer('threshold')
   return runtime.viewModel.chrome.value.editor.layers
 }
@@ -296,7 +311,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       harness.isCanvasInteractionLocked.value = false
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(false)
 
-      expect(harness.runtime.commands.lifecycle.enter('node-1', 'adjust')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'adjust')).toBe(true)
 
       expect(harness.runtime.viewModel.locks.isCanvasLocked.value).toBe(true)
     } finally {
@@ -331,7 +346,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         { url: 'https://example.com/source.png', title: 'Source' },
         renderableLayers,
         expect.objectContaining({
-          scopeId: 'node-1',
+          scopeId: 'image-1',
           onProgress: expect.any(Function),
         }),
       )
@@ -341,13 +356,59 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
       expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
+      expect(harness.feedback.warning).not.toHaveBeenCalled()
       expect(harness.feedback.succeeded).toHaveBeenCalledWith('已应用编辑并派生新节点')
-      expect(harness.connectImageNodes).toHaveBeenCalledWith({
-        source: 'node-1',
-        sourceHandle: 'out:image',
-        target: 'node-created',
-        targetHandle: 'in:image',
+      expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
+        sourceNodeId: 'image-1',
+        sourcePort: 'image',
+        targetNodeId: 'image-3',
+        targetPort: 'image',
       })
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('does not render or create a derived node from a noncanonical active source', async () => {
+    const harness = mountCanvasImageTools()
+
+    try {
+      prepareRenderableAdjustmentSession(harness.runtime)
+      expect(harness.runtime.commands.lifecycle.enter('legacy-image', 'adjust')).toBe(true)
+      harness.runtime.commands.chrome.selectAdjustmentLayer('threshold')
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(renderLayerStackFileMock).not.toHaveBeenCalled()
+      expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
+      expect(harness.connectionAdapter.connectIntent).not.toHaveBeenCalled()
+      expect(harness.feedback.warning).toHaveBeenCalledWith('图片节点未能写入画布')
+      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+    } finally {
+      harness.unmount()
+    }
+  })
+
+  it('keeps the rendered node and editor open when automatic connection is rejected', async () => {
+    renderLayerStackFileMock.mockResolvedValue(
+      new File(['rendered'], 'rendered.webp', { type: 'image/webp' }),
+    )
+    const harness = mountCanvasImageTools()
+    harness.connectionAdapter.connectIntent.mockReturnValue(false)
+
+    try {
+      prepareRenderableAdjustmentSession(harness.runtime)
+
+      await harness.runtime.commands.editor.apply()
+
+      expect(harness.createImageNodeFromFile).toHaveBeenCalledTimes(1)
+      expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledTimes(1)
+      expect(harness.feedback.warning).toHaveBeenCalledWith(
+        '图片已创建，但自动连线失败，请手动连接',
+      )
+      expect(harness.feedback.succeeded).not.toHaveBeenCalled()
+      expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-1')
+      expect(harness.runtime.viewModel.active.mode.value).toBe('adjust')
     } finally {
       harness.unmount()
     }
@@ -370,7 +431,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       await flushPromises()
       harness.cancelImageAdjustmentFinalApply()
 
-      expect(cancelFinalRenderMock).toHaveBeenCalledWith('node-1')
+      expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-1')
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
       expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
 
@@ -401,19 +462,19 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       await flushPromises()
 
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(true)
-      expect(harness.runtime.commands.lifecycle.enter('node-2', 'adjust')).toBe(true)
-      expect(cancelFinalRenderMock).toHaveBeenCalledWith('node-1')
-      expect(harness.runtime.viewModel.active.nodeId.value).toBe('node-2')
+      expect(harness.runtime.commands.lifecycle.enter('image-2', 'adjust')).toBe(true)
+      expect(cancelFinalRenderMock).toHaveBeenCalledWith('image-1')
+      expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-2')
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
 
       resolveOldRender(new File(['old'], 'old.webp', { type: 'image/webp' }))
       await oldApply
 
       expect(harness.createImageNodeFromFile).not.toHaveBeenCalled()
-      expect(harness.connectImageNodes).not.toHaveBeenCalled()
+      expect(harness.connectionAdapter.connectIntent).not.toHaveBeenCalled()
       expect(harness.feedback.succeeded).not.toHaveBeenCalled()
       expect(harness.feedback.warning).not.toHaveBeenCalled()
-      expect(harness.runtime.viewModel.active.nodeId.value).toBe('node-2')
+      expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-2')
     } finally {
       harness.unmount()
     }
@@ -423,10 +484,10 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      expect(harness.runtime.commands.lifecycle.enter('node-1', 'inpaint')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
-      const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('node-1')
-      const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+      const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
+      const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
       expect(stageBinding.mode).toBe('inpaint')
       expect(stageBinding.maskOverlayStyle).toEqual({
@@ -448,17 +509,17 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      expect(harness.runtime.commands.lifecycle.enter('node-1', 'inpaint')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
-      const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('node-1')
-      const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
-      const inactiveStageBinding = harness.runtime.viewModel.nodeBindings.stageFor('node-2')
-      const inactiveActionBinding = harness.runtime.viewModel.nodeBindings.actionFor('node-2')
+      const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
+      const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
+      const inactiveStageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-2')
+      const inactiveActionBinding = harness.runtime.viewModel.nodeBindings.actionFor('image-2')
 
-      expect(harness.runtime.viewModel.nodeBindings.stageFor('node-1')).toBe(stageBinding)
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1')).toBe(actionBinding)
-      expect(harness.runtime.viewModel.nodeBindings.stageFor('node-2')).toBe(inactiveStageBinding)
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-2')).toBe(inactiveActionBinding)
+      expect(harness.runtime.viewModel.nodeBindings.stageFor('image-1')).toBe(stageBinding)
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1')).toBe(actionBinding)
+      expect(harness.runtime.viewModel.nodeBindings.stageFor('image-2')).toBe(inactiveStageBinding)
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2')).toBe(inactiveActionBinding)
     } finally {
       harness.unmount()
     }
@@ -468,24 +529,24 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      expect(harness.runtime.commands.lifecycle.enter('node-1', 'inpaint')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
-      const stageBefore = harness.runtime.viewModel.nodeBindings.stageFor('node-1')
+      const stageBefore = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
       harness.runtime.commands.chrome.setMaskBrushSize(48)
-      const stageAfter = harness.runtime.viewModel.nodeBindings.stageFor('node-1')
+      const stageAfter = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
 
       expect(stageAfter).not.toBe(stageBefore)
       expect(stageAfter.maskBrushSize).toBe(48)
-      expect(harness.runtime.viewModel.nodeBindings.stageFor('node-1')).toBe(stageAfter)
+      expect(harness.runtime.viewModel.nodeBindings.stageFor('image-1')).toBe(stageAfter)
 
-      const actionBefore = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+      const actionBefore = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
       harness.activeStrengthAction.value = IMAGE_STRENGTH_ACTIONS[0]
-      const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+      const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
       expect(actionAfter).not.toBe(actionBefore)
       expect(actionAfter.strengthControl.activeAction).toBe(IMAGE_STRENGTH_ACTIONS[0])
       expect(actionAfter.strengthControl.visible).toBe(true)
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1')).toBe(actionAfter)
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1')).toBe(actionAfter)
     } finally {
       harness.unmount()
     }
@@ -495,23 +556,23 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      expect(harness.runtime.commands.lifecycle.enter('node-1', 'inpaint')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1').directGenerating).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(
         false,
       )
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
 
-      const actionBefore = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+      const actionBefore = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
       harness.generationAvailable.value = false
-      const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+      const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
       expect(actionAfter).not.toBe(actionBefore)
       expect(actionAfter.directGenerating).toBe(true)
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(true)
 
       harness.generationAvailable.value = true
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1').directGenerating).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(
         false,
       )
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
@@ -524,9 +585,9 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      const node1StageBinding = harness.runtime.viewModel.nodeBindings.stageFor('node-1')
-      const node1StageBindingAgain = harness.runtime.viewModel.nodeBindings.stageFor('node-1')
-      const node2StageBinding = harness.runtime.viewModel.nodeBindings.stageFor('node-2')
+      const node1StageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
+      const node1StageBindingAgain = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
+      const node2StageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-2')
 
       expect(node1StageBindingAgain.setMaskCanvasRef).toBe(node1StageBinding.setMaskCanvasRef)
       expect(node1StageBindingAgain.setRasterCanvasRef).toBe(
@@ -539,19 +600,19 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       const rasterCanvas = document.createElement('canvas')
       node2StageBinding.setRasterCanvasRef(rasterCanvas)
-      expect(rasterOverlayMocks.setRasterCanvasRef).toHaveBeenCalledWith('node-2', rasterCanvas)
+      expect(rasterOverlayMocks.setRasterCanvasRef).toHaveBeenCalledWith('image-2', rasterCanvas)
 
-      expect(harness.runtime.commands.lifecycle.enter('node-2', 'inpaint')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-2', 'inpaint')).toBe(true)
       const maskCanvas = document.createElement('canvas')
       maskCanvas.width = 4
       maskCanvas.height = 4
       node2StageBinding.setMaskCanvasRef(maskCanvas)
-      harness.runtime.commands.chrome.submitMaskPrompt('重绘 node-2', 1)
+      harness.runtime.commands.chrome.submitMaskPrompt('重绘 image-2', 1)
 
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-2').promptPlaceholder).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2').promptPlaceholder).toBe(
         '描述如何重绘选区',
       )
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1').promptPlaceholder).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
         '输入提示词改造这张图',
       )
     } finally {
@@ -563,42 +624,42 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      expect(harness.runtime.commands.lifecycle.enter('node-1', 'inpaint')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
       const canvas = document.createElement('canvas')
       canvas.width = 4
       canvas.height = 4
-      harness.runtime.viewModel.nodeBindings.stageFor('node-1').setMaskCanvasRef(canvas)
+      harness.runtime.viewModel.nodeBindings.stageFor('image-1').setMaskCanvasRef(canvas)
 
       harness.runtime.commands.chrome.submitMaskPrompt('重绘这块区域', 2)
 
-      expect(harness.runInpaintAction).toHaveBeenCalledWith('node-1', {
+      expect(harness.runInpaintAction).toHaveBeenCalledWith('image-1', {
         prompt: '重绘这块区域',
         outputCount: 2,
         maskDataUrl: 'data:image/png;base64,execution-mask',
         referenceImageUrls: [],
       })
       expect(harness.runtime.viewModel.active.nodeId.value).toBeNull()
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1').promptPlaceholder).toBe(
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
         '描述如何重绘选区',
       )
 
-      harness.runtime.commands.prompt.runPromptAction('node-1', '继续用选区生成', 3)
+      harness.runtime.commands.prompt.runPromptAction('image-1', '继续用选区生成', 3)
 
-      expect(harness.runInpaintAction).toHaveBeenLastCalledWith('node-1', {
+      expect(harness.runInpaintAction).toHaveBeenLastCalledWith('image-1', {
         prompt: '继续用选区生成',
         outputCount: 3,
         maskDataUrl: 'data:image/png;base64,execution-mask',
       })
       expect(harness.runPromptGeneration).not.toHaveBeenCalled()
 
-      harness.runtime.commands.lifecycle.discardNodeEdits('node-1')
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('node-1').promptPlaceholder).toBe(
+      harness.runtime.commands.lifecycle.discardNodeEdits('image-1')
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
         '输入提示词改造这张图',
       )
 
-      harness.runtime.commands.prompt.runPromptAction('node-1', '普通生成', 1)
-      expect(harness.runPromptGeneration).toHaveBeenCalledWith('node-1', '普通生成', 1)
+      harness.runtime.commands.prompt.runPromptAction('image-1', '普通生成', 1)
+      expect(harness.runPromptGeneration).toHaveBeenCalledWith('image-1', '普通生成', 1)
     } finally {
       harness.unmount()
     }
@@ -608,7 +669,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     const harness = mountCanvasImageTools()
 
     try {
-      expect(harness.runtime.commands.lifecycle.enter('node-1', 'inpaint')).toBe(true)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
       harness.runtime.commands.chrome.setMaskBrushShape('square')
       harness.runtime.commands.chrome.setMaskBrushSize(36)
@@ -616,8 +677,8 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       harness.runtime.commands.chrome.updateMaskOutputCount(3)
 
       const chromeModel = harness.runtime.viewModel.chrome.value
-      const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('node-1')
-      const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('node-1')
+      const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
+      const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
       expect(chromeModel.mode).toBe('inpaint')
       expect(chromeModel.mask.brushShape).toBe('square')
@@ -626,7 +687,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(stageBinding.maskBrushShape).toBe('square')
       expect(stageBinding.maskBrushSize).toBe(36)
       expect(actionBinding.promptComposerVisible).toBe(true)
-      expect(harness.updateOutputCount).toHaveBeenCalledWith('node-1', {
+      expect(harness.updateOutputCount).toHaveBeenCalledWith('image-1', {
         key: 'outputCount',
         value: 3,
       })

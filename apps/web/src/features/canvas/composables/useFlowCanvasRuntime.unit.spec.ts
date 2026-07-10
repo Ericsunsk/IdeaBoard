@@ -533,7 +533,7 @@ describe('useFlowCanvasRuntime', () => {
     const { graphRuntime } = createCanvasGraphRuntimeHarness(harness)
     clearGraphActionMocks(harness)
 
-    graphRuntime.vueFlowConnectionBindings.onConnect({
+    graphRuntime.connectionAdapter.vueFlowBindings.onConnect({
       source: 'image-1',
       target: 'prompt-2',
       sourceHandle: 'out:image',
@@ -632,7 +632,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.fullEdges.value = [staleEdge, ...harness.fullEdges.value]
     clearGraphActionMocks(harness)
 
-    graphRuntime.vueFlowConnectionBindings.onConnect({
+    graphRuntime.connectionAdapter.vueFlowBindings.onConnect({
       source: 'prompt-3',
       target: 'fusion-1',
       sourceHandle: 'out:prompt',
@@ -698,7 +698,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.fullEdges.value = [...harness.fullEdges.value, staleEdge]
     clearGraphActionMocks(harness)
 
-    graphRuntime.vueFlowConnectionBindings.onConnect({
+    graphRuntime.connectionAdapter.vueFlowBindings.onConnect({
       source: 'prompt-3',
       target: 'fusion-1',
       sourceHandle: 'out:prompt',
@@ -768,7 +768,7 @@ describe('useFlowCanvasRuntime', () => {
     const snapshotBefore = exportCurrentBoardSnapshot(harness)
     const saveStatusBefore = harness.saveStatus.value
 
-    graphRuntime.vueFlowConnectionBindings.onConnect({
+    graphRuntime.connectionAdapter.vueFlowBindings.onConnect({
       source: 'image-1',
       target: 'prompt-2',
       sourceHandle: 'out:image',
@@ -795,7 +795,7 @@ describe('useFlowCanvasRuntime', () => {
     const edgeToUpdate = harness.fullEdges.value.find((edge) => edge.id === 'connection-2')
     expect(edgeToUpdate).toBeDefined()
 
-    graphRuntime.vueFlowConnectionBindings.onEdgeUpdate({
+    graphRuntime.connectionAdapter.vueFlowBindings.onEdgeUpdate({
       edge: edgeToUpdate as Edge,
       connection: {
         source: 'prompt-2',
@@ -859,7 +859,7 @@ describe('useFlowCanvasRuntime', () => {
     } as Edge
     harness.fullEdges.value = [generatedEdge]
 
-    graphRuntime.vueFlowConnectionBindings.onEdgeUpdate({
+    graphRuntime.connectionAdapter.vueFlowBindings.onEdgeUpdate({
       edge: generatedEdge,
       connection: {
         source: 'image-1',
@@ -917,7 +917,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(currentEdge).toBeDefined()
     expect(harness.isDirty.value).toBe(false)
 
-    graphRuntime.vueFlowConnectionBindings.onEdgeUpdate({
+    graphRuntime.connectionAdapter.vueFlowBindings.onEdgeUpdate({
       edge: {
         ...(currentEdge as Edge),
         id: 'vueflow__edge-image-1out:image-prompt-2in:image',

@@ -62,7 +62,7 @@
         :zoom-on-pinch="!isFlowCanvasLocked"
         :pan-on-scroll-mode="PanOnScrollMode.Free"
         :only-render-visible-elements="true"
-        v-bind="vueFlowConnectionBindings"
+        v-bind="connectionAdapter.vueFlowBindings"
         @nodes-change="commands.flowPane.onNodesChange"
         @edges-change="vueFlowSelectionBindings.onEdgesChange"
         @connect-end="onFlowConnectEnd"
@@ -173,7 +173,8 @@ import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
-import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
+import type { CanvasConnectionPort, CanvasCreatableNodeKind } from '../../canvas-board/domain'
+import type { CanvasGraphNodeId } from '../graph-runtime'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
@@ -260,14 +261,14 @@ const commands = workspace.commands
 const isGenerationAvailable = computed(() => commands.imageWorkflow.isGenerationAvailable())
 
 const { nodes, edges } = viewModel.flowPane
-const { connectNodes, vueFlowConnectionBindings } = commands.flowPane
+const { connectionAdapter } = commands.flowPane
 
 type CanvasBenchmarkConnectDeleteTarget = {
-  sourceNodeId: string
-  targetNodeId: string
-  sourceHandle: string
-  targetHandle: string
-  deleteNodeId: string
+  sourceNodeId: CanvasGraphNodeId
+  targetNodeId: CanvasGraphNodeId
+  sourcePort: CanvasConnectionPort
+  targetPort: CanvasConnectionPort
+  deleteNodeId: CanvasGraphNodeId
 }
 
 type CanvasBenchmarkWindow = Window & {
@@ -282,11 +283,11 @@ if (import.meta.env.DEV && isCanvasBenchmarkActionsEnabled.value) {
   const benchmarkWindow = window as CanvasBenchmarkWindow
   benchmarkWindow.__ideaboardCanvasBenchmarkActions = {
     connectDelete: (target) => {
-      connectNodes({
+      connectionAdapter.connectIntent({
         sourceNodeId: target.sourceNodeId,
         targetNodeId: target.targetNodeId,
-        sourceHandle: target.sourceHandle,
-        targetHandle: target.targetHandle,
+        sourcePort: target.sourcePort,
+        targetPort: target.targetPort,
       })
       commands.flowPane.onNodesChange([{ id: target.deleteNodeId, type: 'remove' }])
     },

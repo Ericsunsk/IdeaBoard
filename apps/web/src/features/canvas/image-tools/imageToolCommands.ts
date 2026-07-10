@@ -3,6 +3,7 @@ import {
   renderImageEditorLayerStackFile,
 } from '../image-editor/services/imageAdjustmentRenderer'
 import { useMaskEditorChromeActions } from '../mask-editor/composables/useMaskEditorChromeActions'
+import { isCanvasGraphNodeId } from '../graph-runtime'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
@@ -14,6 +15,10 @@ export function createImageToolCommands(session: ImageToolSession) {
 
     const nodeId = session.imageEditorNodeId.value
     if (!nodeId || session.imageEditorMode.value !== 'adjust') return
+    if (!isCanvasGraphNodeId(nodeId)) {
+      options.feedback.warning('图片节点未能写入画布')
+      return
+    }
 
     const boardId = options.currentBoardId.value
     const source = options.getImageNodeDisplayPayload(nodeId)
@@ -60,12 +65,16 @@ export function createImageToolCommands(session: ImageToolSession) {
         renderedFile,
       )
       if (!newNodeId) return
-      options.connectImageNodes({
-        source: nodeId,
-        sourceHandle: 'out:image',
-        target: newNodeId,
-        targetHandle: 'in:image',
+      const didConnect = options.connectionAdapter.connectIntent({
+        sourceNodeId: nodeId,
+        sourcePort: 'image',
+        targetNodeId: newNodeId,
+        targetPort: 'image',
       })
+      if (!didConnect) {
+        options.feedback.warning('图片已创建，但自动连线失败，请手动连接')
+        return
+      }
       session.imageEditorSession.clearImageEditorRasterHistory()
       session.exitImageEditorMode({ runBeforeExit: false })
       session.imageEditorSession.resetImageEditorSession()

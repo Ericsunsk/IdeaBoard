@@ -205,9 +205,7 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
   return {
     scheduleFlowNodeInternalsRefresh,
     clearSelectedFlowElementsSync,
-    connectImageNodes: flowNodeMutations.connectImageNodes,
-    connectNodes: flowNodeMutations.connectNodes,
-    vueFlowConnectionBindings: flowNodeMutations.vueFlowConnectionBindings,
+    connectionAdapter: flowNodeMutations.connectionAdapter,
     createNodeAtPosition: flowNodeMutations.createNodeAtPosition,
     onFlowDeleteNode: options.deleteNode,
     _onFlowPromptTextUpdate: flowNodeMutations.onFlowPromptTextUpdate,

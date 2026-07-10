@@ -6,6 +6,7 @@ import {
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
 import { readCurrentBoardIdRef } from '../utils/currentBoardId'
+import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 
 type FlowImageUploadResult = { url: string; ratio: number }
 
@@ -24,7 +25,7 @@ type UseFlowImageUploadActionsOptions = {
     x: number,
     y: number,
     initialSnapshotPatch?: Partial<ImageNodeItem>,
-  ) => string | null
+  ) => CanvasGraphNodeIdForKind<'image'> | null
   updateSnapshotNode: (nodeId: string, patcher: (prev: CanvasNodeItem) => CanvasNodeItem) => void
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   uploadApi: {
@@ -162,7 +163,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     point: { x: number; y: number },
     payload: FlowImageUploadResult,
     title?: string,
-  ): string | null {
+  ): CanvasGraphNodeIdForKind<'image'> | null {
     const frameSize = resolveImageNodeFrameSize(payload.ratio, true)
     const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
       ...(title ? { title } : {}),
@@ -181,7 +182,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
   async function createImageNodeFromFile(
     point: { x: number; y: number },
     file: File,
-  ): Promise<string | null> {
+  ): Promise<CanvasGraphNodeIdForKind<'image'> | null> {
     if (!isSupportedUploadImageFile(file)) {
       options.onWarning(unsupportedUploadImageMessage())
       return null

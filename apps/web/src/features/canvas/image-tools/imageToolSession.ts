@@ -1,9 +1,11 @@
 import { useEventListener } from '@vueuse/core'
 import { computed, ref } from 'vue'
-import type { Connection, Node } from '@vue-flow/core'
+import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../composables/useFlowCanvasInteractionState'
+import type { CanvasFlowPaneConnectionAdapter } from '../flow-pane'
+import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import { useImageEditorMode } from '../image-editor/composables/useImageEditorMode'
 import { useImageEditorRasterOverlay } from '../image-editor/composables/useImageEditorRasterOverlay'
 import { useImageEditorSession } from '../image-editor/composables/useImageEditorSession'
@@ -51,8 +53,11 @@ export type UseCanvasImageToolsOptions = {
     y: number,
     options?: { zoom?: number; duration?: number; interpolate?: 'smooth' },
   ) => Promise<unknown> | unknown
-  createImageNodeFromFile: (point: { x: number; y: number }, file: File) => Promise<string | null>
-  connectImageNodes: (connection: Connection) => void
+  createImageNodeFromFile: (
+    point: { x: number; y: number },
+    file: File,
+  ) => Promise<CanvasGraphNodeIdForKind<'image'> | null>
+  connectionAdapter: Pick<CanvasFlowPaneConnectionAdapter, 'connectIntent'>
   uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
   openImageUrlPreview: (url: string, ratio: number) => void | Promise<void>
   clearActiveNodePanel: () => void

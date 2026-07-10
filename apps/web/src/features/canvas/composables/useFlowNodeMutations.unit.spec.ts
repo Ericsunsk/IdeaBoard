@@ -262,7 +262,7 @@ describe('useFlowNodeMutations', () => {
     )
   })
 
-  it('creates valid connections through the graph adapter and marks ready targets stale', () => {
+  it('creates valid connections from adapter-normalized intents and marks ready targets stale', () => {
     const { nodes, edges, graphActions, graphCommand, mutations } = createMutationsHarness(
       [
         makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
@@ -271,11 +271,11 @@ describe('useFlowNodeMutations', () => {
       [],
     )
 
-    mutations.vueFlowConnectionBindings.onConnect({
-      source: 'image-1',
-      target: 'fusion-1',
-      sourceHandle: 'out:image',
-      targetHandle: 'in:image',
+    mutations.connectionAdapter.connectIntent({
+      sourceNodeId: 'image-1',
+      targetNodeId: 'fusion-1',
+      sourcePort: 'image',
+      targetPort: 'image',
     })
 
     expect(edges.value).toHaveLength(1)
@@ -305,7 +305,7 @@ describe('useFlowNodeMutations', () => {
       [],
     )
 
-    mutations.vueFlowConnectionBindings.onConnect({
+    mutations.connectionAdapter.vueFlowBindings.onConnect({
       source: 'image-1',
       target: 'fusion-1',
       sourceHandle: 'out:image',
@@ -355,7 +355,7 @@ describe('useFlowNodeMutations', () => {
       [generatedEdge, explicitEdge],
     )
 
-    mutations.vueFlowConnectionBindings.onEdgeUpdate({
+    mutations.connectionAdapter.vueFlowBindings.onEdgeUpdate({
       edge: generatedEdge,
       connection: {
         source: 'image-1',
@@ -385,7 +385,7 @@ describe('useFlowNodeMutations', () => {
       [makeEdge('connection-1', 'prompt-1', 'fusion-1', 'out:prompt', 'in:prompt')],
     )
 
-    mutations.vueFlowConnectionBindings.onConnect({
+    mutations.connectionAdapter.vueFlowBindings.onConnect({
       source: 'prompt-2',
       target: 'fusion-1',
       sourceHandle: 'out:prompt',
@@ -412,7 +412,7 @@ describe('useFlowNodeMutations', () => {
       [1, 2, 3, 4].map((id) => makeEdge(`connection-${id}`, `image-${id}`, 'fusion-1')),
     )
 
-    mutations.vueFlowConnectionBindings.onConnect({
+    mutations.connectionAdapter.vueFlowBindings.onConnect({
       source: 'image-5',
       target: 'fusion-1',
       sourceHandle: 'out:image',
@@ -434,7 +434,7 @@ describe('useFlowNodeMutations', () => {
       [],
     )
 
-    mutations.vueFlowConnectionBindings.onConnect({
+    mutations.connectionAdapter.vueFlowBindings.onConnect({
       source: 'image-1',
       target: 'fusion-1',
       sourceHandle: 'out:image',
@@ -476,7 +476,7 @@ describe('useFlowNodeMutations', () => {
       ],
     )
 
-    mutations.vueFlowConnectionBindings.onEdgeUpdate({
+    mutations.connectionAdapter.vueFlowBindings.onEdgeUpdate({
       edge: edges.value[0]!,
       connection: {
         source: 'image-2',

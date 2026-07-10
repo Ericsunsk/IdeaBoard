@@ -56,8 +56,7 @@ export type CanvasWorkspaceRuntimeCommands = {
     CanvasWorkspaceRuntimeParts['flowPane'],
     | 'onNodesChange'
     | 'onEdgesChange'
-    | 'connectNodes'
-    | 'vueFlowConnectionBindings'
+    | 'connectionAdapter'
     | 'nodeDragTransactions'
   >
   persistence: Pick<

@@ -26,10 +26,8 @@ import {
   type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
 import {
-  createVueFlowConnectionBindings,
-  createVueFlowConnectionFromIntent,
-  type CanvasFlowPaneConnectIntent,
-} from '../flow-pane/vueFlowConnectionBindings'
+  createCanvasFlowPaneConnectionAdapter,
+} from '../flow-pane'
 
 type UseFlowConnectionMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node data is an open Record; narrowing breaks vue-flow's internal type expectations
@@ -135,12 +133,12 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     return true
   }
 
-  function onConnectTransaction(resolvedConnection: Connection) {
+  function onConnectTransaction(resolvedConnection: Connection): boolean {
     const existingEdges = options.edges.value as unknown as Edge[]
     const nextConnection = createNextCanvasConnection(resolvedConnection, existingEdges)
     if (!nextConnection) {
       options.onWarning('连线未能写入画布，请刷新后重试')
-      return
+      return false
     }
 
     const allowsMultipleTargetConnections =
@@ -156,9 +154,9 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     } catch (error) {
       console.error('[Canvas] Failed to commit connection transaction', error)
       options.onWarning('连线未能写入画布，请刷新后重试')
-      return
+      return false
     }
-    if (!summary.didChange) return
+    if (!summary.didChange) return false
 
     const didCommitProjection = commitConnectProjection(
       existingEdges,
@@ -167,19 +165,16 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       allowsMultipleTargetConnections,
       { summary },
     )
-    if (!didCommitProjection) return
+    if (!didCommitProjection) return false
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
+    return true
   }
 
-  function connect(connection: Connection) {
+  function connect(connection: Connection): boolean {
     const existingEdges = options.edges.value as unknown as Edge[]
     const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
-    if (!resolvedConnection) return
-    onConnectTransaction(resolvedConnection)
-  }
-
-  function connectNodes(intent: CanvasFlowPaneConnectIntent) {
-    connect(createVueFlowConnectionFromIntent(intent))
+    if (!resolvedConnection) return false
+    return onConnectTransaction(resolvedConnection)
   }
 
   function createEdgeUpdatePatch(nextEdge: Edge): Partial<Edge> {
@@ -313,15 +308,15 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     onEdgeUpdateTransaction(event, resolvedConnection)
   }
 
-  const vueFlowConnectionBindings = createVueFlowConnectionBindings({
-    canConnect: options.isValidConnection,
-    connect,
-    updateEdge,
-  })
+  const connectionAdapter = createCanvasFlowPaneConnectionAdapter(
+    {
+      canConnect: options.isValidConnection,
+      connect,
+      updateEdge,
+    },
+  )
 
   return {
-    connect,
-    connectNodes,
-    vueFlowConnectionBindings,
+    connectionAdapter,
   }
 }
