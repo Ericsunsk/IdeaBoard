@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
@@ -34,6 +35,7 @@ type Service struct {
 	generationSettings settings.GoogleNativeGenerationSettingProvider
 	eventHub           *EventHub
 	taskEvents         events.TaskStatusPublisher
+	taskBilling        *taskbilling.Service
 }
 
 type AccountStore interface {
@@ -70,6 +72,7 @@ type ServiceDeps struct {
 	MediaValidator     taskmedia.Validator
 	TaskOutputCleaner  taskmedia.TaskOutputCleaner
 	GenerationSettings settings.GoogleNativeGenerationSettingProvider
+	TaskBilling        *taskbilling.Service
 }
 
 type ServiceOptions struct {
@@ -102,6 +105,7 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		generationSettings: deps.GenerationSettings,
 		eventHub:           opts.EventHub,
 		taskEvents:         opts.TaskEvents,
+		taskBilling:        deps.TaskBilling,
 	}
 }
 
@@ -153,6 +157,18 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		Priority:       priority,
 		Status:         tasks.StatusPending,
 	}
+	if featureSlug == workflow.FeatureSlugPatternGen {
+		if clientActionID == "" {
+			return "", validation.New("AI 生图任务必须提供 client_action_id")
+		}
+		billingRequest, err := taskbilling.PatternGenerationRequest(requestedModel)
+		if err != nil {
+			return "", err
+		}
+		task.BillingRequest = &tasks.TaskBillingRequest{
+			Feature: billingRequest.Feature, Model: billingRequest.Model, Quantity: billingRequest.Quantity,
+		}
+	}
 
 	accountIDs := make([]int64, len(apiAccounts))
 	for i, acc := range apiAccounts {
@@ -177,6 +193,9 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	result, err := s.submissionStore.SubmitTask(ctx, task, queueTask)
 	if err != nil {
 		slog.Warn("submit task transaction failed", "task_id", taskID, "correlation_id", correlationID, "err", err)
+		if errors.Is(err, taskbilling.ErrInsufficientCredits) {
+			return "", validation.New("点子不足")
+		}
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
@@ -186,18 +205,43 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	return result.TaskID, nil
 }
 
-func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
+type SubmitTaskReadiness struct {
+	Feature string
+	Billing *taskbilling.Readiness
+}
+
+func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (SubmitTaskReadiness, error) {
 	if req == nil {
-		return "", fmt.Errorf("请求参数错误")
+		return SubmitTaskReadiness{}, fmt.Errorf("请求参数错误")
 	}
-	if _, err := normalizeSubmitTaskClientActionID(req.ClientActionID); err != nil {
-		return "", err
-	}
-	_, _, _, featureSlug, _, err := s.prepareSubmitTask(ctx, userID, req)
+	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
 	if err != nil {
-		return "", err
+		return SubmitTaskReadiness{}, err
 	}
-	return featureSlug, nil
+	_, typedParams, _, featureSlug, _, err := s.prepareSubmitTask(ctx, userID, req)
+	if err != nil {
+		return SubmitTaskReadiness{}, err
+	}
+	result := SubmitTaskReadiness{Feature: featureSlug}
+	if featureSlug != workflow.FeatureSlugPatternGen {
+		return result, nil
+	}
+	if clientActionID == "" {
+		return SubmitTaskReadiness{}, validation.New("AI 生图任务必须提供 client_action_id")
+	}
+	if s.taskBilling == nil {
+		return SubmitTaskReadiness{}, fmt.Errorf("点子计费服务暂不可用")
+	}
+	billingRequest, err := taskbilling.PatternGenerationRequest(typedParams.Model)
+	if err != nil {
+		return SubmitTaskReadiness{}, err
+	}
+	readiness, err := s.taskBilling.Readiness(ctx, userID, billingRequest)
+	if err != nil {
+		return SubmitTaskReadiness{}, err
+	}
+	result.Billing = &readiness
+	return result, nil
 }
 
 func normalizeSubmitTaskClientActionID(raw string) (string, error) {
@@ -439,6 +483,13 @@ func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int6
 	if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
 		return err
 	}
+	if !tasks.IsTerminalStatus(task.Status) {
+		if _, err := s.taskRepo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
+			TaskID: taskID, CancelledAt: time.Now(), CancelledBy: &userID, Reason: userDeletedTaskCancelReason,
+		}, nil); err != nil {
+			return err
+		}
+	}
 	if err := s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID); err != nil {
 		return err
 	}
@@ -476,6 +527,11 @@ func (s *Service) DeleteTasks(ctx context.Context, rawTaskIDs []string) (DeleteT
 		}
 		for _, taskID := range activeTaskIDs {
 			if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
+				return DeleteTasksResult{}, err
+			}
+			if _, err := s.taskRepo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
+				TaskID: taskID, CancelledAt: time.Now(), Reason: "管理员删除任务",
+			}, nil); err != nil {
 				return DeleteTasksResult{}, err
 			}
 		}

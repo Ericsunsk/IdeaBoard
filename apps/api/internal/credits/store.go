@@ -2,6 +2,7 @@ package credits
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -49,8 +50,14 @@ func executeCreditCommand(
 	if tx == nil {
 		return CommandResult{}, fmt.Errorf("credits service: transaction not configured")
 	}
-	var result CommandResult
-	err := tx.QueryRow(ctx, `
+	return scanCreditCommand(tx.QueryRow(ctx, creditCommandSQL,
+		commandType, userID, amount, strings.TrimSpace(relatedTransactionID),
+		metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID,
+		metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID,
+	))
+}
+
+const creditCommandSQL = `
 SELECT transaction_id,
        command_type,
        command_amount,
@@ -59,19 +66,34 @@ SELECT transaction_id,
        reserved_balance_after,
        replayed,
        created_at
-FROM execute_credit_command($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		commandType,
-		userID,
-		amount,
-		strings.TrimSpace(relatedTransactionID),
-		metadata.IdempotencyKey,
-		metadata.Actor.Type,
-		metadata.Actor.ID,
-		metadata.Source,
-		metadata.Reason,
-		metadata.BusinessReference.Type,
-		metadata.BusinessReference.ID,
-	).Scan(
+FROM execute_credit_command($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+
+type rowScanner interface {
+	Scan(...any) error
+}
+
+func executeSQLCreditCommand(
+	ctx context.Context,
+	tx *sql.Tx,
+	commandType CommandType,
+	userID int64,
+	amount int64,
+	relatedTransactionID string,
+	metadata CommandMetadata,
+) (CommandResult, error) {
+	if tx == nil {
+		return CommandResult{}, fmt.Errorf("credits service: SQL transaction not configured")
+	}
+	return scanCreditCommand(tx.QueryRowContext(ctx, creditCommandSQL,
+		commandType, userID, amount, strings.TrimSpace(relatedTransactionID),
+		metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID,
+		metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID,
+	))
+}
+
+func scanCreditCommand(row rowScanner) (CommandResult, error) {
+	var result CommandResult
+	err := row.Scan(
 		&result.TransactionID,
 		&result.CommandType,
 		&result.Amount,

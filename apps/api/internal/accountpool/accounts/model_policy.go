@@ -114,5 +114,5 @@ func normalizeFeatureSlug(slug string) string {
 }
 
 func normalizeModelKey(model string) string {
-	return strings.ToLower(strings.TrimSpace(model))
+	return workflow.NormalizeModelKey(model)
 }

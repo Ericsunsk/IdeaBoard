@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -13,7 +14,13 @@ import (
 type consumerTaskRuntime interface {
 	RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error
 	FailTask(ctx context.Context, input taskruntime.FailTaskInput) error
+	ResetRunningTask(ctx context.Context, input taskruntime.ResetRunningTaskInput) error
 }
+
+var (
+	errFinalAttemptMarkerUnavailable = errors.New("final attempt marker unavailable")
+	errFinalAttemptMarkerResetFailed = errors.New("reset after final attempt marker failure failed")
+)
 
 type taskProcessor struct {
 	assigner    taskqueue.TaskAssigner
@@ -34,6 +41,14 @@ func newTaskProcessor(
 }
 
 func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) error {
+	return p.process(ctx, task, nil)
+}
+
+func (p *taskProcessor) ProcessBeforeExecute(ctx context.Context, task *tasks.TaskPayload, beforeExecute func() error) error {
+	return p.process(ctx, task, beforeExecute)
+}
+
+func (p *taskProcessor) process(ctx context.Context, task *tasks.TaskPayload, beforeExecute func() error) error {
 	if task == nil {
 		return nil
 	}
@@ -80,6 +95,21 @@ func (p *taskProcessor) Process(ctx context.Context, task *tasks.TaskPayload) er
 		}
 	default:
 		return fmt.Errorf("unexpected assign status %q for task=%s", assignment.Status, task.TaskID)
+	}
+	if beforeExecute != nil {
+		if err := beforeExecute(); err != nil {
+			resetErr := p.taskRuntime.ResetRunningTask(context.WithoutCancel(ctx), taskruntime.ResetRunningTaskInput{
+				Assignment: assignment,
+				Reason:     "final attempt marker unavailable; waiting retry",
+			})
+			if resetErr != nil {
+				return errors.Join(
+					fmt.Errorf("%w: %v", errFinalAttemptMarkerResetFailed, err),
+					fmt.Errorf("reset task after marker failure: %w", resetErr),
+				)
+			}
+			return fmt.Errorf("%w: %v", errFinalAttemptMarkerUnavailable, err)
+		}
 	}
 
 	return p.executeTask(ctx, task, assignment)

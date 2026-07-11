@@ -1717,6 +1717,16 @@ components:
         total_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
         quoted_at: { type: string, format: date-time }
 
+    TaskBillingReadiness:
+      allOf:
+        - $ref: '#/components/schemas/BillingQuote'
+        - type: object
+          required: [available_credits, reserved_credits, sufficient]
+          properties:
+            available_credits: { type: integer, format: int64, minimum: 0 }
+            reserved_credits: { type: integer, format: int64, minimum: 0 }
+            sufficient: { type: boolean }
+
     BillingPrice:
       type: object
       required: [price_version_id, version, unit_credits, enabled, created_by, created_at, updated_by, updated_at]
@@ -2210,10 +2220,10 @@ components:
           maxLength: 128
           pattern: '^[A-Za-z0-9_.:-]+$'
           description: >
-            Optional client-generated idempotency key for a single task submission
-            action. Reuse the same value when retrying the same action after a
-            network failure or duplicate click; generate a new value for an
-            intentional rerun.
+            Client-generated idempotency key for a single task submission action.
+            It is required for pattern-gen because billed AI image submissions must
+            converge after network timeouts. Reuse the same value when retrying the
+            same action; generate a new value for an intentional rerun.
         priority:
           type: integer
           minimum: 1
@@ -3254,6 +3264,8 @@ components:
                 ready: { type: boolean }
                 message: { type: string }
                 feature: { type: string }
+                billing:
+                  $ref: '#/components/schemas/TaskBillingReadiness'
 
     ApiResponseTaskList:
       allOf:

@@ -1025,8 +1025,9 @@ func TestSubmitTaskAppliesFeaturePromptModelDefaultBeforeRouting(t *testing.T) {
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt:  "draw a chair",
-		Feature: workflow.FeatureSlugPatternGen,
+		Prompt:         "draw a chair",
+		Feature:        workflow.FeatureSlugPatternGen,
+		ClientActionID: "pattern-default-model",
 	})
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
@@ -1084,9 +1085,10 @@ func TestSubmitTaskExplicitModelOverridesFeaturePromptModelDefault(t *testing.T)
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt:  "draw a chair",
-		Feature: workflow.FeatureSlugPatternGen,
-		Params:  map[string]interface{}{"model": "gpt-image-1"},
+		Prompt:         "draw a chair",
+		Feature:        workflow.FeatureSlugPatternGen,
+		ClientActionID: "pattern-explicit-model",
+		Params:         map[string]interface{}{"model": "gpt-image-1"},
 	})
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)

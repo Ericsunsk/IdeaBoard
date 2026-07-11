@@ -97,6 +97,8 @@ River + PostgreSQL 负责：
 - 任务状态、取消标记和运行态事实源
 - 队列监控的聚合来源
 
+Pattern Generation 是首个接入点子计费的 Task tracer。Submit 必须在同一 PostgreSQL transaction 中完成 server-side Quote snapshot、Credit Hold、Task insert 与 River enqueue；成功终态与 Capture 原子提交，失败、取消或最终 timeout 与 Release 原子提交。Task status event 只能在该 transaction commit 后发布。
+
 NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前核心事件是 `task.status_changed`，由 API 实例 bridge 到本地 SSE hub。禁止把 NATS JetStream 恢复成任务执行队列，也不保留 Redis/Asynq/Dragonfly/Garnet 等生产兼容路径。
 
 ### 4. Worker 是 runtime adapter
@@ -183,6 +185,7 @@ Dependency direction:
 - Cross-context collaboration should use small service/repository interfaces at the caller boundary.
 - Products consume Credits through the `credits.Commands` seam; only Credits owns Ledger writes and balance projections.
 - Products ask Billing for an immutable `PriceSnapshot`; Provider Account routing must not influence SKU price. Billing does not write the Credits Ledger.
+- Tasking 通过 `internal/tasking/taskbilling` 编排 Billing Quote 与 Credits Commands，并持久化不可变 Task Billing snapshot；Billing/Credits 仍分别拥有价格事实和 Ledger 写入。
 
 ## Frontend Context Map
 

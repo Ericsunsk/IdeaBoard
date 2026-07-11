@@ -8,6 +8,7 @@ import (
 
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 
 	"github.com/gin-gonic/gin"
@@ -56,9 +57,10 @@ type submitTaskResponse struct {
 }
 
 type submitTaskReadinessResponse struct {
-	Ready   bool   `json:"ready"`
-	Message string `json:"message,omitempty"`
-	Feature string `json:"feature,omitempty"`
+	Ready   bool                   `json:"ready"`
+	Message string                 `json:"message,omitempty"`
+	Feature string                 `json:"feature,omitempty"`
+	Billing *taskbilling.Readiness `json:"billing,omitempty"`
 }
 
 type adminTaskResponse struct {
@@ -134,12 +136,17 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	featureSlug, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
+	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
 	if err != nil {
 		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err)})
 		return
 	}
-	response.SuccessDTO(c, submitTaskReadinessResponse{Ready: true, Feature: featureSlug})
+	ready := readiness.Billing == nil || readiness.Billing.Sufficient
+	message := ""
+	if !ready {
+		message = "点子不足"
+	}
+	response.SuccessDTO(c, submitTaskReadinessResponse{Ready: ready, Message: message, Feature: readiness.Feature, Billing: readiness.Billing})
 }
 
 func (h *Handler) GetTask(c *gin.Context) {

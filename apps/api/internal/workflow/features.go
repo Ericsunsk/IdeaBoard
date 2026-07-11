@@ -53,6 +53,12 @@ func normalizeWorkflowFeatureSlug(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
+// NormalizeModelKey is the canonical model identity shared by account routing
+// and billing. Provider-specific path aliases are not collapsed here.
+func NormalizeModelKey(model string) string {
+	return strings.ToLower(strings.TrimSpace(model))
+}
+
 func ParseWorkflowFeatureSlug(raw string) (string, bool) {
 	slug := normalizeWorkflowFeatureSlug(raw)
 	if slug == "" || !workflowFeatureSlugRe.MatchString(slug) {

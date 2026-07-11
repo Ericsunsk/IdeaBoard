@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/worker"
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/taskservice"
@@ -62,6 +63,8 @@ func newAppTaskRuntime(
 	repos appRepositories,
 	services appDomainServices,
 ) (appTaskServices, appWorkerRuntime, error) {
+	taskBillingService := taskbilling.NewService(services.billingService, services.creditService)
+	repos.taskRepo.SetTaskBilling(taskBillingService)
 	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)
 	taskMediaAuthorizer := storage.NewTaskMediaAuthorizer(
@@ -122,7 +125,7 @@ func newAppTaskRuntime(
 	}
 	riverQueue.SetClient(riverClient)
 
-	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry)
+	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		AccountRepo:        repos.accountRepo,
 		TaskRepo:           repos.taskRepo,
@@ -132,6 +135,7 @@ func newAppTaskRuntime(
 		MediaValidator:     submitMediaValidator,
 		TaskOutputCleaner:  runtimeTaskMediaStore,
 		GenerationSettings: services.runtimeSettings,
+		TaskBilling:        taskBillingService,
 	}, taskservice.ServiceOptions{
 		EventHub:   taskEventHub,
 		TaskEvents: taskEvents,

@@ -108,6 +108,26 @@ FROM set_billing_price_version_enabled($1, $2, $3, $4)`, sku, input.Version, inp
 }
 
 func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
+	if err := s.requirePool(); err != nil {
+		return Quote{}, err
+	}
+	return s.quote(ctx, s.pool, rawSKU, quantity)
+}
+
+// QuoteInTx locks a submission to the price visible in its caller-owned
+// PostgreSQL transaction.
+func (s *Service) QuoteInTx(ctx context.Context, tx pgx.Tx, rawSKU string, quantity int64) (Quote, error) {
+	if tx == nil {
+		return Quote{}, ErrServiceUnavailable
+	}
+	return s.quote(ctx, tx, rawSKU, quantity)
+}
+
+type quoteQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string, quantity int64) (Quote, error) {
 	sku, err := CanonicalizeSKU(rawSKU)
 	if err != nil {
 		return Quote{}, err
@@ -115,8 +135,8 @@ func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quo
 	if quantity <= 0 {
 		return Quote{}, ErrInvalidQuantity
 	}
-	if err := s.requirePool(); err != nil {
-		return Quote{}, err
+	if querier == nil {
+		return Quote{}, ErrServiceUnavailable
 	}
 	var skuEnabled bool
 	var priceVersionID pgtype.Int8
@@ -124,7 +144,7 @@ func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quo
 	var unitCredits pgtype.Int8
 	var priceEnabled pgtype.Bool
 	var quotedAt pgtype.Timestamptz
-	err = s.pool.QueryRow(ctx, `
+	err = querier.QueryRow(ctx, `
 SELECT skus.enabled, prices.price_version_id, prices.version, prices.unit_credits,
        states.enabled, statement_timestamp()
 FROM billing_skus skus

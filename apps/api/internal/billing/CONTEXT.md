@@ -21,6 +21,7 @@ Billing 是平台级商品身份与 Credit pricing context。它为 IdeaBoard �
 - `PriceSnapshot` 包含 `sku`, `price_version_id`, `price_version`, `unit_credits`, `quoted_at`；后续 Hold/Charge 必须保存并复用该 snapshot，不得重新报价。
 - Admin handler 创建 SKU、修改 display fields/SKU enabled、追加 Price Version、修改 Price State，以及读取 Catalog/Price history。
 - SKU identity 没有 rename/delete contract；停用使用 `enabled=false`。
+- Pattern Generation 的 SKU 由 canonical `feature/model` 确定性计算：`ai-image:pattern-gen.<sha256-hex("pattern-gen\\x00" + lower(trim(model)))>`。Admin 必须先创建该 SKU 与 current Price，Readiness/Submit 才可用；`models/` 等 provider path alias 不会被折叠。
 
 ## Invariants
 

@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	RiverJobKindDrawingGenerate = "drawing_generate"
-	RiverQueueDefault           = "drawing_default"
-	RiverMaxAttemptsDefault     = 25
+	RiverJobKindDrawingGenerate     = "drawing_generate"
+	RiverJobKindDrawingFinalFailure = "drawing_final_failure"
+	RiverQueueDefault               = "drawing_default"
+	RiverMaxAttemptsDefault         = 25
 )
 
 type DrawingTaskArgs struct {
@@ -28,6 +29,18 @@ type DrawingTaskArgs struct {
 
 func (DrawingTaskArgs) Kind() string {
 	return RiverJobKindDrawingGenerate
+}
+
+// DrawingFinalFailureArgs is a settlement-only retry. Its worker must never
+// dispatch to an AI Provider.
+type DrawingFinalFailureArgs struct {
+	TaskID     string `json:"task_id" river:"unique"`
+	RiverJobID int64  `json:"river_job_id" river:"unique"`
+	Reason     string `json:"reason"`
+}
+
+func (DrawingFinalFailureArgs) Kind() string {
+	return RiverJobKindDrawingFinalFailure
 }
 
 type riverClient interface {

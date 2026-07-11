@@ -13,14 +13,16 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type Repository struct {
-	db *sql.DB
-	q  *dbsqlc.Queries
+	db          *sql.DB
+	q           *dbsqlc.Queries
+	taskBilling *taskbilling.Service
 }
 
 type RunningTaskLease struct {
@@ -166,6 +168,10 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
 
+func (r *Repository) SetTaskBilling(service *taskbilling.Service) {
+	r.taskBilling = service
+}
+
 func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
 	params := createTaskParams(task)
 	id, err := r.q.CreateTask(ctx, params)
@@ -215,6 +221,63 @@ func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks
 	}
 	task.TaskID = taskID
 	return true, nil
+}
+
+func (r *Repository) FindSubmissionByClientActionWithPGXTx(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string, request taskbilling.Request) (tasks.TaskSubmissionResult, bool, error) {
+	if tx == nil || userID <= 0 || strings.TrimSpace(clientActionID) == "" {
+		return tasks.TaskSubmissionResult{}, false, nil
+	}
+	expectedHash, err := taskbilling.RequestFingerprint(request)
+	if err != nil {
+		return tasks.TaskSubmissionResult{}, false, err
+	}
+	var result tasks.TaskSubmissionResult
+	var actualHash string
+	err = tx.QueryRow(ctx, `
+SELECT task_id, request_hash
+FROM task_submission_claims
+WHERE user_id = $1 AND client_action_id = $2
+	FOR UPDATE`, userID, strings.TrimSpace(clientActionID)).Scan(&result.TaskID, &actualHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		var existingTaskID, feature string
+		taskErr := tx.QueryRow(ctx, `
+SELECT task_id, feature_slug
+FROM tasks
+WHERE user_id = $1 AND client_action_id = $2
+FOR UPDATE`, userID, strings.TrimSpace(clientActionID)).Scan(&existingTaskID, &feature)
+		if errors.Is(taskErr, pgx.ErrNoRows) {
+			return tasks.TaskSubmissionResult{}, false, nil
+		}
+		if taskErr != nil {
+			return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: inspect existing submission without claim: %w", taskErr)
+		}
+		if taskbilling.RequiresBilling(feature) {
+			return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: billed submission %s has no durable idempotency claim", taskbilling.ErrIntegrity, existingTaskID)
+		}
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: client action already belongs to task %s", taskbilling.ErrIdempotencyConflict, existingTaskID)
+	}
+	if err != nil {
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: find durable submission claim: %w", err)
+	}
+	if actualHash != expectedHash {
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: client action %s was reused with a different billed product", taskbilling.ErrIdempotencyConflict, clientActionID)
+	}
+	var settlementState taskbilling.SettlementState
+	if err := tx.QueryRow(ctx, `
+SELECT COALESCE(snapshots.hold_transaction_id, ''), settlements.state
+FROM task_billing_snapshots snapshots
+JOIN task_billing_settlements settlements USING (task_id)
+WHERE snapshots.task_id = $1`, result.TaskID).Scan(&result.HoldTransactionID, &settlementState); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: billed submission %s has incomplete billing facts", taskbilling.ErrIntegrity, result.TaskID)
+		}
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: load billed submission %s facts: %w", result.TaskID, err)
+	}
+	if settlementState == taskbilling.SettlementStateHeld && result.HoldTransactionID == "" {
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("%w: billed submission %s has held state without Hold", taskbilling.ErrIntegrity, result.TaskID)
+	}
+	result.Created = false
+	return result, true, nil
 }
 
 func (r *Repository) loadIdempotentTaskWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error) {
@@ -320,7 +383,7 @@ func (r *Repository) ListByTaskIDs(ctx context.Context, taskIDs []string) ([]*ta
 
 func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
-	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
 		updated, err := q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
 			ErrorMsg:    errMsg,
 			Result:      result,
@@ -340,10 +403,46 @@ func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses
 		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
 			return err
 		}
+		if err := r.settleTaskBilling(ctx, tx, taskID, taskbilling.SettlementStateReleased); err != nil {
+			return err
+		}
 		rowsAffected = updated
 		return nil
 	})
 	return rowsAffected, err
+}
+
+func (r *Repository) settleTaskBilling(ctx context.Context, tx *sql.Tx, taskID string, target taskbilling.SettlementState) error {
+	if r == nil || tx == nil {
+		return fmt.Errorf("taskstore: billing transaction unavailable")
+	}
+	if r.taskBilling == nil {
+		return failIfTaskBillingSnapshotExists(ctx, tx, taskID)
+	}
+	switch target {
+	case taskbilling.SettlementStateCaptured:
+		return r.taskBilling.Capture(ctx, tx, taskID)
+	case taskbilling.SettlementStateReleased:
+		return r.taskBilling.Release(ctx, tx, taskID)
+	default:
+		return fmt.Errorf("taskstore: unsupported terminal billing settlement %q", target)
+	}
+}
+
+func failIfTaskBillingSnapshotExists(ctx context.Context, tx *sql.Tx, taskID string) error {
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM task_billing_snapshots WHERE task_id = $1)`, taskID).Scan(&exists); err != nil {
+		return fmt.Errorf("taskstore: inspect task billing snapshot: %w", err)
+	}
+	var feature string
+	err := tx.QueryRowContext(ctx, `SELECT feature_slug FROM tasks WHERE task_id = $1`, taskID).Scan(&feature)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("taskstore: inspect task billing requirement: %w", err)
+	}
+	if exists || taskbilling.RequiresBilling(feature) {
+		return fmt.Errorf("%w: task billing settlement service not configured for task %s", taskbilling.ErrIntegrity, taskID)
+	}
+	return nil
 }
 
 func (r *Repository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error) {

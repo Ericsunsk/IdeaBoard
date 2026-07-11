@@ -41,7 +41,7 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	queueTask.CreatedAt = 1710000000
 	task.Priority = tasks.TaskPriorityInteractive
 	queueTask.Priority = tasks.TaskPriorityInteractive
-	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 
 	result, err := store.SubmitTask(ctx, task, queueTask)
 	if err != nil {
@@ -100,7 +100,7 @@ func TestStoreSubmitTaskReturnsExistingTaskForDuplicateClientActionID(t *testing
 	client := &countingRiverTxClient{
 		inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts),
 	}
-	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 
 	first := newTaskSubmissionTask("task_action_first")
 	first.ClientActionID = "canvas-action-1"
@@ -145,7 +145,7 @@ func TestStoreSubmitTaskCreatesDistinctTaskForNewClientActionID(t *testing.T) {
 	client := &countingRiverTxClient{
 		inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts),
 	}
-	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 
 	first := newTaskSubmissionTask("task_action_rerun_first")
 	first.ClientActionID = "canvas-action-rerun-1"
@@ -199,7 +199,7 @@ func TestStoreSubmitTaskSerializesConcurrentDuplicateClientActionID(t *testing.T
 	client := &countingRiverTxClient{
 		inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts),
 	}
-	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 
 	start := make(chan struct{})
 	results := make(chan tasks.TaskSubmissionResult, 2)
@@ -259,7 +259,7 @@ func TestStoreSubmitTaskRollsBackTaskAndRiverJobWhenRealInsertReportsFailure(t *
 	store := NewStore(pool, taskstore.NewRepository(db), insertThenFailRiverTxClient{
 		inner: client,
 		err:   forcedErr,
-	}, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+	}, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 
 	_, err := store.SubmitTask(ctx, task, queueTask)
 	if !errors.Is(err, forcedErr) {

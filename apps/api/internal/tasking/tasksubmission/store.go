@@ -2,11 +2,16 @@ package tasksubmission
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,21 +23,27 @@ type TaskInserter interface {
 	CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error)
 }
 
+type idempotentTaskFinder interface {
+	FindSubmissionByClientActionWithPGXTx(context.Context, pgx.Tx, int64, string, taskbilling.Request) (tasks.TaskSubmissionResult, bool, error)
+}
+
 type Store struct {
 	pool      *pgxpool.Pool
 	tasks     TaskInserter
 	client    taskqueue.RiverTxClient
 	queueName string
 	maxRetry  int
+	billing   *taskbilling.Service
 }
 
-func NewStore(pool *pgxpool.Pool, tasks TaskInserter, client taskqueue.RiverTxClient, queueName string, maxRetry int) *Store {
+func NewStore(pool *pgxpool.Pool, tasks TaskInserter, client taskqueue.RiverTxClient, queueName string, maxRetry int, billingService *taskbilling.Service) *Store {
 	return &Store{
 		pool:      pool,
 		tasks:     tasks,
 		client:    client,
 		queueName: queueName,
 		maxRetry:  maxRetry,
+		billing:   billingService,
 	}
 }
 
@@ -82,6 +93,19 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	if queueTask.Priority != task.Priority {
 		return emptyResult, fmt.Errorf("submit task: priority mismatch task=%d queue=%d", task.Priority, queueTask.Priority)
 	}
+	var billingRequest taskbilling.Request
+	if task.BillingRequest != nil {
+		if strings.TrimSpace(task.BillingRequest.Feature) != strings.TrimSpace(task.FeatureSlug) ||
+			workflow.NormalizeModelKey(task.BillingRequest.Model) != workflow.NormalizeModelKey(task.RequestedModel) {
+			return emptyResult, fmt.Errorf("submit task: billing request does not match canonical task product")
+		}
+		billingRequest = taskbilling.Request{
+			Feature: task.BillingRequest.Feature, Model: task.BillingRequest.Model, Quantity: task.BillingRequest.Quantity,
+		}
+		if _, err := taskbilling.RequestFingerprint(billingRequest); err != nil {
+			return emptyResult, fmt.Errorf("submit task: invalid billing request: %w", err)
+		}
+	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -94,8 +118,33 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 		}
 		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
 		defer cancel()
-		_ = tx.Rollback(rollbackCtx)
+		if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("failed to roll back task submission transaction", "err", rollbackErr)
+		}
 	}()
+
+	if task.BillingRequest != nil && strings.TrimSpace(task.ClientActionID) != "" {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+			fmt.Sprintf("task-submit:%d:%s", task.UserID, strings.TrimSpace(task.ClientActionID))); err != nil {
+			return emptyResult, fmt.Errorf("submit task: acquire idempotency lock: %w", err)
+		}
+		finder, ok := s.tasks.(idempotentTaskFinder)
+		if !ok {
+			return emptyResult, fmt.Errorf("submit task: idempotent task finder not configured")
+		}
+		existing, found, err := finder.FindSubmissionByClientActionWithPGXTx(ctx, tx, task.UserID, task.ClientActionID, billingRequest)
+		if err != nil {
+			return emptyResult, fmt.Errorf("submit task: find existing task: %w", err)
+		}
+		if found {
+			task.TaskID = existing.TaskID
+			if err := tx.Commit(ctx); err != nil {
+				return emptyResult, fmt.Errorf("submit task: commit existing task lookup: %w", err)
+			}
+			committed = true
+			return existing, nil
+		}
+	}
 
 	created, err := s.tasks.CreateWithPGXTx(ctx, tx, task)
 	if err != nil {
@@ -110,6 +159,19 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 		committed = true
 		return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: false}, nil
 	}
+	if task.BillingRequest != nil {
+		if s.billing == nil {
+			return emptyResult, fmt.Errorf("submit task: billing service not configured")
+		}
+		snapshot, err := s.billing.HoldAndPersist(ctx, tx, task.TaskID, task.UserID, billingRequest)
+		if err != nil {
+			return emptyResult, fmt.Errorf("submit task: bill task: %w", err)
+		}
+		if err := s.billing.PersistSubmissionClaim(ctx, tx, task.UserID, task.ClientActionID, task.TaskID, billingRequest); err != nil {
+			return emptyResult, fmt.Errorf("submit task: persist idempotency claim: %w", err)
+		}
+		emptyResult.HoldTransactionID = snapshot.HoldTransactionID
+	}
 	if err := taskqueue.InsertDrawingTaskTx(ctx, s.client, tx, queueTask, s.queueName, s.maxRetry); err != nil {
 		return emptyResult, fmt.Errorf("submit task: enqueue river job: %w", err)
 	}
@@ -117,5 +179,5 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 		return emptyResult, fmt.Errorf("submit task: commit tx: %w", err)
 	}
 	committed = true
-	return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: true}, nil
+	return tasks.TaskSubmissionResult{TaskID: task.TaskID, HoldTransactionID: emptyResult.HoldTransactionID, Created: true}, nil
 }

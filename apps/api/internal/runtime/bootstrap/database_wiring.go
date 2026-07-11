@@ -21,6 +21,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/worker"
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskstore"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -55,6 +56,9 @@ func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, er
 		return appDatabases{}, closeStartupDatabase(db, err)
 	}
 	if err := billing.VerifyRuntimePrivileges(ctx, db); err != nil {
+		return appDatabases{}, closeStartupDatabase(db, err)
+	}
+	if err := taskbilling.VerifyRuntimePrivileges(ctx, db); err != nil {
 		return appDatabases{}, closeStartupDatabase(db, err)
 	}
 	riverPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
@@ -106,6 +110,9 @@ func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
 		return rollbackPrivilegeTransaction(privilegeTx, err)
 	}
 	if err := billing.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
+		return rollbackPrivilegeTransaction(privilegeTx, err)
+	}
+	if err := taskbilling.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
 		return rollbackPrivilegeTransaction(privilegeTx, err)
 	}
 	if err := privilegeTx.Commit(); err != nil {

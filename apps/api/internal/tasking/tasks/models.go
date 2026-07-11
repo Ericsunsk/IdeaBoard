@@ -40,6 +40,13 @@ type Task struct {
 	CancelReason               string                `json:"cancel_reason"`
 	Outputs                    []TaskOutput          `json:"outputs,omitempty"`
 	ExecutionMetrics           *TaskExecutionMetrics `json:"execution_metrics,omitempty"`
+	BillingRequest             *TaskBillingRequest   `json:"-"`
+}
+
+type TaskBillingRequest struct {
+	Feature  string
+	Model    string
+	Quantity int64
 }
 
 type TaskOutput struct {
@@ -209,8 +216,9 @@ type SubmitTaskRequest struct {
 }
 
 type TaskSubmissionResult struct {
-	TaskID  string
-	Created bool
+	TaskID            string
+	HoldTransactionID string
+	Created           bool
 }
 
 type TaskListRequest struct {

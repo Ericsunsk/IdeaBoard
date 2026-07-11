@@ -98,6 +98,10 @@ type fakeRuntime struct {
 	lastFailedTask  string
 	lastFailedCause string
 	converged       []riverFinalFailureCall
+	convergeErr     error
+	convergeFn      func(context.Context) error
+	resetErr        error
+	resetCalls      int
 }
 
 func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error {
@@ -114,19 +118,27 @@ func (f *fakeRuntime) FailTask(_ context.Context, input taskruntime.FailTaskInpu
 	return nil
 }
 
+func (f *fakeRuntime) ResetRunningTask(context.Context, taskruntime.ResetRunningTaskInput) error {
+	f.resetCalls++
+	return f.resetErr
+}
+
 type riverFinalFailureCall struct {
 	taskID     string
 	riverJobID int64
 	reason     string
 }
 
-func (f *fakeRuntime) ConvergeTaskAfterRiverFinalFailure(_ context.Context, taskID string, riverJobID int64, reason string) error {
+func (f *fakeRuntime) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error {
 	f.converged = append(f.converged, riverFinalFailureCall{
 		taskID:     taskID,
 		riverJobID: riverJobID,
 		reason:     reason,
 	})
-	return nil
+	if f.convergeFn != nil {
+		return f.convergeFn(ctx)
+	}
+	return f.convergeErr
 }
 
 type fakeCancelStoreForRiver struct {

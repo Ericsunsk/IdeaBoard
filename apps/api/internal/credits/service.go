@@ -2,6 +2,7 @@ package credits
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -22,6 +23,10 @@ type transactionCommands struct {
 	tx pgx.Tx
 }
 
+type sqlTransactionCommands struct {
+	tx *sql.Tx
+}
+
 func NewService(pool *pgxpool.Pool) *Service {
 	return &Service{pool: pool}
 }
@@ -30,6 +35,12 @@ func NewService(pool *pgxpool.Pool) *Service {
 // transaction. The caller owns commit and rollback.
 func (s *Service) InTx(tx pgx.Tx) Commands {
 	return &transactionCommands{tx: tx}
+}
+
+// InSQLTx composes Credits commands into an existing database/sql transaction.
+// The caller owns commit and rollback.
+func (s *Service) InSQLTx(tx *sql.Tx) Commands {
+	return &sqlTransactionCommands{tx: tx}
 }
 
 // LifecycleInTx lets Identity compose Wallet changes with user writes.
@@ -103,11 +114,7 @@ func withManagedTransaction(
 }
 
 func (c *transactionCommands) Grant(ctx context.Context, command GrantCommand) (CommandResult, error) {
-	metadata, err := normalizeMetadata(command.Metadata)
-	if err != nil || command.UserID <= 0 || !isValidAmount(command.Amount) {
-		return CommandResult{}, ErrInvalidCommand
-	}
-	return executeCreditCommand(ctx, c.tx, CommandGrant, command.UserID, command.Amount.Int64(), "", metadata)
+	return executeGrant(ctx, command, c.execute)
 }
 
 func (c *transactionCommands) ProvisionWallet(ctx context.Context, userID int64) error {
@@ -169,35 +176,89 @@ func (c *transactionCommands) ClaimWelcomeGrant(
 }
 
 func (c *transactionCommands) Hold(ctx context.Context, command HoldCommand) (CommandResult, error) {
+	return executeHold(ctx, command, c.execute)
+}
+
+func (c *transactionCommands) Capture(ctx context.Context, command CaptureCommand) (CommandResult, error) {
+	return executeCapture(ctx, command, c.execute)
+}
+
+func (c *transactionCommands) Release(ctx context.Context, command ReleaseCommand) (CommandResult, error) {
+	return executeRelease(ctx, command, c.execute)
+}
+
+func (c *transactionCommands) Refund(ctx context.Context, command RefundCommand) (CommandResult, error) {
+	return executeRefund(ctx, command, c.execute)
+}
+
+func (c *sqlTransactionCommands) Grant(ctx context.Context, command GrantCommand) (CommandResult, error) {
+	return executeGrant(ctx, command, c.execute)
+}
+
+func (c *sqlTransactionCommands) Hold(ctx context.Context, command HoldCommand) (CommandResult, error) {
+	return executeHold(ctx, command, c.execute)
+}
+
+func (c *sqlTransactionCommands) Capture(ctx context.Context, command CaptureCommand) (CommandResult, error) {
+	return executeCapture(ctx, command, c.execute)
+}
+
+func (c *sqlTransactionCommands) Release(ctx context.Context, command ReleaseCommand) (CommandResult, error) {
+	return executeRelease(ctx, command, c.execute)
+}
+
+func (c *sqlTransactionCommands) Refund(ctx context.Context, command RefundCommand) (CommandResult, error) {
+	return executeRefund(ctx, command, c.execute)
+}
+
+type commandExecutor func(context.Context, CommandType, int64, int64, string, CommandMetadata) (CommandResult, error)
+
+func (c *transactionCommands) execute(ctx context.Context, commandType CommandType, userID, amount int64, relatedID string, metadata CommandMetadata) (CommandResult, error) {
+	return executeCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
+}
+
+func (c *sqlTransactionCommands) execute(ctx context.Context, commandType CommandType, userID, amount int64, relatedID string, metadata CommandMetadata) (CommandResult, error) {
+	return executeSQLCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
+}
+
+func executeGrant(ctx context.Context, command GrantCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
 	if err != nil || command.UserID <= 0 || !isValidAmount(command.Amount) {
 		return CommandResult{}, ErrInvalidCommand
 	}
-	return executeCreditCommand(ctx, c.tx, CommandHold, command.UserID, command.Amount.Int64(), "", metadata)
+	return execute(ctx, CommandGrant, command.UserID, command.Amount.Int64(), "", metadata)
 }
 
-func (c *transactionCommands) Capture(ctx context.Context, command CaptureCommand) (CommandResult, error) {
+func executeHold(ctx context.Context, command HoldCommand, execute commandExecutor) (CommandResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	if err != nil || command.UserID <= 0 || !isValidAmount(command.Amount) {
+		return CommandResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, CommandHold, command.UserID, command.Amount.Int64(), "", metadata)
+}
+
+func executeCapture(ctx context.Context, command CaptureCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
 	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.HoldTransactionID) == "" {
 		return CommandResult{}, ErrInvalidCommand
 	}
-	return executeCreditCommand(ctx, c.tx, CommandCapture, command.UserID, 0, command.HoldTransactionID, metadata)
+	return execute(ctx, CommandCapture, command.UserID, 0, command.HoldTransactionID, metadata)
 }
 
-func (c *transactionCommands) Release(ctx context.Context, command ReleaseCommand) (CommandResult, error) {
+func executeRelease(ctx context.Context, command ReleaseCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
 	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.HoldTransactionID) == "" {
 		return CommandResult{}, ErrInvalidCommand
 	}
-	return executeCreditCommand(ctx, c.tx, CommandRelease, command.UserID, 0, command.HoldTransactionID, metadata)
+	return execute(ctx, CommandRelease, command.UserID, 0, command.HoldTransactionID, metadata)
 }
 
-func (c *transactionCommands) Refund(ctx context.Context, command RefundCommand) (CommandResult, error) {
+func executeRefund(ctx context.Context, command RefundCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
 	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.ChargeTransactionID) == "" || !isValidAmount(command.Amount) {
 		return CommandResult{}, ErrInvalidCommand
 	}
-	return executeCreditCommand(ctx, c.tx, CommandRefund, command.UserID, command.Amount.Int64(), command.ChargeTransactionID, metadata)
+	return execute(ctx, CommandRefund, command.UserID, command.Amount.Int64(), command.ChargeTransactionID, metadata)
 }
 
 func isValidAmount(amount CreditAmount) bool {

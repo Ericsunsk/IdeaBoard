@@ -3,6 +3,8 @@ package dbutil
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -17,12 +19,12 @@ type DBTX interface {
 }
 
 func WithTx(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries) error) error {
-	return WithTxDBTX(ctx, db, func(q *dbsqlc.Queries, _ DBTX) error {
+	return WithTxDBTX(ctx, db, func(q *dbsqlc.Queries, _ *sql.Tx) error {
 		return fn(q)
 	})
 }
 
-func WithTxDBTX(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries, DBTX) error) error {
+func WithTxDBTX(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries, *sql.Tx) error) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -30,7 +32,9 @@ func WithTxDBTX(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries, DBTX) 
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+				slog.Warn("failed to roll back database transaction", "err", rollbackErr)
+			}
 		}
 	}()
 

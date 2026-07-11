@@ -306,7 +306,7 @@ func (r *AccountRepository) Delete(ctx context.Context, id int64) error {
 
 func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Context, id int64, reason string) ([]string, error) {
 	var failedTaskIDs []string
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx dbutil.DBTX) error {
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
 		updated, err := q.ArchiveAccount(ctx, id)
 		if err != nil {
 			return err
@@ -339,7 +339,7 @@ func (r *AccountRepository) UpdateStatus(ctx context.Context, id int64, status i
 
 func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Context, id int64, reason string) ([]string, error) {
 	var failedTaskIDs []string
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx dbutil.DBTX) error {
+	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
 		updated, err := q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: 0, ID: id})
 		if err != nil {
 			return err
