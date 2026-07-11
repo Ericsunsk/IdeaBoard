@@ -57,20 +57,83 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	}
 }
 
-func TestSupportedFeatureSlugsMatchFrontendWorkflowFeatures(t *testing.T) {
+func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
+	got := AIImageFeatureSlugs()
+	want := []string{
+		FeatureSlugSketchToImage,
+		FeatureSlugStyleVariation,
+		FeatureSlugPartialEdit,
+		FeatureSlugRemoveBg,
+		FeatureSlugStyleFusion,
+		FeatureSlugPatternGen,
+		FeatureSlugHDUpscale,
+		FeatureSlugImageExtend,
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("AI image features=%v, want=%v", got, want)
+	}
+	supported := SupportedFeatureSlugs()
+	for _, slug := range want {
+		if !IsAIImageFeature(slug) {
+			t.Fatalf("canonical workflow %q is not classified as AI image", slug)
+		}
+		if !slices.Contains(supported, slug) {
+			t.Fatalf("AI image workflow %q is not supported", slug)
+		}
+	}
+	for _, slug := range []string{"", "crop", "color-adjust", "mask-draw"} {
+		if IsAIImageFeature(slug) {
+			t.Fatalf("local operation %q must not be classified as AI image", slug)
+		}
+	}
+
+	definitions := append([]featureDefinition(nil), workflowFeatureDefinitions...)
+	definitions = append(definitions, featureDefinition{Slug: "local-crop", UsesAIProvider: false})
+	got = featureSlugs(definitions, func(definition featureDefinition) bool { return definition.UsesAIProvider })
+	if slices.Contains(got, "local-crop") {
+		t.Fatalf("supported local workflow was included in AI billing registry: %v", got)
+	}
+}
+
+func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T) {
 	repoRoot := findWorkflowRepoRoot(t)
-	raw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "workflowFeatures.ts"))
+	frontendPath := filepath.Join(repoRoot, "apps", "web", "src", "shared", "domain", "workflowFeatures.ts")
+	raw, err := os.ReadFile(frontendPath)
 	if err != nil {
 		t.Fatalf("read frontend workflow features: %v", err)
 	}
 
 	frontendSlugs := extractFrontendWorkflowFeatureSlugs(t, string(raw))
 	backendSlugs := SupportedFeatureSlugs()
-	slices.Sort(frontendSlugs)
-	slices.Sort(backendSlugs)
+	assertSameFeatureSlugs(t, "frontend shared contract", backendSlugs, frontendSlugs)
 
-	if !slices.Equal(backendSlugs, frontendSlugs) {
-		t.Fatalf("workflow feature slugs mismatch\nbackend=%v\nfrontend=%v", backendSlugs, frontendSlugs)
+	openAPIRaw, err := os.ReadFile(filepath.Join(repoRoot, "apps", "api", "openapi.yaml"))
+	if err != nil {
+		t.Fatalf("read OpenAPI: %v", err)
+	}
+	assertSameFeatureSlugs(t, "OpenAPI", backendSlugs, extractOpenAPIWorkflowFeatureSlugs(t, string(openAPIRaw)))
+
+	featureKeys := extractFrontendWorkflowFeatureKeys(t, string(raw))
+	for label, relativePath := range map[string]string{
+		"frontend execution": "apps/web/src/features/canvas/execution/contracts/executionContract.ts",
+		"Admin registry":     "apps/web/src/shared/domain/workflowFeatureRegistry.ts",
+	} {
+		contractRaw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(relativePath)))
+		if err != nil {
+			t.Fatalf("read %s: %v", label, err)
+		}
+		assertSameFeatureSlugs(t, label, backendSlugs, extractWorkflowFeatureReferences(t, label, string(contractRaw), featureKeys))
+	}
+}
+
+func assertSameFeatureSlugs(t *testing.T, label string, want, got []string) {
+	t.Helper()
+	want = append([]string(nil), want...)
+	got = append([]string(nil), got...)
+	slices.Sort(want)
+	slices.Sort(got)
+	if !slices.Equal(want, got) {
+		t.Fatalf("%s workflow feature slugs mismatch\nbackend=%v\ncontract=%v", label, want, got)
 	}
 }
 
@@ -155,6 +218,71 @@ func extractFrontendWorkflowFeatureSlugs(t *testing.T, source string) []string {
 		}
 		seenKeys[key] = struct{}{}
 		seenSlugs[slug] = struct{}{}
+		slugs = append(slugs, slug)
+	}
+	return slugs
+}
+
+func extractFrontendWorkflowFeatureKeys(t *testing.T, source string) map[string]string {
+	t.Helper()
+	objectRe := regexp.MustCompile(`(?s)export\s+const\s+WORKFLOW_FEATURE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
+	match := objectRe.FindStringSubmatch(source)
+	if match == nil {
+		t.Fatal("WORKFLOW_FEATURE object not found")
+	}
+	body := match[objectRe.SubexpIndex("body")]
+	entryRe := regexp.MustCompile(`(?m)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*'([^']+)'\s*,?`)
+	keys := make(map[string]string)
+	for _, entry := range entryRe.FindAllStringSubmatch(body, -1) {
+		keys[entry[1]] = entry[2]
+	}
+	return keys
+}
+
+func extractOpenAPIWorkflowFeatureSlugs(t *testing.T, source string) []string {
+	t.Helper()
+	blockRe := regexp.MustCompile(`(?m)^    WorkflowFeatureSlug:\n      type: string\n      enum:\n((?:        - [a-z0-9-]+\n)+)`)
+	match := blockRe.FindStringSubmatch(source)
+	if match == nil {
+		t.Fatal("OpenAPI WorkflowFeatureSlug enum not found")
+	}
+	entryRe := regexp.MustCompile(`(?m)^        - ([a-z0-9-]+)$`)
+	entries := entryRe.FindAllStringSubmatch(match[1], -1)
+	slugs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		slugs = append(slugs, entry[1])
+	}
+	return slugs
+}
+
+func extractWorkflowFeatureReferences(t *testing.T, label, source string, featureKeys map[string]string) []string {
+	t.Helper()
+	var blockPattern string
+	switch label {
+	case "frontend execution":
+		blockPattern = `(?s)export\s+const\s+EXECUTION_FEATURE\s*=\s*\{(.*?)\}\s+as\s+const`
+	case "Admin registry":
+		blockPattern = `(?s)const\s+WORKFLOW_FEATURE_REGISTRY_BASE.*?=\s*\[(.*?)\]\s+as\s+const`
+	default:
+		t.Fatalf("unsupported feature contract label %q", label)
+	}
+	match := regexp.MustCompile(blockPattern).FindStringSubmatch(source)
+	if match == nil {
+		t.Fatalf("%s feature contract block not found", label)
+	}
+	references := regexp.MustCompile(`WORKFLOW_FEATURE\.([A-Za-z_][A-Za-z0-9_]*)`).FindAllStringSubmatch(match[1], -1)
+	slugs := make([]string, 0, len(references))
+	seen := make(map[string]struct{}, len(references))
+	for _, reference := range references {
+		key := reference[1]
+		slug, ok := featureKeys[key]
+		if !ok {
+			t.Fatalf("%s references unknown WORKFLOW_FEATURE key %q", label, key)
+		}
+		if _, duplicate := seen[slug]; duplicate {
+			t.Fatalf("%s duplicates workflow feature %q", label, slug)
+		}
+		seen[slug] = struct{}{}
 		slugs = append(slugs, slug)
 	}
 	return slugs

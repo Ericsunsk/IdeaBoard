@@ -1,20 +1,22 @@
 package taskbilling
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/workflow"
 )
 
-func TestPatternGenerationReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
+func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := PatternGenerationRequest("gpt-image-1")
+	request, err := AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,12 +54,93 @@ func TestPatternGenerationReadinessReturnsQuoteAndWalletAvailability(t *testing.
 	}
 }
 
+func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
+	for _, feature := range workflow.AIImageFeatureSlugs() {
+		feature := feature
+		for _, scenario := range []struct {
+			name         string
+			unitCredits  int64
+			createSKU    bool
+			skuEnabled   bool
+			priceEnabled bool
+			wantErr      error
+			wantEnough   bool
+		}{
+			{name: "paid", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: true, wantEnough: false},
+			{name: "free", unitCredits: 0, createSKU: true, skuEnabled: true, priceEnabled: true, wantEnough: true},
+			{name: "missing", wantErr: billing.ErrSKUNotFound},
+			{name: "disabled-sku", unitCredits: 25, createSKU: true, priceEnabled: true, wantErr: billing.ErrPricingUnavailable},
+			{name: "disabled-price", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: false, wantErr: billing.ErrPricingUnavailable},
+		} {
+			scenario := scenario
+			t.Run(feature+"/"+scenario.name, func(t *testing.T) {
+				_, pool := testdb.OpenWithPool(t)
+				billingService := billing.NewService(pool)
+				creditService := credits.NewService(pool)
+				service := NewService(billingService, creditService)
+				request, err := AIImageRequest(feature, "gpt-image-1")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scenario.createSKU {
+					sku, err := ResolveSKU(request)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, ActorID: 1}); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, ActorID: 1}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				tx, err := pool.Begin(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer tx.Rollback(t.Context())
+				if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
+					t.Fatal(err)
+				}
+				amount, err := credits.NewCreditAmount(20)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := creditService.InTx(tx).Grant(t.Context(), credits.GrantCommand{UserID: 1, Amount: amount, Metadata: credits.CommandMetadata{
+					IdempotencyKey: "readiness-matrix:" + feature + ":" + scenario.name,
+					Actor:          credits.Actor{Type: credits.ActorSystem, ID: "test"}, Source: "test", Reason: "readiness matrix",
+					BusinessReference: credits.BusinessReference{Type: "test", ID: feature + ":" + scenario.name},
+				}}); err != nil {
+					t.Fatal(err)
+				}
+				if err := tx.Commit(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+
+				readiness, err := service.Readiness(t.Context(), 1, request)
+				if scenario.wantErr != nil {
+					if !errors.Is(err, scenario.wantErr) {
+						t.Fatalf("error=%v, want %v", err, scenario.wantErr)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if readiness.UnitCredits != scenario.unitCredits || readiness.TotalCredits != scenario.unitCredits || readiness.Sufficient != scenario.wantEnough {
+					t.Fatalf("readiness=%+v", readiness)
+				}
+			})
+		}
+	}
+}
+
 func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, _ := PatternGenerationRequest("gpt-image-1")
+	request, _ := AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
 	sku, _ := ResolveSKU(request)
 	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, ActorID: 1}); err != nil {
 		t.Fatal(err)

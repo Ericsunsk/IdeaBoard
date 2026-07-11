@@ -154,7 +154,7 @@ git diff --exit-code -- internal/db/sqlc
 | ---- | ---- |
 | [service.go](./apps/api/internal/billing/service.go) | 全局 SKU Catalog、versioned pricing 与 Quote seam |
 | [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md) | Billing domain language、SKU namespace 与 snapshot invariants |
-| [service.go](./apps/api/internal/tasking/taskbilling/service.go) | Pattern Generation SKU resolver、Readiness、Submit Hold 与 terminal Capture/Release orchestration |
+| [service.go](./apps/api/internal/tasking/taskbilling/service.go) | AI Image Workflow SKU resolver、Readiness、Submit Hold 与 terminal Capture/Release orchestration |
 
 ## Workflow Feature Contract
 

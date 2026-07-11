@@ -215,6 +215,26 @@ func TestRemoveBgWithoutConfiguredSystemPromptIsRejected(t *testing.T) {
 	}
 }
 
+func TestResolveTaskBillingRequestUsesCanonicalAIWorkflowRegistry(t *testing.T) {
+	for _, feature := range workflow.AIImageFeatureSlugs() {
+		t.Run(feature, func(t *testing.T) {
+			request, err := resolveTaskBillingRequest(feature, " GPT-Image-1 ")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if request == nil || request.Feature != feature || request.Model != "gpt-image-1" || request.Quantity != 1 {
+				t.Fatalf("request=%+v", request)
+			}
+		})
+	}
+	for _, feature := range []string{"", "crop", "color-adjust", "mask-draw"} {
+		request, err := resolveTaskBillingRequest(feature, "gpt-image-1")
+		if err != nil || request != nil {
+			t.Fatalf("local feature %q request=%+v err=%v", feature, request, err)
+		}
+	}
+}
+
 func TestValidateExecutablePromptReturnsExplicitErrorWhenFinalPromptEmpty(t *testing.T) {
 	err := validateExecutablePrompt("   ")
 	if err == nil {
@@ -1125,13 +1145,15 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt:  "融合但不要太夸张",
-		Feature: workflow.FeatureSlugStyleFusion,
+		Prompt:         "融合但不要太夸张",
+		Feature:        workflow.FeatureSlugStyleFusion,
+		ClientActionID: "style-fusion-normalize",
 		ImageURLs: []string{
 			"https://example.com/a.png",
 			"https://example.com/b.png",
 		},
 		Params: map[string]interface{}{
+			"model": "gpt-image-1",
 			"fusion": map[string]interface{}{
 				"input_weights": []interface{}{2.0, 1.0},
 			},
@@ -1225,12 +1247,14 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt:  "右侧延展为工作室背景",
-		Feature: workflow.FeatureSlugImageExtend,
+		Prompt:         "右侧延展为工作室背景",
+		Feature:        workflow.FeatureSlugImageExtend,
+		ClientActionID: "image-extend-normalize",
 		ImageURLs: []string{
 			"https://example.com/source.png",
 		},
 		Params: map[string]interface{}{
+			"model": "gpt-image-1",
 			"extend": map[string]interface{}{
 				"top_percent":    0,
 				"right_percent":  25,

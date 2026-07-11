@@ -20,6 +20,7 @@ import (
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/tasking/tasksubmission"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -136,7 +137,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	request, err := taskbilling.PatternGenerationRequest("gpt-image-1")
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
 	if err != nil {
 		t.Fatal(err)
 	}

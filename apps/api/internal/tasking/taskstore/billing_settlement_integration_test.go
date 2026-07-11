@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -69,6 +71,44 @@ func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T
 	}
 	if status != tasks.StatusCompleted || result != `{"status":"success"}` {
 		t.Fatalf("status=%q result=%q", status, result)
+	}
+}
+
+func TestAllAIImageWorkflowTerminalSettlementMatrix(t *testing.T) {
+	for _, feature := range workflow.AIImageFeatureSlugs() {
+		feature := feature
+		for _, terminal := range []string{"success", "failure"} {
+			terminal := terminal
+			t.Run(feature+"/"+terminal, func(t *testing.T) {
+				db, pool := testdb.OpenWithPool(t)
+				repo, taskBilling, request := newBillingSettlementFixtureForFeature(t, db, pool, feature, 1, 100, 25)
+				accountID := seedRepositoryTestAccount(t, db, 880)
+				channelID := accountID + 10000
+				credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+				taskID := "billing-matrix-" + strings.ReplaceAll(feature, "-", "_") + "-" + terminal
+				task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), taskID, accountID, channelID, credentialID, "lease-"+terminal, "lease-"+terminal)
+				if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2, requested_model = $3 WHERE task_id = $1`, task.TaskID, feature, request.Model); err != nil {
+					t.Fatal(err)
+				}
+				holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+
+				var rows int64
+				var err error
+				if terminal == "success" {
+					rows, err = repo.CompleteWithOutputsAndLeaseToken(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil)
+				} else {
+					rows, err = repo.MarkTaskFailedWithLease(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
+				}
+				if err != nil || rows != 1 {
+					t.Fatalf("rows=%d err=%v", rows, err)
+				}
+				wantState, wantAvailable := "captured", int64(75)
+				if terminal == "failure" {
+					wantState, wantAvailable = "released", 100
+				}
+				assertTaskBillingSettlement(t, db, task.TaskID, wantState, wantAvailable, 0)
+			})
+		}
 	}
 }
 
@@ -225,7 +265,7 @@ func TestBilledTerminalTransitionFailsClosedWithoutCompleteBillingFacts(t *testi
 			creditService := credits.NewService(pool)
 			billingService := billing.NewService(pool)
 			taskBilling := taskbilling.NewService(billingService, creditService)
-			request, err := taskbilling.PatternGenerationRequest("gpt-image-1")
+			request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -337,18 +377,22 @@ func TestAccountStopAndArchiveReleaseBilledHoldsAtomically(t *testing.T) {
 }
 
 func newBillingSettlementFixture(t *testing.T, db *sql.DB, pool *pgxpool.Pool, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {
+	return newBillingSettlementFixtureForFeature(t, db, pool, workflow.FeatureSlugPatternGen, userID, grant, unit)
+}
+
+func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpool.Pool, feature string, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {
 	t.Helper()
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
 	repo := NewRepository(db)
 	repo.SetTaskBilling(taskBilling)
-	request, err := taskbilling.PatternGenerationRequest("gpt-image-1")
+	request, err := taskbilling.AIImageRequest(feature, "gpt-image-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	sku, _ := taskbilling.ResolveSKU(request)
-	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, ActorID: 1}); err != nil {
+	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: true, ActorID: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: unit, Enabled: true, ActorID: 1}); err != nil {

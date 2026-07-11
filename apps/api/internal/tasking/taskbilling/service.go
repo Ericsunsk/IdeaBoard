@@ -18,7 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const patternGenerationQuantity int64 = 1
+const imageWorkflowQuantity int64 = 1
 
 var (
 	ErrUnsupportedProduct  = errors.New("task product is not billable")
@@ -88,31 +88,35 @@ func NewService(quoter Quoter, creditService CreditService) *Service {
 	return &Service{quoter: quoter, credits: creditService}
 }
 
-func PatternGenerationRequest(model string) (Request, error) {
+func AIImageRequest(feature, model string) (Request, error) {
+	canonicalFeature, ok := workflow.ParseAIImageFeatureSlug(feature)
+	if !ok {
+		return Request{}, ErrUnsupportedProduct
+	}
 	canonicalModel := canonicalizeModel(model)
 	if canonicalModel == "" {
 		return Request{}, ErrModelRequired
 	}
-	return Request{Feature: workflow.FeatureSlugPatternGen, Model: canonicalModel, Quantity: patternGenerationQuantity}, nil
+	return Request{Feature: canonicalFeature, Model: canonicalModel, Quantity: imageWorkflowQuantity}, nil
 }
 
 // RequiresBilling identifies task products whose terminal transition must
 // never commit without a complete billing snapshot and settlement fact.
 func RequiresBilling(feature string) bool {
-	return strings.TrimSpace(feature) == workflow.FeatureSlugPatternGen
+	return workflow.IsAIImageFeature(feature)
 }
 
 func ResolveSKU(request Request) (billing.SKU, error) {
-	feature := strings.TrimSpace(request.Feature)
+	feature, ok := workflow.ParseAIImageFeatureSlug(request.Feature)
 	model := canonicalizeModel(request.Model)
-	if feature != workflow.FeatureSlugPatternGen {
+	if !ok {
 		return "", ErrUnsupportedProduct
 	}
 	if model == "" {
 		return "", ErrModelRequired
 	}
 	digest := sha256.Sum256([]byte(feature + "\x00" + model))
-	return billing.SKU("ai-image:pattern-gen." + hex.EncodeToString(digest[:])), nil
+	return billing.SKU("ai-image:" + feature + "." + hex.EncodeToString(digest[:])), nil
 }
 
 func RequestFingerprint(request Request) (string, error) {
@@ -178,7 +182,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 		hold, holdErr := s.credits.InTx(tx).Hold(ctx, credits.HoldCommand{
 			UserID:   userID,
 			Amount:   amount,
-			Metadata: taskCommandMetadata("task-hold:"+taskID, credits.ActorUser, fmt.Sprint(userID), "task_submission", "Pattern Generation 点子预授权", taskID),
+			Metadata: taskCommandMetadata("task-hold:"+taskID, credits.ActorUser, fmt.Sprint(userID), "task_submission", "AI 生图任务点子预授权", taskID),
 		})
 		if errors.Is(holdErr, credits.ErrInsufficientCredits) {
 			return Snapshot{}, ErrInsufficientCredits

@@ -97,7 +97,7 @@ River + PostgreSQL 负责：
 - 任务状态、取消标记和运行态事实源
 - 队列监控的聚合来源
 
-Pattern Generation 是首个接入点子计费的 Task tracer。Submit 必须在同一 PostgreSQL transaction 中完成 server-side Quote snapshot、Credit Hold、Task insert 与 River enqueue；成功终态与 Capture 原子提交，失败、取消或最终 timeout 与 Release 原子提交。Task status event 只能在该 transaction commit 后发布。
+全部 canonical AI Image Workflow 都使用点子计费；纯本地裁剪、调色、图层和蒙版绘制不进入 Task Billing。Submit 必须在同一 PostgreSQL transaction 中完成 server-side Quote snapshot、Credit Hold、Task insert 与 River enqueue；成功终态与 Capture 原子提交，失败、取消或最终 timeout 与 Release 原子提交。Task status event 只能在该 transaction commit 后发布。
 
 NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前核心事件是 `task.status_changed`，由 API 实例 bridge 到本地 SSE hub。禁止把 NATS JetStream 恢复成任务执行队列，也不保留 Redis/Asynq/Dragonfly/Garnet 等生产兼容路径。
 

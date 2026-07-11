@@ -41,7 +41,7 @@
 - Credits Ledger 与 Tasking 共用 PostgreSQL；其他 context 只能通过 `credits.Commands` 写账，禁止直接改 balance projection 或 Ledger。
 - Billing 只根据全局 SKU 选择 immutable price version 并生成 Quote；不读取 Provider Account routing，也不直接写 Credits Ledger。
 - Credit Commands 需要与 caller 的业务状态原子提交时，pgx caller 使用 `credits.Service.InTx(pgx.Tx)`，database/sql caller 使用 `credits.Service.InSQLTx(*sql.Tx)`；两者都只调用同一个 typed Credit Command，且 caller 拥有 commit/rollback，禁止外部双写。
-- Pattern Generation Submit 由 Tasking 在一个 pgx transaction 内完成 Quote/Hold/snapshot/Task/River；terminal transition 由 Task Store 在一个 database/sql transaction 内完成 Capture/Release 与 Task result/status。
+- canonical AI Image Workflow Submit 由 Tasking 在一个 pgx transaction 内完成 Quote/Hold/snapshot/Task/River；terminal transition 由 Task Store 在一个 database/sql transaction 内完成 Capture/Release 与 Task result/status。纯本地编辑操作不进入该计费边界。
 - Task Billing settlement 使用 typed `free | held | captured | released` state machine：0 点子 Quote 直接进入 `free`；收费任务只能从 `held` 幂等收敛到 `captured` 或 `released`，禁止反向或跨终态转换。
 - River drawing job 在最终执行失败且 terminal convergence 暂时不可写时，会持久化 settlement-only marker 并 snooze；重启后的 retry 只做 terminal convergence，不再调用 Provider。若 marker 记录本身失败，则 enqueue 专用 settlement-only River job 作为 durable fallback。
 - Identity 的用户生命周期可通过 `credits.WalletLifecycle` typed seam 原子 provision/freeze Wallet 与领取 Welcome Grant；该 seam 仍由 Credits 独占 Ledger 写入和 runtime privilege。

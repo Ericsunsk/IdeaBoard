@@ -133,6 +133,17 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		return "", err
 	}
+	billingRequest, err := resolveTaskBillingRequest(featureSlug, typedParams.Model)
+	if err != nil {
+		return "", err
+	}
+	if billingRequest != nil {
+		if clientActionID == "" {
+			return "", validation.New("AI 生图任务必须提供 client_action_id")
+		}
+		typedParams.Model = billingRequest.Model
+		sourceParams[paramkeys.Model] = billingRequest.Model
+	}
 
 	taskID := generateSecureTaskID("task")
 	correlationID := tasks.CorrelationIDForTaskID(taskID)
@@ -157,14 +168,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		Priority:       priority,
 		Status:         tasks.StatusPending,
 	}
-	if featureSlug == workflow.FeatureSlugPatternGen {
-		if clientActionID == "" {
-			return "", validation.New("AI 生图任务必须提供 client_action_id")
-		}
-		billingRequest, err := taskbilling.PatternGenerationRequest(requestedModel)
-		if err != nil {
-			return "", err
-		}
+	if billingRequest != nil {
 		task.BillingRequest = &tasks.TaskBillingRequest{
 			Feature: billingRequest.Feature, Model: billingRequest.Model, Quantity: billingRequest.Quantity,
 		}
@@ -223,7 +227,11 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 		return SubmitTaskReadiness{}, err
 	}
 	result := SubmitTaskReadiness{Feature: featureSlug}
-	if featureSlug != workflow.FeatureSlugPatternGen {
+	billingRequest, err := resolveTaskBillingRequest(featureSlug, typedParams.Model)
+	if err != nil {
+		return SubmitTaskReadiness{}, err
+	}
+	if billingRequest == nil {
 		return result, nil
 	}
 	if clientActionID == "" {
@@ -232,16 +240,23 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	if s.taskBilling == nil {
 		return SubmitTaskReadiness{}, fmt.Errorf("点子计费服务暂不可用")
 	}
-	billingRequest, err := taskbilling.PatternGenerationRequest(typedParams.Model)
-	if err != nil {
-		return SubmitTaskReadiness{}, err
-	}
-	readiness, err := s.taskBilling.Readiness(ctx, userID, billingRequest)
+	readiness, err := s.taskBilling.Readiness(ctx, userID, *billingRequest)
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}
 	result.Billing = &readiness
 	return result, nil
+}
+
+func resolveTaskBillingRequest(feature, resolvedModel string) (*taskbilling.Request, error) {
+	if !taskbilling.RequiresBilling(feature) {
+		return nil, nil
+	}
+	request, err := taskbilling.AIImageRequest(feature, resolvedModel)
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
 }
 
 func normalizeSubmitTaskClientActionID(raw string) (string, error) {

@@ -2221,7 +2221,7 @@ components:
           pattern: '^[A-Za-z0-9_.:-]+$'
           description: >
             Client-generated idempotency key for a single task submission action.
-            It is required for pattern-gen because billed AI image submissions must
+            It is required for every canonical AI image workflow because billed submissions must
             converge after network timeouts. Reuse the same value when retrying the
             same action; generate a new value for an intentional rerun.
         priority:

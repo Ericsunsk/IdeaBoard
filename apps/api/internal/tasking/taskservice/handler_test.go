@@ -2,6 +2,8 @@ package taskservice
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"math"
 	"net/http"
@@ -10,10 +12,14 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 )
 
 func TestAdminListTasksRejectsInvalidIDFilters(t *testing.T) {
@@ -69,10 +75,12 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
-		"prompt":     "融合但保留主体",
-		"feature":    workflow.FeatureSlugStyleFusion,
-		"image_urls": []string{"https://example.com/a.png", "https://example.com/b.png"},
+		"prompt":           "融合但保留主体",
+		"client_action_id": "handler-style-fusion",
+		"feature":          workflow.FeatureSlugStyleFusion,
+		"image_urls":       []string{"https://example.com/a.png", "https://example.com/b.png"},
 		"params": map[string]interface{}{
+			"model": "gpt-image-1",
 			"fusion": map[string]interface{}{
 				"input_weights": []float64{3, 1},
 			},
@@ -144,15 +152,18 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 		}},
 		SubmissionStore: &recordingSubmissionStore{},
 		MediaValidator:  testSubmitMediaValidator{},
+		TaskBilling:     newHandlerTaskBillingService(),
 	}, ServiceOptions{})
 	router := newSubmitHandlerTestRouter(service, 42)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
-		"prompt":     "向右扩展为工作室背景",
-		"feature":    workflow.FeatureSlugImageExtend,
-		"image_urls": []string{"https://example.com/source.png"},
+		"prompt":           "向右扩展为工作室背景",
+		"client_action_id": "handler-image-extend",
+		"feature":          workflow.FeatureSlugImageExtend,
+		"image_urls":       []string{"https://example.com/source.png"},
 		"params": map[string]interface{}{
+			"model": "gpt-image-1",
 			"extend": map[string]interface{}{
 				"top_percent":    0,
 				"right_percent":  25,
@@ -176,9 +187,40 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	if body.Code != 0 || body.Msg != "success" {
 		t.Fatalf("unexpected response envelope: %+v", body)
 	}
-	if !body.Data.Ready || body.Data.Feature != workflow.FeatureSlugImageExtend || body.Data.Message != "" {
+	if !body.Data.Ready || body.Data.Feature != workflow.FeatureSlugImageExtend || body.Data.Message != "" || body.Data.Billing == nil {
 		t.Fatalf("unexpected readiness data: %+v", body.Data)
 	}
+}
+
+type handlerBillingQuoter struct{}
+
+func (handlerBillingQuoter) Quote(_ context.Context, rawSKU string, quantity int64) (billing.Quote, error) {
+	sku, err := billing.CanonicalizeSKU(rawSKU)
+	if err != nil {
+		return billing.Quote{}, err
+	}
+	return billing.Quote{PriceSnapshot: billing.PriceSnapshot{SKU: sku, PriceVersionID: 1, PriceVersion: 1, UnitCredits: 0}, Quantity: quantity}, nil
+}
+
+func (q handlerBillingQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, rawSKU string, quantity int64) (billing.Quote, error) {
+	return q.Quote(ctx, rawSKU, quantity)
+}
+
+type handlerBillingCredits struct{}
+
+func (handlerBillingCredits) GetWallet(context.Context, int64) (credits.WalletBalance, error) {
+	return credits.WalletBalance{Available: 100}, nil
+}
+
+func (handlerBillingCredits) ListLedger(context.Context, credits.ListLedgerInput) (credits.LedgerPage, error) {
+	return credits.LedgerPage{}, nil
+}
+
+func (handlerBillingCredits) InTx(pgx.Tx) credits.Commands     { return nil }
+func (handlerBillingCredits) InSQLTx(*sql.Tx) credits.Commands { return nil }
+
+func newHandlerTaskBillingService() *taskbilling.Service {
+	return taskbilling.NewService(handlerBillingQuoter{}, handlerBillingCredits{})
 }
 
 func newSubmitHandlerTestRouter(service *Service, userID int64) *gin.Engine {

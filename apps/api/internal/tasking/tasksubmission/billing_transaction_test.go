@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -289,9 +290,87 @@ func TestFreeBilledSubmissionPersistsSnapshotWithoutLedgerMovement(t *testing.T)
 	}
 }
 
+func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
+	for _, feature := range workflow.AIImageFeatureSlugs() {
+		feature := feature
+		for _, scenario := range []struct {
+			name          string
+			unitCredits   int64
+			createSKU     bool
+			skuEnabled    bool
+			priceEnabled  bool
+			wantErr       error
+			wantState     string
+			wantHoldCount int
+		}{
+			{name: "paid", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: true, wantState: "held", wantHoldCount: 1},
+			{name: "free", unitCredits: 0, createSKU: true, skuEnabled: true, priceEnabled: true, wantState: "free"},
+			{name: "missing", wantErr: billing.ErrSKUNotFound},
+			{name: "disabled-sku", unitCredits: 25, createSKU: true, priceEnabled: true, wantErr: billing.ErrPricingUnavailable},
+			{name: "disabled-price", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: false, wantErr: billing.ErrPricingUnavailable},
+		} {
+			scenario := scenario
+			t.Run(feature+"/"+scenario.name, func(t *testing.T) {
+				db, pool := testdb.OpenWithPool(t)
+				creditService := credits.NewService(pool)
+				billingService := billing.NewService(pool)
+				request, err := taskbilling.AIImageRequest(feature, "gpt-image-1")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scenario.createSKU {
+					sku := mustResolveSKU(t, request)
+					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, ActorID: 1}); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, ActorID: 1}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				seedCreditWallet(t, pool, creditService, 42, 100)
+				client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+				store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
+				task := newBilledAIImageTask("task_"+strings.ReplaceAll(feature, "-", "_")+"_"+scenario.name, "action:"+feature+":"+scenario.name, request)
+
+				result, err := store.SubmitTask(t.Context(), task, newTaskSubmissionQueueTask(task))
+				if scenario.wantErr != nil {
+					if !errors.Is(err, scenario.wantErr) {
+						t.Fatalf("error=%v, want %v", err, scenario.wantErr)
+					}
+					assertTaskRowCount(t, db, task.TaskID, 0)
+					assertRiverJobRowCount(t, db, task.TaskID, 0)
+					assertBillingSnapshotCount(t, db, task.TaskID, 0)
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				var snapshotFeature, snapshotModel, state string
+				if err := db.QueryRowContext(t.Context(), `
+SELECT snapshots.feature_slug, snapshots.model, settlements.state
+FROM task_billing_snapshots snapshots
+JOIN task_billing_settlements settlements USING (task_id)
+WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &snapshotModel, &state); err != nil {
+					t.Fatal(err)
+				}
+				if snapshotFeature != feature || snapshotModel != "gpt-image-1" || state != scenario.wantState {
+					t.Fatalf("snapshot feature/model/state=%q/%q/%q", snapshotFeature, snapshotModel, state)
+				}
+				var holdCount int
+				if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'hold' AND business_reference_id = $1`, result.TaskID).Scan(&holdCount); err != nil {
+					t.Fatal(err)
+				}
+				if holdCount != scenario.wantHoldCount {
+					t.Fatalf("hold count=%d, want %d", holdCount, scenario.wantHoldCount)
+				}
+			})
+		}
+	}
+}
+
 func seedPatternBillingProduct(t *testing.T, service *billing.Service, model string, unitCredits int64) taskbilling.Request {
 	t.Helper()
-	request, err := taskbilling.PatternGenerationRequest(model)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, model)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,9 +417,13 @@ func seedCreditWallet(t *testing.T, pool *pgxpool.Pool, service *credits.Service
 }
 
 func newBilledPatternTask(taskID, clientActionID string, request taskbilling.Request) *tasks.Task {
+	return newBilledAIImageTask(taskID, clientActionID, request)
+}
+
+func newBilledAIImageTask(taskID, clientActionID string, request taskbilling.Request) *tasks.Task {
 	task := newTaskSubmissionTask(taskID)
 	task.ClientActionID = clientActionID
-	task.FeatureSlug = workflow.FeatureSlugPatternGen
+	task.FeatureSlug = request.Feature
 	task.RequestedModel = request.Model
 	task.BillingRequest = &tasks.TaskBillingRequest{Feature: request.Feature, Model: request.Model, Quantity: request.Quantity}
 	return task
