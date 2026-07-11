@@ -1,6 +1,6 @@
 # Credits Context
 
-Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示为「点子」。本 context 只拥有货币账户、不可变账本、余额 projection 和 Credit Commands；商品身份与价格属于后续 `billing` context。
+Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示为「点子」。本 context 只拥有货币账户、不可变账本、余额 projection 和 Credit Commands；商品身份、versioned pricing 与 Quote 属于 `billing` context。
 
 ## Domain Language
 

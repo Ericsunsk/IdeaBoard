@@ -5,6 +5,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
@@ -57,11 +58,13 @@ type UserRouteDeps struct {
 	TaskHandler      *taskservice.Handler
 	BoardHandler     *boards.BoardHandler
 	LineDraftHandler *assets.LineDraftHandler
+	BillingHandler   *billing.Handler
 	Uploads          UploadDeps
 }
 
 type AdminRouteDeps struct {
 	AdminHandler            *users.AdminHandler
+	BillingHandler          *billing.Handler
 	CreditHandler           *credits.Handler
 	AccountHandler          *accounts.AccountHandler
 	TaskHandler             *taskservice.Handler

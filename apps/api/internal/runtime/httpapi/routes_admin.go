@@ -23,12 +23,22 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminLineDraftRoutes(adminAPI, h)
 	registerAdminFeaturePromptRoutes(adminAPI, h)
 	registerAdminCreditRoutes(adminAPI, h)
+	registerAdminBillingRoutes(adminAPI, h)
 }
 
 func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.POST("/credits/grants", h.CreditHandler.Grant)
 	adminAPI.GET("/credits/wallets/:user_id", h.CreditHandler.GetWallet)
 	adminAPI.GET("/credits/wallets/:user_id/ledger", h.CreditHandler.ListLedger)
+}
+
+func registerAdminBillingRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/billing/skus", h.BillingHandler.ListCatalog)
+	adminAPI.POST("/billing/skus", h.BillingHandler.CreateSKU)
+	adminAPI.PATCH("/billing/skus/:sku", h.BillingHandler.UpdateSKU)
+	adminAPI.GET("/billing/skus/:sku/prices", h.BillingHandler.ListPrices)
+	adminAPI.POST("/billing/skus/:sku/prices", h.BillingHandler.CreatePrice)
+	adminAPI.PATCH("/billing/skus/:sku/prices/:version", h.BillingHandler.SetPriceEnabled)
 }
 
 func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

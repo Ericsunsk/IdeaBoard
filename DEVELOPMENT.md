@@ -148,6 +148,13 @@ git diff --exit-code -- internal/db/sqlc
 | [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md) | Credits domain language 与 invariants |
 | [credits-million.md](./docs/benchmarks/credits-million.md) | 显式百万流水 harness 与参考结果 |
 
+### Billing
+
+| 入口 | 用途 |
+| ---- | ---- |
+| [service.go](./apps/api/internal/billing/service.go) | 全局 SKU Catalog、versioned pricing 与 Quote seam |
+| [CONTEXT.md](./apps/api/internal/billing/CONTEXT.md) | Billing domain language、SKU namespace 与 snapshot invariants |
+
 ## Workflow Feature Contract
 
 | Feature | 语义 |

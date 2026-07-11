@@ -171,6 +171,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Boards | `internal/boards` | board ownership、access checks、board management API |
 | Media | `internal/media` | storage、assets、media refs、image format validation |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | executable feature contract、task params、prompt templates、prompt assembly |
+| Billing | `internal/billing` | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot |
 | Credits | `internal/credits` | 平台点子 Wallet、Double-entry Ledger、余额 projection、幂等 Credit Commands |
 
 Dependency direction:
@@ -181,6 +182,7 @@ Dependency direction:
 - `internal/platform` must not import business contexts.
 - Cross-context collaboration should use small service/repository interfaces at the caller boundary.
 - Products consume Credits through the `credits.Commands` seam; only Credits owns Ledger writes and balance projections.
+- Products ask Billing for an immutable `PriceSnapshot`; Provider Account routing must not influence SKU price. Billing does not write the Credits Ledger.
 
 ## Frontend Context Map
 

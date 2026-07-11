@@ -5,6 +5,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
@@ -30,6 +31,7 @@ func newAppRouter(
 	accountHandler := accounts.NewAccountHandler(taskServices.accountService)
 	taskHandler := taskservice.NewHandler(taskServices.taskService)
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
+	billingHandler := billing.NewHandler(services.billingService, services.billingService)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: services.authServiceClient,
@@ -52,10 +54,12 @@ func newAppRouter(
 			TaskHandler:      taskHandler,
 			BoardHandler:     boards.NewBoardHandler(services.boardService, services.runtimeSettings),
 			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
+			BillingHandler:   billingHandler,
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler:            users.NewAdminHandler(services.userService, services.runtimeSettings, services.authServiceClient),
+			BillingHandler:          billingHandler,
 			CreditHandler:           credits.NewHandler(services.creditService),
 			AccountHandler:          accountHandler,
 			TaskHandler:             taskHandler,

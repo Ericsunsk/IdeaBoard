@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/db/migrations"
@@ -48,19 +49,26 @@ func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, er
 		return appDatabases{}, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	if err := database.VerifyRuntimePrivileges(ctx, db); err != nil {
-		_ = db.Close()
-		return appDatabases{}, err
+		return appDatabases{}, closeStartupDatabase(db, err)
 	}
 	if err := credits.VerifyRuntimePrivileges(ctx, db); err != nil {
-		_ = db.Close()
-		return appDatabases{}, err
+		return appDatabases{}, closeStartupDatabase(db, err)
+	}
+	if err := billing.VerifyRuntimePrivileges(ctx, db); err != nil {
+		return appDatabases{}, closeStartupDatabase(db, err)
 	}
 	riverPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
-		_ = db.Close()
-		return appDatabases{}, fmt.Errorf("failed to connect River database pool: %w", err)
+		return appDatabases{}, closeStartupDatabase(db, fmt.Errorf("failed to connect River database pool: %w", err))
 	}
 	return appDatabases{db: db, riverPool: riverPool}, nil
+}
+
+func closeStartupDatabase(db *sql.DB, cause error) error {
+	if closeErr := db.Close(); closeErr != nil {
+		return errors.Join(cause, fmt.Errorf("close startup database: %w", closeErr))
+	}
+	return cause
 }
 
 func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
@@ -95,6 +103,9 @@ func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
 		return rollbackPrivilegeTransaction(privilegeTx, err)
 	}
 	if err := credits.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
+		return rollbackPrivilegeTransaction(privilegeTx, err)
+	}
+	if err := billing.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
 		return rollbackPrivilegeTransaction(privilegeTx, err)
 	}
 	if err := privilegeTx.Commit(); err != nil {

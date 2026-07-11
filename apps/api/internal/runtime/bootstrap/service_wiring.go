@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
@@ -22,11 +23,12 @@ type appDomainServices struct {
 	storageService    *storage.StorageService
 	userService       *users.UserService
 	boardService      *boards.BoardService
+	billingService    *billing.Service
 	creditService     *credits.Service
 	userLifecycle     *users.LifecycleService
 }
 
-func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, creditPool *pgxpool.Pool) (appDomainServices, error) {
+func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
 	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
 	storageService := storage.NewStorageService(repos.storageProfileRepo, runtimeSettings)
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
@@ -37,8 +39,9 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	if err != nil || len(welcomeIdentityKey) != 32 {
 		return appDomainServices{}, fmt.Errorf("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
 	}
-	creditService := credits.NewService(creditPool)
-	userLifecycle := users.NewLifecycleService(creditPool, creditService, welcomeIdentityKey)
+	creditService := credits.NewService(appPool)
+	billingService := billing.NewService(appPool)
+	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		return appDomainServices{}, err
 	}
@@ -49,6 +52,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		storageService:    storageService,
 		userService:       userService,
 		boardService:      boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
+		billingService:    billingService,
 		creditService:     creditService,
 		userLifecycle:     userLifecycle,
 	}, nil
