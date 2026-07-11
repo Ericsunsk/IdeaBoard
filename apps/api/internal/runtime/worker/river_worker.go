@@ -261,10 +261,12 @@ func finalFailureRetryFromJob(job *rivertype.JobRow, taskID string) (finalFailur
 }
 
 type RiverServerOptions struct {
-	QueueName   string
-	Concurrency int
-	JobTimeout  time.Duration
-	MaxRetry    int
+	QueueName        string
+	Concurrency      int
+	JobTimeout       time.Duration
+	MaxRetry         int
+	AdditionalQueues map[string]river.QueueConfig
+	RegisterWorkers  func(*river.Workers)
 }
 
 type riverFinalFailureRuntime interface {
@@ -308,6 +310,9 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)
+	if opts.RegisterWorkers != nil {
+		opts.RegisterWorkers(workers)
+	}
 	errorHandler := river.ErrorHandler(nil)
 	if worker != nil && worker.processor != nil {
 		if finalFailureRuntime, ok := worker.processor.taskRuntime.(riverFinalFailureRuntime); ok {
@@ -332,10 +337,14 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 			errorHandler = newRiverFinalFailureHandler(worker.processor.taskRuntime)
 		}
 	}
+	queues := map[string]river.QueueConfig{queueName: {MaxWorkers: concurrency}}
+	for name, queue := range opts.AdditionalQueues {
+		if strings.TrimSpace(name) != "" {
+			queues[name] = queue
+		}
+	}
 	return river.NewClient(riverpgxv5.New(dbPool), &river.Config{
-		Queues: map[string]river.QueueConfig{
-			queueName: {MaxWorkers: concurrency},
-		},
+		Queues:       queues,
 		Workers:      workers,
 		MaxAttempts:  maxRetry,
 		JobTimeout:   jobTimeout,

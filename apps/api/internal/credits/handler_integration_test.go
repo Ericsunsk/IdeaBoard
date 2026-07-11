@@ -3,6 +3,7 @@ package credits
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,94 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	handler := NewHandler(service)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("user_id", int64(1)); c.Next() })
+	router.POST("/api/admin/credits/reconciliation/runs", handler.StartReconciliation)
+	router.GET("/api/admin/credits/reconciliation/runs", handler.ListReconciliationRuns)
+	router.GET("/api/admin/credits/reconciliation/runs/:run_id", handler.GetReconciliationRun)
+	router.GET("/api/admin/credits/reconciliation/runs/:run_id/findings", handler.ListReconciliationFindings)
+
+	unknown := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"unknown":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(unknown, request)
+	if unknown.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field status = %d, body=%s", unknown.Code, unknown.Body.String())
+	}
+
+	oversized := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewReader(bytes.Repeat([]byte(" "), maxAdminCreditRequestBytes+1)))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(oversized, request)
+	if oversized.Code != http.StatusBadRequest {
+		t.Fatalf("oversized status = %d, body=%s", oversized.Code, oversized.Body.String())
+	}
+	overflow := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"stale_hold_after_seconds":36028797018964028}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(overflow, request)
+	if overflow.Code != http.StatusBadRequest {
+		t.Fatalf("overflow duration status = %d, body=%s", overflow.Code, overflow.Body.String())
+	}
+
+	created := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(created, request)
+	if created.Code != http.StatusOK || !bytes.Contains(created.Body.Bytes(), []byte(`"status":"queued"`)) {
+		t.Fatalf("created response = %d %s", created.Code, created.Body.String())
+	}
+	var runID int64
+	if err := pool.QueryRow(t.Context(), `SELECT id FROM credit_reconciliation_runs`).Scan(&runID); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(t.Context(), runID); err != nil {
+		t.Fatal(err)
+	}
+
+	for path := range map[string]struct{}{
+		"/api/admin/credits/reconciliation/runs?limit=1":                                             {},
+		fmt.Sprintf("/api/admin/credits/reconciliation/runs/%d", runID):                              {},
+		fmt.Sprintf("/api/admin/credits/reconciliation/runs/%d/findings?limit=1&status=open", runID): {},
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
+		}
+	}
+	invalid := httptest.NewRecorder()
+	router.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/api/admin/credits/reconciliation/runs?limit=201", nil))
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid pagination status = %d", invalid.Code)
+	}
+	invalidStatus := httptest.NewRecorder()
+	router.ServeHTTP(invalidStatus, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/admin/credits/reconciliation/runs/%d/findings?status=pending", runID), nil))
+	if invalidStatus.Code != http.StatusBadRequest {
+		t.Fatalf("invalid finding status = %d", invalidStatus.Code)
+	}
+}
+
+func TestAdminCreditReconciliationReadHandlersReturnServiceUnavailable(t *testing.T) {
+	handler := NewHandler(nil)
+	router := gin.New()
+	router.GET("/runs", handler.ListReconciliationRuns)
+	router.GET("/runs/:run_id", handler.GetReconciliationRun)
+	router.GET("/runs/:run_id/findings", handler.ListReconciliationFindings)
+	for _, path := range []string{"/runs", "/runs/1", "/runs/1/findings"} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusServiceUnavailable {
+			t.Fatalf("GET %s status = %d, want 503; body=%s", path, recorder.Code, recorder.Body.String())
+		}
+	}
+}
 
 func TestAdminCreditHTTPContractGrantsAndReadsWallet(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)

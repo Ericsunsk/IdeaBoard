@@ -33,6 +33,10 @@ func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.POST("/credits/refunds", h.CreditHandler.Refund)
 	adminAPI.GET("/credits/wallets/:user_id", h.CreditHandler.GetWallet)
 	adminAPI.GET("/credits/wallets/:user_id/ledger", h.CreditHandler.ListLedger)
+	adminAPI.POST("/credits/reconciliation/runs", h.CreditHandler.StartReconciliation)
+	adminAPI.GET("/credits/reconciliation/runs", h.CreditHandler.ListReconciliationRuns)
+	adminAPI.GET("/credits/reconciliation/runs/:run_id", h.CreditHandler.GetReconciliationRun)
+	adminAPI.GET("/credits/reconciliation/runs/:run_id/findings", h.CreditHandler.ListReconciliationFindings)
 }
 
 func registerAdminBillingRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

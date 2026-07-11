@@ -24,8 +24,14 @@ import type {
   AdminCreditRefundRequest,
   ApiResponseCreditCommandResult,
   ApiResponseCreditLedgerPage,
+  ApiResponseCreditReconciliationFindingPage,
+  ApiResponseCreditReconciliationRun,
+  ApiResponseCreditReconciliationRunPage,
   ApiResponseCreditWallet,
+  CreditReconciliationRequest,
   ListAdminCreditLedgerParams,
+  ListAdminCreditReconciliationFindingsParams,
+  ListAdminCreditReconciliationRunsParams,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -484,6 +490,392 @@ export function useListAdminCreditLedger<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminCreditLedgerQueryOptions(userId, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getStartAdminCreditReconciliationUrl = () => {
+  return `/admin/credits/reconciliation/runs`
+}
+
+export const startAdminCreditReconciliation = async (
+  creditReconciliationRequest: CreditReconciliationRequest,
+  options?: RequestInit,
+): Promise<ApiResponseCreditReconciliationRun> => {
+  return orvalMutator<ApiResponseCreditReconciliationRun>(getStartAdminCreditReconciliationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(creditReconciliationRequest),
+  })
+}
+
+export const getStartAdminCreditReconciliationQueryKey = (
+  creditReconciliationRequest?: MaybeRefOrGetter<CreditReconciliationRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'credits',
+    'reconciliation',
+    'runs',
+    creditReconciliationRequest,
+  ] as const
+}
+
+export const getStartAdminCreditReconciliationQueryOptions = <
+  TData = Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+  TError = ErrorType<unknown>,
+>(
+  creditReconciliationRequest: MaybeRefOrGetter<CreditReconciliationRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof startAdminCreditReconciliation>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getStartAdminCreditReconciliationQueryKey(creditReconciliationRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof startAdminCreditReconciliation>>> = ({
+    signal,
+  }) =>
+    startAdminCreditReconciliation(toValue(creditReconciliationRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+    TError,
+    TData
+  >
+}
+
+export type StartAdminCreditReconciliationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof startAdminCreditReconciliation>>
+>
+export type StartAdminCreditReconciliationQueryError = ErrorType<unknown>
+
+export function useStartAdminCreditReconciliation<
+  TData = Awaited<ReturnType<typeof startAdminCreditReconciliation>>,
+  TError = ErrorType<unknown>,
+>(
+  creditReconciliationRequest: MaybeRefOrGetter<CreditReconciliationRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof startAdminCreditReconciliation>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getStartAdminCreditReconciliationQueryOptions(
+    creditReconciliationRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminCreditReconciliationRunsUrl = (
+  params?: ListAdminCreditReconciliationRunsParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/credits/reconciliation/runs?${stringifiedParams}`
+    : `/admin/credits/reconciliation/runs`
+}
+
+export const listAdminCreditReconciliationRuns = async (
+  params?: ListAdminCreditReconciliationRunsParams,
+  options?: RequestInit,
+): Promise<ApiResponseCreditReconciliationRunPage> => {
+  return orvalMutator<ApiResponseCreditReconciliationRunPage>(
+    getListAdminCreditReconciliationRunsUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListAdminCreditReconciliationRunsQueryKey = (
+  params?: MaybeRefOrGetter<ListAdminCreditReconciliationRunsParams>,
+) => {
+  return ['admin', 'credits', 'reconciliation', 'runs', ...(params ? [params] : [])] as const
+}
+
+export const getListAdminCreditReconciliationRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationRuns>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<ListAdminCreditReconciliationRunsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminCreditReconciliationRuns>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminCreditReconciliationRunsQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminCreditReconciliationRuns>>> = ({
+    signal,
+  }) => listAdminCreditReconciliationRuns(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminCreditReconciliationRuns>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminCreditReconciliationRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminCreditReconciliationRuns>>
+>
+export type ListAdminCreditReconciliationRunsQueryError = ErrorType<unknown>
+
+export function useListAdminCreditReconciliationRuns<
+  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationRuns>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<ListAdminCreditReconciliationRunsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminCreditReconciliationRuns>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminCreditReconciliationRunsQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminCreditReconciliationRunUrl = (runId: number) => {
+  return `/admin/credits/reconciliation/runs/${encodeURIComponent(String(runId))}`
+}
+
+export const getAdminCreditReconciliationRun = async (
+  runId: number,
+  options?: RequestInit,
+): Promise<ApiResponseCreditReconciliationRun> => {
+  return orvalMutator<ApiResponseCreditReconciliationRun>(
+    getGetAdminCreditReconciliationRunUrl(runId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetAdminCreditReconciliationRunQueryKey = (runId: MaybeRefOrGetter<number>) => {
+  return ['admin', 'credits', 'reconciliation', 'runs', runId] as const
+}
+
+export const getGetAdminCreditReconciliationRunQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminCreditReconciliationRun>>,
+  TError = ErrorType<unknown>,
+>(
+  runId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditReconciliationRun>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminCreditReconciliationRunQueryKey(runId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminCreditReconciliationRun>>> = ({
+    signal,
+  }) => getAdminCreditReconciliationRun(toValue(runId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(runId) !== null && toValue(runId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditReconciliationRun>>, TError, TData>
+}
+
+export type GetAdminCreditReconciliationRunQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminCreditReconciliationRun>>
+>
+export type GetAdminCreditReconciliationRunQueryError = ErrorType<unknown>
+
+export function useGetAdminCreditReconciliationRun<
+  TData = Awaited<ReturnType<typeof getAdminCreditReconciliationRun>>,
+  TError = ErrorType<unknown>,
+>(
+  runId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditReconciliationRun>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminCreditReconciliationRunQueryOptions(runId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminCreditReconciliationFindingsUrl = (
+  runId: number,
+  params?: ListAdminCreditReconciliationFindingsParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/credits/reconciliation/runs/${encodeURIComponent(String(runId))}/findings?${stringifiedParams}`
+    : `/admin/credits/reconciliation/runs/${encodeURIComponent(String(runId))}/findings`
+}
+
+export const listAdminCreditReconciliationFindings = async (
+  runId: number,
+  params?: ListAdminCreditReconciliationFindingsParams,
+  options?: RequestInit,
+): Promise<ApiResponseCreditReconciliationFindingPage> => {
+  return orvalMutator<ApiResponseCreditReconciliationFindingPage>(
+    getListAdminCreditReconciliationFindingsUrl(runId, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListAdminCreditReconciliationFindingsQueryKey = (
+  runId: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminCreditReconciliationFindingsParams>,
+) => {
+  return [
+    'admin',
+    'credits',
+    'reconciliation',
+    'runs',
+    runId,
+    'findings',
+    ...(params ? [params] : []),
+  ] as const
+}
+
+export const getListAdminCreditReconciliationFindingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+  TError = ErrorType<unknown>,
+>(
+  runId: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminCreditReconciliationFindingsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminCreditReconciliationFindingsQueryKey(runId, params)
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>
+  > = ({ signal }) =>
+    listAdminCreditReconciliationFindings(toValue(runId), toValue(params), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(runId) !== null && toValue(runId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminCreditReconciliationFindingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>
+>
+export type ListAdminCreditReconciliationFindingsQueryError = ErrorType<unknown>
+
+export function useListAdminCreditReconciliationFindings<
+  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+  TError = ErrorType<unknown>,
+>(
+  runId: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminCreditReconciliationFindingsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+        TError,
+        TData
+      >
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminCreditReconciliationFindingsQueryOptions(runId, params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

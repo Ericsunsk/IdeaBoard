@@ -17,12 +17,15 @@ Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示�
 | Capture | User Reserved → System Revenue |
 | Release | User Reserved → User Available |
 | Refund | System Revenue → User Available，累计不得超过原 Charge |
+| Reconciliation Run | Admin 触发、River 异步执行的全量一致性扫描；只检测、报告和隔离 |
+| Finding | 由 finding type + Wallet + subject 生成稳定 fingerprint 的可重跑异常事实 |
 
 ## Public Seams
 
 - `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release 与 Refund；底层只调用 typed `SECURITY DEFINER execute_credit_command_v2`。
 - `Service.InTx(pgx.Tx)` 与 `Service.InSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，现有 Task Store terminal transition 使用 database/sql；caller 都拥有 commit/rollback。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
+- `Reconciliation` 通过独立 River queue 运行，Admin 可读取 run history、summary 和 keyset-paginated findings。
 - Admin HTTP 提供单用户 Wallet/Ledger read、Grant、Deduction、linked Refund 与 Correction；不提供 set balance、更新或删除账本历史。Ledger read 显式返回 Hold/Charge reference，避免 Admin 以裸关联 ID 推断结算状态。
 
 其他 context 不得直接更新 `credit_accounts.balance`、插入 Ledger 或自行计算幂等 hash。
@@ -41,6 +44,9 @@ Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示�
 - Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin、关联原 Admin Grant/Deduction/Refund，并以原 Posting 的反向 Posting 追加记录；Capture 更正使用 linked Refund。
 - frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction 被拒绝；仅 authenticated Admin 的 linked Refund/Correction 可写入 frozen Wallet，余额仍被冻结而不可消费。
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
+- Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
+- `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 finding、alert 与 run report 同一 transaction 内冻结相关 Wallet。扫描不得修改 Ledger、projection 或自动创建 Correction。
+- Finding fingerprint 不包含 run ID；重复异常复用 open finding 并增加 occurrence/run link，异常消失后标记 resolved。frozen Wallet 的历史 read contract 不变。
 - Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 Wallet，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 100 点子 Welcome Grant；claim identity 明文不进入 Credits schema。
 - Welcome identity HMAC key 首次使用时通过 typed `SECURITY DEFINER` command 永久绑定数据库 fingerprint；配置误变更时 startup/provision fail closed，避免同一身份生成新 claim。
 - 删除业务用户先在本地事务冻结 Wallet 并记录 durable deletion phase，再依次幂等删除 Auth、清理 Storage、写 user tombstone；失败请求可从持久 phase 重试收敛。最终保留 user tombstone 主键、Task、Wallet、Ledger 与 Welcome claim；相同领取身份重新注册不会再次获得 Welcome Grant。

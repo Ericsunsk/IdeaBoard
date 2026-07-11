@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/platform/response"
 
@@ -21,6 +22,10 @@ type AdminService interface {
 	Refund(context.Context, RefundCommand) (CommandResult, error)
 	GetWallet(context.Context, int64) (WalletDetails, error)
 	ListLedger(context.Context, ListLedgerInput) (LedgerPage, error)
+	StartReconciliation(context.Context, int64, time.Duration) (ReconciliationRun, error)
+	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
+	ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error)
+	ListReconciliationFindings(context.Context, int64, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error)
 }
 
 type Handler struct {
@@ -53,6 +58,10 @@ type adminCorrectionRequest struct {
 	IdempotencyKey        string `json:"idempotency_key"`
 	Reason                string `json:"reason"`
 	BusinessReferenceID   string `json:"business_reference_id"`
+}
+
+type adminReconciliationRequest struct {
+	StaleHoldAfterSeconds int64 `json:"stale_hold_after_seconds"`
 }
 
 const maxAdminCreditRequestBytes = 16 << 10
@@ -271,6 +280,123 @@ func (h *Handler) ListLedger(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
+func (h *Handler) StartReconciliation(c *gin.Context) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		return
+	}
+	adminID, ok := authenticatedAdminID(c)
+	if !ok {
+		return
+	}
+	var request adminReconciliationRequest
+	if err := decodeAdminCreditRequest(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	if request.StaleHoldAfterSeconds == 0 {
+		request.StaleHoldAfterSeconds = 86400
+	}
+	if request.StaleHoldAfterSeconds < 60 || request.StaleHoldAfterSeconds > 31536000 {
+		response.Error(c, http.StatusBadRequest, "stale_hold_after_seconds 无效")
+		return
+	}
+	run, err := h.service.StartReconciliation(c.Request.Context(), adminID, time.Duration(request.StaleHoldAfterSeconds)*time.Second)
+	if err != nil {
+		writeCreditError(c, err)
+		return
+	}
+	response.SuccessDTO(c, run)
+}
+
+func (h *Handler) GetReconciliationRun(c *gin.Context) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		return
+	}
+	runID, ok := parsePositiveInt64(c.Param("run_id"))
+	if !ok {
+		response.Error(c, http.StatusBadRequest, "run_id 无效")
+		return
+	}
+	run, err := h.service.GetReconciliationRun(c.Request.Context(), runID)
+	if err != nil {
+		writeCreditError(c, err)
+		return
+	}
+	response.SuccessDTO(c, run)
+}
+
+func (h *Handler) ListReconciliationRuns(c *gin.Context) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		return
+	}
+	input, ok := parseReconciliationPage(c)
+	if !ok {
+		return
+	}
+	page, err := h.service.ListReconciliationRuns(c.Request.Context(), input)
+	if err != nil {
+		writeCreditError(c, err)
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) ListReconciliationFindings(c *gin.Context) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		return
+	}
+	runID, ok := parsePositiveInt64(c.Param("run_id"))
+	if !ok {
+		response.Error(c, http.StatusBadRequest, "run_id 无效")
+		return
+	}
+	input, ok := parseReconciliationPage(c)
+	if !ok {
+		return
+	}
+	status, ok := parseReconciliationFindingStatus(c.Query("status"))
+	if !ok {
+		response.Error(c, http.StatusBadRequest, "status 无效")
+		return
+	}
+	page, err := h.service.ListReconciliationFindings(c.Request.Context(), runID, status, input)
+	if err != nil {
+		writeCreditError(c, err)
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func parseReconciliationFindingStatus(value string) (ReconciliationFindingStatus, bool) {
+	status := ReconciliationFindingStatus(strings.TrimSpace(value))
+	return status, status == "" || status == ReconciliationFindingOpen || status == ReconciliationFindingResolved
+}
+
+func parseReconciliationPage(c *gin.Context) (ListReconciliationInput, bool) {
+	input := ListReconciliationInput{}
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		limit, err := strconv.Atoi(raw)
+		if err != nil || limit < 1 || limit > 200 {
+			response.Error(c, http.StatusBadRequest, "limit 无效")
+			return input, false
+		}
+		input.Limit = limit
+	}
+	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
+		before, ok := parsePositiveInt64(raw)
+		if !ok {
+			response.Error(c, http.StatusBadRequest, "before_id 无效")
+			return input, false
+		}
+		input.BeforeID = before
+	}
+	return input, true
+}
+
 func parsePositiveInt64(value string) (int64, bool) {
 	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
 	return parsed, err == nil && parsed > 0
@@ -292,6 +418,10 @@ func writeCreditError(c *gin.Context, err error) {
 		response.Error(c, http.StatusNotFound, "原扣款记录不存在")
 	case errors.Is(err, ErrRefundExceedsCharge):
 		response.Error(c, http.StatusUnprocessableEntity, "退款金额超过原扣款剩余额度")
+	case errors.Is(err, ErrReconciliationNotFound):
+		response.Error(c, http.StatusNotFound, "点子对账任务不存在")
+	case errors.Is(err, ErrReconciliationUnavailable):
+		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", err)
 	default:
 		response.InternalError(c, http.StatusInternalServerError, "点子操作失败", err)
 	}

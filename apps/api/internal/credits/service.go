@@ -16,7 +16,8 @@ import (
 const rollbackTimeout = 5 * time.Second
 
 type Service struct {
-	pool *pgxpool.Pool
+	pool                   *pgxpool.Pool
+	reconciliationEnqueuer ReconciliationEnqueuer
 }
 
 type transactionCommands struct {
@@ -29,6 +30,12 @@ type sqlTransactionCommands struct {
 
 func NewService(pool *pgxpool.Pool) *Service {
 	return &Service{pool: pool}
+}
+
+func (s *Service) SetReconciliationEnqueuer(enqueuer ReconciliationEnqueuer) {
+	if s != nil {
+		s.reconciliationEnqueuer = enqueuer
+	}
 }
 
 // InTx lets Tasking compose Credits commands into its existing PostgreSQL

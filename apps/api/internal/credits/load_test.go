@@ -2,11 +2,13 @@ package credits
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -122,6 +124,35 @@ FROM (
 	}
 	verifyDuration := time.Since(verifyStarted)
 
+	var databaseBytesBefore int64
+	if err := db.QueryRowContext(ctx, `SELECT pg_database_size(current_database())`).Scan(&databaseBytesBefore); err != nil {
+		t.Fatalf("read database size before reconciliation error = %v", err)
+	}
+	var memoryBefore runtime.MemStats
+	runtime.ReadMemStats(&memoryBefore)
+	var reconciliationRunID int64
+	if err := db.QueryRowContext(ctx, `SELECT start_credit_reconciliation(1, 86400)`).Scan(&reconciliationRunID); err != nil {
+		t.Fatalf("start reconciliation error = %v", err)
+	}
+	reconciliationStarted := time.Now()
+	if err := service.ExecuteReconciliation(ctx, reconciliationRunID); err != nil {
+		t.Fatalf("execute million reconciliation error = %v", err)
+	}
+	reconciliationDuration := time.Since(reconciliationStarted)
+	var reconciliationFindings int64
+	if err := db.QueryRowContext(ctx, `SELECT finding_count FROM credit_reconciliation_runs WHERE id = $1`, reconciliationRunID).Scan(&reconciliationFindings); err != nil {
+		t.Fatalf("read reconciliation summary error = %v", err)
+	}
+	if reconciliationFindings != 0 {
+		t.Fatalf("clean million dataset reconciliation findings = %d", reconciliationFindings)
+	}
+	var databaseBytesAfter int64
+	if err := db.QueryRowContext(ctx, `SELECT pg_database_size(current_database())`).Scan(&databaseBytesAfter); err != nil {
+		t.Fatalf("read database size after reconciliation error = %v", err)
+	}
+	var memoryAfter runtime.MemStats
+	runtime.ReadMemStats(&memoryAfter)
+
 	walletStarted := time.Now()
 	wallet, err := service.GetWallet(ctx, userID)
 	if err != nil {
@@ -147,13 +178,17 @@ FROM (
 	parallelStarted := time.Now()
 	runCreditLoadParallelWallets(t, ctx, service, pool)
 	parallelDuration := time.Since(parallelStarted)
+	throughputDuration, throughputRate := runCreditMultiWalletThroughput(t, ctx, service, db)
+	if throughputRate < 232 {
+		t.Fatalf("different-wallet throughput %.1f commands/s, want >= 232", throughputRate)
+	}
 
 	var postgresVersion string
 	if err := db.QueryRowContext(ctx, `SHOW server_version`).Scan(&postgresVersion); err != nil {
 		t.Fatalf("read PostgreSQL version error = %v", err)
 	}
 	t.Logf(
-		"credits load result: transactions=%d postings=%d postgres=%s go=%s os=%s arch=%s cpus=%d seed=%s verify=%s wallet=%s ledger50=%s same_wallet_32=%s different_wallets=%s",
+		"credits load result: transactions=%d postings=%d postgres=%s go=%s os=%s arch=%s cpus=%d seed=%s verify=%s reconciliation=%s reconciliation_findings=%d database_bytes_before=%d database_bytes_after=%d go_heap_before=%d go_heap_after=%d wallet=%s ledger50=%s same_wallet_32=%s different_wallets=%s multi_wallet_1000=%s throughput_commands_per_second=%.1f",
 		transactionCount,
 		transactionCount*2,
 		postgresVersion,
@@ -163,10 +198,18 @@ FROM (
 		runtime.NumCPU(),
 		seedDuration,
 		verifyDuration,
+		reconciliationDuration,
+		reconciliationFindings,
+		databaseBytesBefore,
+		databaseBytesAfter,
+		memoryBefore.HeapAlloc,
+		memoryAfter.HeapAlloc,
 		walletDuration,
 		ledgerDuration,
 		contentionDuration,
 		parallelDuration,
+		throughputDuration,
+		throughputRate,
 	)
 }
 
@@ -245,6 +288,59 @@ func runCreditLoadParallelWallets(t *testing.T, ctx context.Context, service *Se
 	case <-time.After(2 * time.Second):
 		t.Fatal("different-wallet Grant blocked on another wallet's open transaction")
 	}
+}
+
+func runCreditMultiWalletThroughput(t *testing.T, ctx context.Context, service *Service, db interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}) (time.Duration, float64) {
+	t.Helper()
+	const commandCount = 1000
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO users (id, username, storage_uid, role, status)
+SELECT 10000 + series, 'credits-load-' || series, 'L' || lpad(series::TEXT, 5, '0'), 'user', 1
+FROM generate_series(1, $1::BIGINT) series ON CONFLICT (id) DO NOTHING`, commandCount); err != nil {
+		t.Fatalf("seed throughput users error = %v", err)
+	}
+	for userID := int64(10001); userID <= 10000+commandCount; userID++ {
+		if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 2), Metadata: testMetadata(
+			fmt.Sprintf("load:throughput:grant:%d", userID), fmt.Sprintf("load-throughput-grant-%d", userID),
+		)}); err != nil {
+			t.Fatalf("seed throughput wallet %d error = %v", userID, err)
+		}
+	}
+	started := time.Now()
+	var next atomic.Int64
+	var wait sync.WaitGroup
+	errorsCh := make(chan error, 64)
+	for worker := 0; worker < 64; worker++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			for {
+				index := next.Add(1) - 1
+				if index >= commandCount {
+					return
+				}
+				userID := int64(10001) + index
+				_, err := service.Hold(ctx, HoldCommand{UserID: userID, Amount: mustCreditAmount(t, 1), Metadata: testMetadata(
+					fmt.Sprintf("load:throughput:hold:%d", userID), fmt.Sprintf("load-throughput-hold-%d", userID),
+				)})
+				if err != nil {
+					errorsCh <- err
+					return
+				}
+			}
+		}()
+	}
+	wait.Wait()
+	close(errorsCh)
+	for err := range errorsCh {
+		if err != nil {
+			t.Fatalf("throughput Hold() error = %v", err)
+		}
+	}
+	duration := time.Since(started)
+	return duration, float64(commandCount) / duration.Seconds()
 }
 
 type creditPoolBeginner interface {

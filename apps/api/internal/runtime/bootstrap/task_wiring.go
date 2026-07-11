@@ -8,6 +8,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/storage"
@@ -110,6 +111,12 @@ func newAppTaskRuntime(
 		Concurrency: cfg.Queue.WorkerConcurrency,
 		JobTimeout:  time.Duration(cfg.Queue.TaskTimeoutSeconds) * time.Second,
 		MaxRetry:    cfg.Queue.MaxRetry,
+		AdditionalQueues: map[string]river.QueueConfig{
+			credits.ReconciliationQueue: {MaxWorkers: 1},
+		},
+		RegisterWorkers: func(workers *river.Workers) {
+			river.AddWorker(workers, credits.NewReconciliationWorker(services.creditService))
+		},
 	})
 	if err != nil {
 		if eventBus != nil {
@@ -124,6 +131,7 @@ func newAppTaskRuntime(
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to recover running tasks after startup: %w", err)
 	}
 	riverQueue.SetClient(riverClient)
+	services.creditService.SetReconciliationEnqueuer(riverClient)
 
 	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{

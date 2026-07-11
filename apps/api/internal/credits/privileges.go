@@ -18,6 +18,10 @@ var creditTableNames = []string{
 	"credit_charges",
 	"credit_welcome_claims",
 	"credit_welcome_identity_key_guard",
+	"credit_reconciliation_runs",
+	"credit_reconciliation_findings",
+	"credit_reconciliation_run_findings",
+	"credit_reconciliation_alerts",
 }
 
 var creditInternalFunctionSignatures = []string{
@@ -42,6 +46,12 @@ var creditLifecycleFunctionSignatures = []string{
 	"provision_credit_wallet(BIGINT)",
 	"set_credit_wallet_status(BIGINT, TEXT)",
 	"claim_credit_welcome(TEXT, BIGINT)",
+}
+
+var creditReconciliationFunctionSignatures = []string{
+	"start_credit_reconciliation(BIGINT, BIGINT)",
+	"execute_credit_reconciliation(BIGINT)",
+	"fail_credit_reconciliation(BIGINT, TEXT)",
 }
 
 type privilegeDBTX interface {
@@ -75,6 +85,10 @@ func ConfigureRuntimePrivileges(ctx context.Context, db privilegeDBTX, runtimeRo
 	statements = append(statements, `GRANT EXECUTE ON FUNCTION `+creditCommandFunctionSignature+` TO `+roleSQL)
 	statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+legacyCreditCommandFunctionSignature+` FROM `+roleSQL)
 	for _, functionSignature := range creditLifecycleFunctionSignatures {
+		statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+functionSignature+` FROM PUBLIC`)
+		statements = append(statements, `GRANT EXECUTE ON FUNCTION `+functionSignature+` TO `+roleSQL)
+	}
+	for _, functionSignature := range creditReconciliationFunctionSignatures {
 		statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+functionSignature+` FROM PUBLIC`)
 		statements = append(statements, `GRANT EXECUTE ON FUNCTION `+functionSignature+` TO `+roleSQL)
 	}
@@ -139,6 +153,15 @@ SELECT current_user,
 		}
 		if !allowed {
 			return fmt.Errorf("verify Credits runtime privileges: role %q cannot execute wallet lifecycle function %s", currentUser, functionSignature)
+		}
+	}
+	for _, functionSignature := range creditReconciliationFunctionSignatures {
+		var allowed bool
+		if err := db.QueryRowContext(ctx, `SELECT has_function_privilege(current_user, $1, 'EXECUTE')`, functionSignature).Scan(&allowed); err != nil {
+			return fmt.Errorf("verify Credits runtime privileges: check reconciliation function %s: %w", functionSignature, err)
+		}
+		if !allowed {
+			return fmt.Errorf("verify Credits runtime privileges: role %q cannot execute reconciliation function %s", currentUser, functionSignature)
 		}
 	}
 	for _, tableName := range creditTableNames {
