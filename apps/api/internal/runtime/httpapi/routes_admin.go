@@ -28,6 +28,9 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 
 func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.POST("/credits/grants", h.CreditHandler.Grant)
+	adminAPI.POST("/credits/deductions", h.CreditHandler.Deduct)
+	adminAPI.POST("/credits/corrections", h.CreditHandler.Correct)
+	adminAPI.POST("/credits/refunds", h.CreditHandler.Refund)
 	adminAPI.GET("/credits/wallets/:user_id", h.CreditHandler.GetWallet)
 	adminAPI.GET("/credits/wallets/:user_id/ledger", h.CreditHandler.ListLedger)
 }

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -163,14 +164,15 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 	}))
 	defer authServer.Close()
 
-	db := testdb.Open(t)
+	db, pool := testdb.OpenWithPool(t)
 	userRepo := users.NewUserRepository(db)
-	if err := userRepo.Create(context.Background(), &users.User{
+	routeUser := &users.User{
 		Username:   "route-user",
 		AuthUserID: &authUserID,
 		Status:     1,
 		Role:       "user",
-	}); err != nil {
+	}
+	if err := userRepo.Create(context.Background(), routeUser); err != nil {
 		t.Fatalf("seed local user failed: %v", err)
 	}
 
@@ -201,6 +203,21 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 				t.Fatalf("local user status = %d, want %d; body=%s", localUser.Code, http.StatusForbidden, localUser.Body.String())
 			}
 		})
+	}
+	if err := userRepo.UpdateRoleByID(context.Background(), routeUser.ID, "admin"); err != nil {
+		t.Fatalf("promote route user to admin: %v", err)
+	}
+	adminDeps := newAdminRouteGuardTestDependencies(authDeps)
+	adminDeps.AdminRoutes.CreditHandler = credits.NewHandler(credits.NewService(pool))
+	router = gin.New()
+	RegisterRoutes(router, adminDeps, fstest.MapFS{}, FrontendRouteOptions{})
+	adminRecorder := httptest.NewRecorder()
+	adminRequest := httptest.NewRequest(http.MethodPost, "/api/admin/credits/grants", bytes.NewBufferString(`{"user_id":`+strconv.FormatInt(routeUser.ID, 10)+`,"amount_credits":1,"idempotency_key":"route-admin-grant","reason":"route auth test","business_reference_id":"route-admin-grant"}`))
+	adminRequest.Header.Set("Content-Type", "application/json")
+	adminRequest.Header.Set("Cookie", "better-auth.session_token=valid")
+	router.ServeHTTP(adminRecorder, adminRequest)
+	if adminRecorder.Code != http.StatusOK {
+		t.Fatalf("admin Grant status = %d, want %d; body=%s", adminRecorder.Code, http.StatusOK, adminRecorder.Body.String())
 	}
 }
 
@@ -361,6 +378,9 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/users":                               false,
 		"POST /api/admin/accounts":                           false,
 		"POST /api/admin/credits/grants":                     false,
+		"POST /api/admin/credits/deductions":                 false,
+		"POST /api/admin/credits/corrections":                false,
+		"POST /api/admin/credits/refunds":                    false,
 		"POST /api/admin/billing/skus":                       false,
 		"POST /api/admin/billing/skus/:sku/prices":           false,
 		"POST /api/admin/accounts/:id/start":                 false,

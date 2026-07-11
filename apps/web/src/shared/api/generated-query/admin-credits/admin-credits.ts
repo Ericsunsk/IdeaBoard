@@ -18,7 +18,10 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  AdminCreditCorrectionRequest,
+  AdminCreditDeductionRequest,
   AdminCreditGrantRequest,
+  AdminCreditRefundRequest,
   ApiResponseCreditCommandResult,
   ApiResponseCreditLedgerPage,
   ApiResponseCreditWallet,
@@ -93,6 +96,225 @@ export function useGrantAdminCredits<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGrantAdminCreditsQueryOptions(adminCreditGrantRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getDeductAdminCreditsUrl = () => {
+  return `/admin/credits/deductions`
+}
+
+export const deductAdminCredits = async (
+  adminCreditDeductionRequest: AdminCreditDeductionRequest,
+  options?: RequestInit,
+): Promise<ApiResponseCreditCommandResult> => {
+  return orvalMutator<ApiResponseCreditCommandResult>(getDeductAdminCreditsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminCreditDeductionRequest),
+  })
+}
+
+export const getDeductAdminCreditsQueryKey = (
+  adminCreditDeductionRequest?: MaybeRefOrGetter<AdminCreditDeductionRequest>,
+) => {
+  return ['POST', 'admin', 'credits', 'deductions', adminCreditDeductionRequest] as const
+}
+
+export const getDeductAdminCreditsQueryOptions = <
+  TData = Awaited<ReturnType<typeof deductAdminCredits>>,
+  TError = ErrorType<unknown>,
+>(
+  adminCreditDeductionRequest: MaybeRefOrGetter<AdminCreditDeductionRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deductAdminCredits>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDeductAdminCreditsQueryKey(adminCreditDeductionRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deductAdminCredits>>> = ({ signal }) =>
+    deductAdminCredits(toValue(adminCreditDeductionRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof deductAdminCredits>>,
+    TError,
+    TData
+  >
+}
+
+export type DeductAdminCreditsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof deductAdminCredits>>
+>
+export type DeductAdminCreditsQueryError = ErrorType<unknown>
+
+export function useDeductAdminCredits<
+  TData = Awaited<ReturnType<typeof deductAdminCredits>>,
+  TError = ErrorType<unknown>,
+>(
+  adminCreditDeductionRequest: MaybeRefOrGetter<AdminCreditDeductionRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deductAdminCredits>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeductAdminCreditsQueryOptions(adminCreditDeductionRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getRefundAdminCreditsUrl = () => {
+  return `/admin/credits/refunds`
+}
+
+export const refundAdminCredits = async (
+  adminCreditRefundRequest: AdminCreditRefundRequest,
+  options?: RequestInit,
+): Promise<ApiResponseCreditCommandResult> => {
+  return orvalMutator<ApiResponseCreditCommandResult>(getRefundAdminCreditsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminCreditRefundRequest),
+  })
+}
+
+export const getRefundAdminCreditsQueryKey = (
+  adminCreditRefundRequest?: MaybeRefOrGetter<AdminCreditRefundRequest>,
+) => {
+  return ['POST', 'admin', 'credits', 'refunds', adminCreditRefundRequest] as const
+}
+
+export const getRefundAdminCreditsQueryOptions = <
+  TData = Awaited<ReturnType<typeof refundAdminCredits>>,
+  TError = ErrorType<unknown>,
+>(
+  adminCreditRefundRequest: MaybeRefOrGetter<AdminCreditRefundRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof refundAdminCredits>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getRefundAdminCreditsQueryKey(adminCreditRefundRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof refundAdminCredits>>> = ({ signal }) =>
+    refundAdminCredits(toValue(adminCreditRefundRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof refundAdminCredits>>,
+    TError,
+    TData
+  >
+}
+
+export type RefundAdminCreditsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof refundAdminCredits>>
+>
+export type RefundAdminCreditsQueryError = ErrorType<unknown>
+
+export function useRefundAdminCredits<
+  TData = Awaited<ReturnType<typeof refundAdminCredits>>,
+  TError = ErrorType<unknown>,
+>(
+  adminCreditRefundRequest: MaybeRefOrGetter<AdminCreditRefundRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof refundAdminCredits>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRefundAdminCreditsQueryOptions(adminCreditRefundRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getCorrectAdminCreditsUrl = () => {
+  return `/admin/credits/corrections`
+}
+
+export const correctAdminCredits = async (
+  adminCreditCorrectionRequest: AdminCreditCorrectionRequest,
+  options?: RequestInit,
+): Promise<ApiResponseCreditCommandResult> => {
+  return orvalMutator<ApiResponseCreditCommandResult>(getCorrectAdminCreditsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminCreditCorrectionRequest),
+  })
+}
+
+export const getCorrectAdminCreditsQueryKey = (
+  adminCreditCorrectionRequest?: MaybeRefOrGetter<AdminCreditCorrectionRequest>,
+) => {
+  return ['POST', 'admin', 'credits', 'corrections', adminCreditCorrectionRequest] as const
+}
+
+export const getCorrectAdminCreditsQueryOptions = <
+  TData = Awaited<ReturnType<typeof correctAdminCredits>>,
+  TError = ErrorType<unknown>,
+>(
+  adminCreditCorrectionRequest: MaybeRefOrGetter<AdminCreditCorrectionRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof correctAdminCredits>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCorrectAdminCreditsQueryKey(adminCreditCorrectionRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof correctAdminCredits>>> = ({ signal }) =>
+    correctAdminCredits(toValue(adminCreditCorrectionRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof correctAdminCredits>>,
+    TError,
+    TData
+  >
+}
+
+export type CorrectAdminCreditsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof correctAdminCredits>>
+>
+export type CorrectAdminCreditsQueryError = ErrorType<unknown>
+
+export function useCorrectAdminCredits<
+  TData = Awaited<ReturnType<typeof correctAdminCredits>>,
+  TError = ErrorType<unknown>,
+>(
+  adminCreditCorrectionRequest: MaybeRefOrGetter<AdminCreditCorrectionRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof correctAdminCredits>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCorrectAdminCreditsQueryOptions(adminCreditCorrectionRequest, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

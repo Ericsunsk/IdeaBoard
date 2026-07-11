@@ -65,6 +65,23 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 	if result.Wallet.Available != 25 {
 		t.Fatalf("runtime role Grant() result = %+v", result)
 	}
+	denialTx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("Begin(deduction denial) error = %v", err)
+	}
+	defer denialTx.Rollback(ctx)
+	if _, err := denialTx.Exec(ctx, `SET LOCAL ROLE `+roleSQL); err != nil {
+		t.Fatalf("SET ROLE(deduction denial) error = %v", err)
+	}
+	var ignored string
+	err = denialTx.QueryRow(ctx, `
+SELECT transaction_id FROM execute_credit_command_v2(
+  'deduction', 42, 1, '', 'runtime-role:non-admin-deduction', 'service', 'runtime',
+  'runtime_test', 'must be rejected', 'test', 'runtime-role-non-admin-deduction'
+)`).Scan(&ignored)
+	if err == nil || !strings.Contains(err.Error(), "invalid credit command") {
+		t.Fatalf("runtime direct non-admin deduction error = %v, want invalid credit command", err)
+	}
 	runtimeConn, err := db.Conn(ctx)
 	if err != nil {
 		t.Fatalf("open runtime privilege verification connection error = %v", err)
@@ -111,24 +128,31 @@ VALUES ('ctx_runtime_bypass', 42, 'grant', 'runtime-role:bypass', repeat('0', 64
 	var canInsertAPIUser bool
 	var canInsertAuthUser bool
 	var canExecuteCommand bool
+	var canExecuteLegacyCommand bool
 	if err := db.QueryRowContext(ctx, `
 SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
        has_table_privilege($1, 'users', 'INSERT'),
        has_table_privilege($1, '"user"', 'INSERT'),
        has_function_privilege(
          $1,
+         'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
+         'EXECUTE'
+	       ),
+       has_function_privilege(
+         $1,
          'execute_credit_command(text,bigint,bigint,text,text,text,text,text,text,text,text)',
          'EXECUTE'
-       )`, runtimeRole).Scan(&canInsertLedger, &canInsertAPIUser, &canInsertAuthUser, &canExecuteCommand); err != nil {
+       )`, runtimeRole).Scan(&canInsertLedger, &canInsertAPIUser, &canInsertAuthUser, &canExecuteCommand, &canExecuteLegacyCommand); err != nil {
 		t.Fatalf("read runtime privileges error = %v", err)
 	}
-	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand {
+	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand || canExecuteLegacyCommand {
 		t.Fatalf(
-			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v",
+			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v execute_legacy_command=%v",
 			canInsertLedger,
 			canInsertAPIUser,
 			canInsertAuthUser,
 			canExecuteCommand,
+			canExecuteLegacyCommand,
 		)
 	}
 	var securityDefiner bool
@@ -137,7 +161,7 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
 	if err := db.QueryRowContext(ctx, `
 SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), ''), current_schema()
 FROM pg_proc
-WHERE oid = 'execute_credit_command(text,bigint,bigint,text,text,text,text,text,text,text,text)'::regprocedure`,
+WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)'::regprocedure`,
 	).Scan(&securityDefiner, &functionConfig, &trustedSchema); err != nil {
 		t.Fatalf("read command function security config error = %v", err)
 	}

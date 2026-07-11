@@ -32,7 +32,10 @@ type runtimePrivilegeQuerier interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
-const creditCommandFunctionSignature = "execute_credit_command(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const (
+	creditCommandFunctionSignature       = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+	legacyCreditCommandFunctionSignature = "execute_credit_command(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+)
 
 var creditLifecycleFunctionSignatures = []string{
 	"bind_credit_welcome_identity_key(TEXT)",
@@ -70,6 +73,7 @@ func ConfigureRuntimePrivileges(ctx context.Context, db privilegeDBTX, runtimeRo
 	}
 	statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+creditCommandFunctionSignature+` FROM PUBLIC`)
 	statements = append(statements, `GRANT EXECUTE ON FUNCTION `+creditCommandFunctionSignature+` TO `+roleSQL)
+	statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+legacyCreditCommandFunctionSignature+` FROM `+roleSQL)
 	for _, functionSignature := range creditLifecycleFunctionSignatures {
 		statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+functionSignature+` FROM PUBLIC`)
 		statements = append(statements, `GRANT EXECUTE ON FUNCTION `+functionSignature+` TO `+roleSQL)
@@ -119,7 +123,7 @@ func VerifyRuntimePrivileges(ctx context.Context, db runtimePrivilegeQuerier) er
 SELECT current_user,
        has_function_privilege(
          current_user,
-         'execute_credit_command(text,bigint,bigint,text,text,text,text,text,text,text,text)',
+         'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
          'EXECUTE'
        )`).Scan(&currentUser, &canExecuteCommand)
 	if err != nil {

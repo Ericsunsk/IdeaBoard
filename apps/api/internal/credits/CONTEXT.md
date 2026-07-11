@@ -20,10 +20,10 @@ Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示�
 
 ## Public Seams
 
-- `Commands` 是唯一应用写入入口，统一提供 Grant、Hold、Capture、Release 与 Refund；底层只调用 typed `SECURITY DEFINER execute_credit_command`。
+- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release 与 Refund；底层只调用 typed `SECURITY DEFINER execute_credit_command_v2`。
 - `Service.InTx(pgx.Tx)` 与 `Service.InSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，现有 Task Store terminal transition 使用 database/sql；caller 都拥有 commit/rollback。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
-- Admin HTTP 只提供 #244 所需的单用户 Grant、Wallet read 和 Ledger read；完整调账与 UI 属于后续 tickets。
+- Admin HTTP 提供单用户 Wallet/Ledger read、Grant、Deduction、linked Refund 与 Correction；不提供 set balance、更新或删除账本历史。Ledger read 显式返回 Hold/Charge reference，避免 Admin 以裸关联 ID 推断结算状态。
 
 其他 context 不得直接更新 `credit_accounts.balance`、插入 Ledger 或自行计算幂等 hash。
 
@@ -38,6 +38,8 @@ Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示�
 - 每个 Command 先取得 idempotency-key advisory transaction lock，再比较服务端 canonical SHA-256 request hash。相同 key/相同 hash 返回原结果；不同 hash 返回 conflict。
 - Task Hold 不使用 Credits-owned TTL 自动解冻；只有 Task terminal transition 能在同一 transaction 中 Capture 或 Release。
 - actor、source、reason 和 business reference 必填并写入不可变 Transaction。
+- Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin、关联原 Admin Grant/Deduction/Refund，并以原 Posting 的反向 Posting 追加记录；Capture 更正使用 linked Refund。
+- frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction 被拒绝；仅 authenticated Admin 的 linked Refund/Correction 可写入 frozen Wallet，余额仍被冻结而不可消费。
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
 - Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 Wallet，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 100 点子 Welcome Grant；claim identity 明文不进入 Credits schema。
 - Welcome identity HMAC key 首次使用时通过 typed `SECURITY DEFINER` command 永久绑定数据库 fingerprint；配置误变更时 startup/provision fail closed，避免同一身份生成新 claim。

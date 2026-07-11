@@ -6,6 +6,8 @@
  */
 import type { CreditActor } from './creditActor'
 import type { CreditBusinessReference } from './creditBusinessReference'
+import type { CreditChargeReference } from './creditChargeReference'
+import type { CreditHoldReference } from './creditHoldReference'
 import type { CreditLedgerTransactionCommandType } from './creditLedgerTransactionCommandType'
 import type { CreditPosting } from './creditPosting'
 
@@ -27,4 +29,6 @@ export interface CreditLedgerTransaction {
   created_at: string
   /** @minItems 2 */
   postings: CreditPosting[]
+  hold?: CreditHoldReference
+  charge?: CreditChargeReference
 }

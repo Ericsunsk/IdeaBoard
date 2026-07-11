@@ -774,6 +774,66 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseCreditCommandResult'
 
+  /admin/credits/deductions:
+    post:
+      tags: [AdminCredits]
+      operationId: deductAdminCredits
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreditDeductionRequest'
+      responses:
+        '200':
+          description: Credits deducted or the original idempotent result returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCreditCommandResult'
+
+  /admin/credits/refunds:
+    post:
+      tags: [AdminCredits]
+      operationId: refundAdminCredits
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreditRefundRequest'
+      responses:
+        '200':
+          description: Linked refund or the original idempotent result returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCreditCommandResult'
+
+  /admin/credits/corrections:
+    post:
+      tags: [AdminCredits]
+      operationId: correctAdminCredits
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreditCorrectionRequest'
+      responses:
+        '200':
+          description: Immutable correction or the original idempotent result returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCreditCommandResult'
+
   /admin/credits/wallets/{user_id}:
     get:
       tags: [AdminCredits]
@@ -1690,6 +1750,41 @@ components:
         reason: { type: string, minLength: 1 }
         business_reference_id: { type: string, minLength: 1, maxLength: 160 }
 
+    AdminCreditDeductionRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, amount_credits, idempotency_key, reason, business_reference_id]
+      properties:
+        user_id: { type: integer, format: int64, minimum: 1 }
+        amount_credits: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        idempotency_key: { type: string, minLength: 1, maxLength: 160 }
+        reason: { type: string, minLength: 1 }
+        business_reference_id: { type: string, minLength: 1, maxLength: 160 }
+
+    AdminCreditRefundRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, charge_transaction_id, amount_credits, idempotency_key, reason, business_reference_id]
+      properties:
+        user_id: { type: integer, format: int64, minimum: 1 }
+        charge_transaction_id: { type: string, minLength: 1, maxLength: 64 }
+        amount_credits: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        idempotency_key: { type: string, minLength: 1, maxLength: 160 }
+        reason: { type: string, minLength: 1 }
+        business_reference_id: { type: string, minLength: 1, maxLength: 160 }
+
+    AdminCreditCorrectionRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, original_transaction_id, amount_credits, idempotency_key, reason, business_reference_id]
+      properties:
+        user_id: { type: integer, format: int64, minimum: 1 }
+        original_transaction_id: { type: string, minLength: 1, maxLength: 64 }
+        amount_credits: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        idempotency_key: { type: string, minLength: 1, maxLength: 160 }
+        reason: { type: string, minLength: 1 }
+        business_reference_id: { type: string, minLength: 1, maxLength: 160 }
+
     BillingSKUCode:
       type: string
       minLength: 3
@@ -1813,6 +1908,15 @@ components:
         available_credits: { type: integer, format: int64, minimum: 0 }
         reserved_credits: { type: integer, format: int64, minimum: 0 }
 
+    CreditWalletDetails:
+      type: object
+      required: [user_id, status, available_credits, reserved_credits]
+      properties:
+        user_id: { type: integer, format: int64 }
+        status: { type: string, enum: [active, frozen] }
+        available_credits: { type: integer, format: int64, minimum: 0 }
+        reserved_credits: { type: integer, format: int64, minimum: 0 }
+
     CreditActor:
       type: object
       required: [type, id]
@@ -1854,7 +1958,7 @@ components:
       properties:
         sequence_id: { type: integer, format: int64 }
         transaction_id: { type: string }
-        command_type: { type: string, enum: [grant, hold, capture, release, refund, correction] }
+        command_type: { type: string, enum: [grant, deduction, hold, capture, release, refund, correction] }
         amount_credits: { type: integer, format: int64, minimum: 1 }
         actor: { $ref: '#/components/schemas/CreditActor' }
         source: { type: string }
@@ -1868,13 +1972,31 @@ components:
           type: array
           minItems: 2
           items: { $ref: '#/components/schemas/CreditPosting' }
+        hold: { $ref: '#/components/schemas/CreditHoldReference' }
+        charge: { $ref: '#/components/schemas/CreditChargeReference' }
+
+    CreditHoldReference:
+      type: object
+      required: [amount_credits, status]
+      properties:
+        amount_credits: { type: integer, format: int64, minimum: 1 }
+        status: { type: string, enum: [held, captured, released] }
+        terminal_transaction_id: { type: string }
+
+    CreditChargeReference:
+      type: object
+      required: [amount_credits, refunded_credits, remaining_refundable_credits]
+      properties:
+        amount_credits: { type: integer, format: int64, minimum: 1 }
+        refunded_credits: { type: integer, format: int64, minimum: 0 }
+        remaining_refundable_credits: { type: integer, format: int64, minimum: 0 }
 
     CreditCommandResult:
       type: object
       required: [transaction_id, command_type, amount_credits, wallet, replayed, created_at]
       properties:
         transaction_id: { type: string }
-        command_type: { type: string, enum: [grant, hold, capture, release, refund] }
+        command_type: { type: string, enum: [grant, deduction, hold, capture, release, refund, correction] }
         amount_credits: { type: integer, format: int64, minimum: 1 }
         wallet: { $ref: '#/components/schemas/CreditWallet' }
         replayed: { type: boolean }
@@ -3410,7 +3532,7 @@ components:
         - type: object
           properties:
             data:
-              $ref: '#/components/schemas/CreditWallet'
+              $ref: '#/components/schemas/CreditWalletDetails'
 
     ApiResponseCreditLedgerPage:
       allOf:

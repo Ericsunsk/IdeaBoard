@@ -66,7 +66,7 @@ SELECT transaction_id,
        reserved_balance_after,
        replayed,
        created_at
-FROM execute_credit_command($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+FROM execute_credit_command_v2($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
 type rowScanner interface {
 	Scan(...any) error

@@ -9,11 +9,13 @@ import (
 type CommandType string
 
 const (
-	CommandGrant   CommandType = "grant"
-	CommandHold    CommandType = "hold"
-	CommandCapture CommandType = "capture"
-	CommandRelease CommandType = "release"
-	CommandRefund  CommandType = "refund"
+	CommandGrant      CommandType = "grant"
+	CommandHold       CommandType = "hold"
+	CommandCapture    CommandType = "capture"
+	CommandRelease    CommandType = "release"
+	CommandRefund     CommandType = "refund"
+	CommandDeduction  CommandType = "deduction"
+	CommandCorrection CommandType = "correction"
 )
 
 type AccountRole string
@@ -72,6 +74,23 @@ type GrantCommand struct {
 	Metadata CommandMetadata
 }
 
+// DeductionCommand records a discretionary administrative debit. It can only
+// consume available credits and always creates a new immutable transaction.
+type DeductionCommand struct {
+	UserID   int64
+	Amount   CreditAmount
+	Metadata CommandMetadata
+}
+
+// CorrectionCommand partially or fully reverses one prior administrative
+// Grant, Deduction, or Refund. Capture corrections remain linked Refunds.
+type CorrectionCommand struct {
+	UserID                int64
+	OriginalTransactionID string
+	Amount                CreditAmount
+	Metadata              CommandMetadata
+}
+
 type HoldCommand struct {
 	UserID   int64
 	Amount   CreditAmount
@@ -99,6 +118,8 @@ type RefundCommand struct {
 
 type Commands interface {
 	Grant(context.Context, GrantCommand) (CommandResult, error)
+	Deduct(context.Context, DeductionCommand) (CommandResult, error)
+	Correct(context.Context, CorrectionCommand) (CommandResult, error)
 	Hold(context.Context, HoldCommand) (CommandResult, error)
 	Capture(context.Context, CaptureCommand) (CommandResult, error)
 	Release(context.Context, ReleaseCommand) (CommandResult, error)
@@ -113,7 +134,7 @@ type WalletLifecycle interface {
 }
 
 type WalletReader interface {
-	GetWallet(context.Context, int64) (WalletBalance, error)
+	GetWallet(context.Context, int64) (WalletDetails, error)
 	ListLedger(context.Context, ListLedgerInput) (LedgerPage, error)
 }
 
@@ -122,6 +143,20 @@ type WalletBalance struct {
 	Available int64 `json:"available_credits"`
 	Reserved  int64 `json:"reserved_credits"`
 }
+
+// WalletDetails is the current administrative read model. CommandResult keeps
+// WalletBalance only, preserving its transaction-time balance snapshot.
+type WalletDetails struct {
+	WalletBalance
+	Status WalletStatus `json:"status"`
+}
+
+type WalletStatus string
+
+const (
+	WalletStatusActive WalletStatus = "active"
+	WalletStatusFrozen WalletStatus = "frozen"
+)
 
 type CommandResult struct {
 	TransactionID string        `json:"transaction_id"`
@@ -151,6 +186,22 @@ type LedgerTransaction struct {
 	ReservedBalanceAfter  int64             `json:"reserved_credits_after"`
 	CreatedAt             time.Time         `json:"created_at"`
 	Postings              []Posting         `json:"postings"`
+	Hold                  *HoldReference    `json:"hold,omitempty"`
+	Charge                *ChargeReference  `json:"charge,omitempty"`
+}
+
+// HoldReference and ChargeReference make settlement facts explicit in Admin
+// ledger reads; related_transaction_id remains the immutable audit link.
+type HoldReference struct {
+	Amount                int64  `json:"amount_credits"`
+	Status                string `json:"status"`
+	TerminalTransactionID string `json:"terminal_transaction_id,omitempty"`
+}
+
+type ChargeReference struct {
+	Amount              int64 `json:"amount_credits"`
+	RefundedAmount      int64 `json:"refunded_credits"`
+	RemainingRefundable int64 `json:"remaining_refundable_credits"`
 }
 
 type ListLedgerInput struct {

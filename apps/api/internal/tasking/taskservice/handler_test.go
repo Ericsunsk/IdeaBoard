@@ -208,8 +208,8 @@ func (q handlerBillingQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, rawSKU st
 
 type handlerBillingCredits struct{}
 
-func (handlerBillingCredits) GetWallet(context.Context, int64) (credits.WalletBalance, error) {
-	return credits.WalletBalance{Available: 100}, nil
+func (handlerBillingCredits) GetWallet(context.Context, int64) (credits.WalletDetails, error) {
+	return credits.WalletDetails{WalletBalance: credits.WalletBalance{Available: 100}, Status: credits.WalletStatusActive}, nil
 }
 
 func (handlerBillingCredits) ListLedger(context.Context, credits.ListLedgerInput) (credits.LedgerPage, error) {

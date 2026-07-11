@@ -55,6 +55,18 @@ func (s *Service) Grant(ctx context.Context, command GrantCommand) (CommandResul
 	})
 }
 
+func (s *Service) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
+	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
+		return commands.Deduct(ctx, command)
+	})
+}
+
+func (s *Service) Correct(ctx context.Context, command CorrectionCommand) (CommandResult, error) {
+	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
+		return commands.Correct(ctx, command)
+	})
+}
+
 func (s *Service) Hold(ctx context.Context, command HoldCommand) (CommandResult, error) {
 	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
 		return commands.Hold(ctx, command)
@@ -115,6 +127,14 @@ func withManagedTransaction(
 
 func (c *transactionCommands) Grant(ctx context.Context, command GrantCommand) (CommandResult, error) {
 	return executeGrant(ctx, command, c.execute)
+}
+
+func (c *transactionCommands) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
+	return executeDeduction(ctx, command, c.execute)
+}
+
+func (c *transactionCommands) Correct(ctx context.Context, command CorrectionCommand) (CommandResult, error) {
+	return executeCorrection(ctx, command, c.execute)
 }
 
 func (c *transactionCommands) ProvisionWallet(ctx context.Context, userID int64) error {
@@ -195,6 +215,14 @@ func (c *sqlTransactionCommands) Grant(ctx context.Context, command GrantCommand
 	return executeGrant(ctx, command, c.execute)
 }
 
+func (c *sqlTransactionCommands) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
+	return executeDeduction(ctx, command, c.execute)
+}
+
+func (c *sqlTransactionCommands) Correct(ctx context.Context, command CorrectionCommand) (CommandResult, error) {
+	return executeCorrection(ctx, command, c.execute)
+}
+
 func (c *sqlTransactionCommands) Hold(ctx context.Context, command HoldCommand) (CommandResult, error) {
 	return executeHold(ctx, command, c.execute)
 }
@@ -229,6 +257,23 @@ func executeGrant(ctx context.Context, command GrantCommand, execute commandExec
 	return execute(ctx, CommandGrant, command.UserID, command.Amount.Int64(), "", metadata)
 }
 
+func executeDeduction(ctx context.Context, command DeductionCommand, execute commandExecutor) (CommandResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	if err != nil || metadata.Actor.Type != ActorAdmin || command.UserID <= 0 || !isValidAmount(command.Amount) {
+		return CommandResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, CommandDeduction, command.UserID, command.Amount.Int64(), "", metadata)
+}
+
+func executeCorrection(ctx context.Context, command CorrectionCommand, execute commandExecutor) (CommandResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	originalTransactionID := strings.TrimSpace(command.OriginalTransactionID)
+	if err != nil || metadata.Actor.Type != ActorAdmin || command.UserID <= 0 || originalTransactionID == "" || len(originalTransactionID) > 64 || !isValidAmount(command.Amount) {
+		return CommandResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, CommandCorrection, command.UserID, command.Amount.Int64(), originalTransactionID, metadata)
+}
+
 func executeHold(ctx context.Context, command HoldCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
 	if err != nil || command.UserID <= 0 || !isValidAmount(command.Amount) {
@@ -255,10 +300,11 @@ func executeRelease(ctx context.Context, command ReleaseCommand, execute command
 
 func executeRefund(ctx context.Context, command RefundCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
-	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.ChargeTransactionID) == "" || !isValidAmount(command.Amount) {
+	chargeTransactionID := strings.TrimSpace(command.ChargeTransactionID)
+	if err != nil || command.UserID <= 0 || chargeTransactionID == "" || len(chargeTransactionID) > 64 || !isValidAmount(command.Amount) {
 		return CommandResult{}, ErrInvalidCommand
 	}
-	return execute(ctx, CommandRefund, command.UserID, command.Amount.Int64(), command.ChargeTransactionID, metadata)
+	return execute(ctx, CommandRefund, command.UserID, command.Amount.Int64(), chargeTransactionID, metadata)
 }
 
 func isValidAmount(amount CreditAmount) bool {

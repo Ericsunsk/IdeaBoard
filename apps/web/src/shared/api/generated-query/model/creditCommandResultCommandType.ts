@@ -10,8 +10,10 @@ export type CreditCommandResultCommandType =
 
 export const CreditCommandResultCommandType = {
   grant: 'grant',
+  deduction: 'deduction',
   hold: 'hold',
   capture: 'capture',
   release: 'release',
   refund: 'refund',
+  correction: 'correction',
 } as const

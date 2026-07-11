@@ -8,29 +8,31 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *Service) GetWallet(ctx context.Context, userID int64) (WalletBalance, error) {
+func (s *Service) GetWallet(ctx context.Context, userID int64) (WalletDetails, error) {
 	if s == nil || s.pool == nil {
-		return WalletBalance{}, fmt.Errorf("credits service: database pool not configured")
+		return WalletDetails{}, fmt.Errorf("credits service: database pool not configured")
 	}
 	if userID <= 0 {
-		return WalletBalance{}, ErrInvalidCommand
+		return WalletDetails{}, ErrInvalidCommand
 	}
-	wallet := WalletBalance{UserID: userID}
+	wallet := WalletDetails{WalletBalance: WalletBalance{UserID: userID}}
 	err := s.pool.QueryRow(ctx, `
 SELECT
+	  (SELECT status FROM credit_wallets WHERE user_id = $1),
   MAX(balance) FILTER (WHERE account_role = 'user_available'),
   MAX(balance) FILTER (WHERE account_role = 'user_reserved')
 FROM credit_accounts
 WHERE wallet_user_id = $1
 HAVING COUNT(*) FILTER (WHERE account_role IN ('user_available', 'user_reserved')) = 2`, userID).Scan(
+		&wallet.Status,
 		&wallet.Available,
 		&wallet.Reserved,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return WalletBalance{}, ErrWalletNotFound
+		return WalletDetails{}, ErrWalletNotFound
 	}
 	if err != nil {
-		return WalletBalance{}, fmt.Errorf("credits service: read wallet: %w", err)
+		return WalletDetails{}, fmt.Errorf("credits service: read wallet: %w", err)
 	}
 	return wallet, nil
 }
@@ -107,8 +109,115 @@ LIMIT $3`, input.UserID, input.BeforeSequence, limit+1)
 	if err := s.loadPostings(ctx, transactions); err != nil {
 		return LedgerPage{}, err
 	}
+	if err := s.loadReferences(ctx, transactions); err != nil {
+		return LedgerPage{}, err
+	}
 	page.Transactions = transactions
 	return page, nil
+}
+
+func (s *Service) loadReferences(ctx context.Context, transactions []LedgerTransaction) error {
+	if len(transactions) == 0 {
+		return nil
+	}
+	transactionIDs := make([]string, 0, len(transactions)*2)
+	seenTransactionIDs := make(map[string]struct{}, len(transactions)*2)
+	byID := make(map[string]*LedgerTransaction, len(transactions))
+	for index := range transactions {
+		transactionIDs = append(transactionIDs, transactions[index].TransactionID)
+		seenTransactionIDs[transactions[index].TransactionID] = struct{}{}
+		if relatedID := transactions[index].RelatedTransactionID; relatedID != "" {
+			if _, seen := seenTransactionIDs[relatedID]; !seen {
+				transactionIDs = append(transactionIDs, relatedID)
+				seenTransactionIDs[relatedID] = struct{}{}
+			}
+		}
+		byID[transactions[index].TransactionID] = &transactions[index]
+	}
+
+	holds, err := s.pool.Query(ctx, `
+SELECT hold_transaction_id, amount, status, COALESCE(terminal_transaction_id, '')
+FROM credit_holds
+WHERE hold_transaction_id = ANY($1::VARCHAR[]) OR terminal_transaction_id = ANY($1::VARCHAR[])`, transactionIDs)
+	if err != nil {
+		return fmt.Errorf("credits service: list hold references: %w", err)
+	}
+	defer holds.Close()
+	holdsByTransactionID := make(map[string]*HoldReference, len(transactions))
+	for holds.Next() {
+		var holdTransactionID, terminalTransactionID string
+		reference := HoldReference{}
+		if err := holds.Scan(&holdTransactionID, &reference.Amount, &reference.Status, &terminalTransactionID); err != nil {
+			return fmt.Errorf("credits service: scan hold reference: %w", err)
+		}
+		reference.TerminalTransactionID = terminalTransactionID
+		holdsByTransactionID[holdTransactionID] = &reference
+		holdsByTransactionID[terminalTransactionID] = &reference
+		if transaction := byID[holdTransactionID]; transaction != nil {
+			transaction.Hold = &reference
+		}
+		if transaction := byID[terminalTransactionID]; transaction != nil {
+			transaction.Hold = &reference
+		}
+	}
+	if err := holds.Err(); err != nil {
+		return fmt.Errorf("credits service: read hold references: %w", err)
+	}
+
+	charges, err := s.pool.Query(ctx, `
+SELECT charge.capture_transaction_id, charge.amount, charge.refunded_amount, COALESCE(refund.transaction_id, '')
+FROM credit_charges charge
+LEFT JOIN credit_transactions refund
+  ON refund.related_transaction_id = charge.capture_transaction_id AND refund.command_type = 'refund'
+WHERE charge.capture_transaction_id = ANY($1::VARCHAR[])
+   OR charge.capture_transaction_id IN (
+     SELECT related_transaction_id
+     FROM credit_transactions
+     WHERE transaction_id = ANY($1::VARCHAR[])
+       AND related_transaction_id IS NOT NULL
+   )`, transactionIDs)
+	if err != nil {
+		return fmt.Errorf("credits service: list charge references: %w", err)
+	}
+	defer charges.Close()
+	chargesByTransactionID := make(map[string]*ChargeReference, len(transactions))
+	for charges.Next() {
+		var captureTransactionID, refundTransactionID string
+		reference := ChargeReference{}
+		if err := charges.Scan(&captureTransactionID, &reference.Amount, &reference.RefundedAmount, &refundTransactionID); err != nil {
+			return fmt.Errorf("credits service: scan charge reference: %w", err)
+		}
+		reference.RemainingRefundable = reference.Amount - reference.RefundedAmount
+		chargesByTransactionID[captureTransactionID] = &reference
+		chargesByTransactionID[refundTransactionID] = &reference
+		if transaction := byID[captureTransactionID]; transaction != nil {
+			transaction.Charge = &reference
+		}
+	}
+	if err := charges.Err(); err != nil {
+		return fmt.Errorf("credits service: read charge references: %w", err)
+	}
+
+	// A capture/refund can refer to a transaction outside this page. Query keys
+	// include related IDs and this loop attaches those facts without N+1 reads.
+	for index := range transactions {
+		transaction := &transactions[index]
+		if transaction.Hold == nil {
+			transaction.Hold = holdsByTransactionID[transaction.TransactionID]
+		}
+		if transaction.Charge == nil {
+			transaction.Charge = chargesByTransactionID[transaction.TransactionID]
+		}
+		if transaction.RelatedTransactionID != "" {
+			if transaction.Hold == nil {
+				transaction.Hold = holdsByTransactionID[transaction.RelatedTransactionID]
+			}
+			if transaction.Charge == nil {
+				transaction.Charge = chargesByTransactionID[transaction.RelatedTransactionID]
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Service) loadPostings(ctx context.Context, transactions []LedgerTransaction) error {

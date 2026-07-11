@@ -63,7 +63,7 @@ type DeletionProgress struct {
 
 type CreditWalletLifecycleService interface {
 	LifecycleInTx(pgx.Tx) credits.WalletLifecycle
-	GetWallet(context.Context, int64) (credits.WalletBalance, error)
+	GetWallet(context.Context, int64) (credits.WalletDetails, error)
 }
 
 func (s *LifecycleService) InitializeExistingIdentities(
@@ -185,10 +185,11 @@ RETURNING id, username, auth_user_id, storage_uid, avatar, role, status, created
 	}
 	wallet := grant.Wallet
 	if !granted {
-		wallet, err = s.credits.GetWallet(ctx, user.ID)
+		walletDetails, err := s.credits.GetWallet(ctx, user.ID)
 		if err != nil {
 			return nil, fmt.Errorf("read provisioned Credit Wallet: %w", err)
 		}
+		wallet = walletDetails.WalletBalance
 	}
 	return &ProvisionResult{User: *user, Wallet: wallet, WelcomeGranted: granted}, nil
 }

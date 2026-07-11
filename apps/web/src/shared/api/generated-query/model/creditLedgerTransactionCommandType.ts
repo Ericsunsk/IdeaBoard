@@ -10,6 +10,7 @@ export type CreditLedgerTransactionCommandType =
 
 export const CreditLedgerTransactionCommandType = {
   grant: 'grant',
+  deduction: 'deduction',
   hold: 'hold',
   capture: 'capture',
   release: 'release',
