@@ -492,6 +492,7 @@ func TestCompleteWithOutputsAndLeaseTokenConcurrentOnlyOneSucceeds(t *testing.T)
 		LeaseToken: "token-a",
 	}
 	seedTasks(t, repo, ctx, task)
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, accountID+10000, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken)
 
 	results := make(chan int64, 2)
 	for i := 0; i < 2; i++ {
@@ -559,7 +560,7 @@ func seedTasks(t *testing.T, repo *Repository, ctx context.Context, items ...*ta
 		if item.AccountID != nil && item.AssignedProviderEndpointID == nil {
 			item.AssignedProviderEndpointID = tasks.IDPtr(tasks.IDValue(item.AccountID) + 10000)
 		}
-		if err := repo.Create(ctx, item); err != nil {
+		if err := createRepositoryTestTask(t, repo, ctx, item); err != nil {
 			t.Fatalf("seed task %q failed: %v", item.TaskID, err)
 		}
 	}

@@ -21,7 +21,7 @@ func TestListAttachesExecutionMetrics(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		CreatedAt:                  createdAt,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -42,9 +42,10 @@ func TestListAttachesExecutionMetrics(t *testing.T) {
 	nextStage := tasks.ExecutionStageFinalizing
 	totalLatencyMS := int64(4500)
 	if err := taskRepo.PatchExecutionMetrics(ctx, tasks.TaskExecutionMetricsPatch{
-		TaskID:         task.TaskID,
-		CurrentStage:   &nextStage,
-		TotalLatencyMS: &totalLatencyMS,
+		TaskID:           task.TaskID,
+		CurrentStage:     &nextStage,
+		BottleneckSource: &bottleneck,
+		TotalLatencyMS:   &totalLatencyMS,
 	}); err != nil {
 		t.Fatalf("patch execution metrics update failed: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestListCountsCancelledTasksSeparately(t *testing.T) {
 		},
 	}
 	for _, task := range tasksToSeed {
-		if err := taskRepo.Create(ctx, task); err != nil {
+		if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 			t.Fatalf("seed task %s failed: %v", task.TaskID, err)
 		}
 	}
@@ -129,7 +130,7 @@ func TestPatchExecutionMetricsDoesNotOverwriteTerminalStage(t *testing.T) {
 		Status:    tasks.StatusCancelled,
 		CreatedAt: createdAt,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -204,9 +205,10 @@ func TestMarkTaskFailedWithLeaseWritesTerminalExecutionMetrics(t *testing.T) {
 		LeaseToken:                 "lease-metrics-failed",
 		CreatedAt:                  completedAt.Add(-2 * time.Second),
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, "metrics-failed-with-lease", accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken)
 
 	rows, err := taskRepo.MarkTaskFailedWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, "provider timeout", "{}", completedAt, &tasks.TaskAttemptFinish{
 		FailureStage:    tasks.ExecutionStageProvider,
@@ -253,9 +255,10 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 		LeaseToken:                 "lease-metrics-completed",
 		CreatedAt:                  completedAt.Add(-3 * time.Second),
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, "metrics-completed-with-outputs", accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken)
 
 	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, `{"status":"success"}`, completedAt, nil, nil)
 	if err != nil || rows != 1 {
@@ -488,7 +491,7 @@ func TestListMonitorGoldenSignalSamplesByRangeCountsFailedAttemptBeforeSuccessfu
 		LeaseToken:                 "lease-golden-a",
 		CreatedAt:                  now.Add(-2 * time.Minute),
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
@@ -526,16 +529,12 @@ SET status = 'running',
     account_id = $2,
     assigned_provider_endpoint_id = $3,
     assigned_credential_id = $4,
-    resolved_model = 'gpt-image-1',
-    api_type = 'openai-compatible',
-    provider_endpoint_base_url = $5,
-    lease_token = $6
+    lease_token = $5
 WHERE task_id = $1`,
 		task.TaskID,
 		accountID,
 		channelID,
 		credentialID,
-		baseURL,
 		secondLease,
 	); err != nil {
 		t.Fatalf("assign second lease snapshot failed: %v", err)

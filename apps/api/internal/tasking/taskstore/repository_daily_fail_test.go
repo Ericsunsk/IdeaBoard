@@ -23,7 +23,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	accountID := seedRepositoryTestAccount(t, db, 66)
 	createdAt := time.Now().Add(-10 * time.Minute)
 
-	if err := taskRepo.Create(ctx, &tasks.Task{
+	if err := createRepositoryTestTask(t, taskRepo, ctx, &tasks.Task{
 		TaskID:                     "acc-fail-1",
 		UserID:                     10,
 		AssignedProviderEndpointID: tasks.IDPtr(accountID + 10000),
@@ -36,7 +36,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed task1 failed: %v", err)
 	}
-	if err := taskRepo.Create(ctx, &tasks.Task{
+	if err := createRepositoryTestTask(t, taskRepo, ctx, &tasks.Task{
 		TaskID:                     "acc-fail-2",
 		UserID:                     10,
 		AssignedProviderEndpointID: tasks.IDPtr(accountID + 10000),
@@ -49,6 +49,9 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed task2 failed: %v", err)
 	}
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	insertRepositoryActiveTaskLease(t, db, "acc-fail-1", accountID, accountID+10000, credentialID, "lease-acc-fail-1")
+	insertRepositoryActiveTaskLease(t, db, "acc-fail-2", accountID, accountID+10000, credentialID, "lease-acc-fail-2")
 
 	failedTaskIDs, err := taskRepo.FailRunningByAccountID(ctx, accountID, "stopped")
 	if err != nil {
@@ -112,7 +115,7 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 		Result:    `{"model":"model-fail","username":"user-fail"}`,
 		CreatedAt: createdAt,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -159,7 +162,7 @@ func TestMarkTaskCancelledUpsertsDailyStats(t *testing.T) {
 		Result:    `{"model":"model-cancel","username":"user-cancel"}`,
 		CreatedAt: createdAt,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 

@@ -1461,7 +1461,7 @@ func TestCancelUserTaskMarksRunningTaskCancelledWithoutDeletingRow(t *testing.T)
 		Status:     tasks.StatusRunning,
 		Params:     "{}",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
@@ -1512,7 +1512,7 @@ func TestCancelUserTaskDoesNotMarkTaskCancelledWhenCancellationMarkerFails(t *te
 		Status:     tasks.StatusRunning,
 		Params:     "{}",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
@@ -1557,7 +1557,7 @@ func TestCancelUserTaskIsIdempotentForTerminalTask(t *testing.T) {
 		Params:      "{}",
 		CompletedAt: &completedAt,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
@@ -1641,7 +1641,7 @@ RETURNING id`).Scan(&channelID); err != nil {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-delete",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -1709,7 +1709,7 @@ func TestDeleteUserTaskSucceedsWhenOutputCleanupFails(t *testing.T) {
 		Status:     tasks.StatusCompleted,
 		Params:     "{}",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
@@ -1755,7 +1755,7 @@ func TestDeleteTasksCancelsActiveTasksAndDeletesRows(t *testing.T) {
 		CompletedAt: &completedAt,
 	}
 	for _, task := range []*tasks.Task{runningTask, completedTask} {
-		if err := taskRepo.Create(ctx, task); err != nil {
+		if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 			t.Fatalf("create task %q: %v", task.TaskID, err)
 		}
 	}
@@ -1799,7 +1799,7 @@ func TestDeleteTasksDoesNotDeleteWhenCancellationMarkerFails(t *testing.T) {
 		Status: tasks.StatusRunning,
 		Params: "{}",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 

@@ -50,7 +50,7 @@ func TestResetRunningTaskResetsState(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-reset",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -91,7 +91,7 @@ func TestResetRunningTaskRejectsTerminalTask(t *testing.T) {
 		Status:                     tasks.StatusCompleted,
 		CompletedAt:                ptrTime(time.Now()),
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -112,7 +112,7 @@ func TestFailTaskPersistsProvidedResultEnvelope(t *testing.T) {
 		UserID: 1,
 		Status: tasks.StatusPending,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -153,7 +153,7 @@ func TestRequeueTaskForFailoverPersistsProvidedResultEnvelope(t *testing.T) {
 		LeaseToken:                 "lease-requeue-custom-result",
 		RetryCount:                 0,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -220,6 +220,11 @@ ON CONFLICT (id) DO NOTHING`,
 func seedTaskRuntimeCredential(t testing.TB, db *sql.DB, accountID int64) int64 {
 	t.Helper()
 	var id int64
+	if err := db.QueryRow(`SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err == nil {
+		return id
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("load credential for account %d failed: %v", accountID, err)
+	}
 	if err := db.QueryRow(`
 INSERT INTO api_account_secrets (account_id, secret_material_kind, secret_payload, key_version, fingerprint, status)
 VALUES ($1, 'encrypted', 'encrypted-secret', 'test-key', $2, 'active')
@@ -232,13 +237,70 @@ RETURNING id`,
 	return id
 }
 
+func seedTaskRuntimeTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
+	t.Helper()
+	if task.Status == tasks.StatusRunning || task.AccountID != nil {
+		accountID := tasks.IDValue(task.AccountID)
+		if accountID <= 0 {
+			t.Fatalf("running/assigned task %q requires account_id", task.TaskID)
+		}
+		if task.AssignedProviderEndpointID == nil {
+			task.AssignedProviderEndpointID = tasks.IDPtr(taskRuntimeProviderEndpointID(accountID))
+		}
+		if task.AssignedCredentialID == nil {
+			task.AssignedCredentialID = tasks.IDPtr(seedTaskRuntimeCredential(t, db, accountID))
+		}
+	}
+	now := time.Now()
+	switch task.Status {
+	case tasks.StatusCompleted:
+		if task.CompletedAt == nil {
+			task.CompletedAt = &now
+		}
+	case tasks.StatusFailed:
+		if task.CompletedAt == nil {
+			task.CompletedAt = &now
+		}
+		if task.ErrorMsg == "" {
+			task.ErrorMsg = "test failure"
+		}
+	case tasks.StatusCancelled:
+		if task.CompletedAt == nil {
+			task.CompletedAt = &now
+		}
+		if task.CancelledAt == nil {
+			task.CancelledAt = &now
+		}
+		if task.CancelReason == "" {
+			task.CancelReason = "test cancellation"
+		}
+	}
+	if err := repo.Create(ctx, task); err != nil {
+		return err
+	}
+	if task.Status == tasks.StatusRunning && task.LeaseToken != "" {
+		seedTaskRuntimeActiveLease(t, db, task, tasks.IDValue(task.AssignedCredentialID))
+	}
+	return nil
+}
+
 func seedTaskRuntimeActiveLease(t testing.TB, db *sql.DB, task *tasks.Task, credentialID int64) {
 	t.Helper()
+	var exists bool
+	if err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM task_leases WHERE task_id=$1 AND released_at IS NULL)`, task.TaskID).Scan(&exists); err != nil {
+		t.Fatalf("check active task lease for %s failed: %v", task.TaskID, err)
+	}
+	if exists {
+		return
+	}
 	if _, err := db.Exec(`
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  resolved_model, acquired_at
-) VALUES ($1, $2, 1, $3, $4, $5, $6, now())`,
+  feature_slug, requested_model, resolved_model, api_type,
+  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
+  acquired_at
+) VALUES ($1, $2, 1, $3, $4, $5, 'image-generate', COALESCE(NULLIF($6, ''), 'gpt-image-1'), COALESCE(NULLIF($6, ''), 'gpt-image-1'), 'openai-compatible',
+  'runtime-test-endpoint', 'https://example.com/runtime-test', 'runtime-test-fingerprint', 'test-key', now())`,
 		task.TaskID,
 		task.LeaseToken,
 		tasks.IDValue(task.AccountID),
@@ -299,7 +361,7 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 		LeaseToken:                 "lease-requeue",
 		RetryCount:                 defaultTaskRetryLimit - 2,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -349,7 +411,7 @@ func TestConfirmTaskLeasePublishesRunningStatus(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-publish",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 	seedTaskRuntimeActiveLease(t, db, task, credentialID)
@@ -385,7 +447,7 @@ func TestRecordTaskCancelledPublishesCancelledStatus(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-cancelled-event",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -436,7 +498,7 @@ func TestConvergeTaskAfterRiverFinalFailureFailsPendingTask(t *testing.T) {
 		Status:     tasks.StatusPending,
 		LeaseToken: "",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -481,7 +543,7 @@ func TestConvergeTaskAfterRiverFinalFailureFailsRunningTaskWithSameRiverLease(t 
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "river:202:lease",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -524,7 +586,7 @@ func TestConvergeTaskAfterRiverFinalFailureRejectsRunningTaskWithDifferentRiverL
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "river:303:lease",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -556,7 +618,7 @@ func TestFailTaskRejectsPartialAssignment(t *testing.T) {
 		UserID: 1,
 		Status: tasks.StatusPending,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -597,7 +659,7 @@ func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-current",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 	seedTaskRuntimeActiveLease(t, db, task, credentialID)
@@ -629,7 +691,7 @@ func TestCompleteTaskRejectsLeaseTokenMismatch(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "current-lease-token",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -663,7 +725,7 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 		LeaseToken:                 "lease-retry-limit",
 		RetryCount:                 defaultTaskRetryLimit - 1,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -730,7 +792,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		LeaseToken:                 "lease-publish-pending",
 		RetryCount:                 0,
 	}
-	if err := taskRepo.Create(ctx, requeueTask); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, requeueTask); err != nil {
 		t.Fatalf("seed requeue task failed: %v", err)
 	}
 	requeued, err := service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(requeueTask), Reason: "retry"})
@@ -758,7 +820,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		LeaseToken:                 "lease-publish-failed",
 		RetryCount:                 defaultTaskRetryLimit - 1,
 	}
-	if err := taskRepo.Create(ctx, finalTask); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, finalTask); err != nil {
 		t.Fatalf("seed final requeue task failed: %v", err)
 	}
 	requeued, err = service.RequeueTaskForFailover(ctx, RequeueForFailoverInput{Assignment: taskRuntimeAssignment(finalTask), Reason: "stop retry"})
@@ -794,7 +856,7 @@ func TestCompleteTaskUpsertsDailyStat(t *testing.T) {
 		LeaseToken:                 "lease-completed-daily",
 		CreatedAt:                  time.Now().Add(-90 * time.Second),
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -814,7 +876,7 @@ func TestCompleteTaskUpsertsDailyStat(t *testing.T) {
 	if len(rows) != 1 {
 		t.Fatalf("daily stat rows = %d, want 1", len(rows))
 	}
-	if rows[0].ModelName != "gpt-image-1" || rows[0].UserKey != "alice" {
+	if rows[0].ModelName != "gpt-image-1" || rows[0].UserKey != "7" {
 		t.Fatalf("daily stat model/user = %s/%s", rows[0].ModelName, rows[0].UserKey)
 	}
 	if rows[0].Total != 1 || rows[0].Completed != 1 || rows[0].Failed != 0 {
@@ -844,7 +906,7 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-completed-outputs",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -944,7 +1006,7 @@ func TestCompleteTaskReusesDuplicateMediaAsset(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-duplicate-output-asset",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -997,7 +1059,7 @@ func TestCompleteTaskPersistsRemoteOnlyOutput(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-remote-only-output",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -1052,7 +1114,7 @@ func TestCompleteTaskDoesNotInferOutputsFromResultURL(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-foreign-origin",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -1083,7 +1145,7 @@ func TestCompleteTaskRejectsOutputWithoutStorageKey(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-inline-result",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 

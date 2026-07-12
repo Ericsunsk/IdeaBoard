@@ -87,7 +87,7 @@ func TestCreateTaskOutputRequiresMediaAssetOwner(t *testing.T) {
 		UserID: ownerA.ID,
 		Status: tasks.StatusPending,
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -120,7 +120,7 @@ func TestCreateTaskOutputEnforcesOutputKindShape(t *testing.T) {
 		UserID: owner.ID,
 		Status: tasks.StatusPending,
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	assetID, err := q.UpsertMediaAsset(ctx, mediaAssetParamsForTest(owner.ID, "task-output-kind-asset", "owner-kind/output.png"))

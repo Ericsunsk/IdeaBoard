@@ -555,7 +555,7 @@ func TestPostgresTaskAssignerRejectsTaskRowNotRunning(t *testing.T) {
 
 	accountID := createAssignerAccount(t, db, "confirm-not-running", 1)
 	createAssignerTask(t, db, "completed-confirm-lease", accountID, tasks.StatusRunning, "lease-confirm")
-	if _, err := db.Exec(`UPDATE tasks SET status = $1 WHERE task_id = $2`, tasks.StatusCompleted, "completed-confirm-lease"); err != nil {
+	if _, err := db.Exec(`UPDATE tasks SET status = $1, lease_token='', completed_at=clock_timestamp() WHERE task_id = $2`, tasks.StatusCompleted, "completed-confirm-lease"); err != nil {
 		t.Fatalf("mark task completed failed: %v", err)
 	}
 
@@ -578,8 +578,9 @@ func TestPostgresTaskAssignerRejectsTaskRowLeaseMismatch(t *testing.T) {
 	ctx := context.Background()
 
 	accountID := createAssignerAccount(t, db, "confirm-mismatch", 1)
+	otherAccountID := createAssignerAccount(t, db, "confirm-mismatch-other", 1)
 	createAssignerTask(t, db, "mismatch-confirm-lease", accountID, tasks.StatusRunning, "lease-confirm")
-	if _, err := db.Exec(`UPDATE tasks SET assigned_provider_endpoint_id = assigned_provider_endpoint_id + 1000 WHERE task_id = $1`, "mismatch-confirm-lease"); err != nil {
+	if _, err := db.Exec(`UPDATE tasks SET account_id=$2, assigned_provider_endpoint_id=(SELECT provider_endpoint_id FROM api_accounts WHERE id=$2), assigned_credential_id=(SELECT id FROM api_account_secrets WHERE account_id=$2 AND status='active') WHERE task_id = $1`, "mismatch-confirm-lease", otherAccountID); err != nil {
 		t.Fatalf("mutate task assignment failed: %v", err)
 	}
 
@@ -732,39 +733,31 @@ func createAssignerTaskWithOptions(t *testing.T, db *sql.DB, taskID string, acco
 	_, err := db.Exec(`
 	INSERT INTO tasks (
 		task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id,
-		prompt, user_prompt, params, status, lease_token, error_msg, result, resolved_model,
-		feature_slug, requested_model, priority, created_at,
-		api_type, provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version
+		prompt, user_prompt, params, status, lease_token, error_msg, result,
+		feature_slug, requested_model, priority, created_at
 	)
 	VALUES (
 		$1,
-		$6,
-		(SELECT provider_endpoint_id FROM api_accounts WHERE id = $2),
-		(SELECT id FROM api_account_secrets WHERE account_id = $2 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1),
-		NULLIF($2, 0),
+		$5,
+		CASE WHEN $3 <> 'pending' AND $2 > 0 THEN (SELECT provider_endpoint_id FROM api_accounts WHERE id = $2) END,
+		CASE WHEN $3 <> 'pending' AND $2 > 0 THEN (SELECT id FROM api_account_secrets WHERE account_id = $2 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1) END,
+		CASE WHEN $3 <> 'pending' THEN NULLIF($2, 0) END,
 		'prompt',
 		'prompt',
 		'{}',
 		$3,
-		$4,
+		CASE WHEN $3 = 'running' THEN $4 ELSE '' END,
 		'',
 		'',
-		CASE WHEN NULLIF($5, '') IS NOT NULL THEN $5 WHEN $2 = 0 THEN '' ELSE 'gpt-image-1' END,
+		$6,
 		$7,
 		$8,
-		$9,
-		$10,
-		COALESCE((SELECT pe.api_type FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $2), ''),
-		COALESCE((SELECT pe.name FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $2), ''),
-		COALESCE((SELECT pe.base_url FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $2), ''),
-		COALESCE((SELECT fingerprint FROM api_account_secrets WHERE account_id = $2 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1), ''),
-		COALESCE((SELECT key_version FROM api_account_secrets WHERE account_id = $2 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1), '')
+		$9
 	)`,
 		taskID,
 		accountID,
 		status,
 		leaseToken,
-		resolvedModel,
 		userID,
 		opts.FeatureSlug,
 		opts.RequestedModel,
@@ -821,7 +814,7 @@ VALUES (
 func assertTaskResolvedModel(t *testing.T, db *sql.DB, taskID string, wantModel string) {
 	t.Helper()
 	var got string
-	if err := db.QueryRow(`SELECT resolved_model FROM tasks WHERE task_id = $1`, taskID).Scan(&got); err != nil {
+	if err := db.QueryRow(`SELECT resolved_model FROM task_leases WHERE task_id = $1 ORDER BY id DESC LIMIT 1`, taskID).Scan(&got); err != nil {
 		t.Fatalf("load task %q resolved model failed: %v", taskID, err)
 	}
 	if got != wantModel {
@@ -880,10 +873,11 @@ func assertRuntimeAssignmentSnapshot(t *testing.T, db *sql.DB, taskID string, as
 	var credentialKeyVersion string
 	var resolvedModel string
 	err := db.QueryRow(`
-SELECT assigned_credential_id, api_type, provider_endpoint_name, provider_endpoint_base_url,
-       credential_fingerprint, credential_key_version, resolved_model
+SELECT tasks.assigned_credential_id, leases.api_type, leases.provider_endpoint_name, leases.provider_endpoint_base_url,
+       leases.credential_fingerprint, leases.credential_key_version, leases.resolved_model
 FROM tasks
-WHERE task_id = $1`, taskID).Scan(
+JOIN task_leases leases ON leases.task_id = tasks.task_id AND leases.released_at IS NULL
+WHERE tasks.task_id = $1`, taskID).Scan(
 		&assignedCredentialID,
 		&apiType,
 		&providerEndpointName,

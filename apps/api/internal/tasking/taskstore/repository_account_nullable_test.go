@@ -21,7 +21,7 @@ func TestCreateTaskStoresUnassignedAccountAsNull(t *testing.T) {
 		UserID: 1,
 		Status: tasks.StatusPending,
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create unassigned task failed: %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestCreateTaskAcceptsKnownAccountID(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-known-account",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task with known account failed: %v", err)
 	}
 	loaded, err := repo.GetByTaskID(ctx, task.TaskID)
@@ -110,7 +110,7 @@ func TestTaskAttemptRequiresKnownAccountAndChannel(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-attempt-fk",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
@@ -151,7 +151,7 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 		Status:    tasks.StatusPending,
 		CreatedAt: now.Add(-90 * time.Second),
 	}
-	if err := repo.Create(ctx, pendingTask); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, pendingTask); err != nil {
 		t.Fatalf("create pending task failed: %v", err)
 	}
 
@@ -163,7 +163,7 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 		CreatedAt:  now.Add(-5 * time.Minute),
 		UpdatedAt:  now.Add(-10 * time.Second),
 	}
-	if err := repo.Create(ctx, requeuedPendingTask); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, requeuedPendingTask); err != nil {
 		t.Fatalf("create requeued pending task failed: %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-attempt-pressure-running",
 	}
-	if err := repo.Create(ctx, runningTask); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, runningTask); err != nil {
 		t.Fatalf("create running task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, runningTask.TaskID, accountID, channelID, credentialID, runningTask.LeaseToken)
@@ -210,7 +210,7 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-attempt-pressure-failed",
 	}
-	if err := repo.Create(ctx, failedTask); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, failedTask); err != nil {
 		t.Fatalf("create failed task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, failedTask.TaskID, accountID, channelID, credentialID, failedTask.LeaseToken)
@@ -246,7 +246,7 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-attempt-pressure-requeued",
 	}
-	if err := repo.Create(ctx, retryTask); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, retryTask); err != nil {
 		t.Fatalf("create retry task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, retryTask.TaskID, accountID, channelID, credentialID, retryTask.LeaseToken)
@@ -315,7 +315,7 @@ func TestCreateTaskAttemptRequiresCurrentLeaseIdentity(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-attempt-current",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
@@ -375,7 +375,7 @@ func TestFinishTaskAttemptOnlyUpdatesRunningAttempt(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-attempt-terminal-guard",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
@@ -438,7 +438,7 @@ func TestRetryAttemptHistoryUsesReleasedLeaseThenNewLease(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-retry-history-a",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
@@ -473,16 +473,12 @@ SET status = 'running',
     account_id = $2,
     assigned_provider_endpoint_id = $3,
     assigned_credential_id = $4,
-    resolved_model = 'gpt-image-1',
-    api_type = 'openai-compatible',
-    provider_endpoint_base_url = $5,
-    lease_token = $6
+    lease_token = $5
 WHERE task_id = $1`,
 		task.TaskID,
 		accountID,
 		channelID,
 		credentialID,
-		task.ProviderEndpointBaseURL,
 		secondLease,
 	); err != nil {
 		t.Fatalf("assign second lease snapshot failed: %v", err)
@@ -549,7 +545,7 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-complete-attempt-rollback",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -604,7 +600,7 @@ func TestRequeueWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-requeue-attempt-rollback",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -658,9 +654,10 @@ func TestResetRunningTaskClearsAssignedAccountAndChannel(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-reset-assigned-channel",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken)
 	rows, err := repo.ResetTaskRunningToPendingWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, "retry", nil)
 	if err != nil {
 		t.Fatalf("reset task failed: %v", err)
@@ -690,7 +687,7 @@ func TestMarkTaskCancelledStoresSystemCancelActorAsNull(t *testing.T) {
 		UserID: 1,
 		Status: tasks.StatusPending,
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	if rows, err := repo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
@@ -725,7 +722,7 @@ func TestMarkTaskCancelledRetainsAssignmentSnapshot(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-cancel-retains-assignment",
 	}
-	if err := repo.Create(ctx, task); err != nil {
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	if rows, err := repo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{

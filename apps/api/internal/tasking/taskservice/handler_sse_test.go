@@ -344,7 +344,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 		Status:     tasks.StatusCompleted,
 		Result:     `{"status":"success","image_url":"https://example.com/out.png","account_id":11,"provider_endpoint_id":9}`,
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -397,7 +397,7 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-sse-live",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -489,7 +489,7 @@ func TestStreamUserTaskReturnsJSONWhenConnectionLimitReached(t *testing.T) {
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-sse-limit",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 	_, unsubscribe, ok := hub.Subscribe("occupied-task", 9)
@@ -548,7 +548,7 @@ func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-sse-heartbeat",
 	}
-	if err := taskRepo.Create(ctx, task); err != nil {
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
