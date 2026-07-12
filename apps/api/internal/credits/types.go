@@ -47,7 +47,7 @@ var (
 	ErrHoldSettled                = errors.New("credit hold is already settled")
 	ErrChargeNotFound             = errors.New("credit charge not found")
 	ErrRefundExceedsCharge        = errors.New("credit refund exceeds remaining charge")
-	ErrWelcomeIdentityKeyMismatch = errors.New("Welcome identity key does not match the permanently bound key")
+	ErrWelcomeIdentityKeyMismatch = errors.New("welcome identity key does not match the permanently bound key")
 )
 
 type Actor struct {

@@ -196,7 +196,7 @@ func waitForTaskSubscriber(t *testing.T, hub *EventHub, taskID string) {
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
-		if hub.subscriberCount(taskID) > 0 {
+		if subscriberCountForTest(hub, taskID) > 0 {
 			return
 		}
 		select {

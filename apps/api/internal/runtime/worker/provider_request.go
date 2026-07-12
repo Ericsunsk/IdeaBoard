@@ -72,14 +72,6 @@ func (p providerTaskParams) providerRequest(prompt string, resolvedModel string)
 	return newProviderRequest(prompt, width, height, p.Provider, resolvedModel)
 }
 
-func newProviderTaskParamsFromProviderMap(params map[string]interface{}) providerTaskParams {
-	return providerTaskParams{Provider: params}
-}
-
-func (p providerTaskParams) providerRequestWithSize(prompt string, width, height int, resolvedModel string) providerRequest {
-	return newProviderRequest(prompt, width, height, p.Provider, resolvedModel)
-}
-
 func newProviderRequest(prompt string, width, height int, params map[string]interface{}, resolvedModel string) providerRequest {
 	providerParams := workflow.BuildProviderPromptParams(params)
 	return providerRequest{

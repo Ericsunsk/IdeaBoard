@@ -86,18 +86,6 @@ type StyleFusionParams struct {
 	InputWeights []float64 `json:"input_weights,omitempty"`
 }
 
-// MarshalParams serialises params to the JSON string stored in task.Params.
-func MarshalParams(p *WorkflowTaskParams) (string, error) {
-	if p == nil {
-		return "{}", nil
-	}
-	b, err := json.Marshal(p)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
-
 // UnmarshalParams deserialises the JSON string from task.Params.
 // Unknown provider-specific keys are preserved in Extra.
 func UnmarshalParams(raw string) (*WorkflowTaskParams, error) {

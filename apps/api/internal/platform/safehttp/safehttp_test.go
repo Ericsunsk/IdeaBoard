@@ -14,7 +14,7 @@ import (
 )
 
 func TestValidateURLRejectsLocalhostByDefault(t *testing.T) {
-	if _, err := ValidateURL("http://localhost:6000/uploads/test.png"); err == nil {
+	if _, err := ValidateURLWithAllowHosts("http://localhost:6000/uploads/test.png"); err == nil {
 		t.Fatal("expected localhost URL to be rejected by default")
 	}
 }

@@ -220,35 +220,6 @@ func (q *Queries) GetFeaturePromptForUpdate(ctx context.Context, featureSlug str
 	return i, err
 }
 
-const getStorageProfile = `-- name: GetStorageProfile :one
-SELECT
-  profile_id, name, provider, enabled, is_current, builtin,
-  status, config, created_by, updated_by, created_at, updated_at, deleted_at
-FROM storage_profiles
-WHERE profile_id = $1
-`
-
-func (q *Queries) GetStorageProfile(ctx context.Context, profileID string) (StorageProfile, error) {
-	row := q.db.QueryRowContext(ctx, getStorageProfile, profileID)
-	var i StorageProfile
-	err := row.Scan(
-		&i.ProfileID,
-		&i.Name,
-		&i.Provider,
-		&i.Enabled,
-		&i.IsCurrent,
-		&i.Builtin,
-		&i.Status,
-		&i.Config,
-		&i.CreatedBy,
-		&i.UpdatedBy,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
 const getSystemConfig = `-- name: GetSystemConfig :one
 SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
@@ -666,42 +637,6 @@ func (q *Queries) MarkStorageProfileDeleted(ctx context.Context, profileID strin
 	return result.RowsAffected()
 }
 
-const restoreLatestRetiredStorageProfileSecretVersion = `-- name: RestoreLatestRetiredStorageProfileSecretVersion :execrows
-UPDATE storage_profile_secret_versions AS target_version
-SET status = 'active',
-    retired_at = NULL,
-    revoked_at = NULL
-WHERE id = (
-    SELECT retired_version.id
-    FROM storage_profile_secret_versions AS retired_version
-    WHERE retired_version.profile_id = $1
-      AND retired_version.secret_name = $2
-      AND retired_version.status = 'retired'
-    ORDER BY retired_version.version_number DESC
-    LIMIT 1
-  )
-  AND NOT EXISTS (
-    SELECT 1
-    FROM storage_profile_secret_versions AS active_version
-    WHERE active_version.profile_id = $1
-      AND active_version.secret_name = $2
-      AND active_version.status = 'active'
-  )
-`
-
-type RestoreLatestRetiredStorageProfileSecretVersionParams struct {
-	ProfileID  string `json:"profile_id"`
-	SecretName string `json:"secret_name"`
-}
-
-func (q *Queries) RestoreLatestRetiredStorageProfileSecretVersion(ctx context.Context, arg RestoreLatestRetiredStorageProfileSecretVersionParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, restoreLatestRetiredStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const retireActiveStorageProfileSecretVersion = `-- name: RetireActiveStorageProfileSecretVersion :execrows
 UPDATE storage_profile_secret_versions
 SET status = 'retired',
@@ -718,29 +653,6 @@ type RetireActiveStorageProfileSecretVersionParams struct {
 
 func (q *Queries) RetireActiveStorageProfileSecretVersion(ctx context.Context, arg RetireActiveStorageProfileSecretVersionParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, retireActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
-const revokeActiveStorageProfileSecretVersion = `-- name: RevokeActiveStorageProfileSecretVersion :execrows
-UPDATE storage_profile_secret_versions
-SET status = 'revoked',
-    revoked_at = now(),
-    retired_at = NULL
-WHERE profile_id = $1
-  AND secret_name = $2
-  AND status = 'active'
-`
-
-type RevokeActiveStorageProfileSecretVersionParams struct {
-	ProfileID  string `json:"profile_id"`
-	SecretName string `json:"secret_name"`
-}
-
-func (q *Queries) RevokeActiveStorageProfileSecretVersion(ctx context.Context, arg RevokeActiveStorageProfileSecretVersionParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeActiveStorageProfileSecretVersion, arg.ProfileID, arg.SecretName)
 	if err != nil {
 		return 0, err
 	}

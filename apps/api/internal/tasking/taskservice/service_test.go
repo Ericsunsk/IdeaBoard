@@ -34,6 +34,28 @@ type testPublicURLProvider struct {
 	setting settings.PublicURLSetting
 }
 
+func applyTaskSystemPrompt(basePrompt, userPrompt, featureSlug string, params map[string]interface{}, loadPrompt func(string) (string, error)) string {
+	if loadPrompt == nil {
+		return basePrompt
+	}
+	prompt, err := loadPrompt(featureSlug)
+	if err != nil || prompt == "" {
+		return basePrompt
+	}
+	return prompts.ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, prompts.FeaturePromptRuntimeConfig{
+		Prompt:                prompt,
+		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
+	})
+}
+
+func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {
+	typed, err := workflowTaskParamsFromMap(params, "")
+	if err != nil {
+		return "", err
+	}
+	return marshalWorkflowTaskParams(typed, params)
+}
+
 func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
 	return p.setting, nil
 }

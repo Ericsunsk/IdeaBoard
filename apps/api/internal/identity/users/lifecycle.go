@@ -295,8 +295,8 @@ func (s *LifecycleService) AdvanceUserDeletion(ctx context.Context, userID int64
 	if s == nil || s.pool == nil || userID <= 0 {
 		return fmt.Errorf("invalid user deletion transition")
 	}
-	if !((from == DeletionPendingAuth && to == DeletionPendingStorage) ||
-		(from == DeletionPendingStorage && to == DeletionPendingTombstone)) {
+	if (from != DeletionPendingAuth || to != DeletionPendingStorage) &&
+		(from != DeletionPendingStorage || to != DeletionPendingTombstone) {
 		return fmt.Errorf("invalid user deletion phase transition %s -> %s", from, to)
 	}
 	result, err := s.pool.Exec(ctx, `

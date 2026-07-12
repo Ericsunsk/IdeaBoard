@@ -9,7 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/lib/pq"
 )
@@ -177,14 +176,14 @@ func (q *Queries) DeleteAccountModelsByAccountID(ctx context.Context, accountID 
 }
 
 const getAccountByID = `-- name: GetAccountByID :one
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
+       pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.id = $1
@@ -192,42 +191,33 @@ WHERE a.id = $1
 `
 
 type GetAccountByIDRow struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	ApiType            string    `json:"api_type"`
-	ApiKey             string    `json:"api_key"`
-	SecretConfigured   bool      `json:"secret_configured"`
-	ProxyUrl           string    `json:"proxy_url"`
-	MaxConcurrent      int32     `json:"max_concurrent"`
-	Timeout            int32     `json:"timeout"`
-	ExtraConfig        string    `json:"extra_config"`
-	Status             int16     `json:"status"`
-	FailCount          int32     `json:"fail_count"`
-	Weight             int32     `json:"weight"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ApiAccount       ApiAccount `json:"api_account"`
+	ApiType          string     `json:"api_type"`
+	ApiKey           string     `json:"api_key"`
+	SecretConfigured bool       `json:"secret_configured"`
+	ProxyUrl         string     `json:"proxy_url"`
 }
 
 func (q *Queries) GetAccountByID(ctx context.Context, id int64) (GetAccountByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getAccountByID, id)
 	var i GetAccountByIDRow
 	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.ProviderEndpointID,
+		&i.ApiAccount.ID,
+		&i.ApiAccount.Name,
+		&i.ApiAccount.ProviderEndpointID,
+		&i.ApiAccount.MaxConcurrent,
+		&i.ApiAccount.Timeout,
+		&i.ApiAccount.ExtraConfig,
+		&i.ApiAccount.Status,
+		&i.ApiAccount.FailCount,
+		&i.ApiAccount.Weight,
+		&i.ApiAccount.CreatedAt,
+		&i.ApiAccount.UpdatedAt,
+		&i.ApiAccount.DeletedAt,
 		&i.ApiType,
 		&i.ApiKey,
 		&i.SecretConfigured,
 		&i.ProxyUrl,
-		&i.MaxConcurrent,
-		&i.Timeout,
-		&i.ExtraConfig,
-		&i.Status,
-		&i.FailCount,
-		&i.Weight,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -263,12 +253,12 @@ func (q *Queries) GetActiveAccountSecretByAccountID(ctx context.Context, account
 }
 
 const getRuntimeAccountByIDWithSecret = `-- name: GetRuntimeAccountByIDWithSecret :one
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
+       pe.api_type,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 INNER JOIN LATERAL (
@@ -288,55 +278,46 @@ WHERE a.id = $1
 `
 
 type GetRuntimeAccountByIDWithSecretRow struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	ApiType            string    `json:"api_type"`
-	ApiKey             string    `json:"api_key"`
-	ApiKeyMaterialKind string    `json:"api_key_material_kind"`
-	SecretConfigured   bool      `json:"secret_configured"`
-	ProxyUrl           string    `json:"proxy_url"`
-	MaxConcurrent      int32     `json:"max_concurrent"`
-	Timeout            int32     `json:"timeout"`
-	ExtraConfig        string    `json:"extra_config"`
-	Status             int16     `json:"status"`
-	FailCount          int32     `json:"fail_count"`
-	Weight             int32     `json:"weight"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ApiAccount         ApiAccount `json:"api_account"`
+	ApiType            string     `json:"api_type"`
+	ApiKey             string     `json:"api_key"`
+	ApiKeyMaterialKind string     `json:"api_key_material_kind"`
+	SecretConfigured   bool       `json:"secret_configured"`
+	ProxyUrl           string     `json:"proxy_url"`
 }
 
 func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error) {
 	row := q.db.QueryRowContext(ctx, getRuntimeAccountByIDWithSecret, id)
 	var i GetRuntimeAccountByIDWithSecretRow
 	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.ProviderEndpointID,
+		&i.ApiAccount.ID,
+		&i.ApiAccount.Name,
+		&i.ApiAccount.ProviderEndpointID,
+		&i.ApiAccount.MaxConcurrent,
+		&i.ApiAccount.Timeout,
+		&i.ApiAccount.ExtraConfig,
+		&i.ApiAccount.Status,
+		&i.ApiAccount.FailCount,
+		&i.ApiAccount.Weight,
+		&i.ApiAccount.CreatedAt,
+		&i.ApiAccount.UpdatedAt,
+		&i.ApiAccount.DeletedAt,
 		&i.ApiType,
 		&i.ApiKey,
 		&i.ApiKeyMaterialKind,
 		&i.SecretConfigured,
 		&i.ProxyUrl,
-		&i.MaxConcurrent,
-		&i.Timeout,
-		&i.ExtraConfig,
-		&i.Status,
-		&i.FailCount,
-		&i.Weight,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getRuntimeAccountForAssignment = `-- name: GetRuntimeAccountForAssignment :one
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
+       pe.api_type,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 INNER JOIN api_account_secrets AS secret ON secret.id = $1
@@ -358,44 +339,35 @@ type GetRuntimeAccountForAssignmentParams struct {
 }
 
 type GetRuntimeAccountForAssignmentRow struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	ApiType            string    `json:"api_type"`
-	ApiKey             string    `json:"api_key"`
-	ApiKeyMaterialKind string    `json:"api_key_material_kind"`
-	SecretConfigured   bool      `json:"secret_configured"`
-	ProxyUrl           string    `json:"proxy_url"`
-	MaxConcurrent      int32     `json:"max_concurrent"`
-	Timeout            int32     `json:"timeout"`
-	ExtraConfig        string    `json:"extra_config"`
-	Status             int16     `json:"status"`
-	FailCount          int32     `json:"fail_count"`
-	Weight             int32     `json:"weight"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ApiAccount         ApiAccount `json:"api_account"`
+	ApiType            string     `json:"api_type"`
+	ApiKey             string     `json:"api_key"`
+	ApiKeyMaterialKind string     `json:"api_key_material_kind"`
+	SecretConfigured   bool       `json:"secret_configured"`
+	ProxyUrl           string     `json:"proxy_url"`
 }
 
 func (q *Queries) GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error) {
 	row := q.db.QueryRowContext(ctx, getRuntimeAccountForAssignment, arg.CredentialID, arg.AccountID, arg.ProviderEndpointID)
 	var i GetRuntimeAccountForAssignmentRow
 	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.ProviderEndpointID,
+		&i.ApiAccount.ID,
+		&i.ApiAccount.Name,
+		&i.ApiAccount.ProviderEndpointID,
+		&i.ApiAccount.MaxConcurrent,
+		&i.ApiAccount.Timeout,
+		&i.ApiAccount.ExtraConfig,
+		&i.ApiAccount.Status,
+		&i.ApiAccount.FailCount,
+		&i.ApiAccount.Weight,
+		&i.ApiAccount.CreatedAt,
+		&i.ApiAccount.UpdatedAt,
+		&i.ApiAccount.DeletedAt,
 		&i.ApiType,
 		&i.ApiKey,
 		&i.ApiKeyMaterialKind,
 		&i.SecretConfigured,
 		&i.ProxyUrl,
-		&i.MaxConcurrent,
-		&i.Timeout,
-		&i.ExtraConfig,
-		&i.Status,
-		&i.FailCount,
-		&i.Weight,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -441,23 +413,6 @@ func (q *Queries) GetRuntimeCredentialByID(ctx context.Context, arg GetRuntimeCr
 	return i, err
 }
 
-const getSingleEnabledModelByAccountID = `-- name: GetSingleEnabledModelByAccountID :one
-SELECT (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
-FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
-INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
-WHERE m.account_id = $1
-  AND m.enabled = TRUE
-HAVING COUNT(*) = 1
-`
-
-func (q *Queries) GetSingleEnabledModelByAccountID(ctx context.Context, id int64) (string, error) {
-	row := q.db.QueryRowContext(ctx, getSingleEnabledModelByAccountID, id)
-	var model_name string
-	err := row.Scan(&model_name)
-	return model_name, err
-}
-
 const incrementAccountFailCount = `-- name: IncrementAccountFailCount :execrows
 UPDATE api_accounts
 SET fail_count = fail_count + 1
@@ -493,54 +448,6 @@ func (q *Queries) ListAccountIDs(ctx context.Context) ([]int64, error) {
 			return nil, err
 		}
 		items = append(items, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAccountModelsByAccountID = `-- name: ListAccountModelsByAccountID :many
-SELECT id, account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order, created_at, updated_at
-FROM api_account_models AS m
-WHERE m.account_id = $1
-  AND EXISTS (
-    SELECT 1
-    FROM api_accounts AS a
-    WHERE a.id = m.account_id
-      AND a.deleted_at IS NULL
-  )
-ORDER BY m.sort_order ASC, m.id ASC
-`
-
-func (q *Queries) ListAccountModelsByAccountID(ctx context.Context, accountID int64) ([]ApiAccountModel, error) {
-	rows, err := q.db.QueryContext(ctx, listAccountModelsByAccountID, accountID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ApiAccountModel
-	for rows.Next() {
-		var i ApiAccountModel
-		if err := rows.Scan(
-			&i.ID,
-			&i.AccountID,
-			&i.ModelName,
-			&i.Enabled,
-			&i.Weight,
-			&i.MaxConcurrent,
-			&i.FeatureSlugs,
-			&i.Metadata,
-			&i.SortOrder,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -600,14 +507,14 @@ func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds 
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
+       pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.deleted_at IS NULL
@@ -627,21 +534,11 @@ type ListAccountsParams struct {
 }
 
 type ListAccountsRow struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	ApiType            string    `json:"api_type"`
-	ApiKey             string    `json:"api_key"`
-	SecretConfigured   bool      `json:"secret_configured"`
-	ProxyUrl           string    `json:"proxy_url"`
-	MaxConcurrent      int32     `json:"max_concurrent"`
-	Timeout            int32     `json:"timeout"`
-	ExtraConfig        string    `json:"extra_config"`
-	Status             int16     `json:"status"`
-	FailCount          int32     `json:"fail_count"`
-	Weight             int32     `json:"weight"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ApiAccount       ApiAccount `json:"api_account"`
+	ApiType          string     `json:"api_type"`
+	ApiKey           string     `json:"api_key"`
+	SecretConfigured bool       `json:"secret_configured"`
+	ProxyUrl         string     `json:"proxy_url"`
 }
 
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error) {
@@ -661,21 +558,22 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 	for rows.Next() {
 		var i ListAccountsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.ProviderEndpointID,
+			&i.ApiAccount.ID,
+			&i.ApiAccount.Name,
+			&i.ApiAccount.ProviderEndpointID,
+			&i.ApiAccount.MaxConcurrent,
+			&i.ApiAccount.Timeout,
+			&i.ApiAccount.ExtraConfig,
+			&i.ApiAccount.Status,
+			&i.ApiAccount.FailCount,
+			&i.ApiAccount.Weight,
+			&i.ApiAccount.CreatedAt,
+			&i.ApiAccount.UpdatedAt,
+			&i.ApiAccount.DeletedAt,
 			&i.ApiType,
 			&i.ApiKey,
 			&i.SecretConfigured,
 			&i.ProxyUrl,
-			&i.MaxConcurrent,
-			&i.Timeout,
-			&i.ExtraConfig,
-			&i.Status,
-			&i.FailCount,
-			&i.Weight,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -691,11 +589,11 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 }
 
 const listEnabledAccounts = `-- name: ListEnabledAccounts :many
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
+       pe.api_type,
        ''::text AS api_key,
        TRUE::boolean AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.status = 1
@@ -713,21 +611,11 @@ ORDER BY a.id ASC
 `
 
 type ListEnabledAccountsRow struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	ProviderEndpointID int64     `json:"provider_endpoint_id"`
-	ApiType            string    `json:"api_type"`
-	ApiKey             string    `json:"api_key"`
-	SecretConfigured   bool      `json:"secret_configured"`
-	ProxyUrl           string    `json:"proxy_url"`
-	MaxConcurrent      int32     `json:"max_concurrent"`
-	Timeout            int32     `json:"timeout"`
-	ExtraConfig        string    `json:"extra_config"`
-	Status             int16     `json:"status"`
-	FailCount          int32     `json:"fail_count"`
-	Weight             int32     `json:"weight"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ApiAccount       ApiAccount `json:"api_account"`
+	ApiType          string     `json:"api_type"`
+	ApiKey           string     `json:"api_key"`
+	SecretConfigured bool       `json:"secret_configured"`
+	ProxyUrl         string     `json:"proxy_url"`
 }
 
 func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error) {
@@ -740,64 +628,23 @@ func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccount
 	for rows.Next() {
 		var i ListEnabledAccountsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.ProviderEndpointID,
+			&i.ApiAccount.ID,
+			&i.ApiAccount.Name,
+			&i.ApiAccount.ProviderEndpointID,
+			&i.ApiAccount.MaxConcurrent,
+			&i.ApiAccount.Timeout,
+			&i.ApiAccount.ExtraConfig,
+			&i.ApiAccount.Status,
+			&i.ApiAccount.FailCount,
+			&i.ApiAccount.Weight,
+			&i.ApiAccount.CreatedAt,
+			&i.ApiAccount.UpdatedAt,
+			&i.ApiAccount.DeletedAt,
 			&i.ApiType,
 			&i.ApiKey,
 			&i.SecretConfigured,
 			&i.ProxyUrl,
-			&i.MaxConcurrent,
-			&i.Timeout,
-			&i.ExtraConfig,
-			&i.Status,
-			&i.FailCount,
-			&i.Weight,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listSingleEnabledModelsByAccountIDs = `-- name: ListSingleEnabledModelsByAccountIDs :many
-SELECT
-  m.account_id AS id,
-  (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
-FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
-INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
-WHERE m.account_id = ANY($1::bigint[])
-  AND m.enabled = TRUE
-GROUP BY m.account_id
-HAVING COUNT(*) = 1
-ORDER BY m.account_id ASC
-`
-
-type ListSingleEnabledModelsByAccountIDsRow struct {
-	ID        int64  `json:"id"`
-	ModelName string `json:"model_name"`
-}
-
-func (q *Queries) ListSingleEnabledModelsByAccountIDs(ctx context.Context, ids []int64) ([]ListSingleEnabledModelsByAccountIDsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listSingleEnabledModelsByAccountIDs, pq.Array(ids))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListSingleEnabledModelsByAccountIDsRow
-	for rows.Next() {
-		var i ListSingleEnabledModelsByAccountIDsRow
-		if err := rows.Scan(&i.ID, &i.ModelName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

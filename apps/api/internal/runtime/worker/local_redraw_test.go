@@ -88,24 +88,33 @@ func TestBuildLocalRedrawMaskSamplerUsesLuminanceFallbackAndPadding(t *testing.T
 }
 
 func TestShouldUseLocalRedrawPipelineOnlyForPartialEditWithMask(t *testing.T) {
-	params := map[string]interface{}{
-		"feature":        "partial-edit",
-		"image_urls":     []interface{}{"data:image/png;base64,aGVsbG8="},
-		"mask_image_url": "data:image/png;base64,bWFzaw==",
+	tests := []struct {
+		name    string
+		feature string
+		mask    string
+		want    bool
+	}{
+		{name: "partial edit with mask", feature: "partial-edit", mask: "data:image/png;base64,bWFzaw==", want: true},
+		{name: "other feature with stale mask", feature: "hd-upscale", mask: "data:image/png;base64,bWFzaw=="},
+		{name: "partial edit without mask", feature: "partial-edit"},
 	}
-	if !shouldUseLocalRedrawPipeline(params) {
-		t.Fatalf("expected partial-edit with mask to use local redraw pipeline")
-	}
-
-	params["feature"] = "hd-upscale"
-	if shouldUseLocalRedrawPipeline(params) {
-		t.Fatalf("expected hd-upscale to stay out of local redraw even with stale mask params")
-	}
-
-	params["feature"] = "partial-edit"
-	delete(params, "mask_image_url")
-	if shouldUseLocalRedrawPipeline(params) {
-		t.Fatalf("expected partial-edit without mask to stay out of local redraw pipeline")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := map[string]interface{}{
+				"feature":    tt.feature,
+				"image_urls": []interface{}{"data:image/png;base64,aGVsbG8="},
+			}
+			if tt.mask != "" {
+				params["mask_image_url"] = tt.mask
+			}
+			_, got, err := readLocalRedrawRequest(params)
+			if err != nil {
+				t.Fatalf("readLocalRedrawRequest: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("local redraw eligibility=%v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -210,7 +219,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	defer server.Close()
 
 	useMask := true
-	paramsJSON, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+	paramsJSON := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "partial-edit",
 		Media: &tasks.MediaInputs{
@@ -223,10 +232,6 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 			UseMask:  &useMask,
 		},
 	})
-	if err != nil {
-		t.Fatalf("marshal params: %v", err)
-	}
-
 	c := newTestProviderExecutorWithLocalStorage(t)
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -240,7 +245,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		Params: paramsJSON,
 	}
 
-	output, err := c.callDrawingAPI(context.Background(), account, task)
+	output, err := c.callDrawingAPIForTest(context.Background(), account, task)
 	if err != nil {
 		t.Fatalf("callDrawingAPI: %v", err)
 	}

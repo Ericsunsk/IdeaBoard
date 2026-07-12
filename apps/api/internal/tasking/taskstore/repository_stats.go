@@ -2,7 +2,6 @@ package taskstore
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -408,239 +407,70 @@ func normalizeTaskStatDate(value time.Time) time.Time {
 	return taskStatDateFromTime(value, value.Location())
 }
 
-type taskSQLCFields struct {
-	ID                         int64
-	TaskID                     string
-	UserID                     int64
-	ClientActionID             string
-	AssignedProviderEndpointID sql.NullInt64
-	AssignedCredentialID       sql.NullInt64
-	AccountID                  sql.NullInt64
-	Prompt                     string
-	UserPrompt                 string
-	Params                     string
-	FeatureSlug                string
-	RequestedModel             string
-	Priority                   int32
-	ResolvedModel              string
-	APIType                    string
-	ProviderEndpointName       string
-	ProviderEndpointBaseURL    string
-	CredentialFingerprint      string
-	CredentialKeyVersion       string
-	Status                     string
-	LeaseToken                 string
-	RetryCount                 int32
-	ErrorMsg                   string
-	Result                     string
-	CreatedAt                  time.Time
-	UpdatedAt                  time.Time
-	CompletedAt                sql.NullTime
-	CancelledAt                sql.NullTime
-	CancelledBy                sql.NullInt64
-	CancelReason               string
+type taskLeaseSnapshot struct {
+	ResolvedModel           string
+	APIType                 string
+	ProviderEndpointName    string
+	ProviderEndpointBaseURL string
+	CredentialFingerprint   string
+	CredentialKeyVersion    string
 }
 
 func taskFromSQLC(row any) tasks.Task {
 	switch r := row.(type) {
 	case dbsqlc.GetTaskByTaskIDRow:
-		return taskFromSQLCFields(taskSQLCFields{
-			ID:                         r.ID,
-			TaskID:                     r.TaskID,
-			UserID:                     r.UserID,
-			ClientActionID:             r.ClientActionID,
-			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
-			AssignedCredentialID:       r.AssignedCredentialID,
-			AccountID:                  r.AccountID,
-			Prompt:                     r.Prompt,
-			UserPrompt:                 r.UserPrompt,
-			Params:                     r.Params,
-			FeatureSlug:                r.FeatureSlug,
-			RequestedModel:             r.RequestedModel,
-			Priority:                   r.Priority,
-			ResolvedModel:              r.ResolvedModel,
-			APIType:                    r.ApiType,
-			ProviderEndpointName:       r.ProviderEndpointName,
-			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:      r.CredentialFingerprint,
-			CredentialKeyVersion:       r.CredentialKeyVersion,
-			Status:                     r.Status,
-			LeaseToken:                 r.LeaseToken,
-			RetryCount:                 r.RetryCount,
-			ErrorMsg:                   r.ErrorMsg,
-			Result:                     r.Result,
-			CreatedAt:                  r.CreatedAt,
-			UpdatedAt:                  r.UpdatedAt,
-			CompletedAt:                r.CompletedAt,
-			CancelledAt:                r.CancelledAt,
-			CancelledBy:                r.CancelledBy,
-			CancelReason:               r.CancelReason,
+		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
+			ResolvedModel:           r.ResolvedModel,
+			APIType:                 r.ApiType,
+			ProviderEndpointName:    r.ProviderEndpointName,
+			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:   r.CredentialFingerprint,
+			CredentialKeyVersion:    r.CredentialKeyVersion,
 		})
 	case dbsqlc.GetTaskByTaskIDAndUserIDRow:
-		return taskFromSQLCFields(taskSQLCFields{
-			ID:                         r.ID,
-			TaskID:                     r.TaskID,
-			UserID:                     r.UserID,
-			ClientActionID:             r.ClientActionID,
-			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
-			AssignedCredentialID:       r.AssignedCredentialID,
-			AccountID:                  r.AccountID,
-			Prompt:                     r.Prompt,
-			UserPrompt:                 r.UserPrompt,
-			Params:                     r.Params,
-			FeatureSlug:                r.FeatureSlug,
-			RequestedModel:             r.RequestedModel,
-			Priority:                   r.Priority,
-			ResolvedModel:              r.ResolvedModel,
-			APIType:                    r.ApiType,
-			ProviderEndpointName:       r.ProviderEndpointName,
-			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:      r.CredentialFingerprint,
-			CredentialKeyVersion:       r.CredentialKeyVersion,
-			Status:                     r.Status,
-			LeaseToken:                 r.LeaseToken,
-			RetryCount:                 r.RetryCount,
-			ErrorMsg:                   r.ErrorMsg,
-			Result:                     r.Result,
-			CreatedAt:                  r.CreatedAt,
-			UpdatedAt:                  r.UpdatedAt,
-			CompletedAt:                r.CompletedAt,
-			CancelledAt:                r.CancelledAt,
-			CancelledBy:                r.CancelledBy,
-			CancelReason:               r.CancelReason,
+		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
+			ResolvedModel:           r.ResolvedModel,
+			APIType:                 r.ApiType,
+			ProviderEndpointName:    r.ProviderEndpointName,
+			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:   r.CredentialFingerprint,
+			CredentialKeyVersion:    r.CredentialKeyVersion,
 		})
 	case dbsqlc.ListTasksRow:
-		return taskFromSQLCFields(taskSQLCFields{
-			ID:                         r.ID,
-			TaskID:                     r.TaskID,
-			UserID:                     r.UserID,
-			ClientActionID:             r.ClientActionID,
-			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
-			AssignedCredentialID:       r.AssignedCredentialID,
-			AccountID:                  r.AccountID,
-			Prompt:                     r.Prompt,
-			UserPrompt:                 r.UserPrompt,
-			Params:                     r.Params,
-			FeatureSlug:                r.FeatureSlug,
-			RequestedModel:             r.RequestedModel,
-			Priority:                   r.Priority,
-			ResolvedModel:              r.ResolvedModel,
-			APIType:                    r.ApiType,
-			ProviderEndpointName:       r.ProviderEndpointName,
-			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:      r.CredentialFingerprint,
-			CredentialKeyVersion:       r.CredentialKeyVersion,
-			Status:                     r.Status,
-			LeaseToken:                 r.LeaseToken,
-			RetryCount:                 r.RetryCount,
-			ErrorMsg:                   r.ErrorMsg,
-			Result:                     r.Result,
-			CreatedAt:                  r.CreatedAt,
-			UpdatedAt:                  r.UpdatedAt,
-			CompletedAt:                r.CompletedAt,
-			CancelledAt:                r.CancelledAt,
-			CancelledBy:                r.CancelledBy,
-			CancelReason:               r.CancelReason,
+		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
+			ResolvedModel:           r.ResolvedModel,
+			APIType:                 r.ApiType,
+			ProviderEndpointName:    r.ProviderEndpointName,
+			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:   r.CredentialFingerprint,
+			CredentialKeyVersion:    r.CredentialKeyVersion,
 		})
 	case dbsqlc.ListTasksByTaskIDsRow:
-		return taskFromSQLCFields(taskSQLCFields{
-			ID:                         r.ID,
-			TaskID:                     r.TaskID,
-			UserID:                     r.UserID,
-			ClientActionID:             r.ClientActionID,
-			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
-			AssignedCredentialID:       r.AssignedCredentialID,
-			AccountID:                  r.AccountID,
-			Prompt:                     r.Prompt,
-			UserPrompt:                 r.UserPrompt,
-			Params:                     r.Params,
-			FeatureSlug:                r.FeatureSlug,
-			RequestedModel:             r.RequestedModel,
-			Priority:                   r.Priority,
-			ResolvedModel:              r.ResolvedModel,
-			APIType:                    r.ApiType,
-			ProviderEndpointName:       r.ProviderEndpointName,
-			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:      r.CredentialFingerprint,
-			CredentialKeyVersion:       r.CredentialKeyVersion,
-			Status:                     r.Status,
-			LeaseToken:                 r.LeaseToken,
-			RetryCount:                 r.RetryCount,
-			ErrorMsg:                   r.ErrorMsg,
-			Result:                     r.Result,
-			CreatedAt:                  r.CreatedAt,
-			UpdatedAt:                  r.UpdatedAt,
-			CompletedAt:                r.CompletedAt,
-			CancelledAt:                r.CancelledAt,
-			CancelledBy:                r.CancelledBy,
-			CancelReason:               r.CancelReason,
+		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
+			ResolvedModel:           r.ResolvedModel,
+			APIType:                 r.ApiType,
+			ProviderEndpointName:    r.ProviderEndpointName,
+			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:   r.CredentialFingerprint,
+			CredentialKeyVersion:    r.CredentialKeyVersion,
 		})
 	case dbsqlc.ListTasksByUserIDRow:
-		return taskFromSQLCFields(taskSQLCFields{
-			ID:                         r.ID,
-			TaskID:                     r.TaskID,
-			UserID:                     r.UserID,
-			ClientActionID:             r.ClientActionID,
-			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
-			AssignedCredentialID:       r.AssignedCredentialID,
-			AccountID:                  r.AccountID,
-			Prompt:                     r.Prompt,
-			UserPrompt:                 r.UserPrompt,
-			Params:                     r.Params,
-			FeatureSlug:                r.FeatureSlug,
-			RequestedModel:             r.RequestedModel,
-			Priority:                   r.Priority,
-			ResolvedModel:              r.ResolvedModel,
-			APIType:                    r.ApiType,
-			ProviderEndpointName:       r.ProviderEndpointName,
-			ProviderEndpointBaseURL:    r.ProviderEndpointBaseUrl,
-			CredentialFingerprint:      r.CredentialFingerprint,
-			CredentialKeyVersion:       r.CredentialKeyVersion,
-			Status:                     r.Status,
-			LeaseToken:                 r.LeaseToken,
-			RetryCount:                 r.RetryCount,
-			ErrorMsg:                   r.ErrorMsg,
-			Result:                     r.Result,
-			CreatedAt:                  r.CreatedAt,
-			UpdatedAt:                  r.UpdatedAt,
-			CompletedAt:                r.CompletedAt,
-			CancelledAt:                r.CancelledAt,
-			CancelledBy:                r.CancelledBy,
-			CancelReason:               r.CancelReason,
+		return taskFromSQLCModel(r.Task, taskLeaseSnapshot{
+			ResolvedModel:           r.ResolvedModel,
+			APIType:                 r.ApiType,
+			ProviderEndpointName:    r.ProviderEndpointName,
+			ProviderEndpointBaseURL: r.ProviderEndpointBaseUrl,
+			CredentialFingerprint:   r.CredentialFingerprint,
+			CredentialKeyVersion:    r.CredentialKeyVersion,
 		})
 	case dbsqlc.Task:
-		return taskFromSQLCFields(taskSQLCFields{
-			ID:                         r.ID,
-			TaskID:                     r.TaskID,
-			UserID:                     r.UserID,
-			ClientActionID:             r.ClientActionID,
-			AssignedProviderEndpointID: r.AssignedProviderEndpointID,
-			AssignedCredentialID:       r.AssignedCredentialID,
-			AccountID:                  r.AccountID,
-			Prompt:                     r.Prompt,
-			UserPrompt:                 r.UserPrompt,
-			Params:                     r.Params,
-			FeatureSlug:                r.FeatureSlug,
-			RequestedModel:             r.RequestedModel,
-			Priority:                   r.Priority,
-			Status:                     r.Status,
-			LeaseToken:                 r.LeaseToken,
-			RetryCount:                 r.RetryCount,
-			ErrorMsg:                   r.ErrorMsg,
-			Result:                     r.Result,
-			CreatedAt:                  r.CreatedAt,
-			UpdatedAt:                  r.UpdatedAt,
-			CompletedAt:                r.CompletedAt,
-			CancelledAt:                r.CancelledAt,
-			CancelledBy:                r.CancelledBy,
-			CancelReason:               r.CancelReason,
-		})
+		return taskFromSQLCModel(r, taskLeaseSnapshot{})
 	default:
 		panic(fmt.Sprintf("unsupported task sqlc row %T", row))
 	}
 }
 
-func taskFromSQLCFields(row taskSQLCFields) tasks.Task {
+func taskFromSQLCModel(row dbsqlc.Task, lease taskLeaseSnapshot) tasks.Task {
 	return tasks.Task{
 		ID:                         row.ID,
 		TaskID:                     row.TaskID,
@@ -656,12 +486,12 @@ func taskFromSQLCFields(row taskSQLCFields) tasks.Task {
 		FeatureSlug:                row.FeatureSlug,
 		RequestedModel:             row.RequestedModel,
 		Priority:                   int(row.Priority),
-		ResolvedModel:              row.ResolvedModel,
-		APIType:                    row.APIType,
-		ProviderEndpointName:       row.ProviderEndpointName,
-		ProviderEndpointBaseURL:    row.ProviderEndpointBaseURL,
-		CredentialFingerprint:      row.CredentialFingerprint,
-		CredentialKeyVersion:       row.CredentialKeyVersion,
+		ResolvedModel:              lease.ResolvedModel,
+		APIType:                    lease.APIType,
+		ProviderEndpointName:       lease.ProviderEndpointName,
+		ProviderEndpointBaseURL:    lease.ProviderEndpointBaseURL,
+		CredentialFingerprint:      lease.CredentialFingerprint,
+		CredentialKeyVersion:       lease.CredentialKeyVersion,
 		Status:                     row.Status,
 		LeaseToken:                 row.LeaseToken,
 		RetryCount:                 int(row.RetryCount),

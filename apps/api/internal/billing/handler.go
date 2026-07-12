@@ -2,13 +2,12 @@ package billing
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -225,16 +224,7 @@ func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
 }
 
 func decodeStrictJSON(c *gin.Context, destination any) error {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBillingRequestBytes)
-	decoder := json.NewDecoder(c.Request.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(destination); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return errors.New("request body must contain one JSON object")
-	}
-	return nil
+	return jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxBillingRequestBytes, destination)
 }
 
 func parseOptionalInt(raw string) (int, bool) {

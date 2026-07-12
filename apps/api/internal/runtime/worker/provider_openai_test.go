@@ -157,7 +157,7 @@ func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 		"extend_right": 22,
 	}
 
-	gotResult, err := c.callOpenAI(context.Background(), account, "extend prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
+	gotResult, err := c.callOpenAIForTest(context.Background(), account, "extend prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
 	if err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestCallOpenAIRemoveBgForcesTransparentPNGOutput(t *testing.T) {
 		"output_format": "jpeg",
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "remove background", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "remove background", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotPath != "/v1/images/edits" {
@@ -250,7 +250,7 @@ func TestCallOpenAIRemoveBgRejectsModelWithoutTransparentBackground(t *testing.T
 		"image_urls": []interface{}{buildTinyPNGDataURL(t)},
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "remove background", 1024, 1024, 2*time.Second, params, "gpt-image-2"); err == nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "remove background", 1024, 1024, 2*time.Second, params, "gpt-image-2"); err == nil {
 		t.Fatalf("expected transparent background capability error")
 	}
 }
@@ -297,7 +297,7 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 		"feature": "pattern-gen",
 	}
 
-	gotResult, err := c.callOpenAI(context.Background(), account, "pattern prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
+	gotResult, err := c.callOpenAIForTest(context.Background(), account, "pattern prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
 	if err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t 
 		"output_count": 2,
 	}
 
-	gotResult, err := c.callOpenAI(context.Background(), account, "pattern prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
+	gotResult, err := c.callOpenAIForTest(context.Background(), account, "pattern prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
 	if err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
@@ -392,7 +392,7 @@ func TestCallOpenAIStyleVariationUsesEditEndpointAndMultipartImage(t *testing.T)
 		},
 	}
 
-	gotResult, err := c.callOpenAI(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
+	gotResult, err := c.callOpenAIForTest(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
 	if err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
@@ -451,7 +451,7 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 		"image_urls": []interface{}{server.URL + "/a.png", server.URL + "/b.png"},
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "fusion prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "fusion prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotPath != "/v1/images/edits" {
@@ -495,7 +495,7 @@ func TestCallOpenAIStyleVariationDataURLUsesMultipartWithoutLegacyImageFields(t 
 		},
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotPath != "/v1/images/edits" {
@@ -543,7 +543,7 @@ func TestCallOpenAIStyleVariationFlattensNestedContractParams(t *testing.T) {
 		},
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "style prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotBody["variation_strength"] != float64(5) {
@@ -581,7 +581,7 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 		"mask_image_url":     maskDataURL,
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotPath != "/v1/images/edits" {
@@ -625,7 +625,7 @@ func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) 
 		"mask_image_url":     maskDataURL,
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	images := gotMultipart.Files["image"]
@@ -680,7 +680,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 		"mask_image_url":     maskDataURL,
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	images := gotMultipart.Files["image"]
@@ -729,7 +729,7 @@ func TestCallOpenAIUsesFirstModelWhenAccountHasMultipleModels(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected account model to resolve")
 	}
-	if _, err := c.callOpenAI(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, params, resolved.Name); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, params, resolved.Name); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotBody["model"] != "gpt-image-1" {
@@ -760,7 +760,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,
 	}
-	output, err := c.callDrawingAPI(context.Background(), account, task)
+	output, err := c.callDrawingAPIForTest(context.Background(), account, task)
 	if err != nil {
 		t.Fatalf("callDrawingAPI returned error: %v", err)
 	}
@@ -860,7 +860,7 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 		"use_mask":        true,
 	}
 
-	if _, err := c.callOpenAI(context.Background(), account, "upscale prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "upscale prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotPath != "/v1/images/generations" {
@@ -880,14 +880,17 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 }
 
 func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
-	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
+	usesEditEndpoint := func(params map[string]interface{}) bool {
+		return readOpenAIProviderParams(newProviderRequest("", 0, 0, params, "")).useEditEndpoint()
+	}
+	if !usesEditEndpoint(map[string]interface{}{
 		"feature":    "image-extend",
 		"image_urls": []interface{}{"https://img.example/source.png"},
 	}) {
 		t.Fatalf("expected image-extend to use edit endpoint")
 	}
 
-	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
+	if !usesEditEndpoint(map[string]interface{}{
 		"feature":    "partial-edit",
 		"image_urls": []interface{}{"https://img.example/source.png"},
 		"use_mask":   true,
@@ -895,7 +898,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 		t.Fatalf("expected partial-edit to use edit endpoint")
 	}
 
-	if shouldUseOpenAIEditEndpoint(map[string]interface{}{
+	if usesEditEndpoint(map[string]interface{}{
 		"feature":        "hd-upscale",
 		"image_urls":     []interface{}{"https://img.example/source.png"},
 		"mask_image_url": "https://img.example/mask.png",
@@ -905,7 +908,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	}
 
 	for _, feature := range []string{"style-fusion", "remove-bg", "style-variation", "sketch-to-image"} {
-		if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
+		if !usesEditEndpoint(map[string]interface{}{
 			"feature":    feature,
 			"image_urls": []interface{}{"https://img.example/source.png", "https://img.example/ref.png"},
 		}) {
@@ -980,7 +983,7 @@ func TestOpenAIRequestFinalizerDropsRedundantFields(t *testing.T) {
 }
 
 func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
-	refs := collectOpenAIEditImageRefs(map[string]interface{}{
+	refs := collectProviderMediaRefs(map[string]interface{}{
 		"image_urls": []interface{}{
 			"https://img.example/source.png",
 		},
@@ -990,7 +993,7 @@ func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			" ",
 			"https://img.example/ref-b.png",
 		},
-	})
+	}).OpenAIImages
 	want := []string{
 		"https://img.example/source.png",
 		"https://img.example/ref-a.png",

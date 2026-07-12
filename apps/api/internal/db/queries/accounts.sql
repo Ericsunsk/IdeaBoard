@@ -10,26 +10,26 @@ INSERT INTO api_accounts (
 RETURNING id;
 
 -- name: GetAccountByID :one
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT sqlc.embed(a),
+       pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.id = sqlc.arg(id)
   AND a.deleted_at IS NULL;
 
 -- name: GetRuntimeAccountByIDWithSecret :one
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT sqlc.embed(a),
+       pe.api_type,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 INNER JOIN LATERAL (
@@ -48,12 +48,12 @@ WHERE a.id = sqlc.arg(id)
   AND a.deleted_at IS NULL;
 
 -- name: GetRuntimeAccountForAssignment :one
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT sqlc.embed(a),
+       pe.api_type,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 INNER JOIN api_account_secrets AS secret ON secret.id = sqlc.arg(credential_id)
@@ -76,14 +76,14 @@ WHERE a.deleted_at IS NULL
   AND (NOT sqlc.arg(has_api_type)::boolean OR pe.api_type = sqlc.arg(api_type));
 
 -- name: ListAccounts :many
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT sqlc.embed(a),
+       pe.api_type,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
          WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
        ) AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.deleted_at IS NULL
@@ -93,11 +93,11 @@ ORDER BY a.id DESC
 LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: ListEnabledAccounts :many
-SELECT a.id, a.name, a.provider_endpoint_id, pe.api_type,
+SELECT sqlc.embed(a),
+       pe.api_type,
        ''::text AS api_key,
        TRUE::boolean AS secret_configured,
-       pe.base_url AS proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
-       a.fail_count, a.weight, a.created_at, a.updated_at
+       pe.base_url AS proxy_url
 FROM api_accounts AS a
 INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.status = 1
@@ -119,28 +119,6 @@ FROM api_accounts
 WHERE deleted_at IS NULL
 ORDER BY id ASC;
 
--- name: ListSingleEnabledModelsByAccountIDs :many
-SELECT
-  m.account_id AS id,
-  (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
-FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
-INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
-WHERE m.account_id = ANY(sqlc.arg(ids)::bigint[])
-  AND m.enabled = TRUE
-GROUP BY m.account_id
-HAVING COUNT(*) = 1
-ORDER BY m.account_id ASC;
-
--- name: GetSingleEnabledModelByAccountID :one
-SELECT (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
-FROM api_account_models AS m
-INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.status = 1 AND a.deleted_at IS NULL
-INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id AND pe.status = 1
-WHERE m.account_id = sqlc.arg(id)
-  AND m.enabled = TRUE
-HAVING COUNT(*) = 1;
-
 -- name: DeleteAccountModelsByAccountID :exec
 DELETE FROM api_account_models
 WHERE account_id = sqlc.arg(account_id)
@@ -149,18 +127,6 @@ WHERE account_id = sqlc.arg(account_id)
     WHERE id = sqlc.arg(account_id)
       AND deleted_at IS NULL
   );
-
--- name: ListAccountModelsByAccountID :many
-SELECT id, account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order, created_at, updated_at
-FROM api_account_models AS m
-WHERE m.account_id = sqlc.arg(account_id)
-  AND EXISTS (
-    SELECT 1
-    FROM api_accounts AS a
-    WHERE a.id = m.account_id
-      AND a.deleted_at IS NULL
-  )
-ORDER BY m.sort_order ASC, m.id ASC;
 
 -- name: ListAccountModelsByAccountIDs :many
 SELECT id, account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order, created_at, updated_at

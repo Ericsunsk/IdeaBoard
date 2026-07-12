@@ -224,10 +224,6 @@ type providerExecutionConfig struct {
 	Request              providerRequest
 }
 
-func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload) (providerCallOutput, error) {
-	return c.callDrawingAPIWithAssignment(ctx, account, task, taskqueue.TaskAssignment{})
-}
-
 func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
 	correlationID := task.EnsureCorrelationID()
 	slog.Info("calling provider API", "account_name", account.Name, "provider_endpoint_id", account.ProviderEndpointID, "task_id", task.TaskID, "correlation_id", correlationID)

@@ -184,7 +184,7 @@ func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskI
 		if err != nil {
 			return err
 		}
-		if err := insertTaskOutputs(ctx, q, taskID, taskRow.UserID, outputs); err != nil {
+		if err := insertTaskOutputs(ctx, q, taskID, taskRow.Task.UserID, outputs); err != nil {
 			return err
 		}
 		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
@@ -197,7 +197,7 @@ func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskI
 		if err != nil {
 			return err
 		}
-		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.CreatedAt, metricsByTaskID[taskID], tasks.ExecutionStageCompleted, "", "", completedAt); err != nil {
+		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.Task.CreatedAt, metricsByTaskID[taskID], tasks.ExecutionStageCompleted, "", "", completedAt); err != nil {
 			return err
 		}
 		if err := r.settleTaskBilling(ctx, tx, taskID, taskbilling.SettlementStateCaptured); err != nil {

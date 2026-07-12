@@ -12,7 +12,7 @@ func TestFilterAccountsByFeatureKeepsUnrestrictedModels(t *testing.T) {
 		{ID: 2, Models: []AccountModel{{Name: "imagen-4-preview", Enabled: true}}},
 	}
 
-	got := FilterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
+	got := FilterAccountsForRequest(accounts, workflow.FeatureSlugImageExtend, nil)
 	if len(got) != 2 {
 		t.Fatalf("expected unrestricted models to remain eligible, got=%d", len(got))
 	}
@@ -25,7 +25,7 @@ func TestFilterAccountsByFeatureUsesModelFeatureSlugs(t *testing.T) {
 		{ID: 3, Models: []AccountModel{{Name: "disabled", Enabled: false, FeatureSlugs: []string{workflow.FeatureSlugImageExtend}}}},
 	}
 
-	got := FilterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
+	got := FilterAccountsForRequest(accounts, workflow.FeatureSlugImageExtend, nil)
 	if len(got) != 1 || got[0].ID != 1 {
 		t.Fatalf("unexpected account ids: got=%v, want [1]", accountIDsForTest(got))
 	}

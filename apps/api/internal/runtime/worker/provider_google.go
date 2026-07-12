@@ -151,11 +151,6 @@ func resolveGoogleProviderModel(params map[string]interface{}, resolvedModel str
 	return ""
 }
 
-func (c *ProviderExecutor) callGoogleAI(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
-	req := newProviderTaskParamsFromProviderMap(params).providerRequestWithSize(prompt, 0, 0, resolvedModel)
-	return c.callGoogleAIWithRequest(ctx, account, req, timeout)
-}
-
 func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
 	baseURL := "https://generativelanguage.googleapis.com"
 	if strings.TrimSpace(account.ProxyURL) != "" {
@@ -292,10 +287,6 @@ func (c *ProviderExecutor) collectGoogleInlineImageParts(ctx context.Context, re
 		})
 	}
 	return parts, nil
-}
-
-func collectGoogleImageRefs(params map[string]interface{}) []string {
-	return mediarefs.CollectUniqueParamRefs(params, googleImageInputRefKeys)
 }
 
 func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Duration) (string, []byte, error) {

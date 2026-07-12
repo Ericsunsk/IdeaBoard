@@ -509,7 +509,7 @@ func EvaluateGoogleNativeGeneration(setting GoogleNativeGenerationSetting, userI
 
 func googleNativeGenerationBucket(userID int64) int {
 	hash := fnv.New64a()
-	_, _ = hash.Write([]byte(fmt.Sprintf("google-native-generation:%d", userID)))
+	_, _ = fmt.Fprintf(hash, "google-native-generation:%d", userID)
 	return int(hash.Sum64() % 100)
 }
 

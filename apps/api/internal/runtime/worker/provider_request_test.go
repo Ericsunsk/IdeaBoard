@@ -78,7 +78,7 @@ func TestProviderRequestAfterLocalRedrawKeepsOpenAIROIInput(t *testing.T) {
 }
 
 func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T) {
-	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "image-extend",
 		Media: &tasks.MediaInputs{
@@ -96,10 +96,6 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 			LeftPercent:   0,
 		},
 	})
-	if err != nil {
-		t.Fatalf("MarshalParams: %v", err)
-	}
-
 	got := (&ProviderExecutor{}).parseAndNormalizeTaskParams(context.Background(), &tasks.TaskPayload{
 		TaskID: "task-canonical-params",
 		Params: raw,
@@ -123,7 +119,7 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 }
 
 func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
-	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "style-fusion",
 		Model:         "gpt-image-1",
@@ -145,9 +141,6 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 			InputWeights: []float64{0.75, 0.25},
 		},
 	})
-	if err != nil {
-		t.Fatalf("MarshalParams: %v", err)
-	}
 	submitted := &tasks.TaskPayload{
 		TaskID:     "task-river-contract",
 		UserID:     42,
@@ -155,14 +148,7 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 		Params:     raw,
 		AccountIDs: []int64{101},
 	}
-	encoded, err := taskqueue.EncodeRiverPayload(submitted)
-	if err != nil {
-		t.Fatalf("EncodeRiverPayload: %v", err)
-	}
-	decoded, err := taskqueue.DecodeRiverPayload(encoded)
-	if err != nil {
-		t.Fatalf("DecodeRiverPayload: %v", err)
-	}
+	decoded := roundTripDrawingTaskForTest(t, submitted)
 
 	params := (&ProviderExecutor{}).parseAndNormalizeTaskParams(context.Background(), decoded)
 	req := params.providerRequest(decoded.Prompt, "gpt-image-1")
@@ -189,18 +175,14 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 }
 
 func TestPrepareProviderExecutionRejectsInvalidPatternGenTaskContract(t *testing.T) {
-	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       workflow.FeatureSlugPatternGen,
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{{URL: "https://img.example/source.png", Role: "input"}},
 		},
 	})
-	if err != nil {
-		t.Fatalf("MarshalParams: %v", err)
-	}
-
-	_, err = (&ProviderExecutor{}).prepareProviderExecution(
+	_, err := (&ProviderExecutor{}).prepareProviderExecution(
 		context.Background(),
 		&accounts.ApiAccount{
 			Name:    "pattern-gen-provider",
@@ -231,7 +213,7 @@ func TestPrepareProviderExecutionRejectsInvalidPatternGenTaskContract(t *testing
 }
 
 func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *testing.T) {
-	raw, err := tasks.MarshalParams(&tasks.WorkflowTaskParams{
+	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       workflow.FeatureSlugPatternGen,
 		Model:         "gpt-image-1",
@@ -243,10 +225,6 @@ func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *tes
 			"provider_hint": "keep",
 		},
 	})
-	if err != nil {
-		t.Fatalf("MarshalParams: %v", err)
-	}
-
 	exec, err := (&ProviderExecutor{}).prepareProviderExecution(
 		context.Background(),
 		&accounts.ApiAccount{

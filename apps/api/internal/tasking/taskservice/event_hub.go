@@ -141,9 +141,3 @@ func (h *EventHub) Publish(taskID string, event TaskEvent) {
 		}
 	}
 }
-
-func (h *EventHub) subscriberCount(taskID string) int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return len(h.subs[taskID])
-}

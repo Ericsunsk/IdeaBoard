@@ -316,22 +316,3 @@ func TestValidateProviderAPIType(t *testing.T) {
 		})
 	}
 }
-
-func TestIsReferenceImageFeature(t *testing.T) {
-	tests := []struct {
-		feature string
-		want    bool
-	}{
-		{feature: FeatureSlugStyleFusion, want: true},
-		{feature: FeatureSlugRemoveBg, want: false},
-		{feature: FeatureSlugImageExtend, want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.feature, func(t *testing.T) {
-			if got := IsReferenceImageFeature(tt.feature); got != tt.want {
-				t.Fatalf("feature=%q got=%v, want=%v", tt.feature, got, tt.want)
-			}
-		})
-	}
-}

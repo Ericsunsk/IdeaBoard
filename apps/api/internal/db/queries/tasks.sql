@@ -16,16 +16,13 @@ INSERT INTO tasks (
 RETURNING id;
 
 -- name: GetTaskByTaskID :one
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT sqlc.embed(t),
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -38,16 +35,13 @@ LEFT JOIN LATERAL (
 WHERE t.task_id = sqlc.arg(task_id);
 
 -- name: GetTaskByTaskIDAndUserID :one
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT sqlc.embed(t),
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -60,16 +54,13 @@ LEFT JOIN LATERAL (
 WHERE t.task_id = sqlc.arg(task_id) AND t.user_id = sqlc.arg(user_id);
 
 -- name: ListTasksByTaskIDs :many
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT sqlc.embed(t),
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -98,16 +89,13 @@ WHERE (NOT sqlc.arg(has_user_id)::boolean OR user_id = sqlc.arg(user_id))
   AND (NOT sqlc.arg(has_keyword)::boolean OR prompt ILIKE sqlc.arg(keyword_like));
 
 -- name: ListTasks :many
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT sqlc.embed(t),
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -229,27 +217,6 @@ UPDATE tasks
 SET feature_slug = sqlc.arg(feature_slug),
     requested_model = sqlc.arg(requested_model)
 WHERE task_id = sqlc.arg(task_id);
-
--- name: AcquireTaskLease :execrows
-INSERT INTO task_leases (
-  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, requested_model, resolved_model, api_type,
-  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
-  acquired_at
-)
-SELECT
-  sqlc.arg(task_id), sqlc.arg(lease_token), sqlc.arg(river_job_id),
-  sqlc.arg(account_id), sqlc.arg(provider_endpoint_id), sqlc.arg(credential_id),
-  sqlc.arg(feature_slug), sqlc.arg(requested_model), sqlc.arg(resolved_model), sqlc.arg(api_type),
-  sqlc.arg(provider_endpoint_name), sqlc.arg(provider_endpoint_base_url), sqlc.arg(credential_fingerprint), sqlc.arg(credential_key_version),
-  sqlc.arg(acquired_at)
-WHERE EXISTS (
-  SELECT 1
-  FROM tasks
-  WHERE task_id = sqlc.arg(task_id)
-    AND status = 'running'
-)
-ON CONFLICT (task_id) WHERE released_at IS NULL DO NOTHING;
 
 -- name: ReleaseTaskLease :execrows
 UPDATE task_leases
@@ -413,21 +380,6 @@ SET status = 'cancelled',
 WHERE task_id = ANY(sqlc.arg(task_ids)::text[])
   AND status = 'running';
 
--- name: ListTaskAttemptsByTaskID :many
-SELECT ta.id, ta.task_id, ta.lease_id, ta.attempt_no, ta.river_job_id,
-       tl.lease_token, tl.account_id, tl.provider_endpoint_id, tl.credential_id,
-       tl.feature_slug, tl.requested_model, tl.resolved_model, tl.api_type,
-       tl.provider_endpoint_name, tl.provider_endpoint_base_url, tl.credential_fingerprint, tl.credential_key_version,
-       status,
-       failure_stage, failure_category, error_msg,
-       provider_started_at, provider_finished_at, finalize_started_at, finalize_finished_at,
-       provider_latency_ms, finalize_latency_ms, total_latency_ms,
-       completed_at, cancelled_at, ta.created_at, ta.updated_at
-FROM task_attempts ta
-JOIN task_leases tl ON tl.id = ta.lease_id
-WHERE ta.task_id = sqlc.arg(task_id)
-ORDER BY ta.attempt_no ASC;
-
 -- name: ListMonitorExecutionPressureByRange :many
 WITH pending_tasks AS (
   SELECT
@@ -509,16 +461,13 @@ FROM tasks
 WHERE user_id = sqlc.arg(user_id);
 
 -- name: ListTasksByUserID :many
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT sqlc.embed(t),
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,

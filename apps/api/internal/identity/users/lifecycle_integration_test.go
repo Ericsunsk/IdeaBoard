@@ -15,15 +15,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func mustLifecycleAmount(t *testing.T, value int64) credits.CreditAmount {
-	t.Helper()
-	amount, err := credits.NewCreditAmount(value)
-	if err != nil {
-		t.Fatalf("NewCreditAmount(%d) error = %v", value, err)
-	}
-	return amount
-}
-
 func lifecycleHold(userID int64, key string) credits.HoldCommand {
 	return credits.HoldCommand{
 		UserID: userID,

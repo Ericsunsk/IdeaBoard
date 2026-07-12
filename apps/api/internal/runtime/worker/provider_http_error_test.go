@@ -26,7 +26,7 @@ func TestCallOpenAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 	}
 	params := map[string]interface{}{"feature": "pattern-gen"}
 
-	_, err := c.callOpenAI(context.Background(), account, "prompt", 1024, 1024, time.Second, params, "gpt-image-1")
+	_, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, time.Second, params, "gpt-image-1")
 	if err == nil {
 		t.Fatalf("expected callOpenAI error")
 	}

@@ -28,29 +28,3 @@ func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 		t.Fatalf("controls = %#v, want sample_count 2", params.Controls)
 	}
 }
-
-func TestMarshalParamsUsesNestedCanonicalContract(t *testing.T) {
-	raw, err := MarshalParams(&WorkflowTaskParams{
-		Feature: "image-extend",
-		Extend: &ImageExtendParams{
-			TopPercent:    1,
-			RightPercent:  2,
-			BottomPercent: 3,
-			LeftPercent:   4,
-		},
-	})
-	if err != nil {
-		t.Fatalf("MarshalParams returned error: %v", err)
-	}
-
-	params, err := UnmarshalParams(raw)
-	if err != nil {
-		t.Fatalf("UnmarshalParams returned error: %v", err)
-	}
-	if params.Extend == nil || params.Extend.RightPercent != 2 {
-		t.Fatalf("extend = %#v, want nested canonical contract", params.Extend)
-	}
-	if _, exists := params.Extra["extend_right"]; exists {
-		t.Fatalf("provider edge extend_right leaked into Extra: %#v", params.Extra)
-	}
-}

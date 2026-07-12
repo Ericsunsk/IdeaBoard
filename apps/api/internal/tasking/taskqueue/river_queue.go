@@ -3,7 +3,6 @@ package taskqueue
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -242,25 +241,4 @@ func queuedRiverJobStateValues() []string {
 		values = append(values, string(state))
 	}
 	return values
-}
-
-func EncodeRiverPayload(task *tasks.TaskPayload) ([]byte, error) {
-	if task == nil {
-		return nil, fmt.Errorf("encode river payload: task is nil")
-	}
-	if strings.TrimSpace(task.TaskID) == "" {
-		return nil, fmt.Errorf("encode river payload: empty task_id")
-	}
-	return json.Marshal(task)
-}
-
-func DecodeRiverPayload(data []byte) (*tasks.TaskPayload, error) {
-	var task tasks.TaskPayload
-	if err := json.Unmarshal(data, &task); err != nil {
-		return nil, fmt.Errorf("decode river payload: %w", err)
-	}
-	if strings.TrimSpace(task.TaskID) == "" {
-		return nil, fmt.Errorf("decode river payload: empty task_id")
-	}
-	return &task, nil
 }

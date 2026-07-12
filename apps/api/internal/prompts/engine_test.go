@@ -5,6 +5,20 @@ import (
 	"testing"
 )
 
+func ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug string, params map[string]interface{}, loadPrompt func(string) (string, error)) string {
+	if featureSlug == "" || loadPrompt == nil {
+		return basePrompt
+	}
+	prompt, err := loadPrompt(featureSlug)
+	if err != nil || prompt == "" {
+		return basePrompt
+	}
+	return ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, FeaturePromptRuntimeConfig{
+		Prompt:                prompt,
+		UserPromptMergePolicy: DefaultFeaturePromptMergePolicy(featureSlug),
+	})
+}
+
 func TestApplyFeatureSystemPromptStyleVariationUsesConfiguredPromptOnly(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"[style-variation] 延展强度：40%，前端默认文案",

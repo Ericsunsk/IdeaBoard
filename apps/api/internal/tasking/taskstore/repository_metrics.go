@@ -60,7 +60,7 @@ func patchTerminalExecutionMetricsTx(ctx context.Context, q *dbsqlc.Queries, tas
 	if err != nil {
 		return err
 	}
-	return patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.CreatedAt, metricsByTaskID[taskID], currentStage, failureStage, failureCategory, finishedAt)
+	return patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.Task.CreatedAt, metricsByTaskID[taskID], currentStage, failureStage, failureCategory, finishedAt)
 }
 
 func patchTerminalExecutionMetricsForTaskTx(

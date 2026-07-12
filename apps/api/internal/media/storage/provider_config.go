@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 )
 
@@ -81,12 +80,6 @@ func builtinLocalProfileID() string {
 
 func canonicalizeStorageProvider(provider StorageProvider) StorageProvider {
 	return provider
-}
-
-func canonicalizeStorageProfile(provider StorageProvider, cfg map[string]interface{}) (StorageProvider, map[string]interface{}, bool) {
-	normalizedProvider := canonicalizeStorageProvider(provider)
-	normalizedConfig := storageProfileConfigMap(normalizedProvider, cfg)
-	return normalizedProvider, normalizedConfig, !reflect.DeepEqual(cfg, normalizedConfig)
 }
 
 func storageProfileConfigMap(provider StorageProvider, cfg map[string]interface{}) map[string]interface{} {

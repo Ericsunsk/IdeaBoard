@@ -129,29 +129,6 @@ func stringPromptValue(value interface{}) (string, bool) {
 	return fmt.Sprintf("%v", value), true
 }
 
-func ApplyFeatureSystemPrompt(
-	basePrompt string,
-	userPrompt string,
-	featureSlug string,
-	params map[string]interface{},
-	loadPrompt func(string) (string, error),
-) string {
-	if featureSlug == "" || loadPrompt == nil {
-		return basePrompt
-	}
-	sysPrompt, err := loadPrompt(featureSlug)
-	if err != nil || sysPrompt == "" {
-		return basePrompt
-	}
-
-	varMap := map[string]string{
-		"{{user_prompt}}": userPrompt,
-	}
-	applyPromptTemplateBindings(varMap, featureSlug, params)
-	policy := DefaultFeaturePromptMergePolicy(featureSlug)
-	return applyFeatureSystemPromptWithMergePolicy(basePrompt, userPrompt, featureSlug, params, sysPrompt, policy)
-}
-
 func ApplyFeatureSystemPromptWithConfig(
 	basePrompt string,
 	userPrompt string,

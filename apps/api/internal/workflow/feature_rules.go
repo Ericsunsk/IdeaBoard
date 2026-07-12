@@ -40,12 +40,3 @@ func InferProviderAPITypeFromBaseURL(rawBaseURL string) string {
 func IsGoogleNativeAPIType(apiType string) bool {
 	return strings.ToLower(strings.TrimSpace(apiType)) == ProviderGoogleAI
 }
-
-func IsReferenceImageFeature(featureSlug string) bool {
-	switch featureSlug {
-	case FeatureSlugStyleFusion:
-		return true
-	default:
-		return false
-	}
-}

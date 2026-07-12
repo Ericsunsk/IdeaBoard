@@ -513,14 +513,6 @@ func (s *BoardService) resolveAccessibleBoardByNormalizedID(ctx context.Context,
 	return boardWithRole, nil
 }
 
-func (s *BoardService) resolveOwnerBoard(ctx context.Context, userID int64, boardID string) (*BoardWithRole, error) {
-	normalizedID := normalizeBoardID(boardID)
-	if normalizedID == "" {
-		return nil, ErrInvalidBoardInput
-	}
-	return s.resolveOwnerBoardByNormalizedID(ctx, userID, normalizedID)
-}
-
 func (s *BoardService) resolveBoardByNormalizedID(ctx context.Context, normalizedBoardID string) (UserBoard, error) {
 	board, err := s.repo.GetByBoardID(ctx, normalizedBoardID)
 	if err != nil {

@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+func subscriberCountForTest(h *EventHub, taskID string) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.subs[taskID])
+}
+
 func TestEventHubSubscribeAndPublish(t *testing.T) {
 	hub := NewEventHub()
 
@@ -43,8 +49,8 @@ func TestEventHubUnsubscribe(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 
-	if hub.subscriberCount("task-1") != 0 {
-		t.Errorf("expected 0 subscribers, got %d", hub.subscriberCount("task-1"))
+	if subscriberCountForTest(hub, "task-1") != 0 {
+		t.Errorf("expected 0 subscribers, got %d", subscriberCountForTest(hub, "task-1"))
 	}
 }
 

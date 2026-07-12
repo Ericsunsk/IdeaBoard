@@ -70,7 +70,7 @@ Canvas 节点编排 -> Workflow feature contract -> Task 提交 -> River Worker 
 | 组件 | 版本 |
 | ---- | ---- |
 | Node.js | `22.18+` |
-| Go | `1.26.4+` |
+| Go | `1.26.5+` |
 | PostgreSQL | `17+` |
 
 1. 启动本地依赖：

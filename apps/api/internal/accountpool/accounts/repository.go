@@ -72,7 +72,7 @@ func (r *AccountRepository) GetByID(ctx context.Context, id int64) (*ApiAccount,
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromProjection(accountProjectionFromGet(row))
+	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
 	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
 		return nil, err
 	}
@@ -84,11 +84,11 @@ func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int
 	if err != nil {
 		return nil, err
 	}
-	projection, err := accountProjectionFromRuntimeGet(row)
+	apiKey, err := decryptAPIKey(row.ApiKey, row.ApiKeyMaterialKind)
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromProjection(projection)
+	account := accountFromSQLC(row.ApiAccount, row.ApiType, apiKey, row.SecretConfigured, row.ProxyUrl)
 	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
 		return nil, err
 	}
@@ -104,11 +104,11 @@ func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	projection, err := accountProjectionFromRuntimeAssignment(row)
+	apiKey, err := decryptAPIKey(row.ApiKey, row.ApiKeyMaterialKind)
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromProjection(projection)
+	account := accountFromSQLC(row.ApiAccount, row.ApiType, apiKey, row.SecretConfigured, row.ProxyUrl)
 	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
 		return nil, err
 	}
@@ -378,33 +378,15 @@ func (r *AccountRepository) ResetFailCount(ctx context.Context, id int64) error 
 	return nil
 }
 
-type accountProjection struct {
-	ID                 int64
-	Name               string
-	ProviderEndpointID int64
-	ApiType            string
-	ApiKey             string
-	SecretConfigured   bool
-	ProxyURL           string
-	MaxConcurrent      int32
-	Timeout            int32
-	ExtraConfig        string
-	Status             int16
-	FailCount          int32
-	Weight             int32
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-}
-
-func accountFromProjection(row accountProjection) ApiAccount {
+func accountFromSQLC(row dbsqlc.ApiAccount, apiType, apiKey string, secretConfigured bool, proxyURL string) ApiAccount {
 	return ApiAccount{
 		ID:                 row.ID,
 		Name:               row.Name,
 		ProviderEndpointID: row.ProviderEndpointID,
-		ApiType:            row.ApiType,
-		ApiKey:             row.ApiKey,
-		SecretConfigured:   row.SecretConfigured,
-		ProxyURL:           row.ProxyURL,
+		ApiType:            apiType,
+		ApiKey:             apiKey,
+		SecretConfigured:   secretConfigured,
+		ProxyURL:           proxyURL,
 		MaxConcurrent:      int(row.MaxConcurrent),
 		Timeout:            int(row.Timeout),
 		ExtraConfig:        row.ExtraConfig,
@@ -416,126 +398,26 @@ func accountFromProjection(row accountProjection) ApiAccount {
 	}
 }
 
-func accountProjectionFromGet(row dbsqlc.GetAccountByIDRow) accountProjection {
-	return accountProjection{
-		ID:                 row.ID,
-		Name:               row.Name,
-		ProviderEndpointID: row.ProviderEndpointID,
-		ApiType:            row.ApiType,
-		ApiKey:             row.ApiKey,
-		SecretConfigured:   row.SecretConfigured,
-		ProxyURL:           row.ProxyUrl,
-		MaxConcurrent:      row.MaxConcurrent,
-		Timeout:            row.Timeout,
-		ExtraConfig:        row.ExtraConfig,
-		Status:             row.Status,
-		FailCount:          row.FailCount,
-		Weight:             row.Weight,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
-	}
+func accountFromListRow(row dbsqlc.ListAccountsRow) ApiAccount {
+	return accountFromSQLC(row.ApiAccount, row.ApiType, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
 }
 
-func accountProjectionFromRuntimeGet(row dbsqlc.GetRuntimeAccountByIDWithSecretRow) (accountProjection, error) {
-	apiKey, err := decryptAPIKey(row.ApiKey, row.ApiKeyMaterialKind)
-	if err != nil {
-		return accountProjection{}, err
-	}
-	return accountProjection{
-		ID:                 row.ID,
-		Name:               row.Name,
-		ProviderEndpointID: row.ProviderEndpointID,
-		ApiType:            row.ApiType,
-		ApiKey:             apiKey,
-		SecretConfigured:   row.SecretConfigured,
-		ProxyURL:           row.ProxyUrl,
-		MaxConcurrent:      row.MaxConcurrent,
-		Timeout:            row.Timeout,
-		ExtraConfig:        row.ExtraConfig,
-		Status:             row.Status,
-		FailCount:          row.FailCount,
-		Weight:             row.Weight,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
-	}, nil
-}
-
-func accountProjectionFromRuntimeAssignment(row dbsqlc.GetRuntimeAccountForAssignmentRow) (accountProjection, error) {
-	apiKey, err := decryptAPIKey(row.ApiKey, row.ApiKeyMaterialKind)
-	if err != nil {
-		return accountProjection{}, err
-	}
-	return accountProjection{
-		ID:                 row.ID,
-		Name:               row.Name,
-		ProviderEndpointID: row.ProviderEndpointID,
-		ApiType:            row.ApiType,
-		ApiKey:             apiKey,
-		SecretConfigured:   row.SecretConfigured,
-		ProxyURL:           row.ProxyUrl,
-		MaxConcurrent:      row.MaxConcurrent,
-		Timeout:            row.Timeout,
-		ExtraConfig:        row.ExtraConfig,
-		Status:             row.Status,
-		FailCount:          row.FailCount,
-		Weight:             row.Weight,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
-	}, nil
-}
-
-func accountProjectionFromList(row dbsqlc.ListAccountsRow) accountProjection {
-	return accountProjection{
-		ID:                 row.ID,
-		Name:               row.Name,
-		ProviderEndpointID: row.ProviderEndpointID,
-		ApiType:            row.ApiType,
-		ApiKey:             row.ApiKey,
-		SecretConfigured:   row.SecretConfigured,
-		ProxyURL:           row.ProxyUrl,
-		MaxConcurrent:      row.MaxConcurrent,
-		Timeout:            row.Timeout,
-		ExtraConfig:        row.ExtraConfig,
-		Status:             row.Status,
-		FailCount:          row.FailCount,
-		Weight:             row.Weight,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
-	}
-}
-
-func accountProjectionFromEnabled(row dbsqlc.ListEnabledAccountsRow) accountProjection {
-	return accountProjection{
-		ID:                 row.ID,
-		Name:               row.Name,
-		ProviderEndpointID: row.ProviderEndpointID,
-		ApiType:            row.ApiType,
-		ApiKey:             row.ApiKey,
-		SecretConfigured:   row.SecretConfigured,
-		ProxyURL:           row.ProxyUrl,
-		MaxConcurrent:      row.MaxConcurrent,
-		Timeout:            row.Timeout,
-		ExtraConfig:        row.ExtraConfig,
-		Status:             row.Status,
-		FailCount:          row.FailCount,
-		Weight:             row.Weight,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
-	}
+func accountFromEnabledRow(row dbsqlc.ListEnabledAccountsRow) ApiAccount {
+	return accountFromSQLC(row.ApiAccount, row.ApiType, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
 }
 
 func accountsFromListRows(rows []dbsqlc.ListAccountsRow) []*ApiAccount {
-	return accountsFromRows(rows, accountProjectionFromList)
+	return accountsFromRows(rows, accountFromListRow)
 }
 
 func accountsFromEnabledRows(rows []dbsqlc.ListEnabledAccountsRow) []*ApiAccount {
-	return accountsFromRows(rows, accountProjectionFromEnabled)
+	return accountsFromRows(rows, accountFromEnabledRow)
 }
 
-func accountsFromRows[T any](rows []T, project func(T) accountProjection) []*ApiAccount {
+func accountsFromRows[T any](rows []T, convert func(T) ApiAccount) []*ApiAccount {
 	result := make([]*ApiAccount, 0, len(rows))
 	for _, row := range rows {
-		account := accountFromProjection(project(row))
+		account := convert(row)
 		result = append(result, &account)
 	}
 	return result

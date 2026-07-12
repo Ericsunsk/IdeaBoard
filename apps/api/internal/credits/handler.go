@@ -2,14 +2,13 @@ package credits
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -60,6 +59,15 @@ type adminCorrectionRequest struct {
 	BusinessReferenceID   string `json:"business_reference_id"`
 }
 
+type adminCreditCommandRequest interface {
+	creditAmount() int64
+}
+
+func (r *adminGrantRequest) creditAmount() int64      { return r.AmountCredits }
+func (r *adminDeductionRequest) creditAmount() int64  { return r.AmountCredits }
+func (r *adminRefundRequest) creditAmount() int64     { return r.AmountCredits }
+func (r *adminCorrectionRequest) creditAmount() int64 { return r.AmountCredits }
+
 type adminReconciliationRequest struct {
 	StaleHoldAfterSeconds int64 `json:"stale_hold_after_seconds"`
 }
@@ -71,119 +79,84 @@ func NewHandler(service AdminService) *Handler {
 }
 
 func (h *Handler) Grant(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
-		return
-	}
-	adminID, ok := authenticatedAdminID(c)
+	var request adminGrantRequest
+	adminID, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	var request adminGrantRequest
-	if err := decodeAdminCreditRequest(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-	amount, err := NewCreditAmount(request.AmountCredits)
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, "点子数量必须是有效正整数")
-		return
-	}
-	result, err := h.service.Grant(c.Request.Context(), GrantCommand{
-		UserID:   request.UserID,
-		Amount:   amount,
-		Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_grant", request.Reason, request.BusinessReferenceID),
+	writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+		return h.service.Grant(ctx, GrantCommand{
+			UserID: request.UserID, Amount: amount,
+			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_grant", request.Reason, request.BusinessReferenceID),
+		})
 	})
-	if err != nil {
-		writeCreditError(c, err)
-		return
-	}
-	response.SuccessDTO(c, result)
 }
 
 func (h *Handler) Deduct(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
-		return
-	}
-	adminID, ok := authenticatedAdminID(c)
+	var request adminDeductionRequest
+	adminID, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	var request adminDeductionRequest
-	if err := decodeAdminCreditRequest(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-	amount, err := NewCreditAmount(request.AmountCredits)
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, "点子数量必须是有效正整数")
-		return
-	}
-	result, err := h.service.Deduct(c.Request.Context(), DeductionCommand{
-		UserID: request.UserID, Amount: amount,
-		Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_deduction", request.Reason, request.BusinessReferenceID),
+	writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+		return h.service.Deduct(ctx, DeductionCommand{
+			UserID: request.UserID, Amount: amount,
+			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_deduction", request.Reason, request.BusinessReferenceID),
+		})
 	})
-	if err != nil {
-		writeCreditError(c, err)
-		return
-	}
-	response.SuccessDTO(c, result)
 }
 
 func (h *Handler) Refund(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
-		return
-	}
-	adminID, ok := authenticatedAdminID(c)
+	var request adminRefundRequest
+	adminID, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	var request adminRefundRequest
-	if err := decodeAdminCreditRequest(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-	amount, err := NewCreditAmount(request.AmountCredits)
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, "点子数量必须是有效正整数")
-		return
-	}
-	result, err := h.service.Refund(c.Request.Context(), RefundCommand{
-		UserID: request.UserID, ChargeTransactionID: request.ChargeTransactionID, Amount: amount,
-		Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_refund", request.Reason, request.BusinessReferenceID),
+	writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+		return h.service.Refund(ctx, RefundCommand{
+			UserID: request.UserID, ChargeTransactionID: request.ChargeTransactionID, Amount: amount,
+			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_refund", request.Reason, request.BusinessReferenceID),
+		})
 	})
-	if err != nil {
-		writeCreditError(c, err)
-		return
-	}
-	response.SuccessDTO(c, result)
 }
 
 func (h *Handler) Correct(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
-		return
-	}
-	adminID, ok := authenticatedAdminID(c)
+	var request adminCorrectionRequest
+	adminID, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	var request adminCorrectionRequest
-	if err := decodeAdminCreditRequest(c, &request); err != nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
-		return
+	writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+		return h.service.Correct(ctx, CorrectionCommand{
+			UserID: request.UserID, OriginalTransactionID: request.OriginalTransactionID, Amount: amount,
+			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_correction", request.Reason, request.BusinessReferenceID),
+		})
+	})
+}
+
+func (h *Handler) prepareAdminCreditCommand(c *gin.Context, request adminCreditCommandRequest) (int64, CreditAmount, bool) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		return 0, 0, false
 	}
-	amount, err := NewCreditAmount(request.AmountCredits)
+	adminID, ok := authenticatedAdminID(c)
+	if !ok {
+		return 0, 0, false
+	}
+	if err := decodeAdminCreditRequest(c, request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return 0, 0, false
+	}
+	amount, err := NewCreditAmount(request.creditAmount())
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "点子数量必须是有效正整数")
-		return
+		return 0, 0, false
 	}
-	result, err := h.service.Correct(c.Request.Context(), CorrectionCommand{
-		UserID: request.UserID, OriginalTransactionID: request.OriginalTransactionID, Amount: amount,
-		Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_correction", request.Reason, request.BusinessReferenceID),
-	})
+	return adminID, amount, true
+}
+
+func writeAdminCreditCommand(c *gin.Context, execute func(context.Context) (CommandResult, error)) {
+	result, err := execute(c.Request.Context())
 	if err != nil {
 		writeCreditError(c, err)
 		return
@@ -210,16 +183,7 @@ func adminCommandMetadata(adminID int64, idempotencyKey, source, reason, busines
 }
 
 func decodeAdminCreditRequest(c *gin.Context, destination any) error {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAdminCreditRequestBytes)
-	decoder := json.NewDecoder(c.Request.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(destination); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return errors.New("request must contain one JSON object")
-	}
-	return nil
+	return jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxAdminCreditRequestBytes, destination)
 }
 
 func (h *Handler) GetWallet(c *gin.Context) {

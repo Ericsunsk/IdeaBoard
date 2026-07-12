@@ -128,7 +128,6 @@ VALUES ('ctx_runtime_bypass', 42, 'grant', 'runtime-role:bypass', repeat('0', 64
 	var canInsertAPIUser bool
 	var canInsertAuthUser bool
 	var canExecuteCommand bool
-	var canExecuteLegacyCommand bool
 	if err := db.QueryRowContext(ctx, `
 SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
        has_table_privilege($1, 'users', 'INSERT'),
@@ -137,22 +136,16 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
          $1,
          'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
          'EXECUTE'
-	       ),
-       has_function_privilege(
-         $1,
-         'execute_credit_command(text,bigint,bigint,text,text,text,text,text,text,text,text)',
-         'EXECUTE'
-       )`, runtimeRole).Scan(&canInsertLedger, &canInsertAPIUser, &canInsertAuthUser, &canExecuteCommand, &canExecuteLegacyCommand); err != nil {
+	       )`, runtimeRole).Scan(&canInsertLedger, &canInsertAPIUser, &canInsertAuthUser, &canExecuteCommand); err != nil {
 		t.Fatalf("read runtime privileges error = %v", err)
 	}
-	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand || canExecuteLegacyCommand {
+	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand {
 		t.Fatalf(
-			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v execute_legacy_command=%v",
+			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v",
 			canInsertLedger,
 			canInsertAPIUser,
 			canInsertAuthUser,
 			canExecuteCommand,
-			canExecuteLegacyCommand,
 		)
 	}
 	var securityDefiner bool

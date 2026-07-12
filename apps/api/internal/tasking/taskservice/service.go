@@ -664,16 +664,6 @@ func generateSecureTaskID(prefix string) string {
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
 }
 
-func applyTaskSystemPrompt(
-	basePrompt string,
-	userPrompt string,
-	featureSlug string,
-	params map[string]interface{},
-	loadPrompt func(string) (string, error),
-) string {
-	return prompts.ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug, params, loadPrompt)
-}
-
 func validateExecutablePrompt(fullPrompt string) error {
 	if strings.TrimSpace(fullPrompt) == "" {
 		return fmt.Errorf("缺少提示词，请填写 Prompt 或配置后台 system prompt")

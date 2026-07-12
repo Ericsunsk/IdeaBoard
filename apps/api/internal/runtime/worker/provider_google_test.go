@@ -50,7 +50,7 @@ func TestCallGoogleGeminiGenerateContent(t *testing.T) {
 		"image_urls": []interface{}{inputDataURL},
 	}
 
-	got, err := c.callGoogleAI(context.Background(), account, "draw a cat", 2*time.Second, params, "gemini-2.5-flash-image")
+	got, err := c.callGoogleAIForTest(context.Background(), account, "draw a cat", 2*time.Second, params, "gemini-2.5-flash-image")
 	if err != nil {
 		t.Fatalf("callGoogleAI error: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestCallGoogleGeminiGenerateContentAcceptsVersionedBaseURL(t *testing.T) {
 		ApiKey:   "google-key",
 	}
 
-	_, err := c.callGoogleAI(context.Background(), account, "draw a cat", 2*time.Second, nil, "gemini-2.5-flash-image")
+	_, err := c.callGoogleAIForTest(context.Background(), account, "draw a cat", 2*time.Second, nil, "gemini-2.5-flash-image")
 	if err != nil {
 		t.Fatalf("callGoogleAI error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestBuildGoogleModelEndpoint(t *testing.T) {
 }
 
 func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
-	refs := collectGoogleImageRefs(map[string]interface{}{
+	refs := collectProviderMediaRefs(map[string]interface{}{
 		"image_urls": []interface{}{
 			"data:image/png;base64,aGVsbG8=",
 		},
@@ -153,7 +153,7 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			"",
 			"https://img.example/ref-b.png",
 		},
-	})
+	}).GoogleImages
 	want := []string{
 		"data:image/png;base64,aGVsbG8=",
 		"https://img.example/ref-a.png",
@@ -233,7 +233,7 @@ func TestCallGoogleImagenPredict(t *testing.T) {
 		"ratio":        "16:9",
 	}
 
-	got, err := c.callGoogleAI(context.Background(), account, "draw skyline", 2*time.Second, params, "")
+	got, err := c.callGoogleAIForTest(context.Background(), account, "draw skyline", 2*time.Second, params, "")
 	if err != nil {
 		t.Fatalf("callGoogleAI error: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestCallGoogleImagenPredictAcceptsVersionedBaseURL(t *testing.T) {
 		"model": "imagen-4.0-generate-001",
 	}
 
-	_, err := c.callGoogleAI(context.Background(), account, "draw skyline", 2*time.Second, params, "")
+	_, err := c.callGoogleAIForTest(context.Background(), account, "draw skyline", 2*time.Second, params, "")
 	if err != nil {
 		t.Fatalf("callGoogleAI error: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		Params: `{"feature":"pattern-gen"}`,
 	}
 
-	output, err := c.callDrawingAPI(context.Background(), account, task)
+	output, err := c.callDrawingAPIForTest(context.Background(), account, task)
 	if err != nil {
 		t.Fatalf("callDrawingAPI error: %v", err)
 	}

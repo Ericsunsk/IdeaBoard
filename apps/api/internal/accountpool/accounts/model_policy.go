@@ -46,30 +46,6 @@ func ResolveAccountModel(account *ApiAccount, featureSlug, requestedModel string
 	return AccountModel{}, false
 }
 
-func EnabledModels(account *ApiAccount) []string {
-	if account == nil {
-		return nil
-	}
-	result := make([]string, 0, len(account.Models))
-	seen := make(map[string]struct{}, len(account.Models))
-	for _, model := range account.Models {
-		if !model.Enabled {
-			continue
-		}
-		name := strings.TrimSpace(model.Name)
-		if name == "" {
-			continue
-		}
-		key := normalizeModelKey(name)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		result = append(result, name)
-	}
-	return result
-}
-
 func paramsMapFromJSON(paramsJSON string) map[string]interface{} {
 	paramsJSON = strings.TrimSpace(paramsJSON)
 	if paramsJSON == "" {

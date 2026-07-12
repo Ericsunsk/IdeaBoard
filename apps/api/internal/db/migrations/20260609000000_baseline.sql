@@ -86,7 +86,7 @@ CREATE TABLE credit_transactions (
   CONSTRAINT uq_credit_transactions_idempotency_key UNIQUE (idempotency_key),
   CONSTRAINT fk_credit_transactions_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
   CONSTRAINT fk_credit_transactions_related_transaction_id FOREIGN KEY (related_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
-  CONSTRAINT ck_credit_transactions_command_type CHECK (command_type IN ('grant', 'hold', 'capture', 'release', 'refund', 'correction')),
+  CONSTRAINT ck_credit_transactions_command_type CHECK (command_type IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction')),
   CONSTRAINT ck_credit_transactions_asset CHECK (asset_code = 'credits'),
   CONSTRAINT ck_credit_transactions_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT ck_credit_transactions_actor CHECK (btrim(actor_type) <> '' AND btrim(actor_id) <> ''),

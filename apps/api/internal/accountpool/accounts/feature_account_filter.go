@@ -7,19 +7,6 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func FilterAccountsByFeature(accounts []*ApiAccount, featureSlug string) []*ApiAccount {
-	if featureSlug == "" {
-		return accounts
-	}
-	result := make([]*ApiAccount, 0, len(accounts))
-	for _, account := range accounts {
-		if _, ok := ResolveAccountModel(account, featureSlug, ""); ok {
-			result = append(result, account)
-		}
-	}
-	return result
-}
-
 func ParseFeatureSlugFromParamsJSON(paramsJSON string) string {
 	paramsJSON = strings.TrimSpace(paramsJSON)
 	if paramsJSON == "" {

@@ -37,8 +37,7 @@ type runtimePrivilegeQuerier interface {
 }
 
 const (
-	creditCommandFunctionSignature       = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
-	legacyCreditCommandFunctionSignature = "execute_credit_command(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+	creditCommandFunctionSignature = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 )
 
 var creditLifecycleFunctionSignatures = []string{
@@ -83,7 +82,6 @@ func ConfigureRuntimePrivileges(ctx context.Context, db privilegeDBTX, runtimeRo
 	}
 	statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+creditCommandFunctionSignature+` FROM PUBLIC`)
 	statements = append(statements, `GRANT EXECUTE ON FUNCTION `+creditCommandFunctionSignature+` TO `+roleSQL)
-	statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+legacyCreditCommandFunctionSignature+` FROM `+roleSQL)
 	for _, functionSignature := range creditLifecycleFunctionSignatures {
 		statements = append(statements, `REVOKE EXECUTE ON FUNCTION `+functionSignature+` FROM PUBLIC`)
 		statements = append(statements, `GRANT EXECUTE ON FUNCTION `+functionSignature+` TO `+roleSQL)

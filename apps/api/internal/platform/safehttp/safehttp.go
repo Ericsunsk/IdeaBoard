@@ -28,10 +28,6 @@ type resolvedPolicy struct {
 	allowedIPPorts   map[string]bool
 }
 
-func ValidateURL(rawURL string) (*url.URL, error) {
-	return ValidateURLWithAllowHosts(rawURL)
-}
-
 func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, error) {
 	policy, err := resolvePolicyWithTimeout(context.Background(), rawURL, defaultTimeout, allowHosts...)
 	if err != nil {

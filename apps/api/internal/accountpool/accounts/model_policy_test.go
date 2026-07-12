@@ -6,21 +6,6 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func TestEnabledModelsUsesStructuredModels(t *testing.T) {
-	account := &ApiAccount{
-		Models: []AccountModel{
-			{Name: "gpt-image-1", Enabled: true},
-			{Name: "imagen-4-preview", Enabled: false},
-			{Name: "gpt-image-1", Enabled: true},
-		},
-	}
-
-	got := EnabledModels(account)
-	if len(got) != 1 || got[0] != "gpt-image-1" {
-		t.Fatalf("EnabledModels()=%v, want [gpt-image-1]", got)
-	}
-}
-
 func TestFilterAccountsForRequestMatchesRequestedModel(t *testing.T) {
 	accounts := []*ApiAccount{
 		{ID: 1, Models: []AccountModel{{Name: "gpt-image-1", Enabled: false}}},

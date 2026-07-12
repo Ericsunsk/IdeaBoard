@@ -58,7 +58,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if priceV2.Version != 2 || quoteV2.PriceVersionID != priceV2.PriceVersionID || quoteV2.TotalCredits != 120 {
 		t.Fatalf("Quote(v2) = %+v, price = %+v", quoteV2, priceV2)
 	}
-	if total, err := quoteV1.PriceSnapshot.Total(4); err != nil || total != 100 {
+	if total, err := quoteV1.Total(4); err != nil || total != 100 {
 		t.Fatalf("old snapshot changed after repricing: total=%d err=%v", total, err)
 	}
 

@@ -13,70 +13,6 @@ import (
 	"github.com/lib/pq"
 )
 
-const acquireTaskLease = `-- name: AcquireTaskLease :execrows
-INSERT INTO task_leases (
-  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, requested_model, resolved_model, api_type,
-  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
-  acquired_at
-)
-SELECT
-  $1, $2, $3,
-  $4, $5, $6,
-  $7, $8, $9, $10,
-  $11, $12, $13, $14,
-  $15
-WHERE EXISTS (
-  SELECT 1
-  FROM tasks
-  WHERE task_id = $1
-    AND status = 'running'
-)
-ON CONFLICT (task_id) WHERE released_at IS NULL DO NOTHING
-`
-
-type AcquireTaskLeaseParams struct {
-	TaskID                  string    `json:"task_id"`
-	LeaseToken              string    `json:"lease_token"`
-	RiverJobID              int64     `json:"river_job_id"`
-	AccountID               int64     `json:"account_id"`
-	ProviderEndpointID      int64     `json:"provider_endpoint_id"`
-	CredentialID            int64     `json:"credential_id"`
-	FeatureSlug             string    `json:"feature_slug"`
-	RequestedModel          string    `json:"requested_model"`
-	ResolvedModel           string    `json:"resolved_model"`
-	ApiType                 string    `json:"api_type"`
-	ProviderEndpointName    string    `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl string    `json:"provider_endpoint_base_url"`
-	CredentialFingerprint   string    `json:"credential_fingerprint"`
-	CredentialKeyVersion    string    `json:"credential_key_version"`
-	AcquiredAt              time.Time `json:"acquired_at"`
-}
-
-func (q *Queries) AcquireTaskLease(ctx context.Context, arg AcquireTaskLeaseParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, acquireTaskLease,
-		arg.TaskID,
-		arg.LeaseToken,
-		arg.RiverJobID,
-		arg.AccountID,
-		arg.ProviderEndpointID,
-		arg.CredentialID,
-		arg.FeatureSlug,
-		arg.RequestedModel,
-		arg.ResolvedModel,
-		arg.ApiType,
-		arg.ProviderEndpointName,
-		arg.ProviderEndpointBaseUrl,
-		arg.CredentialFingerprint,
-		arg.CredentialKeyVersion,
-		arg.AcquiredAt,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const cancelRunningTaskAttemptsByTaskIDs = `-- name: CancelRunningTaskAttemptsByTaskIDs :execrows
 UPDATE task_attempts
 SET status = 'cancelled',
@@ -756,16 +692,13 @@ func (q *Queries) GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string)
 }
 
 const getTaskByTaskID = `-- name: GetTaskByTaskID :one
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -779,89 +712,62 @@ WHERE t.task_id = $1
 `
 
 type GetTaskByTaskIDRow struct {
-	ID                         int64         `json:"id"`
-	TaskID                     string        `json:"task_id"`
-	UserID                     int64         `json:"user_id"`
-	ClientActionID             string        `json:"client_action_id"`
-	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
-	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
-	AccountID                  sql.NullInt64 `json:"account_id"`
-	Prompt                     string        `json:"prompt"`
-	UserPrompt                 string        `json:"user_prompt"`
-	Params                     string        `json:"params"`
-	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
-	Priority                   int32         `json:"priority"`
-	ResolvedModel              string        `json:"resolved_model"`
-	ApiType                    string        `json:"api_type"`
-	ProviderEndpointName       string        `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl    string        `json:"provider_endpoint_base_url"`
-	CredentialFingerprint      string        `json:"credential_fingerprint"`
-	CredentialKeyVersion       string        `json:"credential_key_version"`
-	Status                     string        `json:"status"`
-	LeaseToken                 string        `json:"lease_token"`
-	RetryCount                 int32         `json:"retry_count"`
-	AttemptSeq                 int32         `json:"attempt_seq"`
-	ErrorMsg                   string        `json:"error_msg"`
-	Result                     string        `json:"result"`
-	CreatedAt                  time.Time     `json:"created_at"`
-	UpdatedAt                  time.Time     `json:"updated_at"`
-	CompletedAt                sql.NullTime  `json:"completed_at"`
-	CancelledAt                sql.NullTime  `json:"cancelled_at"`
-	CancelledBy                sql.NullInt64 `json:"cancelled_by"`
-	CancelReason               string        `json:"cancel_reason"`
+	Task                    Task   `json:"task"`
+	ResolvedModel           string `json:"resolved_model"`
+	ApiType                 string `json:"api_type"`
+	ProviderEndpointName    string `json:"provider_endpoint_name"`
+	ProviderEndpointBaseUrl string `json:"provider_endpoint_base_url"`
+	CredentialFingerprint   string `json:"credential_fingerprint"`
+	CredentialKeyVersion    string `json:"credential_key_version"`
 }
 
 func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskByTaskIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getTaskByTaskID, taskID)
 	var i GetTaskByTaskIDRow
 	err := row.Scan(
-		&i.ID,
-		&i.TaskID,
-		&i.UserID,
-		&i.ClientActionID,
-		&i.AssignedProviderEndpointID,
-		&i.AssignedCredentialID,
-		&i.AccountID,
-		&i.Prompt,
-		&i.UserPrompt,
-		&i.Params,
-		&i.FeatureSlug,
-		&i.RequestedModel,
-		&i.Priority,
+		&i.Task.ID,
+		&i.Task.TaskID,
+		&i.Task.UserID,
+		&i.Task.ClientActionID,
+		&i.Task.AssignedProviderEndpointID,
+		&i.Task.AssignedCredentialID,
+		&i.Task.AccountID,
+		&i.Task.Prompt,
+		&i.Task.UserPrompt,
+		&i.Task.Params,
+		&i.Task.FeatureSlug,
+		&i.Task.RequestedModel,
+		&i.Task.Priority,
+		&i.Task.Status,
+		&i.Task.LeaseToken,
+		&i.Task.RetryCount,
+		&i.Task.AttemptSeq,
+		&i.Task.ErrorMsg,
+		&i.Task.Result,
+		&i.Task.CreatedAt,
+		&i.Task.UpdatedAt,
+		&i.Task.CompletedAt,
+		&i.Task.CancelledAt,
+		&i.Task.CancelledBy,
+		&i.Task.CancelReason,
 		&i.ResolvedModel,
 		&i.ApiType,
 		&i.ProviderEndpointName,
 		&i.ProviderEndpointBaseUrl,
 		&i.CredentialFingerprint,
 		&i.CredentialKeyVersion,
-		&i.Status,
-		&i.LeaseToken,
-		&i.RetryCount,
-		&i.AttemptSeq,
-		&i.ErrorMsg,
-		&i.Result,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.CompletedAt,
-		&i.CancelledAt,
-		&i.CancelledBy,
-		&i.CancelReason,
 	)
 	return i, err
 }
 
 const getTaskByTaskIDAndUserID = `-- name: GetTaskByTaskIDAndUserID :one
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -880,74 +786,50 @@ type GetTaskByTaskIDAndUserIDParams struct {
 }
 
 type GetTaskByTaskIDAndUserIDRow struct {
-	ID                         int64         `json:"id"`
-	TaskID                     string        `json:"task_id"`
-	UserID                     int64         `json:"user_id"`
-	ClientActionID             string        `json:"client_action_id"`
-	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
-	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
-	AccountID                  sql.NullInt64 `json:"account_id"`
-	Prompt                     string        `json:"prompt"`
-	UserPrompt                 string        `json:"user_prompt"`
-	Params                     string        `json:"params"`
-	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
-	Priority                   int32         `json:"priority"`
-	ResolvedModel              string        `json:"resolved_model"`
-	ApiType                    string        `json:"api_type"`
-	ProviderEndpointName       string        `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl    string        `json:"provider_endpoint_base_url"`
-	CredentialFingerprint      string        `json:"credential_fingerprint"`
-	CredentialKeyVersion       string        `json:"credential_key_version"`
-	Status                     string        `json:"status"`
-	LeaseToken                 string        `json:"lease_token"`
-	RetryCount                 int32         `json:"retry_count"`
-	AttemptSeq                 int32         `json:"attempt_seq"`
-	ErrorMsg                   string        `json:"error_msg"`
-	Result                     string        `json:"result"`
-	CreatedAt                  time.Time     `json:"created_at"`
-	UpdatedAt                  time.Time     `json:"updated_at"`
-	CompletedAt                sql.NullTime  `json:"completed_at"`
-	CancelledAt                sql.NullTime  `json:"cancelled_at"`
-	CancelledBy                sql.NullInt64 `json:"cancelled_by"`
-	CancelReason               string        `json:"cancel_reason"`
+	Task                    Task   `json:"task"`
+	ResolvedModel           string `json:"resolved_model"`
+	ApiType                 string `json:"api_type"`
+	ProviderEndpointName    string `json:"provider_endpoint_name"`
+	ProviderEndpointBaseUrl string `json:"provider_endpoint_base_url"`
+	CredentialFingerprint   string `json:"credential_fingerprint"`
+	CredentialKeyVersion    string `json:"credential_key_version"`
 }
 
 func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTaskIDAndUserIDParams) (GetTaskByTaskIDAndUserIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getTaskByTaskIDAndUserID, arg.TaskID, arg.UserID)
 	var i GetTaskByTaskIDAndUserIDRow
 	err := row.Scan(
-		&i.ID,
-		&i.TaskID,
-		&i.UserID,
-		&i.ClientActionID,
-		&i.AssignedProviderEndpointID,
-		&i.AssignedCredentialID,
-		&i.AccountID,
-		&i.Prompt,
-		&i.UserPrompt,
-		&i.Params,
-		&i.FeatureSlug,
-		&i.RequestedModel,
-		&i.Priority,
+		&i.Task.ID,
+		&i.Task.TaskID,
+		&i.Task.UserID,
+		&i.Task.ClientActionID,
+		&i.Task.AssignedProviderEndpointID,
+		&i.Task.AssignedCredentialID,
+		&i.Task.AccountID,
+		&i.Task.Prompt,
+		&i.Task.UserPrompt,
+		&i.Task.Params,
+		&i.Task.FeatureSlug,
+		&i.Task.RequestedModel,
+		&i.Task.Priority,
+		&i.Task.Status,
+		&i.Task.LeaseToken,
+		&i.Task.RetryCount,
+		&i.Task.AttemptSeq,
+		&i.Task.ErrorMsg,
+		&i.Task.Result,
+		&i.Task.CreatedAt,
+		&i.Task.UpdatedAt,
+		&i.Task.CompletedAt,
+		&i.Task.CancelledAt,
+		&i.Task.CancelledBy,
+		&i.Task.CancelReason,
 		&i.ResolvedModel,
 		&i.ApiType,
 		&i.ProviderEndpointName,
 		&i.ProviderEndpointBaseUrl,
 		&i.CredentialFingerprint,
 		&i.CredentialKeyVersion,
-		&i.Status,
-		&i.LeaseToken,
-		&i.RetryCount,
-		&i.AttemptSeq,
-		&i.ErrorMsg,
-		&i.Result,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.CompletedAt,
-		&i.CancelledAt,
-		&i.CancelledBy,
-		&i.CancelReason,
 	)
 	return i, err
 }
@@ -1127,113 +1009,6 @@ func (q *Queries) ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimi
 	for rows.Next() {
 		var i ListRunningTasksMissingLeaseTokenRow
 		if err := rows.Scan(&i.TaskID, &i.AccountID, &i.LeaseToken); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTaskAttemptsByTaskID = `-- name: ListTaskAttemptsByTaskID :many
-SELECT ta.id, ta.task_id, ta.lease_id, ta.attempt_no, ta.river_job_id,
-       tl.lease_token, tl.account_id, tl.provider_endpoint_id, tl.credential_id,
-       tl.feature_slug, tl.requested_model, tl.resolved_model, tl.api_type,
-       tl.provider_endpoint_name, tl.provider_endpoint_base_url, tl.credential_fingerprint, tl.credential_key_version,
-       status,
-       failure_stage, failure_category, error_msg,
-       provider_started_at, provider_finished_at, finalize_started_at, finalize_finished_at,
-       provider_latency_ms, finalize_latency_ms, total_latency_ms,
-       completed_at, cancelled_at, ta.created_at, ta.updated_at
-FROM task_attempts ta
-JOIN task_leases tl ON tl.id = ta.lease_id
-WHERE ta.task_id = $1
-ORDER BY ta.attempt_no ASC
-`
-
-type ListTaskAttemptsByTaskIDRow struct {
-	ID                      int64        `json:"id"`
-	TaskID                  string       `json:"task_id"`
-	LeaseID                 int64        `json:"lease_id"`
-	AttemptNo               int32        `json:"attempt_no"`
-	RiverJobID              int64        `json:"river_job_id"`
-	LeaseToken              string       `json:"lease_token"`
-	AccountID               int64        `json:"account_id"`
-	ProviderEndpointID      int64        `json:"provider_endpoint_id"`
-	CredentialID            int64        `json:"credential_id"`
-	FeatureSlug             string       `json:"feature_slug"`
-	RequestedModel          string       `json:"requested_model"`
-	ResolvedModel           string       `json:"resolved_model"`
-	ApiType                 string       `json:"api_type"`
-	ProviderEndpointName    string       `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl string       `json:"provider_endpoint_base_url"`
-	CredentialFingerprint   string       `json:"credential_fingerprint"`
-	CredentialKeyVersion    string       `json:"credential_key_version"`
-	Status                  string       `json:"status"`
-	FailureStage            string       `json:"failure_stage"`
-	FailureCategory         string       `json:"failure_category"`
-	ErrorMsg                string       `json:"error_msg"`
-	ProviderStartedAt       sql.NullTime `json:"provider_started_at"`
-	ProviderFinishedAt      sql.NullTime `json:"provider_finished_at"`
-	FinalizeStartedAt       sql.NullTime `json:"finalize_started_at"`
-	FinalizeFinishedAt      sql.NullTime `json:"finalize_finished_at"`
-	ProviderLatencyMs       int64        `json:"provider_latency_ms"`
-	FinalizeLatencyMs       int64        `json:"finalize_latency_ms"`
-	TotalLatencyMs          int64        `json:"total_latency_ms"`
-	CompletedAt             sql.NullTime `json:"completed_at"`
-	CancelledAt             sql.NullTime `json:"cancelled_at"`
-	CreatedAt               time.Time    `json:"created_at"`
-	UpdatedAt               time.Time    `json:"updated_at"`
-}
-
-func (q *Queries) ListTaskAttemptsByTaskID(ctx context.Context, taskID string) ([]ListTaskAttemptsByTaskIDRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTaskAttemptsByTaskID, taskID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListTaskAttemptsByTaskIDRow
-	for rows.Next() {
-		var i ListTaskAttemptsByTaskIDRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.TaskID,
-			&i.LeaseID,
-			&i.AttemptNo,
-			&i.RiverJobID,
-			&i.LeaseToken,
-			&i.AccountID,
-			&i.ProviderEndpointID,
-			&i.CredentialID,
-			&i.FeatureSlug,
-			&i.RequestedModel,
-			&i.ResolvedModel,
-			&i.ApiType,
-			&i.ProviderEndpointName,
-			&i.ProviderEndpointBaseUrl,
-			&i.CredentialFingerprint,
-			&i.CredentialKeyVersion,
-			&i.Status,
-			&i.FailureStage,
-			&i.FailureCategory,
-			&i.ErrorMsg,
-			&i.ProviderStartedAt,
-			&i.ProviderFinishedAt,
-			&i.FinalizeStartedAt,
-			&i.FinalizeFinishedAt,
-			&i.ProviderLatencyMs,
-			&i.FinalizeLatencyMs,
-			&i.TotalLatencyMs,
-			&i.CompletedAt,
-			&i.CancelledAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1462,16 +1237,13 @@ func (q *Queries) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg Lis
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -1503,37 +1275,13 @@ type ListTasksParams struct {
 }
 
 type ListTasksRow struct {
-	ID                         int64         `json:"id"`
-	TaskID                     string        `json:"task_id"`
-	UserID                     int64         `json:"user_id"`
-	ClientActionID             string        `json:"client_action_id"`
-	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
-	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
-	AccountID                  sql.NullInt64 `json:"account_id"`
-	Prompt                     string        `json:"prompt"`
-	UserPrompt                 string        `json:"user_prompt"`
-	Params                     string        `json:"params"`
-	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
-	Priority                   int32         `json:"priority"`
-	ResolvedModel              string        `json:"resolved_model"`
-	ApiType                    string        `json:"api_type"`
-	ProviderEndpointName       string        `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl    string        `json:"provider_endpoint_base_url"`
-	CredentialFingerprint      string        `json:"credential_fingerprint"`
-	CredentialKeyVersion       string        `json:"credential_key_version"`
-	Status                     string        `json:"status"`
-	LeaseToken                 string        `json:"lease_token"`
-	RetryCount                 int32         `json:"retry_count"`
-	AttemptSeq                 int32         `json:"attempt_seq"`
-	ErrorMsg                   string        `json:"error_msg"`
-	Result                     string        `json:"result"`
-	CreatedAt                  time.Time     `json:"created_at"`
-	UpdatedAt                  time.Time     `json:"updated_at"`
-	CompletedAt                sql.NullTime  `json:"completed_at"`
-	CancelledAt                sql.NullTime  `json:"cancelled_at"`
-	CancelledBy                sql.NullInt64 `json:"cancelled_by"`
-	CancelReason               string        `json:"cancel_reason"`
+	Task                    Task   `json:"task"`
+	ResolvedModel           string `json:"resolved_model"`
+	ApiType                 string `json:"api_type"`
+	ProviderEndpointName    string `json:"provider_endpoint_name"`
+	ProviderEndpointBaseUrl string `json:"provider_endpoint_base_url"`
+	CredentialFingerprint   string `json:"credential_fingerprint"`
+	CredentialKeyVersion    string `json:"credential_key_version"`
 }
 
 func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTasksRow, error) {
@@ -1557,37 +1305,37 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 	for rows.Next() {
 		var i ListTasksRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.TaskID,
-			&i.UserID,
-			&i.ClientActionID,
-			&i.AssignedProviderEndpointID,
-			&i.AssignedCredentialID,
-			&i.AccountID,
-			&i.Prompt,
-			&i.UserPrompt,
-			&i.Params,
-			&i.FeatureSlug,
-			&i.RequestedModel,
-			&i.Priority,
+			&i.Task.ID,
+			&i.Task.TaskID,
+			&i.Task.UserID,
+			&i.Task.ClientActionID,
+			&i.Task.AssignedProviderEndpointID,
+			&i.Task.AssignedCredentialID,
+			&i.Task.AccountID,
+			&i.Task.Prompt,
+			&i.Task.UserPrompt,
+			&i.Task.Params,
+			&i.Task.FeatureSlug,
+			&i.Task.RequestedModel,
+			&i.Task.Priority,
+			&i.Task.Status,
+			&i.Task.LeaseToken,
+			&i.Task.RetryCount,
+			&i.Task.AttemptSeq,
+			&i.Task.ErrorMsg,
+			&i.Task.Result,
+			&i.Task.CreatedAt,
+			&i.Task.UpdatedAt,
+			&i.Task.CompletedAt,
+			&i.Task.CancelledAt,
+			&i.Task.CancelledBy,
+			&i.Task.CancelReason,
 			&i.ResolvedModel,
 			&i.ApiType,
 			&i.ProviderEndpointName,
 			&i.ProviderEndpointBaseUrl,
 			&i.CredentialFingerprint,
 			&i.CredentialKeyVersion,
-			&i.Status,
-			&i.LeaseToken,
-			&i.RetryCount,
-			&i.AttemptSeq,
-			&i.ErrorMsg,
-			&i.Result,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.CompletedAt,
-			&i.CancelledAt,
-			&i.CancelledBy,
-			&i.CancelReason,
 		); err != nil {
 			return nil, err
 		}
@@ -1603,16 +1351,13 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 }
 
 const listTasksByTaskIDs = `-- name: ListTasksByTaskIDs :many
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -1627,37 +1372,13 @@ ORDER BY array_position($1::text[], t.task_id)
 `
 
 type ListTasksByTaskIDsRow struct {
-	ID                         int64         `json:"id"`
-	TaskID                     string        `json:"task_id"`
-	UserID                     int64         `json:"user_id"`
-	ClientActionID             string        `json:"client_action_id"`
-	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
-	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
-	AccountID                  sql.NullInt64 `json:"account_id"`
-	Prompt                     string        `json:"prompt"`
-	UserPrompt                 string        `json:"user_prompt"`
-	Params                     string        `json:"params"`
-	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
-	Priority                   int32         `json:"priority"`
-	ResolvedModel              string        `json:"resolved_model"`
-	ApiType                    string        `json:"api_type"`
-	ProviderEndpointName       string        `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl    string        `json:"provider_endpoint_base_url"`
-	CredentialFingerprint      string        `json:"credential_fingerprint"`
-	CredentialKeyVersion       string        `json:"credential_key_version"`
-	Status                     string        `json:"status"`
-	LeaseToken                 string        `json:"lease_token"`
-	RetryCount                 int32         `json:"retry_count"`
-	AttemptSeq                 int32         `json:"attempt_seq"`
-	ErrorMsg                   string        `json:"error_msg"`
-	Result                     string        `json:"result"`
-	CreatedAt                  time.Time     `json:"created_at"`
-	UpdatedAt                  time.Time     `json:"updated_at"`
-	CompletedAt                sql.NullTime  `json:"completed_at"`
-	CancelledAt                sql.NullTime  `json:"cancelled_at"`
-	CancelledBy                sql.NullInt64 `json:"cancelled_by"`
-	CancelReason               string        `json:"cancel_reason"`
+	Task                    Task   `json:"task"`
+	ResolvedModel           string `json:"resolved_model"`
+	ApiType                 string `json:"api_type"`
+	ProviderEndpointName    string `json:"provider_endpoint_name"`
+	ProviderEndpointBaseUrl string `json:"provider_endpoint_base_url"`
+	CredentialFingerprint   string `json:"credential_fingerprint"`
+	CredentialKeyVersion    string `json:"credential_key_version"`
 }
 
 func (q *Queries) ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]ListTasksByTaskIDsRow, error) {
@@ -1670,37 +1391,37 @@ func (q *Queries) ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]L
 	for rows.Next() {
 		var i ListTasksByTaskIDsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.TaskID,
-			&i.UserID,
-			&i.ClientActionID,
-			&i.AssignedProviderEndpointID,
-			&i.AssignedCredentialID,
-			&i.AccountID,
-			&i.Prompt,
-			&i.UserPrompt,
-			&i.Params,
-			&i.FeatureSlug,
-			&i.RequestedModel,
-			&i.Priority,
+			&i.Task.ID,
+			&i.Task.TaskID,
+			&i.Task.UserID,
+			&i.Task.ClientActionID,
+			&i.Task.AssignedProviderEndpointID,
+			&i.Task.AssignedCredentialID,
+			&i.Task.AccountID,
+			&i.Task.Prompt,
+			&i.Task.UserPrompt,
+			&i.Task.Params,
+			&i.Task.FeatureSlug,
+			&i.Task.RequestedModel,
+			&i.Task.Priority,
+			&i.Task.Status,
+			&i.Task.LeaseToken,
+			&i.Task.RetryCount,
+			&i.Task.AttemptSeq,
+			&i.Task.ErrorMsg,
+			&i.Task.Result,
+			&i.Task.CreatedAt,
+			&i.Task.UpdatedAt,
+			&i.Task.CompletedAt,
+			&i.Task.CancelledAt,
+			&i.Task.CancelledBy,
+			&i.Task.CancelReason,
 			&i.ResolvedModel,
 			&i.ApiType,
 			&i.ProviderEndpointName,
 			&i.ProviderEndpointBaseUrl,
 			&i.CredentialFingerprint,
 			&i.CredentialKeyVersion,
-			&i.Status,
-			&i.LeaseToken,
-			&i.RetryCount,
-			&i.AttemptSeq,
-			&i.ErrorMsg,
-			&i.Result,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.CompletedAt,
-			&i.CancelledAt,
-			&i.CancelledBy,
-			&i.CancelReason,
 		); err != nil {
 			return nil, err
 		}
@@ -1716,16 +1437,13 @@ func (q *Queries) ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]L
 }
 
 const listTasksByUserID = `-- name: ListTasksByUserID :many
-SELECT id, task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-       feature_slug, requested_model, priority,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(latest_lease.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(latest_lease.credential_fingerprint, '') AS credential_fingerprint,
-       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version,
-       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
-       cancelled_at, cancelled_by, cancel_reason
+       COALESCE(latest_lease.credential_key_version, '') AS credential_key_version
 FROM tasks t
 LEFT JOIN LATERAL (
   SELECT resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
@@ -1747,37 +1465,13 @@ type ListTasksByUserIDParams struct {
 }
 
 type ListTasksByUserIDRow struct {
-	ID                         int64         `json:"id"`
-	TaskID                     string        `json:"task_id"`
-	UserID                     int64         `json:"user_id"`
-	ClientActionID             string        `json:"client_action_id"`
-	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
-	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
-	AccountID                  sql.NullInt64 `json:"account_id"`
-	Prompt                     string        `json:"prompt"`
-	UserPrompt                 string        `json:"user_prompt"`
-	Params                     string        `json:"params"`
-	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
-	Priority                   int32         `json:"priority"`
-	ResolvedModel              string        `json:"resolved_model"`
-	ApiType                    string        `json:"api_type"`
-	ProviderEndpointName       string        `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl    string        `json:"provider_endpoint_base_url"`
-	CredentialFingerprint      string        `json:"credential_fingerprint"`
-	CredentialKeyVersion       string        `json:"credential_key_version"`
-	Status                     string        `json:"status"`
-	LeaseToken                 string        `json:"lease_token"`
-	RetryCount                 int32         `json:"retry_count"`
-	AttemptSeq                 int32         `json:"attempt_seq"`
-	ErrorMsg                   string        `json:"error_msg"`
-	Result                     string        `json:"result"`
-	CreatedAt                  time.Time     `json:"created_at"`
-	UpdatedAt                  time.Time     `json:"updated_at"`
-	CompletedAt                sql.NullTime  `json:"completed_at"`
-	CancelledAt                sql.NullTime  `json:"cancelled_at"`
-	CancelledBy                sql.NullInt64 `json:"cancelled_by"`
-	CancelReason               string        `json:"cancel_reason"`
+	Task                    Task   `json:"task"`
+	ResolvedModel           string `json:"resolved_model"`
+	ApiType                 string `json:"api_type"`
+	ProviderEndpointName    string `json:"provider_endpoint_name"`
+	ProviderEndpointBaseUrl string `json:"provider_endpoint_base_url"`
+	CredentialFingerprint   string `json:"credential_fingerprint"`
+	CredentialKeyVersion    string `json:"credential_key_version"`
 }
 
 func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDParams) ([]ListTasksByUserIDRow, error) {
@@ -1790,37 +1484,37 @@ func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDPa
 	for rows.Next() {
 		var i ListTasksByUserIDRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.TaskID,
-			&i.UserID,
-			&i.ClientActionID,
-			&i.AssignedProviderEndpointID,
-			&i.AssignedCredentialID,
-			&i.AccountID,
-			&i.Prompt,
-			&i.UserPrompt,
-			&i.Params,
-			&i.FeatureSlug,
-			&i.RequestedModel,
-			&i.Priority,
+			&i.Task.ID,
+			&i.Task.TaskID,
+			&i.Task.UserID,
+			&i.Task.ClientActionID,
+			&i.Task.AssignedProviderEndpointID,
+			&i.Task.AssignedCredentialID,
+			&i.Task.AccountID,
+			&i.Task.Prompt,
+			&i.Task.UserPrompt,
+			&i.Task.Params,
+			&i.Task.FeatureSlug,
+			&i.Task.RequestedModel,
+			&i.Task.Priority,
+			&i.Task.Status,
+			&i.Task.LeaseToken,
+			&i.Task.RetryCount,
+			&i.Task.AttemptSeq,
+			&i.Task.ErrorMsg,
+			&i.Task.Result,
+			&i.Task.CreatedAt,
+			&i.Task.UpdatedAt,
+			&i.Task.CompletedAt,
+			&i.Task.CancelledAt,
+			&i.Task.CancelledBy,
+			&i.Task.CancelReason,
 			&i.ResolvedModel,
 			&i.ApiType,
 			&i.ProviderEndpointName,
 			&i.ProviderEndpointBaseUrl,
 			&i.CredentialFingerprint,
 			&i.CredentialKeyVersion,
-			&i.Status,
-			&i.LeaseToken,
-			&i.RetryCount,
-			&i.AttemptSeq,
-			&i.ErrorMsg,
-			&i.Result,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.CompletedAt,
-			&i.CancelledAt,
-			&i.CancelledBy,
-			&i.CancelReason,
 		); err != nil {
 			return nil, err
 		}

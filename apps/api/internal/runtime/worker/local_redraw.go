@@ -246,11 +246,6 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 	return materializedURL, []tasks.TaskOutput{materialized.Items[0].Output}, true, nil
 }
 
-func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
-	_, ok, err := readLocalRedrawRequest(params)
-	return err == nil && ok
-}
-
 func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, bool) {
 	if ref, ok := workflow.ReadWorkflowStringParam(params, "original_image_url"); ok {
 		return ref, true

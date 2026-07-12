@@ -5,7 +5,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"ideaboard/api/internal/tasking/tasks"
 
@@ -31,31 +30,6 @@ type concurrentRiverClient struct {
 func (c *concurrentRiverClient) Insert(_ context.Context, _ river.JobArgs, _ *river.InsertOpts) (*rivertype.JobInsertResult, error) {
 	c.inserts.Add(1)
 	return &rivertype.JobInsertResult{}, nil
-}
-
-func TestRiverPayloadEncodeDecodeRoundTrip(t *testing.T) {
-	task := &tasks.TaskPayload{
-		TaskID:     "task_123",
-		UserID:     42,
-		Prompt:     "draw",
-		Params:     `{"size":"1024x1024"}`,
-		Priority:   tasks.TaskPriorityInteractive,
-		AccountIDs: []int64{1, 2},
-		RetryCount: 1,
-		CreatedAt:  time.Now().Unix(),
-	}
-
-	data, err := EncodeRiverPayload(task)
-	if err != nil {
-		t.Fatalf("EncodeRiverPayload failed: %v", err)
-	}
-	decoded, err := DecodeRiverPayload(data)
-	if err != nil {
-		t.Fatalf("DecodeRiverPayload failed: %v", err)
-	}
-	if decoded.TaskID != task.TaskID || decoded.UserID != task.UserID || decoded.Priority != task.Priority || len(decoded.AccountIDs) != 2 {
-		t.Fatalf("decoded=%+v, want %+v", decoded, task)
-	}
 }
 
 func TestRiverQueueEnqueueUsesDrawingArgs(t *testing.T) {

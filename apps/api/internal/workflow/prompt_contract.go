@@ -121,12 +121,6 @@ func ReadStyleFusionPromptContract(params map[string]interface{}) (StyleFusionPr
 	return StyleFusionPromptContract{Mode: mode, InputWeights: weights}, true
 }
 
-func (c StyleFusionPromptContract) PromptVariables() map[string]interface{} {
-	return map[string]interface{}{
-		paramkeys.PromptPlaceholderFusionInputWeights: c.InputWeights,
-	}
-}
-
 func readStringField(obj map[string]interface{}, key string) (string, bool) {
 	raw, ok := obj[key]
 	if !ok {

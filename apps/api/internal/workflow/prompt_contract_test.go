@@ -286,7 +286,7 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 	}
 }
 
-func TestStyleFusionPromptContractUsesPublishedWeightsVariable(t *testing.T) {
+func TestReadStyleFusionPromptContractReadsWeights(t *testing.T) {
 	params := map[string]interface{}{
 		ParamKeyFusion: map[string]interface{}{
 			"mode":          "weighted_reference",
@@ -298,14 +298,7 @@ func TestStyleFusionPromptContractUsesPublishedWeightsVariable(t *testing.T) {
 	if !ok {
 		t.Fatal("ReadStyleFusionPromptContract returned false")
 	}
-	vars := contract.PromptVariables()
-	if _, exists := vars["{{fusion_mode}}"]; exists {
-		t.Fatalf("did not expect unpublished fusion_mode variable: %#v", vars)
-	}
-	weights, ok := vars["{{fusion_input_weights}}"].([]float64)
-	if !ok {
-		t.Fatalf("fusion_input_weights = %#v, want []float64", vars["{{fusion_input_weights}}"])
-	}
+	weights := contract.InputWeights
 	if len(weights) != 2 || weights[0] != 0.6 || weights[1] != 0.4 {
 		t.Fatalf("weights = %#v, want [0.6 0.4]", weights)
 	}

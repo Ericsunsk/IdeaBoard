@@ -185,23 +185,6 @@ func (s *Service) validateSubmitTaskMediaRef(ctx context.Context, userID int64, 
 	return s.mediaValidator.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
-func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {
-	if params == nil {
-		return "", nil
-	}
-	if jsonlimit.ValueDepth(params) > maxSubmitTaskParamsDepth {
-		return "", fmt.Errorf("任务参数层级过深")
-	}
-	payload, err := json.Marshal(params)
-	if err != nil {
-		return "", fmt.Errorf("任务参数格式错误")
-	}
-	if len(payload) > maxSubmitTaskParamsBytes {
-		return "", fmt.Errorf("任务参数不能超过 %dMB", maxSubmitTaskParamsBytes/1024/1024)
-	}
-	return string(payload), nil
-}
-
 func marshalWorkflowTaskParams(params *tasks.WorkflowTaskParams, source map[string]interface{}) (string, error) {
 	if params == nil {
 		return "", nil

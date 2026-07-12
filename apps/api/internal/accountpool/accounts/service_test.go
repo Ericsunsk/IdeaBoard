@@ -54,13 +54,14 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 		},
 	}
 
-	got := prompts.ApplyFeatureSystemPrompt(
+	got := prompts.ApplyFeatureSystemPromptWithConfig(
 		"base prompt",
 		"user prompt",
 		"hd-upscale",
 		params,
-		func(slug string) (string, error) {
-			return "SYS={{user_prompt}}|{{clarity_strength}}", nil
+		prompts.FeaturePromptRuntimeConfig{
+			Prompt:                "SYS={{user_prompt}}|{{clarity_strength}}",
+			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("hd-upscale"),
 		},
 	)
 
@@ -71,7 +72,7 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 }
 
 func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) {
-	got := prompts.ApplyFeatureSystemPrompt(
+	got := prompts.ApplyFeatureSystemPromptWithConfig(
 		"user prompt",
 		"user prompt",
 		"image-extend",
@@ -83,8 +84,9 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 				"left_percent":   0,
 			},
 		},
-		func(slug string) (string, error) {
-			return "SYS=canvas extend only", nil
+		prompts.FeaturePromptRuntimeConfig{
+			Prompt:                "SYS=canvas extend only",
+			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("image-extend"),
 		},
 	)
 

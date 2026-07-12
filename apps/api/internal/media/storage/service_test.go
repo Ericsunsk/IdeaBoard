@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -25,7 +26,7 @@ func TestListProviderMetaUsesEmptyFieldSlices(t *testing.T) {
 	}
 }
 
-func TestCanonicalizeStorageProfileKeepsCurrentS3CompatibleConfig(t *testing.T) {
+func TestStorageProfileConfigMapKeepsCurrentS3CompatibleConfig(t *testing.T) {
 	original := map[string]interface{}{
 		"access_key_id":     "test-ak",
 		"secret_access_key": "test-sk",
@@ -35,11 +36,8 @@ func TestCanonicalizeStorageProfileKeepsCurrentS3CompatibleConfig(t *testing.T) 
 		"force_path_style":  true,
 	}
 
-	provider, migrated, changed := canonicalizeStorageProfile(StorageProviderS3Compatible, original)
-	if provider != StorageProviderS3Compatible {
-		t.Fatalf("provider = %q, want %q", provider, StorageProviderS3Compatible)
-	}
-	if changed {
+	migrated := storageProfileConfigMap(StorageProviderS3Compatible, original)
+	if !reflect.DeepEqual(migrated, original) {
 		t.Fatalf("expected canonical s3-compatible profile to remain unchanged")
 	}
 	if got := configString(migrated, "secret_access_key"); got != "test-sk" {

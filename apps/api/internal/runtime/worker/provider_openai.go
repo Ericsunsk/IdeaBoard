@@ -210,12 +210,6 @@ func (b *openAIImageRequestBody) setExtra(key string, value interface{}) {
 	b.Extra[key] = value
 }
 
-// callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）
-func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
-	req := newProviderTaskParamsFromProviderMap(params).providerRequestWithSize(prompt, width, height, resolvedModel)
-	return c.callOpenAIWithRequest(ctx, account, req, timeout)
-}
-
 func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
 	baseURL := "https://api.openai.com"
 	if account.ProxyURL != "" {
@@ -569,14 +563,6 @@ func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, openAIParams ope
 	openAIRequestFinalizer{FeatureSlug: openAIParams.FeatureSlug}.apply(reqBody)
 }
 
-func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
-	providerReq := providerRequest{
-		Params:    params,
-		MediaRefs: collectProviderMediaRefs(params),
-	}
-	return readOpenAIProviderParams(providerReq).useEditEndpoint()
-}
-
 func trustedRuntimeAssetHosts(ctx context.Context, provider settings.PublicURLSettingProvider) []string {
 	base := settings.ResolvePublicAssetBaseURL(ctx, provider)
 	if base == nil || strings.TrimSpace(base.Host) == "" {
@@ -636,10 +622,6 @@ func openAIImageModelCapabilitiesFor(model string) openAIImageModelCapabilities 
 		return capabilities
 	}
 	return defaultOpenAIImageModelCapabilities
-}
-
-func collectOpenAIEditImageRefs(params map[string]interface{}) []string {
-	return mediarefs.CollectUniqueParamRefs(params, openAIImageInputRefKeys)
 }
 
 func extractOpenAIImageResponses(respBody []byte, params map[string]interface{}) ([]string, error) {

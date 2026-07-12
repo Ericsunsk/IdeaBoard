@@ -80,10 +80,11 @@ func TestCreateAndGetTaskByID(t *testing.T) {
 		t.Fatalf("CreateTask returned id=%d", createdID)
 	}
 
-	task, err := q.GetTaskByTaskID(context.Background(), taskID)
+	taskRow, err := q.GetTaskByTaskID(context.Background(), taskID)
 	if err != nil {
 		t.Fatalf("GetTaskByTaskID: %v", err)
 	}
+	task := taskRow.Task
 	if task.TaskID != taskID || task.UserID != 1 || task.Status != "pending" {
 		t.Fatalf("unexpected: id=%q user=%d status=%q", task.TaskID, task.UserID, task.Status)
 	}
@@ -167,10 +168,11 @@ func TestCompleteTaskWithLeaseOnlyMatchesCorrectLease(t *testing.T) {
 	if updated != 1 {
 		t.Fatalf("correct lease updated=%d, want 1", updated)
 	}
-	task, err := q.GetTaskByTaskID(context.Background(), taskID)
+	taskRow, err := q.GetTaskByTaskID(context.Background(), taskID)
 	if err != nil {
 		t.Fatalf("GetTaskByTaskID after complete: %v", err)
 	}
+	task := taskRow.Task
 	if task.Status != "completed" || task.LeaseToken != "" {
 		t.Fatalf("completed task status=%q lease=%q, want completed with cleared lease", task.Status, task.LeaseToken)
 	}
@@ -214,10 +216,11 @@ func TestMarkTaskFailedWithLease(t *testing.T) {
 	if updated != 1 {
 		t.Fatalf("MarkTaskFailedWithLease updated=%d, want 1", updated)
 	}
-	task, err := q.GetTaskByTaskID(context.Background(), taskID)
+	taskRow, err := q.GetTaskByTaskID(context.Background(), taskID)
 	if err != nil {
 		t.Fatalf("GetTaskByTaskID after fail: %v", err)
 	}
+	task := taskRow.Task
 	if task.Status != "failed" || task.ErrorMsg != "provider error" || task.LeaseToken != "" {
 		t.Fatalf("failed task status=%q error=%q lease=%q", task.Status, task.ErrorMsg, task.LeaseToken)
 	}

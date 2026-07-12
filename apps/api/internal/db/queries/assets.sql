@@ -69,36 +69,6 @@ SELECT
 FROM media_assets
 WHERE id = sqlc.arg(id);
 
--- name: GetMediaAssetByAssetID :one
-SELECT
-  id, asset_id, owner_user_id, storage_profile_id, storage_key,
-  url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
-  status, metadata, created_at, updated_at, deleted_at
-FROM media_assets
-WHERE asset_id = sqlc.arg(asset_id);
-
--- name: ListMediaAssetsByOwner :many
-SELECT
-  id, asset_id, owner_user_id, storage_profile_id, storage_key,
-  url, source_url, media_kind, mime_type,
-  width, height, size_bytes, checksum_sha256,
-  status, metadata, created_at, updated_at, deleted_at
-FROM media_assets
-WHERE owner_user_id = sqlc.arg(owner_user_id)
-  AND (
-    (sqlc.arg(has_status)::boolean AND status = sqlc.arg(status))
-    OR (NOT sqlc.arg(has_status)::boolean AND deleted_at IS NULL AND status <> 'deleted')
-  )
-ORDER BY updated_at DESC, id DESC
-LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
-
--- name: MarkMediaAssetDeleted :exec
-UPDATE media_assets
-SET status = 'deleted',
-    deleted_at = COALESCE(deleted_at, now())
-WHERE id = sqlc.arg(id) AND owner_user_id = sqlc.arg(owner_user_id);
-
 -- name: UpsertMediaRef :one
 INSERT INTO media_refs (
   media_asset_id, owner_user_id, ref_type, ref_id,
@@ -115,14 +85,6 @@ SET board_id = EXCLUDED.board_id,
 WHERE media_refs.owner_user_id = EXCLUDED.owner_user_id
 RETURNING id;
 
--- name: ListMediaRefsByAssetID :many
-SELECT
-  id, media_asset_id, owner_user_id, ref_type, ref_id,
-  board_id, task_id, role, metadata, created_at, updated_at
-FROM media_refs
-WHERE media_asset_id = sqlc.arg(media_asset_id)
-ORDER BY created_at ASC, id ASC;
-
 -- name: ListMediaRefsByBoardID :many
 SELECT
   id, media_asset_id, owner_user_id, ref_type, ref_id,
@@ -130,13 +92,6 @@ SELECT
 FROM media_refs
 WHERE owner_user_id = sqlc.arg(owner_user_id) AND board_id = sqlc.arg(board_id)
 ORDER BY created_at ASC, id ASC;
-
--- name: DeleteMediaRef :exec
-DELETE FROM media_refs
-WHERE media_asset_id = sqlc.arg(media_asset_id)
-  AND ref_type = sqlc.arg(ref_type)
-  AND ref_id = sqlc.arg(ref_id)
-  AND role = sqlc.arg(role);
 
 -- name: DeleteBoardMediaRefsByOwnerAndBoardID :exec
 DELETE FROM media_refs

@@ -194,7 +194,7 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 
 func (w *RiverTaskWorker) enqueueFinalFailureRetry(ctx context.Context, taskID string, riverJobID int64, reason string) error {
 	if w == nil || w.enqueueFinalFailure == nil {
-		return errors.New("River final failure enqueuer is unavailable")
+		return errors.New("river final failure enqueuer is unavailable")
 	}
 	return w.enqueueFinalFailure(context.WithoutCancel(ctx), taskqueue.DrawingFinalFailureArgs{
 		TaskID: taskID, RiverJobID: riverJobID, Reason: reason,
@@ -207,7 +207,7 @@ func (w *RiverTaskWorker) recordFinalFailureRetry(ctx context.Context, taskID, r
 
 func (w *RiverTaskWorker) recordFinalFailureMode(ctx context.Context, kind, taskID, reason string) error {
 	if w == nil || w.recordOutput == nil {
-		return errors.New("River output recorder is unavailable")
+		return errors.New("river output recorder is unavailable")
 	}
 	return w.recordOutput(context.WithoutCancel(ctx), finalFailureRetryOutput{
 		Kind:   kind,

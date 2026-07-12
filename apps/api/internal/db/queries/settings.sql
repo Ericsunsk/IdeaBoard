@@ -61,13 +61,6 @@ SET name = EXCLUDED.name,
     updated_by = EXCLUDED.updated_by,
     deleted_at = CASE WHEN EXCLUDED.status = 'deleted' THEN COALESCE(storage_profiles.deleted_at, now()) ELSE NULL END;
 
--- name: GetStorageProfile :one
-SELECT
-  profile_id, name, provider, enabled, is_current, builtin,
-  status, config, created_by, updated_by, created_at, updated_at, deleted_at
-FROM storage_profiles
-WHERE profile_id = sqlc.arg(profile_id);
-
 -- name: ListStorageProfiles :many
 SELECT
   profile_id, name, provider, enabled, is_current, builtin,
@@ -190,37 +183,6 @@ FROM storage_profile_secret_versions
 WHERE profile_id = sqlc.arg(profile_id)
   AND secret_name = sqlc.arg(secret_name)
 ORDER BY version_number DESC;
-
--- name: RevokeActiveStorageProfileSecretVersion :execrows
-UPDATE storage_profile_secret_versions
-SET status = 'revoked',
-    revoked_at = now(),
-    retired_at = NULL
-WHERE profile_id = sqlc.arg(profile_id)
-  AND secret_name = sqlc.arg(secret_name)
-  AND status = 'active';
-
--- name: RestoreLatestRetiredStorageProfileSecretVersion :execrows
-UPDATE storage_profile_secret_versions AS target_version
-SET status = 'active',
-    retired_at = NULL,
-    revoked_at = NULL
-WHERE id = (
-    SELECT retired_version.id
-    FROM storage_profile_secret_versions AS retired_version
-    WHERE retired_version.profile_id = sqlc.arg(profile_id)
-      AND retired_version.secret_name = sqlc.arg(secret_name)
-      AND retired_version.status = 'retired'
-    ORDER BY retired_version.version_number DESC
-    LIMIT 1
-  )
-  AND NOT EXISTS (
-    SELECT 1
-    FROM storage_profile_secret_versions AS active_version
-    WHERE active_version.profile_id = sqlc.arg(profile_id)
-      AND active_version.secret_name = sqlc.arg(secret_name)
-      AND active_version.status = 'active'
-  );
 
 -- name: EnsureFeaturePrompt :exec
 INSERT INTO feature_prompts (feature_slug)
