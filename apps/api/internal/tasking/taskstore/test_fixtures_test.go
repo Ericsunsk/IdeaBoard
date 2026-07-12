@@ -22,14 +22,14 @@ func createRepositoryTestTask(t testing.TB, repo *Repository, ctx context.Contex
 		if task.AssignedProviderEndpointID == nil {
 			var providerEndpointID int64
 			if err := repo.db.QueryRowContext(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&providerEndpointID); err != nil {
-				return err
+				return fmt.Errorf("load task store fixture provider endpoint: %w", err)
 			}
 			task.AssignedProviderEndpointID = tasks.IDPtr(providerEndpointID)
 		}
 		if task.AssignedCredentialID == nil {
 			var credentialID int64
 			if err := repo.db.QueryRowContext(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&credentialID); err != nil {
-				return err
+				return fmt.Errorf("load task store fixture credential: %w", err)
 			}
 			task.AssignedCredentialID = tasks.IDPtr(credentialID)
 		}
@@ -58,5 +58,8 @@ func createRepositoryTestTask(t testing.TB, repo *Repository, ctx context.Contex
 			task.CancelReason = "test cancellation"
 		}
 	}
-	return repo.Create(ctx, task)
+	if err := repo.Create(ctx, task); err != nil {
+		return fmt.Errorf("create task store fixture task: %w", err)
+	}
+	return nil
 }

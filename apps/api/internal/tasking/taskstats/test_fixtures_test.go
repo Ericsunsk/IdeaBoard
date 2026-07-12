@@ -3,6 +3,7 @@ package taskstats
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -17,14 +18,14 @@ func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repositor
 		if task.AssignedProviderEndpointID == nil {
 			var id int64
 			if err := db.QueryRowContext(ctx, `SELECT provider_endpoint_id FROM api_accounts WHERE id=$1`, accountID).Scan(&id); err != nil {
-				return err
+				return fmt.Errorf("load task stats fixture provider endpoint: %w", err)
 			}
 			task.AssignedProviderEndpointID = tasks.IDPtr(id)
 		}
 		if task.AssignedCredentialID == nil {
 			var id int64
 			if err := db.QueryRowContext(ctx, `SELECT id FROM api_account_secrets WHERE account_id=$1 AND status='active' ORDER BY id DESC LIMIT 1`, accountID).Scan(&id); err != nil {
-				return err
+				return fmt.Errorf("load task stats fixture credential: %w", err)
 			}
 			task.AssignedCredentialID = tasks.IDPtr(id)
 		}
@@ -53,5 +54,8 @@ func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repositor
 			task.CancelReason = "test cancellation"
 		}
 	}
-	return repo.Create(ctx, task)
+	if err := repo.Create(ctx, task); err != nil {
+		return fmt.Errorf("create task stats fixture task: %w", err)
+	}
+	return nil
 }
