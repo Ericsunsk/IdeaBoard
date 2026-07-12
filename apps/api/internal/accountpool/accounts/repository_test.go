@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/db/dbutil"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type stubRunningTaskFinalizer struct {
@@ -166,9 +168,10 @@ func TestAccountSecretRejectsExternalRefMaterial(t *testing.T) {
 UPDATE api_account_secrets
 SET secret_material_kind = 'external_ref',
     secret_payload = ''
-WHERE account_id = $1 AND status = 'active'`, account.ID); err != nil {
-		if !strings.Contains(err.Error(), "chk_api_account_secrets_material_kind") {
-			t.Fatalf("external_ref should fail material kind check, got: %v", err)
+	WHERE account_id = $1 AND status = 'active'`, account.ID); err != nil {
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23514" {
+			t.Fatalf("external_ref should fail a CHECK constraint with SQLSTATE 23514, got: %v", err)
 		}
 		return
 	}

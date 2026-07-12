@@ -124,6 +124,55 @@ func createTestAccount(t *testing.T, repo *AccountRepository, name string, statu
 	return acc
 }
 
+func createRunningTaskFixture(t *testing.T, db *sql.DB, repo *taskstore.Repository, account *ApiAccount, taskID string) *tasks.Task {
+	t.Helper()
+	ctx := t.Context()
+	var credentialID int64
+	var credentialFingerprint string
+	var credentialKeyVersion string
+	if err := db.QueryRowContext(ctx, `
+SELECT id, fingerprint, key_version
+FROM api_account_secrets
+WHERE account_id = $1 AND status = 'active'
+ORDER BY rotated_at DESC, id DESC
+LIMIT 1`, account.ID).Scan(&credentialID, &credentialFingerprint, &credentialKeyVersion); err != nil {
+		t.Fatalf("load running task credential snapshot failed: %v", err)
+	}
+	var apiType string
+	var endpointName string
+	var endpointBaseURL string
+	if err := db.QueryRowContext(ctx, `
+SELECT api_type, name, base_url
+FROM provider_endpoints
+WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &endpointName, &endpointBaseURL); err != nil {
+		t.Fatalf("load running task provider snapshot failed: %v", err)
+	}
+	leaseToken := "lease-" + taskID
+	task := &tasks.Task{
+		TaskID: taskID, UserID: 1,
+		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(account.ID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 leaseToken,
+	}
+	if err := repo.Create(ctx, task); err != nil {
+		t.Fatalf("create running task %q failed: %v", taskID, err)
+	}
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO task_leases (
+  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
+  requested_model, resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
+  credential_fingerprint, credential_key_version
+) VALUES ($1, $2, 0, $3, $4, $5, 'gpt-image-1', 'gpt-image-1', $6, $7, $8, $9, $10)`,
+		taskID, leaseToken, account.ID, account.ProviderEndpointID, credentialID,
+		apiType, endpointName, endpointBaseURL, credentialFingerprint, credentialKeyVersion,
+	); err != nil {
+		t.Fatalf("create running task lease %q failed: %v", taskID, err)
+	}
+	return task
+}
+
 func createAccountTestChannel(t testing.TB, db *sql.DB, suffix string) int64 {
 	t.Helper()
 	var id int64
@@ -411,14 +460,8 @@ func TestDeleteAccountFailsResidualInFlightTasks(t *testing.T) {
 	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "delete-residual", 0)
 
-	first := &tasks.Task{TaskID: "delete-residual-running-1", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
-	second := &tasks.Task{TaskID: "delete-residual-running-2", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
-	if err := taskRepo.Create(context.Background(), first); err != nil {
-		t.Fatalf("create first running task failed: %v", err)
-	}
-	if err := taskRepo.Create(context.Background(), second); err != nil {
-		t.Fatalf("create second running task failed: %v", err)
-	}
+	first := createRunningTaskFixture(t, db, taskRepo, acc, "delete-residual-running-1")
+	second := createRunningTaskFixture(t, db, taskRepo, acc, "delete-residual-running-2")
 
 	cancelStore := &fakeCancelStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
@@ -465,14 +508,8 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	accountRepo := NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 
-	first := &tasks.Task{TaskID: "t-running-1", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
-	second := &tasks.Task{TaskID: "t-running-2", UserID: 1, AssignedProviderEndpointID: tasks.IDPtr(acc.ProviderEndpointID), AccountID: tasks.IDPtr(acc.ID), Status: tasks.StatusRunning}
-	if err := taskRepo.Create(context.Background(), first); err != nil {
-		t.Fatalf("create first running task failed: %v", err)
-	}
-	if err := taskRepo.Create(context.Background(), second); err != nil {
-		t.Fatalf("create second running task failed: %v", err)
-	}
+	first := createRunningTaskFixture(t, db, taskRepo, acc, "t-running-1")
+	second := createRunningTaskFixture(t, db, taskRepo, acc, "t-running-2")
 
 	cancelStore := &fakeCancelStore{}
 	taskEvents := &recordingTaskStatusPublisher{}

@@ -210,8 +210,18 @@ func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 	if token.BoardID != boardID || token.CreatedBy != owner.ID {
 		t.Fatalf("token identity = board:%q created:%d, want board:%q created:%d", token.BoardID, token.CreatedBy, boardID, owner.ID)
 	}
+	ownerTokens, err := service.ListShareTokens(ctx, owner.ID, boardID)
+	if err != nil {
+		t.Fatalf("owner list share tokens failed: %v", err)
+	}
+	if len(ownerTokens) != 1 || ownerTokens[0].ID != token.ID {
+		t.Fatalf("owner share tokens = %+v, want token %d", ownerTokens, token.ID)
+	}
 	if _, err := service.ListShareTokens(ctx, outsider.ID, boardID); !errors.Is(err, ErrBoardNotFound) {
 		t.Fatalf("outsider list share tokens err = %v, want ErrBoardNotFound", err)
+	}
+	if err := service.RevokeShareToken(ctx, outsider.ID, boardID, token.ID); !errors.Is(err, ErrBoardNotFound) {
+		t.Fatalf("outsider revoke share token err = %v, want ErrBoardNotFound", err)
 	}
 
 	joined, err := service.JoinBoardByShareToken(ctx, joiner.ID, token.Token)

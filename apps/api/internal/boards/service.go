@@ -594,9 +594,12 @@ func (s *BoardService) saveAndReloadBoardForActor(ctx context.Context, actorUser
 }
 
 func (s *BoardService) requireOwnerBoard(ctx context.Context, userID int64, boardID string) (*UserBoard, error) {
-	access, err := s.resolveOwnerBoard(ctx, userID, boardID)
+	access, err := s.resolveAccessibleBoard(ctx, userID, boardID)
 	if err != nil {
 		return nil, err
+	}
+	if access.Role != BoardAccessRoleOwner || access.Board.OwnerUserID != userID {
+		return nil, ErrBoardPermissionDenied
 	}
 	return &access.Board, nil
 }
