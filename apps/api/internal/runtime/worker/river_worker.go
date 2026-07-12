@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -47,6 +48,7 @@ const (
 	finalFailureExecutionOutputKind = "task_final_attempt_started"
 	defaultFinalFailureRetryDelay   = 5 * time.Second
 	finalFailureConvergeTimeout     = 15 * time.Second
+	riverSchemaLookupTimeout        = 5 * time.Second
 )
 
 type finalFailureRetryOutput struct {
@@ -291,6 +293,12 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 	if dbPool == nil {
 		return nil, errors.New("river db pool is nil")
 	}
+	schemaCtx, cancel := context.WithTimeout(context.Background(), riverSchemaLookupTimeout)
+	defer cancel()
+	schema, err := currentRiverSchema(schemaCtx, dbPool)
+	if err != nil {
+		return nil, err
+	}
 	queueName := opts.QueueName
 	if queueName == "" {
 		queueName = taskqueue.RiverQueueDefault
@@ -349,6 +357,7 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 		MaxAttempts:  maxRetry,
 		JobTimeout:   jobTimeout,
 		ErrorHandler: errorHandler,
+		Schema:       schema,
 	})
 }
 
@@ -423,12 +432,27 @@ func MigrateRiver(ctx context.Context, dbPool *pgxpool.Pool) error {
 	if dbPool == nil {
 		return errors.New("river db pool is nil")
 	}
-	migrator, err := rivermigrate.New(riverpgxv5.New(dbPool), nil)
+	schema, err := currentRiverSchema(ctx, dbPool)
+	if err != nil {
+		return err
+	}
+	migrator, err := rivermigrate.New(riverpgxv5.New(dbPool), &rivermigrate.Config{Schema: schema})
 	if err != nil {
 		return err
 	}
 	_, err = migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
 	return err
+}
+
+func currentRiverSchema(ctx context.Context, dbPool *pgxpool.Pool) (string, error) {
+	var schema string
+	if err := dbPool.QueryRow(ctx, `SELECT current_schema()`).Scan(&schema); err != nil {
+		return "", fmt.Errorf("read current River schema: %w", err)
+	}
+	if strings.TrimSpace(schema) == "" {
+		return "", errors.New("current River schema is empty")
+	}
+	return schema, nil
 }
 
 func NewRiverPgxPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {

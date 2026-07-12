@@ -60,6 +60,7 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 		TaskID:                     "confirm-fail-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-confirm-fail",
@@ -114,6 +115,7 @@ func TestExecuteDropsTaskWhenLeaseConfirmationAlreadyConverged(t *testing.T) {
 		TaskID:                     "confirm-converged-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-confirm-converged",
@@ -164,6 +166,7 @@ func TestExecuteRequeuesWhenAssignmentProviderEndpointNoLongerMatchesAccount(t *
 		TaskID:                     "endpoint-mismatch-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-endpoint-mismatch",
@@ -207,6 +210,7 @@ func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 		TaskID:                     "complete-fail-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-direct-complete",
@@ -263,6 +267,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 		TaskID:                     "cancel-after-provider-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-cancel-after-provider",
@@ -324,6 +329,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 		TaskID:                     "cancel-before-provider-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-cancel-before-provider",
@@ -389,6 +395,7 @@ func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 		TaskID:                     "failed-fail-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-direct-failed",
@@ -442,6 +449,7 @@ func TestExecuteFailsImmediatelyWhenFailoverHasNoCandidates(t *testing.T) {
 		TaskID:                     "failover-exhausted-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-failover-exhausted",
@@ -499,6 +507,7 @@ func TestExecuteProviderFailureRoutesThroughConvergenceDecision(t *testing.T) {
 		TaskID:                     "convergence-provider-failure-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-convergence-provider-failure",
@@ -616,6 +625,7 @@ func TestExecuteTemporaryProviderFailureRequeuesWithoutFailureResult(t *testing.
 		TaskID:                     "temporary-provider-failure-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-temporary-provider-failure",
@@ -662,7 +672,7 @@ func TestExecuteTemporaryProviderFailureRequeuesWithoutFailureResult(t *testing.
 	}
 }
 
-func TestExecuteProviderParseFailureRequeuesWithFailureResultEnvelope(t *testing.T) {
+func TestExecuteProviderParseFailureFinalFailsWithFailureResultEnvelope(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
@@ -674,6 +684,7 @@ func TestExecuteProviderParseFailureRequeuesWithFailureResultEnvelope(t *testing
 		TaskID:                     "provider-parse-retry-task",
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
+		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
 		AccountID:                  tasks.IDPtr(account.ID),
 		Status:                     tasks.StatusRunning,
 		LeaseToken:                 "lease-provider-parse-retry",
@@ -703,16 +714,16 @@ func TestExecuteProviderParseFailureRequeuesWithFailureResultEnvelope(t *testing
 	if err != nil {
 		t.Fatalf("execute returned error: %v", err)
 	}
-	if requeuer.calls != 1 {
-		t.Fatalf("requeue calls = %d, want 1", requeuer.calls)
+	if requeuer.calls != 0 {
+		t.Fatalf("requeue calls = %d, want 0", requeuer.calls)
 	}
 
 	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
 	if err != nil {
 		t.Fatalf("reload task failed: %v", err)
 	}
-	if updated.Status != tasks.StatusPending {
-		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	if updated.Status != tasks.StatusFailed {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusFailed)
 	}
 	if updated.Result != failureResult {
 		t.Fatalf("result = %q, want parse failure envelope", updated.Result)
@@ -720,8 +731,8 @@ func TestExecuteProviderParseFailureRequeuesWithFailureResultEnvelope(t *testing
 	if !strings.Contains(updated.ErrorMsg, "workflow contract") {
 		t.Fatalf("error_msg = %q, want parse contract reason", updated.ErrorMsg)
 	}
-	if updated.CompletedAt != nil {
-		t.Fatalf("completed_at should remain nil, got %v", updated.CompletedAt)
+	if updated.CompletedAt == nil {
+		t.Fatal("completed_at should be set")
 	}
 }
 

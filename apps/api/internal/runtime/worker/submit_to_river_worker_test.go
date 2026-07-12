@@ -38,9 +38,32 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	if err := MigrateRiver(ctx, pool); err != nil {
 		t.Fatalf("migrate River schema failed: %v", err)
 	}
+	creditService := credits.NewService(pool)
+	billingService := billing.NewService(pool)
+	taskBilling := taskbilling.NewService(billingService, creditService)
+	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage, "gpt-image-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sku, err := taskbilling.ResolveSKU(billingRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := billingService.CreateSKU(ctx, billing.CreateSKUInput{
+		SKU: string(sku), DisplayName: "Sketch to Image", Enabled: true, ActorID: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := billingService.CreatePrice(ctx, billing.CreatePriceInput{
+		SKU: string(sku), UnitCredits: 5, Enabled: true, ActorID: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	seedRiverBillingWallet(t, pool, creditService, 42, 20)
 
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
+	taskRepo.SetTaskBilling(taskBilling)
 	account := createRiverTestAccount(t, db, accountRepo, "submit-worker-convergence")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
@@ -68,11 +91,15 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	}
 
 	task := newSubmitToRiverWorkerTask("task_submit_worker_converges")
+	task.ClientActionID = "action-task-submit-worker-converges"
+	task.BillingRequest = &tasks.TaskBillingRequest{
+		Feature: billingRequest.Feature, Model: billingRequest.Model, Quantity: billingRequest.Quantity,
+	}
 	queueTask := newSubmitToRiverWorkerQueueTask(task, account.ID)
 	if task.Status != tasks.StatusPending {
 		t.Fatalf("new task status=%q, want %q", task.Status, tasks.StatusPending)
 	}
-	store := tasksubmission.NewStore(pool, taskRepo, client, submitToRiverWorkerQueue, submitToRiverWorkerMaxAttempts, nil)
+	store := tasksubmission.NewStore(pool, taskRepo, client, submitToRiverWorkerQueue, submitToRiverWorkerMaxAttempts, taskBilling)
 	result, err := store.SubmitTask(ctx, task, queueTask)
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
@@ -122,6 +149,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	if !taskqueue.LeaseBelongsToRiverJob(attempt.leaseToken, job.id) {
 		t.Fatalf("lease_token=%q does not belong to river_job.id=%d", attempt.leaseToken, job.id)
 	}
+	assertRiverTaskBillingState(t, db, task.TaskID, tasks.StatusCompleted, "captured", 15, 0)
 }
 
 func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t *testing.T) {
@@ -552,10 +580,11 @@ func loadSubmitToRiverWorkerAttempt(t testing.TB, db *sql.DB, taskID string) sub
 	t.Helper()
 	var attempt submitToRiverWorkerAttempt
 	err := db.QueryRowContext(t.Context(), `
-SELECT river_job_id, status, lease_token
-FROM task_attempts
-WHERE task_id = $1
-ORDER BY attempt_no DESC
+SELECT attempts.river_job_id, attempts.status, leases.lease_token
+FROM task_attempts attempts
+JOIN task_leases leases ON leases.id = attempts.lease_id
+WHERE attempts.task_id = $1
+ORDER BY attempts.attempt_no DESC
 LIMIT 1`, taskID).Scan(&attempt.riverJobID, &attempt.status, &attempt.leaseToken)
 	if err != nil {
 		t.Fatalf("load task attempt for %q failed: %v", taskID, err)

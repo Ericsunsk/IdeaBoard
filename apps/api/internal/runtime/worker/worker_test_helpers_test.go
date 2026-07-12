@@ -217,7 +217,18 @@ RETURNING id`,
 
 func riverTestAssignment(t testing.TB, db testRuntimeDB, account *accounts.ApiAccount, taskID string, leaseToken string) taskqueue.TaskAssignment {
 	t.Helper()
-	credentialID := loadRiverTestCredentialID(t, db, account.ID)
+	var credentialID int64
+	var credentialFingerprint string
+	var credentialKeyVersion string
+	if err := db.QueryRowContext(context.Background(), `
+SELECT id, fingerprint, key_version
+FROM api_account_secrets
+WHERE account_id = $1
+  AND status = 'active'
+ORDER BY rotated_at DESC, id DESC
+LIMIT 1`, account.ID).Scan(&credentialID, &credentialFingerprint, &credentialKeyVersion); err != nil {
+		t.Fatalf("load runtime credential snapshot failed: %v", err)
+	}
 	var endpointName string
 	var endpointBaseURL string
 	var apiType string
@@ -236,25 +247,30 @@ WHERE id = $1`, account.ProviderEndpointID).Scan(&endpointName, &endpointBaseURL
 		APIType:                 apiType,
 		ProviderEndpointName:    endpointName,
 		ProviderEndpointBaseURL: endpointBaseURL,
+		CredentialFingerprint:   credentialFingerprint,
+		CredentialKeyVersion:    credentialKeyVersion,
 		Status:                  taskqueue.AssignStatusAssigned,
 		LeaseToken:              leaseToken,
 	}
 	if _, err := db.ExecContext(context.Background(), `
-UPDATE tasks
-SET assigned_credential_id = $2,
-    resolved_model = $3,
-    api_type = $4,
-    provider_endpoint_name = $5,
-    provider_endpoint_base_url = $6
-WHERE task_id = $1`,
+INSERT INTO task_leases (
+  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
+  resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
+  credential_fingerprint, credential_key_version
+) VALUES ($1, $2, 0, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		taskID,
+		assignment.LeaseToken,
+		assignment.AccountID,
+		assignment.ProviderEndpointID,
 		assignment.CredentialID,
 		assignment.ResolvedModel,
 		assignment.APIType,
 		assignment.ProviderEndpointName,
 		assignment.ProviderEndpointBaseURL,
+		assignment.CredentialFingerprint,
+		assignment.CredentialKeyVersion,
 	); err != nil {
-		t.Fatalf("write task assignment snapshot failed: %v", err)
+		t.Fatalf("write task lease snapshot failed: %v", err)
 	}
 	return assignment
 }

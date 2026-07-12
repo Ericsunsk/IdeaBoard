@@ -139,6 +139,60 @@ func TestStoreSubmitTaskReturnsExistingTaskForDuplicateClientActionID(t *testing
 	}
 }
 
+func TestTaskSubmissionRiverClientPinsCurrentSchemaWhenFallbackContainsRiverTables(t *testing.T) {
+	ctx := t.Context()
+	db, pool := testdb.OpenWithPool(t)
+	currentSchema := taskSubmissionCurrentSchema(t, pool)
+	fallbackSchema := currentSchema + "_river_fallback"
+	fallbackSQL := pgx.Identifier{fallbackSchema}.Sanitize()
+	if _, err := db.ExecContext(ctx, `CREATE SCHEMA `+fallbackSQL); err != nil {
+		t.Fatalf("create fallback River schema failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), `DROP SCHEMA IF EXISTS `+fallbackSQL+` CASCADE`)
+	})
+
+	migrator, err := rivermigrate.New(riverpgxv5.New(pool), &rivermigrate.Config{
+		Logger: discardRiverTestLogger(),
+		Schema: fallbackSchema,
+	})
+	if err != nil {
+		t.Fatalf("create fallback River migrator failed: %v", err)
+	}
+	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
+		t.Fatalf("migrate fallback River schema failed: %v", err)
+	}
+
+	poolConfig := pool.Config().Copy()
+	poolConfig.ConnConfig.RuntimeParams["search_path"] = pgx.Identifier{currentSchema}.Sanitize() + "," + fallbackSQL
+	shadowPool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		t.Fatalf("create fallback-aware pool failed: %v", err)
+	}
+	t.Cleanup(shadowPool.Close)
+	if err := shadowPool.Ping(ctx); err != nil {
+		t.Fatalf("ping fallback-aware pool failed: %v", err)
+	}
+
+	client := newTaskSubmissionRiverClient(t, shadowPool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
+	if got := client.Schema(); got != currentSchema {
+		t.Fatalf("River client schema=%q, want current schema %q", got, currentSchema)
+	}
+	task := newTaskSubmissionTask("task_river_schema_pinned")
+	store := NewStore(shadowPool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
+	if _, err := store.SubmitTask(ctx, task, newTaskSubmissionQueueTask(task)); err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	var count int
+	currentRiverJob := pgx.Identifier{currentSchema, "river_job"}.Sanitize()
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+currentRiverJob+` WHERE args->'task'->>'task_id' = $1`, task.TaskID).Scan(&count); err != nil {
+		t.Fatalf("count current-schema River jobs failed: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("current-schema River job count=%d, want 1", count)
+	}
+}
+
 func TestStoreSubmitTaskCreatesDistinctTaskForNewClientActionID(t *testing.T) {
 	ctx := context.Background()
 	db, pool := testdb.OpenWithPool(t)
@@ -307,7 +361,8 @@ func (noopDrawingWorker) Work(context.Context, *river.Job[taskqueue.DrawingTaskA
 
 func newTaskSubmissionRiverClient(t testing.TB, pool *pgxpool.Pool, queueName string, maxAttempts int) *river.Client[pgx.Tx] {
 	t.Helper()
-	migrateRiverForTaskSubmissionTest(t, pool)
+	schema := taskSubmissionCurrentSchema(t, pool)
+	migrateRiverForTaskSubmissionTest(t, pool, schema)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, noopDrawingWorker{})
@@ -317,6 +372,7 @@ func newTaskSubmissionRiverClient(t testing.TB, pool *pgxpool.Pool, queueName st
 		},
 		Workers:     workers,
 		MaxAttempts: maxAttempts,
+		Schema:      schema,
 		TestOnly:    true,
 		Logger:      discardRiverTestLogger(),
 	})
@@ -326,10 +382,11 @@ func newTaskSubmissionRiverClient(t testing.TB, pool *pgxpool.Pool, queueName st
 	return client
 }
 
-func migrateRiverForTaskSubmissionTest(t testing.TB, pool *pgxpool.Pool) {
+func migrateRiverForTaskSubmissionTest(t testing.TB, pool *pgxpool.Pool, schema string) {
 	t.Helper()
 	migrator, err := rivermigrate.New(riverpgxv5.New(pool), &rivermigrate.Config{
 		Logger: discardRiverTestLogger(),
+		Schema: schema,
 	})
 	if err != nil {
 		t.Fatalf("create River migrator failed: %v", err)
@@ -337,6 +394,18 @@ func migrateRiverForTaskSubmissionTest(t testing.TB, pool *pgxpool.Pool) {
 	if _, err := migrator.Migrate(t.Context(), rivermigrate.DirectionUp, nil); err != nil {
 		t.Fatalf("migrate River schema failed: %v", err)
 	}
+}
+
+func taskSubmissionCurrentSchema(t testing.TB, pool *pgxpool.Pool) string {
+	t.Helper()
+	var schema string
+	if err := pool.QueryRow(t.Context(), `SELECT current_schema()`).Scan(&schema); err != nil {
+		t.Fatalf("read current PostgreSQL schema failed: %v", err)
+	}
+	if schema == "" {
+		t.Fatal("current PostgreSQL schema is empty")
+	}
+	return schema
 }
 
 func discardRiverTestLogger() *slog.Logger {
