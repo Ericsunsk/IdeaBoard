@@ -131,7 +131,7 @@ FROM (
 	var memoryBefore runtime.MemStats
 	runtime.ReadMemStats(&memoryBefore)
 	var reconciliationRunID int64
-	if err := db.QueryRowContext(ctx, `SELECT start_credit_reconciliation(1, 86400)`).Scan(&reconciliationRunID); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT start_credit_reconciliation(1, 86400, 'million dataset verification')`).Scan(&reconciliationRunID); err != nil {
 		t.Fatalf("start reconciliation error = %v", err)
 	}
 	reconciliationStarted := time.Now()

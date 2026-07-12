@@ -47,21 +47,25 @@ type createSKURequest struct {
 	DisplayName string `json:"display_name"`
 	Description string `json:"description"`
 	Enabled     *bool  `json:"enabled"`
+	Reason      string `json:"reason"`
 }
 
 type updateSKURequest struct {
 	DisplayName *string `json:"display_name"`
 	Description *string `json:"description"`
 	Enabled     *bool   `json:"enabled"`
+	Reason      string  `json:"reason"`
 }
 
 type createPriceRequest struct {
-	UnitCredits int64 `json:"unit_credits"`
-	Enabled     *bool `json:"enabled"`
+	UnitCredits int64  `json:"unit_credits"`
+	Enabled     *bool  `json:"enabled"`
+	Reason      string `json:"reason"`
 }
 
 type setPriceEnabledRequest struct {
-	Enabled *bool `json:"enabled"`
+	Enabled *bool  `json:"enabled"`
+	Reason  string `json:"reason"`
 }
 
 func (h *Handler) Quote(c *gin.Context) {
@@ -92,9 +96,14 @@ func (h *Handler) CreateSKU(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
+	reason, err := normalizeAdminReason(request.Reason)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "reason 无效")
+		return
+	}
 	item, err := h.admin.CreateSKU(c.Request.Context(), CreateSKUInput{
 		SKU: request.SKU, DisplayName: request.DisplayName, Description: request.Description,
-		Enabled: *request.Enabled, ActorID: actorID,
+		Enabled: *request.Enabled, ActorID: actorID, Reason: reason,
 	})
 	if err != nil {
 		writeError(c, err)
@@ -113,9 +122,14 @@ func (h *Handler) UpdateSKU(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
+	reason, err := normalizeAdminReason(request.Reason)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "reason 无效")
+		return
+	}
 	item, err := h.admin.UpdateSKU(c.Request.Context(), UpdateSKUInput{
 		SKU: c.Param("sku"), DisplayName: request.DisplayName, Description: request.Description,
-		Enabled: request.Enabled, ActorID: actorID,
+		Enabled: request.Enabled, ActorID: actorID, Reason: reason,
 	})
 	if err != nil {
 		writeError(c, err)
@@ -134,8 +148,13 @@ func (h *Handler) CreatePrice(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
+	reason, err := normalizeAdminReason(request.Reason)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "reason 无效")
+		return
+	}
 	price, err := h.admin.CreatePrice(c.Request.Context(), CreatePriceInput{
-		SKU: c.Param("sku"), UnitCredits: request.UnitCredits, Enabled: *request.Enabled, ActorID: actorID,
+		SKU: c.Param("sku"), UnitCredits: request.UnitCredits, Enabled: *request.Enabled, ActorID: actorID, Reason: reason,
 	})
 	if err != nil {
 		writeError(c, err)
@@ -159,8 +178,13 @@ func (h *Handler) SetPriceEnabled(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
+	reason, err := normalizeAdminReason(request.Reason)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "reason 无效")
+		return
+	}
 	price, err := h.admin.SetPriceEnabled(c.Request.Context(), SetPriceEnabledInput{
-		SKU: c.Param("sku"), Version: version, Enabled: *request.Enabled, ActorID: actorID,
+		SKU: c.Param("sku"), Version: version, Enabled: *request.Enabled, ActorID: actorID, Reason: reason,
 	})
 	if err != nil {
 		writeError(c, err)

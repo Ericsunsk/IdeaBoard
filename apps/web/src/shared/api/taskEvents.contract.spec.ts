@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseTask, Task } from './generated-query/model'
 import { queryClient } from '../query/queryClient'
 import { TaskResultPendingError, waitTaskImageResultsWithSse } from './taskEvents'
+import { subscribeUserCreditsInvalidation } from '../query/userCreditsInvalidation'
 
 const mocks = vi.hoisted(() => ({
   getTask: vi.fn(),
@@ -163,6 +164,27 @@ describe('waitTaskImageResultsWithSse', () => {
     ])
     expect(mocks.getTask).not.toHaveBeenCalled()
     expect(MockEventSource.instances[0]?.closed).toBe(true)
+  })
+
+  it('notifies wallet and ledger consumers after terminal settlement', async () => {
+    vi.stubGlobal('EventSource', MockEventSource)
+    const listener = vi.fn()
+    const unsubscribe = subscribeUserCreditsInvalidation(listener)
+
+    const result = waitTaskImageResultsWithSse('task-1')
+    MockEventSource.instances[0]?.emit('task', {
+      task_id: 'task-1',
+      status: 'completed',
+      outputs: [makeImageOutput('https://cdn.example.com/settled.png')],
+    })
+    await result
+
+    expect(listener).toHaveBeenCalledWith({
+      source: 'task-settlement',
+      taskId: 'task-1',
+      status: 'completed',
+    })
+    unsubscribe()
   })
 
   it('rejects malformed SSE payloads without falling back to polling', async () => {

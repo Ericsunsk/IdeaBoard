@@ -62,10 +62,10 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 	if err := VerifyRuntimePrivileges(ctx, conn); err != nil {
 		t.Fatalf("VerifyRuntimePrivileges() error = %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5)`, "test:runtime", "Runtime", "", true, 1); err != nil {
+	if _, err := conn.ExecContext(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5, $6)`, "test:runtime", "Runtime", "", true, 1, "runtime test setup"); err != nil {
 		t.Fatalf("typed create SKU command: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `SELECT * FROM create_billing_price_version($1, $2, $3, $4)`, "test:runtime", 0, true, 1); err != nil {
+	if _, err := conn.ExecContext(ctx, `SELECT * FROM create_billing_price_version($1, $2, $3, $4, $5)`, "test:runtime", 0, true, 1, "runtime test price"); err != nil {
 		t.Fatalf("typed free price command: %v", err)
 	}
 	var count int
@@ -77,6 +77,8 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 		`INSERT INTO billing_skus (sku, display_name, enabled, created_by, updated_by) VALUES ('test:bypass', 'Bypass', TRUE, 1, 1)`,
 		`UPDATE billing_price_versions SET unit_credits = 99 WHERE sku = 'test:runtime'`,
 		`DELETE FROM billing_skus WHERE sku = 'test:runtime'`,
+		`SELECT * FROM billing_admin_actions`,
+		`INSERT INTO billing_admin_actions (action_type, sku, actor_id, reason) VALUES ('update_sku', 'test:runtime', 1, 'bypass')`,
 		`SELECT prevent_billing_price_version_mutation()`,
 	} {
 		if _, err := conn.ExecContext(ctx, statement); err == nil {

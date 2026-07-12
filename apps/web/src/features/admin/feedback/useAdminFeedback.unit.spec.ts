@@ -46,4 +46,26 @@ describe('createAdminFeedback', () => {
     ])
     expect(appToast.warning).toHaveBeenCalledWith('账号限制加载失败，已使用默认限制')
   })
+
+  it('reports Credits idempotency conflicts without implying a repeated posting', () => {
+    const appToast = {
+      success: vi.fn(),
+      warning: vi.fn(),
+      error: vi.fn(),
+    }
+    const feedback = createAdminFeedback(appToast)
+
+    feedback.creditsBilling.operations.commandFailed({ status: 409 }, '赠送')
+    feedback.creditsBilling.operations.commandFailed({ code: 409 }, '退款')
+
+    expect(appToast.error).toHaveBeenNthCalledWith(
+      1,
+      '操作发生幂等冲突，未重复记账。请刷新 Wallet 与流水后重试。',
+    )
+    expect(appToast.error).toHaveBeenNthCalledWith(
+      2,
+      '操作发生幂等冲突，未重复记账。请刷新 Wallet 与流水后重试。',
+    )
+    expect(appToast.success).not.toHaveBeenCalled()
+  })
 })

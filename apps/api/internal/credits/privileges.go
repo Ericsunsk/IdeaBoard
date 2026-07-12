@@ -48,7 +48,7 @@ var creditLifecycleFunctionSignatures = []string{
 }
 
 var creditReconciliationFunctionSignatures = []string{
-	"start_credit_reconciliation(BIGINT, BIGINT)",
+	"start_credit_reconciliation(BIGINT, BIGINT, TEXT)",
 	"execute_credit_reconciliation(BIGINT)",
 	"fail_credit_reconciliation(BIGINT, TEXT)",
 }

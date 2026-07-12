@@ -10,6 +10,7 @@ tags:
   - name: Boards
   - name: Tasks
   - name: Billing
+  - name: UserCredits
   - name: AdminSettings
   - name: AdminUsers
   - name: AdminCredits
@@ -67,6 +68,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillingQuote'
+  /user/credits/wallet:
+    get:
+      tags: [UserCredits]
+      operationId: getUserCreditWallet
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current authenticated user's Credit wallet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCreditWallet'
+  /user/credits/ledger:
+    get:
+      tags: [UserCredits]
+      operationId: listUserCreditLedger
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: before_sequence
+          in: query
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Current authenticated user's immutable Credit ledger page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseCreditLedgerPage'
   /user/profile/avatar:
     post:
       tags: [UserAssets]
@@ -977,6 +1011,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillingCatalogItem'
+
+  /admin/billing/coverage:
+    get:
+      tags: [AdminBilling]
+      operationId: getAdminBillingCoverage
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Executable AI workflow and provider model pricing coverage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBillingCoverage'
 
   /admin/billing/skus/{sku}:
     patch:
@@ -1918,6 +1966,27 @@ components:
           items: { $ref: '#/components/schemas/BillingCatalogItem' }
         next_after_sku: { $ref: '#/components/schemas/BillingSKUCode' }
 
+    BillingCoverageItem:
+      type: object
+      required: [feature, model, sku, sku_configured, sku_enabled, price_configured, price_enabled]
+      properties:
+        feature: { $ref: '#/components/schemas/WorkflowFeatureSlug' }
+        model: { type: string, minLength: 1 }
+        sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        sku_configured: { type: boolean }
+        sku_enabled: { type: boolean }
+        price_configured: { type: boolean }
+        price_enabled: { type: boolean }
+        unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
+
+    BillingCoverage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BillingCoverageItem' }
+
     BillingPricePage:
       type: object
       required: [prices]
@@ -1930,36 +1999,49 @@ components:
     AdminBillingSKUCreateRequest:
       type: object
       additionalProperties: false
-      required: [sku, display_name, enabled]
+      required: [sku, display_name, enabled, reason]
       properties:
         sku: { $ref: '#/components/schemas/BillingSKUCode' }
         display_name: { type: string, minLength: 1, maxLength: 120 }
         description: { type: string, maxLength: 1000, default: '' }
         enabled: { type: boolean }
+        reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     AdminBillingSKUUpdateRequest:
       type: object
       additionalProperties: false
-      minProperties: 1
+      required: [reason]
+      anyOf:
+        - required: [display_name]
+        - required: [description]
+        - required: [enabled]
       properties:
         display_name: { type: string, minLength: 1, maxLength: 120 }
         description: { type: string, maxLength: 1000 }
         enabled: { type: boolean }
+        reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     AdminBillingPriceCreateRequest:
       type: object
       additionalProperties: false
-      required: [unit_credits, enabled]
+      required: [unit_credits, enabled, reason]
       properties:
         unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
         enabled: { type: boolean }
+        reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     AdminBillingPriceStateRequest:
       type: object
       additionalProperties: false
-      required: [enabled]
+      required: [enabled, reason]
       properties:
         enabled: { type: boolean }
+        reason: { $ref: '#/components/schemas/AdminActionReason' }
+
+    AdminActionReason:
+      type: string
+      minLength: 1
+      maxLength: 1000
 
     CreditWallet:
       type: object
@@ -2075,16 +2157,19 @@ components:
     CreditReconciliationRequest:
       type: object
       additionalProperties: false
+      required: [reason]
       properties:
         stale_hold_after_seconds: { type: integer, format: int64, minimum: 60, maximum: 31536000, default: 86400 }
+        reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     CreditReconciliationRun:
       type: object
-      required: [id, status, requested_by, stale_hold_after_seconds, finding_count, critical_count, isolated_wallet_count, attempt_count, requested_at]
+      required: [id, status, requested_by, reason, stale_hold_after_seconds, finding_count, critical_count, isolated_wallet_count, attempt_count, requested_at]
       properties:
         id: { type: integer, format: int64 }
         status: { type: string, enum: [queued, running, completed, failed] }
         requested_by: { type: integer, format: int64 }
+        reason: { $ref: '#/components/schemas/AdminActionReason' }
         stale_hold_after_seconds: { type: integer, format: int64 }
         finding_count: { type: integer, format: int64 }
         critical_count: { type: integer, format: int64 }
@@ -3696,6 +3781,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/BillingCatalogItem'
+
+    ApiResponseBillingCoverage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/BillingCoverage'
 
     ApiResponseBillingCatalogPage:
       allOf:

@@ -21,10 +21,10 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 	sku, _ := ResolveSKU(request)
-	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, ActorID: 1}); err != nil {
+	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: 25, Enabled: true, ActorID: 1}); err != nil {
+	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: 25, Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := pool.Begin(t.Context())
@@ -87,10 +87,10 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, ActorID: 1}); err != nil {
+					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, ActorID: 1, Reason: "test setup"}); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, ActorID: 1}); err != nil {
+					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, ActorID: 1, Reason: "test setup"}); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -142,10 +142,10 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	service := NewService(billingService, creditService)
 	request, _ := AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
 	sku, _ := ResolveSKU(request)
-	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, ActorID: 1}); err != nil {
+	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, ActorID: 1}); err != nil {
+	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := pool.Begin(t.Context())

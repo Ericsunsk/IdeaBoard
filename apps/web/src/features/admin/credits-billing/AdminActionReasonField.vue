@@ -1,0 +1,49 @@
+<template>
+  <AdminFormField
+    v-slot="{ describedbyId, invalid }"
+    :label="label"
+    :for="inputId"
+    :error="error"
+    :hint="hint"
+    required
+    :body-class="bodyClass"
+  >
+    <Textarea
+      :id="inputId"
+      :model-value="modelValue"
+      :rows="rows"
+      fluid
+      :invalid="invalid"
+      :aria-describedby="describedbyId"
+      @update:model-value="emit('update:modelValue', $event ?? '')"
+    />
+  </AdminFormField>
+</template>
+
+<script setup lang="ts">
+import Textarea from 'primevue/textarea'
+import AdminFormField from '../shared/components/AdminFormField.vue'
+
+withDefaults(
+  defineProps<{
+    modelValue: string
+    inputId: string
+    error?: string
+    label?: string
+    hint?: string
+    rows?: number
+    bodyClass?: string
+  }>(),
+  {
+    error: '',
+    label: '操作原因',
+    hint: '将进入不可变审计记录，请说明原因与影响范围。',
+    rows: 3,
+    bodyClass: '',
+  },
+)
+
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+}>()
+</script>

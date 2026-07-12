@@ -5,6 +5,7 @@ import { renderWithUser, screen } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import type { AccountManagementTab } from '../useAccountManagementDialogController'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
 const logoutAndRedirectMock = vi.hoisted(() => vi.fn())
@@ -95,11 +96,12 @@ function makeUser(): User {
   }
 }
 
-function renderAccountManagementDialogContent() {
+function renderAccountManagementDialogContent(initialTab: AccountManagementTab = 'profile') {
   const store = useUserStore()
   store.setAuth(makeUser())
 
   return renderWithUser(AccountManagementDialogContent, {
+    props: { initialTab },
     global: {
       stubs: {
         Avatar: AvatarStub,
@@ -107,6 +109,10 @@ function renderAccountManagementDialogContent() {
         Message: MessageStub,
         Password: PasswordStub,
         Tag: TagStub,
+        UserCreditsPane: {
+          props: ['active'],
+          template: '<section aria-label="点子账户">点子余额与流水</section>',
+        },
       },
     },
   })
@@ -142,6 +148,23 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.getByRole('textbox', { name: '当前原密码' })).toBeVisible()
     expect(screen.getByRole('textbox', { name: '设置新密码' })).toBeVisible()
     expect(screen.queryByText('auth-user-layout')).not.toBeInTheDocument()
+  })
+
+  it('opens the point wallet inside account management', async () => {
+    const { user } = renderAccountManagementDialogContent()
+
+    await user.click(screen.getByRole('button', { name: '点子' }))
+
+    expect(screen.getByRole('button', { name: '点子' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: '点子账户' })).toHaveTextContent('点子余额与流水')
+  })
+
+  it('opens directly on the requested initial tab', () => {
+    renderAccountManagementDialogContent('credits')
+
+    expect(screen.getByRole('button', { name: '点子' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: '点子账户' })).toBeVisible()
+    expect(screen.queryByRole('region', { name: '账户资料概览' })).not.toBeInTheDocument()
   })
 
   it('logs out directly from the left rail without extra confirmation', async () => {

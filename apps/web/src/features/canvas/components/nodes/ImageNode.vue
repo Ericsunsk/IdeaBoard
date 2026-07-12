@@ -73,6 +73,7 @@
         :placeholder="actionBinding.promptPlaceholder"
         :disabled="actionBinding.directGenerating"
         :output-count="outputCountValue"
+        :billing-state="partialEditBillingQuote"
         @update:output-count="selectOutputCount"
         @submit="submitPrompt"
       />
@@ -91,6 +92,8 @@ import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import NodeShell from './NodeShell.vue'
+import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
+import { useCanvasBillingQuote } from '../../execution'
 
 const props = defineProps<{
   node: ImageNodeItem
@@ -148,6 +151,10 @@ type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)
 const promptDraft = ref('')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+const partialEditBillingQuote = useCanvasBillingQuote(
+  () => WORKFLOW_FEATURE.partialEdit,
+  () => showPromptComposer.value,
+)
 
 watchPostEffect((onCleanup) => {
   const flowNodeId = props.flowNodeId

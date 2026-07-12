@@ -40,6 +40,7 @@ func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 }
 
 func registerAdminBillingRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/billing/coverage", h.BillingCoverageHandler.List)
 	adminAPI.GET("/billing/skus", h.BillingHandler.ListCatalog)
 	adminAPI.POST("/billing/skus", h.BillingHandler.CreateSKU)
 	adminAPI.PATCH("/billing/skus/:sku", h.BillingHandler.UpdateSKU)

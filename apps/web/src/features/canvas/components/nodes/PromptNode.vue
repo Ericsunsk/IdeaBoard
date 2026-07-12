@@ -57,6 +57,7 @@
             :output-count="outputCount"
             :aspect-ratio="aspectRatio"
             :submit-disabled="!canGenerate || props.generationAvailable === false"
+            :billing-state="billingQuote"
             class="flex-auto"
             @update:model-value="emit('update:text', $event)"
             @update:output-count="emit('update:output-count', $event)"
@@ -82,6 +83,8 @@ import NodeStageFrame from './NodeStageFrame.vue'
 import PromptTextComposer from './PromptTextComposer.vue'
 import { useImageInputSlots } from './composables/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../canvas-board/domain'
+import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
+import { useCanvasBillingQuote } from '../../execution'
 
 const props = defineProps<{
   node: PromptNodeItem
@@ -113,6 +116,7 @@ const maxInputImages = 4
 const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const canGenerate = computed(() => props.node.text.trim().length > 0)
+const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.patternGen)
 const {
   addSlotDragOver,
   canAcceptMoreImages,

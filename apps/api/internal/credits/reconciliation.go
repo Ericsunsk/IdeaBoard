@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -15,6 +17,8 @@ import (
 const ReconciliationQueue = "credit_reconciliation"
 
 const reconciliationFinalFailureTimeout = 5 * time.Second
+
+const MaxReconciliationReasonLength = 1000
 
 var (
 	ErrReconciliationUnavailable = errors.New("credit reconciliation unavailable")
@@ -35,6 +39,7 @@ type ReconciliationRun struct {
 	ID                  int64                   `json:"id"`
 	Status              ReconciliationRunStatus `json:"status"`
 	RequestedBy         int64                   `json:"requested_by"`
+	Reason              string                  `json:"reason"`
 	StaleHoldAfterSecs  int64                   `json:"stale_hold_after_seconds"`
 	FindingCount        int64                   `json:"finding_count"`
 	CriticalCount       int64                   `json:"critical_count"`
@@ -98,11 +103,18 @@ type ListReconciliationInput struct {
 	Limit    int
 }
 
-func (s *Service) StartReconciliation(ctx context.Context, adminID int64, staleHoldAfter time.Duration) (ReconciliationRun, error) {
+type StartReconciliationInput struct {
+	AdminID        int64
+	StaleHoldAfter time.Duration
+	Reason         string
+}
+
+func (s *Service) StartReconciliation(ctx context.Context, input StartReconciliationInput) (ReconciliationRun, error) {
 	if s == nil || s.pool == nil || s.reconciliationEnqueuer == nil {
 		return ReconciliationRun{}, ErrReconciliationUnavailable
 	}
-	if adminID <= 0 || staleHoldAfter < time.Minute || staleHoldAfter > 365*24*time.Hour {
+	reason, err := normalizeReconciliationReason(input.Reason)
+	if input.AdminID <= 0 || input.StaleHoldAfter < time.Minute || input.StaleHoldAfter > 365*24*time.Hour || err != nil {
 		return ReconciliationRun{}, ErrInvalidCommand
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -117,7 +129,7 @@ func (s *Service) StartReconciliation(ctx context.Context, adminID int64, staleH
 		}
 	}()
 	var runID int64
-	if err := tx.QueryRow(ctx, `SELECT start_credit_reconciliation($1, $2)`, adminID, int64(staleHoldAfter/time.Second)).Scan(&runID); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT start_credit_reconciliation($1, $2, $3)`, input.AdminID, int64(input.StaleHoldAfter/time.Second), reason).Scan(&runID); err != nil {
 		return ReconciliationRun{}, fmt.Errorf("credits reconciliation: create run: %w", err)
 	}
 	if _, err := s.reconciliationEnqueuer.InsertTx(ctx, tx, ReconciliationJobArgs{RunID: runID}, &river.InsertOpts{
@@ -160,10 +172,10 @@ func (s *Service) GetReconciliationRun(ctx context.Context, runID int64) (Reconc
 	var run ReconciliationRun
 	var staleSeconds float64
 	err := s.pool.QueryRow(ctx, `
-SELECT id, status, requested_by, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, requested_by, reason, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs WHERE id = $1`, runID).Scan(
-		&run.ID, &run.Status, &run.RequestedBy, &staleSeconds, &run.FindingCount, &run.CriticalCount,
+		&run.ID, &run.Status, &run.RequestedBy, &run.Reason, &staleSeconds, &run.FindingCount, &run.CriticalCount,
 		&run.IsolatedWalletCount, &run.AttemptCount, &run.ErrorMessage, &run.RequestedAt, &run.StartedAt, &run.CompletedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -182,7 +194,7 @@ func (s *Service) ListReconciliationRuns(ctx context.Context, input ListReconcil
 		return ReconciliationRunPage{}, ErrInvalidCommand
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT id, status, requested_by, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, requested_by, reason, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DESC LIMIT $2`, input.BeforeID, limit+1)
 	if err != nil {
@@ -193,7 +205,7 @@ FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DE
 	for rows.Next() {
 		var run ReconciliationRun
 		var staleSeconds float64
-		if err := rows.Scan(&run.ID, &run.Status, &run.RequestedBy, &staleSeconds, &run.FindingCount, &run.CriticalCount,
+		if err := rows.Scan(&run.ID, &run.Status, &run.RequestedBy, &run.Reason, &staleSeconds, &run.FindingCount, &run.CriticalCount,
 			&run.IsolatedWalletCount, &run.AttemptCount, &run.ErrorMessage, &run.RequestedAt, &run.StartedAt, &run.CompletedAt); err != nil {
 			return ReconciliationRunPage{}, fmt.Errorf("credits reconciliation: scan run: %w", err)
 		}
@@ -255,6 +267,14 @@ func normalizeReconciliationLimit(limit int) (int, error) {
 		return 0, ErrInvalidCommand
 	}
 	return limit, nil
+}
+
+func normalizeReconciliationReason(reason string) (string, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" || utf8.RuneCountInString(reason) > MaxReconciliationReasonLength {
+		return "", ErrInvalidCommand
+	}
+	return reason, nil
 }
 
 type ReconciliationWorker struct {

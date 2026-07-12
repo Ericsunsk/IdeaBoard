@@ -182,10 +182,12 @@ import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import { openAccountManagementDialog } from '../../account-management/useAccountManagementDialogController'
+import { useUserCreditWalletSummary } from '../../account-management/useUserCreditWalletSummary'
 
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
 const userStore = useUserStore()
+const { availableCredits } = useUserCreditWalletSummary(() => Boolean(userStore.user))
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const { projectName } = useSiteBranding()
 const boardCommands = createCanvasBoardCommands()
@@ -214,8 +216,10 @@ const sortOptions = [
 const userMenuItems = computed(() =>
   createUserAccountMenuItems({
     canAccessAdmin: canAccessAdmin(userStore.user),
+    availableCredits: availableCredits.value,
     handlers: {
       profile: openAccountManagement,
+      credits: openCredits,
       admin: openAdmin,
       home: goHome,
       logout: () => {
@@ -416,6 +420,11 @@ async function confirmDeleteBoard() {
 function openAccountManagement() {
   activeMenuBoardId.value = null
   openAccountManagementDialog()
+}
+
+function openCredits() {
+  activeMenuBoardId.value = null
+  openAccountManagementDialog('credits')
 }
 
 function openAdmin() {

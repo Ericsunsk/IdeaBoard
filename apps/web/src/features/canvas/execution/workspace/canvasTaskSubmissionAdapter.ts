@@ -3,7 +3,10 @@ import {
   assertTaskRequestReady,
   submitTaskRequest,
 } from '../task-runner/flowImageDirectActionExecutor'
-import { withTaskClientActionId } from '../task-runner/taskClientActionIds'
+import {
+  createCanvasTaskClientActionId,
+  withTaskClientActionId,
+} from '../task-runner/taskClientActionIds'
 
 export type CanvasTaskSubmission = {
   taskId: string
@@ -36,14 +39,18 @@ export function createCanvasTaskSubmissionCallbacks(options: {
   const taskAdapter = options.taskAdapter ?? defaultCanvasTaskSubmissionAdapter
   const { readinessRequest } = options
   const assertReady = readinessRequest
-    ? () => taskAdapter.assertTaskRequestReady(readinessRequest(), options.fallbackMessage)
+    ? () =>
+        taskAdapter.assertTaskRequestReady(
+          withTaskClientActionId(readinessRequest(), createCanvasTaskClientActionId()),
+          options.fallbackMessage,
+        )
     : undefined
   return {
     assertReady,
-    submitTask: async (clientActionId) =>
-      taskAdapter.submitTaskRequest(
-        withTaskClientActionId(await options.buildRequest(), clientActionId),
-        options.fallbackMessage,
-      ),
+    submitTask: async (clientActionId) => {
+      const request = withTaskClientActionId(await options.buildRequest(), clientActionId)
+      await taskAdapter.assertTaskRequestReady(request, options.fallbackMessage)
+      return taskAdapter.submitTaskRequest(request, options.fallbackMessage)
+    },
   }
 }

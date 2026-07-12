@@ -143,6 +143,7 @@ Admin route pages 不直接依赖 generated API。每个 Admin vertical context 
 | `features/admin/storage` | `internal/media/storage` | storage provider/profile、secret masking、bucket test/apply |
 | `features/admin/task-monitor` | `internal/tasking` | task list/detail、runtime monitor、stream/poll fallback |
 | `features/admin/statistics` | `internal/tasking/taskstats` | statistics aggregation、backfill status、range contract |
+| `features/admin/credits-billing` | `internal/billing`, `internal/credits`, `internal/runtime/billingcoverage` | SKU 与 versioned pricing、Wallet/Ledger operations、Reconciliation、AI workflow pricing coverage |
 
 ### 9. Generated code 是边界，不是业务模型
 

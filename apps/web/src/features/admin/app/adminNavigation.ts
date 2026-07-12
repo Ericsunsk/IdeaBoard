@@ -7,6 +7,7 @@ import {
   Link,
   Settings,
   StatsDownSquare,
+  Wallet,
 } from '@iconoir/vue'
 import {
   ADMIN_DEFAULT_PATH,
@@ -25,6 +26,7 @@ export type AdminNavigationItem = AdminNavigationRouteDef & {
 
 const adminNavigationIcons = {
   users: Group,
+  credits: Wallet,
   'provider-endpoints': Link,
   statistics: DashboardSpeed,
   'task-monitor': StatsDownSquare,

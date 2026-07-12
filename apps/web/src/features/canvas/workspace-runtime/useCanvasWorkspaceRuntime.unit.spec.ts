@@ -4,10 +4,15 @@ import { useCanvasWorkspaceRuntime } from './useCanvasWorkspaceRuntime'
 
 const mocks = vi.hoisted(() => ({
   createCanvasWorkspaceRuntimeParts: vi.fn(),
+  provideCanvasBillingReadiness: vi.fn(),
 }))
 
 vi.mock('./internal/createCanvasWorkspaceRuntimeParts', () => ({
   createCanvasWorkspaceRuntimeParts: mocks.createCanvasWorkspaceRuntimeParts,
+}))
+
+vi.mock('../execution', () => ({
+  provideCanvasBillingReadiness: mocks.provideCanvasBillingReadiness,
 }))
 
 function createRuntimeParts() {
@@ -160,6 +165,7 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
 
     const workspace = useCanvasWorkspaceRuntime({} as never)
 
+    expect(mocks.provideCanvasBillingReadiness).toHaveBeenCalledOnce()
     expect(Object.keys(workspace).sort()).toEqual(['commands', 'viewModel'])
     expect(workspace.viewModel.flowPane).toEqual({
       nodes: runtimeParts.flowPane.nodes,

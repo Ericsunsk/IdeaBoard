@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/runtime/billingcoverage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,6 +25,7 @@ type appDomainServices struct {
 	userService       *users.UserService
 	boardService      *boards.BoardService
 	billingService    *billing.Service
+	billingCoverage   *billingcoverage.Service
 	creditService     *credits.Service
 	userLifecycle     *users.LifecycleService
 }
@@ -41,6 +43,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	}
 	creditService := credits.NewService(appPool)
 	billingService := billing.NewService(appPool)
+	billingCoverage := billingcoverage.NewService(repos.accountRepo, billingService)
 	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		return appDomainServices{}, err
@@ -53,6 +56,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		userService:       userService,
 		boardService:      boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
 		billingService:    billingService,
+		billingCoverage:   billingCoverage,
 		creditService:     creditService,
 		userLifecycle:     userLifecycle,
 	}, nil

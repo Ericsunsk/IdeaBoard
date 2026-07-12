@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminActionReason } from './adminActionReason'
 import type { BillingSKUCode } from './billingSKUCode'
 
 export interface AdminBillingSKUCreateRequest {
@@ -16,4 +17,5 @@ export interface AdminBillingSKUCreateRequest {
   /** @maxLength 1000 */
   description?: string
   enabled: boolean
+  reason: AdminActionReason
 }

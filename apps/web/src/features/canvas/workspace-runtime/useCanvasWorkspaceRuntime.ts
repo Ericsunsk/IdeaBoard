@@ -3,10 +3,12 @@ import {
   type UseCanvasWorkspaceRuntimeOptions,
 } from './internal/createCanvasWorkspaceRuntimeParts'
 import type { CanvasWorkspaceRuntime } from './types'
+import { provideCanvasBillingReadiness } from '../execution'
 
 export function useCanvasWorkspaceRuntime(
   options: UseCanvasWorkspaceRuntimeOptions,
 ): CanvasWorkspaceRuntime {
+  provideCanvasBillingReadiness()
   const runtime = createCanvasWorkspaceRuntimeParts(options)
   const grouping = runtime.graphEditing.grouping
 

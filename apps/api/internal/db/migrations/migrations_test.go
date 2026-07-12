@@ -299,6 +299,40 @@ func TestEmbeddedMigrationsKeepBaselineFirst(t *testing.T) {
 	}
 }
 
+func TestAdminBillingReasonMigrationDeclaresReversibleContract(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260712020000_admin_billing_reasons.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	for _, expected := range []string{
+		"CREATE TABLE billing_admin_actions",
+		"ADD COLUMN reason VARCHAR(1000) NOT NULL",
+		"create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
+		"start_credit_reconciliation(BIGINT, BIGINT, TEXT)",
+		"DROP FUNCTION create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT)",
+		"DROP FUNCTION start_credit_reconciliation(BIGINT, BIGINT)",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("up migration missing %q", expected)
+		}
+	}
+	for _, expected := range []string{
+		"DROP TABLE IF EXISTS billing_admin_actions",
+		"DROP COLUMN IF EXISTS reason",
+		"CREATE OR REPLACE FUNCTION create_billing_sku(",
+		"CREATE OR REPLACE FUNCTION start_credit_reconciliation(p_requested_by BIGINT, p_stale_hold_seconds BIGINT)",
+	} {
+		if !strings.Contains(down, expected) {
+			t.Fatalf("down migration missing %q", expected)
+		}
+	}
+	if err := validateMigrationStatements("20260712020000_admin_billing_reasons.sql down", parseSQLStatements(down)); err != nil {
+		t.Fatalf("down migration failed validation: %v", err)
+	}
+}
+
 func TestBaselineMigrationMatchesSchemaSnapshot(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260609000000_baseline.sql")
 	if err != nil {
@@ -499,12 +533,65 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertStorageProfileSeed(t, ctx, conn)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_provider_endpoint_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
+	assertTriggerExists(t, ctx, conn, "billing_admin_actions", "billing_admin_actions_append_only")
+	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
 	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_provider_endpoint")
 	assertConstraintExists(t, ctx, conn, "media_assets", "fk_media_assets_storage_profile_id")
 	assertConstraintExists(t, ctx, conn, "boards", "uq_boards_board_id")
 	assertConstraintExists(t, ctx, conn, "boards", "fk_boards_created_by")
 	assertConstraintExists(t, ctx, conn, "board_members", "fk_board_members_board")
 	assertConstraintExists(t, ctx, conn, "board_share_tokens", "fk_board_share_tokens_board")
+}
+
+func TestAdminBillingReasonMigrationRollsBackAndReapplies(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", true)
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint)", false)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", true)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint)", false)
+
+	raw, err := migrationFS.ReadFile("20260712020000_admin_billing_reasons.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
+		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = 20260712020000`); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint)", true)
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", false)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint)", true)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", false)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "reason", false)
+	assertTableExists(t, ctx, conn, "billing_admin_actions", false)
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("reapply migration after down: %v", err)
+	}
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", true)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", true)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "reason", true)
+	assertTableExists(t, ctx, conn, "billing_admin_actions", true)
 }
 
 func TestMigrationsRejectUnknownAppliedVersions(t *testing.T) {
@@ -743,6 +830,44 @@ WHERE table_schema = current_schema()
 	}
 }
 
+func assertColumnExists(t *testing.T, ctx context.Context, conn *sql.Conn, tableName, columnName string, want bool) {
+	t.Helper()
+	var exists bool
+	if err := conn.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM information_schema.columns
+  WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2
+)`, tableName, columnName).Scan(&exists); err != nil {
+		t.Fatalf("read column existence %s.%s failed: %v", tableName, columnName, err)
+	}
+	if exists != want {
+		t.Fatalf("column %s.%s exists=%v, want %v", tableName, columnName, exists, want)
+	}
+}
+
+func assertTableExists(t *testing.T, ctx context.Context, conn *sql.Conn, tableName string, want bool) {
+	t.Helper()
+	var exists bool
+	if err := conn.QueryRowContext(ctx, `
+SELECT to_regclass(current_schema() || '.' || $1) IS NOT NULL`, tableName).Scan(&exists); err != nil {
+		t.Fatalf("read table existence %s failed: %v", tableName, err)
+	}
+	if exists != want {
+		t.Fatalf("table %s exists=%v, want %v", tableName, exists, want)
+	}
+}
+
+func assertRegprocedureExists(t *testing.T, ctx context.Context, conn *sql.Conn, signature string, want bool) {
+	t.Helper()
+	var exists bool
+	if err := conn.QueryRowContext(ctx, `SELECT to_regprocedure($1) IS NOT NULL`, signature).Scan(&exists); err != nil {
+		t.Fatalf("read function existence %s failed: %v", signature, err)
+	}
+	if exists != want {
+		t.Fatalf("function %s exists=%v, want %v", signature, exists, want)
+	}
+}
+
 func assertIndexValid(t *testing.T, ctx context.Context, conn *sql.Conn, indexName string) {
 	t.Helper()
 	var valid bool
@@ -872,4 +997,12 @@ func normalizeBaselineSchema(up string) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(normalized, "\n"))
+}
+
+func extractDownSQLForTest(raw string) string {
+	_, down, ok := strings.Cut(raw, "-- migrate:down")
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(down)
 }

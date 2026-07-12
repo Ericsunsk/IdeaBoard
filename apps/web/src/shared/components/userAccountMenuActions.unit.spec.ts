@@ -51,4 +51,39 @@ describe('user account menu actions', () => {
 
     expect(items.map((item) => item.key)).toEqual(['profile', 'admin', 'logout'])
   })
+
+  it('shows the current available credits as a direct account entry', () => {
+    const openCredits = vi.fn()
+    const items = createUserAccountMenuItems({
+      canAccessAdmin: false,
+      availableCredits: 1280,
+      handlers: {
+        profile: vi.fn(),
+        credits: openCredits,
+        logout: vi.fn(),
+      },
+    })
+
+    const credits = items.find((item) => item.key === 'credits')
+    expect(credits).toMatchObject({ label: '点子', meta: '1,280' })
+    credits?.command()
+    expect(openCredits).toHaveBeenCalledOnce()
+  })
+
+  it('keeps very large balances compact inside the account menu', () => {
+    const items = createUserAccountMenuItems({
+      canAccessAdmin: false,
+      availableCredits: 9_000_000_000_000_000,
+      handlers: {
+        profile: vi.fn(),
+        credits: vi.fn(),
+        logout: vi.fn(),
+      },
+    })
+
+    expect(items.find((item) => item.key === 'credits')).toMatchObject({
+      label: '点子',
+      meta: '9000万亿',
+    })
+  })
 })

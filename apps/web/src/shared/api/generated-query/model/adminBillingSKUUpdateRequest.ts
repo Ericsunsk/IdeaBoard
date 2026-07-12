@@ -4,8 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminActionReason } from './adminActionReason'
 
-export interface AdminBillingSKUUpdateRequest {
+export type AdminBillingSKUUpdateRequest = unknown & {
   /**
    * @minLength 1
    * @maxLength 120
@@ -14,4 +15,5 @@ export interface AdminBillingSKUUpdateRequest {
   /** @maxLength 1000 */
   description?: string
   enabled?: boolean
+  reason: AdminActionReason
 }

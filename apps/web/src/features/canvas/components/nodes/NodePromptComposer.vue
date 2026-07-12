@@ -17,6 +17,7 @@
       :allow-empty="allowEmpty"
       :submit-disabled="submitDisabled"
       :show-aspect-ratio="showAspectRatio"
+      :billing-state="billingState"
       :textarea-class="promptInputClass"
       :actions-class="promptActionsClass"
       send-button-class="image-node-prompt-send node-tool-send node-tool-button node-tool-tooltip-trigger"
@@ -32,6 +33,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import type { CanvasBillingQuoteState } from '../../execution'
 import PromptComposerControls from './PromptComposerControls.vue'
 import type { PromptComposerResizePayload } from './composables/usePromptComposerControls'
 
@@ -45,6 +47,7 @@ const props = withDefaults(
     submitDisabled?: boolean
     aspectRatio?: PromptAspectRatio
     offset?: string
+    billingState?: CanvasBillingQuoteState | null
   }>(),
   {
     allowEmpty: false,
@@ -52,6 +55,7 @@ const props = withDefaults(
     disabled: false,
     offset: '8px',
     submitDisabled: false,
+    billingState: null,
   },
 )
 

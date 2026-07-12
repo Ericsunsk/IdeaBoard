@@ -10,6 +10,7 @@ import {
 } from '../../../../shared/query/taskResult'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import { assertTaskSubmitReady } from './taskReadiness'
+import { notifyUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
 
 export async function assertTaskRequestReady(
   request: SubmitTaskData,
@@ -48,14 +49,17 @@ export async function waitExistingOrLiveTaskImageResults(
     return waitTaskImageResultsWithSse(taskId)
   }
   if (task?.status === 'completed') {
+    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })
     const results = extractImageResultsFromTaskPayload(task)
     if (results.length > 0) return results
     throw new Error('任务完成但未返回图片')
   }
   if (task?.status === 'failed') {
+    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'failed' })
     throw createTaskResultFailureError(task)
   }
   if (task?.status === 'cancelled') {
+    notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
     throw createTaskCancelledError(task)
   }
   return waitTaskImageResultsWithSse(taskId)

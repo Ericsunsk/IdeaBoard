@@ -1,8 +1,12 @@
 import { ref } from 'vue'
 
 const accountManagementDialogVisible = ref(false)
+const accountManagementInitialTab = ref<AccountManagementTab>('profile')
 
-export function openAccountManagementDialog() {
+export type AccountManagementTab = 'profile' | 'credits' | 'security'
+
+export function openAccountManagementDialog(tab: AccountManagementTab = 'profile') {
+  accountManagementInitialTab.value = tab
   accountManagementDialogVisible.value = true
 }
 
@@ -17,6 +21,7 @@ export function setAccountManagementDialogVisible(visible: boolean) {
 export function useAccountManagementDialogController() {
   return {
     visible: accountManagementDialogVisible,
+    initialTab: accountManagementInitialTab,
     open: openAccountManagementDialog,
     close: closeAccountManagementDialog,
     setVisible: setAccountManagementDialogVisible,

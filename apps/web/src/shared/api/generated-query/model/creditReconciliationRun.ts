@@ -4,12 +4,14 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminActionReason } from './adminActionReason'
 import type { CreditReconciliationRunStatus } from './creditReconciliationRunStatus'
 
 export interface CreditReconciliationRun {
   id: number
   status: CreditReconciliationRunStatus
   requested_by: number
+  reason: AdminActionReason
   stale_hold_after_seconds: number
   finding_count: number
   critical_count: number

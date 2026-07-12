@@ -17,7 +17,9 @@ type handlerServiceStub struct {
 		quantity int64
 	}
 	createSKUInput   CreateSKUInput
+	updateSKUInput   UpdateSKUInput
 	createPriceInput CreatePriceInput
+	setPriceInput    SetPriceEnabledInput
 }
 
 func (s *handlerServiceStub) Quote(_ context.Context, sku string, quantity int64) (Quote, error) {
@@ -35,6 +37,7 @@ func (s *handlerServiceStub) CreateSKU(_ context.Context, input CreateSKUInput) 
 }
 
 func (s *handlerServiceStub) UpdateSKU(_ context.Context, input UpdateSKUInput) (CatalogItem, error) {
+	s.updateSKUInput = input
 	return CatalogItem{SKU: SKU(input.SKU)}, nil
 }
 
@@ -44,6 +47,7 @@ func (s *handlerServiceStub) CreatePrice(_ context.Context, input CreatePriceInp
 }
 
 func (s *handlerServiceStub) SetPriceEnabled(_ context.Context, input SetPriceEnabledInput) (PriceInfo, error) {
+	s.setPriceInput = input
 	return PriceInfo{PriceVersionID: 1, Version: input.Version, Enabled: input.Enabled}, nil
 }
 
@@ -108,9 +112,11 @@ func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
 		body       string
 		wantStatus int
 	}{
-		{name: "missing actor", body: `{"sku":"test:item","display_name":"Item","enabled":true}`, wantStatus: http.StatusUnauthorized},
-		{name: "missing explicit enabled", actorID: 9, body: `{"sku":"test:item","display_name":"Item"}`, wantStatus: http.StatusBadRequest},
-		{name: "valid", actorID: 9, body: `{"sku":"test:item","display_name":"Item","description":"D","enabled":true}`, wantStatus: http.StatusOK},
+		{name: "missing actor", body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"launch pricing"}`, wantStatus: http.StatusUnauthorized},
+		{name: "missing explicit enabled", actorID: 9, body: `{"sku":"test:item","display_name":"Item","reason":"launch pricing"}`, wantStatus: http.StatusBadRequest},
+		{name: "missing reason", actorID: 9, body: `{"sku":"test:item","display_name":"Item","enabled":true}`, wantStatus: http.StatusBadRequest},
+		{name: "blank reason", actorID: 9, body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"  "}`, wantStatus: http.StatusBadRequest},
+		{name: "valid", actorID: 9, body: `{"sku":"test:item","display_name":"Item","description":"D","enabled":true,"reason":"  launch pricing  "}`, wantStatus: http.StatusOK},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			response := httptest.NewRecorder()
@@ -133,8 +139,65 @@ func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
 			}
 		})
 	}
-	if service.createSKUInput.ActorID != 9 || !service.createSKUInput.Enabled {
+	if service.createSKUInput.ActorID != 9 || !service.createSKUInput.Enabled || service.createSKUInput.Reason != "launch pricing" {
 		t.Fatalf("CreateSKU input = %+v", service.createSKUInput)
+	}
+}
+
+func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &handlerServiceStub{}
+	handler := NewHandler(service, service)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", int64(9))
+		c.Next()
+	})
+	router.PATCH("/skus/:sku", handler.UpdateSKU)
+	router.POST("/skus/:sku/prices", handler.CreatePrice)
+	router.PATCH("/skus/:sku/prices/:version", handler.SetPriceEnabled)
+
+	for _, tt := range []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "update missing reason", method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false}`},
+		{name: "create price blank reason", method: http.MethodPost, path: "/skus/test:item/prices", body: `{"unit_credits":4,"enabled":true,"reason":"  "}`},
+		{name: "set state too long reason", method: http.MethodPatch, path: "/skus/test:item/prices/1", body: `{"enabled":false,"reason":"` + strings.Repeat("r", 1001) + `"}`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(response, request)
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d body=%s, want 400", response.Code, response.Body.String())
+			}
+		})
+	}
+
+	validRequests := []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false,"reason":"  disable catalog  "}`},
+		{method: http.MethodPost, path: "/skus/test:item/prices", body: `{"unit_credits":4,"enabled":true,"reason":"  publish price  "}`},
+		{method: http.MethodPatch, path: "/skus/test:item/prices/1", body: `{"enabled":false,"reason":"  pause price  "}`},
+	}
+	for _, requestCase := range validRequests {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(requestCase.method, requestCase.path, strings.NewReader(requestCase.body))
+		request.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s %s status = %d body=%s", requestCase.method, requestCase.path, response.Code, response.Body.String())
+		}
+	}
+	if service.updateSKUInput.Reason != "disable catalog" || service.createPriceInput.Reason != "publish price" || service.setPriceInput.Reason != "pause price" {
+		t.Fatalf("trimmed reasons update=%q create_price=%q set_price=%q", service.updateSKUInput.Reason, service.createPriceInput.Reason, service.setPriceInput.Reason)
 	}
 }
 

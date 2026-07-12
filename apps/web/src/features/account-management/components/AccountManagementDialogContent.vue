@@ -175,6 +175,12 @@
           </section>
         </div>
 
+        <UserCreditsPane
+          v-else-if="activeTab === 'credits'"
+          key="credits"
+          :active="activeTab === 'credits'"
+        />
+
         <div v-else-if="activeTab === 'security'" key="security">
           <form class="grid gap-5" novalidate @submit.prevent="handleUpdatePassword">
             <label :class="passwordFieldClass">
@@ -324,7 +330,7 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import { computed, onMounted, onUnmounted, ref, type Component } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useAvatarUploadWorkflow } from '../useAvatarUploadWorkflow'
 import { usePasswordChangeWorkflow } from '../usePasswordChangeWorkflow'
 import Avatar from 'primevue/avatar'
@@ -332,7 +338,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import Tag from 'primevue/tag'
-import { Camera, Lock, LogOut, User, Xmark } from '@iconoir/vue'
+import { Camera, Lock, LogOut, User, Wallet, Xmark } from '@iconoir/vue'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
@@ -346,9 +352,11 @@ import {
   ibPasswordPt,
 } from '../../../shared/theme/formControls'
 import { useProfileFeedback } from '../useProfileFeedback'
+import UserCreditsPane from './UserCreditsPane.vue'
+import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
 type NavItem = {
-  key: 'profile' | 'security'
+  key: AccountManagementTab
   label: string
   icon: Component
 }
@@ -360,6 +368,9 @@ type ProfileField = {
   mono?: boolean
 }
 
+const props = withDefaults(defineProps<{ initialTab?: AccountManagementTab }>(), {
+  initialTab: 'profile',
+})
 const emit = defineEmits<{
   close: []
 }>()
@@ -383,7 +394,13 @@ const {
 const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } =
   useAvatarUploadWorkflow()
 
-const activeTab = ref<NavItem['key']>('profile')
+const activeTab = ref<NavItem['key']>(props.initialTab)
+watch(
+  () => props.initialTab,
+  (tab) => {
+    activeTab.value = tab
+  },
+)
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 const isProfileMainScrolling = ref(false)
 const logoutLoading = ref(false)
@@ -394,6 +411,11 @@ const navItems = [
     key: 'profile',
     label: '个人资料',
     icon: User,
+  },
+  {
+    key: 'credits',
+    label: '点子',
+    icon: Wallet,
   },
   {
     key: 'security',

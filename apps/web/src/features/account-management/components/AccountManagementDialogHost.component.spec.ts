@@ -54,10 +54,16 @@ async function renderHost(path = '/user/boards') {
         AccountManagementDialog: {
           props: {
             visible: { type: Boolean, required: true },
+            initialTab: { type: String, default: 'profile' },
           },
           emits: ['update:visible'],
           template: `
-            <section v-if="visible" role="dialog" aria-label="账户管理">
+            <section
+              v-if="visible"
+              role="dialog"
+              aria-label="账户管理"
+              :data-initial-tab="initialTab"
+            >
               <button type="button" aria-label="关闭账户管理" @click="$emit('update:visible', false)">
                 关闭
               </button>
@@ -84,6 +90,17 @@ describe('AccountManagementDialogHost', () => {
     await renderHost()
 
     expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
+  })
+
+  it('forwards the controller initial tab to the global dialog', async () => {
+    openAccountManagementDialog('credits')
+
+    await renderHost()
+
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+      'data-initial-tab',
+      'credits',
+    )
   })
 
   it.each([['/admin/users'], ['/user/login'], ['/user/register']])(

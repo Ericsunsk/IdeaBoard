@@ -3,8 +3,9 @@ import {
   getListAdminUsersQueryKey,
   useListAdminUsers,
 } from '../../../shared/api/generated-query/admin-users/admin-users'
-import type { ListAdminUsersParams } from '../../../shared/api/generated-query/model'
+import type { ListAdminUsersParams, User } from '../../../shared/api/generated-query/model'
 
+export type AdminUserListItem = User
 export type AdminUsersRoleFilterValue = 'admin' | 'user'
 export type AdminUsersStatusFilterValue = 0 | 1
 

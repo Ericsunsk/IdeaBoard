@@ -2,10 +2,12 @@ package credits
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/testdb"
@@ -41,23 +43,37 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 		t.Fatalf("oversized status = %d, body=%s", oversized.Code, oversized.Body.String())
 	}
 	overflow := httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"stale_hold_after_seconds":36028797018964028}`))
+	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"stale_hold_after_seconds":36028797018964028,"reason":"manual audit"}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(overflow, request)
 	if overflow.Code != http.StatusBadRequest {
 		t.Fatalf("overflow duration status = %d, body=%s", overflow.Code, overflow.Body.String())
 	}
 
+	for _, body := range []string{`{}`, `{"reason":"  "}`, `{"reason":"` + strings.Repeat("r", 1001) + `"}`} {
+		rejected := httptest.NewRecorder()
+		request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(body))
+		request.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(rejected, request)
+		if rejected.Code != http.StatusBadRequest {
+			t.Fatalf("invalid reason body=%s status=%d body=%s", body, rejected.Code, rejected.Body.String())
+		}
+	}
+
 	created := httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{}`))
+	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"reason":"  manual audit  "}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(created, request)
 	if created.Code != http.StatusOK || !bytes.Contains(created.Body.Bytes(), []byte(`"status":"queued"`)) {
 		t.Fatalf("created response = %d %s", created.Code, created.Body.String())
 	}
 	var runID int64
-	if err := pool.QueryRow(t.Context(), `SELECT id FROM credit_reconciliation_runs`).Scan(&runID); err != nil {
+	var storedReason string
+	if err := pool.QueryRow(t.Context(), `SELECT id, reason FROM credit_reconciliation_runs`).Scan(&runID, &storedReason); err != nil {
 		t.Fatal(err)
+	}
+	if storedReason != "manual audit" {
+		t.Fatalf("stored reason = %q", storedReason)
 	}
 	if err := service.ExecuteReconciliation(t.Context(), runID); err != nil {
 		t.Fatal(err)
@@ -155,6 +171,52 @@ func TestAdminCreditHTTPContractGrantsAndReadsWallet(t *testing.T) {
 	}
 	if !bytes.Contains(ledgerRecorder.Body.Bytes(), []byte(`"actor":{"type":"admin","id":"7"}`)) {
 		t.Fatalf("ledger actor was not derived from authenticated admin: %s", ledgerRecorder.Body.String())
+	}
+}
+
+func TestUserCreditHTTPScopesReadsToAuthenticatedUser(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	ctx := context.Background()
+	for _, grant := range []struct {
+		userID int64
+		amount int64
+		key    string
+	}{
+		{userID: 94, amount: 125, key: "user-http:94"},
+		{userID: 95, amount: 999, key: "user-http:95"},
+	} {
+		if _, err := service.Grant(ctx, GrantCommand{
+			UserID:   grant.userID,
+			Amount:   mustCreditAmount(t, grant.amount),
+			Metadata: testMetadata(grant.key, grant.key),
+		}); err != nil {
+			t.Fatalf("Grant(%d) error = %v", grant.userID, err)
+		}
+	}
+
+	handler := NewHandler(service)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", int64(94))
+		c.Next()
+	})
+	router.GET("/api/user/credits/wallet", handler.GetCurrentWallet)
+	router.GET("/api/user/credits/ledger", handler.ListCurrentLedger)
+
+	walletRecorder := httptest.NewRecorder()
+	router.ServeHTTP(walletRecorder, httptest.NewRequest(http.MethodGet, "/api/user/credits/wallet", nil))
+	if walletRecorder.Code != http.StatusOK || !bytes.Contains(walletRecorder.Body.Bytes(), []byte(`"user_id":94`)) ||
+		!bytes.Contains(walletRecorder.Body.Bytes(), []byte(`"available_credits":125`)) || bytes.Contains(walletRecorder.Body.Bytes(), []byte(`999`)) {
+		t.Fatalf("wallet status = %d body=%s", walletRecorder.Code, walletRecorder.Body.String())
+	}
+
+	ledgerRecorder := httptest.NewRecorder()
+	router.ServeHTTP(ledgerRecorder, httptest.NewRequest(http.MethodGet, "/api/user/credits/ledger?limit=10", nil))
+	if ledgerRecorder.Code != http.StatusOK || !bytes.Contains(ledgerRecorder.Body.Bytes(), []byte(`"business_reference":{"type":"test","id":"user-http:94"}`)) ||
+		bytes.Contains(ledgerRecorder.Body.Bytes(), []byte(`user-http:95`)) {
+		t.Fatalf("ledger status = %d body=%s", ledgerRecorder.Code, ledgerRecorder.Body.String())
 	}
 }
 

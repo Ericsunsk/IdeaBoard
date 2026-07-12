@@ -3,12 +3,17 @@ import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { ImageStrengthAction } from '../../execution'
 import HomeCanvasImageActionMenu from './HomeCanvasImageActionMenu.vue'
 import { render, screen, waitFor } from '../../../../test/render'
+import {
+  canvasBillingReadinessKey,
+  type CanvasBillingReadinessStore,
+} from '../../execution'
 
 function renderImageActionMenu(
   input: {
     activeStrengthAction?: ImageStrengthAction | null
     showStrengthControl?: boolean
     strengthValue?: number
+    billingStore?: CanvasBillingReadinessStore
   } = {},
 ) {
   const props = {
@@ -29,7 +34,14 @@ function renderImageActionMenu(
 
   return {
     props,
-    ...render(HomeCanvasImageActionMenu, { props }),
+    ...render(HomeCanvasImageActionMenu, {
+      props,
+      global: {
+        provide: input.billingStore
+          ? { [canvasBillingReadinessKey as symbol]: input.billingStore }
+          : {},
+      },
+    }),
   }
 }
 
@@ -90,5 +102,23 @@ describe('HomeCanvasImageActionMenu', () => {
 
     expect(activeHdRange).not.toHaveAttribute('aria-hidden')
     expect(findActionControl(activeHdRange)).toHaveClass('is-strength-active')
+  })
+
+  it('shows AI prices, blocks unavailable AI actions, and keeps local tools price-free', () => {
+    const billingStore: CanvasBillingReadinessStore = {
+      ensureFeature: vi.fn(async () => undefined),
+      applyReadiness: vi.fn(),
+      getFeatureState: (feature) =>
+        feature === IMAGE_NODE_ACTION.removeBg
+          ? { feature, status: 'blocked', reason: '价格未配置' }
+          : { feature, status: 'ready', totalCredits: 3, availableCredits: 20 },
+    }
+
+    renderImageActionMenu({ billingStore })
+
+    expect(screen.getByRole('button', { name: '抠图 · 价格未配置' })).toBeDisabled()
+    expect(screen.getAllByText('3 点子').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: '图像编辑' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '局部重绘' })).toBeEnabled()
   })
 })

@@ -17,7 +17,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示�
 | Capture | User Reserved → System Revenue |
 | Release | User Reserved → User Available |
 | Refund | System Revenue → User Available，累计不得超过原 Charge |
-| Reconciliation Run | Admin 触发、River 异步执行的全量一致性扫描；只检测、报告和隔离 |
+| Reconciliation Run | Admin 以 non-empty reason 触发、River 异步执行的全量一致性扫描；run 持久化原始 actor/reason，只检测、报告和隔离 |
 | Finding | 由 finding type + Wallet + subject 生成稳定 fingerprint 的可重跑异常事实 |
 
 ## Public Seams
@@ -45,6 +45,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示�
 - frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction 被拒绝；仅 authenticated Admin 的 linked Refund/Correction 可写入 frozen Wallet，余额仍被冻结而不可消费。
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
+- 启动 Reconciliation 必须提供 trim 后 1–1000 字符的 reason；active run 的重复 start 返回原 run，禁止覆盖首次请求的 actor/reason。
 - `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 finding、alert 与 run report 同一 transaction 内冻结相关 Wallet。扫描不得修改 Ledger、projection 或自动创建 Correction。
 - Finding fingerprint 不包含 run ID；重复异常复用 open finding 并增加 occurrence/run link，异常消失后标记 resolved。frozen Wallet 的历史 read contract 不变。
 - Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 Wallet，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 100 点子 Welcome Grant；claim identity 明文不进入 Credits schema。

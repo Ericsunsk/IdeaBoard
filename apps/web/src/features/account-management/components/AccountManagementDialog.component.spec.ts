@@ -38,9 +38,12 @@ const DialogStub = defineComponent({
 
 const AccountManagementDialogContentStub = defineComponent({
   name: 'AccountManagementDialogContent',
+  props: {
+    initialTab: { type: String, default: 'profile' },
+  },
   emits: ['close'],
   template: `
-    <div data-testid="account-management-dialog-content">
+    <div data-testid="account-management-dialog-content" :data-initial-tab="initialTab">
       Account management content
       <button type="button" aria-label="关闭账户管理" @click="$emit('close')">
         关闭
@@ -51,9 +54,12 @@ const AccountManagementDialogContentStub = defineComponent({
 
 const StatefulAccountManagementDialogContentStub = defineComponent({
   name: 'AccountManagementDialogContent',
+  props: {
+    initialTab: { type: String, default: 'profile' },
+  },
   data() {
     return {
-      tab: 'profile',
+      tab: this.initialTab,
       oldPassword: '',
     }
   },
@@ -69,12 +75,17 @@ const StatefulAccountManagementDialogContentStub = defineComponent({
   `,
 })
 
-function renderAccountManagementDialog(visible: boolean, onVisibleUpdate = vi.fn()) {
+function renderAccountManagementDialog(
+  visible: boolean,
+  onVisibleUpdate = vi.fn(),
+  initialTab: 'profile' | 'credits' | 'security' = 'profile',
+) {
   return {
     onVisibleUpdate,
     ...renderWithUser(AccountManagementDialog, {
       props: {
         visible,
+        initialTab,
         'onUpdate:visible': onVisibleUpdate,
       },
       global: {
@@ -117,6 +128,15 @@ describe('AccountManagementDialog', () => {
     renderAccountManagementDialog(false)
 
     expect(screen.queryByTestId('account-management-dialog-content')).not.toBeInTheDocument()
+  })
+
+  it('forwards the requested initial tab to dialog content', () => {
+    renderAccountManagementDialog(true, vi.fn(), 'credits')
+
+    expect(screen.getByTestId('account-management-dialog-content')).toHaveAttribute(
+      'data-initial-tab',
+      'credits',
+    )
   })
 
   it('emits visibility updates without owning route state', async () => {

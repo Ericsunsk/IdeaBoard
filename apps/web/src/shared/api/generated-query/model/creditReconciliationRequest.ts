@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminActionReason } from './adminActionReason'
 
 export interface CreditReconciliationRequest {
   /**
@@ -11,4 +12,5 @@ export interface CreditReconciliationRequest {
    * @maximum 31536000
    */
   stale_hold_after_seconds?: number
+  reason: AdminActionReason
 }

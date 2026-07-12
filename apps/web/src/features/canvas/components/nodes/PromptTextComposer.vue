@@ -43,6 +43,7 @@
       :submit-disabled="submitDisabled"
       :show-aspect-ratio="showAspectRatio"
       :autofocus="autofocus"
+      :billing-state="billingState"
       :textarea-class="promptTextInputClass"
       actions-class="prompt-text-composer-actions flex self-end gap-[var(--node-tool-button-gap)]"
       send-button-class="prompt-text-composer-send node-tool-send node-tool-button node-tool-tooltip-trigger"
@@ -59,6 +60,7 @@
 import { computed } from 'vue'
 import { Plus } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import type { CanvasBillingQuoteState } from '../../execution'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import PromptComposerControls from './PromptComposerControls.vue'
 
@@ -83,6 +85,7 @@ const props = withDefaults(
     showImageInput?: boolean
     autofocus?: boolean
     variant?: 'node' | 'floating'
+    billingState?: CanvasBillingQuoteState | null
   }>(),
   {
     allowEmpty: false,
@@ -96,6 +99,7 @@ const props = withDefaults(
     showImageInput: false,
     submitDisabled: false,
     variant: 'node',
+    billingState: null,
   },
 )
 

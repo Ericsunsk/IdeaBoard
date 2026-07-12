@@ -50,12 +50,12 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := billingService.CreateSKU(ctx, billing.CreateSKUInput{
-		SKU: string(sku), DisplayName: "Sketch to Image", Enabled: true, ActorID: 1,
+		SKU: string(sku), DisplayName: "Sketch to Image", Enabled: true, ActorID: 1, Reason: "test setup",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := billingService.CreatePrice(ctx, billing.CreatePriceInput{
-		SKU: string(sku), UnitCredits: 5, Enabled: true, ActorID: 1,
+		SKU: string(sku), UnitCredits: 5, Enabled: true, ActorID: 1, Reason: "test setup",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -174,12 +174,12 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 		t.Fatal(err)
 	}
 	if _, err := billingService.CreateSKU(ctx, billing.CreateSKUInput{
-		SKU: string(sku), DisplayName: "Pattern Generation", Enabled: true, ActorID: 1,
+		SKU: string(sku), DisplayName: "Pattern Generation", Enabled: true, ActorID: 1, Reason: "test setup",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := billingService.CreatePrice(ctx, billing.CreatePriceInput{
-		SKU: string(sku), UnitCredits: 25, Enabled: true, ActorID: 1,
+		SKU: string(sku), UnitCredits: 25, Enabled: true, ActorID: 1, Reason: "test setup",
 	}); err != nil {
 		t.Fatal(err)
 	}

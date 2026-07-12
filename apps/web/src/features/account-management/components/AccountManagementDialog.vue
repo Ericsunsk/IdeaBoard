@@ -11,7 +11,11 @@
     aria-label="账户管理"
     @update:visible="emit('update:visible', $event)"
   >
-    <AccountManagementDialogContent v-if="visible" @close="emit('update:visible', false)" />
+    <AccountManagementDialogContent
+      v-if="visible"
+      :initial-tab="initialTab"
+      @close="emit('update:visible', false)"
+    />
   </Dialog>
 </template>
 
@@ -20,10 +24,12 @@ import Dialog from 'primevue/dialog'
 import type { DialogPassThroughOptions } from 'primevue/dialog'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
+import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
-defineProps<{
+withDefaults(defineProps<{
   visible: boolean
-}>()
+  initialTab?: AccountManagementTab
+}>(), { initialTab: 'profile' })
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean]

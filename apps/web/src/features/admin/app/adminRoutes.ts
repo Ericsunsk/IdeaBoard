@@ -2,9 +2,11 @@ import type { RouteRecordRaw } from 'vue-router'
 import { adminNavigationRouteDefs, ADMIN_DEFAULT_PATH } from './adminNavigationMeta'
 import type { AdminNavigationKey } from './adminNavigationMeta'
 import { ADMIN_ROOT_PATH } from '../../../shared/constants/routePaths'
+import { ADMIN_CREDIT_WALLETS_PATH } from '../../../shared/constants/routePaths'
 
 const adminPageComponents = {
   users: () => import('../users/AdminUsersPage.vue'),
+  credits: () => import('../credits-billing/AdminCreditsBillingLayout.vue'),
   'provider-endpoints': () => import('../pages/provider-endpoints/AdminProviderEndpointsPage.vue'),
   statistics: () => import('../pages/statistics/AdminStatisticsPage.vue'),
   'task-monitor': () => import('../pages/task-monitor/AdminTaskMonitorPage.vue'),
@@ -28,12 +30,38 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('../pages/login/AdminLoginPage.vue'),
         meta: { guest: true },
       },
-      ...adminNavigationRouteDefs.map((item) => ({
+      ...adminNavigationRouteDefs.filter((item) => item.key !== 'credits').map((item) => ({
         path: item.childPath,
         name: item.routeName,
         component: adminPageComponents[item.key],
         meta: { requiresAuth: true, title: item.title },
       })),
+      {
+        path: 'credits',
+        component: adminPageComponents.credits,
+        meta: { requiresAuth: true, title: '点子与计费' },
+        children: [
+          { path: '', redirect: ADMIN_CREDIT_WALLETS_PATH },
+          {
+            path: 'wallets',
+            name: 'AdminCreditWallets',
+            component: () =>
+              import('../credits-billing/wallets/AdminCreditWalletsPage.vue'),
+          },
+          {
+            path: 'pricing',
+            name: 'AdminCreditPricing',
+            component: () =>
+              import('../credits-billing/pricing/AdminBillingPricingPage.vue'),
+          },
+          {
+            path: 'reconciliation',
+            name: 'AdminCreditReconciliation',
+            component: () =>
+              import('../credits-billing/reconciliation/AdminCreditReconciliationPage.vue'),
+          },
+        ],
+      },
     ],
   },
 ]

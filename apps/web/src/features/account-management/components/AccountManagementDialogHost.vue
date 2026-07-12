@@ -1,5 +1,10 @@
 <template>
-  <AccountManagementDialog v-if="isHostAllowed" :visible="visible" @update:visible="setVisible" />
+  <AccountManagementDialog
+    v-if="isHostAllowed"
+    :visible="visible"
+    :initial-tab="initialTab"
+    @update:visible="setVisible"
+  />
 </template>
 
 <script setup lang="ts">
@@ -17,7 +22,7 @@ import { useAccountManagementDialogController } from '../useAccountManagementDia
 
 const route = useRoute()
 const userStore = useUserStore()
-const { visible, close, setVisible } = useAccountManagementDialogController()
+const { visible, initialTab, close, setVisible } = useAccountManagementDialogController()
 
 const isAuthRoute = computed(
   () =>

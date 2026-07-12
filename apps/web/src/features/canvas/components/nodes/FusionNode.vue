@@ -43,6 +43,7 @@
         :aspect-ratio="aspectRatio"
         :output-count="outputCountValue"
         :submit-disabled="!canGenerate || props.generationAvailable === false"
+        :billing-state="billingQuote"
         @update:aspect-ratio="emit('update:aspect-ratio', $event)"
         @update:output-count="selectOutputCount"
         @submit="submitPrompt"
@@ -61,6 +62,8 @@ import type { FusionBlendPoint } from '../../../canvas-board/domain'
 import FusionStage from './FusionStage.vue'
 import NodeShell from './NodeShell.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
+import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
+import { buildFusionBillingReadinessRequest, useCanvasBillingQuote } from '../../execution'
 
 const props = defineProps<{
   node: FusionNodeItem
@@ -92,6 +95,15 @@ const canGenerate = computed(() => visibleInputImages.value.length >= 2)
 const showPromptComposer = computed(() => !!props.promptComposerVisible)
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+const billingQuote = useCanvasBillingQuote(
+  () => WORKFLOW_FEATURE.styleFusion,
+  () => showPromptComposer.value && canGenerate.value,
+  () =>
+    buildFusionBillingReadinessRequest({
+      imageUrls: visibleInputImages.value.map((image) => image.url),
+      aspectRatio: aspectRatio.value,
+    }) ?? undefined,
+)
 
 watch(
   () => props.node.prompt,

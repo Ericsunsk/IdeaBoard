@@ -27,22 +27,32 @@
       @toggle="toggleOutputCountPicker"
       @select="selectOutputCount"
     />
-    <button
-      :class="sendButtonClass"
-      type="button"
-      :disabled="!canSubmit"
-      aria-label="发送"
-      @click="submit"
-    >
-      <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
-      <span class="node-tool-tooltip" aria-hidden="true">发送</span>
-    </button>
+    <div class="canvas-credit-submit-control">
+      <CanvasCreditQuoteBadge
+        class="canvas-credit-submit-control__quote"
+        :state="billingState ?? null"
+      />
+      <button
+        :class="sendButtonClass"
+        type="button"
+        :disabled="!canSubmit"
+        aria-label="发送"
+        :title="billingBlockedReason"
+        @click="submit"
+      >
+        <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
+        <span class="node-tool-tooltip" aria-hidden="true">发送</span>
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { SendDiagonalSolid } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import { isCanvasBillingSubmitBlocked, type CanvasBillingQuoteState } from '../../execution'
+import CanvasCreditQuoteBadge from './CanvasCreditQuoteBadge.vue'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import {
@@ -65,11 +75,13 @@ const props = withDefaults(
     aspectRatio?: PromptAspectRatio
     showAspectRatio?: boolean
     autofocus?: boolean
+    billingState?: CanvasBillingQuoteState | null
   }>(),
   {
     allowEmpty: false,
     aspectRatio: undefined,
     autofocus: false,
+    billingState: null,
     disabled: false,
     rows: 1,
     showAspectRatio: true,
@@ -85,6 +97,13 @@ const emit = defineEmits<{
   (e: 'textarea-resize', payload: PromptComposerResizePayload): void
   (e: 'submit', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
+
+const billingSubmitBlocked = computed(() =>
+  isCanvasBillingSubmitBlocked(props.billingState ?? null),
+)
+const billingBlockedReason = computed(() =>
+  billingSubmitBlocked.value ? props.billingState?.reason || '正在获取点子价格' : undefined,
+)
 
 const {
   actionsRef,
@@ -107,7 +126,7 @@ const {
   outputCount: () => props.outputCount,
   aspectRatio: () => props.aspectRatio,
   disabled: () => props.disabled,
-  submitDisabled: () => props.submitDisabled,
+  submitDisabled: () => props.submitDisabled || billingSubmitBlocked.value,
   allowEmpty: () => props.allowEmpty,
   autofocus: () => props.autofocus,
   showAspectRatio: () => props.showAspectRatio,
@@ -118,3 +137,20 @@ const {
   onSubmit: (prompt, outputCount, aspectRatio) => emit('submit', prompt, outputCount, aspectRatio),
 })
 </script>
+
+<style scoped>
+.canvas-credit-submit-control {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-credit-submit-control__quote {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 3px);
+  max-width: 86px;
+}
+</style>

@@ -14,6 +14,7 @@ Billing 是平台级商品身份与 Credit pricing context。它为 IdeaBoard �
 | Current Price | SKU 原子指向的最新 Price Version；创建新版本与切换 pointer 在同一 database command 完成 |
 | Price Snapshot | Quote 返回并由后续 Billing Command 持久化的 immutable value object |
 | Quote | 服务端以 current Price Snapshot × positive integer quantity 计算的结果 |
+| Admin Action | Admin 对 Catalog/Price 的一次写操作；包含 authenticated actor、non-empty reason 与 action metadata，并以 append-only audit 记录持久化 |
 
 ## Public Seams
 
@@ -28,11 +29,12 @@ Billing 是平台级商品身份与 Credit pricing context。它为 IdeaBoard �
 - SKU 全局唯一、不可 rename、不可 delete/reuse；display name 与 description 可改。
 - Price Version 严格 append-only；enabled 存在独立 state table。
 - 每次调价锁定 SKU row，在一个 typed PostgreSQL command 内分配单调 version、插入 price/state 并更新 current pointer。
+- 所有 Admin Catalog/Price 写操作必须提供 trim 后 1–1000 字符的 reason；业务变更与 `billing_admin_actions` append-only audit 必须在同一 typed PostgreSQL command/transaction 内提交。
 - Quote 使用单条 MVCC statement 读取 SKU、current pointer、Price Version 和 state，不会混合并发版本。
 - quantity 必须为正 `int64`；`unit_credits × quantity` 超过 `9_000_000_000_000_000` 时 fail closed。
 - 0 Credits 是显式免费价格；SKU 不存在、SKU/price disabled 或没有 current price 时 fail closed。
 - Billing 不 import `internal/accountpool`，价格不随 Provider Account routing 变化。
-- API runtime 对 Billing tables 只有 SELECT，通过 typed `SECURITY DEFINER` functions 写入；functions 固定 trusted schema、`pg_catalog`, `pg_temp` search path 并 `REVOKE PUBLIC`。
+- API runtime 对 Catalog/Price tables 只有 SELECT，对 `billing_admin_actions` 无直接权限，所有写入都通过 typed `SECURITY DEFINER` functions；functions 固定 trusted schema、`pg_catalog`, `pg_temp` search path 并 `REVOKE PUBLIC`。
 
 ## Non-goals
 

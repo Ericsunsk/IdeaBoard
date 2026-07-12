@@ -21,13 +21,17 @@
           <NodeToolIconButton
             :ref="(el) => setItemStrengthTriggerRef(item, el)"
             class="image-action-icon-btn"
-            :aria-label-value="item.title"
-            :disabled="directGenerating"
-            :tooltip="item.label"
+            :aria-label-value="getItemTooltip(item)"
+            :disabled="isItemDisabled(item)"
+            :tooltip="getItemTooltip(item)"
             @click="onActionClick(item)"
           >
             <ImageActionMenuIcon :icon="item.icon" />
           </NodeToolIconButton>
+          <CanvasCreditQuoteBadge
+            class="image-action-price"
+            :state="getItemBillingState(item)"
+          />
           <input
             v-if="item.strengthAction"
             :ref="(el) => setItemStrengthRangeRef(item, el)"
@@ -38,7 +42,7 @@
             step="1"
             :value="getItemStrengthValue(item)"
             :style="getItemStrengthRangeStyle(item)"
-            :disabled="directGenerating"
+            :disabled="isItemDisabled(item)"
             tabindex="-1"
             :aria-hidden="isStrengthActive(item) ? undefined : 'true'"
             :aria-label="`${item.label}强度`"
@@ -55,7 +59,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type ComponentPublicInstance } from 'vue'
+import { computed, onMounted, type ComponentPublicInstance } from 'vue'
+import {
+  WORKFLOW_FEATURE_SLUGS,
+  type WorkflowFeature,
+} from '../../../../shared/domain/workflowFeatures'
 import {
   IMAGE_ACTION_MENU_ITEMS,
   type ImageActionMenuItem,
@@ -65,6 +73,11 @@ import type { ImageStrengthAction } from '../../execution'
 import type { ImageActionStrengthControl } from '../../image-tools'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
+import CanvasCreditQuoteBadge from '../nodes/CanvasCreditQuoteBadge.vue'
+import {
+  isCanvasBillingSubmitBlocked,
+  useCanvasBillingReadinessStore,
+} from '../../execution'
 
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>
@@ -77,8 +90,40 @@ const emit = defineEmits<{
 }>()
 
 const showStrengthControl = computed(() => props.strengthControl.visible)
+const billingStore = useCanvasBillingReadinessStore()
+
+onMounted(() => {
+  if (!billingStore) return
+  for (const item of IMAGE_ACTION_MENU_ITEMS) {
+    const feature = resolveItemBillingFeature(item)
+    if (feature) void billingStore.ensureFeature(feature)
+  }
+})
+
+function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature | null {
+  return WORKFLOW_FEATURE_SLUGS.includes(item.action as WorkflowFeature)
+    ? (item.action as WorkflowFeature)
+    : null
+}
+
+function getItemBillingState(item: ImageActionMenuItem) {
+  const feature = resolveItemBillingFeature(item)
+  return feature && billingStore ? billingStore.getFeatureState(feature) : null
+}
+
+function isItemDisabled(item: ImageActionMenuItem) {
+  return props.directGenerating || isCanvasBillingSubmitBlocked(getItemBillingState(item))
+}
+
+function getItemTooltip(item: ImageActionMenuItem) {
+  const billing = getItemBillingState(item)
+  if (!billing) return item.label
+  if (billing.status === 'ready') return `${item.label} · ${billing.totalCredits ?? 0} 点子`
+  return `${item.label} · ${billing.reason || '正在获取点子价格'}`
+}
 
 function onActionClick(item: ImageActionMenuItem) {
+  if (isItemDisabled(item)) return
   emit('action', item.action)
 }
 
@@ -154,6 +199,7 @@ function onItemStrengthPointerUp(item: ImageActionMenuItem, event: PointerEvent)
 function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   const action = getStrengthAction(item)
   if (!action) return
+  if (isItemDisabled(item)) return
   props.strengthControl.onClick(action, event)
   emit('action', item.action)
 }
@@ -161,6 +207,7 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
 
 <style scoped>
 .image-action-menu {
+  --canvas-image-action-price-z-index: 3;
   position: absolute;
   top: calc(100% + 10px);
   left: 50%;
@@ -205,6 +252,19 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   flex: 0 0 var(--node-tool-button-size);
   width: var(--node-tool-button-size);
   height: var(--node-tool-button-size);
+}
+
+.image-action-price {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  z-index: var(--canvas-image-action-price-z-index);
+  max-width: 82px;
+  transform: translateX(-50%);
+}
+
+.image-action-menu:not(.strength-mode) .image-action-menu-inner {
+  padding-bottom: 18px;
 }
 
 .image-action-control.is-strength-active {

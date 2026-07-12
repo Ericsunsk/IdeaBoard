@@ -21,7 +21,7 @@ type AdminService interface {
 	Refund(context.Context, RefundCommand) (CommandResult, error)
 	GetWallet(context.Context, int64) (WalletDetails, error)
 	ListLedger(context.Context, ListLedgerInput) (LedgerPage, error)
-	StartReconciliation(context.Context, int64, time.Duration) (ReconciliationRun, error)
+	StartReconciliation(context.Context, StartReconciliationInput) (ReconciliationRun, error)
 	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
 	ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error)
 	ListReconciliationFindings(context.Context, int64, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error)
@@ -69,7 +69,8 @@ func (r *adminRefundRequest) creditAmount() int64     { return r.AmountCredits }
 func (r *adminCorrectionRequest) creditAmount() int64 { return r.AmountCredits }
 
 type adminReconciliationRequest struct {
-	StaleHoldAfterSeconds int64 `json:"stale_hold_after_seconds"`
+	StaleHoldAfterSeconds int64  `json:"stale_hold_after_seconds"`
+	Reason                string `json:"reason"`
 }
 
 const maxAdminCreditRequestBytes = 16 << 10
@@ -204,6 +205,23 @@ func (h *Handler) GetWallet(c *gin.Context) {
 	response.SuccessDTO(c, wallet)
 }
 
+func (h *Handler) GetCurrentWallet(c *gin.Context) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		return
+	}
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	wallet, err := h.service.GetWallet(c.Request.Context(), userID)
+	if err != nil {
+		writeCreditError(c, err)
+		return
+	}
+	response.SuccessDTO(c, wallet)
+}
+
 func (h *Handler) ListLedger(c *gin.Context) {
 	if h == nil || h.service == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
@@ -214,6 +232,22 @@ func (h *Handler) ListLedger(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "用户 ID 无效")
 		return
 	}
+	h.listLedger(c, userID)
+}
+
+func (h *Handler) ListCurrentLedger(c *gin.Context) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		return
+	}
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	h.listLedger(c, userID)
+}
+
+func (h *Handler) listLedger(c *gin.Context, userID int64) {
 	limit := 0
 	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
 		parsed, err := strconv.Atoi(rawLimit)
@@ -244,6 +278,15 @@ func (h *Handler) ListLedger(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
+func authenticatedUserID(c *gin.Context) (int64, bool) {
+	userID := c.GetInt64("user_id")
+	if userID <= 0 {
+		response.Error(c, http.StatusUnauthorized, "未登录")
+		return 0, false
+	}
+	return userID, true
+}
+
 func (h *Handler) StartReconciliation(c *gin.Context) {
 	if h == nil || h.service == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
@@ -265,7 +308,14 @@ func (h *Handler) StartReconciliation(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "stale_hold_after_seconds 无效")
 		return
 	}
-	run, err := h.service.StartReconciliation(c.Request.Context(), adminID, time.Duration(request.StaleHoldAfterSeconds)*time.Second)
+	reason, err := normalizeReconciliationReason(request.Reason)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "reason 无效")
+		return
+	}
+	run, err := h.service.StartReconciliation(c.Request.Context(), StartReconciliationInput{
+		AdminID: adminID, StaleHoldAfter: time.Duration(request.StaleHoldAfterSeconds) * time.Second, Reason: reason,
+	})
 	if err != nil {
 		writeCreditError(c, err)
 		return

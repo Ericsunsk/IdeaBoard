@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminActionReason } from './adminActionReason'
 
 export interface AdminBillingPriceCreateRequest {
   /**
@@ -12,4 +13,5 @@ export interface AdminBillingPriceCreateRequest {
    */
   unit_credits: number
   enabled: boolean
+  reason: AdminActionReason
 }

@@ -16,17 +16,22 @@ var billingTableNames = []string{
 	"billing_price_version_states",
 }
 
+var billingNoDirectAccessTableNames = []string{
+	"billing_admin_actions",
+}
+
 var billingCommandFunctionSignatures = []string{
-	"create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT)",
-	"update_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT)",
-	"create_billing_price_version(TEXT, BIGINT, BOOLEAN, BIGINT)",
-	"set_billing_price_version_enabled(TEXT, BIGINT, BOOLEAN, BIGINT)",
+	"create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
+	"update_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
+	"create_billing_price_version(TEXT, BIGINT, BOOLEAN, BIGINT, TEXT)",
+	"set_billing_price_version_enabled(TEXT, BIGINT, BOOLEAN, BIGINT, TEXT)",
 }
 
 var billingInternalFunctionSignatures = []string{
 	"prevent_billing_sku_identity_mutation()",
 	"prevent_billing_price_version_mutation()",
 	"prevent_billing_price_state_delete()",
+	"prevent_billing_admin_action_mutation()",
 }
 
 type privilegeDBTX interface {
@@ -55,6 +60,9 @@ func ConfigureRuntimePrivileges(ctx context.Context, db privilegeDBTX, runtimeRo
 	statements := []string{
 		`REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ` + joinedTables + ` FROM ` + roleSQL,
 		`GRANT SELECT ON ` + joinedTables + ` TO ` + roleSQL,
+	}
+	for _, tableName := range billingNoDirectAccessTableNames {
+		statements = append(statements, `REVOKE ALL PRIVILEGES ON TABLE `+pgx.Identifier{tableName}.Sanitize()+` FROM `+roleSQL)
 	}
 	for _, functionSignature := range billingInternalFunctionSignatures {
 		statements = append(statements,
@@ -122,6 +130,17 @@ func VerifyRuntimePrivileges(ctx context.Context, db runtimePrivilegeQuerier) er
 			return fmt.Errorf("verify Billing runtime privileges: role %q cannot read %s", currentUser, tableName)
 		}
 		for _, privilege := range []string{"INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"} {
+			var allowed bool
+			if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, tableName, privilege).Scan(&allowed); err != nil {
+				return fmt.Errorf("verify Billing runtime privileges: check %s on %s: %w", privilege, tableName, err)
+			}
+			if allowed {
+				return fmt.Errorf("verify Billing runtime privileges: role %q has forbidden %s on %s", currentUser, privilege, tableName)
+			}
+		}
+	}
+	for _, tableName := range billingNoDirectAccessTableNames {
+		for _, privilege := range []string{"SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"} {
 			var allowed bool
 			if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, tableName, privilege).Scan(&allowed); err != nil {
 				return fmt.Errorf("verify Billing runtime privileges: check %s on %s: %w", privilege, tableName, err)

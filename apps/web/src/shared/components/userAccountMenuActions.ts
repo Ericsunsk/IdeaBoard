@@ -1,10 +1,11 @@
-export type UserAccountMenuItemKey = 'profile' | 'admin' | 'home' | 'logout'
+export type UserAccountMenuItemKey = 'profile' | 'credits' | 'admin' | 'home' | 'logout'
 
 export type UserAccountMenuItemTone = 'default' | 'danger'
 
 export type UserAccountMenuItem = {
   key: UserAccountMenuItemKey
   label: string
+  meta?: string
   tone?: UserAccountMenuItemTone
   command: () => void
 }
@@ -12,8 +13,10 @@ export type UserAccountMenuItem = {
 export type CreateUserAccountMenuItemsOptions = {
   canAccessAdmin: boolean
   hiddenKeys?: readonly UserAccountMenuItemKey[]
+  availableCredits?: number
   handlers: {
     profile: () => void
+    credits?: () => void
     admin?: () => void
     home?: () => void
     logout: () => void
@@ -31,6 +34,18 @@ export function createUserAccountMenuItems(
       command: options.handlers.profile,
     },
   ]
+
+  if (options.handlers.credits) {
+    items.push({
+      key: 'credits',
+      label: '点子',
+      meta:
+        options.availableCredits == null
+          ? '加载中'
+          : formatAccountMenuCredits(options.availableCredits),
+      command: options.handlers.credits,
+    })
+  }
 
   if (options.canAccessAdmin && options.handlers.admin) {
     items.push({
@@ -56,4 +71,13 @@ export function createUserAccountMenuItems(
   })
 
   return items.filter((item) => !hiddenKeys.has(item.key))
+}
+
+function formatAccountMenuCredits(value: number) {
+  const full = new Intl.NumberFormat('zh-CN').format(value)
+  if (full.length <= 12) return full
+  return new Intl.NumberFormat('zh-CN', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
 }

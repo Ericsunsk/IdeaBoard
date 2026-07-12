@@ -36,7 +36,12 @@
           v-bind="itemProps.action"
           :class="[menuItemClass, item.tone === 'danger' ? menuDangerItemClass : '']"
         >
-          <span>{{ item.label }}</span>
+          <span class="flex min-w-0 flex-1 items-center justify-between gap-4">
+            <span class="truncate">{{ item.label }}</span>
+            <span v-if="item.meta" class="shrink-0 font-mono text-xs text-ib-text-subtle">
+              {{ item.meta }}
+            </span>
+          </span>
         </a>
       </template>
     </Menu>

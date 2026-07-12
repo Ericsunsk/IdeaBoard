@@ -26,6 +26,7 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/testdb"
@@ -283,6 +284,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			BoardHandler:     boards.NewBoardHandler(nil, nil),
 			LineDraftHandler: assets.NewLineDraftHandler(nil),
 			BillingHandler:   billing.NewHandler(nil, nil),
+			CreditHandler:    credits.NewHandler(nil),
 			Uploads: UploadDeps{
 				UserRepo:       authDeps.UserRepo,
 				UploadSettings: &fakeMediaUploadSettingsProvider{},
@@ -291,6 +293,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 		AdminRoutes: AdminRouteDeps{
 			AdminHandler:            users.NewAdminHandler(nil, nil, nil),
 			BillingHandler:          billing.NewHandler(nil, nil),
+			BillingCoverageHandler:  billingcoverage.NewHandler(nil),
 			CreditHandler:           credits.NewHandler(nil),
 			AccountHandler:          accounts.NewAccountHandler(nil),
 			TaskHandler:             taskservice.NewHandler(nil),
@@ -361,6 +364,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/credits/reconciliation/runs/:run_id":          false,
 		"GET /api/admin/credits/reconciliation/runs/:run_id/findings": false,
 		"GET /api/admin/billing/skus":                                 false,
+		"GET /api/admin/billing/coverage":                             false,
 		"GET /api/admin/billing/skus/:sku/prices":                     false,
 		"GET /api/admin/line-draft-modes":                             false,
 		"GET /api/admin/monitor":                                      false,

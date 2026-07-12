@@ -238,6 +238,7 @@
         :image-inputs="referenceImages"
         :max-image-inputs="MASK_EDITOR_REFERENCE_IMAGE_LIMIT"
         :show-aspect-ratio="false"
+        :billing-state="billingQuote"
         show-image-input
         @update:output-count="emit('update:output-count', $event)"
         @image-input-open="emit('image-input-open')"
@@ -285,6 +286,8 @@ import { useMaskFeatherStrengthControl } from '../composables/useMaskFeatherStre
 import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
 import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 import PromptTextComposer from '../../components/nodes/PromptTextComposer.vue'
+import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
+import { useCanvasBillingQuote } from '../../execution'
 
 defineProps<{
   drawMode: ImageMaskDrawMode
@@ -324,6 +327,7 @@ const emit = defineEmits<{
 }>()
 
 const promptDraft = ref('')
+const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.partialEdit)
 const {
   strength: featherStrength,
   visible: featherStrengthVisible,

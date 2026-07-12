@@ -32,10 +32,14 @@ func (s *Service) CreateSKU(ctx context.Context, input CreateSKUInput) (CatalogI
 	if err != nil {
 		return CatalogItem{}, err
 	}
+	reason, err := normalizeAdminReason(input.Reason)
+	if err != nil {
+		return CatalogItem{}, err
+	}
 	if err := s.requirePool(); err != nil {
 		return CatalogItem{}, err
 	}
-	if _, err := s.pool.Exec(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5)`, sku, displayName, description, input.Enabled, input.ActorID); err != nil {
+	if _, err := s.pool.Exec(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.ActorID, reason); err != nil {
 		return CatalogItem{}, mapDatabaseError("create SKU", err)
 	}
 	return s.GetSKU(ctx, string(sku))
@@ -62,10 +66,14 @@ func (s *Service) UpdateSKU(ctx context.Context, input UpdateSKUInput) (CatalogI
 		}
 		description = &value
 	}
+	reason, err := normalizeAdminReason(input.Reason)
+	if err != nil {
+		return CatalogItem{}, err
+	}
 	if err := s.requirePool(); err != nil {
 		return CatalogItem{}, err
 	}
-	if _, err := s.pool.Exec(ctx, `SELECT update_billing_sku($1, $2, $3, $4, $5)`, sku, displayName, description, input.Enabled, input.ActorID); err != nil {
+	if _, err := s.pool.Exec(ctx, `SELECT update_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.ActorID, reason); err != nil {
 		return CatalogItem{}, mapDatabaseError("update SKU", err)
 	}
 	return s.GetSKU(ctx, string(sku))
@@ -76,12 +84,16 @@ func (s *Service) CreatePrice(ctx context.Context, input CreatePriceInput) (Pric
 	if err != nil || input.UnitCredits < 0 || input.UnitCredits > MaxQuoteCredits || input.ActorID <= 0 {
 		return PriceInfo{}, ErrInvalidCatalogEntry
 	}
+	reason, err := normalizeAdminReason(input.Reason)
+	if err != nil {
+		return PriceInfo{}, err
+	}
 	if err := s.requirePool(); err != nil {
 		return PriceInfo{}, err
 	}
 	var price PriceInfo
 	err = s.pool.QueryRow(ctx, `SELECT `+priceInfoColumns+`
-FROM create_billing_price_version($1, $2, $3, $4)`, sku, input.UnitCredits, input.Enabled, input.ActorID).
+FROM create_billing_price_version($1, $2, $3, $4, $5)`, sku, input.UnitCredits, input.Enabled, input.ActorID, reason).
 		Scan(priceInfoScanTargets(&price)...)
 	if err != nil {
 		return PriceInfo{}, mapDatabaseError("create price version", err)
@@ -94,12 +106,16 @@ func (s *Service) SetPriceEnabled(ctx context.Context, input SetPriceEnabledInpu
 	if err != nil || input.Version <= 0 || input.ActorID <= 0 {
 		return PriceInfo{}, ErrInvalidCatalogEntry
 	}
+	reason, err := normalizeAdminReason(input.Reason)
+	if err != nil {
+		return PriceInfo{}, err
+	}
 	if err := s.requirePool(); err != nil {
 		return PriceInfo{}, err
 	}
 	var price PriceInfo
 	err = s.pool.QueryRow(ctx, `SELECT `+priceInfoColumns+`
-FROM set_billing_price_version_enabled($1, $2, $3, $4)`, sku, input.Version, input.Enabled, input.ActorID).
+FROM set_billing_price_version_enabled($1, $2, $3, $4, $5)`, sku, input.Version, input.Enabled, input.ActorID, reason).
 		Scan(priceInfoScanTargets(&price)...)
 	if err != nil {
 		return PriceInfo{}, mapDatabaseError("set price version state", err)
@@ -191,6 +207,47 @@ func (s *Service) GetSKU(ctx context.Context, rawSKU string) (CatalogItem, error
 		return CatalogItem{}, fmt.Errorf("get billing SKU: %w", err)
 	}
 	return item, nil
+}
+
+func (s *Service) GetSKUs(ctx context.Context, rawSKUs []string) ([]CatalogItem, error) {
+	if len(rawSKUs) == 0 {
+		return []CatalogItem{}, nil
+	}
+	skus := make([]string, 0, len(rawSKUs))
+	seen := make(map[SKU]struct{}, len(rawSKUs))
+	for _, rawSKU := range rawSKUs {
+		sku, err := CanonicalizeSKU(rawSKU)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := seen[sku]; exists {
+			continue
+		}
+		seen[sku] = struct{}{}
+		skus = append(skus, string(sku))
+	}
+	if err := s.requirePool(); err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, catalogSelectSQL+`
+WHERE skus.sku = ANY($1::text[])
+ORDER BY skus.sku`, skus)
+	if err != nil {
+		return nil, fmt.Errorf("get billing SKUs: %w", err)
+	}
+	defer rows.Close()
+	items := make([]CatalogItem, 0, len(skus))
+	for rows.Next() {
+		item, err := scanCatalogItem(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan billing SKUs: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read billing SKUs: %w", err)
+	}
+	return items, nil
 }
 
 func (s *Service) ListCatalog(ctx context.Context, input ListCatalogInput) (CatalogPage, error) {

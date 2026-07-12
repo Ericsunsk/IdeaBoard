@@ -1,5 +1,6 @@
 import {
   ADMIN_PROVIDER_ENDPOINTS_PATH,
+  ADMIN_CREDITS_PATH,
   ADMIN_FEATURE_PROMPTS_PATH,
   ADMIN_LOGIN_PATH,
   ADMIN_OSS_CONFIG_PATH,
@@ -14,6 +15,7 @@ export { ADMIN_LOGIN_PATH }
 
 export type AdminNavigationKey =
   | 'users'
+  | 'credits'
   | 'provider-endpoints'
   | 'statistics'
   | 'task-monitor'
@@ -54,6 +56,14 @@ export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
     label: '用户管理',
     title: '用户管理',
     routeName: 'AdminUsers',
+  },
+  {
+    key: 'credits',
+    path: ADMIN_CREDITS_PATH,
+    childPath: 'credits',
+    label: '点子与计费',
+    title: '点子与计费',
+    routeName: 'AdminCredits',
   },
   {
     key: 'task-monitor',

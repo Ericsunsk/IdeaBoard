@@ -6,6 +6,7 @@ import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
 import type { Task } from './task'
 import { resolveApiUrl } from '../config/runtimeUrls'
+import { notifyUserCreditsInvalidation } from '../query/userCreditsInvalidation'
 
 type TaskEventPayload = Pick<
   Task,
@@ -149,14 +150,17 @@ function waitWithEventSource(
       )
 
       if (task.status === 'completed') {
+        notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })
         settleResolve(extractImageResultsFromTaskEvent(task))
         return
       }
       if (task.status === 'failed') {
+        notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'failed' })
         settleReject(createTaskResultFailureError(task))
         return
       }
       if (task.status === 'cancelled') {
+        notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
         settleReject(createTaskCancelledError(task))
       }
     }
@@ -202,12 +206,15 @@ async function waitWithPolling(
     }
 
     if (task?.status === 'completed') {
+      notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })
       return extractImageResultsFromTaskEvent(task)
     }
     if (task?.status === 'failed') {
+      notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'failed' })
       throw createTaskResultFailureError(task)
     }
     if (task?.status === 'cancelled') {
+      notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'cancelled' })
       throw createTaskCancelledError(task)
     }
 

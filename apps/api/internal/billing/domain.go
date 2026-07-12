@@ -6,13 +6,15 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
-	MaxSKULength     = 128
-	MaxQuoteCredits  = int64(9_000_000_000_000_000)
-	DefaultPageLimit = 50
-	MaxPageLimit     = 100
+	MaxSKULength         = 128
+	MaxQuoteCredits      = int64(9_000_000_000_000_000)
+	MaxAdminReasonLength = 1000
+	DefaultPageLimit     = 50
+	MaxPageLimit         = 100
 )
 
 var (
@@ -75,6 +77,7 @@ type CreateSKUInput struct {
 	Description string
 	Enabled     bool
 	ActorID     int64
+	Reason      string
 }
 
 type UpdateSKUInput struct {
@@ -83,6 +86,7 @@ type UpdateSKUInput struct {
 	Description *string
 	Enabled     *bool
 	ActorID     int64
+	Reason      string
 }
 
 type CreatePriceInput struct {
@@ -90,6 +94,7 @@ type CreatePriceInput struct {
 	UnitCredits int64
 	Enabled     bool
 	ActorID     int64
+	Reason      string
 }
 
 type SetPriceEnabledInput struct {
@@ -97,6 +102,7 @@ type SetPriceEnabledInput struct {
 	Version int64
 	Enabled bool
 	ActorID int64
+	Reason  string
 }
 
 type ListCatalogInput struct {
@@ -155,6 +161,14 @@ func normalizeDisplayName(value string) (string, error) {
 func normalizeDescription(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if len(value) > 1000 {
+		return "", ErrInvalidCatalogEntry
+	}
+	return value, nil
+}
+
+func normalizeAdminReason(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" || utf8.RuneCountInString(value) > MaxAdminReasonLength {
 		return "", ErrInvalidCatalogEntry
 	}
 	return value, nil

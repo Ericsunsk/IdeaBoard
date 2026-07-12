@@ -30,6 +30,7 @@
           :disabled="directGenerating"
           :allow-empty="true"
           :output-count="outputCount"
+          :billing-state="billingQuote"
           @update:output-count="emit('update:output-count', $event)"
           @submit="onSubmit"
         />
@@ -45,6 +46,8 @@ import {
   CANVAS_EXTEND_DRAG_ANCHORS,
   type CanvasExtendDragAnchor,
 } from '../../composables/useImageCanvasExtendOverlay'
+import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
+import { useCanvasBillingQuote } from '../../execution'
 
 const props = defineProps<{
   overlayStyle: Record<string, string>
@@ -64,6 +67,7 @@ const emit = defineEmits<{
 
 const promptDraft = ref('')
 const anchors = CANVAS_EXTEND_DRAG_ANCHORS
+const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.imageExtend)
 const handleStyle = computed(() => {
   const radius = Number.isFinite(props.handleRadius)
     ? Math.max(2, Math.round(props.handleRadius))

@@ -24,6 +24,7 @@ import type {
   AdminBillingSKUUpdateRequest,
   ApiResponseBillingCatalogItem,
   ApiResponseBillingCatalogPage,
+  ApiResponseBillingCoverage,
   ApiResponseBillingPrice,
   ApiResponseBillingPricePage,
   ListAdminBillingPricesParams,
@@ -189,6 +190,75 @@ export function useCreateAdminBillingSKU<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getCreateAdminBillingSKUQueryOptions(adminBillingSKUCreateRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminBillingCoverageUrl = () => {
+  return `/admin/billing/coverage`
+}
+
+export const getAdminBillingCoverage = async (
+  options?: RequestInit,
+): Promise<ApiResponseBillingCoverage> => {
+  return orvalMutator<ApiResponseBillingCoverage>(getGetAdminBillingCoverageUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminBillingCoverageQueryKey = () => {
+  return ['admin', 'billing', 'coverage'] as const
+}
+
+export const getGetAdminBillingCoverageQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminBillingCoverage>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminBillingCoverage>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminBillingCoverageQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminBillingCoverage>>> = ({
+    signal,
+  }) => getAdminBillingCoverage({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminBillingCoverage>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminBillingCoverageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminBillingCoverage>>
+>
+export type GetAdminBillingCoverageQueryError = ErrorType<unknown>
+
+export function useGetAdminBillingCoverage<
+  TData = Awaited<ReturnType<typeof getAdminBillingCoverage>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminBillingCoverage>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminBillingCoverageQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

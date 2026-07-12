@@ -206,10 +206,12 @@ import {
 } from '../components/chrome'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
 import { openAccountManagementDialog } from '../../account-management/useAccountManagementDialogController'
+import { useUserCreditWalletSummary } from '../../account-management/useUserCreditWalletSummary'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const { availableCredits } = useUserCreditWalletSummary(() => Boolean(userStore.user))
 
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const flowPaneAdapter = useVueFlowPaneAdapter()
@@ -326,8 +328,10 @@ const userMenuItems = computed(() =>
   createUserAccountMenuItems({
     canAccessAdmin: canAccessAdmin(userStore.user),
     hiddenKeys: ['home'],
+    availableCredits: availableCredits.value,
     handlers: {
       profile: openAccountManagementDialog,
+      credits: () => openAccountManagementDialog('credits'),
       admin: () => onNavigateRequest(ADMIN_ROOT_PATH),
       logout: () => {
         void onLogoutRequest()

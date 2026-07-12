@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 
@@ -59,12 +60,14 @@ type UserRouteDeps struct {
 	BoardHandler     *boards.BoardHandler
 	LineDraftHandler *assets.LineDraftHandler
 	BillingHandler   *billing.Handler
+	CreditHandler    *credits.Handler
 	Uploads          UploadDeps
 }
 
 type AdminRouteDeps struct {
 	AdminHandler            *users.AdminHandler
 	BillingHandler          *billing.Handler
+	BillingCoverageHandler  *billingcoverage.Handler
 	CreditHandler           *credits.Handler
 	AccountHandler          *accounts.AccountHandler
 	TaskHandler             *taskservice.Handler
