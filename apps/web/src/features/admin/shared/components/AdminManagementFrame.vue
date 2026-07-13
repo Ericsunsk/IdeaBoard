@@ -11,7 +11,7 @@
         </div>
       </div>
 
-      <div :class="frameContentClass" @scroll.passive="$emit('scroll')">
+      <div :class="frameContentClass">
         <slot />
       </div>
     </div>
@@ -30,9 +30,7 @@ import {
 
 const props = defineProps<{
   contentClass?: string
-  isScrolling?: boolean
 }>()
-defineEmits<{ scroll: [] }>()
 
 const slots = useSlots()
 const hasToolbar = computed(() =>
@@ -41,6 +39,5 @@ const hasToolbar = computed(() =>
 const frameContentClass = computed(() => [
   adminSurfaceScrollContentClass,
   props.contentClass || (hasToolbar.value ? 'px-6 pb-6' : 'p-6'),
-  { 'is-scrolling': props.isScrolling },
 ])
 </script>

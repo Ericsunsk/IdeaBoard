@@ -1,8 +1,5 @@
 <template>
-  <div
-    :class="[boardCatalogClasses.page, { 'is-scrolling': isBoardsPageScrolling }]"
-    @scroll.passive="handleBoardsPageScroll"
-  >
+  <div :class="boardCatalogClasses.page">
     <div :class="boardCatalogClasses.pageBackground"></div>
 
     <header :class="boardCatalogClasses.header">
@@ -204,9 +201,7 @@ const activeMenuBoardId = ref<string | null>(null)
 const deleteDialogVisible = ref(false)
 const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
 const isDeleteBoardPending = ref(false)
-const isBoardsPageScrolling = ref(false)
 const boardPreviewMap = boardPreviewRefresh.previewMap
-let boardsPageScrollTimer: number | undefined
 
 const sortOptions = [
   { label: 'Recent', value: 'recent' },
@@ -258,15 +253,6 @@ function formatDate(ts: number): string {
 
 function onSearchInput(value: string | undefined) {
   searchKeyword.value = (value || '').trim()
-}
-
-function handleBoardsPageScroll() {
-  isBoardsPageScrolling.value = true
-  if (boardsPageScrollTimer) window.clearTimeout(boardsPageScrollTimer)
-  boardsPageScrollTimer = window.setTimeout(() => {
-    isBoardsPageScrolling.value = false
-    boardsPageScrollTimer = undefined
-  }, 700)
 }
 
 async function createAndOpenBoard() {
@@ -453,9 +439,5 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   boardPreviewRefresh.dispose()
-  if (boardsPageScrollTimer) {
-    window.clearTimeout(boardsPageScrollTimer)
-    boardsPageScrollTimer = undefined
-  }
 })
 </script>

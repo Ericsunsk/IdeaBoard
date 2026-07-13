@@ -6,8 +6,6 @@
     :empty-title="emptyStorageMessage"
     :is-empty="filteredStorageCards.length === 0"
     :is-loading="loading && storages.length === 0"
-    :is-scrolling="isStoragePanelScrolling"
-    @scroll="handleStoragePanelScroll"
   >
     <template #toolbar>
       <AdminResourceToolbar>
@@ -194,14 +192,7 @@
       </div>
     </template>
 
-    <div
-      :class="[
-        adminDialogScrollableBodyClass,
-        'max-h-[min(68vh,640px)]',
-        { 'is-scrolling': isStorageDialogScrolling },
-      ]"
-      @scroll.passive="handleStorageDialogScroll"
-    >
+    <div :class="[adminDialogScrollableBodyClass, 'max-h-[min(68vh,640px)]']">
       <Tabs value="basic" class="min-w-0 pr-3">
         <TabList>
           <Tab value="basic">基本信息</Tab>
@@ -420,7 +411,6 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
   adminActionButtonClass,
@@ -474,10 +464,6 @@ const {
   loadData,
   refreshData,
 } = useAdminStorageContext({ confirm: adminConfirm })
-const { isScrolling: isStoragePanelScrolling, handleScroll: handleStoragePanelScroll } =
-  useTransientScrolling()
-const { isScrolling: isStorageDialogScrolling, handleScroll: handleStorageDialogScroll } =
-  useTransientScrolling()
 const searchKeyword = cards.searchKeyword
 const hasStorageSearch = cards.hasSearch
 const filteredStorageCards = cards.items

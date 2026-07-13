@@ -79,11 +79,7 @@
       </AdminResourceToolbar>
     </template>
 
-    <div
-      class="app-scrollbar h-full overflow-y-auto overscroll-contain"
-      :class="{ 'is-scrolling': isUserTableScrolling }"
-      @scroll.passive="handleUserTableScroll"
-    >
+    <div class="app-scrollbar h-full overflow-y-auto overscroll-contain">
       <DataTable
         v-model:selection="selectedUsers"
         :value="users"
@@ -250,7 +246,6 @@ import AdminResourceToolbar from '../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
-import { useTransientScrolling } from '../shared/composables/useTransientScrolling'
 import { adminDenseDataTablePt } from '../shared/lib/adminDataTablePt'
 import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
 import { adminRoundIconButtonClass, adminTextButtonClass } from '../shared/lib/adminUiClasses'
@@ -271,9 +266,6 @@ type PrimePopupPanel = {
 const adminFeedback = useAdminFeedback()
 const adminConfirm = useAdminConfirm()
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
-const { isScrolling: isUserTableScrolling, handleScroll: handleUserTableScroll } =
-  useTransientScrolling()
-
 const adminUsers = useAdminUsersContext({
   feedback: adminFeedback.users.management,
   confirm: adminConfirm,

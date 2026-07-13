@@ -1,9 +1,5 @@
 <template>
-  <AdminManagementFrame
-    :content-class="promptPanelContentClass"
-    :is-scrolling="isPromptPanelScrolling"
-    @scroll="handlePromptPanelScroll"
-  >
+  <AdminManagementFrame :content-class="promptPanelContentClass">
     <template v-if="featureGroups.length > 0">
       <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg" :pt="adminCardPt">
         <template #content>
@@ -82,15 +78,7 @@
       </div>
     </template>
 
-    <div
-      v-if="activeGroup"
-      :class="[
-        adminDialogScrollableBodyClass,
-        'h-[min(66vh,620px)]',
-        { 'is-scrolling': isPromptDialogScrolling },
-      ]"
-      @scroll.passive="handlePromptDialogScroll"
-    >
+    <div v-if="activeGroup" :class="[adminDialogScrollableBodyClass, 'h-[min(66vh,620px)]']">
       <div class="flex flex-col gap-3 pr-3">
         <Panel v-for="item in activeGroup.items" :key="item.slug" :pt="adminPanelPt">
           <template #header>
@@ -191,7 +179,6 @@ import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
-import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminPanelPt } from '../../shared/lib/adminPanelPt'
 import {
@@ -214,10 +201,6 @@ import {
 } from './featurePromptMeta'
 
 const adminFeedback = useAdminFeedback()
-const { isScrolling: isPromptPanelScrolling, handleScroll: handlePromptPanelScroll } =
-  useTransientScrolling()
-const { isScrolling: isPromptDialogScrolling, handleScroll: handlePromptDialogScroll } =
-  useTransientScrolling()
 const promptConfigWorkspace = useAdminPromptConfigWorkspace({
   feedback: adminFeedback.promptConfig,
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,

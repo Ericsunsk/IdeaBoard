@@ -217,11 +217,7 @@
         </AdminResourceToolbar>
       </template>
 
-      <div
-        class="app-scrollbar overflow-x-auto overscroll-contain"
-        :class="{ 'is-scrolling': isTaskTableScrolling }"
-        @scroll.passive="handleTaskTableScroll"
-      >
+      <div class="app-scrollbar overflow-x-auto overscroll-contain">
         <DataTable
           v-model:selection="selectedTasks"
           :value="tasks"
@@ -743,7 +739,6 @@ import {
   adminToolbarIconButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {
   formatTaskCreatedAt,
   getTaskApiCall,
@@ -832,8 +827,6 @@ const { canDeleteSelectedTasks, isDeletingSelectedTasks, requestDeleteSelectedTa
     confirm: adminConfirm,
     feedback: adminFeedback.taskMonitor.taskDeletion,
   })
-const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
-  useTransientScrolling()
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1)
 const taskListErrorMessage = computed(() =>

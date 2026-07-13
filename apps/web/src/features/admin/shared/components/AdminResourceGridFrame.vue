@@ -1,9 +1,5 @@
 <template>
-  <AdminManagementFrame
-    :content-class="contentClass"
-    :is-scrolling="isScrolling"
-    @scroll="$emit('scroll')"
-  >
+  <AdminManagementFrame :content-class="contentClass">
     <template v-if="$slots.toolbar" #toolbar>
       <slot name="toolbar" />
     </template>
@@ -52,9 +48,7 @@ const props = defineProps<{
   gridClass?: string
   isEmpty: boolean
   isLoading: boolean
-  isScrolling?: boolean
 }>()
-defineEmits<{ scroll: [] }>()
 
 const resolvedGridClass = computed(() => props.gridClass || adminMasonryGridClass)
 </script>

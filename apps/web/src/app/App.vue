@@ -18,7 +18,7 @@
 
 <script setup lang="ts">
 import { IconoirProvider } from '@iconoir/vue'
-import { onMounted, onUnmounted, watch } from 'vue'
+import { watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import { useSiteBranding } from '../shared/composables/useSiteBranding'
 
@@ -32,8 +32,6 @@ const iconoirProps = {
 const toastOptions = {
   class: 'ideaboard-toast',
 }
-
-let appScrollTimer: number | undefined
 
 const defaultSiteIcon = {
   href: '/favicon.svg',
@@ -73,19 +71,6 @@ function updateSiteIcon(nextLogoURL: string) {
   }
 }
 
-function setAppScrollingClass(enabled: boolean) {
-  document.documentElement.classList.toggle('app-scrolling', enabled)
-}
-
-function handleAppScroll() {
-  setAppScrollingClass(true)
-  if (appScrollTimer) window.clearTimeout(appScrollTimer)
-  appScrollTimer = window.setTimeout(() => {
-    setAppScrollingClass(false)
-    appScrollTimer = undefined
-  }, 700)
-}
-
 watch(
   projectName,
   (value) => {
@@ -101,17 +86,4 @@ watch(
   },
   { immediate: true },
 )
-
-onMounted(() => {
-  window.addEventListener('scroll', handleAppScroll, { passive: true })
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', handleAppScroll)
-  if (appScrollTimer) {
-    window.clearTimeout(appScrollTimer)
-    appScrollTimer = undefined
-  }
-  setAppScrollingClass(false)
-})
 </script>

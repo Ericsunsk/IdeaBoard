@@ -82,10 +82,7 @@
       </div>
     </aside>
 
-    <main
-      :class="[profilePaneClass, { 'is-scrolling': isProfileMainScrolling }]"
-      @scroll.passive="handleProfileMainScroll"
-    >
+    <main :class="profilePaneClass">
       <Transition
         mode="out-in"
         enter-active-class="transition-opacity duration-150 ease-out"
@@ -357,7 +354,7 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
+import { computed, onMounted, ref, watch, type Component } from 'vue'
 import { useAvatarUploadWorkflow } from '../useAvatarUploadWorkflow'
 import { usePasswordChangeWorkflow } from '../usePasswordChangeWorkflow'
 import Avatar from 'primevue/avatar'
@@ -453,9 +450,7 @@ watch(
   },
 )
 const avatarInputRef = ref<HTMLInputElement | null>(null)
-const isProfileMainScrolling = ref(false)
 const logoutLoading = ref(false)
-let profileMainScrollTimer: number | undefined
 
 const navGroups = [
   {
@@ -554,15 +549,6 @@ function openAvatarPicker() {
   avatarInputRef.value?.click()
 }
 
-function handleProfileMainScroll() {
-  isProfileMainScrolling.value = true
-  if (profileMainScrollTimer) window.clearTimeout(profileMainScrollTimer)
-  profileMainScrollTimer = window.setTimeout(() => {
-    isProfileMainScrolling.value = false
-    profileMainScrollTimer = undefined
-  }, 700)
-}
-
 async function handleLogout() {
   if (logoutLoading.value) return
 
@@ -580,12 +566,5 @@ async function handleLogout() {
 
 onMounted(() => {
   void userStore.fetchUserInfo()
-})
-
-onUnmounted(() => {
-  if (profileMainScrollTimer) {
-    window.clearTimeout(profileMainScrollTimer)
-    profileMainScrollTimer = undefined
-  }
 })
 </script>

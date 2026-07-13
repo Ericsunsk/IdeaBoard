@@ -1,12 +1,6 @@
 <template>
   <section class="image-editor-panel image-editor-layers-panel">
-    <div
-      class="image-editor-layers-panel__list app-scrollbar"
-      :class="{ 'is-scrolling': isLayerListScrolling }"
-      role="listbox"
-      aria-label="图层"
-      @scroll="onLayerListScroll"
-    >
+    <div class="image-editor-layers-panel__list app-scrollbar" role="listbox" aria-label="图层">
       <div
         v-for="layer in layers"
         :key="layer.id"
@@ -46,7 +40,6 @@
 
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { onBeforeUnmount, ref } from 'vue'
 import {
   Brightness,
   ColorFilter,
@@ -71,24 +64,6 @@ const emit = defineEmits<{
   (e: 'select-layer', layerId: string): void
   (e: 'set-layer-visible', layerId: string, visible: boolean): void
 }>()
-
-const isLayerListScrolling = ref(false)
-let layerListScrollTimer: number | null = null
-
-function clearLayerListScrollTimer() {
-  if (layerListScrollTimer == null) return
-  window.clearTimeout(layerListScrollTimer)
-  layerListScrollTimer = null
-}
-
-function onLayerListScroll() {
-  isLayerListScrolling.value = true
-  clearLayerListScrollTimer()
-  layerListScrollTimer = window.setTimeout(() => {
-    isLayerListScrolling.value = false
-    layerListScrollTimer = null
-  }, 600)
-}
 
 function onToggleVisibility(layer: ImageEditorLayer) {
   if (layer.type === 'source') return
@@ -120,8 +95,6 @@ function resolveLayerIcon(layer: ImageEditorLayer): Component {
 function assertNever(value: never): never {
   throw new Error(`Unhandled image editor layer kind: ${String(value)}`)
 }
-
-onBeforeUnmount(clearLayerListScrollTimer)
 </script>
 
 <style src="./styles/image-editor-panel.css"></style>

@@ -5,8 +5,6 @@
     :grid-class="adminTwoColumnMasonryGridClass"
     :is-empty="false"
     :is-loading="false"
-    :is-scrolling="isSystemSettingsPanelScrolling"
-    @scroll="handleSystemSettingsPanelScroll"
   >
     <Card :class="adminMasonryCardClass" :pt="adminCardPt">
       <template #title>
@@ -497,7 +495,6 @@ import {
 } from '../../system-settings/taskMonitorSettingsResource'
 import { useAdminTaskMonitorSettings } from '../../system-settings/useAdminTaskMonitorSettings'
 import { useAdminPublicURLSettings } from '../../system-settings/useAdminPublicURLSettings'
-import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
   adminActionButtonClass,
@@ -518,10 +515,6 @@ const brandingLogoButtonClass = createBrandMarkClass(
 )
 
 const adminFeedback = useAdminFeedback()
-const {
-  isScrolling: isSystemSettingsPanelScrolling,
-  handleScroll: handleSystemSettingsPanelScroll,
-} = useTransientScrolling()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
 const logoCropDialogVisible = ref(false)
 const pendingLogoFile = ref<File | null>(null)

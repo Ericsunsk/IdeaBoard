@@ -7,8 +7,6 @@
       :empty-title="emptyProviderEndpointMessage"
       :is-empty="providerEndpointCards.length === 0"
       :is-loading="isProviderEndpointLoading"
-      :is-scrolling="isProviderEndpointPanelScrolling"
-      @scroll="handleProviderEndpointPanelScroll"
     >
       <template #toolbar>
         <AdminResourceToolbar>
@@ -463,7 +461,6 @@ import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
@@ -481,11 +478,6 @@ import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 
 const adminFeedback = useAdminFeedback()
 const adminConfirm = useAdminConfirm()
-
-const {
-  isScrolling: isProviderEndpointPanelScrolling,
-  handleScroll: handleProviderEndpointPanelScroll,
-} = useTransientScrolling()
 
 const { cards, providerEndpointEditor, accountEditor, commands } = useAdminProviderConfig({
   feedback: adminFeedback.providerEndpoints.providerConfig,

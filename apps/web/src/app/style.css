@@ -281,6 +281,12 @@
   --radius-ib-overlay: 14px;
   --radius-ib-pill: 999px;
 
+  --size-ib-scrollbar: 10px;
+  --size-ib-scrollbar-thumb-inset: 3px;
+  --color-ib-scrollbar-track: transparent;
+  --color-ib-scrollbar-thumb: color-mix(in srgb, var(--color-ib-text) 58%, transparent);
+  --color-ib-scrollbar-thumb-hover: color-mix(in srgb, var(--color-ib-text) 72%, transparent);
+
   --shadow-ib-control: 0 3px 10px rgba(45, 64, 89, 0.05);
   --shadow-ib-panel: 0 4px 20px -2px rgba(45, 64, 89, 0.02), 0 2px 6px -1px rgba(45, 64, 89, 0.01);
   --shadow-ib-overlay: 0 18px 42px rgba(45, 64, 89, 0.14);
@@ -309,6 +315,8 @@
 @layer base {
   * {
     box-sizing: border-box;
+    scrollbar-color: var(--color-ib-scrollbar-thumb) var(--color-ib-scrollbar-track);
+    scrollbar-width: thin;
   }
 
   html,
@@ -343,23 +351,25 @@
     text-decoration: none;
   }
 
-  /* 滚动条样式 */
+  /* Global scrollbar skin; app-scrollbar adds a stable gutter for layout-sensitive surfaces. */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: var(--size-ib-scrollbar);
+    height: var(--size-ib-scrollbar);
   }
 
   ::-webkit-scrollbar-track {
-    background: #f8f9fd;
+    background: var(--color-ib-scrollbar-track);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #c8d0e4;
-    border-radius: 4px;
+    border: var(--size-ib-scrollbar-thumb-inset) solid transparent;
+    border-radius: var(--radius-ib-pill);
+    background-color: var(--color-ib-scrollbar-thumb);
+    background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #aeb8cf;
+    background-color: var(--color-ib-scrollbar-thumb-hover);
   }
 
   /* 选中文字颜色 */
@@ -455,49 +465,8 @@ body.admin-route {
   font-feature-settings: 'tnum' 1;
 }
 
-/*
- * App-owned global: scroll state is toggled from App.vue and reused by surfaces that need
- * stable gutters without owning the root scroll listener.
- */
-html,
 .app-scrollbar {
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-html.app-scrolling,
-.app-scrollbar.is-scrolling {
-  scrollbar-color: rgba(31, 41, 55, 0.58) transparent;
-}
-
-html::-webkit-scrollbar,
-.app-scrollbar::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-html::-webkit-scrollbar-track,
-.app-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-html::-webkit-scrollbar-thumb,
-.app-scrollbar::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  border-radius: 999px;
-  background-color: transparent;
-  background-clip: content-box;
-}
-
-html.app-scrolling::-webkit-scrollbar-thumb,
-.app-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
-  background-color: rgba(31, 41, 55, 0.58);
-}
-
-html.app-scrolling::-webkit-scrollbar-thumb:hover,
-.app-scrollbar.is-scrolling::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(17, 24, 39, 0.72);
 }
 
 /*
