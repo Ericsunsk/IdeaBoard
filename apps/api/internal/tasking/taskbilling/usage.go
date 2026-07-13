@@ -13,8 +13,21 @@ type UsageStore struct {
 	db *sql.DB
 }
 
+type contextQueryer struct {
+	ctx context.Context
+	db  *sql.DB
+}
+
 func NewUsageStore(db *sql.DB) *UsageStore {
 	return &UsageStore{db: db}
+}
+
+func (s *UsageStore) dbWithContext(ctx context.Context) contextQueryer {
+	return contextQueryer{ctx: ctx, db: s.db}
+}
+
+func (q contextQueryer) QueryRow(query string, args ...any) *sql.Row {
+	return q.db.QueryRowContext(q.ctx, query, args...)
 }
 
 func (s *UsageStore) GetTaskUsage(
@@ -28,7 +41,7 @@ func (s *UsageStore) GetTaskUsage(
 	if userID <= 0 || location == nil {
 		return 0, 0, fmt.Errorf("task billing usage store: invalid query")
 	}
-	err = s.db.QueryRowContext(ctx, `
+	err = s.dbWithContext(ctx).QueryRow(`
 SELECT COUNT(*)::bigint,
        COUNT(DISTINCT (created_at AT TIME ZONE $2)::date)::bigint
 FROM task_billing_snapshots

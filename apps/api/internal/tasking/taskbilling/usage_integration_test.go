@@ -63,6 +63,85 @@ WHERE user_id = $1`, 81, location.String())
 	}
 }
 
+func TestTaskUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	ctx := context.Background()
+	request, sku := seedTaskBillingUsageProduct(t, ctx, pool)
+	const (
+		userID = int64(83)
+		prefix = "usage_shanghai_boundary"
+	)
+	seedTaskBillingUsageBoundarySnapshots(t, ctx, pool, userID, prefix, request, sku)
+
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	count, activeDays, err := NewUsageStore(db).GetTaskUsage(ctx, userID, location)
+	if err != nil {
+		t.Fatalf("GetTaskUsage() error = %v", err)
+	}
+	if count != 2 || activeDays != 2 {
+		t.Fatalf("task usage count=%d active_days=%d, want 2/2", count, activeDays)
+	}
+}
+
+func seedTaskBillingUsageBoundarySnapshots(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	userID int64,
+	prefix string,
+	request Request,
+	sku billing.SKU,
+) {
+	t.Helper()
+	beforeTaskID := prefix + "_before"
+	afterTaskID := prefix + "_after"
+	beforeBoundary := time.Date(2026, time.July, 12, 15, 59, 59, 0, time.UTC)
+	afterBoundary := time.Date(2026, time.July, 12, 16, 0, 0, 0, time.UTC)
+	if _, err := pool.Exec(ctx, `
+INSERT INTO task_billing_snapshots (
+  task_id, user_id, feature_slug, model, sku, price_version_id, price_version,
+  unit_credits, quantity, total_credits, quoted_at, created_at
+)
+SELECT
+  fixture.task_id,
+  $1,
+  $2,
+  $3,
+  price.sku,
+  price.price_version_id,
+  price.version,
+  price.unit_credits,
+  1,
+  0,
+  fixture.created_at,
+  fixture.created_at
+FROM (
+  SELECT price_version_id, sku, version, unit_credits
+  FROM billing_price_versions
+  WHERE sku = $4
+  ORDER BY version DESC
+  LIMIT 1
+) AS price
+CROSS JOIN (
+  VALUES ($5::varchar, $6::timestamptz), ($7::varchar, $8::timestamptz)
+) AS fixture(task_id, created_at)`,
+		userID, request.Feature, request.Model, string(sku),
+		beforeTaskID, beforeBoundary, afterTaskID, afterBoundary,
+	); err != nil {
+		t.Fatalf("seed task snapshots around Shanghai day boundary: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO task_billing_settlements (task_id, state, settled_at)
+VALUES ($1, 'free', $3), ($2, 'free', $4)`,
+		beforeTaskID, afterTaskID, beforeBoundary, afterBoundary,
+	); err != nil {
+		t.Fatalf("seed task settlements around Shanghai day boundary: %v", err)
+	}
+}
+
 func seedTaskBillingUsageProduct(
 	t *testing.T,
 	ctx context.Context,
@@ -109,7 +188,7 @@ SELECT
   $4,
   $5,
   price.sku,
-	  price.price_version_id,
+  price.price_version_id,
   price.version,
   price.unit_credits,
   1,
@@ -117,7 +196,7 @@ SELECT
   clock_timestamp(),
   clock_timestamp() - (series::text || ' seconds')::interval
 FROM (
-	  SELECT price_version_id, sku, version, unit_credits
+  SELECT price_version_id, sku, version, unit_credits
   FROM billing_price_versions
   WHERE sku = $6
   ORDER BY version DESC
