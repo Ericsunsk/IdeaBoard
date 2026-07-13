@@ -8,15 +8,17 @@ describe('UserAccountMenu', () => {
     const openCredits = vi.fn()
     const items: UserAccountMenuItem[] = [
       { key: 'profile', label: '账户管理', command: vi.fn() },
-      { key: 'credits', label: 'Idea', meta: '1,280', command: openCredits },
+      { key: 'credits', label: 'Idea', meta: '1,280 Ideas', command: openCredits },
       { key: 'logout', label: '退出登录', command: vi.fn() },
     ]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
-    const credits = screen.getByRole('button', { name: 'Idea余额 1,280' })
+    const credits = screen.getByRole('button', { name: 'Idea余额 1,280 Ideas' })
     const accountMenu = screen.getByRole('button', { name: '账户菜单' })
 
     expect(credits).toBeVisible()
+    expect(credits).toHaveTextContent('1,280 Ideas')
+    expect(credits).toHaveAttribute('title', 'Idea余额 1,280 Ideas')
     expect(credits.querySelector('svg')).not.toBeNull()
     expect(credits.nextElementSibling).toBe(accountMenu)
 

@@ -65,12 +65,12 @@ describe('user account menu actions', () => {
     })
 
     const credits = items.find((item) => item.key === 'credits')
-    expect(credits).toMatchObject({ label: 'Idea', meta: '1,280' })
+    expect(credits).toMatchObject({ label: 'Idea', meta: '1,280 Ideas' })
     credits?.command()
     expect(openCredits).toHaveBeenCalledOnce()
   })
 
-  it('keeps very large balances compact inside the credits control', () => {
+  it('keeps the complete currency wording for very large balances', () => {
     const items = createUserAccountMenuItems({
       canAccessAdmin: false,
       availableCredits: 9_000_000_000_000_000,
@@ -83,7 +83,24 @@ describe('user account menu actions', () => {
 
     expect(items.find((item) => item.key === 'credits')).toMatchObject({
       label: 'Idea',
-      meta: '9000万亿',
+      meta: '9,000,000,000,000,000 Ideas',
+    })
+  })
+
+  it('uses the singular currency name for exactly one credit', () => {
+    const items = createUserAccountMenuItems({
+      canAccessAdmin: false,
+      availableCredits: 1,
+      handlers: {
+        profile: vi.fn(),
+        credits: vi.fn(),
+        logout: vi.fn(),
+      },
+    })
+
+    expect(items.find((item) => item.key === 'credits')).toMatchObject({
+      label: 'Idea',
+      meta: '1 Idea',
     })
   })
 })

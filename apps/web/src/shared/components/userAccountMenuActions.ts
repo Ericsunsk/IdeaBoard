@@ -1,3 +1,5 @@
+import { formatIdeaAmount } from '../utils/ideaCurrency'
+
 export type UserAccountMenuItemKey = 'profile' | 'credits' | 'admin' | 'home' | 'logout'
 
 export type UserAccountMenuItemTone = 'default' | 'danger'
@@ -40,9 +42,7 @@ export function createUserAccountMenuItems(
       key: 'credits',
       label: 'Idea',
       meta:
-        options.availableCredits == null
-          ? '加载中'
-          : formatAccountMenuCredits(options.availableCredits),
+        options.availableCredits == null ? '加载中' : formatIdeaAmount(options.availableCredits),
       command: options.handlers.credits,
     })
   }
@@ -71,13 +71,4 @@ export function createUserAccountMenuItems(
   })
 
   return items.filter((item) => !hiddenKeys.has(item.key))
-}
-
-function formatAccountMenuCredits(value: number) {
-  const full = new Intl.NumberFormat('zh-CN').format(value)
-  if (full.length <= 12) return full
-  return new Intl.NumberFormat('zh-CN', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(value)
 }

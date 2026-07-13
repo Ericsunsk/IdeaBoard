@@ -50,7 +50,7 @@ describe('CanvasChrome', () => {
         },
         account: {
           menuItems: [
-            { key: 'credits', label: 'Idea', meta: '100', command: vi.fn() },
+            { key: 'credits', label: 'Idea', meta: '100 Ideas', command: vi.fn() },
             { key: 'logout', label: '退出登录', command: vi.fn() },
           ],
         },
@@ -59,10 +59,10 @@ describe('CanvasChrome', () => {
       },
     })
 
-    const credits = screen.getByRole('button', { name: 'Idea余额 100' })
+    const credits = screen.getByRole('button', { name: 'Idea余额 100 Ideas' })
     const share = screen.getByRole('button', { name: '分享功能稍后接入' })
 
     expect(share.previousElementSibling).toBe(credits)
-    expect(screen.getAllByRole('button', { name: 'Idea余额 100' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Idea余额 100 Ideas' })).toHaveLength(1)
   })
 })

@@ -1,17 +1,10 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const legacyCurrencyName = String.fromCodePoint(0x70b9, 0x5b50)
-const scannedExtensions = new Set(['.go', '.md', '.ts', '.vue', '.yaml', '.yml'])
-const ignoredDirectories = new Set([
-  '.git',
-  '.codegraph',
-  '.playwright-cli',
-  'coverage',
-  'dist',
-  'node_modules',
-])
+const scannedExtensions = new Set(['.go', '.md', '.ts', '.tsx', '.vue', '.yaml', '.yml'])
 
 function findRepositoryRoot(start: string) {
   let candidate = path.resolve(start)
@@ -29,15 +22,15 @@ function findRepositoryRoot(start: string) {
   }
 }
 
-function collectFiles(target: string): string[] {
-  const entries = readdirSync(target, { withFileTypes: true })
-  return entries.flatMap((entry) => {
-    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) return []
-
-    const entryPath = path.join(target, entry.name)
-    if (entry.isDirectory()) return collectFiles(entryPath)
-    return scannedExtensions.has(path.extname(entry.name)) ? [entryPath] : []
+function listTrackedSourceFiles(repositoryRoot: string) {
+  return execFileSync('git', ['ls-files', '-z'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
   })
+    .split('\0')
+    .filter(Boolean)
+    .filter((relativePath) => !relativePath.startsWith('.playwright-cli/'))
+    .filter((relativePath) => scannedExtensions.has(path.extname(relativePath)))
 }
 
 function isAllowedTechnicalFixture(relativePath: string, line: string) {
@@ -47,13 +40,11 @@ function isAllowedTechnicalFixture(relativePath: string, line: string) {
   )
 }
 
-describe('human-facing currency copy', () => {
-  it('does not expose the retired currency name in product surfaces or documentation', () => {
+describe('tracked human-facing currency copy', () => {
+  it('does not expose the retired currency name in tracked product source or documentation', () => {
     const repositoryRoot = findRepositoryRoot(process.cwd())
-    const files = collectFiles(repositoryRoot)
-    const violations = files.flatMap((file) => {
-      const relativePath = path.relative(repositoryRoot, file)
-      return readFileSync(file, 'utf8')
+    const violations = listTrackedSourceFiles(repositoryRoot).flatMap((relativePath) => {
+      return readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
         .split(/\r?\n/)
         .flatMap((line, index) =>
           line.includes(legacyCurrencyName) && !isAllowedTechnicalFixture(relativePath, line)
