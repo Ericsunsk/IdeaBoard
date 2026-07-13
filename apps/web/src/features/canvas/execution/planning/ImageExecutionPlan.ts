@@ -38,7 +38,6 @@ import type {
 export type { ImageExecutionInput, ImageExecutionResultOptions, ImageResultAnchor }
 
 export type ImageActionExecutionPlan = {
-  activationId?: string
   kind: 'image-action'
   sourceNodeId: string
   source: ImageExecutionInput
@@ -48,7 +47,6 @@ export type ImageActionExecutionPlan = {
 }
 
 export type CanvasExtendExecutionPlan = {
-  activationId?: string
   kind: 'canvas-extend'
   sourceNodeId: string
   source: ImageExecutionInput
@@ -61,7 +59,6 @@ export type CanvasExtendExecutionPlan = {
 }
 
 export type ImageInpaintExecutionPlan = {
-  activationId?: string
   kind: 'image-inpaint'
   sourceNodeId: string
   source: ImageExecutionInput
@@ -73,7 +70,6 @@ export type ImageInpaintExecutionPlan = {
 }
 
 export type ImagePromptExecutionPlan = {
-  activationId?: string
   kind: 'image-prompt'
   sourceNodeId: string
   source: ImageExecutionInput
@@ -84,7 +80,6 @@ export type ImagePromptExecutionPlan = {
 }
 
 export type TextPromptExecutionPlan = {
-  activationId?: string
   kind: 'text-prompt'
   sourceNodeId: string
   source: ImageExecutionInput
@@ -97,7 +92,6 @@ export type TextPromptExecutionPlan = {
 export type FusionExecutionInputImage = ResolvedFlowInputImage
 
 export type FusionExecutionPlan = {
-  activationId?: string
   kind: 'fusion'
   sourceNodeId: string
   source: ImageExecutionInput

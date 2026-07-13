@@ -33,13 +33,13 @@ function createPendingResults(
 }
 
 describe('pendingImageWorkflowRunner', () => {
-  it('reuses a client action id for the same pending result submission across repeated runs', async () => {
+  it('retries one network transport failure with the same idempotency key and reservation', async () => {
     const submittedClientActionIds: string[] = []
     const pendingResults = createPendingResults(async (params) => {
       params.onReserved?.(['image-2'])
-      await params.submitTask('image-2')
-      await params.submitTask('image-2')
-      return makeRunSummary({ successCount: 0 })
+      const task = await params.submitTask('image-2')
+      expect(task).toEqual({ taskId: 'task-1' })
+      return makeRunSummary({ resultNodeIds: ['image-2'] })
     })
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
@@ -58,6 +58,9 @@ describe('pendingImageWorkflowRunner', () => {
       activationId: 'canvas:activation-1',
       submitTask: vi.fn(async (_resultNodeId: string, clientActionId?: string) => {
         submittedClientActionIds.push(clientActionId ?? '')
+        if (submittedClientActionIds.length === 1) {
+          throw new CanvasBillingPreflightError('network', '网络错误，请重试')
+        }
         return { taskId: 'task-1' }
       }),
       resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
@@ -65,14 +68,40 @@ describe('pendingImageWorkflowRunner', () => {
     }
 
     await runner.run(runParams)
-    await runner.run(runParams)
 
-    expect(submittedClientActionIds).toEqual([
-      'client-action-1',
-      'client-action-1',
-      'client-action-1',
-      'client-action-1',
-    ])
+    expect(pendingResults.runPendingResults).toHaveBeenCalledOnce()
+    expect(submittedClientActionIds).toEqual(['client-action-1', 'client-action-1'])
+  })
+
+  it('does not retry definitive billing errors', async () => {
+    const submitTask = vi.fn(async () => {
+      throw new CanvasBillingPreflightError('insufficient-credits', 'Idea不足')
+    })
+    const pendingResults = createPendingResults(async (params) => {
+      params.onReserved?.(['image-2'])
+      await params.submitTask('image-2')
+      return makeRunSummary()
+    })
+    const runner = createPendingImageWorkflowRunner({
+      pendingResults,
+      isBoardCurrent: () => true,
+      setNodeRunning: vi.fn(),
+      onSuccess: vi.fn(),
+      onWarning: vi.fn(),
+    })
+
+    await runner.run({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      boardId: 'board-a',
+      activationId: 'canvas:activation-2',
+      outputCount: 1,
+      submitTask,
+      resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
+      fallbackErrorMessage: '生成失败',
+    })
+
+    expect(submitTask).toHaveBeenCalledOnce()
   })
 
   it('runs the prepared pending workflow lifecycle and always clears running state', async () => {

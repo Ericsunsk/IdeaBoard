@@ -235,8 +235,11 @@ describe('useCanvasExecutionWorkspace', () => {
     expect(onSuccess).not.toHaveBeenCalled()
   })
 
-  it('reuses the reserved pending result client action id across retries', async () => {
-    const createClientActionId = vi.fn(() => 'client-action-1')
+  it('creates a distinct idempotency id for each deliberate activation', async () => {
+    const createClientActionId = vi
+      .fn()
+      .mockReturnValueOnce('client-action-1')
+      .mockReturnValueOnce('client-action-2')
     const submittedClientActionIds: Array<unknown> = []
     const { workspace } = createWorkspaceHarness({
       createClientActionId,
@@ -254,8 +257,8 @@ describe('useCanvasExecutionWorkspace', () => {
     await workspace.commands.runTextPromptGeneration(makeTextPromptPlan())
     await workspace.commands.runTextPromptGeneration(makeTextPromptPlan())
 
-    expect(createClientActionId).toHaveBeenCalledTimes(1)
-    expect(submittedClientActionIds).toEqual(['client-action-1', 'client-action-1'])
+    expect(createClientActionId).toHaveBeenCalledTimes(2)
+    expect(submittedClientActionIds).toEqual(['client-action-1', 'client-action-2'])
   })
 
   it('flushes the board snapshot after a pending task id attaches', async () => {

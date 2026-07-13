@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import { TaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
+import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
 import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createCanvasGraphStore } from '../../graph-runtime'
 import { flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
@@ -381,6 +382,35 @@ describe('flowImageWorkflowExecution', () => {
     expect(submittedIds[0]).toMatch(/^canvas:/)
     expect(submittedIds[1]).toMatch(/^canvas:/)
     expect(submittedIds[0]).not.toBe(submittedIds[1])
+  })
+
+  it('retries one network submit within an activation without creating another pending task', async () => {
+    executorMocks.submitTaskRequest
+      .mockRejectedValueOnce(new CanvasBillingPreflightError('network', '网络错误，请重试'))
+      .mockResolvedValueOnce({ taskId: 'task-retried' })
+    executorMocks.waitExistingOrLiveTaskImageResults.mockRejectedValueOnce(
+      new TaskResultPendingError('任务进度推送超时，请稍后查看结果'),
+    )
+    const { execution, nodes } = createExecutionHarness()
+
+    await execution.executeImageWorkflow({
+      ...imageActionPlan(),
+      activationId: 'canvas:activation-retry',
+    })
+
+    const pendingResultNodes = nodes.value.filter(
+      (node) => node.id !== 'image-1' && node.data?.kind === 'image',
+    )
+    expect(pendingResultNodes).toHaveLength(1)
+    expect(readImageSnapshot(nodes.value, pendingResultNodes[0].id).pendingTaskId).toBe('task-retried')
+    expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(2)
+    const submitCalls = executorMocks.submitTaskRequest.mock.calls as unknown as Array<
+      [{ client_action_id?: string }]
+    >
+    expect(submitCalls.map(([request]) => request.client_action_id)).toEqual([
+      expect.stringMatching(/^canvas:/),
+      submitCalls[0][0].client_action_id,
+    ])
   })
 
   it('keeps the canvas editable without creating result nodes when provider readiness is unavailable', async () => {

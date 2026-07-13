@@ -2,10 +2,6 @@ import type { SubmitTaskData } from '../../../../shared/api/task'
 
 export type ClientActionIdFactory = () => string
 
-export type PendingTaskClientActionIds = {
-  getForResultNode: (activationId: string, resultNodeId: string) => string
-}
-
 const CANVAS_CLIENT_ACTION_ID_PREFIX = 'canvas:'
 
 function createCanvasId(): string {
@@ -24,23 +20,6 @@ export function createCanvasTaskClientActionId(): string {
 
 export function createCanvasActivationId(): string {
   return createCanvasId()
-}
-
-export function createPendingTaskClientActionIds(
-  createId: ClientActionIdFactory = createCanvasTaskClientActionId,
-): PendingTaskClientActionIds {
-  const idsByResultNodeId = new Map<string, string>()
-
-  return {
-    getForResultNode(activationId, resultNodeId) {
-      const key = `${activationId}:${resultNodeId}`
-      const existing = idsByResultNodeId.get(key)
-      if (existing) return existing
-      const next = createId()
-      idsByResultNodeId.set(key, next)
-      return next
-    },
-  }
 }
 
 export function withTaskClientActionId(

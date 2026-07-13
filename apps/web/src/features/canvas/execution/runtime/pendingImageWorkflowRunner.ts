@@ -9,7 +9,7 @@ import type {
   PendingImageResultRunSummary,
 } from '../result-nodes/usePendingImageResultNodes'
 import {
-  createPendingTaskClientActionIds,
+  createCanvasTaskClientActionId,
   type ClientActionIdFactory,
 } from '../task-runner/taskClientActionIds'
 import { isCanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
@@ -114,14 +114,30 @@ function reportPendingImageRunSummary(
 export function createPendingImageWorkflowRunner(
   options: PendingImageWorkflowRunnerOptions,
 ): PendingImageWorkflowRunner {
-  const clientActionIds = createPendingTaskClientActionIds(options.createClientActionId)
-
   function warnIfBoardCurrent(boardId: string, message: string) {
     if (options.isBoardCurrent(boardId)) options.onWarning(message)
   }
 
   async function run(params: PendingImageWorkflowBatchParams): Promise<void> {
     let resultNodeIds: string[] = []
+    const clientActionIdsByResultNodeId = new Map<string, string>()
+    const createClientActionId = options.createClientActionId ?? createCanvasTaskClientActionId
+
+    async function submitWithTransportRetry(resultNodeId: string) {
+      const clientActionId =
+        clientActionIdsByResultNodeId.get(resultNodeId) ?? createClientActionId()
+      clientActionIdsByResultNodeId.set(resultNodeId, clientActionId)
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          return await params.submitTask(resultNodeId, clientActionId)
+        } catch (error) {
+          if (attempt === 0 && isCanvasBillingPreflightError(error, 'network')) continue
+          throw error
+        }
+      }
+      throw new Error('网络错误，请重试')
+    }
+
     try {
       await params.preflight?.()
       const prepared = await params.prepare?.()
@@ -132,11 +148,7 @@ export function createPendingImageWorkflowRunner(
         outputCount: params.outputCount,
         clientActionKey: params.activationId,
         resultOptions: prepared?.resultOptions ?? params.resultOptions,
-        submitTask: (resultNodeId) =>
-          params.submitTask(
-            resultNodeId,
-            clientActionIds.getForResultNode(params.activationId, resultNodeId),
-          ),
+        submitTask: submitWithTransportRetry,
         resolveResult: params.resolveResult,
         persistPendingTaskIds: params.persistPendingTaskIds,
         isCurrent: () => options.isBoardCurrent(params.boardId),
