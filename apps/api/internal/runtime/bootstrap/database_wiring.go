@@ -61,6 +61,9 @@ func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, er
 	if err := taskbilling.VerifyRuntimePrivileges(ctx, db); err != nil {
 		return appDatabases{}, closeStartupDatabase(db, err)
 	}
+	if err := worker.VerifyRiverRuntimePrivileges(ctx, db); err != nil {
+		return appDatabases{}, closeStartupDatabase(db, err)
+	}
 	riverPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
 		return appDatabases{}, closeStartupDatabase(db, fmt.Errorf("failed to connect River database pool: %w", err))
@@ -113,6 +116,9 @@ func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
 		return rollbackPrivilegeTransaction(privilegeTx, err)
 	}
 	if err := taskbilling.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
+		return rollbackPrivilegeTransaction(privilegeTx, err)
+	}
+	if err := worker.ConfigureRiverRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
 		return rollbackPrivilegeTransaction(privilegeTx, err)
 	}
 	if err := privilegeTx.Commit(); err != nil {

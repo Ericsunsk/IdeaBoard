@@ -1,6 +1,9 @@
 import { getAdapter } from 'better-auth/db/adapter'
 import { getMigrations } from 'better-auth/db/migration'
+import dotenv from 'dotenv'
 import { configureAuthRuntimePrivileges } from './runtime-privileges.js'
+
+dotenv.config({ quiet: true })
 
 async function runAuthMigrations() {
   const runtimeUser = requiredEnv('DB_USER')

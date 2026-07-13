@@ -37,21 +37,35 @@ test("configureAuthRuntimePrivileges grants only Better Auth tables atomically",
 })
 
 test("verifyAuthRuntimePrivileges rejects a role that can write Credits", async () => {
+  let inspectedFunctions: unknown
   const pool = {
-    query: async () => ({
-      rows: [
-        {
-          current_user: 'schema_owner',
-          can_read_auth_users: true,
-          can_write_credits: true,
-          can_execute_credit_functions: true,
-        },
-      ],
-    }),
+    query: async (_sql: string, values: unknown[]) => {
+      inspectedFunctions = values[1]
+      return {
+        rows: [
+          {
+            current_user: 'schema_owner',
+            can_read_auth_users: true,
+            can_write_credits: true,
+            can_execute_credit_functions: true,
+          },
+        ],
+      }
+    },
   } as unknown as Pool
 
   await assert.rejects(
     () => verifyAuthRuntimePrivileges(pool),
     /Unsafe Auth runtime database role/,
+  )
+  assert.ok(Array.isArray(inspectedFunctions))
+  assert.ok(
+    inspectedFunctions.includes(
+      'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
+    ),
+  )
+  assert.equal(
+    inspectedFunctions.some((signature) => String(signature).startsWith('execute_credit_command(')),
+    false,
   )
 })
