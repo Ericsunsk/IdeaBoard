@@ -23,7 +23,10 @@ import type {
   ApiResponseTaskId,
   ApiResponseTaskList,
   ApiResponseTaskSubmitReadiness,
+  InsufficientCreditsError,
   ListUserTasksParams,
+  PricingUnavailableError,
+  SubmitTaskReadinessRequest,
   SubmitTaskRequest,
 } from '../model'
 
@@ -56,7 +59,7 @@ export const getSubmitUserTaskQueryKey = (
 
 export const getSubmitUserTaskQueryOptions = <
   TData = Awaited<ReturnType<typeof submitUserTask>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError>,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {
@@ -79,11 +82,11 @@ export const getSubmitUserTaskQueryOptions = <
 }
 
 export type SubmitUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof submitUserTask>>>
-export type SubmitUserTaskQueryError = ErrorType<unknown>
+export type SubmitUserTaskQueryError = ErrorType<InsufficientCreditsError | PricingUnavailableError>
 
 export function useSubmitUserTask<
   TData = Awaited<ReturnType<typeof submitUserTask>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError>,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {
@@ -108,28 +111,28 @@ export const getCheckUserTaskSubmitReadinessUrl = () => {
 }
 
 export const checkUserTaskSubmitReadiness = async (
-  submitTaskRequest: SubmitTaskRequest,
+  submitTaskReadinessRequest: SubmitTaskReadinessRequest,
   options?: RequestInit,
 ): Promise<ApiResponseTaskSubmitReadiness> => {
   return orvalMutator<ApiResponseTaskSubmitReadiness>(getCheckUserTaskSubmitReadinessUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(submitTaskRequest),
+    body: JSON.stringify(submitTaskReadinessRequest),
   })
 }
 
 export const getCheckUserTaskSubmitReadinessQueryKey = (
-  submitTaskRequest?: MaybeRefOrGetter<SubmitTaskRequest>,
+  submitTaskReadinessRequest?: MaybeRefOrGetter<SubmitTaskReadinessRequest>,
 ) => {
-  return ['POST', 'user', 'tasks', 'submit', 'readiness', submitTaskRequest] as const
+  return ['POST', 'user', 'tasks', 'submit', 'readiness', submitTaskReadinessRequest] as const
 }
 
 export const getCheckUserTaskSubmitReadinessQueryOptions = <
   TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<PricingUnavailableError>,
 >(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
+  submitTaskReadinessRequest: MaybeRefOrGetter<SubmitTaskReadinessRequest>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>
@@ -139,11 +142,12 @@ export const getCheckUserTaskSubmitReadinessQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getCheckUserTaskSubmitReadinessQueryKey(submitTaskRequest)
+  const queryKey = getCheckUserTaskSubmitReadinessQueryKey(submitTaskReadinessRequest)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>> = ({
     signal,
-  }) => checkUserTaskSubmitReadiness(toValue(submitTaskRequest), { signal, ...requestOptions })
+  }) =>
+    checkUserTaskSubmitReadiness(toValue(submitTaskReadinessRequest), { signal, ...requestOptions })
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
@@ -155,13 +159,13 @@ export const getCheckUserTaskSubmitReadinessQueryOptions = <
 export type CheckUserTaskSubmitReadinessQueryResult = NonNullable<
   Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>
 >
-export type CheckUserTaskSubmitReadinessQueryError = ErrorType<unknown>
+export type CheckUserTaskSubmitReadinessQueryError = ErrorType<PricingUnavailableError>
 
 export function useCheckUserTaskSubmitReadiness<
   TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<PricingUnavailableError>,
 >(
-  submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
+  submitTaskReadinessRequest: MaybeRefOrGetter<SubmitTaskReadinessRequest>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>
@@ -170,7 +174,10 @@ export function useCheckUserTaskSubmitReadiness<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCheckUserTaskSubmitReadinessQueryOptions(submitTaskRequest, options)
+  const queryOptions = getCheckUserTaskSubmitReadinessQueryOptions(
+    submitTaskReadinessRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

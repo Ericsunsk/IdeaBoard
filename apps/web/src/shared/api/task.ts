@@ -11,6 +11,7 @@ export type {
   ApiResponseTaskSubmitReadinessData as SubmitTaskReadinessData,
   ListUserTasksParams,
   SubmitTaskRequest as SubmitTaskData,
+  SubmitTaskReadinessRequest as SubmitTaskReadinessRequestData,
   SubmitTaskRequestParams as SubmitTaskParams,
   Task,
 } from './generated-query/model'

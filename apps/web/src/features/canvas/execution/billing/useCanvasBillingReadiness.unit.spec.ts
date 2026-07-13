@@ -34,7 +34,7 @@ describe('canvas billing readiness store', () => {
     await store.ensureFeature(WORKFLOW_FEATURE.patternGen)
     expect(store.getFeatureState(WORKFLOW_FEATURE.patternGen)).toMatchObject({
       status: 'ready',
-      totalCredits: 4,
+      unitCredits: 4,
       availableCredits: 20,
       priceVersionId: 1,
     })
@@ -46,19 +46,20 @@ describe('canvas billing readiness store', () => {
           price_version_id: 2,
           price_version: 2,
           unit_credits: 6,
-          total_credits: 6,
+          quantity: 4,
+          total_credits: 24,
         },
       }),
     )
 
     expect(store.getFeatureState(WORKFLOW_FEATURE.patternGen)).toMatchObject({
       status: 'ready',
-      totalCredits: 6,
+      unitCredits: 6,
       priceVersionId: 2,
     })
   })
 
-  it('blocks submission when available credits are insufficient', async () => {
+  it('retains an insufficient quote for actionable preflight instead of disabling the control', async () => {
     const store = createCanvasBillingReadinessStore({
       fetchReadiness: async (feature) =>
         makeReadiness(feature, {
@@ -76,10 +77,10 @@ describe('canvas billing readiness store', () => {
     await store.ensureFeature(WORKFLOW_FEATURE.partialEdit)
 
     expect(store.getFeatureState(WORKFLOW_FEATURE.partialEdit)).toMatchObject({
-      status: 'blocked',
-      totalCredits: 8,
+      status: 'ready',
+      unitCredits: 4,
       availableCredits: 3,
-      reason: 'Idea不足（需要 8 Ideas，当前 3 Ideas）',
+      sufficient: false,
     })
   })
 
@@ -96,7 +97,7 @@ describe('canvas billing readiness store', () => {
     await store.ensureFeature(WORKFLOW_FEATURE.removeBg)
 
     expect(store.getFeatureState(WORKFLOW_FEATURE.removeBg)).toMatchObject({
-      status: 'blocked',
+      status: 'error',
       reason,
     })
   })

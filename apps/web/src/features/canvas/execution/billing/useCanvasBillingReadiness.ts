@@ -20,9 +20,10 @@ import { subscribeCanvasTaskReadiness } from './taskReadinessEvents'
 export type CanvasBillingQuoteState = {
   feature: WorkflowFeature
   status: 'idle' | 'loading' | 'ready' | 'blocked' | 'error'
-  totalCredits?: number
+  unitCredits?: number
   availableCredits?: number
   priceVersionId?: number
+  sufficient?: boolean
   reason?: string
 }
 
@@ -86,10 +87,11 @@ export function createCanvasBillingReadinessStore(
     if (billing && !billing.sufficient) {
       states[feature] = {
         feature,
-        status: 'blocked',
-        totalCredits: billing.total_credits,
+        status: 'ready',
+        unitCredits: billing.unit_credits,
         availableCredits: billing.available_credits,
         priceVersionId: billing.price_version_id,
+        sufficient: false,
         reason: `Idea不足（需要 ${formatIdeaAmount(billing.total_credits)}，当前 ${formatIdeaAmount(billing.available_credits)}）`,
       }
       return
@@ -113,9 +115,10 @@ export function createCanvasBillingReadinessStore(
     states[feature] = {
       feature,
       status: 'ready',
-      totalCredits: billing.total_credits,
+      unitCredits: billing.unit_credits,
       availableCredits: billing.available_credits,
       priceVersionId: billing.price_version_id,
+      sufficient: billing.sufficient,
     }
     loadedAt.set(feature, now())
   }
@@ -139,7 +142,7 @@ export function createCanvasBillingReadinessStore(
       .catch((error: unknown) => {
         states[feature] = {
           feature,
-          status: 'blocked',
+          status: 'error',
           reason: normalizeBlockedReason(
             error instanceof Error ? error.message : undefined,
             'Idea计费信息暂不可用',
@@ -185,8 +188,4 @@ export function useCanvasBillingQuote(
     void store.ensureFeature(feature(), { request: readinessRequest })
   })
   return computed(() => (store ? store.getFeatureState(feature()) : null))
-}
-
-export function isCanvasBillingSubmitBlocked(state: CanvasBillingQuoteState | null): boolean {
-  return state != null && state.status !== 'ready'
 }

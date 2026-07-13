@@ -453,6 +453,16 @@
   line-height: 1.45;
 }
 
+[data-sonner-toaster].ideaboard-toaster [data-sonner-toast].ideaboard-toast [data-button] {
+  border: 0;
+  background: transparent;
+  color: var(--color-ib-creative-accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @media (max-width: 640px) {
   [data-sonner-toaster].ideaboard-toaster {
     width: min(300px, calc(100vw - 20px));

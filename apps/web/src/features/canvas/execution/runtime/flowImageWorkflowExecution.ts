@@ -59,6 +59,7 @@ export type UseFlowImageWorkflowExecutionOptions = {
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
+  onError?: (error: unknown) => boolean
   getCurrentBoardId?: () => string
   executionWorkspace?: CanvasExecutionWorkspace
 }
@@ -134,6 +135,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     afterTaskIdAttached: flushPendingTaskSnapshot,
     onSuccess: options.onSuccess,
     onWarning: options.onWarning,
+    onError: options.onError,
   })
   const executionWorkspace =
     options.executionWorkspace ??
@@ -164,6 +166,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       readinessRequest: () => buildImageActionReadinessRequest(plan.action),
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
+      outputCount: () => 1,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -192,6 +195,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       readinessRequest: buildCanvasExtendReadinessRequest,
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
+      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -223,6 +227,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     const readinessSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: buildPromptImageReadinessRequest,
       buildRequest: buildPromptImageReadinessRequest,
+      outputCount: () => plan.outputCount,
     })
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       buildRequest: () => requirePreparedTaskRequest(request, '局部重绘任务未准备完成'),
@@ -298,6 +303,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       readinessRequest: buildPromptImageReadinessRequest,
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
+      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -332,6 +338,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       readinessRequest: () => requirePreparedTaskRequest(request, 'Fusion 任务未准备完成'),
       buildRequest: () => requirePreparedTaskRequest(request, 'Fusion 任务未准备完成'),
       fallbackMessage: '提交 Fusion 任务失败',
+      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,

@@ -120,6 +120,14 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 	}
 	taskID, err := h.taskService.SubmitTask(c.Request.Context(), userID, &req)
 	if err != nil {
+		if errors.Is(err, taskbilling.ErrInsufficientCredits) {
+			response.MachineError(c, http.StatusPaymentRequired, "insufficient_credits", "Idea不足")
+			return
+		}
+		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
+			response.MachineError(c, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
+			return
+		}
 		response.Error(c, 400, userFacingSubmitError(err))
 		return
 	}
@@ -131,13 +139,17 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req tasks.SubmitTaskRequest
+	var req tasks.SubmitTaskReadinessRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
+	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req.SubmitTaskRequest, req.BillingQuantity)
 	if err != nil {
+		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
+			response.MachineError(c, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
+			return
+		}
 		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err)})
 		return
 	}

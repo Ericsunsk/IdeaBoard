@@ -44,7 +44,9 @@ describe('tracked human-facing currency copy', () => {
   it('does not expose the retired currency name in tracked product source or documentation', () => {
     const repositoryRoot = findRepositoryRoot(process.cwd())
     const violations = listTrackedSourceFiles(repositoryRoot).flatMap((relativePath) => {
-      return readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
+      const absolutePath = path.join(repositoryRoot, relativePath)
+      if (!existsSync(absolutePath)) return []
+      return readFileSync(absolutePath, 'utf8')
         .split(/\r?\n/)
         .flatMap((line, index) =>
           line.includes(legacyCurrencyName) && !isAllowedTechnicalFixture(relativePath, line)

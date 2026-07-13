@@ -257,6 +257,7 @@ const workspace = useCanvasWorkspaceRuntime({
   onNativeRemove: () => {
     dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
   },
+  openRecharge: () => openAccountManagementDialog('recharge'),
 })
 const viewModel = workspace.viewModel
 const commands = workspace.commands

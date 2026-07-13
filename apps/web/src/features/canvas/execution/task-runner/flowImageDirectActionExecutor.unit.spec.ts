@@ -41,6 +41,51 @@ describe('flowImageDirectActionExecutor', () => {
     await expect(submitTaskRequest({ prompt: 'generate' }, '提交失败')).rejects.toThrow('提交失败')
   })
 
+  it('classifies only the Task Submit machine code as user wallet insufficiency', async () => {
+    mocks.submit.mockRejectedValueOnce(
+      Object.assign(new Error('Idea不足'), {
+        status: 402,
+        code: 'insufficient_credits',
+      }),
+    )
+
+    await expect(submitTaskRequest({ prompt: 'generate' })).rejects.toMatchObject({
+      kind: 'insufficient-credits',
+      message: 'Idea不足',
+    })
+
+    mocks.submit.mockRejectedValueOnce(
+      Object.assign(new Error('insufficient_quota'), { status: 402, code: 402 }),
+    )
+
+    await expect(submitTaskRequest({ prompt: 'generate' })).rejects.not.toMatchObject({
+      kind: 'insufficient-credits',
+    })
+  })
+
+  it('maps a confirmed browser connection failure during submit to the network copy', async () => {
+    mocks.submit.mockRejectedValueOnce(new Error('fetch failed'))
+
+    await expect(submitTaskRequest({ prompt: 'generate' })).rejects.toMatchObject({
+      kind: 'network',
+      message: '网络错误，请重试',
+    })
+  })
+
+  it('maps an authoritative submit pricing race to the pricing-unavailable contract', async () => {
+    mocks.submit.mockRejectedValueOnce(
+      Object.assign(new Error('暂时无法获取报价，请重试'), {
+        status: 503,
+        code: 'pricing_unavailable',
+      }),
+    )
+
+    await expect(submitTaskRequest({ prompt: 'generate' })).rejects.toMatchObject({
+      kind: 'pricing-unavailable',
+      message: '暂时无法获取报价，请重试',
+    })
+  })
+
   it('returns canonical image results from completed task fast path', async () => {
     mocks.get.mockResolvedValueOnce({
       code: 0,

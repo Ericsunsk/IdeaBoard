@@ -3,6 +3,7 @@ import { onScopeDispose, ref, type Ref } from 'vue'
 import {
   createImageExecutionPlanner,
   createImageWorkflowCommands,
+  isCanvasBillingPreflightError,
   type ImageWorkflowCommands,
   useCanvasExecutionWorkspace,
   useFlowImageWorkflowExecution,
@@ -88,6 +89,14 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
     options.feedback.warning(message)
   }
 
+  function handleWorkflowError(error: unknown) {
+    if (isCanvasBillingPreflightError(error, 'insufficient-credits')) {
+      options.feedback.insufficientCredits()
+      return true
+    }
+    return false
+  }
+
   onScopeDispose(clearGenerationAvailabilityTimer)
 
   const planner = createImageExecutionPlanner(() => ({
@@ -105,6 +114,7 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
     getCurrentBoardId: () => options.currentBoardId.value ?? '',
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,
+    onError: handleWorkflowError,
   })
   const workflow = useFlowImageWorkflowExecution({
     nodes: options.nodes,
@@ -117,6 +127,7 @@ export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): Canv
     getCurrentBoardId: () => options.currentBoardId.value ?? '',
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,
+    onError: handleWorkflowError,
     executionWorkspace,
   })
 

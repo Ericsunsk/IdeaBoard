@@ -61,10 +61,11 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   stopNodeDragInteraction: () => void
   refreshFlowHandleVisibility: () => void
   onNativeRemove?: () => void
+  openRecharge: () => void
 }
 
 export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
-  const feedback = useCanvasFeedback()
+  const feedback = useCanvasFeedback(options.openRecharge)
 
   function stopDeletedRunningTask(taskId: string, attempt = 0) {
     void cancelTask(taskId).catch((error: unknown) => {

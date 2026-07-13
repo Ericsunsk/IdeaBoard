@@ -1,6 +1,11 @@
 import { useAppToast } from '../../../shared/composables/useAppToast'
 
-type CanvasToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'warning' | 'error' | 'loading'>
+type CanvasToast = Pick<
+  ReturnType<typeof useAppToast>,
+  'success' | 'warning' | 'error' | 'loading' | 'dismiss'
+>
+
+const insufficientCreditsToastId = 'canvas-insufficient-credits'
 
 export type CanvasFeedback = {
   boardSession: {
@@ -16,6 +21,7 @@ export type CanvasFeedback = {
   taskExecution: {
     succeeded: (message: string) => void
     warning: (message: string) => void
+    insufficientCredits: () => void
   }
   imageTools: {
     succeeded: (message: string) => void
@@ -24,12 +30,28 @@ export type CanvasFeedback = {
   }
 }
 
-export function createCanvasFeedback(appToast: CanvasToast): CanvasFeedback {
+export function createCanvasFeedback(
+  appToast: CanvasToast,
+  openRecharge: () => void,
+): CanvasFeedback {
   const success = (message: string) => {
     appToast.success(message)
   }
   const warning = (message: string) => {
     appToast.warning(message)
+  }
+  const insufficientCredits = () => {
+    appToast.warning('Idea不足', {
+      id: insufficientCreditsToastId,
+      duration: 6000,
+      action: {
+        label: '立即充值',
+        onClick: () => {
+          openRecharge()
+          appToast.dismiss(insufficientCreditsToastId)
+        },
+      },
+    })
   }
   const error = (message: string) => {
     appToast.error(message)
@@ -48,6 +70,7 @@ export function createCanvasFeedback(appToast: CanvasToast): CanvasFeedback {
   const taskExecution = {
     succeeded: success,
     warning,
+    insufficientCredits,
   }
   const imageTools = {
     succeeded: success,
@@ -63,6 +86,6 @@ export function createCanvasFeedback(appToast: CanvasToast): CanvasFeedback {
   }
 }
 
-export function useCanvasFeedback() {
-  return createCanvasFeedback(useAppToast())
+export function useCanvasFeedback(openRecharge: () => void) {
+  return createCanvasFeedback(useAppToast(), openRecharge)
 }

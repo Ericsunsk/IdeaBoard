@@ -198,7 +198,10 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		slog.Warn("submit task transaction failed", "task_id", taskID, "correlation_id", correlationID, "err", err)
 		if errors.Is(err, taskbilling.ErrInsufficientCredits) {
-			return "", validation.New("Idea不足")
+			return "", taskbilling.ErrInsufficientCredits
+		}
+		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
+			return "", taskbilling.ErrPricingUnavailable
 		}
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
@@ -214,7 +217,7 @@ type SubmitTaskReadiness struct {
 	Billing *taskbilling.Readiness
 }
 
-func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (SubmitTaskReadiness, error) {
+func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest, billingQuantity int64) (SubmitTaskReadiness, error) {
 	if req == nil {
 		return SubmitTaskReadiness{}, fmt.Errorf("请求参数错误")
 	}
@@ -234,6 +237,10 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	if billingRequest == nil {
 		return result, nil
 	}
+	if billingQuantity <= 0 || billingQuantity > int64(maxSubmitTaskImageURLs) {
+		return SubmitTaskReadiness{}, validation.New("billing_quantity 必须为 1-16")
+	}
+	billingRequest.Quantity = billingQuantity
 	if clientActionID == "" {
 		return SubmitTaskReadiness{}, validation.New("AI 生图任务必须提供 client_action_id")
 	}

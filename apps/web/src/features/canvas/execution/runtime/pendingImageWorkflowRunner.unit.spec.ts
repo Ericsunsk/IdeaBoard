@@ -5,6 +5,7 @@ import type {
   RunPendingImageResultsParams,
 } from '../result-nodes/usePendingImageResultNodes'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
+import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
 
 function makeRunSummary(
   overrides: Partial<PendingImageResultRunSummary> = {},
@@ -16,6 +17,7 @@ function makeRunSummary(
     pendingCount: 0,
     failureCount: 0,
     firstFailure: null,
+    failures: [],
     ...overrides,
   }
 }
@@ -215,5 +217,71 @@ describe('pendingImageWorkflowRunner', () => {
 
     expect(onWarning).toHaveBeenCalledWith('任务进度推送超时，请稍后查看结果')
     expect(onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('preserves custom error formatting when the typed error hook declines the error', async () => {
+    const onWarning = vi.fn()
+    const onError = vi.fn(() => false)
+    const pendingResults = createPendingResults(async () => {
+      throw new Error('raw error')
+    })
+    const runner = createPendingImageWorkflowRunner({
+      pendingResults,
+      isBoardCurrent: () => true,
+      setNodeRunning: vi.fn(),
+      onSuccess: vi.fn(),
+      onWarning,
+      onError,
+    })
+
+    await runner.run({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      boardId: 'board-a',
+      outputCount: 1,
+      submitTask: vi.fn(async () => ({ taskId: 'task-1' })),
+      resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
+      fallbackErrorMessage: '生成失败',
+      formatErrorMessage: () => '自定义错误',
+    })
+
+    expect(onError).toHaveBeenCalledOnce()
+    expect(onWarning).toHaveBeenCalledWith('自定义错误')
+  })
+
+  it('routes a typed insufficient failure even when another output succeeds', async () => {
+    const insufficient = new CanvasBillingPreflightError('insufficient-credits', 'Idea不足')
+    const onError = vi.fn(() => true)
+    const onWarning = vi.fn()
+    const pendingResults = createPendingResults(async () =>
+      makeRunSummary({
+        totalCount: 2,
+        successCount: 1,
+        failureCount: 1,
+        firstFailure: insufficient,
+        failures: [insufficient],
+      }),
+    )
+    const runner = createPendingImageWorkflowRunner({
+      pendingResults,
+      isBoardCurrent: () => true,
+      setNodeRunning: vi.fn(),
+      onSuccess: vi.fn(),
+      onWarning,
+      onError,
+    })
+
+    await runner.run({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      boardId: 'board-a',
+      outputCount: 2,
+      submitTask: vi.fn(async () => ({ taskId: 'task-1' })),
+      resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
+      fallbackErrorMessage: '生成失败',
+    })
+
+    expect(onError).toHaveBeenCalledWith(insufficient)
+    expect(onWarning).not.toHaveBeenCalled()
   })
 })

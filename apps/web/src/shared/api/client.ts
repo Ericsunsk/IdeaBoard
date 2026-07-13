@@ -3,7 +3,7 @@ import { handleAuthFailure } from '../utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
 
 export type ApiClientError = Error & {
-  code?: number
+  code?: number | string
   msg?: string
   status?: number
   data?: unknown
@@ -27,7 +27,9 @@ export function createApiError(payload?: unknown, status?: number): ApiClientErr
   const data = toObject(payload)
   const message = getPayloadMessage(payload, data)
   const error = new Error(message) as ApiClientError
-  error.code = (typeof data?.code === 'number' ? data.code : undefined) ?? status
+  error.code =
+    (typeof data?.code === 'number' || typeof data?.code === 'string' ? data.code : undefined) ??
+    status
   error.msg = (typeof data?.msg === 'string' && data.msg) || message
   error.status = status
   error.data = data?.data

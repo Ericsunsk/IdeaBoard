@@ -12,6 +12,7 @@ import {
   createPendingTaskClientActionIds,
   type ClientActionIdFactory,
 } from '../task-runner/taskClientActionIds'
+import { isCanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
 
 type PendingImageResultOptions = ImageExecutionResultOptions
 
@@ -52,6 +53,7 @@ export type PendingImageWorkflowRunnerOptions = {
   createClientActionId?: ClientActionIdFactory
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
+  onError?: (error: unknown) => boolean
 }
 
 function resolvePendingRunErrorMessage(
@@ -143,9 +145,20 @@ export function createPendingImageWorkflowRunner(
         },
       })
       if (!options.isBoardCurrent(params.boardId)) return
+      let typedFailureHandled = false
+      if (summary.successCount > 0) {
+        const typedFailure = summary.failures.find((error) =>
+          isCanvasBillingPreflightError(error, 'insufficient-credits'),
+        )
+        typedFailureHandled = !!typedFailure && options.onError?.(typedFailure) === true
+      }
+      if (typedFailureHandled) return
       reportPendingImageRunSummary(summary, params, options.onSuccess, options.onWarning)
     } catch (error) {
-      warnIfBoardCurrent(params.boardId, resolvePendingRunErrorMessage(error, params))
+      const handled = options.isBoardCurrent(params.boardId) && options.onError?.(error) === true
+      if (!handled) {
+        warnIfBoardCurrent(params.boardId, resolvePendingRunErrorMessage(error, params))
+      }
     } finally {
       await params.cleanup?.()
       for (const resultNodeId of resultNodeIds) options.setNodeRunning(resultNodeId, false)

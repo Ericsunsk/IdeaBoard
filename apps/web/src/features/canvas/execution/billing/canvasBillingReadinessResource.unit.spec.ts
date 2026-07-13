@@ -1,7 +1,38 @@
-import { describe, expect, it } from 'vitest'
-import { buildFusionBillingReadinessRequest } from './canvasBillingReadinessResource'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  buildFusionBillingReadinessRequest,
+  fetchCanvasBillingReadiness,
+} from './canvasBillingReadinessResource'
+
+const mocks = vi.hoisted(() => ({
+  checkSubmitReadiness: vi.fn(),
+}))
+
+vi.mock('../../../../shared/api/task', () => ({
+  taskApi: { checkSubmitReadiness: mocks.checkSubmitReadiness },
+}))
 
 describe('canvas billing readiness request contracts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('uses quantity one for presentation quote refreshes', async () => {
+    const readiness = { ready: true, feature: 'pattern-gen' } as const
+    mocks.checkSubmitReadiness.mockResolvedValue({ code: 0, data: readiness })
+
+    await expect(
+      fetchCanvasBillingReadiness('pattern-gen', {
+        prompt: 'presentation quote',
+        feature: 'pattern-gen',
+      }),
+    ).resolves.toEqual(readiness)
+
+    expect(mocks.checkSubmitReadiness).toHaveBeenCalledWith(
+      expect.objectContaining({ billing_quantity: 1 }),
+    )
+  })
+
   it('uses current Fusion media with normalized weights for a valid readiness request', () => {
     expect(
       buildFusionBillingReadinessRequest({

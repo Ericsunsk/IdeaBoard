@@ -809,7 +809,7 @@ func TestSubmitTaskGoogleNativeGenerationSettingControlsSubmission(t *testing.T)
 			submissionStore := &recordingSubmissionStore{}
 			svc := newGoogleNativeSubmitTestService(tt.setting, submissionStore)
 
-			_, readinessErr := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest())
+			_, readinessErr := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest(), 1)
 			taskID, submitErr := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest())
 			if tt.wantAllowed {
 				if readinessErr != nil {
@@ -895,7 +895,7 @@ func TestSubmitTaskGoogleNativeGenerationSettingDoesNotFallbackToNonGoogleAccoun
 		},
 	)
 
-	if _, err := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest()); err == nil || !strings.Contains(err.Error(), "Google AI 原生生成通道当前已关闭") {
+	if _, err := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest(), 1); err == nil || !strings.Contains(err.Error(), "Google AI 原生生成通道当前已关闭") {
 		t.Fatalf("readiness error = %v, want disabled gate", err)
 	}
 	if _, err := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest()); err == nil || !strings.Contains(err.Error(), "Google AI 原生生成通道当前已关闭") {

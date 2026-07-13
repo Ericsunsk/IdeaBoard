@@ -1,4 +1,7 @@
-import type { SubmitTaskData } from '../../../../shared/api/task'
+import type {
+  SubmitTaskData,
+  SubmitTaskReadinessRequestData,
+} from '../../../../shared/api/task'
 import {
   assertTaskRequestReady,
   submitTaskRequest,
@@ -18,7 +21,10 @@ export type CanvasTaskSubmissionCallbacks = {
 }
 
 export type CanvasTaskSubmissionAdapter = {
-  assertTaskRequestReady: (request: SubmitTaskData, fallbackMessage?: string) => Promise<void>
+  assertTaskRequestReady: (
+    request: SubmitTaskReadinessRequestData,
+    fallbackMessage?: string,
+  ) => Promise<void>
   submitTaskRequest: (
     request: SubmitTaskData,
     fallbackMessage?: string,
@@ -30,26 +36,48 @@ export const defaultCanvasTaskSubmissionAdapter: CanvasTaskSubmissionAdapter = {
   submitTaskRequest,
 }
 
-export function createCanvasTaskSubmissionCallbacks(options: {
-  readinessRequest?: () => SubmitTaskData
+type CanvasTaskSubmissionOptions = {
   buildRequest: () => SubmitTaskData | Promise<SubmitTaskData>
   fallbackMessage?: string
   taskAdapter?: CanvasTaskSubmissionAdapter
-}): CanvasTaskSubmissionCallbacks {
+} & (
+  | {
+      readinessRequest: () => SubmitTaskData
+      outputCount: () => number
+    }
+  | {
+      readinessRequest?: undefined
+      outputCount?: undefined
+    }
+)
+
+function requireBillingQuantity(outputCount: number): number {
+  if (!Number.isInteger(outputCount) || outputCount < 1 || outputCount > 16) {
+    throw new Error('生成数量无效')
+  }
+  return outputCount
+}
+
+export function createCanvasTaskSubmissionCallbacks(
+  options: CanvasTaskSubmissionOptions,
+): CanvasTaskSubmissionCallbacks {
   const taskAdapter = options.taskAdapter ?? defaultCanvasTaskSubmissionAdapter
   const { readinessRequest } = options
   const assertReady = readinessRequest
-    ? () =>
-        taskAdapter.assertTaskRequestReady(
-          withTaskClientActionId(readinessRequest(), createCanvasTaskClientActionId()),
+    ? async () => {
+        await taskAdapter.assertTaskRequestReady(
+          {
+            ...withTaskClientActionId(readinessRequest(), createCanvasTaskClientActionId()),
+            billing_quantity: requireBillingQuantity(options.outputCount()),
+          },
           options.fallbackMessage,
         )
+      }
     : undefined
   return {
     assertReady,
     submitTask: async (clientActionId) => {
       const request = withTaskClientActionId(await options.buildRequest(), clientActionId)
-      await taskAdapter.assertTaskRequestReady(request, options.fallbackMessage)
       return taskAdapter.submitTaskRequest(request, options.fallbackMessage)
     },
   }

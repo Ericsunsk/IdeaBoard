@@ -1,8 +1,10 @@
-export type UserCreditsInvalidationEvent = {
-  source: 'task-settlement'
-  taskId: string
-  status: 'completed' | 'failed' | 'cancelled'
-}
+export type UserCreditsInvalidationEvent =
+  | { source: 'task-hold'; taskId: string }
+  | {
+      source: 'task-settlement'
+      taskId: string
+      status: 'completed' | 'failed' | 'cancelled'
+    }
 
 export type UserCreditsInvalidationListener = (event: UserCreditsInvalidationEvent) => void
 

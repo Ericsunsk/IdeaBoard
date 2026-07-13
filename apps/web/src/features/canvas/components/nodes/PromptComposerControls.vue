@@ -28,21 +28,24 @@
       @select="selectOutputCount"
     />
     <div class="canvas-credit-submit-control">
-      <CanvasCreditQuoteBadge
-        class="canvas-credit-submit-control__quote"
-        :state="billingState ?? null"
-      />
       <button
         :class="sendButtonClass"
         type="button"
         :disabled="!canSubmit"
         aria-label="发送"
-        :title="billingBlockedReason"
+        :title="billingTooltip"
         @click="submit"
       >
         <SendDiagonalSolid class="size-4 translate-x-[0.5px]" />
-        <span class="node-tool-tooltip" aria-hidden="true">发送</span>
+        <span class="node-tool-tooltip" aria-hidden="true">{{ billingTooltip }}</span>
       </button>
+      <span
+        v-if="touchQuoteLabel"
+        class="canvas-credit-submit-control__touch-quote"
+        data-touch-quote
+      >
+        {{ touchQuoteLabel }}
+      </span>
     </div>
   </div>
 </template>
@@ -51,8 +54,8 @@
 import { computed } from 'vue'
 import { SendDiagonalSolid } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
-import { isCanvasBillingSubmitBlocked, type CanvasBillingQuoteState } from '../../execution'
-import CanvasCreditQuoteBadge from './CanvasCreditQuoteBadge.vue'
+import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
+import type { CanvasBillingQuoteState } from '../../execution'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import {
@@ -98,12 +101,17 @@ const emit = defineEmits<{
   (e: 'submit', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
 
-const billingSubmitBlocked = computed(() =>
-  isCanvasBillingSubmitBlocked(props.billingState ?? null),
-)
-const billingBlockedReason = computed(() =>
-  billingSubmitBlocked.value ? props.billingState?.reason || '正在获取Idea价格' : undefined,
-)
+const quoteLabel = computed(() => {
+  const state = props.billingState
+  if (!state || state.status !== 'ready') return ''
+  const unitTotal = state.unitCredits ?? 0
+  if (unitTotal === 0) return '免费'
+  const total = unitTotal * outputCountValue.value
+  if (!Number.isSafeInteger(total)) return ''
+  return formatIdeaAmount(total)
+})
+const billingTooltip = computed(() => (quoteLabel.value ? `发送 · ${quoteLabel.value}` : '发送'))
+const touchQuoteLabel = computed(() => quoteLabel.value)
 
 const {
   actionsRef,
@@ -126,7 +134,7 @@ const {
   outputCount: () => props.outputCount,
   aspectRatio: () => props.aspectRatio,
   disabled: () => props.disabled,
-  submitDisabled: () => props.submitDisabled || billingSubmitBlocked.value,
+  submitDisabled: () => props.submitDisabled,
   allowEmpty: () => props.allowEmpty,
   autofocus: () => props.autofocus,
   showAspectRatio: () => props.showAspectRatio,
@@ -147,10 +155,21 @@ const {
   justify-content: center;
 }
 
-.canvas-credit-submit-control__quote {
+.canvas-credit-submit-control__touch-quote {
   position: absolute;
   right: 0;
   bottom: calc(100% + 3px);
-  max-width: 86px;
+  display: none;
+  color: var(--canvas-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .canvas-credit-submit-control__touch-quote {
+    display: inline-flex;
+  }
 }
 </style>

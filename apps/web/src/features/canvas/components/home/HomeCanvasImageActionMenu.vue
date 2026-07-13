@@ -28,7 +28,9 @@
           >
             <ImageActionMenuIcon :icon="item.icon" />
           </NodeToolIconButton>
-          <CanvasCreditQuoteBadge class="image-action-price" :state="getItemBillingState(item)" />
+          <span v-if="getItemTouchPrice(item)" class="image-action-price" data-touch-quote>
+            {{ getItemTouchPrice(item) }}
+          </span>
           <input
             v-if="item.strengthAction"
             :ref="(el) => setItemStrengthRangeRef(item, el)"
@@ -71,8 +73,7 @@ import type { ImageStrengthAction } from '../../execution'
 import type { ImageActionStrengthControl } from '../../image-tools'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
-import CanvasCreditQuoteBadge from '../nodes/CanvasCreditQuoteBadge.vue'
-import { isCanvasBillingSubmitBlocked, useCanvasBillingReadinessStore } from '../../execution'
+import { useCanvasBillingReadinessStore } from '../../execution'
 
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>
@@ -106,17 +107,26 @@ function getItemBillingState(item: ImageActionMenuItem) {
   return feature && billingStore ? billingStore.getFeatureState(feature) : null
 }
 
-function isItemDisabled(item: ImageActionMenuItem) {
-  return props.directGenerating || isCanvasBillingSubmitBlocked(getItemBillingState(item))
+function isItemDisabled(_item: ImageActionMenuItem) {
+  return props.directGenerating
 }
 
 function getItemTooltip(item: ImageActionMenuItem) {
   const billing = getItemBillingState(item)
   if (!billing) return item.label
   if (billing.status === 'ready') {
-    return `${item.label} · ${formatIdeaAmount(billing.totalCredits ?? 0)}`
+    return `${item.label} · ${formatQuote(billing.unitCredits ?? 0)}`
   }
-  return `${item.label} · ${billing.reason || '正在获取Idea价格'}`
+  return item.label
+}
+
+function formatQuote(totalCredits: number) {
+  return totalCredits === 0 ? '免费' : formatIdeaAmount(totalCredits)
+}
+
+function getItemTouchPrice(item: ImageActionMenuItem) {
+  const billing = getItemBillingState(item)
+  return billing?.status === 'ready' ? formatQuote(billing.unitCredits ?? 0) : ''
 }
 
 function onActionClick(item: ImageActionMenuItem) {
@@ -258,6 +268,18 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   z-index: var(--canvas-image-action-price-z-index);
   max-width: 82px;
   transform: translateX(-50%);
+  display: none;
+  color: var(--canvas-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .image-action-price {
+    display: inline-flex;
+  }
 }
 
 .image-action-menu:not(.strength-mode) .image-action-menu-inner {

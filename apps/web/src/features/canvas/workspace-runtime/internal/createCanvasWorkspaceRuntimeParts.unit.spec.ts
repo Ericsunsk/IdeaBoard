@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     taskExecution: {
       succeeded: vi.fn(),
       warning: vi.fn(),
+      insufficientCredits: vi.fn(),
     },
     imageTools: {
       succeeded: vi.fn(),
@@ -163,6 +164,7 @@ function createWorkspaceOptions() {
     startNodeDragInteraction: vi.fn(),
     stopNodeDragInteraction: vi.fn(),
     refreshFlowHandleVisibility: vi.fn(),
+    openRecharge: vi.fn(),
   }
 }
 

@@ -13,6 +13,14 @@ type Response struct {
 	Data interface{} `json:"data,omitempty"`
 }
 
+// MachineErrorResponse carries a stable machine-readable error code for the
+// narrow HTTP contracts that need callers to branch without matching copy.
+// Generic responses retain the established numeric transport contract.
+type MachineErrorResponse struct {
+	Code string `json:"code"`
+	Msg  string `json:"msg"`
+}
+
 func Success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
 		Code: 0,
@@ -26,6 +34,10 @@ func Error(c *gin.Context, code int, msg string) {
 		Code: code,
 		Msg:  msg,
 	})
+}
+
+func MachineError(c *gin.Context, httpStatus int, code, msg string) {
+	c.JSON(httpStatus, MachineErrorResponse{Code: code, Msg: msg})
 }
 
 // SuccessDTO is a typed variant of Success for callers that already have a

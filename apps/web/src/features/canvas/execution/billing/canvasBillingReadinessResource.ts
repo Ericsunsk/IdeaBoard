@@ -38,10 +38,13 @@ export async function fetchCanvasBillingReadiness(
   request?: SubmitTaskData,
 ): Promise<SubmitTaskReadinessData> {
   const response = await taskApi.checkSubmitReadiness(
-    withTaskClientActionId(
-      request ?? buildCanvasBillingReadinessRequest(feature),
-      createCanvasTaskClientActionId(),
-    ),
+    {
+      ...withTaskClientActionId(
+        request ?? buildCanvasBillingReadinessRequest(feature),
+        createCanvasTaskClientActionId(),
+      ),
+      billing_quantity: 1,
+    },
   )
   if (response.code !== 0 || !response.data) {
     throw new Error(sanitizeApiErrorMessage(response.msg, 'Idea计费信息暂不可用'))

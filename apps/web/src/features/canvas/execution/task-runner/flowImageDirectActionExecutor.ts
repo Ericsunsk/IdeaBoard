@@ -1,4 +1,9 @@
-import { taskApi, type SubmitTaskData, type Task } from '../../../../shared/api/task'
+import {
+  taskApi,
+  type SubmitTaskData,
+  type SubmitTaskReadinessRequestData,
+  type Task,
+} from '../../../../shared/api/task'
 import {
   createTaskResultFailureError,
   createTaskCancelledError,
@@ -11,9 +16,10 @@ import {
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import { assertTaskSubmitReady } from './taskReadiness'
 import { notifyUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
+import { mapCanvasBillingRequestError } from './canvasBillingPreflight'
 
 export async function assertTaskRequestReady(
-  request: SubmitTaskData,
+  request: SubmitTaskReadinessRequestData,
   fallbackMessage = '提交任务失败',
 ): Promise<void> {
   await assertTaskSubmitReady(request, fallbackMessage)
@@ -23,10 +29,24 @@ export async function submitTaskRequest(
   request: SubmitTaskData,
   fallbackMessage = '提交任务失败',
 ): Promise<{ taskId: string }> {
-  const submitRes = await taskApi.submit(request)
+  let submitRes: Awaited<ReturnType<typeof taskApi.submit>>
+  try {
+    submitRes = await taskApi.submit(request)
+  } catch (error) {
+    const apiError = error as { code?: unknown; status?: unknown }
+    if (
+      apiError.code === 'insufficient_credits' ||
+      apiError.code === 'pricing_unavailable' ||
+      (apiError.status == null && apiError.code == null)
+    ) {
+      throw mapCanvasBillingRequestError(error)
+    }
+    throw error
+  }
   if (submitRes.code !== 0 || !submitRes.data?.task_id) {
     throw new Error(sanitizeApiErrorMessage(submitRes.msg, fallbackMessage))
   }
+  notifyUserCreditsInvalidation({ source: 'task-hold', taskId: submitRes.data.task_id })
   return { taskId: submitRes.data.task_id }
 }
 

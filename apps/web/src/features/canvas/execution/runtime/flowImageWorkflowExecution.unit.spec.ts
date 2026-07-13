@@ -270,7 +270,7 @@ describe('flowImageWorkflowExecution', () => {
     ])
     await run
 
-    expect(executorMocks.assertTaskRequestReady).toHaveBeenCalledTimes(2)
+    expect(executorMocks.assertTaskRequestReady).toHaveBeenCalledOnce()
     expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(1)
     expect(executorMocks.submitTaskRequest).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -65,6 +65,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   createClientActionId?: ClientActionIdFactory
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
+  onError?: (error: unknown) => boolean
 }
 
 function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
@@ -154,6 +155,7 @@ export function useCanvasExecutionWorkspace(
     createClientActionId: options.createClientActionId,
     onSuccess: options.onSuccess,
     onWarning: options.onWarning,
+    onError: options.onError,
   })
 
   async function runTextPromptGeneration(plan: TextPromptExecutionPlan): Promise<void> {
@@ -164,8 +166,10 @@ export function useCanvasExecutionWorkspace(
       return taskRequest
     }
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
+      readinessRequest: buildTaskRequest,
       buildRequest: buildTaskRequest,
       taskAdapter: options.taskAdapter,
+      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -183,6 +187,7 @@ export function useCanvasExecutionWorkspace(
       preflight: async () => {
         buildTaskRequest()
       },
+      assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, 1),
       fallbackErrorMessage: '生成失败',

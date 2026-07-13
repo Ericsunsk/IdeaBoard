@@ -92,6 +92,7 @@ export type PendingImageResultRunSummary = {
   pendingCount: number
   failureCount: number
   firstFailure: unknown
+  failures: unknown[]
 }
 
 type ImageResultLayout = ImageResultAnchor & {
@@ -710,6 +711,7 @@ export function usePendingImageResultExecution(
     let pendingCount = 0
     let failureCount = 0
     let firstFailure: unknown = null
+    const failures: unknown[] = []
 
     await Promise.allSettled(
       resultNodeIds.map(async (resultNodeId, index) => {
@@ -733,6 +735,7 @@ export function usePendingImageResultExecution(
           successCount += 1
         } catch (error) {
           firstFailure ??= error
+          failures.push(error)
           if (params.isPendingError(error)) {
             pendingCount += 1
             if (!persistPendingTaskIds && params.isCurrent()) {
@@ -765,6 +768,7 @@ export function usePendingImageResultExecution(
       pendingCount,
       failureCount,
       firstFailure,
+      failures,
     }
   }
 

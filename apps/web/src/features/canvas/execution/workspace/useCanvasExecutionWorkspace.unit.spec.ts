@@ -24,6 +24,7 @@ function makeRunSummary(
     pendingCount: 0,
     failureCount: 0,
     firstFailure: null,
+    failures: [],
     ...overrides,
   }
 }

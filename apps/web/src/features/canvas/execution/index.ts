@@ -19,8 +19,11 @@ export {
 export { useCanvasExecutionWorkspace } from './workspace/useCanvasExecutionWorkspace'
 export { buildFusionBillingReadinessRequest } from './billing/canvasBillingReadinessResource'
 export {
+  CanvasBillingPreflightError,
+  isCanvasBillingPreflightError,
+} from './task-runner/canvasBillingPreflight'
+export {
   canvasBillingReadinessKey,
-  isCanvasBillingSubmitBlocked,
   provideCanvasBillingReadiness,
   useCanvasBillingQuote,
   useCanvasBillingReadinessStore,

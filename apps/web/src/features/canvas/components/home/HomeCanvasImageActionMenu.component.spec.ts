@@ -101,21 +101,41 @@ describe('HomeCanvasImageActionMenu', () => {
     expect(findActionControl(activeHdRange)).toHaveClass('is-strength-active')
   })
 
-  it('shows AI prices, blocks unavailable AI actions, and keeps local tools price-free', () => {
+  it('shows AI prices without disabling cached unavailable billing states, and keeps local tools price-free', () => {
     const billingStore: CanvasBillingReadinessStore = {
       ensureFeature: vi.fn(async () => undefined),
       applyReadiness: vi.fn(),
       getFeatureState: (feature) =>
         feature === IMAGE_NODE_ACTION.removeBg
           ? { feature, status: 'blocked', reason: '价格未配置' }
-          : { feature, status: 'ready', totalCredits: 3, availableCredits: 20 },
+          : { feature, status: 'ready', unitCredits: 3, availableCredits: 20 },
     }
 
     renderImageActionMenu({ billingStore })
 
-    expect(screen.getByRole('button', { name: '抠图 · 价格未配置' })).toBeDisabled()
-    expect(screen.getAllByText('3 Ideas').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: '抠图' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '风格延展 · 3 Ideas' })).toBeEnabled()
+    expect(screen.getAllByText('3 Ideas')[0]).toHaveAttribute('data-touch-quote')
     expect(screen.getByRole('button', { name: '图像编辑' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '局部重绘' })).toBeEnabled()
+  })
+
+  it('presents explicit zero pricing as free in tooltip and touch quote', () => {
+    const billingStore: CanvasBillingReadinessStore = {
+      ensureFeature: vi.fn(async () => undefined),
+      applyReadiness: vi.fn(),
+      getFeatureState: (feature) => ({
+        feature,
+        status: 'ready',
+        unitCredits: 0,
+        availableCredits: 0,
+        sufficient: true,
+      }),
+    }
+
+    renderImageActionMenu({ billingStore })
+
+    expect(screen.getByRole('button', { name: '抠图 · 免费' })).toBeEnabled()
+    expect(screen.getAllByText('免费')[0]).toHaveAttribute('data-touch-quote')
   })
 })

@@ -23,6 +23,7 @@ const imageWorkflowQuantity int64 = 1
 var (
 	ErrUnsupportedProduct  = errors.New("task product is not billable")
 	ErrModelRequired       = errors.New("canonical model is required for billing")
+	ErrPricingUnavailable  = errors.New("task pricing is unavailable")
 	ErrInsufficientCredits = errors.New("insufficient credits for task")
 	ErrSettlementConflict  = errors.New("task billing settlement conflict")
 	ErrIntegrity           = errors.New("task billing integrity error")
@@ -141,7 +142,7 @@ func (s *Service) Readiness(ctx context.Context, userID int64, request Request) 
 	}
 	quote, err := s.quoter.Quote(ctx, string(sku), request.Quantity)
 	if err != nil {
-		return Readiness{}, err
+		return Readiness{}, fmt.Errorf("%w: %w", ErrPricingUnavailable, err)
 	}
 	wallet, err := s.credits.GetWallet(ctx, userID)
 	if err != nil {
@@ -163,7 +164,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	}
 	quote, err := s.quoter.QuoteInTx(ctx, tx, string(sku), request.Quantity)
 	if err != nil {
-		return Snapshot{}, err
+		return Snapshot{}, fmt.Errorf("%w: %w", ErrPricingUnavailable, err)
 	}
 
 	snapshot := Snapshot{

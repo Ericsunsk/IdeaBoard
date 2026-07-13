@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -136,6 +137,76 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 	}
 }
 
+func TestSubmitTaskHandlerReturnsStructuredInsufficientCreditsError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	service := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+			{
+				ID: 101,
+				Models: []accounts.AccountModel{{
+					Name:         "gpt-image-1",
+					Enabled:      true,
+					FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+				}},
+			},
+		}},
+		SubmissionStore: &recordingSubmissionStore{err: taskbilling.ErrInsufficientCredits},
+		MediaValidator:  testSubmitMediaValidator{},
+	}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(service, 42)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
+		"prompt":           "生成海报",
+		"client_action_id": "handler-insufficient",
+		"feature":          workflow.FeatureSlugPatternGen,
+		"params": map[string]interface{}{
+			"model": "gpt-image-1",
+		},
+	}))
+
+	if rec.Code != http.StatusPaymentRequired {
+		t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusPaymentRequired, rec.Body.String())
+	}
+	var body struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != "insufficient_credits" || body.Msg != "Idea不足" {
+		t.Fatalf("unexpected insufficient response: %+v", body)
+	}
+}
+
+func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	service := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name: "gpt-image-1", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+			}},
+		}}},
+		SubmissionStore: &recordingSubmissionStore{err: taskbilling.ErrPricingUnavailable},
+		MediaValidator:  testSubmitMediaValidator{},
+	}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(service, 42)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
+		"prompt":           "生成海报",
+		"client_action_id": "handler-pricing-unavailable",
+		"feature":          workflow.FeatureSlugPatternGen,
+		"params":           map[string]interface{}{"model": "gpt-image-1"},
+	}))
+
+	assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
+}
+
 func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -160,6 +231,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 		"prompt":           "向右扩展为工作室背景",
 		"client_action_id": "handler-image-extend",
+		"billing_quantity": 4,
 		"feature":          workflow.FeatureSlugImageExtend,
 		"image_urls":       []string{"https://example.com/source.png"},
 		"params": map[string]interface{}{
@@ -190,16 +262,84 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	if !body.Data.Ready || body.Data.Feature != workflow.FeatureSlugImageExtend || body.Data.Message != "" || body.Data.Billing == nil {
 		t.Fatalf("unexpected readiness data: %+v", body.Data)
 	}
+	if body.Data.Billing.UnitCredits != 3 || body.Data.Billing.Quantity != 4 || body.Data.Billing.TotalCredits != 12 || !body.Data.Billing.Sufficient {
+		t.Fatalf("unexpected readiness quote: %+v", body.Data.Billing)
+	}
 }
 
-type handlerBillingQuoter struct{}
+func TestCheckSubmitTaskReadinessHandlerRequiresValidBillingQuantity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 
-func (handlerBillingQuoter) Quote(_ context.Context, rawSKU string, quantity int64) (billing.Quote, error) {
+	service := NewService(ServiceDeps{}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(service, 42)
+	for _, billingQuantity := range []interface{}{nil, 0, 17} {
+		t.Run(fmt.Sprint(billingQuantity), func(t *testing.T) {
+			body := map[string]interface{}{
+				"prompt":           "生成海报",
+				"client_action_id": "handler-invalid-quantity",
+				"feature":          workflow.FeatureSlugPatternGen,
+			}
+			if billingQuantity != nil {
+				body["billing_quantity"] = billingQuantity
+			}
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", body))
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, quoteErr := range []error{billing.ErrSKUNotFound, billing.ErrPricingUnavailable} {
+		t.Run(quoteErr.Error(), func(t *testing.T) {
+			service := NewService(ServiceDeps{
+				AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+					ID: 101,
+					Models: []accounts.AccountModel{{
+						Name: "gpt-image-1", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+					}},
+				}}},
+				SubmissionStore: &recordingSubmissionStore{},
+				MediaValidator:  testSubmitMediaValidator{},
+				TaskBilling: taskbilling.NewService(
+					handlerBillingQuoter{err: quoteErr},
+					handlerBillingCredits{},
+				),
+			}, ServiceOptions{})
+			router := newSubmitHandlerTestRouter(service, 42)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
+				"prompt":           "生成海报",
+				"client_action_id": "handler-pricing-unavailable",
+				"billing_quantity": 1,
+				"feature":          workflow.FeatureSlugPatternGen,
+				"params":           map[string]interface{}{"model": "gpt-image-1"},
+			}))
+
+			assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
+		})
+	}
+}
+
+type handlerBillingQuoter struct{ err error }
+
+func (q handlerBillingQuoter) Quote(_ context.Context, rawSKU string, quantity int64) (billing.Quote, error) {
+	if q.err != nil {
+		return billing.Quote{}, q.err
+	}
 	sku, err := billing.CanonicalizeSKU(rawSKU)
 	if err != nil {
 		return billing.Quote{}, err
 	}
-	return billing.Quote{PriceSnapshot: billing.PriceSnapshot{SKU: sku, PriceVersionID: 1, PriceVersion: 1, UnitCredits: 0}, Quantity: quantity}, nil
+	return billing.Quote{
+		PriceSnapshot: billing.PriceSnapshot{SKU: sku, PriceVersionID: 1, PriceVersion: 1, UnitCredits: 3},
+		Quantity:      quantity,
+		TotalCredits:  3 * quantity,
+	}, nil
 }
 
 func (q handlerBillingQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, rawSKU string, quantity int64) (billing.Quote, error) {
@@ -221,6 +361,23 @@ func (handlerBillingCredits) InSQLTx(*sql.Tx) credits.Commands { return nil }
 
 func newHandlerTaskBillingService() *taskbilling.Service {
 	return taskbilling.NewService(handlerBillingQuoter{}, handlerBillingCredits{})
+}
+
+func assertMachineErrorResponse(t *testing.T, recorder *httptest.ResponseRecorder, status int, code, msg string) {
+	t.Helper()
+	if recorder.Code != status {
+		t.Fatalf("status=%d, want %d, body=%s", recorder.Code, status, recorder.Body.String())
+	}
+	var body struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != code || body.Msg != msg {
+		t.Fatalf("machine error=%+v, want code=%q msg=%q", body, code, msg)
+	}
 }
 
 func newSubmitHandlerTestRouter(service *Service, userID int64) *gin.Engine {

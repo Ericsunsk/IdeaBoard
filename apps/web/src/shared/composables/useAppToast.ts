@@ -1,9 +1,9 @@
-import { toast } from 'vue-sonner'
+import { toast, type ExternalToast } from 'vue-sonner'
 
-type ToastLevelOptions = {
-  description?: string
-  duration?: number
-}
+type ToastLevelOptions = Pick<
+  ExternalToast,
+  'action' | 'description' | 'duration' | 'id' | 'onAutoClose' | 'onDismiss'
+>
 
 type ToastLoadingOptions = {
   description?: string

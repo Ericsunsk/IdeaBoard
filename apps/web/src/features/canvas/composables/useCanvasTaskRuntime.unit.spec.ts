@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useCanvasTaskRuntime } from './useCanvasTaskRuntime'
+import { CanvasBillingPreflightError } from '../execution'
 
 const mocks = vi.hoisted(() => {
   const plan = {
@@ -27,7 +28,10 @@ const mocks = vi.hoisted(() => {
       isNodeDirectActionRunning: vi.fn(() => false),
       reattachPendingImageResults: vi.fn(),
     },
-    executionOptions: null as null | { onWarning: (message: string) => void },
+    executionOptions: null as null | {
+      onWarning: (message: string) => void
+      onError?: (error: unknown) => void
+    },
   }
 })
 
@@ -37,7 +41,10 @@ vi.mock('../execution', async (importOriginal) => {
     ...actual,
     createImageExecutionPlanner: vi.fn(() => mocks.planner),
     useFlowImageWorkflowExecution: vi.fn((options) => {
-      mocks.executionOptions = options as { onWarning: (message: string) => void }
+      mocks.executionOptions = options as {
+        onWarning: (message: string) => void
+        onError?: (error: unknown) => void
+      }
       return mocks.workflow
     }),
   }
@@ -47,6 +54,7 @@ function createRuntime() {
   const feedback = {
     succeeded: vi.fn<(message: string) => void>(),
     warning: vi.fn<(message: string) => void>(),
+    insufficientCredits: vi.fn<() => void>(),
   }
   const runtimeOptions = {
     nodes: ref([]),
@@ -97,5 +105,16 @@ describe('useCanvasTaskRuntime', () => {
       'auto',
     )
     expect(mocks.workflow.executeImageWorkflow).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes typed wallet insufficiency to the actionable billing feedback intent', () => {
+    const { feedback } = createRuntime()
+
+    mocks.executionOptions?.onError?.(
+      new CanvasBillingPreflightError('insufficient-credits', 'Idea不足'),
+    )
+
+    expect(feedback.insufficientCredits).toHaveBeenCalledOnce()
+    expect(feedback.warning).not.toHaveBeenCalled()
   })
 })

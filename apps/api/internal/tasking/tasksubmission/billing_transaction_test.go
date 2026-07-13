@@ -239,6 +239,65 @@ func TestBilledSubmissionInsufficientCreditsCreatesNothing(t *testing.T) {
 	assertBillingSnapshotCount(t, db, task.TaskID, 0)
 }
 
+func TestConcurrentBilledSubmissionsLeaveNoWritesForInsufficientLoser(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	billingService := billing.NewService(pool)
+	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+	seedCreditWallet(t, pool, creditService, 42, 25)
+	client := &countingRiverTxClient{inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)}
+	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
+
+	start := make(chan struct{})
+	type submissionOutcome struct {
+		taskID string
+		err    error
+	}
+	outcomes := make(chan submissionOutcome, 2)
+	var wg sync.WaitGroup
+	tasksByID := []*tasks.Task{
+		newBilledPatternTask("task_billed_race_a", "pattern-action-race-a", request),
+		newBilledPatternTask("task_billed_race_b", "pattern-action-race-b", request),
+	}
+	for _, task := range tasksByID {
+		wg.Add(1)
+		go func(task *tasks.Task) {
+			defer wg.Done()
+			<-start
+			_, err := store.SubmitTask(context.Background(), task, newTaskSubmissionQueueTask(task))
+			outcomes <- submissionOutcome{taskID: task.TaskID, err: err}
+		}(task)
+	}
+	close(start)
+	wg.Wait()
+	close(outcomes)
+
+	winnerTaskID := ""
+	loserTaskID := ""
+	for outcome := range outcomes {
+		switch {
+		case outcome.err == nil:
+			winnerTaskID = outcome.taskID
+		case errors.Is(outcome.err, taskbilling.ErrInsufficientCredits):
+			loserTaskID = outcome.taskID
+		default:
+			t.Fatalf("unexpected concurrent submission error for %s: %v", outcome.taskID, outcome.err)
+		}
+	}
+	if winnerTaskID == "" || loserTaskID == "" || winnerTaskID == loserTaskID {
+		t.Fatalf("winner/loser=%q/%q, want distinct task ids", winnerTaskID, loserTaskID)
+	}
+
+	assertTaskRowCount(t, db, winnerTaskID, 1)
+	assertRiverJobRowCount(t, db, winnerTaskID, 1)
+	assertBillingSnapshotCount(t, db, winnerTaskID, 1)
+	assertCreditCommandCount(t, db, winnerTaskID, "hold", 1)
+	assertTaskRowCount(t, db, loserTaskID, 0)
+	assertRiverJobRowCount(t, db, loserTaskID, 0)
+	assertBillingSnapshotCount(t, db, loserTaskID, 0)
+	assertCreditCommandCount(t, db, loserTaskID, "hold", 0)
+}
+
 func TestBilledSubmissionRollsBackHoldSnapshotTaskAndRiver(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
@@ -439,5 +498,18 @@ func assertBillingSnapshotCount(t *testing.T, db interface {
 	}
 	if count != want {
 		t.Fatalf("billing snapshot count=%d want=%d", count, want)
+	}
+}
+
+func assertCreditCommandCount(t *testing.T, db interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, taskID, commandType string, want int) {
+	t.Helper()
+	var count int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE business_reference_id = $1 AND command_type = $2`, taskID, commandType).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != want {
+		t.Fatalf("credit %s count=%d want=%d for task %s", commandType, count, want, taskID)
 	}
 }

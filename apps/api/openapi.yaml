@@ -383,6 +383,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskId'
+        '402':
+          description: The server quote cannot be covered by the user's available Idea balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsufficientCreditsError'
+        '503':
+          description: The authoritative Task price cannot currently be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingUnavailableError'
   /user/tasks/submit/readiness:
     post:
       tags: [Tasks]
@@ -392,7 +404,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubmitTaskRequest'
+              $ref: '#/components/schemas/SubmitTaskReadinessRequest'
       responses:
         '200':
           description: OK
@@ -400,6 +412,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskSubmitReadiness'
+        '503':
+          description: The readiness Quote cannot currently be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingUnavailableError'
   /user/tasks:
     get:
       tags: [Tasks]
@@ -1887,6 +1905,26 @@ components:
         code: { type: integer }
         msg: { type: string }
 
+    InsufficientCreditsError:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: string
+          enum: [insufficient_credits]
+        msg:
+          type: string
+
+    PricingUnavailableError:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: string
+          enum: [pricing_unavailable]
+        msg:
+          type: string
+
     User:
       type: object
       required: [id, uid, username, role, status, created_at, updated_at]
@@ -2643,6 +2681,19 @@ components:
           items: { type: string }
         params:
           $ref: '#/components/schemas/SubmitTaskRequestParams'
+
+    SubmitTaskReadinessRequest:
+      allOf:
+        - $ref: '#/components/schemas/SubmitTaskRequest'
+        - type: object
+          required: [billing_quantity]
+          properties:
+            billing_quantity:
+              type: integer
+              format: int64
+              minimum: 1
+              maximum: 16
+              description: Readiness-only number of independently billed Task submissions in this activation.
 
     WorkflowFeatureSlug:
       type: string
