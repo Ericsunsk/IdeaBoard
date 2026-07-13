@@ -1,4 +1,5 @@
-import { adminChartLegend, adminChartTheme, type AdminChartOptions } from '../shared/lib/adminChart'
+import type { ChartOptions } from '../../../shared/lib/chartPrimitives'
+import { adminChartLegend, adminChartTheme } from '../shared/lib/adminChart'
 
 export const defaultModelColors = [
   adminChartTheme.brand,
@@ -9,7 +10,7 @@ export const defaultModelColors = [
   adminChartTheme.mist,
 ]
 
-export function baseChartOptions(): AdminChartOptions {
+export function baseChartOptions(): ChartOptions {
   return {
     responsive: true,
     maintainAspectRatio: false,

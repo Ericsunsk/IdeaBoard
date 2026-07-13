@@ -2,6 +2,12 @@ import {
   GetAdminStatisticsRange,
   type GetAdminStatisticsRange as GetAdminStatisticsRangeValue,
 } from '../../../../shared/api/generated-query/model'
+import {
+  buildChartTimeBuckets,
+  shouldShowChartTimeTick,
+  type ChartTimeBucket,
+  type ChartTimeTickDensity,
+} from '../../../../shared/lib/chartTimeRange'
 
 export type AdminTimeRangeOption = {
   label: string
@@ -10,10 +16,7 @@ export type AdminTimeRangeOption = {
   bucketHours?: number
 }
 
-export type AdminTimeRangeBucket = {
-  date: string
-  label: string
-}
+export type AdminTimeRangeBucket = ChartTimeBucket
 
 const adminTimeRangeOptions: readonly AdminTimeRangeOption[] = [
   { label: '日', key: GetAdminStatisticsRange['1d'], days: 1, bucketHours: 4 },
@@ -40,17 +43,10 @@ export function buildAdminTimeRangeBuckets(
   now = new Date(),
 ): AdminTimeRangeBucket[] {
   const option = getAdminTimeRangeOption(range)
-  if (option.bucketHours) return buildIntradayBuckets(now, option.bucketHours)
-
-  const days = option.days
-  return Array.from({ length: days }, (_, idx) => {
-    const d = new Date(now)
-    d.setDate(now.getDate() - (days - 1 - idx))
-    const date = formatDateKey(d)
-    return {
-      date,
-      label: date.slice(5).replace('-', '/'),
-    }
+  return buildChartTimeBuckets({
+    days: option.days,
+    now,
+    bucketHours: option.bucketHours,
   })
 }
 
@@ -60,44 +56,16 @@ export function shouldShowAdminTimeRangeTick(input: {
   range: GetAdminStatisticsRangeValue
   label?: string
 }): boolean {
-  const { index, count, range, label } = input
-  if (count <= 7) return true
-  if (range === GetAdminStatisticsRange['30d'])
-    return index === 0 || index === count - 1 || index % 6 === 0
-  if (range === GetAdminStatisticsRange['1y'])
-    return index === 0 || index === count - 1 || isMonthStartLabel(label)
-  return true
-}
-
-function isMonthStartLabel(label: string | undefined): boolean {
-  const value = (label || '').trim()
-  if (!value) return false
-  const mmdd = /^(\d{2})\/(\d{2})$/.exec(value)
-  if (mmdd) return mmdd[2] === '01'
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  if (ymd) return ymd[3] === '01'
-  return false
-}
-
-function buildIntradayBuckets(now: Date, bucketHours: number): AdminTimeRangeBucket[] {
-  const bucketCount = Math.ceil(24 / bucketHours)
-  const dayStart = new Date(now)
-  dayStart.setHours(0, 0, 0, 0)
-  const date = formatDateKey(dayStart)
-
-  return Array.from({ length: bucketCount }, (_, idx) => {
-    const startHour = idx * bucketHours
-    return {
-      date: `${date}T${pad2(startHour)}`,
-      label: `${pad2(startHour)}:00`,
-    }
+  return shouldShowChartTimeTick({
+    index: input.index,
+    count: input.count,
+    label: input.label,
+    density: getAdminTimeRangeTickDensity(input.range),
   })
 }
 
-function formatDateKey(date: Date): string {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
-}
-
-function pad2(value: number): string {
-  return value.toString().padStart(2, '0')
+function getAdminTimeRangeTickDensity(range: GetAdminStatisticsRangeValue): ChartTimeTickDensity {
+  if (range === GetAdminStatisticsRange['30d']) return { mode: 'interval', interval: 6 }
+  if (range === GetAdminStatisticsRange['1y']) return { mode: 'month-start' }
+  return { mode: 'all' }
 }

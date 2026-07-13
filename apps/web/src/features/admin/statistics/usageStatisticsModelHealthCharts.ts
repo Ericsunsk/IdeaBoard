@@ -1,18 +1,20 @@
 import { computed, type Ref } from 'vue'
+import {
+  defineChartData,
+  type ChartData,
+  type ChartOptions,
+  type ChartTooltipItem,
+} from '../../../shared/lib/chartPrimitives'
 import type { AdminStatistics } from './statisticsResource'
 import {
   adminChartTheme,
   defineAdminChartBubbleDatasetStyle,
   defineAdminChartBubblePointStyle,
-  defineAdminChartData,
   defineAdminChartDurationScale,
-  defineAdminChartOptions,
   defineAdminChartPercentScale,
+  defineAdminChartOptions,
   getAdminChartBubbleHoverRadius,
   getAdminChartBubbleRadius,
-  type AdminChartData,
-  type AdminChartOptions,
-  type AdminTooltipItem,
 } from '../shared/lib/adminChart'
 import {
   baseChartOptions,
@@ -69,7 +71,7 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
       .slice(0, 12),
   )
 
-  const modelRiskChartData = computed<AdminChartData>(() => {
+  const modelRiskChartData = computed<ChartData>(() => {
     const maxTotal = Math.max(1, ...modelRiskRows.value.map((item) => item.total))
     const colors = modelRiskRows.value.map((item) => item.color)
     const points = modelRiskRows.value.map<ModelRiskPoint>((item) => ({
@@ -81,7 +83,7 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
       avgSeconds: item.avgSeconds,
       failureRate: item.failureRate,
     }))
-    return defineAdminChartData({
+    return defineChartData({
       labels: modelRiskRows.value.map((item) => item.name),
       datasets: [
         {
@@ -100,7 +102,7 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
     })
   })
 
-  const modelRiskChartOptions = computed<AdminChartOptions>(() =>
+  const modelRiskChartOptions = computed<ChartOptions>(() =>
     defineAdminChartOptions({
       ...baseChartOptions(),
       interaction: { mode: 'nearest', intersect: true },
@@ -164,11 +166,11 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
       .slice(0, 6),
   )
 
-  const slowModelsChartData = computed<AdminChartData>(() => {
+  const slowModelsChartData = computed<ChartData>(() => {
     const maxSamples = Math.max(1, ...slowModelRows.value.map((row) => row.samples))
     const colors = slowModelRows.value.map((row) => row.color)
 
-    return defineAdminChartData({
+    return defineChartData({
       labels: slowModelRows.value.map((row) => row.name),
       datasets: [
         {
@@ -189,7 +191,7 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
     })
   })
 
-  const slowModelsChartOptions = computed<AdminChartOptions>(() =>
+  const slowModelsChartOptions = computed<ChartOptions>(() =>
     defineAdminChartOptions({
       ...baseChartOptions(),
       layout: { padding: { top: 10, right: 18 } },
@@ -240,10 +242,10 @@ export function useUsageStatisticsModelHealthCharts(adminStatistics: Ref<AdminSt
   }
 }
 
-function getModelRiskPoint(context: AdminTooltipItem | undefined) {
+function getModelRiskPoint(context: ChartTooltipItem | undefined) {
   return context?.raw as ModelRiskPoint | undefined
 }
 
-function getSlowModelPoint(context: AdminTooltipItem | undefined) {
+function getSlowModelPoint(context: ChartTooltipItem | undefined) {
   return context?.raw as SlowModelPoint | undefined
 }

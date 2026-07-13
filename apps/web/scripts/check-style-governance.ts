@@ -98,12 +98,6 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Admin Card pass-through owns the panel shadow contract.',
   },
-  'src/features/admin/shared/lib/adminChart.ts': {
-    counts: {
-      'raw-color': 1,
-    },
-    reason: 'Chart.js colors are converted to rgba() at runtime from Admin tokens.',
-  },
   'src/features/admin/shared/lib/adminOverlayPt.ts': {
     counts: {
       'raw-shadow': 1,

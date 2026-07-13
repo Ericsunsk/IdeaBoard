@@ -1,16 +1,18 @@
 import { computed, type Ref } from 'vue'
+import {
+  defineChartData,
+  type ChartData,
+  type ChartOptions,
+  type ChartTooltipItem,
+  withAlpha,
+} from '../../../shared/lib/chartPrimitives'
 import type { AdminStatistics, GetAdminStatisticsRangeValue } from './statisticsResource'
 import {
   adminChartStrokeWidth,
   adminChartTheme,
   defineAdminChartCountScale,
-  defineAdminChartData,
-  defineAdminChartOptions,
   defineAdminChartPointClipStyle,
-  type AdminChartData,
-  type AdminChartOptions,
-  type AdminTooltipItem,
-  withAlpha,
+  defineAdminChartOptions,
 } from '../shared/lib/adminChart'
 import {
   buildAdminTimeRangeBuckets,
@@ -94,7 +96,7 @@ export function useUsageStatisticsCharts(options: {
     })
   }
 
-  function getUsageTrendTooltipPoint(context: AdminTooltipItem | undefined) {
+  function getUsageTrendTooltipPoint(context: ChartTooltipItem | undefined) {
     if (!context) return null
     const label = context.dataset.label || ''
     const day = trendData.value[context.dataIndex]
@@ -108,8 +110,8 @@ export function useUsageStatisticsCharts(options: {
     }
   }
 
-  const trendChartData = computed<AdminChartData>(() =>
-    defineAdminChartData({
+  const trendChartData = computed<ChartData>(() =>
+    defineChartData({
       labels: trendData.value.map((day) => day.date),
       datasets: trendSeriesModelOrder.value.map((model) => ({
         type: 'line',
@@ -132,7 +134,7 @@ export function useUsageStatisticsCharts(options: {
     }),
   )
 
-  const trendChartOptions = computed<AdminChartOptions>(() =>
+  const trendChartOptions = computed<ChartOptions>(() =>
     defineAdminChartOptions({
       ...baseChartOptions(),
       interaction: { mode: 'index', intersect: false },

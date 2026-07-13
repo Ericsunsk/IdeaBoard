@@ -6,19 +6,21 @@ import {
   type MonitorStats,
 } from '../../../shared/api/generated-query/model'
 import {
+  defineChartData,
+  type ChartData,
+  type ChartOptions,
+  withAlpha,
+} from '../../../shared/lib/chartPrimitives'
+import {
   adminChartLegend,
   adminChartStrokeWidth,
   adminChartTheme,
   defineAdminChartBubbleDatasetStyle,
-  defineAdminChartData,
-  defineAdminChartOptions,
   defineAdminChartPercentScale,
   defineAdminChartPointClipStyle,
   defineAdminChartRadialPercentScale,
+  defineAdminChartOptions,
   getAdminChartBubbleRadius,
-  type AdminChartData,
-  type AdminChartOptions,
-  withAlpha,
 } from '../shared/lib/adminChart'
 import { getTaskStatusDefinition, taskStatusOrder } from './taskMonitorStatus'
 import {
@@ -188,9 +190,9 @@ export function buildTaskDistributionRows(snapshot: TaskStatusSnapshot): TaskDis
   })
 }
 
-export function buildAccountConcurrencyChartData(rows: AccountLoadRow[]): AdminChartData {
+export function buildAccountConcurrencyChartData(rows: AccountLoadRow[]): ChartData {
   if (rows.length <= 0) {
-    return defineAdminChartData({
+    return defineChartData({
       labels: ['无账号'],
       datasets: [
         {
@@ -211,7 +213,7 @@ export function buildAccountConcurrencyChartData(rows: AccountLoadRow[]): AdminC
     })
   }
 
-  return defineAdminChartData({
+  return defineChartData({
     labels: rows.map((row) => `账号 ${row.id}`),
     datasets: [
       {
@@ -238,7 +240,7 @@ export function buildAccountConcurrencyChartData(rows: AccountLoadRow[]): AdminC
   })
 }
 
-export function buildAccountConcurrencyChartOptions(rows: AccountLoadRow[]): AdminChartOptions {
+export function buildAccountConcurrencyChartOptions(rows: AccountLoadRow[]): ChartOptions {
   return defineAdminChartOptions({
     responsive: true,
     maintainAspectRatio: false,
@@ -277,8 +279,8 @@ export function buildAccountConcurrencyChartOptions(rows: AccountLoadRow[]): Adm
   })
 }
 
-export function buildTaskDistributionChartData(rows: TaskDistributionRow[]): AdminChartData {
-  return defineAdminChartData({
+export function buildTaskDistributionChartData(rows: TaskDistributionRow[]): ChartData {
+  return defineChartData({
     labels: rows.map((point) => point.label),
     datasets: [
       {
@@ -299,7 +301,7 @@ export function buildTaskDistributionChartData(rows: TaskDistributionRow[]): Adm
   })
 }
 
-export function buildTaskDistributionChartOptions(rows: TaskDistributionRow[]): AdminChartOptions {
+export function buildTaskDistributionChartOptions(rows: TaskDistributionRow[]): ChartOptions {
   return defineAdminChartOptions({
     responsive: true,
     maintainAspectRatio: false,
@@ -325,12 +327,10 @@ export function buildTaskDistributionChartOptions(rows: TaskDistributionRow[]): 
   })
 }
 
-export function buildExecutionPressureChartData(
-  points: TaskExecutionPressurePoint[],
-): AdminChartData {
+export function buildExecutionPressureChartData(points: TaskExecutionPressurePoint[]): ChartData {
   const maxCount = Math.max(1, ...points.map((point) => point.count))
 
-  return defineAdminChartData({
+  return defineChartData({
     datasets: points.map((point) => ({
       type: 'bubble' as const,
       label: point.label,
@@ -350,7 +350,7 @@ export function buildExecutionPressureChartData(
   })
 }
 
-export function buildExecutionPressureChartOptions(): AdminChartOptions {
+export function buildExecutionPressureChartOptions(): ChartOptions {
   return defineAdminChartOptions({
     responsive: true,
     maintainAspectRatio: false,

@@ -96,6 +96,36 @@ describe('useUsageStatisticsCharts', () => {
     expect(charts.todaySuccessRateFoot.value).toBe('+30.0pp 较昨日')
     expect(charts.monthCallsFoot.value).toBe('占总调用 20.0%')
     expect(trendTooltipAfterBody(charts.trendChartOptions.value, 6)).toEqual(['总调用: 7 次'])
+
+    const trendOptions = charts.trendChartOptions.value as {
+      responsive: boolean
+      maintainAspectRatio: boolean
+      scales: {
+        x: {
+          title: { display: boolean }
+          ticks: { font: { family: string } }
+        }
+        y: {
+          max: number
+          title: { display: boolean }
+          ticks: {
+            callback: (value: number) => string
+            font: { family: string }
+          }
+        }
+      }
+    }
+    expect(trendOptions).toMatchObject({
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { title: { display: false } },
+        y: { max: 10, title: { display: false } },
+      },
+    })
+    expect(trendOptions.scales.y.ticks.callback(1_200)).toBe('1.2k')
+    expect(trendOptions.scales.x.ticks.font.family).toContain('Segoe UI')
+    expect(trendOptions.scales.y.ticks.font.family).toContain('Segoe UI')
   })
 
   it('uses quality statistics only when provided or when the quality range matches usage', () => {

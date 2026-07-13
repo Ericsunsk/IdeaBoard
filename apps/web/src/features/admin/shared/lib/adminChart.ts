@@ -1,12 +1,14 @@
-import type { Chart, ChartData, ChartOptions, ChartType, Plugin, TooltipItem } from 'chart.js'
+import type { Chart, ChartType, Plugin } from 'chart.js'
 import { markRaw, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import {
+  defineChartNumericScale,
+  defineChartOptions,
+  resolveChartScaleMax,
+  type ChartOptions,
+  withAlpha,
+} from '../../../../shared/lib/chartPrimitives'
 import { adminThemeTokenFallbacks } from '../../../../shared/theme/adminThemeTokens'
 
-export type AdminChartData = ChartData<ChartType, unknown[], string>
-export type AdminChartOptions = ChartOptions<ChartType>
-export type AdminTooltipItem = TooltipItem<ChartType>
-
-const adminHiddenScaleTitle = { display: false } as const
 export const adminChartStrokeWidth = 1
 export const adminChartPointClipPadding = 6
 const adminChartBubbleFillOpacity = 0.3
@@ -80,12 +82,11 @@ type AdminChartNumericScaleInput = {
   gridColor?: string
 }
 
-export function defineAdminChartData(data: AdminChartData): AdminChartData {
-  return markRaw(data)
-}
-
-export function defineAdminChartOptions(options: AdminChartOptions): AdminChartOptions {
-  return markRaw(withAdminChartDefaults(options))
+export function defineAdminChartOptions(options: ChartOptions): ChartOptions {
+  return defineChartOptions(options, {
+    fontFamily: adminChartFontFamily,
+    hideScaleTitles: true,
+  })
 }
 
 export function adminChartLegend(position: 'top' | 'bottom' = 'top') {
@@ -110,55 +111,52 @@ export function adminChartLegend(position: 'top' | 'bottom' = 'top') {
 }
 
 export function defineAdminChartCountScale(input: AdminChartNumericScaleInput = {}) {
-  return {
+  return defineChartNumericScale({
     stacked: input.stacked,
-    beginAtZero: true,
-    max: resolveAdminChartScaleMax(input),
-    ticks: {
-      color: adminChartTheme.axisText,
-      precision: 0,
-      stepSize: input.stepSize,
-      callback: (value: string | number) => formatAdminChartCompactNumber(Number(value)),
-    },
-    grid: { color: input.gridColor ?? adminChartTheme.splitLine },
-    border: input.borderColor ? { color: input.borderColor } : { display: false },
-  }
+    values: input.values,
+    max: input.max,
+    min: input.min,
+    headroom: input.headroom,
+    precision: 0,
+    stepSize: input.stepSize,
+    tickColor: adminChartTheme.axisText,
+    gridColor: input.gridColor ?? adminChartTheme.splitLine,
+    borderColor: input.borderColor,
+    formatTick: formatAdminChartCompactNumber,
+  })
 }
 
 export function defineAdminChartDurationScale(input: AdminChartNumericScaleInput = {}) {
-  return {
-    beginAtZero: true,
-    max: resolveAdminChartScaleMax(input),
-    ticks: {
-      color: adminChartTheme.axisText,
-      stepSize: input.stepSize,
-      callback: (value: string | number) => formatAdminChartDurationSeconds(Number(value)),
-    },
-    grid: { color: input.gridColor ?? adminChartTheme.splitLine },
-    border: input.borderColor ? { color: input.borderColor } : { display: false },
-  }
+  return defineChartNumericScale({
+    values: input.values,
+    max: input.max,
+    min: input.min,
+    headroom: input.headroom,
+    stepSize: input.stepSize,
+    tickColor: adminChartTheme.axisText,
+    gridColor: input.gridColor ?? adminChartTheme.splitLine,
+    borderColor: input.borderColor,
+    formatTick: formatAdminChartDurationSeconds,
+  })
 }
 
 export function defineAdminChartPercentScale(input: AdminChartNumericScaleInput = {}) {
-  return {
-    min: input.min ?? 0,
+  return defineChartNumericScale({
+    axisMin: input.min ?? 0,
     max: input.max ?? 100,
-    beginAtZero: true,
-    ticks: {
-      color: adminChartTheme.axisText,
-      precision: 0,
-      stepSize: input.stepSize,
-      callback: (value: string | number) => formatAdminChartPercent(Number(value), input.suffix),
-    },
-    grid: { color: input.gridColor ?? adminChartTheme.splitLine },
-    border: input.borderColor ? { color: input.borderColor } : { display: false },
-  }
+    precision: 0,
+    stepSize: input.stepSize,
+    tickColor: adminChartTheme.axisText,
+    gridColor: input.gridColor ?? adminChartTheme.splitLine,
+    borderColor: input.borderColor,
+    formatTick: (value) => formatAdminChartPercent(value, input.suffix),
+  })
 }
 
 export function defineAdminChartRadialCountScale(input: AdminChartNumericScaleInput = {}) {
   return {
     beginAtZero: true,
-    max: resolveAdminChartScaleMax(input),
+    max: resolveChartScaleMax(input),
     ticks: {
       backdropColor: 'transparent',
       color: adminChartTheme.axisText,
@@ -233,23 +231,6 @@ export function getAdminChartBubbleHoverRadius(value: number, maxValue: number) 
   return radius > 0 ? radius + adminChartBubbleHoverRadiusOffset : 0
 }
 
-function getAdminChartNiceScaleMax(
-  values: readonly number[],
-  options: Pick<AdminChartNumericScaleInput, 'min' | 'headroom'> = {},
-) {
-  const peak = Math.max(0, ...values.map(toFiniteChartNumber))
-  return getAdminChartNiceMax(peak, options)
-}
-
-function getAdminChartNiceMax(
-  value: number,
-  options: Pick<AdminChartNumericScaleInput, 'min' | 'headroom'> = {},
-) {
-  const headroom = options.headroom ?? 1
-  const min = options.min ?? 0
-  return ceilToNiceChartMax(Math.max(min, toFiniteChartNumber(value) * headroom))
-}
-
 function formatAdminChartCompactNumber(value: number) {
   const rounded = Math.round(toFiniteChartNumber(value))
   if (rounded >= 1_000_000) return formatCompactUnit(rounded / 1_000_000, 'm')
@@ -294,47 +275,8 @@ export function useAdminChartReady(isDataSettled: Ref<boolean>) {
   return isChartReady
 }
 
-export function withAlpha(hexColor: string, opacity: number) {
-  const value = hexColor.replace('#', '')
-  const bigint = Number.parseInt(value.length === 3 ? expandShortHex(value) : value, 16)
-  const red = (bigint >> 16) & 255
-  const green = (bigint >> 8) & 255
-  const blue = bigint & 255
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`
-}
-
-export function getParsedY(context: AdminTooltipItem) {
-  const parsed = context.parsed as { y?: number } | number | undefined
-  if (typeof parsed === 'number') return parsed
-  return Number(parsed?.y ?? context.raw ?? 0)
-}
-
-function expandShortHex(value: string) {
-  return value
-    .split('')
-    .map((char) => char + char)
-    .join('')
-}
-
 function mapChartColor(color: string | string[], mapper: (value: string) => string) {
   return Array.isArray(color) ? color.map(mapper) : mapper(color)
-}
-
-function resolveAdminChartScaleMax(input: AdminChartNumericScaleInput) {
-  if (input.max != null) return input.max
-  if (!input.values) return undefined
-  return getAdminChartNiceScaleMax(input.values, {
-    min: input.min,
-    headroom: input.headroom,
-  })
-}
-
-function ceilToNiceChartMax(value: number) {
-  if (value <= 0) return 10
-  const magnitude = 10 ** Math.floor(Math.log10(value))
-  const normalized = value / magnitude
-  const step = [1, 1.5, 2, 3, 5, 10].find((item) => normalized <= item) || 10
-  return step * magnitude
 }
 
 function formatCompactUnit(value: number, unit: string) {
@@ -344,84 +286,6 @@ function formatCompactUnit(value: number, unit: string) {
 
 function toFiniteChartNumber(value: number) {
   return Number.isFinite(value) ? value : 0
-}
-
-function withAdminChartDefaults(options: AdminChartOptions): AdminChartOptions {
-  applyAdminChartPluginTypography(options)
-
-  if (!options.scales) return options
-
-  Object.values(options.scales).forEach((scaleOptions) => {
-    if (!scaleOptions || typeof scaleOptions !== 'object') return
-    const scale = scaleOptions as AdminChartScaleTypographyOptions
-    scale.title = { ...scale.title, ...adminHiddenScaleTitle }
-    scale.ticks = {
-      ...scale.ticks,
-      font: withAdminChartFont(scale.ticks?.font),
-    }
-    if (scale.pointLabels) {
-      scale.pointLabels = {
-        ...scale.pointLabels,
-        font: withAdminChartFont(scale.pointLabels.font),
-      }
-    }
-  })
-
-  return options
-}
-
-type AdminChartFontOptions = {
-  family?: string
-  size?: number
-  weight?: string | number
-}
-
-type AdminChartScaleTypographyOptions = {
-  title?: { display?: boolean }
-  ticks?: {
-    font?: AdminChartFontOptions
-  }
-  pointLabels?: {
-    font?: AdminChartFontOptions
-  }
-}
-
-type AdminChartPluginTypographyOptions = {
-  legend?:
-    | false
-    | {
-        labels?: {
-          font?: AdminChartFontOptions
-        }
-      }
-  tooltip?:
-    | false
-    | {
-        bodyFont?: AdminChartFontOptions
-        titleFont?: AdminChartFontOptions
-        footerFont?: AdminChartFontOptions
-      }
-}
-
-function applyAdminChartPluginTypography(options: AdminChartOptions) {
-  if (!options.plugins || typeof options.plugins !== 'object') return
-
-  const plugins = options.plugins as AdminChartPluginTypographyOptions
-  if (plugins.legend && typeof plugins.legend === 'object' && plugins.legend.labels) {
-    plugins.legend.labels.font = withAdminChartFont(plugins.legend.labels.font)
-  }
-  if (plugins.tooltip && typeof plugins.tooltip === 'object') {
-    plugins.tooltip.bodyFont = withAdminChartFont(plugins.tooltip.bodyFont)
-    plugins.tooltip.titleFont = withAdminChartFont(plugins.tooltip.titleFont)
-    plugins.tooltip.footerFont = withAdminChartFont(plugins.tooltip.footerFont)
-  }
-}
-
-function withAdminChartFont(font: AdminChartFontOptions | undefined): AdminChartFontOptions {
-  return {
-    ...font,
-    family: adminChartFontFamily,
-  }
 }
 
 function isChartDataEmpty(chart: Chart<ChartType>) {

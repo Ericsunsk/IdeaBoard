@@ -1,16 +1,18 @@
 import { computed, type Ref } from 'vue'
+import {
+  defineChartData,
+  getParsedY,
+  type ChartData,
+  type ChartOptions,
+  withAlpha,
+} from '../../../shared/lib/chartPrimitives'
 import type { AdminStatistics, GetAdminStatisticsRangeValue } from './statisticsResource'
 import {
   adminChartStrokeWidth,
   adminChartTheme,
-  defineAdminChartData,
-  defineAdminChartOptions,
   defineAdminChartPercentScale,
   defineAdminChartPointClipStyle,
-  getParsedY,
-  type AdminChartData,
-  type AdminChartOptions,
-  withAlpha,
+  defineAdminChartOptions,
 } from '../shared/lib/adminChart'
 import {
   buildAdminTimeRangeBuckets,
@@ -59,8 +61,8 @@ export function useUsageStatisticsQualityTrendCharts(options: {
     })
   })
 
-  const qualityTrendChartData = computed<AdminChartData>(() =>
-    defineAdminChartData({
+  const qualityTrendChartData = computed<ChartData>(() =>
+    defineChartData({
       labels: qualityTrendRows.value.map((item) => item.label),
       datasets: [
         {
@@ -95,7 +97,7 @@ export function useUsageStatisticsQualityTrendCharts(options: {
     }),
   )
 
-  const qualityTrendChartOptions = computed<AdminChartOptions>(() =>
+  const qualityTrendChartOptions = computed<ChartOptions>(() =>
     defineAdminChartOptions({
       ...baseChartOptions(),
       interaction: { mode: 'index', intersect: false },

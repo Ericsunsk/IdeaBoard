@@ -1,14 +1,16 @@
 import { computed, type Ref } from 'vue'
+import {
+  defineChartData,
+  type ChartData,
+  type ChartOptions,
+  withAlpha,
+} from '../../../shared/lib/chartPrimitives'
 import type { AdminStatistics } from './statisticsResource'
 import {
   adminChartStrokeWidth,
   adminChartTheme,
-  defineAdminChartData,
-  defineAdminChartOptions,
   defineAdminChartRadialCountScale,
-  type AdminChartData,
-  type AdminChartOptions,
-  withAlpha,
+  defineAdminChartOptions,
 } from '../shared/lib/adminChart'
 import {
   baseChartOptions,
@@ -34,8 +36,8 @@ export function useUsageStatisticsBreakdownCharts(adminStatistics: Ref<AdminStat
       .slice(0, 6),
   )
 
-  const bottleneckSourceChartData = computed<AdminChartData>(() =>
-    defineAdminChartData({
+  const bottleneckSourceChartData = computed<ChartData>(() =>
+    defineChartData({
       labels: bottleneckSourceRows.value.map((item) => item.label),
       datasets: [
         {
@@ -51,7 +53,7 @@ export function useUsageStatisticsBreakdownCharts(adminStatistics: Ref<AdminStat
     }),
   )
 
-  const bottleneckSourceChartOptions = computed<AdminChartOptions>(() =>
+  const bottleneckSourceChartOptions = computed<ChartOptions>(() =>
     defineAdminChartOptions({
       ...baseChartOptions(),
       plugins: {
@@ -81,7 +83,7 @@ export function useUsageStatisticsBreakdownCharts(adminStatistics: Ref<AdminStat
           }),
         },
       },
-    } as AdminChartOptions),
+    } as ChartOptions),
   )
 
   const failureCategoryRows = computed(() => {
@@ -103,8 +105,8 @@ export function useUsageStatisticsBreakdownCharts(adminStatistics: Ref<AdminStat
     }))
   })
 
-  const failureCategoryChartData = computed<AdminChartData>(() =>
-    defineAdminChartData({
+  const failureCategoryChartData = computed<ChartData>(() =>
+    defineChartData({
       labels: failureCategoryRows.value.map((item) => item.label),
       datasets: [
         {
@@ -119,7 +121,7 @@ export function useUsageStatisticsBreakdownCharts(adminStatistics: Ref<AdminStat
     }),
   )
 
-  const failureCategoryChartOptions = computed<AdminChartOptions>(() =>
+  const failureCategoryChartOptions = computed<ChartOptions>(() =>
     defineAdminChartOptions({
       ...baseChartOptions(),
       plugins: {
