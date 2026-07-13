@@ -3,10 +3,7 @@ import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import type { ImageStrengthAction } from '../../execution'
 import HomeCanvasImageActionMenu from './HomeCanvasImageActionMenu.vue'
 import { render, screen, waitFor } from '../../../../test/render'
-import {
-  canvasBillingReadinessKey,
-  type CanvasBillingReadinessStore,
-} from '../../execution'
+import { canvasBillingReadinessKey, type CanvasBillingReadinessStore } from '../../execution'
 
 function renderImageActionMenu(
   input: {

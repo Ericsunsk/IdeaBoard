@@ -267,10 +267,7 @@ import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
-import {
-  useAdminUsersResource,
-  type AdminUserListItem,
-} from '../../users/adminUsersResource'
+import { useAdminUsersResource, type AdminUserListItem } from '../../users/adminUsersResource'
 import { useCreditsBillingFeedback } from '../creditsBillingFeedback'
 import {
   formatAdminDateTime,

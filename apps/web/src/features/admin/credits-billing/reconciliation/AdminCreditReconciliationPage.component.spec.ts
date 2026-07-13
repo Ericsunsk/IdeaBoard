@@ -37,19 +37,13 @@ describe('AdminCreditReconciliationPage', () => {
       }),
       http.get('/api/admin/credits/reconciliation/runs/7', () => {
         if (runDetailShouldFail) {
-          return HttpResponse.json(
-            { code: 503, msg: 'run detail unavailable' },
-            { status: 503 },
-          )
+          return HttpResponse.json({ code: 503, msg: 'run detail unavailable' }, { status: 503 })
         }
         return HttpResponse.json({ code: 0, msg: 'ok', data: makeRun() })
       }),
       http.get('/api/admin/credits/reconciliation/runs/7/findings', ({ request }) => {
         if (findingsShouldFail) {
-          return HttpResponse.json(
-            { code: 503, msg: 'findings unavailable' },
-            { status: 503 },
-          )
+          return HttpResponse.json({ code: 503, msg: 'findings unavailable' }, { status: 503 })
         }
         const status = new URL(request.url).searchParams.get('status')
         findingStatusQueries.push(status)
@@ -105,9 +99,7 @@ describe('AdminCreditReconciliationPage', () => {
       onConfirm: () => Promise<void>
     }
     await confirmation.onConfirm()
-    expect(startRequests).toEqual([
-      { stale_hold_after_seconds: 86_400, reason: '运营抽查' },
-    ])
+    expect(startRequests).toEqual([{ stale_hold_after_seconds: 86_400, reason: '运营抽查' }])
   })
 
   it('sends the selected finding status and renders the matching Task and Transaction details', async () => {

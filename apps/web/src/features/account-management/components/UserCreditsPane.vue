@@ -151,10 +151,7 @@
 import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import type {
-  UserCreditLedgerCommandType,
-  UserCreditPosting,
-} from '../userCreditsResource'
+import type { UserCreditLedgerCommandType, UserCreditPosting } from '../userCreditsResource'
 import { useUserCredits } from '../useUserCredits'
 
 const props = defineProps<{ active: boolean }>()

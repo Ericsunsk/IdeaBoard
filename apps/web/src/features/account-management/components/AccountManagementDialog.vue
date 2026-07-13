@@ -26,10 +26,13 @@ import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
-withDefaults(defineProps<{
-  visible: boolean
-  initialTab?: AccountManagementTab
-}>(), { initialTab: 'profile' })
+withDefaults(
+  defineProps<{
+    visible: boolean
+    initialTab?: AccountManagementTab
+  }>(),
+  { initialTab: 'profile' },
+)
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean]

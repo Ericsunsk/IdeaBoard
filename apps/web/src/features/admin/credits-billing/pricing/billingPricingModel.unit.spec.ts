@@ -85,10 +85,12 @@ describe('billing pricing model', () => {
     expect(
       validateBillingPriceForm({ unitCredits: 0, enabled: true, reason: '发布免费价格' }),
     ).toEqual({})
-    expect(validateBillingPriceForm({ unitCredits: 1.5, enabled: true, reason: '' })).toMatchObject({
-      reason: expect.any(String),
-      unitCredits: expect.any(String),
-    })
+    expect(validateBillingPriceForm({ unitCredits: 1.5, enabled: true, reason: '' })).toMatchObject(
+      {
+        reason: expect.any(String),
+        unitCredits: expect.any(String),
+      },
+    )
   })
 })
 

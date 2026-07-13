@@ -28,10 +28,7 @@
           >
             <ImageActionMenuIcon :icon="item.icon" />
           </NodeToolIconButton>
-          <CanvasCreditQuoteBadge
-            class="image-action-price"
-            :state="getItemBillingState(item)"
-          />
+          <CanvasCreditQuoteBadge class="image-action-price" :state="getItemBillingState(item)" />
           <input
             v-if="item.strengthAction"
             :ref="(el) => setItemStrengthRangeRef(item, el)"
@@ -74,10 +71,7 @@ import type { ImageActionStrengthControl } from '../../image-tools'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
 import CanvasCreditQuoteBadge from '../nodes/CanvasCreditQuoteBadge.vue'
-import {
-  isCanvasBillingSubmitBlocked,
-  useCanvasBillingReadinessStore,
-} from '../../execution'
+import { isCanvasBillingSubmitBlocked, useCanvasBillingReadinessStore } from '../../execution'
 
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>

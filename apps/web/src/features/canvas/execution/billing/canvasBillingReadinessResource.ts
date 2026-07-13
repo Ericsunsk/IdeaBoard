@@ -1,5 +1,9 @@
 import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
-import { taskApi, type SubmitTaskData, type SubmitTaskReadinessData } from '../../../../shared/api/task'
+import {
+  taskApi,
+  type SubmitTaskData,
+  type SubmitTaskReadinessData,
+} from '../../../../shared/api/task'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import {
   buildFusionTaskRequest,
@@ -7,7 +11,10 @@ import {
   buildPromptImageReadinessRequest,
   buildTextPromptTaskRequest,
 } from '../commands/flowImageTaskRequests'
-import { createCanvasTaskClientActionId, withTaskClientActionId } from '../task-runner/taskClientActionIds'
+import {
+  createCanvasTaskClientActionId,
+  withTaskClientActionId,
+} from '../task-runner/taskClientActionIds'
 
 function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
   switch (feature) {
@@ -46,7 +53,10 @@ export function buildFusionBillingReadinessRequest(input: {
   imageUrls: string[]
   aspectRatio: Parameters<typeof buildFusionTaskRequest>[0]['aspectRatio']
 }): SubmitTaskData | null {
-  const imageUrls = input.imageUrls.map((url) => url.trim()).filter(Boolean).slice(0, 4)
+  const imageUrls = input.imageUrls
+    .map((url) => url.trim())
+    .filter(Boolean)
+    .slice(0, 4)
   if (imageUrls.length < 2) return null
   return buildFusionTaskRequest({
     prompt: '[style-fusion] submit readiness',

@@ -30,12 +30,14 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('../pages/login/AdminLoginPage.vue'),
         meta: { guest: true },
       },
-      ...adminNavigationRouteDefs.filter((item) => item.key !== 'credits').map((item) => ({
-        path: item.childPath,
-        name: item.routeName,
-        component: adminPageComponents[item.key],
-        meta: { requiresAuth: true, title: item.title },
-      })),
+      ...adminNavigationRouteDefs
+        .filter((item) => item.key !== 'credits')
+        .map((item) => ({
+          path: item.childPath,
+          name: item.routeName,
+          component: adminPageComponents[item.key],
+          meta: { requiresAuth: true, title: item.title },
+        })),
       {
         path: 'credits',
         component: adminPageComponents.credits,
@@ -45,14 +47,12 @@ export const adminRoutes: RouteRecordRaw[] = [
           {
             path: 'wallets',
             name: 'AdminCreditWallets',
-            component: () =>
-              import('../credits-billing/wallets/AdminCreditWalletsPage.vue'),
+            component: () => import('../credits-billing/wallets/AdminCreditWalletsPage.vue'),
           },
           {
             path: 'pricing',
             name: 'AdminCreditPricing',
-            component: () =>
-              import('../credits-billing/pricing/AdminBillingPricingPage.vue'),
+            component: () => import('../credits-billing/pricing/AdminBillingPricingPage.vue'),
           },
           {
             path: 'reconciliation',

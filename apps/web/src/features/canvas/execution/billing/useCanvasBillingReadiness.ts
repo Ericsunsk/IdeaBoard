@@ -64,11 +64,13 @@ function isWorkflowFeature(value: string | undefined): value is WorkflowFeature 
   return WORKFLOW_FEATURE_SLUGS.includes(value as WorkflowFeature)
 }
 
-export function createCanvasBillingReadinessStore(options: {
-  fetchReadiness?: CanvasBillingReadinessFetcher
-  now?: () => number
-  cacheMs?: number
-} = {}): CanvasBillingReadinessStore {
+export function createCanvasBillingReadinessStore(
+  options: {
+    fetchReadiness?: CanvasBillingReadinessFetcher
+    now?: () => number
+    cacheMs?: number
+  } = {},
+): CanvasBillingReadinessStore {
   const fetchReadiness = options.fetchReadiness ?? fetchCanvasBillingReadiness
   const now = options.now ?? Date.now
   const cacheMs = options.cacheMs ?? 60_000

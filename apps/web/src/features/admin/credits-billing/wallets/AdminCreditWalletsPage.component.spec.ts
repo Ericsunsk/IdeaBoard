@@ -23,7 +23,10 @@ vi.mock('../../../../shared/composables/useAppToast', () => ({
 describe('AdminCreditWalletsPage', () => {
   let walletRequestCount: number
   let ledgerRequestCount: number
-  let commandRequests: Array<{ kind: 'grant' | 'deduction' | 'refund'; body: Record<string, unknown> }>
+  let commandRequests: Array<{
+    kind: 'grant' | 'deduction' | 'refund'
+    body: Record<string, unknown>
+  }>
 
   beforeEach(() => {
     confirmRequestMock.mockReset()
@@ -150,10 +153,7 @@ describe('AdminCreditWalletsPage', () => {
     expect(toastMocks.error).not.toHaveBeenCalled()
   })
 
-  function makeCommandHandler(
-    kind: 'grant' | 'deduction' | 'refund',
-    path: string,
-  ) {
+  function makeCommandHandler(kind: 'grant' | 'deduction' | 'refund', path: string) {
     return http.post(path, async ({ request }) => {
       commandRequests.push({
         kind,
@@ -194,9 +194,7 @@ async function submitCommand(
   await user.click(screen.getByRole('button', { name: input.openButton }))
   await user.type(screen.getByRole('spinbutton', { name: '点子数量' }), input.amount)
   await user.type(screen.getByRole('textbox', { name: /^操作原因/ }), input.reason)
-  await user.click(
-    screen.getByRole('button', { name: input.submitButton ?? '下一步：确认' }),
-  )
+  await user.click(screen.getByRole('button', { name: input.submitButton ?? '下一步：确认' }))
 
   expect(confirmRequestMock).toHaveBeenLastCalledWith(
     expect.objectContaining({

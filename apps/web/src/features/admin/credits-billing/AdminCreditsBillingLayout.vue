@@ -33,5 +33,4 @@ const navigationItems = [
   { path: ADMIN_CREDIT_PRICING_PATH, label: 'SKU 与价格', icon: Page },
   { path: ADMIN_CREDIT_RECONCILIATION_PATH, label: '对账报告', icon: ShieldCheck },
 ] as const
-
 </script>

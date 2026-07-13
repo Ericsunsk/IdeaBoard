@@ -15,10 +15,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  useCanvasBillingReadinessStore,
-  type CanvasBillingQuoteState,
-} from '../../execution'
+import { useCanvasBillingReadinessStore, type CanvasBillingQuoteState } from '../../execution'
 
 const props = defineProps<{
   state: CanvasBillingQuoteState | null

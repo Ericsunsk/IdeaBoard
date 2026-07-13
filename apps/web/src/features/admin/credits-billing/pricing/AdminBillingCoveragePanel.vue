@@ -16,12 +16,7 @@
           </h2>
           <Tag :value="`${items.length} 个组合`" severity="info" rounded />
           <Tag v-if="gapCount > 0" :value="`${gapCount} 个缺口`" severity="warn" rounded />
-          <Tag
-            v-else-if="items.length > 0"
-            value="全部可计价"
-            severity="success"
-            rounded
-          />
+          <Tag v-else-if="items.length > 0" value="全部可计价" severity="success" rounded />
         </div>
         <p class="m-0 mt-0.5 text-admin-caption text-admin-text-3">
           服务端解析可执行的 feature × model，并核对 canonical SKU 与 current price。
