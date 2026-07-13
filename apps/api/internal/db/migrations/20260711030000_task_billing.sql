@@ -30,9 +30,6 @@ CREATE TABLE task_billing_snapshots (
   )
 );
 
-CREATE INDEX idx_task_billing_snapshots_user_created
-ON task_billing_snapshots (user_id, created_at);
-
 CREATE TABLE task_billing_settlements (
   task_id VARCHAR(64) PRIMARY KEY REFERENCES task_billing_snapshots(task_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
   state VARCHAR(16) NOT NULL CHECK (state IN ('held', 'free', 'captured', 'released')),

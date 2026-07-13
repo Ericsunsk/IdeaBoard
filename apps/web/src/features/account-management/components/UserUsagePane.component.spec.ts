@@ -68,7 +68,7 @@ describe('UserUsagePane', () => {
     usageState.usage.value = {
       timezone: 'Asia/Shanghai',
       lifetime: {
-        total_credits: 1234,
+        total_credits: Number.MAX_SAFE_INTEGER,
         peak_daily_credits: 500,
         average_daily_credits: 12.5,
         task_count: 9,
@@ -87,6 +87,9 @@ describe('UserUsagePane', () => {
     expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
     const value = cells[0]?.querySelector('p')
     expect(value).toHaveClass('text-[34px]', 'max-[900px]:text-[30px]', 'max-[640px]:text-[28px]')
+    expect(value).toHaveClass('break-all', 'whitespace-normal', 'leading-tight')
+    expect(value).not.toHaveClass('overflow-hidden', 'text-ellipsis', 'whitespace-nowrap')
+    expect(value).toHaveTextContent('9,007,199,254,740,991')
     expect(value?.className).not.toContain('clamp')
     expect(value?.className).not.toContain('vw')
   })

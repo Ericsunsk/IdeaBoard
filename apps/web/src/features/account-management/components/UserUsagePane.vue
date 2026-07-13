@@ -44,7 +44,7 @@
           :class="[summaryCellClass, metric.cellClass]"
         >
           <p
-            class="m-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[34px] leading-none font-bold text-ib-text max-[900px]:text-[30px] max-[640px]:text-[28px]"
+            class="m-0 break-all whitespace-normal font-mono text-[34px] leading-tight font-bold text-ib-text max-[900px]:text-[30px] max-[640px]:text-[28px]"
           >
             {{ metric.value }}
           </p>

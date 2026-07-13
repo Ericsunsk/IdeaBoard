@@ -519,6 +519,51 @@ func TestSchemaDoesNotCreateUpdatedAtTriggerForAppendOnlyPromptRevisions(t *test
 	}
 }
 
+func TestUsageIndexesHaveSingleMigrationOwner(t *testing.T) {
+	tests := []struct {
+		indexName string
+		owner     string
+	}{
+		{
+			indexName: "idx_credit_transactions_capture_user_created",
+			owner:     "20260713040000_credit_capture_usage_index.sql",
+		},
+		{
+			indexName: "idx_task_billing_snapshots_user_created",
+			owner:     "20260713050000_task_billing_usage_index.sql",
+		},
+	}
+	files, err := fs.Glob(migrationFS, "*.sql")
+	if err != nil {
+		t.Fatalf("list migrations: %v", err)
+	}
+	schema, err := os.ReadFile("../schema/schema.sql")
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.indexName, func(t *testing.T) {
+			var owners []string
+			for _, file := range files {
+				raw, err := migrationFS.ReadFile(file)
+				if err != nil {
+					t.Fatalf("read migration %s: %v", file, err)
+				}
+				if strings.Contains(string(raw), tt.indexName) {
+					owners = append(owners, file)
+				}
+			}
+			if len(owners) != 1 || owners[0] != tt.owner {
+				t.Fatalf("index %s owners=%v, want [%s]", tt.indexName, owners, tt.owner)
+			}
+			if strings.Contains(string(schema), tt.indexName) {
+				t.Fatalf("schema.sql must not duplicate migration-owned index %s", tt.indexName)
+			}
+		})
+	}
+}
+
 func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -561,6 +606,8 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertIndexValid(t, ctx, conn, "idx_task_attempts_terminal_completed_at")
 	assertIndexValid(t, ctx, conn, "idx_task_stat_events_model_latency")
 	assertIndexValid(t, ctx, conn, "idx_task_stat_events_feature_api_date")
+	assertIndexValid(t, ctx, conn, "idx_credit_transactions_capture_user_created")
+	assertIndexValid(t, ctx, conn, "idx_task_billing_snapshots_user_created")
 	assertStorageProfileSeed(t, ctx, conn)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_provider_endpoint_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
@@ -574,6 +621,61 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertConstraintExists(t, ctx, conn, "boards", "fk_boards_created_by")
 	assertConstraintExists(t, ctx, conn, "board_members", "fk_board_members_board")
 	assertConstraintExists(t, ctx, conn, "board_share_tokens", "fk_board_share_tokens_board")
+}
+
+func TestUsageIndexMigrationsRollBackAndReapplyIndependently(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	tests := []struct {
+		name                  string
+		file                  string
+		version               int64
+		indexName             string
+		dependencyVersion     int64
+		dependencyTable       string
+		independentUsageIndex string
+	}{
+		{
+			name:                  "credit capture",
+			file:                  "20260713040000_credit_capture_usage_index.sql",
+			version:               20260713040000,
+			indexName:             "idx_credit_transactions_capture_user_created",
+			dependencyVersion:     baselineMigrationVersion,
+			dependencyTable:       "credit_transactions",
+			independentUsageIndex: "idx_task_billing_snapshots_user_created",
+		},
+		{
+			name:                  "task billing",
+			file:                  "20260713050000_task_billing_usage_index.sql",
+			version:               20260713050000,
+			indexName:             "idx_task_billing_snapshots_user_created",
+			dependencyVersion:     20260711030000,
+			dependencyTable:       "task_billing_snapshots",
+			independentUsageIndex: "idx_credit_transactions_capture_user_created",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertIndexValid(t, ctx, conn, tt.indexName)
+			rollbackNoTxMigrationForTest(t, ctx, conn, tt.file, tt.version)
+			assertIndexExists(t, ctx, conn, tt.indexName, false)
+			assertTableExists(t, ctx, conn, tt.dependencyTable, true)
+			assertMigrationApplied(t, ctx, conn, tt.dependencyVersion, true)
+			assertIndexValid(t, ctx, conn, tt.independentUsageIndex)
+
+			if err := upWithConn(ctx, conn); err != nil {
+				t.Fatalf("reapply migration %s: %v", tt.file, err)
+			}
+			assertIndexValid(t, ctx, conn, tt.indexName)
+			assertMigrationApplied(t, ctx, conn, tt.version, true)
+		})
+	}
 }
 
 func TestRuntimeOperationalSettingsMigrationRollsBackAndReapplies(t *testing.T) {
@@ -971,6 +1073,65 @@ WHERE n.nspname = current_schema()
 	}
 	if !valid {
 		t.Fatalf("index %s is not valid", indexName)
+	}
+}
+
+func assertIndexExists(t *testing.T, ctx context.Context, conn *sql.Conn, indexName string, want bool) {
+	t.Helper()
+	var exists bool
+	if err := conn.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = current_schema()
+    AND c.relkind = 'i'
+    AND c.relname = $1
+)`, indexName).Scan(&exists); err != nil {
+		t.Fatalf("read index existence %s failed: %v", indexName, err)
+	}
+	if exists != want {
+		t.Fatalf("index %s exists=%v, want %v", indexName, exists, want)
+	}
+}
+
+func assertMigrationApplied(t *testing.T, ctx context.Context, conn *sql.Conn, version int64, want bool) {
+	t.Helper()
+	applied, err := migrationApplied(ctx, conn, version)
+	if err != nil {
+		t.Fatalf("read migration %d state: %v", version, err)
+	}
+	if applied != want {
+		t.Fatalf("migration %d applied=%v, want %v", version, applied, want)
+	}
+}
+
+func rollbackNoTxMigrationForTest(
+	t *testing.T,
+	ctx context.Context,
+	conn *sql.Conn,
+	file string,
+	version int64,
+) {
+	t.Helper()
+	raw, err := migrationFS.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read migration %s: %v", file, err)
+	}
+	statements := parseSQLStatements(extractDownSQLForTest(string(raw)))
+	if len(statements) == 0 {
+		t.Fatalf("migration %s has no down statements", file)
+	}
+	for _, statement := range statements {
+		if !statement.NoTx {
+			t.Fatalf("migration %s down statement must be no-tx: %s", file, firstSQLLine(statement.SQL))
+		}
+		if err := applyNoTxStatement(ctx, conn, file, statement); err != nil {
+			t.Fatalf("apply migration %s down statement: %v", file, err)
+		}
+	}
+	if _, err := conn.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
+		t.Fatalf("remove migration %s marker: %v", file, err)
 	}
 }
 
