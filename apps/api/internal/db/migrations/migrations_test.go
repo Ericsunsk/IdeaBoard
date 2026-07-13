@@ -566,6 +566,7 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
 	assertTriggerExists(t, ctx, conn, "billing_admin_actions", "billing_admin_actions_append_only")
 	assertTriggerExists(t, ctx, conn, "system_settings_admin_actions", "system_settings_admin_actions_append_only")
+	assertFunctionSearchPath(t, ctx, conn, "apply_credit_posting_balances()")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
 	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_provider_endpoint")
 	assertConstraintExists(t, ctx, conn, "media_assets", "fk_media_assets_storage_profile_id")
@@ -934,6 +935,22 @@ func assertRegprocedureExists(t *testing.T, ctx context.Context, conn *sql.Conn,
 	}
 	if exists != want {
 		t.Fatalf("function %s exists=%v, want %v", signature, exists, want)
+	}
+}
+
+func assertFunctionSearchPath(t *testing.T, ctx context.Context, conn *sql.Conn, signature string) {
+	t.Helper()
+	var schemaName string
+	var configuredSearchPath string
+	if err := conn.QueryRowContext(ctx, `
+SELECT current_schema(), COALESCE(array_to_string(proconfig, ','), '')
+FROM pg_proc
+WHERE oid = $1::regprocedure`, signature).Scan(&schemaName, &configuredSearchPath); err != nil {
+		t.Fatalf("read function %s search_path failed: %v", signature, err)
+	}
+	want := "search_path=" + schemaName + ", pg_catalog, pg_temp"
+	if configuredSearchPath != want {
+		t.Fatalf("function %s search_path=%q, want %q", signature, configuredSearchPath, want)
 	}
 }
 
