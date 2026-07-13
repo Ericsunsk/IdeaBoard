@@ -5,7 +5,6 @@
     "types": ["vite/client", "vitest/globals", "node"]
   },
   "include": [
-    "src/app/humanFacingCopy.contract.spec.ts",
     "src/app/style.contract.spec.ts",
     "src/features/canvas/components/CanvasGroupFramesOverlay.component.spec.ts"
   ],
