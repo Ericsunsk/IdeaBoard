@@ -27,7 +27,7 @@ export type PendingImageWorkflowBatchParams = {
   sourceNodeId: string
   boardId: string
   outputCount: number
-  clientActionKey?: string
+  activationId: string
   resultOptions?: PendingImageResultOptions
   preflight?: () => Promise<void>
   assertReady?: () => Promise<void>
@@ -130,10 +130,13 @@ export function createPendingImageWorkflowRunner(
         source: prepared?.source ?? params.source,
         sourceNodeId: prepared?.sourceNodeId ?? params.sourceNodeId,
         outputCount: params.outputCount,
-        clientActionKey: params.clientActionKey,
+        clientActionKey: params.activationId,
         resultOptions: prepared?.resultOptions ?? params.resultOptions,
         submitTask: (resultNodeId) =>
-          params.submitTask(resultNodeId, clientActionIds.getForResultNode(resultNodeId)),
+          params.submitTask(
+            resultNodeId,
+            clientActionIds.getForResultNode(params.activationId, resultNodeId),
+          ),
         resolveResult: params.resolveResult,
         persistPendingTaskIds: params.persistPendingTaskIds,
         isCurrent: () => options.isBoardCurrent(params.boardId),

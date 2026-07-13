@@ -7,7 +7,7 @@ import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFl
 import type { CanvasGraphNodeId, CanvasGraphStore } from '../../graph-runtime'
 import { syncImageInputEdgeAnimation } from '../flowEdgeAnimation'
 import { loadImageSizeFromUrl } from '../media/imageSize'
-import type { TextPromptExecutionPlan } from '../planning/ImageExecutionPlan'
+import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
 import { resolveFirstTaskImageResultDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
 import {
   collectPendingImageTasks,
@@ -25,7 +25,6 @@ import { buildImageExecutionTaskRequest } from '../commands/flowImageTaskRequest
 import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
 import { readCurrentBoardId } from '../../utils/currentBoardId'
 import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
-import { createWorkflowClientActionKey } from '../runtime/workflowClientActionKeys'
 import type { ImageSizeLoader } from '../result-nodes/flowImageDirectActionTaskResult'
 import {
   createCanvasTaskSubmissionCallbacks,
@@ -38,7 +37,7 @@ export type CanvasExecutionWorkspaceState = {
 }
 
 export type CanvasExecutionWorkspaceCommands = {
-  runTextPromptGeneration: (plan: TextPromptExecutionPlan) => Promise<void>
+  runTextPromptGeneration: (plan: ActivatedImageExecutionPlan & { kind: 'text-prompt' }) => Promise<void>
   reattachPendingImageResults: () => Promise<void>
 }
 
@@ -158,7 +157,9 @@ export function useCanvasExecutionWorkspace(
     onError: options.onError,
   })
 
-  async function runTextPromptGeneration(plan: TextPromptExecutionPlan): Promise<void> {
+  async function runTextPromptGeneration(
+    plan: ActivatedImageExecutionPlan & { kind: 'text-prompt' },
+  ): Promise<void> {
     const boardId = readBoardId()
     let taskRequest: SubmitTaskData | null = null
     const buildTaskRequest = () => {
@@ -177,13 +178,7 @@ export function useCanvasExecutionWorkspace(
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      clientActionKey: createWorkflowClientActionKey(plan.kind, {
-        sourceNodeId: plan.sourceNodeId,
-        prompt: plan.prompt,
-        outputCount: plan.outputCount,
-        aspectRatio: plan.aspectRatio,
-        resultOptions: plan.resultOptions,
-      }),
+      activationId: plan.activationId,
       preflight: async () => {
         buildTaskRequest()
       },

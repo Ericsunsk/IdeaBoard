@@ -163,6 +163,7 @@ function createExecutionHarness(
 
 function imageActionPlan() {
   return {
+    activationId: 'canvas:test-activation',
     kind: 'image-action' as const,
     sourceNodeId: 'image-1',
     source: {
@@ -183,6 +184,7 @@ function imageActionPlan() {
 
 function imageInpaintPlan() {
   return {
+    activationId: 'canvas:test-activation',
     kind: 'image-inpaint' as const,
     sourceNodeId: 'image-1',
     source: {
@@ -350,6 +352,35 @@ describe('flowImageWorkflowExecution', () => {
       outputStatus: 'running',
     })
     expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
+  })
+
+  it('keeps identical activations as distinct pending tasks and idempotency requests', async () => {
+    executorMocks.submitTaskRequest
+      .mockResolvedValueOnce({ taskId: 'task-first' })
+      .mockResolvedValueOnce({ taskId: 'task-second' })
+    executorMocks.waitExistingOrLiveTaskImageResults.mockRejectedValue(
+      new TaskResultPendingError('任务进度推送超时，请稍后查看结果'),
+    )
+    const { execution, nodes } = createExecutionHarness()
+
+    await execution.executeImageWorkflow({ ...imageActionPlan(), activationId: 'canvas:activation-1' })
+    await execution.executeImageWorkflow({ ...imageActionPlan(), activationId: 'canvas:activation-2' })
+
+    const pendingResultNodes = nodes.value.filter(
+      (node) => node.id !== 'image-1' && node.data?.kind === 'image',
+    )
+    expect(pendingResultNodes).toHaveLength(2)
+    expect(pendingResultNodes.map((node) => readImageSnapshot(nodes.value, node.id).pendingTaskId)).toEqual(
+      ['task-first', 'task-second'],
+    )
+    expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(2)
+    const submitCalls = executorMocks.submitTaskRequest.mock.calls as unknown as Array<
+      [{ client_action_id?: string }]
+    >
+    const submittedIds = submitCalls.map(([request]) => request.client_action_id)
+    expect(submittedIds[0]).toMatch(/^canvas:/)
+    expect(submittedIds[1]).toMatch(/^canvas:/)
+    expect(submittedIds[0]).not.toBe(submittedIds[1])
   })
 
   it('keeps the canvas editable without creating result nodes when provider readiness is unavailable', async () => {

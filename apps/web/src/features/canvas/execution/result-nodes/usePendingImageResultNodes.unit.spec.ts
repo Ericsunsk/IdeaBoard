@@ -463,7 +463,7 @@ describe('usePendingImageResultExecution', () => {
     })
   })
 
-  it('reattaches repeated clicks to the existing pending result for the same client action', async () => {
+  it('reuses the same task without a second submit when retrying one activation', async () => {
     const harness = createHarness([makeAnchorNode()])
     const pendingError = new Error('任务进度推送超时，请稍后查看结果')
     let firstReservedNodeIds: string[] = []

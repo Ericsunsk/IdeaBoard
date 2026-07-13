@@ -55,6 +55,7 @@ describe('pendingImageWorkflowRunner', () => {
       sourceNodeId: 'image-1',
       boardId: 'board-a',
       outputCount: 1,
+      activationId: 'canvas:activation-1',
       submitTask: vi.fn(async (_resultNodeId: string, clientActionId?: string) => {
         submittedClientActionIds.push(clientActionId ?? '')
         return { taskId: 'task-1' }
@@ -110,6 +111,7 @@ describe('pendingImageWorkflowRunner', () => {
       source: { url: 'https://example.com/source.png', ratio: 1 },
       sourceNodeId: 'image-1',
       boardId: 'board-a',
+      activationId: 'canvas:activation-2',
       outputCount: 2,
       resultOptions: { targetRatio: 1 },
       preflight: vi.fn(async () => {
@@ -174,6 +176,7 @@ describe('pendingImageWorkflowRunner', () => {
       source: { url: 'https://example.com/source.png', ratio: 1 },
       sourceNodeId: 'image-1',
       boardId: 'board-a',
+      activationId: 'canvas:activation-3',
       outputCount: 1,
       submitTask: vi.fn(async () => ({ taskId: 'task-1' })),
       resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
@@ -209,6 +212,7 @@ describe('pendingImageWorkflowRunner', () => {
       source: { url: 'https://example.com/source.png', ratio: 1 },
       sourceNodeId: 'image-1',
       boardId: 'board-a',
+      activationId: 'canvas:activation-4',
       outputCount: 1,
       submitTask: vi.fn(async () => ({ taskId: 'task-1' })),
       resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
@@ -238,6 +242,7 @@ describe('pendingImageWorkflowRunner', () => {
       source: { url: 'https://example.com/source.png', ratio: 1 },
       sourceNodeId: 'image-1',
       boardId: 'board-a',
+      activationId: 'canvas:activation-5',
       outputCount: 1,
       submitTask: vi.fn(async () => ({ taskId: 'task-1' })),
       resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
@@ -275,6 +280,7 @@ describe('pendingImageWorkflowRunner', () => {
       source: { url: 'https://example.com/source.png', ratio: 1 },
       sourceNodeId: 'image-1',
       boardId: 'board-a',
+      activationId: 'canvas:activation-6',
       outputCount: 2,
       submitTask: vi.fn(async () => ({ taskId: 'task-1' })),
       resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),

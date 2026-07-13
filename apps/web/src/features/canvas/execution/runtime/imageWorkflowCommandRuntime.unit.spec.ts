@@ -62,4 +62,17 @@ describe('imageWorkflowCommandRuntime', () => {
     expect(commands.isNodeDirectActionRunning('image-1')).toBe(false)
     expect(workflow.isNodeDirectActionRunning).toHaveBeenCalledWith('image-1')
   })
+
+  it('assigns a distinct activation identity to each deliberate prompt generation', async () => {
+    const { commands, workflow } = createCommandHarness()
+
+    await commands.runTextPromptGeneration('prompt-1', 'draft', 1, 'auto')
+    await commands.runTextPromptGeneration('prompt-1', 'draft', 1, 'auto')
+
+    const [firstPlan, secondPlan] = (workflow.executeImageWorkflow as ReturnType<typeof vi.fn>).mock
+      .calls.map(([plan]) => plan as ImageExecutionPlan)
+    expect(firstPlan).toMatchObject({ activationId: expect.stringMatching(/^canvas:/) })
+    expect(secondPlan).toMatchObject({ activationId: expect.stringMatching(/^canvas:/) })
+    expect(firstPlan.activationId).not.toBe(secondPlan.activationId)
+  })
 })

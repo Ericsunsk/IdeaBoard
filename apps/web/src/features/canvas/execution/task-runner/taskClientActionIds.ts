@@ -3,23 +3,27 @@ import type { SubmitTaskData } from '../../../../shared/api/task'
 export type ClientActionIdFactory = () => string
 
 export type PendingTaskClientActionIds = {
-  getForResultNode: (resultNodeId: string) => string
+  getForResultNode: (activationId: string, resultNodeId: string) => string
 }
 
 const CANVAS_CLIENT_ACTION_ID_PREFIX = 'canvas:'
 
-function createFallbackClientActionId(): string {
+function createCanvasId(): string {
+  const randomUUID = globalThis.crypto?.randomUUID
+  if (typeof randomUUID === 'function') {
+    return `${CANVAS_CLIENT_ACTION_ID_PREFIX}${randomUUID.call(globalThis.crypto)}`
+  }
   return `${CANVAS_CLIENT_ACTION_ID_PREFIX}${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 12)}`
 }
 
 export function createCanvasTaskClientActionId(): string {
-  const randomUUID = globalThis.crypto?.randomUUID
-  if (typeof randomUUID === 'function') {
-    return `${CANVAS_CLIENT_ACTION_ID_PREFIX}${randomUUID.call(globalThis.crypto)}`
-  }
-  return createFallbackClientActionId()
+  return createCanvasId()
+}
+
+export function createCanvasActivationId(): string {
+  return createCanvasId()
 }
 
 export function createPendingTaskClientActionIds(
@@ -28,11 +32,12 @@ export function createPendingTaskClientActionIds(
   const idsByResultNodeId = new Map<string, string>()
 
   return {
-    getForResultNode(resultNodeId) {
-      const existing = idsByResultNodeId.get(resultNodeId)
+    getForResultNode(activationId, resultNodeId) {
+      const key = `${activationId}:${resultNodeId}`
+      const existing = idsByResultNodeId.get(key)
       if (existing) return existing
       const next = createId()
-      idsByResultNodeId.set(resultNodeId, next)
+      idsByResultNodeId.set(key, next)
       return next
     },
   }

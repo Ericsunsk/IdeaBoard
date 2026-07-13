@@ -2,11 +2,13 @@ import type { PromptAspectRatio } from '../../../canvas-board/domain'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
 import {
   isImageExecutionPlanError,
+  type ActivatedImageExecutionPlan,
   type ImageExecutionInput,
   type ImageExecutionPlan,
   type ImageResultAnchor,
 } from '../planning/ImageExecutionPlan'
 import type { CanvasExtendRect } from '../../utils/canvasExtendGeometry'
+import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
 
 export type RunImageDirectActionOptions = {
   strength?: number
@@ -67,7 +69,7 @@ export type ImageWorkflowPlanner = {
 }
 
 export type ImageWorkflowExecutionPort = {
-  executeImageWorkflow: (plan: ImageExecutionPlan) => Promise<void>
+  executeImageWorkflow: (plan: ActivatedImageExecutionPlan) => Promise<void>
   isNodeDirectActionRunning: (nodeId: string) => boolean
   reattachPendingImageResults: () => Promise<void> | void
 }
@@ -139,7 +141,12 @@ export function createImageWorkflowCommands(options: {
       return
     }
     try {
-      await options.workflow.executeImageWorkflow(planAction())
+      const plan = planAction()
+      const activatedPlan: ActivatedImageExecutionPlan = {
+        ...plan,
+        activationId: createCanvasActivationId(),
+      }
+      await options.workflow.executeImageWorkflow(activatedPlan)
     } catch (error) {
       if (!warnPlanningError(error, options.onWarning)) throw error
     }

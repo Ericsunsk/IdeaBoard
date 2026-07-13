@@ -23,10 +23,10 @@ import {
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import {
   prepareFusionExecutionPlan,
+  type ActivatedImageExecutionPlan,
   type CanvasExtendExecutionPlan,
   type FusionExecutionPlan,
   type ImageActionExecutionPlan,
-  type ImageExecutionPlan,
   type ImageInpaintExecutionPlan,
   type ImagePromptExecutionPlan,
   type TextPromptExecutionPlan,
@@ -43,9 +43,8 @@ import {
   useCanvasExecutionWorkspace,
 } from '../workspace/useCanvasExecutionWorkspace'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
-import { createWorkflowClientActionKey, hashWorkflowActionKey } from './workflowClientActionKeys'
 
-export type FlowImageWorkflowExecutionPlan = ImageExecutionPlan
+export type FlowImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 
 export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
@@ -160,7 +159,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     return readCurrentBoardId(options.getCurrentBoardId)
   }
 
-  async function executeImageAction(plan: ImageActionExecutionPlan): Promise<void> {
+  async function executeImageAction(
+    plan: ImageActionExecutionPlan & { activationId: string },
+  ): Promise<void> {
     const boardId = readBoardId()
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => buildImageActionReadinessRequest(plan.action),
@@ -174,13 +175,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       resultOptions: plan.resultOptions,
       boardId,
       outputCount: 1,
-      clientActionKey: createWorkflowClientActionKey(plan.kind, {
-        sourceNodeId: plan.sourceNodeId,
-        sourceUrl: plan.source.url,
-        action: plan.action,
-        strength: plan.strength,
-        resultOptions: plan.resultOptions,
-      }),
+      activationId: plan.activationId,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
@@ -189,7 +184,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     })
   }
 
-  async function executeCanvasExtend(plan: CanvasExtendExecutionPlan): Promise<void> {
+  async function executeCanvasExtend(
+    plan: CanvasExtendExecutionPlan & { activationId: string },
+  ): Promise<void> {
     const boardId = readBoardId()
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: buildCanvasExtendReadinessRequest,
@@ -203,16 +200,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      clientActionKey: createWorkflowClientActionKey(plan.kind, {
-        sourceNodeId: plan.sourceNodeId,
-        sourceUrl: plan.source.url,
-        prompt: plan.prompt,
-        outputCount: plan.outputCount,
-        extendPercent: plan.extendPercent,
-        targetRatio: plan.targetRatio,
-        targetWidth: plan.targetWidth,
-        resultOptions: plan.resultOptions,
-      }),
+      activationId: plan.activationId,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.targetRatio),
@@ -220,7 +208,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     })
   }
 
-  async function executeImageInpaint(plan: ImageInpaintExecutionPlan): Promise<void> {
+  async function executeImageInpaint(
+    plan: ImageInpaintExecutionPlan & { activationId: string },
+  ): Promise<void> {
     let localInpaint: PreparedFlowLocalInpaintMedia | null = null
     let request: SubmitTaskData | null = null
     const boardId = readBoardId()
@@ -239,15 +229,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      clientActionKey: createWorkflowClientActionKey(plan.kind, {
-        sourceNodeId: plan.sourceNodeId,
-        sourceUrl: plan.source.url,
-        prompt: plan.prompt,
-        mask: hashWorkflowActionKey(plan.rawMaskDataUrl),
-        outputCount: plan.outputCount,
-        referenceImageUrls: plan.referenceImageUrls,
-        resultOptions: plan.resultOptions,
-      }),
+      activationId: plan.activationId,
       preflight: readinessSubmission.assertReady,
       prepare: async () => {
         localInpaint = await prepareFlowLocalInpaintMedia({
@@ -297,7 +279,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     })
   }
 
-  async function executeImagePrompt(plan: ImagePromptExecutionPlan): Promise<void> {
+  async function executeImagePrompt(
+    plan: ImagePromptExecutionPlan & { activationId: string },
+  ): Promise<void> {
     const boardId = readBoardId()
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: buildPromptImageReadinessRequest,
@@ -311,14 +295,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       boardId,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      clientActionKey: createWorkflowClientActionKey(plan.kind, {
-        sourceNodeId: plan.sourceNodeId,
-        sourceUrl: plan.source.url,
-        prompt: plan.prompt,
-        outputCount: plan.outputCount,
-        aspectRatio: plan.aspectRatio,
-        resultOptions: plan.resultOptions,
-      }),
+      activationId: plan.activationId,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
@@ -326,11 +303,13 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     })
   }
 
-  async function executeTextPrompt(plan: TextPromptExecutionPlan): Promise<void> {
+  async function executeTextPrompt(
+    plan: TextPromptExecutionPlan & { activationId: string },
+  ): Promise<void> {
     await executionWorkspace.commands.runTextPromptGeneration(plan)
   }
 
-  async function executeFusion(plan: FusionExecutionPlan): Promise<void> {
+  async function executeFusion(plan: FusionExecutionPlan & { activationId: string }): Promise<void> {
     const boardId = readBoardId()
     let targetRatio = plan.source.ratio
     let request: SubmitTaskData | null = null
@@ -345,16 +324,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       boardId,
       outputCount: plan.outputCount,
-      clientActionKey: createWorkflowClientActionKey(plan.kind, {
-        sourceNodeId: plan.sourceNodeId,
-        taskPrompt: plan.taskPrompt,
-        outputCount: plan.outputCount,
-        aspectRatio: plan.aspectRatio,
-        imageUrls: plan.imageUrls,
-        blendPoint: plan.blendPoint,
-        stageWidth: plan.stageWidth,
-        resultOptions: plan.resultOptions,
-      }),
+      activationId: plan.activationId,
       prepare: async () => {
         const imageSizes = await Promise.all(
           plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)),

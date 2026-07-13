@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
-import type { TextPromptExecutionPlan } from '../planning/ImageExecutionPlan'
+import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
 import type { ResultMaterializerResult } from '../result-nodes/resultMaterializer'
 import type {
   PendingImageResultExecution,
@@ -43,9 +43,10 @@ function makeMaterializerResult(
 }
 
 function makeTextPromptPlan(
-  overrides: Partial<TextPromptExecutionPlan> = {},
-): TextPromptExecutionPlan {
+  overrides: Partial<ActivatedImageExecutionPlan & { kind: 'text-prompt' }> = {},
+): ActivatedImageExecutionPlan & { kind: 'text-prompt' } {
   return {
+    activationId: 'canvas:test-activation',
     kind: 'text-prompt',
     sourceNodeId: 'prompt-1',
     source: {

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SubmitTaskData } from '../../../../shared/api/task'
-import { createPendingTaskClientActionIds, withTaskClientActionId } from './taskClientActionIds'
+import {
+  createCanvasActivationId,
+  createPendingTaskClientActionIds,
+  withTaskClientActionId,
+} from './taskClientActionIds'
 
 describe('taskClientActionIds', () => {
   it('adds a normalized client action id to a submit request', () => {
@@ -16,18 +20,24 @@ describe('taskClientActionIds', () => {
     expect(withTaskClientActionId(request, '')).toBe(request)
   })
 
-  it('reuses ids within one pending action scope and rotates them for a new scope', () => {
+  it('reuses an id for transport retries within one activation and rotates it for another', () => {
     const createId = vi
       .fn()
       .mockReturnValueOnce('canvas:action-1')
       .mockReturnValueOnce('canvas:action-2')
       .mockReturnValueOnce('canvas:action-3')
+      .mockReturnValueOnce('canvas:action-4')
     const firstScope = createPendingTaskClientActionIds(createId)
     const nextScope = createPendingTaskClientActionIds(createId)
 
-    expect(firstScope.getForResultNode('image-1')).toBe('canvas:action-1')
-    expect(firstScope.getForResultNode('image-1')).toBe('canvas:action-1')
-    expect(firstScope.getForResultNode('image-2')).toBe('canvas:action-2')
-    expect(nextScope.getForResultNode('image-1')).toBe('canvas:action-3')
+    expect(firstScope.getForResultNode('canvas:activation-1', 'image-1')).toBe('canvas:action-1')
+    expect(firstScope.getForResultNode('canvas:activation-1', 'image-1')).toBe('canvas:action-1')
+    expect(firstScope.getForResultNode('canvas:activation-1', 'image-2')).toBe('canvas:action-2')
+    expect(firstScope.getForResultNode('canvas:activation-2', 'image-1')).toBe('canvas:action-3')
+    expect(nextScope.getForResultNode('canvas:activation-1', 'image-1')).toBe('canvas:action-4')
+  })
+
+  it('creates a Canvas activation identity independently from task idempotency ids', () => {
+    expect(createCanvasActivationId()).toMatch(/^canvas:/)
   })
 })
