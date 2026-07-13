@@ -13,6 +13,7 @@ func TestCaptureUsageAggregationUsesPartialCoveringIndex(t *testing.T) {
 	ctx := context.Background()
 	service := NewService(pool)
 	const userID int64 = 771
+	ensureAdminOperationUser(t, pool, userID)
 	if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 10), Metadata: testMetadata("usage-index-grant", "usage-index-grant")}); err != nil {
 		t.Fatalf("grant: %v", err)
 	}
