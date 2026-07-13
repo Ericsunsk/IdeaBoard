@@ -68,6 +68,12 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/account-management/components/UserUsagePane.component.spec.ts': [
+    {
+      reason:
+        'Verifies the fixed responsive 5-column to 2x2-plus-spanning-row layout and stable loading geometry required by the usage summary contract.',
+    },
+  ],
   'src/features/canvas/components/home/HomeCanvasImageActionMenu.component.spec.ts': [
     {
       reason:

@@ -36,6 +36,7 @@ type appRepositories struct {
 	userRepo             *users.UserRepository
 	accountRepo          *accounts.AccountRepository
 	taskRepo             *taskstore.Repository
+	taskBillingUsage     *taskbilling.UsageStore
 	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
 	systemConfigRepo     *settings.SystemConfigRepository
 	featurePromptRepo    *prompts.FeaturePromptRepository
@@ -155,6 +156,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		userRepo:             users.NewUserRepository(db),
 		accountRepo:          accounts.NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo),
 		taskRepo:             taskRepo,
+		taskBillingUsage:     taskbilling.NewUsageStore(db),
 		providerEndpointRepo: providerendpoints.NewProviderEndpointRepository(db),
 		systemConfigRepo:     settings.NewSystemConfigRepository(db),
 		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),

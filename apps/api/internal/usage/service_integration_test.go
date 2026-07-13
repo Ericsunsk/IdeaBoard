@@ -7,12 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/workflow"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestServiceGetLifetimeAggregatesOnlyCurrentUsersSettledCaptures(t *testing.T) {
+func TestServiceGetLifetimeKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
 	const userID int64 = 901
@@ -32,33 +37,53 @@ func TestServiceGetLifetimeAggregatesOnlyCurrentUsersSettledCaptures(t *testing.
 		t.Fatalf("refund usage capture: %v", err)
 	}
 
-	firstCaptureAt := time.Date(2026, time.July, 10, 15, 50, 0, 0, time.UTC)  // 23:50 Shanghai
-	secondCaptureAt := time.Date(2026, time.July, 10, 16, 10, 0, 0, time.UTC) // 00:10 Shanghai
-	seedUsageTask(t, ctx, db, "usage-task-1", userID, firstCaptureAt)
-	seedUsageTask(t, ctx, db, "usage-task-2", userID, secondCaptureAt)
-	seedUsageTask(t, ctx, db, "usage-task-3", userID, secondCaptureAt.Add(2*time.Hour))
-	seedUsageTask(t, ctx, db, "usage-task-other-user", 902, secondCaptureAt)
+	taskIDs := []string{
+		"usage-free-completed",
+		"usage-free-failed",
+		"usage-free-cancelled",
+		"usage-free-pending",
+	}
+	billingWriter, request := newDurableUsageBilling(t, ctx, pool, creditService)
+	seedDurableUsageSnapshots(t, ctx, db, pool, billingWriter, request, userID, taskIDs)
+	seedDurableUsageSnapshots(t, ctx, db, pool, billingWriter, request, 902, []string{"usage-other-user"})
+	setUsageTaskStatus(t, ctx, db, taskIDs[0], "completed")
+	setUsageTaskStatus(t, ctx, db, taskIDs[1], "failed")
+	setUsageTaskStatus(t, ctx, db, taskIDs[2], "cancelled")
 
 	location, err := time.LoadLocation(ShanghaiTimezone)
 	if err != nil {
 		t.Fatalf("load Shanghai location: %v", err)
 	}
-	service := NewService(creditService, taskstore.NewRepository(db), func() time.Time {
+	service := NewService(creditService, taskbilling.NewUsageStore(db), func() time.Time {
 		return time.Date(2026, time.July, 13, 8, 0, 0, 0, location)
 	})
 
-	result, err := service.GetLifetime(ctx, userID)
+	beforeDelete, err := service.GetLifetime(ctx, userID)
 	if err != nil {
 		t.Fatalf("GetLifetime() error = %v", err)
 	}
-	if result.Lifetime.TotalCredits != 120 || result.Lifetime.PeakDailyCredits != 120 {
-		t.Fatalf("capture summary = %+v, want total=120 peak=120", result.Lifetime)
+	if beforeDelete.Lifetime.TotalCredits != 120 || beforeDelete.Lifetime.PeakDailyCredits != 120 {
+		t.Fatalf("capture summary = %+v, want total=120 peak=120", beforeDelete.Lifetime)
 	}
-	if result.Lifetime.AverageDailyCredits <= 0 {
-		t.Fatalf("daily average = %v, want positive value", result.Lifetime.AverageDailyCredits)
+	if beforeDelete.Lifetime.AverageDailyCredits <= 0 {
+		t.Fatalf("daily average = %v, want positive value", beforeDelete.Lifetime.AverageDailyCredits)
 	}
-	if result.Lifetime.TaskCount != 3 || result.Lifetime.ActiveDays != 2 {
-		t.Fatalf("task summary = %+v, want count=3 active_days=2", result.Lifetime)
+	if beforeDelete.Lifetime.TaskCount != 4 || beforeDelete.Lifetime.ActiveDays != 1 {
+		t.Fatalf("task summary = %+v, want count=4 active_days=1", beforeDelete.Lifetime)
+	}
+
+	repo := taskstore.NewRepository(db)
+	for _, taskID := range taskIDs {
+		if err := repo.DeleteByTaskIDAndUserID(ctx, taskID, userID); err != nil {
+			t.Fatalf("delete task %s: %v", taskID, err)
+		}
+	}
+	afterDelete, err := service.GetLifetime(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetLifetime() after task deletion error = %v", err)
+	}
+	if afterDelete.Lifetime.TaskCount != beforeDelete.Lifetime.TaskCount || afterDelete.Lifetime.ActiveDays != beforeDelete.Lifetime.ActiveDays {
+		t.Fatalf("durable task usage changed after deletion: before=%+v after=%+v", beforeDelete.Lifetime, afterDelete.Lifetime)
 	}
 }
 
@@ -121,11 +146,81 @@ func usageCreditMetadata(key string) credits.CommandMetadata {
 	}
 }
 
-func seedUsageTask(t *testing.T, ctx context.Context, db *sql.DB, taskID string, userID int64, createdAt time.Time) {
+func seedDurableUsageSnapshots(
+	t *testing.T,
+	ctx context.Context,
+	db *sql.DB,
+	pool *pgxpool.Pool,
+	billingWriter *taskbilling.Service,
+	request taskbilling.Request,
+	userID int64,
+	taskIDs []string,
+) {
+	t.Helper()
+	for _, taskID := range taskIDs {
+		seedUsageTask(t, ctx, db, taskID, userID)
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatalf("begin task billing fixture: %v", err)
+		}
+		if _, err := billingWriter.HoldAndPersist(ctx, tx, taskID, userID, request); err != nil {
+			_ = tx.Rollback(ctx)
+			t.Fatalf("persist task billing snapshot %s: %v", taskID, err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatalf("commit task billing snapshot %s: %v", taskID, err)
+		}
+	}
+}
+
+func newDurableUsageBilling(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	creditService *credits.Service,
+) (*taskbilling.Service, taskbilling.Request) {
+	t.Helper()
+	billingService := billing.NewService(pool)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, "usage-free-model")
+	if err != nil {
+		t.Fatalf("build task billing request: %v", err)
+	}
+	sku, err := taskbilling.ResolveSKU(request)
+	if err != nil {
+		t.Fatalf("resolve usage SKU: %v", err)
+	}
+	if _, err := billingService.CreateSKU(ctx, billing.CreateSKUInput{SKU: string(sku), DisplayName: "Usage Free", Enabled: true, ActorID: 1, Reason: "usage fixture"}); err != nil {
+		t.Fatalf("create usage SKU: %v", err)
+	}
+	if _, err := billingService.CreatePrice(ctx, billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, ActorID: 1, Reason: "usage fixture"}); err != nil {
+		t.Fatalf("create usage price: %v", err)
+	}
+	return taskbilling.NewService(billingService, creditService), request
+}
+
+func seedUsageTask(t *testing.T, ctx context.Context, db *sql.DB, taskID string, userID int64) {
 	t.Helper()
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result, created_at, updated_at)
-VALUES ($1, $2, 'usage task', 'usage task', '{}', 'pending', '', '', $3, $3)`, taskID, userID, createdAt); err != nil {
+VALUES ($1, $2, 'usage task', 'usage task', '{}', 'pending', '', '', clock_timestamp(), clock_timestamp())`, taskID, userID); err != nil {
 		t.Fatalf("seed task %s: %v", taskID, err)
+	}
+}
+
+func setUsageTaskStatus(t *testing.T, ctx context.Context, db *sql.DB, taskID, status string) {
+	t.Helper()
+	var query string
+	switch status {
+	case "completed":
+		query = `UPDATE tasks SET status = 'completed', completed_at = clock_timestamp() WHERE task_id = $1`
+	case "failed":
+		query = `UPDATE tasks SET status = 'failed', error_msg = 'fixture failure', completed_at = clock_timestamp() WHERE task_id = $1`
+	case "cancelled":
+		query = `UPDATE tasks SET status = 'cancelled', completed_at = clock_timestamp(), cancelled_at = clock_timestamp(), cancel_reason = 'fixture cancellation' WHERE task_id = $1`
+	default:
+		t.Fatalf("unsupported fixture status %q", status)
+	}
+	if _, err := db.ExecContext(ctx, query, taskID); err != nil {
+		t.Fatalf("set task %s status %s: %v", taskID, status, err)
 	}
 }

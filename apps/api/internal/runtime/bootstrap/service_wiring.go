@@ -62,7 +62,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		billingService:    billingService,
 		billingCoverage:   billingCoverage,
 		creditService:     creditService,
-		usageService:      usage.NewService(creditService, repos.taskRepo, nil),
+		usageService:      usage.NewService(creditService, repos.taskBillingUsage, nil),
 		userLifecycle:     userLifecycle,
 	}, nil
 }

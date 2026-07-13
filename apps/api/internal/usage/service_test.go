@@ -2,11 +2,10 @@ package usage
 
 import (
 	"context"
+	"errors"
+	"math"
 	"testing"
 	"time"
-
-	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/tasking/taskstore"
 )
 
 func TestServiceGetLifetimeUsesShanghaiCaptureDaysAndLogicalTasks(t *testing.T) {
@@ -16,12 +15,12 @@ func TestServiceGetLifetimeUsesShanghaiCaptureDaysAndLogicalTasks(t *testing.T) 
 	}
 	now := time.Date(2026, time.July, 13, 8, 0, 0, 0, location)
 	service := NewService(
-		captureUsageReaderStub{summary: credits.CaptureUsageSummary{
-			TotalCredits:     130,
-			PeakDailyCredits: 100,
-			FirstCaptureDay:  time.Date(2026, time.July, 11, 0, 0, 0, 0, location),
-		}},
-		taskUsageReaderStub{summary: taskstore.UsageSummary{TaskCount: 4, ActiveDays: 2}},
+		captureUsageReaderStub{
+			totalCredits:     130,
+			peakDailyCredits: 100,
+			firstCaptureDay:  time.Date(2026, time.July, 11, 0, 0, 0, 0, location),
+		},
+		&taskUsageReaderStub{taskCount: 4, activeDays: 2},
 		func() time.Time { return now },
 	)
 
@@ -43,10 +42,67 @@ func TestServiceGetLifetimeUsesShanghaiCaptureDaysAndLogicalTasks(t *testing.T) 
 	}
 }
 
+func TestServiceGetLifetimeRejectsUnsafeCaptureBeforeReadingTasks(t *testing.T) {
+	tasks := &taskUsageReaderStub{}
+	service := NewService(
+		captureUsageReaderStub{totalCredits: MaxSafeInteger + 1},
+		tasks,
+		time.Now,
+	)
+
+	_, err := service.GetLifetime(context.Background(), 42)
+	if !errors.Is(err, ErrUnsafeNumber) {
+		t.Fatalf("GetLifetime() error = %v, want ErrUnsafeNumber", err)
+	}
+	if tasks.calls != 0 {
+		t.Fatalf("task reader calls = %d, want 0 before unsafe numerator rejection", tasks.calls)
+	}
+}
+
+func TestValidateLifetimeUsageRejectsEveryUnsafeExportedNumber(t *testing.T) {
+	tests := map[string]LifetimeUsage{
+		"total":   {Lifetime: LifetimeSummary{TotalCredits: MaxSafeInteger + 1}},
+		"peak":    {Lifetime: LifetimeSummary{PeakDailyCredits: MaxSafeInteger + 1}},
+		"tasks":   {Lifetime: LifetimeSummary{TaskCount: MaxSafeInteger + 1}},
+		"days":    {Lifetime: LifetimeSummary{ActiveDays: MaxSafeInteger + 1}},
+		"average": {Lifetime: LifetimeSummary{AverageDailyCredits: math.Inf(1)}},
+	}
+	for name, value := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := ValidateLifetimeUsage(value); !errors.Is(err, ErrUnsafeNumber) {
+				t.Fatalf("ValidateLifetimeUsage() error = %v, want ErrUnsafeNumber", err)
+			}
+		})
+	}
+}
+
+func TestServiceGetLifetimeAcceptsMaximumSafeInteger(t *testing.T) {
+	location, err := time.LoadLocation(ShanghaiTimezone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(
+		captureUsageReaderStub{
+			totalCredits:     MaxSafeInteger,
+			peakDailyCredits: MaxSafeInteger,
+			firstCaptureDay:  time.Date(2026, time.July, 13, 0, 0, 0, 0, location),
+		},
+		&taskUsageReaderStub{taskCount: MaxSafeInteger, activeDays: MaxSafeInteger},
+		func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, location) },
+	)
+	result, err := service.GetLifetime(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("GetLifetime() error = %v", err)
+	}
+	if result.Lifetime.TotalCredits != MaxSafeInteger || result.Lifetime.AverageDailyCredits != float64(MaxSafeInteger) {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
 func TestServiceGetLifetimeReturnsZeroesWithoutCapturesOrTasks(t *testing.T) {
 	service := NewService(
 		captureUsageReaderStub{},
-		taskUsageReaderStub{},
+		&taskUsageReaderStub{},
 		func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, time.UTC) },
 	)
 
@@ -60,19 +116,24 @@ func TestServiceGetLifetimeReturnsZeroesWithoutCapturesOrTasks(t *testing.T) {
 }
 
 type captureUsageReaderStub struct {
-	summary credits.CaptureUsageSummary
-	err     error
+	totalCredits     int64
+	peakDailyCredits int64
+	firstCaptureDay  time.Time
+	err              error
 }
 
-func (s captureUsageReaderStub) GetCaptureUsage(context.Context, int64, string) (credits.CaptureUsageSummary, error) {
-	return s.summary, s.err
+func (s captureUsageReaderStub) GetCaptureUsage(context.Context, int64, *time.Location) (int64, int64, time.Time, error) {
+	return s.totalCredits, s.peakDailyCredits, s.firstCaptureDay, s.err
 }
 
 type taskUsageReaderStub struct {
-	summary taskstore.UsageSummary
-	err     error
+	taskCount  int64
+	activeDays int64
+	err        error
+	calls      int
 }
 
-func (s taskUsageReaderStub) GetUsageSummary(context.Context, int64, string) (taskstore.UsageSummary, error) {
-	return s.summary, s.err
+func (s *taskUsageReaderStub) GetTaskUsage(context.Context, int64, *time.Location) (int64, int64, error) {
+	s.calls++
+	return s.taskCount, s.activeDays, s.err
 }

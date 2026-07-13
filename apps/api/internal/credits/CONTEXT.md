@@ -25,7 +25,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币，用户文案统一显示�
 - `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release 与 Refund；底层只调用 typed `SECURITY DEFINER execute_credit_command_v2`。
 - `Service.InTx(pgx.Tx)` 与 `Service.InSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，现有 Task Store terminal transition 使用 database/sql；caller 都拥有 commit/rollback。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
-- `CaptureUsageReader` 只提供已结算 Capture 的按用户用量聚合，供用户 Usage Read Model 组合；不返回 Refund，也不授予 Ledger 写入能力。
+- `Service.GetCaptureUsage` 是已结算 Capture 的 typed-location 按用户只读聚合实现，供 caller-owned Usage interface 组合；不返回 Refund，也不授予 Ledger 写入能力。
 - `Reconciliation` 通过独立 River queue 运行，Admin 可读取 run history、summary 和 keyset-paginated findings。
 - Admin HTTP 提供单用户 Wallet/Ledger read、Grant、Deduction、linked Refund 与 Correction；不提供 set balance、更新或删除账本历史。Ledger read 显式返回 Hold/Charge reference，避免 Admin 以裸关联 ID 推断结算状态。
 

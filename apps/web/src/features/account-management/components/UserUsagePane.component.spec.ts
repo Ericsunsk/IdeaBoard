@@ -63,6 +63,33 @@ describe('UserUsagePane', () => {
     expect(screen.getByText('累计活跃天数')).toBeVisible()
   })
 
+  it('keeps the responsive 2x2 plus spanning-row contract without viewport font sizing', () => {
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 1234,
+        peak_daily_credits: 500,
+        average_daily_credits: 12.5,
+        task_count: 9,
+        active_days: 4,
+      },
+    }
+    usageState.isPending.value = false
+    usageState.error.value = null
+
+    renderUsagePane()
+
+    const panel = screen.getByRole('region', { name: '用量摘要' })
+    const cells = panel.querySelectorAll('article')
+    expect(cells).toHaveLength(5)
+    expect(cells[0]).toHaveClass('max-[640px]:border-b')
+    expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
+    const value = cells[0]?.querySelector('p')
+    expect(value).toHaveClass('text-[34px]', 'max-[900px]:text-[30px]', 'max-[640px]:text-[28px]')
+    expect(value?.className).not.toContain('clamp')
+    expect(value?.className).not.toContain('vw')
+  })
+
   it('keeps the five zero metrics visible when no records exist', () => {
     usageState.usage.value = undefined
     usageState.isPending.value = false
@@ -81,7 +108,12 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    expect(screen.getByLabelText('正在加载用量统计')).toBeVisible()
+    const skeleton = screen.getByLabelText('正在加载用量统计')
+    expect(skeleton).toBeVisible()
+    const cells = skeleton.querySelectorAll('article')
+    expect(cells).toHaveLength(5)
+    expect(cells[0]).toHaveClass('min-w-0', 'p-5', 'max-[640px]:p-4')
+    expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
     expect(screen.queryByRole('region', { name: '用量摘要' })).not.toBeInTheDocument()
   })
 

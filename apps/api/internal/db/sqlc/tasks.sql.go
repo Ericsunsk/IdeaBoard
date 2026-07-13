@@ -834,30 +834,6 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 	return i, err
 }
 
-const getTaskUsageSummary = `-- name: GetTaskUsageSummary :one
-SELECT COUNT(*)::bigint AS task_count,
-       COUNT(DISTINCT (created_at AT TIME ZONE $1::text)::date)::bigint AS active_days
-FROM tasks
-WHERE user_id = $2
-`
-
-type GetTaskUsageSummaryParams struct {
-	Timezone string `json:"timezone"`
-	UserID   int64  `json:"user_id"`
-}
-
-type GetTaskUsageSummaryRow struct {
-	TaskCount  int64 `json:"task_count"`
-	ActiveDays int64 `json:"active_days"`
-}
-
-func (q *Queries) GetTaskUsageSummary(ctx context.Context, arg GetTaskUsageSummaryParams) (GetTaskUsageSummaryRow, error) {
-	row := q.db.QueryRowContext(ctx, getTaskUsageSummary, arg.Timezone, arg.UserID)
-	var i GetTaskUsageSummaryRow
-	err := row.Scan(&i.TaskCount, &i.ActiveDays)
-	return i, err
-}
-
 const listMonitorExecutionPressureByRange = `-- name: ListMonitorExecutionPressureByRange :many
 WITH pending_tasks AS (
   SELECT

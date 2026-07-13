@@ -4,15 +4,24 @@ package usage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
-
-	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/tasking/taskstore"
 )
 
 const ShanghaiTimezone = "Asia/Shanghai"
+const MaxSafeInteger int64 = 9_007_199_254_740_991
+
+var ErrUnsafeNumber = errors.New("usage value exceeds JavaScript safe integer range")
+
+type CaptureUsageReader interface {
+	GetCaptureUsage(context.Context, int64, *time.Location) (int64, int64, time.Time, error)
+}
+
+type LogicalTaskUsageReader interface {
+	GetTaskUsage(context.Context, int64, *time.Location) (int64, int64, error)
+}
 
 type LifetimeSummary struct {
 	TotalCredits        int64   `json:"total_credits"`
@@ -28,14 +37,14 @@ type LifetimeUsage struct {
 }
 
 type Service struct {
-	captures credits.CaptureUsageReader
-	tasks    taskstore.UsageReader
+	captures CaptureUsageReader
+	tasks    LogicalTaskUsageReader
 	now      func() time.Time
 }
 
 func NewService(
-	captures credits.CaptureUsageReader,
-	tasks taskstore.UsageReader,
+	captures CaptureUsageReader,
+	tasks LogicalTaskUsageReader,
 	now func() time.Time,
 ) *Service {
 	if now == nil {
@@ -51,38 +60,53 @@ func (s *Service) GetLifetime(ctx context.Context, userID int64) (LifetimeUsage,
 	if userID <= 0 {
 		return LifetimeUsage{}, fmt.Errorf("usage service: invalid user id")
 	}
-	captures, err := s.captures.GetCaptureUsage(ctx, userID, ShanghaiTimezone)
+	location, err := time.LoadLocation(ShanghaiTimezone)
+	if err != nil {
+		return LifetimeUsage{}, fmt.Errorf("usage service: load timezone: %w", err)
+	}
+	totalCredits, peakDailyCredits, firstCaptureDay, err := s.captures.GetCaptureUsage(ctx, userID, location)
 	if err != nil {
 		return LifetimeUsage{}, fmt.Errorf("usage service: read settled captures: %w", err)
 	}
-	tasks, err := s.tasks.GetUsageSummary(ctx, userID, ShanghaiTimezone)
+	if err := validateSafeInteger("total credits", totalCredits); err != nil {
+		return LifetimeUsage{}, err
+	}
+	if err := validateSafeInteger("peak daily credits", peakDailyCredits); err != nil {
+		return LifetimeUsage{}, err
+	}
+	taskCount, activeDays, err := s.tasks.GetTaskUsage(ctx, userID, location)
 	if err != nil {
 		return LifetimeUsage{}, fmt.Errorf("usage service: read logical tasks: %w", err)
+	}
+	if err := validateSafeInteger("task count", taskCount); err != nil {
+		return LifetimeUsage{}, err
+	}
+	if err := validateSafeInteger("active days", activeDays); err != nil {
+		return LifetimeUsage{}, err
 	}
 
 	result := LifetimeUsage{
 		Timezone: ShanghaiTimezone,
 		Lifetime: LifetimeSummary{
-			TotalCredits:     captures.TotalCredits,
-			PeakDailyCredits: captures.PeakDailyCredits,
-			TaskCount:        tasks.TaskCount,
-			ActiveDays:       tasks.ActiveDays,
+			TotalCredits:     totalCredits,
+			PeakDailyCredits: peakDailyCredits,
+			TaskCount:        taskCount,
+			ActiveDays:       activeDays,
 		},
 	}
-	if captures.FirstCaptureDay.IsZero() {
+	if firstCaptureDay.IsZero() {
 		return result, nil
 	}
-	location, err := time.LoadLocation(ShanghaiTimezone)
-	if err != nil {
-		return LifetimeUsage{}, fmt.Errorf("usage service: load timezone: %w", err)
-	}
-	firstDay := dateInLocation(captures.FirstCaptureDay, location)
+	firstDay := dateInLocation(firstCaptureDay, location)
 	today := dateInLocation(s.now(), location)
-	days := int(today.Sub(firstDay).Hours()/24) + 1
+	days := int64(today.Sub(firstDay).Hours()/24) + 1
 	if days < 1 {
 		days = 1
 	}
-	result.Lifetime.AverageDailyCredits = roundOneDecimal(float64(captures.TotalCredits) / float64(days))
+	result.Lifetime.AverageDailyCredits = averageCredits(totalCredits, days)
+	if err := ValidateLifetimeUsage(result); err != nil {
+		return LifetimeUsage{}, err
+	}
 	return result, nil
 }
 
@@ -91,6 +115,38 @@ func dateInLocation(value time.Time, location *time.Location) time.Time {
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
 }
 
-func roundOneDecimal(value float64) float64 {
-	return math.Round(value*10) / 10
+func averageCredits(totalCredits, days int64) float64 {
+	whole := totalCredits / days
+	remainder := totalCredits % days
+	tenths := (remainder*10 + days/2) / days
+	if tenths == 10 {
+		whole++
+		tenths = 0
+	}
+	return float64(whole) + float64(tenths)/10
+}
+
+func ValidateLifetimeUsage(value LifetimeUsage) error {
+	for name, integer := range map[string]int64{
+		"total credits":      value.Lifetime.TotalCredits,
+		"peak daily credits": value.Lifetime.PeakDailyCredits,
+		"task count":         value.Lifetime.TaskCount,
+		"active days":        value.Lifetime.ActiveDays,
+	} {
+		if err := validateSafeInteger(name, integer); err != nil {
+			return err
+		}
+	}
+	average := value.Lifetime.AverageDailyCredits
+	if math.IsNaN(average) || math.IsInf(average, 0) || average < 0 || average > float64(MaxSafeInteger) {
+		return fmt.Errorf("%w: average daily credits", ErrUnsafeNumber)
+	}
+	return nil
+}
+
+func validateSafeInteger(name string, value int64) error {
+	if value < 0 || value > MaxSafeInteger {
+		return fmt.Errorf("%w: %s", ErrUnsafeNumber, name)
+	}
+	return nil
 }

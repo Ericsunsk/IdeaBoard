@@ -48,6 +48,28 @@ func TestHandlerGetCurrentLifetimeReturnsRetryableInlineFailureStatus(t *testing
 	}
 }
 
+func TestHandlerGetCurrentLifetimeRejectsUnsafeNumbers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", int64(42))
+		c.Next()
+	})
+	router.GET("/usage", NewHandler(&lifetimeReaderStub{result: LifetimeUsage{
+		Timezone: ShanghaiTimezone,
+		Lifetime: LifetimeSummary{TaskCount: MaxSafeInteger + 1},
+	}}).GetCurrentLifetime)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/usage", nil))
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "9007199254740992") {
+		t.Fatalf("unsafe number leaked through API: %s", recorder.Body.String())
+	}
+}
+
 type lifetimeReaderStub struct {
 	result LifetimeUsage
 	err    error

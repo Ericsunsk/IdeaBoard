@@ -5,16 +5,18 @@
       <h2 class="mt-1 mb-0 text-[26px] leading-tight font-bold text-ib-text">用量统计</h2>
     </header>
 
-    <section
-      v-if="isPending"
-      class="grid min-h-35 grid-cols-5 overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface animate-pulse max-[640px]:grid-cols-2"
-      aria-label="正在加载用量统计"
-    >
-      <span
-        v-for="item in 5"
-        :key="item"
-        class="border-r border-ib-border-soft last:border-r-0 max-[640px]:last:col-span-2"
-      />
+    <section v-if="isPending" :class="summaryPanelClass" aria-label="正在加载用量统计">
+      <div :class="summaryGridClass">
+        <article
+          v-for="metric in summaryCellDefinitions"
+          :key="metric.label"
+          :class="[summaryCellClass, metric.cellClass]"
+          aria-hidden="true"
+        >
+          <div class="h-9 w-2/3 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+          <div class="mt-3 h-5 w-1/2 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+        </article>
+      </div>
     </section>
 
     <section
@@ -34,20 +36,15 @@
       </Button>
     </section>
 
-    <section
-      v-else
-      class="overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]"
-      aria-label="用量摘要"
-    >
-      <div class="grid grid-cols-5 max-[640px]:grid-cols-2">
+    <section v-else :class="summaryPanelClass" aria-label="用量摘要">
+      <div :class="summaryGridClass">
         <article
           v-for="metric in metrics"
           :key="metric.label"
-          class="min-w-0 p-5 max-[640px]:p-4"
-          :class="metric.cellClass"
+          :class="[summaryCellClass, metric.cellClass]"
         >
           <p
-            class="m-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[clamp(1.5rem,4vw,2.625rem)] leading-none font-bold text-ib-text"
+            class="m-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[34px] leading-none font-bold text-ib-text max-[900px]:text-[30px] max-[640px]:text-[28px]"
           >
             {{ metric.value }}
           </p>
@@ -67,36 +64,44 @@ const props = defineProps<{ active: boolean }>()
 const { usage, isPending, error, refresh } = useUserUsage(() => props.active)
 
 const integerFormatter = new Intl.NumberFormat('zh-CN')
+const summaryPanelClass =
+  'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
+const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
+const summaryCellClass = 'min-w-0 p-5 max-[640px]:p-4'
+
+const summaryCellDefinitions = [
+  {
+    label: '总消耗',
+    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b',
+  },
+  {
+    label: '历史单日峰值',
+    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
+  },
+  {
+    label: '日均消耗',
+    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r',
+  },
+  {
+    label: '调用次数',
+    cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
+  },
+  {
+    label: '累计活跃天数',
+    cellClass: 'max-[640px]:col-span-2',
+  },
+] as const
 
 const metrics = computed(() => {
   const lifetime = usage.value?.lifetime
-  return [
-    {
-      label: '总消耗',
-      value: formatInteger(lifetime?.total_credits ?? 0),
-      cellClass: 'border-r border-ib-border-soft max-[640px]:border-b',
-    },
-    {
-      label: '历史单日峰值',
-      value: formatInteger(lifetime?.peak_daily_credits ?? 0),
-      cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
-    },
-    {
-      label: '日均消耗',
-      value: formatAverage(lifetime?.average_daily_credits ?? 0),
-      cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r',
-    },
-    {
-      label: '调用次数',
-      value: formatInteger(lifetime?.task_count ?? 0),
-      cellClass: 'border-r border-ib-border-soft max-[640px]:border-b max-[640px]:border-r-0',
-    },
-    {
-      label: '累计活跃天数',
-      value: formatInteger(lifetime?.active_days ?? 0),
-      cellClass: 'max-[640px]:col-span-2',
-    },
+  const values = [
+    formatInteger(lifetime?.total_credits ?? 0),
+    formatInteger(lifetime?.peak_daily_credits ?? 0),
+    formatAverage(lifetime?.average_daily_credits ?? 0),
+    formatInteger(lifetime?.task_count ?? 0),
+    formatInteger(lifetime?.active_days ?? 0),
   ]
+  return summaryCellDefinitions.map((metric, index) => ({ ...metric, value: values[index] }))
 })
 
 function formatInteger(value: number) {

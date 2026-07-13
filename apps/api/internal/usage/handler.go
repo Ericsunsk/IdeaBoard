@@ -36,5 +36,9 @@ func (h *Handler) GetCurrentLifetime(c *gin.Context) {
 		response.InternalError(c, http.StatusInternalServerError, "加载用量统计失败", err)
 		return
 	}
+	if err := ValidateLifetimeUsage(result); err != nil {
+		response.InternalError(c, http.StatusInternalServerError, "加载用量统计失败", err)
+		return
+	}
 	response.SuccessDTO(c, result)
 }
