@@ -44,7 +44,7 @@ export async function fetchCanvasBillingReadiness(
     ),
   )
   if (response.code !== 0 || !response.data) {
-    throw new Error(sanitizeApiErrorMessage(response.msg, '点子计费信息暂不可用'))
+    throw new Error(sanitizeApiErrorMessage(response.msg, 'Idea计费信息暂不可用'))
   }
   return response.data
 }

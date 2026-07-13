@@ -124,7 +124,7 @@
           <tbody>
             <tr v-for="point in trendRows" :key="point.date">
               <th scope="row">{{ point.date }}</th>
-              <td>{{ formatInteger(point.credits) }} 点子</td>
+              <td>{{ formatIdeaAmount(point.credits) }}</td>
             </tr>
           </tbody>
         </table>
@@ -137,6 +137,7 @@
 import { computed, markRaw, ref, useId } from 'vue'
 import Button from 'primevue/button'
 import RangedLineChartCard from '../../../shared/components/RangedLineChartCard.vue'
+import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import { useUserUsage } from '../useUserUsage'
 import { DEFAULT_USER_USAGE_RANGE, type UserUsageRange } from '../userUsageResource'
 import {
@@ -193,9 +194,9 @@ const summaryCellDefinitions = [
 const metrics = computed(() => {
   const lifetime = usage.value?.lifetime
   const values = [
-    formatInteger(lifetime?.total_credits ?? 0),
-    formatInteger(lifetime?.peak_daily_credits ?? 0),
-    formatAverage(lifetime?.average_daily_credits ?? 0),
+    formatIdeaAmount(lifetime?.total_credits ?? 0),
+    formatIdeaAmount(lifetime?.peak_daily_credits ?? 0),
+    formatIdeaAmount(lifetime?.average_daily_credits ?? 0),
     formatInteger(lifetime?.task_count ?? 0),
     formatInteger(lifetime?.active_days ?? 0),
   ]
@@ -222,11 +223,6 @@ function rangeDays(value: UserUsageRange) {
 
 function formatInteger(value: number) {
   return integerFormatter.format(value)
-}
-
-function formatAverage(value: number) {
-  if (Number.isInteger(value)) return formatInteger(value)
-  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value)
 }
 
 function errorMessage(value: unknown) {

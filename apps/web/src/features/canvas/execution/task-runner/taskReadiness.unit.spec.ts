@@ -20,7 +20,7 @@ describe('task readiness billing updates', () => {
   it('publishes the fresh server quote before blocking an insufficient submission', async () => {
     const readiness = {
       ready: false,
-      message: '点子不足',
+      message: 'Idea不足',
       feature: 'pattern-gen',
       billing: {
         sku: 'ai.image.pattern-gen',
@@ -45,7 +45,7 @@ describe('task readiness billing updates', () => {
         feature: 'pattern-gen',
         client_action_id: 'canvas:action-1',
       }),
-    ).rejects.toThrow('点子不足')
+    ).rejects.toThrow('Idea不足')
 
     expect(listener).toHaveBeenCalledWith(readiness)
     unsubscribe()

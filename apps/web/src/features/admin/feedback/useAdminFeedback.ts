@@ -461,7 +461,7 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
           appToast.error(formatCreditsBillingError(error, '加载 Wallet 失败，请稍后重试'))
         },
         ledgerLoadFailed(error) {
-          appToast.error(formatCreditsBillingError(error, '加载点子流水失败，请稍后重试'))
+          appToast.error(formatCreditsBillingError(error, '加载Idea流水失败，请稍后重试'))
         },
         commandSucceeded(label, replayed) {
           appToast.success(replayed ? `${label}已安全重放，未重复记账` : `${label}成功`)

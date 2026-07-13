@@ -65,7 +65,7 @@ describe('user account menu actions', () => {
     })
 
     const credits = items.find((item) => item.key === 'credits')
-    expect(credits).toMatchObject({ label: '点子', meta: '1,280' })
+    expect(credits).toMatchObject({ label: 'Idea', meta: '1,280' })
     credits?.command()
     expect(openCredits).toHaveBeenCalledOnce()
   })
@@ -82,7 +82,7 @@ describe('user account menu actions', () => {
     })
 
     expect(items.find((item) => item.key === 'credits')).toMatchObject({
-      label: '点子',
+      label: 'Idea',
       meta: '9000万亿',
     })
   })

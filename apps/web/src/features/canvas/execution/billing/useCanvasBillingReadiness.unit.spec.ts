@@ -63,7 +63,7 @@ describe('canvas billing readiness store', () => {
       fetchReadiness: async (feature) =>
         makeReadiness(feature, {
           ready: false,
-          message: '点子不足',
+          message: 'Idea不足',
           billing: {
             ...makeReadiness(feature).billing!,
             total_credits: 8,
@@ -79,7 +79,7 @@ describe('canvas billing readiness store', () => {
       status: 'blocked',
       totalCredits: 8,
       availableCredits: 3,
-      reason: '点子不足（需要 8，当前 3）',
+      reason: 'Idea不足（需要 8 Ideas，当前 3 Ideas）',
     })
   })
 

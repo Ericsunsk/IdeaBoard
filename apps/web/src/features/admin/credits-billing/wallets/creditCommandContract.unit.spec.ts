@@ -32,7 +32,7 @@ describe('Admin Credit command contract', () => {
         chargeTransactionId: 'charge-1',
         remainingRefundableCredits: 5,
       }),
-    ).toMatchObject({ valid: false, amountError: '退款不能超过可退余额 5 点子' })
+    ).toMatchObject({ valid: false, amountError: '退款不能超过可退余额 5 Ideas' })
 
     expect(
       validateAdminCreditCommand({
@@ -72,7 +72,7 @@ describe('Admin Credit command contract', () => {
       }),
     ).toEqual({
       valid: false,
-      amountError: '请输入大于 0 的整数点子数量',
+      amountError: '请输入大于 0 的整数Idea数量',
       reasonError: '请填写操作原因',
     })
   })

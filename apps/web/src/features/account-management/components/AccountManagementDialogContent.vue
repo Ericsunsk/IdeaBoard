@@ -465,7 +465,7 @@ const navGroups = [
     key: 'subscription',
     label: '订阅与套餐',
     items: [
-      { key: 'recharge', label: '充值积分', icon: Coins },
+      { key: 'recharge', label: '充值Idea', icon: Coins },
       { key: 'subscriptions', label: '订阅套餐', icon: CreditCard },
     ],
   },
@@ -481,7 +481,7 @@ const navGroups = [
 ] satisfies NavGroup[]
 
 const upcomingPages: Record<UpcomingTab, UpcomingPage> = {
-  recharge: { category: '订阅与套餐', title: '充值积分', icon: Coins },
+  recharge: { category: '订阅与套餐', title: '充值Idea', icon: Coins },
   subscriptions: { category: '订阅与套餐', title: '订阅套餐', icon: CreditCard },
   rewards: { category: '权益和账单', title: '奖励中心', icon: Gift },
 }

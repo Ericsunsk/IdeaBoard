@@ -79,7 +79,7 @@
               v-if="item.unitCredits !== undefined"
               class="font-mono text-admin-body font-bold text-admin-text-1"
             >
-              {{ item.unitCredits }} 点子
+              {{ formatIdeaAmount(item.unitCredits) }}
             </span>
             <span v-else class="text-admin-meta text-admin-text-3">—</span>
           </template>
@@ -127,6 +127,7 @@ import DataTable from 'primevue/datatable'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../../shared/domain/workflowFeatureRegistry'
+import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import {
   adminCompactTagClass,

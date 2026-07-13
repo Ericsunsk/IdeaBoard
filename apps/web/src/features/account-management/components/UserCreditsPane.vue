@@ -1,18 +1,18 @@
 <template>
-  <div class="grid gap-6" aria-label="点子账户">
+  <div class="grid gap-6" aria-label="Idea账户">
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div>
         <p class="m-0 text-[12px] font-semibold tracking-[0.08em] text-ib-text-subtle uppercase">
           Credits Wallet
         </p>
-        <h2 class="mt-1 mb-0 text-[26px] leading-tight font-bold text-ib-text">我的点子</h2>
+        <h2 class="mt-1 mb-0 text-[26px] leading-tight font-bold text-ib-text">我的Idea</h2>
       </div>
       <Button
         type="button"
         text
         :loading="refreshing"
         class="!h-9 !rounded-[var(--radius-ib-control)] !border !border-ib-border-soft !bg-ib-surface !px-3 !text-sm !font-semibold !text-ib-text-muted !shadow-none hover:!border-ib-border-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
-        aria-label="刷新点子余额和流水"
+        aria-label="刷新Idea余额和流水"
         @click="handleRefresh"
       >
         刷新
@@ -22,14 +22,14 @@
     <section
       v-if="walletPending"
       class="min-h-44 animate-pulse rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5"
-      aria-label="正在加载点子余额"
+      aria-label="正在加载Idea余额"
     />
     <section
       v-else-if="walletError"
       class="rounded-[var(--radius-ib-panel)] border border-ib-danger/25 bg-ib-surface p-5"
       role="alert"
     >
-      <p class="m-0 font-semibold text-ib-danger">点子余额加载失败</p>
+      <p class="m-0 font-semibold text-ib-danger">Idea余额加载失败</p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(walletError) }}</p>
       <Button
         type="button"
@@ -43,12 +43,12 @@
     <section
       v-else-if="wallet"
       class="overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]"
-      aria-label="点子余额概览"
+      aria-label="Idea余额概览"
     >
       <div class="grid gap-5 p-5 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-end">
         <div>
           <div class="flex items-center gap-2">
-            <span class="text-sm font-semibold text-ib-text-muted">可用点子</span>
+            <span class="text-sm font-semibold text-ib-text-muted">可用Idea</span>
             <Tag
               :value="wallet.status === 'active' ? '正常' : '已冻结'"
               :severity="wallet.status === 'active' ? 'success' : 'danger'"
@@ -75,9 +75,9 @@
       </div>
     </section>
 
-    <section class="grid gap-3" aria-label="点子流水">
+    <section class="grid gap-3" aria-label="Idea流水">
       <div>
-        <h3 class="m-0 text-lg font-bold text-ib-text">点子流水</h3>
+        <h3 class="m-0 text-lg font-bold text-ib-text">Idea流水</h3>
         <p class="mt-1 mb-0 text-sm text-ib-text-muted">
           每一次赠送、冻结、消费与退款都会保留记录。
         </p>
@@ -86,7 +86,7 @@
       <div
         v-if="ledgerPending"
         class="min-h-32 animate-pulse rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface"
-        aria-label="正在加载点子流水"
+        aria-label="正在加载Idea流水"
       />
       <div
         v-else-if="ledgerError"
@@ -99,7 +99,7 @@
         v-else-if="transactions.length === 0"
         class="rounded-[var(--radius-ib-panel)] border border-dashed border-ib-border bg-ib-surface p-7 text-center"
       >
-        <p class="m-0 font-semibold text-ib-text">还没有点子流水</p>
+        <p class="m-0 font-semibold text-ib-text">还没有Idea流水</p>
         <p class="mt-1 mb-0 text-sm text-ib-text-muted">
           完成 AI 图像任务后，相关记录会显示在这里。
         </p>
@@ -120,7 +120,7 @@
               }}</span>
             </div>
             <p class="mt-1 mb-0 truncate text-sm text-ib-text-muted" :title="transaction.reason">
-              {{ transaction.reason || '系统点子操作' }}
+              {{ transaction.reason || '系统Idea操作' }}
             </p>
             <p class="mt-1 mb-0 text-xs text-ib-text-subtle">
               余额 {{ formatCredits(transaction.available_credits_after) }} · 冻结
@@ -151,6 +151,7 @@
 import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import type { UserCreditLedgerCommandType, UserCreditPosting } from '../userCreditsResource'
 import { useUserCredits } from '../useUserCredits'
 
@@ -186,7 +187,7 @@ async function handleRefresh() {
 }
 
 function formatCredits(value: number) {
-  return new Intl.NumberFormat('zh-CN').format(value)
+  return formatIdeaAmount(value)
 }
 
 function formatDate(value: string) {
@@ -202,12 +203,12 @@ function formatDate(value: string) {
 }
 
 const commandLabels: Record<UserCreditLedgerCommandType, string> = {
-  grant: '获得点子',
+  grant: '获得Idea',
   deduction: '管理员扣减',
   hold: '任务冻结',
   capture: 'AI 图像消费',
   release: '任务解冻',
-  refund: '点子退款',
+  refund: 'Idea退款',
   correction: '管理员调整',
 }
 

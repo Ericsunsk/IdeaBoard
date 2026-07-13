@@ -5,7 +5,7 @@ import "fmt"
 // MaxCreditAmount keeps command arithmetic comfortably inside signed BIGINT.
 const MaxCreditAmount int64 = 9_000_000_000_000_000
 
-// CreditAmount is the smallest indivisible unit shown to users as 点子.
+// CreditAmount is the smallest indivisible unit shown to users as Idea.
 // Credits never use floating-point arithmetic.
 type CreditAmount int64
 

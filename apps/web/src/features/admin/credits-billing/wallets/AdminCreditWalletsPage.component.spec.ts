@@ -72,13 +72,13 @@ describe('AdminCreditWalletsPage', () => {
     await user.type(userIdInput, '12')
     await user.click(screen.getByRole('button', { name: '打开 Wallet' }))
 
-    expect(await screen.findByText('1,200 点子')).toBeVisible()
-    expect(screen.getByText('冻结 25')).toBeVisible()
-    expect(screen.getByText('已退 5 · 可退 20')).toBeVisible()
+    expect(await screen.findByText('1,200 Ideas')).toBeVisible()
+    expect(screen.getByText('冻结 25 Ideas')).toBeVisible()
+    expect(screen.getByText('已退 5 Ideas · 可退 20 Ideas')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '退款' }))
     expect(screen.getByText('原 Charge')).toBeVisible()
-    expect(screen.getByText('剩余可退：20 点子')).toBeVisible()
+    expect(screen.getByText('剩余可退：20 Ideas')).toBeVisible()
     expect(screen.getByText('charge-1')).toBeVisible()
   })
 
@@ -90,7 +90,7 @@ describe('AdminCreditWalletsPage', () => {
       openButton: '赠送',
       amount: '40',
       reason: '活动补偿',
-      confirmTitle: '确认赠送点子',
+      confirmTitle: '确认赠送Idea',
     })
     await executeLatestConfirmation()
 
@@ -109,7 +109,7 @@ describe('AdminCreditWalletsPage', () => {
       openButton: '扣减',
       amount: '7',
       reason: '误发回收',
-      confirmTitle: '确认扣减点子',
+      confirmTitle: '确认扣减Idea',
     })
     await executeLatestConfirmation()
 
@@ -128,7 +128,7 @@ describe('AdminCreditWalletsPage', () => {
       openButton: '退款',
       amount: '3',
       reason: '任务失败退还',
-      confirmTitle: '确认退款点子',
+      confirmTitle: '确认退款Idea',
       submitButton: '核对退款',
     })
     await executeLatestConfirmation()
@@ -178,7 +178,7 @@ describe('AdminCreditWalletsPage', () => {
 async function openWallet(user: ReturnType<typeof renderPage>['user']) {
   await user.type(screen.getByRole('spinbutton', { name: '用户 ID' }), '12')
   await user.click(screen.getByRole('button', { name: '打开 Wallet' }))
-  expect(await screen.findByText('1,200 点子')).toBeVisible()
+  expect(await screen.findByText('1,200 Ideas')).toBeVisible()
 }
 
 async function submitCommand(
@@ -192,7 +192,7 @@ async function submitCommand(
   },
 ) {
   await user.click(screen.getByRole('button', { name: input.openButton }))
-  await user.type(screen.getByRole('spinbutton', { name: '点子数量' }), input.amount)
+  await user.type(screen.getByRole('spinbutton', { name: 'Idea数量' }), input.amount)
   await user.type(screen.getByRole('textbox', { name: /^操作原因/ }), input.reason)
   await user.click(screen.getByRole('button', { name: input.submitButton ?? '下一步：确认' }))
 

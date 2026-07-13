@@ -69,7 +69,7 @@ describe('buildUserUsageTrendChart', () => {
         parsed: { y: 1_234_567 },
         raw: 1_234_567,
       }),
-    ).toBe('Idea消耗：1,234,567 点子')
+    ).toBe('Idea消耗：1,234,567 Ideas')
   })
 
   it('shows every weekly label and month boundaries for the 365-day range', () => {

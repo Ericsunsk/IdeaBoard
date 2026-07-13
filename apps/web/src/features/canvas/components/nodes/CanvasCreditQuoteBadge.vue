@@ -15,6 +15,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import { useCanvasBillingReadinessStore, type CanvasBillingQuoteState } from '../../execution'
 
 const props = defineProps<{
@@ -31,14 +32,16 @@ const canRetry = computed(
 
 const label = computed(() => {
   if (!props.state) return ''
-  if (props.state.status === 'loading' || props.state.status === 'idle') return '点子…'
-  if (props.state.status === 'ready') return `${props.state.totalCredits ?? 0} 点子`
+  if (props.state.status === 'loading' || props.state.status === 'idle') return 'Idea…'
+  if (props.state.status === 'ready') return formatIdeaAmount(props.state.totalCredits ?? 0)
   return props.state.reason || '暂不可用'
 })
 const title = computed(() => {
   if (!props.state) return ''
-  if (props.state.status === 'ready') return `本次预计消耗 ${props.state.totalCredits ?? 0} 点子`
-  return props.state.reason || '正在获取点子价格'
+  if (props.state.status === 'ready') {
+    return `本次预计消耗 ${formatIdeaAmount(props.state.totalCredits ?? 0)}`
+  }
+  return props.state.reason || '正在获取Idea价格'
 })
 
 function retry() {

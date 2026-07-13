@@ -27,7 +27,7 @@ describe('PromptComposerControls billing contract', () => {
       priceVersionId: 1,
     })
 
-    expect(screen.getByText('4 点子')).toBeVisible()
+    expect(screen.getByText('4 Ideas')).toBeVisible()
     expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
   })
 
@@ -37,17 +37,17 @@ describe('PromptComposerControls billing contract', () => {
       status: 'blocked',
       totalCredits: 8,
       availableCredits: 3,
-      reason: '点子不足（需要 8，当前 3）',
+      reason: 'Idea不足（需要 8 Ideas，当前 3 Ideas）',
     })
 
-    expect(screen.getByText('点子不足（需要 8，当前 3）')).toBeVisible()
+    expect(screen.getByText('Idea不足（需要 8 Ideas，当前 3 Ideas）')).toBeVisible()
     expect(screen.getByRole('button', { name: '发送' })).toBeDisabled()
   })
 
   it('keeps local composers price-free when no billing state is provided', () => {
     renderControls(null)
 
-    expect(screen.queryByText(/点子/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Idea/)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
   })
 })

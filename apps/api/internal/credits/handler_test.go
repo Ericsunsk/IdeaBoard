@@ -97,3 +97,18 @@ func TestStartReconciliationHandlerRequiresAndTrimsReason(t *testing.T) {
 		t.Fatalf("StartReconciliation input=%+v calls=%d", service.startInput, service.startCalls)
 	}
 }
+
+func TestWriteCreditErrorUsesIdeaDisplayName(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+
+	writeCreditError(context, ErrInsufficientCredits)
+
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status=%d, want %d", recorder.Code, http.StatusUnprocessableEntity)
+	}
+	if body := recorder.Body.String(); !strings.Contains(body, `"msg":"Idea不足"`) {
+		t.Fatalf("response=%s, want Idea display name", body)
+	}
+}

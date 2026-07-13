@@ -28,7 +28,7 @@ const props = defineProps<{ items: UserAccountMenuItem[] }>()
 const creditsItem = computed(() => props.items.find((item) => item.key === 'credits'))
 const balance = computed(() => creditsItem.value?.meta ?? '加载中')
 const isLoading = computed(() => balance.value === '加载中')
-const ariaLabel = computed(() => `点子余额 ${balance.value}`)
+const ariaLabel = computed(() => `Idea余额 ${balance.value}`)
 </script>
 
 <style scoped>

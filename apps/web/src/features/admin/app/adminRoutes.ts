@@ -41,7 +41,7 @@ export const adminRoutes: RouteRecordRaw[] = [
       {
         path: 'credits',
         component: adminPageComponents.credits,
-        meta: { requiresAuth: true, title: '点子与计费' },
+        meta: { requiresAuth: true, title: 'Idea与计费' },
         children: [
           { path: '', redirect: ADMIN_CREDIT_WALLETS_PATH },
           {

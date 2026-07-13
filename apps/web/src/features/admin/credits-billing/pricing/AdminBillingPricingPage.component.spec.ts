@@ -69,7 +69,7 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('AI 生图 · 草图成图')).toBeVisible()
     expect(screen.getByRole('heading', { name: 'AI Workflow 计费覆盖' })).toBeVisible()
     expect(screen.queryByText(/当前 API 未暴露 workflow × model 映射/)).not.toBeInTheDocument()
-    expect(screen.getAllByText('25 点子')[0]).toBeVisible()
+    expect(screen.getAllByText('25 Ideas')[0]).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '新建 SKU' }))
 
@@ -89,8 +89,8 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('SKU disabled')).toBeVisible()
     expect(screen.getByText('无 current price')).toBeVisible()
     expect(screen.getByText('current price disabled')).toBeVisible()
-    expect(screen.getByText('12 点子')).toBeVisible()
-    expect(screen.getByText('18 点子')).toBeVisible()
+    expect(screen.getByText('12 Ideas')).toBeVisible()
+    expect(screen.getByText('18 Ideas')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '为 gemini-missing-sku 配置 SKU' }))
 
@@ -133,7 +133,7 @@ describe('AdminBillingPricingPage', () => {
     expect(confirmRequestMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '确认发布新价格版本',
-        message: expect.stringContaining('30 点子'),
+        message: expect.stringContaining('30 Ideas'),
       }),
     )
   })

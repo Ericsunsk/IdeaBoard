@@ -26,13 +26,13 @@ export const userCreditsQueryKeys = {
 }
 
 export async function fetchUserCreditWallet(): Promise<UserCreditWallet> {
-  return requireUserCreditsData(await getUserCreditWallet(), '加载点子余额失败')
+  return requireUserCreditsData(await getUserCreditWallet(), '加载Idea余额失败')
 }
 
 export async function fetchUserCreditLedger(
   params?: ListUserCreditLedgerParams,
 ): Promise<UserCreditLedgerPage> {
-  return requireUserCreditsData(await listUserCreditLedger(params), '加载点子流水失败')
+  return requireUserCreditsData(await listUserCreditLedger(params), '加载Idea流水失败')
 }
 
 function requireUserCreditsData<T>(response: ApiEnvelope<T>, fallbackMessage: string): T {

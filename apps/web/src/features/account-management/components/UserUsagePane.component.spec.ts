@@ -1,7 +1,7 @@
 import { cleanup } from '@testing-library/vue'
 import { defineComponent, type Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../test/render'
+import { renderWithUser, screen, within } from '../../../test/render'
 import UserUsagePane from './UserUsagePane.vue'
 
 const usageState = vi.hoisted(() => ({
@@ -78,8 +78,8 @@ describe('UserUsagePane', () => {
 
     expect(screen.getByRole('heading', { name: '用量统计' })).toBeVisible()
     expect(screen.queryByText('Lifetime 数据 · Asia/Shanghai')).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('1,234')
-    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('12.5')
+    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('1,234 Ideas')
+    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('12.5 Ideas')
     expect(screen.getByText('调用次数')).toBeVisible()
     expect(screen.getByText('累计活跃天数')).toBeVisible()
   })
@@ -132,15 +132,19 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('总消耗')
-    expect(screen.getAllByText('0')).toHaveLength(5)
+    const summary = within(screen.getByRole('region', { name: '用量摘要' }))
+    expect(summary.getByText('总消耗')).toBeVisible()
+    expect(summary.getAllByText('0 Ideas')).toHaveLength(3)
+    expect(summary.getAllByText('0')).toHaveLength(2)
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-datasets', '1')
     const table = screen.getByRole('table', { name: '最近 30 天Idea消耗明细' })
     expect(table).toHaveClass('sr-only')
     expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
     expect(
-      Array.from(table.querySelectorAll('tbody td')).every((cell) => cell.textContent === '0 点子'),
+      Array.from(table.querySelectorAll('tbody td')).every(
+        (cell) => cell.textContent === '0 Ideas',
+      ),
     ).toBe(true)
     expect(screen.queryByText('暂无数据')).not.toBeInTheDocument()
   })
@@ -236,7 +240,7 @@ describe('UserUsagePane', () => {
     expect(chartImage).toHaveAttribute('aria-describedby', table.querySelector('caption')?.id)
     expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
     expect(table).toHaveTextContent('2026-07-30')
-    expect(table).toHaveTextContent('99 点子')
+    expect(table).toHaveTextContent('99 Ideas')
   })
 
   it('shows an inline retry when loading fails', async () => {

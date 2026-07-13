@@ -15,8 +15,8 @@
 | Media | `internal/media/storage`, `internal/media/assets`, `internal/media/imageformat`, `internal/media/mediarefs` | Object storage、upload serving、upload authorization、media references、image format validation、bundled business assets | `storage.Service`, media stores/authorizers, media reference helpers |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | Executable workflow feature contract、task parameter shaping、prompt templates、prompt assembly | Workflow helpers, prompt engine/repository/handler |
 | Billing | `internal/billing` | 全局 SKU Catalog、versioned Credit pricing、server-side Quote snapshot | `billing.Service.Quote`, `billing.PriceSnapshot`, Admin billing handler |
-| Credits | `internal/credits` | 平台点子 Wallet、Double-entry Ledger、余额 projection、幂等 Commands | `credits.Commands`, `credits.WalletReader`, `credits.Service.InTx`, `credits.Service.InSQLTx` |
-| Usage | `internal/usage` | 用户侧点子消耗的 Lifetime 摘要、每日 Capture Trend 与 durable logical AI Task submission 只读聚合 | `usage.Service`, caller-owned `CaptureUsageReader`, caller-owned `LogicalTaskUsageReader` |
+| Credits | `internal/credits` | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Commands | `credits.Commands`, `credits.WalletReader`, `credits.Service.InTx`, `credits.Service.InSQLTx` |
+| Usage | `internal/usage` | 用户侧 Idea 消耗的 Lifetime 摘要、每日 Capture Trend 与 durable logical AI Task submission 只读聚合 | `usage.Service`, caller-owned `CaptureUsageReader`, caller-owned `LogicalTaskUsageReader` |
 
 ## Dependency Direction
 
@@ -45,7 +45,7 @@
 - Billing 只根据全局 SKU 选择 immutable price version 并生成 Quote；不读取 Provider Account routing，也不直接写 Credits Ledger。
 - Credit Commands 需要与 caller 的业务状态原子提交时，pgx caller 使用 `credits.Service.InTx(pgx.Tx)`，database/sql caller 使用 `credits.Service.InSQLTx(*sql.Tx)`；两者都只调用同一个 typed Credit Command，且 caller 拥有 commit/rollback，禁止外部双写。
 - canonical AI Image Workflow Submit 由 Tasking 在一个 pgx transaction 内完成 Quote/Hold/snapshot/Task/River；terminal transition 由 Task Store 在一个 database/sql transaction 内完成 Capture/Release 与 Task result/status。纯本地编辑操作不进入该计费边界。
-- Task Billing settlement 使用 typed `free | held | captured | released` state machine：0 点子 Quote 直接进入 `free`；收费任务只能从 `held` 幂等收敛到 `captured` 或 `released`，禁止反向或跨终态转换。
+- Task Billing settlement 使用 typed `free | held | captured | released` state machine：`0 Ideas` Quote 直接进入 `free`；收费任务只能从 `held` 幂等收敛到 `captured` 或 `released`，禁止反向或跨终态转换。
 - River drawing job 在最终执行失败且 terminal convergence 暂时不可写时，会持久化 settlement-only marker 并 snooze；重启后的 retry 只做 terminal convergence，不再调用 Provider。若 marker 记录本身失败，则 enqueue 专用 settlement-only River job 作为 durable fallback。
 - Identity 的用户生命周期可通过 `credits.WalletLifecycle` typed seam 原子 provision/freeze Wallet 与领取 Welcome Grant；该 seam 仍由 Credits 独占 Ledger 写入和 runtime privilege。
 - 用户删除以 `user_deletion_requests` 为 durable state：先冻结业务用户与 Wallet，再按 Auth → Storage → tombstone phase 幂等收敛；跨服务失败不得恢复 active Wallet。

@@ -23,7 +23,7 @@ IdeaBoard 当前最优方案是：**在现有 PostgreSQL 中实现小而专用�
 
 本次评估按已经确认的产品与系统 contract：
 
-- 「点子」在代码中称为 `credits`，是整个 IdeaBoard 生态的 Closed-loop Virtual Credit。
+- 「Idea」在代码中称为 `credits`，是整个 IdeaBoard 生态的 Closed-loop Virtual Credit。
 - 用户独立持有钱包，Credits 不提现、不交易、不转账、不产生利息。
 - Double-entry Ledger 是事实源；余额是投影，不允许直接覆盖。
 - 所有 Grant、Hold、Capture、Release、Refund、Admin adjustment 都必须强制幂等。
@@ -147,7 +147,7 @@ Stripe Billing Credits 是成熟 SaaS 能力，支持 prepaid/promotional Credit
 - 不 self-host，也不可能与 IdeaBoard PostgreSQL transaction 原子提交。
 - Stripe 文档禁止将 Billing Credits 作为一般 stored value、第三方支付或数字钱包链接；IdeaBoard 的 closed-loop 产品消费本身不冲突，但 Stripe 的能力边界仍是 Stripe Billing，而不是项目内通用 Ledger。[Approved/prohibited uses](https://docs.stripe.com/billing/subscriptions/usage-based/billing-credits#use-cases-for-billing-credits)
 
-结论：**未来可作为真实支付与 invoice 系统，不应成为「点子」事实源。支付成功后，由 webhook/outbox 触发内部 Credits Grant。**
+结论：**未来可作为真实支付与 invoice 系统，不应成为「Idea」事实源。支付成功后，由 webhook/outbox 触发内部 Credits Grant。**
 
 ### Go / PostgreSQL 可嵌入 Ledger Libraries
 
@@ -251,7 +251,7 @@ Lago 与 Stripe 更适合作为未来外部 Billing/Payment system，不适合�
 - 现在：在 IdeaBoard PostgreSQL 内实现专用 Credits Double-entry Ledger 与 Billing SKU Catalog。
 - 参考：吸收 pgledger 的 ordered locking、atomic multi-transfer、balance constraints 与 reconciliation patterns，但不直接绑定其未稳定 schema。
 - 未来收真钱：Stripe/支付宝/微信等只负责 payment order；支付确认通过幂等 Command 向内部 Ledger Mint/Grant Credits。
-- 未来 subscription/invoice 变复杂：在边缘接 Lago、OpenMeter 或 Stripe Billing；内部「点子」仍保持自己的事实源。
+- 未来 subscription/invoice 变复杂：在边缘接 Lago、OpenMeter 或 Stripe Billing；内部「Idea」仍保持自己的事实源。
 - 未来真实指标证明单 PostgreSQL 无法满足 throughput/availability：执行 ADR 驱动的 Ledger Service extraction，首选 Formance Ledger CE；极高规模再考虑 TigerBeetle。
 
 这条路径既没有锁死未来外部化，也避免在最早阶段为尚不存在的规模问题牺牲最重要的账务原子性。

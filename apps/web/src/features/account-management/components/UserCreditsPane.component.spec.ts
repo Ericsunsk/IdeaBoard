@@ -144,14 +144,14 @@ describe('UserCreditsPane', () => {
 
     renderPane()
 
-    expect(screen.getByText('1,280')).toBeVisible()
+    expect(screen.getByText('1,280 Ideas')).toBeVisible()
     expect(screen.getByText('时间未知')).toBeVisible()
-    expect(rowFor('欢迎赠送').getByText('+50')).toBeVisible()
-    expect(rowFor('任务 101 冻结').getByText('20')).toBeVisible()
-    expect(rowFor('任务 102 解冻').getByText('20')).toBeVisible()
-    expect(rowFor('任务 103 生图').getByText('-20')).toBeVisible()
-    expect(rowFor('恢复管理员扣减').getByText('+4')).toBeVisible()
-    expect(rowFor('撤销管理员赠送').getByText('-3')).toBeVisible()
+    expect(rowFor('欢迎赠送').getByText('+50 Ideas')).toBeVisible()
+    expect(rowFor('任务 101 冻结').getByText('20 Ideas')).toBeVisible()
+    expect(rowFor('任务 102 解冻').getByText('20 Ideas')).toBeVisible()
+    expect(rowFor('任务 103 生图').getByText('-20 Ideas')).toBeVisible()
+    expect(rowFor('恢复管理员扣减').getByText('+4 Ideas')).toBeVisible()
+    expect(rowFor('撤销管理员赠送').getByText('-3 Ideas')).toBeVisible()
   })
 
   it('offers recovery for errors and delegates refresh and pagination', async () => {
@@ -170,7 +170,7 @@ describe('UserCreditsPane', () => {
 
     const { user } = renderPane()
 
-    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('点子余额加载失败')
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Idea余额加载失败')
     expect(screen.getByText('流水服务暂时不可用')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '重新加载' }))

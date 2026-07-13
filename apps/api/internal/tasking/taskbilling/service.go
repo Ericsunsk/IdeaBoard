@@ -182,7 +182,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 		hold, holdErr := s.credits.InTx(tx).Hold(ctx, credits.HoldCommand{
 			UserID:   userID,
 			Amount:   amount,
-			Metadata: taskCommandMetadata("task-hold:"+taskID, credits.ActorUser, fmt.Sprint(userID), "task_submission", "AI 生图任务点子预授权", taskID),
+			Metadata: taskCommandMetadata("task-hold:"+taskID, credits.ActorUser, fmt.Sprint(userID), "task_submission", "AI 生图任务 Idea 预授权", taskID),
 		})
 		if errors.Is(holdErr, credits.ErrInsufficientCredits) {
 			return Snapshot{}, ErrInsufficientCredits

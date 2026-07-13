@@ -38,7 +38,7 @@ export function createUserAccountMenuItems(
   if (options.handlers.credits) {
     items.push({
       key: 'credits',
-      label: '点子',
+      label: 'Idea',
       meta:
         options.availableCredits == null
           ? '加载中'

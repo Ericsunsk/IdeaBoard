@@ -3,9 +3,9 @@ import type {
   CreditReconciliationFinding,
   CreditReconciliationRun,
 } from '../../../shared/api/generated-query/model'
+import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
-const creditNumberFormat = new Intl.NumberFormat('zh-CN')
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric',
   month: '2-digit',
@@ -17,7 +17,7 @@ const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
 })
 
 export function formatCredits(value: number) {
-  return `${creditNumberFormat.format(value)} 点子`
+  return formatIdeaAmount(value)
 }
 
 export function formatAdminDateTime(value?: string) {

@@ -94,7 +94,7 @@ export function validateBillingPriceForm(form: BillingPriceForm): BillingPriceFo
   const errors: BillingPriceFormErrors = {}
   const value = form.unitCredits
   if (value == null || !Number.isSafeInteger(value) || value < 0 || value > maxCredits) {
-    errors.unitCredits = '点子必须是 0 到 9,000,000,000,000,000 的整数'
+    errors.unitCredits = 'Idea必须是 0 到 9,000,000,000,000,000 的整数'
   }
   const reasonValidation = validateAdminActionReason(form.reason)
   if (!reasonValidation.valid) errors.reason = reasonValidation.error

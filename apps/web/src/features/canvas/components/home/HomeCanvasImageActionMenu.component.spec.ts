@@ -114,7 +114,7 @@ describe('HomeCanvasImageActionMenu', () => {
     renderImageActionMenu({ billingStore })
 
     expect(screen.getByRole('button', { name: '抠图 · 价格未配置' })).toBeDisabled()
-    expect(screen.getAllByText('3 点子').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('3 Ideas').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '图像编辑' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '局部重绘' })).toBeEnabled()
   })

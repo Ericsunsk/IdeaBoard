@@ -102,7 +102,7 @@ const billingSubmitBlocked = computed(() =>
   isCanvasBillingSubmitBlocked(props.billingState ?? null),
 )
 const billingBlockedReason = computed(() =>
-  billingSubmitBlocked.value ? props.billingState?.reason || '正在获取点子价格' : undefined,
+  billingSubmitBlocked.value ? props.billingState?.reason || '正在获取Idea价格' : undefined,
 )
 
 const {

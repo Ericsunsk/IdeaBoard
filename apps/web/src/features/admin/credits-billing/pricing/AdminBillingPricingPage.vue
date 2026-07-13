@@ -134,7 +134,7 @@
                   v-if="item.currentPrice"
                   class="font-mono text-admin-body font-bold text-admin-text-1"
                 >
-                  {{ item.currentPrice.unitCredits }} 点子
+                  {{ formatIdeaAmount(item.currentPrice.unitCredits) }}
                 </span>
                 <Tag v-else value="未配置" severity="warn" rounded :class="adminCompactTagClass" />
               </template>
@@ -290,9 +290,9 @@
               </Column>
               <Column header="单价" :style="{ width: '140px' }">
                 <template #body="{ data: price }">
-                  <span class="font-mono text-admin-body font-bold"
-                    >{{ price.unitCredits }} 点子</span
-                  >
+                  <span class="font-mono text-admin-body font-bold">{{
+                    formatIdeaAmount(price.unitCredits)
+                  }}</span>
                 </template>
               </Column>
               <Column header="发布信息" :style="{ minWidth: '180px' }">
@@ -443,7 +443,7 @@
       </Message>
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
-        label="单价（点子）"
+        label="单价（Idea）"
         for="admin-billing-unit-credits"
         :error="priceFormErrors.unitCredits"
         hint="0 表示免费，但仍会记录 Billing snapshot。"
@@ -516,6 +516,7 @@ import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { Plus, Refresh } from '@iconoir/vue'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../../shared/domain/workflowFeatureRegistry'
+import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
@@ -613,7 +614,7 @@ const priceStateReasonMessage = computed(() => {
   const target = priceStateTarget.value
   if (!target) return '请填写操作原因后再确认。'
   const skuLabel = selectedSKU.value?.displayName || selectedSKU.value?.sku || '当前 SKU'
-  return `${target.enabled ? '启用' : '停用'} ${skuLabel} 的 v${target.price.version}（${target.price.unitCredits} 点子）。`
+  return `${target.enabled ? '启用' : '停用'} ${skuLabel} 的 v${target.price.version}（${formatIdeaAmount(target.price.unitCredits)}）。`
 })
 const catalogFilterOptions: { label: string; value: BillingCatalogFilter }[] = [
   { label: '全部 SKU（当前页）', value: 'all' },
@@ -718,7 +719,7 @@ function requestCreatePrice() {
   const unitCredits = priceForm.unitCredits
   adminConfirm.request({
     title: '确认发布新价格版本',
-    message: `将为 ${selectedSKU.value?.sku ?? '当前 SKU'} 发布 ${unitCredits} 点子的 immutable price version${priceForm.enabled ? '，并立即启用' : ''}。`,
+    message: `将为 ${selectedSKU.value?.sku ?? '当前 SKU'} 发布 ${formatIdeaAmount(unitCredits)} 的 immutable price version${priceForm.enabled ? '，并立即启用' : ''}。`,
     confirmLabel: '确认发布',
     intent: 'warn',
     onConfirm: async () => {

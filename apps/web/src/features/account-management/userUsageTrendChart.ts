@@ -8,6 +8,7 @@ import {
   type ChartOptions,
 } from '../../shared/lib/chartPrimitives'
 import { shouldShowChartTimeTick, type ChartTimeTickDensity } from '../../shared/lib/chartTimeRange'
+import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
 
 export type UserUsageTrendPoint = {
   date: string
@@ -95,7 +96,7 @@ export function buildUserUsageTrendChart(
           padding: 10,
           displayColors: false,
           callbacks: {
-            label: (context) => `Idea消耗：${formatFullCredits(getParsedY(context))} 点子`,
+            label: (context) => `Idea消耗：${formatIdeaAmount(getParsedY(context))}`,
           },
         },
       },
@@ -179,10 +180,6 @@ function formatTrendDateLabel(date: string) {
 
 function normalizeCredits(value: number) {
   return Number.isSafeInteger(value) && value >= 0 ? value : 0
-}
-
-function formatFullCredits(value: number) {
-  return Math.max(0, Math.round(Number.isFinite(value) ? value : 0)).toLocaleString('zh-CN')
 }
 
 function formatCompactCredits(value: number) {

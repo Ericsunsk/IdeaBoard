@@ -137,7 +137,7 @@ func (h *Handler) Correct(c *gin.Context) {
 
 func (h *Handler) prepareAdminCreditCommand(c *gin.Context, request adminCreditCommandRequest) (int64, CreditAmount, bool) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
 		return 0, 0, false
 	}
 	adminID, ok := authenticatedAdminID(c)
@@ -150,7 +150,7 @@ func (h *Handler) prepareAdminCreditCommand(c *gin.Context, request adminCreditC
 	}
 	amount, err := NewCreditAmount(request.creditAmount())
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "点子数量必须是有效正整数")
+		response.Error(c, http.StatusBadRequest, "Idea数量必须是有效正整数")
 		return 0, 0, false
 	}
 	return adminID, amount, true
@@ -189,7 +189,7 @@ func decodeAdminCreditRequest(c *gin.Context, destination any) error {
 
 func (h *Handler) GetWallet(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
 		return
 	}
 	userID, ok := parsePositiveInt64(c.Param("user_id"))
@@ -207,7 +207,7 @@ func (h *Handler) GetWallet(c *gin.Context) {
 
 func (h *Handler) GetCurrentWallet(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
 		return
 	}
 	userID, ok := authenticatedUserID(c)
@@ -224,7 +224,7 @@ func (h *Handler) GetCurrentWallet(c *gin.Context) {
 
 func (h *Handler) ListLedger(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
 		return
 	}
 	userID, ok := parsePositiveInt64(c.Param("user_id"))
@@ -237,7 +237,7 @@ func (h *Handler) ListLedger(c *gin.Context) {
 
 func (h *Handler) ListCurrentLedger(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
 		return
 	}
 	userID, ok := authenticatedUserID(c)
@@ -289,7 +289,7 @@ func authenticatedUserID(c *gin.Context) (int64, bool) {
 
 func (h *Handler) StartReconciliation(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
 		return
 	}
 	adminID, ok := authenticatedAdminID(c)
@@ -325,7 +325,7 @@ func (h *Handler) StartReconciliation(c *gin.Context) {
 
 func (h *Handler) GetReconciliationRun(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
 		return
 	}
 	runID, ok := parsePositiveInt64(c.Param("run_id"))
@@ -343,7 +343,7 @@ func (h *Handler) GetReconciliationRun(c *gin.Context) {
 
 func (h *Handler) ListReconciliationRuns(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
 		return
 	}
 	input, ok := parseReconciliationPage(c)
@@ -360,7 +360,7 @@ func (h *Handler) ListReconciliationRuns(c *gin.Context) {
 
 func (h *Handler) ListReconciliationFindings(c *gin.Context) {
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", nil)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
 		return
 	}
 	runID, ok := parsePositiveInt64(c.Param("run_id"))
@@ -421,22 +421,22 @@ func writeCreditError(c *gin.Context, err error) {
 	case errors.Is(err, ErrInvalidCommand):
 		response.Error(c, http.StatusBadRequest, "参数错误")
 	case errors.Is(err, ErrIdempotencyConflict):
-		response.Error(c, http.StatusConflict, "幂等键已用于不同的点子操作")
+		response.Error(c, http.StatusConflict, "幂等键已用于不同的Idea操作")
 	case errors.Is(err, ErrWalletNotFound):
-		response.Error(c, http.StatusNotFound, "点子钱包不存在")
+		response.Error(c, http.StatusNotFound, "Idea钱包不存在")
 	case errors.Is(err, ErrWalletFrozen):
-		response.Error(c, http.StatusLocked, "点子钱包已冻结")
+		response.Error(c, http.StatusLocked, "Idea钱包已冻结")
 	case errors.Is(err, ErrInsufficientCredits):
-		response.Error(c, http.StatusUnprocessableEntity, "点子不足")
+		response.Error(c, http.StatusUnprocessableEntity, "Idea不足")
 	case errors.Is(err, ErrChargeNotFound):
 		response.Error(c, http.StatusNotFound, "原扣款记录不存在")
 	case errors.Is(err, ErrRefundExceedsCharge):
 		response.Error(c, http.StatusUnprocessableEntity, "退款金额超过原扣款剩余额度")
 	case errors.Is(err, ErrReconciliationNotFound):
-		response.Error(c, http.StatusNotFound, "点子对账任务不存在")
+		response.Error(c, http.StatusNotFound, "Idea对账任务不存在")
 	case errors.Is(err, ErrReconciliationUnavailable):
-		response.InternalError(c, http.StatusServiceUnavailable, "点子对账服务暂不可用", err)
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", err)
 	default:
-		response.InternalError(c, http.StatusInternalServerError, "点子操作失败", err)
+		response.InternalError(c, http.StatusInternalServerError, "Idea操作失败", err)
 	}
 }

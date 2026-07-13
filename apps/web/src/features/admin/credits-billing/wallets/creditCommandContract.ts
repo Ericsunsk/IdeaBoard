@@ -3,6 +3,7 @@ import type {
   AdminCreditGrantRequest,
   AdminCreditRefundRequest,
 } from '../../../../shared/api/generated-query/model'
+import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 
 export type AdminCreditCommandKind = 'grant' | 'deduction' | 'refund'
 
@@ -35,14 +36,14 @@ export function validateAdminCreditCommand(
   let amountError = ''
   const amount = input.amountCredits
   if (amount == null || !Number.isSafeInteger(amount) || amount < 1) {
-    amountError = '请输入大于 0 的整数点子数量'
+    amountError = '请输入大于 0 的整数Idea数量'
   } else if (amount > MAX_CREDIT_AMOUNT) {
-    amountError = '点子数量超出单次操作上限'
+    amountError = 'Idea数量超出单次操作上限'
   } else if (
     input.kind === 'refund' &&
     (input.remainingRefundableCredits == null || amount > input.remainingRefundableCredits)
   ) {
-    amountError = `退款不能超过可退余额 ${input.remainingRefundableCredits ?? 0} 点子`
+    amountError = `退款不能超过可退余额 ${formatIdeaAmount(input.remainingRefundableCredits ?? 0)}`
   }
 
   const reason = input.reason.trim()
@@ -62,13 +63,13 @@ export function buildAdminCreditCommandRequest(
 ): AdminCreditCommandRequest {
   const validation = validateAdminCreditCommand(input)
   if (!validation.valid || input.amountCredits == null) {
-    throw new Error(validation.amountError || validation.reasonError || '点子操作参数无效')
+    throw new Error(validation.amountError || validation.reasonError || 'Idea操作参数无效')
   }
 
   const operationId = idFactory()
     .replace(/[^a-zA-Z0-9_-]/g, '')
     .slice(0, 96)
-  if (!operationId) throw new Error('无法生成点子操作标识')
+  if (!operationId) throw new Error('无法生成Idea操作标识')
   const common = {
     user_id: input.userId,
     amount_credits: input.amountCredits,

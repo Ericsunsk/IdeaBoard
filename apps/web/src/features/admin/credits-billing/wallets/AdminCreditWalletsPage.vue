@@ -5,7 +5,7 @@
     >
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div class="min-w-0">
-          <h2 class="m-0 text-admin-modal-title font-[780] text-admin-title-color">用户点子账户</h2>
+          <h2 class="m-0 text-admin-modal-title font-[780] text-admin-title-color">用户Idea账户</h2>
           <p class="mt-1 mb-0 text-admin-body text-admin-text-3">
             通过用户 ID 精确打开 Wallet，或搜索用户后选择。余额只能通过 Ledger command 变更。
           </p>
@@ -66,8 +66,8 @@
 
     <template v-if="selectedUserId">
       <section class="grid grid-cols-1 gap-3.5 md:grid-cols-3">
-        <AdminSummaryCard label="可用点子" :value="formatCredits(wallet?.available_credits ?? 0)" />
-        <AdminSummaryCard label="冻结点子" :value="formatCredits(wallet?.reserved_credits ?? 0)" />
+        <AdminSummaryCard label="可用Idea" :value="formatCredits(wallet?.available_credits ?? 0)" />
+        <AdminSummaryCard label="冻结Idea" :value="formatCredits(wallet?.reserved_credits ?? 0)" />
         <AdminSummaryCard
           label="Wallet 状态"
           :value="
@@ -154,7 +154,7 @@
               />
             </template>
           </Column>
-          <Column header="点子" style="width: 140px">
+          <Column header="Idea" style="width: 140px">
             <template #body="{ data }">
               <span class="font-[760] tabular-nums">
                 {{ getCreditCommandSign(data.command_type)
@@ -164,9 +164,11 @@
           </Column>
           <Column header="余额快照" style="width: 190px">
             <template #body="{ data }">
-              <div class="text-admin-body">可用 {{ data.available_credits_after }}</div>
+              <div class="text-admin-body">
+                可用 {{ formatCredits(data.available_credits_after) }}
+              </div>
               <div class="text-admin-caption text-admin-text-3">
-                冻结 {{ data.reserved_credits_after }}
+                冻结 {{ formatCredits(data.reserved_credits_after) }}
               </div>
             </template>
           </Column>
@@ -193,8 +195,8 @@
                 >
               </div>
               <div v-if="data.charge" class="mt-1 text-admin-caption text-admin-text-3">
-                已退 {{ data.charge.refunded_credits }} · 可退
-                {{ data.charge.remaining_refundable_credits }}
+                已退 {{ formatCredits(data.charge.refunded_credits) }} · 可退
+                {{ formatCredits(data.charge.remaining_refundable_credits) }}
               </div>
             </template>
           </Column>
@@ -398,8 +400,8 @@ function requestCommandConfirmation(draft: AdminCreditCommandDraft) {
   const kind = activeCommand.value
   const label = kind === 'grant' ? '赠送' : kind === 'deduction' ? '扣减' : '退款'
   confirm.request({
-    title: `确认${label}点子`,
-    message: `将为 ${selectedUserLabel.value} ${label} ${draft.amountCredits} 点子。原因：${draft.reason}`,
+    title: `确认${label}Idea`,
+    message: `将为 ${selectedUserLabel.value} ${label} ${formatCredits(draft.amountCredits)}。原因：${draft.reason}`,
     confirmLabel: `确认${label}`,
     intent: kind === 'grant' ? 'warn' : 'danger',
     onConfirm: async () => {

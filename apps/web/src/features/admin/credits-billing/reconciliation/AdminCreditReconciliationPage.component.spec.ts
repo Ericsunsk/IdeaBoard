@@ -90,7 +90,7 @@ describe('AdminCreditReconciliationPage', () => {
     await user.click(screen.getByRole('button', { name: '启动对账' }))
     expect(confirmRequestMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: '确认启动点子对账',
+        title: '确认启动Idea对账',
         message: expect.stringContaining('24 小时'),
       }),
     )

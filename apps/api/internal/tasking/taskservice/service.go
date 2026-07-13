@@ -198,7 +198,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		slog.Warn("submit task transaction failed", "task_id", taskID, "correlation_id", correlationID, "err", err)
 		if errors.Is(err, taskbilling.ErrInsufficientCredits) {
-			return "", validation.New("点子不足")
+			return "", validation.New("Idea不足")
 		}
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
@@ -238,7 +238,7 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 		return SubmitTaskReadiness{}, validation.New("AI 生图任务必须提供 client_action_id")
 	}
 	if s.taskBilling == nil {
-		return SubmitTaskReadiness{}, fmt.Errorf("点子计费服务暂不可用")
+		return SubmitTaskReadiness{}, fmt.Errorf("Idea计费服务暂不可用")
 	}
 	readiness, err := s.taskBilling.Readiness(ctx, userID, *billingRequest)
 	if err != nil {

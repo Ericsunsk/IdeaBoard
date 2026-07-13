@@ -5,7 +5,7 @@
 
 ## Context
 
-「点子」是 IdeaBoard 后续产品共用的 Closed-loop Virtual Credit。首个消费方会是 AI image workflows，但 Wallet 和 Ledger 必须独立于具体产品。
+「Idea」是 IdeaBoard 后续产品共用的 Closed-loop Virtual Credit。首个消费方会是 AI image workflows，但 Wallet 和 Ledger 必须独立于具体产品。
 
 Task submission 已要求 business Task、Credit Hold 和 River enqueue 处于同一 PostgreSQL transaction；Task 成功与 Capture 也需要原子提交。外部 ledger service 会把这一边界改造成 Saga/TCC，并引入当前不需要的补偿与 dual-write 风险。
 
@@ -19,7 +19,7 @@ Task submission 已要求 business Task、Credit Hold 和 River enqueue 处于�
 - User available/reserved 不得为负。账户锁按稳定 ID 顺序获取。
 - System Issuance、Revenue 和 Sink 按 Wallet shard，避免全局 system account 热行，同时保留可聚合的 account role 与 metadata。
 - Ledger rows 不得修改或删除；修正必须追加 reversal/correction Transaction。
-- 禁止把外部 billing/payment/ledger 作为点子余额的第二事实源。未来支付成功只能调用幂等 Grant。
+- 禁止把外部 billing/payment/ledger 作为Idea余额的第二事实源。未来支付成功只能调用幂等 Grant。
 - PostgreSQL schema owner/migration role 与 API runtime role 分离。Runtime 对 Credit tables 只有 SELECT，只能在自己的 transaction 内执行固定-search-path 的 typed `SECURITY DEFINER` Command function。
 
 ## Consequences

@@ -144,7 +144,7 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 	ready := readiness.Billing == nil || readiness.Billing.Sufficient
 	message := ""
 	if !ready {
-		message = "点子不足"
+		message = "Idea不足"
 	}
 	response.SuccessDTO(c, submitTaskReadinessResponse{Ready: ready, Message: message, Feature: readiness.Feature, Billing: readiness.Billing})
 }

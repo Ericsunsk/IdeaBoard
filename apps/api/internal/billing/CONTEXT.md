@@ -1,6 +1,6 @@
 # Billing Context
 
-Billing 是平台级商品身份与 Credit pricing context。它为 IdeaBoard 当前和未来产品提供全局 SKU Catalog、append-only price versions 与 server-side Quote；不拥有 Wallet、Ledger、Provider Account routing、subscription 或 invoice。
+Billing 是平台级商品身份与 Credit pricing context。用户看到的货币名称是 `Idea/Ideas`，内部价格字段和 domain terminology 继续使用 `Credit/credits`。它为 IdeaBoard 当前和未来产品提供全局 SKU Catalog、append-only price versions 与 server-side Quote；不拥有 Wallet、Ledger、Provider Account routing、subscription 或 invoice。
 
 ## Domain Language
 

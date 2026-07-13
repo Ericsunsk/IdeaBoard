@@ -61,6 +61,7 @@ import {
   WORKFLOW_FEATURE_SLUGS,
   type WorkflowFeature,
 } from '../../../../shared/domain/workflowFeatures'
+import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import {
   IMAGE_ACTION_MENU_ITEMS,
   type ImageActionMenuItem,
@@ -112,8 +113,10 @@ function isItemDisabled(item: ImageActionMenuItem) {
 function getItemTooltip(item: ImageActionMenuItem) {
   const billing = getItemBillingState(item)
   if (!billing) return item.label
-  if (billing.status === 'ready') return `${item.label} · ${billing.totalCredits ?? 0} 点子`
-  return `${item.label} · ${billing.reason || '正在获取点子价格'}`
+  if (billing.status === 'ready') {
+    return `${item.label} · ${formatIdeaAmount(billing.totalCredits ?? 0)}`
+  }
+  return `${item.label} · ${billing.reason || '正在获取Idea价格'}`
 }
 
 function onActionClick(item: ImageActionMenuItem) {

@@ -8,12 +8,12 @@ describe('UserAccountMenu', () => {
     const openCredits = vi.fn()
     const items: UserAccountMenuItem[] = [
       { key: 'profile', label: '账户管理', command: vi.fn() },
-      { key: 'credits', label: '点子', meta: '1,280', command: openCredits },
+      { key: 'credits', label: 'Idea', meta: '1,280', command: openCredits },
       { key: 'logout', label: '退出登录', command: vi.fn() },
     ]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
 
-    const credits = screen.getByRole('button', { name: '点子余额 1,280' })
+    const credits = screen.getByRole('button', { name: 'Idea余额 1,280' })
     const accountMenu = screen.getByRole('button', { name: '账户菜单' })
 
     expect(credits).toBeVisible()
@@ -22,7 +22,7 @@ describe('UserAccountMenu', () => {
 
     await user.click(accountMenu)
     expect(await screen.findByText('账户管理')).toBeVisible()
-    expect(screen.queryByText('点子')).toBeNull()
+    expect(screen.queryByText('Idea')).toBeNull()
 
     await user.click(credits)
     expect(openCredits).toHaveBeenCalledOnce()
@@ -31,12 +31,12 @@ describe('UserAccountMenu', () => {
   it('keeps the balance control stable while credits are loading', () => {
     const items: UserAccountMenuItem[] = [
       { key: 'profile', label: '账户管理', command: vi.fn() },
-      { key: 'credits', label: '点子', meta: '加载中', command: vi.fn() },
+      { key: 'credits', label: 'Idea', meta: '加载中', command: vi.fn() },
     ]
 
     render(UserAccountMenu, { props: { items } })
 
-    const credits = screen.getByRole('button', { name: '点子余额 加载中' })
+    const credits = screen.getByRole('button', { name: 'Idea余额 加载中' })
     expect(credits).toHaveAttribute('aria-busy', 'true')
     expect(credits).toHaveTextContent('加载中')
   })

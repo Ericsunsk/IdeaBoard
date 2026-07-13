@@ -13,6 +13,7 @@ import {
   type WorkflowFeature,
 } from '../../../../shared/domain/workflowFeatures'
 import type { SubmitTaskReadinessData } from '../../../../shared/api/task'
+import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import { fetchCanvasBillingReadiness } from './canvasBillingReadinessResource'
 import { subscribeCanvasTaskReadiness } from './taskReadinessEvents'
 
@@ -50,8 +51,8 @@ export const canvasBillingReadinessKey: InjectionKey<CanvasBillingReadinessStore
 function normalizeBlockedReason(message: string | undefined, fallback: string): string {
   const normalized = `${message ?? ''}`.trim()
   if (!normalized) return fallback
-  if (/点子.*不足|余额.*不足|insufficient/i.test(normalized)) return '点子不足'
-  if (/未配置|不存在/.test(normalized) && /SKU|价格|计价|点子/.test(normalized)) {
+  if (/Idea.*不足|余额.*不足|insufficient/i.test(normalized)) return 'Idea不足'
+  if (/未配置|不存在/.test(normalized) && /SKU|价格|计价|Idea/.test(normalized)) {
     return '价格未配置'
   }
   if (/停用|禁用|未启用/.test(normalized) && /价格|计价|SKU/.test(normalized)) {
@@ -89,7 +90,7 @@ export function createCanvasBillingReadinessStore(
         totalCredits: billing.total_credits,
         availableCredits: billing.available_credits,
         priceVersionId: billing.price_version_id,
-        reason: `点子不足（需要 ${billing.total_credits}，当前 ${billing.available_credits}）`,
+        reason: `Idea不足（需要 ${formatIdeaAmount(billing.total_credits)}，当前 ${formatIdeaAmount(billing.available_credits)}）`,
       }
       return
     }
@@ -105,7 +106,7 @@ export function createCanvasBillingReadinessStore(
       states[feature] = {
         feature,
         status: 'error',
-        reason: '点子计费信息暂不可用',
+        reason: 'Idea计费信息暂不可用',
       }
       return
     }
@@ -141,7 +142,7 @@ export function createCanvasBillingReadinessStore(
           status: 'blocked',
           reason: normalizeBlockedReason(
             error instanceof Error ? error.message : undefined,
-            '点子计费信息暂不可用',
+            'Idea计费信息暂不可用',
           ),
         }
       })

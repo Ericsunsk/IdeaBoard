@@ -5,7 +5,7 @@
     >
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div class="min-w-0">
-          <h2 class="m-0 text-admin-modal-title font-[780] text-admin-title-color">点子对账</h2>
+          <h2 class="m-0 text-admin-modal-title font-[780] text-admin-title-color">Idea对账</h2>
           <p class="mt-1 mb-0 text-admin-body text-admin-text-3">
             检查 Wallet、Ledger、Task Billing 与结算状态的一致性。异常仅报告和隔离，不执行自动修复。
           </p>
@@ -421,7 +421,7 @@ function requestStart() {
 
   const reason = reasonValidation.normalizedReason
   confirm.request({
-    title: '确认启动点子对账',
+    title: '确认启动Idea对账',
     message: `将扫描 Ledger 与 Task Billing，一旦发现高风险不一致可能隔离 Wallet。Stale Hold 阈值为 ${hours} 小时。`,
     confirmLabel: '启动对账',
     intent: 'warn',

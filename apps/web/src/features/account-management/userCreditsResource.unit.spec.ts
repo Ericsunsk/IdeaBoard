@@ -39,8 +39,8 @@ describe('userCreditsResource', () => {
   })
 
   it('surfaces API feedback instead of returning an empty wallet', async () => {
-    generated.getUserCreditWallet.mockResolvedValue({ code: 404, msg: '点子钱包不存在' })
+    generated.getUserCreditWallet.mockResolvedValue({ code: 404, msg: 'Idea钱包不存在' })
 
-    await expect(fetchUserCreditWallet()).rejects.toThrow('点子钱包不存在')
+    await expect(fetchUserCreditWallet()).rejects.toThrow('Idea钱包不存在')
   })
 })

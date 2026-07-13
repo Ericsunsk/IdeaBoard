@@ -2,7 +2,7 @@
   <div class="flex min-h-0 min-w-0 flex-col gap-4">
     <nav
       class="flex min-w-0 flex-wrap items-center gap-1 rounded-[var(--radius-ib-panel)] border border-admin-border-soft bg-admin-control-bg p-1.5"
-      aria-label="点子与计费"
+      aria-label="Idea与计费"
     >
       <RouterLink
         v-for="item in navigationItems"
@@ -29,7 +29,7 @@ import {
 } from '../../../shared/constants/routePaths'
 
 const navigationItems = [
-  { path: ADMIN_CREDIT_WALLETS_PATH, label: '用户点子账户', icon: Coins },
+  { path: ADMIN_CREDIT_WALLETS_PATH, label: '用户Idea账户', icon: Coins },
   { path: ADMIN_CREDIT_PRICING_PATH, label: 'SKU 与价格', icon: Page },
   { path: ADMIN_CREDIT_RECONCILIATION_PATH, label: '对账报告', icon: ShieldCheck },
 ] as const

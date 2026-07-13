@@ -10,7 +10,7 @@
   >
     <div :class="adminDialogFormBodyClass">
       <Message severity="info" :closable="false">
-        目标：{{ targetLabel }}。提交后还需要在二次确认中核对点子数量与原因。
+        目标：{{ targetLabel }}。提交后还需要在二次确认中核对Idea数量与原因。
       </Message>
 
       <div
@@ -24,7 +24,7 @@
 
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
-        label="点子数量"
+        label="Idea数量"
         for="admin-credit-command-amount"
         :error="showErrors ? validation.amountError : ''"
         required
@@ -113,9 +113,9 @@ const reason = ref('')
 const showErrors = ref(false)
 
 const dialogTitle = computed(() => {
-  if (props.kind === 'grant') return '赠送点子'
-  if (props.kind === 'deduction') return '扣减点子'
-  return '退还点子'
+  if (props.kind === 'grant') return '赠送Idea'
+  if (props.kind === 'deduction') return '扣减Idea'
+  return '退还Idea'
 })
 const submitLabel = computed(() => (props.kind === 'refund' ? '核对退款' : '下一步：确认'))
 const submitSeverity = computed(() => (props.kind === 'grant' ? undefined : 'danger'))

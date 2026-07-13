@@ -286,7 +286,7 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, ErrPricingUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "SKU 当前不可计价")
 	case errors.Is(err, ErrQuoteTotalExceeded):
-		response.Error(c, http.StatusUnprocessableEntity, "点子报价超过允许上限")
+		response.Error(c, http.StatusUnprocessableEntity, "Idea报价超过允许上限")
 	case errors.Is(err, ErrServiceUnavailable):
 		response.InternalError(c, http.StatusServiceUnavailable, "计费服务暂不可用", err)
 	default:

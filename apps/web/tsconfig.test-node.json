@@ -4,6 +4,10 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test-node.tsbuildinfo",
     "types": ["vite/client", "vitest/globals", "node"]
   },
-  "include": ["src/features/canvas/components/CanvasGroupFramesOverlay.component.spec.ts"],
+  "include": [
+    "src/app/humanFacingCopy.contract.spec.ts",
+    "src/app/style.contract.spec.ts",
+    "src/features/canvas/components/CanvasGroupFramesOverlay.component.spec.ts"
+  ],
   "exclude": []
 }

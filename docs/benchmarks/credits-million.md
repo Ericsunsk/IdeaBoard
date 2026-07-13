@@ -34,7 +34,7 @@ CREDITS_LOAD_TEST=1 go test ./internal/credits \
 | Grant on another Wallet while first Wallet transaction stayed open | 5.647ms, no global system-account blocking |
 | 1,000 Holds on 1,000 pre-provisioned Wallets, 64 goroutines | 539.579ms = 1,853.3 commands/s |
 
-“100 万笔/天”平均约 11.6 tx/s；20× 目标为 232 commands/s。本次先创建 1,000 个测试用户并完成 Wallet/2 点子 Grant 预置，预置时间不计入 throughput；计时边界只包含 64 个 goroutine 从开始并发执行到 1,000 个不同 Wallet 的 Hold 全部 commit。实测 1,853.3 commands/s，约为平均负载 160×、最低 20× 目标的 8.0×。命令使用 per-Wallet system account shard，open transaction 锁住一个 Wallet 时另一 Wallet 仍在 5.647ms 完成，未出现全局 system account 串行化。
+“100 万笔/天”平均约 11.6 tx/s；20× 目标为 232 commands/s。本次先创建 1,000 个测试用户并完成 Wallet/`2 Ideas` Grant 预置，预置时间不计入 throughput；计时边界只包含 64 个 goroutine 从开始并发执行到 1,000 个不同 Wallet 的 Hold 全部 commit。实测 1,853.3 commands/s，约为平均负载 160×、最低 20× 目标的 8.0×。命令使用 per-Wallet system account shard，open transaction 锁住一个 Wallet 时另一 Wallet 仍在 5.647ms 完成，未出现全局 system account 串行化。
 
 资源指标在同一 harness 内采集：数据库占用通过 Reconciliation 前后 `pg_database_size(current_database())` 读取；Go heap 通过前后两次 `runtime.ReadMemStats().HeapAlloc` 读取。它们是进程/数据库级 point-in-time 指标，不等同于 peak RSS 或 PostgreSQL buffer peak，因此用于判断扫描是否把结果集拉入 Go process，以及 report metadata 的量级；production capacity planning 仍应接入容器 RSS、PostgreSQL shared buffers/temp bytes 与 I/O telemetry。
 
