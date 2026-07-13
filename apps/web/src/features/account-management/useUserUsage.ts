@@ -4,7 +4,7 @@ import { fetchUserUsage, userUsageQueryKeys } from './userUsageResource'
 
 export function useUserUsage(enabled: MaybeRefOrGetter<boolean> = true) {
   const query = useQuery({
-    queryKey: userUsageQueryKeys.lifetime,
+    queryKey: userUsageQueryKeys.current,
     queryFn: fetchUserUsage,
     enabled: () => toValue(enabled),
     retry: false,

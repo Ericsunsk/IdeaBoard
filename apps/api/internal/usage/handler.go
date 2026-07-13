@@ -9,19 +9,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type LifetimeReader interface {
-	GetLifetime(context.Context, int64) (LifetimeUsage, error)
+type Reader interface {
+	GetCurrent(context.Context, int64) (Usage, error)
 }
 
 type Handler struct {
-	service LifetimeReader
+	service Reader
 }
 
-func NewHandler(service LifetimeReader) *Handler {
+func NewHandler(service Reader) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) GetCurrentLifetime(c *gin.Context) {
+func (h *Handler) GetCurrent(c *gin.Context) {
 	if h == nil || h.service == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "用量统计服务暂不可用", nil)
 		return
@@ -31,12 +31,12 @@ func (h *Handler) GetCurrentLifetime(c *gin.Context) {
 		response.Error(c, http.StatusUnauthorized, "未登录")
 		return
 	}
-	result, err := h.service.GetLifetime(c.Request.Context(), userID)
+	result, err := h.service.GetCurrent(c.Request.Context(), userID)
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "加载用量统计失败", err)
 		return
 	}
-	if err := ValidateLifetimeUsage(result); err != nil {
+	if err := ValidateUsage(result); err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "加载用量统计失败", err)
 		return
 	}

@@ -5,19 +5,29 @@
       <h2 class="mt-1 mb-0 text-[26px] leading-tight font-bold text-ib-text">用量统计</h2>
     </header>
 
-    <section v-if="isPending" :class="summaryPanelClass" aria-label="正在加载用量统计">
-      <div :class="summaryGridClass">
-        <article
-          v-for="metric in summaryCellDefinitions"
-          :key="metric.label"
-          :class="[summaryCellClass, metric.cellClass]"
-          aria-hidden="true"
-        >
-          <div class="h-9 w-2/3 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
-          <div class="mt-3 h-5 w-1/2 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
-        </article>
-      </div>
-    </section>
+    <template v-if="isPending">
+      <section :class="summaryPanelClass" aria-label="正在加载用量统计">
+        <div :class="summaryGridClass">
+          <article
+            v-for="metric in summaryCellDefinitions"
+            :key="metric.label"
+            :class="[summaryCellClass, metric.cellClass]"
+            aria-hidden="true"
+          >
+            <div class="h-9 w-2/3 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+            <div class="mt-3 h-5 w-1/2 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+          </article>
+        </div>
+      </section>
+
+      <section
+        :class="[trendPanelClass, 'min-h-[334px]']"
+        aria-label="正在加载点子消耗趋势"
+      >
+        <div class="h-5 w-28 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+        <div class="mt-5 h-[260px] rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+      </section>
+    </template>
 
     <section
       v-else-if="error"
@@ -36,29 +46,49 @@
       </Button>
     </section>
 
-    <section v-else :class="summaryPanelClass" aria-label="用量摘要">
-      <div :class="summaryGridClass">
-        <article
-          v-for="metric in metrics"
-          :key="metric.label"
-          :class="[summaryCellClass, metric.cellClass]"
-        >
-          <p
-            class="m-0 break-all whitespace-normal font-mono text-[34px] leading-tight font-bold text-ib-text max-[900px]:text-[30px] max-[640px]:text-[28px]"
+    <template v-else>
+      <section :class="summaryPanelClass" aria-label="用量摘要">
+        <div :class="summaryGridClass">
+          <article
+            v-for="metric in metrics"
+            :key="metric.label"
+            :class="[summaryCellClass, metric.cellClass]"
           >
-            {{ metric.value }}
-          </p>
-          <p class="mt-3 mb-0 text-sm font-semibold text-ib-text-muted">{{ metric.label }}</p>
-        </article>
-      </div>
-    </section>
+            <p
+              class="m-0 break-all whitespace-normal font-mono text-[34px] leading-tight font-bold text-ib-text max-[900px]:text-[30px] max-[640px]:text-[28px]"
+            >
+              {{ metric.value }}
+            </p>
+            <p class="mt-3 mb-0 text-sm font-semibold text-ib-text-muted">{{ metric.label }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section :class="trendPanelClass" aria-label="点子消耗趋势">
+        <header class="flex min-w-0 items-center justify-between gap-4">
+          <h3 class="m-0 text-[16px] leading-6 font-bold text-ib-text">点子消耗</h3>
+          <span class="shrink-0 text-[12px] font-semibold text-ib-text-subtle">最近 30 天</span>
+        </header>
+        <Chart
+          type="line"
+          class="mt-4 h-[260px] w-full"
+          :data="trendChart.data"
+          :options="trendChart.options"
+        />
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import Button from 'primevue/button'
+import Chart from 'primevue/chart'
 import { useUserUsage } from '../useUserUsage'
+import {
+  buildUserUsageTrendChart,
+  resolveUserUsageChartTheme,
+} from '../userUsageTrendChart'
 
 const props = defineProps<{ active: boolean }>()
 const { usage, isPending, error, refresh } = useUserUsage(() => props.active)
@@ -68,6 +98,9 @@ const summaryPanelClass =
   'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
 const summaryCellClass = 'min-h-[108px] min-w-0 p-5 max-[640px]:min-h-[100px] max-[640px]:p-4'
+const trendPanelClass =
+  'min-w-0 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4'
+const trendChartTheme = resolveUserUsageChartTheme()
 
 const summaryCellDefinitions = [
   {
@@ -103,6 +136,10 @@ const metrics = computed(() => {
   ]
   return summaryCellDefinitions.map((metric, index) => ({ ...metric, value: values[index] }))
 })
+
+const trendChart = computed(() =>
+  buildUserUsageTrendChart(usage.value?.trend || [], trendChartTheme),
+)
 
 function formatInteger(value: number) {
   return integerFormatter.format(value)

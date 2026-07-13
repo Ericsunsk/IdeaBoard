@@ -6,8 +6,14 @@
  */
 import type { UserUsageLifetime } from './userUsageLifetime'
 import type { UserUsageTimezone } from './userUsageTimezone'
+import type { UserUsageTrendPoint } from './userUsageTrendPoint'
 
 export interface UserUsage {
   timezone: UserUsageTimezone
   lifetime: UserUsageLifetime
+  /**
+   * @minItems 30
+   * @maxItems 30
+   */
+  trend: UserUsageTrendPoint[]
 }

@@ -17,7 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestServiceGetLifetimeKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T) {
+func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
 	const userID int64 = 901
@@ -58,9 +58,9 @@ func TestServiceGetLifetimeKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.
 		return time.Date(2026, time.July, 13, 8, 0, 0, 0, location)
 	})
 
-	beforeDelete, err := service.GetLifetime(ctx, userID)
+	beforeDelete, err := service.GetCurrent(ctx, userID)
 	if err != nil {
-		t.Fatalf("GetLifetime() error = %v", err)
+		t.Fatalf("GetCurrent() error = %v", err)
 	}
 	if beforeDelete.Lifetime.TotalCredits != 120 || beforeDelete.Lifetime.PeakDailyCredits != 120 {
 		t.Fatalf("capture summary = %+v, want total=120 peak=120", beforeDelete.Lifetime)
@@ -71,6 +71,16 @@ func TestServiceGetLifetimeKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.
 	if beforeDelete.Lifetime.TaskCount != 4 || beforeDelete.Lifetime.ActiveDays != 1 {
 		t.Fatalf("task summary = %+v, want count=4 active_days=1", beforeDelete.Lifetime)
 	}
+	if len(beforeDelete.Trend) != DefaultTrendDays {
+		t.Fatalf("trend buckets = %d, want %d", len(beforeDelete.Trend), DefaultTrendDays)
+	}
+	var trendTotal int64
+	for _, day := range beforeDelete.Trend {
+		trendTotal += day.Credits
+	}
+	if trendTotal != 120 {
+		t.Fatalf("trend total = %d, want gross captures 120", trendTotal)
+	}
 
 	repo := taskstore.NewRepository(db)
 	for _, taskID := range taskIDs {
@@ -78,9 +88,9 @@ func TestServiceGetLifetimeKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.
 			t.Fatalf("delete task %s: %v", taskID, err)
 		}
 	}
-	afterDelete, err := service.GetLifetime(ctx, userID)
+	afterDelete, err := service.GetCurrent(ctx, userID)
 	if err != nil {
-		t.Fatalf("GetLifetime() after task deletion error = %v", err)
+		t.Fatalf("GetCurrent() after task deletion error = %v", err)
 	}
 	if afterDelete.Lifetime.TaskCount != beforeDelete.Lifetime.TaskCount || afterDelete.Lifetime.ActiveDays != beforeDelete.Lifetime.ActiveDays {
 		t.Fatalf("durable task usage changed after deletion: before=%+v after=%+v", beforeDelete.Lifetime, afterDelete.Lifetime)

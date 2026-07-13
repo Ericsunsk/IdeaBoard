@@ -12,11 +12,13 @@ import (
 
 const ShanghaiTimezone = "Asia/Shanghai"
 const MaxSafeInteger int64 = 9_007_199_254_740_991
+const DefaultTrendDays = 30
 
 var ErrUnsafeNumber = errors.New("usage value exceeds JavaScript safe integer range")
 
 type CaptureUsageReader interface {
 	GetCaptureUsage(context.Context, int64, *time.Location) (int64, int64, time.Time, error)
+	GetDailyCaptureUsage(context.Context, int64, *time.Location, time.Time, time.Time) (map[string]int64, error)
 }
 
 type LogicalTaskUsageReader interface {
@@ -31,9 +33,15 @@ type LifetimeSummary struct {
 	ActiveDays          int64   `json:"active_days"`
 }
 
-type LifetimeUsage struct {
+type DailyUsage struct {
+	Date    string `json:"date"`
+	Credits int64  `json:"credits"`
+}
+
+type Usage struct {
 	Timezone string          `json:"timezone"`
 	Lifetime LifetimeSummary `json:"lifetime"`
+	Trend    []DailyUsage    `json:"trend"`
 }
 
 type Service struct {
@@ -53,39 +61,40 @@ func NewService(
 	return &Service{captures: captures, tasks: tasks, now: now}
 }
 
-func (s *Service) GetLifetime(ctx context.Context, userID int64) (LifetimeUsage, error) {
+func (s *Service) GetCurrent(ctx context.Context, userID int64) (Usage, error) {
 	if s == nil || s.captures == nil || s.tasks == nil {
-		return LifetimeUsage{}, fmt.Errorf("usage service: readers not configured")
+		return Usage{}, fmt.Errorf("usage service: readers not configured")
 	}
 	if userID <= 0 {
-		return LifetimeUsage{}, fmt.Errorf("usage service: invalid user id")
+		return Usage{}, fmt.Errorf("usage service: invalid user id")
 	}
 	location, err := time.LoadLocation(ShanghaiTimezone)
 	if err != nil {
-		return LifetimeUsage{}, fmt.Errorf("usage service: load timezone: %w", err)
+		return Usage{}, fmt.Errorf("usage service: load timezone: %w", err)
 	}
 	totalCredits, peakDailyCredits, firstCaptureDay, err := s.captures.GetCaptureUsage(ctx, userID, location)
 	if err != nil {
-		return LifetimeUsage{}, fmt.Errorf("usage service: read settled captures: %w", err)
+		return Usage{}, fmt.Errorf("usage service: read settled captures: %w", err)
 	}
 	if err := validateSafeInteger("total credits", totalCredits); err != nil {
-		return LifetimeUsage{}, err
+		return Usage{}, err
 	}
 	if err := validateSafeInteger("peak daily credits", peakDailyCredits); err != nil {
-		return LifetimeUsage{}, err
+		return Usage{}, err
 	}
 	taskCount, activeDays, err := s.tasks.GetTaskUsage(ctx, userID, location)
 	if err != nil {
-		return LifetimeUsage{}, fmt.Errorf("usage service: read logical tasks: %w", err)
+		return Usage{}, fmt.Errorf("usage service: read logical tasks: %w", err)
 	}
 	if err := validateSafeInteger("task count", taskCount); err != nil {
-		return LifetimeUsage{}, err
+		return Usage{}, err
 	}
 	if err := validateSafeInteger("active days", activeDays); err != nil {
-		return LifetimeUsage{}, err
+		return Usage{}, err
 	}
 
-	result := LifetimeUsage{
+	today := dateInLocation(s.now(), location)
+	result := Usage{
 		Timezone: ShanghaiTimezone,
 		Lifetime: LifetimeSummary{
 			TotalCredits:     totalCredits,
@@ -94,18 +103,37 @@ func (s *Service) GetLifetime(ctx context.Context, userID int64) (LifetimeUsage,
 			ActiveDays:       activeDays,
 		},
 	}
-	if firstCaptureDay.IsZero() {
-		return result, nil
+	if !firstCaptureDay.IsZero() {
+		firstDay := dateInLocation(firstCaptureDay, location)
+		days := int64(today.Sub(firstDay).Hours()/24) + 1
+		if days < 1 {
+			days = 1
+		}
+		result.Lifetime.AverageDailyCredits = averageCredits(totalCredits, days)
 	}
-	firstDay := dateInLocation(firstCaptureDay, location)
-	today := dateInLocation(s.now(), location)
-	days := int64(today.Sub(firstDay).Hours()/24) + 1
-	if days < 1 {
-		days = 1
+
+	trendStart := today.AddDate(0, 0, -(DefaultTrendDays - 1))
+	dailyCredits, err := s.captures.GetDailyCaptureUsage(
+		ctx,
+		userID,
+		location,
+		trendStart,
+		today.AddDate(0, 0, 1),
+	)
+	if err != nil {
+		return Usage{}, fmt.Errorf("usage service: read daily settled captures: %w", err)
 	}
-	result.Lifetime.AverageDailyCredits = averageCredits(totalCredits, days)
-	if err := ValidateLifetimeUsage(result); err != nil {
-		return LifetimeUsage{}, err
+	result.Trend = make([]DailyUsage, 0, DefaultTrendDays)
+	for dayIndex := 0; dayIndex < DefaultTrendDays; dayIndex++ {
+		date := trendStart.AddDate(0, 0, dayIndex).Format(time.DateOnly)
+		credits := dailyCredits[date]
+		if err := validateSafeInteger("daily credits", credits); err != nil {
+			return Usage{}, err
+		}
+		result.Trend = append(result.Trend, DailyUsage{Date: date, Credits: credits})
+	}
+	if err := ValidateUsage(result); err != nil {
+		return Usage{}, err
 	}
 	return result, nil
 }
@@ -126,7 +154,7 @@ func averageCredits(totalCredits, days int64) float64 {
 	return float64(whole) + float64(tenths)/10
 }
 
-func ValidateLifetimeUsage(value LifetimeUsage) error {
+func ValidateUsage(value Usage) error {
 	for name, integer := range map[string]int64{
 		"total credits":      value.Lifetime.TotalCredits,
 		"peak daily credits": value.Lifetime.PeakDailyCredits,
@@ -140,6 +168,17 @@ func ValidateLifetimeUsage(value LifetimeUsage) error {
 	average := value.Lifetime.AverageDailyCredits
 	if math.IsNaN(average) || math.IsInf(average, 0) || average < 0 || average > float64(MaxSafeInteger) {
 		return fmt.Errorf("%w: average daily credits", ErrUnsafeNumber)
+	}
+	for _, day := range value.Trend {
+		if err := validateSafeInteger("daily credits", day.Credits); err != nil {
+			return err
+		}
+	}
+	if value.Timezone != ShanghaiTimezone {
+		return fmt.Errorf("usage response: unsupported timezone %q", value.Timezone)
+	}
+	if len(value.Trend) != DefaultTrendDays {
+		return fmt.Errorf("usage response: trend bucket count = %d, want %d", len(value.Trend), DefaultTrendDays)
 	}
 	return nil
 }

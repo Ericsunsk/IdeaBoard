@@ -16,7 +16,7 @@
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | Executable workflow feature contract、task parameter shaping、prompt templates、prompt assembly | Workflow helpers, prompt engine/repository/handler |
 | Billing | `internal/billing` | 全局 SKU Catalog、versioned Credit pricing、server-side Quote snapshot | `billing.Service.Quote`, `billing.PriceSnapshot`, Admin billing handler |
 | Credits | `internal/credits` | 平台点子 Wallet、Double-entry Ledger、余额 projection、幂等 Commands | `credits.Commands`, `credits.WalletReader`, `credits.Service.InTx`, `credits.Service.InSQLTx` |
-| Usage | `internal/usage` | 用户侧点子消耗与 durable logical AI Task submission 的只读聚合 | `usage.Service`, caller-owned `CaptureUsageReader`, caller-owned `LogicalTaskUsageReader` |
+| Usage | `internal/usage` | 用户侧点子消耗的 Lifetime 摘要、每日 Capture Trend 与 durable logical AI Task submission 只读聚合 | `usage.Service`, caller-owned `CaptureUsageReader`, caller-owned `LogicalTaskUsageReader` |
 
 ## Dependency Direction
 

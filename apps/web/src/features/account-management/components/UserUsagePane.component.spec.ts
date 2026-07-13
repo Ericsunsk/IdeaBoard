@@ -16,6 +16,7 @@ const usageState = vi.hoisted(() => ({
             task_count: number
             active_days: number
           }
+          trend: { date: string; credits: number }[]
         }
       | undefined,
     __v_isRef: true,
@@ -33,10 +34,19 @@ const ButtonStub = defineComponent({
   template: '<button type="button"><slot /></button>',
 })
 
+const chartStub = {
+  props: {
+    data: { type: Object, required: true },
+    options: { type: Object, required: true },
+  },
+  template:
+    '<div data-testid="usage-trend-chart" :data-points="String(data.datasets[0].data.length)" :data-datasets="String(data.datasets.length)" />',
+}
+
 function renderUsagePane() {
   return renderWithUser(UserUsagePane, {
     props: { active: true },
-    global: { stubs: { Button: ButtonStub } },
+    global: { stubs: { Button: ButtonStub, Chart: chartStub } },
   })
 }
 
@@ -51,6 +61,7 @@ describe('UserUsagePane', () => {
         task_count: 9,
         active_days: 4,
       },
+      trend: buildZeroTrend(),
     }
     usageState.isPending.value = false
     usageState.error.value = null
@@ -74,6 +85,7 @@ describe('UserUsagePane', () => {
         task_count: 9,
         active_days: 4,
       },
+      trend: buildZeroTrend(),
     }
     usageState.isPending.value = false
     usageState.error.value = null
@@ -95,7 +107,17 @@ describe('UserUsagePane', () => {
   })
 
   it('keeps the five zero metrics visible when no records exist', () => {
-    usageState.usage.value = undefined
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 0,
+        peak_daily_credits: 0,
+        average_daily_credits: 0,
+        task_count: 0,
+        active_days: 0,
+      },
+      trend: buildZeroTrend(),
+    }
     usageState.isPending.value = false
     usageState.error.value = null
 
@@ -103,6 +125,9 @@ describe('UserUsagePane', () => {
 
     expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('总消耗')
     expect(screen.getAllByText('0')).toHaveLength(5)
+    expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
+    expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-datasets', '1')
+    expect(screen.queryByText('暂无数据')).not.toBeInTheDocument()
   })
 
   it('shows a local skeleton while the first request is pending', () => {
@@ -124,6 +149,7 @@ describe('UserUsagePane', () => {
       'max-[640px]:p-4',
     )
     expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
+    expect(screen.getByLabelText('正在加载点子消耗趋势')).toHaveClass('min-h-[334px]')
     expect(screen.queryByRole('region', { name: '用量摘要' })).not.toBeInTheDocument()
   })
 
@@ -146,6 +172,7 @@ describe('UserUsagePane', () => {
         task_count: 9,
         active_days: 4,
       },
+      trend: buildZeroTrend(),
     }
     usageState.isPending.value = false
     renderUsagePane()
@@ -156,6 +183,32 @@ describe('UserUsagePane', () => {
     expect(loadedClasses).toEqual(loadingClasses)
     expect(loadedClasses[0]).toContain('min-h-[108px]')
     expect(loadedClasses[0]).toContain('max-[640px]:min-h-[100px]')
+  })
+
+  it('renders the server-owned monthly credit trend below the lifetime summary', () => {
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 99,
+        peak_daily_credits: 42,
+        average_daily_credits: 3.3,
+        task_count: 5,
+        active_days: 4,
+      },
+      trend: buildZeroTrend().map((point, index) => ({
+        ...point,
+        credits: index === 29 ? 99 : 0,
+      })),
+    }
+    usageState.isPending.value = false
+    usageState.error.value = null
+
+    renderUsagePane()
+
+    expect(screen.getByRole('region', { name: '点子消耗趋势' })).toBeVisible()
+    expect(screen.getByText('最近 30 天')).toBeVisible()
+    expect(screen.getByTestId('usage-trend-chart')).toHaveClass('h-[260px]')
+    expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
   })
 
   it('shows an inline retry when loading fails', async () => {
@@ -171,3 +224,10 @@ describe('UserUsagePane', () => {
     expect(usageState.refresh).toHaveBeenCalledOnce()
   })
 })
+
+function buildZeroTrend() {
+  return Array.from({ length: 30 }, (_, index) => ({
+    date: `2026-07-${String(index + 1).padStart(2, '0')}`,
+    credits: 0,
+  }))
+}

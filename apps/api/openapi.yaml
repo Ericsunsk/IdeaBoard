@@ -110,7 +110,7 @@ paths:
         - cookieAuth: []
       responses:
         '200':
-          description: Current authenticated user's lifetime Credit usage summary
+          description: Current authenticated user's lifetime Credit usage and default 30-day trend
           content:
             application/json:
               schema:
@@ -2206,12 +2206,24 @@ components:
         task_count: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
         active_days: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
 
+    UserUsageTrendPoint:
+      type: object
+      required: [date, credits]
+      properties:
+        date: { type: string, format: date }
+        credits: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
+
     UserUsage:
       type: object
-      required: [timezone, lifetime]
+      required: [timezone, lifetime, trend]
       properties:
         timezone: { type: string, enum: [Asia/Shanghai] }
         lifetime: { $ref: '#/components/schemas/UserUsageLifetime' }
+        trend:
+          type: array
+          minItems: 30
+          maxItems: 30
+          items: { $ref: '#/components/schemas/UserUsageTrendPoint' }
 
     CreditReconciliationRequest:
       type: object

@@ -7,7 +7,7 @@ export type AccountUsage = UserUsage
 
 export const userUsageQueryKeys = {
   all: ['user', 'usage'] as const,
-  lifetime: ['user', 'usage', 'lifetime'] as const,
+  current: ['user', 'usage', 'current'] as const,
 }
 
 export async function fetchUserUsage(): Promise<AccountUsage> {

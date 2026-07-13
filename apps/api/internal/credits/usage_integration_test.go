@@ -32,6 +32,20 @@ func TestCaptureUsageAggregationUsesShanghaiDayBoundary(t *testing.T) {
 	if total != 120 || peak != 100 || !firstDay.Equal(wantFirstDay) {
 		t.Fatalf("capture usage total=%d peak=%d first=%s, want 120/100/%s", total, peak, firstDay, wantFirstDay)
 	}
+
+	daily, err := service.GetDailyCaptureUsage(
+		ctx,
+		userID,
+		location,
+		time.Date(2026, time.July, 10, 0, 0, 0, 0, location),
+		time.Date(2026, time.July, 12, 0, 0, 0, 0, location),
+	)
+	if err != nil {
+		t.Fatalf("GetDailyCaptureUsage() error = %v", err)
+	}
+	if daily["2026-07-10"] != 20 || daily["2026-07-11"] != 100 || len(daily) != 2 {
+		t.Fatalf("daily capture usage = %+v, want Shanghai buckets 20/100", daily)
+	}
 }
 
 func TestCaptureUsageAggregationUsesPartialCoveringIndex(t *testing.T) {
@@ -79,6 +93,37 @@ FROM daily_captures`, targetUserID, "Asia/Shanghai")
 	}
 	if !strings.Contains(plan.String(), "idx_credit_transactions_capture_user_created") {
 		t.Fatalf("normal planner did not use partial covering index:\n%s", plan.String())
+	}
+
+	dailyRows, err := pool.Query(ctx, `
+EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF, SUMMARY OFF)
+SELECT ((created_at AT TIME ZONE $2)::date)::text AS capture_day,
+       SUM(command_amount)::bigint AS amount
+FROM credit_transactions
+WHERE wallet_user_id = $1
+  AND command_type = 'capture'
+  AND created_at >= $3
+  AND created_at < $4
+GROUP BY (created_at AT TIME ZONE $2)::date
+ORDER BY capture_day`, targetUserID, "Asia/Shanghai", time.Now().AddDate(0, 0, -29), time.Now().AddDate(0, 0, 1))
+	if err != nil {
+		t.Fatalf("explain daily capture trend: %v", err)
+	}
+	defer dailyRows.Close()
+	var dailyPlan strings.Builder
+	for dailyRows.Next() {
+		var line string
+		if err := dailyRows.Scan(&line); err != nil {
+			t.Fatalf("scan daily plan: %v", err)
+		}
+		dailyPlan.WriteString(line)
+		dailyPlan.WriteByte('\n')
+	}
+	if err := dailyRows.Err(); err != nil {
+		t.Fatalf("read daily plan: %v", err)
+	}
+	if !strings.Contains(dailyPlan.String(), "idx_credit_transactions_capture_user_created") {
+		t.Fatalf("normal planner did not use capture index for daily trend:\n%s", dailyPlan.String())
 	}
 }
 
