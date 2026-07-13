@@ -41,3 +41,36 @@ CREDITS_LOAD_TEST=1 go test ./internal/credits \
 当前 100 万 Transactions 下完整扫描为 2.741s，现有 `credit_postings(transaction_id)`、`credit_postings(account_id)`、`credit_transactions(related_transaction_id)`、Wallet/status 和 Task Billing PK/index 足够。暂不 partition，避免增加 routing/maintenance complexity。触发重新评估的明确阈值是：单表达到 1 亿 rows、full scan 超过 5 分钟运营窗口、或扫描产生持续 temp-file spill / I/O saturation 任一项；届时优先按 `credit_transactions.created_at` 做 monthly time-range partition，并保持 `transaction_id`/idempotency 全局唯一策略，Reconciliation 再改为 high-water-mark incremental scan + 周期性 full scan。findings/run tables 体量远小于 Ledger，继续使用普通 B-tree。
 
 这些数字用于回归比较，不是 production SLO；硬件、PostgreSQL cache 和 container storage 会显著影响结果。
+
+## User Usage Read Model Baseline
+
+用户侧用量统计使用同一个显式 load-test 开关，但由独立 harness 负责造数、Query Plan 与 latency 采样：
+
+```bash
+cd apps/api
+export API_TEST_DATABASE_DSN='postgres://...'
+CREDITS_LOAD_TEST=1 go test ./internal/usage \
+  -run '^TestUsageMillionTransactionDataset$' -count=1 -v
+```
+
+`API_TEST_DATABASE_DSN` 仍必须指向 migration owner；harness 在隔离 schema 中运行并自动清理。`CREDITS_LOAD_TEST_TRANSACTIONS` 可提高规模，但不能低于 1,000,000。数据集包含 100 个用户、1 个目标重用户和跨用户 noise；目标用户占 10%，用于同时观察 selective range scan 与较重的 Lifetime 聚合。latency 采样直接调用未缓存的 Usage compute seam，因此不会被应用层 30 秒 cache 命中掩盖。
+
+2026-07-13 本地 Docker 环境结果：
+
+| Item | Result |
+| ---- | ------ |
+| PostgreSQL | 17.10 |
+| Go | 1.26.5 |
+| Host | macOS arm64, 8 logical CPUs |
+| Dataset | 1,000,000 Capture Transactions / 2,000,000 balanced Postings / 1,000,000 Task Billing Snapshots |
+| Users | 100；目标用户 100,000 Capture facts + 100,000 Task facts |
+| Capture seed | 1m35.331s |
+| Task Billing snapshot seed | 22.164s |
+| Independent fact verification | 2.217s |
+| Planner check | `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` 命中 `idx_credit_transactions_capture_user_created` |
+| Uncached `7d` | p50 74.129ms / p95 82.243ms |
+| Uncached `30d` | p50 74.273ms / p95 91.466ms |
+| Uncached `1y` | p50 100.195ms / p95 102.928ms |
+| Samples | 每个 range 1 次 warm-up + 20 次采样 |
+
+该基线下 365 个 daily buckets 的 uncached p95 仍低于 110ms，因此首版继续实时聚合 immutable Credit Capture 与 Task Billing snapshot，不引入 Daily Projection。API 实例使用 feature-local、容量 2,048、TTL 约 30 秒的 LRU cache；多实例之间不做 distributed invalidation，因此最多约 30 秒 eventual freshness 是明确 contract。上述 latency 仍是 warm local filesystem/PostgreSQL cache 下的回归基线，不是 production SLO；若线上 p95、buffer reads 或用户级数据倾斜明显超出该量级，再单独设计 projection，而不是把它隐式加入当前 read path。

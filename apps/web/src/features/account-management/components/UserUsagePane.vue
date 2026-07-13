@@ -1,11 +1,10 @@
 <template>
-  <div class="grid gap-6" aria-label="用量统计">
+  <div class="grid min-w-0 gap-6" aria-label="用量统计">
     <header>
-      <p class="m-0 text-[12px] font-semibold text-ib-text-subtle">Lifetime 数据 · Asia/Shanghai</p>
-      <h2 class="mt-1 mb-0 text-[26px] leading-tight font-bold text-ib-text">用量统计</h2>
+      <h2 class="m-0 text-[26px] leading-tight font-bold text-ib-text">用量统计</h2>
     </header>
 
-    <template v-if="isPending">
+    <template v-if="isInitialPending">
       <section :class="summaryPanelClass" aria-label="正在加载用量统计">
         <div :class="summaryGridClass">
           <article
@@ -19,18 +18,10 @@
           </article>
         </div>
       </section>
-
-      <section
-        :class="[trendPanelClass, 'min-h-[334px]']"
-        aria-label="正在加载点子消耗趋势"
-      >
-        <div class="h-5 w-28 rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
-        <div class="mt-5 h-[260px] rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
-      </section>
     </template>
 
     <section
-      v-else-if="error"
+      v-else-if="!usage && error"
       class="rounded-[var(--radius-ib-panel)] border border-ib-danger/25 bg-ib-surface p-5"
       role="alert"
     >
@@ -40,13 +31,13 @@
         type="button"
         text
         class="!mt-3 !px-0 !font-semibold !text-ib-creative-accent-pressed"
-        @click="refresh()"
+        @click="retry()"
       >
         重新加载
       </Button>
     </section>
 
-    <template v-else>
+    <template v-else-if="usage">
       <section :class="summaryPanelClass" aria-label="用量摘要">
         <div :class="summaryGridClass">
           <article
@@ -63,22 +54,78 @@
           </article>
         </div>
       </section>
+    </template>
 
-      <section :class="trendPanelClass" aria-label="点子消耗趋势">
-        <header class="flex min-w-0 items-center justify-between gap-4">
-          <h3 class="m-0 text-[16px] leading-6 font-bold text-ib-text">点子消耗</h3>
-          <span class="shrink-0 text-[12px] font-semibold text-ib-text-subtle">最近 30 天</span>
-        </header>
-        <Chart
-          type="line"
-          class="mt-4 h-[260px] w-full"
-          :data="trendChart.data"
-          :options="trendChart.options"
-          :canvas-props="trendCanvasProps"
-        />
+    <section
+      v-if="isInitialPending || usage"
+      :class="[trendPanelClass, { 'min-h-[334px]': isInitialPending }]"
+      :aria-label="isInitialPending ? '正在加载点子消耗趋势' : '点子消耗趋势'"
+    >
+      <header
+        class="flex min-w-0 flex-wrap items-center justify-between gap-3 max-[640px]:items-stretch max-[640px]:flex-col"
+      >
+        <h3 class="m-0 text-[16px] leading-6 font-bold text-ib-text">点子消耗</h3>
+        <div
+          role="radiogroup"
+          aria-label="趋势时间范围"
+          class="grid w-[180px] shrink-0 grid-cols-3 rounded-[var(--radius-ib-control)] border border-ib-border-soft bg-ib-surface-muted p-1 max-[640px]:w-full"
+        >
+          <button
+            v-for="(option, index) in rangeOptions"
+            :key="option.value"
+            :ref="(element) => setRangeButtonRef(option.value, element)"
+            type="button"
+            role="radio"
+            :aria-checked="selectedRange === option.value"
+            :tabindex="selectedRange === option.value ? 0 : -1"
+            :class="rangeButtonClass(option.value)"
+            @click="selectRange(option.value)"
+            @keydown="onRangeKeydown($event, index)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </header>
+      <template v-if="isInitialPending">
+        <div class="mt-5 h-[260px] rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+      </template>
+      <template v-else>
+        <p
+          v-if="isSwitching"
+          class="mt-3 mb-0 text-[12px] font-semibold text-ib-text-subtle"
+          aria-live="polite"
+        >
+          正在加载{{ selectedRangeText }}趋势…
+        </p>
+        <div
+          v-if="error"
+          class="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-ib-control)] border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 max-[640px]:items-start max-[640px]:flex-col"
+          role="alert"
+        >
+          <p class="m-0 min-w-0 text-sm text-ib-danger">{{ errorMessage(error) }}</p>
+          <Button
+            type="button"
+            text
+            class="!shrink-0 !p-0 !text-sm !font-semibold !text-ib-creative-accent-pressed"
+            @click="retry()"
+          >
+            重试当前范围
+          </Button>
+        </div>
+        <div class="mt-4 min-w-0 overflow-hidden">
+          <Chart
+            type="line"
+            class="h-[260px] w-full min-w-0"
+            :data="trendChart.data"
+            :options="trendChart.options"
+            :canvas-props="trendCanvasProps"
+          />
+        </div>
         <table class="sr-only">
           <caption :id="trendDetailsCaptionId">
-            最近 30 天点子消耗明细
+            {{
+              displayRangeText
+            }}点子消耗明细
           </caption>
           <thead>
             <tr>
@@ -93,23 +140,25 @@
             </tr>
           </tbody>
         </table>
-      </section>
-    </template>
+      </template>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, nextTick, ref, useId } from 'vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import { useUserUsage } from '../useUserUsage'
-import {
-  buildUserUsageTrendChart,
-  resolveUserUsageChartTheme,
-} from '../userUsageTrendChart'
+import { DEFAULT_USER_USAGE_RANGE, type UserUsageRange } from '../userUsageResource'
+import { buildUserUsageTrendChart, resolveUserUsageChartTheme } from '../userUsageTrendChart'
 
 const props = defineProps<{ active: boolean }>()
-const { usage, isPending, error, refresh } = useUserUsage(() => props.active)
+const selectedRange = ref<UserUsageRange>(DEFAULT_USER_USAGE_RANGE)
+const { usage, displayRange, isInitialPending, isSwitching, error, retry } = useUserUsage(
+  selectedRange,
+  () => props.active,
+)
 
 const integerFormatter = new Intl.NumberFormat('zh-CN')
 const summaryPanelClass =
@@ -117,14 +166,16 @@ const summaryPanelClass =
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
 const summaryCellClass = 'min-h-[108px] min-w-0 p-5 max-[640px]:min-h-[100px] max-[640px]:p-4'
 const trendPanelClass =
-  'min-w-0 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4'
+  'min-w-0 overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4'
 const trendChartTheme = resolveUserUsageChartTheme()
 const trendDetailsCaptionId = useId()
-const trendCanvasProps = {
-  role: 'img',
-  'aria-label': '最近 30 天点子消耗趋势',
-  'aria-describedby': trendDetailsCaptionId,
-} as const
+const rangeButtonRefs = new Map<UserUsageRange, HTMLButtonElement>()
+
+const rangeOptions = [
+  { value: '7d', label: '周', days: 7 },
+  { value: '30d', label: '月', days: 30 },
+  { value: '1y', label: '年', days: 365 },
+] as const satisfies ReadonlyArray<{ value: UserUsageRange; label: string; days: number }>
 
 const summaryCellDefinitions = [
   {
@@ -163,6 +214,64 @@ const metrics = computed(() => {
 
 const trendRows = computed(() => usage.value?.trend || [])
 const trendChart = computed(() => buildUserUsageTrendChart(trendRows.value, trendChartTheme))
+const displayRangeText = computed(() => rangeText(displayRange.value ?? selectedRange.value))
+const selectedRangeText = computed(() => rangeText(selectedRange.value))
+const trendCanvasProps = computed(() => ({
+  role: 'img',
+  'aria-label': `${displayRangeText.value}点子消耗趋势`,
+  'aria-describedby': trendDetailsCaptionId,
+}))
+
+function selectRange(value: UserUsageRange) {
+  selectedRange.value = value
+}
+
+function setRangeButtonRef(value: UserUsageRange, element: unknown) {
+  if (element instanceof HTMLButtonElement) {
+    rangeButtonRefs.set(value, element)
+  } else {
+    rangeButtonRefs.delete(value)
+  }
+}
+
+function onRangeKeydown(event: KeyboardEvent, currentIndex: number) {
+  let targetIndex: number | undefined
+  switch (event.key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+      targetIndex = (currentIndex + 1) % rangeOptions.length
+      break
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      targetIndex = (currentIndex - 1 + rangeOptions.length) % rangeOptions.length
+      break
+    case 'Home':
+      targetIndex = 0
+      break
+    case 'End':
+      targetIndex = rangeOptions.length - 1
+      break
+    default:
+      return
+  }
+  event.preventDefault()
+  const target = rangeOptions[targetIndex]
+  selectRange(target.value)
+  void nextTick(() => rangeButtonRefs.get(target.value)?.focus())
+}
+
+function rangeButtonClass(value: UserUsageRange) {
+  const base =
+    'min-w-0 rounded-[calc(var(--radius-ib-control)-2px)] px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ib-creative-accent'
+  return selectedRange.value === value
+    ? `${base} bg-ib-surface text-ib-text shadow-[var(--shadow-ib-control)]`
+    : `${base} text-ib-text-muted hover:bg-ib-surface hover:text-ib-text`
+}
+
+function rangeText(value: UserUsageRange) {
+  const option = rangeOptions.find((candidate) => candidate.value === value)
+  return `最近 ${option?.days ?? 30} 天`
+}
 
 function formatInteger(value: number) {
   return integerFormatter.format(value)

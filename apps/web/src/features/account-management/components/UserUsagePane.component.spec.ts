@@ -1,5 +1,5 @@
 import { cleanup } from '@testing-library/vue'
-import { defineComponent } from 'vue'
+import { defineComponent, type Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
 import UserUsagePane from './UserUsagePane.vue'
@@ -21,13 +21,20 @@ const usageState = vi.hoisted(() => ({
       | undefined,
     __v_isRef: true,
   },
-  isPending: { value: false, __v_isRef: true },
+  displayRange: { value: '30d' as '7d' | '30d' | '1y' | undefined, __v_isRef: true },
+  isInitialPending: { value: false, __v_isRef: true },
+  isSwitching: { value: false, __v_isRef: true },
   error: { value: null as unknown, __v_isRef: true },
-  refresh: vi.fn(),
+  retry: vi.fn(),
 }))
 
+let selectedRangeRef: Ref<'7d' | '30d' | '1y'> | undefined
+
 vi.mock('../useUserUsage', () => ({
-  useUserUsage: () => usageState,
+  useUserUsage: (range: Ref<'7d' | '30d' | '1y'>) => {
+    selectedRangeRef = range
+    return usageState
+  },
 }))
 
 const ButtonStub = defineComponent({
@@ -64,12 +71,13 @@ describe('UserUsagePane', () => {
       },
       trend: buildZeroTrend(),
     }
-    usageState.isPending.value = false
+    usageState.isInitialPending.value = false
     usageState.error.value = null
 
     renderUsagePane()
 
     expect(screen.getByRole('heading', { name: '用量统计' })).toBeVisible()
+    expect(screen.queryByText('Lifetime 数据 · Asia/Shanghai')).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('1,234')
     expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('12.5')
     expect(screen.getByText('调用次数')).toBeVisible()
@@ -88,7 +96,7 @@ describe('UserUsagePane', () => {
       },
       trend: buildZeroTrend(),
     }
-    usageState.isPending.value = false
+    usageState.isInitialPending.value = false
     usageState.error.value = null
 
     renderUsagePane()
@@ -119,7 +127,7 @@ describe('UserUsagePane', () => {
       },
       trend: buildZeroTrend(),
     }
-    usageState.isPending.value = false
+    usageState.isInitialPending.value = false
     usageState.error.value = null
 
     renderUsagePane()
@@ -139,7 +147,7 @@ describe('UserUsagePane', () => {
 
   it('shows a local skeleton while the first request is pending', () => {
     usageState.usage.value = undefined
-    usageState.isPending.value = true
+    usageState.isInitialPending.value = true
     usageState.error.value = null
 
     renderUsagePane()
@@ -162,7 +170,7 @@ describe('UserUsagePane', () => {
 
   it('uses identical cell wrapper heights while loading and loaded', () => {
     usageState.usage.value = undefined
-    usageState.isPending.value = true
+    usageState.isInitialPending.value = true
     usageState.error.value = null
     renderUsagePane()
     const loadingClasses = Array.from(
@@ -181,7 +189,7 @@ describe('UserUsagePane', () => {
       },
       trend: buildZeroTrend(),
     }
-    usageState.isPending.value = false
+    usageState.isInitialPending.value = false
     renderUsagePane()
     const loadedClasses = Array.from(
       screen.getByRole('region', { name: '用量摘要' }).querySelectorAll('article'),
@@ -207,13 +215,13 @@ describe('UserUsagePane', () => {
         credits: index === 29 ? 99 : 0,
       })),
     }
-    usageState.isPending.value = false
+    usageState.isInitialPending.value = false
     usageState.error.value = null
 
     renderUsagePane()
 
     expect(screen.getByRole('region', { name: '点子消耗趋势' })).toBeVisible()
-    expect(screen.getByText('最近 30 天')).toBeVisible()
+    expect(screen.getByRole('radio', { name: '月' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByTestId('usage-trend-chart')).toHaveClass('h-[260px]')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
     const chartImage = screen.getByRole('img', { name: '最近 30 天点子消耗趋势' })
@@ -226,15 +234,90 @@ describe('UserUsagePane', () => {
 
   it('shows an inline retry when loading fails', async () => {
     usageState.usage.value = undefined
-    usageState.isPending.value = false
+    usageState.isInitialPending.value = false
     usageState.error.value = new Error('网络异常')
-    usageState.refresh.mockReset()
+    usageState.retry.mockReset()
 
     const { user } = renderUsagePane()
 
     expect(screen.getByRole('alert')).toHaveTextContent('网络异常')
     await user.click(screen.getByRole('button', { name: '重新加载' }))
-    expect(usageState.refresh).toHaveBeenCalledOnce()
+    expect(usageState.retry).toHaveBeenCalledOnce()
+  })
+
+  it('offers a keyboard-accessible week month year segmented control with month selected by default', async () => {
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 99,
+        peak_daily_credits: 42,
+        average_daily_credits: 3.3,
+        task_count: 5,
+        active_days: 4,
+      },
+      trend: buildZeroTrend(),
+    }
+    usageState.displayRange.value = '30d'
+    usageState.isInitialPending.value = false
+    usageState.isSwitching.value = false
+    usageState.error.value = null
+
+    const { user } = renderUsagePane()
+    const group = screen.getByRole('radiogroup', { name: '趋势时间范围' })
+    expect(group).toHaveClass('max-[640px]:w-full')
+    const trendSection = screen.getByRole('region', { name: '点子消耗趋势' })
+    const trendHeader = group.closest('header')
+    expect(trendHeader).not.toBeNull()
+    expect(trendHeader).toHaveClass('flex-wrap', 'max-[640px]:flex-col')
+    expect(trendSection).toContainElement(trendHeader)
+    expect(
+      screen.getByRole('heading', { name: '用量统计' }).closest('header'),
+    ).not.toContainElement(group)
+    const month = screen.getByRole('radio', { name: '月' })
+    expect(month).toHaveAttribute('aria-checked', 'true')
+    expect(month).toHaveAttribute('tabindex', '0')
+
+    month.focus()
+    await user.keyboard('{ArrowRight}')
+    const year = screen.getByRole('radio', { name: '年' })
+    expect(year).toHaveAttribute('aria-checked', 'true')
+    expect(year).toHaveFocus()
+    expect(selectedRangeRef?.value).toBe('1y')
+
+    await user.keyboard('{Home}')
+    const week = screen.getByRole('radio', { name: '周' })
+    expect(week).toHaveAttribute('aria-checked', 'true')
+    expect(week).toHaveFocus()
+    expect(selectedRangeRef?.value).toBe('7d')
+  })
+
+  it('keeps the last successful chart and summary visible when a range switch fails', async () => {
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 99,
+        peak_daily_credits: 42,
+        average_daily_credits: 3.3,
+        task_count: 5,
+        active_days: 4,
+      },
+      trend: buildZeroTrend(),
+    }
+    usageState.displayRange.value = '30d'
+    usageState.isInitialPending.value = false
+    usageState.isSwitching.value = false
+    usageState.error.value = new Error('周趋势加载失败')
+    usageState.retry.mockReset()
+
+    const { user } = renderUsagePane()
+
+    expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('99')
+    expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
+    expect(screen.getByRole('radio', { name: '月' })).toHaveAttribute('aria-checked', 'true')
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('周趋势加载失败')
+    await user.click(screen.getByRole('button', { name: '重试当前范围' }))
+    expect(usageState.retry).toHaveBeenCalledOnce()
   })
 })
 

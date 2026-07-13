@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchUserUsage } from './userUsageResource'
+import { fetchUserUsage, userUsageQueryKeys } from './userUsageResource'
 
 const generated = vi.hoisted(() => ({
   getUserUsage: vi.fn(),
@@ -26,17 +26,22 @@ describe('userUsageResource', () => {
       },
     })
 
-    await expect(fetchUserUsage()).resolves.toMatchObject({
+    const controller = new AbortController()
+    await expect(fetchUserUsage('7d', controller.signal)).resolves.toMatchObject({
       lifetime: { total_credits: 12 },
       trend: [{ date: '2026-07-13', credits: 12 }],
     })
     expect(generated.getUserUsage).toHaveBeenCalledOnce()
-    expect(generated.getUserUsage).toHaveBeenCalledWith()
+    expect(generated.getUserUsage).toHaveBeenCalledWith(
+      { range: '7d' },
+      { signal: controller.signal },
+    )
+    expect(userUsageQueryKeys.current('7d')).toEqual(['user', 'usage', 'current', '7d'])
   })
 
   it('surfaces API feedback instead of manufacturing an empty trend', async () => {
     generated.getUserUsage.mockResolvedValue({ code: 500, msg: '用量统计暂不可用' })
 
-    await expect(fetchUserUsage()).rejects.toThrow('用量统计暂不可用')
+    await expect(fetchUserUsage('30d')).rejects.toThrow('用量统计暂不可用')
   })
 })

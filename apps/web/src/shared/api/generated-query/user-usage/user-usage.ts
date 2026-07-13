@@ -14,43 +14,60 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { unref } from 'vue'
+import { toValue, unref } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 
-import type { ApiResponseUserUsage } from '../model'
+import type { ApiResponseBase, ApiResponseUserUsage, GetUserUsageParams } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-export const getGetUserUsageUrl = () => {
-  return `/user/usage`
+export const getGetUserUsageUrl = (params?: GetUserUsageParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0 ? `/user/usage?${stringifiedParams}` : `/user/usage`
 }
 
-export const getUserUsage = async (options?: RequestInit): Promise<ApiResponseUserUsage> => {
-  return orvalMutator<ApiResponseUserUsage>(getGetUserUsageUrl(), {
+export const getUserUsage = async (
+  params?: GetUserUsageParams,
+  options?: RequestInit,
+): Promise<ApiResponseUserUsage> => {
+  return orvalMutator<ApiResponseUserUsage>(getGetUserUsageUrl(params), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getGetUserUsageQueryKey = () => {
-  return ['user', 'usage'] as const
+export const getGetUserUsageQueryKey = (params?: MaybeRefOrGetter<GetUserUsageParams>) => {
+  return ['user', 'usage', ...(params ? [params] : [])] as const
 }
 
 export const getGetUserUsageQueryOptions = <
   TData = Awaited<ReturnType<typeof getUserUsage>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserUsage>>, TError, TData>>
-  request?: SecondParameter<typeof orvalMutator>
-}) => {
+  TError = ErrorType<ApiResponseBase>,
+>(
+  params?: MaybeRefOrGetter<GetUserUsageParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserUsage>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getGetUserUsageQueryKey()
+  const queryKey = getGetUserUsageQueryKey(params)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserUsage>>> = ({ signal }) =>
-    getUserUsage({ signal, ...requestOptions })
+    getUserUsage(toValue(params), { signal, ...requestOptions })
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getUserUsage>>,
@@ -60,19 +77,20 @@ export const getGetUserUsageQueryOptions = <
 }
 
 export type GetUserUsageQueryResult = NonNullable<Awaited<ReturnType<typeof getUserUsage>>>
-export type GetUserUsageQueryError = ErrorType<unknown>
+export type GetUserUsageQueryError = ErrorType<ApiResponseBase>
 
 export function useGetUserUsage<
   TData = Awaited<ReturnType<typeof getUserUsage>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<ApiResponseBase>,
 >(
+  params?: MaybeRefOrGetter<GetUserUsageParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserUsage>>, TError, TData>>
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetUserUsageQueryOptions(options)
+  const queryOptions = getGetUserUsageQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

@@ -25,10 +25,10 @@ func TestServiceGetCurrentUsesShanghaiCaptureDaysAndLogicalTasks(t *testing.T) {
 			},
 		},
 		&taskUsageReaderStub{taskCount: 4, activeDays: 2},
-		func() time.Time { return now },
+		ServiceOptions{Now: func() time.Time { return now }},
 	)
 
-	result, err := service.GetCurrent(context.Background(), 42)
+	result, err := service.GetCurrent(context.Background(), 42, Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}
@@ -58,15 +58,52 @@ func TestServiceGetCurrentUsesShanghaiCaptureDaysAndLogicalTasks(t *testing.T) {
 	}
 }
 
+func TestServiceGetCurrentBuildsEverySupportedShanghaiRangeIncludingToday(t *testing.T) {
+	location, err := time.LoadLocation(ShanghaiTimezone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, time.July, 13, 23, 59, 0, 0, location)
+	tests := []struct {
+		usageRange Range
+		wantDays   int
+		wantFirst  string
+	}{
+		{usageRange: Range7Days, wantDays: 7, wantFirst: "2026-07-07"},
+		{usageRange: Range30Days, wantDays: 30, wantFirst: "2026-06-14"},
+		{usageRange: Range1Year, wantDays: 365, wantFirst: "2025-07-14"},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.usageRange), func(t *testing.T) {
+			service := NewService(
+				captureUsageReaderStub{dailyCredits: map[string]int64{"2026-07-13": 9}},
+				&taskUsageReaderStub{},
+				ServiceOptions{Now: func() time.Time { return now }},
+			)
+
+			result, err := service.GetCurrent(context.Background(), 42, tt.usageRange)
+			if err != nil {
+				t.Fatalf("GetCurrent() error = %v", err)
+			}
+			if len(result.Trend) != tt.wantDays {
+				t.Fatalf("trend buckets = %d, want %d", len(result.Trend), tt.wantDays)
+			}
+			if result.Trend[0].Date != tt.wantFirst || result.Trend[len(result.Trend)-1] != (DailyUsage{Date: "2026-07-13", Credits: 9}) {
+				t.Fatalf("trend bounds = %s..%+v, want %s..2026-07-13", result.Trend[0].Date, result.Trend[len(result.Trend)-1], tt.wantFirst)
+			}
+		})
+	}
+}
+
 func TestServiceGetCurrentRejectsUnsafeCaptureBeforeReadingTasks(t *testing.T) {
 	tasks := &taskUsageReaderStub{}
 	service := NewService(
 		captureUsageReaderStub{totalCredits: MaxSafeInteger + 1},
 		tasks,
-		time.Now,
+		ServiceOptions{},
 	)
 
-	_, err := service.GetCurrent(context.Background(), 42)
+	_, err := service.GetCurrent(context.Background(), 42, Range30Days)
 	if !errors.Is(err, ErrUnsafeNumber) {
 		t.Fatalf("GetCurrent() error = %v, want ErrUnsafeNumber", err)
 	}
@@ -85,7 +122,7 @@ func TestValidateUsageRejectsEveryUnsafeExportedNumber(t *testing.T) {
 	}
 	for name, value := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := ValidateUsage(value); !errors.Is(err, ErrUnsafeNumber) {
+			if err := ValidateUsage(value, Range30Days); !errors.Is(err, ErrUnsafeNumber) {
 				t.Fatalf("ValidateUsage() error = %v, want ErrUnsafeNumber", err)
 			}
 		})
@@ -96,10 +133,10 @@ func TestServiceGetCurrentRejectsUnsafeDailyCapture(t *testing.T) {
 	service := NewService(
 		captureUsageReaderStub{dailyCredits: map[string]int64{"2026-07-13": MaxSafeInteger + 1}},
 		&taskUsageReaderStub{},
-		func() time.Time { return time.Date(2026, time.July, 13, 0, 0, 0, 0, time.UTC) },
+		ServiceOptions{Now: func() time.Time { return time.Date(2026, time.July, 13, 0, 0, 0, 0, time.UTC) }},
 	)
 
-	_, err := service.GetCurrent(context.Background(), 42)
+	_, err := service.GetCurrent(context.Background(), 42, Range30Days)
 	if !errors.Is(err, ErrUnsafeNumber) {
 		t.Fatalf("GetCurrent() error = %v, want ErrUnsafeNumber", err)
 	}
@@ -117,9 +154,9 @@ func TestServiceGetCurrentAcceptsMaximumSafeInteger(t *testing.T) {
 			firstCaptureDay:  time.Date(2026, time.July, 13, 0, 0, 0, 0, location),
 		},
 		&taskUsageReaderStub{taskCount: MaxSafeInteger, activeDays: MaxSafeInteger},
-		func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, location) },
+		ServiceOptions{Now: func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, location) }},
 	)
-	result, err := service.GetCurrent(context.Background(), 42)
+	result, err := service.GetCurrent(context.Background(), 42, Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}
@@ -132,10 +169,10 @@ func TestServiceGetCurrentReturnsZeroesWithoutCapturesOrTasks(t *testing.T) {
 	service := NewService(
 		captureUsageReaderStub{},
 		&taskUsageReaderStub{},
-		func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, time.UTC) },
+		ServiceOptions{Now: func() time.Time { return time.Date(2026, time.July, 13, 8, 0, 0, 0, time.UTC) }},
 	)
 
-	result, err := service.GetCurrent(context.Background(), 42)
+	result, err := service.GetCurrent(context.Background(), 42, Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}

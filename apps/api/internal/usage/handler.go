@@ -10,7 +10,7 @@ import (
 )
 
 type Reader interface {
-	GetCurrent(context.Context, int64) (Usage, error)
+	GetCurrent(context.Context, int64, Range) (Usage, error)
 }
 
 type Handler struct {
@@ -31,12 +31,17 @@ func (h *Handler) GetCurrent(c *gin.Context) {
 		response.Error(c, http.StatusUnauthorized, "未登录")
 		return
 	}
-	result, err := h.service.GetCurrent(c.Request.Context(), userID)
+	usageRange, err := ParseRange(c.Query("range"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "range 仅支持 7d、30d 或 1y")
+		return
+	}
+	result, err := h.service.GetCurrent(c.Request.Context(), userID, usageRange)
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "加载用量统计失败", err)
 		return
 	}
-	if err := ValidateUsage(result); err != nil {
+	if err := ValidateUsage(result, usageRange); err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "加载用量统计失败", err)
 		return
 	}

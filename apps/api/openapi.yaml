@@ -108,13 +108,24 @@ paths:
       operationId: getUserUsage
       security:
         - cookieAuth: []
+      parameters:
+        - name: range
+          in: query
+          description: Shanghai daily trend window; lifetime totals are never range-filtered
+          schema: { type: string, enum: [7d, 30d, 1y], default: 30d }
       responses:
         '200':
-          description: Current authenticated user's lifetime Credit usage and default 30-day trend
+          description: Current authenticated user's lifetime Credit usage and selected daily trend
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserUsage'
+        '400':
+          description: Unsupported usage range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBase'
   /user/profile/avatar:
     post:
       tags: [UserAssets]
@@ -2221,8 +2232,8 @@ components:
         lifetime: { $ref: '#/components/schemas/UserUsageLifetime' }
         trend:
           type: array
-          minItems: 30
-          maxItems: 30
+          minItems: 7
+          maxItems: 365
           items: { $ref: '#/components/schemas/UserUsageTrendPoint' }
 
     CreditReconciliationRequest:

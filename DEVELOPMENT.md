@@ -96,6 +96,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | sqlc regeneration | `cd apps/api && go tool sqlc generate` |
 | Auth build | `cd apps/auth && npm run build` |
 | Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
+| Usage million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v` |
 
 修改 `apps/api/internal/db/queries` 或 schema 后：
 

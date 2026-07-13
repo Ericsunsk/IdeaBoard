@@ -6,7 +6,7 @@ import {
   type ChartData,
   type ChartOptions,
 } from '../../shared/lib/chartPrimitives'
-import { shouldShowChartTimeTick } from '../../shared/lib/chartTimeRange'
+import { shouldShowChartTimeTick, type ChartTimeTickDensity } from '../../shared/lib/chartTimeRange'
 
 export type UserUsageTrendPoint = {
   date: string
@@ -83,13 +83,13 @@ export function buildUserUsageTrendChart(
           padding: 10,
           displayColors: false,
           callbacks: {
-            label: (context) =>
-              `点子消耗：${formatFullCredits(getParsedY(context))} 点子`,
+            label: (context) => `点子消耗：${formatFullCredits(getParsedY(context))} 点子`,
           },
         },
       },
       scales: {
         x: {
+          display: true,
           ticks: {
             color: theme.axisText,
             maxRotation: 0,
@@ -99,7 +99,7 @@ export function buildUserUsageTrendChart(
                 index,
                 count: labels.length,
                 label: labels[index],
-                density: { mode: 'interval', interval: 6 },
+                density: usageTrendTickDensity(labels.length),
               })
                 ? labels[index] || ''
                 : '',
@@ -123,6 +123,12 @@ export function buildUserUsageTrendChart(
   )
 
   return { data, options }
+}
+
+function usageTrendTickDensity(count: number): ChartTimeTickDensity {
+  if (count <= 7) return { mode: 'all' }
+  if (count >= 365) return { mode: 'month-start' }
+  return { mode: 'interval', interval: 6 }
 }
 
 export function resolveUserUsageChartTheme(

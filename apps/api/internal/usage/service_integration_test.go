@@ -54,11 +54,11 @@ func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T
 	if err != nil {
 		t.Fatalf("load Shanghai location: %v", err)
 	}
-	service := NewService(creditService, taskbilling.NewUsageStore(db), func() time.Time {
+	service := NewService(creditService, taskbilling.NewUsageStore(db), ServiceOptions{Now: func() time.Time {
 		return time.Date(2026, time.July, 13, 8, 0, 0, 0, location)
-	})
+	}})
 
-	beforeDelete, err := service.GetCurrent(ctx, userID)
+	beforeDelete, err := service.GetCurrent(ctx, userID, Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() error = %v", err)
 	}
@@ -71,8 +71,8 @@ func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T
 	if beforeDelete.Lifetime.TaskCount != 4 || beforeDelete.Lifetime.ActiveDays != 1 {
 		t.Fatalf("task summary = %+v, want count=4 active_days=1", beforeDelete.Lifetime)
 	}
-	if len(beforeDelete.Trend) != DefaultTrendDays {
-		t.Fatalf("trend buckets = %d, want %d", len(beforeDelete.Trend), DefaultTrendDays)
+	if len(beforeDelete.Trend) != Range30Days.Days() {
+		t.Fatalf("trend buckets = %d, want %d", len(beforeDelete.Trend), Range30Days.Days())
 	}
 	var trendTotal int64
 	for _, day := range beforeDelete.Trend {
@@ -88,7 +88,7 @@ func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T
 			t.Fatalf("delete task %s: %v", taskID, err)
 		}
 	}
-	afterDelete, err := service.GetCurrent(ctx, userID)
+	afterDelete, err := service.GetCurrent(ctx, userID, Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() after task deletion error = %v", err)
 	}

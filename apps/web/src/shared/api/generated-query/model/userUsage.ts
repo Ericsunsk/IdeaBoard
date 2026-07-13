@@ -12,8 +12,8 @@ export interface UserUsage {
   timezone: UserUsageTimezone
   lifetime: UserUsageLifetime
   /**
-   * @minItems 30
-   * @maxItems 30
+   * @minItems 7
+   * @maxItems 365
    */
   trend: UserUsageTrendPoint[]
 }

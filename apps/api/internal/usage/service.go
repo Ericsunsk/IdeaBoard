@@ -12,7 +12,6 @@ import (
 
 const ShanghaiTimezone = "Asia/Shanghai"
 const MaxSafeInteger int64 = 9_007_199_254_740_991
-const DefaultTrendDays = 30
 
 var ErrUnsafeNumber = errors.New("usage value exceeds JavaScript safe integer range")
 
@@ -48,26 +47,55 @@ type Service struct {
 	captures CaptureUsageReader
 	tasks    LogicalTaskUsageReader
 	now      func() time.Time
+	cache    *usageCache
+}
+
+type ServiceOptions struct {
+	Now           func() time.Time
+	CacheTTL      time.Duration
+	CacheCapacity int
 }
 
 func NewService(
 	captures CaptureUsageReader,
 	tasks LogicalTaskUsageReader,
-	now func() time.Time,
+	options ServiceOptions,
 ) *Service {
+	now := options.Now
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{captures: captures, tasks: tasks, now: now}
+	return &Service{
+		captures: captures,
+		tasks:    tasks,
+		now:      now,
+		cache:    newUsageCache(options.CacheCapacity, options.CacheTTL, now),
+	}
 }
 
-func (s *Service) GetCurrent(ctx context.Context, userID int64) (Usage, error) {
+func (s *Service) GetCurrent(ctx context.Context, userID int64, usageRange Range) (Usage, error) {
 	if s == nil || s.captures == nil || s.tasks == nil {
 		return Usage{}, fmt.Errorf("usage service: readers not configured")
 	}
 	if userID <= 0 {
 		return Usage{}, fmt.Errorf("usage service: invalid user id")
 	}
+	if !usageRange.Valid() {
+		return Usage{}, fmt.Errorf("usage service: %w: %q", ErrInvalidRange, usageRange)
+	}
+	key := cacheKey{userID: userID, usageRange: usageRange}
+	if cached, ok := s.cache.Get(key); ok {
+		return cached, nil
+	}
+	result, err := s.loadCurrent(ctx, userID, usageRange)
+	if err != nil {
+		return Usage{}, err
+	}
+	s.cache.Set(key, result)
+	return result, nil
+}
+
+func (s *Service) loadCurrent(ctx context.Context, userID int64, usageRange Range) (Usage, error) {
 	location, err := time.LoadLocation(ShanghaiTimezone)
 	if err != nil {
 		return Usage{}, fmt.Errorf("usage service: load timezone: %w", err)
@@ -112,7 +140,8 @@ func (s *Service) GetCurrent(ctx context.Context, userID int64) (Usage, error) {
 		result.Lifetime.AverageDailyCredits = averageCredits(totalCredits, days)
 	}
 
-	trendStart := today.AddDate(0, 0, -(DefaultTrendDays - 1))
+	trendDays := usageRange.Days()
+	trendStart := today.AddDate(0, 0, -(trendDays - 1))
 	dailyCredits, err := s.captures.GetDailyCaptureUsage(
 		ctx,
 		userID,
@@ -123,8 +152,8 @@ func (s *Service) GetCurrent(ctx context.Context, userID int64) (Usage, error) {
 	if err != nil {
 		return Usage{}, fmt.Errorf("usage service: read daily settled captures: %w", err)
 	}
-	result.Trend = make([]DailyUsage, 0, DefaultTrendDays)
-	for dayIndex := 0; dayIndex < DefaultTrendDays; dayIndex++ {
+	result.Trend = make([]DailyUsage, 0, trendDays)
+	for dayIndex := 0; dayIndex < trendDays; dayIndex++ {
 		date := trendStart.AddDate(0, 0, dayIndex).Format(time.DateOnly)
 		credits := dailyCredits[date]
 		if err := validateSafeInteger("daily credits", credits); err != nil {
@@ -132,7 +161,7 @@ func (s *Service) GetCurrent(ctx context.Context, userID int64) (Usage, error) {
 		}
 		result.Trend = append(result.Trend, DailyUsage{Date: date, Credits: credits})
 	}
-	if err := ValidateUsage(result); err != nil {
+	if err := ValidateUsage(result, usageRange); err != nil {
 		return Usage{}, err
 	}
 	return result, nil
@@ -154,7 +183,10 @@ func averageCredits(totalCredits, days int64) float64 {
 	return float64(whole) + float64(tenths)/10
 }
 
-func ValidateUsage(value Usage) error {
+func ValidateUsage(value Usage, usageRange Range) error {
+	if !usageRange.Valid() {
+		return fmt.Errorf("usage response: %w: %q", ErrInvalidRange, usageRange)
+	}
 	for name, integer := range map[string]int64{
 		"total credits":      value.Lifetime.TotalCredits,
 		"peak daily credits": value.Lifetime.PeakDailyCredits,
@@ -177,8 +209,8 @@ func ValidateUsage(value Usage) error {
 	if value.Timezone != ShanghaiTimezone {
 		return fmt.Errorf("usage response: unsupported timezone %q", value.Timezone)
 	}
-	if len(value.Trend) != DefaultTrendDays {
-		return fmt.Errorf("usage response: trend bucket count = %d, want %d", len(value.Trend), DefaultTrendDays)
+	if len(value.Trend) != usageRange.Days() {
+		return fmt.Errorf("usage response: trend bucket count = %d, want %d", len(value.Trend), usageRange.Days())
 	}
 	return nil
 }

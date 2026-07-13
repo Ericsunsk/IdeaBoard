@@ -41,7 +41,13 @@ describe('buildUserUsageTrendChart', () => {
       interaction: { mode: string; intersect: boolean }
       plugins: { tooltip: { callbacks: { label: (context: unknown) => string } } }
       scales: {
-        x: { ticks: { callback: (_value: unknown, index: number) => string } }
+        x: {
+          display: boolean
+          ticks: {
+            autoSkip: boolean
+            callback: (_value: unknown, index: number) => string
+          }
+        }
         y: { ticks: { callback: (value: number) => string } }
       }
     }
@@ -50,6 +56,7 @@ describe('buildUserUsageTrendChart', () => {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
+      scales: { x: { display: true, ticks: { autoSkip: false } } },
     })
     expect(options.scales.x.ticks.callback(null, 0)).toBe('06/14')
     expect(options.scales.x.ticks.callback(null, 1)).toBe('')
@@ -63,13 +70,81 @@ describe('buildUserUsageTrendChart', () => {
       }),
     ).toBe('点子消耗：1,234,567 点子')
   })
+
+  it('shows every weekly label and month boundaries for the 365-day range', () => {
+    const weekly = buildDateTrend('2026-07-07', 7, 1)
+    const weeklyChart = buildUserUsageTrendChart(weekly, theme)
+    const weeklyTicks = getXTickCallback(weeklyChart.options)
+    expect(weekly.map((_point, index) => weeklyTicks(null, index))).toEqual([
+      '07/07',
+      '07/08',
+      '07/09',
+      '07/10',
+      '07/11',
+      '07/12',
+      '07/13',
+    ])
+
+    const yearly = buildDateTrend('2025-07-14', 365, 1)
+    const yearlyChart = buildUserUsageTrendChart(yearly, theme)
+    const yearlyTicks = getXTickCallback(yearlyChart.options)
+    const septemberFirstIndex = yearly.findIndex((point) => point.date === '2025-09-01')
+    const septemberSecondIndex = yearly.findIndex((point) => point.date === '2025-09-02')
+    expect(yearlyChart.data.labels).toHaveLength(365)
+    expect(yearlyTicks(null, 0)).toBe('07/14')
+    expect(yearlyTicks(null, septemberFirstIndex)).toBe('09/01')
+    expect(yearlyTicks(null, septemberSecondIndex)).toBe('')
+    expect(yearlyTicks(null, 364)).toBe('07/13')
+  })
 })
 
 function buildThirtyDayTrend(credits: number) {
   return [
-    '06-14', '06-15', '06-16', '06-17', '06-18', '06-19', '06-20', '06-21', '06-22',
-    '06-23', '06-24', '06-25', '06-26', '06-27', '06-28', '06-29', '06-30', '07-01',
-    '07-02', '07-03', '07-04', '07-05', '07-06', '07-07', '07-08', '07-09', '07-10',
-    '07-11', '07-12', '07-13',
+    '06-14',
+    '06-15',
+    '06-16',
+    '06-17',
+    '06-18',
+    '06-19',
+    '06-20',
+    '06-21',
+    '06-22',
+    '06-23',
+    '06-24',
+    '06-25',
+    '06-26',
+    '06-27',
+    '06-28',
+    '06-29',
+    '06-30',
+    '07-01',
+    '07-02',
+    '07-03',
+    '07-04',
+    '07-05',
+    '07-06',
+    '07-07',
+    '07-08',
+    '07-09',
+    '07-10',
+    '07-11',
+    '07-12',
+    '07-13',
   ].map((date) => ({ date: `2026-${date}`, credits }))
+}
+
+function buildDateTrend(start: string, days: number, credits: number) {
+  const startDate = new Date(`${start}T00:00:00Z`)
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(startDate.getTime() + index * 24 * 60 * 60 * 1_000)
+    return { date: date.toISOString().slice(0, 10), credits }
+  })
+}
+
+function getXTickCallback(options: unknown) {
+  return (
+    options as {
+      scales: { x: { ticks: { callback: (_value: unknown, index: number) => string } } }
+    }
+  ).scales.x.ticks.callback
 }
