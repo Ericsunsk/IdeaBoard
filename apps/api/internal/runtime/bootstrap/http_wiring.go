@@ -19,6 +19,7 @@ import (
 	"ideaboard/api/internal/runtime/webdist"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
+	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -58,6 +59,7 @@ func newAppRouter(
 			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			BillingHandler:   billingHandler,
 			CreditHandler:    credits.NewHandler(services.creditService),
+			UsageHandler:     usage.NewHandler(services.usageService),
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{

@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
+	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -61,6 +62,7 @@ type UserRouteDeps struct {
 	LineDraftHandler *assets.LineDraftHandler
 	BillingHandler   *billing.Handler
 	CreditHandler    *credits.Handler
+	UsageHandler     *usage.Handler
 	Uploads          UploadDeps
 }
 

@@ -83,6 +83,7 @@ type Querier interface {
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
 	GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskByTaskIDRow, error)
 	GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTaskIDAndUserIDParams) (GetTaskByTaskIDAndUserIDRow, error)
+	GetTaskUsageSummary(ctx context.Context, arg GetTaskUsageSummaryParams) (GetTaskUsageSummaryRow, error)
 	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
 	GetUserByAuthUserID(ctx context.Context, authUserID sql.NullString) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)

@@ -30,6 +30,7 @@ import (
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
 )
@@ -285,6 +286,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			LineDraftHandler: assets.NewLineDraftHandler(nil),
 			BillingHandler:   billing.NewHandler(nil, nil),
 			CreditHandler:    credits.NewHandler(nil),
+			UsageHandler:     usage.NewHandler(nil),
 			Uploads: UploadDeps{
 				UserRepo:       authDeps.UserRepo,
 				UploadSettings: &fakeMediaUploadSettingsProvider{},

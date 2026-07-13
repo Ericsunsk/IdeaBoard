@@ -194,6 +194,12 @@
           :active="activeTab === 'billing'"
         />
 
+        <UserUsagePane
+          v-else-if="activeTab === 'usage'"
+          key="usage"
+          :active="activeTab === 'usage'"
+        />
+
         <div v-else-if="activeTab === 'security'" key="security">
           <form class="grid gap-5" novalidate @submit.prevent="handleUpdatePassword">
             <label :class="passwordFieldClass">
@@ -386,6 +392,7 @@ import {
 import { useProfileFeedback } from '../useProfileFeedback'
 import AccountComingSoonPane from './AccountComingSoonPane.vue'
 import UserCreditsPane from './UserCreditsPane.vue'
+import UserUsagePane from './UserUsagePane.vue'
 import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
 type NavItem = {
@@ -398,10 +405,7 @@ type NavGroup = {
   label: string
   items: NavItem[]
 }
-type UpcomingTab = Extract<
-  AccountManagementTab,
-  'recharge' | 'subscriptions' | 'rewards' | 'usage'
->
+type UpcomingTab = Extract<AccountManagementTab, 'recharge' | 'subscriptions' | 'rewards'>
 type UpcomingPage = {
   category: string
   title: string
@@ -485,7 +489,6 @@ const upcomingPages: Record<UpcomingTab, UpcomingPage> = {
   recharge: { category: '订阅与套餐', title: '充值积分', icon: Coins },
   subscriptions: { category: '订阅与套餐', title: '订阅套餐', icon: CreditCard },
   rewards: { category: '权益和账单', title: '奖励中心', icon: Gift },
-  usage: { category: '权益和账单', title: '用量统计', icon: StatsUpSquare },
 }
 
 const upcomingPage = computed(() =>

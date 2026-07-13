@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/runtime/billingcoverage"
+	"ideaboard/api/internal/usage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,6 +29,7 @@ type appDomainServices struct {
 	billingService    *billing.Service
 	billingCoverage   *billingcoverage.Service
 	creditService     *credits.Service
+	usageService      *usage.Service
 	userLifecycle     *users.LifecycleService
 }
 
@@ -60,6 +62,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		billingService:    billingService,
 		billingCoverage:   billingCoverage,
 		creditService:     creditService,
+		usageService:      usage.NewService(creditService, repos.taskRepo, nil),
 		userLifecycle:     userLifecycle,
 	}, nil
 }

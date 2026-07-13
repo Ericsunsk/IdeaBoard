@@ -176,6 +176,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | executable feature contract、task params、prompt templates、prompt assembly |
 | Billing | `internal/billing` | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot |
 | Credits | `internal/credits` | 平台点子 Wallet、Double-entry Ledger、余额 projection、幂等 Credit Commands |
+| Usage | `internal/usage` | 用户侧 Lifetime 用量 Read Model；只组合 Credits Capture 与 Tasking logical Task 的公开读取 seam，不拥有账务或任务写入 |
 
 Dependency direction:
 

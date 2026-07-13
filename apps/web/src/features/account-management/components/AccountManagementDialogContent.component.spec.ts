@@ -113,6 +113,10 @@ function renderAccountManagementDialogContent(initialTab: AccountManagementTab =
           props: ['active'],
           template: '<section aria-label="点子账户">点子余额与流水</section>',
         },
+        UserUsagePane: {
+          props: ['active'],
+          template: '<section aria-label="用量统计">Lifetime 数据</section>',
+        },
       },
     },
   })
@@ -163,20 +167,14 @@ describe('AccountManagementDialogContent', () => {
 
     await user.click(screen.getByRole('button', { name: '账单记录' }))
 
-    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
+    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('region', { name: '点子账户' })).toHaveTextContent('点子余额与流水')
   })
 
   it('opens directly on the requested initial tab', () => {
     renderAccountManagementDialogContent('billing')
 
-    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
+    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('region', { name: '点子账户' })).toBeVisible()
     expect(screen.queryByRole('region', { name: '账户资料概览' })).not.toBeInTheDocument()
   })
@@ -185,7 +183,6 @@ describe('AccountManagementDialogContent', () => {
     ['充值积分', '充值积分即将上线'],
     ['订阅套餐', '订阅套餐即将上线'],
     ['奖励中心', '奖励中心即将上线'],
-    ['用量统计', '用量统计即将上线'],
   ])('opens the %s roadmap page', async (label, regionName) => {
     const { user } = renderAccountManagementDialogContent()
 
@@ -193,6 +190,15 @@ describe('AccountManagementDialogContent', () => {
 
     expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('region', { name: regionName })).toBeVisible()
+  })
+
+  it('opens lifetime usage inside account management', async () => {
+    const { user } = renderAccountManagementDialogContent()
+
+    await user.click(screen.getByRole('button', { name: '用量统计' }))
+
+    expect(screen.getByRole('button', { name: '用量统计' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: '用量统计' })).toHaveTextContent('Lifetime 数据')
   })
 
   it('logs out directly from the left rail without extra confirmation', async () => {

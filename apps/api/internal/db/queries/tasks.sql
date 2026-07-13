@@ -460,6 +460,12 @@ SELECT COUNT(*)
 FROM tasks
 WHERE user_id = sqlc.arg(user_id);
 
+-- name: GetTaskUsageSummary :one
+SELECT COUNT(*)::bigint AS task_count,
+       COUNT(DISTINCT (created_at AT TIME ZONE sqlc.arg(timezone)::text)::date)::bigint AS active_days
+FROM tasks
+WHERE user_id = sqlc.arg(user_id);
+
 -- name: ListTasksByUserID :many
 SELECT sqlc.embed(t),
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,

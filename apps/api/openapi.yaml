@@ -11,6 +11,7 @@ tags:
   - name: Tasks
   - name: Billing
   - name: UserCredits
+  - name: UserUsage
   - name: AdminSettings
   - name: AdminUsers
   - name: AdminCredits
@@ -101,6 +102,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseCreditLedgerPage'
+  /user/usage:
+    get:
+      tags: [UserUsage]
+      operationId: getUserUsage
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current authenticated user's lifetime Credit usage summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserUsage'
   /user/profile/avatar:
     post:
       tags: [UserAssets]
@@ -2182,6 +2196,23 @@ components:
           items: { $ref: '#/components/schemas/CreditLedgerTransaction' }
         next_before_sequence: { type: integer, format: int64, minimum: 1 }
 
+    UserUsageLifetime:
+      type: object
+      required: [total_credits, peak_daily_credits, average_daily_credits, task_count, active_days]
+      properties:
+        total_credits: { type: integer, format: int64, minimum: 0 }
+        peak_daily_credits: { type: integer, format: int64, minimum: 0 }
+        average_daily_credits: { type: number, format: double, minimum: 0 }
+        task_count: { type: integer, format: int64, minimum: 0 }
+        active_days: { type: integer, format: int64, minimum: 0 }
+
+    UserUsage:
+      type: object
+      required: [timezone, lifetime]
+      properties:
+        timezone: { type: string, enum: [Asia/Shanghai] }
+        lifetime: { $ref: '#/components/schemas/UserUsageLifetime' }
+
     CreditReconciliationRequest:
       type: object
       additionalProperties: false
@@ -3852,6 +3883,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/CreditLedgerPage'
+
+    ApiResponseUserUsage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/UserUsage'
 
     ApiResponseCreditReconciliationRun:
       allOf:
