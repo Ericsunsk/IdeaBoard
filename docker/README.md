@@ -39,10 +39,10 @@ docker compose -f compose.local.yml logs -f postgres
 | 镜像 | `postgres:17-alpine` |
 | 容器名 | `ideaboard-postgres` |
 | 宿主机端口 | `127.0.0.1:${POSTGRES_PORT:-5432}` |
-| 默认数据库 | `${POSTGRES_DB:-ideaboard}` |
-| Schema owner / migration user | `${POSTGRES_USER:-ideaboard}` / `${POSTGRES_PASSWORD}` |
-| API runtime user | `${API_DB_USER:-ideaboard_api}` / `${API_DB_PASSWORD}`，无 Credits 表写权限 |
-| Auth runtime user | `${AUTH_DB_USER:-ideaboard_auth}` / `${AUTH_DB_PASSWORD}`，仅 Better Auth tables DML |
+| 默认数据库 | `ideaboard` |
+| Schema owner / migration user | `ideaboard` / `${POSTGRES_PASSWORD}` |
+| API runtime user | `ideaboard_api` / `${API_DB_PASSWORD}`，无 Credits 表写权限 |
+| Auth runtime user | `ideaboard_auth` / `${AUTH_DB_PASSWORD}`，仅 Better Auth tables DML |
 
 > [!TIP]
 > compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
@@ -139,7 +139,7 @@ docker compose -f compose.local.yml up -d
 请检查：
 
 1. `docker compose -f compose.local.yml ps` 中 PostgreSQL 是否为 `Up`。
-2. `apps/api/.env` 使用 API runtime credential，`apps/auth/.env` 使用 Auth runtime credential；两个 migration command 才使用 `POSTGRES_USER` / `POSTGRES_PASSWORD`。
+2. `apps/api/.env` 使用 API runtime credential，`apps/auth/.env` 使用 Auth runtime credential；两个 migration command 才使用固定 owner `ideaboard` 与 `POSTGRES_PASSWORD`。
 3. owner、API runtime、Auth runtime 三个 roles 必须不同；本地旧 volume 没有 runtime roles 时，重建开发 volume。
 
 > 说明：`APP_BASE_URL` 和 `API_BASE_URL` 是 compose / deploy 层输入；API 容器读取 CORS 与 Auth 内部地址，分享链接和上传素材访问地址在后台「系统设置」里配置，Auth 容器读取 `BETTER_AUTH_URL`。

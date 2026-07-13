@@ -1,33 +1,51 @@
 package outbound
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
-	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/settings"
 )
 
-const allowHostsEnvKey = "API_OUTBOUND_ALLOW_HOSTS"
 const mediaValidationTimeout = 1200 * time.Millisecond
 
-func AllowHostsFromEnv() []string {
-	raw := strings.TrimSpace(os.Getenv(allowHostsEnvKey))
-	if raw == "" {
+var policyProvider struct {
+	sync.RWMutex
+	value settings.OutboundPolicySettingProvider
+}
+
+func ConfigurePolicyProvider(provider settings.OutboundPolicySettingProvider) func() {
+	policyProvider.Lock()
+	previous := policyProvider.value
+	policyProvider.value = provider
+	policyProvider.Unlock()
+	return func() {
+		policyProvider.Lock()
+		policyProvider.value = previous
+		policyProvider.Unlock()
+	}
+}
+
+// AllowHosts loads the current policy for every outbound operation so Admin changes take effect without restart.
+func AllowHosts(ctx context.Context) []string {
+	policyProvider.RLock()
+	provider := policyProvider.value
+	policyProvider.RUnlock()
+	if provider == nil {
 		return nil
 	}
-	parts := strings.Split(raw, ",")
-	out := make([]string, 0, len(parts))
-	for _, item := range parts {
-		host := strings.TrimSpace(item)
-		if host == "" {
-			continue
-		}
-		out = append(out, host)
+	setting, err := provider.GetOutboundPolicy(ctx)
+	if err != nil {
+		slog.WarnContext(ctx, "outbound policy read failed; private egress remains blocked", "error", err)
+		return nil
 	}
-	return out
+	return append([]string(nil), setting.AllowHosts...)
 }
 
 func ValidateConfiguredEndpoint(raw string, allowHosts ...string) (string, error) {

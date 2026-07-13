@@ -156,7 +156,7 @@ func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account 
 	if strings.TrimSpace(account.ProxyURL) != "" {
 		baseURL = strings.TrimRight(strings.TrimSpace(account.ProxyURL), "/")
 	}
-	validatedBaseURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHostsFromEnv()...)
+	validatedBaseURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHosts(ctx)...)
 	if validateErr != nil {
 		return providerCallResult{}, validateErr
 	}
@@ -230,7 +230,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	req.Header.Set("x-goog-api-key", account.ApiKey)
 
 	slog.Info("Google Gemini request", "endpoint", redactLogURL(endpoint), "model", model, "inline_images", len(inlineParts))
-	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
+	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHosts(ctx)...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return providerCallResult{}, err
@@ -410,7 +410,7 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 	req.Header.Set("x-goog-api-key", account.ApiKey)
 
 	slog.Info("Google Imagen request", "endpoint", redactLogURL(endpoint), "model", model, "sample_count", googleParams.SampleCount)
-	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
+	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHosts(ctx)...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return providerCallResult{}, err

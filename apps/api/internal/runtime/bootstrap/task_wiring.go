@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -64,6 +65,14 @@ func newAppTaskRuntime(
 	repos appRepositories,
 	services appDomainServices,
 ) (appTaskServices, appWorkerRuntime, error) {
+	taskRuntimeSetting, eventRetentionSetting, err := resolveOperationalRuntimeSettings(ctx, services.runtimeSettings)
+	if err != nil {
+		return appTaskServices{}, appWorkerRuntime{}, err
+	}
+	services.runtimeSettings.SetEffectiveOperationalSettings(taskRuntimeSetting, eventRetentionSetting)
+	eventConfig := cfg.Events
+	eventConfig.NATSRetentionDays = eventRetentionSetting.NATSRetentionDays
+
 	taskBillingService := taskbilling.NewService(services.billingService, services.creditService)
 	repos.taskRepo.SetTaskBilling(taskBillingService)
 	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
@@ -75,12 +84,12 @@ func newAppTaskRuntime(
 	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService)
 	submitMediaValidator := taskmedia.NewSubmitMediaValidator(services.runtimeSettings, taskMediaAuthorizer)
 	taskEventHub := taskservice.NewEventHub()
-	taskEvents, eventBus, err := newTaskStatusEventPublisher(ctx, cfg.Events, taskEventHub)
+	taskEvents, eventBus, err := newTaskStatusEventPublisher(ctx, eventConfig, taskEventHub)
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
 
-	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, postgresRuntimeStore, cfg.Queue.MaxRetry)
+	riverQueue := taskqueue.NewRiverQueue(nil, dbs.db, postgresRuntimeStore, taskRuntimeSetting.MaxRetry)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
 		AccountRepo:      repos.accountRepo,
 		TaskRepo:         repos.taskRepo,
@@ -105,12 +114,12 @@ func newAppTaskRuntime(
 		PublicURLs:           services.runtimeSettings,
 		GenerationSettings:   services.runtimeSettings,
 	})
-	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
+	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(taskRuntimeSetting.NoCapacityRetrySeconds) * time.Second)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
-		Concurrency: cfg.Queue.WorkerConcurrency,
-		JobTimeout:  time.Duration(cfg.Queue.TaskTimeoutSeconds) * time.Second,
-		MaxRetry:    cfg.Queue.MaxRetry,
+		Concurrency: taskRuntimeSetting.WorkerConcurrency,
+		JobTimeout:  time.Duration(taskRuntimeSetting.TaskTimeoutSeconds) * time.Second,
+		MaxRetry:    taskRuntimeSetting.MaxRetry,
 		AdditionalQueues: map[string]river.QueueConfig{
 			credits.ReconciliationQueue: {MaxWorkers: 1},
 		},
@@ -133,7 +142,7 @@ func newAppTaskRuntime(
 	riverQueue.SetClient(riverClient)
 	services.creditService.SetReconciliationEnqueuer(riverClient)
 
-	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry, taskBillingService)
+	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, taskRuntimeSetting.MaxRetry, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		AccountRepo:        repos.accountRepo,
 		TaskRepo:           repos.taskRepo,
@@ -157,8 +166,26 @@ func newAppTaskRuntime(
 			riverClient: riverClient,
 			eventBus:    eventBus,
 			queueName:   taskqueue.RiverQueueDefault,
-			concurrency: cfg.Queue.WorkerConcurrency,
+			concurrency: taskRuntimeSetting.WorkerConcurrency,
 		}, nil
+}
+
+func resolveOperationalRuntimeSettings(
+	ctx context.Context,
+	provider *settings.RuntimeSettingsService,
+) (settings.TaskRuntimeSetting, settings.EventRetentionSetting, error) {
+	if provider == nil {
+		return settings.TaskRuntimeSetting{}, settings.EventRetentionSetting{}, fmt.Errorf("runtime settings service is nil")
+	}
+	taskRuntime, err := provider.ResolveTaskRuntime(ctx, settings.DefaultTaskRuntimeSetting())
+	if err != nil {
+		return settings.TaskRuntimeSetting{}, settings.EventRetentionSetting{}, fmt.Errorf("load task runtime settings: %w", err)
+	}
+	eventRetention, err := provider.ResolveEventRetention(ctx, settings.DefaultEventRetentionSetting())
+	if err != nil {
+		return settings.TaskRuntimeSetting{}, settings.EventRetentionSetting{}, fmt.Errorf("load event retention settings: %w", err)
+	}
+	return taskRuntime, eventRetention, nil
 }
 
 type taskEventHubPublisher struct {
@@ -227,7 +254,7 @@ func newTaskStatusEventPublisher(
 		_ = bus.Close()
 		return nil, nil, err
 	}
-	slog.Info("NATS JetStream task events enabled", "stream", cfg.NATSStreamName, "subject_prefix", cfg.NATSSubjectPrefix)
+	slog.Info("NATS JetStream task events enabled")
 	return compositeTaskStatusPublisher{local: localPublisher, remote: bus}, bus, nil
 }
 

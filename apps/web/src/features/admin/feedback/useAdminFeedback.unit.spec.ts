@@ -68,4 +68,19 @@ describe('createAdminFeedback', () => {
     )
     expect(appToast.success).not.toHaveBeenCalled()
   })
+
+  it('keeps operational settings validation and save outcomes explicit', () => {
+    const appToast = {
+      success: vi.fn(),
+      warning: vi.fn(),
+      error: vi.fn(),
+    }
+    const feedback = createAdminFeedback(appToast)
+
+    feedback.systemSettings.operational.validationFailed('请输入操作原因')
+    feedback.systemSettings.operational.saved()
+
+    expect(appToast.error).toHaveBeenCalledWith('请输入操作原因')
+    expect(appToast.success).toHaveBeenCalledWith('运行参数已保存')
+  })
 })

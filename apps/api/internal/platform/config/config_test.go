@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"sync"
 	"testing"
 )
@@ -69,53 +70,7 @@ func TestIsProductionAppEnv(t *testing.T) {
 	}
 }
 
-func TestNormalizeGinMode(t *testing.T) {
-	t.Run("defaults to release", func(t *testing.T) {
-		if got := normalizeGinMode(""); got != "release" {
-			t.Fatalf("expected default gin mode release, got %q", got)
-		}
-	})
-
-	t.Run("accepts valid gin mode", func(t *testing.T) {
-		if got := normalizeGinMode(" test "); got != "test" {
-			t.Fatalf("expected gin mode test, got %q", got)
-		}
-	})
-
-	t.Run("invalid value falls back to release", func(t *testing.T) {
-		if got := normalizeGinMode("verbose"); got != "release" {
-			t.Fatalf("expected invalid gin mode to fall back to release, got %q", got)
-		}
-	})
-}
-
 func TestLoadDatabaseConfig(t *testing.T) {
-	t.Run("connect retry defaults", func(t *testing.T) {
-		resetConfigEnv(t)
-
-		cfg := Load()
-		if cfg.Database.ConnectMaxRetries != 60 {
-			t.Fatalf("expected ConnectMaxRetries=60, got %d", cfg.Database.ConnectMaxRetries)
-		}
-		if cfg.Database.ConnectRetryIntervalMS != 1000 {
-			t.Fatalf("expected ConnectRetryIntervalMS=1000, got %d", cfg.Database.ConnectRetryIntervalMS)
-		}
-	})
-
-	t.Run("connect retry env names", func(t *testing.T) {
-		resetConfigEnv(t)
-		t.Setenv("DB_CONNECT_MAX_RETRIES", "7")
-		t.Setenv("DB_CONNECT_RETRY_INTERVAL_MS", "250")
-
-		cfg := Load()
-		if cfg.Database.ConnectMaxRetries != 7 {
-			t.Fatalf("expected ConnectMaxRetries=7, got %d", cfg.Database.ConnectMaxRetries)
-		}
-		if cfg.Database.ConnectRetryIntervalMS != 250 {
-			t.Fatalf("expected ConnectRetryIntervalMS=250, got %d", cfg.Database.ConnectRetryIntervalMS)
-		}
-	})
-
 	t.Run("separate migration credentials", func(t *testing.T) {
 		resetConfigEnv(t)
 		t.Setenv("DB_USER", "ideaboard_api")
@@ -133,46 +88,36 @@ func TestLoadDatabaseConfig(t *testing.T) {
 	})
 }
 
-func TestLoadQueueConfig(t *testing.T) {
-	t.Run("defaults", func(t *testing.T) {
-		resetConfigEnv(t)
+func TestLoadIgnoresRetiredRuntimeTuningEnv(t *testing.T) {
+	resetConfigEnv(t)
+	baseline := Load()
+	resetConfigEnv(t)
+	retired := map[string]string{
+		"DB_CONNECT_MAX_RETRIES":          "7",
+		"DB_CONNECT_RETRY_INTERVAL_MS":    "250",
+		"APP_GIN_MODE":                    "debug",
+		"APP_LOG_FILE":                    "custom.log",
+		"AUTH_SERVICE_TIMEOUT_SECONDS":    "17",
+		"RIVER_WORKER_CONCURRENCY":        "12",
+		"RIVER_TASK_TIMEOUT_SECONDS":      "240",
+		"RIVER_NO_CAPACITY_RETRY_SECONDS": "9",
+		"RIVER_MAX_RETRY":                 "31",
+		"NATS_STREAM_NAME":                "CUSTOM_STREAM",
+		"NATS_SUBJECT_PREFIX":             "custom",
+		"NATS_CONSUMER_NAME":              "custom-consumer",
+		"NATS_RETENTION_DAYS":             "30",
+		"NATS_CONNECT_TIMEOUT_SECONDS":    "11",
+		"NATS_REQUEST_TIMEOUT_SECONDS":    "12",
+		"NATS_DRAIN_TIMEOUT_SECONDS":      "13",
+	}
+	for key, value := range retired {
+		t.Setenv(key, value)
+	}
 
-		cfg := Load()
-		if cfg.Queue.WorkerConcurrency != 5 {
-			t.Fatalf("expected WorkerConcurrency=5, got %d", cfg.Queue.WorkerConcurrency)
-		}
-		if cfg.Queue.TaskTimeoutSeconds != 180 {
-			t.Fatalf("expected TaskTimeoutSeconds=180, got %d", cfg.Queue.TaskTimeoutSeconds)
-		}
-		if cfg.Queue.NoCapacityRetryDelaySeconds != 5 {
-			t.Fatalf("expected NoCapacityRetryDelaySeconds=5, got %d", cfg.Queue.NoCapacityRetryDelaySeconds)
-		}
-		if cfg.Queue.MaxRetry != 25 {
-			t.Fatalf("expected MaxRetry=25, got %d", cfg.Queue.MaxRetry)
-		}
-	})
-
-	t.Run("river env names", func(t *testing.T) {
-		resetConfigEnv(t)
-		t.Setenv("RIVER_WORKER_CONCURRENCY", "12")
-		t.Setenv("RIVER_TASK_TIMEOUT_SECONDS", "240")
-		t.Setenv("RIVER_NO_CAPACITY_RETRY_SECONDS", "9")
-		t.Setenv("RIVER_MAX_RETRY", "31")
-
-		cfg := Load()
-		if cfg.Queue.WorkerConcurrency != 12 {
-			t.Fatalf("expected WorkerConcurrency=12, got %d", cfg.Queue.WorkerConcurrency)
-		}
-		if cfg.Queue.TaskTimeoutSeconds != 240 {
-			t.Fatalf("expected TaskTimeoutSeconds=240, got %d", cfg.Queue.TaskTimeoutSeconds)
-		}
-		if cfg.Queue.NoCapacityRetryDelaySeconds != 9 {
-			t.Fatalf("expected NoCapacityRetryDelaySeconds=9, got %d", cfg.Queue.NoCapacityRetryDelaySeconds)
-		}
-		if cfg.Queue.MaxRetry != 31 {
-			t.Fatalf("expected MaxRetry=31, got %d", cfg.Queue.MaxRetry)
-		}
-	})
+	cfg := Load()
+	if !reflect.DeepEqual(cfg, baseline) {
+		t.Fatalf("retired runtime tuning env changed config:\n got=%+v\nwant=%+v", cfg, baseline)
+	}
 }
 
 func TestLoadIgnoresLegacyAliases(t *testing.T) {
@@ -193,21 +138,6 @@ func TestLoadIgnoresLegacyAliases(t *testing.T) {
 	if cfg.App.Host != "" {
 		t.Fatalf("expected APP_BIND_HOST to be ignored, got host %q", cfg.App.Host)
 	}
-	if cfg.App.GinMode != "release" {
-		t.Fatalf("expected GIN_MODE to be ignored, got gin mode %q", cfg.App.GinMode)
-	}
-	if cfg.Queue.WorkerConcurrency != 5 {
-		t.Fatalf("expected TASK_QUEUE_WORKER_CONCURRENCY to be ignored, got %d", cfg.Queue.WorkerConcurrency)
-	}
-	if cfg.Queue.TaskTimeoutSeconds != 180 {
-		t.Fatalf("expected TASK_QUEUE_TASK_TIMEOUT_SECONDS to be ignored, got %d", cfg.Queue.TaskTimeoutSeconds)
-	}
-	if cfg.Queue.NoCapacityRetryDelaySeconds != 5 {
-		t.Fatalf("expected TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS to be ignored, got %d", cfg.Queue.NoCapacityRetryDelaySeconds)
-	}
-	if cfg.Queue.MaxRetry != 25 {
-		t.Fatalf("expected TASK_QUEUE_MAX_RETRY to be ignored, got %d", cfg.Queue.MaxRetry)
-	}
 }
 
 func TestLoadEventBusConfig(t *testing.T) {
@@ -218,14 +148,9 @@ func TestLoadEventBusConfig(t *testing.T) {
 		if cfg.Events.Enabled {
 			t.Fatal("expected event bus disabled without NATS_URL")
 		}
-		if cfg.Events.NATSStreamName != "IDEABOARD_EVENTS" {
-			t.Fatalf("NATSStreamName=%q, want IDEABOARD_EVENTS", cfg.Events.NATSStreamName)
-		}
-		if cfg.Events.NATSSubjectPrefix != "ideaboard" {
-			t.Fatalf("NATSSubjectPrefix=%q, want ideaboard", cfg.Events.NATSSubjectPrefix)
-		}
-		if cfg.Events.NATSDrainTimeout != 2 {
-			t.Fatalf("NATSDrainTimeout=%d, want 2", cfg.Events.NATSDrainTimeout)
+		if cfg.Events.NATSStreamName != "" || cfg.Events.NATSSubjectPrefix != "" || cfg.Events.NATSConsumerName != "" ||
+			cfg.Events.NATSRetentionDays != 0 || cfg.Events.NATSConnectTimeout != 0 || cfg.Events.NATSRequestTimeout != 0 || cfg.Events.NATSDrainTimeout != 0 {
+			t.Fatalf("stable NATS defaults should be owned by events/settings, got %+v", cfg.Events)
 		}
 	})
 

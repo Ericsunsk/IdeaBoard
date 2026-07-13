@@ -24,4 +24,15 @@ describe('runtime URL helpers', () => {
       'https://cdn.example.com/uploads/canvas/U123/a.png',
     )
   })
+
+  it('derives the Auth base URL from the configured API base URL', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/api')
+    vi.resetModules()
+
+    const { resolveAuthUrl } = await import('./runtimeUrls')
+
+    expect(resolveAuthUrl('/api/auth/get-session')).toBe(
+      'https://api.example.com/api/auth/get-session',
+    )
+  })
 })

@@ -17,7 +17,6 @@ const app = createAuthApp({
   config: {
     trustProxy: env.auth.trustProxy,
     internalKey: env.auth.internalKey,
-    allowInsecureInternalBypass: env.auth.allowInsecureInternalBypass,
     trustedOrigins: env.auth.trustedOrigins,
   },
   healthCheck: async () => {
@@ -42,11 +41,6 @@ const app = createAuthApp({
 try {
   await verifyAuthRuntimePrivileges(authDB)
   await app.listen({ port: env.auth.port, host: env.auth.host })
-  if (!env.auth.internalKey) {
-    console.warn(
-      '[auth] AUTH_INTERNAL_KEY is empty because AUTH_INSECURE_DEV=1 and AUTH_HOST is loopback; internal endpoints are not protected',
-    )
-  }
   console.log(`[auth] Better Auth service listening on http://${env.auth.host}:${env.auth.port}`)
 } catch (error) {
   console.error('[auth] Failed to start auth service', error)

@@ -31,7 +31,7 @@ Build command: npm run build
 Build output directory: dist
 Environment variable: NODE_VERSION=22.22.2
 Environment variable: VITE_API_BASE_URL=https://api.example.com/api
-Environment variable: VITE_AUTH_BASE_URL=https://api.example.com
+Auth requests derive their public origin from `VITE_API_BASE_URL`.
 ```
 
 可选素材域名变量：

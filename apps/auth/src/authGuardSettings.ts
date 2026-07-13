@@ -12,8 +12,7 @@ type AuthGuardSettingsCache = {
 }
 
 type AuthGuardSettingsRow = {
-  config_key?: unknown
-  value?: unknown
+  registration_enabled?: unknown
 }
 
 const AUTH_GUARD_SETTINGS_TTL_MS = 10_000
@@ -40,17 +39,15 @@ export async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
   }
   try {
     const result = await authDB.query(
-      'SELECT config_key, value FROM system_configs WHERE config_key = ANY($1::text[])',
-      [
-        ['auth_registration_enabled'],
-      ],
+      'SELECT registration_enabled FROM get_auth_runtime_settings()',
     )
-    for (const row of result.rows as AuthGuardSettingsRow[]) {
-      applyAuthGuardSettingsRow(nextSettings, row)
+    const row = result.rows[0] as AuthGuardSettingsRow | undefined
+    if (typeof row?.registration_enabled === 'boolean') {
+      nextSettings.registrationEnabled = row.registration_enabled
     }
   } catch (error) {
-    // If query fails (including missing table), apply safe defaults and avoid hammering DB.
-    console.error('[auth] Failed to query system_configs for auth guard settings', error)
+    // If the typed settings seam is unavailable, fail closed and avoid hammering DB.
+    console.error('[auth] Failed to query auth guard settings', error)
     nextSettings = { ...DEFAULT_AUTH_GUARD_SETTINGS }
   }
 
@@ -59,10 +56,4 @@ export async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
     expiresAtMs: nowMs + AUTH_GUARD_SETTINGS_TTL_MS,
   }
   return nextSettings
-}
-
-function applyAuthGuardSettingsRow(settings: AuthGuardSettings, row: AuthGuardSettingsRow) {
-  if (row?.config_key === 'auth_registration_enabled' && typeof row?.value === 'string') {
-    settings.registrationEnabled = row.value === 'true'
-  }
 }

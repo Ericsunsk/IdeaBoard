@@ -47,6 +47,8 @@ var apiOwnedTableNames = []string{
 }
 
 const userDeletionRequestsTable = "user_deletion_requests"
+const systemSettingsAdminActionsTable = "system_settings_admin_actions"
+const systemSettingsAdminActionsSequence = "system_settings_admin_actions_id_seq"
 
 var apiOwnedSequenceNames = []string{
 	"api_account_models_id_seq",
@@ -99,6 +101,10 @@ func ConfigureRuntimePrivileges(ctx context.Context, db RuntimePrivilegeDBTX, ru
 		`GRANT SELECT ON ` + schemaSQL + `.schema_migrations TO ` + roleSQL,
 		`REVOKE ALL PRIVILEGES ON TABLE ` + schemaSQL + `.` + userDeletionRequestsTable + ` FROM ` + roleSQL,
 		`GRANT SELECT, INSERT, UPDATE ON ` + schemaSQL + `.` + userDeletionRequestsTable + ` TO ` + roleSQL,
+		`REVOKE ALL PRIVILEGES ON TABLE ` + schemaSQL + `.` + systemSettingsAdminActionsTable + ` FROM ` + roleSQL,
+		`GRANT SELECT, INSERT ON ` + schemaSQL + `.` + systemSettingsAdminActionsTable + ` TO ` + roleSQL,
+		`REVOKE ALL PRIVILEGES ON SEQUENCE ` + schemaSQL + `.` + systemSettingsAdminActionsSequence + ` FROM ` + roleSQL,
+		`GRANT USAGE, SELECT ON SEQUENCE ` + schemaSQL + `.` + systemSettingsAdminActionsSequence + ` TO ` + roleSQL,
 	}
 	for _, tableName := range protectedAuthTableNames {
 		var exists bool
@@ -160,6 +166,24 @@ SELECT COALESCE(has_table_privilege(current_user, to_regclass($1), $2), FALSE)`,
 		}
 		if allowed {
 			return fmt.Errorf("verify API runtime privileges: role %q has forbidden %s on %s", currentUser, privilege, userDeletionRequestsTable)
+		}
+	}
+	for _, privilege := range []string{"SELECT", "INSERT"} {
+		var allowed bool
+		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, systemSettingsAdminActionsTable, privilege).Scan(&allowed); err != nil {
+			return fmt.Errorf("verify API runtime privileges: check settings audit %s: %w", privilege, err)
+		}
+		if !allowed {
+			return fmt.Errorf("verify API runtime privileges: role %q lacks required %s on %s", currentUser, privilege, systemSettingsAdminActionsTable)
+		}
+	}
+	for _, privilege := range []string{"UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"} {
+		var allowed bool
+		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, systemSettingsAdminActionsTable, privilege).Scan(&allowed); err != nil {
+			return fmt.Errorf("verify API runtime privileges: check settings audit %s: %w", privilege, err)
+		}
+		if allowed {
+			return fmt.Errorf("verify API runtime privileges: role %q has forbidden %s on %s", currentUser, privilege, systemSettingsAdminActionsTable)
 		}
 	}
 	return nil

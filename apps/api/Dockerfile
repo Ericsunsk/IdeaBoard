@@ -26,10 +26,8 @@ COPY --from=builder --chown=65532:65532 /out/ideaboard-healthcheck /app/ideaboar
 COPY --from=builder --chown=65532:65532 /out/uploads /app/uploads
 
 ENV APP_ENV=production \
-    APP_GIN_MODE=release \
     APP_HOST=0.0.0.0 \
-    APP_PORT=6000 \
-    APP_LOG_FILE=none
+    APP_PORT=6000
 
 EXPOSE 6000
 

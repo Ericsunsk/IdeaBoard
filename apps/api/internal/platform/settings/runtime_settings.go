@@ -58,9 +58,11 @@ type GoogleNativeGenerationEvaluation struct {
 }
 
 type RuntimeSettingsService struct {
-	repo           *SystemConfigRepository
-	mu             sync.RWMutex
-	rateLimitCache *cachedRateLimitSetting
+	repo                 *SystemConfigRepository
+	mu                   sync.RWMutex
+	rateLimitCache       *cachedRateLimitSetting
+	operationalMu        sync.RWMutex
+	effectiveOperational *effectiveOperationalSettings
 }
 
 type PublicURLSettingProvider interface {

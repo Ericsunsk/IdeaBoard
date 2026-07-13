@@ -12,13 +12,15 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+const (
+	postgresConnectMaxRetries = 60
+	postgresConnectRetryDelay = time.Second
+)
+
 func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 	dsn := PostgresDSN(cfg)
-	maxRetries := positiveIntDefault(cfg.ConnectMaxRetries, 60)
-	retryInterval := time.Duration(positiveIntDefault(cfg.ConnectRetryIntervalMS, 1000)) * time.Millisecond
-
 	var lastErr error
-	for attempt := 1; attempt <= maxRetries; attempt++ {
+	for attempt := 1; attempt <= postgresConnectMaxRetries; attempt++ {
 		db, err := sql.Open("pgx", dsn)
 		if err == nil {
 			// sql.DB pool (25 conns). The River worker maintains its own pgxpool.Pool;
@@ -35,20 +37,13 @@ func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 		}
 
 		lastErr = err
-		if attempt >= maxRetries {
+		if attempt >= postgresConnectMaxRetries {
 			break
 		}
-		slog.Warn("PostgreSQL connect attempt failed", "attempt", attempt, "max_retries", maxRetries, "retry_interval", retryInterval, "err", err)
-		time.Sleep(retryInterval)
+		slog.Warn("PostgreSQL connect attempt failed", "attempt", attempt, "max_retries", postgresConnectMaxRetries, "retry_interval", postgresConnectRetryDelay, "err", err)
+		time.Sleep(postgresConnectRetryDelay)
 	}
 	return nil, lastErr
-}
-
-func positiveIntDefault(value, defaultValue int) int {
-	if value > 0 {
-		return value
-	}
-	return defaultValue
 }
 
 func PostgresDSN(cfg config.DatabaseConfig) string {

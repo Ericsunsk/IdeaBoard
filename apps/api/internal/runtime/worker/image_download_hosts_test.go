@@ -17,7 +17,7 @@ func (p testImageDownloadPublicURLProvider) GetPublicURL(context.Context) (setti
 }
 
 func TestTrustedImageDownloadHostsIncludesProxyEnvAndTrustedAssets(t *testing.T) {
-	t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "cdn.example.com, https://media.example.org:8443")
+	setTestOutboundAllowHosts(t, "cdn.example.com", "media.example.org:8443")
 
 	got := trustedImageDownloadHosts(
 		context.Background(),

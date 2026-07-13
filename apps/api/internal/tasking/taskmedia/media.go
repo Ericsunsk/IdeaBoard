@@ -88,7 +88,7 @@ func NewSubmitMediaValidator(publicURLs settings.PublicURLSettingProvider, autho
 
 func (v *SubmitMediaValidator) ValidateSubmitMediaRef(ctx context.Context, userID int64, raw string) error {
 	normalized := v.CanonicalizePublicUploadRef(ctx, raw)
-	if err := ValidateSubmitMediaRef(normalized); err != nil {
+	if err := ValidateSubmitMediaRef(ctx, normalized); err != nil {
 		return err
 	}
 	trimmed := strings.TrimSpace(normalized)
@@ -114,8 +114,8 @@ func (v *SubmitMediaValidator) CanonicalizePublicUploadRef(ctx context.Context, 
 	return CanonicalizeConfiguredPublicUploadRefWithProvider(ctx, v.publicURLs, raw)
 }
 
-func ValidateSubmitMediaRef(raw string) error {
-	return mediarefs.ValidateMediaRef(CanonicalizeConfiguredPublicUploadRef(raw), outbound.AllowHostsFromEnv(), MaxSubmitTaskMediaDataURLBytes)
+func ValidateSubmitMediaRef(ctx context.Context, raw string) error {
+	return mediarefs.ValidateMediaRef(CanonicalizeConfiguredPublicUploadRef(raw), outbound.AllowHosts(ctx), MaxSubmitTaskMediaDataURLBytes)
 }
 
 const MaxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024

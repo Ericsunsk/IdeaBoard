@@ -14,7 +14,6 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
   const config: AuthAppConfig = {
     trustProxy: false,
     internalKey: 'test-internal-key',
-    allowInsecureInternalBypass: false,
     trustedOrigins: ['https://app.example.com'],
     ...overrides.config,
   }

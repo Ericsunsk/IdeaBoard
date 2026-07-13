@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/settings"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+type testProviderEndpointOutboundPolicy struct{ hosts []string }
+
+func (p testProviderEndpointOutboundPolicy) GetOutboundPolicy(context.Context) (settings.OutboundPolicySetting, error) {
+	return settings.OutboundPolicySetting{AllowHosts: p.hosts}, nil
+}
+
+func setProviderEndpointTestAllowHosts(t *testing.T, hosts ...string) {
+	t.Helper()
+	restore := outbound.ConfigurePolicyProvider(testProviderEndpointOutboundPolicy{hosts: hosts})
+	t.Cleanup(restore)
+}
 
 func TestBuildModelsURL(t *testing.T) {
 	tests := []struct {
@@ -51,7 +64,7 @@ func TestBuildModelsURL(t *testing.T) {
 }
 
 func TestProviderEndpointCreateRejectsLocalhostAPIURL(t *testing.T) {
-	t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "")
+	setProviderEndpointTestAllowHosts(t)
 	if _, err := outbound.ValidateConfiguredEndpoint("http://127.0.0.1:8080/v1"); err == nil {
 		t.Fatal("expected localhost base_url to be rejected")
 	}
@@ -248,7 +261,7 @@ func TestParseModelIDs(t *testing.T) {
 
 func newProviderEndpointHandlerTestRouter(t *testing.T) (*gin.Engine, *ProviderEndpointRepository) {
 	t.Helper()
-	t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "127.0.0.1")
+	setProviderEndpointTestAllowHosts(t, "127.0.0.1")
 	db := newProviderEndpointRepositoryTestDB(t)
 	repo := NewProviderEndpointRepository(db)
 	handler := NewProviderEndpointHandler(repo, "production")
@@ -339,15 +352,15 @@ func TestDetectModelsAllowHostsMergesEnvironmentAndDevDefaults(t *testing.T) {
 		gin.SetMode(prevMode)
 	})
 
-	t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "models.internal")
+	setProviderEndpointTestAllowHosts(t, "models.internal")
 	gin.SetMode(gin.ReleaseMode)
 	prodHandler := NewProviderEndpointHandler(nil, "production")
-	if got := strings.Join(prodHandler.detectModelsAllowHosts(), ","); got != "models.internal" {
+	if got := strings.Join(prodHandler.detectModelsAllowHosts(context.Background()), ","); got != "models.internal" {
 		t.Fatalf("production allow hosts = %q, want models.internal", got)
 	}
 
 	devHandler := NewProviderEndpointHandler(nil, "development")
-	got := strings.Join(devHandler.detectModelsAllowHosts(), ",")
+	got := strings.Join(devHandler.detectModelsAllowHosts(context.Background()), ",")
 	for _, want := range []string{"models.internal", "localhost", "127.0.0.1", "::1"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("development allow hosts = %q, missing %q", got, want)

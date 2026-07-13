@@ -21,6 +21,7 @@ import type {
   ApiResponseBrandingSetting,
   ApiResponseGoogleNativeGenerationSetting,
   ApiResponseMediaUploadSetting,
+  ApiResponseOperationalSettingsState,
   ApiResponsePublicURLSetting,
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
@@ -28,6 +29,7 @@ import type {
   BrandingSetting,
   GoogleNativeGenerationSetting,
   MediaUploadSetting,
+  OperationalSettingsUpdateRequest,
   PublicURLSetting,
   RateLimitSetting,
   TaskMonitorSetting,
@@ -1103,6 +1105,160 @@ export function useUpdateAdminTaskMonitorSetting<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getUpdateAdminTaskMonitorSettingQueryOptions(taskMonitorSetting, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminOperationalSettingsUrl = () => {
+  return `/admin/settings/operational`
+}
+
+export const getAdminOperationalSettings = async (
+  options?: RequestInit,
+): Promise<ApiResponseOperationalSettingsState> => {
+  return orvalMutator<ApiResponseOperationalSettingsState>(getGetAdminOperationalSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminOperationalSettingsQueryKey = () => {
+  return ['admin', 'settings', 'operational'] as const
+}
+
+export const getGetAdminOperationalSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminOperationalSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminOperationalSettings>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminOperationalSettingsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOperationalSettings>>> = ({
+    signal,
+  }) => getAdminOperationalSettings({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminOperationalSettings>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminOperationalSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminOperationalSettings>>
+>
+export type GetAdminOperationalSettingsQueryError = ErrorType<unknown>
+
+export function useGetAdminOperationalSettings<
+  TData = Awaited<ReturnType<typeof getAdminOperationalSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminOperationalSettings>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminOperationalSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateAdminOperationalSettingsUrl = () => {
+  return `/admin/settings/operational`
+}
+
+export const updateAdminOperationalSettings = async (
+  operationalSettingsUpdateRequest: OperationalSettingsUpdateRequest,
+  options?: RequestInit,
+): Promise<ApiResponseOperationalSettingsState> => {
+  return orvalMutator<ApiResponseOperationalSettingsState>(getUpdateAdminOperationalSettingsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(operationalSettingsUpdateRequest),
+  })
+}
+
+export const getUpdateAdminOperationalSettingsQueryKey = (
+  operationalSettingsUpdateRequest?: MaybeRefOrGetter<OperationalSettingsUpdateRequest>,
+) => {
+  return ['PUT', 'admin', 'settings', 'operational', operationalSettingsUpdateRequest] as const
+}
+
+export const getUpdateAdminOperationalSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminOperationalSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  operationalSettingsUpdateRequest: MaybeRefOrGetter<OperationalSettingsUpdateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOperationalSettings>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminOperationalSettingsQueryKey(operationalSettingsUpdateRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminOperationalSettings>>> = ({
+    signal,
+  }) =>
+    updateAdminOperationalSettings(toValue(operationalSettingsUpdateRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminOperationalSettings>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminOperationalSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminOperationalSettings>>
+>
+export type UpdateAdminOperationalSettingsQueryError = ErrorType<unknown>
+
+export function useUpdateAdminOperationalSettings<
+  TData = Awaited<ReturnType<typeof updateAdminOperationalSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  operationalSettingsUpdateRequest: MaybeRefOrGetter<OperationalSettingsUpdateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOperationalSettings>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminOperationalSettingsQueryOptions(
+    operationalSettingsUpdateRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

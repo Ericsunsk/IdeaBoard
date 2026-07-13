@@ -30,7 +30,7 @@ func trustedImageDownloadHosts(ctx context.Context, account *accounts.ApiAccount
 	for _, host := range trustedRuntimeAssetHosts(ctx, provider) {
 		appendHost(host)
 	}
-	for _, host := range outbound.AllowHostsFromEnv() {
+	for _, host := range outbound.AllowHosts(ctx) {
 		appendHost(host)
 	}
 

@@ -2,10 +2,148 @@ package settings
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"ideaboard/api/internal/testdb"
 )
+
+func TestRuntimeSettingsOperationalUpdatePersistsAuditAndTracksRestartRequired(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	service := NewRuntimeSettingsService(NewSystemConfigRepository(db))
+	service.SetEffectiveOperationalSettings(DefaultTaskRuntimeSetting(), DefaultEventRetentionSetting())
+
+	updated, err := service.UpdateOperationalSettings(ctx, OperationalSettings{
+		TaskRuntime: TaskRuntimeSetting{
+			WorkerConcurrency:      12,
+			TaskTimeoutSeconds:     240,
+			NoCapacityRetrySeconds: 9,
+			MaxRetry:               31,
+		},
+		OutboundPolicy: OutboundPolicySetting{AllowHosts: []string{"  INTERNAL.example.com:8443 ", "10.0.0.8", "internal.example.com:8443"}},
+		EventRetention: EventRetentionSetting{NATSRetentionDays: 30},
+	}, 42, "  capacity tuning  ")
+	if err != nil {
+		t.Fatalf("update operational settings failed: %v", err)
+	}
+
+	wantTask := TaskRuntimeSetting{WorkerConcurrency: 12, TaskTimeoutSeconds: 240, NoCapacityRetrySeconds: 9, MaxRetry: 31}
+	wantOutbound := OutboundPolicySetting{AllowHosts: []string{"internal.example.com:8443", "10.0.0.8"}}
+	wantRetention := EventRetentionSetting{NATSRetentionDays: 30}
+	if updated.TaskRuntime.Configured != wantTask || updated.TaskRuntime.Effective != DefaultTaskRuntimeSetting() || !updated.TaskRuntime.RestartRequired {
+		t.Fatalf("task runtime state = %+v", updated.TaskRuntime)
+	}
+	if !equalStringSlices(updated.OutboundPolicy.Configured.AllowHosts, wantOutbound.AllowHosts) || !equalStringSlices(updated.OutboundPolicy.Effective.AllowHosts, wantOutbound.AllowHosts) || updated.OutboundPolicy.RestartRequired {
+		t.Fatalf("outbound policy state = %+v", updated.OutboundPolicy)
+	}
+	if updated.EventRetention.Configured != wantRetention || updated.EventRetention.Effective != DefaultEventRetentionSetting() || !updated.EventRetention.RestartRequired {
+		t.Fatalf("event retention state = %+v", updated.EventRetention)
+	}
+
+	var actionType string
+	var actorID int64
+	var reason string
+	var metadataRaw []byte
+	if err := db.QueryRowContext(ctx, `
+SELECT action_type, actor_id, reason, metadata
+FROM system_settings_admin_actions
+ORDER BY id DESC
+LIMIT 1`).Scan(&actionType, &actorID, &reason, &metadataRaw); err != nil {
+		t.Fatalf("read operational settings audit: %v", err)
+	}
+	if actionType != "update_operational_settings" || actorID != 42 || reason != "capacity tuning" {
+		t.Fatalf("audit = type=%q actor=%d reason=%q", actionType, actorID, reason)
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal(metadataRaw, &metadata); err != nil {
+		t.Fatalf("decode audit metadata: %v", err)
+	}
+	if metadata["task_runtime"] == nil || metadata["outbound_policy"] == nil || metadata["event_retention"] == nil {
+		t.Fatalf("audit metadata = %#v, want all operational groups", metadata)
+	}
+}
+
+func TestNormalizeOperationalSettingsRejectsInvalidInputs(t *testing.T) {
+	valid := DefaultOperationalSettings()
+	tests := []struct {
+		name    string
+		setting OperationalSettings
+	}{
+		{name: "worker concurrency", setting: func() OperationalSettings { value := valid; value.TaskRuntime.WorkerConcurrency = 0; return value }()},
+		{name: "task timeout", setting: func() OperationalSettings {
+			value := valid
+			value.TaskRuntime.TaskTimeoutSeconds = 31_536_001
+			return value
+		}()},
+		{name: "capacity retry", setting: func() OperationalSettings { value := valid; value.TaskRuntime.NoCapacityRetrySeconds = 0; return value }()},
+		{name: "max retry", setting: func() OperationalSettings { value := valid; value.TaskRuntime.MaxRetry = 0; return value }()},
+		{name: "retention", setting: func() OperationalSettings {
+			value := valid
+			value.EventRetention.NATSRetentionDays = 3661
+			return value
+		}()},
+		{name: "host scheme", setting: func() OperationalSettings {
+			value := valid
+			value.OutboundPolicy.AllowHosts = []string{"https://internal.example.com"}
+			return value
+		}()},
+		{name: "host wildcard", setting: func() OperationalSettings {
+			value := valid
+			value.OutboundPolicy.AllowHosts = []string{"*.example.com"}
+			return value
+		}()},
+		{name: "too many hosts", setting: func() OperationalSettings {
+			value := valid
+			value.OutboundPolicy.AllowHosts = make([]string, maxOutboundAllowHosts+1)
+			return value
+		}()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := NormalizeOperationalSettings(tt.setting); err == nil {
+				t.Fatalf("NormalizeOperationalSettings(%+v) succeeded, want error", tt.setting)
+			}
+		})
+	}
+}
+
+func TestRuntimeOperationalSettingsUseCallerFallbackWhenConfigsAreMissing(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	service := NewRuntimeSettingsService(NewSystemConfigRepository(db))
+	if _, err := db.ExecContext(ctx, `DELETE FROM system_configs WHERE config_key = ANY($1::text[])`, []string{
+		taskRuntimeWorkerConcurrencyKey,
+		taskRuntimeTaskTimeoutSecondsKey,
+		taskRuntimeNoCapacityRetrySecondsKey,
+		taskRuntimeMaxRetryKey,
+		eventRetentionNATSDaysKey,
+	}); err != nil {
+		t.Fatalf("delete operational defaults: %v", err)
+	}
+
+	taskFallback := TaskRuntimeSetting{WorkerConcurrency: 7, TaskTimeoutSeconds: 321, NoCapacityRetrySeconds: 11, MaxRetry: 19}
+	retentionFallback := EventRetentionSetting{NATSRetentionDays: 14}
+	if got, err := service.ResolveTaskRuntime(ctx, taskFallback); err != nil || got != taskFallback {
+		t.Fatalf("task fallback = %+v, err=%v", got, err)
+	}
+	if got, err := service.ResolveEventRetention(ctx, retentionFallback); err != nil || got != retentionFallback {
+		t.Fatalf("retention fallback = %+v, err=%v", got, err)
+	}
+}
+
+func equalStringSlices(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
 
 func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 	ctx := context.Background()

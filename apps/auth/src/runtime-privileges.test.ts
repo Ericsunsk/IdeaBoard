@@ -29,6 +29,14 @@ test("configureAuthRuntimePrivileges grants only Better Auth tables atomically",
     queries[3] || "",
     /"user", "session", "account", "verification"/,
   )
+  assert.match(
+    queries[4] || '',
+    /REVOKE ALL ON TABLE "public"\.system_configs FROM "ideaboard_auth"/,
+  )
+  assert.match(
+    queries[5] || '',
+    /GRANT EXECUTE ON FUNCTION "public"\.get_auth_runtime_settings\(\) TO "ideaboard_auth"/,
+  )
   assert.equal(queries.at(-1), 'COMMIT')
   assert.equal(
     queries.some((sql) => sql.includes("credit_")),
@@ -45,6 +53,8 @@ test("verifyAuthRuntimePrivileges rejects a role that can write Credits", async 
         rows: [
           {
             current_user: 'schema_owner',
+            can_execute_auth_settings: true,
+            can_read_system_configs: false,
             can_read_auth_users: true,
             can_write_credits: true,
             can_execute_credit_functions: true,
@@ -68,4 +78,67 @@ test("verifyAuthRuntimePrivileges rejects a role that can write Credits", async 
     inspectedFunctions.some((signature) => String(signature).startsWith('execute_credit_command(')),
     false,
   )
+})
+
+test('verifyAuthRuntimePrivileges rejects a role without the typed Auth settings seam', async () => {
+  const pool = {
+    query: async () => ({
+      rows: [
+        {
+          current_user: 'ideaboard_auth',
+          can_execute_auth_settings: false,
+          can_read_system_configs: false,
+          can_read_auth_users: true,
+          can_write_credits: false,
+          can_execute_credit_functions: false,
+        },
+      ],
+    }),
+  } as unknown as Pool
+
+  await assert.rejects(
+    () => verifyAuthRuntimePrivileges(pool),
+    /execute_auth_settings=false/,
+  )
+})
+
+test('verifyAuthRuntimePrivileges rejects direct access to raw system settings', async () => {
+  const pool = {
+    query: async () => ({
+      rows: [
+        {
+          current_user: 'ideaboard_auth',
+          can_execute_auth_settings: true,
+          can_read_system_configs: true,
+          can_read_auth_users: true,
+          can_write_credits: false,
+          can_execute_credit_functions: false,
+        },
+      ],
+    }),
+  } as unknown as Pool
+
+  await assert.rejects(
+    () => verifyAuthRuntimePrivileges(pool),
+    /read_system_configs=true/,
+  )
+})
+
+test('verifyAuthRuntimePrivileges accepts the limited Auth runtime role', async () => {
+  const pool = {
+    query: async () => ({
+      rows: [
+        {
+          current_user: 'ideaboard_auth',
+          can_execute_auth_settings: true,
+          can_read_system_configs: false,
+          can_read_auth_users: true,
+          can_write_credits: false,
+          can_execute_credit_functions: false,
+        },
+      ],
+    }),
+  } as unknown as Pool
+
+  await verifyAuthRuntimePrivileges(pool)
 })

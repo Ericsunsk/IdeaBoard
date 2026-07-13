@@ -76,7 +76,6 @@ export type AuthUserRepository = {
 
 export type InternalRoutesOptions = {
   internalKey: string
-  allowInsecureInternalBypass: boolean
   authApi: InternalAuthAPI
   repository: AuthUserRepository
 }
@@ -335,10 +334,6 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
 function createRequireInternalKey(options: InternalRoutesOptions): preHandlerHookHandler {
   return (request, reply, done) => {
     if (!options.internalKey) {
-      if (options.allowInsecureInternalBypass) {
-        done()
-        return
-      }
       sendError(reply, 500, 'internal key is not configured')
       done()
       return

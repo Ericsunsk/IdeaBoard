@@ -13,7 +13,6 @@ import { createAuthDispatchHandler } from './publicRegistration.js'
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions['trustProxy']
   internalKey: string
-  allowInsecureInternalBypass: boolean
   trustedOrigins: string[]
 }
 
@@ -62,7 +61,6 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
 
   registerInternalRoutes(app, {
     internalKey: deps.config.internalKey,
-    allowInsecureInternalBypass: deps.config.allowInsecureInternalBypass,
     authApi: deps.authApi,
     repository: deps.repository,
   })

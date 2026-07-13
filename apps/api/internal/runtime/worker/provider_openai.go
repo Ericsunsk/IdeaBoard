@@ -215,7 +215,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	if account.ProxyURL != "" {
 		baseURL = strings.TrimRight(account.ProxyURL, "/")
 	}
-	validatedBaseURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHostsFromEnv()...)
+	validatedBaseURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHosts(ctx)...)
 	if validateErr != nil {
 		return providerCallResult{}, validateErr
 	}
@@ -279,7 +279,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 
 	slog.Info("OpenAI-compatible image request", "feature", featureSlug, "endpoint", redactLogURL(endpoint), "model", model, "size", size, "edit", useEditEndpoint, "images", imageInputCount)
 
-	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
+	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHosts(ctx)...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return providerCallResult{}, err

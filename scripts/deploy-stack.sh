@@ -388,13 +388,7 @@ validate_env_file() {
     echo "IDEABOARD_API_IMAGE, IDEABOARD_AUTH_IMAGE, and IDEABOARD_AUTH_MIGRATE_IMAGE must come from the same GHCR owner/repo." >&2
     return 1
   fi
-  nats_user="$(env_value NATS_USER)"
-  nats_user="${nats_user:-ideaboard}"
   nats_password="$(env_value NATS_PASSWORD)"
-  if ! is_url_userinfo_value "$nats_user"; then
-    echo "NATS_USER may only contain URL-safe characters: A-Z a-z 0-9 . _ ~ -" >&2
-    return 1
-  fi
   if ! is_url_userinfo_value "$nats_password"; then
     echo "NATS_PASSWORD may only contain URL-safe characters: A-Z a-z 0-9 . _ ~ -" >&2
     return 1
@@ -786,8 +780,7 @@ backup_postgres() {
   mkdir -p "$BACKUP_DIR"
   chmod 700 "$BACKUP_DIR"
   timestamp="$(date +%Y%m%d-%H%M%S)"
-  database="$(env_value POSTGRES_DB)"
-  database="${database:-ideaboard}"
+  database="ideaboard"
   backup_file="$BACKUP_DIR/postgres-${database}-${timestamp}.dump"
   tmp_file="${backup_file}.tmp"
 
@@ -1062,8 +1055,7 @@ check_nats_event_stream() {
     return 0
   fi
 
-  stream_name="$(env_value NATS_STREAM_NAME)"
-  stream_name="${stream_name:-IDEABOARD_EVENTS}"
+  stream_name="IDEABOARD_EVENTS"
 
   echo "Checking NATS JetStream stream: $stream_name"
   body="$(

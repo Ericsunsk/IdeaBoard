@@ -14,7 +14,7 @@ import type {
   BillingSKUForm,
   BillingSKUFormErrors,
 } from './billingPricingTypes'
-import { validateAdminActionReason } from '../adminActionReasonContract'
+import { validateAdminActionReason } from '../../shared/validation/adminActionReasonContract'
 
 const billingSKUPattern = /^[a-z][a-z0-9-]{0,31}:[a-z][a-z0-9._-]{0,94}$/
 const aiImageSKUPattern = /^ai-image:([a-z][a-z0-9-]*)\.([a-f0-9]{64})$/

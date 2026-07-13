@@ -4,7 +4,27 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/settings"
 )
+
+type testStorageOutboundPolicyProvider struct{ hosts []string }
+
+func (p testStorageOutboundPolicyProvider) GetOutboundPolicy(context.Context) (settings.OutboundPolicySetting, error) {
+	return settings.OutboundPolicySetting{AllowHosts: p.hosts}, nil
+}
+
+type mutableStorageOutboundPolicyProvider struct {
+	hosts   []string
+	err     error
+	seenCtx context.Context
+}
+
+func (p *mutableStorageOutboundPolicyProvider) GetOutboundPolicy(ctx context.Context) (settings.OutboundPolicySetting, error) {
+	p.seenCtx = ctx
+	return settings.OutboundPolicySetting{AllowHosts: p.hosts}, p.err
+}
 
 type stubS3BucketExistenceChecker struct {
 	exists  bool
@@ -143,29 +163,67 @@ func TestS3CompatibleValidateBaseConfigEndpointPolicy(t *testing.T) {
 	}
 
 	t.Run("plain public host endpoint passes", func(t *testing.T) {
-		t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "")
+		restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{})
+		t.Cleanup(restore)
 		cfg := *base
 		cfg.Endpoint = "s3.us-east-1.amazonaws.com"
-		if err := service.validateBaseConfig(&cfg); err != nil {
+		if err := service.validateBaseConfig(context.Background(), &cfg); err != nil {
 			t.Fatalf("expected plain public host endpoint to pass, got %v", err)
 		}
 	})
 
 	t.Run("plain localhost endpoint rejected by default", func(t *testing.T) {
-		t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "")
+		restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{})
+		t.Cleanup(restore)
 		cfg := *base
 		cfg.Endpoint = "127.0.0.1:9000"
-		if err := service.validateBaseConfig(&cfg); err == nil {
+		if err := service.validateBaseConfig(context.Background(), &cfg); err == nil {
 			t.Fatal("expected localhost endpoint to be rejected")
 		}
 	})
 
 	t.Run("plain localhost endpoint allowed when allowlisted", func(t *testing.T) {
-		t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "127.0.0.1")
+		restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+		t.Cleanup(restore)
 		cfg := *base
 		cfg.Endpoint = "127.0.0.1:9000"
-		if err := service.validateBaseConfig(&cfg); err != nil {
+		if err := service.validateBaseConfig(context.Background(), &cfg); err != nil {
 			t.Fatalf("expected localhost endpoint to pass with allowlist, got %v", err)
 		}
 	})
+}
+
+func TestS3CompatibleClientRechecksEndpointPolicyBeforeUsingCachedClient(t *testing.T) {
+	service := NewS3CompatibleService()
+	provider := &mutableStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}}
+	restore := outbound.ConfigurePolicyProvider(provider)
+	t.Cleanup(restore)
+
+	type ctxKey struct{}
+	ctx := context.WithValue(context.Background(), ctxKey{}, "request-context")
+	cfg := &S3CompatibleConfig{
+		AccessKeyID:     "ak",
+		SecretAccessKey: "sk",
+		BucketName:      "bucket",
+		Endpoint:        "127.0.0.1:9000",
+		AccessDomain:    "http://127.0.0.1:9000",
+	}
+
+	if _, err := service.clientWithConfig(ctx, cfg); err != nil {
+		t.Fatalf("initial allowlisted client creation failed: %v", err)
+	}
+	if provider.seenCtx != ctx {
+		t.Fatal("endpoint policy did not receive caller context")
+	}
+
+	provider.hosts = nil
+	if _, err := service.clientWithConfig(ctx, cfg); err == nil {
+		t.Fatal("cached client remained usable after allowlist revocation")
+	}
+
+	provider.hosts = []string{"127.0.0.1"}
+	provider.err = errors.New("settings database unavailable")
+	if _, err := service.clientWithConfig(ctx, cfg); err == nil {
+		t.Fatal("cached client remained usable when policy lookup failed")
+	}
 }

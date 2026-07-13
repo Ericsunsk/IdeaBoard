@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/runtime/billingcoverage"
 
@@ -32,6 +33,7 @@ type appDomainServices struct {
 
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
 	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
+	outbound.ConfigurePolicyProvider(runtimeSettings)
 	storageService := storage.NewStorageService(repos.storageProfileRepo, runtimeSettings)
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
 		return appDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)

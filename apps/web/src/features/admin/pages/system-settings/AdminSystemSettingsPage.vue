@@ -443,6 +443,8 @@
         </div>
       </template>
     </Card>
+
+    <AdminOperationalSettingsCard />
   </AdminResourceGridFrame>
 
   <AdminLogoCropDialog
@@ -466,6 +468,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import AdminOperationalSettingsCard from '../../system-settings/AdminOperationalSettingsCard.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'

@@ -1,6 +1,10 @@
 package taskservice
 
-import "ideaboard/api/internal/tasking/taskmedia"
+import (
+	"context"
+
+	"ideaboard/api/internal/tasking/taskmedia"
+)
 
 func validateSubmitTaskImageURLs(imageURLs []string) error {
 	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, validateSubmitTaskMediaRef)
@@ -11,5 +15,5 @@ func validateSubmitTaskMediaParams(params map[string]interface{}) error {
 }
 
 func validateSubmitTaskMediaRef(raw string) error {
-	return taskmedia.ValidateSubmitMediaRef(raw)
+	return taskmedia.ValidateSubmitMediaRef(context.Background(), raw)
 }

@@ -434,7 +434,7 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		)
 	}
 
-	providerEndpointName, err := c.applyAssignmentEndpointSnapshot(account, assignment)
+	providerEndpointName, err := c.applyAssignmentEndpointSnapshot(ctx, account, assignment)
 	if err != nil {
 		return providerExecutionConfig{}, err
 	}
@@ -501,7 +501,7 @@ func (c *ProviderExecutor) applyAccountProviderEndpoint(ctx context.Context, acc
 			fmt.Errorf("ProviderEndpoint(ID=%d)不存在: %w", account.ProviderEndpointID, err),
 		)
 	}
-	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(providerEndpoint.BaseURL, outbound.AllowHostsFromEnv()...)
+	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(providerEndpoint.BaseURL, outbound.AllowHosts(ctx)...)
 	if validateErr != nil {
 		return "", newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
@@ -514,13 +514,13 @@ func (c *ProviderExecutor) applyAccountProviderEndpoint(ctx context.Context, acc
 	return providerEndpoint.Name, nil
 }
 
-func (c *ProviderExecutor) applyAssignmentEndpointSnapshot(account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) (string, error) {
+func (c *ProviderExecutor) applyAssignmentEndpointSnapshot(ctx context.Context, account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) (string, error) {
 	baseURL := strings.TrimSpace(assignment.ProviderEndpointBaseURL)
 	apiType := strings.TrimSpace(assignment.APIType)
 	if assignment.ProviderEndpointID <= 0 || baseURL == "" || apiType == "" {
 		return "", nil
 	}
-	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHostsFromEnv()...)
+	proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHosts(ctx)...)
 	if validateErr != nil {
 		return "", newExecutionFailureError(
 			tasks.ExecutionStageAssigned,

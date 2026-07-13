@@ -1,5 +1,4 @@
 import dotenv from 'dotenv'
-import { isIP } from 'node:net'
 import { isProductionRuntime } from './runtimeEnv.js'
 
 dotenv.config({ quiet: true })
@@ -61,21 +60,6 @@ function validateDatabaseSSLMode(value: string): DatabaseSSLMode {
   throw new Error('DB_SSLMODE must be one of disable, require, or verify-full')
 }
 
-function isLoopbackHost(value: string): boolean {
-  const normalized = value.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1')
-  if (normalized === 'localhost') return true
-
-  const ipVersion = isIP(normalized)
-  if (ipVersion === 4) return normalized.split('.')[0] === '127'
-  if (ipVersion !== 6) return false
-
-  return (
-    normalized === '::1' ||
-    normalized === '0:0:0:0:0:0:0:1' ||
-    normalized.startsWith('::ffff:127.')
-  )
-}
-
 export function loadEnv(source: EnvSource) {
   const productionRuntime = isProductionRuntime(source)
 
@@ -86,11 +70,6 @@ export function loadEnv(source: EnvSource) {
 
   const authInternalKey = getEnv(source, 'AUTH_INTERNAL_KEY', '')
   const authHost = getEnv(source, 'AUTH_HOST', '127.0.0.1')
-  const allowInsecureInternalBypass =
-    !productionRuntime &&
-    !authInternalKey &&
-    getEnv(source, 'AUTH_INSECURE_DEV', '') === '1' &&
-    isLoopbackHost(authHost)
   const authSecret =
     getEnv(source, 'BETTER_AUTH_SECRET', '') ||
     (productionRuntime ? '' : 'ideaboard-local-development-secret-change-before-production')
@@ -100,10 +79,8 @@ export function loadEnv(source: EnvSource) {
   const dbPassword = getEnv(source, 'DB_PASSWORD', '')
   const dbSSLMode = validateDatabaseSSLMode(getEnv(source, 'DB_SSLMODE', 'disable'))
 
-  if (!authInternalKey && !allowInsecureInternalBypass) {
-    throw new Error(
-      'AUTH_INTERNAL_KEY is required unless AUTH_INSECURE_DEV=1 and AUTH_HOST is loopback',
-    )
+  if (!authInternalKey) {
+    throw new Error('AUTH_INTERNAL_KEY is required')
   }
 
   if (productionRuntime) {
@@ -137,7 +114,6 @@ export function loadEnv(source: EnvSource) {
       host: authHost,
       trustProxy: getEnv(source, 'AUTH_TRUST_PROXY', 'loopback'),
       internalKey: authInternalKey,
-      allowInsecureInternalBypass,
       secret: authSecret,
       baseURL: authBaseURL,
       trustedOrigins,

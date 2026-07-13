@@ -113,6 +113,13 @@ export type AdminGoogleNativeGenerationSettingsFeedback = {
   saveFailed: (error: unknown) => void
 }
 
+export type AdminOperationalSettingsFeedback = {
+  loadFailed: (error: unknown) => void
+  validationFailed: (message: string) => void
+  saved: () => void
+  saveFailed: (error: unknown) => void
+}
+
 export type AdminCreditsBillingOperationsFeedback = {
   walletLoadFailed: (error: unknown) => void
   ledgerLoadFailed: (error: unknown) => void
@@ -149,6 +156,7 @@ export type AdminFeedback = {
     publicURL: AdminPublicURLSettingsFeedback
     mediaUpload: AdminMediaUploadSettingsFeedback
     googleNativeGeneration: AdminGoogleNativeGenerationSettingsFeedback
+    operational: AdminOperationalSettingsFeedback
     unsupportedLogoFile: () => void
   }
   taskMonitor: {
@@ -399,6 +407,20 @@ export function createAdminFeedback(appToast: AdminToast): AdminFeedback {
         },
         saveFailed(error) {
           appToast.error(formatDisplayErrorMessage(error, '保存生成策略灰度失败'))
+        },
+      },
+      operational: {
+        loadFailed(error) {
+          appToast.error(formatDisplayErrorMessage(error, '加载运行参数失败'))
+        },
+        validationFailed(message) {
+          appToast.error(message)
+        },
+        saved() {
+          appToast.success('运行参数已保存')
+        },
+        saveFailed(error) {
+          appToast.error(formatDisplayErrorMessage(error, '保存运行参数失败'))
         },
       },
       unsupportedLogoFile() {

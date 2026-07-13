@@ -44,7 +44,7 @@ func Run(args []string) {
 	slog.Info("server starting", "storage_profiles", true)
 
 	requireAuthInternalKeyForProduction(cfg)
-	gin.SetMode(cfg.App.GinMode)
+	gin.SetMode(gin.ReleaseMode)
 	slog.Info("gin mode configured", "gin_mode", gin.Mode(), "app_env", cfg.App.Env)
 
 	app, err := newRuntimeApp(cfg)

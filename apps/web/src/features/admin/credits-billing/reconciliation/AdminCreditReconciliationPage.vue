@@ -329,7 +329,7 @@ import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
-import { validateAdminActionReason } from '../adminActionReasonContract'
+import { validateAdminActionReason } from '../../shared/validation/adminActionReasonContract'
 import { useCreditsBillingFeedback } from '../creditsBillingFeedback'
 import {
   formatAdminDateTime,

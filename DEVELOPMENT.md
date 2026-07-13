@@ -21,22 +21,30 @@ cp .env.example .env
 docker compose -f compose.local.yml up -d
 ```
 
-启动 Auth：
+初始化数据库时必须先执行 API migration，再执行 Auth migration。Auth 的 limited runtime role 通过后者获得 Better Auth tables 和 typed runtime settings function 权限：
+
+```bash
+cd apps/api
+cp .env.example .env
+go run ./cmd migrate
+```
 
 ```bash
 cd apps/auth
 cp .env.example .env
 npm install
 npm run migrate
+```
+
+然后分别启动 Auth 与 API：
+
+```bash
+cd apps/auth
 npm run dev
 ```
 
-启动 API：
-
 ```bash
 cd apps/api
-cp .env.example .env
-go run ./cmd migrate
 go run ./cmd
 ```
 

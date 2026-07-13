@@ -9,7 +9,6 @@ let loadEnv: LoadEnv
 const moduleEnvKeys = [
   'APP_ENV',
   'AUTH_HOST',
-  'AUTH_INSECURE_DEV',
   'AUTH_INTERNAL_KEY',
   'DB_SSLMODE',
   'NODE_ENV',
@@ -22,9 +21,8 @@ before(async () => {
   }
   process.env.NODE_ENV = 'test'
   process.env.APP_ENV = ''
-  process.env.AUTH_INSECURE_DEV = '1'
   process.env.AUTH_HOST = '127.0.0.1'
-  process.env.AUTH_INTERNAL_KEY = ''
+  process.env.AUTH_INTERNAL_KEY = 'test-internal-key'
   process.env.DB_SSLMODE = 'disable'
 
   const envModule = await import('./env.js')
@@ -150,40 +148,11 @@ describe('loadEnv production guard', () => {
   })
 })
 
-describe('loadEnv AUTH_INSECURE_DEV guard', () => {
-  it('allows empty AUTH_INTERNAL_KEY only in non-production loopback mode', () => {
-    const config = loadEnv({
-      NODE_ENV: 'development',
-      AUTH_INSECURE_DEV: '1',
-      AUTH_HOST: 'localhost',
-      AUTH_INTERNAL_KEY: '',
-    })
-
-    assert.equal(config.auth.allowInsecureInternalBypass, true)
-    assert.equal(config.auth.internalKey, '')
-  })
-
-  it('rejects AUTH_INSECURE_DEV bypass in production', () => {
+describe('loadEnv internal authentication guard', () => {
+  it('requires AUTH_INTERNAL_KEY in development', () => {
     assert.throws(
-      () =>
-        loadEnv(productionSource({
-          AUTH_INSECURE_DEV: '1',
-          AUTH_HOST: '127.0.0.1',
-          AUTH_INTERNAL_KEY: '',
-        })),
-      /AUTH_INTERNAL_KEY/,
-    )
-  })
-
-  it('rejects AUTH_INSECURE_DEV bypass on non-loopback hosts', () => {
-    assert.throws(
-      () => loadEnv({
-        NODE_ENV: 'development',
-        AUTH_INSECURE_DEV: '1',
-        AUTH_HOST: '0.0.0.0',
-        AUTH_INTERNAL_KEY: '',
-      }),
-      /AUTH_INTERNAL_KEY is required unless AUTH_INSECURE_DEV=1 and AUTH_HOST is loopback/,
+      () => loadEnv({ NODE_ENV: 'development', AUTH_INTERNAL_KEY: '' }),
+      /AUTH_INTERNAL_KEY is required/,
     )
   })
 })

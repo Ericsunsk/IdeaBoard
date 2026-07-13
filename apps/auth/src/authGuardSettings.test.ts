@@ -3,9 +3,9 @@ import { describe, it } from 'node:test'
 
 describe('getAuthGuardSettings', () => {
   it('loads only registration settings and keeps auth rate-limit defaults', async (t) => {
-    const originalAuthInsecureDev = process.env.AUTH_INSECURE_DEV
+    const originalAuthInternalKey = process.env.AUTH_INTERNAL_KEY
     const originalAuthHost = process.env.AUTH_HOST
-    process.env.AUTH_INSECURE_DEV = '1'
+    process.env.AUTH_INTERNAL_KEY = 'test-internal-key'
     process.env.AUTH_HOST = '127.0.0.1'
 
     const { authDB } = await import('./auth.js')
@@ -15,27 +15,21 @@ describe('getAuthGuardSettings', () => {
       getAuthGuardSettings,
     } = await import('./authGuardSettings.js')
     const originalQuery = authDB.query
-    let selectedConfigKeys: unknown
+    let settingsQuery = ''
 
-    authDB.query = (async (_queryText: unknown, values?: unknown[]) => {
-      selectedConfigKeys = values?.[0]
+    authDB.query = (async (queryText: unknown) => {
+      settingsQuery = String(queryText)
       return {
-        rows: [
-          { config_key: 'auth_registration_enabled', value: 'true' },
-          { config_key: 'auth_rate_limit_window', value: '1' },
-          { config_key: 'auth_rate_limit_max_requests', value: '1' },
-          { config_key: 'api_rate_limit_window_seconds', value: '1' },
-          { config_key: 'api_rate_limit_max_requests', value: '1' },
-        ],
+        rows: [{ registration_enabled: true }],
       }
     }) as typeof authDB.query
 
     t.after(() => {
       authDB.query = originalQuery
-      if (originalAuthInsecureDev === undefined) {
-        delete process.env.AUTH_INSECURE_DEV
+      if (originalAuthInternalKey === undefined) {
+        delete process.env.AUTH_INTERNAL_KEY
       } else {
-        process.env.AUTH_INSECURE_DEV = originalAuthInsecureDev
+        process.env.AUTH_INTERNAL_KEY = originalAuthInternalKey
       }
       if (originalAuthHost === undefined) {
         delete process.env.AUTH_HOST
@@ -46,7 +40,8 @@ describe('getAuthGuardSettings', () => {
 
     const settings = await getAuthGuardSettings()
 
-    assert.deepEqual(selectedConfigKeys, ['auth_registration_enabled'])
+    assert.match(settingsQuery, /get_auth_runtime_settings\(\)/)
+    assert.doesNotMatch(settingsQuery, /system_configs/)
     assert.deepEqual(settings, {
       registrationEnabled: true,
       windowSeconds: DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,

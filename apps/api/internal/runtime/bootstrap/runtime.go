@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"log/slog"
 	"strings"
 
 	"ideaboard/api/internal/platform/applog"
@@ -12,9 +11,7 @@ func configureRuntimeLogging(cfg *config.Config) {
 	if cfg == nil {
 		return
 	}
-	if err := applog.Configure(cfg.App.LogFile, cfg.App.Env); err != nil {
-		slog.Warn("failed to open log file", "path", cfg.App.LogFile, "err", err)
-	}
+	applog.Configure(cfg.App.Env)
 }
 
 func requireAuthInternalKeyForProduction(cfg *config.Config) {

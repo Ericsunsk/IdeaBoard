@@ -10,10 +10,12 @@ describe('admin action reason contract', () => {
       error: '请输入操作原因',
       valid: false,
     })
-    expect(validateAdminActionReason('x'.repeat(MAX_ADMIN_ACTION_REASON_LENGTH + 1))).toMatchObject({
-      error: `操作原因不能超过 ${MAX_ADMIN_ACTION_REASON_LENGTH} 个字符`,
-      valid: false,
-    })
+    expect(validateAdminActionReason('x'.repeat(MAX_ADMIN_ACTION_REASON_LENGTH + 1))).toMatchObject(
+      {
+        error: `操作原因不能超过 ${MAX_ADMIN_ACTION_REASON_LENGTH} 个字符`,
+        valid: false,
+      },
+    )
   })
 
   it('normalizes a valid reason before it crosses the API boundary', () => {

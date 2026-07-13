@@ -25,12 +25,7 @@
     <template #footer>
       <div :class="adminDialogCompactFooterActionsClass">
         <Button label="取消" severity="secondary" outlined :disabled="loading" @click="close" />
-        <Button
-          :label="confirmLabel"
-          :severity="intent"
-          :loading="loading"
-          @click="submit"
-        />
+        <Button :label="confirmLabel" :severity="intent" :loading="loading" @click="submit" />
       </div>
     </template>
   </Dialog>
@@ -46,7 +41,7 @@ import {
   adminDialogCompactFooterActionsClass,
   adminDialogFormBodyClass,
 } from '../shared/lib/adminUiClasses'
-import { validateAdminActionReason } from './adminActionReasonContract'
+import { validateAdminActionReason } from '../shared/validation/adminActionReasonContract'
 import AdminActionReasonField from './AdminActionReasonField.vue'
 
 const props = withDefaults(

@@ -50,10 +50,10 @@ func (s *S3CompatibleService) TestConnectionWithConfig(ctx context.Context, cfg 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := s.validateBaseConfig(cfg); err != nil {
+	if err := s.validateBaseConfig(ctx, cfg); err != nil {
 		return err
 	}
-	client, err := s.clientWithConfig(cfg)
+	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -67,10 +67,10 @@ func (s *S3CompatibleService) GetBucketInfoWithConfig(ctx context.Context, cfg *
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := s.validateBaseConfig(cfg); err != nil {
+	if err := s.validateBaseConfig(ctx, cfg); err != nil {
 		return nil, err
 	}
-	client, err := s.clientWithConfig(cfg)
+	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multip
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	client, err := s.prepareUploadClient(cfg)
+	client, err := s.prepareUploadClient(ctx, cfg)
 	if err != nil {
 		return "", err
 	}
@@ -166,7 +166,7 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 		return nil, fmt.Errorf("文件大小无效")
 	}
 
-	client, err := s.prepareUploadClient(cfg)
+	client, err := s.prepareUploadClient(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -174,11 +174,11 @@ func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, fil
 	return s.putReaderWithConfigRef(ctx, client, filename, contentType, body, size, cfg, opts)
 }
 
-func (s *S3CompatibleService) prepareUploadClient(cfg *S3CompatibleConfig) (*minio.Client, error) {
+func (s *S3CompatibleService) prepareUploadClient(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
 	if !s.IsConfigEnabled(cfg) {
 		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
 	}
-	return s.clientWithConfig(cfg)
+	return s.clientWithConfig(ctx, cfg)
 }
 
 func (s *S3CompatibleService) putReaderWithConfig(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
@@ -234,7 +234,7 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 	if key == "" {
 		return fmt.Errorf("文件路径不能为空")
 	}
-	client, err := s.clientWithConfig(cfg)
+	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -255,7 +255,7 @@ func (s *S3CompatibleService) readWithConfig(ctx context.Context, objectKey stri
 	if key == "" {
 		return nil, fmt.Errorf("文件路径不能为空")
 	}
-	client, err := s.clientWithConfig(cfg)
+	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 		return fmt.Errorf("文件前缀不能为空")
 	}
 
-	client, err := s.clientWithConfig(cfg)
+	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 	return nil
 }
 
-func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error {
+func (s *S3CompatibleService) validateBaseConfig(ctx context.Context, cfg *S3CompatibleConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("配置不能为空")
 	}
@@ -329,7 +329,11 @@ func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error 
 		return fmt.Errorf("请先填写 Endpoint")
 	}
 
-	endpointHost, secure, err := parseS3Endpoint(cfg.Endpoint)
+	return validateS3EndpointPolicy(ctx, cfg.Endpoint)
+}
+
+func validateS3EndpointPolicy(ctx context.Context, endpoint string) error {
+	endpointHost, secure, err := parseS3Endpoint(endpoint)
 	if err != nil {
 		return err
 	}
@@ -337,13 +341,19 @@ func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error 
 	if !secure {
 		endpointURL = "http://" + endpointHost
 	}
-	if _, err := outbound.ValidateConfiguredEndpoint(endpointURL, outbound.AllowHostsFromEnv()...); err != nil {
+	if _, err := outbound.ValidateConfiguredEndpoint(endpointURL, outbound.AllowHosts(ctx)...); err != nil {
 		return errors.New("endpoint 不可用，仅支持可达的公网 http(s) 地址")
 	}
 	return nil
 }
 
-func (s *S3CompatibleService) clientWithConfig(cfg *S3CompatibleConfig) (*minio.Client, error) {
+func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3CompatibleConfig) (*minio.Client, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("配置不能为空")
+	}
+	if err := validateS3EndpointPolicy(ctx, cfg.Endpoint); err != nil {
+		return nil, err
+	}
 	cacheKey := s3ClientCacheKey(cfg)
 	if cached, ok := s.clientCache.Load(cacheKey); ok {
 		return cached.(*minio.Client), nil

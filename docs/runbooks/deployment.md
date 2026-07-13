@@ -53,7 +53,7 @@ graph LR
 - Docker Compose 管理 API、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。
 - River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。
 
-任务 retry 分两层：`taskruntime` 的 `defaultTaskRetryLimit=3` 是 DB/provider failover 的业务 retry 上限；River `MaxAttempts` 是 worker panic、process error、临时基础设施故障的队列层 retry。默认 River `MaxAttempts=25` 必须大于等于业务 retry 上限，调低 `RIVER_MAX_RETRY` 前要确认不会让队列层过早进入 final failure convergence。
+任务 retry 分两层：`taskruntime` 的 `defaultTaskRetryLimit=3` 是 DB/provider failover 的业务 retry 上限；River `MaxAttempts` 是 worker panic、process error、临时基础设施故障的队列层 retry。River 运行参数与 NATS retention 在 Admin System Settings 中管理，修改后页面会标记需要重启 API；River `MaxAttempts` 必须大于等于业务 retry 上限，避免队列层过早进入 final failure convergence。Egress allowlist 按请求读取，保存后动态生效。
 
 Pages 项目建议配置：
 
@@ -64,7 +64,7 @@ Pages 项目建议配置：
 | Build output directory | `dist` |
 | Environment variable | `NODE_VERSION=22.22.2` |
 | Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
-| Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
+| Auth public origin | Derived from `VITE_API_BASE_URL` by removing the trailing `/api` |
 
 VPS 侧至少同步：
 
@@ -94,7 +94,7 @@ VPS 防火墙只开放 SSH、80、443。API/Auth 容器只绑定 `127.0.0.1:6000
 - 真实客户端 IP：宿主机反代层只信任 Cloudflare 来源，并通过 `CF-Connecting-IP` 恢复真实客户端 IP，再向 API/Auth 传递 `X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`。
 - Cache Rules：对 `/api/*`、`/api/auth/*`、SSE 任务状态接口、上传写入接口，以及所有带 `Authorization` 或 session Cookie 的请求设置 bypass cache。`/uploads/*` 可单独按素材访问策略缓存。
 - Rate Limiting / WAF：至少覆盖 `/api/auth/*`、管理员接口、上传接口、任务提交接口。首次启用建议先用 log / challenge / captcha 灰度观察误伤，再切换到 block。
-- Pages 环境隔离：production 与 preview 使用独立 `VITE_API_BASE_URL`、`VITE_AUTH_BASE_URL`、`VITE_PUBLIC_ASSET_BASE_URL`；preview 不连接生产 API/Auth/数据库。
+- Pages 环境隔离：production 与 preview 使用独立 `VITE_API_BASE_URL`、`VITE_PUBLIC_ASSET_BASE_URL`；preview 不连接生产 API/Auth/数据库。
 - HTTPS / HSTS：SSL/TLS 使用 `Full (strict)`；Always Use HTTPS 和 HSTS 先灰度，不要一开始启用 `preload` 或 `includeSubDomains`。
 
 <a id="recommended-docker"></a>
@@ -213,9 +213,9 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 
 ### 5. API 业务库 baseline
 
-`POSTGRES_USER` 是 schema owner；`API_DB_USER`（默认 `ideaboard_api`）与 `AUTH_DB_USER`（默认 `ideaboard_auth`）是彼此独立的 limited runtime roles。三个 roles 必须使用不同密码；长期运行的 API/Auth 容器只接收各自 runtime credential，只有一次性的 `api-migrate` / `auth-migrate` 容器接收 owner credential。
+`ideaboard` 是固定 schema owner；`ideaboard_api` 与 `ideaboard_auth` 是彼此独立的 limited runtime roles。三个 roles 必须使用不同密码；长期运行的 API/Auth 容器只接收各自 runtime credential，只有一次性的 `api-migrate` / `auth-migrate` 容器接收 owner credential。
 
-空 PostgreSQL 库由 API migration 初始化业务 schema 并写入当前 migration 版本；API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + `execute_credit_command`，再运行 Auth migration和启动 API。
+空 PostgreSQL 库由 API migration 初始化业务 schema 并写入当前 migration 版本；API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。
 
 非空数据库不能直接套用该 baseline。若你从其他形态迁入数据，标准做法是先导出需要保留的数据，再在空库上初始化当前 baseline，最后用受控脚本导入业务数据；不要手动修改 `schema_migrations` 绕过 baseline 校验。
 

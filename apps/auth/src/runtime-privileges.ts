@@ -44,6 +44,12 @@ export async function configureAuthRuntimePrivileges(
     await client.query(
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ${tableSQL} TO ${roleSQL}`,
     )
+    await client.query(
+      `REVOKE ALL ON TABLE ${quoteIdentifier(schemaName)}.system_configs FROM ${roleSQL}`,
+    )
+    await client.query(
+      `GRANT EXECUTE ON FUNCTION ${quoteIdentifier(schemaName)}.get_auth_runtime_settings() TO ${roleSQL}`,
+    )
     await client.query('COMMIT')
   } catch (error) {
     try {
@@ -62,7 +68,9 @@ export async function configureAuthRuntimePrivileges(
 
 export async function verifyAuthRuntimePrivileges(pool: Pool) {
   const result = await pool.query<{
+    can_execute_auth_settings: boolean;
     can_execute_credit_functions: boolean;
+    can_read_system_configs: boolean;
     can_write_credits: boolean;
     can_read_auth_users: boolean;
     current_user: string;
@@ -70,6 +78,8 @@ export async function verifyAuthRuntimePrivileges(pool: Pool) {
     `
 SELECT current_user,
        has_table_privilege(current_user, '"user"', 'SELECT') AS can_read_auth_users,
+       has_table_privilege(current_user, 'system_configs', 'SELECT') AS can_read_system_configs,
+       has_function_privilege(current_user, 'get_auth_runtime_settings()', 'EXECUTE') AS can_execute_auth_settings,
        EXISTS (
          SELECT 1
          FROM unnest($1::TEXT[]) AS credit_table(table_name)
@@ -87,12 +97,16 @@ SELECT current_user,
   const privileges = result.rows[0]
   if (
     !privileges?.can_read_auth_users ||
+    !privileges.can_execute_auth_settings ||
+    privileges.can_read_system_configs ||
     privileges.can_write_credits ||
     privileges.can_execute_credit_functions
   ) {
     throw new Error(
       `Unsafe Auth runtime database role ${JSON.stringify(privileges?.current_user || '')}: ` +
         `read_auth_users=${Boolean(privileges?.can_read_auth_users)} ` +
+        `execute_auth_settings=${Boolean(privileges?.can_execute_auth_settings)} ` +
+        `read_system_configs=${Boolean(privileges?.can_read_system_configs)} ` +
         `write_credits=${Boolean(privileges?.can_write_credits)} ` +
         `execute_credit_functions=${Boolean(privileges?.can_execute_credit_functions)}`,
     )

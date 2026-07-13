@@ -333,6 +333,37 @@ func TestAdminBillingReasonMigrationDeclaresReversibleContract(t *testing.T) {
 	}
 }
 
+func TestRuntimeOperationalSettingsMigrationDeclaresReversibleContract(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260713020000_runtime_operational_settings.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	for _, expected := range []string{
+		"CREATE TABLE system_settings_admin_actions",
+		"system_settings_admin_actions_append_only",
+		"river_worker_concurrency",
+		"api_outbound_allow_hosts",
+		"nats_retention_days",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("up migration missing %q", expected)
+		}
+	}
+	for _, expected := range []string{
+		"DROP TABLE IF EXISTS system_settings_admin_actions",
+		"DELETE FROM system_configs",
+	} {
+		if !strings.Contains(down, expected) {
+			t.Fatalf("down migration missing %q", expected)
+		}
+	}
+	if err := validateMigrationStatements("20260713020000_runtime_operational_settings.sql down", parseSQLStatements(down)); err != nil {
+		t.Fatalf("down migration failed validation: %v", err)
+	}
+}
+
 func TestBaselineMigrationMatchesSchemaSnapshot(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260609000000_baseline.sql")
 	if err != nil {
@@ -534,6 +565,7 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_provider_endpoint_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
 	assertTriggerExists(t, ctx, conn, "billing_admin_actions", "billing_admin_actions_append_only")
+	assertTriggerExists(t, ctx, conn, "system_settings_admin_actions", "system_settings_admin_actions_append_only")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
 	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_provider_endpoint")
 	assertConstraintExists(t, ctx, conn, "media_assets", "fk_media_assets_storage_profile_id")
@@ -541,6 +573,43 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertConstraintExists(t, ctx, conn, "boards", "fk_boards_created_by")
 	assertConstraintExists(t, ctx, conn, "board_members", "fk_board_members_board")
 	assertConstraintExists(t, ctx, conn, "board_share_tokens", "fk_board_share_tokens_board")
+}
+
+func TestRuntimeOperationalSettingsMigrationRollsBackAndReapplies(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+	assertTableExists(t, ctx, conn, "system_settings_admin_actions", true)
+
+	raw, err := migrationFS.ReadFile("20260713020000_runtime_operational_settings.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
+		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = 20260713020000`); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	assertTableExists(t, ctx, conn, "system_settings_admin_actions", false)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("reapply migration: %v", err)
+	}
+	assertTableExists(t, ctx, conn, "system_settings_admin_actions", true)
 }
 
 func TestAdminBillingReasonMigrationRollsBackAndReapplies(t *testing.T) {

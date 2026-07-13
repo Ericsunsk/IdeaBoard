@@ -18,14 +18,7 @@ function defaultAuthBaseURL(): string {
 }
 
 export const API_BASE_URL = normalizeBaseURL(import.meta.env.VITE_API_BASE_URL, '/api')
-export const AUTH_BASE_URL = normalizeBaseURL(
-  import.meta.env.VITE_AUTH_BASE_URL,
-  defaultAuthBaseURL(),
-)
-
-function deriveAssetBaseURL(): string {
-  const explicit = normalizeBaseURL(import.meta.env.VITE_PUBLIC_ASSET_BASE_URL, '')
-  if (explicit) return explicit
+function deriveAPIOriginBaseURL(fallback: string): string {
   if (!HTTP_URL_RE.test(API_BASE_URL)) return ''
 
   try {
@@ -38,8 +31,16 @@ function deriveAssetBaseURL(): string {
     url.hash = ''
     return trimTrailingSlashes(url.toString())
   } catch {
-    return ''
+    return fallback
   }
+}
+
+export const AUTH_BASE_URL = deriveAPIOriginBaseURL(defaultAuthBaseURL())
+
+function deriveAssetBaseURL(): string {
+  const explicit = normalizeBaseURL(import.meta.env.VITE_PUBLIC_ASSET_BASE_URL, '')
+  if (explicit) return explicit
+  return deriveAPIOriginBaseURL('')
 }
 
 export const PUBLIC_ASSET_BASE_URL = deriveAssetBaseURL()

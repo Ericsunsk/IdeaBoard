@@ -35,6 +35,13 @@ type adminActionError struct {
 	err    error
 }
 
+type updateOperationalSettingsRequest struct {
+	TaskRuntime    settings.TaskRuntimeSetting    `json:"task_runtime" binding:"required"`
+	OutboundPolicy settings.OutboundPolicySetting `json:"outbound_policy" binding:"required"`
+	EventRetention settings.EventRetentionSetting `json:"event_retention" binding:"required"`
+	Reason         string                         `json:"reason" binding:"required"`
+}
+
 func (e *adminActionError) Error() string {
 	if e == nil {
 		return ""
@@ -276,6 +283,41 @@ func (h *AdminHandler) UpdateTaskMonitorSettings(c *gin.Context) {
 	}
 
 	updated, err := runtimeSettings.UpdateTaskMonitor(c.Request.Context(), req)
+	if h.respondRuntimeSettingsWriteError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, updated)
+}
+
+// GetOperationalSettings returns persisted values alongside the snapshot used by this process.
+func (h *AdminHandler) GetOperationalSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	setting, err := runtimeSettings.GetOperationalSettings(c.Request.Context())
+	if h.respondRuntimeSettingsReadError(c, err) {
+		return
+	}
+	response.SuccessDTO(c, setting)
+}
+
+// UpdateOperationalSettings atomically persists the typed groups and their admin audit record.
+func (h *AdminHandler) UpdateOperationalSettings(c *gin.Context) {
+	runtimeSettings, ok := h.requireRuntimeSettings(c)
+	if !ok {
+		return
+	}
+	var req updateOperationalSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误，reason 与所有 operational settings 分组均为必填")
+		return
+	}
+	updated, err := runtimeSettings.UpdateOperationalSettings(c.Request.Context(), settings.OperationalSettings{
+		TaskRuntime:    req.TaskRuntime,
+		OutboundPolicy: req.OutboundPolicy,
+		EventRetention: req.EventRetention,
+	}, c.GetInt64("user_id"), req.Reason)
 	if h.respondRuntimeSettingsWriteError(c, err) {
 		return
 	}

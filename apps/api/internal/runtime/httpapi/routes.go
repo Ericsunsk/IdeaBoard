@@ -97,6 +97,7 @@ const (
 	RouteAdminSettingsRateLimit              = "/settings/rate-limit"
 	RouteAdminSettingsTaskMonitor            = "/settings/task-monitor"
 	RouteAdminSettingsGoogleNativeGeneration = "/settings/generation/google-native"
+	RouteAdminSettingsOperational            = "/settings/operational"
 )
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {

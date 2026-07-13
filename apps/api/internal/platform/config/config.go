@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -14,7 +13,6 @@ import (
 
 type Config struct {
 	Database DatabaseConfig
-	Queue    QueueConfig
 	Events   EventBusConfig
 	App      AppConfig
 	Auth     AuthServiceConfig
@@ -26,32 +24,21 @@ type CreditsConfig struct {
 }
 
 type DatabaseConfig struct {
-	Host                   string
-	Port                   string
-	User                   string
-	Password               string
-	MigrationUser          string
-	MigrationPassword      string
-	Database               string
-	SSLMode                string
-	ConnectMaxRetries      int
-	ConnectRetryIntervalMS int
+	Host              string
+	Port              string
+	User              string
+	Password          string
+	MigrationUser     string
+	MigrationPassword string
+	Database          string
+	SSLMode           string
 }
 
 type AppConfig struct {
 	Port               string
 	Host               string
 	Env                string
-	GinMode            string
-	LogFile            string
 	CORSAllowedOrigins []string
-}
-
-type QueueConfig struct {
-	WorkerConcurrency           int
-	TaskTimeoutSeconds          int
-	NoCapacityRetryDelaySeconds int
-	MaxRetry                    int
 }
 
 type EventBusConfig struct {
@@ -73,42 +60,24 @@ type AuthServiceConfig struct {
 }
 
 type envConfig struct {
-	DBHost                   string `env:"DB_HOST"`
-	DBPort                   string `env:"DB_PORT"`
-	DBUser                   string `env:"DB_USER"`
-	DBPassword               string `env:"DB_PASSWORD"`
-	DBMigrationUser          string `env:"DB_MIGRATION_USER"`
-	DBMigrationPassword      string `env:"DB_MIGRATION_PASSWORD"`
-	DBName                   string `env:"DB_NAME"`
-	DBSSLMode                string `env:"DB_SSLMODE"`
-	DBConnectMaxRetries      string `env:"DB_CONNECT_MAX_RETRIES"`
-	DBConnectRetryIntervalMS string `env:"DB_CONNECT_RETRY_INTERVAL_MS"`
-
-	RiverWorkerConcurrency           string `env:"RIVER_WORKER_CONCURRENCY"`
-	RiverTaskTimeoutSeconds          string `env:"RIVER_TASK_TIMEOUT_SECONDS"`
-	RiverNoCapacityRetryDelaySeconds string `env:"RIVER_NO_CAPACITY_RETRY_SECONDS"`
-	RiverMaxRetry                    string `env:"RIVER_MAX_RETRY"`
-
+	DBHost              string `env:"DB_HOST"`
+	DBPort              string `env:"DB_PORT"`
+	DBUser              string `env:"DB_USER"`
+	DBPassword          string `env:"DB_PASSWORD"`
+	DBMigrationUser     string `env:"DB_MIGRATION_USER"`
+	DBMigrationPassword string `env:"DB_MIGRATION_PASSWORD"`
+	DBName              string `env:"DB_NAME"`
+	DBSSLMode           string `env:"DB_SSLMODE"`
 	NATSEventBusEnabled string `env:"NATS_EVENT_BUS_ENABLED"`
 	NATSURL             string `env:"NATS_URL"`
-	NATSStreamName      string `env:"NATS_STREAM_NAME"`
-	NATSSubjectPrefix   string `env:"NATS_SUBJECT_PREFIX"`
-	NATSConsumerName    string `env:"NATS_CONSUMER_NAME"`
-	NATSRetentionDays   string `env:"NATS_RETENTION_DAYS"`
-	NATSConnectTimeout  string `env:"NATS_CONNECT_TIMEOUT_SECONDS"`
-	NATSRequestTimeout  string `env:"NATS_REQUEST_TIMEOUT_SECONDS"`
-	NATSDrainTimeout    string `env:"NATS_DRAIN_TIMEOUT_SECONDS"`
 
 	AppPort               string `env:"APP_PORT"`
 	AppHost               string `env:"APP_HOST"`
 	AppEnv                string `env:"APP_ENV"`
-	AppGinMode            string `env:"APP_GIN_MODE"`
-	AppLogFile            string `env:"APP_LOG_FILE"`
 	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
 
 	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
 	AuthServiceInternalAPIKey string `env:"AUTH_INTERNAL_KEY"`
-	AuthServiceTimeoutSeconds string `env:"AUTH_SERVICE_TIMEOUT_SECONDS"`
 	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
 }
 
@@ -129,51 +98,33 @@ func Load() *Config {
 	raw.DBMigrationPassword = strings.TrimSpace(raw.DBMigrationPassword)
 
 	appEnv := normalizeAppEnv(raw.AppEnv)
-	ginMode := normalizeGinMode(raw.AppGinMode)
 	natsURL := strings.TrimSpace(raw.NATSURL)
 
 	return &Config{
 		Database: DatabaseConfig{
-			Host:                   stringEnvDefault(raw.DBHost, "localhost"),
-			Port:                   stringEnvDefault(raw.DBPort, "5432"),
-			User:                   stringEnvDefault(raw.DBUser, "ideaboard"),
-			Password:               raw.DBPassword,
-			MigrationUser:          strings.TrimSpace(raw.DBMigrationUser),
-			MigrationPassword:      raw.DBMigrationPassword,
-			Database:               stringEnvDefault(raw.DBName, "ideaboard"),
-			SSLMode:                stringEnvDefault(raw.DBSSLMode, "disable"),
-			ConnectMaxRetries:      parsePositiveIntEnv("DB_CONNECT_MAX_RETRIES", raw.DBConnectMaxRetries, 60),
-			ConnectRetryIntervalMS: parsePositiveIntEnv("DB_CONNECT_RETRY_INTERVAL_MS", raw.DBConnectRetryIntervalMS, 1000),
-		},
-		Queue: QueueConfig{
-			WorkerConcurrency:           parsePositiveIntEnv("RIVER_WORKER_CONCURRENCY", raw.RiverWorkerConcurrency, 5),
-			TaskTimeoutSeconds:          parsePositiveIntEnv("RIVER_TASK_TIMEOUT_SECONDS", raw.RiverTaskTimeoutSeconds, 180),
-			NoCapacityRetryDelaySeconds: parsePositiveIntEnv("RIVER_NO_CAPACITY_RETRY_SECONDS", raw.RiverNoCapacityRetryDelaySeconds, 5),
-			MaxRetry:                    parsePositiveIntEnv("RIVER_MAX_RETRY", raw.RiverMaxRetry, 25),
+			Host:              stringEnvDefault(raw.DBHost, "localhost"),
+			Port:              stringEnvDefault(raw.DBPort, "5432"),
+			User:              stringEnvDefault(raw.DBUser, "ideaboard"),
+			Password:          raw.DBPassword,
+			MigrationUser:     strings.TrimSpace(raw.DBMigrationUser),
+			MigrationPassword: raw.DBMigrationPassword,
+			Database:          stringEnvDefault(raw.DBName, "ideaboard"),
+			SSLMode:           stringEnvDefault(raw.DBSSLMode, "disable"),
 		},
 		Events: EventBusConfig{
-			Enabled:            parseBoolEnvDefault("NATS_EVENT_BUS_ENABLED", raw.NATSEventBusEnabled, natsURL != ""),
-			NATSURL:            natsURL,
-			NATSStreamName:     stringEnvDefault(raw.NATSStreamName, "IDEABOARD_EVENTS"),
-			NATSSubjectPrefix:  stringEnvDefault(raw.NATSSubjectPrefix, "ideaboard"),
-			NATSConsumerName:   strings.TrimSpace(raw.NATSConsumerName),
-			NATSRetentionDays:  parsePositiveIntEnv("NATS_RETENTION_DAYS", raw.NATSRetentionDays, 7),
-			NATSConnectTimeout: parsePositiveIntEnv("NATS_CONNECT_TIMEOUT_SECONDS", raw.NATSConnectTimeout, 5),
-			NATSRequestTimeout: parsePositiveIntEnv("NATS_REQUEST_TIMEOUT_SECONDS", raw.NATSRequestTimeout, 5),
-			NATSDrainTimeout:   parsePositiveIntEnv("NATS_DRAIN_TIMEOUT_SECONDS", raw.NATSDrainTimeout, 2),
+			Enabled: parseBoolEnvDefault("NATS_EVENT_BUS_ENABLED", raw.NATSEventBusEnabled, natsURL != ""),
+			NATSURL: natsURL,
 		},
 		App: AppConfig{
 			Port:               stringEnvDefault(raw.AppPort, "6000"),
 			Host:               strings.TrimSpace(raw.AppHost),
 			Env:                appEnv,
-			GinMode:            ginMode,
-			LogFile:            stringEnvDefault(raw.AppLogFile, "server.log"),
 			CORSAllowedOrigins: detectCORSAllowedOrigins(raw.AppCORSAllowedOrigins, appEnv),
 		},
 		Auth: AuthServiceConfig{
 			BaseURL:        stringEnvDefault(raw.AuthServiceBaseURL, "http://127.0.0.1:6001"),
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
-			TimeoutSeconds: parsePositiveIntEnv("AUTH_SERVICE_TIMEOUT_SECONDS", raw.AuthServiceTimeoutSeconds, 5),
+			TimeoutSeconds: 5,
 		},
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 	}
@@ -181,21 +132,6 @@ func Load() *Config {
 
 func normalizeAppEnv(raw string) string {
 	return stringEnvDefault(raw, "development")
-}
-
-func normalizeGinMode(raw string) string {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return "release"
-	}
-
-	switch strings.ToLower(value) {
-	case "debug", "release", "test":
-		return strings.ToLower(value)
-	default:
-		slog.Warn("invalid APP_GIN_MODE; fallback to release", "value", value)
-		return "release"
-	}
 }
 
 func detectCORSAllowedOrigins(raw, appEnv string) []string {
@@ -267,19 +203,6 @@ func stringEnvDefault(raw, defaultValue string) string {
 		return value
 	}
 	return defaultValue
-}
-
-func parsePositiveIntEnv(key, raw string, defaultValue int) int {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return defaultValue
-	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed <= 0 {
-		slog.Warn("invalid positive integer env; fallback to default", "key", key, "value", value, "default", defaultValue)
-		return defaultValue
-	}
-	return parsed
 }
 
 func parseBoolEnvDefault(key, raw string, defaultValue bool) bool {

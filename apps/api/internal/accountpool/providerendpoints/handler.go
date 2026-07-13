@@ -1,6 +1,7 @@
 package providerendpoints
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -73,7 +74,7 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 		return
 	}
 
-	baseURL, err := outbound.ValidateConfiguredEndpoint(req.BaseURL, outbound.AllowHostsFromEnv()...)
+	baseURL, err := outbound.ValidateConfiguredEndpoint(req.BaseURL, outbound.AllowHosts(c.Request.Context())...)
 	if err != nil {
 		response.Error(c, 400, "base_url 不可用，仅支持可达的公网 http(s) 地址")
 		return
@@ -120,7 +121,7 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 		return
 	}
 
-	baseURL, err := outbound.ValidateConfiguredEndpoint(req.BaseURL, outbound.AllowHostsFromEnv()...)
+	baseURL, err := outbound.ValidateConfiguredEndpoint(req.BaseURL, outbound.AllowHosts(c.Request.Context())...)
 	if err != nil {
 		response.Error(c, 400, "base_url 不可用，仅支持可达的公网 http(s) 地址")
 		return
@@ -213,7 +214,7 @@ func (h *ProviderEndpointHandler) DetectModels(c *gin.Context) {
 			r.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 		r.Header.Set("Accept", "application/json")
-	}, detectModelsTimeout, h.detectModelsAllowHosts()...)
+	}, detectModelsTimeout, h.detectModelsAllowHosts(c.Request.Context())...)
 	if err != nil {
 		slog.Warn("model detection request failed", "api_type", apiType, "models_url", modelsURL, "err", err)
 		if workflow.IsGoogleNativeAPIType(apiType) {
@@ -250,8 +251,8 @@ func (h *ProviderEndpointHandler) DetectModels(c *gin.Context) {
 	response.SuccessDTO(c, detectedModelsResponse{Models: models, APIType: apiType})
 }
 
-func (h *ProviderEndpointHandler) detectModelsAllowHosts() []string {
-	allowHosts := outbound.AllowHostsFromEnv()
+func (h *ProviderEndpointHandler) detectModelsAllowHosts(ctx context.Context) []string {
+	allowHosts := outbound.AllowHosts(ctx)
 	if h.isDevLikeEnvironment() {
 		allowHosts = append(allowHosts, "localhost", "127.0.0.1", "::1")
 	}
