@@ -930,7 +930,9 @@ SELECT to_regclass(current_schema() || '.' || $1) IS NOT NULL`, tableName).Scan(
 func assertRegprocedureExists(t *testing.T, ctx context.Context, conn *sql.Conn, signature string, want bool) {
 	t.Helper()
 	var exists bool
-	if err := conn.QueryRowContext(ctx, `SELECT to_regprocedure($1) IS NOT NULL`, signature).Scan(&exists); err != nil {
+	if err := conn.QueryRowContext(ctx, `
+SELECT to_regprocedure(format('%I.%s', current_schema(), $1::text)) IS NOT NULL
+`, signature).Scan(&exists); err != nil {
 		t.Fatalf("read function existence %s failed: %v", signature, err)
 	}
 	if exists != want {
@@ -945,7 +947,8 @@ func assertFunctionSearchPath(t *testing.T, ctx context.Context, conn *sql.Conn,
 	if err := conn.QueryRowContext(ctx, `
 SELECT current_schema(), COALESCE(array_to_string(proconfig, ','), '')
 FROM pg_proc
-WHERE oid = $1::regprocedure`, signature).Scan(&schemaName, &configuredSearchPath); err != nil {
+WHERE oid = to_regprocedure(format('%I.%s', current_schema(), $1::text))
+`, signature).Scan(&schemaName, &configuredSearchPath); err != nil {
 		t.Fatalf("read function %s search_path failed: %v", signature, err)
 	}
 	want := "search_path=" + schemaName + ", pg_catalog, pg_temp"

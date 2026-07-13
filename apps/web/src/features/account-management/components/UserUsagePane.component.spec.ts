@@ -1,3 +1,4 @@
+import { cleanup } from '@testing-library/vue'
 import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
@@ -112,9 +113,46 @@ describe('UserUsagePane', () => {
     expect(skeleton).toBeVisible()
     const cells = skeleton.querySelectorAll('article')
     expect(cells).toHaveLength(5)
-    expect(cells[0]).toHaveClass('min-w-0', 'p-5', 'max-[640px]:p-4')
+    expect(cells[0]).toHaveClass(
+      'min-h-[108px]',
+      'min-w-0',
+      'p-5',
+      'max-[640px]:min-h-[100px]',
+      'max-[640px]:p-4',
+    )
     expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
     expect(screen.queryByRole('region', { name: '用量摘要' })).not.toBeInTheDocument()
+  })
+
+  it('uses identical cell wrapper heights while loading and loaded', () => {
+    usageState.usage.value = undefined
+    usageState.isPending.value = true
+    usageState.error.value = null
+    renderUsagePane()
+    const loadingClasses = Array.from(
+      screen.getByLabelText('正在加载用量统计').querySelectorAll('article'),
+    ).map((cell) => cell.className)
+    cleanup()
+
+    usageState.usage.value = {
+      timezone: 'Asia/Shanghai',
+      lifetime: {
+        total_credits: 1234,
+        peak_daily_credits: 500,
+        average_daily_credits: 12.5,
+        task_count: 9,
+        active_days: 4,
+      },
+    }
+    usageState.isPending.value = false
+    renderUsagePane()
+    const loadedClasses = Array.from(
+      screen.getByRole('region', { name: '用量摘要' }).querySelectorAll('article'),
+    ).map((cell) => cell.className)
+
+    expect(loadedClasses).toEqual(loadingClasses)
+    expect(loadedClasses[0]).toContain('min-h-[108px]')
+    expect(loadedClasses[0]).toContain('max-[640px]:min-h-[100px]')
   })
 
   it('shows an inline retry when loading fails', async () => {

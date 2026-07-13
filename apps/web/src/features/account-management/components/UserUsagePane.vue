@@ -67,7 +67,7 @@ const integerFormatter = new Intl.NumberFormat('zh-CN')
 const summaryPanelClass =
   'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
-const summaryCellClass = 'min-w-0 p-5 max-[640px]:p-4'
+const summaryCellClass = 'min-h-[108px] min-w-0 p-5 max-[640px]:min-h-[100px] max-[640px]:p-4'
 
 const summaryCellDefinitions = [
   {

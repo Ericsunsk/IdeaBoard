@@ -104,15 +104,7 @@ WHERE version = 20260713010000
 		t.Fatalf("commit Auth runtime settings rollback: %v", err)
 	}
 
-	var functionExists bool
-	if err := conn.QueryRowContext(ctx, `
-SELECT to_regprocedure('get_auth_runtime_settings()') IS NOT NULL
-`).Scan(&functionExists); err != nil {
-		t.Fatalf("inspect rolled back Auth runtime settings function: %v", err)
-	}
-	if functionExists {
-		t.Fatal("Auth runtime settings function still exists after rollback")
-	}
+	assertRegprocedureExists(t, ctx, conn, "get_auth_runtime_settings()", false)
 	if err := upWithConn(ctx, conn); err != nil {
 		t.Fatalf("reapply Auth runtime settings migration: %v", err)
 	}
