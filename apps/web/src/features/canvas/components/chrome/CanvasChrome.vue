@@ -125,6 +125,7 @@
     </div>
 
     <div class="canvas-chrome-control-group canvas-chrome-action-group">
+      <UserCreditBalanceButton :items="account.menuItems" />
       <button
         type="button"
         :class="canvasChromeActionControlClass"
@@ -152,6 +153,7 @@
         :avatar-url="account.avatarUrl"
         :items="account.menuItems"
         :avatar-button-class="canvasChromeAvatarButtonClass"
+        :show-credits="false"
       />
     </div>
   </header>
@@ -239,6 +241,7 @@ import {
   SquareCursor,
 } from '@iconoir/vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
+import UserCreditBalanceButton from '../../../../shared/components/UserCreditBalanceButton.vue'
 import {
   createPageChromeAccountAvatarButtonClass,
   createPageChromeRoundControlClass,

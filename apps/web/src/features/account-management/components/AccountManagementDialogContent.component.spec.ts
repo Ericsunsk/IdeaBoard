@@ -130,7 +130,15 @@ describe('AccountManagementDialogContent', () => {
     renderAccountManagementDialogContent()
 
     expect(screen.getByRole('navigation', { name: '账户管理导航' })).toBeVisible()
+    expect(screen.getByRole('region', { name: '账户设置' })).toBeVisible()
+    expect(screen.getByRole('region', { name: '订阅与套餐' })).toBeVisible()
+    expect(screen.getByRole('region', { name: '权益和账单' })).toBeVisible()
     expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: '充值积分' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '订阅套餐' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '奖励中心' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '账单记录' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '用量统计' })).toBeVisible()
     expect(screen.getByText('IdeaBoard')).toBeVisible()
     expect(screen.getByRole('button', { name: '退出登录' })).toBeVisible()
     expect(screen.getAllByText('mock-user')[0]).toBeVisible()
@@ -153,18 +161,38 @@ describe('AccountManagementDialogContent', () => {
   it('opens the point wallet inside account management', async () => {
     const { user } = renderAccountManagementDialogContent()
 
-    await user.click(screen.getByRole('button', { name: '点子' }))
+    await user.click(screen.getByRole('button', { name: '账单记录' }))
 
-    expect(screen.getByRole('button', { name: '点子' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     expect(screen.getByRole('region', { name: '点子账户' })).toHaveTextContent('点子余额与流水')
   })
 
   it('opens directly on the requested initial tab', () => {
-    renderAccountManagementDialogContent('credits')
+    renderAccountManagementDialogContent('billing')
 
-    expect(screen.getByRole('button', { name: '点子' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     expect(screen.getByRole('region', { name: '点子账户' })).toBeVisible()
     expect(screen.queryByRole('region', { name: '账户资料概览' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['充值积分', '充值积分即将上线'],
+    ['订阅套餐', '订阅套餐即将上线'],
+    ['奖励中心', '奖励中心即将上线'],
+    ['用量统计', '用量统计即将上线'],
+  ])('opens the %s roadmap page', async (label, regionName) => {
+    const { user } = renderAccountManagementDialogContent()
+
+    await user.click(screen.getByRole('button', { name: label }))
+
+    expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: regionName })).toBeVisible()
   })
 
   it('logs out directly from the left rail without extra confirmation', async () => {

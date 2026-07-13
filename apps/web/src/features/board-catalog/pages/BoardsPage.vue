@@ -424,7 +424,7 @@ function openAccountManagement() {
 
 function openCredits() {
   activeMenuBoardId.value = null
-  openAccountManagementDialog('credits')
+  openAccountManagementDialog('billing')
 }
 
 function openAdmin() {

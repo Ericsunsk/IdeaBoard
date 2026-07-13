@@ -33,4 +33,36 @@ describe('CanvasChrome', () => {
     expect(screen.getByText('100%')).toBeVisible()
     expect(screen.getByRole('button', { name: '放大' })).toBeVisible()
   })
+
+  it('places the credits balance immediately before the share control', () => {
+    render(CanvasChrome, {
+      props: {
+        inert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: null,
+          isMenuOpen: false,
+          isRenaming: false,
+          renameRecovery: { status: 'idle' },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          menuItems: [
+            { key: 'credits', label: '点子', meta: '100', command: vi.fn() },
+            { key: 'logout', label: '退出登录', command: vi.fn() },
+          ],
+        },
+        tools: { activeTool: 'select', minimapEnabled: false },
+        status: { exportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    const credits = screen.getByRole('button', { name: '点子余额 100' })
+    const share = screen.getByRole('button', { name: '分享功能稍后接入' })
+
+    expect(share.previousElementSibling).toBe(credits)
+    expect(screen.getAllByRole('button', { name: '点子余额 100' })).toHaveLength(1)
+  })
 })

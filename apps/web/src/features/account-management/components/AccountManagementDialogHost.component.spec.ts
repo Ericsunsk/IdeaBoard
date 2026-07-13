@@ -93,13 +93,13 @@ describe('AccountManagementDialogHost', () => {
   })
 
   it('forwards the controller initial tab to the global dialog', async () => {
-    openAccountManagementDialog('credits')
+    openAccountManagementDialog('billing')
 
     await renderHost()
 
     expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
       'data-initial-tab',
-      'credits',
+      'billing',
     )
   })
 

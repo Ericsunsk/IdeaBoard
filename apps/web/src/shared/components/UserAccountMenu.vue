@@ -1,11 +1,12 @@
 <template>
   <div
-    class="inline-flex shrink-0 leading-none"
+    class="inline-flex shrink-0 items-center gap-2 leading-none"
     :class="wrapClass"
     @pointerdown.stop
     @mousedown.stop
     @click.stop
   >
+    <UserCreditBalanceButton v-if="showCredits" :items="items" />
     <Button
       ref="avatarButtonRef"
       unstyled
@@ -58,6 +59,7 @@ import type { MenuItem } from 'primevue/menuitem'
 import { appOverlayMenuDangerItemClass, appOverlayMenuItemClass } from '../theme/appOverlayMenu'
 import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
 import { userAccountMenuPt } from '../theme/userAccountMenuSkin'
+import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import type { UserAccountMenuItem } from './userAccountMenuActions'
 
 type PrimePopupMenuRef = {
@@ -80,6 +82,7 @@ const props = withDefaults(
     menuPt?: MenuPassThroughOptions
     menuItemClass?: string
     menuDangerItemClass?: string
+    showCredits?: boolean
   }>(),
   {
     avatarUrl: undefined,
@@ -92,6 +95,7 @@ const props = withDefaults(
     menuPt: undefined,
     menuItemClass: appOverlayMenuItemClass,
     menuDangerItemClass: appOverlayMenuDangerItemClass,
+    showCredits: true,
   },
 )
 
@@ -101,13 +105,15 @@ const isMenuOpen = ref(false)
 const resolvedMenuPt = computed(() => props.menuPt ?? userAccountMenuPt)
 
 const primeMenuItems = computed<MenuItem[]>(() =>
-  props.items.map((item) => ({
-    ...item,
-    command: () => {
-      menuRef.value?.hide()
-      item.command()
-    },
-  })),
+  props.items
+    .filter((item) => item.key !== 'credits')
+    .map((item) => ({
+      ...item,
+      command: () => {
+        menuRef.value?.hide()
+        item.command()
+      },
+    })),
 )
 
 function resolveAvatarButtonElement(): HTMLElement | undefined {

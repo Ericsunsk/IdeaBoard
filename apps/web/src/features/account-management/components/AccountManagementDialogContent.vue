@@ -11,7 +11,9 @@
       <Xmark class="h-4 w-4" />
     </Button>
 
-    <aside class="flex min-h-0 flex-col bg-ib-surface px-4 py-5 max-[820px]:px-4 max-[820px]:py-4">
+    <aside
+      class="app-scrollbar flex min-h-0 flex-col overflow-y-auto bg-ib-surface px-4 py-5 max-[820px]:max-h-[48dvh] max-[820px]:px-4 max-[820px]:py-4"
+    >
       <div class="mb-7 flex min-w-0 items-center gap-2.5 px-1" :aria-label="projectName">
         <span :class="accountBrandMarkClass">
           <SiteBrandLogo
@@ -27,31 +29,42 @@
         </span>
       </div>
 
-      <nav class="min-w-0" aria-label="账户管理导航">
-        <p
-          class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-subtle"
+      <nav
+        class="grid min-w-0 gap-5 max-[820px]:grid-cols-3 max-[820px]:gap-3 max-[640px]:grid-cols-1"
+        aria-label="账户管理导航"
+      >
+        <section
+          v-for="group in navGroups"
+          :key="group.key"
+          class="min-w-0"
+          :aria-labelledby="`account-nav-${group.key}`"
         >
-          通用设置
-        </p>
-        <div class="grid gap-1.5 max-[820px]:grid-cols-2 max-[520px]:grid-cols-1">
-          <Button
-            v-for="item in navItems"
-            :key="item.key"
-            type="button"
-            text
-            class="!flex !h-11 !w-full !justify-start !gap-2 !rounded-[var(--radius-ib-control)] !border-0 !px-2.5 !text-[14px] !font-semibold !shadow-none focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
-            :class="
-              activeTab === item.key
-                ? '!bg-ib-creative-accent-soft !text-ib-creative-accent-pressed'
-                : '!bg-transparent !text-ib-text-muted hover:!bg-ib-surface-hover hover:!text-ib-text'
-            "
-            :aria-current="activeTab === item.key ? 'page' : undefined"
-            @click="activeTab = item.key"
+          <p
+            :id="`account-nav-${group.key}`"
+            class="mb-2 px-2 text-[12px] leading-5 font-semibold tracking-normal text-ib-text-subtle"
           >
-            <component :is="item.icon" class="h-4 w-4 shrink-0" />
-            <span class="truncate">{{ item.label }}</span>
-          </Button>
-        </div>
+            {{ group.label }}
+          </p>
+          <div class="grid gap-1.5 max-[640px]:grid-cols-2">
+            <Button
+              v-for="item in group.items"
+              :key="item.key"
+              type="button"
+              text
+              class="!flex !h-11 !w-full !justify-start !gap-2 !rounded-[var(--radius-ib-control)] !border-0 !px-2.5 !text-[14px] !font-semibold !shadow-none focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
+              :class="
+                activeTab === item.key
+                  ? '!bg-ib-creative-accent-soft !text-ib-creative-accent-pressed'
+                  : '!bg-transparent !text-ib-text-muted hover:!bg-ib-surface-hover hover:!text-ib-text'
+              "
+              :aria-current="activeTab === item.key ? 'page' : undefined"
+              @click="activeTab = item.key"
+            >
+              <component :is="item.icon" class="h-4 w-4 shrink-0" />
+              <span class="truncate">{{ item.label }}</span>
+            </Button>
+          </div>
+        </section>
       </nav>
 
       <div class="mt-auto pt-4">
@@ -176,9 +189,9 @@
         </div>
 
         <UserCreditsPane
-          v-else-if="activeTab === 'credits'"
-          key="credits"
-          :active="activeTab === 'credits'"
+          v-else-if="activeTab === 'billing'"
+          key="billing"
+          :active="activeTab === 'billing'"
         />
 
         <div v-else-if="activeTab === 'security'" key="security">
@@ -323,6 +336,14 @@
             />
           </form>
         </div>
+
+        <AccountComingSoonPane
+          v-else-if="upcomingPage"
+          :key="activeTab"
+          :category="upcomingPage.category"
+          :title="upcomingPage.title"
+          :icon="upcomingPage.icon"
+        />
       </Transition>
     </main>
   </section>
@@ -338,7 +359,18 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import Tag from 'primevue/tag'
-import { Camera, Lock, LogOut, User, Wallet, Xmark } from '@iconoir/vue'
+import {
+  Camera,
+  Coins,
+  CreditCard,
+  Gift,
+  Lock,
+  LogOut,
+  Page,
+  StatsUpSquare,
+  User,
+  Xmark,
+} from '@iconoir/vue'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
@@ -352,12 +384,27 @@ import {
   ibPasswordPt,
 } from '../../../shared/theme/formControls'
 import { useProfileFeedback } from '../useProfileFeedback'
+import AccountComingSoonPane from './AccountComingSoonPane.vue'
 import UserCreditsPane from './UserCreditsPane.vue'
 import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
 type NavItem = {
   key: AccountManagementTab
   label: string
+  icon: Component
+}
+type NavGroup = {
+  key: 'account' | 'subscription' | 'benefits'
+  label: string
+  items: NavItem[]
+}
+type UpcomingTab = Extract<
+  AccountManagementTab,
+  'recharge' | 'subscriptions' | 'rewards' | 'usage'
+>
+type UpcomingPage = {
+  category: string
+  title: string
   icon: Component
 }
 
@@ -394,7 +441,7 @@ const {
 const { uploading: avatarUploading, handleFileChange: onAvatarFileChange } =
   useAvatarUploadWorkflow()
 
-const activeTab = ref<NavItem['key']>(props.initialTab)
+const activeTab = ref<AccountManagementTab>(props.initialTab)
 watch(
   () => props.initialTab,
   (tab) => {
@@ -406,32 +453,57 @@ const isProfileMainScrolling = ref(false)
 const logoutLoading = ref(false)
 let profileMainScrollTimer: number | undefined
 
-const navItems = [
+const navGroups = [
   {
-    key: 'profile',
-    label: '个人资料',
-    icon: User,
+    key: 'account',
+    label: '账户设置',
+    items: [
+      { key: 'profile', label: '个人资料', icon: User },
+      { key: 'security', label: '账号安全', icon: Lock },
+    ],
   },
   {
-    key: 'credits',
-    label: '点子',
-    icon: Wallet,
+    key: 'subscription',
+    label: '订阅与套餐',
+    items: [
+      { key: 'recharge', label: '充值积分', icon: Coins },
+      { key: 'subscriptions', label: '订阅套餐', icon: CreditCard },
+    ],
   },
   {
-    key: 'security',
-    label: '账号安全',
-    icon: Lock,
+    key: 'benefits',
+    label: '权益和账单',
+    items: [
+      { key: 'rewards', label: '奖励中心', icon: Gift },
+      { key: 'billing', label: '账单记录', icon: Page },
+      { key: 'usage', label: '用量统计', icon: StatsUpSquare },
+    ],
   },
-] satisfies NavItem[]
+] satisfies NavGroup[]
+
+const upcomingPages: Record<UpcomingTab, UpcomingPage> = {
+  recharge: { category: '订阅与套餐', title: '充值积分', icon: Coins },
+  subscriptions: { category: '订阅与套餐', title: '订阅套餐', icon: CreditCard },
+  rewards: { category: '权益和账单', title: '奖励中心', icon: Gift },
+  usage: { category: '权益和账单', title: '用量统计', icon: StatsUpSquare },
+}
+
+const upcomingPage = computed(() =>
+  isUpcomingTab(activeTab.value) ? upcomingPages[activeTab.value] : null,
+)
 
 const mainContentClass =
-  'relative grid h-[min(78dvh,720px)] min-h-0 grid-cols-[234px_minmax(0,1fr)] overflow-hidden bg-ib-surface-raised max-[820px]:h-[calc(100dvh-64px)] max-[820px]:grid-cols-1'
+  'relative grid h-[min(78dvh,720px)] min-h-0 grid-cols-[234px_minmax(0,1fr)] overflow-hidden bg-ib-surface-raised max-[820px]:h-[calc(100dvh-64px)] max-[820px]:grid-cols-1 max-[820px]:grid-rows-[auto_minmax(0,1fr)]'
 const profilePaneClass =
   'app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto rounded-l-[var(--radius-ib-overlay)] bg-ib-surface-muted px-8 py-7 pr-14 max-[820px]:rounded-l-none max-[820px]:rounded-t-[var(--radius-ib-overlay)] max-[820px]:px-4 max-[820px]:py-5 max-[820px]:pr-14'
 const accountBrandMarkClass = createBrandMarkClass(brandMarkClasses.sizes.account)
 const passwordFieldClass = ibFormFieldClass
 const passwordInputClass = ibFormInputClass
 const passwordInputErrorClass = ibFormInputErrorClass
+
+function isUpcomingTab(tab: AccountManagementTab): tab is UpcomingTab {
+  return tab in upcomingPages
+}
 
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))

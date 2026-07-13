@@ -3,6 +3,7 @@ import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import AccountManagementDialog from './AccountManagementDialog.vue'
 import { renderWithUser, screen } from '../../../test/render'
+import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
 const DialogStub = defineComponent({
   inheritAttrs: false,
@@ -78,7 +79,7 @@ const StatefulAccountManagementDialogContentStub = defineComponent({
 function renderAccountManagementDialog(
   visible: boolean,
   onVisibleUpdate = vi.fn(),
-  initialTab: 'profile' | 'credits' | 'security' = 'profile',
+  initialTab: AccountManagementTab = 'profile',
 ) {
   return {
     onVisibleUpdate,
@@ -131,11 +132,11 @@ describe('AccountManagementDialog', () => {
   })
 
   it('forwards the requested initial tab to dialog content', () => {
-    renderAccountManagementDialog(true, vi.fn(), 'credits')
+    renderAccountManagementDialog(true, vi.fn(), 'billing')
 
     expect(screen.getByTestId('account-management-dialog-content')).toHaveAttribute(
       'data-initial-tab',
-      'credits',
+      'billing',
     )
   })
 

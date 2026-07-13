@@ -52,7 +52,7 @@ describe('user account menu actions', () => {
     expect(items.map((item) => item.key)).toEqual(['profile', 'admin', 'logout'])
   })
 
-  it('shows the current available credits as a direct account entry', () => {
+  it('provides the current balance for the dedicated credits control', () => {
     const openCredits = vi.fn()
     const items = createUserAccountMenuItems({
       canAccessAdmin: false,
@@ -70,7 +70,7 @@ describe('user account menu actions', () => {
     expect(openCredits).toHaveBeenCalledOnce()
   })
 
-  it('keeps very large balances compact inside the account menu', () => {
+  it('keeps very large balances compact inside the credits control', () => {
     const items = createUserAccountMenuItems({
       canAccessAdmin: false,
       availableCredits: 9_000_000_000_000_000,

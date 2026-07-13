@@ -331,7 +331,7 @@ const userMenuItems = computed(() =>
     availableCredits: availableCredits.value,
     handlers: {
       profile: openAccountManagementDialog,
-      credits: () => openAccountManagementDialog('credits'),
+      credits: () => openAccountManagementDialog('billing'),
       admin: () => onNavigateRequest(ADMIN_ROOT_PATH),
       logout: () => {
         void onLogoutRequest()
