@@ -1,24 +1,17 @@
 <template>
-  <Card :class="spanClass" :pt="adminCardPt">
-    <template #title>
-      <AdminCardHeader :title="title">
-        <template v-if="$slots.actions" #actions>
-          <slot name="actions" />
-        </template>
-      </AdminCardHeader>
+  <ChartCard :title="title" :class="spanClass" :pt="adminCardPt">
+    <template v-if="$slots.actions" #actions>
+      <slot name="actions" />
     </template>
-    <template #content>
-      <AdminChartPanel :size="chartSize" :height="height">
-        <slot />
-      </AdminChartPanel>
-    </template>
-  </Card>
+    <ChartPanel :size="chartSize" :height="height">
+      <slot />
+    </ChartPanel>
+  </ChartCard>
 </template>
 
 <script setup lang="ts">
-import Card from 'primevue/card'
-import AdminCardHeader from './AdminCardHeader.vue'
-import AdminChartPanel from './AdminChartPanel.vue'
+import ChartCard from '../../../../shared/components/ChartCard.vue'
+import ChartPanel from '../../../../shared/components/ChartPanel.vue'
 import { adminCardPt } from '../lib/adminCardPt'
 
 type AdminChartPanelSize = 'hero' | 'standard' | 'compact' | 'monitor'

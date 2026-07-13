@@ -136,7 +136,7 @@ describe('UserUsagePane', () => {
     expect(screen.getAllByText('0')).toHaveLength(5)
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-datasets', '1')
-    const table = screen.getByRole('table', { name: '最近 30 天点子消耗明细' })
+    const table = screen.getByRole('table', { name: '最近 30 天Idea消耗明细' })
     expect(table).toHaveClass('sr-only')
     expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
     expect(
@@ -164,7 +164,10 @@ describe('UserUsagePane', () => {
       'max-[640px]:p-4',
     )
     expect(cells[4]).toHaveClass('max-[640px]:col-span-2')
-    expect(screen.getByLabelText('正在加载点子消耗趋势')).toHaveClass('min-h-[334px]')
+    expect(screen.getByLabelText('正在加载Idea消耗趋势')).toBeVisible()
+    const trendSkeleton = screen.getByTestId('usage-trend-skeleton')
+    expect(trendSkeleton).toHaveClass('h-full')
+    expect(trendSkeleton.parentElement).toHaveClass('h-[240px]', 'md:h-[278px]')
     expect(screen.queryByRole('region', { name: '用量摘要' })).not.toBeInTheDocument()
   })
 
@@ -220,12 +223,16 @@ describe('UserUsagePane', () => {
 
     renderUsagePane()
 
-    expect(screen.getByRole('region', { name: '点子消耗趋势' })).toBeVisible()
-    expect(screen.getByRole('radio', { name: '月' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByTestId('usage-trend-chart')).toHaveClass('h-[260px]')
+    expect(screen.getByRole('region', { name: 'Idea消耗趋势' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '月' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('usage-trend-chart')).toHaveClass('h-full', 'w-full', 'min-w-0')
+    expect(screen.getByTestId('usage-trend-chart').parentElement).toHaveClass(
+      'h-[240px]',
+      'md:h-[278px]',
+    )
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
-    const chartImage = screen.getByRole('img', { name: '最近 30 天点子消耗趋势' })
-    const table = screen.getByRole('table', { name: '最近 30 天点子消耗明细' })
+    const chartImage = screen.getByRole('img', { name: '最近 30 天Idea消耗趋势' })
+    const table = screen.getByRole('table', { name: '最近 30 天Idea消耗明细' })
     expect(chartImage).toHaveAttribute('aria-describedby', table.querySelector('caption')?.id)
     expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
     expect(table).toHaveTextContent('2026-07-30')
@@ -245,7 +252,7 @@ describe('UserUsagePane', () => {
     expect(usageState.retry).toHaveBeenCalledOnce()
   })
 
-  it('offers a keyboard-accessible week month year segmented control with month selected by default', async () => {
+  it('reuses the Admin-aligned small SelectButton in the chart card header', async () => {
     usageState.usage.value = {
       timezone: 'Asia/Shanghai',
       lifetime: {
@@ -263,31 +270,33 @@ describe('UserUsagePane', () => {
     usageState.error.value = null
 
     const { user } = renderUsagePane()
-    const group = screen.getByRole('radiogroup', { name: '趋势时间范围' })
-    expect(group).toHaveClass('max-[640px]:w-full')
-    const trendSection = screen.getByRole('region', { name: '点子消耗趋势' })
-    const trendHeader = group.closest('header')
-    expect(trendHeader).not.toBeNull()
-    expect(trendHeader).toHaveClass('flex-wrap', 'max-[640px]:flex-col')
+    const group = screen.getByRole('group', { name: '趋势时间范围' })
+    expect(group).toHaveClass('p-selectbutton')
+    const trendSection = screen.getByRole('region', { name: 'Idea消耗趋势' })
+    const chartHeading = screen.getByRole('heading', { name: 'Idea消耗' })
+    const trendHeader = chartHeading.parentElement?.parentElement
+    if (!trendHeader) throw new Error('ChartCard header is missing')
+    expect(trendHeader).toHaveClass('flex', 'flex-wrap', 'items-start', 'justify-between', 'gap-3')
+    expect(trendHeader).toContainElement(group)
     expect(trendSection).toContainElement(trendHeader)
+    expect(chartHeading).toBeVisible()
     expect(
       screen.getByRole('heading', { name: '用量统计' }).closest('header'),
     ).not.toContainElement(group)
-    const month = screen.getByRole('radio', { name: '月' })
-    expect(month).toHaveAttribute('aria-checked', 'true')
-    expect(month).toHaveAttribute('tabindex', '0')
+    const month = screen.getByRole('button', { name: '月' })
+    expect(month).toHaveAttribute('aria-pressed', 'true')
+    expect(month).toHaveClass('p-togglebutton-sm')
 
-    month.focus()
-    await user.keyboard('{ArrowRight}')
-    const year = screen.getByRole('radio', { name: '年' })
-    expect(year).toHaveAttribute('aria-checked', 'true')
-    expect(year).toHaveFocus()
+    const year = screen.getByRole('button', { name: '年' })
+    year.focus()
+    await user.keyboard('{Enter}')
+    expect(year).toHaveAttribute('aria-pressed', 'true')
     expect(selectedRangeRef?.value).toBe('1y')
 
-    await user.keyboard('{Home}')
-    const week = screen.getByRole('radio', { name: '周' })
-    expect(week).toHaveAttribute('aria-checked', 'true')
-    expect(week).toHaveFocus()
+    const week = screen.getByRole('button', { name: '周' })
+    week.focus()
+    await user.keyboard(' ')
+    expect(week).toHaveAttribute('aria-pressed', 'true')
     expect(selectedRangeRef?.value).toBe('7d')
   })
 
@@ -313,7 +322,7 @@ describe('UserUsagePane', () => {
 
     expect(screen.getByRole('region', { name: '用量摘要' })).toHaveTextContent('99')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
-    expect(screen.getByRole('radio', { name: '月' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('button', { name: '月' })).toHaveAttribute('aria-pressed', 'true')
     const alert = screen.getByRole('alert')
     expect(alert).toHaveTextContent('周趋势加载失败')
     await user.click(screen.getByRole('button', { name: '重试当前范围' }))

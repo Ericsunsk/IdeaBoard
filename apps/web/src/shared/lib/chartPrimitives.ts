@@ -1,7 +1,9 @@
 import type {
+  Chart,
   ChartData as ChartJsData,
   ChartOptions as ChartJsOptions,
   ChartType,
+  Plugin,
   TooltipItem,
 } from 'chart.js'
 import { markRaw } from 'vue'
@@ -9,6 +11,37 @@ import { markRaw } from 'vue'
 export type ChartData = ChartJsData<ChartType, unknown[], string>
 export type ChartOptions = ChartJsOptions<ChartType>
 export type ChartTooltipItem = TooltipItem<ChartType>
+
+export type ChartEmptyStatePluginInput = {
+  id: string
+  textColor: string
+  fontFamily: string
+  text?: string
+}
+
+export function createChartEmptyStatePlugin(input: ChartEmptyStatePluginInput): Plugin<ChartType> {
+  return {
+    id: input.id,
+    afterDraw(chart) {
+      if (!isChartDataEmpty(chart)) return
+
+      const { ctx, chartArea } = chart
+      if (!chartArea) return
+
+      ctx.save()
+      ctx.fillStyle = input.textColor
+      ctx.font = `600 12px ${input.fontFamily}`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(
+        input.text ?? '暂无数据',
+        (chartArea.left + chartArea.right) / 2,
+        (chartArea.top + chartArea.bottom) / 2,
+      )
+      ctx.restore()
+    },
+  }
+}
 
 export type ChartNumericScaleInput = {
   values?: readonly number[]
@@ -181,4 +214,21 @@ function withChartFont(font: ChartFontOptions | undefined, fontFamily: string): 
     ...font,
     family: fontFamily,
   }
+}
+
+function isChartDataEmpty(chart: Chart<ChartType>) {
+  return chart.data.datasets.every((dataset) =>
+    dataset.data.every((item) => getChartDatumMagnitude(item) <= 0),
+  )
+}
+
+function getChartDatumMagnitude(item: unknown): number {
+  if (typeof item === 'number') return Math.abs(item)
+  if (!item || typeof item !== 'object') return 0
+
+  const record = item as Record<string, unknown>
+  const x = Number(record.x ?? 0)
+  const y = Number(record.y ?? 0)
+  const value = Number(record.value ?? 0)
+  return Math.abs(x) + Math.abs(y) + Math.abs(value)
 }

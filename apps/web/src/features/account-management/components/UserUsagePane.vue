@@ -56,81 +56,69 @@
       </section>
     </template>
 
-    <section
+    <RangedLineChartCard
       v-if="isInitialPending || usage"
-      :class="[trendPanelClass, { 'min-h-[334px]': isInitialPending }]"
-      :aria-label="isInitialPending ? '正在加载点子消耗趋势' : '点子消耗趋势'"
+      v-model="selectedRange"
+      title="Idea消耗"
+      title-tag="h3"
+      :ranges="rangeOptions"
+      range-aria-label="趋势时间范围"
+      :data="trendChart.data"
+      :options="trendChart.options"
+      :plugins="trendChartPlugins"
+      :canvas-props="trendCanvasProps"
+      :show-chart="!isInitialPending"
+      size="hero"
+      class="min-w-0"
+      role="region"
+      :aria-label="isInitialPending ? '正在加载Idea消耗趋势' : 'Idea消耗趋势'"
     >
-      <header
-        class="flex min-w-0 flex-wrap items-center justify-between gap-3 max-[640px]:items-stretch max-[640px]:flex-col"
-      >
-        <h3 class="m-0 text-[16px] leading-6 font-bold text-ib-text">点子消耗</h3>
-        <div
-          role="radiogroup"
-          aria-label="趋势时间范围"
-          class="grid w-[180px] shrink-0 grid-cols-3 rounded-[var(--radius-ib-control)] border border-ib-border-soft bg-ib-surface-muted p-1 max-[640px]:w-full"
-        >
-          <button
-            v-for="(option, index) in rangeOptions"
-            :key="option.value"
-            :ref="(element) => setRangeButtonRef(option.value, element)"
-            type="button"
-            role="radio"
-            :aria-checked="selectedRange === option.value"
-            :tabindex="selectedRange === option.value ? 0 : -1"
-            :class="rangeButtonClass(option.value)"
-            @click="selectRange(option.value)"
-            @keydown="onRangeKeydown($event, index)"
+      <template #before-chart>
+        <template v-if="!isInitialPending">
+          <p
+            v-if="isSwitching"
+            class="mt-3 mb-0 text-[12px] font-semibold text-ib-text-subtle"
+            aria-live="polite"
           >
-            {{ option.label }}
-          </button>
-        </div>
-      </header>
-      <template v-if="isInitialPending">
-        <div class="mt-5 h-[260px] rounded-[var(--radius-ib-control)] bg-ib-surface-muted" />
+            正在加载{{ selectedRangeText }}趋势…
+          </p>
+          <div
+            v-if="error"
+            class="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-ib-control)] border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 max-[640px]:items-start max-[640px]:flex-col"
+            role="alert"
+          >
+            <p class="m-0 min-w-0 text-sm text-ib-danger">{{ errorMessage(error) }}</p>
+            <Button
+              type="button"
+              text
+              class="!shrink-0 !p-0 !text-sm !font-semibold !text-ib-creative-accent-pressed"
+              @click="retry()"
+            >
+              重试当前范围
+            </Button>
+          </div>
+        </template>
       </template>
-      <template v-else>
-        <p
-          v-if="isSwitching"
-          class="mt-3 mb-0 text-[12px] font-semibold text-ib-text-subtle"
-          aria-live="polite"
-        >
-          正在加载{{ selectedRangeText }}趋势…
-        </p>
+
+      <template #chart-fallback>
         <div
-          v-if="error"
-          class="mt-3 flex min-w-0 items-center justify-between gap-3 rounded-[var(--radius-ib-control)] border border-ib-danger/25 bg-ib-surface-muted px-3 py-2 max-[640px]:items-start max-[640px]:flex-col"
-          role="alert"
-        >
-          <p class="m-0 min-w-0 text-sm text-ib-danger">{{ errorMessage(error) }}</p>
-          <Button
-            type="button"
-            text
-            class="!shrink-0 !p-0 !text-sm !font-semibold !text-ib-creative-accent-pressed"
-            @click="retry()"
-          >
-            重试当前范围
-          </Button>
-        </div>
-        <div class="mt-4 min-w-0 overflow-hidden">
-          <Chart
-            type="line"
-            class="h-[260px] w-full min-w-0"
-            :data="trendChart.data"
-            :options="trendChart.options"
-            :canvas-props="trendCanvasProps"
-          />
-        </div>
-        <table class="sr-only">
+          data-testid="usage-trend-skeleton"
+          class="h-full rounded-[var(--radius-ib-control)] bg-ib-surface-muted"
+          aria-hidden="true"
+        />
+      </template>
+
+      <template #after-chart>
+        <table v-if="!isInitialPending" class="sr-only">
           <caption :id="trendDetailsCaptionId">
             {{
               displayRangeText
-            }}点子消耗明细
+            }}Idea消耗明细
           </caption>
           <thead>
             <tr>
               <th scope="col">日期</th>
-              <th scope="col">点子消耗</th>
+              <th scope="col">Idea消耗</th>
             </tr>
           </thead>
           <tbody>
@@ -141,17 +129,21 @@
           </tbody>
         </table>
       </template>
-    </section>
+    </RangedLineChartCard>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from 'vue'
+import { computed, markRaw, ref, useId } from 'vue'
 import Button from 'primevue/button'
-import Chart from 'primevue/chart'
+import RangedLineChartCard from '../../../shared/components/RangedLineChartCard.vue'
 import { useUserUsage } from '../useUserUsage'
 import { DEFAULT_USER_USAGE_RANGE, type UserUsageRange } from '../userUsageResource'
-import { buildUserUsageTrendChart, resolveUserUsageChartTheme } from '../userUsageTrendChart'
+import {
+  buildUserUsageTrendChart,
+  createUserUsageChartPlugins,
+  resolveUserUsageChartTheme,
+} from '../userUsageTrendChart'
 
 const props = defineProps<{ active: boolean }>()
 const selectedRange = ref<UserUsageRange>(DEFAULT_USER_USAGE_RANGE)
@@ -165,17 +157,15 @@ const summaryPanelClass =
   'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
 const summaryCellClass = 'min-h-[108px] min-w-0 p-5 max-[640px]:min-h-[100px] max-[640px]:p-4'
-const trendPanelClass =
-  'min-w-0 overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4'
 const trendChartTheme = resolveUserUsageChartTheme()
+const trendChartPlugins = markRaw(createUserUsageChartPlugins(trendChartTheme))
 const trendDetailsCaptionId = useId()
-const rangeButtonRefs = new Map<UserUsageRange, HTMLButtonElement>()
 
 const rangeOptions = [
-  { value: '7d', label: '周', days: 7 },
-  { value: '30d', label: '月', days: 30 },
-  { value: '1y', label: '年', days: 365 },
-] as const satisfies ReadonlyArray<{ value: UserUsageRange; label: string; days: number }>
+  { key: '7d', label: '周', days: 7 },
+  { key: '30d', label: '月', days: 30 },
+  { key: '1y', label: '年', days: 365 },
+] satisfies Array<{ key: UserUsageRange; label: string; days: number }>
 
 const summaryCellDefinitions = [
   {
@@ -218,59 +208,16 @@ const displayRangeText = computed(() => rangeText(displayRange.value ?? selected
 const selectedRangeText = computed(() => rangeText(selectedRange.value))
 const trendCanvasProps = computed(() => ({
   role: 'img',
-  'aria-label': `${displayRangeText.value}点子消耗趋势`,
+  'aria-label': `${displayRangeText.value}Idea消耗趋势`,
   'aria-describedby': trendDetailsCaptionId,
 }))
 
-function selectRange(value: UserUsageRange) {
-  selectedRange.value = value
-}
-
-function setRangeButtonRef(value: UserUsageRange, element: unknown) {
-  if (element instanceof HTMLButtonElement) {
-    rangeButtonRefs.set(value, element)
-  } else {
-    rangeButtonRefs.delete(value)
-  }
-}
-
-function onRangeKeydown(event: KeyboardEvent, currentIndex: number) {
-  let targetIndex: number | undefined
-  switch (event.key) {
-    case 'ArrowRight':
-    case 'ArrowDown':
-      targetIndex = (currentIndex + 1) % rangeOptions.length
-      break
-    case 'ArrowLeft':
-    case 'ArrowUp':
-      targetIndex = (currentIndex - 1 + rangeOptions.length) % rangeOptions.length
-      break
-    case 'Home':
-      targetIndex = 0
-      break
-    case 'End':
-      targetIndex = rangeOptions.length - 1
-      break
-    default:
-      return
-  }
-  event.preventDefault()
-  const target = rangeOptions[targetIndex]
-  selectRange(target.value)
-  void nextTick(() => rangeButtonRefs.get(target.value)?.focus())
-}
-
-function rangeButtonClass(value: UserUsageRange) {
-  const base =
-    'min-w-0 rounded-[calc(var(--radius-ib-control)-2px)] px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ib-creative-accent'
-  return selectedRange.value === value
-    ? `${base} bg-ib-surface text-ib-text shadow-[var(--shadow-ib-control)]`
-    : `${base} text-ib-text-muted hover:bg-ib-surface hover:text-ib-text`
-}
-
 function rangeText(value: UserUsageRange) {
-  const option = rangeOptions.find((candidate) => candidate.value === value)
-  return `最近 ${option?.days ?? 30} 天`
+  return `最近 ${rangeDays(value)} 天`
+}
+
+function rangeDays(value: UserUsageRange) {
+  return rangeOptions.find((candidate) => candidate.key === value)?.days ?? 30
 }
 
 function formatInteger(value: number) {

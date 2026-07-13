@@ -1,6 +1,7 @@
-import type { Chart, ChartType, Plugin } from 'chart.js'
+import type { ChartType, Plugin } from 'chart.js'
 import { markRaw, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import {
+  createChartEmptyStatePlugin,
   defineChartNumericScale,
   defineChartOptions,
   resolveChartScaleMax,
@@ -47,27 +48,11 @@ export const adminChartTheme = {
 }
 
 export const adminChartPlugins = markRaw<Plugin<ChartType>[]>([
-  {
+  createChartEmptyStatePlugin({
     id: 'adminEmptyState',
-    afterDraw(chart) {
-      if (!isChartDataEmpty(chart)) return
-
-      const { ctx, chartArea } = chart
-      if (!chartArea) return
-
-      ctx.save()
-      ctx.fillStyle = adminChartTheme.emptyText
-      ctx.font = `600 12px ${adminChartFontFamily}`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(
-        '暂无数据',
-        (chartArea.left + chartArea.right) / 2,
-        (chartArea.top + chartArea.bottom) / 2,
-      )
-      ctx.restore()
-    },
-  },
+    textColor: adminChartTheme.emptyText,
+    fontFamily: adminChartFontFamily,
+  }),
 ])
 
 type AdminChartNumericScaleInput = {
@@ -286,21 +271,4 @@ function formatCompactUnit(value: number, unit: string) {
 
 function toFiniteChartNumber(value: number) {
   return Number.isFinite(value) ? value : 0
-}
-
-function isChartDataEmpty(chart: Chart<ChartType>) {
-  return chart.data.datasets.every((dataset) =>
-    dataset.data.every((item) => getDatumMagnitude(item) <= 0),
-  )
-}
-
-function getDatumMagnitude(item: unknown): number {
-  if (typeof item === 'number') return Math.abs(item)
-  if (!item || typeof item !== 'object') return 0
-
-  const record = item as Record<string, unknown>
-  const x = Number(record.x ?? 0)
-  const y = Number(record.y ?? 0)
-  const value = Number(record.value ?? 0)
-  return Math.abs(x) + Math.abs(y) + Math.abs(value)
 }

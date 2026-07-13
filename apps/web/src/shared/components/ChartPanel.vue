@@ -4,23 +4,22 @@
   </div>
 </template>
 
+<script lang="ts">
+export type ChartPanelSize = 'hero' | 'standard' | 'compact' | 'monitor'
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue'
 
-type AdminChartPanelSize = 'hero' | 'standard' | 'compact' | 'monitor'
-
 const props = withDefaults(
   defineProps<{
-    size?: AdminChartPanelSize
+    size?: ChartPanelSize
     height?: string
   }>(),
-  {
-    size: 'standard',
-    height: '',
-  },
+  { size: 'standard', height: '' },
 )
 
-const heightClassBySize: Record<AdminChartPanelSize, string> = {
+const heightClassBySize: Record<ChartPanelSize, string> = {
   hero: 'h-[240px] md:h-[278px]',
   standard: 'h-[300px] md:h-[320px] xl:h-[360px]',
   compact: 'h-[220px]',

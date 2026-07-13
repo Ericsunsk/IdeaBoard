@@ -92,11 +92,11 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Task detail dialog and diagnostic status visuals are domain-specific.',
   },
-  'src/features/admin/shared/lib/adminCardPt.ts': {
+  'src/shared/theme/panelCardPt.ts': {
     counts: {
       'raw-shadow': 1,
     },
-    reason: 'Admin Card pass-through owns the panel shadow contract.',
+    reason: 'Shared panel Card pass-through owns the cross-surface panel shadow contract.',
   },
   'src/features/admin/shared/lib/adminOverlayPt.ts': {
     counts: {

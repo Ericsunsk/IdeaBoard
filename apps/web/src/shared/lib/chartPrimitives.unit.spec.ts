@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
+  createChartEmptyStatePlugin,
   defineChartNumericScale,
   defineChartOptions,
   getParsedY,
@@ -8,6 +9,40 @@ import {
 } from './chartPrimitives'
 
 describe('chart primitives', () => {
+  it('draws the shared empty state only when every chart datum is zero', () => {
+    const fillText = vi.fn()
+    const context = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      fillText,
+      fillStyle: '',
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+    }
+    const plugin = createChartEmptyStatePlugin({
+      id: 'testEmptyState',
+      textColor: '#667085',
+      fontFamily: 'system-ui',
+    })
+    const afterDraw = plugin.afterDraw as (chart: unknown) => void
+
+    afterDraw({
+      data: { datasets: [{ data: [0, 0] }] },
+      ctx: context,
+      chartArea: { left: 0, right: 100, top: 0, bottom: 50 },
+    })
+    expect(fillText).toHaveBeenCalledWith('暂无数据', 50, 25)
+
+    fillText.mockClear()
+    afterDraw({
+      data: { datasets: [{ data: [0, 1] }] },
+      ctx: context,
+      chartArea: { left: 0, right: 100, top: 0, bottom: 50 },
+    })
+    expect(fillText).not.toHaveBeenCalled()
+  })
+
   it('builds a numeric scale from injected colors and tick formatting', () => {
     const scale = defineChartNumericScale({
       values: [0, 9],

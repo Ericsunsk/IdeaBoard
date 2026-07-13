@@ -17,30 +17,17 @@
       </div>
 
       <div :class="adminChartGridClass">
-        <AdminChartCard
+        <RangedLineChartCard
+          v-model="timeRange"
           :title="usageCards.trend.title"
-          span-class="xl:col-span-12"
-          chart-size="hero"
-        >
-          <template #actions>
-            <SelectButton
-              v-model="timeRange"
-              :options="rangeOptions"
-              option-label="label"
-              option-value="key"
-              :allow-empty="false"
-              size="small"
-            />
-          </template>
-          <Chart
-            v-if="isChartReady"
-            type="line"
-            :class="adminChartCanvasClass"
-            :data="trendChartData"
-            :options="trendChartOptions"
-            :plugins="adminChartPlugins"
-          />
-        </AdminChartCard>
+          class="xl:col-span-12"
+          :ranges="rangeOptions"
+          :data="trendChartData"
+          :options="trendChartOptions"
+          :plugins="adminChartPlugins"
+          :show-chart="isChartReady"
+          size="hero"
+        />
 
         <AdminChartCard :title="usageCards.modelRisk.title" span-class="xl:col-span-7">
           <Chart
@@ -53,26 +40,16 @@
           />
         </AdminChartCard>
 
-        <AdminChartCard :title="usageCards.qualityTrend.title" span-class="xl:col-span-5">
-          <template #actions>
-            <SelectButton
-              v-model="qualityTimeRange"
-              :options="qualityRangeOptions"
-              option-label="label"
-              option-value="key"
-              :allow-empty="false"
-              size="small"
-            />
-          </template>
-          <Chart
-            v-if="isChartReady"
-            type="line"
-            :class="adminChartCanvasClass"
-            :data="qualityTrendChartData"
-            :options="qualityTrendChartOptions"
-            :plugins="adminChartPlugins"
-          />
-        </AdminChartCard>
+        <RangedLineChartCard
+          v-model="qualityTimeRange"
+          :title="usageCards.qualityTrend.title"
+          class="xl:col-span-5"
+          :ranges="qualityRangeOptions"
+          :data="qualityTrendChartData"
+          :options="qualityTrendChartOptions"
+          :plugins="adminChartPlugins"
+          :show-chart="isChartReady"
+        />
 
         <div class="grid grid-cols-1 gap-3.5 xl:col-span-12 xl:grid-cols-3">
           <AdminChartCard :title="usageCards.slowModels.title" chart-size="compact">
@@ -117,7 +94,7 @@
 import { computed } from 'vue'
 import Chart from 'primevue/chart'
 import Message from 'primevue/message'
-import SelectButton from 'primevue/selectbutton'
+import RangedLineChartCard from '../../../../shared/components/RangedLineChartCard.vue'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'

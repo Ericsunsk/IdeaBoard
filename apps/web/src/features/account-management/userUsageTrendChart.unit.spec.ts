@@ -23,8 +23,9 @@ describe('buildUserUsageTrendChart', () => {
     expect(chart.data.labels?.[29]).toBe('07/13')
     expect(chart.data.datasets).toHaveLength(1)
     expect(chart.data.datasets[0]).toMatchObject({
-      label: '点子消耗',
+      label: 'Idea消耗',
       data: Array(30).fill(0),
+      hidden: true,
       fill: true,
       tension: 0.38,
       pointRadius: 0,
@@ -68,7 +69,7 @@ describe('buildUserUsageTrendChart', () => {
         parsed: { y: 1_234_567 },
         raw: 1_234_567,
       }),
-    ).toBe('点子消耗：1,234,567 点子')
+    ).toBe('Idea消耗：1,234,567 点子')
   })
 
   it('shows every weekly label and month boundaries for the 365-day range', () => {

@@ -1,4 +1,5 @@
 import {
+  createChartEmptyStatePlugin,
   defineChartData,
   defineChartNumericScale,
   defineChartOptions,
@@ -22,6 +23,16 @@ export type UserUsageChartTheme = {
   surface: string
   text: string
   fontFamily: string
+}
+
+export function createUserUsageChartPlugins(theme: UserUsageChartTheme) {
+  return [
+    createChartEmptyStatePlugin({
+      id: 'userUsageEmptyState',
+      textColor: theme.axisText,
+      fontFamily: theme.fontFamily,
+    }),
+  ]
 }
 
 const defaultTheme: UserUsageChartTheme = {
@@ -48,8 +59,9 @@ export function buildUserUsageTrendChart(
     datasets: [
       {
         type: 'line',
-        label: '点子消耗',
+        label: 'Idea消耗',
         data: values,
+        hidden: values.every((value) => value <= 0),
         borderColor: theme.accent,
         backgroundColor: theme.accentFill,
         fill: true,
@@ -83,7 +95,7 @@ export function buildUserUsageTrendChart(
           padding: 10,
           displayColors: false,
           callbacks: {
-            label: (context) => `点子消耗：${formatFullCredits(getParsedY(context))} 点子`,
+            label: (context) => `Idea消耗：${formatFullCredits(getParsedY(context))} 点子`,
           },
         },
       },
