@@ -33,15 +33,7 @@ export async function submitTaskRequest(
   try {
     submitRes = await taskApi.submit(request)
   } catch (error) {
-    const apiError = error as { code?: unknown; status?: unknown }
-    if (
-      apiError.code === 'insufficient_credits' ||
-      apiError.code === 'pricing_unavailable' ||
-      (apiError.status == null && apiError.code == null)
-    ) {
-      throw mapCanvasBillingRequestError(error)
-    }
-    throw error
+    throw mapCanvasBillingRequestError(error)
   }
   if (submitRes.code !== 0 || !submitRes.data?.task_id) {
     throw new Error(sanitizeApiErrorMessage(submitRes.msg, fallbackMessage))
