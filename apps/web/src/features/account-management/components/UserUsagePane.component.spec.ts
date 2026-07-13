@@ -38,9 +38,10 @@ const chartStub = {
   props: {
     data: { type: Object, required: true },
     options: { type: Object, required: true },
+    canvasProps: { type: Object, required: true },
   },
   template:
-    '<div data-testid="usage-trend-chart" :data-points="String(data.datasets[0].data.length)" :data-datasets="String(data.datasets.length)" />',
+    '<div data-testid="usage-trend-chart" :data-points="String(data.datasets[0].data.length)" :data-datasets="String(data.datasets.length)"><canvas v-bind="canvasProps" /></div>',
 }
 
 function renderUsagePane() {
@@ -127,6 +128,12 @@ describe('UserUsagePane', () => {
     expect(screen.getAllByText('0')).toHaveLength(5)
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-datasets', '1')
+    const table = screen.getByRole('table', { name: '最近 30 天点子消耗明细' })
+    expect(table).toHaveClass('sr-only')
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
+    expect(
+      Array.from(table.querySelectorAll('tbody td')).every((cell) => cell.textContent === '0 点子'),
+    ).toBe(true)
     expect(screen.queryByText('暂无数据')).not.toBeInTheDocument()
   })
 
@@ -209,6 +216,12 @@ describe('UserUsagePane', () => {
     expect(screen.getByText('最近 30 天')).toBeVisible()
     expect(screen.getByTestId('usage-trend-chart')).toHaveClass('h-[260px]')
     expect(screen.getByTestId('usage-trend-chart')).toHaveAttribute('data-points', '30')
+    const chartImage = screen.getByRole('img', { name: '最近 30 天点子消耗趋势' })
+    const table = screen.getByRole('table', { name: '最近 30 天点子消耗明细' })
+    expect(chartImage).toHaveAttribute('aria-describedby', table.querySelector('caption')?.id)
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(30)
+    expect(table).toHaveTextContent('2026-07-30')
+    expect(table).toHaveTextContent('99 点子')
   })
 
   it('shows an inline retry when loading fails', async () => {

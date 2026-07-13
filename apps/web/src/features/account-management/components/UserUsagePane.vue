@@ -74,14 +74,32 @@
           class="mt-4 h-[260px] w-full"
           :data="trendChart.data"
           :options="trendChart.options"
+          :canvas-props="trendCanvasProps"
         />
+        <table class="sr-only">
+          <caption :id="trendDetailsCaptionId">
+            最近 30 天点子消耗明细
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">日期</th>
+              <th scope="col">点子消耗</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="point in trendRows" :key="point.date">
+              <th scope="row">{{ point.date }}</th>
+              <td>{{ formatInteger(point.credits) }} 点子</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import { useUserUsage } from '../useUserUsage'
@@ -101,6 +119,12 @@ const summaryCellClass = 'min-h-[108px] min-w-0 p-5 max-[640px]:min-h-[100px] ma
 const trendPanelClass =
   'min-w-0 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4'
 const trendChartTheme = resolveUserUsageChartTheme()
+const trendDetailsCaptionId = useId()
+const trendCanvasProps = {
+  role: 'img',
+  'aria-label': '最近 30 天点子消耗趋势',
+  'aria-describedby': trendDetailsCaptionId,
+} as const
 
 const summaryCellDefinitions = [
   {
@@ -137,9 +161,8 @@ const metrics = computed(() => {
   return summaryCellDefinitions.map((metric, index) => ({ ...metric, value: values[index] }))
 })
 
-const trendChart = computed(() =>
-  buildUserUsageTrendChart(usage.value?.trend || [], trendChartTheme),
-)
+const trendRows = computed(() => usage.value?.trend || [])
+const trendChart = computed(() => buildUserUsageTrendChart(trendRows.value, trendChartTheme))
 
 function formatInteger(value: number) {
   return integerFormatter.format(value)
