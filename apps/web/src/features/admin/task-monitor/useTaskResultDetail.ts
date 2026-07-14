@@ -1,8 +1,8 @@
-import { computed, ref } from 'vue'
+import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { formatAdminDateTime } from '../../../shared/utils/dateTime'
 import type { Task } from '../../../shared/api/task'
 import type { AdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
-import { getSafeResultImageUrl } from './taskResultImages'
+import { getSafeResultImageUrl, hasTaskResultImageCandidate } from './taskResultImages'
 import {
   formatTaskDuration,
   formatTaskResultDebug,
@@ -11,9 +11,11 @@ import {
   getTaskResultDetailImageUrl,
 } from './taskResultPresentation'
 
-export function useTaskResultDetail(options: { feedback: AdminTaskResultFeedback }) {
-  const detailModalVisible = ref(false)
-  const detailTask = ref<Task | null>(null)
+export function useTaskResultDetail(
+  task: MaybeRefOrGetter<Task | null>,
+  options: { feedback: AdminTaskResultFeedback },
+) {
+  const detailTask = computed(() => toValue(task))
   const showDebugResult = ref(false)
 
   const resultImageUrl = computed(() => {
@@ -28,6 +30,17 @@ export function useTaskResultDetail(options: { feedback: AdminTaskResultFeedback
     return formatTaskResultDebug(detailTask.value?.result)
   })
 
+  const hasResultImageCandidate = computed(() => {
+    return hasTaskResultImageCandidate(detailTask.value?.result)
+  })
+
+  const hasResultPayload = computed(() => Boolean(detailTask.value?.result?.trim()))
+
+  // Debug expansion is local UI state and must never follow a different task into the Dialog.
+  watch(detailTask, () => {
+    showDebugResult.value = false
+  })
+
   function openResultImage(url: string) {
     if (!url.trim()) return
     const normalizedUrl = getSafeResultImageUrl(url)
@@ -40,7 +53,12 @@ export function useTaskResultDetail(options: { feedback: AdminTaskResultFeedback
 
   function copyToClipboard(text: string) {
     if (!text) return
-    navigator.clipboard
+    const clipboard = navigator.clipboard
+    if (!clipboard?.writeText) {
+      options.feedback.copyFailed()
+      return
+    }
+    clipboard
       .writeText(text)
       .then(() => options.feedback.copiedToClipboard())
       .catch(() => {
@@ -53,12 +71,6 @@ export function useTaskResultDetail(options: { feedback: AdminTaskResultFeedback
     return formatAdminDateTime(timeStr, timeStr)
   }
 
-  function showDetail(row: Task) {
-    detailTask.value = row
-    showDebugResult.value = false
-    detailModalVisible.value = true
-  }
-
   function getErrorReason(row: Task): string {
     return getTaskErrorReason(row)
   }
@@ -68,16 +80,16 @@ export function useTaskResultDetail(options: { feedback: AdminTaskResultFeedback
   }
 
   return {
-    detailModalVisible,
     detailTask,
     showDebugResult,
     resultImageUrl,
     resultSummaryText,
     resultDebugText,
+    hasResultImageCandidate,
+    hasResultPayload,
     openResultImage,
     copyToClipboard,
     formatDateTime,
-    showDetail,
     getErrorReason,
     calcDuration,
   }

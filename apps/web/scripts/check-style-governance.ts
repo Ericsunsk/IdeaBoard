@@ -85,13 +85,6 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Logo upload affordance uses a focus-ring shadow that bridges an Admin token.',
   },
-  'src/features/admin/pages/task-monitor/AdminTaskMonitorPage.vue': {
-    counts: {
-      'raw-color': 4,
-      'raw-shadow': 2,
-    },
-    reason: 'Task detail dialog and diagnostic status visuals are domain-specific.',
-  },
   'src/shared/theme/panelCardPt.ts': {
     counts: {
       'raw-shadow': 1,
@@ -100,9 +93,9 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
   },
   'src/features/admin/shared/lib/adminOverlayPt.ts': {
     counts: {
-      'raw-shadow': 1,
+      'raw-shadow': 2,
     },
-    reason: 'Admin overlay pass-through owns the overlay shadow contract.',
+    reason: 'Admin overlay pass-through owns the menu and dialog overlay shadow contracts.',
   },
   'src/features/admin/shared/lib/adminUiClasses.ts': {
     counts: {

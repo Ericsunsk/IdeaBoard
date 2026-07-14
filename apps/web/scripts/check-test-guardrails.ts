@@ -68,6 +68,12 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/admin/task-monitor/AdminTaskResultDialog.component.spec.ts': [
+    {
+      reason:
+        'Verifies the keyboard focus visibility class contract for the image result action; the DOM harness cannot compute Tailwind focus pseudo-state styles.',
+    },
+  ],
   'src/features/account-management/components/UserRewardsPane.component.spec.ts': [
     {
       reason:

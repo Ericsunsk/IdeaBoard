@@ -82,3 +82,19 @@ export function getSafeTaskResultImageUrl(result: string): string {
   }
   return ''
 }
+
+export function hasTaskResultImageCandidate(result: string | null | undefined): boolean {
+  if (!result) return false
+  try {
+    const parsed = JSON.parse(result)
+    if (!parsed || typeof parsed !== 'object') return false
+
+    const { image_url: imageUrl, image_urls: imageUrls } = parsed as Record<string, unknown>
+    return (
+      typeof imageUrl === 'string' ||
+      (Array.isArray(imageUrls) && imageUrls.some((candidate) => typeof candidate === 'string'))
+    )
+  } catch {
+    return false
+  }
+}

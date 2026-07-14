@@ -23,6 +23,9 @@ export const adminOverlayMenuItemLinkClass =
 export const adminOverlayPopoverRootClass =
   '!rounded-lg !border-ib-border !bg-ib-surface !shadow-none'
 
+export const adminOverlayDialogRootClass =
+  '!overflow-hidden !rounded-[var(--radius-ib-overlay)] !border !border-ib-border !bg-ib-surface !shadow-[var(--shadow-ib-overlay)]'
+
 export function createAdminMenuPt(input: {
   rootClass: string
   listClass?: string
