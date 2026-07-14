@@ -13,7 +13,7 @@ import type {
   StorageProfilePayload as GeneratedStorageProfilePayload,
   StorageProviderMeta as GeneratedStorageProviderMeta,
 } from '../../../shared/api/generated-query/model'
-import { requireApiData } from '../../../shared/api/apiResponse'
+import { resolveApiData } from '../../../shared/api/apiResponse'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './storageHelpers'
 
 export type SaveStorageProfileInput =
@@ -56,12 +56,12 @@ export function createAdminStorageResource(): AdminStorageResource {
 }
 
 export async function fetchAdminStorageProviders(): Promise<StorageProviderMeta[]> {
-  const data = requireApiData(await listAdminStorageProviders(), '加载存储供应商失败')
+  const data = await resolveApiData(listAdminStorageProviders(), '加载存储供应商失败')
   return (data.providers ?? []).map(normalizeGeneratedProvider)
 }
 
 export async function fetchAdminStorageProfiles(): Promise<StorageProfile[]> {
-  const data = requireApiData(await listAdminStorageProfiles(), '加载存储配置失败')
+  const data = await resolveApiData(listAdminStorageProfiles(), '加载存储配置失败')
   return (data.profiles ?? []).map(normalizeGeneratedProfile)
 }
 
@@ -69,17 +69,14 @@ export async function saveAdminStorageProfile(
   input: SaveStorageProfileInput,
 ): Promise<StorageProfileCommandResult> {
   const requestParams = input.apply ? { apply: true } : undefined
-  const response = input.id
-    ? await updateAdminStorageProfile(
+  const request = input.id
+    ? updateAdminStorageProfile(
         input.id,
         input.payload as GeneratedStorageProfilePayload,
         requestParams,
       )
-    : await createAdminStorageProfile(
-        input.payload as GeneratedStorageProfilePayload,
-        requestParams,
-      )
-  const data = requireApiData(response, '保存存储配置失败')
+    : createAdminStorageProfile(input.payload as GeneratedStorageProfilePayload, requestParams)
+  const data = await resolveApiData(request, '保存存储配置失败')
   return {
     message: data.message,
     profile: normalizeGeneratedProfile(data.profile),
@@ -89,7 +86,7 @@ export async function saveAdminStorageProfile(
 export async function applyAdminStorageProfileRecord(
   id: string,
 ): Promise<StorageProfileCommandResult> {
-  const data = requireApiData(await applyAdminStorageProfile(id), '设为当前失败')
+  const data = await resolveApiData(applyAdminStorageProfile(id), '设为当前失败')
   return {
     message: data.message,
     profile: normalizeGeneratedProfile(data.profile),
@@ -97,15 +94,15 @@ export async function applyAdminStorageProfileRecord(
 }
 
 export async function testAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
-  return requireApiData(await testAdminStorageProfile(id), '连接失败')
+  return resolveApiData(testAdminStorageProfile(id), '连接失败')
 }
 
 export async function deleteAdminStorageProfileRecord(id: string): Promise<{ message: string }> {
-  return requireApiData(await deleteAdminStorageProfile(id), '删除失败')
+  return resolveApiData(deleteAdminStorageProfile(id), '删除失败')
 }
 
 export async function fetchAdminStorageBucketDomains(id: string): Promise<string[]> {
-  const data = requireApiData(await getAdminStorageBucketInfo(id), '获取 Bucket 信息失败')
+  const data = await resolveApiData(getAdminStorageBucketInfo(id), '获取 Bucket 信息失败')
   return data.info.domains ?? []
 }
 

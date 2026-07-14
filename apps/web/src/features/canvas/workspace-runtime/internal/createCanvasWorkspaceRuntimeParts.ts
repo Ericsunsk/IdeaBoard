@@ -10,7 +10,7 @@ import { useFlowNodeMediaInputs } from '../../composables/useFlowNodeMediaInputs
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'
 import { useCanvasImageWorkflow } from '../../image-workflow'
-import { cancelTask } from '../../../../shared/api/task'
+import { taskApi } from '../../../../shared/api/task'
 
 const STOP_DELETED_TASK_RETRY_DELAYS_MS = [0, 1000, 3000] as const
 
@@ -19,15 +19,11 @@ type CanvasGraphUploadApi = {
     file: File,
     boardId: string,
   ) => Promise<{
-    code: number
-    msg?: string
-    data?: {
-      url?: string
-      width?: number
-      height?: number
-      mime?: string
-      ext?: string
-    }
+    url: string
+    width?: number
+    height?: number
+    mime?: string
+    ext?: string
   }>
 }
 
@@ -53,7 +49,6 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   createNodeKind: Ref<CanvasCreatableNodeKind>
   flowPaneAdapter: CanvasFlowPaneAdapter
   uploadApi: CanvasGraphUploadApi
-  sanitizeApiErrorMessage: (message: string | null | undefined, fallback: string) => string
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
@@ -68,7 +63,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   const feedback = useCanvasFeedback(options.openRecharge)
 
   function stopDeletedRunningTask(taskId: string, attempt = 0) {
-    void cancelTask(taskId).catch((error: unknown) => {
+    void taskApi.cancel(taskId).catch((error: unknown) => {
       const nextAttempt = attempt + 1
       const retryDelay = STOP_DELETED_TASK_RETRY_DELAYS_MS[nextAttempt]
       if (retryDelay !== undefined) {
@@ -114,7 +109,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     getSelectedElements: options.flowPaneAdapter.getSelectedElements,
     removeSelectedElements: options.flowPaneAdapter.removeSelectedElements,
     uploadApi: options.uploadApi,
-    sanitizeApiErrorMessage: options.sanitizeApiErrorMessage,
     openNodeImagePreview: options.openNodeImagePreview,
     openImageUrlPreview: options.openImageUrlPreview,
     feedback: feedback.graph,

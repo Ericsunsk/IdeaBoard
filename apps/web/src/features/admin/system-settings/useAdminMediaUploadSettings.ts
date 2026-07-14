@@ -4,6 +4,7 @@ import {
   useGetAdminMediaUploadSetting,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { MediaUploadSetting } from '../../../shared/api/generated-query/model'
+import { createApiDataSelector } from '../../../shared/api/apiResponse'
 import type { AdminMediaUploadSettingsFeedback } from '../feedback/useAdminFeedback'
 import { updateMediaUploadSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
@@ -15,11 +16,15 @@ export const DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING: MediaUploadSetting = {
 export const MEDIA_UPLOAD_MIN_CONCURRENT = 1
 export const MEDIA_UPLOAD_MAX_CONCURRENT = 64
 
+const selectMediaUploadSetting = createApiDataSelector<MediaUploadSetting>('加载上传设置失败')
+
 export function useAdminMediaUploadSettings(options: {
   feedback: AdminMediaUploadSettingsFeedback
 }) {
-  const query = useGetAdminMediaUploadSetting()
-  const sourceSetting = computed(() => query.data.value?.data)
+  const query = useGetAdminMediaUploadSetting<MediaUploadSetting>({
+    query: { select: selectMediaUploadSetting },
+  })
+  const sourceSetting = computed(() => query.data.value)
   const resource = useSettingResourceLifecycle<MediaUploadSetting>({
     defaultSetting: DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING,
     feedback: options.feedback,

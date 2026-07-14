@@ -4,6 +4,7 @@ import {
   useGetAdminPublicURLSetting,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { PublicURLSetting } from '../../../shared/api/generated-query/model'
+import { createApiDataSelector } from '../../../shared/api/apiResponse'
 import type { AdminPublicURLSettingsFeedback } from '../feedback/useAdminFeedback'
 import { updatePublicURLSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
@@ -15,9 +16,13 @@ export const DEFAULT_ADMIN_PUBLIC_URL_SETTING: PublicURLSetting = {
   public_asset_base_url: '',
 }
 
+const selectPublicURLSetting = createApiDataSelector<PublicURLSetting>('加载链接与域名失败')
+
 export function useAdminPublicURLSettings(options: { feedback: AdminPublicURLSettingsFeedback }) {
-  const query = useGetAdminPublicURLSetting()
-  const sourceSetting = computed(() => query.data.value?.data)
+  const query = useGetAdminPublicURLSetting<PublicURLSetting>({
+    query: { select: selectPublicURLSetting },
+  })
+  const sourceSetting = computed(() => query.data.value)
   const resource = useSettingResourceLifecycle<PublicURLSetting>({
     defaultSetting: DEFAULT_ADMIN_PUBLIC_URL_SETTING,
     feedback: options.feedback,

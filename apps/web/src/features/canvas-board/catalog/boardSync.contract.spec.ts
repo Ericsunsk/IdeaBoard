@@ -10,7 +10,10 @@ import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from './boardS
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
-  const state = {
+  const state: {
+    listResponse: { code?: number; msg?: string; data: { list: UserBoardItem[] } }
+    upsertResponse: { code: number; msg?: string; data: null }
+  } = {
     listResponse: { data: { list: [] as UserBoardItem[] } },
     upsertResponse: { code: 0, data: null },
   }
@@ -213,6 +216,25 @@ describe('boardSync', () => {
     expect(listCanvasBoards()[0]?.name).toBe('Local Board')
   })
 
+  it('returns hydrate failure for a successful HTTP response with a failed business code', async () => {
+    mocks.state.listResponse = {
+      code: 503,
+      msg: '服务暂不可用',
+      data: { list: [] },
+    }
+
+    const result = await hydrateCanvasBoardsFromServer()
+
+    expect(result).toMatchObject({ ok: false, error: expect.any(Error) })
+  })
+
+  it('rejects a board save with a failed business code', async () => {
+    replaceCanvasBoards([{ id: 'board-1', name: 'Board', createdAt: 100, updatedAt: 2_000 }])
+    mocks.state.upsertResponse = { code: 409, msg: '画布名称已存在', data: null }
+
+    await expect(syncCanvasBoardToServer('board-1')).rejects.toThrow('画布名称已存在')
+  })
+
   it('returns hydrate failure for old-shape remote board state without upgrading it', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
@@ -396,7 +418,9 @@ describe('boardSync', () => {
 
 function mockBoardApiRequest(url: string, config?: { method?: string }) {
   const method = config?.method ?? 'GET'
-  if (url === '/user/boards' && method === 'GET') return Promise.resolve(mocks.state.listResponse)
+  if (url === '/user/boards' && method === 'GET') {
+    return Promise.resolve({ code: 0, msg: 'ok', ...mocks.state.listResponse })
+  }
   if (url.startsWith('/user/boards/') && method === 'PUT') {
     return Promise.resolve(mocks.state.upsertResponse)
   }

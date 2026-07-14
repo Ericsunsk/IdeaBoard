@@ -59,7 +59,7 @@ export function useAdminUsersContext(
     status: selectedUserStatus.value,
   }))
   const usersQuery = useAdminUsersResource(userQueryParams)
-  const usersData = computed(() => usersQuery.data.value?.data)
+  const usersData = computed(() => usersQuery.data.value)
   const users = computed<AdminUserRowView[]>(() =>
     (usersData.value?.list ?? []).map(createAdminUserRowView),
   )

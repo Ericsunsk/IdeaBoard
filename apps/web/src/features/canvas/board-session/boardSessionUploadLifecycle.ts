@@ -120,11 +120,8 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     })
     const prepared = await prepareImageAssetForUpload(file)
     prepared.warnings.forEach((message) => warning(message))
-    const uploadRes = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
-    if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-      throw new Error(uploadRes.msg || '上传图片失败')
-    }
-    const stableUrl = uploadRes.data.url.trim()
+    const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
+    const stableUrl = uploaded.url.trim()
     if (!stableUrl || !isStableCanvasUrl(stableUrl)) {
       throw new Error('上传图片失败：返回链接不是当前 board canvas uploads')
     }
@@ -230,11 +227,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     const results = await Promise.allSettled(
       recycleTargets.map((url) => uploadApi.recycle(url, normalizedBoardId)),
     )
-    const failed = results.filter((item) => {
-      if (item.status === 'rejected') return true
-      const code = item.value?.code
-      return typeof code === 'number' && code !== 0
-    }).length
+    const failed = results.filter((item) => item.status === 'rejected').length
     if (failed > 0) {
       warning(`有 ${failed} 张图片回收失败，已保留文件`)
     }

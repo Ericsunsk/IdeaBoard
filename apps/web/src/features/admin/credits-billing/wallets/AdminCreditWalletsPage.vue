@@ -302,7 +302,7 @@ const usersQuery = useAdminUsersResource(
     keyword: appliedUserSearch.value || undefined,
   })),
 )
-const userSearchResults = computed(() => usersQuery.data.value?.data?.list ?? [])
+const userSearchResults = computed(() => usersQuery.data.value?.list ?? [])
 const usersLoading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
 const selectedUserLabel = computed(
   () => selectedUser.value?.username || `用户 #${selectedUserId.value}`,

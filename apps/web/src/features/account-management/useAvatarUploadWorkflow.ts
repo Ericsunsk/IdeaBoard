@@ -40,11 +40,7 @@ export function useAvatarUploadWorkflow(deps: AvatarUploadWorkflowDependencies =
 
     await runAsyncAction(
       async () => {
-        const uploadRes = await uploadAvatar(file)
-        const avatarUrl = uploadRes.data?.avatar?.trim()
-        if (!avatarUrl) {
-          throw new Error('头像上传失败，请稍后重试')
-        }
+        const avatarUrl = (await uploadAvatar(file)).avatar.trim()
         userStore.setAvatarLocal(avatarUrl)
       },
       {

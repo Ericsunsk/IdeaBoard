@@ -13,7 +13,6 @@ import {
   extractImageResultsFromTaskPayload,
   type TaskImageResult,
 } from '../../../../shared/query/taskResult'
-import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import { assertTaskSubmitReady } from './taskReadiness'
 import { notifyUserCreditsInvalidation } from '../../../../shared/query/userCreditsInvalidation'
 import { mapCanvasBillingRequestError } from './canvasBillingPreflight'
@@ -29,17 +28,15 @@ export async function submitTaskRequest(
   request: SubmitTaskData,
   fallbackMessage = '提交任务失败',
 ): Promise<{ taskId: string }> {
-  let submitRes: Awaited<ReturnType<typeof taskApi.submit>>
+  let submission: Awaited<ReturnType<typeof taskApi.submit>>
   try {
-    submitRes = await taskApi.submit(request)
+    submission = await taskApi.submit(request)
   } catch (error) {
     throw mapCanvasBillingRequestError(error)
   }
-  if (submitRes.code !== 0 || !submitRes.data?.task_id) {
-    throw new Error(sanitizeApiErrorMessage(submitRes.msg, fallbackMessage))
-  }
-  notifyUserCreditsInvalidation({ source: 'task-hold', taskId: submitRes.data.task_id })
-  return { taskId: submitRes.data.task_id }
+  if (!submission.task_id) throw new Error(fallbackMessage)
+  notifyUserCreditsInvalidation({ source: 'task-hold', taskId: submission.task_id })
+  return { taskId: submission.task_id }
 }
 
 export async function waitExistingOrLiveTaskImageResults(
@@ -52,8 +49,8 @@ export async function waitExistingOrLiveTaskImageResults(
       >
     | undefined
   try {
-    const taskRes = await taskApi.get(taskId)
-    task = taskRes.data?.task
+    const taskData = await taskApi.get(taskId)
+    task = taskData.task
   } catch (error) {
     const status = Number((error as { status?: unknown; code?: unknown })?.status)
     const code = Number((error as { status?: unknown; code?: unknown })?.code)

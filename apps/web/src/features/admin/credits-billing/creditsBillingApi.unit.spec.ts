@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
-  correctAdminCredits: vi.fn(),
   deductAdminCredits: vi.fn(),
   getAdminCreditReconciliationRun: vi.fn(),
   getAdminCreditWallet: vi.fn(),
@@ -33,7 +32,6 @@ describe('credits billing API adapter', () => {
     apiMocks.grantAdminCredits.mockResolvedValue(success(command))
     apiMocks.deductAdminCredits.mockResolvedValue(success(command))
     apiMocks.refundAdminCredits.mockResolvedValue(success(command))
-    apiMocks.correctAdminCredits.mockResolvedValue(success(command))
     apiMocks.startAdminCreditReconciliation.mockResolvedValue(success(run))
     apiMocks.listAdminCreditReconciliationRuns.mockResolvedValue(success(runs))
     apiMocks.getAdminCreditReconciliationRun.mockResolvedValue(success(run))
@@ -50,7 +48,6 @@ describe('credits billing API adapter', () => {
       ...request,
       charge_transaction_id: 'charge-1',
     } as never)
-    const correction = await adminCreditsBillingApi.correct(request as never)
     const startedRun = await adminCreditsBillingApi.startReconciliation({
       stale_hold_after_seconds: 3600,
       reason: '运营例行对账',
@@ -64,7 +61,6 @@ describe('credits billing API adapter', () => {
     expect(grant).toEqual({ transaction_id: 'transaction-1' })
     expect(deduction).toEqual({ transaction_id: 'transaction-1' })
     expect(refund).toEqual({ transaction_id: 'transaction-1' })
-    expect(correction).toEqual({ transaction_id: 'transaction-1' })
     expect(startedRun).toEqual({ id: 7, status: 'completed' })
     expect(runs).toEqual({ runs: [{ id: 7, status: 'completed' }] })
     expect(run).toEqual({ id: 7, status: 'completed' })
@@ -75,7 +71,6 @@ describe('credits billing API adapter', () => {
     expect(apiMocks.grantAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.deductAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.refundAdminCredits).toHaveBeenCalledOnce()
-    expect(apiMocks.correctAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.startAdminCreditReconciliation).toHaveBeenCalledWith({
       stale_hold_after_seconds: 3600,
       reason: '运营例行对账',
@@ -99,7 +94,6 @@ describe('credits billing API adapter', () => {
       [adminCreditsBillingApi.grant(request as never), '赠送Idea失败'],
       [adminCreditsBillingApi.deduct(request as never), '扣减Idea失败'],
       [adminCreditsBillingApi.refund(request as never), '退款Idea失败'],
-      [adminCreditsBillingApi.correct(request as never), '校正Idea失败'],
       [
         adminCreditsBillingApi.startReconciliation({
           stale_hold_after_seconds: 3600,

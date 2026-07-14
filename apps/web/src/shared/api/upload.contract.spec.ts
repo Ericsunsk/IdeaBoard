@@ -46,15 +46,11 @@ describe('uploadApi', () => {
     )
 
     await expect(uploadApi.upload(file, ' board 1 ')).resolves.toEqual({
-      code: 0,
-      msg: 'ok',
-      data: {
-        url: '/uploads/boards/board-1/image.png',
-        width: 640,
-        height: 480,
-        mime: 'image/png',
-        ext: '.png',
-      },
+      url: '/uploads/boards/board-1/image.png',
+      width: 640,
+      height: 480,
+      mime: 'image/png',
+      ext: '.png',
     })
     expect(receivedRequests).toEqual([
       {
@@ -103,15 +99,11 @@ describe('uploadApi', () => {
     )
 
     await expect(uploadApi.uploadAvatar(file)).resolves.toEqual({
-      code: 0,
-      msg: 'ok',
-      data: {
-        avatar: '/uploads/avatars/me.jpg',
-        width: 128,
-        height: 128,
-        mime: 'image/jpeg',
-        ext: '.jpg',
-      },
+      avatar: '/uploads/avatars/me.jpg',
+      width: 128,
+      height: 128,
+      mime: 'image/jpeg',
+      ext: '.jpg',
     })
     expect(receivedRequests).toEqual([
       {
@@ -159,12 +151,8 @@ describe('uploadApi', () => {
       await vi.advanceTimersByTimeAsync(slowResponseDelayMs)
 
       await expect(response).resolves.toEqual({
-        code: 0,
-        msg: 'ok',
-        data: {
-          avatar: '/uploads/avatars/slow-avatar.jpg',
-          mime: 'image/jpeg',
-        },
+        avatar: '/uploads/avatars/slow-avatar.jpg',
+        mime: 'image/jpeg',
       })
     } finally {
       vi.useRealTimers()
@@ -180,11 +168,65 @@ describe('uploadApi', () => {
 
     await expect(
       uploadApi.upload(new File(['too large'], 'large.png', { type: 'image/png' }), 'board-1'),
+    ).rejects.toThrow('upload too large')
+  })
+
+  it('rejects successful upload envelopes without domain data', async () => {
+    useMswHandlers(
+      http.post('/api/user/boards/:boardId/uploads', () => {
+        return HttpResponse.json({ code: 0, msg: 'ok' })
+      }),
+    )
+
+    await expect(
+      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
+    ).rejects.toThrow('上传图片失败')
+  })
+
+  it('adds a contextual fallback to sanitized transport errors without dropping metadata', async () => {
+    useMswHandlers(
+      http.post('/api/user/boards/:boardId/uploads', () => {
+        return HttpResponse.json(
+          { code: 'upstream_failure', msg: 'authorization token leaked', data: { retry: true } },
+          { status: 503 },
+        )
+      }),
+    )
+
+    await expect(
+      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
     ).rejects.toMatchObject({
-      code: 413,
-      msg: 'upload too large',
-      message: 'upload too large',
-      status: 200,
+      code: 'upstream_failure',
+      data: { retry: true },
+      message: '上传图片失败',
+      status: 503,
     })
+  })
+
+  it('rejects avatar responses without a usable URL', async () => {
+    useMswHandlers(
+      http.post('/api/user/profile/avatar', () => {
+        return HttpResponse.json({ code: 0, msg: 'ok', data: { avatar: '   ' } })
+      }),
+    )
+
+    await expect(
+      uploadApi.uploadAvatar(new File(['avatar'], 'avatar.png', { type: 'image/png' })),
+    ).rejects.toThrow('头像上传失败，请稍后重试')
+  })
+
+  it('recycles a board asset and hides the response envelope', async () => {
+    let receivedBody: unknown
+    useMswHandlers(
+      http.delete('/api/user/boards/:boardId/uploads', async ({ request }) => {
+        receivedBody = await request.json()
+        return HttpResponse.json({ code: 0, msg: 'ok', data: { deleted: true } })
+      }),
+    )
+
+    await expect(
+      uploadApi.recycle('/uploads/canvas/user/board-1/content/image.png', ' board 1 '),
+    ).resolves.toBeUndefined()
+    expect(receivedBody).toEqual({ url: '/uploads/canvas/user/board-1/content/image.png' })
   })
 })

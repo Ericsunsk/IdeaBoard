@@ -1,5 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useGetAdminMonitor } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
+import type { MonitorResponse } from '../../../../shared/api/generated-query/model'
+import { createApiDataSelector } from '../../../../shared/api/apiResponse'
 import {
   GetAdminStatisticsRange,
   useAdminStatisticsResource,
@@ -21,6 +23,7 @@ type StableAnomalyRecord = {
 }
 
 const RECOVERY_SAMPLE_COUNT = 3
+const selectAdminMonitor = createApiDataSelector<MonitorResponse>('加载监控数据失败')
 const severityRank: Record<AdminAnomalySeverity, number> = {
   critical: 0,
   warning: 1,
@@ -35,12 +38,13 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
     isEnabled: () => isEnabled.value,
   })
 
-  const monitorQuery = useGetAdminMonitor({
+  const monitorQuery = useGetAdminMonitor<MonitorResponse>({
     query: {
       enabled: isEnabled,
       refetchInterval: polling.refetchInterval,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
+      select: selectAdminMonitor,
     },
   })
   const statisticsResource = useAdminStatisticsResource(
@@ -51,8 +55,8 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
     },
   )
 
-  const monitorData = computed(() => monitorQuery.data.value?.data?.monitor || null)
-  const monitorStats = computed(() => monitorQuery.data.value?.data?.stats || null)
+  const monitorData = computed(() => monitorQuery.data.value?.monitor || null)
+  const monitorStats = computed(() => monitorQuery.data.value?.stats || null)
   const statistics = statisticsResource.statistics
   const stableRecords = ref(new Map<string, StableAnomalyRecord>())
   const anomalies = ref<AdminAnomalyItem[]>([])

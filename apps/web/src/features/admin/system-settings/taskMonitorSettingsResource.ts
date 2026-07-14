@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import { useGetAdminTaskMonitorSetting } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { TaskMonitorSetting } from '../../../shared/api/generated-query/model'
+import { createApiDataSelector } from '../../../shared/api/apiResponse'
 
 export const DEFAULT_ADMIN_TASK_MONITOR_SETTING: TaskMonitorSetting = {
   list_page_size: 12,
@@ -14,9 +15,13 @@ export const TASK_MONITOR_MAX_PAGE_SIZE = 50
 export const TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS = 2
 export const TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS = 60
 
+const selectTaskMonitorSetting = createApiDataSelector<TaskMonitorSetting>('加载任务监控设置失败')
+
 export function useAdminTaskMonitorSettingQuery() {
-  const query = useGetAdminTaskMonitorSetting()
-  const settings = computed(() => normalizeTaskMonitorSetting(query.data.value?.data))
+  const query = useGetAdminTaskMonitorSetting<TaskMonitorSetting>({
+    query: { select: selectTaskMonitorSetting },
+  })
+  const settings = computed(() => normalizeTaskMonitorSetting(query.data.value))
   const settingsError = computed(() => (query.isError.value ? (query.error.value ?? null) : null))
 
   return {

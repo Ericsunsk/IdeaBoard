@@ -19,7 +19,7 @@ describe('canvas billing readiness request contracts', () => {
 
   it('uses quantity one for presentation quote refreshes', async () => {
     const readiness = { ready: true, feature: 'pattern-gen' } as const
-    mocks.checkSubmitReadiness.mockResolvedValue({ code: 0, data: readiness })
+    mocks.checkSubmitReadiness.mockResolvedValue(readiness)
 
     await expect(
       fetchCanvasBillingReadiness('pattern-gen', {

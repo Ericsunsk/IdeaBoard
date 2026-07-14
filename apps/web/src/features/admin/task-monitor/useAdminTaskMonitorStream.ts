@@ -2,25 +2,33 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useDocumentVisibility } from '@vueuse/core'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { getGetAdminMonitorQueryKey } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
-import type { ApiResponseMonitor } from '../../../shared/api/generated-query/model'
+import type { ApiResponseMonitor, MonitorResponse } from '../../../shared/api/generated-query/model'
+import { requireApiData } from '../../../shared/api/apiResponse'
 import { resolveApiUrl } from '../../../shared/config/runtimeUrls'
 
 type AdminMonitorStreamStatus = 'idle' | 'unsupported' | 'connecting' | 'connected' | 'degraded'
 
-function parseMonitorSnapshot(raw: string): ApiResponseMonitor | null {
+type ParsedMonitorSnapshot = {
+  response: ApiResponseMonitor
+  snapshot: MonitorResponse
+}
+
+function parseMonitorSnapshot(raw: string): ParsedMonitorSnapshot | null {
   const payload = JSON.parse(raw) as unknown
   if (!payload || typeof payload !== 'object') return null
   const response = payload as Partial<ApiResponseMonitor>
   if (typeof response.code !== 'number' || typeof response.msg !== 'string') return null
-  if (response.code !== 0 || !response.data?.monitor || !response.data?.stats) return null
-  return response as ApiResponseMonitor
+  const typedResponse = response as ApiResponseMonitor
+  const snapshot = requireApiData(typedResponse, '读取监控快照失败')
+  if (!snapshot.monitor || !snapshot.stats) return null
+  return { response: typedResponse, snapshot }
 }
 
 export function useAdminTaskMonitorStream() {
   const queryClient = useQueryClient()
   const visibility = useDocumentVisibility()
   const status = ref<AdminMonitorStreamStatus>('idle')
-  const snapshot = ref<ApiResponseMonitor | null>(null)
+  const snapshot = ref<MonitorResponse | null>(null)
   const isPageVisible = computed(() => visibility.value === 'visible')
   const isConnected = computed(() => status.value === 'connected')
   let eventSource: EventSource | null = null
@@ -50,13 +58,13 @@ export function useAdminTaskMonitorStream() {
 
     source.addEventListener('snapshot', (event: MessageEvent) => {
       try {
-        const nextSnapshot = parseMonitorSnapshot(event.data)
-        if (!nextSnapshot) {
+        const parsed = parseMonitorSnapshot(event.data)
+        if (!parsed) {
           status.value = 'degraded'
           return
         }
-        queryClient.setQueryData(getGetAdminMonitorQueryKey(), nextSnapshot)
-        snapshot.value = nextSnapshot
+        queryClient.setQueryData(getGetAdminMonitorQueryKey(), parsed.response)
+        snapshot.value = parsed.snapshot
         status.value = 'connected'
       } catch {
         status.value = 'degraded'

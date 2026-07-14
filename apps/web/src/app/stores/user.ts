@@ -137,15 +137,9 @@ function createUserSessionStore(): UserSessionStore {
   async function fetchUserInfo(force = false, options: { failClosedOnError?: boolean } = {}) {
     if (userInfoLoaded.value && !force) return user.value
     try {
-      const res = await fetchCurrentUserInfo()
-      if (res.code === 0 && res.data?.user) {
-        updateAuth(res.data.user)
-        return user.value
-      }
-      if (options.failClosedOnError) {
-        resetAuth()
-        return null
-      }
+      const session = await fetchCurrentUserInfo()
+      updateAuth(session.user)
+      return user.value
     } catch (e) {
       const code = getErrorStatusCode(e)
       if (code === 401 || code === 403) {

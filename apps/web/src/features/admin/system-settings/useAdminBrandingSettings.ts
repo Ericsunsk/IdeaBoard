@@ -6,7 +6,7 @@ import {
   useGetAdminBrandingSetting,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { BrandingSetting } from '../../../shared/api/generated-query/model'
-import { requireApiData } from '../../../shared/api/apiResponse'
+import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 import type { AdminBrandingSettingsFeedback } from '../feedback/useAdminFeedback'
 import {
   isSupportedUploadImageFile,
@@ -24,9 +24,13 @@ import {
 import { updateBrandingSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
+const selectAdminBrandingSetting = createApiDataSelector<BrandingSetting>('加载项目品牌失败')
+
 export function useAdminBrandingSettings(options: { feedback: AdminBrandingSettingsFeedback }) {
-  const brandingQuery = useGetAdminBrandingSetting()
-  const sourceSetting = computed(() => brandingQuery.data.value?.data)
+  const brandingQuery = useGetAdminBrandingSetting<BrandingSetting>({
+    query: { select: selectAdminBrandingSetting },
+  })
+  const sourceSetting = computed(() => brandingQuery.data.value)
   const resource = useSettingResourceLifecycle<BrandingSetting>({
     defaultSetting: DEFAULT_SITE_BRANDING_SETTING,
     extraInvalidateQueryKeys: [SITE_BRANDING_QUERY_KEY],
@@ -101,7 +105,7 @@ async function uploadBrandingLogoFile(file: File): Promise<string> {
     throw new Error(unsupportedUploadImageMessage())
   }
 
-  const data = requireApiData(await uploadAdminAsset({ file }), '上传 Logo 失败')
+  const data = await resolveApiData(uploadAdminAsset({ file }), '上传 Logo 失败')
   if (!data.url) throw new Error('上传 Logo 失败')
   return data.url
 }

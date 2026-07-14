@@ -2,9 +2,9 @@ import { computed, nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ListAdminTasksStatus,
-  type ApiResponseMonitor,
-  type ApiResponseTaskList,
+  type ApiResponseTaskListData,
   type MonitorData,
+  type MonitorResponse,
   type MonitorStats,
   type TaskMonitorSetting,
   type Task,
@@ -75,7 +75,7 @@ beforeEach(() => {
 
 describe('useTaskMonitor polling', () => {
   it('uses aggregate pending/running counts instead of current page rows', async () => {
-    const data = ref<ApiResponseTaskList>()
+    const data = ref<ApiResponseTaskListData>()
     mockState.listAdminTasksReturn = {
       data,
       error: ref(null),
@@ -107,7 +107,7 @@ describe('useTaskMonitor polling', () => {
   it('exposes task list API errors so the page does not render them as an empty list', () => {
     const error = new Error('task list failed')
     mockState.listAdminTasksReturn = {
-      data: ref<ApiResponseTaskList>(),
+      data: ref<ApiResponseTaskListData>(),
       error: ref(error),
       isError: ref(true),
       isLoading: ref(false),
@@ -121,7 +121,7 @@ describe('useTaskMonitor polling', () => {
   })
 
   it('uses task monitor settings for page size and refresh interval', () => {
-    const data = ref<ApiResponseTaskList>()
+    const data = ref<ApiResponseTaskListData>()
     mockState.taskMonitorSettings.value = {
       list_page_size: 24,
       auto_refresh_enabled: true,
@@ -148,11 +148,11 @@ describe('useTaskMonitor polling', () => {
 describe('useTaskRuntimeMonitor SSE fallback', () => {
   it('keeps stale monitor data and exposes retry when both stream and REST are degraded', async () => {
     const sseResponse = makeMonitorResponse(50, 20, 30)
-    const monitorData = ref<ApiResponseMonitor>()
+    const monitorData = ref<MonitorResponse>()
     const refetch = vi.fn()
     const reconnect = vi.fn()
     const streamStatus = ref('connected')
-    const streamSnapshot = ref<ApiResponseMonitor | null>(sseResponse)
+    const streamSnapshot = ref<MonitorResponse | null>(sseResponse)
     mockState.getAdminMonitorReturn = {
       data: monitorData,
       error: ref(new Error('monitor failed')),
@@ -192,14 +192,14 @@ describe('useTaskRuntimeMonitor SSE fallback', () => {
     const error = new Error('monitor failed')
     const streamStatus = ref('degraded')
     mockState.getAdminMonitorReturn = {
-      data: ref<ApiResponseMonitor>(),
+      data: ref<MonitorResponse>(),
       error: ref(error),
       isError: ref(true),
       refetch: vi.fn(),
     }
     mockState.streamReturn = {
       isConnected: computed(() => streamStatus.value === 'connected'),
-      snapshot: ref<ApiResponseMonitor | null>(null),
+      snapshot: ref<MonitorResponse | null>(null),
       status: streamStatus,
       reconnect: vi.fn(),
     }
@@ -228,20 +228,16 @@ function makeTask(status: string, id: number): Task {
 function makeTaskList(
   list: Task[],
   counts: { pending: number; running: number },
-): ApiResponseTaskList {
+): ApiResponseTaskListData {
   return {
-    code: 0,
-    msg: 'ok',
-    data: {
-      list,
-      total: list.length,
-      pending_count: counts.pending,
-      running_count: counts.running,
-      completed_count: 0,
-      failed_count: 0,
-      cancelled_count: 0,
-      other_count: 0,
-    },
+    list,
+    total: list.length,
+    pending_count: counts.pending,
+    running_count: counts.running,
+    completed_count: 0,
+    failed_count: 0,
+    cancelled_count: 0,
+    other_count: 0,
   }
 }
 
@@ -249,14 +245,10 @@ function makeMonitorResponse(
   globalQueueLen: number,
   pending: number,
   running: number,
-): ApiResponseMonitor {
+): MonitorResponse {
   return {
-    code: 0,
-    msg: 'ok',
-    data: {
-      monitor: makeMonitorData(globalQueueLen),
-      stats: makeMonitorStats(pending, running),
-    },
+    monitor: makeMonitorData(globalQueueLen),
+    stats: makeMonitorStats(pending, running),
   }
 }
 

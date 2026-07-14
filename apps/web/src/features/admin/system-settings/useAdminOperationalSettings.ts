@@ -22,7 +22,7 @@ export function useAdminOperationalSettings(options: {
     cloneForm(DEFAULT_OPERATIONAL_SETTINGS_FORM),
   ) as Ref<OperationalSettingsForm>
   const validationError = ref('')
-  const state = computed(() => resource.query.data.value?.data)
+  const state = computed(() => resource.query.data.value)
   const loading = computed(() => resource.query.isLoading.value || resource.query.isFetching.value)
   const saving = computed(() => resource.updatePending.value)
   const isDirty = computed(() => !isSameForm(form.value, lastSyncedForm.value))

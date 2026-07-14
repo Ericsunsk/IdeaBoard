@@ -22,7 +22,7 @@ describe('flowImageDirectActionExecutor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.get.mockReset()
-    mocks.submit.mockResolvedValue({ code: 0, data: { task_id: 'task-hd' } })
+    mocks.submit.mockResolvedValue({ task_id: 'task-hd' })
   })
 
   it('submits a prepared task request and returns the task id', async () => {
@@ -36,7 +36,7 @@ describe('flowImageDirectActionExecutor', () => {
   })
 
   it('sanitizes submit failures with a fallback message', async () => {
-    mocks.submit.mockResolvedValueOnce({ code: 400, msg: '', data: {} })
+    mocks.submit.mockResolvedValueOnce({})
 
     await expect(submitTaskRequest({ prompt: 'generate' }, '提交失败')).rejects.toThrow('提交失败')
   })
@@ -88,20 +88,17 @@ describe('flowImageDirectActionExecutor', () => {
 
   it('returns canonical image results from completed task fast path', async () => {
     mocks.get.mockResolvedValueOnce({
-      code: 0,
-      data: {
-        task: {
-          status: 'completed',
-          outputs: [
-            {
-              role: 'image',
-              url: ' https://cdn.example.com/done.png ',
-              width: 1000,
-              height: 750,
-              mime_type: ' image/png ',
-            },
-          ],
-        },
+      task: {
+        status: 'completed',
+        outputs: [
+          {
+            role: 'image',
+            url: ' https://cdn.example.com/done.png ',
+            width: 1000,
+            height: 750,
+            mime_type: ' image/png ',
+          },
+        ],
       },
     })
 
@@ -117,25 +114,22 @@ describe('flowImageDirectActionExecutor', () => {
 
   it('keeps storage materialization failures pending on the existing task fast path', async () => {
     mocks.get.mockResolvedValueOnce({
-      code: 0,
-      data: {
-        task: {
-          status: 'failed',
-          error_msg: '图片结果保存失败，请检查存储配置',
-          execution_metrics: {
-            task_id: 'task-storage',
-            current_stage: 'failed',
-            bottleneck_source: 'storage',
-            failure_stage: 'finalizing',
-            failure_category: 'storage_error',
-            queue_wait_ms: 0,
-            worker_overhead_ms: 0,
-            provider_latency_ms: 100,
-            finalize_latency_ms: 20,
-            total_latency_ms: 120,
-            created_at: '2026-01-01T00:00:00.000Z',
-            updated_at: '2026-01-01T00:00:00.000Z',
-          },
+      task: {
+        status: 'failed',
+        error_msg: '图片结果保存失败，请检查存储配置',
+        execution_metrics: {
+          task_id: 'task-storage',
+          current_stage: 'failed',
+          bottleneck_source: 'storage',
+          failure_stage: 'finalizing',
+          failure_category: 'storage_error',
+          queue_wait_ms: 0,
+          worker_overhead_ms: 0,
+          provider_latency_ms: 100,
+          finalize_latency_ms: 20,
+          total_latency_ms: 120,
+          created_at: '2026-01-01T00:00:00.000Z',
+          updated_at: '2026-01-01T00:00:00.000Z',
         },
       },
     })

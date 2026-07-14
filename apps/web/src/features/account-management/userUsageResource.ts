@@ -1,6 +1,6 @@
 import { getUserUsage } from '../../shared/api/generated-query/user-usage/user-usage'
 import type { GetUserUsageRange, UserUsage } from '../../shared/api/generated-query/model'
-import { requireApiData } from '../../shared/api/apiResponse'
+import { resolveApiData } from '../../shared/api/apiResponse'
 
 export type AccountUsage = UserUsage
 export type UserUsageRange = GetUserUsageRange
@@ -16,8 +16,8 @@ export async function fetchUserUsage(
   range: UserUsageRange,
   signal?: AbortSignal,
 ): Promise<AccountUsage> {
-  return requireApiData(
-    await getUserUsage({ range }, signal ? { signal } : undefined),
+  return resolveApiData(
+    getUserUsage({ range }, signal ? { signal } : undefined),
     '加载用量统计失败',
   )
 }

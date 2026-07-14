@@ -157,7 +157,6 @@ function createWorkspaceOptions() {
     createNodeKind: ref('prompt' as const),
     flowPaneAdapter,
     uploadApi: { upload: vi.fn() },
-    sanitizeApiErrorMessage: vi.fn(),
     openNodeImagePreview: vi.fn(),
     openImageUrlPreview: vi.fn(),
     logoutAndRedirect: vi.fn(),

@@ -41,6 +41,14 @@ export function sanitizeTaskErrorMessage(
 
 /** Unified display helper: prefers Error.message first, then falls back to API-safe extraction. */
 export function formatDisplayErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error) return sanitizeApiErrorMessage(error.message, fallback)
+  if (error instanceof Error) {
+    if (
+      'hasSafeDisplayMessage' in error &&
+      (error as Error & { hasSafeDisplayMessage?: unknown }).hasSafeDisplayMessage === false
+    ) {
+      return fallback
+    }
+    return sanitizeApiErrorMessage(error.message, fallback)
+  }
   return extractSafeApiErrorMessage(error, fallback)
 }

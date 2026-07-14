@@ -26,33 +26,10 @@ describe('useAvatarUploadWorkflow', () => {
     expect(deps.uploadAvatar).not.toHaveBeenCalled()
   })
 
-  it('throws through runAsyncAction when uploaded avatar URL is empty after trim', async () => {
-    const capturedErrors: string[] = []
-    const deps = createDeps({
-      uploadAvatar: vi.fn(async () => ({ code: 0, msg: 'ok', data: { avatar: '   ' } })),
-      runAsyncAction: async (action) => {
-        try {
-          return await action()
-        } catch (error) {
-          capturedErrors.push(error instanceof Error ? error.message : String(error))
-          return undefined
-        }
-      },
-    })
-    const workflow = useAvatarUploadWorkflow(deps)
-
-    await workflow.selectFile(new File(['image'], 'avatar.png', { type: 'image/png' }))
-
-    expect(capturedErrors).toEqual(['头像上传失败，请稍后重试'])
-    expect(deps.userStore.setAvatarLocal).not.toHaveBeenCalled()
-  })
-
   it('uploads images, trims avatar URL, updates local user, and shows success', async () => {
     const deps = createDeps({
       uploadAvatar: vi.fn(async () => ({
-        code: 0,
-        msg: 'ok',
-        data: { avatar: ' https://cdn.example/avatar.png ' },
+        avatar: ' https://cdn.example/avatar.png ',
       })),
     })
     const workflow = useAvatarUploadWorkflow(deps)
@@ -100,8 +77,7 @@ function createDeps(
 
   return {
     uploadAvatar:
-      overrides.uploadAvatar ??
-      vi.fn(async () => ({ code: 0, msg: 'ok', data: { avatar: 'https://cdn.example/a.png' } })),
+      overrides.uploadAvatar ?? vi.fn(async () => ({ avatar: 'https://cdn.example/a.png' })),
     userStore: {
       setAvatarLocal: overrides.setAvatarLocal ?? vi.fn(),
     },

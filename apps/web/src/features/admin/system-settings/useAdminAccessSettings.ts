@@ -11,6 +11,7 @@ import type {
   ApiResponseRegistrationSettingData,
   RateLimitSetting,
 } from '../../../shared/api/generated-query/model'
+import { createApiDataSelector } from '../../../shared/api/apiResponse'
 import type { AdminAccessSettingsFeedback } from '../feedback/useAdminFeedback'
 import { updateRateLimitSettings, updateRegistrationSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
@@ -31,13 +32,21 @@ const DEFAULT_RATE_LIMIT_FORM: AdminAccessRateLimitForm = {
   ...DEFAULT_RATE_LIMIT_SETTING,
 }
 const DEFAULT_REGISTRATION_ENABLED = false
+const selectRateLimitSetting = createApiDataSelector<RateLimitSetting>('加载访问限流失败')
+const selectRegistrationSetting =
+  createApiDataSelector<ApiResponseRegistrationSettingData>('加载注册设置失败')
 
 export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsFeedback }) {
   const queryClient = useQueryClient()
-  const registrationSettingQuery = useGetAdminRegistrationSetting()
-  const rateLimitSettingsQuery = useGetAdminRateLimitSettings()
+  const registrationSettingQuery =
+    useGetAdminRegistrationSetting<ApiResponseRegistrationSettingData>({
+      query: { select: selectRegistrationSetting },
+    })
+  const rateLimitSettingsQuery = useGetAdminRateLimitSettings<RateLimitSetting>({
+    query: { select: selectRateLimitSetting },
+  })
   const registrationEnabled = ref(DEFAULT_REGISTRATION_ENABLED)
-  const rateLimitSource = computed(() => rateLimitSettingsQuery.data.value?.data)
+  const rateLimitSource = computed(() => rateLimitSettingsQuery.data.value)
 
   function invalidateRegistrationSettingQuery() {
     return queryClient.invalidateQueries({ queryKey: getGetAdminRegistrationSettingQueryKey() })
@@ -96,8 +105,7 @@ export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsF
 
   watch(
     () => registrationSettingQuery.data.value,
-    (response) => {
-      const setting = response?.data
+    (setting) => {
       if (!setting || updateRegistrationSettingMutation.isPending.value) return
       registrationEnabled.value = setting.enabled
     },
@@ -113,7 +121,7 @@ export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsF
   }
 
   async function handleToggleRegistration(newValue: boolean) {
-    const fallbackEnabled = registrationSettingQuery.data.value?.data?.enabled ?? !newValue
+    const fallbackEnabled = registrationSettingQuery.data.value?.enabled ?? !newValue
     try {
       await updateRegistrationSettingMutation.mutateAsync(newValue)
       options.feedback.registrationUpdated(newValue)

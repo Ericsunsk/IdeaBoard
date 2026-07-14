@@ -31,15 +31,11 @@ type CanvasGraphUploadApi = {
     file: File,
     boardId: string,
   ) => Promise<{
-    code: number
-    msg?: string
-    data?: {
-      url?: string
-      width?: number
-      height?: number
-      mime?: string
-      ext?: string
-    }
+    url: string
+    width?: number
+    height?: number
+    mime?: string
+    ext?: string
   }>
 }
 
@@ -58,7 +54,6 @@ type UseCanvasGraphRuntimeOptions = {
   getSelectedElements: ValueRef<Array<Node | Edge>>
   removeSelectedElements: (elements: Array<Node | Edge>) => void
   uploadApi: CanvasGraphUploadApi
-  sanitizeApiErrorMessage: (message: string | null | undefined, fallback: string) => string
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   feedback: CanvasGraphRuntimeFeedback
@@ -134,7 +129,6 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
       updateSnapshotNode,
       getImageNodeSnapshot,
       uploadApi: options.uploadApi,
-      sanitizeApiErrorMessage: options.sanitizeApiErrorMessage,
       onWarning: (msg) => options.feedback.operationWarning(msg),
       onSuccess: (msg) => options.feedback.operationSucceeded(msg),
       onNodeMutated: (nodeId) => flowNodeMutations.markFlowExecutionNodeDirty(nodeId),

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ApiResponseTask, Task } from './generated-query/model'
-import { queryClient } from '../query/queryClient'
+import type { ApiResponseTaskData, Task } from './generated-query/model'
 import { TaskResultPendingError, waitTaskImageResultsWithSse } from './taskEvents'
 import { subscribeUserCreditsInvalidation } from '../query/userCreditsInvalidation'
 
@@ -104,13 +103,9 @@ function makeFinalizingFailureMetrics(
   }
 }
 
-function makeTaskResponse(status: string, task: Partial<Task> = {}): ApiResponseTask {
+function makeTaskResponse(status: string, task: Partial<Task> = {}): ApiResponseTaskData {
   return {
-    code: 0,
-    msg: 'ok',
-    data: {
-      task: makeTask(status, task),
-    },
+    task: makeTask(status, task),
   }
 }
 
@@ -119,7 +114,6 @@ describe('waitTaskImageResultsWithSse', () => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.clearAllMocks()
-    queryClient.clear()
     MockEventSource.instances = []
   })
 

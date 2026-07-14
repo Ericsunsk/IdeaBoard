@@ -4,7 +4,6 @@ import {
   type SubmitTaskData,
   type SubmitTaskReadinessData,
 } from '../../../../shared/api/task'
-import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import {
   buildFusionTaskRequest,
   buildImageActionReadinessRequest,
@@ -37,19 +36,13 @@ export async function fetchCanvasBillingReadiness(
   feature: WorkflowFeature,
   request?: SubmitTaskData,
 ): Promise<SubmitTaskReadinessData> {
-  const response = await taskApi.checkSubmitReadiness(
-    {
-      ...withTaskClientActionId(
-        request ?? buildCanvasBillingReadinessRequest(feature),
-        createCanvasTaskClientActionId(),
-      ),
-      billing_quantity: 1,
-    },
-  )
-  if (response.code !== 0 || !response.data) {
-    throw new Error(sanitizeApiErrorMessage(response.msg, 'Idea计费信息暂不可用'))
-  }
-  return response.data
+  return taskApi.checkSubmitReadiness({
+    ...withTaskClientActionId(
+      request ?? buildCanvasBillingReadinessRequest(feature),
+      createCanvasTaskClientActionId(),
+    ),
+    billing_quantity: 1,
+  })
 }
 
 export function buildFusionBillingReadinessRequest(input: {

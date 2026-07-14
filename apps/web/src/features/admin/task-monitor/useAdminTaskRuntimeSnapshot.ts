@@ -1,23 +1,27 @@
 import { computed, ref, watch } from 'vue'
 import { useGetAdminMonitor } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
-import type { ApiResponseMonitor } from '../../../shared/api/generated-query/model'
+import type { MonitorResponse } from '../../../shared/api/generated-query/model'
+import { createApiDataSelector } from '../../../shared/api/apiResponse'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
 import { useAdminTaskMonitorStream } from './useAdminTaskMonitorStream'
 
+const selectAdminMonitor = createApiDataSelector<MonitorResponse>('加载监控数据失败')
+
 export function useAdminTaskRuntimeSnapshot() {
   const stream = useAdminTaskMonitorStream()
-  const lastGoodSnapshot = ref<ApiResponseMonitor | null>(null)
+  const lastGoodSnapshot = ref<MonitorResponse | null>(null)
   const polling = useAdminQueryPolling({
     visibleInterval: 10_000,
     hiddenInterval: false,
     isEnabled: () => !stream.isConnected.value,
   })
 
-  const monitorQuery = useGetAdminMonitor({
+  const monitorQuery = useGetAdminMonitor<MonitorResponse>({
     query: {
       refetchInterval: polling.refetchInterval,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
+      select: selectAdminMonitor,
     },
   })
 
@@ -57,8 +61,8 @@ export function useAdminTaskRuntimeSnapshot() {
       null,
   )
   const activeSnapshot = computed(() => liveSnapshot.value || lastGoodSnapshot.value)
-  const monitorData = computed(() => activeSnapshot.value?.data?.monitor || null)
-  const monitorStats = computed(() => activeSnapshot.value?.data?.stats || null)
+  const monitorData = computed(() => activeSnapshot.value?.monitor || null)
+  const monitorStats = computed(() => activeSnapshot.value?.stats || null)
   const isStale = computed(() => !liveSnapshot.value && !!lastGoodSnapshot.value)
   const isError = computed(
     () => !activeSnapshot.value && !stream.isConnected.value && monitorQuery.isError.value,

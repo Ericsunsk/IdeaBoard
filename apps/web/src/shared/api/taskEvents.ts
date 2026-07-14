@@ -1,6 +1,3 @@
-import { queryClient } from '../query/queryClient'
-import { getGetUserTaskQueryKey } from './generated-query/tasks/tasks'
-import type { ApiResponseTask } from './generated-query/model'
 import { extractImageResultsFromTaskPayload, type TaskImageResult } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
@@ -135,20 +132,6 @@ function waitWithEventSource(
         return
       }
 
-      queryClient.setQueryData(
-        getGetUserTaskQueryKey(taskId),
-        (old: ApiResponseTask | undefined) => {
-          if (!old?.data?.task) return old
-          return {
-            ...old,
-            data: {
-              ...old.data,
-              task: { ...old.data.task, ...task },
-            },
-          }
-        },
-      )
-
       if (task.status === 'completed') {
         notifyUserCreditsInvalidation({ source: 'task-settlement', taskId, status: 'completed' })
         settleResolve(extractImageResultsFromTaskEvent(task))
@@ -195,10 +178,7 @@ async function waitWithPolling(
     let task: TaskEventPayload | undefined
     try {
       const taskRes = await taskApi.get(taskId)
-      if (taskRes.data?.task) {
-        queryClient.setQueryData(getGetUserTaskQueryKey(taskId), taskRes)
-      }
-      task = taskRes.data?.task
+      task = taskRes.task
       lastError = undefined
     } catch (error) {
       if (isTaskNotFoundError(error)) throw error

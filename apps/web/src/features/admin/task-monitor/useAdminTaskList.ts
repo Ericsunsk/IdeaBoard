@@ -64,13 +64,13 @@ export function useAdminTaskList() {
     },
   })
 
-  const tasks = computed(() => tasksQuery.data.value?.data?.list || [])
-  const total = computed(() => tasksQuery.data.value?.data?.total || 0)
+  const tasks = computed(() => tasksQuery.data.value?.list || [])
+  const total = computed(() => tasksQuery.data.value?.total || 0)
   const loading = computed(() => tasksQuery.isLoading.value)
   const isError = computed(() => tasksQuery.isError.value)
   const error = computed(() => (isError.value ? (tasksQuery.error.value ?? null) : null))
   const taskStats = computed<TaskStatusStats>(() => {
-    const data = tasksQuery.data.value?.data
+    const data = tasksQuery.data.value
     return {
       pending: data?.pending_count ?? 0,
       running: data?.running_count ?? 0,
@@ -83,7 +83,7 @@ export function useAdminTaskList() {
 
   watch(
     () => {
-      const data = tasksQuery.data.value?.data
+      const data = tasksQuery.data.value
       if (!data) return true
       return (data.pending_count ?? 0) > 0 || (data.running_count ?? 0) > 0
     },

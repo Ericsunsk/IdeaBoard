@@ -13,7 +13,10 @@ import {
 
 const mocks = vi.hoisted(() => {
   const request = vi.fn()
-  const state = {
+  const state: {
+    listResponse: { code?: number; msg?: string; data: { list: UserBoardItem[] } }
+    upsertResponse: { code: number; msg?: string; data: null }
+  } = {
     listResponse: { data: { list: [] as UserBoardItem[] } },
     upsertResponse: { code: 0, data: null },
   }
@@ -355,7 +358,9 @@ describe('createBoardSessionRepository', () => {
 
 function mockBoardApiRequest(url: string, config?: { method?: string }) {
   const method = config?.method ?? 'GET'
-  if (url === '/user/boards' && method === 'GET') return Promise.resolve(mocks.state.listResponse)
+  if (url === '/user/boards' && method === 'GET') {
+    return Promise.resolve({ code: 0, msg: 'ok', ...mocks.state.listResponse })
+  }
   if (url.startsWith('/user/boards/') && method === 'PUT') {
     return Promise.resolve(mocks.state.upsertResponse)
   }

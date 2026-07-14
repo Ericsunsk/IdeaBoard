@@ -69,14 +69,8 @@ describe('useFlowImageUploadActions', () => {
     const currentBoardId = { value: 'board-a' }
     const snapshots = new Map<string, ImageNodeItem>([['node-1', makeImageNode()]])
     const updates: string[] = []
-    const uploadA = createDeferred<{
-      code: number
-      data: { url: string; width: number; height: number }
-    }>()
-    const uploadB = createDeferred<{
-      code: number
-      data: { url: string; width: number; height: number }
-    }>()
+    const uploadA = createDeferred<{ url: string; width: number; height: number }>()
+    const uploadB = createDeferred<{ url: string; width: number; height: number }>()
     const uploadApi = {
       upload: vi.fn().mockReturnValueOnce(uploadA.promise).mockReturnValueOnce(uploadB.promise),
     }
@@ -93,7 +87,6 @@ describe('useFlowImageUploadActions', () => {
       },
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi,
-      sanitizeApiErrorMessage: (msg, fallback) => msg || fallback,
       onWarning: (msg) => warnings.push(msg),
       onSuccess: vi.fn(),
     })
@@ -102,9 +95,9 @@ describe('useFlowImageUploadActions', () => {
     const secondUpload = actions.applyImageFileToImageNode('node-1', makeFile('b.png'))
     await flushPromises()
 
-    uploadB.resolve({ code: 0, data: { url: '/uploads/b.png', width: 100, height: 100 } })
+    uploadB.resolve({ url: '/uploads/b.png', width: 100, height: 100 })
     await expect(secondUpload).resolves.toBe(true)
-    uploadA.resolve({ code: 0, data: { url: '/uploads/a.png', width: 100, height: 100 } })
+    uploadA.resolve({ url: '/uploads/a.png', width: 100, height: 100 })
     await expect(firstUpload).resolves.toBe(false)
 
     expect(snapshots.get('node-1')?.sourceImageUrl).toBe('/uploads/b.png')
@@ -115,10 +108,7 @@ describe('useFlowImageUploadActions', () => {
   it('ignores an image node upload that completes after switching boards', async () => {
     const currentBoardId = { value: 'board-a' }
     const snapshots = new Map<string, ImageNodeItem>([['node-1', makeImageNode()]])
-    const upload = createDeferred<{
-      code: number
-      data: { url: string; width: number; height: number }
-    }>()
+    const upload = createDeferred<{ url: string; width: number; height: number }>()
     const updateSnapshotNode = vi.fn()
     const actions = useFlowImageUploadActions({
       currentBoardId,
@@ -126,7 +116,6 @@ describe('useFlowImageUploadActions', () => {
       updateSnapshotNode,
       getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
-      sanitizeApiErrorMessage: (msg, fallback) => msg || fallback,
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
     })
@@ -134,7 +123,7 @@ describe('useFlowImageUploadActions', () => {
     const task = actions.applyImageFileToImageNode('node-1', makeFile('a.png'))
     await flushPromises()
     currentBoardId.value = 'board-b'
-    upload.resolve({ code: 0, data: { url: '/uploads/a.png', width: 100, height: 100 } })
+    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100 })
 
     await expect(task).resolves.toBe(false)
     expect(updateSnapshotNode).not.toHaveBeenCalled()
@@ -142,10 +131,7 @@ describe('useFlowImageUploadActions', () => {
 
   it('does not create an image node when upload completes after switching boards', async () => {
     const currentBoardId = { value: 'board-a' }
-    const upload = createDeferred<{
-      code: number
-      data: { url: string; width: number; height: number }
-    }>()
+    const upload = createDeferred<{ url: string; width: number; height: number }>()
     const createNodeAtPosition = vi.fn().mockReturnValue('node-new')
     const actions = useFlowImageUploadActions({
       currentBoardId,
@@ -153,7 +139,6 @@ describe('useFlowImageUploadActions', () => {
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: vi.fn(),
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
-      sanitizeApiErrorMessage: (msg, fallback) => msg || fallback,
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
     })
@@ -161,7 +146,7 @@ describe('useFlowImageUploadActions', () => {
     const task = actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('a.png'))
     await flushPromises()
     currentBoardId.value = 'board-b'
-    upload.resolve({ code: 0, data: { url: '/uploads/a.png', width: 100, height: 100 } })
+    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100 })
 
     await expect(task).resolves.toBeNull()
     expect(createNodeAtPosition).not.toHaveBeenCalled()
@@ -174,12 +159,14 @@ describe('useFlowImageUploadActions', () => {
       upload: vi
         .fn()
         .mockResolvedValueOnce({
-          code: 0,
-          data: { url: '/uploads/canvas/user/board-a/content/first.png', width: 100, height: 100 },
+          url: '/uploads/canvas/user/board-a/content/first.png',
+          width: 100,
+          height: 100,
         })
         .mockResolvedValueOnce({
-          code: 0,
-          data: { url: '/uploads/canvas/user/board-a/content/second.png', width: 100, height: 100 },
+          url: '/uploads/canvas/user/board-a/content/second.png',
+          width: 100,
+          height: 100,
         }),
     }
     const actions = useFlowImageUploadActions({
@@ -191,7 +178,6 @@ describe('useFlowImageUploadActions', () => {
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: vi.fn(),
       uploadApi,
-      sanitizeApiErrorMessage: (msg, fallback) => msg || fallback,
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
     })
@@ -210,17 +196,13 @@ describe('useFlowImageUploadActions', () => {
 
   it('rejects shared upload results that complete after switching boards', async () => {
     const currentBoardId = { value: 'board-a' }
-    const upload = createDeferred<{
-      code: number
-      data: { url: string; width: number; height: number }
-    }>()
+    const upload = createDeferred<{ url: string; width: number; height: number }>()
     const actions = useFlowImageUploadActions({
       currentBoardId,
       createNodeAtPosition: vi.fn(),
       updateSnapshotNode: vi.fn(),
       getImageNodeSnapshot: vi.fn(),
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
-      sanitizeApiErrorMessage: (msg, fallback) => msg || fallback,
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
     })
@@ -228,7 +210,7 @@ describe('useFlowImageUploadActions', () => {
     const task = actions.uploadImageToBoard(makeFile('a.png'))
     await flushPromises()
     currentBoardId.value = 'board-b'
-    upload.resolve({ code: 0, data: { url: '/uploads/a.png', width: 100, height: 100 } })
+    upload.resolve({ url: '/uploads/a.png', width: 100, height: 100 })
 
     await expect(task).rejects.toThrow('上传结果已过期')
   })

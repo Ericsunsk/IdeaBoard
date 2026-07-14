@@ -21,6 +21,8 @@ describe('joinSharedCanvasBoardByToken', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.request.mockResolvedValue({
+      code: 0,
+      msg: 'ok',
       data: { board: { board_id: 'board-1' } },
     })
     mocks.hydrateCanvasBoardsFromServer.mockResolvedValue({ ok: true })
@@ -35,6 +37,8 @@ describe('joinSharedCanvasBoardByToken', () => {
 
   it('joins with a trimmed token, hydrates the catalog, and returns the trimmed board id', async () => {
     mocks.request.mockResolvedValueOnce({
+      code: 0,
+      msg: 'ok',
       data: { board: { board_id: ' board-42 ' } },
     })
 
@@ -48,6 +52,8 @@ describe('joinSharedCanvasBoardByToken', () => {
 
   it('rejects when the API response does not include a board id', async () => {
     mocks.request.mockResolvedValueOnce({
+      code: 0,
+      msg: 'ok',
       data: { board: { board_id: '  ' } },
     })
 
@@ -73,11 +79,18 @@ describe('joinSharedCanvasBoardByToken', () => {
     expect(mocks.hydrateCanvasBoardsFromServer).toHaveBeenCalledOnce()
   })
 
-  it('propagates API errors', async () => {
-    const apiError = new Error('invalid share token')
-    mocks.request.mockRejectedValueOnce(apiError)
+  it('replaces unsafe API errors with the workflow fallback', async () => {
+    mocks.request.mockRejectedValueOnce(new Error('invalid share token'))
 
-    await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toBe(apiError)
+    await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow('加入共享画布失败')
+
+    expect(mocks.hydrateCanvasBoardsFromServer).not.toHaveBeenCalled()
+  })
+
+  it('rejects a business failure before hydrating the catalog', async () => {
+    mocks.request.mockResolvedValueOnce({ code: 410, msg: '分享链接已失效' })
+
+    await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow('分享链接已失效')
 
     expect(mocks.hydrateCanvasBoardsFromServer).not.toHaveBeenCalled()
   })

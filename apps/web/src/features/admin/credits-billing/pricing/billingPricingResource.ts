@@ -12,7 +12,7 @@ import type {
   BillingCatalogItem as GeneratedBillingCatalogItem,
   BillingPrice as GeneratedBillingPrice,
 } from '../../../../shared/api/generated-query/model'
-import { requireApiData } from '../../../../shared/api/apiResponse'
+import { resolveApiData } from '../../../../shared/api/apiResponse'
 import type {
   AdminBillingCatalogItem,
   AdminBillingCoverageItem,
@@ -54,15 +54,15 @@ export function createAdminBillingPricingResource(): AdminBillingPricingResource
 }
 
 export async function fetchAdminBillingCoverage(): Promise<AdminBillingCoverageItem[]> {
-  const data = requireApiData(await listAdminBillingCoverage(), '加载 AI Workflow 计费覆盖失败')
+  const data = await resolveApiData(listAdminBillingCoverage(), '加载 AI Workflow 计费覆盖失败')
   return data.items.map(normalizeCoverageItem)
 }
 
 export async function fetchAdminBillingSKUs(
   input: { afterSku?: string; limit?: number } = {},
 ): Promise<AdminBillingCatalogPage> {
-  const data = requireApiData(
-    await listAdminBillingSKUs({ after_sku: input.afterSku, limit: input.limit }),
+  const data = await resolveApiData(
+    listAdminBillingSKUs({ after_sku: input.afterSku, limit: input.limit }),
     '加载 SKU Catalog 失败',
   )
   return {
@@ -74,8 +74,8 @@ export async function fetchAdminBillingSKUs(
 export async function createAdminBillingSKURecord(
   input: CreateAdminBillingSKUInput,
 ): Promise<AdminBillingCatalogItem> {
-  const data = requireApiData(
-    await createAdminBillingSKU({
+  const data = await resolveApiData(
+    createAdminBillingSKU({
       sku: input.sku.trim().toLocaleLowerCase(),
       display_name: input.displayName.trim(),
       description: input.description.trim(),
@@ -91,8 +91,8 @@ export async function updateAdminBillingSKURecord(
   sku: string,
   input: UpdateAdminBillingSKUInput,
 ): Promise<AdminBillingCatalogItem> {
-  const data = requireApiData(
-    await updateAdminBillingSKU(sku, {
+  const data = await resolveApiData(
+    updateAdminBillingSKU(sku, {
       display_name: input.displayName.trim(),
       description: input.description.trim(),
       enabled: input.enabled,
@@ -107,8 +107,8 @@ export async function fetchAdminBillingPrices(
   sku: string,
   input: { beforeVersion?: number; limit?: number } = {},
 ): Promise<AdminBillingPricePage> {
-  const data = requireApiData(
-    await listAdminBillingPrices(sku, {
+  const data = await resolveApiData(
+    listAdminBillingPrices(sku, {
       before_version: input.beforeVersion,
       limit: input.limit,
     }),
@@ -124,8 +124,8 @@ export async function createAdminBillingPriceRecord(
   sku: string,
   input: CreateAdminBillingPriceInput,
 ): Promise<AdminBillingPrice> {
-  const data = requireApiData(
-    await createAdminBillingPrice(sku, {
+  const data = await resolveApiData(
+    createAdminBillingPrice(sku, {
       unit_credits: input.unitCredits,
       enabled: input.enabled,
       reason: input.reason.trim(),
@@ -140,8 +140,8 @@ export async function setAdminBillingPriceState(
   version: number,
   input: { enabled: boolean; reason: string },
 ): Promise<AdminBillingPrice> {
-  const data = requireApiData(
-    await setAdminBillingPriceEnabled(sku, version, {
+  const data = await resolveApiData(
+    setAdminBillingPriceEnabled(sku, version, {
       enabled: input.enabled,
       reason: input.reason.trim(),
     }),

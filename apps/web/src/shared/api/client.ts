@@ -1,9 +1,11 @@
 import { ofetch, type FetchError, type FetchOptions } from 'ofetch'
 import { handleAuthFailure } from '../utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
+import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 
 export type ApiClientError = Error & {
   code?: number | string
+  hasSafeDisplayMessage?: boolean
   msg?: string
   status?: number
   data?: unknown
@@ -20,17 +22,19 @@ function getPayloadMessage(payload: unknown, data: Record<string, unknown> | nul
   if (typeof data?.message === 'string' && data.message) return data.message
   if (payload instanceof Error && payload.message) return payload.message
   if (typeof payload === 'string' && payload.trim()) return payload.trim()
-  return '请求失败'
+  return ''
 }
 
 export function createApiError(payload?: unknown, status?: number): ApiClientError {
   const data = toObject(payload)
-  const message = getPayloadMessage(payload, data)
+  const safeMessage = sanitizeApiErrorMessage(getPayloadMessage(payload, data), '')
+  const message = safeMessage || '请求失败'
   const error = new Error(message) as ApiClientError
   error.code =
     (typeof data?.code === 'number' || typeof data?.code === 'string' ? data.code : undefined) ??
     status
-  error.msg = (typeof data?.msg === 'string' && data.msg) || message
+  error.hasSafeDisplayMessage = Boolean(safeMessage)
+  error.msg = safeMessage
   error.status = status
   error.data = data?.data
   return error
@@ -49,13 +53,7 @@ const apiFetch = ofetch.create({
   retry: false,
   timeout: 10000,
   onResponse({ response }) {
-    const data = normalizeRuntimeMediaRefs(response._data)
-    response._data = data
-    if (data && typeof data.code === 'number' && data.code !== 0) {
-      const requestUrl = response.url || ''
-      handleAuthFailure({ status: response.status, payload: data, requestUrl })
-      throw createApiError(data, response.status)
-    }
+    response._data = normalizeRuntimeMediaRefs(response._data)
   },
   onResponseError({ request, response }) {
     const payload = response._data

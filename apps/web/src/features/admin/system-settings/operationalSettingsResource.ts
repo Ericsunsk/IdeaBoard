@@ -5,17 +5,21 @@ import {
   useGetAdminOperationalSettings,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { ApiResponseOperationalSettingsState } from '../../../shared/api/generated-query/model'
-import { requireApiData } from '../../../shared/api/apiResponse'
+import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 import type {
   OperationalSettingsState,
   UpdateOperationalSettingsRequest,
 } from './operationalSettingsContract'
 
 export const operationalSettingsQueryKey = getGetAdminOperationalSettingsQueryKey()
+const selectOperationalSettings =
+  createApiDataSelector<OperationalSettingsState>('加载运行参数失败')
 
 export function useOperationalSettingsResource() {
   const queryClient = useQueryClient()
-  const query = useGetAdminOperationalSettings()
+  const query = useGetAdminOperationalSettings<OperationalSettingsState>({
+    query: { select: selectOperationalSettings },
+  })
   const updateMutation = useMutation({
     mutationFn: updateOperationalSettings,
     onSuccess: (state) => {
@@ -37,6 +41,5 @@ export function useOperationalSettingsResource() {
 async function updateOperationalSettings(
   request: UpdateOperationalSettingsRequest,
 ): Promise<OperationalSettingsState> {
-  const response = await updateAdminOperationalSettings(request)
-  return requireApiData(response, '保存运行参数失败')
+  return resolveApiData(updateAdminOperationalSettings(request), '保存运行参数失败')
 }

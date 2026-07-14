@@ -7,20 +7,30 @@ import {
 } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import type {
   AdminTaskDeleteResult,
-  ApiResponseTaskList,
+  ApiResponseTaskListData,
   ListAdminTasksParams,
 } from '../../../shared/api/generated-query/model'
-import { requireApiData } from '../../../shared/api/apiResponse'
+import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 
 export type AdminTaskListQueryParams = ListAdminTasksParams
 
-type UseAdminTaskListResourceOptions = Parameters<typeof useListAdminTasks<ApiResponseTaskList>>[1]
+type UseAdminTaskListResourceOptions = Parameters<
+  typeof useListAdminTasks<ApiResponseTaskListData>
+>[1]
+
+const selectAdminTaskList = createApiDataSelector<ApiResponseTaskListData>('加载任务列表失败')
 
 export function useAdminTaskListResource(
   params: MaybeRef<AdminTaskListQueryParams>,
   options?: UseAdminTaskListResourceOptions,
 ) {
-  return useListAdminTasks<ApiResponseTaskList>(params, options)
+  return useListAdminTasks<ApiResponseTaskListData>(params, {
+    ...options,
+    query: {
+      ...options?.query,
+      select: selectAdminTaskList,
+    },
+  })
 }
 
 export function getAdminTaskListQueryKey() {
@@ -32,6 +42,5 @@ export function getAdminMonitorQueryKey() {
 }
 
 export async function deleteAdminTaskSelection(taskIDs: string[]): Promise<AdminTaskDeleteResult> {
-  const res = await deleteAdminTasks({ task_ids: taskIDs })
-  return requireApiData(res, '删除任务失败')
+  return resolveApiData(deleteAdminTasks({ task_ids: taskIDs }), '删除任务失败')
 }

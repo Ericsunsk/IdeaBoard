@@ -27,4 +27,10 @@ describe('error message helpers', () => {
     )
     expect(formatDisplayErrorMessage(null, '默认错误')).toBe('默认错误')
   })
+
+  it('uses the caller fallback for transport errors whose original message was unsafe', () => {
+    const error = Object.assign(new Error('请求失败'), { hasSafeDisplayMessage: false })
+
+    expect(formatDisplayErrorMessage(error, '加载失败')).toBe('加载失败')
+  })
 })

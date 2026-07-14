@@ -94,11 +94,7 @@ export async function uploadCanvasBlob(
     throw new Error('缺少 boardId，无法上传图片')
   }
   const file = new File([blob], fileName, { type: blob.type || 'image/png' })
-  const res = await uploadApi.upload(file, normalizedBoardId)
-  if (res.code !== 0 || !res.data?.url) {
-    throw new Error(res.msg || '上传图片失败')
-  }
-  return res.data.url
+  return (await uploadApi.upload(file, normalizedBoardId)).url
 }
 
 /** Guess a file extension from a MIME type string. */

@@ -12,14 +12,23 @@ describe('createApiError', () => {
 
   it('preserves the pricing-unavailable machine code from a structured HTTP error', () => {
     expect(
-      createApiError(
-        { code: 'pricing_unavailable', msg: '暂时无法获取报价，请重试' },
-        503,
-      ),
+      createApiError({ code: 'pricing_unavailable', msg: '暂时无法获取报价，请重试' }, 503),
     ).toMatchObject({
       code: 'pricing_unavailable',
       status: 503,
       message: '暂时无法获取报价，请重试',
+    })
+  })
+
+  it('replaces sensitive and internal transport messages while preserving error metadata', () => {
+    expect(
+      createApiError({ code: 503, msg: 'dial tcp 127.0.0.1:5432 with api_key=secret' }, 503),
+    ).toMatchObject({
+      code: 503,
+      status: 503,
+      hasSafeDisplayMessage: false,
+      message: '请求失败',
+      msg: '',
     })
   })
 })

@@ -375,12 +375,8 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
     getSelectedElements: computed(() => []),
     removeSelectedElements: vi.fn(),
     uploadApi: {
-      upload: vi.fn(async () => ({
-        code: 0,
-        data: { url: 'https://example.com/upload.png' },
-      })),
+      upload: vi.fn(async () => ({ url: 'https://example.com/upload.png' })),
     },
-    sanitizeApiErrorMessage: (_message, fallback) => fallback,
     openNodeImagePreview: vi.fn(async () => {}),
     openImageUrlPreview: vi.fn(async () => {}),
     feedback: graphFeedback,

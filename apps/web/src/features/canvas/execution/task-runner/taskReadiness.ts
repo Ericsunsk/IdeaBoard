@@ -14,24 +14,18 @@ export async function assertTaskSubmitReady(
   request: SubmitTaskReadinessRequestData,
   fallbackMessage = '提交任务失败',
 ): Promise<SubmitTaskReadinessData> {
-  let readiness: Awaited<ReturnType<typeof taskApi.checkSubmitReadiness>>
+  let readiness: SubmitTaskReadinessData
   try {
     readiness = await taskApi.checkSubmitReadiness(request)
   } catch (error) {
     throw mapCanvasBillingRequestError(error)
   }
-  if (readiness.code !== 0) {
-    throw new Error(sanitizeApiErrorMessage(readiness.msg, fallbackMessage))
-  }
-  if (!readiness.data) {
-    throw new Error(fallbackMessage)
-  }
-  publishCanvasTaskReadiness(readiness.data)
-  if (readiness.data.billing && !readiness.data.billing.sufficient) {
+  publishCanvasTaskReadiness(readiness)
+  if (readiness.billing && !readiness.billing.sufficient) {
     throw insufficientCreditsPreflightError()
   }
-  if (!readiness.data.ready) {
-    throw new Error(sanitizeApiErrorMessage(readiness.data.message, fallbackMessage))
+  if (!readiness.ready) {
+    throw new Error(sanitizeApiErrorMessage(readiness.message, fallbackMessage))
   }
-  return readiness.data
+  return readiness
 }

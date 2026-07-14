@@ -14,8 +14,8 @@ import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 
 type FlowImageUploadResult = { url: string; ratio: number }
 
-type UploadImageResponseData = {
-  url?: string
+type UploadedImageData = {
+  url: string
   width?: number
   height?: number
   mime?: string
@@ -33,12 +33,8 @@ type UseFlowImageUploadActionsOptions = {
   updateSnapshotNode: (nodeId: string, patcher: (prev: CanvasNodeItem) => CanvasNodeItem) => void
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   uploadApi: {
-    upload: (
-      file: File,
-      boardId: string,
-    ) => Promise<{ code: number; msg?: string; data?: UploadImageResponseData }>
+    upload: (file: File, boardId: string) => Promise<UploadedImageData>
   }
-  sanitizeApiErrorMessage: (msg: string | null | undefined, fallback: string) => string
   onWarning: (msg: string) => void
   onSuccess: (msg: string) => void
   onNodeMutated?: (nodeId: string) => void
@@ -88,12 +84,9 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       try {
         const prepared = await prepareImageAssetForUpload(file)
         prepared.warnings.forEach((message) => options.onWarning(message))
-        const uploadRes = await options.uploadApi.upload(prepared.uploadFile, boardId)
-        if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-          throw new Error(options.sanitizeApiErrorMessage(uploadRes.msg, '上传失败'))
-        }
-        const width = Number(uploadRes.data.width)
-        const height = Number(uploadRes.data.height)
+        const uploaded = await options.uploadApi.upload(prepared.uploadFile, boardId)
+        const width = Number(uploaded.width)
+        const height = Number(uploaded.height)
         const serverRatio =
           Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
             ? height / width
@@ -101,7 +94,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const preparedRatio = prepared.dimensionsKnown && prepared.ratio > 0 ? prepared.ratio : null
         const resolvedRatio =
           preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
-        return { url: uploadRes.data.url, ratio: resolvedRatio }
+        return { url: uploaded.url, ratio: resolvedRatio }
       } finally {
         inFlightUploads.delete(cacheKey)
       }

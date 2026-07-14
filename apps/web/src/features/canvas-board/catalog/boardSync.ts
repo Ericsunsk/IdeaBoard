@@ -4,6 +4,7 @@ import {
   upsertUserBoard,
 } from '../../../shared/api/generated-query/boards/boards'
 import type { BoardStateEnvelope, UserBoardItem } from '../../../shared/api/generated-query/model'
+import { resolveApiData, resolveApiOk } from '../../../shared/api/apiResponse'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import {
   getCanvasBoardById,
@@ -193,8 +194,8 @@ function resolveHydrateOptions(
 }
 
 async function listRemoteBoards(): Promise<UserBoardItem[]> {
-  const res = await listUserBoards()
-  return Array.isArray(res.data?.list) ? res.data.list : []
+  const data = await resolveApiData(listUserBoards(), '同步画布列表失败')
+  return Array.isArray(data.list) ? data.list : []
 }
 
 export async function hydrateCanvasBoardsFromServer(
@@ -235,12 +236,15 @@ export async function syncCanvasBoardToServer(
   const state =
     stateOverride ?? getCanvasBoardState(boardId) ?? createEmptyCanvasBoardState(board.updatedAt)
   try {
-    await upsertUserBoard(boardId, {
-      name: board.name,
-      state: toGeneratedBoardStateProjection(state),
-      created_at: board.createdAt,
-      updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
-    })
+    await resolveApiOk(
+      upsertUserBoard(boardId, {
+        name: board.name,
+        state: toGeneratedBoardStateProjection(state),
+        created_at: board.createdAt,
+        updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
+      }),
+      '保存画布失败',
+    )
     pendingRollbackBoardIds.delete(boardId.trim())
   } catch (error) {
     if (isBoardNameConflictError(error)) {
@@ -257,7 +261,7 @@ export function clearPendingBoardSyncRollback(boardId: string) {
 }
 
 export async function syncDeleteCanvasBoardToServer(boardId: string) {
-  await deleteUserBoard(boardId)
+  await resolveApiOk(deleteUserBoard(boardId), '删除画布失败')
 }
 
 export function isBoardNameConflictError(error: unknown): boolean {
@@ -266,6 +270,11 @@ export function isBoardNameConflictError(error: unknown): boolean {
   if (status === 409) return true
   const code = 'code' in error ? (error as { code?: unknown }).code : undefined
   if (code === 409) return true
-  const msg = 'msg' in error ? (error as { msg?: unknown }).msg : undefined
+  const msg =
+    error instanceof Error
+      ? error.message
+      : 'msg' in error
+        ? (error as { msg?: unknown }).msg
+        : undefined
   return typeof msg === 'string' && msg.includes('画布名称已存在')
 }

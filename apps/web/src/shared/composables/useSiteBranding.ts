@@ -7,8 +7,8 @@ import {
   useGetSiteBrandingSetting,
 } from '../api/generated-query/settings/settings'
 import type { ApiResponseBrandingSetting, BrandingSetting } from '../api/generated-query/model'
+import { createApiDataSelector, resolveApiData } from '../api/apiResponse'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../config/runtimeUrls'
-import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 
 export const SITE_BRANDING_QUERY_KEY = getGetSiteBrandingSettingQueryKey()
 
@@ -20,25 +20,25 @@ export const DEFAULT_SITE_BRANDING_SETTING: BrandingSetting = {
 export const SITE_BRANDING_PROJECT_NAME_MAX_CHARS = 40
 export const SITE_BRANDING_LOGO_URL_MAX_LENGTH = 2048
 export const SITE_BRANDING_UPLOAD_LOGO_PATH_PREFIX = '/uploads/site/assets/'
+const selectSiteBranding = createApiDataSelector<BrandingSetting>('读取站点设置失败')
 
 export async function fetchSiteBranding(): Promise<BrandingSetting> {
-  const res = await getSiteBrandingSetting()
-  if (res.code !== 0 || !res.data) {
-    throw new Error(sanitizeApiErrorMessage(res.msg, '读取站点设置失败'))
-  }
-  return normalizeSiteBrandingSetting(res.data)
+  return normalizeSiteBrandingSetting(
+    await resolveApiData(getSiteBrandingSetting(), '读取站点设置失败'),
+  )
 }
 
 export function useSiteBranding(options?: { enabled?: MaybeRef<boolean> }) {
   const isEnabled = computed(() =>
     options?.enabled === undefined ? true : Boolean(unref(options.enabled)),
   )
-  const brandingQuery = useGetSiteBrandingSetting({
+  const brandingQuery = useGetSiteBrandingSetting<BrandingSetting>({
     query: {
       enabled: isEnabled,
+      select: selectSiteBranding,
     },
   })
-  const branding = computed(() => normalizeSiteBrandingSetting(brandingQuery.data.value?.data))
+  const branding = computed(() => normalizeSiteBrandingSetting(brandingQuery.data.value))
   const projectName = computed(() => branding.value.project_name)
   const logoURL = computed(() => resolveSiteBrandingLogoURL(branding.value.logo_url))
   const fallbackText = computed(() => getSiteBrandFallbackText(projectName.value))

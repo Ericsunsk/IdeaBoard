@@ -7,6 +7,7 @@ import {
   GoogleNativeGenerationSettingMode,
   type GoogleNativeGenerationSetting,
 } from '../../../shared/api/generated-query/model'
+import { createApiDataSelector } from '../../../shared/api/apiResponse'
 import type { AdminGoogleNativeGenerationSettingsFeedback } from '../feedback/useAdminFeedback'
 import { updateGoogleNativeGenerationSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
@@ -25,11 +26,16 @@ export const googleNativeGenerationModeOptions = [
   { label: '灰度', value: GoogleNativeGenerationSettingMode.canary },
 ]
 
+const selectGoogleNativeGenerationSetting =
+  createApiDataSelector<GoogleNativeGenerationSetting>('加载生成策略灰度失败')
+
 export function useAdminGoogleNativeGenerationSettings(options: {
   feedback: AdminGoogleNativeGenerationSettingsFeedback
 }) {
-  const query = useGetAdminGoogleNativeGenerationSetting()
-  const sourceSetting = computed(() => query.data.value?.data)
+  const query = useGetAdminGoogleNativeGenerationSetting<GoogleNativeGenerationSetting>({
+    query: { select: selectGoogleNativeGenerationSetting },
+  })
+  const sourceSetting = computed(() => query.data.value)
   const resource = useSettingResourceLifecycle<GoogleNativeGenerationSetting>({
     defaultSetting: DEFAULT_GOOGLE_NATIVE_GENERATION_SETTING,
     feedback: options.feedback,

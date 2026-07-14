@@ -22,7 +22,7 @@ import type {
   AdminAccountUpdateRequest,
   ProviderEndpoint as ProviderEndpointDto,
 } from '../../../shared/api/generated-query/model'
-import { assertApiOk, requireApiData } from '../../../shared/api/apiResponse'
+import { resolveApiData, resolveApiOk } from '../../../shared/api/apiResponse'
 import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
 import type {
   AdminProviderAccountLimits,
@@ -42,8 +42,7 @@ type SaveAdminProviderEndpointInput = {
 const ADMIN_ACCOUNT_LIST_PAGE_SIZE = 100
 
 export async function fetchAdminProviderEndpoints(): Promise<ProviderEndpointRecord[]> {
-  const res = await listAdminProviderEndpoints()
-  const data = requireApiData(res, '加载供应商端点失败')
+  const data = await resolveApiData(listAdminProviderEndpoints(), '加载供应商端点失败')
   return (data.list ?? []).map(toProviderEndpointRecord)
 }
 
@@ -51,29 +50,29 @@ export async function saveAdminProviderEndpoint(
   input: SaveAdminProviderEndpointInput,
 ): Promise<void> {
   const payload = createProviderEndpointSavePayload(input.data)
-  const res =
+  const request =
     input.id != null
-      ? await updateAdminProviderEndpoint(input.id, payload)
-      : await createAdminProviderEndpoint(payload)
-  assertApiOk(res, '保存供应商端点失败')
+      ? updateAdminProviderEndpoint(input.id, payload)
+      : createAdminProviderEndpoint(payload)
+  await resolveApiOk(request, '保存供应商端点失败')
 }
 
 export async function deleteAdminProviderEndpoint(id: number): Promise<void> {
-  const res = await deleteAdminProviderEndpointRequest(id)
-  assertApiOk(res, '删除供应商端点失败')
+  await resolveApiOk(deleteAdminProviderEndpointRequest(id), '删除供应商端点失败')
 }
 
 export async function detectAdminProviderEndpointModels(
   input: ProviderModelDetectionInput,
 ): Promise<string[]> {
-  const res = await detectAdminProviderEndpointModelsRequest(toDetectModelsRequest(input))
-  const data = requireApiData(res, '自动检测模型失败')
+  const data = await resolveApiData(
+    detectAdminProviderEndpointModelsRequest(toDetectModelsRequest(input)),
+    '自动检测模型失败',
+  )
   return data.models ?? []
 }
 
 export async function fetchAdminAccountLimits(): Promise<AdminProviderAccountLimits> {
-  const res = await getAdminAccountLimits()
-  const data = requireApiData(res, '加载账号限制失败')
+  const data = await resolveApiData(getAdminAccountLimits(), '加载账号限制失败')
   return normalizeAdminAccountLimits(data.limits)
 }
 
@@ -83,11 +82,13 @@ export async function fetchAllAdminAccounts(): Promise<ProviderAccountRecord[]> 
   let total = Number.POSITIVE_INFINITY
 
   while (true) {
-    const res = await listAdminAccounts({
-      page,
-      page_size: ADMIN_ACCOUNT_LIST_PAGE_SIZE,
-    })
-    const data = requireApiData(res, '加载账号失败')
+    const data = await resolveApiData(
+      listAdminAccounts({
+        page,
+        page_size: ADMIN_ACCOUNT_LIST_PAGE_SIZE,
+      }),
+      '加载账号失败',
+    )
     const list = (data.list ?? []).map(toProviderAccountRecord)
     total = data.total ?? total
     all.push(...list)
@@ -99,30 +100,26 @@ export async function fetchAllAdminAccounts(): Promise<ProviderAccountRecord[]> 
 }
 
 export async function createAdminAccountRecord(data: AdminAccountCreateRequest): Promise<void> {
-  const res = await createAdminAccount(data)
-  assertApiOk(res, '创建账号失败')
+  await resolveApiOk(createAdminAccount(data), '创建账号失败')
 }
 
 export async function updateAdminAccountRecord(
   id: number,
   data: AdminAccountUpdateRequest,
 ): Promise<void> {
-  const res = await updateAdminAccount(id, data)
-  assertApiOk(res, '更新账号失败')
+  await resolveApiOk(updateAdminAccount(id, data), '更新账号失败')
 }
 
 export async function patchAdminAccountModelRecord(
   id: number,
   data: AdminAccountModelPatchRequest,
 ): Promise<ProviderAccountRecord> {
-  const res = await patchAdminAccountModel(id, data)
-  const responseData = requireApiData(res, '更新账号模型失败')
+  const responseData = await resolveApiData(patchAdminAccountModel(id, data), '更新账号模型失败')
   return toProviderAccountRecord(responseData.account)
 }
 
 export async function deleteAdminAccountRecord(id: number): Promise<void> {
-  const res = await deleteAdminAccount(id)
-  assertApiOk(res, '删除账号失败')
+  await resolveApiOk(deleteAdminAccount(id), '删除账号失败')
 }
 
 function normalizeAdminAccountLimits(limits?: AccountLimits): AdminProviderAccountLimits {

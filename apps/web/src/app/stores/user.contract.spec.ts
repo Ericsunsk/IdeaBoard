@@ -74,11 +74,7 @@ describe('useUserStore auth cache handling', () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
     const loggedInUser = makeUser({ id: 4, uid: 'USER04' })
     vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
-    vi.mocked(getUserInfo).mockResolvedValue({
-      code: 0,
-      msg: 'ok',
-      data: { user: loggedInUser },
-    } as never)
+    vi.mocked(getUserInfo).mockResolvedValue({ user: loggedInUser } as never)
 
     await expect(store.login('alice', 'secret-password')).resolves.toBe(true)
 
@@ -166,11 +162,7 @@ describe('useUserStore auth cache handling', () => {
     const registeredUser = makeUser({ id: 2, uid: 'USER02', username: 'alice' })
     registerUsername.mockResolvedValue('alice')
     vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
-    vi.mocked(getUserInfo).mockResolvedValue({
-      code: 0,
-      msg: 'ok',
-      data: { user: registeredUser },
-    } as never)
+    vi.mocked(getUserInfo).mockResolvedValue({ user: registeredUser } as never)
 
     await store.register(' alice ', 'secret-password')
 
@@ -186,7 +178,7 @@ describe('useUserStore auth cache handling', () => {
     const { store, getUserInfo, authClient, registerUsername } = await getFreshUserStore()
     registerUsername.mockResolvedValue('bob')
     vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
-    vi.mocked(getUserInfo).mockResolvedValue({ code: 0, msg: 'ok', data: {} } as never)
+    vi.mocked(getUserInfo).mockRejectedValue(new Error('获取用户信息失败'))
 
     await expect(store.register('bob', 'secret-password')).rejects.toThrow('登录状态恢复失败')
 
