@@ -242,7 +242,7 @@ import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'
 import type { AdminUserRowView, UserActionKey } from './adminUserView'
-import { useAdminFeedback } from '../feedback/useAdminFeedback'
+import { useAdminUsersFeedback } from './useAdminUsersFeedback'
 
 const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
 const userActionPopoverPt = createAdminPopoverPt({ contentClass: '!p-1.5' })
@@ -252,11 +252,11 @@ type PrimePopupPanel = {
   hide?: () => void
 }
 
-const adminFeedback = useAdminFeedback()
+const feedback = useAdminUsersFeedback()
 const adminConfirm = useAdminConfirm()
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
 const adminUsers = useAdminUsersContext({
-  feedback: adminFeedback.users.management,
+  feedback,
   confirm: adminConfirm,
 })
 

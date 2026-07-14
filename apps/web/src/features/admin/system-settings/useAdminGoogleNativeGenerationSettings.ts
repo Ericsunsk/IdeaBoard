@@ -8,7 +8,7 @@ import {
   type GoogleNativeGenerationSetting,
 } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector } from '../../../shared/api/apiResponse'
-import type { AdminGoogleNativeGenerationSettingsFeedback } from '../feedback/useAdminFeedback'
+import type { AdminGoogleNativeGenerationSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import { updateGoogleNativeGenerationSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 

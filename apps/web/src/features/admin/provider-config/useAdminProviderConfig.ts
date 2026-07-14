@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
+import type { AdminProviderConfigFeedback } from './useAdminProviderConfigFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   createEmptyProviderEndpointForm,

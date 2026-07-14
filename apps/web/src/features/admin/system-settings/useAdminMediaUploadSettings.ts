@@ -5,7 +5,7 @@ import {
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { MediaUploadSetting } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector } from '../../../shared/api/apiResponse'
-import type { AdminMediaUploadSettingsFeedback } from '../feedback/useAdminFeedback'
+import type { AdminMediaUploadSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import { updateMediaUploadSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 

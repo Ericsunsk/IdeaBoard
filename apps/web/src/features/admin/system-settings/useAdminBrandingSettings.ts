@@ -7,7 +7,7 @@ import {
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { BrandingSetting } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
-import type { AdminBrandingSettingsFeedback } from '../feedback/useAdminFeedback'
+import type { AdminBrandingSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,

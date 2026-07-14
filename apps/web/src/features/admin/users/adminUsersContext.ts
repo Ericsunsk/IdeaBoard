@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue'
-import type { AdminUsersFeedback } from '../feedback/useAdminFeedback'
+import type { AdminUsersFeedback } from './useAdminUsersFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { useAdminPagePagination } from '../shared/composables/useAdminPagePagination'
 import { useAdminUserCommands } from './adminUserCommands'

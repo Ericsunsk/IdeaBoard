@@ -1,6 +1,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import type { AdminPromptConfigFeedback } from '../feedback/useAdminFeedback'
+import type { AdminPromptConfigFeedback } from './useAdminPromptConfigFeedback'
 import {
   createAdminPromptConfigResource,
   type AdminPromptConfigResource,

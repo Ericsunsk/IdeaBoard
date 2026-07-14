@@ -18,14 +18,10 @@ import type {
   UpdateAdminBillingSKUInput,
 } from './billingPricingTypes'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
+import type { AdminBillingPricingFeedback } from '../creditsBillingFeedback'
 
 const catalogPageSize = 24
 const pricePageSize = 20
-
-export interface AdminBillingPricingFeedback {
-  success: (message: string) => void
-  error: (error: unknown, fallback: string) => void
-}
 
 export interface UseAdminBillingPricingOptions {
   resource?: AdminBillingPricingResource

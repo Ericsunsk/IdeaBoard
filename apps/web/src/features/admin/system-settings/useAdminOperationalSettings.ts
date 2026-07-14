@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import type { AdminOperationalSettingsFeedback } from '../feedback/useAdminFeedback'
+import type { AdminOperationalSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import {
   DEFAULT_OPERATIONAL_SETTINGS_FORM,
   normalizeOperationalSettingsForm,

@@ -327,7 +327,7 @@ import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
 import { validateAdminActionReason } from '../../shared/validation/adminActionReasonContract'
-import { useCreditsBillingFeedback } from '../creditsBillingFeedback'
+import { useAdminCreditsBillingOperationsFeedback } from '../creditsBillingFeedback'
 import {
   formatAdminDateTime,
   formatFindingDetails,
@@ -354,7 +354,7 @@ const findingStatusOptions = [
 ] satisfies Array<{ label: string; value: 'all' | 'open' | 'resolved' }>
 
 const confirm = useAdminConfirm()
-const feedback = useCreditsBillingFeedback()
+const feedback = useAdminCreditsBillingOperationsFeedback()
 const runPagination = useAdminCursorPagination<number>({
   pending: () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
 })

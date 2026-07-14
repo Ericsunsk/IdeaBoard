@@ -465,7 +465,6 @@ import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
-import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import AdminOperationalSettingsCard from '../../system-settings/AdminOperationalSettingsCard.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
@@ -495,6 +494,15 @@ import {
 } from '../../system-settings/taskMonitorSettingsResource'
 import { useAdminTaskMonitorSettings } from '../../system-settings/useAdminTaskMonitorSettings'
 import { useAdminPublicURLSettings } from '../../system-settings/useAdminPublicURLSettings'
+import {
+  useAdminAccessSettingsFeedback,
+  useAdminBrandingSettingsFeedback,
+  useAdminGoogleNativeGenerationSettingsFeedback,
+  useAdminMediaUploadSettingsFeedback,
+  useAdminPublicURLSettingsFeedback,
+  useAdminTaskMonitorSettingsFeedback,
+  useAdminUnsupportedLogoFileFeedback,
+} from '../../system-settings/useAdminSystemSettingsFeedback'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
   adminActionButtonClass,
@@ -514,7 +522,13 @@ const brandingLogoButtonClass = createBrandMarkClass(
   'hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60',
 )
 
-const adminFeedback = useAdminFeedback()
+const accessSettingsFeedback = useAdminAccessSettingsFeedback()
+const brandingSettingsFeedback = useAdminBrandingSettingsFeedback()
+const googleNativeGenerationSettingsFeedback = useAdminGoogleNativeGenerationSettingsFeedback()
+const mediaUploadSettingsFeedback = useAdminMediaUploadSettingsFeedback()
+const publicURLSettingsFeedback = useAdminPublicURLSettingsFeedback()
+const taskMonitorSettingsFeedback = useAdminTaskMonitorSettingsFeedback()
+const unsupportedLogoFileFeedback = useAdminUnsupportedLogoFileFeedback()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
 const logoCropDialogVisible = ref(false)
 const pendingLogoFile = ref<File | null>(null)
@@ -529,7 +543,7 @@ const {
   resetBrandingForm,
   saving: brandingSaving,
   uploading,
-} = useAdminBrandingSettings({ feedback: adminFeedback.systemSettings.branding })
+} = useAdminBrandingSettings({ feedback: brandingSettingsFeedback })
 const {
   handleSaveRateLimit,
   handleToggleRegistration,
@@ -539,28 +553,28 @@ const {
   registrationEnabled,
   registrationSettingLoading,
   resetRateLimitForm,
-} = useAdminAccessSettings({ feedback: adminFeedback.systemSettings.access })
+} = useAdminAccessSettings({ feedback: accessSettingsFeedback })
 const {
   form: taskMonitorForm,
   handleSaveTaskMonitorSettings,
   loading: taskMonitorLoading,
   resetTaskMonitorForm,
   saving: taskMonitorSaving,
-} = useAdminTaskMonitorSettings({ feedback: adminFeedback.systemSettings.taskMonitor })
+} = useAdminTaskMonitorSettings({ feedback: taskMonitorSettingsFeedback })
 const {
   form: publicURLForm,
   handleSavePublicURLSettings,
   loading: publicURLLoading,
   resetPublicURLForm,
   saving: publicURLSaving,
-} = useAdminPublicURLSettings({ feedback: adminFeedback.systemSettings.publicURL })
+} = useAdminPublicURLSettings({ feedback: publicURLSettingsFeedback })
 const {
   form: mediaUploadForm,
   handleSaveMediaUploadSettings,
   loading: mediaUploadLoading,
   resetMediaUploadForm,
   saving: mediaUploadSaving,
-} = useAdminMediaUploadSettings({ feedback: adminFeedback.systemSettings.mediaUpload })
+} = useAdminMediaUploadSettings({ feedback: mediaUploadSettingsFeedback })
 const {
   form: googleNativeGenerationForm,
   handleSaveGoogleNativeGenerationSettings,
@@ -570,7 +584,7 @@ const {
   statusLabel: googleNativeGenerationStatusLabel,
   statusSeverity: googleNativeGenerationStatusSeverity,
 } = useAdminGoogleNativeGenerationSettings({
-  feedback: adminFeedback.systemSettings.googleNativeGeneration,
+  feedback: googleNativeGenerationSettingsFeedback,
 })
 
 const publicURLStatusLabel = computed(() => {
@@ -601,7 +615,7 @@ async function handleLogoInputChange(event: Event) {
   input.value = ''
   if (!file) return
   if (!isSupportedUploadImageFile(file)) {
-    adminFeedback.systemSettings.unsupportedLogoFile()
+    unsupportedLogoFileFeedback()
     return
   }
   pendingLogoFile.value = file

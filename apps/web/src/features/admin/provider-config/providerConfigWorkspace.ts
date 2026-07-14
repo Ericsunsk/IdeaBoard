@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import type { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import type { AdminProviderConfigFeedback } from '../feedback/useAdminFeedback'
+import type { AdminProviderConfigFeedback } from './useAdminProviderConfigFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   countUniqueAccountModels,

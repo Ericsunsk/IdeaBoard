@@ -94,14 +94,14 @@ import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedir
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
-import { useAdminFeedback } from '../../feedback/useAdminFeedback'
 import { adminTextButtonClass } from '../../shared/lib/adminUiClasses'
+import { useAdminLoginFeedback } from './useAdminLoginFeedback'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
-const adminFeedback = useAdminFeedback()
+const feedback = useAdminLoginFeedback()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const brandMarkClass = computed(() =>
   createBrandMarkClass(
@@ -166,17 +166,17 @@ async function handleLogin() {
     loading.value = true
     await userStore.login(username, password)
     if (userStore.isAdmin) {
-      adminFeedback.login.succeeded()
+      feedback.succeeded()
       await router.replace(resolveAdminRedirectPath())
     } else {
       const logoutSuccess = await logoutAndRedirect(ADMIN_LOGIN_PATH, { replace: true })
       if (!logoutSuccess) {
-        adminFeedback.login.sessionRevokeFailed()
+        feedback.sessionRevokeFailed()
       }
-      adminFeedback.login.nonAdminAccount()
+      feedback.nonAdminAccount()
     }
   } catch (error: unknown) {
-    adminFeedback.login.failed(error)
+    feedback.failed(error)
   } finally {
     loading.value = false
   }

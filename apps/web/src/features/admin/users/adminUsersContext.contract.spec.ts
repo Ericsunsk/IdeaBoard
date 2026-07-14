@@ -1,7 +1,7 @@
 import { ref, type ComputedRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseUserListData } from '../../../shared/api/generated-query/model'
-import type { AdminUsersFeedback } from '../feedback/useAdminFeedback'
+import type { AdminUsersFeedback } from './useAdminUsersFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { useAdminUsersContext } from './adminUsersContext'
 import type { AdminUsersQueryParams } from './adminUsersResource'

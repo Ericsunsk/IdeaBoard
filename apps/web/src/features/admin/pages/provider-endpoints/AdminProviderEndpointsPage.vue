@@ -474,13 +474,13 @@ import {
   adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
-import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import { useAdminProviderConfigFeedback } from '../../provider-config/useAdminProviderConfigFeedback'
 
-const adminFeedback = useAdminFeedback()
+const feedback = useAdminProviderConfigFeedback()
 const adminConfirm = useAdminConfirm()
 
 const { cards, providerEndpointEditor, accountEditor, commands } = useAdminProviderConfig({
-  feedback: adminFeedback.providerEndpoints.providerConfig,
+  feedback,
   confirm: adminConfirm,
 })
 

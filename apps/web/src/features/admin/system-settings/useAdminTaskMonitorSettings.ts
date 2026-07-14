@@ -1,6 +1,6 @@
 import { getGetAdminTaskMonitorSettingQueryKey } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { TaskMonitorSetting } from '../../../shared/api/generated-query/model'
-import type { AdminTaskMonitorSettingsFeedback } from '../feedback/useAdminFeedback'
+import type { AdminTaskMonitorSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import {
   DEFAULT_ADMIN_TASK_MONITOR_SETTING,
   TASK_MONITOR_MAX_PAGE_SIZE,

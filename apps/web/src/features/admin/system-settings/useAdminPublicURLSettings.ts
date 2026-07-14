@@ -5,7 +5,7 @@ import {
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { PublicURLSetting } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector } from '../../../shared/api/apiResponse'
-import type { AdminPublicURLSettingsFeedback } from '../feedback/useAdminFeedback'
+import type { AdminPublicURLSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import { updatePublicURLSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 

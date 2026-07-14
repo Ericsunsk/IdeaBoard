@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AdminTaskDeletionFeedback } from '../feedback/useAdminFeedback'
+import type { AdminTaskDeletionFeedback } from './useAdminTaskMonitorFeedback'
 import type { AdminConfirmRequest } from '../shared/composables/useAdminConfirm'
 import { useAdminTaskSelectionDelete } from './useAdminTaskSelectionDelete'
 import type { AdminTaskRow } from './useAdminTaskList'

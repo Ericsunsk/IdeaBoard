@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
-import type { AdminUsersFeedback } from '../feedback/useAdminFeedback'
+import type { AdminUsersFeedback } from './useAdminUsersFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   banAdminUser,

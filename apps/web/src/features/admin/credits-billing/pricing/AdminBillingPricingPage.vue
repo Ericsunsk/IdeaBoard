@@ -504,7 +504,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { Plus, Refresh } from '@iconoir/vue'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../../shared/domain/workflowFeatureRegistry'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
-import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import { useAdminBillingPricingFeedback } from '../creditsBillingFeedback'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
@@ -541,10 +541,10 @@ import type {
 import AdminBillingCoveragePanel from './AdminBillingCoveragePanel.vue'
 import { useAdminBillingPricing } from './useAdminBillingPricing'
 
-const adminFeedback = useAdminFeedback()
+const feedback = useAdminBillingPricingFeedback()
 const adminConfirm = useAdminConfirm()
 const pricing = useAdminBillingPricing({
-  feedback: adminFeedback.creditsBilling.pricing,
+  feedback,
 })
 
 const {

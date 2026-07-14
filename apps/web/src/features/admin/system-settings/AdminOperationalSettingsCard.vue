@@ -214,15 +214,15 @@ import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
-import { useAdminFeedback } from '../feedback/useAdminFeedback'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { adminCardPt } from '../shared/lib/adminCardPt'
 import { adminActionButtonClass, adminMasonryCardClass } from '../shared/lib/adminUiClasses'
 import { useAdminOperationalSettings } from './useAdminOperationalSettings'
+import { useAdminOperationalSettingsFeedback } from './useAdminSystemSettingsFeedback'
 
-const feedback = useAdminFeedback()
+const feedback = useAdminOperationalSettingsFeedback()
 const { error, form, loading, refetch, reset, save, saving, state, validationError } =
-  useAdminOperationalSettings({ feedback: feedback.systemSettings.operational })
+  useAdminOperationalSettings({ feedback })
 
 const controlsDisabled = computed(() => loading.value || saving.value || Boolean(error.value))
 const restartRequiredCount = computed(

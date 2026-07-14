@@ -710,7 +710,10 @@ import {
   XmarkCircle,
 } from '@iconoir/vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import {
+  useAdminTaskDeletionFeedback,
+  useAdminTaskResultFeedback,
+} from '../../task-monitor/useAdminTaskMonitorFeedback'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
@@ -754,7 +757,8 @@ import { type AdminTaskRow, useAdminTaskList } from '../../task-monitor/useAdmin
 import { useAdminTaskSelectionDelete } from '../../task-monitor/useAdminTaskSelectionDelete'
 import { useAdminTaskRuntimeSnapshot } from '../../task-monitor/useAdminTaskRuntimeSnapshot'
 
-const adminFeedback = useAdminFeedback()
+const taskDeletionFeedback = useAdminTaskDeletionFeedback()
+const taskResultFeedback = useAdminTaskResultFeedback()
 const adminConfirm = useAdminConfirm()
 const taskCards = adminCards.taskMonitor
 const taskDetailDialogPt = createAdminDialogPt({
@@ -783,7 +787,7 @@ const {
   showDetail,
   getErrorReason,
   calcDuration,
-} = useTaskResultDetail({ feedback: adminFeedback.taskMonitor.resultDetail })
+} = useTaskResultDetail({ feedback: taskResultFeedback })
 
 const {
   tasks,
@@ -817,7 +821,7 @@ const { canDeleteSelectedTasks, isDeletingSelectedTasks, requestDeleteSelectedTa
   useAdminTaskSelectionDelete({
     selectedTasks,
     confirm: adminConfirm,
-    feedback: adminFeedback.taskMonitor.taskDeletion,
+    feedback: taskDeletionFeedback,
   })
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
 const taskListErrorMessage = computed(() =>

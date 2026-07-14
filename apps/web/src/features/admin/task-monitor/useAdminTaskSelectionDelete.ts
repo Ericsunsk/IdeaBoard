@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, type Ref } from 'vue'
-import type { AdminTaskDeletionFeedback } from '../feedback/useAdminFeedback'
+import type { AdminTaskDeletionFeedback } from './useAdminTaskMonitorFeedback'
 import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import { adminTaskStatuses } from './taskMonitorStatus'
 import {

@@ -178,7 +178,7 @@ import Tag from 'primevue/tag'
 import type { TagPassThroughOptions } from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import { useAdminPromptConfigFeedback } from '../../prompt-config/useAdminPromptConfigFeedback'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -200,9 +200,9 @@ import {
   type FeatureSlug,
 } from './featurePromptMeta'
 
-const adminFeedback = useAdminFeedback()
+const feedback = useAdminPromptConfigFeedback()
 const promptConfigWorkspace = useAdminPromptConfigWorkspace({
-  feedback: adminFeedback.promptConfig,
+  feedback,
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,
 })
 const {

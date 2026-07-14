@@ -12,7 +12,7 @@ import type {
   RateLimitSetting,
 } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector } from '../../../shared/api/apiResponse'
-import type { AdminAccessSettingsFeedback } from '../feedback/useAdminFeedback'
+import type { AdminAccessSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import { updateRateLimitSettings, updateRegistrationSetting } from './systemSettingsCommands'
 import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 

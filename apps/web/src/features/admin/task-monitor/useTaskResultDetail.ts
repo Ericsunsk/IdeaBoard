@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { formatAdminDateTime } from '../../../shared/utils/dateTime'
 import type { Task } from '../../../shared/api/task'
-import type { AdminTaskResultFeedback } from '../feedback/useAdminFeedback'
+import type { AdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
 import { getSafeResultImageUrl } from './taskResultImages'
 import {
   formatTaskDuration,

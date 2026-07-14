@@ -269,7 +269,7 @@ import { useAdminCursorPagination } from '../../shared/composables/useAdminCurso
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import { useAdminUsersResource, type AdminUserListItem } from '../../users/adminUsersResource'
-import { useCreditsBillingFeedback } from '../creditsBillingFeedback'
+import { useAdminCreditsBillingOperationsFeedback } from '../creditsBillingFeedback'
 import {
   formatAdminDateTime,
   formatCredits,
@@ -293,7 +293,7 @@ const activeCommand = ref<AdminCreditCommandKind | null>(null)
 const commandDialogVisible = ref(false)
 const refundSource = ref<AdminCreditLedgerTransaction | null>(null)
 
-const feedback = useCreditsBillingFeedback()
+const feedback = useAdminCreditsBillingOperationsFeedback()
 const confirm = useAdminConfirm()
 const usersQuery = useAdminUsersResource(
   computed(() => ({
