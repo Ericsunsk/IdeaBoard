@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeVue from 'primevue/config'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
+import { primeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
@@ -161,7 +162,7 @@ describe('AdminBillingPricingPage', () => {
 function renderPricingPage() {
   return renderWithUser(AdminBillingPricingPage, {
     global: {
-      plugins: [[PrimeVue, { unstyled: true }]],
+      plugins: [[PrimeVue, primeVueTestOptions]],
       stubs: {
         NavArrowLeft: true,
         NavArrowRight: true,

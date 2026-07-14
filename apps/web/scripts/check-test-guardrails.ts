@@ -68,6 +68,12 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/account-management/components/UserBillingRecordsPane.component.spec.ts': [
+    {
+      reason:
+        'Verifies the confirmed semantic color contract for income, ordinary consumption, and system deductions.',
+    },
+  ],
   'src/features/account-management/components/UserUsagePane.component.spec.ts': [
     {
       reason:
@@ -102,6 +108,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
     {
       reason:
         'Verifies the brush cursor visibility class after pointer movement in the mask overlay.',
+    },
+  ],
+  'src/shared/components/DataTableFrame.component.spec.ts': [
+    {
+      reason:
+        'Verifies the single PrimeVue table-container scroll surface and its mechanical accessibility class.',
     },
   ],
 }

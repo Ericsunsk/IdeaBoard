@@ -37,84 +37,85 @@
       {{ error }}。Catalog 仍可独立操作，请刷新覆盖检查重试。
     </Message>
 
-    <div class="app-scrollbar max-h-[320px] min-h-[180px] overflow-auto">
-      <DataTable
-        v-if="items.length > 0 || loading"
-        :value="items"
-        :loading="loading"
-        data-key="sku"
-        size="small"
-        scrollable
-        :pt="adminDenseDataTablePt"
-        :table-style="{ minWidth: '980px' }"
-      >
-        <Column header="Workflow" :style="{ minWidth: '190px' }">
-          <template #body="{ data: item }">
-            <span class="block text-admin-body font-bold text-admin-text-1">
-              {{ featureLabel(item) }}
-            </span>
-            <code class="mt-0.5 block text-admin-caption text-admin-text-3">
-              {{ item.feature }}
-            </code>
-          </template>
-        </Column>
-        <Column field="model" header="Model" :style="{ minWidth: '180px' }">
-          <template #body="{ data: item }">
-            <code class="text-admin-body font-semibold text-admin-text-1">{{ item.model }}</code>
-          </template>
-        </Column>
-        <Column header="Canonical SKU" :style="{ minWidth: '310px' }">
-          <template #body="{ data: item }">
-            <code
-              class="block max-w-[340px] truncate text-admin-caption text-admin-text-2"
-              :title="item.sku"
-            >
-              {{ item.sku }}
-            </code>
-          </template>
-        </Column>
-        <Column header="单价" :style="{ width: '110px' }">
-          <template #body="{ data: item }">
-            <span
-              v-if="item.unitCredits !== undefined"
-              class="font-mono text-admin-body font-bold text-admin-text-1"
-            >
-              {{ formatIdeaAmount(item.unitCredits) }}
-            </span>
-            <span v-else class="text-admin-meta text-admin-text-3">—</span>
-          </template>
-        </Column>
-        <Column header="覆盖状态" :style="{ width: '190px' }">
-          <template #body="{ data: item }">
-            <Tag
-              :value="coverageStatus(item).label"
-              :severity="coverageStatus(item).severity"
-              rounded
-              :class="adminCompactTagClass"
-            />
-          </template>
-        </Column>
-        <Column header="操作" :style="{ width: '150px' }">
-          <template #body="{ data: item }">
-            <Button
-              v-if="!item.skuConfigured"
-              label="配置 SKU"
-              size="small"
-              severity="secondary"
-              outlined
-              :aria-label="`为 ${item.model} 配置 SKU`"
-              @click="emit('configure-sku', item)"
-            />
-            <span v-else class="text-admin-meta text-admin-text-3">—</span>
-          </template>
-        </Column>
-      </DataTable>
-
-      <div v-else :class="adminEmptyStateClass">
-        <span class="font-semibold text-admin-title-color">没有可执行的 AI Workflow × model</span>
-        <span class="mt-1 text-admin-meta">启用 Provider Account 与 model 后再刷新覆盖检查。</span>
-      </div>
-    </div>
+    <DataTableFrame
+      :value="items"
+      :loading="loading"
+      data-key="sku"
+      size="small"
+      scrollable
+      scroll-height="320px"
+      frame-class="min-h-[180px]"
+      :table-style="{ minWidth: '980px' }"
+    >
+      <Column header="Workflow" :style="{ minWidth: '190px' }">
+        <template #body="{ data: item }">
+          <span class="block text-admin-body font-bold text-admin-text-1">
+            {{ featureLabel(item) }}
+          </span>
+          <code class="mt-0.5 block text-admin-caption text-admin-text-3">
+            {{ item.feature }}
+          </code>
+        </template>
+      </Column>
+      <Column field="model" header="Model" :style="{ minWidth: '180px' }">
+        <template #body="{ data: item }">
+          <code class="text-admin-body font-semibold text-admin-text-1">{{ item.model }}</code>
+        </template>
+      </Column>
+      <Column header="Canonical SKU" :style="{ minWidth: '310px' }">
+        <template #body="{ data: item }">
+          <code
+            class="block max-w-[340px] truncate text-admin-caption text-admin-text-2"
+            :title="item.sku"
+          >
+            {{ item.sku }}
+          </code>
+        </template>
+      </Column>
+      <Column header="单价" :style="{ width: '110px' }">
+        <template #body="{ data: item }">
+          <span
+            v-if="item.unitCredits !== undefined"
+            class="font-mono text-admin-body font-bold text-admin-text-1"
+          >
+            {{ formatIdeaAmount(item.unitCredits) }}
+          </span>
+          <span v-else class="text-admin-meta text-admin-text-3">—</span>
+        </template>
+      </Column>
+      <Column header="覆盖状态" :style="{ width: '190px' }">
+        <template #body="{ data: item }">
+          <Tag
+            :value="coverageStatus(item).label"
+            :severity="coverageStatus(item).severity"
+            rounded
+            :class="adminCompactTagClass"
+          />
+        </template>
+      </Column>
+      <Column header="操作" :style="{ width: '150px' }">
+        <template #body="{ data: item }">
+          <Button
+            v-if="!item.skuConfigured"
+            label="配置 SKU"
+            size="small"
+            severity="secondary"
+            outlined
+            :aria-label="`为 ${item.model} 配置 SKU`"
+            @click="emit('configure-sku', item)"
+          />
+          <span v-else class="text-admin-meta text-admin-text-3">—</span>
+        </template>
+      </Column>
+      <template #empty>
+        <div :class="adminEmptyStateClass">
+          <span class="font-semibold text-admin-title-color">没有可执行的 AI Workflow × model</span>
+          <span class="mt-1 text-admin-meta"
+            >启用 Provider Account 与 model 后再刷新覆盖检查。</span
+          >
+        </div>
+      </template>
+    </DataTableFrame>
   </section>
 </template>
 
@@ -123,12 +124,11 @@ import { computed } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../../shared/domain/workflowFeatureRegistry'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
-import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import {
   adminCompactTagClass,
   adminEmptyStateClass,

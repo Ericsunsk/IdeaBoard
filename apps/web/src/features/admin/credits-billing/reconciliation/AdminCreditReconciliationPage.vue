@@ -86,14 +86,14 @@
       <Message v-if="runsError" class="m-5" severity="error" :closable="false">
         对账运行记录加载失败，请刷新重试。
       </Message>
-      <DataTable
+      <DataTableFrame
         v-else
         :value="runs"
         data-key="id"
         :loading="runsLoading"
+        scrollable
         selection-mode="single"
         :selection="selectedRunRow"
-        :pt="adminDenseDataTablePt"
         table-style="min-width: 1160px"
         @update:selection="selectRun"
       >
@@ -137,7 +137,7 @@
         <Column header="发起时间" style="width: 190px">
           <template #body="{ data }">{{ formatAdminDateTime(data.requested_at) }}</template>
         </Column>
-      </DataTable>
+      </DataTableFrame>
     </AdminTablePanel>
 
     <section
@@ -220,85 +220,82 @@
           />
         </div>
       </Message>
-      <div v-else class="min-w-0 overflow-x-auto">
-        <DataTable
-          :value="findings"
-          data-key="id"
-          :loading="findingsLoading || runDetailLoading"
-          :pt="adminDenseDataTablePt"
-          table-style="min-width: 1120px"
-        >
-          <template #empty>
-            <div class="py-12 text-center text-admin-body text-admin-text-3">
-              当前筛选下暂无异常
+      <DataTableFrame
+        v-else
+        :value="findings"
+        data-key="id"
+        :loading="findingsLoading || runDetailLoading"
+        scrollable
+        table-style="min-width: 1120px"
+      >
+        <template #empty>
+          <div class="py-12 text-center text-admin-body text-admin-text-3">当前筛选下暂无异常</div>
+        </template>
+        <Column header="异常" style="min-width: 230px">
+          <template #body="{ data }">
+            <div class="font-[700] text-admin-text-1">{{ data.finding_type }}</div>
+            <div class="mt-1 flex gap-1.5">
+              <Tag
+                :value="getFindingSeverityLabel(data.severity)"
+                :severity="getFindingSeverityTag(data.severity)"
+                :class="adminCompactTagClass"
+              />
+              <Tag
+                :value="data.risk === 'high' ? '高风险' : '低风险'"
+                :severity="data.risk === 'high' ? 'danger' : 'secondary'"
+                :class="adminCompactTagClass"
+              />
             </div>
           </template>
-          <Column header="异常" style="min-width: 230px">
-            <template #body="{ data }">
-              <div class="font-[700] text-admin-text-1">{{ data.finding_type }}</div>
-              <div class="mt-1 flex gap-1.5">
-                <Tag
-                  :value="getFindingSeverityLabel(data.severity)"
-                  :severity="getFindingSeverityTag(data.severity)"
-                  :class="adminCompactTagClass"
-                />
-                <Tag
-                  :value="data.risk === 'high' ? '高风险' : '低风险'"
-                  :severity="data.risk === 'high' ? 'danger' : 'secondary'"
-                  :class="adminCompactTagClass"
-                />
-              </div>
-            </template>
-          </Column>
-          <Column header="关联对象" style="min-width: 250px">
-            <template #body="{ data }">
-              <div class="flex flex-wrap gap-1.5">
-                <span
-                  v-if="data.wallet_user_id"
-                  class="rounded-[var(--radius-ib-pill)] bg-ib-surface-muted px-2 py-1 text-admin-caption font-[680]"
-                >
-                  Wallet · User #{{ data.wallet_user_id }}
-                </span>
-                <span
-                  class="rounded-[var(--radius-ib-control)] border border-admin-border-soft px-2 py-1 text-admin-caption font-[680]"
-                >
-                  {{ data.subject_type }} · {{ data.subject_id }}
-                </span>
-              </div>
-              <div
-                class="mt-1 max-w-96 truncate text-admin-caption text-admin-text-3"
-                :title="formatFindingDetails(data.details)"
+        </Column>
+        <Column header="关联对象" style="min-width: 250px">
+          <template #body="{ data }">
+            <div class="flex flex-wrap gap-1.5">
+              <span
+                v-if="data.wallet_user_id"
+                class="rounded-[var(--radius-ib-pill)] bg-ib-surface-muted px-2 py-1 text-admin-caption font-[680]"
               >
-                {{ formatFindingDetails(data.details) }}
-              </div>
-            </template>
-          </Column>
-          <Column header="隔离状态" style="width: 130px">
-            <template #body="{ data }">
-              <Tag
-                :value="data.isolated ? '已隔离' : '未隔离'"
-                :severity="data.isolated ? 'danger' : 'secondary'"
-                :class="adminCompactTagClass"
-              />
-            </template>
-          </Column>
-          <Column header="处理状态" style="width: 120px">
-            <template #body="{ data }">
-              <Tag
-                :value="data.status === 'open' ? '待处理' : '已解决'"
-                :severity="data.status === 'open' ? 'warn' : 'success'"
-                :class="adminCompactTagClass"
-              />
-            </template>
-          </Column>
-          <Column header="次数" style="width: 90px">
-            <template #body="{ data }">{{ data.occurrence_count }}</template>
-          </Column>
-          <Column header="最近发现" style="width: 190px">
-            <template #body="{ data }">{{ formatAdminDateTime(data.last_seen_at) }}</template>
-          </Column>
-        </DataTable>
-      </div>
+                Wallet · User #{{ data.wallet_user_id }}
+              </span>
+              <span
+                class="rounded-[var(--radius-ib-control)] border border-admin-border-soft px-2 py-1 text-admin-caption font-[680]"
+              >
+                {{ data.subject_type }} · {{ data.subject_id }}
+              </span>
+            </div>
+            <div
+              class="mt-1 max-w-96 truncate text-admin-caption text-admin-text-3"
+              :title="formatFindingDetails(data.details)"
+            >
+              {{ formatFindingDetails(data.details) }}
+            </div>
+          </template>
+        </Column>
+        <Column header="隔离状态" style="width: 130px">
+          <template #body="{ data }">
+            <Tag
+              :value="data.isolated ? '已隔离' : '未隔离'"
+              :severity="data.isolated ? 'danger' : 'secondary'"
+              :class="adminCompactTagClass"
+            />
+          </template>
+        </Column>
+        <Column header="处理状态" style="width: 120px">
+          <template #body="{ data }">
+            <Tag
+              :value="data.status === 'open' ? '待处理' : '已解决'"
+              :severity="data.status === 'open' ? 'warn' : 'success'"
+              :class="adminCompactTagClass"
+            />
+          </template>
+        </Column>
+        <Column header="次数" style="width: 90px">
+          <template #body="{ data }">{{ data.occurrence_count }}</template>
+        </Column>
+        <Column header="最近发现" style="width: 190px">
+          <template #body="{ data }">{{ formatAdminDateTime(data.last_seen_at) }}</template>
+        </Column>
+      </DataTableFrame>
     </section>
 
     <div
@@ -316,7 +313,6 @@ import { computed, ref, watch } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
@@ -326,7 +322,7 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
 import { validateAdminActionReason } from '../../shared/validation/adminActionReasonContract'

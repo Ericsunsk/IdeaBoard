@@ -131,13 +131,12 @@
             Wallet 或流水加载失败。请检查用户 ID 后刷新重试。
           </Message>
         </div>
-        <DataTable
+        <DataTableFrame
           v-else
           :value="transactions"
           data-key="transaction_id"
           :loading="ledgerLoading"
           scrollable
-          :pt="adminDenseDataTablePt"
           table-style="min-width: 1080px"
         >
           <template #empty>
@@ -224,7 +223,7 @@
               <span v-else class="text-admin-caption text-admin-text-3">-</span>
             </template>
           </Column>
-        </DataTable>
+        </DataTableFrame>
       </AdminTablePanel>
     </template>
 
@@ -257,7 +256,6 @@ import { computed, ref, watch } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -267,7 +265,7 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import { useAdminUsersResource, type AdminUserListItem } from '../../users/adminUsersResource'
 import { useCreditsBillingFeedback } from '../creditsBillingFeedback'

@@ -1,6 +1,7 @@
 import { onScopeDispose } from 'vue'
 import { useQueryClient, type QueryClient } from '@tanstack/vue-query'
 import { subscribeUserCreditsInvalidation } from '../../shared/query/userCreditsInvalidation'
+import { userBillingRecordsQueryKeys } from './userBillingRecordsResource'
 import { userCreditsQueryKeys } from './userCreditsResource'
 
 type UserCreditsInvalidationBridge = {
@@ -19,6 +20,7 @@ export function useUserCreditsInvalidationBridge(): void {
       consumers: 0,
       unsubscribe: subscribeUserCreditsInvalidation(() => {
         void queryClient.invalidateQueries({ queryKey: userCreditsQueryKeys.all })
+        void queryClient.invalidateQueries({ queryKey: userBillingRecordsQueryKeys.all })
       }),
     }
     bridges.set(queryClient, bridge)

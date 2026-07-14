@@ -109,9 +109,9 @@ function renderAccountManagementDialogContent(initialTab: AccountManagementTab =
         Message: MessageStub,
         Password: PasswordStub,
         Tag: TagStub,
-        UserCreditsPane: {
+        UserBillingRecordsPane: {
           props: ['active'],
-          template: '<section aria-label="Idea账户">Idea余额与流水</section>',
+          template: '<section aria-label="账单记录">最终收支记录</section>',
         },
         UserUsagePane: {
           props: ['active'],
@@ -165,20 +165,20 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.queryByText('auth-user-layout')).not.toBeInTheDocument()
   })
 
-  it('opens the point wallet inside account management', async () => {
+  it('opens billing records inside account management', async () => {
     const { user } = renderAccountManagementDialogContent()
 
     await user.click(screen.getByRole('button', { name: '账单记录' }))
 
     expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('region', { name: 'Idea账户' })).toHaveTextContent('Idea余额与流水')
+    expect(screen.getByRole('region', { name: '账单记录' })).toHaveTextContent('最终收支记录')
   })
 
   it('opens directly on the requested initial tab', () => {
     renderAccountManagementDialogContent('billing')
 
     expect(screen.getByRole('button', { name: '账单记录' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('region', { name: 'Idea账户' })).toBeVisible()
+    expect(screen.getByRole('region', { name: '账单记录' })).toBeVisible()
     expect(screen.queryByRole('region', { name: '账户资料概览' })).not.toBeInTheDocument()
   })
 

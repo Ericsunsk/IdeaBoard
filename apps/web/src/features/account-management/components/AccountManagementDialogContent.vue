@@ -185,7 +185,7 @@
           </section>
         </div>
 
-        <UserCreditsPane
+        <UserBillingRecordsPane
           v-else-if="activeTab === 'billing'"
           key="billing"
           :active="activeTab === 'billing'"
@@ -383,7 +383,6 @@ import {
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
-import { useAppToast } from '../../../shared/composables/useAppToast'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
 import {
@@ -395,7 +394,7 @@ import {
 } from '../../../shared/theme/formControls'
 import { useProfileFeedback } from '../useProfileFeedback'
 import AccountComingSoonPane from './AccountComingSoonPane.vue'
-import UserCreditsPane from './UserCreditsPane.vue'
+import UserBillingRecordsPane from './UserBillingRecordsPane.vue'
 import UserRewardsPane from './UserRewardsPane.vue'
 import UserUsagePane from './UserUsagePane.vue'
 import type { AccountManagementTab } from '../useAccountManagementDialogController'
@@ -434,7 +433,6 @@ const userStore = useUserStore()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const profileFeedback = useProfileFeedback()
-const appToast = useAppToast()
 const {
   form: pwdForm,
   errors: pwdErrors,
@@ -512,7 +510,7 @@ function isUpcomingTab(tab: AccountManagementTab): tab is UpcomingTab {
 }
 
 function handleRewardRedeem() {
-  appToast.info('兑换服务暂未开放')
+  profileFeedback.rewardRedemptionUnavailable()
 }
 
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))

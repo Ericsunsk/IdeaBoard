@@ -73,10 +73,6 @@ export function useAdminUsersContext(
   )
   const totalPages = computed(() => Math.ceil(totalRecords.value / pageSize.value) || 1)
   const emptyUserMessage = computed(() => (hasAppliedUserQuery.value ? '暂无匹配用户' : '暂无用户'))
-  const userPlaceholderRows = computed(() => {
-    if (loading.value || users.value.length === 0) return 0
-    return Math.max(0, pageSize.value - users.value.length)
-  })
 
   watch(totalPages, (newTotal) => {
     if (currentPage.value > newTotal) {
@@ -153,7 +149,6 @@ export function useAdminUsersContext(
     totalUsersLabel,
     totalPages,
     emptyUserMessage,
-    userPlaceholderRows,
     resetUserFilters,
     handlePrevPage,
     handleNextPage,

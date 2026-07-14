@@ -2,6 +2,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
+import { primeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminCreditWalletsPage from './AdminCreditWalletsPage.vue'
 
@@ -217,7 +218,7 @@ function renderPage() {
   return renderWithUser(AdminCreditWalletsPage, {
     global: {
       plugins: [
-        [PrimeVue, { unstyled: true }],
+        [PrimeVue, primeVueTestOptions],
         [VueQueryPlugin, { queryClient }],
       ],
       stubs: { Refresh: true, NavArrowLeft: true, NavArrowRight: true },

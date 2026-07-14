@@ -2,11 +2,12 @@ import type { AsyncActionFeedback } from '../../shared/composables/useAsyncActio
 import { useAppToast } from '../../shared/composables/useAppToast'
 import { formatDisplayErrorMessage } from '../../shared/utils/errorMessages'
 
-type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'warning' | 'error'>
+type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'info' | 'warning' | 'error'>
 
 export type ProfileFeedback = {
   invalidAvatarFile: () => void
   logoutFailed: () => void
+  rewardRedemptionUnavailable: () => void
   avatarUpload: AsyncActionFeedback<void>
   passwordChange: AsyncActionFeedback<boolean>
 }
@@ -18,6 +19,9 @@ export function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
     },
     logoutFailed() {
       appToast.error('退出登录失败，请稍后重试')
+    },
+    rewardRedemptionUnavailable() {
+      appToast.info('兑换服务暂未开放')
     },
     avatarUpload: {
       success() {

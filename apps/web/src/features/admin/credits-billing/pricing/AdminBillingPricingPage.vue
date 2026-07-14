@@ -95,67 +95,65 @@
           </div>
         </div>
 
-        <div class="app-scrollbar min-h-[420px] overflow-auto">
-          <DataTable
-            v-if="visibleCatalogItems.length > 0 || catalogLoading"
-            :value="visibleCatalogItems"
-            :loading="catalogLoading"
-            data-key="sku"
-            size="small"
-            scrollable
-            :pt="adminDenseDataTablePt"
-            :table-style="{ minWidth: '620px' }"
-            :row-class="catalogRowClass"
-            @row-click="selectSKU($event.data)"
-          >
-            <Column header="SKU" :style="{ minWidth: '280px' }">
-              <template #body="{ data: item }">
-                <button
-                  type="button"
-                  class="block w-full rounded-[var(--radius-ib-control)] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-accent"
-                  :aria-pressed="selectedSKU?.sku === item.sku"
-                  @click.stop="selectSKU(item)"
-                >
-                  <span class="block truncate text-admin-body font-bold text-admin-text-1">
-                    {{ item.displayName }}
-                  </span>
-                  <code
-                    class="mt-0.5 block max-w-[320px] truncate text-admin-caption text-admin-text-3"
-                    :title="item.sku"
-                  >
-                    {{ item.sku }}
-                  </code>
-                </button>
-              </template>
-            </Column>
-            <Column header="当前价格" :style="{ width: '128px' }">
-              <template #body="{ data: item }">
-                <span
-                  v-if="item.currentPrice"
-                  class="font-mono text-admin-body font-bold text-admin-text-1"
-                >
-                  {{ formatIdeaAmount(item.currentPrice.unitCredits) }}
+        <DataTableFrame
+          :value="visibleCatalogItems"
+          :loading="catalogLoading"
+          data-key="sku"
+          size="small"
+          scrollable
+          frame-class="min-h-[420px]"
+          :table-style="{ minWidth: '620px' }"
+          :row-class="catalogRowClass"
+          @row-click="selectSKU($event.data)"
+        >
+          <Column header="SKU" :style="{ minWidth: '280px' }">
+            <template #body="{ data: item }">
+              <button
+                type="button"
+                class="block w-full rounded-[var(--radius-ib-control)] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-accent"
+                :aria-pressed="selectedSKU?.sku === item.sku"
+                @click.stop="selectSKU(item)"
+              >
+                <span class="block truncate text-admin-body font-bold text-admin-text-1">
+                  {{ item.displayName }}
                 </span>
-                <Tag v-else value="未配置" severity="warn" rounded :class="adminCompactTagClass" />
-              </template>
-            </Column>
-            <Column header="状态" :style="{ width: '102px' }">
-              <template #body="{ data: item }">
-                <Tag
-                  :value="catalogStatus(item).label"
-                  :severity="catalogStatus(item).severity"
-                  rounded
-                  :class="adminCompactTagClass"
-                />
-              </template>
-            </Column>
-          </DataTable>
-
-          <div v-else :class="adminEmptyStateClass">
-            <span class="font-semibold text-admin-title-color">当前页没有匹配的 SKU</span>
-            <span class="mt-1 text-admin-meta">调整筛选，或创建第一个计费 SKU。</span>
-          </div>
-        </div>
+                <code
+                  class="mt-0.5 block max-w-[320px] truncate text-admin-caption text-admin-text-3"
+                  :title="item.sku"
+                >
+                  {{ item.sku }}
+                </code>
+              </button>
+            </template>
+          </Column>
+          <Column header="当前价格" :style="{ width: '128px' }">
+            <template #body="{ data: item }">
+              <span
+                v-if="item.currentPrice"
+                class="font-mono text-admin-body font-bold text-admin-text-1"
+              >
+                {{ formatIdeaAmount(item.currentPrice.unitCredits) }}
+              </span>
+              <Tag v-else value="未配置" severity="warn" rounded :class="adminCompactTagClass" />
+            </template>
+          </Column>
+          <Column header="状态" :style="{ width: '102px' }">
+            <template #body="{ data: item }">
+              <Tag
+                :value="catalogStatus(item).label"
+                :severity="catalogStatus(item).severity"
+                rounded
+                :class="adminCompactTagClass"
+              />
+            </template>
+          </Column>
+          <template #empty>
+            <div :class="adminEmptyStateClass">
+              <span class="font-semibold text-admin-title-color">当前页没有匹配的 SKU</span>
+              <span class="mt-1 text-admin-meta">调整筛选，或创建第一个计费 SKU。</span>
+            </div>
+          </template>
+        </DataTableFrame>
       </section>
 
       <section
@@ -263,68 +261,68 @@
             {{ pricesError }}。请刷新重试。
           </Message>
 
-          <div class="app-scrollbar min-h-[280px] overflow-auto border-t border-admin-border-soft">
-            <DataTable
-              v-if="prices.length > 0 || pricesLoading"
-              :value="prices"
-              :loading="pricesLoading"
-              data-key="priceVersionId"
-              size="small"
-              scrollable
-              :pt="adminDenseDataTablePt"
-              :table-style="{ minWidth: '650px' }"
-            >
-              <Column field="version" header="版本" :style="{ width: '90px' }">
-                <template #body="{ data: price }">
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono font-bold">v{{ price.version }}</span>
-                    <Tag
-                      v-if="selectedSKU?.currentPriceVersionId === price.priceVersionId"
-                      value="当前"
-                      severity="info"
-                      rounded
-                      :class="adminCompactTagClass"
-                    />
-                  </div>
-                </template>
-              </Column>
-              <Column header="单价" :style="{ width: '140px' }">
-                <template #body="{ data: price }">
-                  <span class="font-mono text-admin-body font-bold">{{
-                    formatIdeaAmount(price.unitCredits)
+          <DataTableFrame
+            :value="prices"
+            :loading="pricesLoading"
+            data-key="priceVersionId"
+            size="small"
+            scrollable
+            frame-class="min-h-[280px] border-t border-admin-border-soft"
+            :table-style="{ minWidth: '650px' }"
+          >
+            <Column field="version" header="版本" :style="{ width: '90px' }">
+              <template #body="{ data: price }">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-bold">v{{ price.version }}</span>
+                  <Tag
+                    v-if="selectedSKU?.currentPriceVersionId === price.priceVersionId"
+                    value="当前"
+                    severity="info"
+                    rounded
+                    :class="adminCompactTagClass"
+                  />
+                </div>
+              </template>
+            </Column>
+            <Column header="单价" :style="{ width: '140px' }">
+              <template #body="{ data: price }">
+                <span class="font-mono text-admin-body font-bold">{{
+                  formatIdeaAmount(price.unitCredits)
+                }}</span>
+              </template>
+            </Column>
+            <Column header="发布信息" :style="{ minWidth: '180px' }">
+              <template #body="{ data: price }">
+                <div class="text-admin-body text-admin-text-1">Admin #{{ price.createdBy }}</div>
+                <div class="mt-0.5 text-admin-caption text-admin-text-3">
+                  {{ formatBillingDate(price.createdAt) }}
+                </div>
+              </template>
+            </Column>
+            <Column header="状态" :style="{ width: '128px' }">
+              <template #body="{ data: price }">
+                <div class="flex items-center gap-2">
+                  <ToggleSwitch
+                    :model-value="price.enabled"
+                    :disabled="mutationPending"
+                    :aria-label="`${price.enabled ? '停用' : '启用'}价格版本 v${price.version}`"
+                    @update:model-value="requestPriceStateChange(price, $event)"
+                  />
+                  <span class="text-admin-meta text-admin-text-2">{{
+                    price.enabled ? '启用' : '停用'
                   }}</span>
-                </template>
-              </Column>
-              <Column header="发布信息" :style="{ minWidth: '180px' }">
-                <template #body="{ data: price }">
-                  <div class="text-admin-body text-admin-text-1">Admin #{{ price.createdBy }}</div>
-                  <div class="mt-0.5 text-admin-caption text-admin-text-3">
-                    {{ formatBillingDate(price.createdAt) }}
-                  </div>
-                </template>
-              </Column>
-              <Column header="状态" :style="{ width: '128px' }">
-                <template #body="{ data: price }">
-                  <div class="flex items-center gap-2">
-                    <ToggleSwitch
-                      :model-value="price.enabled"
-                      :disabled="mutationPending"
-                      :aria-label="`${price.enabled ? '停用' : '启用'}价格版本 v${price.version}`"
-                      @update:model-value="requestPriceStateChange(price, $event)"
-                    />
-                    <span class="text-admin-meta text-admin-text-2">{{
-                      price.enabled ? '启用' : '停用'
-                    }}</span>
-                  </div>
-                </template>
-              </Column>
-            </DataTable>
-
-            <div v-else :class="adminEmptyStateClass">
-              <span class="font-semibold text-admin-title-color">尚未发布价格版本</span>
-              <span class="mt-1 text-admin-meta">发布首个 version 后，该 SKU 才能参与 Quote。</span>
-            </div>
-          </div>
+                </div>
+              </template>
+            </Column>
+            <template #empty>
+              <div :class="adminEmptyStateClass">
+                <span class="font-semibold text-admin-title-color">尚未发布价格版本</span>
+                <span class="mt-1 text-admin-meta"
+                  >发布首个 version 后，该 SKU 才能参与 Quote。</span
+                >
+              </div>
+            </template>
+          </DataTableFrame>
         </template>
 
         <div v-else :class="adminEmptyStateClass">
@@ -505,7 +503,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -524,7 +521,7 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { createAdminDialogPt } from '../../shared/lib/adminOverlayPt'
 import {
   adminActionButtonClass,

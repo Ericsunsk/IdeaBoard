@@ -3,6 +3,7 @@ import { createApp, defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { notifyUserCreditsInvalidation } from '../../shared/query/userCreditsInvalidation'
 import { useUserCreditsInvalidationBridge } from './useUserCreditsInvalidationBridge'
+import { userBillingRecordsQueryKeys } from './userBillingRecordsResource'
 import { userCreditsQueryKeys } from './userCreditsResource'
 
 describe('useUserCreditsInvalidationBridge', () => {
@@ -29,8 +30,11 @@ describe('useUserCreditsInvalidationBridge', () => {
       status: 'completed',
     })
 
-    expect(invalidateQueries).toHaveBeenCalledOnce()
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: userCreditsQueryKeys.all })
+    expect(invalidateQueries).toHaveBeenCalledTimes(2)
+    expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: userCreditsQueryKeys.all })
+    expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
+      queryKey: userBillingRecordsQueryKeys.all,
+    })
 
     app.unmount()
     notifyUserCreditsInvalidation({
@@ -38,7 +42,7 @@ describe('useUserCreditsInvalidationBridge', () => {
       taskId: 'task-8',
       status: 'failed',
     })
-    expect(invalidateQueries).toHaveBeenCalledOnce()
+    expect(invalidateQueries).toHaveBeenCalledTimes(2)
 
     queryClient.clear()
     host.remove()
