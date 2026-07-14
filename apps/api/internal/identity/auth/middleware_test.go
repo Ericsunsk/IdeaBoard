@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -176,13 +177,131 @@ func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
 	}
 }
 
+func TestAuthMiddlewareSetsCompletePrincipal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, role := range []string{"user", "admin"} {
+		t.Run(role, func(t *testing.T) {
+			authUserID := "auth-" + role
+			databaseUsername := role
+			if role == "admin" {
+				databaseUsername = " admin "
+			}
+			wantUsername := strings.TrimSpace(databaseUsername)
+			authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"username":%q,"claim_identity":%q,"claim_identity_kind":"trusted_canonical_registration","claim_identity_verified":true}}}`, authUserID, role, role+"@users.ideaboard.local")
+			}))
+			defer authServer.Close()
+
+			userRepo := users.NewUserRepository(testdb.Open(t))
+			user := &users.User{Username: databaseUsername, AuthUserID: &authUserID, Status: 1, Role: role}
+			if err := userRepo.Create(t.Context(), user); err != nil {
+				t.Fatal(err)
+			}
+
+			var got Principal
+			router := gin.New()
+			router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
+				BaseURL: authServer.URL, TimeoutSeconds: 1,
+			}), userRepo, nil))
+			router.GET("/me", func(c *gin.Context) {
+				var ok bool
+				got, ok = PrincipalFrom(c)
+				if !ok {
+					t.Fatal("authenticated request is missing Principal")
+				}
+				if c.GetInt64("user_id") != user.ID || c.GetString("auth_user_id") != authUserID || c.GetString("username") != wantUsername || c.GetString("role") != role {
+					t.Fatal("migration context values do not match Principal")
+				}
+				c.Status(http.StatusOK)
+			})
+
+			req := httptest.NewRequest(http.MethodGet, "/me", nil)
+			req.Header.Set("Cookie", "better-auth.session_token=test")
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+			}
+			if got.UserID() != user.ID || got.AuthUserID() != authUserID || got.Username() != wantUsername || got.Role().String() != role || got.IsAdmin() != (role == "admin") {
+				t.Fatalf("Principal = %+v", got)
+			}
+		})
+	}
+}
+
+func TestAuthMiddlewareRejectsRequestWithoutSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authServer := httptest.NewServer(http.NotFoundHandler())
+	defer authServer.Close()
+
+	router := gin.New()
+	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
+		BaseURL: authServer.URL, TimeoutSeconds: 1,
+	}), users.NewUserRepository(testdb.Open(t)), nil))
+	router.GET("/me", func(*gin.Context) {
+		t.Fatal("unauthenticated request reached handler")
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/me", nil))
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestAuthMiddlewareRejectsInvalidLocalPrincipal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authUserID := "auth-invalid-role"
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"username":"alice","claim_identity":"alice@users.ideaboard.local","claim_identity_kind":"trusted_canonical_registration","claim_identity_verified":true}}}`, authUserID)
+	}))
+	defer authServer.Close()
+
+	userRepo := users.NewUserRepository(testdb.Open(t))
+	user := &users.User{Username: "alice", AuthUserID: &authUserID, Status: 1, Role: "owner"}
+	if err := userRepo.Create(t.Context(), user); err != nil {
+		t.Fatal(err)
+	}
+
+	handlerRan := false
+	authorityLeaked := false
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Next()
+		_, hasPrincipal := PrincipalFrom(c)
+		_, hasUserID := c.Get("user_id")
+		_, hasRole := c.Get("role")
+		authorityLeaked = hasPrincipal || hasUserID || hasRole
+	})
+	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
+		BaseURL: authServer.URL, TimeoutSeconds: 1,
+	}), userRepo, nil))
+	router.GET("/me", func(*gin.Context) {
+		handlerRan = true
+	})
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/me", nil)
+	req.Header.Set("Cookie", "better-auth.session_token=test")
+	router.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusUnauthorized || handlerRan || authorityLeaked {
+		t.Fatalf("status = %d handlerRan = %v authorityLeaked = %v body = %s", recorder.Code, handlerRan, authorityLeaked, recorder.Body.String())
+	}
+}
+
 func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
 		name           string
-		role           any
-		setRole        bool
+		role           string
+		rawPrincipal   any
+		setPrincipal   bool
 		wantStatus     int
 		wantHandlerRun bool
 	}{
@@ -191,22 +310,28 @@ func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 		},
 		{
-			name:       "non-admin role",
-			role:       "user",
-			setRole:    true,
-			wantStatus: http.StatusForbidden,
+			name:         "non-admin role",
+			role:         "user",
+			setPrincipal: true,
+			wantStatus:   http.StatusForbidden,
 		},
 		{
 			name:           "admin role",
 			role:           "admin",
-			setRole:        true,
+			setPrincipal:   true,
 			wantStatus:     http.StatusOK,
 			wantHandlerRun: true,
 		},
 		{
-			name:       "non-string role",
-			role:       123,
-			setRole:    true,
+			name:         "wrong Principal type",
+			rawPrincipal: 123,
+			wantStatus:   http.StatusForbidden,
+		},
+		{
+			name: "invalid Principal role",
+			rawPrincipal: Principal{
+				userID: 1, authUserID: "auth-1", username: "alice", role: Role("owner"),
+			},
 			wantStatus: http.StatusForbidden,
 		},
 	}
@@ -216,8 +341,13 @@ func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 			handlerRan := false
 			router := gin.New()
 			router.Use(func(c *gin.Context) {
-				if tt.setRole {
-					c.Set("role", tt.role)
+				if tt.rawPrincipal != nil {
+					c.Set(principalContextKey, tt.rawPrincipal)
+				} else if tt.setPrincipal {
+					principal, err := NewPrincipal(1, "auth-1", "alice", tt.role)
+					if err != nil || SetPrincipal(c, principal) != nil {
+						t.Fatalf("set test Principal: %v", err)
+					}
 				}
 				c.Next()
 			})

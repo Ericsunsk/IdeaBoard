@@ -64,10 +64,17 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository, 
 			return
 		}
 
-		c.Set("user_id", user.ID)
-		c.Set("username", user.Username)
-		c.Set("role", user.Role)
-		c.Set("auth_user_id", identity.AuthUserID)
+		principal, err := NewPrincipal(user.ID, identity.AuthUserID, user.Username, user.Role)
+		if err != nil || SetPrincipal(c, principal) != nil {
+			response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", principal.UserID())
+		c.Set("username", principal.Username())
+		c.Set("role", principal.Role().String())
+		c.Set("auth_user_id", principal.AuthUserID())
 		c.Next()
 	}
 }
@@ -113,8 +120,8 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRep
 // AdminMiddleware 管理员中间件 - 通过角色判断是否为管理员
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, exists := c.Get("role")
-		if !exists || role != "admin" {
+		principal, exists := PrincipalFrom(c)
+		if !exists || !principal.IsAdmin() {
 			response.Error(c, http.StatusForbidden, "需要管理员权限")
 			c.Abort()
 			return
