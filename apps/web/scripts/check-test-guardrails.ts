@@ -68,6 +68,18 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/account-management/components/UserRewardsPane.component.spec.ts': [
+    {
+      reason:
+        'Verifies that the redemption action stays on the User Shell semantic button contract instead of inheriting the Admin PrimeVue primary theme.',
+    },
+  ],
+  'src/features/account-management/components/UserSecurityPane.component.spec.ts': [
+    {
+      reason:
+        'Verifies that the password action stays on the User Shell semantic button contract instead of inheriting the Admin PrimeVue primary theme.',
+    },
+  ],
   'src/features/account-management/components/UserBillingRecordsPane.component.spec.ts': [
     {
       reason:

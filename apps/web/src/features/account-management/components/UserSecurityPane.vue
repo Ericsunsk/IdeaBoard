@@ -130,12 +130,13 @@
       </div>
 
       <Button
+        unstyled
         type="submit"
         :label="pwdLoading ? '更新中...' : '确认更新密码'"
         :loading="pwdLoading"
         :disabled="pwdLoading"
-        size="large"
-        fluid
+        :class="accountPrimaryActionButtonClass"
+        :pt="accountButtonPt"
       />
     </form>
   </AccountManagementPane>
@@ -154,6 +155,7 @@ import {
 } from '../../../shared/theme/formControls'
 import { usePasswordChangeWorkflow } from '../usePasswordChangeWorkflow'
 import AccountManagementPane from './AccountManagementPane.vue'
+import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 
 const {
   form: pwdForm,

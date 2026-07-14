@@ -25,11 +25,12 @@
             placeholder="请输入兑换码"
           />
           <Button
+            unstyled
             type="submit"
             label="兑换"
             :disabled="!canSubmit"
-            size="large"
-            fluid
+            :class="accountPrimaryActionButtonClass"
+            :pt="accountButtonPt"
           />
         </div>
       </form>
@@ -55,6 +56,7 @@ import InputText from 'primevue/inputtext'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
 import { useProfileFeedback } from '../useProfileFeedback'
 import AccountManagementPane from './AccountManagementPane.vue'
+import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 
 const code = ref('')
 const profileFeedback = useProfileFeedback()
