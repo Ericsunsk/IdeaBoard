@@ -18,35 +18,35 @@ export const userRoutes: RouteRecordRaw[] = [
   },
   {
     path: USER_ROOT_PATH,
-    component: () => import('../pages/UserLayoutPage.vue'),
+    component: () => import('../layout/UserLayout.vue'),
     children: [
       {
         path: 'home',
         name: 'UserHome',
-        component: () => import('../pages/UserHomePage.vue'),
+        component: () => import('../../canvas/pages/CanvasLandingPage.vue'),
       },
       {
         path: 'login',
         name: 'UserLogin',
-        component: () => import('../pages/UserHomePage.vue'),
+        component: () => import('../../canvas/pages/CanvasLandingPage.vue'),
         meta: { guest: true },
       },
       {
         path: 'register',
         name: 'UserRegister',
-        component: () => import('../pages/UserHomePage.vue'),
+        component: () => import('../../canvas/pages/CanvasLandingPage.vue'),
         meta: { guest: true },
       },
       {
         path: 'boards',
         name: 'UserBoards',
-        component: () => import('../pages/UserBoardsPage.vue'),
+        component: () => import('../../board-catalog/pages/BoardsPage.vue'),
         meta: { requiresAuth: true },
       },
       {
         path: 'canvas',
         name: 'UserCanvas',
-        component: () => import('../pages/UserCanvasPage.vue'),
+        component: () => import('../../canvas/pages/CanvasPage.vue'),
         meta: { requiresAuth: true },
       },
     ],
