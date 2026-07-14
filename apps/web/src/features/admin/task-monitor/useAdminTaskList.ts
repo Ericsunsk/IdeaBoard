@@ -4,8 +4,9 @@ import {
   type ListAdminTasksParams,
   type ListAdminTasksStatus as ListAdminTasksStatusValue,
 } from '../../../shared/api/generated-query/model'
-import { useAdminTaskMonitorSettingQuery } from '../system-settings/taskMonitorSettingsResource'
+import { useAdminPagePagination } from '../shared/composables/useAdminPagePagination'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
+import { useAdminTaskMonitorSettingQuery } from '../system-settings/taskMonitorSettingsResource'
 import { useAdminTaskListResource } from './taskMonitorResource'
 
 type TaskStatusStats = {
@@ -20,7 +21,7 @@ type TaskStatusStats = {
 export type AdminTaskRow = ApiResponseTaskListData['list'][number]
 
 export function useAdminTaskList() {
-  const page = ref(1)
+  const pageState = ref(1)
   const filterStatus = ref<ListAdminTasksStatusValue | null>(null)
   const accountIdFilter = ref<number | null>(null)
   const searchKeyword = ref('')
@@ -35,7 +36,7 @@ export function useAdminTaskList() {
     const params: ListAdminTasksParams = {
       status: filterStatus.value || undefined,
       account_id: accountIdFilter.value || undefined,
-      page: page.value,
+      page: pageState.value,
       page_size: pageSize.value,
     }
     if (appliedSearchKeyword.value) {
@@ -65,8 +66,18 @@ export function useAdminTaskList() {
   })
 
   const tasks = computed(() => tasksQuery.data.value?.list || [])
-  const total = computed(() => tasksQuery.data.value?.total || 0)
+  const paginationTotalRecords = computed(() => tasksQuery.data.value?.total)
+  const total = computed(() => paginationTotalRecords.value ?? 0)
   const loading = computed(() => tasksQuery.isLoading.value)
+  const paginationPending = computed(
+    () => tasksQuery.isLoading.value || tasksQuery.isFetching.value,
+  )
+  const pagination = useAdminPagePagination({
+    currentPage: pageState,
+    totalRecords: paginationTotalRecords,
+    pageSize,
+    pending: paginationPending,
+  })
   const isError = computed(() => tasksQuery.isError.value)
   const error = computed(() => (isError.value ? (tasksQuery.error.value ?? null) : null))
   const taskStats = computed<TaskStatusStats>(() => {
@@ -94,17 +105,25 @@ export function useAdminTaskList() {
   )
 
   function handleSearch() {
-    page.value = 1
+    pagination.reset()
     appliedSearchKeyword.value = searchKeyword.value.trim()
   }
 
-  watch([filterStatus, accountIdFilter], () => {
-    page.value = 1
-  })
+  watch(
+    [filterStatus, accountIdFilter],
+    () => {
+      pagination.reset()
+    },
+    { flush: 'sync' },
+  )
 
-  watch(pageSize, () => {
-    page.value = 1
-  })
+  watch(
+    pageSize,
+    () => {
+      pagination.reset()
+    },
+    { flush: 'sync' },
+  )
 
   watch(polling.isPageVisible, (isVisible, wasVisible) => {
     if (isVisible && !wasVisible && hasActiveTasks.value) void tasksQuery.refetch()
@@ -120,7 +139,7 @@ export function useAdminTaskList() {
     loading,
     isError,
     error,
-    page,
+    pagination,
     pageSize,
     resultPreviewEnabled,
     taskMonitorSettingsError,

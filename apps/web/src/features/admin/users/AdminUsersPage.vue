@@ -70,10 +70,10 @@
           <AdminPagerControls
             :current-page="currentPage"
             :total-pages="totalPages"
-            :prev-disabled="currentPage === 1 || loading"
-            :next-disabled="currentPage === totalPages || loading"
-            @prev="handlePrevPage"
-            @next="handleNextPage"
+            :prev-disabled="!canPrevious"
+            :next-disabled="!canNext"
+            @prev="previous"
+            @next="next"
           />
         </template>
       </AdminResourceToolbar>
@@ -261,7 +261,7 @@ const adminUsers = useAdminUsersContext({
 })
 
 const {
-  currentPage,
+  pagination,
   searchKeyword,
   userRoleFilter,
   userStatusFilter,
@@ -273,14 +273,12 @@ const {
   bannedUserCount,
   adminUserCount,
   totalUsersLabel,
-  totalPages,
   emptyUserMessage,
   resetUserFilters,
-  handlePrevPage,
-  handleNextPage,
   clearSearch,
   loadUsers,
 } = adminUsers.list
+const { currentPage, totalPages, canPrevious, canNext, previous, next } = pagination
 
 const {
   userActionItems,

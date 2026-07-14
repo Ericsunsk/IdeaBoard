@@ -1,8 +1,9 @@
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ListAdminTasksStatus,
   type ApiResponseTaskListData,
+  type ListAdminTasksParams,
   type MonitorData,
   type MonitorResponse,
   type MonitorStats,
@@ -18,11 +19,15 @@ const mockState = vi.hoisted(() => ({
   pageVisible: undefined as unknown,
   pollingOptions: [] as unknown[],
   streamReturn: undefined as unknown,
+  taskListParams: undefined as MaybeRefOrGetter<ListAdminTasksParams> | undefined,
   taskMonitorSettings: undefined as unknown as { value: TaskMonitorSetting },
 }))
 
 vi.mock('../../../shared/api/generated-query/admin-tasks/admin-tasks', () => ({
-  useListAdminTasks: vi.fn(() => mockState.listAdminTasksReturn),
+  useListAdminTasks: vi.fn((params: MaybeRefOrGetter<ListAdminTasksParams>) => {
+    mockState.taskListParams = params
+    return mockState.listAdminTasksReturn
+  }),
 }))
 
 vi.mock('../../../shared/api/generated-query/admin-monitor/admin-monitor', () => ({
@@ -65,6 +70,7 @@ beforeEach(() => {
   mockState.pageVisible = ref(true)
   mockState.pollingOptions = []
   mockState.streamReturn = undefined
+  mockState.taskListParams = undefined
   mockState.taskMonitorSettings = ref({
     list_page_size: 12,
     auto_refresh_enabled: true,
@@ -142,6 +148,64 @@ describe('useTaskMonitor polling', () => {
     expect(monitor.pageSize.value).toBe(24)
     expect(monitor.resultPreviewEnabled.value).toBe(false)
     expect(polling.visibleInterval()).toBe(10_000)
+  })
+
+  it('uses the shared page boundary for pending navigation, clamp, and filter reset', () => {
+    const data = ref<ApiResponseTaskListData>(makeTaskList([], { pending: 0, running: 0 }, 25))
+    const isFetching = ref(false)
+    mockState.listAdminTasksReturn = {
+      data,
+      error: ref(null),
+      isError: ref(false),
+      isLoading: ref(false),
+      isFetching,
+      refetch: vi.fn(),
+    }
+
+    const monitor = useAdminTaskList()
+    const pagination = monitor.pagination
+
+    expect(pagination.totalPages.value).toBe(3)
+    expect(pagination.next()).toBe(true)
+    expect(pagination.currentPage.value).toBe(2)
+    expect(toValue(mockState.taskListParams)?.page).toBe(2)
+
+    isFetching.value = true
+    expect(pagination.canPrevious.value).toBe(false)
+    expect(pagination.canNext.value).toBe(false)
+    expect(pagination.previous()).toBe(false)
+    expect(pagination.next()).toBe(false)
+    expect(toValue(mockState.taskListParams)?.page).toBe(2)
+
+    isFetching.value = false
+    expect(pagination.next()).toBe(true)
+    data.value = makeTaskList([], { pending: 0, running: 0 }, 15)
+    expect(pagination.currentPage.value).toBe(2)
+
+    monitor.filterStatus.value = ListAdminTasksStatus.failed
+    expect(pagination.currentPage.value).toBe(1)
+  })
+
+  it('keeps the current page when a replacement request fails without data', () => {
+    const data = ref<ApiResponseTaskListData | undefined>(
+      makeTaskList([], { pending: 0, running: 0 }, 25),
+    )
+    mockState.listAdminTasksReturn = {
+      data,
+      error: ref<Error | null>(null),
+      isError: ref(false),
+      isLoading: ref(false),
+      isFetching: ref(false),
+      refetch: vi.fn(),
+    }
+
+    const monitor = useAdminTaskList()
+    monitor.pagination.next()
+    data.value = undefined
+
+    expect(monitor.pagination.currentPage.value).toBe(2)
+    expect(monitor.pagination.totalPages.value).toBe(3)
+    expect(toValue(mockState.taskListParams)?.page).toBe(2)
   })
 })
 
@@ -228,10 +292,11 @@ function makeTask(status: string, id: number): Task {
 function makeTaskList(
   list: Task[],
   counts: { pending: number; running: number },
+  total = list.length,
 ): ApiResponseTaskListData {
   return {
     list,
-    total: list.length,
+    total,
     pending_count: counts.pending,
     running_count: counts.running,
     completed_count: 0,

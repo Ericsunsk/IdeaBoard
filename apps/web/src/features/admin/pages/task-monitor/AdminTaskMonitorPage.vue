@@ -206,12 +206,12 @@
 
           <template #pager>
             <AdminPagerControls
-              :current-page="page"
+              :current-page="currentPage"
               :total-pages="totalPages"
-              :prev-disabled="page === 1 || loading"
-              :next-disabled="page === totalPages || loading"
-              @prev="handlePrevTaskPage"
-              @next="handleNextTaskPage"
+              :prev-disabled="!canPrevious"
+              :next-disabled="!canNext"
+              @prev="previous"
+              @next="next"
             />
           </template>
         </AdminResourceToolbar>
@@ -791,8 +791,7 @@ const {
   loading,
   isError: isTaskListError,
   error: taskListError,
-  page,
-  pageSize,
+  pagination,
   resultPreviewEnabled,
   taskMonitorSettingsError,
   taskStats,
@@ -802,6 +801,7 @@ const {
   loadTasks,
   handleSearch: applyTaskSearch,
 } = useAdminTaskList()
+const { currentPage, totalPages, canPrevious, canNext, previous, next } = pagination
 const {
   monitorData,
   monitorStats,
@@ -820,7 +820,6 @@ const { canDeleteSelectedTasks, isDeletingSelectedTasks, requestDeleteSelectedTa
     feedback: adminFeedback.taskMonitor.taskDeletion,
   })
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
-const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1)
 const taskListErrorMessage = computed(() =>
   formatDisplayErrorMessage(taskListError.value, '加载任务列表失败'),
 )
@@ -834,26 +833,6 @@ const taskMonitorSettingsErrorMessage = computed(() =>
   ),
 )
 
-watch(totalPages, (newTotal) => {
-  if (page.value > newTotal) {
-    page.value = Math.max(1, newTotal)
-  }
-})
-
-function handlePrevTaskPage() {
-  if (loading.value) return
-  if (page.value > 1) {
-    page.value--
-  }
-}
-
-function handleNextTaskPage() {
-  if (loading.value) return
-  if (page.value < totalPages.value) {
-    page.value++
-  }
-}
-
 function handleTaskSearch() {
   selectedTasks.value = []
   applyTaskSearch()
@@ -864,7 +843,7 @@ function resetTaskFilters() {
   accountIdFilter.value = null
 }
 
-watch([page, filterStatus, accountIdFilter], () => {
+watch([currentPage, filterStatus, accountIdFilter], () => {
   selectedTasks.value = []
 })
 
