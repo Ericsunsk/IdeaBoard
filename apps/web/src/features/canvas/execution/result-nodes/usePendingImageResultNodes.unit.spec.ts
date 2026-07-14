@@ -113,6 +113,10 @@ function makeImageNode(
   }
 }
 
+function setNodeDimensions(node: Node, dimensions: { width: number; height: number }) {
+  Object.assign(node, { dimensions })
+}
+
 function makeImageEdge(target: string, overrides: Partial<Edge> = {}): Edge {
   return {
     id: `edge-${target}`,
@@ -251,7 +255,7 @@ describe('usePendingImageResultExecution', () => {
     ])
   })
 
-  it('reuses the first valid empty image child and stacks batched pending nodes', async () => {
+  it('reuses the first valid empty image child and places additional batch results locally', async () => {
     const invalidEmptyNode = makeImageNode('image-1', {
       id: 1,
       sourceImageUrl: '',
@@ -296,8 +300,179 @@ describe('usePendingImageResultExecution', () => {
       y: 0,
     })
     expect(harness.nodes.value.find((node) => node.id === reservedNodeIds[1])?.position).toEqual({
-      x: 0,
+      x: 380,
+      y: 0,
+    })
+  })
+
+  it('places a derived node to the right of its current trigger without moving existing nodes', async () => {
+    const anchor = makeImageNode('image-1', { id: 1, x: 120, y: 80, width: 300 })
+    const occupied = makeImageNode('image-2', { id: 2, x: 900, y: 80, width: 280 })
+    setNodeDimensions(occupied, { width: 280, height: 306 })
+    const harness = createHarness([anchor, occupied])
+    let reservedNodeIds: string[] = []
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+      resultOptions: { targetRatio: 1, targetWidth: 280 },
+      submitTask: async () => ({ taskId: 'task-1' }),
+      resolveResult: async () => ({ url: 'https://example.com/result.png', ratio: 1 }),
+      isCurrent: () => true,
+      isPendingError: () => false,
+      onReserved: (ids) => {
+        reservedNodeIds = ids
+      },
+    })
+
+    expect(harness.nodes.value.find((node) => node.id === reservedNodeIds[0])?.position).toEqual({
+      x: 520,
+      y: 80,
+    })
+    expect(occupied.position).toEqual({ x: 900, y: 80 })
+  })
+
+  it('uses a stable nearby fallback when the preferred right-side slot is occupied', async () => {
+    const anchor = makeImageNode('image-1', { id: 1, x: 0, y: 0, width: 280 })
+    const occupied = makeImageNode('image-2', { id: 2, x: 380, y: 0, width: 280 })
+    setNodeDimensions(occupied, { width: 280, height: 306 })
+    const harness = createHarness([anchor, occupied])
+    let reservedNodeIds: string[] = []
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+      resultOptions: { targetRatio: 1, targetWidth: 280 },
+      submitTask: async () => ({ taskId: 'task-1' }),
+      resolveResult: async () => ({ url: 'https://example.com/result.png', ratio: 1 }),
+      isCurrent: () => true,
+      isPendingError: () => false,
+      onReserved: (ids) => {
+        reservedNodeIds = ids
+      },
+    })
+
+    expect(harness.nodes.value.find((node) => node.id === reservedNodeIds[0])?.position).toEqual({
+      x: 380,
       y: 320,
+    })
+  })
+
+  it('derives from a manually moved image node using its current measured bounds', async () => {
+    const movedAnchor = makeImageNode('image-1', { id: 1, x: 0, y: 0, width: 280 })
+    movedAnchor.position = { x: 1_000, y: 500 }
+    setNodeDimensions(movedAnchor, { width: 350, height: 260 })
+    const harness = createHarness([movedAnchor])
+    let reservedNodeIds: string[] = []
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+      resultOptions: { targetRatio: 1, targetWidth: 280 },
+      submitTask: async () => ({ taskId: 'task-1' }),
+      resolveResult: async () => ({ url: 'https://example.com/result.png', ratio: 1 }),
+      isCurrent: () => true,
+      isPendingError: () => false,
+      onReserved: (ids) => {
+        reservedNodeIds = ids
+      },
+    })
+
+    expect(harness.nodes.value.find((node) => node.id === reservedNodeIds[0])?.position).toEqual({
+      x: 1_450,
+      y: 500,
+    })
+  })
+
+  it('keeps a large derived batch collision-free when nearby preferred slots are occupied', async () => {
+    const anchor = makeImageNode('image-1', { id: 1, x: 0, y: 0, width: 280 })
+    const firstOccupied = makeImageNode('image-2', { id: 2, x: 380, y: 0, width: 280 })
+    const secondOccupied = makeImageNode('image-3', { id: 3, x: 380, y: 320, width: 280 })
+    setNodeDimensions(firstOccupied, { width: 280, height: 306 })
+    setNodeDimensions(secondOccupied, { width: 280, height: 306 })
+    const harness = createHarness([anchor, firstOccupied, secondOccupied])
+    let reservedNodeIds: string[] = []
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      outputCount: 4,
+      resultOptions: { targetRatio: 1, targetWidth: 280 },
+      submitTask: async (resultNodeId) => ({ taskId: `task-${resultNodeId}` }),
+      resolveResult: async (_taskId, resultNodeId) => ({
+        url: `https://example.com/${resultNodeId}.png`,
+        ratio: 1,
+      }),
+      isCurrent: () => true,
+      isPendingError: () => false,
+      onReserved: (ids) => {
+        reservedNodeIds = ids
+      },
+    })
+
+    const positions = reservedNodeIds.map((nodeId) => {
+      const position = harness.nodes.value.find((node) => node.id === nodeId)?.position
+      if (!position) throw new Error(`missing derived node ${nodeId}`)
+      return position
+    })
+    expect(positions).toHaveLength(4)
+    for (let leftIndex = 0; leftIndex < positions.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < positions.length; rightIndex += 1) {
+        const left = positions[leftIndex]
+        const right = positions[rightIndex]
+        expect(Math.abs(left.x - right.x) >= 280 || Math.abs(left.y - right.y) >= 306).toBe(true)
+      }
+    }
+  })
+
+  it('prefers a moved derived node current bounds over its stale planned anchor hint', async () => {
+    const harness = createHarness([makeImageNode('image-1', { id: 1, width: 280 })])
+    let firstResultNodeId = ''
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      outputCount: 1,
+      resultOptions: { targetRatio: 1, targetWidth: 280 },
+      submitTask: async () => ({ taskId: 'task-1' }),
+      resolveResult: async () => ({ url: 'https://example.com/first-result.png', ratio: 1 }),
+      isCurrent: () => true,
+      isPendingError: () => false,
+      onReserved: ([nodeId]) => {
+        firstResultNodeId = nodeId
+      },
+    })
+
+    const movedDerivedNode = harness.nodes.value.find((node) => node.id === firstResultNodeId)
+    if (!movedDerivedNode) throw new Error('missing first derived node')
+    movedDerivedNode.position = { x: 1_000, y: 500 }
+    setNodeDimensions(movedDerivedNode, { width: 350, height: 260 })
+    let secondResultNodeId = ''
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/first-result.png', ratio: 1 },
+      sourceNodeId: firstResultNodeId,
+      outputCount: 1,
+      resultOptions: {
+        targetRatio: 1,
+        targetWidth: 280,
+        anchor: { x: 380, y: 0, width: 280, outputAnchorNodeId: firstResultNodeId },
+      },
+      submitTask: async () => ({ taskId: 'task-2' }),
+      resolveResult: async () => ({ url: 'https://example.com/second-result.png', ratio: 1 }),
+      isCurrent: () => true,
+      isPendingError: () => false,
+      onReserved: ([nodeId]) => {
+        secondResultNodeId = nodeId
+      },
+    })
+
+    expect(harness.nodes.value.find((node) => node.id === secondResultNodeId)?.position).toEqual({
+      x: 1_450,
+      y: 500,
     })
   })
 

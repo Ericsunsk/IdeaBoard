@@ -101,7 +101,6 @@ type ImageResultLayout = ImageResultAnchor & {
 
 type PendingImageResultLookup = {
   nodeById: Map<string, Node>
-  nodeOrderById: Map<string, number>
   imageChildIdsBySource: Map<string, string[]>
 }
 
@@ -150,17 +149,14 @@ export function usePendingImageResultExecution(
   options: UsePendingImageResultNodesOptions,
 ): PendingImageResultExecution {
   const cancelledResultNodeIds = new Set<string>()
-  const resultLayoutsBySourceNodeId = new Map<string, Map<string, ImageResultLayout>>()
 
   function buildPendingResultLookup(): PendingImageResultLookup {
     const nodeById = new Map<string, Node>()
-    const nodeOrderById = new Map<string, number>()
     const imageChildIdsBySource = new Map<string, string[]>()
 
-    options.nodes.value.forEach((node, index) => {
+    options.nodes.value.forEach((node) => {
       if (nodeById.has(node.id)) return
       nodeById.set(node.id, node)
-      nodeOrderById.set(node.id, index)
     })
 
     for (const edge of options.edges.value) {
@@ -175,7 +171,6 @@ export function usePendingImageResultExecution(
 
     return {
       nodeById,
-      nodeOrderById,
       imageChildIdsBySource,
     }
   }
@@ -185,11 +180,12 @@ export function usePendingImageResultExecution(
     const snapshot = node.data.snapshotNode
     if (!snapshot || typeof snapshot !== 'object') return null
     const anchor = resolveImageNodeLayoutAnchor(node, snapshot as ImageNodeItem)
+    const measuredWidth = readMeasuredNodeWidth(node)
     return anchor
       ? {
           x: anchor.x,
           y: anchor.y,
-          width: anchor.width,
+          width: measuredWidth ?? anchor.width,
           ratio: anchor.ratio,
         }
       : null
@@ -201,24 +197,69 @@ export function usePendingImageResultExecution(
     lookup: PendingImageResultLookup,
     anchorHint?: ImageResultAnchor,
   ): ImageResultLayout {
+    const node = lookup.nodeById.get(nodeId)
+    if (node) {
+      if (node.data?.kind === 'image') {
+        return readImageNodeLayout(node) ?? fallback
+      }
+      const snapshot = node.data?.snapshotNode as { width?: unknown } | undefined
+      const width = readMeasuredNodeWidth(node) ?? Number(snapshot?.width)
+      return {
+        ratio: 1,
+        x: Number(node.position?.x ?? 0),
+        y: Number(node.position?.y ?? 0),
+        width: Number.isFinite(width) && width > 0 ? width : fallback.width,
+      }
+    }
     if (anchorHint) {
       return {
         ...anchorHint,
         ratio: fallback.ratio,
       }
     }
-    const node = lookup.nodeById.get(nodeId)
-    if (!node) return fallback
-    if (node.data?.kind === 'image') {
-      return readImageNodeLayout(node) ?? fallback
+    return fallback
+  }
+
+  function readMeasuredNodeWidth(node: Node): number | null {
+    const dimensions = (node as { dimensions?: { width?: unknown } }).dimensions
+    const measuredWidth = Number(dimensions?.width)
+    if (Number.isFinite(measuredWidth) && measuredWidth > 0) return measuredWidth
+    const directWidth = Number((node as { width?: unknown }).width)
+    return Number.isFinite(directWidth) && directWidth > 0 ? directWidth : null
+  }
+
+  function readNodeBounds(node: Node): { x: number; y: number; width: number; height: number } | null {
+    const imageLayout = readImageNodeLayout(node)
+    if (imageLayout) {
+      const dimensions = (node as { dimensions?: { height?: unknown } }).dimensions
+      const measuredHeight = Number(dimensions?.height)
+      return {
+        x: imageLayout.x,
+        y: imageLayout.y,
+        width: imageLayout.width,
+        height:
+          Number.isFinite(measuredHeight) && measuredHeight > 0
+            ? measuredHeight
+            : estimateImageNodeHeight(imageLayout),
+      }
     }
-    const snapshot = node.data?.snapshotNode as { width?: unknown } | undefined
-    const width = Number(snapshot?.width)
+
+    const snapshot = node.data?.snapshotNode as { width?: unknown; height?: unknown } | undefined
+    const width = readMeasuredNodeWidth(node) ?? Number(snapshot?.width)
+    if (!Number.isFinite(width) || width <= 0) return null
+    const dimensions = (node as { dimensions?: { height?: unknown } }).dimensions
+    const measuredHeight = Number(dimensions?.height)
+    const snapshotHeight = Number(snapshot?.height)
     return {
-      ratio: 1,
       x: Number(node.position?.x ?? 0),
       y: Number(node.position?.y ?? 0),
-      width: Number.isFinite(width) && width > 0 ? width : fallback.width,
+      width,
+      height:
+        Number.isFinite(measuredHeight) && measuredHeight > 0
+          ? measuredHeight
+          : Number.isFinite(snapshotHeight) && snapshotHeight > 0
+            ? snapshotHeight
+            : width,
     }
   }
 
@@ -274,82 +315,52 @@ export function usePendingImageResultExecution(
 
   function resolvePendingImageResultPosition(
     anchor: ImageResultLayout,
-    anchorNodeId: string,
     lookup: PendingImageResultLookup,
+    target: Pick<ImageResultLayout, 'width' | 'ratio'>,
   ) {
-    const defaultPosition = {
+    const preferredPosition = {
       x: anchor.x + anchor.width + IMAGE_RESULT_NODE_X_GAP,
       y: anchor.y,
     }
-    const childNodeIds = new Set<string>(lookup.imageChildIdsBySource.get(anchorNodeId) ?? [])
-    const runtimeLayouts = resultLayoutsBySourceNodeId.get(anchorNodeId)
-    runtimeLayouts?.forEach((_, nodeId) => childNodeIds.add(nodeId))
-    if (childNodeIds.size === 0) return defaultPosition
+    const occupiedBounds = Array.from(lookup.nodeById.values())
+      .map(readNodeBounds)
+      .filter((bounds): bounds is { x: number; y: number; width: number; height: number } => !!bounds)
+    const targetHeight = estimateImageNodeHeight(target)
 
-    let nextY = anchor.y
-    let alignedX = defaultPosition.x
-    const measuredNodeIds = new Set<string>()
-    const visitChildLayout = (nodeId: string, layout: ImageResultLayout) => {
-      const bottomY = layout.y + estimateImageNodeHeight(layout) + IMAGE_RESULT_NODE_Y_GAP
-      if (bottomY >= nextY) {
-        alignedX = layout.x
-        nextY = bottomY
-      }
-      measuredNodeIds.add(nodeId)
-    }
-
-    const existingChildNodeIds = Array.from(childNodeIds)
-      .filter((nodeId) => lookup.nodeById.has(nodeId))
-      .sort(
-        (left, right) =>
-          (lookup.nodeOrderById.get(left) ?? Number.MAX_SAFE_INTEGER) -
-          (lookup.nodeOrderById.get(right) ?? Number.MAX_SAFE_INTEGER),
+    const isCollisionFree = (position: { x: number; y: number }) =>
+      occupiedBounds.every(
+        (bounds) =>
+          position.x + target.width <= bounds.x ||
+          position.x >= bounds.x + bounds.width ||
+          position.y + targetHeight <= bounds.y ||
+          position.y >= bounds.y + bounds.height,
       )
+    if (isCollisionFree(preferredPosition)) return preferredPosition
 
-    for (const nodeId of existingChildNodeIds) {
-      const node = lookup.nodeById.get(nodeId)
-      if (!node) continue
-      const layout = readImageNodeLayout(node) ?? runtimeLayouts?.get(node.id)
-      if (!layout) continue
-      visitChildLayout(node.id, layout)
+    let preferredColumnBottom = preferredPosition.y
+    for (const bounds of occupiedBounds) {
+      const overlapsPreferredColumn =
+        preferredPosition.x < bounds.x + bounds.width &&
+        preferredPosition.x + target.width > bounds.x
+      if (!overlapsPreferredColumn || bounds.y + bounds.height <= preferredPosition.y) continue
+      preferredColumnBottom = Math.max(
+        preferredColumnBottom,
+        bounds.y + bounds.height + IMAGE_RESULT_NODE_Y_GAP,
+      )
     }
-    runtimeLayouts?.forEach((layout, nodeId) => {
-      if (!childNodeIds.has(nodeId)) return
-      if (measuredNodeIds.has(nodeId)) return
-      visitChildLayout(nodeId, layout)
-    })
+    const candidate = { x: preferredPosition.x, y: preferredColumnBottom }
+    if (isCollisionFree(candidate)) return candidate
 
-    return {
-      x: alignedX,
-      y: nextY,
+    const escapePosition = {
+      x: preferredPosition.x,
+      y:
+        occupiedBounds.reduce(
+          (bottom, bounds) => Math.max(bottom, bounds.y + bounds.height),
+          preferredPosition.y,
+        ) + IMAGE_RESULT_NODE_Y_GAP,
     }
-  }
-
-  function rememberResultNodeLayout(
-    anchorNodeId: string,
-    resultNodeId: string,
-    layout: ImageResultLayout,
-  ) {
-    const current = resultLayoutsBySourceNodeId.get(anchorNodeId) ?? new Map()
-    current.set(resultNodeId, layout)
-    resultLayoutsBySourceNodeId.set(anchorNodeId, current)
-  }
-
-  function forgetResultNodeLayout(resultNodeId: string) {
-    resultLayoutsBySourceNodeId.forEach((items, sourceNodeId) => {
-      items.delete(resultNodeId)
-      if (items.size === 0) resultLayoutsBySourceNodeId.delete(sourceNodeId)
-    })
-  }
-
-  function pruneResultNodeLayouts() {
-    const existingNodeIds = new Set(options.nodes.value.map((node) => node.id))
-    resultLayoutsBySourceNodeId.forEach((items, sourceNodeId) => {
-      items.forEach((_, nodeId) => {
-        if (!existingNodeIds.has(nodeId)) items.delete(nodeId)
-      })
-      if (items.size === 0) resultLayoutsBySourceNodeId.delete(sourceNodeId)
-    })
+    if (isCollisionFree(escapePosition)) return escapePosition
+    throw new Error('Unable to find a collision-free position for derived image node')
   }
 
   function buildPendingImageNodeSnapshot(
@@ -448,8 +459,6 @@ export function usePendingImageResultExecution(
       lookup,
       optionsOverride?.anchor,
     )
-    const position = resolvePendingImageResultPosition(anchor, anchorNodeId, lookup)
-    const imageNode = createCanvasNodeAt('image', position)
     const resolvedRatio =
       Number.isFinite(optionsOverride?.targetRatio) && (optionsOverride?.targetRatio as number) > 0
         ? (optionsOverride?.targetRatio as number)
@@ -460,6 +469,11 @@ export function usePendingImageResultExecution(
       Number.isFinite(optionsOverride?.targetWidth) && (optionsOverride?.targetWidth as number) > 0
         ? Math.max(1, Math.round(optionsOverride?.targetWidth as number))
         : resolveImageNodeFrameSize(resolvedRatio, true).width
+    const position = resolvePendingImageResultPosition(anchor, lookup, {
+      width: resolvedWidth,
+      ratio: resolvedRatio,
+    })
+    const imageNode = createCanvasNodeAt('image', position)
     const pendingImageNode = buildPendingImageNodeSnapshot(imageNode, {
       sourceImageRatio: resolvedRatio,
       width: resolvedWidth,
@@ -493,13 +507,6 @@ export function usePendingImageResultExecution(
       }
       lookup.nodeById.set(preferredNodeId, updatedNode)
       cancelledResultNodeIds.delete(preferredNodeId)
-      const layout = {
-        ratio: pendingImageNode.sourceImageRatio,
-        x: position.x,
-        y: position.y,
-        width: pendingImageNode.width,
-      }
-      rememberResultNodeLayout(anchorNodeId, preferredNodeId, layout)
       return {
         resultNodeId: preferredNodeId,
         nextNode: updatedNode,
@@ -522,16 +529,7 @@ export function usePendingImageResultExecution(
     }
 
     lookup.nodeById.set(nextNode.id, nextNode as Node)
-    lookup.nodeOrderById.set(nextNode.id, lookup.nodeOrderById.size)
     cancelledResultNodeIds.delete(nextNode.id)
-    const layout = {
-      ratio: pendingImageNode.sourceImageRatio,
-      x: pendingImageNode.x,
-      y: pendingImageNode.y,
-      width: pendingImageNode.width,
-    }
-    rememberResultNodeLayout(anchorNodeId, nextNode.id, layout)
-
     return {
       resultNodeId: nextNode.id,
       nextNode: nextNode as Node,
@@ -558,7 +556,6 @@ export function usePendingImageResultExecution(
       count,
     )
     const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId, lookup)
-    pruneResultNodeLayouts()
     const plans = Array.from({ length: count }, (_, index) =>
       planPendingImageResultNodeWithLookup(
         params.source,
@@ -690,7 +687,6 @@ export function usePendingImageResultExecution(
 
   function cancelPendingResult(params: { resultNodeId: string }) {
     cancelledResultNodeIds.add(params.resultNodeId)
-    forgetResultNodeLayout(params.resultNodeId)
     options.graphAdapter.removeNodes(params.resultNodeId, {
       ...createPendingResultCommandOptions({ recordHistory: false }),
       removeConnectedEdges: true,
