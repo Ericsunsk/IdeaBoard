@@ -5,8 +5,6 @@ import { useUserStore } from '../../app/stores/user'
 import { type AsyncActionFeedback, useAsyncAction } from '../../shared/composables/useAsyncAction'
 import { USER_LOGIN_PATH } from '../../shared/constants/routePaths'
 import {
-  displayErrorMessage,
-  isRequiredErrorMessage,
   markRequiredError,
 } from '../../shared/utils/formValidation'
 import { type ProfileFeedback, useProfileFeedback } from './useProfileFeedback'
@@ -80,18 +78,6 @@ export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependenci
     return passwordFields.map((field) => validateField(field)).every(Boolean)
   }
 
-  function isInlineError(field: PasswordField) {
-    return isRequiredErrorMessage(errors.value[field])
-  }
-
-  function shouldShowMessage(field: PasswordField) {
-    return Boolean(errors.value[field]) && !isInlineError(field)
-  }
-
-  function getDescribedby(field: PasswordField, errorId: string) {
-    return shouldShowMessage(field) ? errorId : undefined
-  }
-
   function clearFieldError(field: PasswordField) {
     if (errors.value[field]) {
       errors.value[field] = ''
@@ -139,9 +125,5 @@ export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependenci
     clearFieldError,
     handleNewPasswordInput,
     submit,
-    isInlineError,
-    shouldShowMessage,
-    getDescribedby,
-    displayErrorMessage,
   }
 }

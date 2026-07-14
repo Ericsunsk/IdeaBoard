@@ -28,35 +28,46 @@
             novalidate
             @submit.prevent="handleRegister"
           >
-            <AuthFormField
-              v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+            <IbFormField
+              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
               label="账号"
               :error="errors.username"
-              error-id="register-username-error"
+              field-id="register-username"
+              required
+              inline-required
+              :field-class="authFieldClass"
+              :message-pt="authErrorMessagePt"
             >
               <div class="relative w-full">
                 <span :class="authInputIconClass">
                   <UserIcon class="size-5" />
                 </span>
                 <InputText
+                  :id="fieldId"
                   v-model="formValue.username"
                   unstyled
                   autocomplete="username"
+                  :required="required"
                   :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
                   :invalid="invalid"
                   :placeholder="inlineError ? inlineErrorText : '设置你的账号'"
+                  :aria-invalid="ariaInvalid"
                   :aria-describedby="describedbyId"
                   @blur="validateField('username')"
                   @update:model-value="clearFieldError('username')"
                 />
               </div>
-            </AuthFormField>
+            </IbFormField>
 
-            <AuthFormField
-              v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+            <IbFormField
+              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
               label="密码"
               :error="errors.password"
-              error-id="register-password-error"
+              field-id="register-password"
+              required
+              inline-required
+              :field-class="authFieldClass"
+              :message-pt="authErrorMessagePt"
             >
               <div class="relative w-full">
                 <span :class="authInputIconClass">
@@ -70,7 +81,10 @@
                   fluid
                   :pt="authPasswordPt"
                   :input-props="{
+                    id: fieldId,
                     autocomplete: 'new-password',
+                    required,
+                    'aria-invalid': ariaInvalid,
                     'aria-describedby': describedbyId,
                   }"
                   :invalid="invalid"
@@ -81,13 +95,17 @@
                   @update:model-value="handlePasswordInput"
                 />
               </div>
-            </AuthFormField>
+            </IbFormField>
 
-            <AuthFormField
-              v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+            <IbFormField
+              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
               label="确认密码"
               :error="errors.confirmPassword"
-              error-id="register-confirm-password-error"
+              field-id="register-confirm-password"
+              required
+              inline-required
+              :field-class="authFieldClass"
+              :message-pt="authErrorMessagePt"
             >
               <div class="relative w-full">
                 <span :class="authInputIconClass">
@@ -101,7 +119,10 @@
                   fluid
                   :pt="authPasswordPt"
                   :input-props="{
+                    id: fieldId,
                     autocomplete: 'new-password',
+                    required,
+                    'aria-invalid': ariaInvalid,
                     'aria-describedby': describedbyId,
                   }"
                   :invalid="invalid"
@@ -112,7 +133,7 @@
                   @update:model-value="clearFieldError('confirmPassword')"
                 />
               </div>
-            </AuthFormField>
+            </IbFormField>
 
             <Button
               unstyled
@@ -154,7 +175,7 @@ import { User as UserIcon, Lock as LockIcon, Shield as ShieldIcon } from '@icono
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useAuthFeedback } from '../useAuthFeedback'
-import AuthFormField from './AuthFormField.vue'
+import IbFormField from '../../../shared/components/IbFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
   AUTH_PASSWORD_LIMIT,
@@ -170,6 +191,8 @@ import {
   authInputIconClass,
   authInputClass,
   authInputErrorClass,
+  authErrorMessagePt,
+  authFieldClass,
   authModalBackdropClass,
   authModalHeaderClass,
   authModalKickerClass,

@@ -24,35 +24,46 @@
           </div>
 
           <form class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
-            <AuthFormField
-              v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+            <IbFormField
+              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
               label="账号"
               :error="errors.username"
-              error-id="login-username-error"
+              field-id="login-username"
+              required
+              inline-required
+              :field-class="authFieldClass"
+              :message-pt="authErrorMessagePt"
             >
               <div class="relative w-full">
                 <span :class="authInputIconClass">
                   <UserIcon class="size-5" />
                 </span>
                 <InputText
+                  :id="fieldId"
                   v-model="formValue.username"
                   unstyled
                   autocomplete="username"
+                  :required="required"
                   :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
                   :invalid="invalid"
                   :placeholder="inlineError ? inlineErrorText : '请输入账号'"
+                  :aria-invalid="ariaInvalid"
                   :aria-describedby="describedbyId"
                   @blur="validateField('username')"
                   @update:model-value="clearFieldError('username')"
                 />
               </div>
-            </AuthFormField>
+            </IbFormField>
 
-            <AuthFormField
-              v-slot="{ describedbyId, inlineError, inlineErrorText, invalid }"
+            <IbFormField
+              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
               label="密码"
               :error="errors.password"
-              error-id="login-password-error"
+              field-id="login-password"
+              required
+              inline-required
+              :field-class="authFieldClass"
+              :message-pt="authErrorMessagePt"
             >
               <div class="relative w-full">
                 <span :class="authInputIconClass">
@@ -66,7 +77,10 @@
                   fluid
                   :pt="authPasswordPt"
                   :input-props="{
+                    id: fieldId,
                     autocomplete: 'current-password',
+                    required,
+                    'aria-invalid': ariaInvalid,
                     'aria-describedby': describedbyId,
                   }"
                   :invalid="invalid"
@@ -77,7 +91,7 @@
                   @update:model-value="clearFieldError('password')"
                 />
               </div>
-            </AuthFormField>
+            </IbFormField>
 
             <Button
               unstyled
@@ -119,7 +133,7 @@ import { User as UserIcon, Lock as LockIcon } from '@iconoir/vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useAuthFeedback } from '../useAuthFeedback'
-import AuthFormField from './AuthFormField.vue'
+import IbFormField from '../../../shared/components/IbFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
 import {
@@ -129,6 +143,8 @@ import {
   authInputIconClass,
   authInputClass,
   authInputErrorClass,
+  authErrorMessagePt,
+  authFieldClass,
   authModalBackdropClass,
   authModalHeaderClass,
   authModalKickerClass,

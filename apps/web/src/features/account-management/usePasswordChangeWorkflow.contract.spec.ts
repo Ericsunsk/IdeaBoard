@@ -12,14 +12,10 @@ describe('usePasswordChangeWorkflow', () => {
 
     expect(workflow.validateField('oldPassword')).toBe(false)
     expect(workflow.errors.value.oldPassword).toBe(markRequiredError('请输入当前原密码'))
-    expect(workflow.isInlineError('oldPassword')).toBe(true)
-    expect(workflow.shouldShowMessage('oldPassword')).toBe(false)
 
     workflow.form.value.newPassword = '12345'
     expect(workflow.validateField('newPassword')).toBe(false)
     expect(workflow.errors.value.newPassword).toBe('密码至少6个字符')
-    expect(workflow.shouldShowMessage('newPassword')).toBe(true)
-    expect(workflow.getDescribedby('newPassword', 'new-error')).toBe('new-error')
 
     workflow.form.value.newPassword = '123456'
     workflow.form.value.confirmPassword = 'abcdef'

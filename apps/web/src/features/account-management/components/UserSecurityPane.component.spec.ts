@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file -- Local stubs isolate the pane's visual contract. */
 import PrimeVue from 'primevue/config'
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,10 +16,6 @@ const PasswordStub = defineComponent({
   template: '<input :value="modelValue" />',
 })
 
-const MessageStub = defineComponent({
-  template: '<p><slot /></p>',
-})
-
 describe('UserSecurityPane', () => {
   beforeEach(() => {
     usePasswordChangeWorkflowMock.mockReset()
@@ -32,10 +27,6 @@ describe('UserSecurityPane', () => {
       clearFieldError: vi.fn(),
       handleNewPasswordInput: vi.fn(),
       submit: vi.fn(),
-      isInlineError: vi.fn(() => false),
-      shouldShowMessage: vi.fn(() => false),
-      getDescribedby: vi.fn(),
-      displayErrorMessage: vi.fn((value: string) => value),
     })
   })
 
@@ -43,7 +34,7 @@ describe('UserSecurityPane', () => {
     renderWithUser(UserSecurityPane, {
       global: {
         plugins: [[PrimeVue, primeVueTestOptions]],
-        stubs: { Message: MessageStub, Password: PasswordStub },
+        stubs: { Password: PasswordStub },
       },
     })
 

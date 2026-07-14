@@ -1,8 +1,16 @@
 <template>
   <AccountManagementPane title="账号安全">
     <form class="grid gap-5" novalidate @submit.prevent="handleUpdatePassword">
-      <label :class="passwordFieldClass">
-        <span>当前原密码</span>
+      <IbFormField
+        v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+        label="当前原密码"
+        :error="pwdErrors.oldPassword"
+        field-id="profile-old-password"
+        required
+        inline-required
+        :field-class="passwordFieldClass"
+        :message-pt="ibFormErrorMessagePt"
+      >
         <Password
           v-model="pwdForm.oldPassword"
           autocomplete="current-password"
@@ -11,39 +19,37 @@
           unstyled
           :pt="ibPasswordPt"
           :input-props="{
+            id: fieldId,
             autocomplete: 'current-password',
-            'aria-describedby': getPasswordDescribedby('oldPassword', 'profile-old-password-error'),
+            required,
+            'aria-invalid': ariaInvalid,
+            'aria-describedby': describedbyId,
           }"
-          :invalid="Boolean(pwdErrors.oldPassword)"
+          :invalid="invalid"
           :input-class="[
             passwordInputClass,
-            isPasswordInlineError('oldPassword') ? passwordInputErrorClass : '',
+            inlineError ? passwordInputErrorClass : '',
           ]"
           :placeholder="
-            isPasswordInlineError('oldPassword')
-              ? displayErrorMessage(pwdErrors.oldPassword)
-              : '请输入当前使用的密码'
+            inlineError ? inlineErrorText : '请输入当前使用的密码'
           "
           toggle-mask
           @blur="validatePasswordField('oldPassword')"
           @update:model-value="clearPasswordFieldError('oldPassword')"
         />
-        <Message
-          v-if="shouldShowPasswordMessage('oldPassword')"
-          id="profile-old-password-error"
-          unstyled
-          :pt="ibFormErrorMessagePt"
-          severity="error"
-          size="small"
-          :closable="false"
-        >
-          {{ displayErrorMessage(pwdErrors.oldPassword) }}
-        </Message>
-      </label>
+      </IbFormField>
 
       <div class="grid grid-cols-2 gap-5 max-[720px]:grid-cols-1">
-        <label :class="passwordFieldClass">
-          <span>设置新密码</span>
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          label="设置新密码"
+          :error="pwdErrors.newPassword"
+          field-id="profile-new-password"
+          required
+          inline-required
+          :field-class="passwordFieldClass"
+          :message-pt="ibFormErrorMessagePt"
+        >
           <Password
             v-model="pwdForm.newPassword"
             autocomplete="new-password"
@@ -52,41 +58,36 @@
             unstyled
             :pt="ibPasswordPt"
             :input-props="{
+              id: fieldId,
               autocomplete: 'new-password',
-              'aria-describedby': getPasswordDescribedby(
-                'newPassword',
-                'profile-new-password-error',
-              ),
+              required,
+              'aria-invalid': ariaInvalid,
+              'aria-describedby': describedbyId,
             }"
-            :invalid="Boolean(pwdErrors.newPassword)"
+            :invalid="invalid"
             :input-class="[
               passwordInputClass,
-              isPasswordInlineError('newPassword') ? passwordInputErrorClass : '',
+              inlineError ? passwordInputErrorClass : '',
             ]"
             :placeholder="
-              isPasswordInlineError('newPassword')
-                ? displayErrorMessage(pwdErrors.newPassword)
-                : '不少于6位字符'
+              inlineError ? inlineErrorText : '不少于6位字符'
             "
             toggle-mask
             @blur="validatePasswordField('newPassword')"
             @update:model-value="handleNewPasswordInput"
           />
-          <Message
-            v-if="shouldShowPasswordMessage('newPassword')"
-            id="profile-new-password-error"
-            unstyled
-            :pt="ibFormErrorMessagePt"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ displayErrorMessage(pwdErrors.newPassword) }}
-          </Message>
-        </label>
+        </IbFormField>
 
-        <label :class="passwordFieldClass">
-          <span>重复新密码</span>
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          label="重复新密码"
+          :error="pwdErrors.confirmPassword"
+          field-id="profile-confirm-password"
+          required
+          inline-required
+          :field-class="passwordFieldClass"
+          :message-pt="ibFormErrorMessagePt"
+        >
           <Password
             v-model="pwdForm.confirmPassword"
             autocomplete="new-password"
@@ -95,38 +96,25 @@
             unstyled
             :pt="ibPasswordPt"
             :input-props="{
+              id: fieldId,
               autocomplete: 'new-password',
-              'aria-describedby': getPasswordDescribedby(
-                'confirmPassword',
-                'profile-confirm-password-error',
-              ),
+              required,
+              'aria-invalid': ariaInvalid,
+              'aria-describedby': describedbyId,
             }"
-            :invalid="Boolean(pwdErrors.confirmPassword)"
+            :invalid="invalid"
             :input-class="[
               passwordInputClass,
-              isPasswordInlineError('confirmPassword') ? passwordInputErrorClass : '',
+              inlineError ? passwordInputErrorClass : '',
             ]"
             :placeholder="
-              isPasswordInlineError('confirmPassword')
-                ? displayErrorMessage(pwdErrors.confirmPassword)
-                : '请再次输入新密码'
+              inlineError ? inlineErrorText : '请再次输入新密码'
             "
             toggle-mask
             @blur="validatePasswordField('confirmPassword')"
             @update:model-value="clearPasswordFieldError('confirmPassword')"
           />
-          <Message
-            v-if="shouldShowPasswordMessage('confirmPassword')"
-            id="profile-confirm-password-error"
-            unstyled
-            :pt="ibFormErrorMessagePt"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ displayErrorMessage(pwdErrors.confirmPassword) }}
-          </Message>
-        </label>
+        </IbFormField>
       </div>
 
       <Button
@@ -144,7 +132,6 @@
 
 <script setup lang="ts">
 import Button from 'primevue/button'
-import Message from 'primevue/message'
 import Password from 'primevue/password'
 import {
   ibFormErrorMessagePt,
@@ -153,6 +140,7 @@ import {
   ibFormInputErrorClass,
   ibPasswordPt,
 } from '../../../shared/theme/formControls'
+import IbFormField from '../../../shared/components/IbFormField.vue'
 import { usePasswordChangeWorkflow } from '../usePasswordChangeWorkflow'
 import AccountManagementPane from './AccountManagementPane.vue'
 import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
@@ -165,10 +153,6 @@ const {
   clearFieldError: clearPasswordFieldError,
   handleNewPasswordInput,
   submit: handleUpdatePassword,
-  isInlineError: isPasswordInlineError,
-  shouldShowMessage: shouldShowPasswordMessage,
-  getDescribedby: getPasswordDescribedby,
-  displayErrorMessage,
 } = usePasswordChangeWorkflow()
 
 const passwordFieldClass = ibFormFieldClass
