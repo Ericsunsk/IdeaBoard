@@ -64,5 +64,7 @@ describe('CanvasChrome', () => {
 
     expect(share.previousElementSibling).toBe(credits)
     expect(screen.getAllByRole('button', { name: 'Idea余额 100 Ideas' })).toHaveLength(1)
+    expect(credits).toHaveTextContent('100')
+    expect(credits).not.toHaveTextContent('Ideas')
   })
 })

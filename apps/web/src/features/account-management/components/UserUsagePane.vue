@@ -153,7 +153,7 @@ const { usage, displayRange, isInitialPending, isSwitching, error, retry } = use
   () => props.active,
 )
 
-const integerFormatter = new Intl.NumberFormat('zh-CN')
+const numberFormatter = new Intl.NumberFormat('zh-CN')
 const summaryPanelClass =
   'overflow-hidden rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]'
 const summaryGridClass = 'grid grid-cols-5 max-[640px]:grid-cols-2'
@@ -194,11 +194,11 @@ const summaryCellDefinitions = [
 const metrics = computed(() => {
   const lifetime = usage.value?.lifetime
   const values = [
-    formatIdeaAmount(lifetime?.total_credits ?? 0),
-    formatIdeaAmount(lifetime?.peak_daily_credits ?? 0),
-    formatIdeaAmount(lifetime?.average_daily_credits ?? 0),
-    formatInteger(lifetime?.task_count ?? 0),
-    formatInteger(lifetime?.active_days ?? 0),
+    formatNumber(lifetime?.total_credits ?? 0),
+    formatNumber(lifetime?.peak_daily_credits ?? 0),
+    formatNumber(lifetime?.average_daily_credits ?? 0),
+    formatNumber(lifetime?.task_count ?? 0),
+    formatNumber(lifetime?.active_days ?? 0),
   ]
   return summaryCellDefinitions.map((metric, index) => ({ ...metric, value: values[index] }))
 })
@@ -221,8 +221,8 @@ function rangeDays(value: UserUsageRange) {
   return rangeOptions.find((candidate) => candidate.key === value)?.days ?? 30
 }
 
-function formatInteger(value: number) {
-  return integerFormatter.format(value)
+function formatNumber(value: number) {
+  return numberFormatter.format(value)
 }
 
 function errorMessage(value: unknown) {
