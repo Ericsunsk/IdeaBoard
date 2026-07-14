@@ -191,6 +191,12 @@
           :active="activeTab === 'billing'"
         />
 
+        <UserRewardsPane
+          v-else-if="activeTab === 'rewards'"
+          key="rewards"
+          @redeem="handleRewardRedeem"
+        />
+
         <UserUsagePane
           v-else-if="activeTab === 'usage'"
           key="usage"
@@ -377,6 +383,7 @@ import {
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useAppToast } from '../../../shared/composables/useAppToast'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
 import {
@@ -389,6 +396,7 @@ import {
 import { useProfileFeedback } from '../useProfileFeedback'
 import AccountComingSoonPane from './AccountComingSoonPane.vue'
 import UserCreditsPane from './UserCreditsPane.vue'
+import UserRewardsPane from './UserRewardsPane.vue'
 import UserUsagePane from './UserUsagePane.vue'
 import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
@@ -402,7 +410,7 @@ type NavGroup = {
   label: string
   items: NavItem[]
 }
-type UpcomingTab = Extract<AccountManagementTab, 'recharge' | 'subscriptions' | 'rewards'>
+type UpcomingTab = Extract<AccountManagementTab, 'recharge' | 'subscriptions'>
 type UpcomingPage = {
   category: string
   title: string
@@ -426,6 +434,7 @@ const userStore = useUserStore()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const profileFeedback = useProfileFeedback()
+const appToast = useAppToast()
 const {
   form: pwdForm,
   errors: pwdErrors,
@@ -483,7 +492,6 @@ const navGroups = [
 const upcomingPages: Record<UpcomingTab, UpcomingPage> = {
   recharge: { category: '订阅与套餐', title: '充值Idea', icon: Coins },
   subscriptions: { category: '订阅与套餐', title: '订阅套餐', icon: CreditCard },
-  rewards: { category: '权益和账单', title: '奖励中心', icon: Gift },
 }
 
 const upcomingPage = computed(() =>
@@ -501,6 +509,10 @@ const passwordInputErrorClass = ibFormInputErrorClass
 
 function isUpcomingTab(tab: AccountManagementTab): tab is UpcomingTab {
   return tab in upcomingPages
+}
+
+function handleRewardRedeem() {
+  appToast.info('兑换服务暂未开放')
 }
 
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))

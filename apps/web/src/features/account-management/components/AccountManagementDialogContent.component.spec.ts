@@ -117,6 +117,9 @@ function renderAccountManagementDialogContent(initialTab: AccountManagementTab =
           props: ['active'],
           template: '<section aria-label="用量统计">Lifetime 数据</section>',
         },
+        UserRewardsPane: {
+          template: '<section aria-label="奖励中心">输入兑换码</section>',
+        },
       },
     },
   })
@@ -182,7 +185,6 @@ describe('AccountManagementDialogContent', () => {
   it.each([
     ['充值Idea', '充值Idea即将上线'],
     ['订阅套餐', '订阅套餐即将上线'],
-    ['奖励中心', '奖励中心即将上线'],
   ])('opens the %s roadmap page', async (label, regionName) => {
     const { user } = renderAccountManagementDialogContent()
 
@@ -190,6 +192,15 @@ describe('AccountManagementDialogContent', () => {
 
     expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('region', { name: regionName })).toBeVisible()
+  })
+
+  it('opens the rewards redemption pane', async () => {
+    const { user } = renderAccountManagementDialogContent()
+
+    await user.click(screen.getByRole('button', { name: '奖励中心' }))
+
+    expect(screen.getByRole('button', { name: '奖励中心' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('region', { name: '奖励中心' })).toHaveTextContent('输入兑换码')
   })
 
   it('opens lifetime usage inside account management', async () => {
