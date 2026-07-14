@@ -20,6 +20,17 @@ export const ideaBoardPrimePt = {
     },
     inputMultiple: { class: '!shadow-none' },
   },
+  datatable: {
+    column: {
+      headerCell: {
+        class: 'text-admin-body',
+        style: { verticalAlign: 'middle' },
+      },
+      bodyCell: {
+        style: { verticalAlign: 'middle' },
+      },
+    },
+  },
   paginator: {
     root: { class: '!gap-1 !border-0 !bg-transparent !p-0' },
   },

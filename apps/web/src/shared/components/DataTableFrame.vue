@@ -29,10 +29,8 @@
         </slot>
       </template>
 
-      <template #loading>
-        <slot name="loading">
-          <span class="text-sm font-semibold" role="status">{{ loadingLabel }}</span>
-        </slot>
+      <template v-if="slots.loading" #loading>
+        <slot name="loading" />
       </template>
     </DataTable>
 
@@ -57,7 +55,6 @@ const props = withDefaults(
     scrollAriaLabel?: string
     emptyTitle?: string
     emptyDescription?: string
-    loadingLabel?: string
   }>(),
   {
     value: () => [],
@@ -71,7 +68,6 @@ const props = withDefaults(
     scrollAriaLabel: '',
     emptyTitle: '暂无数据',
     emptyDescription: '',
-    loadingLabel: '正在加载...',
   },
 )
 

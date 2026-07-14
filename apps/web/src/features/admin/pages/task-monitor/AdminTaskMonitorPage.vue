@@ -222,7 +222,6 @@
         :value="tasks"
         :loading="loading"
         data-key="task_id"
-        size="small"
         scrollable
         :table-style="{ minWidth: '1536px' }"
       >
@@ -230,11 +229,7 @@
           <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
         </template>
 
-        <Column
-          selection-mode="multiple"
-          header-style="width: 3.5rem"
-          :body-style="{ width: '3.5rem' }"
-        />
+        <Column selection-mode="multiple" style="width: 3rem" />
 
         <Column header="创建时间" :style="{ width: '156px' }">
           <template #body="{ data }">

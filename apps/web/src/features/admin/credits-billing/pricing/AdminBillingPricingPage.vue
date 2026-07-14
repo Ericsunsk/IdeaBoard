@@ -99,21 +99,16 @@
           :value="visibleCatalogItems"
           :loading="catalogLoading"
           data-key="sku"
-          size="small"
           scrollable
           frame-class="min-h-[420px]"
           :table-style="{ minWidth: '620px' }"
-          :row-class="catalogRowClass"
-          @row-click="selectSKU($event.data)"
+          selection-mode="single"
+          :selection="selectedSKU"
+          @row-select="selectSKU($event.data)"
         >
           <Column header="SKU" :style="{ minWidth: '280px' }">
             <template #body="{ data: item }">
-              <button
-                type="button"
-                class="block w-full rounded-[var(--radius-ib-control)] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-accent"
-                :aria-pressed="selectedSKU?.sku === item.sku"
-                @click.stop="selectSKU(item)"
-              >
+              <div class="min-w-0">
                 <span class="block truncate text-admin-body font-bold text-admin-text-1">
                   {{ item.displayName }}
                 </span>
@@ -123,7 +118,7 @@
                 >
                   {{ item.sku }}
                 </code>
-              </button>
+              </div>
             </template>
           </Column>
           <Column header="当前价格" :style="{ width: '128px' }">
@@ -265,7 +260,6 @@
             :value="prices"
             :loading="pricesLoading"
             data-key="priceVersionId"
-            size="small"
             scrollable
             frame-class="min-h-[280px] border-t border-admin-border-soft"
             :table-style="{ minWidth: '650px' }"
@@ -749,12 +743,6 @@ function catalogStatus(item: AdminBillingCatalogItem) {
   if (!item.currentPrice) return { label: '未配置', severity: 'warn' as const }
   if (!item.currentPrice.enabled) return { label: '价格停用', severity: 'danger' as const }
   return { label: '可计价', severity: 'success' as const }
-}
-
-function catalogRowClass(item: AdminBillingCatalogItem) {
-  return selectedSKU.value?.sku === item.sku
-    ? '!bg-admin-surface-muted cursor-pointer'
-    : 'cursor-pointer hover:!bg-admin-surface-muted'
 }
 
 function emptySKUForm(): BillingSKUForm {

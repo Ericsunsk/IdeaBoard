@@ -101,7 +101,9 @@ describe('UserBillingRecordsPane', () => {
     expect(screen.getByRole('table', { name: '账单记录表格' })).toBeVisible()
     expect(screen.getAllByRole('columnheader')).toHaveLength(4)
     expect(screen.getByRole('status', { name: '正在加载账单记录' })).toBeInTheDocument()
-    expect(screen.getAllByTestId('billing-skeleton-row')).toHaveLength(5)
+    const skeletonRows = screen.getAllByTestId('billing-skeleton-row')
+    expect(skeletonRows).toHaveLength(5)
+    expect(skeletonRows[0]).toHaveClass('p-skeleton')
   })
 
   it('renders the confirmed empty state inside the shared table frame', () => {
@@ -156,7 +158,9 @@ describe('UserBillingRecordsPane', () => {
     )
 
     const { user } = renderPane()
-    await user.click(screen.getByRole('button', { name: '加载更多' }))
+    const loadMoreButton = screen.getByRole('button', { name: '加载更多' })
+    expect(loadMoreButton).toHaveClass('p-button-outlined')
+    await user.click(loadMoreButton)
 
     expect(loadMore).toHaveBeenCalledOnce()
   })

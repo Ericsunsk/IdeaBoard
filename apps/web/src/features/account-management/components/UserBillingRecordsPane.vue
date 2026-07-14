@@ -1,18 +1,8 @@
 <template>
-  <section class="grid min-w-0 gap-5" aria-labelledby="user-billing-records-title">
-    <header>
-      <h2
-        id="user-billing-records-title"
-        class="m-0 text-[26px] leading-tight font-bold text-ib-text"
-      >
-        账单记录
-      </h2>
-    </header>
-
+  <AccountManagementPane title="账单记录">
     <DataTableFrame
       :value="tableRows"
       data-key="record_id"
-      size="small"
       scrollable
       :table-style="{ minWidth: '720px' }"
       table-aria-label="账单记录表格"
@@ -23,11 +13,10 @@
     >
       <Column field="occurred_at" header="交易时间" :style="{ width: '190px' }">
         <template #body="{ data }">
-          <span
+          <Skeleton
             v-if="isSkeletonRow(data)"
             data-testid="billing-skeleton-row"
-            class="block h-4 w-32 animate-pulse rounded-[var(--radius-ib-control)] bg-ib-surface-muted"
-            aria-hidden="true"
+            width="8rem"
           />
           <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
             {{ formatLocalDateTime(data.occurred_at) }}
@@ -37,11 +26,7 @@
 
       <Column field="title" header="记录内容" :style="{ minWidth: '220px' }">
         <template #body="{ data }">
-          <span
-            v-if="isSkeletonRow(data)"
-            class="block h-4 w-28 animate-pulse rounded-[var(--radius-ib-control)] bg-ib-surface-muted"
-            aria-hidden="true"
-          />
+          <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
           <span v-else class="block max-w-[320px] truncate font-semibold" :title="data.title">
             {{ data.title }}
           </span>
@@ -50,11 +35,7 @@
 
       <Column field="credit_delta" header="Idea 变动" :style="{ width: '140px' }">
         <template #body="{ data }">
-          <span
-            v-if="isSkeletonRow(data)"
-            class="block h-4 w-16 animate-pulse rounded-[var(--radius-ib-control)] bg-ib-surface-muted"
-            aria-hidden="true"
-          />
+          <Skeleton v-if="isSkeletonRow(data)" width="4rem" />
           <span v-else class="font-mono font-bold" :class="amountTone(data)">
             {{ formatSignedAmount(data.credit_delta) }}
           </span>
@@ -63,11 +44,7 @@
 
       <Column field="available_credits_after" header="可用余额" :style="{ width: '140px' }">
         <template #body="{ data }">
-          <span
-            v-if="isSkeletonRow(data)"
-            class="block h-4 w-20 animate-pulse rounded-[var(--radius-ib-control)] bg-ib-surface-muted"
-            aria-hidden="true"
-          />
+          <Skeleton v-if="isSkeletonRow(data)" width="5rem" />
           <span v-else class="font-mono font-semibold text-ib-text-muted">
             {{ formatAmount(data.available_credits_after) }}
           </span>
@@ -82,7 +59,14 @@
         >
           <p class="m-0 font-semibold text-ib-danger">账单加载失败</p>
           <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(initialError) }}</p>
-          <button type="button" :class="textButtonClass" @click="retryInitial()">重新加载</button>
+          <Button
+            label="重新加载"
+            severity="secondary"
+            size="small"
+            text
+            class="mt-3"
+            @click="retryInitial()"
+          />
         </div>
         <div
           v-else
@@ -105,32 +89,41 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-          <button type="button" :class="inlineTextButtonClass" @click="loadMore()">重试加载</button>
+          <Button
+            label="重试加载"
+            severity="secondary"
+            size="small"
+            text
+            @click="loadMore()"
+          />
         </div>
         <div
           v-else-if="hasNextPage"
           class="flex justify-center border-t border-ib-border-soft px-4 py-3"
         >
-          <button
-            type="button"
-            :class="loadMoreButtonClass"
-            :disabled="isFetchingNextPage"
+          <Button
+            label="加载更多"
+            severity="secondary"
+            size="small"
+            outlined
+            :loading="isFetchingNextPage"
             @click="loadMore()"
-          >
-            {{ isFetchingNextPage ? '正在加载...' : '加载更多' }}
-          </button>
+          />
         </div>
       </template>
     </DataTableFrame>
-  </section>
+  </AccountManagementPane>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
+import Skeleton from 'primevue/skeleton'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
 import type { UserBillingRecord } from '../userBillingRecordsResource'
 import { useUserBillingRecords } from '../useUserBillingRecords'
+import AccountManagementPane from './AccountManagementPane.vue'
 
 type BillingSkeletonRow = {
   record_id: string
@@ -158,13 +151,6 @@ const skeletonRows: BillingSkeletonRow[] = Array.from({ length: 5 }, (_, index) 
 const tableRows = computed<BillingTableRow[]>(() =>
   isInitialPending.value ? skeletonRows : records.value,
 )
-const textButtonClass =
-  'mt-3 rounded-[var(--radius-ib-control)] px-2 py-1 text-sm font-semibold text-ib-creative-accent-pressed outline-none transition-colors duration-[var(--duration-ib-standard)] hover:bg-ib-surface-hover focus-visible:shadow-[var(--shadow-ib-focus)]'
-const inlineTextButtonClass =
-  'shrink-0 rounded-[var(--radius-ib-control)] px-2 py-1 text-sm font-semibold text-ib-creative-accent-pressed outline-none transition-colors duration-[var(--duration-ib-standard)] hover:bg-ib-surface-hover focus-visible:shadow-[var(--shadow-ib-focus)]'
-const loadMoreButtonClass =
-  'h-9 rounded-[var(--radius-ib-control)] border border-ib-border-soft bg-ib-surface px-4 text-sm font-semibold text-ib-text-muted outline-none transition-colors duration-[var(--duration-ib-standard)] hover:border-ib-border-hover hover:text-ib-text focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-not-allowed disabled:opacity-60'
-
 function isSkeletonRow(row: BillingTableRow): row is BillingSkeletonRow {
   return 'isSkeleton' in row
 }

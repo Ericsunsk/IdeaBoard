@@ -1,9 +1,5 @@
 <template>
-  <div class="grid min-w-0 gap-7" aria-label="奖励中心">
-    <header>
-      <h2 class="m-0 text-[26px] leading-tight font-bold text-ib-text">奖励中心</h2>
-    </header>
-
+  <AccountManagementPane title="奖励中心">
     <section
       class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4"
       aria-labelledby="reward-code-heading"
@@ -32,7 +28,8 @@
             type="submit"
             label="兑换"
             :disabled="!canSubmit"
-            class="!h-12 !rounded-[var(--radius-ib-control)] !border-0 !bg-ib-creative-accent-hover !px-5 !text-[14px] !font-semibold !text-ib-text-inverse !shadow-none hover:!bg-ib-creative-accent-pressed focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!bg-ib-surface-disabled disabled:!text-ib-text-subtle disabled:!opacity-100"
+            size="large"
+            fluid
           />
         </div>
       </form>
@@ -47,7 +44,7 @@
         <span>暂无兑换记录</span>
       </div>
     </section>
-  </div>
+  </AccountManagementPane>
 </template>
 
 <script setup lang="ts">
@@ -56,17 +53,16 @@ import { Gift } from '@iconoir/vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
-
-const emit = defineEmits<{
-  redeem: [code: string]
-}>()
+import { useProfileFeedback } from '../useProfileFeedback'
+import AccountManagementPane from './AccountManagementPane.vue'
 
 const code = ref('')
+const profileFeedback = useProfileFeedback()
 const normalizedCode = computed(() => code.value.trim())
 const canSubmit = computed(() => normalizedCode.value.length > 0)
 
 function submitCode() {
   if (!canSubmit.value) return
-  emit('redeem', normalizedCode.value)
+  profileFeedback.rewardRedemptionUnavailable()
 }
 </script>

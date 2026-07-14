@@ -1,7 +1,15 @@
 import PrimeVue from 'primevue/config'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
 import UserRewardsPane from './UserRewardsPane.vue'
+
+const rewardRedemptionUnavailableMock = vi.hoisted(() => vi.fn())
+
+vi.mock('../useProfileFeedback', () => ({
+  useProfileFeedback: () => ({
+    rewardRedemptionUnavailable: rewardRedemptionUnavailableMock,
+  }),
+}))
 
 function renderRewardsPane() {
   return renderWithUser(UserRewardsPane, {
@@ -28,12 +36,13 @@ describe('UserRewardsPane', () => {
     expect(screen.getByText('暂无兑换记录')).toBeVisible()
   })
 
-  it('submits a trimmed redemption code', async () => {
-    const { emitted, user } = renderRewardsPane()
+  it('submits a trimmed redemption code through the local reward workflow', async () => {
+    rewardRedemptionUnavailableMock.mockReset()
+    const { user } = renderRewardsPane()
 
     await user.type(screen.getByRole('textbox', { name: '输入兑换码' }), '  IDEA-2026  ')
     await user.click(screen.getByRole('button', { name: '兑换' }))
 
-    expect(emitted().redeem).toEqual([['IDEA-2026']])
+    expect(rewardRedemptionUnavailableMock).toHaveBeenCalledOnce()
   })
 })

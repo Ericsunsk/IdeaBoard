@@ -41,24 +41,29 @@ describe('DataTableFrame', () => {
   })
 
   it('keeps PrimeVue loading feedback inside the themed loading mask', () => {
-    renderTable({ value: [], loading: true })
+    const { container } = renderTable({ value: [], loading: true })
 
     expect(screen.getByRole('table', { name: '记录表格' })).toBeVisible()
-    const loadingFeedback = screen.getByText('正在加载记录...')
-    expect(loadingFeedback).toBeVisible()
-    expect(loadingFeedback.parentElement).toHaveClass('p-datatable-mask', 'p-overlay-mask')
+    const loadingIcon = container.querySelector('svg')
+    expect(loadingIcon).toBeVisible()
+    expect(loadingIcon).toHaveClass('p-datatable-loading-icon')
+    expect(loadingIcon?.parentElement).toHaveClass('p-datatable-mask', 'p-overlay-mask')
   })
 
   it('forwards columns, row data, and DataTable events in styled mode', async () => {
     const onRowClick = vi.fn()
     const { user } = renderTable({ value: rows }, onRowClick)
 
-    expect(screen.getByRole('columnheader', { name: '名称' })).toHaveClass(
-      'p-datatable-header-cell',
-    )
-    expect(screen.getByRole('cell', { name: '第一条记录' })).toBeVisible()
+    const headerCell = screen.getByRole('columnheader', { name: '名称' })
+    const bodyCell = screen.getByRole('cell', { name: '第一条记录' })
 
-    await user.click(screen.getByRole('cell', { name: '第一条记录' }))
+    expect(headerCell).toHaveClass('p-datatable-header-cell')
+    expect(headerCell).toHaveClass('text-admin-body')
+    expect(headerCell).toHaveStyle({ verticalAlign: 'middle' })
+    expect(bodyCell).toBeVisible()
+    expect(bodyCell).toHaveStyle({ verticalAlign: 'middle' })
+
+    await user.click(bodyCell)
     expect(onRowClick).toHaveBeenCalledOnce()
   })
 
@@ -73,7 +78,7 @@ describe('DataTableFrame', () => {
       },
       template: `
         <DataTableFrame v-model:selection="selectedRows" :value="rows" data-key="id">
-          <Column selection-mode="multiple" header-style="width: 3.5rem" />
+          <Column selection-mode="multiple" style="width: 3rem" />
           <Column field="name" header="名称" />
         </DataTableFrame>
         <output aria-label="选中数量">{{ selectedRows.length }}</output>
@@ -83,7 +88,16 @@ describe('DataTableFrame', () => {
       global: { plugins: [[PrimeVue, primeVueTestOptions]] },
     })
 
-    const rowCheckbox = screen.getAllByRole('checkbox')[1]!
+    const [headerCheckbox, rowCheckbox] = screen.getAllByRole('checkbox')
+    const dataTableRoot = screen.getByRole('table').parentElement?.parentElement
+    expect(dataTableRoot).toHaveClass('p-datatable')
+    expect(dataTableRoot).not.toHaveClass('p-datatable-sm')
+    const headerSelectionCell = headerCheckbox?.closest('th')
+    const rowSelectionCell = rowCheckbox?.closest('td')
+    expect(headerSelectionCell).toHaveStyle({ verticalAlign: 'middle' })
+    expect(headerSelectionCell?.style.width).toBe('3rem')
+    expect(rowSelectionCell).toHaveStyle({ verticalAlign: 'middle' })
+    expect(rowSelectionCell?.style.width).toBe('3rem')
     expect(rowCheckbox).toHaveClass('p-checkbox-input')
 
     await user.click(rowCheckbox)
@@ -105,7 +119,6 @@ function renderTable(
       dataKey: 'id',
       emptyTitle: '暂无记录',
       emptyDescription: '记录会显示在这里',
-      loadingLabel: '正在加载记录...',
       scrollAriaLabel: '记录表格',
       tableAriaLabel: '记录表格',
     },

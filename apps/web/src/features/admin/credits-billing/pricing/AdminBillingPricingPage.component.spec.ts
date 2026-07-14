@@ -66,7 +66,11 @@ describe('AdminBillingPricingPage', () => {
   it('renders the real Catalog, canonical workflow identity, and immutable create warning', async () => {
     const { user } = renderPricingPage()
 
-    expect((await screen.findAllByText('草图成图 / GPT Image 1'))[0]).toBeVisible()
+    const catalogLabel = (await screen.findAllByText('草图成图 / GPT Image 1'))[0]
+    const catalogRow = catalogLabel?.closest('tr')
+    expect(catalogLabel).toBeVisible()
+    expect(catalogRow).toHaveAttribute('aria-selected', 'true')
+    expect(catalogRow).toHaveAttribute('data-p-selectable-row', 'true')
     expect(screen.getByText('AI 生图 · 草图成图')).toBeVisible()
     expect(screen.getByRole('heading', { name: 'AI Workflow 计费覆盖' })).toBeVisible()
     expect(screen.queryByText(/当前 API 未暴露 workflow × model 映射/)).not.toBeInTheDocument()

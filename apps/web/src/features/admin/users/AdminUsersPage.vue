@@ -84,18 +84,13 @@
       :value="users"
       :loading="loading"
       data-key="id"
-      size="small"
       lazy
       scrollable
       scroll-height="flex"
       frame-class="h-full min-h-0"
       :table-style="{ minWidth: '920px' }"
     >
-      <Column
-        selection-mode="multiple"
-        header-style="width: 3.5rem"
-        :body-style="{ width: '3.5rem' }"
-      />
+      <Column selection-mode="multiple" style="width: 3rem" />
 
       <Column field="username" header="用户" :style="{ minWidth: '260px' }">
         <template #body="{ data: user }">
@@ -190,7 +185,6 @@
           {{ emptyUserMessage }}
         </div>
       </template>
-      <template #loading>正在加载用户...</template>
     </DataTableFrame>
   </AdminTablePanel>
 

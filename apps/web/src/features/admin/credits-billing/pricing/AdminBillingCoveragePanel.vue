@@ -41,7 +41,6 @@
       :value="items"
       :loading="loading"
       data-key="sku"
-      size="small"
       scrollable
       scroll-height="320px"
       frame-class="min-h-[180px]"

@@ -1,9 +1,5 @@
 <template>
-  <div class="grid min-w-0 gap-6" aria-label="用量统计">
-    <header>
-      <h2 class="m-0 text-[26px] leading-tight font-bold text-ib-text">用量统计</h2>
-    </header>
-
+  <AccountManagementPane title="用量统计">
     <template v-if="isInitialPending">
       <section :class="summaryPanelClass" aria-label="正在加载用量统计">
         <div :class="summaryGridClass">
@@ -130,7 +126,7 @@
         </table>
       </template>
     </RangedLineChartCard>
-  </div>
+  </AccountManagementPane>
 </template>
 
 <script setup lang="ts">
@@ -145,6 +141,7 @@ import {
   createUserUsageChartPlugins,
   resolveUserUsageChartTheme,
 } from '../userUsageTrendChart'
+import AccountManagementPane from './AccountManagementPane.vue'
 
 const props = defineProps<{ active: boolean }>()
 const selectedRange = ref<UserUsageRange>(DEFAULT_USER_USAGE_RANGE)

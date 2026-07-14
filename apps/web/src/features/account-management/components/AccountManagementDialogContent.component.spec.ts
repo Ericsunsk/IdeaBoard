@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file -- Local stubs keep the layout contract test focused. */
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
@@ -9,6 +9,7 @@ import type { AccountManagementTab } from '../useAccountManagementDialogControll
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
 const logoutAndRedirectMock = vi.hoisted(() => vi.fn())
+const useAvatarUploadWorkflowMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../shared/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({
@@ -28,6 +29,10 @@ vi.mock('../../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({
     error: vi.fn(),
   }),
+}))
+
+vi.mock('../useAvatarUploadWorkflow', () => ({
+  useAvatarUploadWorkflow: useAvatarUploadWorkflowMock,
 }))
 
 const ButtonStub = defineComponent({
@@ -129,6 +134,11 @@ describe('AccountManagementDialogContent', () => {
   beforeEach(() => {
     logoutAndRedirectMock.mockReset()
     logoutAndRedirectMock.mockResolvedValue(true)
+    useAvatarUploadWorkflowMock.mockReset()
+    useAvatarUploadWorkflowMock.mockReturnValue({
+      uploading: ref(false),
+      handleFileChange: vi.fn(),
+    })
     useUserStore().clearAuth()
     localStorage.clear()
   })
@@ -163,6 +173,18 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.getByRole('textbox', { name: '当前原密码' })).toBeVisible()
     expect(screen.getByRole('textbox', { name: '设置新密码' })).toBeVisible()
     expect(screen.queryByText('auth-user-layout')).not.toBeInTheDocument()
+  })
+
+  it('keeps the profile workflow mounted while visiting another account pane', async () => {
+    const { user } = renderAccountManagementDialogContent()
+
+    expect(useAvatarUploadWorkflowMock).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: '账号安全' }))
+    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '个人资料' }))
+
+    expect(screen.getByRole('heading', { name: '个人资料' })).toBeVisible()
+    expect(useAvatarUploadWorkflowMock).toHaveBeenCalledOnce()
   })
 
   it('opens billing records inside account management', async () => {
