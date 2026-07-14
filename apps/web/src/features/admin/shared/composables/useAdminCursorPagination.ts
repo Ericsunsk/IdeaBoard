@@ -19,7 +19,7 @@ export function useAdminCursorPagination<TCursor extends AdminCursorValue>(
   function setNextCursor(value: TCursor | undefined) {
     if (
       value === undefined ||
-      (typeof value === 'number' && !Number.isFinite(value)) ||
+      (typeof value === 'number' && (!Number.isSafeInteger(value) || value < 0)) ||
       cursorStack.value.includes(value)
     ) {
       nextCursor.value = undefined

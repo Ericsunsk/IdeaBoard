@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import {
   filterBillingCatalog,
   isCatalogItemBillable,
@@ -49,6 +49,7 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
   const mutationPending = ref(false)
   const catalogPagination = useAdminCursorPagination<string>({ pending: catalogLoading })
   const pricePagination = useAdminCursorPagination<number>({ pending: pricesLoading })
+  const catalogLoadSequence = shallowRef(0)
   const priceLoadSequence = shallowRef(0)
 
   const visibleCatalogItems = computed(() =>
@@ -74,6 +75,8 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
     preferredSKU = selectedSKU.value?.sku,
     fallbackSelection?: AdminBillingCatalogItem,
   ) {
+    const sequence = catalogLoadSequence.value + 1
+    catalogLoadSequence.value = sequence
     catalogLoading.value = true
     catalogError.value = ''
     try {
@@ -81,14 +84,24 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
         afterSku: catalogPagination.cursor.value,
         limit: catalogPageSize,
       })
+      if (sequence !== catalogLoadSequence.value) return
       catalogItems.value = page.items
       catalogPagination.setNextCursor(page.nextAfterSku)
 
+      const visibleItems = filterBillingCatalog(
+        page.items,
+        searchKeyword.value,
+        catalogFilter.value,
+      )
+      const fallbackSelectionIsVisible =
+        fallbackSelection !== undefined &&
+        fallbackSelection.sku === preferredSKU &&
+        filterBillingCatalog([fallbackSelection], searchKeyword.value, catalogFilter.value).length > 0
       const nextSelection =
-        page.items.find((item) => item.sku === preferredSKU) ??
-        (fallbackSelection && fallbackSelection.sku === preferredSKU
+        visibleItems.find((item) => item.sku === preferredSKU) ??
+        (fallbackSelectionIsVisible
           ? fallbackSelection
-          : page.items.at(0))
+          : visibleItems.at(0))
       selectedSKU.value = nextSelection
       resetPricePagination()
       if (nextSelection) {
@@ -97,10 +110,11 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
         prices.value = []
       }
     } catch (error) {
+      if (sequence !== catalogLoadSequence.value) return
       catalogError.value = 'SKU Catalog 加载失败'
       options.feedback.error(error, catalogError.value)
     } finally {
-      catalogLoading.value = false
+      if (sequence === catalogLoadSequence.value) catalogLoading.value = false
     }
   }
 
@@ -271,6 +285,18 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
   function resetPricePagination() {
     pricePagination.reset()
   }
+
+  watch([searchKeyword, catalogFilter], () => {
+    const preferredSKU = selectedSKU.value?.sku
+    resetCatalogPagination()
+    catalogItems.value = []
+    selectedSKU.value = undefined
+    prices.value = []
+    resetPricePagination()
+    priceLoadSequence.value += 1
+    pricesLoading.value = false
+    void loadCatalog(preferredSKU)
+  })
 
   return {
     coverageItems,

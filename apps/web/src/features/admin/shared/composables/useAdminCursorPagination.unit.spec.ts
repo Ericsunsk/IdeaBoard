@@ -81,11 +81,18 @@ describe('useAdminCursorPagination', () => {
     expect(stringPagination.cursor.value).toBe('')
   })
 
-  it('rejects non-finite and cyclic cursor values', () => {
+  it('accepts zero but rejects invalid and cyclic numeric cursor values', () => {
     const pagination = useAdminCursorPagination<number>()
 
+    expect(pagination.setNextCursor(0)).toBe(true)
+    pagination.reset()
+
+    expect(pagination.setNextCursor(-1)).toBe(false)
+    expect(pagination.setNextCursor(1.5)).toBe(false)
+    expect(pagination.setNextCursor(Number.MAX_SAFE_INTEGER + 1)).toBe(false)
     expect(pagination.setNextCursor(Number.NaN)).toBe(false)
     expect(pagination.setNextCursor(Number.POSITIVE_INFINITY)).toBe(false)
+    expect(pagination.setNextCursor(Number.NEGATIVE_INFINITY)).toBe(false)
     expect(pagination.hasNext.value).toBe(false)
 
     expect(pagination.setNextCursor(2)).toBe(true)

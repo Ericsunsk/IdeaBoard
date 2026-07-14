@@ -82,6 +82,112 @@ describe('useAdminBillingPricing', () => {
     expect(feedback.success).toHaveBeenCalledWith('SKU 已创建；该标识将永久占用且不可复用')
     expect(feedback.error).toHaveBeenCalledWith(expect.any(Error), 'SKU Catalog 加载失败')
   })
+
+  it('returns to the first Catalog page and reselects a visible SKU when search changes', async () => {
+    const pageOne = [makeItem('test:a'), makeItem('test:b')]
+    const pageTwo = [makeItem('test:c')]
+    const resource = createResource()
+    resource.listSKUs.mockImplementation(async ({ afterSku } = {}) =>
+      afterSku ? { items: pageTwo } : { items: pageOne, nextAfterSku: 'test:b' },
+    )
+    resource.listPrices.mockResolvedValue({ prices: [] })
+    const pricing = useAdminBillingPricing({
+      resource,
+      feedback: { success: vi.fn(), error: vi.fn() },
+    })
+
+    await pricing.loadCatalog()
+    await pricing.nextCatalogPage()
+    expect(pricing.currentCatalogPage.value).toBe(2)
+    expect(pricing.selectedSKU.value?.sku).toBe('test:c')
+
+    pricing.searchKeyword.value = 'test:b'
+
+    await vi.waitFor(() => expect(resource.listSKUs).toHaveBeenCalledTimes(3))
+    expect(resource.listSKUs).toHaveBeenLastCalledWith({ afterSku: undefined, limit: 24 })
+    expect(pricing.currentCatalogPage.value).toBe(1)
+    expect(pricing.visibleCatalogItems.value.map((item) => item.sku)).toEqual(['test:b'])
+    expect(pricing.selectedSKU.value?.sku).toBe('test:b')
+  })
+
+  it('ignores an obsolete Catalog page response after search returns to the first page', async () => {
+    const pageOne = [makeItem('test:a'), makeItem('test:b')]
+    const pageTwo = [makeItem('test:c')]
+    let resolvePageTwo!: (page: { items: AdminBillingCatalogItem[] }) => void
+    const delayedPageTwo = new Promise<{ items: AdminBillingCatalogItem[] }>((resolve) => {
+      resolvePageTwo = resolve
+    })
+    let resolveResetPage!: (page: {
+      items: AdminBillingCatalogItem[]
+      nextAfterSku: string
+    }) => void
+    const delayedResetPage = new Promise<{
+      items: AdminBillingCatalogItem[]
+      nextAfterSku: string
+    }>((resolve) => {
+      resolveResetPage = resolve
+    })
+    const resource = createResource()
+    resource.listSKUs
+      .mockResolvedValueOnce({ items: pageOne, nextAfterSku: 'test:b' })
+      .mockImplementationOnce(async () => delayedPageTwo)
+      .mockImplementationOnce(async () => delayedResetPage)
+    resource.listPrices.mockResolvedValue({ prices: [] })
+    const pricing = useAdminBillingPricing({
+      resource,
+      feedback: { success: vi.fn(), error: vi.fn() },
+    })
+
+    await pricing.loadCatalog()
+    const obsoletePageLoad = pricing.nextCatalogPage()
+    await vi.waitFor(() => expect(resource.listSKUs).toHaveBeenCalledTimes(2))
+
+    pricing.searchKeyword.value = 'test:b'
+
+    await vi.waitFor(() => expect(resource.listSKUs).toHaveBeenCalledTimes(3))
+    expect(pricing.currentCatalogPage.value).toBe(1)
+    expect(pricing.catalogItems.value).toEqual([])
+    expect(pricing.selectedSKU.value).toBeUndefined()
+
+    resolveResetPage({ items: pageOne, nextAfterSku: 'test:b' })
+    await vi.waitFor(() => expect(pricing.selectedSKU.value?.sku).toBe('test:b'))
+    resolvePageTwo({ items: pageTwo })
+    await obsoletePageLoad
+
+    expect(pricing.currentCatalogPage.value).toBe(1)
+    expect(pricing.catalogItems.value).toEqual(pageOne)
+    expect(pricing.visibleCatalogItems.value.map((item) => item.sku)).toEqual(['test:b'])
+    expect(pricing.selectedSKU.value?.sku).toBe('test:b')
+  })
+
+  it('returns to the first Catalog page and clears an invisible SKU when the filter changes', async () => {
+    const pageOne = [makeItem('test:a'), makeItem('test:b')]
+    const pageTwo = [makeItem('test:c')]
+    const resource = createResource()
+    resource.listSKUs.mockImplementation(async ({ afterSku } = {}) =>
+      afterSku ? { items: pageTwo } : { items: pageOne, nextAfterSku: 'test:b' },
+    )
+    resource.listPrices.mockResolvedValue({ prices: [makePrice(1)] })
+    const pricing = useAdminBillingPricing({
+      resource,
+      feedback: { success: vi.fn(), error: vi.fn() },
+    })
+
+    await pricing.loadCatalog()
+    await pricing.nextCatalogPage()
+    expect(pricing.currentCatalogPage.value).toBe(2)
+    expect(pricing.selectedSKU.value?.sku).toBe('test:c')
+    expect(pricing.prices.value).toEqual([makePrice(1)])
+
+    pricing.catalogFilter.value = 'disabled'
+
+    await vi.waitFor(() => expect(resource.listSKUs).toHaveBeenCalledTimes(3))
+    expect(resource.listSKUs).toHaveBeenLastCalledWith({ afterSku: undefined, limit: 24 })
+    expect(pricing.currentCatalogPage.value).toBe(1)
+    expect(pricing.visibleCatalogItems.value).toEqual([])
+    expect(pricing.selectedSKU.value).toBeUndefined()
+    expect(pricing.prices.value).toEqual([])
+  })
 })
 
 function createResource() {
