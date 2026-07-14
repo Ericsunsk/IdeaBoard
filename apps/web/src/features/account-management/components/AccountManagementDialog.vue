@@ -23,15 +23,18 @@
 import Dialog from 'primevue/dialog'
 import type { DialogPassThroughOptions } from 'primevue/dialog'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
+import {
+  defaultAccountManagementTab,
+  type AccountManagementTab,
+} from '../accountTabRegistry'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
-import type { AccountManagementTab } from '../useAccountManagementDialogController'
 
 withDefaults(
   defineProps<{
     visible: boolean
     initialTab?: AccountManagementTab
   }>(),
-  { initialTab: 'profile' },
+  { initialTab: defaultAccountManagementTab },
 )
 
 const emit = defineEmits<{

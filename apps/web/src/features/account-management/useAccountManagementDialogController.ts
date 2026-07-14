@@ -1,12 +1,13 @@
 import { ref } from 'vue'
+import {
+  defaultAccountManagementTab,
+  type AccountManagementTab,
+} from './accountTabRegistry'
 
 const accountManagementDialogVisible = ref(false)
-const accountManagementInitialTab = ref<AccountManagementTab>('profile')
+const accountManagementInitialTab = ref<AccountManagementTab>(defaultAccountManagementTab)
 
-export type AccountManagementTab =
-  'profile' | 'security' | 'recharge' | 'subscriptions' | 'rewards' | 'billing' | 'usage'
-
-export function openAccountManagementDialog(tab: AccountManagementTab = 'profile') {
+export function openAccountManagementDialog(tab: AccountManagementTab = defaultAccountManagementTab) {
   accountManagementInitialTab.value = tab
   accountManagementDialogVisible.value = true
 }

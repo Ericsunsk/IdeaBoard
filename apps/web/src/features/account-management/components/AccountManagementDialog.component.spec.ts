@@ -3,7 +3,10 @@ import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import AccountManagementDialog from './AccountManagementDialog.vue'
 import { renderWithUser, screen } from '../../../test/render'
-import type { AccountManagementTab } from '../useAccountManagementDialogController'
+import {
+  defaultAccountManagementTab,
+  type AccountManagementTab,
+} from '../accountTabRegistry'
 
 const DialogStub = defineComponent({
   inheritAttrs: false,
@@ -79,7 +82,7 @@ const StatefulAccountManagementDialogContentStub = defineComponent({
 function renderAccountManagementDialog(
   visible: boolean,
   onVisibleUpdate = vi.fn(),
-  initialTab: AccountManagementTab = 'profile',
+  initialTab: AccountManagementTab = defaultAccountManagementTab,
 ) {
   return {
     onVisibleUpdate,

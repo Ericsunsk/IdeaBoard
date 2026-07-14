@@ -5,7 +5,10 @@ import { renderWithUser, screen } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
-import type { AccountManagementTab } from '../useAccountManagementDialogController'
+import {
+  accountTabRegistry,
+  type AccountManagementTab,
+} from '../accountTabRegistry'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
 const logoutAndRedirectMock = vi.hoisted(() => vi.fn())
@@ -87,6 +90,10 @@ const MessageStub = defineComponent({
   template: '<p><slot /></p>',
 })
 
+const accountTabCases: Array<{ key: AccountManagementTab; label: string }> = accountTabRegistry.flatMap(
+  ({ tabs }) => tabs.map(({ key, label }) => ({ key, label })),
+)
+
 function makeUser(): User {
   return {
     id: 1,
@@ -101,12 +108,12 @@ function makeUser(): User {
   }
 }
 
-function renderAccountManagementDialogContent(initialTab: AccountManagementTab = 'profile') {
+function renderAccountManagementDialogContent(initialTab?: AccountManagementTab) {
   const store = useUserStore()
   store.setAuth(makeUser())
 
   return renderWithUser(AccountManagementDialogContent, {
-    props: { initialTab },
+    props: initialTab === undefined ? {} : { initialTab },
     global: {
       stubs: {
         Avatar: AvatarStub,
@@ -151,7 +158,7 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.getByRole('region', { name: '订阅与套餐' })).toBeVisible()
     expect(screen.getByRole('region', { name: '权益和账单' })).toBeVisible()
     expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: '充值Idea' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '充值积分' })).toBeVisible()
     expect(screen.getByRole('button', { name: '订阅套餐' })).toBeVisible()
     expect(screen.getByRole('button', { name: '奖励中心' })).toBeVisible()
     expect(screen.getByRole('button', { name: '账单记录' })).toBeVisible()
@@ -170,8 +177,7 @@ describe('AccountManagementDialogContent', () => {
     await user.click(screen.getByRole('button', { name: '账号安全' }))
 
     expect(screen.getByRole('button', { name: '账号安全' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('textbox', { name: '当前原密码' })).toBeVisible()
-    expect(screen.getByRole('textbox', { name: '设置新密码' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
     expect(screen.queryByText('auth-user-layout')).not.toBeInTheDocument()
   })
 
@@ -204,8 +210,32 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.queryByRole('region', { name: '账户资料概览' })).not.toBeInTheDocument()
   })
 
+  it.each(accountTabCases)(
+    'opens the $label tab from the canonical registry',
+    async ({ label }) => {
+      const { user } = renderAccountManagementDialogContent()
+
+      await user.click(screen.getByRole('button', { name: label }))
+
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+    },
+  )
+
+  it('reacts to an initial tab update and falls back for an unknown tab', async () => {
+    const { rerender } = renderAccountManagementDialogContent()
+
+    await rerender({ initialTab: 'usage' })
+    expect(screen.getByRole('button', { name: '用量统计' })).toHaveAttribute('aria-current', 'page')
+
+    await rerender({ initialTab: 'unknown-tab' as AccountManagementTab })
+    expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it.each([
-    ['充值Idea', '充值Idea即将上线'],
+    ['充值积分', '充值积分即将上线'],
     ['订阅套餐', '订阅套餐即将上线'],
   ])('opens the %s roadmap page', async (label, regionName) => {
     const { user } = renderAccountManagementDialogContent()
