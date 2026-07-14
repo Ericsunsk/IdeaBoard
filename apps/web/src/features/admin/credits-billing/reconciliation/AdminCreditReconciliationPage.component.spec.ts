@@ -62,7 +62,8 @@ describe('AdminCreditReconciliationPage', () => {
         }
         const query = new URL(request.url).searchParams
         const status = query.get('status')
-        findingQueries.push({ status, beforeId: query.get('before_id') })
+        const beforeId = query.get('before_id')
+        findingQueries.push({ status, beforeId })
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -78,7 +79,7 @@ describe('AdminCreditReconciliationPage', () => {
                   })
                 : makeFinding(),
             ],
-            next_before_id: 91,
+            next_before_id: beforeId === null ? 91 : 81,
           },
         })
       }),
@@ -147,9 +148,7 @@ describe('AdminCreditReconciliationPage', () => {
     await waitFor(() => expect(nextButtons[1]).toBeEnabled())
 
     await user.click(nextButtons[1]!)
-    await waitFor(() =>
-      expect(findingQueries).toContainEqual({ status: null, beforeId: '91' }),
-    )
+    await waitFor(() => expect(findingQueries).toContainEqual({ status: null, beforeId: '91' }))
 
     await user.click(screen.getByRole('combobox', { name: '异常状态筛选' }))
     await user.click(await screen.findByRole('option', { name: '已解决' }))
@@ -158,6 +157,24 @@ describe('AdminCreditReconciliationPage', () => {
       expect(findingQueries).toContainEqual({ status: 'resolved', beforeId: null }),
     )
     await waitFor(() => expect(screen.getAllByRole('button', { name: '下一页' })[1]).toBeEnabled())
+  })
+
+  it('does not restore the previous status cursor when replacement findings fail', async () => {
+    const { user } = renderPage()
+
+    await user.click(await screen.findByText('#7'))
+    const nextButtons = await screen.findAllByRole('button', { name: '下一页' })
+    await waitFor(() => expect(nextButtons[1]).toBeEnabled())
+    await user.click(nextButtons[1]!)
+    await waitFor(() => expect(findingQueries).toContainEqual({ status: null, beforeId: '91' }))
+    await waitFor(() => expect(nextButtons[1]).toBeEnabled())
+
+    findingsShouldFail = true
+    await user.click(screen.getByRole('combobox', { name: '异常状态筛选' }))
+    await user.click(await screen.findByRole('option', { name: '已解决' }))
+
+    expect(await screen.findByRole('button', { name: '重试异常列表' })).toBeVisible()
+    expect(nextButtons[1]).toBeDisabled()
   })
 
   it('retries Run detail and findings through their corresponding queries', async () => {

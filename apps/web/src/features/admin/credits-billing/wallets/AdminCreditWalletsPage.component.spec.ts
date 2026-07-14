@@ -175,6 +175,63 @@ describe('AdminCreditWalletsPage', () => {
     expect(ledgerRequestCount).toBe(1)
   })
 
+  it('does not restore a previous Wallet cursor when the replacement Ledger request fails', async () => {
+    const ledgerQueries: Array<{ userId: string; beforeSequence: string | null }> = []
+    useMswHandlers(
+      http.get('/api/admin/credits/wallets/:userId', ({ params }) =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            user_id: Number(params.userId),
+            status: 'active',
+            available_credits: 1200,
+            reserved_credits: 25,
+          },
+        }),
+      ),
+      http.get('/api/admin/credits/wallets/:userId/ledger', ({ params, request }) => {
+        const userId = String(params.userId)
+        const beforeSequence = new URL(request.url).searchParams.get('before_sequence')
+        ledgerQueries.push({ userId, beforeSequence })
+        if (userId === '13') {
+          return HttpResponse.json({ code: 503, msg: 'ledger unavailable' }, { status: 503 })
+        }
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            transactions: [makeCharge()],
+            next_before_sequence: beforeSequence === null ? 90 : 80,
+          },
+        })
+      }),
+    )
+    const { user } = renderPage()
+    await openWallet(user)
+
+    const nextButton = await screen.findByRole('button', { name: '下一页' })
+    await waitFor(() => expect(nextButton).toBeEnabled())
+    await user.click(nextButton)
+    await waitFor(() =>
+      expect(ledgerQueries).toContainEqual({ userId: '12', beforeSequence: '90' }),
+    )
+    await waitFor(() => expect(nextButton).toBeEnabled())
+
+    const userIdInput = screen.getByRole('spinbutton', { name: '用户 ID' })
+    await user.click(userIdInput)
+    await user.keyboard('{Control>}a{/Control}13')
+    await user.click(screen.getByRole('button', { name: '打开 Wallet' }))
+
+    await waitFor(() =>
+      expect(ledgerQueries).toContainEqual({ userId: '13', beforeSequence: null }),
+    )
+    expect(
+      await screen.findByText('Wallet 或流水加载失败。请检查用户 ID 后刷新重试。'),
+    ).toBeVisible()
+    expect(nextButton).toBeDisabled()
+  })
+
   function makeCommandHandler(kind: 'grant' | 'deduction' | 'refund', path: string) {
     return http.post(path, async ({ request }) => {
       commandRequests.push({

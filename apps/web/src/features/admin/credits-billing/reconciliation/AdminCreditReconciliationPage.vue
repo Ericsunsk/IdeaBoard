@@ -73,7 +73,7 @@
           <template #pager>
             <AdminPagerControls
               :current-page="runPage"
-              :total-pages="runTotalPages"
+              :total-pages="runKnownPageCount"
               :prev-disabled="!runCanRetreat"
               :next-disabled="!runCanAdvance"
               @prev="previousRunPage"
@@ -181,7 +181,7 @@
           />
           <AdminPagerControls
             :current-page="findingPage"
-            :total-pages="findingTotalPages"
+            :total-pages="findingKnownPageCount"
             :prev-disabled="!findingCanRetreat"
             :next-disabled="!findingCanAdvance"
             @prev="previousFindingPage"
@@ -359,17 +359,17 @@ const runPagination = useAdminCursorPagination<number>({
   pending: () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
 })
 const findingPagination = useAdminCursorPagination<number>({
-  pending: () =>
-    resource.findingsQuery.isLoading.value || resource.findingsQuery.isFetching.value,
+  pending: () => resource.findingsQuery.isLoading.value || resource.findingsQuery.isFetching.value,
 })
 const runBeforeId = runPagination.cursor
 const findingBeforeId = findingPagination.cursor
+const findingStatus = computed(() =>
+  findingStatusFilter.value === 'all' ? undefined : findingStatusFilter.value,
+)
 const resource = useAdminCreditReconciliationResource({
   runBeforeId,
   selectedRunId,
-  findingStatus: computed(() =>
-    findingStatusFilter.value === 'all' ? undefined : findingStatusFilter.value,
-  ),
+  findingStatus,
   findingBeforeId,
 })
 const { selectedRun, startPending } = resource
@@ -379,11 +379,11 @@ const selectedRunRow = computed(
   () => runs.value.find((run) => run.id === selectedRunId.value) ?? null,
 )
 const runPage = runPagination.currentPage
-const runTotalPages = runPagination.totalPages
+const runKnownPageCount = runPagination.knownPageCount
 const runCanAdvance = runPagination.canAdvance
 const runCanRetreat = runPagination.canRetreat
 const findingPage = findingPagination.currentPage
-const findingTotalPages = findingPagination.totalPages
+const findingKnownPageCount = findingPagination.knownPageCount
 const findingCanAdvance = findingPagination.canAdvance
 const findingCanRetreat = findingPagination.canRetreat
 const canStart = computed(
@@ -414,9 +414,24 @@ watch([runDetailError, findingsError], ([runError, listError]) => {
   if (error) feedback.reconciliationLoadFailed(error)
 })
 watch(
-  [() => resource.runsQuery.dataUpdatedAt.value, () => resource.runsQuery.isFetching.value],
-  ([, isFetching]) => {
-    if (!isFetching) runPagination.setNextCursor(resource.runs.value?.next_before_id)
+  [
+    () => resource.runsQuery.dataUpdatedAt.value,
+    () => resource.runsQuery.isFetching.value,
+    () => resource.runsQuery.isPlaceholderData.value,
+    () => resource.runsDataCriteria.value,
+    () => runBeforeId.value,
+  ],
+  () => {
+    const criteria = resource.runsDataCriteria.value
+    if (
+      resource.runsQuery.isFetching.value ||
+      resource.runsQuery.isPlaceholderData.value ||
+      !criteria ||
+      criteria.beforeId !== runBeforeId.value
+    ) {
+      return
+    }
+    runPagination.setNextCursor(resource.runs.value?.next_before_id)
   },
   { immediate: true },
 )
@@ -424,9 +439,25 @@ watch(
   [
     () => resource.findingsQuery.dataUpdatedAt.value,
     () => resource.findingsQuery.isFetching.value,
+    () => resource.findingsQuery.isPlaceholderData.value,
+    () => resource.findingsDataCriteria.value,
+    () => selectedRunId.value,
+    () => findingStatus.value,
+    () => findingBeforeId.value,
   ],
-  ([, isFetching]) => {
-    if (!isFetching) findingPagination.setNextCursor(resource.findings.value?.next_before_id)
+  () => {
+    const criteria = resource.findingsDataCriteria.value
+    if (
+      resource.findingsQuery.isFetching.value ||
+      resource.findingsQuery.isPlaceholderData.value ||
+      !criteria ||
+      criteria.runId !== (selectedRunId.value ?? 0) ||
+      criteria.status !== findingStatus.value ||
+      criteria.beforeId !== findingBeforeId.value
+    ) {
+      return
+    }
+    findingPagination.setNextCursor(resource.findings.value?.next_before_id)
   },
   { immediate: true },
 )

@@ -18,6 +18,11 @@ const walletQueryRoot = ['admin', 'credits', 'wallets'] as const
 
 export type AdminCreditLedgerTransaction = CreditLedgerTransaction
 
+interface AdminCreditLedgerCriteria {
+  userId: number
+  beforeSequence?: number
+}
+
 export function useAdminCreditWalletResource(
   userId: MaybeRefOrGetter<number | null>,
   beforeSequence: MaybeRefOrGetter<number | undefined>,
@@ -29,9 +34,9 @@ export function useAdminCreditWalletResource(
   const api = dependencies.api ?? adminCreditsBillingApi
   const queryClient = useQueryClient()
   const normalizedUserId = computed(() => toValue(userId) ?? 0)
-  const ledgerParams = computed<ListAdminCreditLedgerParams>(() => ({
-    before_sequence: toValue(beforeSequence),
-    limit: 25,
+  const ledgerCriteria = computed<AdminCreditLedgerCriteria>(() => ({
+    userId: normalizedUserId.value,
+    beforeSequence: toValue(beforeSequence),
   }))
   const enabled = computed(() => normalizedUserId.value > 0)
 
@@ -45,9 +50,19 @@ export function useAdminCreditWalletResource(
       ...walletQueryRoot,
       normalizedUserId.value,
       'ledger',
-      ledgerParams.value,
+      ledgerCriteria.value,
     ]),
-    queryFn: ({ signal }) => api.listLedger(normalizedUserId.value, ledgerParams.value, { signal }),
+    queryFn: async ({ queryKey, signal }) => {
+      const criteria = queryKey.at(-1) as AdminCreditLedgerCriteria
+      const params: ListAdminCreditLedgerParams = {
+        before_sequence: criteria.beforeSequence,
+        limit: 25,
+      }
+      return {
+        criteria,
+        page: await api.listLedger(criteria.userId, params, { signal }),
+      }
+    },
     enabled,
     placeholderData: (previous) => previous,
   })
@@ -89,7 +104,8 @@ export function useAdminCreditWalletResource(
     walletQuery,
     ledgerQuery,
     wallet: computed(() => walletQuery.data.value),
-    ledger: computed(() => ledgerQuery.data.value),
+    ledger: computed(() => ledgerQuery.data.value?.page),
+    ledgerDataCriteria: computed(() => ledgerQuery.data.value?.criteria),
     commandPending: computed(
       () =>
         grantMutation.isPending.value ||

@@ -55,16 +55,16 @@ describe('useAdminCursorPagination', () => {
     const pagination = useAdminCursorPagination<number>()
 
     expect(pagination.hasNext.value).toBe(false)
-    expect(pagination.totalPages.value).toBe(1)
+    expect(pagination.knownPageCount.value).toBe(1)
     expect(pagination.advance()).toBe(false)
 
     pagination.setNextCursor(2)
-    expect(pagination.totalPages.value).toBe(2)
+    expect(pagination.knownPageCount.value).toBe(2)
     pagination.advance()
     pagination.setNextCursor(undefined)
 
     expect(pagination.currentPage.value).toBe(2)
-    expect(pagination.totalPages.value).toBe(2)
+    expect(pagination.knownPageCount.value).toBe(2)
     expect(pagination.canAdvance.value).toBe(false)
   })
 

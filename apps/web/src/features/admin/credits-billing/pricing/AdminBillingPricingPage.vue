@@ -52,7 +52,7 @@
         <template #pager>
           <AdminPagerControls
             :current-page="currentCatalogPage"
-            :total-pages="catalogTotalPages"
+            :total-pages="catalogKnownPageCount"
             :prev-disabled="currentCatalogPage === 1 || catalogLoading"
             :next-disabled="!catalogHasNext || catalogLoading"
             @prev="previousCatalogPage"
@@ -243,7 +243,7 @@
               </Button>
               <AdminPagerControls
                 :current-page="currentPricePage"
-                :total-pages="priceTotalPages"
+                :total-pages="priceKnownPageCount"
                 :prev-disabled="currentPricePage === 1 || pricesLoading"
                 :next-disabled="!priceHasNext || pricesLoading"
                 @prev="previousPricePage"
@@ -569,10 +569,10 @@ const {
   pricesError,
   mutationPending,
   currentCatalogPage,
-  catalogTotalPages,
+  catalogKnownPageCount,
   catalogHasNext,
   currentPricePage,
-  priceTotalPages,
+  priceKnownPageCount,
   priceHasNext,
   unpricedCount,
   billableCount,

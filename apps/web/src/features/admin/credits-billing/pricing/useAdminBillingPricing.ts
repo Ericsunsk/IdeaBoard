@@ -96,12 +96,11 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
       const fallbackSelectionIsVisible =
         fallbackSelection !== undefined &&
         fallbackSelection.sku === preferredSKU &&
-        filterBillingCatalog([fallbackSelection], searchKeyword.value, catalogFilter.value).length > 0
+        filterBillingCatalog([fallbackSelection], searchKeyword.value, catalogFilter.value).length >
+          0
       const nextSelection =
         visibleItems.find((item) => item.sku === preferredSKU) ??
-        (fallbackSelectionIsVisible
-          ? fallbackSelection
-          : visibleItems.at(0))
+        (fallbackSelectionIsVisible ? fallbackSelection : visibleItems.at(0))
       selectedSKU.value = nextSelection
       resetPricePagination()
       if (nextSelection) {
@@ -286,8 +285,28 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
     pricePagination.reset()
   }
 
+  function reconcileVisibleCatalogSelection(preferredSKU = selectedSKU.value?.sku) {
+    const nextSelection =
+      visibleCatalogItems.value.find((item) => item.sku === preferredSKU) ??
+      visibleCatalogItems.value.at(0)
+    if (nextSelection?.sku === selectedSKU.value?.sku) return
+
+    selectedSKU.value = nextSelection
+    prices.value = []
+    pricesError.value = ''
+    resetPricePagination()
+    priceLoadSequence.value += 1
+    pricesLoading.value = false
+    if (nextSelection) void loadPrices(nextSelection.sku)
+  }
+
   watch([searchKeyword, catalogFilter], () => {
     const preferredSKU = selectedSKU.value?.sku
+    if (catalogPagination.currentPage.value === 1) {
+      reconcileVisibleCatalogSelection(preferredSKU)
+      return
+    }
+
     resetCatalogPagination()
     catalogItems.value = []
     selectedSKU.value = undefined
@@ -314,10 +333,10 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
     pricesError,
     mutationPending,
     currentCatalogPage: catalogPagination.currentPage,
-    catalogTotalPages: catalogPagination.totalPages,
+    catalogKnownPageCount: catalogPagination.knownPageCount,
     catalogHasNext: catalogPagination.hasNext,
     currentPricePage: pricePagination.currentPage,
-    priceTotalPages: pricePagination.totalPages,
+    priceKnownPageCount: pricePagination.knownPageCount,
     priceHasNext: pricePagination.hasNext,
     unpricedCount,
     billableCount,

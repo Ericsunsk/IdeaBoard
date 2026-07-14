@@ -116,7 +116,7 @@
             <template #pager>
               <AdminPagerControls
                 :current-page="ledgerPage"
-                :total-pages="ledgerTotalPages"
+                :total-pages="ledgerKnownPageCount"
                 :prev-disabled="!ledgerCanRetreat"
                 :next-disabled="!ledgerCanAdvance"
                 @prev="previousLedgerPage"
@@ -325,7 +325,7 @@ const ledgerLoading = computed(
 const walletError = computed(() => walletResource.walletQuery.error.value)
 const ledgerError = computed(() => walletResource.ledgerQuery.error.value)
 const ledgerPage = ledgerPagination.currentPage
-const ledgerTotalPages = ledgerPagination.totalPages
+const ledgerKnownPageCount = ledgerPagination.knownPageCount
 const ledgerCanAdvance = ledgerPagination.canAdvance
 const ledgerCanRetreat = ledgerPagination.canRetreat
 
@@ -339,9 +339,23 @@ watch(
   [
     () => walletResource.ledgerQuery.dataUpdatedAt.value,
     () => walletResource.ledgerQuery.isFetching.value,
+    () => walletResource.ledgerQuery.isPlaceholderData.value,
+    () => walletResource.ledgerDataCriteria.value,
+    () => selectedUserId.value,
+    () => ledgerBeforeSequence.value,
   ],
-  ([, isFetching]) => {
-    if (!isFetching) ledgerPagination.setNextCursor(ledger.value?.next_before_sequence)
+  () => {
+    const criteria = walletResource.ledgerDataCriteria.value
+    if (
+      walletResource.ledgerQuery.isFetching.value ||
+      walletResource.ledgerQuery.isPlaceholderData.value ||
+      !criteria ||
+      criteria.userId !== selectedUserId.value ||
+      criteria.beforeSequence !== ledgerBeforeSequence.value
+    ) {
+      return
+    }
+    ledgerPagination.setNextCursor(ledger.value?.next_before_sequence)
   },
   { immediate: true },
 )

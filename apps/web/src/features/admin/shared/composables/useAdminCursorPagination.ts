@@ -11,7 +11,7 @@ export function useAdminCursorPagination<TCursor extends AdminCursorValue>(
   const cursor = computed(() => cursorStack.value.at(-1))
   const currentPage = computed(() => cursorStack.value.length)
   const hasNext = computed(() => nextCursor.value !== undefined)
-  const totalPages = computed(() => currentPage.value + (hasNext.value ? 1 : 0))
+  const knownPageCount = computed(() => currentPage.value + (hasNext.value ? 1 : 0))
   const isPending = computed(() => Boolean(options.pending && toValue(options.pending)))
   const canAdvance = computed(() => hasNext.value && !isPending.value)
   const canRetreat = computed(() => currentPage.value > 1 && !isPending.value)
@@ -53,7 +53,7 @@ export function useAdminCursorPagination<TCursor extends AdminCursorValue>(
     cursor,
     currentPage,
     hasNext,
-    totalPages,
+    knownPageCount,
     canAdvance,
     canRetreat,
     setNextCursor,

@@ -1,3 +1,4 @@
+import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { AdminBillingPricingResource } from './billingPricingResource'
 import type { AdminBillingCatalogItem, AdminBillingPrice } from './billingPricingTypes'
@@ -108,6 +109,39 @@ describe('useAdminBillingPricing', () => {
     expect(pricing.currentCatalogPage.value).toBe(1)
     expect(pricing.visibleCatalogItems.value.map((item) => item.sku)).toEqual(['test:b'])
     expect(pricing.selectedSKU.value?.sku).toBe('test:b')
+  })
+
+  it('filters the first Catalog page locally while the user types and clears an excluded SKU', async () => {
+    const pageOne = [makeItem('test:a'), makeItem('test:b')]
+    const resource = createResource()
+    resource.listSKUs.mockResolvedValue({ items: pageOne, nextAfterSku: 'test:b' })
+    resource.listPrices.mockResolvedValue({ prices: [makePrice(1)] })
+    const pricing = useAdminBillingPricing({
+      resource,
+      feedback: { success: vi.fn(), error: vi.fn() },
+    })
+
+    await pricing.loadCatalog()
+    expect(pricing.selectedSKU.value?.sku).toBe('test:a')
+
+    pricing.searchKeyword.value = 't'
+    await nextTick()
+    pricing.searchKeyword.value = 'test:'
+    await nextTick()
+    pricing.searchKeyword.value = 'test:b'
+    await nextTick()
+
+    expect(resource.listSKUs).toHaveBeenCalledTimes(1)
+    expect(pricing.visibleCatalogItems.value.map((item) => item.sku)).toEqual(['test:b'])
+    expect(pricing.selectedSKU.value?.sku).toBe('test:b')
+
+    pricing.catalogFilter.value = 'disabled'
+    await nextTick()
+
+    expect(resource.listSKUs).toHaveBeenCalledTimes(1)
+    expect(pricing.visibleCatalogItems.value).toEqual([])
+    expect(pricing.selectedSKU.value).toBeUndefined()
+    expect(pricing.prices.value).toEqual([])
   })
 
   it('ignores an obsolete Catalog page response after search returns to the first page', async () => {
