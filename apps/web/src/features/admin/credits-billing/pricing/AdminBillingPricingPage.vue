@@ -327,160 +327,157 @@
     </div>
   </AdminManagementFrame>
 
-  <Dialog
+  <AdminDialogShell
     v-model:visible="showSKUDialog"
-    modal
-    :draggable="false"
     :header="skuEditorMode === 'create' ? '创建 SKU' : '编辑 SKU'"
-    :style="{ width: 'min(560px, calc(100vw - 24px))' }"
-    :pt="billingDialogPt"
+    :busy="mutationPending"
   >
-    <div :class="adminDialogFormBodyClass">
-      <Message v-if="skuEditorMode === 'create'" severity="warn" :closable="false">
-        SKU 是全局 immutable identity。创建后不能删除、重命名或复用，请先确认 namespace 与 local
-        key。
-      </Message>
-      <AdminFormField
-        v-slot="{ describedbyId, invalid }"
-        label="SKU"
-        for="admin-billing-sku"
-        :error="skuFormErrors.sku"
-        :hint="
-          skuEditorMode === 'create'
-            ? '例如 ai-image:sketch-to-image.model-fingerprint'
-            : 'Immutable identity'
-        "
-        required
-      >
-        <InputText
-          id="admin-billing-sku"
-          v-model="skuForm.sku"
-          class="w-full font-mono"
-          :disabled="skuEditorMode === 'edit'"
-          :invalid="invalid"
-          :aria-describedby="describedbyId"
-          autocomplete="off"
-        />
-      </AdminFormField>
-      <AdminFormField
-        v-slot="{ describedbyId, invalid }"
-        label="展示名称"
-        for="admin-billing-display-name"
-        :error="skuFormErrors.displayName"
-        required
-      >
-        <InputText
-          id="admin-billing-display-name"
-          v-model="skuForm.displayName"
-          class="w-full"
-          :invalid="invalid"
-          :aria-describedby="describedbyId"
-        />
-      </AdminFormField>
-      <AdminFormField
-        v-slot="{ describedbyId, invalid }"
-        label="说明"
-        for="admin-billing-description"
-        :error="skuFormErrors.description"
-      >
-        <Textarea
-          id="admin-billing-description"
-          v-model="skuForm.description"
-          class="w-full"
-          rows="4"
-          :invalid="invalid"
-          :aria-describedby="describedbyId"
-        />
-      </AdminFormField>
-      <AdminFormField label="SKU 状态" for="admin-billing-sku-enabled">
-        <div
-          class="flex min-h-10 items-center justify-between rounded-[var(--radius-ib-control)] border border-admin-border-soft bg-ib-surface px-3"
-        >
-          <span class="text-admin-body font-medium text-admin-text-1">{{
-            skuForm.enabled ? '启用' : '停用'
-          }}</span>
-          <ToggleSwitch
-            v-model="skuForm.enabled"
-            input-id="admin-billing-sku-enabled"
-            aria-label="SKU 启用状态"
-          />
-        </div>
-      </AdminFormField>
-      <AdminActionReasonField
-        v-model="skuForm.reason"
-        input-id="admin-billing-sku-reason"
-        :error="skuFormErrors.reason"
-        @update:model-value="skuFormErrors.reason = undefined"
+    <Message v-if="skuEditorMode === 'create'" severity="warn" :closable="false">
+      SKU 是全局 immutable identity。创建后不能删除、重命名或复用，请先确认 namespace 与 local key。
+    </Message>
+    <AdminFormField
+      v-slot="{ describedbyId, invalid }"
+      label="SKU"
+      for="admin-billing-sku"
+      :error="skuFormErrors.sku"
+      :hint="
+        skuEditorMode === 'create'
+          ? '例如 ai-image:sketch-to-image.model-fingerprint'
+          : 'Immutable identity'
+      "
+      required
+    >
+      <InputText
+        id="admin-billing-sku"
+        v-model="skuForm.sku"
+        class="w-full font-mono"
+        :disabled="skuEditorMode === 'edit'"
+        :invalid="invalid"
+        :aria-describedby="describedbyId"
+        autocomplete="off"
       />
-    </div>
-    <template #footer>
-      <div :class="adminDialogCompactFooterActionsClass">
-        <Button label="取消" severity="secondary" outlined @click="showSKUDialog = false" />
-        <Button label="确认并保存" :loading="mutationPending" @click="requestSaveSKU" />
+    </AdminFormField>
+    <AdminFormField
+      v-slot="{ describedbyId, invalid }"
+      label="展示名称"
+      for="admin-billing-display-name"
+      :error="skuFormErrors.displayName"
+      required
+    >
+      <InputText
+        id="admin-billing-display-name"
+        v-model="skuForm.displayName"
+        class="w-full"
+        :invalid="invalid"
+        :aria-describedby="describedbyId"
+      />
+    </AdminFormField>
+    <AdminFormField
+      v-slot="{ describedbyId, invalid }"
+      label="说明"
+      for="admin-billing-description"
+      :error="skuFormErrors.description"
+    >
+      <Textarea
+        id="admin-billing-description"
+        v-model="skuForm.description"
+        class="w-full"
+        rows="4"
+        :invalid="invalid"
+        :aria-describedby="describedbyId"
+      />
+    </AdminFormField>
+    <AdminFormField label="SKU 状态" for="admin-billing-sku-enabled">
+      <div
+        class="flex min-h-10 items-center justify-between rounded-[var(--radius-ib-control)] border border-admin-border-soft bg-ib-surface px-3"
+      >
+        <span class="text-admin-body font-medium text-admin-text-1">{{
+          skuForm.enabled ? '启用' : '停用'
+        }}</span>
+        <ToggleSwitch
+          v-model="skuForm.enabled"
+          input-id="admin-billing-sku-enabled"
+          aria-label="SKU 启用状态"
+        />
       </div>
+    </AdminFormField>
+    <AdminActionReasonField
+      v-model="skuForm.reason"
+      input-id="admin-billing-sku-reason"
+      :error="skuFormErrors.reason"
+      @update:model-value="skuFormErrors.reason = undefined"
+    />
+    <template #footer>
+      <Button
+        label="取消"
+        severity="secondary"
+        outlined
+        :disabled="mutationPending"
+        @click="showSKUDialog = false"
+      />
+      <Button label="确认并保存" :loading="mutationPending" @click="requestSaveSKU" />
     </template>
-  </Dialog>
+  </AdminDialogShell>
 
-  <Dialog
+  <AdminDialogShell
     v-model:visible="showPriceDialog"
-    modal
-    :draggable="false"
     header="发布新价格版本"
-    :style="{ width: 'min(500px, calc(100vw - 24px))' }"
-    :pt="billingDialogPt"
+    :busy="mutationPending"
   >
-    <div :class="adminDialogFormBodyClass">
-      <Message severity="info" :closable="false">
-        {{ selectedSKU?.sku }} 的历史价格不可修改。新 version 发布后会成为当前价格快照。
-      </Message>
-      <AdminFormField
-        v-slot="{ describedbyId, invalid }"
-        label="单价（Idea）"
-        for="admin-billing-unit-credits"
-        :error="priceFormErrors.unitCredits"
-        hint="0 表示免费，但仍会记录 Billing snapshot。"
-        required
-      >
-        <InputNumber
-          v-model="priceForm.unitCredits"
-          input-id="admin-billing-unit-credits"
-          fluid
-          :min="0"
-          :max="9000000000000000"
-          :use-grouping="true"
-          :invalid="invalid"
-          :aria-describedby="describedbyId"
-        />
-      </AdminFormField>
-      <AdminFormField label="发布状态" for="admin-billing-price-enabled">
-        <div
-          class="flex min-h-10 items-center justify-between rounded-[var(--radius-ib-control)] border border-admin-border-soft bg-ib-surface px-3"
-        >
-          <span class="text-admin-body font-medium text-admin-text-1">{{
-            priceForm.enabled ? '发布后立即启用' : '发布为停用'
-          }}</span>
-          <ToggleSwitch
-            v-model="priceForm.enabled"
-            input-id="admin-billing-price-enabled"
-            aria-label="新价格版本启用状态"
-          />
-        </div>
-      </AdminFormField>
-      <AdminActionReasonField
-        v-model="priceForm.reason"
-        input-id="admin-billing-price-reason"
-        :error="priceFormErrors.reason"
-        hint="将进入不可变审计记录，请说明调价依据。"
-        @update:model-value="priceFormErrors.reason = undefined"
+    <Message severity="info" :closable="false">
+      {{ selectedSKU?.sku }} 的历史价格不可修改。新 version 发布后会成为当前价格快照。
+    </Message>
+    <AdminFormField
+      v-slot="{ describedbyId, invalid }"
+      label="单价（Idea）"
+      for="admin-billing-unit-credits"
+      :error="priceFormErrors.unitCredits"
+      hint="0 表示免费，但仍会记录 Billing snapshot。"
+      required
+    >
+      <InputNumber
+        v-model="priceForm.unitCredits"
+        input-id="admin-billing-unit-credits"
+        fluid
+        :min="0"
+        :max="9000000000000000"
+        :use-grouping="true"
+        :invalid="invalid"
+        :aria-describedby="describedbyId"
       />
-    </div>
-    <template #footer>
-      <div :class="adminDialogCompactFooterActionsClass">
-        <Button label="取消" severity="secondary" outlined @click="showPriceDialog = false" />
-        <Button label="确认发布" :loading="mutationPending" @click="requestCreatePrice" />
+    </AdminFormField>
+    <AdminFormField label="发布状态" for="admin-billing-price-enabled">
+      <div
+        class="flex min-h-10 items-center justify-between rounded-[var(--radius-ib-control)] border border-admin-border-soft bg-ib-surface px-3"
+      >
+        <span class="text-admin-body font-medium text-admin-text-1">{{
+          priceForm.enabled ? '发布后立即启用' : '发布为停用'
+        }}</span>
+        <ToggleSwitch
+          v-model="priceForm.enabled"
+          input-id="admin-billing-price-enabled"
+          aria-label="新价格版本启用状态"
+        />
       </div>
+    </AdminFormField>
+    <AdminActionReasonField
+      v-model="priceForm.reason"
+      input-id="admin-billing-price-reason"
+      :error="priceFormErrors.reason"
+      hint="将进入不可变审计记录，请说明调价依据。"
+      @update:model-value="priceFormErrors.reason = undefined"
+    />
+    <template #footer>
+      <Button
+        label="取消"
+        severity="secondary"
+        outlined
+        :disabled="mutationPending"
+        @click="showPriceDialog = false"
+      />
+      <Button label="确认发布" :loading="mutationPending" @click="requestCreatePrice" />
     </template>
-  </Dialog>
+  </AdminDialogShell>
 
   <AdminActionReasonDialog
     v-model:visible="showPriceStateReasonDialog"
@@ -497,7 +494,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -509,6 +505,7 @@ import { Plus, Refresh } from '@iconoir/vue'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../../shared/domain/workflowFeatureRegistry'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
@@ -516,12 +513,9 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
-import { createAdminDialogPt } from '../../shared/lib/adminOverlayPt'
 import {
   adminActionButtonClass,
   adminCompactTagClass,
-  adminDialogCompactFooterActionsClass,
-  adminDialogFormBodyClass,
   adminEmptyStateClass,
   adminFramedIconButtonClass,
 } from '../../shared/lib/adminUiClasses'
@@ -613,11 +607,6 @@ const catalogFilterOptions: { label: string; value: BillingCatalogFilter }[] = [
   { label: '未配置价格（当前页）', value: 'unpriced' },
   { label: '已停用 SKU', value: 'disabled' },
 ]
-
-const billingDialogPt = createAdminDialogPt({
-  rootClass: '!rounded-[var(--radius-ib-overlay)]',
-  contentClass: 'app-scrollbar max-h-[min(70vh,620px)] overflow-y-auto',
-})
 
 onMounted(() => {
   void Promise.all([loadCatalog(), loadCoverage()])

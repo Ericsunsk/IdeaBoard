@@ -1,10 +1,9 @@
 <template>
-  <Dialog
+  <AdminDialogShell
     :visible="visible"
-    modal
-    dismissable-mask
-    :draggable="false"
-    :style="{ width: '480px', maxWidth: 'calc(100vw - 24px)' }"
+    aria-label="封禁用户"
+    size="compact"
+    :busy="loading"
     @update:visible="handleVisibleUpdate"
   >
     <template #header>
@@ -20,30 +19,28 @@
       </div>
     </template>
 
-    <div :class="adminDialogFormBodyClass">
-      <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-        <span>封禁时长 (Duration)</span>
-        <Select
-          :model-value="expiresInDays"
-          :options="durationOptions"
-          option-label="label"
-          option-value="value"
-          class="w-full"
-          @update:model-value="handleExpiresInDaysUpdate"
-        />
-      </label>
-      <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-        <span>封禁原因 (内部记录)</span>
-        <Textarea
-          :model-value="reason"
-          placeholder="例如：发表违规内容、恶意刷量..."
-          rows="3"
-          auto-resize
-          class="w-full"
-          @update:model-value="handleReasonUpdate"
-        />
-      </label>
-    </div>
+    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+      <span>封禁时长 (Duration)</span>
+      <Select
+        :model-value="expiresInDays"
+        :options="durationOptions"
+        option-label="label"
+        option-value="value"
+        class="w-full"
+        @update:model-value="handleExpiresInDaysUpdate"
+      />
+    </label>
+    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+      <span>封禁原因 (内部记录)</span>
+      <Textarea
+        :model-value="reason"
+        placeholder="例如：发表违规内容、恶意刷量..."
+        rows="3"
+        auto-resize
+        class="w-full"
+        @update:model-value="handleReasonUpdate"
+      />
+    </label>
 
     <template #footer>
       <div class="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -51,22 +48,27 @@
           封禁会立即断开该用户所有连接，封禁期间无法重新登录。
         </div>
         <div :class="adminDialogFooterActionsClass">
-          <Button label="取消" severity="secondary" outlined @click="$emit('cancel')" />
+          <Button
+            label="取消"
+            severity="secondary"
+            outlined
+            :disabled="loading"
+            @click="$emit('cancel')"
+          />
           <Button label="确认封禁" severity="danger" :loading="loading" @click="$emit('confirm')" />
         </div>
       </div>
     </template>
-  </Dialog>
+  </AdminDialogShell>
 </template>
 
 <script setup lang="ts">
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
+import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
 import {
-  adminDialogFormBodyClass,
   adminDialogFooterActionsClass,
   adminDialogHeaderContentClass,
   adminDialogTitleClass,

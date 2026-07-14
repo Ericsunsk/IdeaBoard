@@ -81,6 +81,4 @@ export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
 
 export const adminDialogFooterActionsClass = 'flex flex-wrap justify-end gap-2'
 
-export const adminDialogCompactFooterActionsClass = 'flex justify-end gap-2.5'
-
 export const adminCompactTagClass = '!px-2 !py-0.5 !text-admin-caption !leading-4'

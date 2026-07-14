@@ -1,83 +1,67 @@
 <template>
-  <Dialog
+  <AdminDialogShell
     :visible="visible"
-    modal
-    :draggable="false"
     :header="dialogTitle"
-    :style="{ width: 'min(500px, calc(100vw - 24px))' }"
-    :pt="dialogPt"
+    size="compact"
+    :busy="loading"
     @update:visible="handleVisibleUpdate"
   >
-    <div :class="adminDialogFormBodyClass">
-      <Message severity="info" :closable="false">
-        目标：{{ targetLabel }}。提交后还需要在二次确认中核对Idea数量与原因。
-      </Message>
+    <Message severity="info" :closable="false">
+      目标：{{ targetLabel }}。提交后还需要在二次确认中核对Idea数量与原因。
+    </Message>
 
-      <div
-        v-if="kind === 'refund'"
-        class="rounded-[var(--radius-ib-control)] border border-admin-border-soft bg-ib-surface-muted px-3 py-2.5 text-admin-body text-admin-text-2"
-      >
-        <div class="font-[680] text-admin-text-1">原 Charge</div>
-        <div class="mt-1 break-all font-mono text-admin-caption">{{ chargeTransactionId }}</div>
-        <div class="mt-1">剩余可退：{{ formatCredits(remainingRefundableCredits ?? 0) }}</div>
-      </div>
-
-      <AdminFormField
-        v-slot="{ describedbyId, invalid }"
-        label="Idea数量"
-        for="admin-credit-command-amount"
-        :error="showErrors ? validation.amountError : ''"
-        required
-      >
-        <InputNumber
-          v-model="amountCredits"
-          input-id="admin-credit-command-amount"
-          fluid
-          :min="1"
-          :max="amountMax"
-          :use-grouping="true"
-          :invalid="invalid"
-          :aria-describedby="describedbyId"
-          @update:model-value="showErrors = false"
-        />
-      </AdminFormField>
-
-      <AdminActionReasonField
-        v-model="reason"
-        input-id="admin-credit-command-reason"
-        hint="原因会进入不可变 Ledger，便于审计与追溯。"
-        :error="showErrors ? validation.reasonError : ''"
-        @update:model-value="showErrors = false"
-      />
+    <div
+      v-if="kind === 'refund'"
+      class="rounded-[var(--radius-ib-control)] border border-admin-border-soft bg-ib-surface-muted px-3 py-2.5 text-admin-body text-admin-text-2"
+    >
+      <div class="font-[680] text-admin-text-1">原 Charge</div>
+      <div class="mt-1 break-all font-mono text-admin-caption">{{ chargeTransactionId }}</div>
+      <div class="mt-1">剩余可退：{{ formatCredits(remainingRefundableCredits ?? 0) }}</div>
     </div>
 
+    <AdminFormField
+      v-slot="{ describedbyId, invalid }"
+      label="Idea数量"
+      for="admin-credit-command-amount"
+      :error="showErrors ? validation.amountError : ''"
+      required
+    >
+      <InputNumber
+        v-model="amountCredits"
+        input-id="admin-credit-command-amount"
+        fluid
+        :min="1"
+        :max="amountMax"
+        :use-grouping="true"
+        :invalid="invalid"
+        :aria-describedby="describedbyId"
+        @update:model-value="showErrors = false"
+      />
+    </AdminFormField>
+
+    <AdminActionReasonField
+      v-model="reason"
+      input-id="admin-credit-command-reason"
+      hint="原因会进入不可变 Ledger，便于审计与追溯。"
+      :error="showErrors ? validation.reasonError : ''"
+      @update:model-value="showErrors = false"
+    />
+
     <template #footer>
-      <div :class="adminDialogCompactFooterActionsClass">
-        <Button label="取消" severity="secondary" outlined :disabled="loading" @click="close" />
-        <Button
-          :label="submitLabel"
-          :severity="submitSeverity"
-          :loading="loading"
-          @click="submit"
-        />
-      </div>
+      <Button label="取消" severity="secondary" outlined :disabled="loading" @click="close" />
+      <Button :label="submitLabel" :severity="submitSeverity" :loading="loading" @click="submit" />
     </template>
-  </Dialog>
+  </AdminDialogShell>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
+import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
-import { createAdminDialogPt } from '../../shared/lib/adminOverlayPt'
-import {
-  adminDialogCompactFooterActionsClass,
-  adminDialogFormBodyClass,
-} from '../../shared/lib/adminUiClasses'
 import { formatCredits } from '../creditsBillingFormat'
 import {
   validateAdminCreditCommand,
@@ -107,7 +91,6 @@ const emit = defineEmits<{
   submit: [draft: AdminCreditCommandDraft]
 }>()
 
-const dialogPt = createAdminDialogPt({ rootClass: '!rounded-[var(--radius-ib-overlay)]' })
 const amountCredits = ref<number | null>(null)
 const reason = ref('')
 const showErrors = ref(false)

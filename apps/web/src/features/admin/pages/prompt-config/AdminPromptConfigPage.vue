@@ -48,12 +48,12 @@
     </div>
   </AdminManagementFrame>
 
-  <Dialog
+  <AdminDialogShell
     :visible="Boolean(activeGroup)"
-    modal
-    dismissable-mask
-    :draggable="false"
-    :style="{ width: '980px', maxWidth: 'calc(100vw - 24px)' }"
+    aria-label="编辑节点提示词"
+    size="wide"
+    content-layout="scrollable"
+    :busy="isEditorBusy"
     @update:visible="handleEditorDialogVisibleUpdate"
   >
     <template #header>
@@ -78,92 +78,94 @@
       </div>
     </template>
 
-    <div v-if="activeGroup" :class="[adminDialogScrollableBodyClass, 'h-[min(66vh,620px)]']">
-      <div class="flex flex-col gap-3 pr-3">
-        <Panel v-for="item in activeGroup.items" :key="item.slug" :pt="adminPanelPt">
-          <template #header>
-            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
-              <span class="text-admin-content font-semibold text-admin-title-color">
-                {{ item.title }}
-              </span>
-              <Tag
-                :value="item.slug"
-                severity="secondary"
-                rounded
-                class="!min-w-0 max-w-full font-mono !text-admin-caption"
-                :pt="promptSlugTagPt"
-              />
-            </div>
-          </template>
-
-          <div class="flex flex-col gap-3">
-            <div class="flex items-center justify-between gap-2.5">
-              <Tag
-                :value="enabledMap[item.slug] ? '已启用' : '已停用'"
-                :severity="enabledMap[item.slug] ? 'success' : 'secondary'"
-                rounded
-              />
-              <ToggleSwitch
-                v-model="enabledMap[item.slug]"
-                :disabled="saving[item.slug]"
-                :aria-label="`${item.title} 启用状态`"
-              />
-            </div>
-
-            <div
-              v-if="getVarsForSlug(item.slug).length > 0"
-              class="flex min-w-0 flex-wrap items-center gap-1.5"
-            >
-              <Tag value="插入变量" severity="secondary" rounded />
-              <Button
-                v-for="v in getVarsForSlug(item.slug)"
-                :key="v.key"
-                type="button"
-                size="small"
-                rounded
-                :label="v.key"
-                :pt="variableTokenButtonPt"
-                :class="getVariableTokenButtonClass(v.tone)"
-                @click="insertVar(item.slug, v.key)"
-              />
-            </div>
-
-            <Textarea
-              :ref="(el: unknown) => bindTextareaRef(item.slug, el)"
-              v-model="promptMap[item.slug]"
-              auto-resize
-              class="w-full"
-              rows="4"
-              :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
-              :disabled="saving[item.slug]"
+    <div v-if="activeGroup" class="flex flex-col gap-3">
+      <Panel v-for="item in activeGroup.items" :key="item.slug" :pt="adminPanelPt">
+        <template #header>
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
+            <span class="text-admin-content font-semibold text-admin-title-color">
+              {{ item.title }}
+            </span>
+            <Tag
+              :value="item.slug"
+              severity="secondary"
+              rounded
+              class="!min-w-0 max-w-full font-mono !text-admin-caption"
+              :pt="promptSlugTagPt"
             />
+          </div>
+        </template>
 
-            <div class="flex items-center justify-between gap-2.5">
-              <Tag
-                :value="`${(promptMap[item.slug] || '').length} 字`"
-                severity="secondary"
-                rounded
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-2.5">
+            <Tag
+              :value="enabledMap[item.slug] ? '已启用' : '已停用'"
+              :severity="enabledMap[item.slug] ? 'success' : 'secondary'"
+              rounded
+            />
+            <ToggleSwitch
+              v-model="enabledMap[item.slug]"
+              :disabled="saving[item.slug]"
+              :aria-label="`${item.title} 启用状态`"
+            />
+          </div>
+
+          <div
+            v-if="getVarsForSlug(item.slug).length > 0"
+            class="flex min-w-0 flex-wrap items-center gap-1.5"
+          >
+            <Tag value="插入变量" severity="secondary" rounded />
+            <Button
+              v-for="v in getVarsForSlug(item.slug)"
+              :key="v.key"
+              type="button"
+              size="small"
+              rounded
+              :label="v.key"
+              :pt="variableTokenButtonPt"
+              :class="getVariableTokenButtonClass(v.tone)"
+              @click="insertVar(item.slug, v.key)"
+            />
+          </div>
+
+          <Textarea
+            :ref="(el: unknown) => bindTextareaRef(item.slug, el)"
+            v-model="promptMap[item.slug]"
+            auto-resize
+            class="w-full"
+            rows="4"
+            :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
+            :disabled="saving[item.slug]"
+          />
+
+          <div class="flex items-center justify-between gap-2.5">
+            <Tag
+              :value="`${(promptMap[item.slug] || '').length} 字`"
+              severity="secondary"
+              rounded
+            />
+            <div class="flex flex-wrap justify-end gap-2">
+              <Button
+                size="small"
+                label="保存"
+                :loading="saving[item.slug]"
+                @click="savePrompt(item.slug)"
               />
-              <div class="flex flex-wrap justify-end gap-2">
-                <Button
-                  size="small"
-                  label="保存"
-                  :loading="saving[item.slug]"
-                  @click="savePrompt(item.slug)"
-                />
-              </div>
             </div>
           </div>
-        </Panel>
-      </div>
+        </div>
+      </Panel>
     </div>
 
     <template #footer>
-      <div :class="adminDialogFooterActionsClass">
-        <Button label="关闭" severity="secondary" outlined @click="closeEditor" />
-      </div>
+      <Button
+        label="关闭"
+        severity="secondary"
+        outlined
+        :disabled="isEditorBusy"
+        @click="closeEditor"
+      />
     </template>
-  </Dialog>
+  </AdminDialogShell>
 </template>
 
 <script setup lang="ts">
@@ -171,21 +173,19 @@ import { computed, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import type { ButtonPassThroughOptions } from 'primevue/button'
 import Card from 'primevue/card'
-import Dialog from 'primevue/dialog'
 import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import type { TagPassThroughOptions } from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useAdminFeedback } from '../../feedback/useAdminFeedback'
+import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminPanelPt } from '../../shared/lib/adminPanelPt'
 import {
-  adminDialogFooterActionsClass,
   adminDialogHeaderContentClass,
   adminDialogHeaderSplitClass,
-  adminDialogScrollableBodyClass,
   adminDialogTitleClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminPromptConfigWorkspace } from '../../prompt-config/promptConfigWorkspace'
@@ -231,6 +231,9 @@ const promptPanelContentClass = computed(() =>
 const activeGroup = computed<FeatureGroup | null>(() => {
   return featureGroups.value.find((group) => group.key === activeGroupKey.value) || null
 })
+const isEditorBusy = computed(
+  () => activeGroup.value?.items.some((item) => saving[item.slug]) ?? false,
+)
 const variableTokenButtonClass =
   'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-admin-caption !font-[760] !leading-4'
 const variableTokenButtonPt = {

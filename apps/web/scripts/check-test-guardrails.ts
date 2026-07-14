@@ -98,6 +98,11 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the shared Admin surface height and overflow contract across Management, Table, and Resource Grid adapters.',
     },
   ],
+  'src/features/admin/shared/components/AdminDialogShell.component.spec.ts': [
+    {
+      reason: 'Verifies the shared Admin dialog footer layout contract.',
+    },
+  ],
   'src/features/canvas/components/home/HomeCanvasImageActionMenu.component.spec.ts': [
     {
       reason:

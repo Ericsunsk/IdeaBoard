@@ -229,214 +229,216 @@
     </AdminResourceGridFrame>
 
     <!-- 供应商端点表单弹窗 -->
-    <Dialog
+    <AdminDialogShell
       v-model:visible="showProviderEndpointModal"
-      modal
       :header="isEditProviderEndpoint ? '编辑供应商端点' : '新增供应商端点'"
-      :style="{ width: 'min(480px, calc(100vw - 24px))' }"
+      :busy="providerEndpointSaveLoading"
     >
-      <div :class="adminDialogFormBodyClass">
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          label="端点名称"
-          for="admin-provider-endpoint-name"
-          :error="providerEndpointFormErrors.name"
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="端点名称"
+        for="admin-provider-endpoint-name"
+        :error="providerEndpointFormErrors.name"
+      >
+        <InputText
+          id="admin-provider-endpoint-name"
+          v-model="providerEndpointForm.name"
+          class="w-full"
+          placeholder="例如：Nano Banana 官方端点"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearProviderEndpointFormError('name')"
+        />
+      </AdminFormField>
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="接口类型"
+        for="admin-provider-endpoint-type"
+        :error="providerEndpointFormErrors.apiType"
+      >
+        <Select
+          v-model="providerEndpointForm.apiType"
+          input-id="admin-provider-endpoint-type"
+          class="w-full"
+          :options="providerEndpointEditor.apiTypeOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="选择接口协议"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearProviderEndpointFormError('apiType')"
+        />
+      </AdminFormField>
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="Base URL地址"
+        for="admin-provider-endpoint-api-url"
+        :error="providerEndpointFormErrors.baseUrl"
+      >
+        <InputText
+          id="admin-provider-endpoint-api-url"
+          v-model="providerEndpointForm.baseUrl"
+          class="w-full"
+          placeholder="例如：https://api.example.com/v1"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @blur="providerEndpointEditor.handleApiUrlBlur"
+          @update:model-value="clearProviderEndpointFormError('baseUrl')"
+        />
+      </AdminFormField>
+      <AdminFormField label="端点状态" for="admin-provider-endpoint-status">
+        <div
+          class="flex min-h-10 items-center justify-between rounded-lg border border-admin-border-soft bg-white px-3"
         >
-          <InputText
-            id="admin-provider-endpoint-name"
-            v-model="providerEndpointForm.name"
-            class="w-full"
-            placeholder="例如：Nano Banana 官方端点"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @update:model-value="clearProviderEndpointFormError('name')"
-          />
-        </AdminFormField>
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          label="接口类型"
-          for="admin-provider-endpoint-type"
-          :error="providerEndpointFormErrors.apiType"
-        >
-          <Select
-            v-model="providerEndpointForm.apiType"
-            input-id="admin-provider-endpoint-type"
-            class="w-full"
-            :options="providerEndpointEditor.apiTypeOptions"
-            option-label="label"
-            option-value="value"
-            placeholder="选择接口协议"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @update:model-value="clearProviderEndpointFormError('apiType')"
-          />
-        </AdminFormField>
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          label="Base URL地址"
-          for="admin-provider-endpoint-api-url"
-          :error="providerEndpointFormErrors.baseUrl"
-        >
-          <InputText
-            id="admin-provider-endpoint-api-url"
-            v-model="providerEndpointForm.baseUrl"
-            class="w-full"
-            placeholder="例如：https://api.example.com/v1"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @blur="providerEndpointEditor.handleApiUrlBlur"
-            @update:model-value="clearProviderEndpointFormError('baseUrl')"
-          />
-        </AdminFormField>
-        <AdminFormField label="端点状态" for="admin-provider-endpoint-status">
-          <div
-            class="flex min-h-10 items-center justify-between rounded-lg border border-admin-border-soft bg-white px-3"
-          >
-            <span class="text-admin-body-sm font-medium text-admin-text-1">
-              {{ providerEndpointForm.status === 1 ? '启用' : '停用' }}
-            </span>
-            <ToggleSwitch
-              input-id="admin-provider-endpoint-status"
-              :model-value="providerEndpointForm.status === 1"
-              aria-label="供应商端点启用状态"
-              @update:model-value="providerEndpointForm.status = $event ? 1 : 0"
-            />
-          </div>
-        </AdminFormField>
-      </div>
-      <template #footer>
-        <div :class="adminDialogCompactFooterActionsClass">
-          <Button label="取消" severity="secondary" outlined @click="closeProviderEndpointModal" />
-          <Button
-            label="确定"
-            :loading="providerEndpointSaveLoading"
-            @click="handleSaveProviderEndpoint"
+          <span class="text-admin-body-sm font-medium text-admin-text-1">
+            {{ providerEndpointForm.status === 1 ? '启用' : '停用' }}
+          </span>
+          <ToggleSwitch
+            input-id="admin-provider-endpoint-status"
+            :model-value="providerEndpointForm.status === 1"
+            aria-label="供应商端点启用状态"
+            @update:model-value="providerEndpointForm.status = $event ? 1 : 0"
           />
         </div>
+      </AdminFormField>
+      <template #footer>
+        <Button
+          label="取消"
+          severity="secondary"
+          outlined
+          :disabled="providerEndpointSaveLoading"
+          @click="closeProviderEndpointModal"
+        />
+        <Button
+          label="确定"
+          :loading="providerEndpointSaveLoading"
+          @click="handleSaveProviderEndpoint"
+        />
       </template>
-    </Dialog>
+    </AdminDialogShell>
 
     <!-- APIKey 配置弹窗 -->
-    <Dialog
+    <AdminDialogShell
       v-model:visible="showAccountModal"
-      modal
       :header="isEditAccount ? '编辑 APIKey' : '新增 APIKey'"
-      :style="{ width: 'min(500px, calc(100vw - 24px))' }"
+      :busy="accountSaveLoading"
     >
-      <div :class="adminDialogFormBodyClass">
-        <div
-          v-if="selectedProviderEndpointForAccount"
-          class="mb-4 flex items-center gap-1.5 rounded-xl border border-admin-border bg-admin-surface-muted px-3 py-2 text-admin-meta text-admin-text-2"
-        >
-          <span>所属端点：</span>
-          <code class="font-semibold text-admin-text-1">{{
-            selectedProviderEndpointForAccount.name
-          }}</code>
-        </div>
+      <div
+        v-if="selectedProviderEndpointForAccount"
+        class="mb-4 flex items-center gap-1.5 rounded-xl border border-admin-border bg-admin-surface-muted px-3 py-2 text-admin-meta text-admin-text-2"
+      >
+        <span>所属端点：</span>
+        <code class="font-semibold text-admin-text-1">{{
+          selectedProviderEndpointForAccount.name
+        }}</code>
+      </div>
 
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="APIKey 名称"
+        for="admin-account-name"
+        :error="accountFormErrors.name"
+      >
+        <InputText
+          id="admin-account-name"
+          v-model="accountForm.name"
+          class="w-full"
+          placeholder="用于区分同一端点下的不同 APIKey"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearAccountFormError('name')"
+        />
+      </AdminFormField>
+
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        :label="isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)'"
+        for="admin-account-secret"
+        :error="accountFormErrors.secret"
+      >
+        <InputText
+          id="admin-account-secret"
+          v-model="accountForm.secret"
+          class="w-full"
+          type="password"
+          :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此供应商端点的 API Key'"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearAccountFormError('secret')"
+        />
+      </AdminFormField>
+
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="分配模型"
+        for="admin-account-models"
+        :error="accountFormErrors.modelValues"
+      >
+        <AutoComplete
+          v-model="accountForm.modelValues"
+          input-id="admin-account-models"
+          multiple
+          fluid
+          :suggestions="modelSuggestions"
+          :loading="detectModelsLoading"
+          complete-on-focus
+          placeholder="选择或输入分配给该 APIKey 的模型"
+          :pt="modelSelectPt"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @focus="accountEditor.handleModelSelectShow(true)"
+          @complete="searchModelSuggestions"
+          @update:model-value="clearAccountFormError('modelValues')"
+        />
+      </AdminFormField>
+
+      <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <AdminFormField
           v-slot="{ describedbyId, invalid }"
-          label="APIKey 名称"
-          for="admin-account-name"
-          :error="accountFormErrors.name"
+          label="最大并发数"
+          for="admin-account-max-concurrent"
+          :error="accountFormErrors.maxConcurrent"
         >
-          <InputText
-            id="admin-account-name"
-            v-model="accountForm.name"
-            class="w-full"
-            placeholder="用于区分同一端点下的不同 APIKey"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @update:model-value="clearAccountFormError('name')"
-          />
-        </AdminFormField>
-
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          :label="isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)'"
-          for="admin-account-secret"
-          :error="accountFormErrors.secret"
-        >
-          <InputText
-            id="admin-account-secret"
-            v-model="accountForm.secret"
-            class="w-full"
-            type="password"
-            :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此供应商端点的 API Key'"
-            :invalid="invalid"
-            :aria-describedby="describedbyId"
-            @update:model-value="clearAccountFormError('secret')"
-          />
-        </AdminFormField>
-
-        <AdminFormField
-          v-slot="{ describedbyId, invalid }"
-          label="分配模型"
-          for="admin-account-models"
-          :error="accountFormErrors.modelValues"
-        >
-          <AutoComplete
-            v-model="accountForm.modelValues"
-            input-id="admin-account-models"
-            multiple
+          <InputNumber
+            v-model="accountForm.maxConcurrent"
+            input-id="admin-account-max-concurrent"
+            :min="accountLimits.maxConcurrent.min"
+            :max="accountLimits.maxConcurrent.max"
             fluid
-            :suggestions="modelSuggestions"
-            :loading="detectModelsLoading"
-            complete-on-focus
-            placeholder="选择或输入分配给该 APIKey 的模型"
-            :pt="modelSelectPt"
             :invalid="invalid"
             :aria-describedby="describedbyId"
-            @focus="accountEditor.handleModelSelectShow(true)"
-            @complete="searchModelSuggestions"
-            @update:model-value="clearAccountFormError('modelValues')"
+            @update:model-value="clearAccountFormError('maxConcurrent')"
           />
         </AdminFormField>
-
-        <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <AdminFormField
-            v-slot="{ describedbyId, invalid }"
-            label="最大并发数"
-            for="admin-account-max-concurrent"
-            :error="accountFormErrors.maxConcurrent"
-          >
-            <InputNumber
-              v-model="accountForm.maxConcurrent"
-              input-id="admin-account-max-concurrent"
-              :min="accountLimits.maxConcurrent.min"
-              :max="accountLimits.maxConcurrent.max"
-              fluid
-              :invalid="invalid"
-              :aria-describedby="describedbyId"
-              @update:model-value="clearAccountFormError('maxConcurrent')"
-            />
-          </AdminFormField>
-          <AdminFormField
-            v-slot="{ describedbyId, invalid }"
-            label="超时时间(秒)"
-            for="admin-account-timeout"
-            :error="accountFormErrors.timeoutSeconds"
-          >
-            <InputNumber
-              v-model="accountForm.timeoutSeconds"
-              input-id="admin-account-timeout"
-              :min="accountLimits.timeoutSeconds.min"
-              :max="accountLimits.timeoutSeconds.max"
-              fluid
-              :invalid="invalid"
-              :aria-describedby="describedbyId"
-              @update:model-value="clearAccountFormError('timeoutSeconds')"
-            />
-          </AdminFormField>
-        </div>
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
+          label="超时时间(秒)"
+          for="admin-account-timeout"
+          :error="accountFormErrors.timeoutSeconds"
+        >
+          <InputNumber
+            v-model="accountForm.timeoutSeconds"
+            input-id="admin-account-timeout"
+            :min="accountLimits.timeoutSeconds.min"
+            :max="accountLimits.timeoutSeconds.max"
+            fluid
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
+            @update:model-value="clearAccountFormError('timeoutSeconds')"
+          />
+        </AdminFormField>
       </div>
       <template #footer>
-        <div :class="adminDialogCompactFooterActionsClass">
-          <Button label="取消" severity="secondary" outlined @click="closeAccountModal" />
-          <Button label="确定" :loading="accountSaveLoading" @click="accountEditor.save" />
-        </div>
+        <Button
+          label="取消"
+          severity="secondary"
+          outlined
+          :disabled="accountSaveLoading"
+          @click="closeAccountModal"
+        />
+        <Button label="确定" :loading="accountSaveLoading" @click="accountEditor.save" />
       </template>
-    </Dialog>
+    </AdminDialogShell>
   </div>
 </template>
 
@@ -447,7 +449,6 @@ import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Chip from 'primevue/chip'
-import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -457,6 +458,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { EditPencil, Plus, Refresh, Trash } from '@iconoir/vue'
+import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
@@ -467,8 +469,6 @@ import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
 import {
   adminCompactTagClass,
   adminActionButtonClass,
-  adminDialogCompactFooterActionsClass,
-  adminDialogFormBodyClass,
   adminFramedIconButtonClass,
   adminMasonryCardClass,
   adminTextButtonClass,
