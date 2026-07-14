@@ -14,14 +14,9 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { toValue, unref } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
+import { unref } from 'vue'
 
-import type {
-  ApiResponseCreditLedgerPage,
-  ApiResponseCreditWallet,
-  ListUserCreditLedgerParams,
-} from '../model'
+import type { ApiResponseCreditWallet } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
@@ -82,93 +77,6 @@ export function useGetUserCreditWallet<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetUserCreditWalletQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getListUserCreditLedgerUrl = (params?: ListUserCreditLedgerParams) => {
-  const normalizedParams = new URLSearchParams()
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  })
-
-  const stringifiedParams = normalizedParams.toString()
-
-  return stringifiedParams.length > 0
-    ? `/user/credits/ledger?${stringifiedParams}`
-    : `/user/credits/ledger`
-}
-
-export const listUserCreditLedger = async (
-  params?: ListUserCreditLedgerParams,
-  options?: RequestInit,
-): Promise<ApiResponseCreditLedgerPage> => {
-  return orvalMutator<ApiResponseCreditLedgerPage>(getListUserCreditLedgerUrl(params), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getListUserCreditLedgerQueryKey = (
-  params?: MaybeRefOrGetter<ListUserCreditLedgerParams>,
-) => {
-  return ['user', 'credits', 'ledger', ...(params ? [params] : [])] as const
-}
-
-export const getListUserCreditLedgerQueryOptions = <
-  TData = Awaited<ReturnType<typeof listUserCreditLedger>>,
-  TError = ErrorType<unknown>,
->(
-  params?: MaybeRefOrGetter<ListUserCreditLedgerParams>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listUserCreditLedger>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getListUserCreditLedgerQueryKey(params)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserCreditLedger>>> = ({ signal }) =>
-    listUserCreditLedger(toValue(params), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listUserCreditLedger>>,
-    TError,
-    TData
-  >
-}
-
-export type ListUserCreditLedgerQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listUserCreditLedger>>
->
-export type ListUserCreditLedgerQueryError = ErrorType<unknown>
-
-export function useListUserCreditLedger<
-  TData = Awaited<ReturnType<typeof listUserCreditLedger>>,
-  TError = ErrorType<unknown>,
->(
-  params?: MaybeRefOrGetter<ListUserCreditLedgerParams>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listUserCreditLedger>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListUserCreditLedgerQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

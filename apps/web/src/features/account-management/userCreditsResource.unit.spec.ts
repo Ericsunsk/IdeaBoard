@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchUserCreditLedger, fetchUserCreditWallet } from './userCreditsResource'
+import { fetchUserCreditWallet } from './userCreditsResource'
 
 const generated = vi.hoisted(() => ({
   getUserCreditWallet: vi.fn(),
-  listUserCreditLedger: vi.fn(),
 }))
 
 vi.mock('../../shared/api/generated-query/user-credits/user-credits', () => generated)
@@ -22,20 +21,6 @@ describe('userCreditsResource', () => {
       available_credits: 128,
     })
     expect(generated.getUserCreditWallet).toHaveBeenCalledWith()
-  })
-
-  it('forwards keyset pagination without accepting a user id', async () => {
-    generated.listUserCreditLedger.mockResolvedValue({
-      code: 0,
-      data: { transactions: [], next_before_sequence: 8 },
-    })
-
-    await fetchUserCreditLedger({ before_sequence: 16, limit: 20 })
-
-    expect(generated.listUserCreditLedger).toHaveBeenCalledWith({
-      before_sequence: 16,
-      limit: 20,
-    })
   })
 
   it('surfaces API feedback instead of returning an empty wallet', async () => {

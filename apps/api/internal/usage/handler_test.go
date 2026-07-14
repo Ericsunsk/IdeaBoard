@@ -139,10 +139,6 @@ func (s *usageReaderStub) GetCurrent(_ context.Context, userID int64, usageRange
 	return s.result, s.err
 }
 
-func usageTrend(lastDayCredits int64) []DailyUsage {
-	return usageTrendForRange(Range30Days, lastDayCredits)
-}
-
 func usageTrendForRange(usageRange Range, lastDayCredits int64) []DailyUsage {
 	trend := make([]DailyUsage, usageRange.Days())
 	for index := range trend {

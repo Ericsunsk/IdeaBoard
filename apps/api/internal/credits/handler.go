@@ -235,18 +235,6 @@ func (h *Handler) ListLedger(c *gin.Context) {
 	h.listLedger(c, userID)
 }
 
-func (h *Handler) ListCurrentLedger(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
-		return
-	}
-	userID, ok := authenticatedUserID(c)
-	if !ok {
-		return
-	}
-	h.listLedger(c, userID)
-}
-
 func (h *Handler) listLedger(c *gin.Context, userID int64) {
 	limit := 0
 	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {

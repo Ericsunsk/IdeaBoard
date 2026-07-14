@@ -174,7 +174,7 @@ func TestAdminCreditHTTPContractGrantsAndReadsWallet(t *testing.T) {
 	}
 }
 
-func TestUserCreditHTTPScopesReadsToAuthenticatedUser(t *testing.T) {
+func TestUserCreditWalletHTTPScopesReadToAuthenticatedUser(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
 	ctx := context.Background()
@@ -203,7 +203,6 @@ func TestUserCreditHTTPScopesReadsToAuthenticatedUser(t *testing.T) {
 		c.Next()
 	})
 	router.GET("/api/user/credits/wallet", handler.GetCurrentWallet)
-	router.GET("/api/user/credits/ledger", handler.ListCurrentLedger)
 
 	walletRecorder := httptest.NewRecorder()
 	router.ServeHTTP(walletRecorder, httptest.NewRequest(http.MethodGet, "/api/user/credits/wallet", nil))
@@ -212,12 +211,6 @@ func TestUserCreditHTTPScopesReadsToAuthenticatedUser(t *testing.T) {
 		t.Fatalf("wallet status = %d body=%s", walletRecorder.Code, walletRecorder.Body.String())
 	}
 
-	ledgerRecorder := httptest.NewRecorder()
-	router.ServeHTTP(ledgerRecorder, httptest.NewRequest(http.MethodGet, "/api/user/credits/ledger?limit=10", nil))
-	if ledgerRecorder.Code != http.StatusOK || !bytes.Contains(ledgerRecorder.Body.Bytes(), []byte(`"business_reference":{"type":"test","id":"user-http:94"}`)) ||
-		bytes.Contains(ledgerRecorder.Body.Bytes(), []byte(`user-http:95`)) {
-		t.Fatalf("ledger status = %d body=%s", ledgerRecorder.Code, ledgerRecorder.Body.String())
-	}
 }
 
 func TestAdminCreditHTTPBindsActorAndRejectsUnknownFields(t *testing.T) {

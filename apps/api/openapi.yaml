@@ -103,26 +103,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseCreditWallet'
-  /user/credits/ledger:
-    get:
-      tags: [UserCredits]
-      operationId: listUserCreditLedger
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: before_sequence
-          in: query
-          schema: { type: integer, format: int64, minimum: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
-      responses:
-        '200':
-          description: Current authenticated user's immutable Credit ledger page
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseCreditLedgerPage'
   /user/usage:
     get:
       tags: [UserUsage]
