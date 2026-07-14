@@ -421,7 +421,7 @@ function requestCommandConfirmation(draft: AdminCreditCommandDraft) {
           chargeTransactionId: refundSource.value?.transaction_id,
           remainingRefundableCredits: refundSource.value?.charge?.remaining_refundable_credits,
         })
-        feedback.commandSucceeded(label, response.data?.replayed ?? false)
+        feedback.commandSucceeded(label, response.replayed)
         commandDialogVisible.value = false
       } catch (error) {
         feedback.commandFailed(error, label)

@@ -88,8 +88,8 @@ export function useAdminCreditWalletResource(
   return {
     walletQuery,
     ledgerQuery,
-    wallet: computed(() => walletQuery.data.value?.data),
-    ledger: computed(() => ledgerQuery.data.value?.data),
+    wallet: computed(() => walletQuery.data.value),
+    ledger: computed(() => ledgerQuery.data.value),
     commandPending: computed(
       () =>
         grantMutation.isPending.value ||

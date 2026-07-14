@@ -45,7 +45,7 @@ export function useAdminCreditReconciliationResource(
     queryFn: ({ signal }) => api.getReconciliationRun(normalizedRunId.value, { signal }),
     enabled: computed(() => normalizedRunId.value > 0),
     refetchInterval: (query) => {
-      const status = query.state.data?.data?.status
+      const status = query.state.data?.status
       return status === 'queued' || status === 'running' ? 3_000 : false
     },
   })
@@ -71,9 +71,9 @@ export function useAdminCreditReconciliationResource(
     runsQuery,
     runQuery,
     findingsQuery,
-    runs: computed(() => runsQuery.data.value?.data),
-    selectedRun: computed(() => runQuery.data.value?.data),
-    findings: computed(() => findingsQuery.data.value?.data),
+    runs: computed(() => runsQuery.data.value),
+    selectedRun: computed(() => runQuery.data.value),
+    findings: computed(() => findingsQuery.data.value),
     startPending: computed(() => startMutation.isPending.value),
     start: (request: CreditReconciliationRequest) => startMutation.mutateAsync(request),
   }

@@ -453,7 +453,7 @@ function requestStart() {
           stale_hold_after_seconds: hours * 3600,
           reason,
         })
-        selectedRunId.value = response.data?.id ?? null
+        selectedRunId.value = response.id
         startReason.value = ''
         feedback.reconciliationStarted()
       } catch (error) {

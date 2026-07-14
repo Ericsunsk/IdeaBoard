@@ -28,6 +28,7 @@ describe('AdminCreditWalletsPage', () => {
     kind: 'grant' | 'deduction' | 'refund'
     body: Record<string, unknown>
   }>
+  let commandBusinessErrorKind: 'grant' | 'deduction' | 'refund' | null
 
   beforeEach(() => {
     confirmRequestMock.mockReset()
@@ -35,6 +36,7 @@ describe('AdminCreditWalletsPage', () => {
     walletRequestCount = 0
     ledgerRequestCount = 0
     commandRequests = []
+    commandBusinessErrorKind = null
     useMswHandlers(
       http.get('/api/admin/users', () =>
         HttpResponse.json({
@@ -154,12 +156,34 @@ describe('AdminCreditWalletsPage', () => {
     expect(toastMocks.error).not.toHaveBeenCalled()
   })
 
+  it('treats an HTTP 200 command business error as a failed mutation without invalidating Wallet data', async () => {
+    commandBusinessErrorKind = 'grant'
+    const { user } = renderPage()
+    await openWallet(user)
+
+    await submitCommand(user, {
+      openButton: '赠送',
+      amount: '40',
+      reason: '活动补偿',
+      confirmTitle: '确认赠送Idea',
+    })
+    await executeLatestConfirmation()
+
+    expect(toastMocks.error).toHaveBeenCalledWith('赠送失败，请刷新后重试')
+    expect(toastMocks.success).not.toHaveBeenCalled()
+    expect(walletRequestCount).toBe(1)
+    expect(ledgerRequestCount).toBe(1)
+  })
+
   function makeCommandHandler(kind: 'grant' | 'deduction' | 'refund', path: string) {
     return http.post(path, async ({ request }) => {
       commandRequests.push({
         kind,
         body: (await request.json()) as Record<string, unknown>,
       })
+      if (commandBusinessErrorKind === kind) {
+        return HttpResponse.json({ code: 503, msg: 'api key invalid' })
+      }
       return HttpResponse.json({
         code: 0,
         msg: 'ok',

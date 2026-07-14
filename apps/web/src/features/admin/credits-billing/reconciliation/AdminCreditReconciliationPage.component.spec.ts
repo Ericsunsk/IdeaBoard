@@ -7,13 +7,18 @@ import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminCreditReconciliationPage from './AdminCreditReconciliationPage.vue'
 
 const confirmRequestMock = vi.hoisted(() => vi.fn())
+const toastMocks = vi.hoisted(() => ({
+  success: vi.fn(),
+  warning: vi.fn(),
+  error: vi.fn(),
+}))
 
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({ request: confirmRequestMock }),
 }))
 
 vi.mock('../../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), error: vi.fn() }),
+  useAppToast: () => toastMocks,
 }))
 
 describe('AdminCreditReconciliationPage', () => {
@@ -21,6 +26,8 @@ describe('AdminCreditReconciliationPage', () => {
   let startRequests: unknown[]
   let runDetailShouldFail: boolean
   let findingsShouldFail: boolean
+  let startBusinessError: boolean
+  let runsRequestCount: number
 
   beforeEach(() => {
     confirmRequestMock.mockReset()
@@ -28,12 +35,19 @@ describe('AdminCreditReconciliationPage', () => {
     startRequests = []
     runDetailShouldFail = false
     findingsShouldFail = false
+    startBusinessError = false
+    runsRequestCount = 0
+    vi.clearAllMocks()
     useMswHandlers(
-      http.get('/api/admin/credits/reconciliation/runs', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { runs: [makeRun()] } }),
-      ),
+      http.get('/api/admin/credits/reconciliation/runs', () => {
+        runsRequestCount += 1
+        return HttpResponse.json({ code: 0, msg: 'ok', data: { runs: [makeRun()] } })
+      }),
       http.post('/api/admin/credits/reconciliation/runs', async ({ request }) => {
         startRequests.push(await request.json())
+        if (startBusinessError) {
+          return HttpResponse.json({ code: 503, msg: 'api key invalid' })
+        }
         return HttpResponse.json({ code: 0, msg: 'ok', data: makeRun() })
       }),
       http.get('/api/admin/credits/reconciliation/runs/7', () => {
@@ -165,6 +179,23 @@ describe('AdminCreditReconciliationPage', () => {
     await user.click(retryFindings)
     expect(await screen.findByText('ledger_balance_mismatch')).toBeVisible()
     expect(screen.queryByRole('button', { name: '重试异常列表' })).not.toBeInTheDocument()
+  })
+
+  it('treats an HTTP 200 start business error as a failed mutation without refreshing reports', async () => {
+    startBusinessError = true
+    const { user } = renderPage()
+    expect(await screen.findByText('#7')).toBeVisible()
+
+    await user.type(screen.getByRole('textbox', { name: /^启动原因/ }), '运营抽查')
+    await user.click(screen.getByRole('button', { name: '启动对账' }))
+    const confirmation = confirmRequestMock.mock.calls[0]?.[0] as {
+      onConfirm: () => Promise<void>
+    }
+    await confirmation.onConfirm()
+
+    expect(toastMocks.error).toHaveBeenCalledWith('启动对账失败，请稍后重试')
+    expect(toastMocks.success).not.toHaveBeenCalled()
+    expect(runsRequestCount).toBe(1)
   })
 })
 
