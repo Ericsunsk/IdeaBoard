@@ -92,6 +92,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the fixed responsive 5-column to 2x2-plus-spanning-row layout and stable loading geometry required by the usage summary contract.',
     },
   ],
+  'src/features/admin/shared/components/AdminSurfaceFrame.component.spec.ts': [
+    {
+      reason:
+        'Verifies the shared Admin surface height and overflow contract across Management, Table, and Resource Grid adapters.',
+    },
+  ],
   'src/features/canvas/components/home/HomeCanvasImageActionMenu.component.spec.ts': [
     {
       reason:

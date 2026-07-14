@@ -1,51 +1,31 @@
 <template>
-  <div :class="rootClass">
-    <div :class="panelClass">
-      <slot v-if="slots.toolbar" name="toolbar" />
-      <div v-else-if="hasToolbar" :class="adminSurfaceToolbarClass">
-        <div class="flex flex-wrap items-center gap-3">
-          <slot name="toolbar-start" />
-        </div>
-        <div class="flex flex-wrap items-center justify-end gap-3">
-          <slot name="toolbar-end" />
-        </div>
-      </div>
+  <AdminSurfaceFrame :content-class="props.contentClass" :viewport-height="props.viewportHeight">
+    <template v-if="$slots.toolbar" #toolbar>
+      <slot name="toolbar" />
+    </template>
 
-      <div :class="resolvedContentClass">
-        <div :class="tableFrameClass">
-          <slot />
-        </div>
-      </div>
+    <template v-if="$slots['toolbar-start']" #toolbar-start>
+      <slot name="toolbar-start" />
+    </template>
+
+    <template v-if="$slots['toolbar-end']" #toolbar-end>
+      <slot name="toolbar-end" />
+    </template>
+
+    <div :class="tableFrameClass">
+      <slot />
     </div>
-  </div>
+  </AdminSurfaceFrame>
 </template>
 
 <script setup lang="ts">
-import { computed, useSlots } from 'vue'
-import {
-  adminSurfacePanelClass,
-  adminSurfacePanelViewportClass,
-  adminSurfaceRootViewportClass,
-  adminSurfaceToolbarClass,
-} from '../lib/adminUiClasses'
+import { computed } from 'vue'
+import AdminSurfaceFrame from './AdminSurfaceFrame.vue'
 
 const props = defineProps<{
   contentClass?: string
   viewportHeight?: boolean
 }>()
-const slots = useSlots()
-const hasToolbar = computed(() =>
-  Boolean(slots.toolbar || slots['toolbar-start'] || slots['toolbar-end']),
-)
-
-const rootClass = computed(() => (props.viewportHeight ? adminSurfaceRootViewportClass : 'min-w-0'))
-const panelClass = computed(() => [
-  adminSurfacePanelClass,
-  props.viewportHeight && adminSurfacePanelViewportClass,
-])
-const resolvedContentClass = computed(
-  () => props.contentClass || (hasToolbar.value ? 'px-6 pb-6' : 'p-6'),
-)
 const tableFrameClass = computed(() => [
   'min-w-0 overflow-hidden rounded-lg border border-admin-border-soft bg-white',
   props.viewportHeight && 'h-full',
