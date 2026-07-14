@@ -21,7 +21,7 @@ func NewService(pool *pgxpool.Pool) *Service {
 
 func (s *Service) CreateSKU(ctx context.Context, input CreateSKUInput) (CatalogItem, error) {
 	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || input.ActorID <= 0 {
+	if err != nil || !input.Action.IsValid() {
 		return CatalogItem{}, ErrInvalidCatalogEntry
 	}
 	displayName, err := normalizeDisplayName(input.DisplayName)
@@ -32,14 +32,10 @@ func (s *Service) CreateSKU(ctx context.Context, input CreateSKUInput) (CatalogI
 	if err != nil {
 		return CatalogItem{}, err
 	}
-	reason, err := normalizeAdminReason(input.Reason)
-	if err != nil {
-		return CatalogItem{}, err
-	}
 	if err := s.requirePool(); err != nil {
 		return CatalogItem{}, err
 	}
-	if _, err := s.pool.Exec(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.ActorID, reason); err != nil {
+	if _, err := s.pool.Exec(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.Action.ActorID(), input.Action.Reason()); err != nil {
 		return CatalogItem{}, mapDatabaseError("create SKU", err)
 	}
 	return s.GetSKU(ctx, string(sku))
@@ -47,7 +43,7 @@ func (s *Service) CreateSKU(ctx context.Context, input CreateSKUInput) (CatalogI
 
 func (s *Service) UpdateSKU(ctx context.Context, input UpdateSKUInput) (CatalogItem, error) {
 	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || input.ActorID <= 0 || (input.DisplayName == nil && input.Description == nil && input.Enabled == nil) {
+	if err != nil || !input.Action.IsValid() || (input.DisplayName == nil && input.Description == nil && input.Enabled == nil) {
 		return CatalogItem{}, ErrInvalidCatalogEntry
 	}
 	var displayName *string
@@ -66,14 +62,10 @@ func (s *Service) UpdateSKU(ctx context.Context, input UpdateSKUInput) (CatalogI
 		}
 		description = &value
 	}
-	reason, err := normalizeAdminReason(input.Reason)
-	if err != nil {
-		return CatalogItem{}, err
-	}
 	if err := s.requirePool(); err != nil {
 		return CatalogItem{}, err
 	}
-	if _, err := s.pool.Exec(ctx, `SELECT update_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.ActorID, reason); err != nil {
+	if _, err := s.pool.Exec(ctx, `SELECT update_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.Action.ActorID(), input.Action.Reason()); err != nil {
 		return CatalogItem{}, mapDatabaseError("update SKU", err)
 	}
 	return s.GetSKU(ctx, string(sku))
@@ -81,19 +73,15 @@ func (s *Service) UpdateSKU(ctx context.Context, input UpdateSKUInput) (CatalogI
 
 func (s *Service) CreatePrice(ctx context.Context, input CreatePriceInput) (PriceInfo, error) {
 	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || input.UnitCredits < 0 || input.UnitCredits > MaxQuoteCredits || input.ActorID <= 0 {
+	if err != nil || input.UnitCredits < 0 || input.UnitCredits > MaxQuoteCredits || !input.Action.IsValid() {
 		return PriceInfo{}, ErrInvalidCatalogEntry
-	}
-	reason, err := normalizeAdminReason(input.Reason)
-	if err != nil {
-		return PriceInfo{}, err
 	}
 	if err := s.requirePool(); err != nil {
 		return PriceInfo{}, err
 	}
 	var price PriceInfo
 	err = s.pool.QueryRow(ctx, `SELECT `+priceInfoColumns+`
-FROM create_billing_price_version($1, $2, $3, $4, $5)`, sku, input.UnitCredits, input.Enabled, input.ActorID, reason).
+FROM create_billing_price_version($1, $2, $3, $4, $5)`, sku, input.UnitCredits, input.Enabled, input.Action.ActorID(), input.Action.Reason()).
 		Scan(priceInfoScanTargets(&price)...)
 	if err != nil {
 		return PriceInfo{}, mapDatabaseError("create price version", err)
@@ -103,19 +91,15 @@ FROM create_billing_price_version($1, $2, $3, $4, $5)`, sku, input.UnitCredits, 
 
 func (s *Service) SetPriceEnabled(ctx context.Context, input SetPriceEnabledInput) (PriceInfo, error) {
 	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || input.Version <= 0 || input.ActorID <= 0 {
+	if err != nil || input.Version <= 0 || !input.Action.IsValid() {
 		return PriceInfo{}, ErrInvalidCatalogEntry
-	}
-	reason, err := normalizeAdminReason(input.Reason)
-	if err != nil {
-		return PriceInfo{}, err
 	}
 	if err := s.requirePool(); err != nil {
 		return PriceInfo{}, err
 	}
 	var price PriceInfo
 	err = s.pool.QueryRow(ctx, `SELECT `+priceInfoColumns+`
-FROM set_billing_price_version_enabled($1, $2, $3, $4, $5)`, sku, input.Version, input.Enabled, input.ActorID, reason).
+FROM set_billing_price_version_enabled($1, $2, $3, $4, $5)`, sku, input.Version, input.Enabled, input.Action.ActorID(), input.Action.Reason()).
 		Scan(priceInfoScanTargets(&price)...)
 	if err != nil {
 		return PriceInfo{}, mapDatabaseError("set price version state", err)

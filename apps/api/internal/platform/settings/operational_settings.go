@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/validation"
 )
 
@@ -36,7 +37,6 @@ const (
 	maxNATSRetentionDays                 = 3650
 	maxOutboundAllowHosts                = 128
 	maxOutboundAllowHostLength           = 255
-	maxAdminSettingsReasonLength         = 1000
 )
 
 type TaskRuntimeSetting struct {
@@ -181,17 +181,13 @@ func (s *RuntimeSettingsService) GetOperationalSettings(ctx context.Context) (Op
 	return operationalSettingsState(configured, s.effectiveOperationalSettings()), nil
 }
 
-func (s *RuntimeSettingsService) UpdateOperationalSettings(ctx context.Context, setting OperationalSettings, actorID int64, reason string) (OperationalSettingsState, error) {
+func (s *RuntimeSettingsService) UpdateOperationalSettings(ctx context.Context, setting OperationalSettings, action adminaction.Metadata) (OperationalSettingsState, error) {
 	normalized, err := NormalizeOperationalSettings(setting)
 	if err != nil {
 		return OperationalSettingsState{}, err
 	}
-	if actorID <= 0 {
-		return OperationalSettingsState{}, validation.New("管理员身份无效")
-	}
-	reason = strings.TrimSpace(reason)
-	if len([]rune(reason)) == 0 || len([]rune(reason)) > maxAdminSettingsReasonLength {
-		return OperationalSettingsState{}, validation.New("reason 必须在 1 到 1000 个字符之间")
+	if !action.IsValid() {
+		return OperationalSettingsState{}, validation.New("管理员操作信息无效")
 	}
 	metadata, err := json.Marshal(normalized)
 	if err != nil {
@@ -202,8 +198,7 @@ func (s *RuntimeSettingsService) UpdateOperationalSettings(ctx context.Context, 
 	}
 	if err := s.repo.SetManyWithAdminAction(ctx, operationalSystemConfigValues(normalized), SystemConfigAdminAction{
 		ActionType: "update_operational_settings",
-		ActorID:    actorID,
-		Reason:     reason,
+		Action:     action,
 		Metadata:   metadata,
 	}); err != nil {
 		return OperationalSettingsState{}, err

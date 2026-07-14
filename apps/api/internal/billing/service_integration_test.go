@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 )
 
 func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
@@ -16,7 +17,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	ctx := t.Context()
 
 	created, err := service.CreateSKU(ctx, CreateSKUInput{
-		SKU: "IdeaBoard:Image.Generate", DisplayName: "AI 生图", Description: "首个计费产品", Enabled: true, ActorID: 7, Reason: "launch image billing",
+		SKU: "IdeaBoard:Image.Generate", DisplayName: "AI 生图", Description: "首个计费产品", Enabled: true, Action: testsupport.AdminAction(t, 7, "launch image billing"),
 	})
 	if err != nil {
 		t.Fatalf("CreateSKU() error = %v", err)
@@ -32,7 +33,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	}
 
 	priceV1, err := service.CreatePrice(ctx, CreatePriceInput{
-		SKU: "ideaboard:image.generate", UnitCredits: 25, Enabled: true, ActorID: 7, Reason: "publish initial price",
+		SKU: "ideaboard:image.generate", UnitCredits: 25, Enabled: true, Action: testsupport.AdminAction(t, 7, "publish initial price"),
 	})
 	if err != nil {
 		t.Fatalf("CreatePrice(v1) error = %v", err)
@@ -46,7 +47,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	}
 
 	priceV2, err := service.CreatePrice(ctx, CreatePriceInput{
-		SKU: "ideaboard:image.generate", UnitCredits: 40, Enabled: true, ActorID: 8, Reason: "publish revised price",
+		SKU: "ideaboard:image.generate", UnitCredits: 40, Enabled: true, Action: testsupport.AdminAction(t, 8, "publish revised price"),
 	})
 	if err != nil {
 		t.Fatalf("CreatePrice(v2) error = %v", err)
@@ -63,7 +64,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	}
 
 	if _, err := service.SetPriceEnabled(ctx, SetPriceEnabledInput{
-		SKU: "ideaboard:image.generate", Version: 2, Enabled: false, ActorID: 9, Reason: "pause revised price",
+		SKU: "ideaboard:image.generate", Version: 2, Enabled: false, Action: testsupport.AdminAction(t, 9, "pause revised price"),
 	}); err != nil {
 		t.Fatalf("SetPriceEnabled(false) error = %v", err)
 	}
@@ -71,7 +72,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 		t.Fatalf("Quote() with disabled current price error = %v", err)
 	}
 	if _, err := service.SetPriceEnabled(ctx, SetPriceEnabledInput{
-		SKU: "ideaboard:image.generate", Version: 2, Enabled: true, ActorID: 9, Reason: "resume revised price",
+		SKU: "ideaboard:image.generate", Version: 2, Enabled: true, Action: testsupport.AdminAction(t, 9, "resume revised price"),
 	}); err != nil {
 		t.Fatalf("SetPriceEnabled(true) error = %v", err)
 	}
@@ -79,7 +80,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	disabled := false
 	newName := "AI Image Generation"
 	updated, err := service.UpdateSKU(ctx, UpdateSKUInput{
-		SKU: "ideaboard:image.generate", DisplayName: &newName, Enabled: &disabled, ActorID: 10, Reason: "retire image SKU",
+		SKU: "ideaboard:image.generate", DisplayName: &newName, Enabled: &disabled, Action: testsupport.AdminAction(t, 10, "retire image SKU"),
 	})
 	if err != nil {
 		t.Fatalf("UpdateSKU() error = %v", err)
@@ -109,10 +110,10 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 		t.Fatalf("ListCatalog() = %+v", catalog)
 	}
 
-	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "ideaboard:free.preview", DisplayName: "Free Preview", Enabled: true, ActorID: 7, Reason: "create free preview"}); err != nil {
+	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "ideaboard:free.preview", DisplayName: "Free Preview", Enabled: true, Action: testsupport.AdminAction(t, 7, "create free preview")}); err != nil {
 		t.Fatalf("CreateSKU(free) error = %v", err)
 	}
-	if _, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "ideaboard:free.preview", UnitCredits: 0, Enabled: true, ActorID: 7, Reason: "publish free preview"}); err != nil {
+	if _, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "ideaboard:free.preview", UnitCredits: 0, Enabled: true, Action: testsupport.AdminAction(t, 7, "publish free preview")}); err != nil {
 		t.Fatalf("CreatePrice(free) error = %v", err)
 	}
 	freeQuote, err := service.Quote(ctx, "ideaboard:free.preview", 99)
@@ -127,24 +128,24 @@ func TestAdminBillingWritesRequireReasonAndPersistAppendOnlyAudit(t *testing.T) 
 	ctx := t.Context()
 
 	if _, err := service.CreateSKU(ctx, CreateSKUInput{
-		SKU: "test:audit", DisplayName: "Audit", Enabled: true, ActorID: 11, Reason: "  create audited SKU  ",
+		SKU: "test:audit", DisplayName: "Audit", Enabled: true, Action: testsupport.AdminAction(t, 11, "  create audited SKU  "),
 	}); err != nil {
 		t.Fatalf("CreateSKU() error = %v", err)
 	}
 	description := "audited description"
 	if _, err := service.UpdateSKU(ctx, UpdateSKUInput{
-		SKU: "test:audit", Description: &description, ActorID: 12, Reason: "update audited SKU",
+		SKU: "test:audit", Description: &description, Action: testsupport.AdminAction(t, 12, "update audited SKU"),
 	}); err != nil {
 		t.Fatalf("UpdateSKU() error = %v", err)
 	}
 	price, err := service.CreatePrice(ctx, CreatePriceInput{
-		SKU: "test:audit", UnitCredits: 9, Enabled: true, ActorID: 13, Reason: "publish audited price",
+		SKU: "test:audit", UnitCredits: 9, Enabled: true, Action: testsupport.AdminAction(t, 13, "publish audited price"),
 	})
 	if err != nil {
 		t.Fatalf("CreatePrice() error = %v", err)
 	}
 	if _, err := service.SetPriceEnabled(ctx, SetPriceEnabledInput{
-		SKU: "test:audit", Version: price.Version, Enabled: false, ActorID: 14, Reason: "pause audited price",
+		SKU: "test:audit", Version: price.Version, Enabled: false, Action: testsupport.AdminAction(t, 14, "pause audited price"),
 	}); err != nil {
 		t.Fatalf("SetPriceEnabled() error = %v", err)
 	}
@@ -198,7 +199,7 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 			t.Fatalf("statement unexpectedly succeeded: %s", statement)
 		}
 	}
-	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:missing-reason", DisplayName: "Missing", Enabled: true, ActorID: 1}); !errors.Is(err, ErrInvalidCatalogEntry) {
+	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:missing-reason", DisplayName: "Missing", Enabled: true}); !errors.Is(err, ErrInvalidCatalogEntry) {
 		t.Fatalf("CreateSKU(blank reason) error = %v, want ErrInvalidCatalogEntry", err)
 	}
 }
@@ -208,13 +209,13 @@ func TestGetSKUsReturnsConfiguredItemsAndOmitsMissingSKUs(t *testing.T) {
 	service := NewService(pool)
 	ctx := t.Context()
 
-	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:coverage-a", DisplayName: "Coverage A", Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
+	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:coverage-a", DisplayName: "Coverage A", Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatalf("CreateSKU(coverage-a) error = %v", err)
 	}
-	if _, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:coverage-a", UnitCredits: 8, Enabled: false, ActorID: 1, Reason: "test setup"}); err != nil {
+	if _, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:coverage-a", UnitCredits: 8, Enabled: false, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatalf("CreatePrice(coverage-a) error = %v", err)
 	}
-	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:coverage-b", DisplayName: "Coverage B", Enabled: false, ActorID: 1, Reason: "test setup"}); err != nil {
+	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:coverage-b", DisplayName: "Coverage B", Enabled: false, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatalf("CreateSKU(coverage-b) error = %v", err)
 	}
 
@@ -238,10 +239,10 @@ func TestDatabasePreventsSKURenameReuseAndPriceMutation(t *testing.T) {
 	service := NewService(pool)
 	ctx := t.Context()
 
-	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:immutable", DisplayName: "Immutable", Enabled: true, ActorID: 1, Reason: "test immutable catalog"}); err != nil {
+	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:immutable", DisplayName: "Immutable", Enabled: true, Action: testsupport.AdminAction(t, 1, "test immutable catalog")}); err != nil {
 		t.Fatalf("CreateSKU() error = %v", err)
 	}
-	price, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:immutable", UnitCredits: 5, Enabled: true, ActorID: 1, Reason: "test immutable price"})
+	price, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:immutable", UnitCredits: 5, Enabled: true, Action: testsupport.AdminAction(t, 1, "test immutable price")})
 	if err != nil {
 		t.Fatalf("CreatePrice() error = %v", err)
 	}
@@ -264,10 +265,10 @@ func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 	service := NewService(pool)
 	ctx := context.Background()
 
-	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:concurrent", DisplayName: "Concurrent", Enabled: true, ActorID: 1, Reason: "test concurrent pricing"}); err != nil {
+	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:concurrent", DisplayName: "Concurrent", Enabled: true, Action: testsupport.AdminAction(t, 1, "test concurrent pricing")}); err != nil {
 		t.Fatalf("CreateSKU() error = %v", err)
 	}
-	initial, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:concurrent", UnitCredits: 10, Enabled: true, ActorID: 1, Reason: "test initial price"})
+	initial, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:concurrent", UnitCredits: 10, Enabled: true, Action: testsupport.AdminAction(t, 1, "test initial price")})
 	if err != nil {
 		t.Fatalf("CreatePrice(initial) error = %v", err)
 	}
@@ -285,7 +286,7 @@ func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			price, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:concurrent", UnitCredits: unitCredits, Enabled: true, ActorID: 2, Reason: "test concurrent repricing"})
+			price, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:concurrent", UnitCredits: unitCredits, Enabled: true, Action: testsupport.AdminAction(t, 2, "test concurrent repricing")})
 			if err != nil {
 				errCh <- fmt.Errorf("CreatePrice(%d): %w", unitCredits, err)
 				return

@@ -3,8 +3,11 @@ package settings
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
+	"ideaboard/api/internal/platform/adminaction"
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -13,6 +16,10 @@ func TestRuntimeSettingsOperationalUpdatePersistsAuditAndTracksRestartRequired(t
 	db := testdb.Open(t)
 	service := NewRuntimeSettingsService(NewSystemConfigRepository(db))
 	service.SetEffectiveOperationalSettings(DefaultTaskRuntimeSetting(), DefaultEventRetentionSetting())
+	action, err := adminaction.New(42, "  capacity tuning  ")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	updated, err := service.UpdateOperationalSettings(ctx, OperationalSettings{
 		TaskRuntime: TaskRuntimeSetting{
@@ -23,7 +30,7 @@ func TestRuntimeSettingsOperationalUpdatePersistsAuditAndTracksRestartRequired(t
 		},
 		OutboundPolicy: OutboundPolicySetting{AllowHosts: []string{"  INTERNAL.example.com:8443 ", "10.0.0.8", "internal.example.com:8443"}},
 		EventRetention: EventRetentionSetting{NATSRetentionDays: 30},
-	}, 42, "  capacity tuning  ")
+	}, action)
 	if err != nil {
 		t.Fatalf("update operational settings failed: %v", err)
 	}
@@ -61,6 +68,14 @@ LIMIT 1`).Scan(&actionType, &actorID, &reason, &metadataRaw); err != nil {
 	}
 	if metadata["task_runtime"] == nil || metadata["outbound_policy"] == nil || metadata["event_retention"] == nil {
 		t.Fatalf("audit metadata = %#v, want all operational groups", metadata)
+	}
+}
+
+func TestRuntimeSettingsOperationalUpdateRejectsInvalidAdminAction(t *testing.T) {
+	service := NewRuntimeSettingsService(nil)
+	_, err := service.UpdateOperationalSettings(t.Context(), DefaultOperationalSettings(), adminaction.Metadata{})
+	if err == nil || !validation.Is(err) || !errors.Is(err, validation.Error("管理员操作信息无效")) {
+		t.Fatalf("UpdateOperationalSettings() error = %v, want validation error", err)
 	}
 }
 

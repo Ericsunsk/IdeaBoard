@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/autherrors"
+	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
@@ -313,11 +314,20 @@ func (h *AdminHandler) UpdateOperationalSettings(c *gin.Context) {
 		response.Error(c, 400, "参数错误，reason 与所有 operational settings 分组均为必填")
 		return
 	}
+	action, err := adminaction.New(c.GetInt64("user_id"), req.Reason)
+	if err != nil {
+		if errors.Is(err, adminaction.ErrInvalidActor) {
+			response.Error(c, 400, "管理员身份无效")
+		} else {
+			response.Error(c, 400, "reason 必须在 1 到 1000 个字符之间")
+		}
+		return
+	}
 	updated, err := runtimeSettings.UpdateOperationalSettings(c.Request.Context(), settings.OperationalSettings{
 		TaskRuntime:    req.TaskRuntime,
 		OutboundPolicy: req.OutboundPolicy,
 		EventRetention: req.EventRetention,
-	}, c.GetInt64("user_id"), req.Reason)
+	}, action)
 	if h.respondRuntimeSettingsWriteError(c, err) {
 		return
 	}

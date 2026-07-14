@@ -8,6 +8,7 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -159,10 +160,10 @@ func seedTaskBillingUsageProduct(
 		t.Fatal(err)
 	}
 	service := billing.NewService(pool)
-	if _, err := service.CreateSKU(ctx, billing.CreateSKUInput{SKU: string(sku), DisplayName: "Usage Index", Enabled: true, ActorID: 1, Reason: "usage index fixture"}); err != nil {
+	if _, err := service.CreateSKU(ctx, billing.CreateSKUInput{SKU: string(sku), DisplayName: "Usage Index", Enabled: true, Action: testsupport.AdminAction(t, 1, "usage index fixture")}); err != nil {
 		t.Fatalf("create usage index SKU: %v", err)
 	}
-	if _, err := service.CreatePrice(ctx, billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, ActorID: 1, Reason: "usage index fixture"}); err != nil {
+	if _, err := service.CreatePrice(ctx, billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, Action: testsupport.AdminAction(t, 1, "usage index fixture")}); err != nil {
 		t.Fatalf("create usage index price: %v", err)
 	}
 	return request, sku

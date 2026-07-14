@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 
@@ -296,13 +297,13 @@ func (h *Handler) StartReconciliation(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "stale_hold_after_seconds 无效")
 		return
 	}
-	reason, err := normalizeReconciliationReason(request.Reason)
+	action, err := adminaction.New(adminID, request.Reason)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "reason 无效")
 		return
 	}
 	run, err := h.service.StartReconciliation(c.Request.Context(), StartReconciliationInput{
-		AdminID: adminID, StaleHoldAfter: time.Duration(request.StaleHoldAfterSeconds) * time.Second, Reason: reason,
+		Action: action, StaleHoldAfter: time.Duration(request.StaleHoldAfterSeconds) * time.Second,
 	})
 	if err != nil {
 		writeCreditError(c, err)

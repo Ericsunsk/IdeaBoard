@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
-	"unicode/utf8"
+
+	"ideaboard/api/internal/platform/adminaction"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -17,8 +17,6 @@ import (
 const ReconciliationQueue = "credit_reconciliation"
 
 const reconciliationFinalFailureTimeout = 5 * time.Second
-
-const MaxReconciliationReasonLength = 1000
 
 var (
 	ErrReconciliationUnavailable = errors.New("credit reconciliation unavailable")
@@ -104,17 +102,15 @@ type ListReconciliationInput struct {
 }
 
 type StartReconciliationInput struct {
-	AdminID        int64
+	Action         adminaction.Metadata
 	StaleHoldAfter time.Duration
-	Reason         string
 }
 
 func (s *Service) StartReconciliation(ctx context.Context, input StartReconciliationInput) (ReconciliationRun, error) {
 	if s == nil || s.pool == nil || s.reconciliationEnqueuer == nil {
 		return ReconciliationRun{}, ErrReconciliationUnavailable
 	}
-	reason, err := normalizeReconciliationReason(input.Reason)
-	if input.AdminID <= 0 || input.StaleHoldAfter < time.Minute || input.StaleHoldAfter > 365*24*time.Hour || err != nil {
+	if !input.Action.IsValid() || input.StaleHoldAfter < time.Minute || input.StaleHoldAfter > 365*24*time.Hour {
 		return ReconciliationRun{}, ErrInvalidCommand
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -129,7 +125,7 @@ func (s *Service) StartReconciliation(ctx context.Context, input StartReconcilia
 		}
 	}()
 	var runID int64
-	if err := tx.QueryRow(ctx, `SELECT start_credit_reconciliation($1, $2, $3)`, input.AdminID, int64(input.StaleHoldAfter/time.Second), reason).Scan(&runID); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT start_credit_reconciliation($1, $2, $3)`, input.Action.ActorID(), int64(input.StaleHoldAfter/time.Second), input.Action.Reason()).Scan(&runID); err != nil {
 		return ReconciliationRun{}, fmt.Errorf("credits reconciliation: create run: %w", err)
 	}
 	if _, err := s.reconciliationEnqueuer.InsertTx(ctx, tx, ReconciliationJobArgs{RunID: runID}, &river.InsertOpts{
@@ -267,14 +263,6 @@ func normalizeReconciliationLimit(limit int) (int, error) {
 		return 0, ErrInvalidCommand
 	}
 	return limit, nil
-}
-
-func normalizeReconciliationReason(reason string) (string, error) {
-	reason = strings.TrimSpace(reason)
-	if reason == "" || utf8.RuneCountInString(reason) > MaxReconciliationReasonLength {
-		return "", ErrInvalidCommand
-	}
-	return reason, nil
 }
 
 type ReconciliationWorker struct {

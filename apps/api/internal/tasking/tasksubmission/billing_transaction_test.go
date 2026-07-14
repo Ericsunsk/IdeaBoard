@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -38,7 +39,7 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 	if !firstResult.Created || firstResult.HoldTransactionID == "" {
 		t.Fatalf("first result=%+v", firstResult)
 	}
-	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(mustResolveSKU(t, request)), UnitCredits: 40, Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
+	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(mustResolveSKU(t, request)), UnitCredits: 40, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -380,10 +381,10 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 				}
 				if scenario.createSKU {
 					sku := mustResolveSKU(t, request)
-					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, ActorID: 1, Reason: "test setup"}); err != nil {
+					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, ActorID: 1, Reason: "test setup"}); err != nil {
+					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -435,10 +436,10 @@ func seedPatternBillingProduct(t *testing.T, service *billing.Service, model str
 		t.Fatal(err)
 	}
 	sku := mustResolveSKU(t, request)
-	if _, err := service.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern Generation", Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
+	if _, err := service.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern Generation", Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: unitCredits, Enabled: true, ActorID: 1, Reason: "test setup"}); err != nil {
+	if _, err := service.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: unitCredits, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatal(err)
 	}
 	return request

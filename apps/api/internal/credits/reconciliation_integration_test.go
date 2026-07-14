@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
@@ -60,7 +62,7 @@ func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) 
 	}
 
 	ledgerBefore := countRows(t, db, `SELECT COUNT(*) FROM credit_transactions`)
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(24*time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
 	if err != nil {
 		t.Fatalf("StartReconciliation() error = %v", err)
 	}
@@ -98,7 +100,7 @@ func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) 
 		t.Fatalf("ledger transactions changed from %d to %d", ledgerBefore, got)
 	}
 
-	second, err := service.StartReconciliation(ctx, reconciliationStartInput(24*time.Hour))
+	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +126,7 @@ func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) 
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
 		t.Fatal(err)
 	}
-	third, err := service.StartReconciliation(ctx, reconciliationStartInput(24*time.Hour))
+	third, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +170,7 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `UPDATE credit_holds SET created_at = clock_timestamp() - INTERVAL '2 hours' WHERE hold_transaction_id = $1`, hold.TransactionID); err != nil {
 		t.Fatal(err)
 	}
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,17 +204,17 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	service := NewService(pool)
 	enqueuer := &reconciliationEnqueuerStub{}
 	service.SetReconciliationEnqueuer(enqueuer)
-	invalid := reconciliationStartInput(24 * time.Hour)
-	invalid.Reason = "  "
+	invalid := reconciliationStartInput(t, 24*time.Hour)
+	invalid.Action = adminaction.Metadata{}
 	if _, err := service.StartReconciliation(t.Context(), invalid); !errors.Is(err, ErrInvalidCommand) {
 		t.Fatalf("StartReconciliation(blank reason) error = %v, want ErrInvalidCommand", err)
 	}
-	first, err := service.StartReconciliation(t.Context(), reconciliationStartInput(24*time.Hour))
+	first, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t, 24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondInput := reconciliationStartInput(24 * time.Hour)
-	secondInput.Reason = "second request must not overwrite active run reason"
+	secondInput := reconciliationStartInput(t, 24*time.Hour)
+	secondInput.Action = testsupport.AdminAction(t, 1, "second request must not overwrite active run reason")
 	second, err := service.StartReconciliation(t.Context(), secondInput)
 	if err != nil {
 		t.Fatal(err)
@@ -230,7 +232,7 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	failing := NewService(pool)
 	riverErr := errors.New("river unavailable")
 	failing.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{err: riverErr})
-	if _, err := failing.StartReconciliation(t.Context(), reconciliationStartInput(24*time.Hour)); !errors.Is(err, riverErr) {
+	if _, err := failing.StartReconciliation(t.Context(), reconciliationStartInput(t, 24*time.Hour)); !errors.Is(err, riverErr) {
 		t.Fatalf("StartReconciliation() error = %v, want wrapped River error", err)
 	}
 	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
@@ -411,7 +413,7 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 		t.Fatal(err)
 	}
 
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(24*time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -473,7 +475,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	}
 	createReconciliationTaskFixture(t, db, service, "active-held", "pending", "", 93, priceID, priceVersion)
 
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(24*time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -652,8 +654,8 @@ func taskReconciliationMetadata(key, taskID string) CommandMetadata {
 	return CommandMetadata{IdempotencyKey: key, Actor: Actor{Type: ActorService, ID: "reconciliation-test"}, Source: "test", Reason: "reconciliation matrix", BusinessReference: BusinessReference{Type: "task", ID: taskID}}
 }
 
-func reconciliationStartInput(staleHoldAfter time.Duration) StartReconciliationInput {
-	return StartReconciliationInput{AdminID: 1, StaleHoldAfter: staleHoldAfter, Reason: "integration reconciliation"}
+func reconciliationStartInput(t testing.TB, staleHoldAfter time.Duration) StartReconciliationInput {
+	return StartReconciliationInput{Action: testsupport.AdminAction(t, 1, "integration reconciliation"), StaleHoldAfter: staleHoldAfter}
 }
 
 func countRows(t testing.TB, db interface {

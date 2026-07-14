@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -199,10 +200,10 @@ func newDurableUsageBilling(
 	if err != nil {
 		t.Fatalf("resolve usage SKU: %v", err)
 	}
-	if _, err := billingService.CreateSKU(ctx, billing.CreateSKUInput{SKU: string(sku), DisplayName: "Usage Free", Enabled: true, ActorID: 1, Reason: "usage fixture"}); err != nil {
+	if _, err := billingService.CreateSKU(ctx, billing.CreateSKUInput{SKU: string(sku), DisplayName: "Usage Free", Enabled: true, Action: testsupport.AdminAction(t, 1, "usage fixture")}); err != nil {
 		t.Fatalf("create usage SKU: %v", err)
 	}
-	if _, err := billingService.CreatePrice(ctx, billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, ActorID: 1, Reason: "usage fixture"}); err != nil {
+	if _, err := billingService.CreatePrice(ctx, billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, Action: testsupport.AdminAction(t, 1, "usage fixture")}); err != nil {
 		t.Fatalf("create usage price: %v", err)
 	}
 	return taskbilling.NewService(billingService, creditService), request

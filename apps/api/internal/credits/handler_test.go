@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/adminaction"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -43,7 +45,7 @@ func (s *adminHandlerServiceStub) ListLedger(context.Context, ListLedgerInput) (
 func (s *adminHandlerServiceStub) StartReconciliation(_ context.Context, input StartReconciliationInput) (ReconciliationRun, error) {
 	s.startInput = input
 	s.startCalls++
-	return ReconciliationRun{ID: 1, Status: ReconciliationRunQueued, RequestedBy: input.AdminID, Reason: input.Reason}, nil
+	return ReconciliationRun{ID: 1, Status: ReconciliationRunQueued, RequestedBy: input.Action.ActorID(), Reason: input.Action.Reason()}, nil
 }
 
 func (s *adminHandlerServiceStub) GetReconciliationRun(context.Context, int64) (ReconciliationRun, error) {
@@ -72,7 +74,7 @@ func TestStartReconciliationHandlerRequiresAndTrimsReason(t *testing.T) {
 	for _, body := range []string{
 		`{}`,
 		`{"reason":"  "}`,
-		`{"reason":"` + strings.Repeat("理", MaxReconciliationReasonLength+1) + `"}`,
+		`{"reason":"` + strings.Repeat("理", adminaction.MaxReasonRunes+1) + `"}`,
 	} {
 		response := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/runs", strings.NewReader(body))
@@ -93,7 +95,7 @@ func TestStartReconciliationHandlerRequiresAndTrimsReason(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d response=%s", response.Code, response.Body.String())
 	}
-	if service.startCalls != 1 || service.startInput.AdminID != 7 || service.startInput.Reason != "manual audit" || service.startInput.StaleHoldAfter != 24*time.Hour {
+	if service.startCalls != 1 || service.startInput.Action.ActorID() != 7 || service.startInput.Action.Reason() != "manual audit" || service.startInput.StaleHoldAfter != 24*time.Hour {
 		t.Fatalf("StartReconciliation input=%+v calls=%d", service.startInput, service.startCalls)
 	}
 }

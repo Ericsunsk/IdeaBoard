@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/adminaction"
 )
 
 type SystemConfigRepository struct {
@@ -15,8 +17,21 @@ type SystemConfigRepository struct {
 	q  *dbsqlc.Queries
 }
 
+type systemConfigContextDB struct {
+	ctx context.Context
+	db  *sql.DB
+}
+
 func NewSystemConfigRepository(db *sql.DB) *SystemConfigRepository {
 	return &SystemConfigRepository{db: db, q: dbsqlc.New(db)}
+}
+
+func (r *SystemConfigRepository) dbWithContext(ctx context.Context) systemConfigContextDB {
+	return systemConfigContextDB{ctx: ctx, db: r.db}
+}
+
+func (db systemConfigContextDB) withTx(run func(*dbsqlc.Queries, *sql.Tx) error) error {
+	return dbutil.WithTxDBTX(db.ctx, db.db, run)
 }
 
 type SystemConfigValue struct {
@@ -26,8 +41,7 @@ type SystemConfigValue struct {
 
 type SystemConfigAdminAction struct {
 	ActionType string
-	ActorID    int64
-	Reason     string
+	Action     adminaction.Metadata
 	Metadata   json.RawMessage
 }
 
@@ -75,19 +89,14 @@ func (r *SystemConfigRepository) SetMany(ctx context.Context, values []SystemCon
 	if len(values) == 0 {
 		return nil
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	q := r.q.WithTx(tx)
-	for _, value := range values {
-		if err := q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
-			return err
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ *sql.Tx) error {
+		for _, value := range values {
+			if err := q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
+				return err
+			}
 		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }
 
 // SetManyWithAdminAction keeps the operational configuration and its append-only audit record atomic.
@@ -98,22 +107,17 @@ func (r *SystemConfigRepository) SetManyWithAdminAction(ctx context.Context, val
 	if len(values) == 0 {
 		return nil
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	q := r.q.WithTx(tx)
-	for _, value := range values {
-		if err := q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
-			return err
+	return r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx *sql.Tx) error {
+		for _, value := range values {
+			if err := q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{ConfigKey: value.Key, Value: value.Value}); err != nil {
+				return err
+			}
 		}
-	}
-	if _, err := tx.ExecContext(ctx, `
+		if _, err := tx.ExecContext(ctx, `
 INSERT INTO system_settings_admin_actions (action_type, actor_id, reason, metadata)
-VALUES ($1, $2, $3, $4::jsonb)`, action.ActionType, action.ActorID, action.Reason, action.Metadata); err != nil {
-		return fmt.Errorf("insert system settings admin action: %w", err)
-	}
-	return tx.Commit()
+VALUES ($1, $2, $3, $4::jsonb)`, action.ActionType, action.Action.ActorID(), action.Action.Reason(), action.Metadata); err != nil {
+			return fmt.Errorf("insert system settings admin action: %w", err)
+		}
+		return nil
+	})
 }

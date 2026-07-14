@@ -139,7 +139,7 @@ func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
 			}
 		})
 	}
-	if service.createSKUInput.ActorID != 9 || !service.createSKUInput.Enabled || service.createSKUInput.Reason != "launch pricing" {
+	if service.createSKUInput.Action.ActorID() != 9 || !service.createSKUInput.Enabled || service.createSKUInput.Action.Reason() != "launch pricing" {
 		t.Fatalf("CreateSKU input = %+v", service.createSKUInput)
 	}
 }
@@ -165,7 +165,7 @@ func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 	}{
 		{name: "update missing reason", method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false}`},
 		{name: "create price blank reason", method: http.MethodPost, path: "/skus/test:item/prices", body: `{"unit_credits":4,"enabled":true,"reason":"  "}`},
-		{name: "set state too long reason", method: http.MethodPatch, path: "/skus/test:item/prices/1", body: `{"enabled":false,"reason":"` + strings.Repeat("r", 1001) + `"}`},
+		{name: "set state too long Unicode reason", method: http.MethodPatch, path: "/skus/test:item/prices/1", body: `{"enabled":false,"reason":"` + strings.Repeat("点", 1001) + `"}`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			response := httptest.NewRecorder()
@@ -196,8 +196,8 @@ func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 			t.Fatalf("%s %s status = %d body=%s", requestCase.method, requestCase.path, response.Code, response.Body.String())
 		}
 	}
-	if service.updateSKUInput.Reason != "disable catalog" || service.createPriceInput.Reason != "publish price" || service.setPriceInput.Reason != "pause price" {
-		t.Fatalf("trimmed reasons update=%q create_price=%q set_price=%q", service.updateSKUInput.Reason, service.createPriceInput.Reason, service.setPriceInput.Reason)
+	if service.updateSKUInput.Action.Reason() != "disable catalog" || service.createPriceInput.Action.Reason() != "publish price" || service.setPriceInput.Action.Reason() != "pause price" {
+		t.Fatalf("trimmed reasons update=%q create_price=%q set_price=%q", service.updateSKUInput.Action.Reason(), service.createPriceInput.Action.Reason(), service.setPriceInput.Action.Reason())
 	}
 }
 
