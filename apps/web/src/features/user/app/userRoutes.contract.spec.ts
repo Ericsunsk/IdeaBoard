@@ -1,7 +1,19 @@
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { userRoutes } from './userRoutes'
+
+const routeComponents = vi.hoisted(() => ({
+  layout: { name: 'UserLayoutRouteTarget' },
+  home: { name: 'UserHomeRouteTarget' },
+  boards: { name: 'UserBoardsRouteTarget' },
+  canvas: { name: 'UserCanvasRouteTarget' },
+}))
+
+vi.mock('../layout/UserLayout.vue', () => ({ default: routeComponents.layout }))
+vi.mock('../../canvas/pages/CanvasLandingPage.vue', () => ({ default: routeComponents.home }))
+vi.mock('../../board-catalog/pages/BoardsPage.vue', () => ({ default: routeComponents.boards }))
+vi.mock('../../canvas/pages/CanvasPage.vue', () => ({ default: routeComponents.canvas }))
 
 type LazyRouteModule = {
   default: Component
@@ -52,35 +64,18 @@ describe('userRoutes contract', () => {
     const userRootRoute = requireRoute(userRoutes, '/user')
     const children = userRootRoute.children ?? []
 
-    const [
-      userLayoutModule,
-      homeModule,
-      boardsModule,
-      canvasModule,
-      loadedLayout,
-      loadedHome,
-      loadedLogin,
-      loadedRegister,
-      loadedBoards,
-      loadedCanvas,
-    ] = await Promise.all([
-      import('../layout/UserLayout.vue'),
-      import('../../canvas/pages/CanvasLandingPage.vue'),
-      import('../../board-catalog/pages/BoardsPage.vue'),
-      import('../../canvas/pages/CanvasPage.vue'),
-      loadRouteComponent(userRootRoute),
-      loadRouteComponent(requireRoute(children, 'home')),
-      loadRouteComponent(requireRoute(children, 'login')),
-      loadRouteComponent(requireRoute(children, 'register')),
-      loadRouteComponent(requireRoute(children, 'boards')),
-      loadRouteComponent(requireRoute(children, 'canvas')),
-    ])
+    const loadedLayout = await loadRouteComponent(userRootRoute)
+    const loadedHome = await loadRouteComponent(requireRoute(children, 'home'))
+    const loadedLogin = await loadRouteComponent(requireRoute(children, 'login'))
+    const loadedRegister = await loadRouteComponent(requireRoute(children, 'register'))
+    const loadedBoards = await loadRouteComponent(requireRoute(children, 'boards'))
+    const loadedCanvas = await loadRouteComponent(requireRoute(children, 'canvas'))
 
-    expect(loadedLayout).toBe(userLayoutModule.default)
-    expect(loadedHome).toBe(homeModule.default)
-    expect(loadedLogin).toBe(homeModule.default)
-    expect(loadedRegister).toBe(homeModule.default)
-    expect(loadedBoards).toBe(boardsModule.default)
-    expect(loadedCanvas).toBe(canvasModule.default)
+    expect(loadedLayout).toBe(routeComponents.layout)
+    expect(loadedHome).toBe(routeComponents.home)
+    expect(loadedLogin).toBe(routeComponents.home)
+    expect(loadedRegister).toBe(routeComponents.home)
+    expect(loadedBoards).toBe(routeComponents.boards)
+    expect(loadedCanvas).toBe(routeComponents.canvas)
   })
 })
