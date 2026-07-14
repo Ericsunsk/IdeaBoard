@@ -6,6 +6,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
@@ -58,6 +59,7 @@ func newAppRouter(
 			BoardHandler:     boards.NewBoardHandler(services.boardService, services.runtimeSettings),
 			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			BillingHandler:   billingHandler,
+			BillingRecords:   billingrecords.NewHandler(services.billingRecords),
 			CreditHandler:    credits.NewHandler(services.creditService),
 			UsageHandler:     usage.NewHandler(services.usageService),
 			Uploads:          uploadDeps,

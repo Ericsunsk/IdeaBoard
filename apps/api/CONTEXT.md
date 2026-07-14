@@ -15,6 +15,7 @@
 | Media | `internal/media/storage`, `internal/media/assets`, `internal/media/imageformat`, `internal/media/mediarefs` | Object storage、upload serving、upload authorization、media references、image format validation、bundled business assets | `storage.Service`, media stores/authorizers, media reference helpers |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | Executable workflow feature contract、task parameter shaping、prompt templates、prompt assembly | Workflow helpers, prompt engine/repository/handler |
 | Billing | `internal/billing` | 全局 SKU Catalog、versioned Credit pricing、server-side Quote snapshot | `billing.Service.Quote`, `billing.PriceSnapshot`, Admin billing handler |
+| Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing Snapshot，不拥有账务写入 | `billingrecords.Service.List`, authenticated billing records handler |
 | Credits | `internal/credits` | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Commands | `credits.Commands`, `credits.WalletReader`, `credits.Service.InTx`, `credits.Service.InSQLTx` |
 | Usage | `internal/usage` | 用户侧 Idea 消耗的 Lifetime 摘要、每日 Capture Trend 与 durable logical AI Task submission 只读聚合 | `usage.Service`, caller-owned `CaptureUsageReader`, caller-owned `LogicalTaskUsageReader` |
 
@@ -51,6 +52,7 @@
 - 用户删除以 `user_deletion_requests` 为 durable state：先冻结业务用户与 Wallet，再按 Auth → Storage → tombstone phase 幂等收敛；跨服务失败不得恢复 active Wallet。
 - Usage range 是 typed `7d | 30d | 1y`，对应包含今天的 7 / 30 / 365 个 `Asia/Shanghai` daily buckets；range 只过滤 Trend，Lifetime 口径不变。
 - Usage 实时组合 immutable Credit Capture 与 Task Billing snapshot，并使用 feature-local、容量 2,048、TTL 约 30 秒的 per-process LRU cache。cache 必须按 `(user_id, range)` 隔离并 copy-on-read/write；多实例最多约 30 秒 eventual freshness，不引入 Redis invalidation 或 Daily Projection。
+- Billing Records 只读组合 Credits Ledger 与 immutable Task Billing Snapshot：使用 authenticated `user_id` 与 Ledger sequence keyset pagination，隐藏 Hold/Release/Refund 等内部或暂不展示的流水，并由后端输出稳定 `kind/title`，前端不得解析 Ledger `source/reason`。
 
 ## When To Expand A Context
 

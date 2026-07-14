@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
@@ -285,6 +286,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			BoardHandler:     boards.NewBoardHandler(nil, nil),
 			LineDraftHandler: assets.NewLineDraftHandler(nil),
 			BillingHandler:   billing.NewHandler(nil, nil),
+			BillingRecords:   billingrecords.NewHandler(nil),
 			CreditHandler:    credits.NewHandler(nil),
 			UsageHandler:     usage.NewHandler(nil),
 			Uploads: UploadDeps{

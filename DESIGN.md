@@ -175,6 +175,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Media | `internal/media` | storage、assets、media refs、image format validation |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | executable feature contract、task params、prompt templates、prompt assembly |
 | Billing | `internal/billing` | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot |
+| Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入 |
 | Credits | `internal/credits` | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands |
 | Usage | `internal/usage` | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入 |
 

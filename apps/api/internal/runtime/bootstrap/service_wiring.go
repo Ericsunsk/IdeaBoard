@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/billing"
+	"ideaboard/api/internal/billingrecords"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
@@ -27,6 +28,7 @@ type appDomainServices struct {
 	userService       *users.UserService
 	boardService      *boards.BoardService
 	billingService    *billing.Service
+	billingRecords    *billingrecords.Service
 	billingCoverage   *billingcoverage.Service
 	creditService     *credits.Service
 	usageService      *usage.Service
@@ -60,6 +62,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		userService:       userService,
 		boardService:      boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
 		billingService:    billingService,
+		billingRecords:    billingrecords.NewService(billingrecords.NewRepository(appPool)),
 		billingCoverage:   billingCoverage,
 		creditService:     creditService,
 		usageService:      usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),

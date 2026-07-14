@@ -15,6 +15,7 @@ func registerAuthenticatedUserRoutes(r *gin.Engine, authDeps AuthDeps, h UserRou
 func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.GET("/info", h.AuthHandler.GetCurrentUser)
 	userAPI.POST("/billing/quotes", h.BillingHandler.Quote)
+	userAPI.GET("/billing/records", h.BillingRecords.List)
 	userAPI.GET("/credits/wallet", h.CreditHandler.GetCurrentWallet)
 	userAPI.GET("/credits/ledger", h.CreditHandler.ListCurrentLedger)
 	userAPI.GET("/usage", h.UsageHandler.GetCurrent)
