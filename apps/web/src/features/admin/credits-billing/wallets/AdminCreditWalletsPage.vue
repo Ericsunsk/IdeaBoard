@@ -116,9 +116,9 @@
             <template #pager>
               <AdminPagerControls
                 :current-page="ledgerPage"
-                :total-pages="ledgerHasNext ? ledgerPage + 1 : ledgerPage"
-                :prev-disabled="ledgerPage === 1 || ledgerLoading"
-                :next-disabled="!ledgerHasNext || ledgerLoading"
+                :total-pages="ledgerTotalPages"
+                :prev-disabled="!ledgerCanRetreat"
+                :next-disabled="!ledgerCanAdvance"
                 @prev="previousLedgerPage"
                 @next="nextLedgerPage"
               />
@@ -265,6 +265,7 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import { useAdminUsersResource, type AdminUserListItem } from '../../users/adminUsersResource'
@@ -288,8 +289,6 @@ const selectedUserId = ref<number | null>(null)
 const selectedUser = ref<AdminUserListItem | null>(null)
 const userSearchKeyword = ref('')
 const appliedUserSearch = ref('')
-const ledgerBeforeSequence = ref<number>()
-const ledgerCursorStack = ref<Array<number | undefined>>([])
 const activeCommand = ref<AdminCreditCommandKind | null>(null)
 const commandDialogVisible = ref(false)
 const refundSource = ref<AdminCreditLedgerTransaction | null>(null)
@@ -309,6 +308,11 @@ const selectedUserLabel = computed(
   () => selectedUser.value?.username || `用户 #${selectedUserId.value}`,
 )
 
+const ledgerPagination = useAdminCursorPagination<number>({
+  pending: () =>
+    walletResource.ledgerQuery.isLoading.value || walletResource.ledgerQuery.isFetching.value,
+})
+const ledgerBeforeSequence = ledgerPagination.cursor
 const walletResource = useAdminCreditWalletResource(selectedUserId, ledgerBeforeSequence)
 const { wallet, ledger, commandPending } = walletResource
 const transactions = computed(() => ledger.value?.transactions ?? [])
@@ -320,8 +324,10 @@ const ledgerLoading = computed(
 )
 const walletError = computed(() => walletResource.walletQuery.error.value)
 const ledgerError = computed(() => walletResource.ledgerQuery.error.value)
-const ledgerPage = computed(() => ledgerCursorStack.value.length + 1)
-const ledgerHasNext = computed(() => Boolean(ledger.value?.next_before_sequence))
+const ledgerPage = ledgerPagination.currentPage
+const ledgerTotalPages = ledgerPagination.totalPages
+const ledgerCanAdvance = ledgerPagination.canAdvance
+const ledgerCanRetreat = ledgerPagination.canRetreat
 
 watch(walletError, (error) => {
   if (error) feedback.walletLoadFailed(error)
@@ -329,9 +335,18 @@ watch(walletError, (error) => {
 watch(ledgerError, (error) => {
   if (error) feedback.ledgerLoadFailed(error)
 })
+watch(
+  [
+    () => walletResource.ledgerQuery.dataUpdatedAt.value,
+    () => walletResource.ledgerQuery.isFetching.value,
+  ],
+  ([, isFetching]) => {
+    if (!isFetching) ledgerPagination.setNextCursor(ledger.value?.next_before_sequence)
+  },
+  { immediate: true },
+)
 watch(selectedUserId, () => {
-  ledgerBeforeSequence.value = undefined
-  ledgerCursorStack.value = []
+  ledgerPagination.reset()
 })
 
 function searchUsers() {
@@ -361,16 +376,11 @@ function refreshWallet() {
 }
 
 function nextLedgerPage() {
-  const next = ledger.value?.next_before_sequence
-  if (!next) return
-  ledgerCursorStack.value = [...ledgerCursorStack.value, ledgerBeforeSequence.value]
-  ledgerBeforeSequence.value = next
+  ledgerPagination.advance()
 }
 
 function previousLedgerPage() {
-  const stack = [...ledgerCursorStack.value]
-  ledgerBeforeSequence.value = stack.pop()
-  ledgerCursorStack.value = stack
+  ledgerPagination.retreat()
 }
 
 function openCommand(kind: Exclude<AdminCreditCommandKind, 'refund'>) {

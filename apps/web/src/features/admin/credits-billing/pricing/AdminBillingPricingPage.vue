@@ -54,7 +54,7 @@
             :current-page="currentCatalogPage"
             :total-pages="catalogTotalPages"
             :prev-disabled="currentCatalogPage === 1 || catalogLoading"
-            :next-disabled="!nextCatalogCursor || catalogLoading"
+            :next-disabled="!catalogHasNext || catalogLoading"
             @prev="previousCatalogPage"
             @next="nextCatalogPage"
           />
@@ -245,7 +245,7 @@
                 :current-page="currentPricePage"
                 :total-pages="priceTotalPages"
                 :prev-disabled="currentPricePage === 1 || pricesLoading"
-                :next-disabled="!nextPriceCursor || pricesLoading"
+                :next-disabled="!priceHasNext || pricesLoading"
                 @prev="previousPricePage"
                 @next="nextPricePage"
               />
@@ -570,10 +570,10 @@ const {
   mutationPending,
   currentCatalogPage,
   catalogTotalPages,
+  catalogHasNext,
   currentPricePage,
   priceTotalPages,
-  nextCatalogCursor,
-  nextPriceCursor,
+  priceHasNext,
   unpricedCount,
   billableCount,
   loadCoverage,

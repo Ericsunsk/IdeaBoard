@@ -17,6 +17,7 @@ import type {
   CreateAdminBillingSKUInput,
   UpdateAdminBillingSKUInput,
 } from './billingPricingTypes'
+import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 
 const catalogPageSize = 24
 const pricePageSize = 20
@@ -46,23 +47,13 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
   const coverageError = ref('')
   const pricesError = ref('')
   const mutationPending = ref(false)
-  const catalogCursors = ref<(string | undefined)[]>([undefined])
-  const catalogPageIndex = ref(0)
-  const nextCatalogCursor = ref<string>()
-  const priceCursors = ref<(number | undefined)[]>([undefined])
-  const pricePageIndex = ref(0)
-  const nextPriceCursor = ref<number>()
+  const catalogPagination = useAdminCursorPagination<string>({ pending: catalogLoading })
+  const pricePagination = useAdminCursorPagination<number>({ pending: pricesLoading })
   const priceLoadSequence = shallowRef(0)
 
   const visibleCatalogItems = computed(() =>
     filterBillingCatalog(catalogItems.value, searchKeyword.value, catalogFilter.value),
   )
-  const currentCatalogPage = computed(() => catalogPageIndex.value + 1)
-  const catalogTotalPages = computed(
-    () => currentCatalogPage.value + (nextCatalogCursor.value ? 1 : 0),
-  )
-  const currentPricePage = computed(() => pricePageIndex.value + 1)
-  const priceTotalPages = computed(() => currentPricePage.value + (nextPriceCursor.value ? 1 : 0))
   const unpricedCount = computed(() => catalogItems.value.filter(isCatalogItemUnpriced).length)
   const billableCount = computed(() => catalogItems.value.filter(isCatalogItemBillable).length)
 
@@ -87,11 +78,11 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
     catalogError.value = ''
     try {
       const page = await resource.listSKUs({
-        afterSku: catalogCursors.value[catalogPageIndex.value],
+        afterSku: catalogPagination.cursor.value,
         limit: catalogPageSize,
       })
       catalogItems.value = page.items
-      nextCatalogCursor.value = page.nextAfterSku
+      catalogPagination.setNextCursor(page.nextAfterSku)
 
       const nextSelection =
         page.items.find((item) => item.sku === preferredSKU) ??
@@ -125,12 +116,12 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
     pricesError.value = ''
     try {
       const page = await resource.listPrices(sku, {
-        beforeVersion: priceCursors.value[pricePageIndex.value],
+        beforeVersion: pricePagination.cursor.value,
         limit: pricePageSize,
       })
       if (sequence !== priceLoadSequence.value || selectedSKU.value?.sku !== sku) return
       prices.value = page.prices
-      nextPriceCursor.value = page.nextBeforeVersion
+      pricePagination.setNextCursor(page.nextBeforeVersion)
     } catch (error) {
       if (sequence !== priceLoadSequence.value) return
       pricesError.value = '价格版本加载失败'
@@ -148,30 +139,22 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
   }
 
   async function nextCatalogPage() {
-    if (!nextCatalogCursor.value || catalogLoading.value) return
-    catalogCursors.value = catalogCursors.value.slice(0, catalogPageIndex.value + 1)
-    catalogCursors.value.push(nextCatalogCursor.value)
-    catalogPageIndex.value += 1
+    if (!catalogPagination.advance()) return
     await loadCatalog()
   }
 
   async function previousCatalogPage() {
-    if (catalogPageIndex.value === 0 || catalogLoading.value) return
-    catalogPageIndex.value -= 1
+    if (!catalogPagination.retreat()) return
     await loadCatalog()
   }
 
   async function nextPricePage() {
-    if (!nextPriceCursor.value || pricesLoading.value) return
-    priceCursors.value = priceCursors.value.slice(0, pricePageIndex.value + 1)
-    priceCursors.value.push(nextPriceCursor.value)
-    pricePageIndex.value += 1
+    if (!pricePagination.advance()) return
     await loadPrices()
   }
 
   async function previousPricePage() {
-    if (pricePageIndex.value === 0 || pricesLoading.value) return
-    pricePageIndex.value -= 1
+    if (!pricePagination.retreat()) return
     await loadPrices()
   }
 
@@ -282,15 +265,11 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
   }
 
   function resetCatalogPagination() {
-    catalogCursors.value = [undefined]
-    catalogPageIndex.value = 0
-    nextCatalogCursor.value = undefined
+    catalogPagination.reset()
   }
 
   function resetPricePagination() {
-    priceCursors.value = [undefined]
-    pricePageIndex.value = 0
-    nextPriceCursor.value = undefined
+    pricePagination.reset()
   }
 
   return {
@@ -308,12 +287,12 @@ export function useAdminBillingPricing(options: UseAdminBillingPricingOptions) {
     catalogError,
     pricesError,
     mutationPending,
-    currentCatalogPage,
-    catalogTotalPages,
-    currentPricePage,
-    priceTotalPages,
-    nextCatalogCursor,
-    nextPriceCursor,
+    currentCatalogPage: catalogPagination.currentPage,
+    catalogTotalPages: catalogPagination.totalPages,
+    catalogHasNext: catalogPagination.hasNext,
+    currentPricePage: pricePagination.currentPage,
+    priceTotalPages: pricePagination.totalPages,
+    priceHasNext: pricePagination.hasNext,
     unpricedCount,
     billableCount,
     loadCoverage,

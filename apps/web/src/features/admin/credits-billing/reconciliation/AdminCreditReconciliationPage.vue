@@ -73,9 +73,9 @@
           <template #pager>
             <AdminPagerControls
               :current-page="runPage"
-              :total-pages="runHasNext ? runPage + 1 : runPage"
-              :prev-disabled="runPage === 1 || runsLoading"
-              :next-disabled="!runHasNext || runsLoading"
+              :total-pages="runTotalPages"
+              :prev-disabled="!runCanRetreat"
+              :next-disabled="!runCanAdvance"
               @prev="previousRunPage"
               @next="nextRunPage"
             />
@@ -181,9 +181,9 @@
           />
           <AdminPagerControls
             :current-page="findingPage"
-            :total-pages="findingHasNext ? findingPage + 1 : findingPage"
-            :prev-disabled="findingPage === 1 || findingsLoading"
-            :next-disabled="!findingHasNext || findingsLoading"
+            :total-pages="findingTotalPages"
+            :prev-disabled="!findingCanRetreat"
+            :next-disabled="!findingCanAdvance"
             @prev="previousFindingPage"
             @next="nextFindingPage"
           />
@@ -322,6 +322,7 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
@@ -344,12 +345,8 @@ import {
 const staleHoldHours = ref<number | null>(24)
 const startReason = ref('')
 const reasonError = ref('')
-const runBeforeId = ref<number>()
-const runCursorStack = ref<Array<number | undefined>>([])
 const selectedRunId = ref<number | null>(null)
 const findingStatusFilter = ref<'all' | 'open' | 'resolved'>('all')
-const findingBeforeId = ref<number>()
-const findingCursorStack = ref<Array<number | undefined>>([])
 const findingStatusOptions = [
   { label: '全部状态', value: 'all' },
   { label: '待处理', value: 'open' },
@@ -358,6 +355,15 @@ const findingStatusOptions = [
 
 const confirm = useAdminConfirm()
 const feedback = useCreditsBillingFeedback()
+const runPagination = useAdminCursorPagination<number>({
+  pending: () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
+})
+const findingPagination = useAdminCursorPagination<number>({
+  pending: () =>
+    resource.findingsQuery.isLoading.value || resource.findingsQuery.isFetching.value,
+})
+const runBeforeId = runPagination.cursor
+const findingBeforeId = findingPagination.cursor
 const resource = useAdminCreditReconciliationResource({
   runBeforeId,
   selectedRunId,
@@ -372,10 +378,14 @@ const findings = computed(() => resource.findings.value?.findings ?? [])
 const selectedRunRow = computed(
   () => runs.value.find((run) => run.id === selectedRunId.value) ?? null,
 )
-const runPage = computed(() => runCursorStack.value.length + 1)
-const findingPage = computed(() => findingCursorStack.value.length + 1)
-const runHasNext = computed(() => Boolean(resource.runs.value?.next_before_id))
-const findingHasNext = computed(() => Boolean(resource.findings.value?.next_before_id))
+const runPage = runPagination.currentPage
+const runTotalPages = runPagination.totalPages
+const runCanAdvance = runPagination.canAdvance
+const runCanRetreat = runPagination.canRetreat
+const findingPage = findingPagination.currentPage
+const findingTotalPages = findingPagination.totalPages
+const findingCanAdvance = findingPagination.canAdvance
+const findingCanRetreat = findingPagination.canRetreat
 const canStart = computed(
   () =>
     staleHoldHours.value != null &&
@@ -403,9 +413,25 @@ watch([runDetailError, findingsError], ([runError, listError]) => {
   const error = runError || listError
   if (error) feedback.reconciliationLoadFailed(error)
 })
+watch(
+  [() => resource.runsQuery.dataUpdatedAt.value, () => resource.runsQuery.isFetching.value],
+  ([, isFetching]) => {
+    if (!isFetching) runPagination.setNextCursor(resource.runs.value?.next_before_id)
+  },
+  { immediate: true },
+)
+watch(
+  [
+    () => resource.findingsQuery.dataUpdatedAt.value,
+    () => resource.findingsQuery.isFetching.value,
+  ],
+  ([, isFetching]) => {
+    if (!isFetching) findingPagination.setNextCursor(resource.findings.value?.next_before_id)
+  },
+  { immediate: true },
+)
 watch([selectedRunId, findingStatusFilter], () => {
-  findingBeforeId.value = undefined
-  findingCursorStack.value = []
+  findingPagination.reset()
 })
 
 function requestStart() {
@@ -442,28 +468,20 @@ function selectRun(run: AdminCreditReconciliationRun | null) {
 }
 
 function nextRunPage() {
-  const next = resource.runs.value?.next_before_id
-  if (!next) return
-  runCursorStack.value = [...runCursorStack.value, runBeforeId.value]
-  runBeforeId.value = next
+  if (!runPagination.advance()) return
+  selectedRunId.value = null
 }
 
 function previousRunPage() {
-  const stack = [...runCursorStack.value]
-  runBeforeId.value = stack.pop()
-  runCursorStack.value = stack
+  if (!runPagination.retreat()) return
+  selectedRunId.value = null
 }
 
 function nextFindingPage() {
-  const next = resource.findings.value?.next_before_id
-  if (!next) return
-  findingCursorStack.value = [...findingCursorStack.value, findingBeforeId.value]
-  findingBeforeId.value = next
+  findingPagination.advance()
 }
 
 function previousFindingPage() {
-  const stack = [...findingCursorStack.value]
-  findingBeforeId.value = stack.pop()
-  findingCursorStack.value = stack
+  findingPagination.retreat()
 }
 </script>

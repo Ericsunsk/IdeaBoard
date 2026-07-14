@@ -17,14 +17,14 @@ vi.mock('../../../../shared/composables/useAppToast', () => ({
 }))
 
 describe('AdminCreditReconciliationPage', () => {
-  let findingStatusQueries: Array<string | null>
+  let findingQueries: Array<{ status: string | null; beforeId: string | null }>
   let startRequests: unknown[]
   let runDetailShouldFail: boolean
   let findingsShouldFail: boolean
 
   beforeEach(() => {
     confirmRequestMock.mockReset()
-    findingStatusQueries = []
+    findingQueries = []
     startRequests = []
     runDetailShouldFail = false
     findingsShouldFail = false
@@ -46,8 +46,9 @@ describe('AdminCreditReconciliationPage', () => {
         if (findingsShouldFail) {
           return HttpResponse.json({ code: 503, msg: 'findings unavailable' }, { status: 503 })
         }
-        const status = new URL(request.url).searchParams.get('status')
-        findingStatusQueries.push(status)
+        const query = new URL(request.url).searchParams
+        const status = query.get('status')
+        findingQueries.push({ status, beforeId: query.get('before_id') })
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -63,6 +64,7 @@ describe('AdminCreditReconciliationPage', () => {
                   })
                 : makeFinding(),
             ],
+            next_before_id: 91,
           },
         })
       }),
@@ -108,16 +110,40 @@ describe('AdminCreditReconciliationPage', () => {
 
     await user.click(await screen.findByText('#7'))
     expect(await screen.findByText('task_id: task-77 · transaction_id: charge-1')).toBeVisible()
-    expect(findingStatusQueries).toContain(null)
+    expect(findingQueries).toContainEqual({ status: null, beforeId: null })
 
     await user.click(screen.getByRole('combobox', { name: '异常状态筛选' }))
     await user.click(await screen.findByRole('option', { name: '已解决' }))
 
-    await waitFor(() => expect(findingStatusQueries).toContain('resolved'))
+    await waitFor(() =>
+      expect(findingQueries).toContainEqual({ status: 'resolved', beforeId: null }),
+    )
     expect(await screen.findByText('credit_transaction · refund-2')).toBeVisible()
     expect(screen.getByText('task_id: task-88 · transaction_id: refund-2')).toBeVisible()
     expect(screen.getAllByText('已解决')).toHaveLength(2)
     expect(screen.getByText('未隔离')).toBeVisible()
+  })
+
+  it('resets the findings cursor when the selected status changes', async () => {
+    const { user } = renderPage()
+
+    await user.click(await screen.findByText('#7'))
+    const nextButtons = await screen.findAllByRole('button', { name: '下一页' })
+    expect(nextButtons).toHaveLength(2)
+    await waitFor(() => expect(nextButtons[1]).toBeEnabled())
+
+    await user.click(nextButtons[1]!)
+    await waitFor(() =>
+      expect(findingQueries).toContainEqual({ status: null, beforeId: '91' }),
+    )
+
+    await user.click(screen.getByRole('combobox', { name: '异常状态筛选' }))
+    await user.click(await screen.findByRole('option', { name: '已解决' }))
+
+    await waitFor(() =>
+      expect(findingQueries).toContainEqual({ status: 'resolved', beforeId: null }),
+    )
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '下一页' })[1]).toBeEnabled())
   })
 
   it('retries Run detail and findings through their corresponding queries', async () => {
