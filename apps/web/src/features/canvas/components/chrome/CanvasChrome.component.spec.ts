@@ -17,7 +17,16 @@ describe('CanvasChrome', () => {
           renameRecovery: { status: 'idle' },
           setNameInputRef: vi.fn(),
         },
-        account: { menuItems: [] },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
         tools: { activeTool: 'select', minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
@@ -49,10 +58,14 @@ describe('CanvasChrome', () => {
           setNameInputRef: vi.fn(),
         },
         account: {
-          menuItems: [
-            { key: 'credits', label: 'Idea', meta: '100 Ideas', command: vi.fn() },
-            { key: 'logout', label: '退出登录', command: vi.fn() },
-          ],
+          balance: {
+            status: 'ready',
+            availableIdeas: 100,
+            displayValue: '100',
+            ariaLabel: 'Idea余额 100 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [{ key: 'logout', label: '退出登录', command: vi.fn() }],
         },
         tools: { activeTool: 'select', minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },

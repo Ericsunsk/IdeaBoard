@@ -125,7 +125,7 @@
     </div>
 
     <div class="canvas-chrome-control-group canvas-chrome-action-group">
-      <UserCreditBalanceButton :items="account.menuItems" />
+      <UserCreditBalanceButton :balance="account.balance" />
       <button
         type="button"
         :class="canvasChromeActionControlClass"
@@ -151,6 +151,7 @@
       </button>
       <UserAccountMenu
         :avatar-url="account.avatarUrl"
+        :balance="account.balance"
         :items="account.menuItems"
         :avatar-button-class="canvasChromeAvatarButtonClass"
         :show-credits="false"

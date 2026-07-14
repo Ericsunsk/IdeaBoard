@@ -1,37 +1,30 @@
 <template>
   <Button
-    v-if="creditsItem"
     unstyled
     type="button"
     class="user-credit-pill"
-    :class="{ 'is-loading': isLoading }"
-    :title="ariaLabel"
-    :aria-label="ariaLabel"
-    :aria-busy="isLoading"
+    :class="`is-${balance.status}`"
+    :data-balance-status="balance.status"
+    :title="balance.ariaLabel"
+    :aria-label="balance.ariaLabel"
+    :aria-busy="balance.status === 'loading'"
     @pointerdown.stop
     @mousedown.stop
-    @click.stop="creditsItem.command"
+    @click.stop="balance.command"
   >
     <LightBulb class="user-credit-pill__icon" aria-hidden="true" />
-    <span class="user-credit-pill__balance font-mono">{{ balance }}</span>
+    <span class="user-credit-pill__balance font-mono">{{ balance.displayValue }}</span>
   </Button>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { LightBulb } from '@iconoir/vue'
 import Button from 'primevue/button'
-import type { UserAccountMenuItem } from './userAccountMenuActions'
+import type { UserIdeaBalanceControl } from './userAccountMenu.types'
 
-const props = defineProps<{
-  items: UserAccountMenuItem[]
+defineProps<{
+  balance: UserIdeaBalanceControl
 }>()
-
-const creditsItem = computed(() => props.items.find((item) => item.key === 'credits'))
-const fullBalance = computed(() => creditsItem.value?.meta ?? '加载中')
-const balance = computed(() => fullBalance.value.replace(/\s+Ideas?$/, ''))
-const isLoading = computed(() => fullBalance.value === '加载中')
-const ariaLabel = computed(() => `Idea余额 ${fullBalance.value}`)
 </script>
 
 <style scoped>
@@ -97,6 +90,10 @@ const ariaLabel = computed(() => `Idea余额 ${fullBalance.value}`)
 
 .user-credit-pill.is-loading .user-credit-pill__balance {
   color: var(--color-ib-text-subtle);
+}
+
+.user-credit-pill.is-error .user-credit-pill__balance {
+  color: var(--color-ib-danger);
 }
 
 @media (max-width: 640px) {

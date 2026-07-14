@@ -1,17 +1,23 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, renderWithUser, screen } from '../../test/render'
 import UserAccountMenu from './UserAccountMenu.vue'
-import type { UserAccountMenuItem } from './userAccountMenuActions'
+import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
 describe('UserAccountMenu', () => {
-  it('renders credits as a dedicated balance control before the avatar', async () => {
+  it('renders the typed balance control before the avatar', async () => {
     const openCredits = vi.fn()
     const items: UserAccountMenuItem[] = [
       { key: 'profile', label: '账户管理', command: vi.fn() },
-      { key: 'credits', label: 'Idea', meta: '1,280 Ideas', command: openCredits },
       { key: 'logout', label: '退出登录', command: vi.fn() },
     ]
-    const { user } = renderWithUser(UserAccountMenu, { props: { items } })
+    const balance: UserIdeaBalanceControl = {
+      status: 'ready',
+      availableIdeas: 1280,
+      displayValue: '1,280',
+      ariaLabel: 'Idea余额 1,280 Ideas',
+      command: openCredits,
+    }
+    const { user } = renderWithUser(UserAccountMenu, { props: { items, balance } })
 
     const credits = screen.getByRole('button', { name: 'Idea余额 1,280 Ideas' })
     const accountMenu = screen.getByRole('button', { name: '账户菜单' })
@@ -32,15 +38,38 @@ describe('UserAccountMenu', () => {
   })
 
   it('keeps the balance control stable while credits are loading', () => {
-    const items: UserAccountMenuItem[] = [
-      { key: 'profile', label: '账户管理', command: vi.fn() },
-      { key: 'credits', label: 'Idea', meta: '加载中', command: vi.fn() },
-    ]
+    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
+    const balance: UserIdeaBalanceControl = {
+      status: 'loading',
+      displayValue: '加载中',
+      ariaLabel: 'Idea余额 加载中',
+      command: vi.fn(),
+    }
 
-    render(UserAccountMenu, { props: { items } })
+    render(UserAccountMenu, { props: { items, balance } })
 
     const credits = screen.getByRole('button', { name: 'Idea余额 加载中' })
     expect(credits).toHaveAttribute('aria-busy', 'true')
     expect(credits).toHaveTextContent('加载中')
+  })
+
+  it('keeps a failed balance actionable without reporting it as busy', async () => {
+    const openBilling = vi.fn()
+    const balance: UserIdeaBalanceControl = {
+      status: 'error',
+      displayValue: '--',
+      ariaLabel: 'Idea余额加载失败，点击查看账户',
+      errorMessage: 'wallet unavailable',
+      command: openBilling,
+    }
+    const { user } = renderWithUser(UserAccountMenu, { props: { items: [], balance } })
+
+    const credits = screen.getByRole('button', { name: 'Idea余额加载失败，点击查看账户' })
+    expect(credits).toHaveAttribute('aria-busy', 'false')
+    expect(credits).toHaveAttribute('data-balance-status', 'error')
+    expect(credits).toHaveTextContent('--')
+
+    await user.click(credits)
+    expect(openBilling).toHaveBeenCalledOnce()
   })
 })

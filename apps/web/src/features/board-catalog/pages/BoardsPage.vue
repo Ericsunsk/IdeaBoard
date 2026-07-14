@@ -7,8 +7,9 @@
         <span :class="boardCatalogClasses.brandName">{{ projectName }}</span>
       </div>
       <UserAccountMenu
-        :avatar-url="userStore.user?.avatar || undefined"
-        :items="userMenuItems"
+        :avatar-url="accountControls.viewModel.avatarUrl.value"
+        :balance="accountControls.viewModel.balance.value"
+        :items="accountControls.viewModel.menuItems.value"
         :wrap-class="boardCatalogClasses.userMenuWrap"
         :avatar-button-class="boardCatalogClasses.userAvatarButton"
         :avatar-image-class="boardCatalogClasses.userAvatar"
@@ -163,28 +164,20 @@ import {
 } from '../lib/boardCatalogSkin'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
-import {
-  ADMIN_ROOT_PATH,
-  USER_CANVAS_PATH,
-  USER_HOME_PATH,
-} from '../../../shared/constants/routePaths'
+import { USER_CANVAS_PATH, USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../../app/stores/user'
-import { canAccessAdmin } from '../../../shared/auth/adminAccess'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
-import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
 import { Search } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
-import { openAccountManagementDialog } from '../../account-management/useAccountManagementDialogController'
-import { useUserCreditWalletSummary } from '../../account-management/useUserCreditWalletSummary'
+import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
 const userStore = useUserStore()
-const { availableCredits } = useUserCreditWalletSummary(() => Boolean(userStore.user))
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const { projectName } = useSiteBranding()
 const boardCommands = createCanvasBoardCommands()
@@ -208,21 +201,12 @@ const sortOptions = [
   { label: 'Name', value: 'name' },
 ]
 
-const userMenuItems = computed(() =>
-  createUserAccountMenuItems({
-    canAccessAdmin: canAccessAdmin(userStore.user),
-    availableCredits: availableCredits.value,
-    handlers: {
-      profile: openAccountManagement,
-      credits: openCredits,
-      admin: openAdmin,
-      home: goHome,
-      logout: () => {
-        void logout()
-      },
-    },
-  }),
-)
+const accountControls = useUserAccountControls({
+  navigation: {
+    navigate: (path) => router.push(path),
+    logout: () => logoutAndRedirect(USER_HOME_PATH),
+  },
+})
 
 const visibleBoards = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -401,28 +385,6 @@ async function confirmDeleteBoard() {
   pendingDeleteBoard.value = null
   isDeleteBoardPending.value = false
   boardFeedback.deleted()
-}
-
-function openAccountManagement() {
-  activeMenuBoardId.value = null
-  openAccountManagementDialog()
-}
-
-function openCredits() {
-  activeMenuBoardId.value = null
-  openAccountManagementDialog('billing')
-}
-
-function openAdmin() {
-  void router.push(ADMIN_ROOT_PATH)
-}
-
-function goHome() {
-  void router.push(USER_HOME_PATH)
-}
-
-async function logout() {
-  await logoutAndRedirect(USER_HOME_PATH)
 }
 
 onMounted(async () => {

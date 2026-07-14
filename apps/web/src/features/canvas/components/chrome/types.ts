@@ -1,4 +1,7 @@
-import type { UserAccountMenuItem } from '../../../../shared/components/userAccountMenuActions'
+import type {
+  UserAccountMenuItem,
+  UserIdeaBalanceControl,
+} from '../../../../shared/components/userAccountMenu.types'
 
 export type CanvasChromeBoardOption = {
   id: string
@@ -26,6 +29,7 @@ export type CanvasChromeBoardState = {
 
 export type CanvasChromeAccountState = {
   avatarUrl?: string
+  balance: UserIdeaBalanceControl
   menuItems: UserAccountMenuItem[]
 }
 

@@ -6,7 +6,7 @@
     @mousedown.stop
     @click.stop
   >
-    <UserCreditBalanceButton v-if="showCredits" :items="items" />
+    <UserCreditBalanceButton v-if="showCredits && balance" :balance="balance" />
     <Button
       ref="avatarButtonRef"
       unstyled
@@ -39,9 +39,6 @@
         >
           <span class="flex min-w-0 flex-1 items-center justify-between gap-4">
             <span class="truncate">{{ item.label }}</span>
-            <span v-if="item.meta" class="shrink-0 font-mono text-xs text-ib-text-subtle">
-              {{ item.meta }}
-            </span>
           </span>
         </a>
       </template>
@@ -60,7 +57,7 @@ import { appOverlayMenuDangerItemClass, appOverlayMenuItemClass } from '../theme
 import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
 import { userAccountMenuPt } from '../theme/userAccountMenuSkin'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
-import type { UserAccountMenuItem } from './userAccountMenuActions'
+import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
 type PrimePopupMenuRef = {
   toggle: (event: Event, target?: HTMLElement) => void
@@ -73,6 +70,7 @@ const props = withDefaults(
   defineProps<{
     avatarUrl?: string
     items: UserAccountMenuItem[]
+    balance?: UserIdeaBalanceControl
     wrapClass?: string
     avatarButtonClass?: string
     avatarImageClass?: string
@@ -86,6 +84,7 @@ const props = withDefaults(
   }>(),
   {
     avatarUrl: undefined,
+    balance: undefined,
     wrapClass: pageChromeAccountMenuClasses.wrap,
     avatarButtonClass: pageChromeAccountMenuClasses.avatarButton,
     avatarImageClass: pageChromeAccountMenuClasses.avatarImage,
@@ -105,15 +104,13 @@ const isMenuOpen = ref(false)
 const resolvedMenuPt = computed(() => props.menuPt ?? userAccountMenuPt)
 
 const primeMenuItems = computed<MenuItem[]>(() =>
-  props.items
-    .filter((item) => item.key !== 'credits')
-    .map((item) => ({
-      ...item,
-      command: () => {
-        menuRef.value?.hide()
-        item.command()
-      },
-    })),
+  props.items.map((item) => ({
+    ...item,
+    command: () => {
+      menuRef.value?.hide()
+      item.command()
+    },
+  })),
 )
 
 function resolveAvatarButtonElement(): HTMLElement | undefined {

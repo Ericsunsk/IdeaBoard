@@ -26,7 +26,7 @@
       @rollback-board-rename="rollbackBoardRename"
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
-      @navigate-back="onNavigateRequest(USER_BOARDS_PATH)"
+      @navigate-back="canvasNavigationAdapter.navigate(USER_BOARDS_PATH)"
       @select-tool="setActiveTool"
       @toggle-minimap="toggleCanvasMinimap"
       @zoom-out="onZoomOut"
@@ -163,9 +163,7 @@ import { useUserStore } from '../../../app/stores/user'
 import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
-import { ADMIN_ROOT_PATH, USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
-import { canAccessAdmin } from '../../../shared/auth/adminAccess'
-import { createUserAccountMenuItems } from '../../../shared/components/userAccountMenuActions'
+import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import { PanOnScrollMode, VueFlow, type NodeMouseEvent } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -204,15 +202,20 @@ import {
   type CanvasChromeToolState,
 } from '../components/chrome'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
-import { openAccountManagementDialog } from '../../account-management/useAccountManagementDialogController'
-import { useUserCreditWalletSummary } from '../../account-management/useUserCreditWalletSummary'
+import {
+  useUserAccountControls,
+  type UserShellNavigationAdapter,
+} from '../../user-shell/useUserAccountControls'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { availableCredits } = useUserCreditWalletSummary(() => Boolean(userStore.user))
-
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
+
+function openRecharge() {
+  accountControls.commands.openAccount('recharge')
+}
+
 const flowPaneAdapter = useVueFlowPaneAdapter()
 const { screenToFlowCoordinate, viewport: flowViewport } = flowPaneAdapter
 
@@ -255,7 +258,7 @@ const workspace = useCanvasWorkspaceRuntime({
   onNativeRemove: () => {
     dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
   },
-  openRecharge: () => openAccountManagementDialog('recharge'),
+  openRecharge,
 })
 const viewModel = workspace.viewModel
 const commands = workspace.commands
@@ -323,21 +326,14 @@ const {
   onLogoutRequest,
 } = commands.boardSession
 
-const userMenuItems = computed(() =>
-  createUserAccountMenuItems({
-    canAccessAdmin: canAccessAdmin(userStore.user),
-    hiddenKeys: ['home'],
-    availableCredits: availableCredits.value,
-    handlers: {
-      profile: openAccountManagementDialog,
-      credits: () => openAccountManagementDialog('billing'),
-      admin: () => onNavigateRequest(ADMIN_ROOT_PATH),
-      logout: () => {
-        void onLogoutRequest()
-      },
-    },
-  }),
-)
+const canvasNavigationAdapter: UserShellNavigationAdapter = {
+  navigate: onNavigateRequest,
+  logout: onLogoutRequest,
+}
+const accountControls = useUserAccountControls({
+  navigation: canvasNavigationAdapter,
+  showHome: false,
+})
 
 const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
   currentName: currentBoardName.value,
@@ -349,8 +345,9 @@ const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
   setNameInputRef: setBoardNameInputRef,
 }))
 const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
-  avatarUrl: userStore.user?.avatar ?? undefined,
-  menuItems: userMenuItems.value,
+  avatarUrl: accountControls.viewModel.avatarUrl.value,
+  balance: accountControls.viewModel.balance.value,
+  menuItems: accountControls.viewModel.menuItems.value,
 }))
 const canvasChromeTools = computed<CanvasChromeToolState>(() => ({
   activeTool: activeTool.value,

@@ -151,12 +151,55 @@ const AVATAR_UPLOAD = {
   },
 }
 
+const CREDIT_WALLET = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    user_id: MOCK_USER.id,
+    status: 'active',
+    available_credits: 1280,
+    reserved_credits: 0,
+  },
+}
+
+const BILLING_RECORDS = {
+  code: 0,
+  msg: 'ok',
+  data: { records: [] },
+}
+
+const TASK_SUBMIT_READINESS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    ready: true,
+    feature: 'sketch-to-image',
+    billing: {
+      sku: 'ai.image.sketch-to-image',
+      display_name: 'Sketch to image',
+      price_version_id: 1,
+      price_version: 1,
+      unit_credits: 4,
+      quantity: 1,
+      total_credits: 4,
+      quoted_at: '2026-07-12T00:00:00.000Z',
+      available_credits: 1280,
+      reserved_credits: 0,
+      sufficient: true,
+    },
+  },
+}
+
 const allowedUserApiRequestPatterns = [
   /\/api\/settings\/branding(?:[?#]|\s|$)/,
   /\/api\/auth\/get-session(?:[?#]|\s|$)/,
   /\/api\/user\/info(?:[?#]|\s|$)/,
   /\/api\/user\/boards(?:[?#]|\s|$)/,
   /\/api\/user\/profile\/avatar(?:[?#]|\s|$)/,
+  /\/api\/user\/credits\/wallet(?:[?#]|\s|$)/,
+  /\/api\/user\/billing\/records(?:[?#]|\s|$)/,
+  /\/api\/user\/tasks\/submit\/readiness(?:[?#]|\s|$)/,
+  /\/api\/auth\/sign-out(?:[?#]|\s|$)/,
   new RegExp(`/api/user/boards/${MOCK_BOARD_ID}(?:[?#]|\\s|$)`),
   new RegExp(`/api/user/boards/${MOCK_BOARD_ID}/uploads(?:[?#]|\\s|$)`),
 ]
@@ -278,6 +321,8 @@ function setupBrowser(playwrightCli: CommandSpec) {
   smoke.routeJson(playwrightCli, '**/api/auth/get-session', AUTH_SESSION)
   smoke.routeJson(playwrightCli, '**/api/settings/branding', SITE_BRANDING_SETTING)
   smoke.routeJson(playwrightCli, '**/api/user/info', USER_INFO)
+  smoke.routeJson(playwrightCli, '**/api/user/credits/wallet', CREDIT_WALLET)
+  smoke.routeJson(playwrightCli, '**/api/user/billing/records**', BILLING_RECORDS)
   smoke.routeJson(playwrightCli, '**/api/user/boards', USER_BOARDS)
   smoke.routeJson(playwrightCli, `**/api/user/boards/${MOCK_BOARD_ID}`, BOARD_UPSERT)
   smoke.routeJson(playwrightCli, `**/api/user/boards/${MOCK_BOARD_ID}/uploads`, BOARD_UPLOAD)
@@ -293,18 +338,14 @@ function setupBrowser(playwrightCli: CommandSpec) {
     { code: 599, msg: 'user route smoke blocked task API request' },
     599,
   )
+  smoke.routeJson(playwrightCli, '**/api/user/tasks/submit/readiness', TASK_SUBMIT_READINESS)
   smoke.routeJson(
     playwrightCli,
     '**/api/auth/change-password',
     { code: 599, msg: 'user route smoke blocked auth mutation' },
     599,
   )
-  smoke.routeJson(
-    playwrightCli,
-    '**/api/auth/sign-out',
-    { code: 599, msg: 'user route smoke blocked auth mutation' },
-    599,
-  )
+  smoke.routeJson(playwrightCli, '**/api/auth/sign-out', {})
   smoke.routeJson(playwrightCli, '**/api/user/profile/avatar', AVATAR_UPLOAD)
 }
 
@@ -489,10 +530,26 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       '  throw new Error(`Boards account button should align to ${chromeInset}px page chrome inset, got top=${accountButtonBox.y}, right=${accountRight}`)',
       '}',
       'await accountButton.click()',
+      'const userMenu = page.getByRole("menu").filter({ hasText: "账户管理" })',
+      'await userMenu.waitFor({ state: "visible", timeout: 10000 })',
       'const adminMenuItem = page.getByText("管理后台", { exact: true }).first()',
       'if (await adminMenuItem.isVisible().catch(() => false)) {',
       '  throw new Error("Regular user should not see admin menu item on boards page")',
       '}',
+      'const balanceButton = page.getByRole("button", { name: /Idea余额/ }).first()',
+      'await balanceButton.click()',
+      'const billingDialog = page.getByRole("dialog", { name: "账户管理" })',
+      'await billingDialog.waitFor({ state: "visible", timeout: 10000 })',
+      'const billingTab = billingDialog.getByRole("button", { name: "账单记录" })',
+      'await billingTab.waitFor({ state: "visible", timeout: 10000 })',
+      'if (await billingTab.getAttribute("aria-current") !== "page") {',
+      '  throw new Error("Balance control should open the billing account tab")',
+      '}',
+      'await page.keyboard.press("Escape")',
+      'await billingDialog.waitFor({ state: "hidden", timeout: 10000 })',
+      'if (await userMenu.isVisible().catch(() => false)) await accountButton.click()',
+      'await accountButton.click()',
+      'await userMenu.waitFor({ state: "visible", timeout: 10000 })',
       'const boardsUrlBeforeProfile = new URL(page.url())',
       'const profileMenuItem = page.getByText("账户管理", { exact: true }).first()',
       'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
@@ -754,6 +811,68 @@ function assertAdminShellAccountMenuReturnsToBoards(playwrightCli: CommandSpec) 
   ])
 }
 
+function assertCanvasLogoutFlushesAutosave(playwrightCli: CommandSpec) {
+  setSessionUserRoute(playwrightCli, MOCK_USER)
+  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/canvas?boardId=${MOCK_BOARD_ID}`])
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      `await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).first().waitFor({ state: "visible", timeout: 15000 })`,
+      `await page.unroute("**/api/user/boards/${MOCK_BOARD_ID}").catch(() => undefined)`,
+      'await page.unroute("**/api/auth/sign-out").catch(() => undefined)',
+      'const departureRequests = []',
+      `await page.route("**/api/user/boards/${MOCK_BOARD_ID}", async (route) => {`,
+      '  if (route.request().method() === "PUT") departureRequests.push("save")',
+      '  await route.fulfill({',
+      '    status: 200,',
+      '    contentType: "application/json",',
+      `    body: ${JSON.stringify(JSON.stringify(BOARD_UPSERT))},`,
+      '  })',
+      '})',
+      'await page.route("**/api/auth/sign-out", async (route) => {',
+      '  departureRequests.push("logout")',
+      '  await route.fulfill({ status: 200, contentType: "application/json", body: "{}" })',
+      '})',
+      'const promptInput = page.locator(".prompt-text-composer-input").first()',
+      'await promptInput.waitFor({ state: "visible", timeout: 10000 })',
+      'await promptInput.fill("Autosave before logout")',
+      'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'await accountButton.click()',
+      'const logoutItem = page.getByText("退出登录", { exact: true }).first()',
+      'await logoutItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await logoutItem.click()',
+      'await page.waitForURL((url) => url.pathname === "/user/home", { timeout: 15000 })',
+      'if (departureRequests.join(",") !== "save,logout") {',
+      '  throw new Error(`Canvas logout must flush autosave first, got ${departureRequests.join(",")}`)',
+      '}',
+    ].join('\n'),
+  ])
+}
+
+function assertBoardsLogout(playwrightCli: CommandSpec) {
+  setSessionUserRoute(playwrightCli, MOCK_USER)
+  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/boards`])
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      `await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).first().waitFor({ state: "visible", timeout: 15000 })`,
+      'await page.unroute("**/api/auth/sign-out").catch(() => undefined)',
+      'let signOutRequested = false',
+      'await page.route("**/api/auth/sign-out", async (route) => {',
+      '  signOutRequested = true',
+      '  await route.fulfill({ status: 200, contentType: "application/json", body: "{}" })',
+      '})',
+      'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'await accountButton.click()',
+      'const logoutItem = page.getByText("退出登录", { exact: true }).first()',
+      'await logoutItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await logoutItem.click()',
+      'await page.waitForURL((url) => url.pathname === "/user/home", { timeout: 15000 })',
+      'if (!signOutRequested) throw new Error("Boards logout did not call the auth sign-out endpoint")',
+    ].join('\n'),
+  ])
+}
+
 function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
   smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${page.path}`])
   waitForExpectedText(playwrightCli, page)
@@ -800,6 +919,8 @@ async function main() {
     }
     assertAdminAccountMenus(playwrightCli)
     assertAdminShellAccountMenuReturnsToBoards(playwrightCli)
+    assertCanvasLogoutFlushesAutosave(playwrightCli)
+    assertBoardsLogout(playwrightCli)
 
     console.log(`user route smoke passed: ${pages.length} pages`)
   } catch (error) {
