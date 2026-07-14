@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient, QueryKey } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRaw, watch } from 'vue'
 import type { Ref } from 'vue'
 
 type ReadonlyValue<T> = {
@@ -38,10 +38,12 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
   source: ReadonlyValue<Partial<TSetting> | null | undefined>
   validate: (setting: TSetting) => string
   writeAdditionalQueryCache?: (queryClient: QueryClient, setting: TSetting) => void
+  writeQueryCache?: (queryClient: QueryClient, setting: TSetting) => void
 }) {
   const queryClient = useQueryClient()
   const form = ref<TSetting>(cloneSetting(options.defaultSetting)) as Ref<TSetting>
   const lastSyncedForm = ref<TSetting>(cloneSetting(options.defaultSetting)) as Ref<TSetting>
+  const validationError = ref('')
   const loading = computed(() => options.query.isLoading.value || options.query.isFetching.value)
 
   function invalidateQuery() {
@@ -54,6 +56,10 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
   }
 
   function writeQueryCache(setting: TSetting) {
+    if (options.writeQueryCache) {
+      options.writeQueryCache(queryClient, setting)
+      return
+    }
     queryClient.setQueryData<SettingQueryCacheEntry<TSetting>>(options.queryKey, (previous) => ({
       code: previous?.code ?? 0,
       msg: previous?.msg ?? 'ok',
@@ -74,6 +80,7 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
     const normalizedSetting = options.normalize(setting)
     lastSyncedForm.value = cloneSetting(normalizedSetting)
     form.value = cloneSetting(normalizedSetting)
+    validationError.value = ''
     return normalizedSetting
   }
 
@@ -90,9 +97,10 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
 
   async function save(): Promise<boolean> {
     const feedback = getSaveFeedback()
-    const validationError = options.validate(form.value)
-    if (validationError) {
-      feedback.validationFailed(validationError)
+    const validationMessage = options.validate(form.value)
+    if (validationMessage) {
+      validationError.value = validationMessage
+      feedback.validationFailed(validationMessage)
       return false
     }
 
@@ -108,7 +116,16 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
 
   function reset() {
     form.value = cloneSetting(lastSyncedForm.value)
+    validationError.value = ''
   }
+
+  watch(
+    form,
+    () => {
+      validationError.value = ''
+    },
+    { deep: true },
+  )
 
   watch(
     () => options.query.error.value,
@@ -133,9 +150,10 @@ export function useSettingResourceLifecycle<TSetting extends object>(options: {
     reset,
     save,
     saving,
+    validationError,
   }
 }
 
 function cloneSetting<TSetting extends object>(setting: TSetting): TSetting {
-  return { ...setting }
+  return structuredClone(toRaw(setting))
 }

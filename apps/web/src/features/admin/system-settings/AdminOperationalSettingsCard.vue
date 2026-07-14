@@ -1,18 +1,10 @@
 <template>
-  <Card :class="adminMasonryCardClass" :pt="adminCardPt">
-    <template #title>
-      <div class="flex min-w-0 items-center justify-between gap-3">
-        <span class="truncate text-admin-title-sm font-bold text-admin-title-color">运行参数</span>
-        <Tag
-          :value="operationalStatusLabel"
-          class="shrink-0"
-          :severity="operationalStatusSeverity"
-          rounded
-        />
-      </div>
-    </template>
-
-    <template #content>
+  <SettingEditorCard
+    title="运行参数"
+    :status="operationalStatusLabel"
+    :status-severity="operationalStatusSeverity"
+  >
+    <template #default>
       <div class="flex flex-col gap-5">
         <Message v-if="error" severity="error" :closable="false">
           <div class="flex flex-wrap items-center justify-between gap-3">
@@ -182,41 +174,40 @@
             :aria-describedby="describedbyId"
           />
         </AdminFormField>
-
-        <div class="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            :class="adminActionButtonClass"
-            label="保存运行参数"
-            severity="contrast"
-            :disabled="controlsDisabled"
-            :loading="saving"
-            @click="save"
-          />
-          <Button
-            :class="adminActionButtonClass"
-            label="重置"
-            severity="secondary"
-            outlined
-            :disabled="controlsDisabled"
-            @click="reset"
-          />
-        </div>
       </div>
     </template>
-  </Card>
+
+    <template #actions>
+      <Button
+        :class="adminActionButtonClass"
+        label="保存运行参数"
+        severity="contrast"
+        :disabled="controlsDisabled"
+        :loading="saving"
+        @click="save"
+      />
+      <Button
+        :class="adminActionButtonClass"
+        label="重置"
+        severity="secondary"
+        outlined
+        :disabled="controlsDisabled"
+        @click="reset"
+      />
+    </template>
+  </SettingEditorCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import Button from 'primevue/button'
-import Card from 'primevue/card'
 import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import AdminFormField from '../shared/components/AdminFormField.vue'
-import { adminCardPt } from '../shared/lib/adminCardPt'
-import { adminActionButtonClass, adminMasonryCardClass } from '../shared/lib/adminUiClasses'
+import { adminActionButtonClass } from '../shared/lib/adminUiClasses'
+import SettingEditorCard from './SettingEditorCard.vue'
 import { useAdminOperationalSettings } from './useAdminOperationalSettings'
 import { useAdminOperationalSettingsFeedback } from './useAdminSystemSettingsFeedback'
 

@@ -7,6 +7,9 @@ import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
 type TestSetting = {
   count: number
+  nested?: {
+    enabled: boolean
+  }
   title: string
 }
 
@@ -48,6 +51,29 @@ describe('useSettingResourceLifecycle', () => {
 
       harness.resource.reset()
       expect(harness.resource.form.value).toEqual({ count: 2, title: 'Initial' })
+      expect(harness.resource.isDirty.value).toBe(false)
+    } finally {
+      await harness.unmount()
+    }
+  })
+
+  it('keeps nested drafts dirty and restores their last synced values on reset', async () => {
+    const harness = mountSettingResource({
+      source: { count: 2, nested: { enabled: true }, title: 'Initial' },
+    })
+
+    try {
+      harness.resource.form.value.nested!.enabled = false
+
+      expect(harness.resource.isDirty.value).toBe(true)
+
+      harness.resource.reset()
+
+      expect(harness.resource.form.value).toEqual({
+        count: 2,
+        nested: { enabled: true },
+        title: 'Initial',
+      })
       expect(harness.resource.isDirty.value).toBe(false)
     } finally {
       await harness.unmount()
@@ -174,7 +200,9 @@ function mountSettingResource(
           extraInvalidateQueryKeys: options.extraInvalidateQueryKeys,
           feedback,
           isSame: (current, synced) =>
-            current.count === synced.count && current.title === synced.title,
+            current.count === synced.count &&
+            current.nested?.enabled === synced.nested?.enabled &&
+            current.title === synced.title,
           normalize: normalizeTestSetting,
           query: {
             error,
@@ -222,11 +250,15 @@ function requireMountedSettingResource(resource: TestSettingResource | null): Te
 }
 
 function normalizeTestSetting(setting: Partial<TestSetting> | null | undefined): TestSetting {
-  return {
+  const normalized: TestSetting = {
     count:
       typeof setting?.count === 'number' && Number.isFinite(setting.count)
         ? Math.trunc(setting.count)
         : 0,
     title: typeof setting?.title === 'string' ? setting.title.trim() : '',
   }
+  if (typeof setting?.nested?.enabled === 'boolean') {
+    normalized.nested = { enabled: setting.nested.enabled }
+  }
+  return normalized
 }

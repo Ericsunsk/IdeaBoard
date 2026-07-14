@@ -6,22 +6,11 @@
     :is-empty="false"
     :is-loading="false"
   >
-    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
-      <template #title>
-        <div class="flex min-w-0 items-center justify-between gap-3">
-          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-            站点设置
-          </span>
-          <Tag
-            :value="brandingForm.logo_url ? '自定义 Logo' : '默认标识'"
-            class="shrink-0"
-            severity="secondary"
-            rounded
-          />
-        </div>
-      </template>
-
-      <template #content>
+    <SettingEditorCard
+      title="站点设置"
+      :status="brandingForm.logo_url ? '自定义 Logo' : '默认标识'"
+    >
+      <template #default>
         <div :class="settingCardBodyClass">
           <div class="grid gap-5 xl:grid-cols-[136px_minmax(0,1fr)]">
             <div class="flex min-w-0 flex-col gap-3">
@@ -94,45 +83,33 @@
               </AdminFormField>
             </div>
           </div>
-
-          <div :class="settingActionRowClass">
-            <Button
-              :class="adminActionButtonClass"
-              label="保存"
-              severity="contrast"
-              :disabled="brandingLoading || brandingSaving || uploading"
-              :loading="brandingSaving"
-              @click="handleSaveBranding"
-            />
-            <Button
-              :class="adminActionButtonClass"
-              label="重置"
-              severity="secondary"
-              outlined
-              :disabled="brandingLoading || brandingSaving || uploading"
-              @click="resetBrandingForm"
-            />
-          </div>
         </div>
       </template>
-    </Card>
-
-    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
-      <template #title>
-        <div class="flex min-w-0 items-center justify-between gap-3">
-          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-            注册与 API 限流
-          </span>
-          <Tag
-            :value="registrationEnabled ? '开放注册' : '关闭注册'"
-            class="shrink-0"
-            severity="secondary"
-            rounded
-          />
-        </div>
+      <template #actions>
+        <Button
+          :class="adminActionButtonClass"
+          label="保存"
+          severity="contrast"
+          :disabled="brandingLoading || brandingSaving || uploading"
+          :loading="brandingSaving"
+          @click="handleSaveBranding"
+        />
+        <Button
+          :class="adminActionButtonClass"
+          label="重置"
+          severity="secondary"
+          outlined
+          :disabled="brandingLoading || brandingSaving || uploading"
+          @click="resetBrandingForm"
+        />
       </template>
+    </SettingEditorCard>
 
-      <template #content>
+    <SettingEditorCard
+      title="注册与 API 限流"
+      :status="registrationEnabled ? '开放注册' : '关闭注册'"
+    >
+      <template #default>
         <div :class="settingCardBodyClass">
           <div :class="settingToggleRowClass">
             <span class="text-admin-body font-bold text-admin-text-1">开放注册</span>
@@ -165,45 +142,34 @@
               />
             </AdminFormField>
           </div>
-
-          <div :class="settingActionRowClass">
-            <Button
-              :class="adminActionButtonClass"
-              label="保存"
-              severity="contrast"
-              :disabled="rateLimitLoading || rateLimitSaving"
-              :loading="rateLimitSaving"
-              @click="handleSaveRateLimit"
-            />
-            <Button
-              :class="adminActionButtonClass"
-              label="重置"
-              severity="secondary"
-              outlined
-              :disabled="rateLimitLoading || rateLimitSaving"
-              @click="resetRateLimitForm"
-            />
-          </div>
         </div>
       </template>
-    </Card>
-
-    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
-      <template #title>
-        <div class="flex min-w-0 items-center justify-between gap-3">
-          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-            生成策略灰度
-          </span>
-          <Tag
-            :value="googleNativeGenerationStatusLabel"
-            class="shrink-0"
-            :severity="googleNativeGenerationStatusSeverity"
-            rounded
-          />
-        </div>
+      <template #actions>
+        <Button
+          :class="adminActionButtonClass"
+          label="保存"
+          severity="contrast"
+          :disabled="rateLimitLoading || rateLimitSaving"
+          :loading="rateLimitSaving"
+          @click="handleSaveRateLimit"
+        />
+        <Button
+          :class="adminActionButtonClass"
+          label="重置"
+          severity="secondary"
+          outlined
+          :disabled="rateLimitLoading || rateLimitSaving"
+          @click="resetRateLimitForm"
+        />
       </template>
+    </SettingEditorCard>
 
-      <template #content>
+    <SettingEditorCard
+      title="生成策略灰度"
+      :status="googleNativeGenerationStatusLabel"
+      :status-severity="googleNativeGenerationStatusSeverity"
+    >
+      <template #default>
         <div :class="settingCardBodyClass">
           <AdminFormField label="Google AI 原生通道">
             <SelectButton
@@ -231,45 +197,33 @@
               "
             />
           </AdminFormField>
-
-          <div :class="settingActionRowClass">
-            <Button
-              :class="adminActionButtonClass"
-              label="保存"
-              severity="contrast"
-              :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
-              :loading="googleNativeGenerationSaving"
-              @click="handleSaveGoogleNativeGenerationSettings"
-            />
-            <Button
-              :class="adminActionButtonClass"
-              label="重置"
-              severity="secondary"
-              outlined
-              :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
-              @click="resetGoogleNativeGenerationForm"
-            />
-          </div>
         </div>
       </template>
-    </Card>
-
-    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
-      <template #title>
-        <div class="flex min-w-0 items-center justify-between gap-3">
-          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-            任务监控展示
-          </span>
-          <Tag
-            :value="taskMonitorForm.auto_refresh_enabled ? '自动刷新' : '手动刷新'"
-            class="shrink-0"
-            severity="secondary"
-            rounded
-          />
-        </div>
+      <template #actions>
+        <Button
+          :class="adminActionButtonClass"
+          label="保存"
+          severity="contrast"
+          :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
+          :loading="googleNativeGenerationSaving"
+          @click="handleSaveGoogleNativeGenerationSettings"
+        />
+        <Button
+          :class="adminActionButtonClass"
+          label="重置"
+          severity="secondary"
+          outlined
+          :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
+          @click="resetGoogleNativeGenerationForm"
+        />
       </template>
+    </SettingEditorCard>
 
-      <template #content>
+    <SettingEditorCard
+      title="任务监控展示"
+      :status="taskMonitorForm.auto_refresh_enabled ? '自动刷新' : '手动刷新'"
+    >
+      <template #default>
         <div :class="settingCardBodyClass">
           <div class="grid gap-4 sm:grid-cols-2">
             <AdminFormField label="任务列表每页数量">
@@ -312,40 +266,30 @@
               />
             </div>
           </div>
-
-          <div :class="settingActionRowClass">
-            <Button
-              :class="adminActionButtonClass"
-              label="保存"
-              severity="contrast"
-              :disabled="taskMonitorLoading || taskMonitorSaving"
-              :loading="taskMonitorSaving"
-              @click="handleSaveTaskMonitorSettings"
-            />
-            <Button
-              :class="adminActionButtonClass"
-              label="重置"
-              severity="secondary"
-              outlined
-              :disabled="taskMonitorLoading || taskMonitorSaving"
-              @click="resetTaskMonitorForm"
-            />
-          </div>
         </div>
       </template>
-    </Card>
-
-    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
-      <template #title>
-        <div class="flex min-w-0 items-center justify-between gap-3">
-          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-            链接与域名
-          </span>
-          <Tag :value="publicURLStatusLabel" class="shrink-0" severity="secondary" rounded />
-        </div>
+      <template #actions>
+        <Button
+          :class="adminActionButtonClass"
+          label="保存"
+          severity="contrast"
+          :disabled="taskMonitorLoading || taskMonitorSaving"
+          :loading="taskMonitorSaving"
+          @click="handleSaveTaskMonitorSettings"
+        />
+        <Button
+          :class="adminActionButtonClass"
+          label="重置"
+          severity="secondary"
+          outlined
+          :disabled="taskMonitorLoading || taskMonitorSaving"
+          @click="resetTaskMonitorForm"
+        />
       </template>
+    </SettingEditorCard>
 
-      <template #content>
+    <SettingEditorCard title="链接与域名" :status="publicURLStatusLabel">
+      <template #default>
         <div :class="settingCardBodyClass">
           <div class="grid gap-4">
             <AdminFormField label="前端访问地址">
@@ -370,45 +314,30 @@
               />
             </AdminFormField>
           </div>
-
-          <div :class="settingActionRowClass">
-            <Button
-              :class="adminActionButtonClass"
-              label="保存"
-              severity="contrast"
-              :disabled="publicURLLoading || publicURLSaving"
-              :loading="publicURLSaving"
-              @click="handleSavePublicURLSettings"
-            />
-            <Button
-              :class="adminActionButtonClass"
-              label="重置"
-              severity="secondary"
-              outlined
-              :disabled="publicURLLoading || publicURLSaving"
-              @click="resetPublicURLForm"
-            />
-          </div>
         </div>
       </template>
-    </Card>
-
-    <Card :class="adminMasonryCardClass" :pt="adminCardPt">
-      <template #title>
-        <div class="flex min-w-0 items-center justify-between gap-3">
-          <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
-            上传并发
-          </span>
-          <Tag
-            :value="`并发 ${mediaUploadForm.upload_max_concurrent}`"
-            class="shrink-0"
-            severity="secondary"
-            rounded
-          />
-        </div>
+      <template #actions>
+        <Button
+          :class="adminActionButtonClass"
+          label="保存"
+          severity="contrast"
+          :disabled="publicURLLoading || publicURLSaving"
+          :loading="publicURLSaving"
+          @click="handleSavePublicURLSettings"
+        />
+        <Button
+          :class="adminActionButtonClass"
+          label="重置"
+          severity="secondary"
+          outlined
+          :disabled="publicURLLoading || publicURLSaving"
+          @click="resetPublicURLForm"
+        />
       </template>
+    </SettingEditorCard>
 
-      <template #content>
+    <SettingEditorCard title="上传并发" :status="`并发 ${mediaUploadForm.upload_max_concurrent}`">
+      <template #default>
         <div :class="settingCardBodyClass">
           <AdminFormField label="上传并发上限">
             <InputNumber
@@ -419,28 +348,27 @@
               :disabled="mediaUploadLoading || mediaUploadSaving"
             />
           </AdminFormField>
-
-          <div :class="settingActionRowClass">
-            <Button
-              :class="adminActionButtonClass"
-              label="保存"
-              severity="contrast"
-              :disabled="mediaUploadLoading || mediaUploadSaving"
-              :loading="mediaUploadSaving"
-              @click="handleSaveMediaUploadSettings"
-            />
-            <Button
-              :class="adminActionButtonClass"
-              label="重置"
-              severity="secondary"
-              outlined
-              :disabled="mediaUploadLoading || mediaUploadSaving"
-              @click="resetMediaUploadForm"
-            />
-          </div>
         </div>
       </template>
-    </Card>
+      <template #actions>
+        <Button
+          :class="adminActionButtonClass"
+          label="保存"
+          severity="contrast"
+          :disabled="mediaUploadLoading || mediaUploadSaving"
+          :loading="mediaUploadSaving"
+          @click="handleSaveMediaUploadSettings"
+        />
+        <Button
+          :class="adminActionButtonClass"
+          label="重置"
+          severity="secondary"
+          outlined
+          :disabled="mediaUploadLoading || mediaUploadSaving"
+          @click="resetMediaUploadForm"
+        />
+      </template>
+    </SettingEditorCard>
 
     <AdminOperationalSettingsCard />
   </AdminResourceGridFrame>
@@ -457,15 +385,14 @@
 import { Xmark } from '@iconoir/vue'
 import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
-import Card from 'primevue/card'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import SelectButton from 'primevue/selectbutton'
-import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
 import AdminOperationalSettingsCard from '../../system-settings/AdminOperationalSettingsCard.vue'
+import SettingEditorCard from '../../system-settings/SettingEditorCard.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminLogoCropDialog from '../../shared/components/AdminLogoCropDialog.vue'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
@@ -503,17 +430,14 @@ import {
   useAdminTaskMonitorSettingsFeedback,
   useAdminUnsupportedLogoFileFeedback,
 } from '../../system-settings/useAdminSystemSettingsFeedback'
-import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
   adminActionButtonClass,
-  adminMasonryCardClass,
   adminTwoColumnMasonryGridClass,
 } from '../../shared/lib/adminUiClasses'
 import SiteBrandLogo from '../../../../shared/components/SiteBrandLogo.vue'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
 
 const settingCardBodyClass = 'flex flex-col gap-5'
-const settingActionRowClass = 'flex flex-wrap items-center gap-2 pt-1'
 const settingToggleRowClass =
   'flex min-h-12 items-center justify-between gap-4 rounded-lg border border-admin-border bg-admin-surface-muted px-3.5 py-3'
 const brandingLogoButtonClass = createBrandMarkClass(

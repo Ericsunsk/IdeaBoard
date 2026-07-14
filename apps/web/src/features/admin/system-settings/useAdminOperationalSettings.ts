@@ -1,120 +1,86 @@
-import { computed, ref, watch } from 'vue'
-import type { Ref } from 'vue'
+import type { QueryClient } from '@tanstack/vue-query'
+import { computed } from 'vue'
+import type { ApiResponseOperationalSettingsState } from '../../../shared/api/generated-query/model'
 import type { AdminOperationalSettingsFeedback } from './useAdminSystemSettingsFeedback'
 import {
   DEFAULT_OPERATIONAL_SETTINGS_FORM,
   normalizeOperationalSettingsForm,
   operationalSettingsFormToRequest,
   validateOperationalSettingsForm,
-  type OperationalEventRetentionSetting,
   type OperationalSettingsForm,
-  type OperationalOutboundPolicySetting,
-  type OperationalTaskRuntimeSetting,
+  type OperationalSettingsState,
 } from './operationalSettingsContract'
-import { useOperationalSettingsResource } from './operationalSettingsResource'
+import {
+  operationalSettingsQueryKey,
+  useOperationalSettingsResource,
+} from './operationalSettingsResource'
+import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
 export function useAdminOperationalSettings(options: {
   feedback: AdminOperationalSettingsFeedback
 }) {
   const resource = useOperationalSettingsResource()
-  const form = ref(cloneForm(DEFAULT_OPERATIONAL_SETTINGS_FORM)) as Ref<OperationalSettingsForm>
-  const lastSyncedForm = ref(
-    cloneForm(DEFAULT_OPERATIONAL_SETTINGS_FORM),
-  ) as Ref<OperationalSettingsForm>
-  const validationError = ref('')
   const state = computed(() => resource.query.data.value)
-  const loading = computed(() => resource.query.isLoading.value || resource.query.isFetching.value)
-  const saving = computed(() => resource.updatePending.value)
-  const isDirty = computed(() => !isSameForm(form.value, lastSyncedForm.value))
-
-  watch(
-    () => resource.query.error.value,
-    (error) => {
-      if (error) options.feedback.loadFailed(error)
+  const source = computed(() => state.value && operationalSettingsStateToForm(state.value))
+  let savedState: OperationalSettingsState | null = null
+  const lifecycle = useSettingResourceLifecycle<OperationalSettingsForm>({
+    defaultSetting: DEFAULT_OPERATIONAL_SETTINGS_FORM,
+    feedback: options.feedback,
+    isSame: isSameForm,
+    normalize: normalizeOperationalSettingsFormValue,
+    query: resource.query,
+    queryKey: operationalSettingsQueryKey,
+    save: async (form) => {
+      savedState = await resource.update(operationalSettingsFormToRequest(form))
+      return operationalSettingsStateToForm(savedState)
     },
-  )
-  watch(
-    state,
-    (nextState) => {
-      if (!nextState || saving.value || isDirty.value) return
-      hydrate(
-        nextState.task_runtime.configured,
-        nextState.outbound_policy.configured,
-        nextState.event_retention.configured,
-      )
-    },
-    { immediate: true },
-  )
-  watch(
-    form,
-    () => {
-      validationError.value = ''
-    },
-    { deep: true },
-  )
-
-  async function save() {
-    const error = validateOperationalSettingsForm(form.value)
-    validationError.value = error
-    if (error) {
-      options.feedback.validationFailed(error)
-      return false
-    }
-
-    try {
-      const updatedState = await resource.update(operationalSettingsFormToRequest(form.value))
-      hydrate(
-        updatedState.task_runtime.configured,
-        updatedState.outbound_policy.configured,
-        updatedState.event_retention.configured,
-      )
-      options.feedback.saved()
-      return true
-    } catch (error) {
-      options.feedback.saveFailed(error)
-      return false
-    }
-  }
-
-  function reset() {
-    form.value = cloneForm(lastSyncedForm.value)
-    validationError.value = ''
-  }
-
-  function hydrate(
-    taskRuntime: OperationalTaskRuntimeSetting,
-    outboundPolicy: OperationalOutboundPolicySetting,
-    eventRetention: OperationalEventRetentionSetting,
-  ) {
-    const normalized = normalizeOperationalSettingsForm({
-      task_runtime: taskRuntime,
-      outbound_policy: outboundPolicy,
-      event_retention: eventRetention,
-    })
-    lastSyncedForm.value = cloneForm(normalized)
-    form.value = cloneForm(normalized)
-    validationError.value = ''
-  }
+    source,
+    validate: validateOperationalSettingsForm,
+    writeQueryCache: (queryClient) => writeOperationalSettingsQueryCache(queryClient, savedState),
+  })
 
   return {
     error: computed(() => resource.query.error.value),
-    form,
-    loading,
+    form: lifecycle.form,
+    loading: lifecycle.loading,
     refetch: resource.query.refetch,
-    reset,
-    save,
-    saving,
+    reset: lifecycle.reset,
+    save: lifecycle.save,
+    saving: lifecycle.saving,
     state,
-    validationError,
+    validationError: lifecycle.validationError,
   }
 }
 
-function cloneForm(form: OperationalSettingsForm): OperationalSettingsForm {
+function operationalSettingsStateToForm(state: OperationalSettingsState): OperationalSettingsForm {
+  return normalizeOperationalSettingsForm({
+    task_runtime: state.task_runtime.configured,
+    outbound_policy: state.outbound_policy.configured,
+    event_retention: state.event_retention.configured,
+  })
+}
+
+function normalizeOperationalSettingsFormValue(
+  form: Partial<OperationalSettingsForm> | null | undefined,
+): OperationalSettingsForm {
   return {
-    task_runtime: { ...form.task_runtime },
-    outbound_allow_hosts: form.outbound_allow_hosts,
-    nats_retention_days: form.nats_retention_days,
-    reason: form.reason,
+    task_runtime: {
+      worker_concurrency:
+        form?.task_runtime?.worker_concurrency ??
+        DEFAULT_OPERATIONAL_SETTINGS_FORM.task_runtime.worker_concurrency,
+      task_timeout_seconds:
+        form?.task_runtime?.task_timeout_seconds ??
+        DEFAULT_OPERATIONAL_SETTINGS_FORM.task_runtime.task_timeout_seconds,
+      no_capacity_retry_seconds:
+        form?.task_runtime?.no_capacity_retry_seconds ??
+        DEFAULT_OPERATIONAL_SETTINGS_FORM.task_runtime.no_capacity_retry_seconds,
+      max_retry:
+        form?.task_runtime?.max_retry ?? DEFAULT_OPERATIONAL_SETTINGS_FORM.task_runtime.max_retry,
+    },
+    outbound_allow_hosts: form?.outbound_allow_hosts ?? '',
+    nats_retention_days:
+      form?.nats_retention_days ?? DEFAULT_OPERATIONAL_SETTINGS_FORM.nats_retention_days,
+    reason: form?.reason ?? '',
   }
 }
 
@@ -128,4 +94,16 @@ function isSameForm(left: OperationalSettingsForm, right: OperationalSettingsFor
     left.nats_retention_days === right.nats_retention_days &&
     left.reason === right.reason
   )
+}
+
+function writeOperationalSettingsQueryCache(
+  queryClient: QueryClient,
+  state: OperationalSettingsState | null,
+) {
+  if (!state) return
+  queryClient.setQueryData<ApiResponseOperationalSettingsState>(operationalSettingsQueryKey, {
+    code: 0,
+    msg: 'ok',
+    data: state,
+  })
 }
