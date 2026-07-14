@@ -50,15 +50,16 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 	if duplicateResult.Created || duplicateResult.TaskID != firstResult.TaskID || duplicateResult.HoldTransactionID != firstResult.HoldTransactionID {
 		t.Fatalf("duplicate result=%+v first=%+v", duplicateResult, firstResult)
 	}
+	var displayName string
 	var total, reserved int64
-	if err := db.QueryRowContext(t.Context(), `SELECT total_credits FROM task_billing_snapshots WHERE task_id = $1`, firstResult.TaskID).Scan(&total); err != nil {
+	if err := db.QueryRowContext(t.Context(), `SELECT display_name, total_credits FROM task_billing_snapshots WHERE task_id = $1`, firstResult.TaskID).Scan(&displayName, &total); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.QueryRowContext(t.Context(), `SELECT balance FROM credit_accounts WHERE wallet_user_id = 42 AND account_role = 'user_reserved'`).Scan(&reserved); err != nil {
 		t.Fatal(err)
 	}
-	if total != 25 || reserved != 25 {
-		t.Fatalf("snapshot total=%d reserved=%d, want 25/25", total, reserved)
+	if displayName != "Pattern Generation" || total != 25 || reserved != 25 {
+		t.Fatalf("snapshot name/total/reserved=%q/%d/%d, want Pattern Generation/25/25", displayName, total, reserved)
 	}
 }
 

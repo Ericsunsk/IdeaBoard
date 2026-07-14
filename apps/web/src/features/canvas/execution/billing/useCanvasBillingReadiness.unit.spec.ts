@@ -12,6 +12,7 @@ function makeReadiness(
     feature,
     billing: {
       sku: 'ai.image.pattern-gen',
+      display_name: 'Pattern generation',
       price_version_id: 1,
       price_version: 1,
       unit_credits: 4,

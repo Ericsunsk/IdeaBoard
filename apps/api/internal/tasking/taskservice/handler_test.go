@@ -336,7 +336,7 @@ func (q handlerBillingQuoter) Quote(_ context.Context, rawSKU string, quantity i
 		return billing.Quote{}, err
 	}
 	return billing.Quote{
-		PriceSnapshot: billing.PriceSnapshot{SKU: sku, PriceVersionID: 1, PriceVersion: 1, UnitCredits: 3},
+		PriceSnapshot: billing.PriceSnapshot{SKU: sku, DisplayName: "Test AI image", PriceVersionID: 1, PriceVersion: 1, UnitCredits: 3},
 		Quantity:      quantity,
 		TotalCredits:  3 * quantity,
 	}, nil

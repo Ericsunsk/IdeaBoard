@@ -41,7 +41,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Quote(v1) error = %v", err)
 	}
-	if quoteV1.PriceVersionID != priceV1.PriceVersionID || quoteV1.PriceVersion != 1 || quoteV1.UnitCredits != 25 || quoteV1.TotalCredits != 100 {
+	if quoteV1.DisplayName != "AI 生图" || quoteV1.PriceVersionID != priceV1.PriceVersionID || quoteV1.PriceVersion != 1 || quoteV1.UnitCredits != 25 || quoteV1.TotalCredits != 100 {
 		t.Fatalf("Quote(v1) = %+v, price = %+v", quoteV1, priceV1)
 	}
 
@@ -86,6 +86,9 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	}
 	if updated.DisplayName != newName || updated.Enabled {
 		t.Fatalf("UpdateSKU() = %+v", updated)
+	}
+	if quoteV1.DisplayName != "AI 生图" {
+		t.Fatalf("old quote display name changed after SKU update: %q", quoteV1.DisplayName)
 	}
 	if _, err := service.Quote(ctx, "ideaboard:image.generate", 1); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("Quote() with disabled SKU error = %v", err)

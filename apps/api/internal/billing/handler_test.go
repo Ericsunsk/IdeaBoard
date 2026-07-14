@@ -26,7 +26,7 @@ func (s *handlerServiceStub) Quote(_ context.Context, sku string, quantity int64
 	s.quoteInput.sku = sku
 	s.quoteInput.quantity = quantity
 	return Quote{
-		PriceSnapshot: PriceSnapshot{SKU: "ideaboard:image.generate", PriceVersionID: 3, PriceVersion: 2, UnitCredits: 25, QuotedAt: time.Unix(10, 0).UTC()},
+		PriceSnapshot: PriceSnapshot{SKU: "ideaboard:image.generate", DisplayName: "AI 生图", PriceVersionID: 3, PriceVersion: 2, UnitCredits: 25, QuotedAt: time.Unix(10, 0).UTC()},
 		Quantity:      quantity, TotalCredits: 100,
 	}, nil
 }
@@ -93,7 +93,7 @@ func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(response, request)
 
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"total_credits":100`) || !strings.Contains(response.Body.String(), `"price_version_id":3`) {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"display_name":"AI 生图"`) || !strings.Contains(response.Body.String(), `"total_credits":100`) || !strings.Contains(response.Body.String(), `"price_version_id":3`) {
 		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
 	}
 	if service.quoteInput.sku != "IDEABOARD:IMAGE.GENERATE" || service.quoteInput.quantity != 4 {

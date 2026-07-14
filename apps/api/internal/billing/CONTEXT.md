@@ -19,7 +19,7 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 ## Public Seams
 
 - `Service.Quote(ctx, sku, quantity)` 是产品读取价格的主要 seam。Caller 只传 SKU 与 quantity，不能传 price。
-- `PriceSnapshot` 包含 `sku`, `price_version_id`, `price_version`, `unit_credits`, `quoted_at`；后续 Hold/Charge 必须保存并复用该 snapshot，不得重新报价。
+- `PriceSnapshot` 包含 `sku`, `display_name`, `price_version_id`, `price_version`, `unit_credits`, `quoted_at`；后续 Hold/Charge 必须保存并复用该 snapshot，不得重新报价。`display_name` 在 Quote 时固化，SKU 后续改名不得改变历史任务账单语义。
 - Admin handler 创建 SKU、修改 display fields/SKU enabled、追加 Price Version、修改 Price State，以及读取 Catalog/Price history。
 - SKU identity 没有 rename/delete contract；停用使用 `enabled=false`。
 - AI Image Workflow 的 SKU 由 canonical `feature/model` 确定性计算：`ai-image:<feature>.<sha256-hex(feature + "\\x00" + lower(trim(model)))>`。计费资格来自 Workflow registry 的 `UsesAIProvider` product contract，不来自 Provider Account；Admin 必须先创建对应 SKU 与 current Price，Readiness/Submit 才可用，`models/` 等 provider path alias 不会被折叠。

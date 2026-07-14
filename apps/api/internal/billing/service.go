@@ -155,20 +155,21 @@ func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string
 		return Quote{}, ErrServiceUnavailable
 	}
 	var skuEnabled bool
+	var displayName string
 	var priceVersionID pgtype.Int8
 	var priceVersion pgtype.Int8
 	var unitCredits pgtype.Int8
 	var priceEnabled pgtype.Bool
 	var quotedAt pgtype.Timestamptz
 	err = querier.QueryRow(ctx, `
-SELECT skus.enabled, prices.price_version_id, prices.version, prices.unit_credits,
+SELECT skus.enabled, skus.display_name, prices.price_version_id, prices.version, prices.unit_credits,
        states.enabled, statement_timestamp()
 FROM billing_skus skus
 LEFT JOIN billing_price_versions prices
   ON prices.sku = skus.sku AND prices.price_version_id = skus.current_price_version_id
 LEFT JOIN billing_price_version_states states USING (price_version_id)
 WHERE skus.sku = $1`, sku).Scan(
-		&skuEnabled, &priceVersionID, &priceVersion, &unitCredits, &priceEnabled, &quotedAt,
+		&skuEnabled, &displayName, &priceVersionID, &priceVersion, &unitCredits, &priceEnabled, &quotedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Quote{}, ErrSKUNotFound
@@ -180,7 +181,7 @@ WHERE skus.sku = $1`, sku).Scan(
 		return Quote{}, ErrPricingUnavailable
 	}
 	snapshot := PriceSnapshot{
-		SKU: sku, PriceVersionID: priceVersionID.Int64, PriceVersion: priceVersion.Int64,
+		SKU: sku, DisplayName: displayName, PriceVersionID: priceVersionID.Int64, PriceVersion: priceVersion.Int64,
 		UnitCredits: unitCredits.Int64, QuotedAt: quotedAt.Time,
 	}
 	total, err := snapshot.Total(quantity)

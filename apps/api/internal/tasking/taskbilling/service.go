@@ -76,6 +76,7 @@ type Snapshot struct {
 	Feature           string
 	Model             string
 	SKU               billing.SKU
+	DisplayName       string
 	PriceVersionID    int64
 	PriceVersion      int64
 	UnitCredits       int64
@@ -169,7 +170,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 
 	snapshot := Snapshot{
 		TaskID: taskID, UserID: userID, Feature: request.Feature, Model: canonicalizeModel(request.Model),
-		SKU: quote.SKU, PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
+		SKU: quote.SKU, DisplayName: quote.DisplayName, PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
 		UnitCredits: quote.UnitCredits, Quantity: quote.Quantity, TotalCredits: quote.TotalCredits, QuotedAt: quote.QuotedAt,
 	}
 	state := SettlementStateFree
@@ -199,11 +200,11 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, price_version_id, price_version,
+  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		snapshot.TaskID, snapshot.UserID, snapshot.Feature, snapshot.Model, snapshot.SKU,
-		snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.UnitCredits, snapshot.Quantity,
+		snapshot.DisplayName, snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.UnitCredits, snapshot.Quantity,
 		snapshot.TotalCredits, snapshot.QuotedAt, holdTransactionID,
 	); err != nil {
 		return Snapshot{}, fmt.Errorf("persist task billing snapshot: %w", err)

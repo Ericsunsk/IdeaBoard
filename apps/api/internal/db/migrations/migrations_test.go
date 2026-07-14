@@ -600,6 +600,8 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertColumnDataType(t, ctx, conn, "task_stat_events", "stat_date", "date")
 	assertColumnDataType(t, ctx, conn, "task_daily_stat_backfills", "stat_date", "date")
 	assertColumnDataType(t, ctx, conn, "boards", "state", "jsonb")
+	assertColumnDataType(t, ctx, conn, "task_billing_snapshots", "display_name", "character varying")
+	assertColumnNullable(t, ctx, conn, "task_billing_snapshots", "display_name", false)
 	assertIndexValid(t, ctx, conn, "idx_tasks_terminal_created_at")
 	assertIndexValid(t, ctx, conn, "idx_tasks_pending_updated_at")
 	assertIndexValid(t, ctx, conn, "idx_task_attempts_running_created_at")
@@ -621,6 +623,101 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertConstraintExists(t, ctx, conn, "boards", "fk_boards_created_by")
 	assertConstraintExists(t, ctx, conn, "board_members", "fk_board_members_board")
 	assertConstraintExists(t, ctx, conn, "board_share_tokens", "fk_board_share_tokens_board")
+	assertConstraintExists(t, ctx, conn, "task_billing_snapshots", "task_billing_snapshot_display_name_check")
+}
+
+func TestTaskBillingSnapshotDisplayNameMigrationBackfillsExistingRows(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if _, err := conn.ExecContext(ctx, `
+CREATE TABLE schema_migrations (
+  version BIGINT NOT NULL PRIMARY KEY,
+  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
+)`); err != nil {
+		t.Fatal(err)
+	}
+
+	const target = "20260714010000_task_billing_snapshot_display_name.sql"
+	files, err := fs.Glob(migrationFS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		if file == target {
+			break
+		}
+		raw, err := migrationFS.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		version, err := migrationVersion(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
+			t.Fatalf("apply prerequisite migration %s: %v", file, err)
+		}
+	}
+
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO billing_skus (sku, display_name, description, enabled, created_by, updated_by)
+VALUES ('test:snapshot-backfill', 'Backfilled Product', '', TRUE, 1, 1)`); err != nil {
+		t.Fatal(err)
+	}
+	var priceVersionID int64
+	if err := conn.QueryRowContext(ctx, `
+INSERT INTO billing_price_versions (sku, version, unit_credits, created_by)
+VALUES ('test:snapshot-backfill', 1, 0, 1)
+RETURNING price_version_id`).Scan(&priceVersionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO billing_price_version_states (price_version_id, enabled, updated_by)
+VALUES ($1, TRUE, 1)`, priceVersionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+UPDATE billing_skus SET current_price_version_id = $1 WHERE sku = 'test:snapshot-backfill'`, priceVersionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO task_billing_snapshots (
+  task_id, user_id, feature_slug, model, sku, price_version_id, price_version,
+  unit_credits, quantity, total_credits, quoted_at
+) VALUES (
+  'snapshot-backfill-task', 1, 'pattern-gen', 'test-model', 'test:snapshot-backfill', $1, 1,
+  0, 1, 0, clock_timestamp()
+)`, priceVersionID); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := migrationFS.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version, err := migrationVersion(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyMigration(ctx, conn, target, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
+		t.Fatalf("apply display name migration: %v", err)
+	}
+
+	var displayName string
+	if err := conn.QueryRowContext(ctx, `
+SELECT display_name FROM task_billing_snapshots WHERE task_id = 'snapshot-backfill-task'`).Scan(&displayName); err != nil {
+		t.Fatal(err)
+	}
+	if displayName != "Backfilled Product" {
+		t.Fatalf("backfilled display name=%q, want Backfilled Product", displayName)
+	}
+	assertColumnNullable(t, ctx, conn, "task_billing_snapshots", "display_name", false)
+	if _, err := conn.ExecContext(ctx, `
+UPDATE task_billing_snapshots SET display_name = 'Tampered' WHERE task_id = 'snapshot-backfill-task'`); err == nil {
+		t.Fatal("snapshot display name mutation unexpectedly succeeded after migration")
+	}
 }
 
 func TestUsageIndexMigrationsRollBackAndReapplyIndependently(t *testing.T) {
@@ -999,6 +1096,23 @@ WHERE table_schema = current_schema()
 	}
 	if got != want {
 		t.Fatalf("%s.%s data_type=%s, want %s", tableName, columnName, got, want)
+	}
+}
+
+func assertColumnNullable(t *testing.T, ctx context.Context, conn *sql.Conn, tableName, columnName string, want bool) {
+	t.Helper()
+	var isNullable string
+	if err := conn.QueryRowContext(ctx, `
+SELECT is_nullable
+FROM information_schema.columns
+WHERE table_schema = current_schema()
+  AND table_name = $1
+  AND column_name = $2`, tableName, columnName).Scan(&isNullable); err != nil {
+		t.Fatalf("read column nullability %s.%s failed: %v", tableName, columnName, err)
+	}
+	got := isNullable == "YES"
+	if got != want {
+		t.Fatalf("%s.%s nullable=%v, want %v", tableName, columnName, got, want)
 	}
 }
 

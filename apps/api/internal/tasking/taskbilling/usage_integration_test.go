@@ -102,7 +102,7 @@ func seedTaskBillingUsageBoundarySnapshots(
 	afterBoundary := time.Date(2026, time.July, 12, 16, 0, 0, 0, time.UTC)
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, price_version_id, price_version,
+  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
@@ -111,6 +111,7 @@ SELECT
   $2,
   $3,
   price.sku,
+  price.display_name,
   price.price_version_id,
   price.version,
   price.unit_credits,
@@ -119,9 +120,10 @@ SELECT
   fixture.created_at,
   fixture.created_at
 FROM (
-  SELECT price_version_id, sku, version, unit_credits
-  FROM billing_price_versions
-  WHERE sku = $4
+  SELECT prices.price_version_id, prices.sku, skus.display_name, prices.version, prices.unit_credits
+  FROM billing_price_versions prices
+  JOIN billing_skus skus USING (sku)
+  WHERE prices.sku = $4
   ORDER BY version DESC
   LIMIT 1
 ) AS price
@@ -179,7 +181,7 @@ func seedTaskBillingUsageSnapshots(
 	t.Helper()
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, price_version_id, price_version,
+  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
@@ -188,6 +190,7 @@ SELECT
   $4,
   $5,
   price.sku,
+  price.display_name,
   price.price_version_id,
   price.version,
   price.unit_credits,
@@ -196,9 +199,10 @@ SELECT
   clock_timestamp(),
   clock_timestamp() - (series::text || ' seconds')::interval
 FROM (
-  SELECT price_version_id, sku, version, unit_credits
-  FROM billing_price_versions
-  WHERE sku = $6
+  SELECT prices.price_version_id, prices.sku, skus.display_name, prices.version, prices.unit_credits
+  FROM billing_price_versions prices
+  JOIN billing_skus skus USING (sku)
+  WHERE prices.sku = $6
   ORDER BY version DESC
   LIMIT 1
 ) AS price

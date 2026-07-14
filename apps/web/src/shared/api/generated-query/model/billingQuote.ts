@@ -8,6 +8,11 @@ import type { BillingSKUCode } from './billingSKUCode'
 
 export interface BillingQuote {
   sku: BillingSKUCode
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  display_name: string
   /** @minimum 1 */
   price_version_id: number
   /** @minimum 1 */

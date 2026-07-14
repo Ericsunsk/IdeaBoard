@@ -61,6 +61,16 @@ func TestRuntimeRoleCanPersistTaskBillingFactsWithoutBypassingGuards(t *testing.
 	if err := VerifyRuntimePrivileges(ctx, conn); err != nil {
 		t.Fatalf("VerifyRuntimePrivileges() error = %v", err)
 	}
+	for _, privilege := range []string{"SELECT", "INSERT"} {
+		var allowed bool
+		if err := conn.QueryRowContext(ctx, `
+SELECT has_column_privilege(current_user, 'task_billing_snapshots', 'display_name', $1)`, privilege).Scan(&allowed); err != nil {
+			t.Fatalf("check display_name %s privilege: %v", privilege, err)
+		}
+		if !allowed {
+			t.Fatalf("runtime role is missing display_name %s privilege", privilege)
+		}
+	}
 	for _, statement := range []string{
 		`UPDATE task_billing_snapshots SET total_credits = total_credits`,
 		`DELETE FROM task_billing_snapshots`,

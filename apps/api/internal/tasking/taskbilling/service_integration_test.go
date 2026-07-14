@@ -155,18 +155,36 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.HoldAndPersist(t.Context(), tx, "immutable-billing-task", 1, request); err != nil {
+	snapshot, err := service.HoldAndPersist(t.Context(), tx, "immutable-billing-task", 1, request)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if snapshot.DisplayName != "Pattern" {
+		t.Fatalf("snapshot display name=%q, want Pattern", snapshot.DisplayName)
 	}
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
+	renamed := "Pattern Generator"
+	if _, err := billingService.UpdateSKU(t.Context(), billing.UpdateSKUInput{
+		SKU: string(sku), DisplayName: &renamed, ActorID: 1, Reason: "verify immutable snapshot name",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var persistedDisplayName string
+	if err := db.QueryRowContext(t.Context(), `
+SELECT display_name FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`).Scan(&persistedDisplayName); err != nil {
+		t.Fatal(err)
+	}
+	if persistedDisplayName != "Pattern" {
+		t.Fatalf("persisted display name=%q after SKU rename, want Pattern", persistedDisplayName)
+	}
 	if _, err := db.ExecContext(t.Context(), `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, price_version_id, price_version,
+  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at
 )
-SELECT 'invalid-initial-settlement', 1, feature_slug, model, sku, price_version_id, price_version,
+SELECT 'invalid-initial-settlement', 1, feature_slug, model, sku, display_name, price_version_id, price_version,
        unit_credits, quantity, total_credits, quoted_at
 FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`); err != nil {
 		t.Fatal(err)
@@ -177,6 +195,7 @@ VALUES ('invalid-initial-settlement', 'held')`); err == nil {
 		t.Fatal("free snapshot accepted held initial settlement")
 	}
 	for _, statement := range []string{
+		`UPDATE task_billing_snapshots SET display_name = 'tampered' WHERE task_id = 'immutable-billing-task'`,
 		`UPDATE task_billing_snapshots SET total_credits = 1 WHERE task_id = 'immutable-billing-task'`,
 		`DELETE FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`,
 		`UPDATE task_billing_settlements SET state = 'released', settlement_transaction_id = 'fake', settled_at = now() WHERE task_id = 'immutable-billing-task'`,

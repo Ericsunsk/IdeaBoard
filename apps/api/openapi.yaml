@@ -2002,9 +2002,10 @@ components:
 
     BillingQuote:
       type: object
-      required: [sku, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at]
+      required: [sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at]
       properties:
         sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        display_name: { type: string, minLength: 1, maxLength: 120 }
         price_version_id: { type: integer, format: int64, minimum: 1 }
         price_version: { type: integer, format: int64, minimum: 1 }
         unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }

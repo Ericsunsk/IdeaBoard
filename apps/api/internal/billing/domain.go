@@ -125,6 +125,7 @@ type PricePage struct {
 // It contains no Provider Account or routing information.
 type PriceSnapshot struct {
 	SKU            SKU       `json:"sku"`
+	DisplayName    string    `json:"display_name"`
 	PriceVersionID int64     `json:"price_version_id"`
 	PriceVersion   int64     `json:"price_version"`
 	UnitCredits    int64     `json:"unit_credits"`

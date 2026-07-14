@@ -638,8 +638,8 @@ func createReconciliationTaskFixture(t *testing.T, db *sql.DB, service *Service,
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(t.Context(), `
-INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,model,sku,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
-VALUES ($1,$2,'test','test','test:reconciliation',$3,$4,5,1,5,clock_timestamp(),$5)`, taskID, userID, priceID, priceVersion, hold.TransactionID); err != nil {
+INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,model,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
+VALUES ($1,$2,'test','test','test:reconciliation','Reconciliation',$3,$4,5,1,5,clock_timestamp(),$5)`, taskID, userID, priceID, priceVersion, hold.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(t.Context(), `INSERT INTO task_billing_settlements(task_id,state) VALUES ($1,'held')`, taskID); err != nil {
