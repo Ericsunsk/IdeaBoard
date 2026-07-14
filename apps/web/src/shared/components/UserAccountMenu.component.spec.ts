@@ -17,7 +17,8 @@ describe('UserAccountMenu', () => {
     const accountMenu = screen.getByRole('button', { name: '账户菜单' })
 
     expect(credits).toBeVisible()
-    expect(credits).toHaveTextContent('1,280 Ideas')
+    expect(credits).toHaveTextContent('1,280')
+    expect(credits).not.toHaveTextContent('Ideas')
     expect(credits).toHaveAttribute('title', 'Idea余额 1,280 Ideas')
     expect(credits.querySelector('svg')).not.toBeNull()
     expect(credits.nextElementSibling).toBe(accountMenu)

@@ -23,21 +23,13 @@ import { LightBulb } from '@iconoir/vue'
 import Button from 'primevue/button'
 import type { UserAccountMenuItem } from './userAccountMenuActions'
 
-const props = withDefaults(
-  defineProps<{
-    items: UserAccountMenuItem[]
-    showUnit?: boolean
-  }>(),
-  {
-    showUnit: true,
-  },
-)
+const props = defineProps<{
+  items: UserAccountMenuItem[]
+}>()
 
 const creditsItem = computed(() => props.items.find((item) => item.key === 'credits'))
 const fullBalance = computed(() => creditsItem.value?.meta ?? '加载中')
-const balance = computed(() =>
-  props.showUnit ? fullBalance.value : fullBalance.value.replace(/\s+Ideas?$/, ''),
-)
+const balance = computed(() => fullBalance.value.replace(/\s+Ideas?$/, ''))
 const isLoading = computed(() => fullBalance.value === '加载中')
 const ariaLabel = computed(() => `Idea余额 ${fullBalance.value}`)
 </script>
