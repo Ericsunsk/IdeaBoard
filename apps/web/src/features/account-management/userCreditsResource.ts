@@ -1,7 +1,6 @@
 import { getUserCreditWallet } from '../../shared/api/generated-query/user-credits/user-credits'
 import type { CreditWalletDetails } from '../../shared/api/generated-query/model'
-
-type ApiEnvelope<T> = { code?: number; msg?: string; data?: T }
+import { requireApiData } from '../../shared/api/apiResponse'
 
 export type UserCreditWallet = CreditWalletDetails
 
@@ -11,12 +10,5 @@ export const userCreditsQueryKeys = {
 }
 
 export async function fetchUserCreditWallet(): Promise<UserCreditWallet> {
-  return requireUserCreditsData(await getUserCreditWallet(), '加载Idea余额失败')
-}
-
-function requireUserCreditsData<T>(response: ApiEnvelope<T>, fallbackMessage: string): T {
-  if (response.code !== 0 || response.data == null) {
-    throw new Error(response.msg || fallbackMessage)
-  }
-  return response.data
+  return requireApiData(await getUserCreditWallet(), '加载Idea余额失败')
 }

@@ -12,7 +12,7 @@ import type {
   BillingCatalogItem as GeneratedBillingCatalogItem,
   BillingPrice as GeneratedBillingPrice,
 } from '../../../../shared/api/generated-query/model'
-import { requireApiData } from '../../shared/queries/adminApiResponse'
+import { requireApiData } from '../../../../shared/api/apiResponse'
 import type {
   AdminBillingCatalogItem,
   AdminBillingCoverageItem,

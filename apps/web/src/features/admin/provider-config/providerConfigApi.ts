@@ -22,7 +22,7 @@ import type {
   AdminAccountUpdateRequest,
   ProviderEndpoint as ProviderEndpointDto,
 } from '../../../shared/api/generated-query/model'
-import { assertApiOk, requireApiData } from '../shared/queries/adminApiResponse'
+import { assertApiOk, requireApiData } from '../../../shared/api/apiResponse'
 import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
 import type {
   AdminProviderAccountLimits,

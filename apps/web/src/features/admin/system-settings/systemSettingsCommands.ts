@@ -17,7 +17,7 @@ import type {
   TaskMonitorSetting,
   UpdateAdminRegistrationSettingBody,
 } from '../../../shared/api/generated-query/model'
-import { requireApiData } from '../shared/queries/adminApiResponse'
+import { requireApiData } from '../../../shared/api/apiResponse'
 
 export async function updateRateLimitSettings(data: RateLimitSetting): Promise<RateLimitSetting> {
   const res = await updateAdminRateLimitSettings(data)

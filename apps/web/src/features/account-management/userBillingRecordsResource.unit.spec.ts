@@ -47,4 +47,13 @@ describe('userBillingRecordsResource', () => {
 
     await expect(fetchUserBillingRecords({ limit: 20 })).rejects.toThrow('账单服务暂不可用')
   })
+
+  it('uses the resource fallback when API feedback contains credential details', async () => {
+    generated.listUserBillingRecords.mockResolvedValue({
+      code: 500,
+      msg: 'credential rejected by upstream',
+    })
+
+    await expect(fetchUserBillingRecords({ limit: 20 })).rejects.toThrow('加载账单记录失败')
+  })
 })

@@ -5,7 +5,7 @@ import {
   unbanAdminUser as requestUnbanAdminUser,
   updateAdminUserRole as requestUpdateAdminUserRole,
 } from '../../../shared/api/generated-query/admin-users/admin-users'
-import { assertApiOk } from '../shared/queries/adminApiResponse'
+import { assertApiOk } from '../../../shared/api/apiResponse'
 
 export async function banAdminUser(input: {
   id: number

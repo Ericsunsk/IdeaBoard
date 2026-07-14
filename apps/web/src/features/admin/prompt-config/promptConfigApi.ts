@@ -6,7 +6,7 @@ import type {
   FeaturePrompt,
   SetAdminFeaturePromptBody,
 } from '../../../shared/api/generated-query/model'
-import { requireApiData } from '../shared/queries/adminApiResponse'
+import { requireApiData } from '../../../shared/api/apiResponse'
 
 export type SaveFeaturePromptInput = {
   slug: string

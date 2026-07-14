@@ -6,7 +6,7 @@ import {
   useGetAdminBrandingSetting,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { BrandingSetting } from '../../../shared/api/generated-query/model'
-import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { requireApiData } from '../../../shared/api/apiResponse'
 import type { AdminBrandingSettingsFeedback } from '../feedback/useAdminFeedback'
 import {
   isSupportedUploadImageFile,
@@ -101,9 +101,7 @@ async function uploadBrandingLogoFile(file: File): Promise<string> {
     throw new Error(unsupportedUploadImageMessage())
   }
 
-  const res = await uploadAdminAsset({ file })
-  if (res.code !== 0 || !res.data?.url) {
-    throw new Error(sanitizeApiErrorMessage(res.msg, '上传 Logo 失败'))
-  }
-  return res.data.url
+  const data = requireApiData(await uploadAdminAsset({ file }), '上传 Logo 失败')
+  if (!data.url) throw new Error('上传 Logo 失败')
+  return data.url
 }

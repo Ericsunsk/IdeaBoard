@@ -106,6 +106,17 @@ describe('createAdminStorageResource', () => {
     )
   })
 
+  it('uses the resource fallback when a successful response omits required data', async () => {
+    useMswHandlers(
+      http.get('/api/admin/storage/providers', () => {
+        return HttpResponse.json({ code: 0, msg: 'success' })
+      }),
+    )
+    const resource = createAdminStorageResource()
+
+    await expect(resource.fetchProviders()).rejects.toThrow('加载存储供应商失败')
+  })
+
   it('normalizes provider field lists when the API returns null for providers without fields', async () => {
     useMswHandlers(
       http.get('/api/admin/storage/providers', () => {

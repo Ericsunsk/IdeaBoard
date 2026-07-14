@@ -44,4 +44,10 @@ describe('userUsageResource', () => {
 
     await expect(fetchUserUsage('30d')).rejects.toThrow('用量统计暂不可用')
   })
+
+  it('uses the resource fallback when API feedback exposes internal transport details', async () => {
+    generated.getUserUsage.mockResolvedValue({ code: 500, msg: 'dial tcp 127.0.0.1:5432' })
+
+    await expect(fetchUserUsage('30d')).rejects.toThrow('加载用量统计失败')
+  })
 })

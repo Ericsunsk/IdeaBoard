@@ -28,4 +28,10 @@ describe('userCreditsResource', () => {
 
     await expect(fetchUserCreditWallet()).rejects.toThrow('Idea钱包不存在')
   })
+
+  it('uses the resource fallback when API feedback contains sensitive details', async () => {
+    generated.getUserCreditWallet.mockResolvedValue({ code: 500, msg: 'api key invalid' })
+
+    await expect(fetchUserCreditWallet()).rejects.toThrow('加载Idea余额失败')
+  })
 })

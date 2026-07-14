@@ -5,7 +5,7 @@ import {
   useGetAdminOperationalSettings,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { ApiResponseOperationalSettingsState } from '../../../shared/api/generated-query/model'
-import { requireApiData } from '../shared/queries/adminApiResponse'
+import { requireApiData } from '../../../shared/api/apiResponse'
 import type {
   OperationalSettingsState,
   UpdateOperationalSettingsRequest,
