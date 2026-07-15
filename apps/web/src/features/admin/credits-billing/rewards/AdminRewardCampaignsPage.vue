@@ -6,6 +6,18 @@
       </div>
 
       <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="createCampaign">
+        <fieldset class="flex min-w-0 flex-col gap-1.5 border-0 p-0">
+          <legend class="text-admin-meta font-[680] text-admin-text-2">
+            Code 模式 <span class="text-admin-danger" aria-hidden="true">*</span>
+          </legend>
+          <SelectButton
+            v-model="draft.mode"
+            :options="campaignModeOptions"
+            option-label="label"
+            option-value="value"
+            :allow-empty="false"
+          />
+        </fieldset>
         <RewardCampaignSettingsFields
           v-model:display-name="draft.displayName"
           v-model:internal-note="draft.internalNote"
@@ -15,6 +27,8 @@
           v-model:expires-at="draft.expiresAt"
           id-prefix="reward-create"
           note-label="初始内部备注"
+          :min-redemptions="draft.mode === 'single_use' ? 0 : 1"
+          :redemption-cap-hint="draft.mode === 'single_use' ? '0 表示无限' : ''"
           :schedule-error="createScheduleError"
         />
         <AdminActionReasonField
@@ -25,7 +39,12 @@
           :rows="2"
         />
         <div class="flex items-end xl:col-span-4">
-          <Button type="submit" label="创建公共 Draft" :loading="saving" :disabled="!canCreate" />
+          <Button
+            type="submit"
+            :label="draft.mode === 'single_use' ? '创建单次码 Draft' : '创建公共 Draft'"
+            :loading="saving"
+            :disabled="!canCreate"
+          />
         </div>
       </form>
     </section>
@@ -43,6 +62,8 @@
         :loading="loading"
         data-key="id"
         table-aria-label="奖励活动列表"
+        scrollable
+        scroll-aria-label="奖励活动列表横向滚动区域"
         empty-title="暂无奖励活动"
       >
         <Column field="displayName" header="活动">
@@ -67,6 +88,9 @@
             </div>
           </template>
         </Column>
+        <Column header="Code 模式">
+          <template #body="{ data }">{{ data.modeLabel }}</template>
+        </Column>
         <Column header="有效时间">
           <template #body="{ data }">
             <span class="whitespace-nowrap text-admin-meta text-admin-text-2">
@@ -78,7 +102,15 @@
           <template #body="{ data }">{{ formatIdeaAmount(data.creditAmount) }}</template>
         </Column>
         <Column header="总上限">
-          <template #body="{ data }">{{ data.maxRedemptions }} 次</template>
+          <template #body="{ data }">{{ data.maxRedemptionsLabel }}</template>
+        </Column>
+        <Column header="Code">
+          <template #body="{ data }">
+            <div class="grid min-w-24 gap-0.5 text-admin-meta">
+              <span>{{ data.issuedCodeCount }} 已发行</span>
+              <span class="text-admin-text-3">{{ data.validUnusedCodeCount }} 可用</span>
+            </div>
+          </template>
         </Column>
         <Column header="兑换进度">
           <template #body="{ data }">
@@ -87,6 +119,7 @@
                 {{ data.progressLabel }}
               </span>
               <div
+                v-if="data.hasRedemptionCap"
                 class="h-1.5 overflow-hidden rounded-full bg-admin-border-soft"
                 role="progressbar"
                 aria-label="兑换进度"
@@ -136,7 +169,7 @@
 
         <div class="flex flex-wrap gap-2">
           <Button
-            v-if="selected.lifecycleStatus === 'draft'"
+            v-if="selected.lifecycleStatus === 'draft' && selected.issuedCodeCount > 0"
             label="激活活动"
             severity="secondary"
             :disabled="saving"
@@ -157,7 +190,7 @@
             @click="requestAuditedAction('resume')"
           />
           <Button
-            v-if="selected.lifecycleStatus === 'draft'"
+            v-if="selected.lifecycleStatus === 'draft' && selected.issuedCodeCount === 0"
             label="删除空 Draft"
             severity="danger"
             outlined
@@ -165,7 +198,7 @@
             @click="requestAuditedAction('delete')"
           />
           <Button
-            v-if="selected.lifecycleStatus !== 'cancelled'"
+            v-if="selected.lifecycleStatus !== 'cancelled' && selected.issuedCodeCount > 0"
             label="取消活动"
             severity="danger"
             :disabled="saving"
@@ -185,6 +218,8 @@
             v-model:expires-at="edit.expiresAt"
             id-prefix="reward-edit"
             note-label="活动内部备注"
+            :min-redemptions="selected.mode === 'single_use' ? 0 : 1"
+            :redemption-cap-hint="selected.mode === 'single_use' ? '0 表示无限' : ''"
             :schedule-error="editScheduleError"
           />
           <AdminActionReasonField
@@ -201,7 +236,10 @@
           </div>
         </form>
 
-        <div v-if="selected.lifecycleStatus === 'draft'" class="grid content-start gap-3 border-l border-admin-border-soft pl-5 max-xl:border-l-0 max-xl:border-t max-xl:pl-0 max-xl:pt-5">
+        <div
+          v-if="selected.mode === 'public' && selected.lifecycleStatus === 'draft'"
+          class="grid content-start gap-3 border-l border-admin-border-soft pl-5 max-xl:border-l-0 max-xl:border-t max-xl:pl-0 max-xl:pt-5"
+        >
           <AdminFormField label="公共兑换码" for="reward-public-code" required>
             <InputText
               id="reward-public-code"
@@ -221,6 +259,12 @@
           </Message>
         </div>
       </div>
+
+      <RewardCodeBatchPanel
+        v-if="selected.mode === 'single_use'"
+        :campaign="selected"
+        @changed="loadCampaigns"
+      />
     </section>
 
     <AdminActionReasonDialog
@@ -241,10 +285,12 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
+import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import { ibFormInputClass } from '../../../../shared/theme/formControls'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
+import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminCompactTagClass } from '../../shared/lib/adminUiClasses'
@@ -253,6 +299,7 @@ import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminTo
 import AdminActionReasonDialog from '../AdminActionReasonDialog.vue'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
 import RewardCampaignSettingsFields from './RewardCampaignSettingsFields.vue'
+import RewardCodeBatchPanel from './RewardCodeBatchPanel.vue'
 import {
   getRewardCampaignActionDescriptor,
   type RewardCampaignActionResult,
@@ -261,6 +308,7 @@ import {
 import { createRewardCampaignView } from './rewardCampaignPresentation'
 import {
   createAdminRewardCampaignResource,
+  type CreateRewardCampaignInput,
   type RewardCampaign,
   RewardCampaignConflictError,
   type UpdateRewardCampaignInput,
@@ -280,9 +328,13 @@ const publicCode = ref('')
 const pendingAction = ref<RewardCampaignAuditedAction | null>(null)
 const actionDialogVisible = ref(false)
 const editReasonError = ref('')
+const campaignModeOptions = [
+  { label: '公共码', value: 'public' },
+  { label: '单次码', value: 'single_use' },
+] satisfies Array<{ label: string; value: CreateRewardCampaignInput['mode'] }>
 
-const draft = reactive<CreateRewardCampaignForm>(emptyCampaignForm())
-const edit = reactive<UpdateRewardCampaignInput>(emptyCampaignForm())
+const draft = reactive<CreateRewardCampaignInput>(emptyCampaignForm())
+const edit = reactive<UpdateRewardCampaignInput>(emptyCampaignSettingsForm())
 
 const campaignViews = computed(() => campaigns.value.map(createRewardCampaignView))
 const selectedView = computed(() => (selected.value ? createRewardCampaignView(selected.value) : null))
@@ -292,7 +344,7 @@ const canCreate = computed(
   () =>
     Boolean(draft.displayName.trim()) &&
     draft.creditAmount > 0 &&
-    draft.maxRedemptions > 0 &&
+    validRedemptionCap(draft.mode, draft.maxRedemptions) &&
     validateAdminActionReason(draft.reason).valid &&
     !createScheduleError.value,
 )
@@ -300,7 +352,7 @@ const canUpdate = computed(
   () =>
     Boolean(edit.displayName.trim()) &&
     edit.creditAmount > 0 &&
-    edit.maxRedemptions > 0 &&
+    Boolean(selected.value && validRedemptionCap(selected.value.mode, edit.maxRedemptions)) &&
     !editScheduleError.value,
 )
 const actionDialog = computed(() =>
@@ -485,9 +537,11 @@ function scheduleError(startsAt: string, expiresAt: string) {
   return startsAt && expiresAt && startsAt >= expiresAt ? '结束时间必须晚于开始时间' : ''
 }
 
-type CreateRewardCampaignForm = UpdateRewardCampaignInput
+function validRedemptionCap(mode: RewardCampaign['mode'], value: number) {
+  return Number.isSafeInteger(value) && value >= (mode === 'single_use' ? 0 : 1)
+}
 
-function emptyCampaignForm(): CreateRewardCampaignForm {
+function emptyCampaignSettingsForm(): UpdateRewardCampaignInput {
   return {
     displayName: '',
     internalNote: '',
@@ -496,6 +550,13 @@ function emptyCampaignForm(): CreateRewardCampaignForm {
     startsAt: '',
     expiresAt: '',
     reason: '',
+  }
+}
+
+function emptyCampaignForm(): CreateRewardCampaignInput {
+  return {
+    ...emptyCampaignSettingsForm(),
+    mode: 'public',
   }
 }
 </script>

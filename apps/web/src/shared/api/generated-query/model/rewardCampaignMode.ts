@@ -9,4 +9,5 @@ export type RewardCampaignMode = (typeof RewardCampaignMode)[keyof typeof Reward
 
 export const RewardCampaignMode = {
   public: 'public',
+  single_use: 'single_use',
 } as const

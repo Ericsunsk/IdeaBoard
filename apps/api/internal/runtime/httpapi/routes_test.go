@@ -348,6 +348,8 @@ func collectAdminRoutes(t *testing.T, router *gin.Engine) []adminRouteUnderTest 
 func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 	t.Helper()
 
+	const rewardBatchRevokeRoute = "POST /api/admin/rewards/campaigns/:campaign_id/batches/:batch_id/revoke"
+
 	want := map[string]bool{
 		"DELETE /api/admin/accounts/:id":                              false,
 		"DELETE /api/admin/accounts/:id/models":                       false,
@@ -373,6 +375,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/billing/skus/:sku/prices":                     false,
 		"GET /api/admin/rewards/campaigns":                            false,
 		"GET /api/admin/rewards/campaigns/:campaign_id":               false,
+		"GET /api/admin/rewards/campaigns/:campaign_id/batches":       false,
 		"GET /api/admin/line-draft-modes":                             false,
 		"GET /api/admin/monitor":                                      false,
 		"GET /api/admin/monitor/stream":                               false,
@@ -401,6 +404,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/billing/skus/:sku/prices":                    false,
 		"POST /api/admin/rewards/campaigns":                           false,
 		"POST /api/admin/rewards/campaigns/:campaign_id/public-code":  false,
+		"POST /api/admin/rewards/campaigns/:campaign_id/batches":      false,
+		rewardBatchRevokeRoute:                                        false,
 		"POST /api/admin/rewards/campaigns/:campaign_id/activate":     false,
 		"POST /api/admin/rewards/campaigns/:campaign_id/cancel":       false,
 		"POST /api/admin/rewards/campaigns/:campaign_id/pause":        false,

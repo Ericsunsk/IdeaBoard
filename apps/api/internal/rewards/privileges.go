@@ -47,6 +47,17 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 				PublicForbidden: allTablePrivileges,
 			},
 			{
+				Kind: dbprivileges.KindTable, Names: []string{"reward_code_batches"},
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert, dbprivileges.PrivilegeUpdate,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeDelete, dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences, dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
 				Kind: dbprivileges.KindSequence, NamePrefix: "reward_", Optional: true,
 				Required: []dbprivileges.Privilege{
 					dbprivileges.PrivilegeUsage, dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeUpdate,
@@ -60,6 +71,11 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 					"prevent_reward_admin_action_mutation()",
 					"guard_reward_campaign_rule_mutation()",
 					"guard_reward_code_mutation()",
+					"validate_reward_code_mode()",
+					"guard_reward_code_batch_mutation()",
+					"project_reward_code_counts()",
+					"guard_single_use_reward_redemption()",
+					"consume_single_use_reward_code()",
 				},
 				Forbidden:       []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},
 				PublicForbidden: []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},

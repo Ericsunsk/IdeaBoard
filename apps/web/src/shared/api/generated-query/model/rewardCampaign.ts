@@ -26,10 +26,14 @@ export interface RewardCampaign {
   mode: RewardCampaignMode
   lifecycle_status: RewardCampaignLifecycleStatus
   status: RewardCampaignStatus
-  /** @minimum 1 */
+  /** @minimum 0 */
   max_redemptions: number
   /** @minimum 0 */
   redemption_count: number
+  /** @minimum 0 */
+  issued_code_count: number
+  /** @minimum 0 */
+  valid_unused_code_count: number
   starts_at?: string
   expires_at?: string
   /** @minimum 1 */

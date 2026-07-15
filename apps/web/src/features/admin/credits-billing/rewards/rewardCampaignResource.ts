@@ -17,7 +17,7 @@ import type {
 import { resolveApiData, resolveApiOk } from '../../../../shared/api/apiResponse'
 import { shanghaiDateTimeInputToISO } from './rewardCampaignTime'
 
-export type CreateRewardCampaignInput = {
+type RewardCampaignSettingsInput = {
   displayName: string
   internalNote: string
   creditAmount: number
@@ -27,7 +27,11 @@ export type CreateRewardCampaignInput = {
   reason: string
 }
 
-export type UpdateRewardCampaignInput = CreateRewardCampaignInput
+export type CreateRewardCampaignInput = RewardCampaignSettingsInput & {
+  mode: GeneratedRewardCampaign['mode']
+}
+
+export type UpdateRewardCampaignInput = RewardCampaignSettingsInput
 
 export type RewardCampaign = {
   id: number
@@ -39,6 +43,8 @@ export type RewardCampaign = {
   status: GeneratedRewardCampaign['status']
   maxRedemptions: number
   redemptionCount: number
+  issuedCodeCount: number
+  validUnusedCodeCount: number
   startsAt?: string
   expiresAt?: string
   createdBy: number
@@ -101,6 +107,7 @@ export function createAdminRewardCampaignResource(): AdminRewardCampaignResource
             display_name: input.displayName.trim(),
             internal_note: input.internalNote.trim(),
             credit_amount: input.creditAmount,
+            mode: input.mode,
             max_redemptions: input.maxRedemptions,
             ...optionalSchedulePayload(input),
             reason: input.reason.trim(),
@@ -186,6 +193,8 @@ function toCampaign(campaign: GeneratedRewardCampaign): RewardCampaign {
     status: campaign.status,
     maxRedemptions: campaign.max_redemptions,
     redemptionCount: campaign.redemption_count,
+    issuedCodeCount: campaign.issued_code_count,
+    validUnusedCodeCount: campaign.valid_unused_code_count,
     startsAt: campaign.starts_at,
     expiresAt: campaign.expires_at,
     createdBy: campaign.created_by,

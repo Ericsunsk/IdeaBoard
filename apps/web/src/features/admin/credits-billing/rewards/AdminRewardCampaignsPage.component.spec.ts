@@ -52,6 +52,9 @@ describe('AdminRewardCampaignsPage', () => {
     expect(screen.getByText('80 Ideas')).toBeVisible()
     expect(screen.getByText('100 次')).toBeVisible()
     expect(screen.getByText('12 / 100')).toBeVisible()
+    expect(
+      screen.getByRole('region', { name: '奖励活动列表横向滚动区域' }),
+    ).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '管理新用户奖励' }))
     expect(screen.getByRole('heading', { name: '新用户奖励' })).toBeVisible()
@@ -72,11 +75,37 @@ describe('AdminRewardCampaignsPage', () => {
     expect(resource.create).toHaveBeenCalledWith(
       expect.objectContaining({
         displayName: '八月活动',
+        mode: 'public',
         startsAt: '2026-08-01T09:00',
         expiresAt: '2026-08-10T18:00',
         reason: '创建八月活动',
       }),
     )
+  })
+
+  it('creates an unlimited single-use Campaign with a zero cap', async () => {
+    resource.create.mockResolvedValueOnce(
+      makeCampaign({
+        id: 8,
+        mode: 'single_use',
+        lifecycleStatus: 'draft',
+        status: 'draft',
+        maxRedemptions: 0,
+      }),
+    )
+    const { user } = renderPage()
+    await screen.findByText('待开始')
+
+    await user.click(screen.getByRole('button', { name: '单次码' }))
+    await user.type(screen.getByRole('textbox', { name: '展示名称' }), '单次码活动')
+    await user.type(screen.getByRole('spinbutton', { name: 'Idea 数量' }), '50')
+    await user.type(screen.getByRole('textbox', { name: /创建原因/ }), '创建单次码活动')
+    await user.click(screen.getByRole('button', { name: '创建单次码 Draft' }))
+
+    expect(resource.create).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'single_use', maxRedemptions: 0 }),
+    )
+    expect(await screen.findByText('Code Batches')).toBeVisible()
   })
 
   it('confirms an audited update and explains frozen core rules on conflict', async () => {
@@ -126,7 +155,27 @@ describe('AdminRewardCampaignsPage', () => {
 
     expect(screen.getByRole('button', { name: '激活活动' })).toBeVisible()
     expect(screen.getByRole('button', { name: '取消活动' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: '删除空 Draft' })).not.toBeInTheDocument()
+  })
+
+  it('only offers deletion for an empty Draft', async () => {
+    resource.list.mockResolvedValue({
+      campaigns: [
+        makeCampaign({
+          lifecycleStatus: 'draft',
+          status: 'draft',
+          issuedCodeCount: 0,
+          validUnusedCodeCount: 0,
+        }),
+      ],
+    })
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: '管理新用户奖励' }))
+
     expect(screen.getByRole('button', { name: '删除空 Draft' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: '激活活动' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '取消活动' })).not.toBeInTheDocument()
   })
 })
 
@@ -134,6 +183,12 @@ function renderPage() {
   return renderWithUser(AdminRewardCampaignsPage, {
     global: {
       plugins: [[PrimeVue, primeVueTestOptions]],
+      stubs: {
+        RewardCodeBatchPanel: {
+          props: ['campaign'],
+          template: '<div>Code Batches</div>',
+        },
+      },
     },
   })
 }
@@ -149,6 +204,8 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
     status: 'scheduled',
     maxRedemptions: 100,
     redemptionCount: 12,
+    issuedCodeCount: 40,
+    validUnusedCodeCount: 28,
     startsAt: '2026-07-15T10:30:00Z',
     expiresAt: '2026-07-31T16:00:00Z',
     createdBy: 1,

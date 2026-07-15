@@ -108,6 +108,87 @@ func TestAdminCampaignLifecycleHTTPContract(t *testing.T) {
 	performRewardRequest[Campaign](t, router, http.MethodGet, emptyDraftPath, nil, http.StatusNotFound)
 }
 
+func TestAdminSingleUseCodeBatchHTTPContract(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewServiceWithOptions(
+		pool,
+		credits.NewService(pool),
+		newTestRewardKeyring(t),
+		ServiceOptions{Random: bytes.NewReader(append(bytes.Repeat([]byte{0x00}, 10), bytes.Repeat([]byte{0xff}, 10)...))},
+	)
+	handler := NewHandler(service)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
+	router.POST("/admin/rewards/campaigns", handler.CreateCampaign)
+	router.POST("/admin/rewards/campaigns/:campaign_id/batches", handler.GenerateCodeBatch)
+	router.GET("/admin/rewards/campaigns/:campaign_id/batches", handler.ListCodeBatches)
+	router.POST("/admin/rewards/campaigns/:campaign_id/batches/:batch_id/revoke", handler.RevokeCodeBatch)
+
+	campaign := performRewardRequest[Campaign](t, router, http.MethodPost, "/admin/rewards/campaigns", map[string]any{
+		"display_name": "线下单次码奖励", "credit_amount": 30, "mode": "single_use",
+		"max_redemptions": 0, "reason": "创建单次码活动",
+	}, http.StatusOK)
+	if campaign.Mode != CampaignModeSingleUse || campaign.MaxRedemptions != 0 {
+		t.Fatalf("created Campaign = %+v, want unlimited single_use", campaign)
+	}
+
+	campaignPath := "/admin/rewards/campaigns/" + strconv.FormatInt(campaign.ID, 10)
+	generated, recorder := performRewardRequestWithRecorder[GeneratedCodeBatch](
+		t,
+		router,
+		http.MethodPost,
+		campaignPath+"/batches",
+		map[string]any{
+			"count": 2, "idempotency_key": "http-batch-001", "reason": "生成首批单次码",
+		},
+		http.StatusOK,
+	)
+	if recorder.Header().Get("Cache-Control") != "no-store" || len(generated.Plaintexts) != 2 || generated.ExportUnavailable {
+		t.Fatalf("generated Batch = %+v Cache-Control=%q, want first no-store export", generated, recorder.Header().Get("Cache-Control"))
+	}
+
+	replayed, replayRecorder := performRewardRequestWithRecorder[GeneratedCodeBatch](
+		t,
+		router,
+		http.MethodPost,
+		campaignPath+"/batches",
+		map[string]any{
+			"count": 2, "idempotency_key": "http-batch-001", "reason": "生成首批单次码",
+		},
+		http.StatusOK,
+	)
+	if replayRecorder.Header().Get("Cache-Control") != "no-store" || replayed.Batch.ID != generated.Batch.ID ||
+		!replayed.Replayed || !replayed.ExportUnavailable || len(replayed.Plaintexts) != 0 {
+		t.Fatalf("replayed Batch = %+v Cache-Control=%q, want metadata-only no-store replay", replayed, replayRecorder.Header().Get("Cache-Control"))
+	}
+
+	page := performRewardRequest[CodeBatchPage](
+		t,
+		router,
+		http.MethodGet,
+		campaignPath+"/batches?limit=20",
+		nil,
+		http.StatusOK,
+	)
+	if len(page.Batches) != 1 || page.Batches[0].ValidUnusedCount != 2 {
+		t.Fatalf("Batch page = %+v, want two valid unused Codes", page)
+	}
+	batchPath := campaignPath + "/batches/" + strconv.FormatInt(generated.Batch.ID, 10) + "/revoke"
+	performRewardRequest[CodeBatch](t, router, http.MethodPost, batchPath, map[string]any{
+		"confirmed": false, "reason": "误操作不应撤销",
+	}, http.StatusBadRequest)
+	revoked := performRewardRequest[CodeBatch](t, router, http.MethodPost, batchPath, map[string]any{
+		"confirmed": true, "reason": "导出文件丢失，撤销未使用码",
+	}, http.StatusOK)
+	if revoked.ValidUnusedCount != 0 || revoked.RevokedUnusedCount != 2 || revoked.RevokedAt == nil {
+		t.Fatalf("revoked Batch = %+v, want both unused Codes revoked", revoked)
+	}
+}
+
 type rewardHTTPResponse[T any] struct {
 	Code int `json:"code"`
 	Data T   `json:"data"`
@@ -121,6 +202,18 @@ func performRewardRequest[T any](
 	body any,
 	wantStatus int,
 ) T {
+	data, _ := performRewardRequestWithRecorder[T](t, router, method, path, body, wantStatus)
+	return data
+}
+
+func performRewardRequestWithRecorder[T any](
+	t *testing.T,
+	router http.Handler,
+	method string,
+	path string,
+	body any,
+	wantStatus int,
+) (T, *httptest.ResponseRecorder) {
 	t.Helper()
 	var encoded []byte
 	var err error
@@ -146,5 +239,5 @@ func performRewardRequest[T any](
 	if response.Code != 0 && wantStatus == http.StatusOK {
 		t.Fatalf("%s %s response code = %d; body=%s", method, path, response.Code, recorder.Body.String())
 	}
-	return response.Data
+	return response.Data, recorder
 }

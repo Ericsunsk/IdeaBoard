@@ -3,6 +3,7 @@ package rewards
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,13 @@ import (
 )
 
 const maxRawCodeRunes = 128
+
+const (
+	generatedCodeEntropyBytes = 10
+	generatedCodeAlphabet     = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+)
+
+var generatedCodeEncoding = base32.NewEncoding(generatedCodeAlphabet).WithPadding(base32.NoPadding)
 
 var (
 	codeVersionPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,32}$`)
@@ -147,4 +155,13 @@ func calculateCodeDigest(secret []byte, normalized string) []byte {
 	mac := hmac.New(sha256.New, secret)
 	_, _ = mac.Write([]byte(normalized))
 	return mac.Sum(nil)
+}
+
+func generateSingleUseCode(random io.Reader) (string, error) {
+	payload := make([]byte, generatedCodeEntropyBytes)
+	if _, err := io.ReadFull(random, payload); err != nil {
+		return "", fmt.Errorf("read reward Code entropy: %w", err)
+	}
+	encoded := generatedCodeEncoding.EncodeToString(payload)
+	return encoded[0:4] + "-" + encoded[4:8] + "-" + encoded[8:12] + "-" + encoded[12:16], nil
 }

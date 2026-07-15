@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminActionReason } from './adminActionReason'
+import type { AdminRewardCampaignCreateRequestMode } from './adminRewardCampaignCreateRequestMode'
 
 export interface AdminRewardCampaignCreateRequest {
   /**
@@ -19,7 +20,8 @@ export interface AdminRewardCampaignCreateRequest {
    * @maximum 9000000000000000
    */
   credit_amount: number
-  /** @minimum 1 */
+  mode: AdminRewardCampaignCreateRequestMode
+  /** @minimum 0 */
   max_redemptions: number
   starts_at?: string
   expires_at?: string

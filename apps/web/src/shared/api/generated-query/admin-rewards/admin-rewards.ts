@@ -21,13 +21,19 @@ import type {
   AdminRewardCampaignCancelRequest,
   AdminRewardCampaignCreateRequest,
   AdminRewardCampaignUpdateRequest,
+  AdminRewardCodeBatchGenerateRequest,
+  AdminRewardCodeBatchRevokeRequest,
   AdminRewardPublicCodeIssueRequest,
   AdminRewardReasonRequest,
   ApiResponseEmpty,
+  ApiResponseGeneratedRewardCodeBatch,
   ApiResponseIssuedRewardPublicCode,
   ApiResponseRewardCampaign,
   ApiResponseRewardCampaignPage,
+  ApiResponseRewardCodeBatch,
+  ApiResponseRewardCodeBatchPage,
   ListAdminRewardCampaignsParams,
+  ListAdminRewardCodeBatchesParams,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -567,6 +573,340 @@ export function useIssueAdminRewardPublicCode<
   const queryOptions = getIssueAdminRewardPublicCodeQueryOptions(
     campaignId,
     adminRewardPublicCodeIssueRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminRewardCodeBatchesUrl = (
+  campaignId: number,
+  params?: ListAdminRewardCodeBatchesParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/batches?${stringifiedParams}`
+    : `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/batches`
+}
+
+export const listAdminRewardCodeBatches = async (
+  campaignId: number,
+  params?: ListAdminRewardCodeBatchesParams,
+  options?: RequestInit,
+): Promise<ApiResponseRewardCodeBatchPage> => {
+  return orvalMutator<ApiResponseRewardCodeBatchPage>(
+    getListAdminRewardCodeBatchesUrl(campaignId, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListAdminRewardCodeBatchesQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminRewardCodeBatchesParams>,
+) => {
+  return [
+    'admin',
+    'rewards',
+    'campaigns',
+    campaignId,
+    'batches',
+    ...(params ? [params] : []),
+  ] as const
+}
+
+export const getListAdminRewardCodeBatchesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminRewardCodeBatches>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminRewardCodeBatchesParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminRewardCodeBatches>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminRewardCodeBatchesQueryKey(campaignId, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminRewardCodeBatches>>> = ({
+    signal,
+  }) =>
+    listAdminRewardCodeBatches(toValue(campaignId), toValue(params), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(campaignId) !== null && toValue(campaignId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listAdminRewardCodeBatches>>, TError, TData>
+}
+
+export type ListAdminRewardCodeBatchesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminRewardCodeBatches>>
+>
+export type ListAdminRewardCodeBatchesQueryError = ErrorType<unknown>
+
+export function useListAdminRewardCodeBatches<
+  TData = Awaited<ReturnType<typeof listAdminRewardCodeBatches>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminRewardCodeBatchesParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminRewardCodeBatches>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminRewardCodeBatchesQueryOptions(campaignId, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGenerateAdminRewardCodeBatchUrl = (campaignId: number) => {
+  return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/batches`
+}
+
+export const generateAdminRewardCodeBatch = async (
+  campaignId: number,
+  adminRewardCodeBatchGenerateRequest: AdminRewardCodeBatchGenerateRequest,
+  options?: RequestInit,
+): Promise<ApiResponseGeneratedRewardCodeBatch> => {
+  return orvalMutator<ApiResponseGeneratedRewardCodeBatch>(
+    getGenerateAdminRewardCodeBatchUrl(campaignId),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(adminRewardCodeBatchGenerateRequest),
+    },
+  )
+}
+
+export const getGenerateAdminRewardCodeBatchQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCodeBatchGenerateRequest?: MaybeRefOrGetter<AdminRewardCodeBatchGenerateRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'rewards',
+    'campaigns',
+    campaignId,
+    'batches',
+    adminRewardCodeBatchGenerateRequest,
+  ] as const
+}
+
+export const getGenerateAdminRewardCodeBatchQueryOptions = <
+  TData = Awaited<ReturnType<typeof generateAdminRewardCodeBatch>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCodeBatchGenerateRequest: MaybeRefOrGetter<AdminRewardCodeBatchGenerateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof generateAdminRewardCodeBatch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGenerateAdminRewardCodeBatchQueryKey(
+    campaignId,
+    adminRewardCodeBatchGenerateRequest,
+  )
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof generateAdminRewardCodeBatch>>> = ({
+    signal,
+  }) =>
+    generateAdminRewardCodeBatch(
+      toValue(campaignId),
+      toValue(adminRewardCodeBatchGenerateRequest),
+      { signal, ...requestOptions },
+    )
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(campaignId) !== null && toValue(campaignId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof generateAdminRewardCodeBatch>>, TError, TData>
+}
+
+export type GenerateAdminRewardCodeBatchQueryResult = NonNullable<
+  Awaited<ReturnType<typeof generateAdminRewardCodeBatch>>
+>
+export type GenerateAdminRewardCodeBatchQueryError = ErrorType<unknown>
+
+export function useGenerateAdminRewardCodeBatch<
+  TData = Awaited<ReturnType<typeof generateAdminRewardCodeBatch>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCodeBatchGenerateRequest: MaybeRefOrGetter<AdminRewardCodeBatchGenerateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof generateAdminRewardCodeBatch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGenerateAdminRewardCodeBatchQueryOptions(
+    campaignId,
+    adminRewardCodeBatchGenerateRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getRevokeAdminRewardCodeBatchUrl = (campaignId: number, batchId: number) => {
+  return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/batches/${encodeURIComponent(String(batchId))}/revoke`
+}
+
+export const revokeAdminRewardCodeBatch = async (
+  campaignId: number,
+  batchId: number,
+  adminRewardCodeBatchRevokeRequest: AdminRewardCodeBatchRevokeRequest,
+  options?: RequestInit,
+): Promise<ApiResponseRewardCodeBatch> => {
+  return orvalMutator<ApiResponseRewardCodeBatch>(
+    getRevokeAdminRewardCodeBatchUrl(campaignId, batchId),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(adminRewardCodeBatchRevokeRequest),
+    },
+  )
+}
+
+export const getRevokeAdminRewardCodeBatchQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  batchId: MaybeRefOrGetter<number>,
+  adminRewardCodeBatchRevokeRequest?: MaybeRefOrGetter<AdminRewardCodeBatchRevokeRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'rewards',
+    'campaigns',
+    campaignId,
+    'batches',
+    batchId,
+    'revoke',
+    adminRewardCodeBatchRevokeRequest,
+  ] as const
+}
+
+export const getRevokeAdminRewardCodeBatchQueryOptions = <
+  TData = Awaited<ReturnType<typeof revokeAdminRewardCodeBatch>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  batchId: MaybeRefOrGetter<number>,
+  adminRewardCodeBatchRevokeRequest: MaybeRefOrGetter<AdminRewardCodeBatchRevokeRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof revokeAdminRewardCodeBatch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getRevokeAdminRewardCodeBatchQueryKey(
+    campaignId,
+    batchId,
+    adminRewardCodeBatchRevokeRequest,
+  )
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof revokeAdminRewardCodeBatch>>> = ({
+    signal,
+  }) =>
+    revokeAdminRewardCodeBatch(
+      toValue(campaignId),
+      toValue(batchId),
+      toValue(adminRewardCodeBatchRevokeRequest),
+      { signal, ...requestOptions },
+    )
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(campaignId) !== null &&
+        toValue(campaignId) !== undefined &&
+        toValue(batchId) !== null &&
+        toValue(batchId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof revokeAdminRewardCodeBatch>>, TError, TData>
+}
+
+export type RevokeAdminRewardCodeBatchQueryResult = NonNullable<
+  Awaited<ReturnType<typeof revokeAdminRewardCodeBatch>>
+>
+export type RevokeAdminRewardCodeBatchQueryError = ErrorType<unknown>
+
+export function useRevokeAdminRewardCodeBatch<
+  TData = Awaited<ReturnType<typeof revokeAdminRewardCodeBatch>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  batchId: MaybeRefOrGetter<number>,
+  adminRewardCodeBatchRevokeRequest: MaybeRefOrGetter<AdminRewardCodeBatchRevokeRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof revokeAdminRewardCodeBatch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRevokeAdminRewardCodeBatchQueryOptions(
+    campaignId,
+    batchId,
+    adminRewardCodeBatchRevokeRequest,
     options,
   )
 

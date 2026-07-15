@@ -19,7 +19,7 @@ export interface AdminRewardCampaignUpdateRequest {
    * @maximum 9000000000000000
    */
   credit_amount: number
-  /** @minimum 1 */
+  /** @minimum 0 */
   max_redemptions: number
   /** @nullable */
   starts_at: string | null

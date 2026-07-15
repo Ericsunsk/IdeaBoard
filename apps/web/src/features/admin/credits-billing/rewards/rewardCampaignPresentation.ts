@@ -42,17 +42,25 @@ export function rewardCampaignStatusSeverity(
 }
 
 export function createRewardCampaignView(campaign: RewardCampaign) {
-  const progressPercent = Math.min(
-    100,
-    Math.max(0, Math.round((campaign.redemptionCount / campaign.maxRedemptions) * 100)),
-  )
+  const hasRedemptionCap = campaign.maxRedemptions > 0
+  const progressPercent = hasRedemptionCap
+    ? Math.min(
+        100,
+        Math.max(0, Math.round((campaign.redemptionCount / campaign.maxRedemptions) * 100)),
+      )
+    : 0
   return {
     ...campaign,
     statusLabel: rewardCampaignStatusLabel(campaign.status),
     statusSeverity: rewardCampaignStatusSeverity(campaign.status),
     lifecycleLabel: lifecycleLabels[campaign.lifecycleStatus],
+    modeLabel: campaign.mode === 'single_use' ? '单次码' : '公共码',
     scheduleLabel: `${formatShanghaiDateTime(campaign.startsAt)} - ${formatShanghaiDateTime(campaign.expiresAt)}`,
-    progressLabel: `${campaign.redemptionCount} / ${campaign.maxRedemptions}`,
+    maxRedemptionsLabel: hasRedemptionCap ? `${campaign.maxRedemptions} 次` : '无限',
+    progressLabel: hasRedemptionCap
+      ? `${campaign.redemptionCount} / ${campaign.maxRedemptions}`
+      : `${campaign.redemptionCount} 次已兑换`,
     progressPercent,
+    hasRedemptionCap,
   }
 }

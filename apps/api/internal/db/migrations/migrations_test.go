@@ -383,7 +383,7 @@ func TestBaselineMigrationExcludesVersionedRewardsSchema(t *testing.T) {
 	}
 }
 
-func TestSchemaSnapshotIncludesRewardsPublicCampaignContract(t *testing.T) {
+func TestSchemaSnapshotIncludesRewardsCampaignContract(t *testing.T) {
 	schemaRaw, err := os.ReadFile("../schema/schema.sql")
 	if err != nil {
 		t.Fatalf("read schema failed: %v", err)
@@ -392,9 +392,11 @@ func TestSchemaSnapshotIncludesRewardsPublicCampaignContract(t *testing.T) {
 	for _, expected := range []string{
 		"CREATE TABLE reward_campaigns",
 		"CREATE TABLE reward_codes",
+		"CREATE TABLE reward_code_batches",
 		"CREATE TABLE reward_redemptions",
 		"CREATE TABLE reward_admin_actions",
 		"CREATE TRIGGER reward_admin_actions_append_only",
+		"CREATE TRIGGER reward_redemptions_single_use_once",
 		"CREATE TRIGGER set_reward_campaigns_updated_at",
 	} {
 		if !strings.Contains(schema, expected) {
@@ -700,6 +702,10 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertColumnDataType(t, ctx, conn, "reward_campaigns", "expires_at", "timestamp with time zone")
 	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_at", "timestamp with time zone")
 	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_by", "bigint")
+	assertColumnDataType(t, ctx, conn, "reward_codes", "batch_id", "bigint")
+	assertColumnDataType(t, ctx, conn, "reward_campaigns", "issued_code_count", "bigint")
+	assertColumnDataType(t, ctx, conn, "reward_campaigns", "valid_unused_code_count", "bigint")
+	assertTableExists(t, ctx, conn, "reward_code_batches", true)
 	assertIndexValid(t, ctx, conn, "idx_tasks_terminal_created_at")
 	assertIndexValid(t, ctx, conn, "idx_tasks_pending_updated_at")
 	assertIndexValid(t, ctx, conn, "idx_task_attempts_running_created_at")
@@ -709,6 +715,9 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertIndexValid(t, ctx, conn, "idx_credit_transactions_capture_user_created")
 	assertIndexValid(t, ctx, conn, "idx_task_billing_snapshots_user_created")
 	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_status_id")
+	assertIndexValid(t, ctx, conn, "uq_reward_codes_public_campaign")
+	assertIndexValid(t, ctx, conn, "idx_reward_codes_batch_id")
+	assertIndexValid(t, ctx, conn, "idx_reward_code_batches_campaign_id")
 	assertStorageProfileSeed(t, ctx, conn)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_provider_endpoint_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
@@ -717,6 +726,11 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertTriggerExists(t, ctx, conn, "reward_admin_actions", "reward_admin_actions_append_only")
 	assertTriggerExists(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
 	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_immutable")
+	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_validate_mode")
+	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_project_counts")
+	assertTriggerExists(t, ctx, conn, "reward_code_batches", "reward_code_batches_immutable")
+	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_single_use_once")
+	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_consume_single_use_code")
 	assertFunctionSearchPath(t, ctx, conn, "apply_credit_posting_balances()")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
 	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_provider_endpoint")
@@ -729,6 +743,8 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertConstraintExists(t, ctx, conn, "reward_redemptions", "uq_reward_redemptions_user_campaign")
 	assertConstraintExists(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_schedule")
 	assertConstraintExists(t, ctx, conn, "reward_codes", "ck_reward_codes_revocation")
+	assertConstraintExists(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_code_counts")
+	assertConstraintExists(t, ctx, conn, "reward_code_batches", "uq_reward_code_batches_campaign_key")
 }
 
 func TestRewardsPublicCampaignMigrationUpgradesExistingSchema(t *testing.T) {
@@ -890,6 +906,58 @@ func TestRewardsCampaignLifecycleMigrationRollsBackUnusedSchemaAndReapplies(t *t
 	assertMigrationApplied(t, ctx, conn, version, true)
 	assertTriggerExists(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
 	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_immutable")
+}
+
+func TestRewardsSingleUseBatchMigrationRollsBackUnusedSchemaAndReapplies(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	const (
+		file    = "20260715040000_rewards_single_use_batches.sql"
+		version = 20260715040000
+	)
+	raw, err := migrationFS.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
+		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	assertTableExists(t, ctx, conn, "reward_code_batches", false)
+	assertColumnExists(t, ctx, conn, "reward_codes", "batch_id", false)
+	assertColumnExists(t, ctx, conn, "reward_campaigns", "issued_code_count", false)
+	assertColumnExists(t, ctx, conn, "reward_campaigns", "valid_unused_code_count", false)
+	assertTriggerMissing(t, ctx, conn, "reward_codes", "reward_codes_validate_mode")
+	assertTriggerMissing(t, ctx, conn, "reward_redemptions", "reward_redemptions_single_use_once")
+	assertConstraintDefinitionContains(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_mode", "public")
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("reapply single-use Batch migration: %v", err)
+	}
+	assertMigrationApplied(t, ctx, conn, version, true)
+	assertTableExists(t, ctx, conn, "reward_code_batches", true)
+	assertColumnDataType(t, ctx, conn, "reward_codes", "batch_id", "bigint")
+	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_validate_mode")
+	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_single_use_once")
 }
 
 func TestRewardGrantCorrectionMigrationRollsBackAndReapplies(t *testing.T) {

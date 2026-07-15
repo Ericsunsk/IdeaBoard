@@ -3,6 +3,7 @@ package rewards
 import (
 	"bytes"
 	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +15,531 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func TestAdminGeneratesSingleUseCodeBatchWithoutPersistingPlaintext(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	keyring := newTestRewardKeyring(t)
+	random := bytes.NewReader(append(bytes.Repeat([]byte{0x00}, 10), bytes.Repeat([]byte{0xff}, 10)...))
+	service := NewServiceWithOptions(pool, credits.NewService(pool), keyring, ServiceOptions{
+		Random: random,
+	})
+	var commands AdminCommands = service
+
+	campaign, err := commands.CreateCampaign(t.Context(), CreateCampaignCommand{
+		DisplayName: "单次码奖励", CreditAmount: 80, Mode: CampaignModeSingleUse,
+		MaxRedemptions: 0, ActorUserID: 1, Reason: "创建不限总量的单次码奖励",
+	})
+	if err != nil {
+		t.Fatalf("CreateCampaign() error = %v", err)
+	}
+	generated, err := commands.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "single-use-batch-001",
+		ActorUserID: 1, Reason: "发行首批单次兑换码",
+	})
+	if err != nil {
+		t.Fatalf("GenerateCodeBatch() error = %v", err)
+	}
+	if generated.Batch.CampaignID != campaign.ID || generated.Batch.CodeCount != 2 ||
+		generated.ExportUnavailable || len(generated.Plaintexts) != 2 {
+		t.Fatalf("generated Batch = %+v, want metadata and two first-response plaintexts", generated)
+	}
+	format := regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{4}(?:-[0-9A-HJKMNP-TV-Z]{4}){3}$`)
+	if generated.Plaintexts[0] != "0000-0000-0000-0000" ||
+		generated.Plaintexts[1] != "ZZZZ-ZZZZ-ZZZZ-ZZZZ" {
+		t.Fatalf("plaintexts = %q, want stable Crockford Base32 grouping", generated.Plaintexts)
+	}
+	for _, plaintext := range generated.Plaintexts {
+		if !format.MatchString(plaintext) || strings.ContainsAny(plaintext, "ILOU") {
+			t.Fatalf("generated plaintext %q is not human-readable Crockford Base32", plaintext)
+		}
+	}
+
+	var codeCount int
+	var plaintextStored bool
+	if err := pool.QueryRow(t.Context(), `
+SELECT COUNT(DISTINCT codes.id), COALESCE(bool_or(metadata::TEXT LIKE '%' || $2 || '%'), FALSE)
+FROM reward_codes codes
+CROSS JOIN reward_admin_actions actions
+WHERE codes.batch_id = $1 AND actions.campaign_id = $3`,
+		generated.Batch.ID, generated.Plaintexts[0], campaign.ID,
+	).Scan(&codeCount, &plaintextStored); err != nil {
+		t.Fatalf("read generated Batch persistence: %v", err)
+	}
+	if codeCount != 2 || plaintextStored {
+		t.Fatalf("persisted Batch code_count=%d plaintext_in_journal=%t, want 2 and false", codeCount, plaintextStored)
+	}
+}
+
+func TestCodeBatchGenerationReplaysMetadataButNeverPlaintext(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewServiceWithOptions(pool, credits.NewService(pool), newTestRewardKeyring(t), ServiceOptions{
+		Random: rewardEntropy(0x2a, 0x2b),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "幂等批次奖励", 10)
+	command := GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "idempotent-batch",
+		ActorUserID: 1, Reason: "首次生成幂等批次",
+	}
+	first, err := service.GenerateCodeBatch(t.Context(), command)
+	if err != nil {
+		t.Fatalf("first GenerateCodeBatch() error = %v", err)
+	}
+	replay, err := service.GenerateCodeBatch(t.Context(), command)
+	if err != nil {
+		t.Fatalf("replayed GenerateCodeBatch() error = %v", err)
+	}
+	if replay.Batch.ID != first.Batch.ID || !replay.Replayed || !replay.ExportUnavailable || len(replay.Plaintexts) != 0 {
+		t.Fatalf("replay = %+v, want same metadata without plaintext", replay)
+	}
+	command.Count = 3
+	if _, err := service.GenerateCodeBatch(t.Context(), command); !errors.Is(err, ErrCodeBatchConflict) {
+		t.Fatalf("conflicting GenerateCodeBatch() error = %v, want ErrCodeBatchConflict", err)
+	}
+	var issueActions int
+	if err := pool.QueryRow(t.Context(), `
+SELECT COUNT(*) FROM reward_admin_actions
+WHERE campaign_id = $1 AND action_type = 'issue_code_batch'`, campaign.ID).Scan(&issueActions); err != nil {
+		t.Fatal(err)
+	}
+	if issueActions != 1 {
+		t.Fatalf("issue_code_batch Journal count = %d, want 1", issueActions)
+	}
+}
+
+func TestCodeBatchCollisionRollsBackBatchCodesAndJournal(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewServiceWithOptions(pool, credits.NewService(pool), newTestRewardKeyring(t), ServiceOptions{
+		Random: bytes.NewReader(bytes.Repeat([]byte{0x00}, 20)),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "碰撞回滚奖励", 10)
+
+	_, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "collision-batch",
+		ActorUserID: 1, Reason: "验证碰撞整批回滚",
+	})
+	if !errors.Is(err, ErrCodeCollision) {
+		t.Fatalf("GenerateCodeBatch() error = %v, want ErrCodeCollision", err)
+	}
+	var batches, codes, actions int
+	if err := pool.QueryRow(t.Context(), `
+SELECT
+  (SELECT COUNT(*) FROM reward_code_batches WHERE campaign_id = $1),
+  (SELECT COUNT(*) FROM reward_codes WHERE campaign_id = $1),
+  (SELECT COUNT(*) FROM reward_admin_actions WHERE campaign_id = $1 AND action_type = 'issue_code_batch')`,
+		campaign.ID,
+	).Scan(&batches, &codes, &actions); err != nil {
+		t.Fatal(err)
+	}
+	if batches != 0 || codes != 0 || actions != 0 {
+		t.Fatalf("rollback state batches=%d codes=%d actions=%d, want all zero", batches, codes, actions)
+	}
+}
+
+func TestCodeBatchGenerationRejectsMoreThanSynchronousLimit(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := newTestRewardService(t, pool, credits.NewService(pool))
+	campaign := createSingleUseRewardDraft(t, service, "批次上限奖励", 0)
+	_, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 10001, IdempotencyKey: "too-large",
+		ActorUserID: 1, Reason: "验证同步上限",
+	})
+	if !errors.Is(err, ErrCodeBatchLimit) {
+		t.Fatalf("GenerateCodeBatch() error = %v, want ErrCodeBatchLimit", err)
+	}
+}
+
+func TestSingleUseCodeCanRedeemOnceAndUserCanRedeemCampaignOnce(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+		Random: bytes.NewReader(append(bytes.Repeat([]byte{0x10}, 10), bytes.Repeat([]byte{0x20}, 10)...)),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "单次兑换约束", 2)
+	generated, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "redeem-once",
+		ActorUserID: 1, Reason: "生成单次兑换约束测试码",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活单次兑换活动",
+	}); err != nil {
+		t.Fatalf("ActivateCampaign() error = %v", err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	provisionRewardWallet(t, pool, creditService, 7)
+
+	first, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: generated.Plaintexts[0]})
+	if err != nil {
+		t.Fatalf("first Redeem() error = %v", err)
+	}
+	replay, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: generated.Plaintexts[0]})
+	if err != nil || !replay.Replayed || replay.Redemption.ID != first.Redemption.ID {
+		t.Fatalf("same user replay = %+v error=%v, want original Redemption", replay, err)
+	}
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: generated.Plaintexts[0]}); !errors.Is(err, ErrCodeUnavailable) {
+		t.Fatalf("second user same Code error = %v, want ErrCodeUnavailable", err)
+	}
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: generated.Plaintexts[1]}); !errors.Is(err, ErrAlreadyRedeemed) {
+		t.Fatalf("same user different Code error = %v, want ErrAlreadyRedeemed", err)
+	}
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: generated.Plaintexts[1]}); err != nil {
+		t.Fatalf("second Code Redeem() error = %v", err)
+	}
+	campaign, err = service.GetCampaign(t.Context(), campaign.ID)
+	if err != nil || campaign.RedemptionCount != 2 || campaign.Status != CampaignStatusExhausted {
+		t.Fatalf("Campaign after both Codes = %+v error=%v, want exhausted with 2 Redemptions", campaign, err)
+	}
+}
+
+func TestSingleUseCampaignCanAppendAfterCodeExhaustionWithinOptionalCap(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+		Random: bytes.NewReader(append(bytes.Repeat([]byte{0x31}, 10), bytes.Repeat([]byte{0x32}, 10)...)),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "可追加批次奖励", 0)
+	first, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 1, IdempotencyKey: "append-first",
+		ActorUserID: 1, Reason: "生成首批单次码",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活不限总量单次码活动",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: first.Plaintexts[0]}); err != nil {
+		t.Fatal(err)
+	}
+	exhausted, err := service.GetCampaign(t.Context(), campaign.ID)
+	if err != nil || exhausted.Status != CampaignStatusExhausted || exhausted.ValidUnusedCodeCount != 0 {
+		t.Fatalf("Campaign after only Code redeemed = %+v error=%v, want Code-exhausted", exhausted, err)
+	}
+	second, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 1, IdempotencyKey: "append-second",
+		ActorUserID: 1, Reason: "补充已耗尽的单次码",
+	})
+	if err != nil || len(second.Plaintexts) != 1 {
+		t.Fatalf("append GenerateCodeBatch() = %+v error=%v", second, err)
+	}
+	active, err := service.GetCampaign(t.Context(), campaign.ID)
+	if err != nil || active.Status != CampaignStatusActive || active.ValidUnusedCodeCount != 1 {
+		t.Fatalf("Campaign after append = %+v error=%v, want active with one unused Code", active, err)
+	}
+}
+
+func TestAdminListsAndRevokesOnlyUnusedCodesInBatch(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+		Random: bytes.NewReader(append(bytes.Repeat([]byte{0x41}, 10), bytes.Repeat([]byte{0x42}, 10)...)),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "批次撤销奖励", 2)
+	generated, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "revoke-unused",
+		ActorUserID: 1, Reason: "生成待撤销批次",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活待撤销批次",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	redemption, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: generated.Plaintexts[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	revoked, err := service.RevokeCodeBatch(t.Context(), RevokeCodeBatchCommand{
+		CampaignID: campaign.ID, BatchID: generated.Batch.ID, Confirmed: true,
+		ActorUserID: 1, Reason: "导出文件丢失，撤销未使用 Code",
+	})
+	if err != nil {
+		t.Fatalf("RevokeCodeBatch() error = %v", err)
+	}
+	if revoked.RedeemedCount != 1 || revoked.RevokedUnusedCount != 1 || revoked.ValidUnusedCount != 0 {
+		t.Fatalf("revoked Batch = %+v, want one redeemed and one revoked-unused", revoked)
+	}
+	page, err := service.ListCodeBatches(t.Context(), ListCodeBatchesInput{
+		CampaignID: campaign.ID, Limit: 20,
+	})
+	if err != nil || len(page.Batches) != 1 || page.Batches[0].ID != generated.Batch.ID {
+		t.Fatalf("ListCodeBatches() = %+v error=%v", page, err)
+	}
+	if page.Batches[0].RedeemedCount != 1 || page.Batches[0].RevokedUnusedCount != 1 {
+		t.Fatalf("listed Batch = %+v, want recovery metadata", page.Batches[0])
+	}
+
+	var redeemedRevokedAt, unusedRevokedAt *time.Time
+	if err := pool.QueryRow(t.Context(), `
+SELECT
+  max(revoked_at) FILTER (WHERE id = $2),
+  max(revoked_at) FILTER (WHERE id <> $2)
+FROM reward_codes
+WHERE batch_id = $1`, generated.Batch.ID, redemption.Redemption.CodeID).Scan(
+		&redeemedRevokedAt, &unusedRevokedAt,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if redeemedRevokedAt != nil || unusedRevokedAt == nil {
+		t.Fatalf("revocation state redeemed=%v unused=%v, want redeemed unchanged and unused revoked", redeemedRevokedAt, unusedRevokedAt)
+	}
+	wallet, err := creditService.GetWallet(t.Context(), 3)
+	if err != nil || wallet.Available != campaign.CreditAmount {
+		t.Fatalf("Wallet after Batch revoke = %+v error=%v, want existing Grant unchanged", wallet, err)
+	}
+}
+
+func TestCancelSingleUseCampaignRevokesOnlyUnusedCodes(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+		Random: bytes.NewReader(append(bytes.Repeat([]byte{0x51}, 10), bytes.Repeat([]byte{0x52}, 10)...)),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "取消单次码奖励", 2)
+	generated, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "cancel-unused",
+		ActorUserID: 1, Reason: "生成取消测试批次",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活取消测试批次",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	provisionRewardWallet(t, pool, creditService, 7)
+	first, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: generated.Plaintexts[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.CancelCampaign(t.Context(), CancelCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Confirmed: true, Reason: "取消单次码活动",
+	}); err != nil {
+		t.Fatalf("CancelCampaign() error = %v", err)
+	}
+	replay, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: generated.Plaintexts[0]})
+	if err != nil || !replay.Replayed || replay.Redemption.ID != first.Redemption.ID {
+		t.Fatalf("redeemed Code replay after cancel = %+v error=%v", replay, err)
+	}
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: generated.Plaintexts[1]}); !errors.Is(err, ErrCodeUnavailable) {
+		t.Fatalf("unused Code after cancel error = %v, want ErrCodeUnavailable", err)
+	}
+	var redeemedRevoked, unusedRevoked bool
+	if err := pool.QueryRow(t.Context(), `
+SELECT
+  bool_or(revoked_at IS NOT NULL) FILTER (WHERE id = $2),
+  bool_or(revoked_at IS NOT NULL) FILTER (WHERE id <> $2)
+FROM reward_codes WHERE batch_id = $1`, generated.Batch.ID, first.Redemption.CodeID).Scan(
+		&redeemedRevoked, &unusedRevoked,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if redeemedRevoked || !unusedRevoked {
+		t.Fatalf("cancel revocation redeemed=%t unused=%t, want false/true", redeemedRevoked, unusedRevoked)
+	}
+}
+
+func TestCodeBatchGenerationHonorsCapacityFormula(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+		Random: rewardEntropy(0x61, 0x62, 0x63),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "批次容量奖励", 3)
+	first, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "capacity-first",
+		ActorUserID: 1, Reason: "生成容量首批",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活容量活动",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: first.Plaintexts[0]}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "capacity-over",
+		ActorUserID: 1, Reason: "验证已完成加有效未使用不超 cap",
+	})
+	if !errors.Is(err, ErrCampaignExhausted) {
+		t.Fatalf("over-cap GenerateCodeBatch() error = %v, want ErrCampaignExhausted", err)
+	}
+	if _, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 1, IdempotencyKey: "capacity-final",
+		ActorUserID: 1, Reason: "补满剩余容量",
+	}); err != nil {
+		t.Fatalf("within-cap GenerateCodeBatch() error = %v", err)
+	}
+}
+
+func TestCodeBatchGenerationAllowsLifecycleStatesButRejectsExpiry(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	startsAt := now.Add(time.Hour)
+	expiresAt := now.Add(2 * time.Hour)
+	service := NewServiceWithOptions(pool, credits.NewService(pool), newTestRewardKeyring(t), ServiceOptions{
+		Now: func() time.Time { return now }, Random: rewardEntropy(0x71, 0x72, 0x73),
+	})
+	campaign, err := service.CreateCampaign(t.Context(), CreateCampaignCommand{
+		DisplayName: "生命周期追加奖励", CreditAmount: 80, Mode: CampaignModeSingleUse,
+		MaxRedemptions: 0, StartsAt: &startsAt, ExpiresAt: &expiresAt,
+		ActorUserID: 1, Reason: "创建排期单次码活动",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	generate := func(key string) error {
+		_, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+			CampaignID: campaign.ID, Count: 1, IdempotencyKey: key,
+			ActorUserID: 1, Reason: "验证生命周期追加",
+		})
+		return err
+	}
+	if err := generate("draft-batch"); err != nil {
+		t.Fatalf("Draft generation error = %v", err)
+	}
+	activated, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活排期活动",
+	})
+	if err != nil || activated.Status != CampaignStatusScheduled {
+		t.Fatalf("scheduled activation = %+v error=%v", activated, err)
+	}
+	if err := generate("scheduled-batch"); err != nil {
+		t.Fatalf("scheduled generation error = %v", err)
+	}
+	if _, err := service.PauseCampaign(t.Context(), PauseCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "暂停排期活动",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := generate("paused-batch"); err != nil {
+		t.Fatalf("paused generation error = %v", err)
+	}
+	now = expiresAt
+	if err := generate("expired-batch"); !errors.Is(err, ErrCampaignExpired) {
+		t.Fatalf("expired generation error = %v, want ErrCampaignExpired", err)
+	}
+}
+
+func TestCodeBatchRandomFailureRollsBackAtomically(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewServiceWithOptions(pool, credits.NewService(pool), newTestRewardKeyring(t), ServiceOptions{
+		Random: bytes.NewReader(bytes.Repeat([]byte{0x77}, 15)),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "随机源失败回滚", 2)
+	if _, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 2, IdempotencyKey: "rng-failure",
+		ActorUserID: 1, Reason: "验证随机源失败回滚",
+	}); err == nil {
+		t.Fatal("GenerateCodeBatch() succeeded, want entropy failure")
+	}
+	var batches, codes, actions int
+	if err := pool.QueryRow(t.Context(), `
+SELECT
+  (SELECT COUNT(*) FROM reward_code_batches WHERE campaign_id = $1),
+  (SELECT COUNT(*) FROM reward_codes WHERE campaign_id = $1),
+  (SELECT COUNT(*) FROM reward_admin_actions WHERE campaign_id = $1 AND action_type = 'issue_code_batch')`,
+		campaign.ID,
+	).Scan(&batches, &codes, &actions); err != nil {
+		t.Fatal(err)
+	}
+	if batches != 0 || codes != 0 || actions != 0 {
+		t.Fatalf("RNG rollback batches=%d codes=%d actions=%d", batches, codes, actions)
+	}
+}
+
+func TestConcurrentUsersCannotRedeemSingleUseCodeTwice(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+		Random: rewardEntropy(0x81),
+	})
+	campaign := createSingleUseRewardDraft(t, service, "并发单次码奖励", 0)
+	generated, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaign.ID, Count: 1, IdempotencyKey: "concurrent-single-use",
+		ActorUserID: 1, Reason: "生成并发测试码",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活并发测试活动",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, userID := range []int64{3, 7} {
+		provisionRewardWallet(t, pool, creditService, userID)
+	}
+	start := make(chan struct{})
+	errorsByUser := make(chan error, 2)
+	var workers sync.WaitGroup
+	for _, userID := range []int64{3, 7} {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			<-start
+			_, err := service.Redeem(t.Context(), RedeemCommand{UserID: userID, Code: generated.Plaintexts[0]})
+			errorsByUser <- err
+		}()
+	}
+	close(start)
+	workers.Wait()
+	close(errorsByUser)
+	var succeeded, unavailable int
+	for err := range errorsByUser {
+		switch {
+		case err == nil:
+			succeeded++
+		case errors.Is(err, ErrCodeUnavailable):
+			unavailable++
+		default:
+			t.Fatalf("concurrent Redeem() unexpected error = %v", err)
+		}
+	}
+	if succeeded != 1 || unavailable != 1 {
+		t.Fatalf("concurrent results success=%d unavailable=%d, want 1/1", succeeded, unavailable)
+	}
+	campaign, err = service.GetCampaign(t.Context(), campaign.ID)
+	if err != nil || campaign.RedemptionCount != 1 || campaign.ValidUnusedCodeCount != 0 {
+		t.Fatalf("Campaign after concurrent redemption = %+v error=%v", campaign, err)
+	}
+}
+
+func TestCampaignCannotMixPublicAndSingleUseCodes(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewServiceWithOptions(pool, credits.NewService(pool), newTestRewardKeyring(t), ServiceOptions{
+		Random: rewardEntropy(0x91),
+	})
+	public := createRewardDraft(t, service, "公共码互斥")
+	if _, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: public.ID, Count: 1, IdempotencyKey: "public-cannot-batch",
+		ActorUserID: 1, Reason: "验证公共码互斥",
+	}); !errors.Is(err, ErrCampaignModeMismatch) {
+		t.Fatalf("public GenerateCodeBatch() error = %v, want ErrCampaignModeMismatch", err)
+	}
+	singleUse := createSingleUseRewardDraft(t, service, "单次码互斥", 1)
+	if _, err := service.IssuePublicCode(t.Context(), IssuePublicCodeCommand{
+		CampaignID: singleUse.ID, Code: "NOMIX2026", ActorUserID: 1, Reason: "验证单次码互斥",
+	}); !errors.Is(err, ErrCampaignModeMismatch) {
+		t.Fatalf("single-use IssuePublicCode() error = %v, want ErrCampaignModeMismatch", err)
+	}
+}
 
 func TestAdminSchedulesPausesAndResumesPublicCampaign(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
@@ -931,12 +1457,7 @@ func newTestRewardService(t *testing.T, pool *pgxpool.Pool, creditService *credi
 	return newTestRewardServiceAt(t, pool, creditService, time.Now())
 }
 
-func newTestRewardServiceAt(
-	t *testing.T,
-	pool *pgxpool.Pool,
-	creditService *credits.Service,
-	now time.Time,
-) *Service {
+func newTestRewardKeyring(t *testing.T) CodeKeyring {
 	t.Helper()
 	keyring, err := NewCodeKeyring(CodeKey{
 		Version: "test-v1",
@@ -945,6 +1466,25 @@ func newTestRewardServiceAt(
 	if err != nil {
 		t.Fatalf("NewCodeKeyring() error = %v", err)
 	}
+	return keyring
+}
+
+func rewardEntropy(values ...byte) *bytes.Reader {
+	payload := make([]byte, 0, len(values)*generatedCodeEntropyBytes)
+	for _, value := range values {
+		payload = append(payload, bytes.Repeat([]byte{value}, generatedCodeEntropyBytes)...)
+	}
+	return bytes.NewReader(payload)
+}
+
+func newTestRewardServiceAt(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	creditService *credits.Service,
+	now time.Time,
+) *Service {
+	t.Helper()
+	keyring := newTestRewardKeyring(t)
 	return NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{Now: func() time.Time { return now }})
 }
 
@@ -974,6 +1514,23 @@ func createActivePublicCampaign(
 func createRewardDraft(t *testing.T, service *Service, displayName string) Campaign {
 	t.Helper()
 	return createRewardDraftWithAmount(t, service, displayName, 80, 3)
+}
+
+func createSingleUseRewardDraft(
+	t *testing.T,
+	service *Service,
+	displayName string,
+	maxRedemptions int64,
+) Campaign {
+	t.Helper()
+	campaign, err := service.CreateCampaign(t.Context(), CreateCampaignCommand{
+		DisplayName: displayName, CreditAmount: 80, Mode: CampaignModeSingleUse,
+		MaxRedemptions: maxRedemptions, ActorUserID: 1, Reason: "创建测试单次码奖励活动",
+	})
+	if err != nil {
+		t.Fatalf("CreateCampaign() single-use error = %v", err)
+	}
+	return campaign
 }
 
 func createRewardDraftWithAmount(

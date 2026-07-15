@@ -12,7 +12,7 @@ import (
 
 const getRewardCampaign = `-- name: GetRewardCampaign :one
 SELECT id, display_name, internal_note, credit_amount, mode, status,
-       max_redemptions, redemption_count, starts_at, expires_at,
+       max_redemptions, redemption_count, issued_code_count, valid_unused_code_count, starts_at, expires_at,
        created_by, created_at, updated_at
 FROM reward_campaigns
 WHERE id = $1
@@ -30,6 +30,8 @@ func (q *Queries) GetRewardCampaign(ctx context.Context, id int64) (RewardCampai
 		&i.Status,
 		&i.MaxRedemptions,
 		&i.RedemptionCount,
+		&i.IssuedCodeCount,
+		&i.ValidUnusedCodeCount,
 		&i.StartsAt,
 		&i.ExpiresAt,
 		&i.CreatedBy,
@@ -68,7 +70,7 @@ func (q *Queries) GetRewardPublicCodeMetadata(ctx context.Context, campaignID in
 
 const listRewardCampaigns = `-- name: ListRewardCampaigns :many
 SELECT id, display_name, internal_note, credit_amount, mode, status,
-       max_redemptions, redemption_count, starts_at, expires_at,
+       max_redemptions, redemption_count, issued_code_count, valid_unused_code_count, starts_at, expires_at,
        created_by, created_at, updated_at
 FROM reward_campaigns
 WHERE ($1::BIGINT <= 0 OR id < $1)
@@ -99,6 +101,8 @@ func (q *Queries) ListRewardCampaigns(ctx context.Context, arg ListRewardCampaig
 			&i.Status,
 			&i.MaxRedemptions,
 			&i.RedemptionCount,
+			&i.IssuedCodeCount,
+			&i.ValidUnusedCodeCount,
 			&i.StartsAt,
 			&i.ExpiresAt,
 			&i.CreatedBy,

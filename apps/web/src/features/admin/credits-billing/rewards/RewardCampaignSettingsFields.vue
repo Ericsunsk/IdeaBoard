@@ -25,11 +25,16 @@
         fluid
       />
     </AdminFormField>
-    <AdminFormField label="总兑换上限" :for="`${idPrefix}-cap`" required>
+    <AdminFormField
+      label="总兑换上限"
+      :for="`${idPrefix}-cap`"
+      :hint="redemptionCapHint"
+      required
+    >
       <InputNumber
         v-model="maxRedemptions"
         :input-id="`${idPrefix}-cap`"
-        :min="1"
+        :min="minRedemptions"
         :use-grouping="false"
         fluid
       />
@@ -71,10 +76,14 @@ withDefaults(
     idPrefix: string
     noteLabel?: string
     scheduleError?: string
+    minRedemptions?: number
+    redemptionCapHint?: string
   }>(),
   {
     noteLabel: '内部备注',
     scheduleError: '',
+    minRedemptions: 1,
+    redemptionCapHint: '',
   },
 )
 

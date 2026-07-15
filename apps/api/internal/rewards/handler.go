@@ -30,18 +30,25 @@ type Handler struct {
 func NewHandler(service RewardService) *Handler { return &Handler{service: service} }
 
 type campaignMutationRequest struct {
-	DisplayName    string     `json:"display_name"`
-	InternalNote   string     `json:"internal_note"`
-	CreditAmount   int64      `json:"credit_amount"`
-	MaxRedemptions int64      `json:"max_redemptions"`
-	StartsAt       *time.Time `json:"starts_at"`
-	ExpiresAt      *time.Time `json:"expires_at"`
-	Reason         string     `json:"reason"`
+	DisplayName    string       `json:"display_name"`
+	InternalNote   string       `json:"internal_note"`
+	CreditAmount   int64        `json:"credit_amount"`
+	Mode           CampaignMode `json:"mode"`
+	MaxRedemptions int64        `json:"max_redemptions"`
+	StartsAt       *time.Time   `json:"starts_at"`
+	ExpiresAt      *time.Time   `json:"expires_at"`
+	Reason         string       `json:"reason"`
 }
 
 type issuePublicCodeRequest struct {
 	Code   string `json:"code"`
 	Reason string `json:"reason"`
+}
+
+type generateCodeBatchRequest struct {
+	Count          int    `json:"count"`
+	IdempotencyKey string `json:"idempotency_key"`
+	Reason         string `json:"reason"`
 }
 
 type rewardReasonRequest struct {
@@ -69,7 +76,7 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 	}
 	campaign, err := h.service.CreateCampaign(c.Request.Context(), CreateCampaignCommand{
 		DisplayName: request.DisplayName, InternalNote: request.InternalNote,
-		CreditAmount: request.CreditAmount, MaxRedemptions: request.MaxRedemptions,
+		CreditAmount: request.CreditAmount, Mode: request.Mode, MaxRedemptions: request.MaxRedemptions,
 		StartsAt: request.StartsAt, ExpiresAt: request.ExpiresAt,
 		ActorUserID: actorID, Reason: request.Reason,
 	})
@@ -130,6 +137,94 @@ func (h *Handler) IssuePublicCode(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	response.SuccessDTO(c, issued)
+}
+
+func (h *Handler) GenerateCodeBatch(c *gin.Context) {
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	var request generateCodeBatchRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	generated, err := h.service.GenerateCodeBatch(c.Request.Context(), GenerateCodeBatchCommand{
+		CampaignID: campaignID, Count: request.Count, IdempotencyKey: request.IdempotencyKey,
+		ActorUserID: actorID, Reason: request.Reason,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	response.SuccessDTO(c, generated)
+}
+
+func (h *Handler) ListCodeBatches(c *gin.Context) {
+	if _, ok := h.requireAdmin(c); !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	input := ListCodeBatchesInput{CampaignID: campaignID, Limit: 20}
+	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value <= 0 {
+			response.Error(c, http.StatusBadRequest, "before_id 无效")
+			return
+		}
+		input.BeforeID = value
+	}
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 || value > 100 {
+			response.Error(c, http.StatusBadRequest, "limit 无效")
+			return
+		}
+		input.Limit = value
+	}
+	page, err := h.service.ListCodeBatches(c.Request.Context(), input)
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) RevokeCodeBatch(c *gin.Context) {
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	batchID, ok := parseRewardPathIDParam(c, "batch_id")
+	if !ok {
+		return
+	}
+	var request cancelCampaignRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	batch, err := h.service.RevokeCodeBatch(c.Request.Context(), RevokeCodeBatchCommand{
+		CampaignID: campaignID, BatchID: batchID, ActorUserID: actorID,
+		Confirmed: request.Confirmed, Reason: request.Reason,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, batch)
 }
 
 func (h *Handler) ActivateCampaign(c *gin.Context) {
@@ -330,9 +425,13 @@ func decodeRewardJSON(c *gin.Context, destination any) error {
 }
 
 func parseRewardPathID(c *gin.Context) (int64, bool) {
-	value, err := strconv.ParseInt(c.Param("campaign_id"), 10, 64)
+	return parseRewardPathIDParam(c, "campaign_id")
+}
+
+func parseRewardPathIDParam(c *gin.Context, parameter string) (int64, bool) {
+	value, err := strconv.ParseInt(c.Param(parameter), 10, 64)
 	if err != nil || value <= 0 {
-		response.Error(c, http.StatusBadRequest, "campaign_id 无效")
+		response.Error(c, http.StatusBadRequest, parameter+" 无效")
 		return 0, false
 	}
 	return value, true
@@ -340,15 +439,19 @@ func parseRewardPathID(c *gin.Context) (int64, bool) {
 
 func writeRewardError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, ErrInvalidCommand):
+	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeBatchLimit):
 		response.Error(c, http.StatusBadRequest, "参数错误")
 	case errors.Is(err, ErrCampaignNotFound):
 		response.Error(c, http.StatusNotFound, "奖励活动不存在")
+	case errors.Is(err, ErrCodeBatchNotFound):
+		response.Error(c, http.StatusNotFound, "奖励码批次不存在")
 	case errors.Is(err, ErrCampaignNotDraft), errors.Is(err, ErrPublicCodeExists),
 		errors.Is(err, ErrPublicCodeRequired), errors.Is(err, ErrCampaignExhausted),
 		errors.Is(err, ErrAlreadyRedeemed), errors.Is(err, ErrCampaignNotActive),
 		errors.Is(err, ErrCampaignNotPaused), errors.Is(err, ErrCampaignRulesFrozen),
-		errors.Is(err, ErrCampaignNotEmpty), errors.Is(err, ErrCampaignExpired):
+		errors.Is(err, ErrCampaignNotEmpty), errors.Is(err, ErrCampaignExpired),
+		errors.Is(err, ErrCampaignModeMismatch), errors.Is(err, ErrCodeBatchConflict),
+		errors.Is(err, ErrCodeCollision):
 		response.Error(c, http.StatusConflict, "奖励活动状态冲突")
 	case errors.Is(err, ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")

@@ -8,7 +8,10 @@ import (
 
 type CampaignMode string
 
-const CampaignModePublic CampaignMode = "public"
+const (
+	CampaignModePublic    CampaignMode = "public"
+	CampaignModeSingleUse CampaignMode = "single_use"
+)
 
 type CampaignLifecycleStatus string
 
@@ -32,36 +35,43 @@ const (
 )
 
 var (
-	ErrInvalidCommand      = errors.New("invalid reward command")
-	ErrCampaignNotFound    = errors.New("reward campaign not found")
-	ErrCampaignNotDraft    = errors.New("reward campaign is not draft")
-	ErrCampaignNotActive   = errors.New("reward campaign is not active")
-	ErrCampaignNotPaused   = errors.New("reward campaign is not paused")
-	ErrCampaignRulesFrozen = errors.New("reward campaign rules are frozen")
-	ErrCampaignNotEmpty    = errors.New("reward campaign is not an empty draft")
-	ErrCampaignExpired     = errors.New("reward campaign is expired")
-	ErrPublicCodeExists    = errors.New("public reward code already exists")
-	ErrPublicCodeRequired  = errors.New("public reward code is required")
-	ErrCodeUnavailable     = errors.New("reward code is invalid or unavailable")
-	ErrCampaignExhausted   = errors.New("reward campaign is exhausted")
-	ErrAlreadyRedeemed     = errors.New("reward campaign already redeemed")
+	ErrInvalidCommand       = errors.New("invalid reward command")
+	ErrCampaignNotFound     = errors.New("reward campaign not found")
+	ErrCampaignNotDraft     = errors.New("reward campaign is not draft")
+	ErrCampaignNotActive    = errors.New("reward campaign is not active")
+	ErrCampaignNotPaused    = errors.New("reward campaign is not paused")
+	ErrCampaignRulesFrozen  = errors.New("reward campaign rules are frozen")
+	ErrCampaignNotEmpty     = errors.New("reward campaign is not an empty draft")
+	ErrCampaignExpired      = errors.New("reward campaign is expired")
+	ErrPublicCodeExists     = errors.New("public reward code already exists")
+	ErrPublicCodeRequired   = errors.New("public reward code is required")
+	ErrCampaignModeMismatch = errors.New("reward campaign mode does not support this Code operation")
+	ErrCodeBatchLimit       = errors.New("reward Code Batch exceeds the synchronous generation limit")
+	ErrCodeBatchConflict    = errors.New("reward Code Batch idempotency key conflicts with another payload")
+	ErrCodeBatchNotFound    = errors.New("reward Code Batch not found")
+	ErrCodeCollision        = errors.New("generated reward Code is not unique")
+	ErrCodeUnavailable      = errors.New("reward code is invalid or unavailable")
+	ErrCampaignExhausted    = errors.New("reward campaign is exhausted")
+	ErrAlreadyRedeemed      = errors.New("reward campaign already redeemed")
 )
 
 type Campaign struct {
-	ID              int64                   `json:"id"`
-	DisplayName     string                  `json:"display_name"`
-	InternalNote    string                  `json:"internal_note"`
-	CreditAmount    int64                   `json:"credit_amount"`
-	Mode            CampaignMode            `json:"mode"`
-	LifecycleStatus CampaignLifecycleStatus `json:"lifecycle_status"`
-	Status          CampaignStatus          `json:"status"`
-	MaxRedemptions  int64                   `json:"max_redemptions"`
-	RedemptionCount int64                   `json:"redemption_count"`
-	StartsAt        *time.Time              `json:"starts_at,omitempty"`
-	ExpiresAt       *time.Time              `json:"expires_at,omitempty"`
-	CreatedBy       int64                   `json:"created_by"`
-	CreatedAt       time.Time               `json:"created_at"`
-	UpdatedAt       time.Time               `json:"updated_at"`
+	ID                   int64                   `json:"id"`
+	DisplayName          string                  `json:"display_name"`
+	InternalNote         string                  `json:"internal_note"`
+	CreditAmount         int64                   `json:"credit_amount"`
+	Mode                 CampaignMode            `json:"mode"`
+	LifecycleStatus      CampaignLifecycleStatus `json:"lifecycle_status"`
+	Status               CampaignStatus          `json:"status"`
+	MaxRedemptions       int64                   `json:"max_redemptions"`
+	RedemptionCount      int64                   `json:"redemption_count"`
+	IssuedCodeCount      int64                   `json:"issued_code_count"`
+	ValidUnusedCodeCount int64                   `json:"valid_unused_code_count"`
+	StartsAt             *time.Time              `json:"starts_at,omitempty"`
+	ExpiresAt            *time.Time              `json:"expires_at,omitempty"`
+	CreatedBy            int64                   `json:"created_by"`
+	CreatedAt            time.Time               `json:"created_at"`
+	UpdatedAt            time.Time               `json:"updated_at"`
 }
 
 type RewardCode struct {
@@ -75,6 +85,27 @@ type RewardCode struct {
 type IssuedPublicCode struct {
 	Code      RewardCode `json:"code"`
 	Plaintext string     `json:"plaintext"`
+}
+
+type CodeBatch struct {
+	ID                 int64      `json:"id"`
+	CampaignID         int64      `json:"campaign_id"`
+	IdempotencyKey     string     `json:"idempotency_key"`
+	CodeCount          int        `json:"code_count"`
+	ValidUnusedCount   int        `json:"valid_unused_count"`
+	RedeemedCount      int        `json:"redeemed_count"`
+	RevokedUnusedCount int        `json:"revoked_unused_count"`
+	IssuedBy           int64      `json:"issued_by"`
+	IssuedAt           time.Time  `json:"issued_at"`
+	RevokedAt          *time.Time `json:"revoked_at,omitempty"`
+	RevokedBy          *int64     `json:"revoked_by,omitempty"`
+}
+
+type GeneratedCodeBatch struct {
+	Batch             CodeBatch `json:"batch"`
+	Plaintexts        []string  `json:"plaintexts,omitempty"`
+	ExportUnavailable bool      `json:"export_unavailable"`
+	Replayed          bool      `json:"replayed"`
 }
 
 type Redemption struct {
@@ -109,11 +140,39 @@ type CreateCampaignCommand struct {
 	DisplayName    string
 	InternalNote   string
 	CreditAmount   int64
+	Mode           CampaignMode
 	MaxRedemptions int64
 	StartsAt       *time.Time
 	ExpiresAt      *time.Time
 	ActorUserID    int64
 	Reason         string
+}
+
+type GenerateCodeBatchCommand struct {
+	CampaignID     int64
+	Count          int
+	IdempotencyKey string
+	ActorUserID    int64
+	Reason         string
+}
+
+type RevokeCodeBatchCommand struct {
+	CampaignID  int64
+	BatchID     int64
+	ActorUserID int64
+	Confirmed   bool
+	Reason      string
+}
+
+type ListCodeBatchesInput struct {
+	CampaignID int64
+	BeforeID   int64
+	Limit      int
+}
+
+type CodeBatchPage struct {
+	Batches      []CodeBatch `json:"batches"`
+	NextBeforeID int64       `json:"next_before_id,omitempty"`
 }
 
 type IssuePublicCodeCommand struct {
@@ -175,6 +234,8 @@ type AdminCommands interface {
 	CreateCampaign(context.Context, CreateCampaignCommand) (Campaign, error)
 	UpdateCampaign(context.Context, UpdateCampaignCommand) (Campaign, error)
 	IssuePublicCode(context.Context, IssuePublicCodeCommand) (IssuedPublicCode, error)
+	GenerateCodeBatch(context.Context, GenerateCodeBatchCommand) (GeneratedCodeBatch, error)
+	RevokeCodeBatch(context.Context, RevokeCodeBatchCommand) (CodeBatch, error)
 	ActivateCampaign(context.Context, ActivateCampaignCommand) (Campaign, error)
 	PauseCampaign(context.Context, PauseCampaignCommand) (Campaign, error)
 	ResumeCampaign(context.Context, ResumeCampaignCommand) (Campaign, error)
@@ -189,4 +250,5 @@ type UserCommands interface {
 type AdminReads interface {
 	ListCampaigns(context.Context, ListCampaignsInput) (CampaignPage, error)
 	GetCampaign(context.Context, int64) (Campaign, error)
+	ListCodeBatches(context.Context, ListCodeBatchesInput) (CodeBatchPage, error)
 }

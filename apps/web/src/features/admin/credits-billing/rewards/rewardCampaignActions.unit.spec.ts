@@ -93,6 +93,8 @@ function makeCampaign(): RewardCampaign {
     status: 'active',
     maxRedemptions: 100,
     redemptionCount: 0,
+    issuedCodeCount: 1,
+    validUnusedCodeCount: 1,
     createdBy: 1,
     createdAt: '2026-07-15T10:00:00Z',
     updatedAt: '2026-07-15T10:00:00Z',
