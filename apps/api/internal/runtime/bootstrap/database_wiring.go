@@ -18,6 +18,7 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
+	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/worker"
@@ -30,6 +31,11 @@ import (
 type appDatabases struct {
 	db        *sql.DB
 	riverPool *pgxpool.Pool
+}
+
+type appDatabaseOpeners struct {
+	postgres func(config.DatabaseConfig) (*sql.DB, error)
+	river    func(context.Context, string) (*pgxpool.Pool, error)
 }
 
 type appRepositories struct {
@@ -46,26 +52,31 @@ type appRepositories struct {
 }
 
 func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, error) {
-	db, err := database.NewPostgres(cfg.Database)
+	return openAppDatabasesWithOpeners(ctx, cfg, appDatabaseOpeners{
+		postgres: database.NewPostgres,
+		river:    worker.NewRiverPgxPool,
+	})
+}
+
+func openAppDatabasesWithOpeners(
+	ctx context.Context,
+	cfg *config.Config,
+	openers appDatabaseOpeners,
+) (appDatabases, error) {
+	if cfg == nil {
+		return appDatabases{}, fmt.Errorf("database config is nil")
+	}
+	if openers.postgres == nil || openers.river == nil {
+		return appDatabases{}, fmt.Errorf("database openers are incomplete")
+	}
+	db, err := openers.postgres(cfg.Database)
 	if err != nil {
 		return appDatabases{}, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	if err := database.VerifyRuntimePrivileges(ctx, db); err != nil {
+	if err := verifyRuntimePrivileges(ctx, db); err != nil {
 		return appDatabases{}, closeStartupDatabase(db, err)
 	}
-	if err := credits.VerifyRuntimePrivileges(ctx, db); err != nil {
-		return appDatabases{}, closeStartupDatabase(db, err)
-	}
-	if err := billing.VerifyRuntimePrivileges(ctx, db); err != nil {
-		return appDatabases{}, closeStartupDatabase(db, err)
-	}
-	if err := taskbilling.VerifyRuntimePrivileges(ctx, db); err != nil {
-		return appDatabases{}, closeStartupDatabase(db, err)
-	}
-	if err := worker.VerifyRiverRuntimePrivileges(ctx, db); err != nil {
-		return appDatabases{}, closeStartupDatabase(db, err)
-	}
-	riverPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(cfg.Database))
+	riverPool, err := openers.river(ctx, database.PostgresDSN(cfg.Database))
 	if err != nil {
 		return appDatabases{}, closeStartupDatabase(db, fmt.Errorf("failed to connect River database pool: %w", err))
 	}
@@ -107,25 +118,27 @@ func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("begin runtime privilege transaction: %w", err)
 	}
-	if err := database.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
-		return rollbackPrivilegeTransaction(privilegeTx, err)
-	}
-	if err := credits.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
-		return rollbackPrivilegeTransaction(privilegeTx, err)
-	}
-	if err := billing.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
-		return rollbackPrivilegeTransaction(privilegeTx, err)
-	}
-	if err := taskbilling.ConfigureRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
-		return rollbackPrivilegeTransaction(privilegeTx, err)
-	}
-	if err := worker.ConfigureRiverRuntimePrivileges(ctx, privilegeTx, cfg.Database.User); err != nil {
+	if err := dbprivileges.Configure(ctx, privilegeTx, cfg.Database.User, runtimePrivilegePolicies()...); err != nil {
 		return rollbackPrivilegeTransaction(privilegeTx, err)
 	}
 	if err := privilegeTx.Commit(); err != nil {
 		return fmt.Errorf("commit runtime privileges: %w", err)
 	}
 	return nil
+}
+
+func runtimePrivilegePolicies() []dbprivileges.Policy {
+	return []dbprivileges.Policy{
+		database.RuntimePrivilegePolicy(),
+		credits.RuntimePrivilegePolicy(),
+		billing.RuntimePrivilegePolicy(),
+		taskbilling.RuntimePrivilegePolicy(),
+		worker.RuntimePrivilegePolicy(),
+	}
+}
+
+func verifyRuntimePrivileges(ctx context.Context, db dbprivileges.DBTX) error {
+	return dbprivileges.Verify(ctx, db, runtimePrivilegePolicies()...)
 }
 
 func rollbackPrivilegeTransaction(tx *sql.Tx, cause error) error {

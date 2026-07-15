@@ -1,18 +1,6 @@
 package database
 
-import (
-	"context"
-	"database/sql"
-	"fmt"
-	"strings"
-
-	"github.com/jackc/pgx/v5"
-)
-
-type RuntimePrivilegeDBTX interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
-	QueryRowContext(context.Context, string, ...any) *sql.Row
-}
+import dbprivileges "ideaboard/api/internal/platform/database/privileges"
 
 var apiOwnedTableNames = []string{
 	"api_account_models",
@@ -31,24 +19,17 @@ var apiOwnedTableNames = []string{
 	"storage_profiles",
 	"system_configs",
 	"task_attempts",
-	"task_billing_settlements",
-	"task_billing_snapshots",
 	"task_cancellations",
 	"task_daily_stat_backfills",
 	"task_daily_stats",
 	"task_execution_metrics",
 	"task_leases",
 	"task_outputs",
-	"task_submission_claims",
 	"task_stat_events",
 	"tasks",
 	"users",
 	"users_used_uids",
 }
-
-const userDeletionRequestsTable = "user_deletion_requests"
-const systemSettingsAdminActionsTable = "system_settings_admin_actions"
-const systemSettingsAdminActionsSequence = "system_settings_admin_actions_id_seq"
 
 var apiOwnedSequenceNames = []string{
 	"api_account_models_id_seq",
@@ -77,122 +58,107 @@ var apiOwnedSequenceNames = []string{
 
 var protectedAuthTableNames = []string{"user", "session", "account", "verification"}
 
-var forbiddenApplicationTablePrivileges = []string{"INSERT", "UPDATE", "DELETE", "TRUNCATE", "TRIGGER"}
-
-func ConfigureRuntimePrivileges(ctx context.Context, db RuntimePrivilegeDBTX, runtimeRole string) error {
-	if db == nil {
-		return fmt.Errorf("configure runtime privileges: database is nil")
+func RuntimePrivilegePolicy() dbprivileges.Policy {
+	allTablePrivileges := []dbprivileges.Privilege{
+		dbprivileges.PrivilegeSelect,
+		dbprivileges.PrivilegeInsert,
+		dbprivileges.PrivilegeUpdate,
+		dbprivileges.PrivilegeDelete,
+		dbprivileges.PrivilegeTruncate,
+		dbprivileges.PrivilegeReferences,
+		dbprivileges.PrivilegeTrigger,
 	}
-	runtimeRole = strings.TrimSpace(runtimeRole)
-	if runtimeRole == "" {
-		return fmt.Errorf("configure runtime privileges: runtime role is empty")
+	allSequencePrivileges := []dbprivileges.Privilege{
+		dbprivileges.PrivilegeUsage,
+		dbprivileges.PrivilegeSelect,
+		dbprivileges.PrivilegeUpdate,
 	}
-	var schemaName string
-	if err := db.QueryRowContext(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
-		return fmt.Errorf("configure runtime privileges: load current schema: %w", err)
+	return dbprivileges.Policy{
+		Name:               "API runtime",
+		RequireSchemaUsage: true,
+		Objects: []dbprivileges.ObjectRule{
+			{
+				Kind:  dbprivileges.KindTable,
+				Names: apiOwnedTableNames,
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect,
+					dbprivileges.PrivilegeInsert,
+					dbprivileges.PrivilegeUpdate,
+					dbprivileges.PrivilegeDelete,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:            dbprivileges.KindSequence,
+				Names:           apiOwnedSequenceNames,
+				Required:        allSequencePrivileges,
+				PublicForbidden: allSequencePrivileges,
+			},
+			{
+				Kind:     dbprivileges.KindTable,
+				Names:    []string{"schema_migrations"},
+				Required: []dbprivileges.Privilege{dbprivileges.PrivilegeSelect},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeInsert,
+					dbprivileges.PrivilegeUpdate,
+					dbprivileges.PrivilegeDelete,
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:  dbprivileges.KindTable,
+				Names: []string{"user_deletion_requests"},
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect,
+					dbprivileges.PrivilegeInsert,
+					dbprivileges.PrivilegeUpdate,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeDelete,
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:  dbprivileges.KindTable,
+				Names: []string{"system_settings_admin_actions"},
+				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect,
+					dbprivileges.PrivilegeInsert,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeUpdate,
+					dbprivileges.PrivilegeDelete,
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences,
+					dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:            dbprivileges.KindSequence,
+				Names:           []string{"system_settings_admin_actions_id_seq"},
+				Required:        []dbprivileges.Privilege{dbprivileges.PrivilegeUsage, dbprivileges.PrivilegeSelect},
+				Forbidden:       []dbprivileges.Privilege{dbprivileges.PrivilegeUpdate},
+				PublicForbidden: allSequencePrivileges,
+			},
+			{
+				Kind:            dbprivileges.KindTable,
+				Names:           protectedAuthTableNames,
+				Optional:        true,
+				Forbidden:       allTablePrivileges,
+				PublicForbidden: allTablePrivileges,
+			},
+		},
 	}
-	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	schemaSQL := pgx.Identifier{schemaName}.Sanitize()
-	statements := []string{
-		`GRANT USAGE ON SCHEMA ` + schemaSQL + ` TO ` + roleSQL,
-		`GRANT SELECT, INSERT, UPDATE, DELETE ON ` + qualifiedIdentifiers(schemaName, apiOwnedTableNames) + ` TO ` + roleSQL,
-		`GRANT USAGE, SELECT, UPDATE ON ` + qualifiedIdentifiers(schemaName, apiOwnedSequenceNames) + ` TO ` + roleSQL,
-		`REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ` + schemaSQL + `.schema_migrations FROM ` + roleSQL,
-		`GRANT SELECT ON ` + schemaSQL + `.schema_migrations TO ` + roleSQL,
-		`REVOKE ALL PRIVILEGES ON TABLE ` + schemaSQL + `.` + userDeletionRequestsTable + ` FROM ` + roleSQL,
-		`GRANT SELECT, INSERT, UPDATE ON ` + schemaSQL + `.` + userDeletionRequestsTable + ` TO ` + roleSQL,
-		`REVOKE ALL PRIVILEGES ON TABLE ` + schemaSQL + `.` + systemSettingsAdminActionsTable + ` FROM ` + roleSQL,
-		`GRANT SELECT, INSERT ON ` + schemaSQL + `.` + systemSettingsAdminActionsTable + ` TO ` + roleSQL,
-		`REVOKE ALL PRIVILEGES ON SEQUENCE ` + schemaSQL + `.` + systemSettingsAdminActionsSequence + ` FROM ` + roleSQL,
-		`GRANT USAGE, SELECT ON SEQUENCE ` + schemaSQL + `.` + systemSettingsAdminActionsSequence + ` TO ` + roleSQL,
-	}
-	for _, tableName := range protectedAuthTableNames {
-		var exists bool
-		if err := db.QueryRowContext(ctx, `SELECT EXISTS (
-SELECT 1 FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2
-)`, schemaName, tableName).Scan(&exists); err != nil {
-			return fmt.Errorf("configure runtime privileges: inspect protected Auth table %s: %w", tableName, err)
-		}
-		if exists {
-			statements = append(statements,
-				`REVOKE ALL PRIVILEGES ON TABLE `+pgx.Identifier{schemaName, tableName}.Sanitize()+` FROM `+roleSQL,
-			)
-		}
-	}
-	for _, statement := range statements {
-		if _, err := db.ExecContext(ctx, statement); err != nil {
-			return fmt.Errorf("configure runtime privileges: %w", err)
-		}
-	}
-	return nil
-}
-
-func VerifyRuntimePrivileges(ctx context.Context, db interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
-}) error {
-	if db == nil {
-		return fmt.Errorf("verify API runtime privileges: database is nil")
-	}
-	var currentUser string
-	if err := db.QueryRowContext(ctx, `SELECT current_user`).Scan(&currentUser); err != nil {
-		return fmt.Errorf("verify API runtime privileges: %w", err)
-	}
-	for _, tableName := range protectedAuthTableNames {
-		for _, privilege := range forbiddenApplicationTablePrivileges {
-			var allowed bool
-			if err := db.QueryRowContext(ctx, `
-SELECT COALESCE(has_table_privilege(current_user, to_regclass($1), $2), FALSE)`,
-				tableName, privilege).Scan(&allowed); err != nil {
-				return fmt.Errorf("verify API runtime privileges: check Auth table %s %s: %w", tableName, privilege, err)
-			}
-			if allowed {
-				return fmt.Errorf("verify API runtime privileges: role %q has forbidden %s on Auth table %s", currentUser, privilege, tableName)
-			}
-		}
-	}
-	for _, privilege := range []string{"SELECT", "INSERT", "UPDATE"} {
-		var allowed bool
-		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, userDeletionRequestsTable, privilege).Scan(&allowed); err != nil {
-			return fmt.Errorf("verify API runtime privileges: check deletion requests %s: %w", privilege, err)
-		}
-		if !allowed {
-			return fmt.Errorf("verify API runtime privileges: role %q lacks required %s on %s", currentUser, privilege, userDeletionRequestsTable)
-		}
-	}
-	for _, privilege := range []string{"DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"} {
-		var allowed bool
-		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, userDeletionRequestsTable, privilege).Scan(&allowed); err != nil {
-			return fmt.Errorf("verify API runtime privileges: check deletion requests %s: %w", privilege, err)
-		}
-		if allowed {
-			return fmt.Errorf("verify API runtime privileges: role %q has forbidden %s on %s", currentUser, privilege, userDeletionRequestsTable)
-		}
-	}
-	for _, privilege := range []string{"SELECT", "INSERT"} {
-		var allowed bool
-		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, systemSettingsAdminActionsTable, privilege).Scan(&allowed); err != nil {
-			return fmt.Errorf("verify API runtime privileges: check settings audit %s: %w", privilege, err)
-		}
-		if !allowed {
-			return fmt.Errorf("verify API runtime privileges: role %q lacks required %s on %s", currentUser, privilege, systemSettingsAdminActionsTable)
-		}
-	}
-	for _, privilege := range []string{"UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"} {
-		var allowed bool
-		if err := db.QueryRowContext(ctx, `SELECT has_table_privilege(current_user, $1, $2)`, systemSettingsAdminActionsTable, privilege).Scan(&allowed); err != nil {
-			return fmt.Errorf("verify API runtime privileges: check settings audit %s: %w", privilege, err)
-		}
-		if allowed {
-			return fmt.Errorf("verify API runtime privileges: role %q has forbidden %s on %s", currentUser, privilege, systemSettingsAdminActionsTable)
-		}
-	}
-	return nil
-}
-
-func qualifiedIdentifiers(schemaName string, names []string) string {
-	qualified := make([]string, len(names))
-	for index, name := range names {
-		qualified[index] = pgx.Identifier{schemaName, name}.Sanitize()
-	}
-	return strings.Join(qualified, ", ")
 }

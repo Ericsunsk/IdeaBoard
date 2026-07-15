@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/database"
+	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -29,16 +30,11 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		_, _ = db.ExecContext(context.Background(), `DROP OWNED BY `+roleSQL)
 		_, _ = db.ExecContext(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
-	if err := database.ConfigureRuntimePrivileges(ctx, db, runtimeRole); err != nil {
-		t.Fatalf("ConfigureRuntimePrivileges() error = %v", err)
+	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
+	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
+		t.Fatalf("configure runtime privilege policies error = %v", err)
 	}
-	if err := ConfigureRuntimePrivileges(ctx, db, runtimeRole); err != nil {
-		t.Fatalf("credits ConfigureRuntimePrivileges() error = %v", err)
-	}
-	if err := database.VerifyRuntimePrivileges(ctx, db); err == nil {
-		t.Fatal("schema owner was accepted as the API runtime role")
-	}
-	if err := VerifyRuntimePrivileges(ctx, db); err == nil {
+	if err := dbprivileges.Verify(ctx, db, policies...); err == nil {
 		t.Fatal("schema owner was accepted as the API runtime role")
 	}
 
@@ -90,11 +86,8 @@ SELECT transaction_id FROM execute_credit_command_v2(
 	if _, err := runtimeConn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE(runtime verification) error = %v", err)
 	}
-	if err := VerifyRuntimePrivileges(ctx, runtimeConn); err != nil {
-		t.Fatalf("VerifyRuntimePrivileges() error = %v", err)
-	}
-	if err := database.VerifyRuntimePrivileges(ctx, runtimeConn); err != nil {
-		t.Fatalf("database VerifyRuntimePrivileges() error = %v", err)
+	if err := dbprivileges.Verify(ctx, runtimeConn, policies...); err != nil {
+		t.Fatalf("verify runtime privilege policies error = %v", err)
 	}
 	if _, err := runtimeConn.ExecContext(ctx, `RESET ROLE`); err != nil {
 		t.Fatalf("RESET ROLE(runtime verification) error = %v", err)

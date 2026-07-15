@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/database"
+	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -32,13 +33,11 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 			t.Errorf("drop runtime role: %v", err)
 		}
 	})
-	if err := database.ConfigureRuntimePrivileges(ctx, db, runtimeRole); err != nil {
-		t.Fatalf("database ConfigureRuntimePrivileges() error = %v", err)
+	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
+	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
+		t.Fatalf("configure runtime privilege policies error = %v", err)
 	}
-	if err := ConfigureRuntimePrivileges(ctx, db, runtimeRole); err != nil {
-		t.Fatalf("billing ConfigureRuntimePrivileges() error = %v", err)
-	}
-	if err := VerifyRuntimePrivileges(ctx, db); err == nil {
+	if err := dbprivileges.Verify(ctx, db, policies...); err == nil {
 		t.Fatal("schema owner was accepted as Billing runtime role")
 	}
 
@@ -59,8 +58,8 @@ func TestRuntimeRoleCanUseTypedBillingCommandsButCannotMutateCatalogDirectly(t *
 	if _, err := conn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE: %v", err)
 	}
-	if err := VerifyRuntimePrivileges(ctx, conn); err != nil {
-		t.Fatalf("VerifyRuntimePrivileges() error = %v", err)
+	if err := dbprivileges.Verify(ctx, conn, policies...); err != nil {
+		t.Fatalf("verify runtime privilege policies error = %v", err)
 	}
 	if _, err := conn.ExecContext(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5, $6)`, "test:runtime", "Runtime", "", true, 1, "runtime test setup"); err != nil {
 		t.Fatalf("typed create SKU command: %v", err)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/platform/database"
+	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
@@ -28,13 +29,11 @@ func TestRiverRuntimeRoleHasOperationalPrivilegesWithoutMigrationOwnership(t *te
 		_, _ = db.ExecContext(context.Background(), `DROP OWNED BY `+roleSQL)
 		_, _ = db.ExecContext(context.Background(), `DROP ROLE IF EXISTS `+roleSQL)
 	})
-	if err := database.ConfigureRuntimePrivileges(ctx, db, runtimeRole); err != nil {
-		t.Fatalf("database ConfigureRuntimePrivileges() error = %v", err)
+	policies := []dbprivileges.Policy{database.RuntimePrivilegePolicy(), RuntimePrivilegePolicy()}
+	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
+		t.Fatalf("configure runtime privilege policies error = %v", err)
 	}
-	if err := ConfigureRiverRuntimePrivileges(ctx, db, runtimeRole); err != nil {
-		t.Fatalf("ConfigureRiverRuntimePrivileges() error = %v", err)
-	}
-	if err := VerifyRiverRuntimePrivileges(ctx, db); err == nil {
+	if err := dbprivileges.Verify(ctx, db, policies...); err == nil {
 		t.Fatal("schema owner was accepted as the River runtime role")
 	}
 
@@ -46,7 +45,7 @@ func TestRiverRuntimeRoleHasOperationalPrivilegesWithoutMigrationOwnership(t *te
 	if _, err := runtimeConn.ExecContext(ctx, `SET ROLE `+roleSQL); err != nil {
 		t.Fatalf("SET ROLE error = %v", err)
 	}
-	if err := VerifyRiverRuntimePrivileges(ctx, runtimeConn); err != nil {
-		t.Fatalf("VerifyRiverRuntimePrivileges() error = %v", err)
+	if err := dbprivileges.Verify(ctx, runtimeConn, policies...); err != nil {
+		t.Fatalf("verify runtime privilege policies error = %v", err)
 	}
 }
