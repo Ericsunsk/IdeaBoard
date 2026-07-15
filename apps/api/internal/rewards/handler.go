@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
@@ -28,12 +29,14 @@ type Handler struct {
 
 func NewHandler(service RewardService) *Handler { return &Handler{service: service} }
 
-type createCampaignRequest struct {
-	DisplayName    string `json:"display_name"`
-	InternalNote   string `json:"internal_note"`
-	CreditAmount   int64  `json:"credit_amount"`
-	MaxRedemptions int64  `json:"max_redemptions"`
-	Reason         string `json:"reason"`
+type campaignMutationRequest struct {
+	DisplayName    string     `json:"display_name"`
+	InternalNote   string     `json:"internal_note"`
+	CreditAmount   int64      `json:"credit_amount"`
+	MaxRedemptions int64      `json:"max_redemptions"`
+	StartsAt       *time.Time `json:"starts_at"`
+	ExpiresAt      *time.Time `json:"expires_at"`
+	Reason         string     `json:"reason"`
 }
 
 type issuePublicCodeRequest struct {
@@ -45,6 +48,11 @@ type rewardReasonRequest struct {
 	Reason string `json:"reason"`
 }
 
+type cancelCampaignRequest struct {
+	Confirmed bool   `json:"confirmed"`
+	Reason    string `json:"reason"`
+}
+
 type redeemRequest struct {
 	Code string `json:"code"`
 }
@@ -54,7 +62,7 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var request createCampaignRequest
+	var request campaignMutationRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
@@ -62,6 +70,34 @@ func (h *Handler) CreateCampaign(c *gin.Context) {
 	campaign, err := h.service.CreateCampaign(c.Request.Context(), CreateCampaignCommand{
 		DisplayName: request.DisplayName, InternalNote: request.InternalNote,
 		CreditAmount: request.CreditAmount, MaxRedemptions: request.MaxRedemptions,
+		StartsAt: request.StartsAt, ExpiresAt: request.ExpiresAt,
+		ActorUserID: actorID, Reason: request.Reason,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, campaign)
+}
+
+func (h *Handler) UpdateCampaign(c *gin.Context) {
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	var request campaignMutationRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	campaign, err := h.service.UpdateCampaign(c.Request.Context(), UpdateCampaignCommand{
+		CampaignID: campaignID, DisplayName: request.DisplayName, InternalNote: request.InternalNote,
+		CreditAmount: request.CreditAmount, MaxRedemptions: request.MaxRedemptions,
+		StartsAt: request.StartsAt, ExpiresAt: request.ExpiresAt,
 		ActorUserID: actorID, Reason: request.Reason,
 	})
 	if err != nil {
@@ -113,6 +149,94 @@ func (h *Handler) ActivateCampaign(c *gin.Context) {
 	campaign, err := h.service.ActivateCampaign(c.Request.Context(), ActivateCampaignCommand{
 		CampaignID: campaignID, ActorUserID: actorID, Reason: request.Reason,
 	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, campaign)
+}
+
+func (h *Handler) PauseCampaign(c *gin.Context) {
+	h.handleLifecycleCommand(c, func(campaignID, actorID int64, reason string) (Campaign, error) {
+		return h.service.PauseCampaign(c.Request.Context(), PauseCampaignCommand{
+			CampaignID: campaignID, ActorUserID: actorID, Reason: reason,
+		})
+	})
+}
+
+func (h *Handler) ResumeCampaign(c *gin.Context) {
+	h.handleLifecycleCommand(c, func(campaignID, actorID int64, reason string) (Campaign, error) {
+		return h.service.ResumeCampaign(c.Request.Context(), ResumeCampaignCommand{
+			CampaignID: campaignID, ActorUserID: actorID, Reason: reason,
+		})
+	})
+}
+
+func (h *Handler) CancelCampaign(c *gin.Context) {
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	var request cancelCampaignRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	campaign, err := h.service.CancelCampaign(c.Request.Context(), CancelCampaignCommand{
+		CampaignID: campaignID, ActorUserID: actorID, Confirmed: request.Confirmed, Reason: request.Reason,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, campaign)
+}
+
+func (h *Handler) DeleteCampaign(c *gin.Context) {
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	var request rewardReasonRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	if err := h.service.DeleteCampaign(c.Request.Context(), DeleteCampaignCommand{
+		CampaignID: campaignID, ActorUserID: actorID, Reason: request.Reason,
+	}); err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, struct{}{})
+}
+
+func (h *Handler) handleLifecycleCommand(
+	c *gin.Context,
+	command func(campaignID, actorID int64, reason string) (Campaign, error),
+) {
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	var request rewardReasonRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	campaign, err := command(campaignID, actorID, request.Reason)
 	if err != nil {
 		writeRewardError(c, err)
 		return
@@ -222,7 +346,9 @@ func writeRewardError(c *gin.Context, err error) {
 		response.Error(c, http.StatusNotFound, "奖励活动不存在")
 	case errors.Is(err, ErrCampaignNotDraft), errors.Is(err, ErrPublicCodeExists),
 		errors.Is(err, ErrPublicCodeRequired), errors.Is(err, ErrCampaignExhausted),
-		errors.Is(err, ErrAlreadyRedeemed):
+		errors.Is(err, ErrAlreadyRedeemed), errors.Is(err, ErrCampaignNotActive),
+		errors.Is(err, ErrCampaignNotPaused), errors.Is(err, ErrCampaignRulesFrozen),
+		errors.Is(err, ErrCampaignNotEmpty), errors.Is(err, ErrCampaignExpired):
 		response.Error(c, http.StatusConflict, "奖励活动状态冲突")
 	case errors.Is(err, ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")

@@ -205,6 +205,55 @@ func TestAdminCorrectionReversesOriginalTransactionWithConcurrentCap(t *testing.
 	}
 }
 
+func TestAdminCorrectionAllowsRewardRedemptionGrantButRejectsOtherUserGrants(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	ctx := context.Background()
+	const rewardUserID int64 = 410
+	const otherUserID int64 = 411
+	ensureAdminOperationUser(t, pool, rewardUserID, otherUserID)
+
+	rewardMetadata := testMetadata("reward-correction:grant", "reward-correction-grant")
+	rewardMetadata.Actor = Actor{Type: ActorUser, ID: "410"}
+	rewardMetadata.Source = "reward_redemption"
+	rewardMetadata.BusinessReference = BusinessReference{Type: "reward_redemption", ID: "910"}
+	rewardGrant, err := service.Grant(ctx, GrantCommand{
+		UserID: rewardUserID, Amount: mustCreditAmount(t, 30), Metadata: rewardMetadata,
+	})
+	if err != nil {
+		t.Fatalf("reward Grant() error = %v", err)
+	}
+	corrected, err := service.Correct(ctx, CorrectionCommand{
+		UserID: rewardUserID, OriginalTransactionID: rewardGrant.TransactionID,
+		Amount:   mustCreditAmount(t, 30),
+		Metadata: testMetadata("reward-correction:correct", "reward-correction-correct"),
+	})
+	if err != nil {
+		t.Fatalf("Correct(reward Grant) error = %v", err)
+	}
+	if corrected.Wallet.Available != 0 || corrected.CommandType != CommandCorrection {
+		t.Fatalf("reward Correction = %+v, want zero available and correction", corrected)
+	}
+
+	otherMetadata := testMetadata("user-grant-correction:grant", "user-grant-correction-grant")
+	otherMetadata.Actor = Actor{Type: ActorUser, ID: "411"}
+	otherMetadata.Source = "manual_user_grant"
+	otherGrant, err := service.Grant(ctx, GrantCommand{
+		UserID: otherUserID, Amount: mustCreditAmount(t, 10), Metadata: otherMetadata,
+	})
+	if err != nil {
+		t.Fatalf("other user Grant() error = %v", err)
+	}
+	_, err = service.Correct(ctx, CorrectionCommand{
+		UserID: otherUserID, OriginalTransactionID: otherGrant.TransactionID,
+		Amount:   mustCreditAmount(t, 10),
+		Metadata: testMetadata("user-grant-correction:correct", "user-grant-correction-correct"),
+	})
+	if !errors.Is(err, ErrInvalidCommand) {
+		t.Fatalf("Correct(other user Grant) error = %v, want ErrInvalidCommand", err)
+	}
+}
+
 func TestAdminCorrectionSupportsDeductionAndRefundDirectionsAndRejectsInvalidOrigins(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)

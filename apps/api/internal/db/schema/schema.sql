@@ -1099,6 +1099,8 @@ CREATE TABLE reward_campaigns (
   status VARCHAR(20) NOT NULL DEFAULT 'draft',
   max_redemptions BIGINT NOT NULL,
   redemption_count BIGINT NOT NULL DEFAULT 0,
+  starts_at TIMESTAMPTZ(3),
+  expires_at TIMESTAMPTZ(3),
   created_by BIGINT NOT NULL,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
@@ -1106,8 +1108,9 @@ CREATE TABLE reward_campaigns (
   CONSTRAINT ck_reward_campaigns_internal_note CHECK (char_length(internal_note) <= 1000),
   CONSTRAINT ck_reward_campaigns_credit_amount CHECK (credit_amount BETWEEN 1 AND 9000000000000000),
   CONSTRAINT ck_reward_campaigns_mode CHECK (mode = 'public'),
-  CONSTRAINT ck_reward_campaigns_status CHECK (status IN ('draft', 'active')),
+  CONSTRAINT ck_reward_campaigns_status CHECK (status IN ('draft', 'active', 'paused', 'cancelled')),
   CONSTRAINT ck_reward_campaigns_limit CHECK (max_redemptions > 0 AND redemption_count BETWEEN 0 AND max_redemptions),
+  CONSTRAINT ck_reward_campaigns_schedule CHECK (starts_at IS NULL OR expires_at IS NULL OR starts_at < expires_at),
   CONSTRAINT fk_reward_campaigns_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
@@ -1119,13 +1122,17 @@ CREATE TABLE reward_codes (
   code_hint VARCHAR(4) NOT NULL,
   issued_by BIGINT NOT NULL,
   issued_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
+  revoked_at TIMESTAMPTZ(3),
+  revoked_by BIGINT,
   CONSTRAINT uq_reward_codes_public_campaign UNIQUE (campaign_id),
   CONSTRAINT uq_reward_codes_digest UNIQUE (key_version, code_digest),
   CONSTRAINT ck_reward_codes_key_version CHECK (key_version = btrim(key_version) AND char_length(key_version) BETWEEN 1 AND 32),
   CONSTRAINT ck_reward_codes_digest CHECK (octet_length(code_digest) = 32),
   CONSTRAINT ck_reward_codes_hint CHECK (code_hint ~ '^[A-Z0-9]{4}$'),
+  CONSTRAINT ck_reward_codes_revocation CHECK ((revoked_at IS NULL AND revoked_by IS NULL) OR (revoked_at IS NOT NULL AND revoked_by IS NOT NULL)),
   CONSTRAINT fk_reward_codes_campaign FOREIGN KEY (campaign_id) REFERENCES reward_campaigns(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
-  CONSTRAINT fk_reward_codes_issued_by FOREIGN KEY (issued_by) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT
+  CONSTRAINT fk_reward_codes_issued_by FOREIGN KEY (issued_by) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+  CONSTRAINT fk_reward_codes_revoked_by FOREIGN KEY (revoked_by) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
 CREATE TABLE reward_redemptions (
@@ -1154,10 +1161,9 @@ CREATE TABLE reward_admin_actions (
   reason VARCHAR(1000) NOT NULL,
   metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
-  CONSTRAINT ck_reward_admin_actions_type CHECK (action_type IN ('create_campaign', 'issue_public_code', 'activate_campaign')),
+  CONSTRAINT ck_reward_admin_actions_type CHECK (action_type IN ('create_campaign', 'update_campaign', 'issue_public_code', 'activate_campaign', 'pause_campaign', 'resume_campaign', 'cancel_campaign', 'delete_campaign')),
   CONSTRAINT ck_reward_admin_actions_reason CHECK (reason = btrim(reason, E' \t\n\r\f') AND char_length(reason) BETWEEN 1 AND 1000),
   CONSTRAINT ck_reward_admin_actions_metadata CHECK (jsonb_typeof(metadata) = 'object'),
-  CONSTRAINT fk_reward_admin_actions_campaign FOREIGN KEY (campaign_id) REFERENCES reward_campaigns(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
   CONSTRAINT fk_reward_admin_actions_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON UPDATE RESTRICT ON DELETE RESTRICT
 );
 
@@ -1178,6 +1184,67 @@ BEFORE UPDATE OR DELETE ON reward_admin_actions
 FOR EACH ROW EXECUTE FUNCTION prevent_reward_admin_action_mutation();
 
 REVOKE ALL ON FUNCTION prevent_reward_admin_action_mutation() FROM PUBLIC;
+
+CREATE FUNCTION guard_reward_campaign_rule_mutation()
+RETURNS TRIGGER AS $$
+DECLARE
+  has_issued_code BOOLEAN;
+BEGIN
+  EXECUTE pg_catalog.format(
+    'SELECT EXISTS (SELECT 1 FROM %I.reward_codes WHERE campaign_id = $1)',
+    TG_TABLE_SCHEMA
+  ) INTO has_issued_code USING OLD.id;
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.status <> 'draft' OR has_issued_code THEN
+      RAISE EXCEPTION USING ERRCODE = 'IB503', MESSAGE = 'only an empty reward Draft can be deleted';
+    END IF;
+    RETURN OLD;
+  END IF;
+  IF has_issued_code AND (
+    NEW.display_name IS DISTINCT FROM OLD.display_name
+    OR NEW.credit_amount IS DISTINCT FROM OLD.credit_amount
+    OR NEW.mode IS DISTINCT FROM OLD.mode
+    OR NEW.max_redemptions IS DISTINCT FROM OLD.max_redemptions
+    OR NEW.starts_at IS DISTINCT FROM OLD.starts_at
+    OR NEW.expires_at IS DISTINCT FROM OLD.expires_at
+    OR NEW.created_by IS DISTINCT FROM OLD.created_by
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB502', MESSAGE = 'reward campaign rules are frozen after Code issuance';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = pg_catalog;
+
+CREATE TRIGGER reward_campaign_rules_frozen
+BEFORE UPDATE OR DELETE ON reward_campaigns
+FOR EACH ROW EXECUTE FUNCTION guard_reward_campaign_rule_mutation();
+
+REVOKE ALL ON FUNCTION guard_reward_campaign_rule_mutation() FROM PUBLIC;
+
+CREATE FUNCTION guard_reward_code_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'DELETE'
+     OR NEW.campaign_id IS DISTINCT FROM OLD.campaign_id
+     OR NEW.key_version IS DISTINCT FROM OLD.key_version
+     OR NEW.code_digest IS DISTINCT FROM OLD.code_digest
+     OR NEW.code_hint IS DISTINCT FROM OLD.code_hint
+     OR NEW.issued_by IS DISTINCT FROM OLD.issued_by
+     OR NEW.issued_at IS DISTINCT FROM OLD.issued_at
+     OR OLD.revoked_at IS NOT NULL
+     OR NEW.revoked_at IS NULL
+     OR NEW.revoked_by IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB504', MESSAGE = 'reward Code identity and revocation are immutable';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = pg_catalog;
+
+CREATE TRIGGER reward_codes_immutable
+BEFORE UPDATE OR DELETE ON reward_codes
+FOR EACH ROW EXECUTE FUNCTION guard_reward_code_mutation();
+
+REVOKE ALL ON FUNCTION guard_reward_code_mutation() FROM PUBLIC;
 
 CREATE TRIGGER set_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_api_accounts_updated_at BEFORE UPDATE ON api_accounts FOR EACH ROW EXECUTE FUNCTION set_updated_at();

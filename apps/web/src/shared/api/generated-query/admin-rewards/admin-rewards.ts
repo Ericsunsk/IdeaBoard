@@ -18,9 +18,12 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  AdminRewardCampaignCancelRequest,
   AdminRewardCampaignCreateRequest,
+  AdminRewardCampaignUpdateRequest,
   AdminRewardPublicCodeIssueRequest,
   AdminRewardReasonRequest,
+  ApiResponseEmpty,
   ApiResponseIssuedRewardPublicCode,
   ApiResponseRewardCampaign,
   ApiResponseRewardCampaignPage,
@@ -279,6 +282,198 @@ export function useGetAdminRewardCampaign<
   return query
 }
 
+export const getUpdateAdminRewardCampaignUrl = (campaignId: number) => {
+  return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}`
+}
+
+export const updateAdminRewardCampaign = async (
+  campaignId: number,
+  adminRewardCampaignUpdateRequest: AdminRewardCampaignUpdateRequest,
+  options?: RequestInit,
+): Promise<ApiResponseRewardCampaign> => {
+  return orvalMutator<ApiResponseRewardCampaign>(getUpdateAdminRewardCampaignUrl(campaignId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRewardCampaignUpdateRequest),
+  })
+}
+
+export const getUpdateAdminRewardCampaignQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCampaignUpdateRequest?: MaybeRefOrGetter<AdminRewardCampaignUpdateRequest>,
+) => {
+  return [
+    'PUT',
+    'admin',
+    'rewards',
+    'campaigns',
+    campaignId,
+    adminRewardCampaignUpdateRequest,
+  ] as const
+}
+
+export const getUpdateAdminRewardCampaignQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCampaignUpdateRequest: MaybeRefOrGetter<AdminRewardCampaignUpdateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminRewardCampaignQueryKey(
+    campaignId,
+    adminRewardCampaignUpdateRequest,
+  )
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRewardCampaign>>> = ({
+    signal,
+  }) =>
+    updateAdminRewardCampaign(toValue(campaignId), toValue(adminRewardCampaignUpdateRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(campaignId) !== null && toValue(campaignId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCampaign>>, TError, TData>
+}
+
+export type UpdateAdminRewardCampaignQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminRewardCampaign>>
+>
+export type UpdateAdminRewardCampaignQueryError = ErrorType<unknown>
+
+export function useUpdateAdminRewardCampaign<
+  TData = Awaited<ReturnType<typeof updateAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCampaignUpdateRequest: MaybeRefOrGetter<AdminRewardCampaignUpdateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminRewardCampaignQueryOptions(
+    campaignId,
+    adminRewardCampaignUpdateRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getDeleteAdminRewardCampaignUrl = (campaignId: number) => {
+  return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}`
+}
+
+export const deleteAdminRewardCampaign = async (
+  campaignId: number,
+  adminRewardReasonRequest: AdminRewardReasonRequest,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getDeleteAdminRewardCampaignUrl(campaignId), {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRewardReasonRequest),
+  })
+}
+
+export const getDeleteAdminRewardCampaignQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest?: MaybeRefOrGetter<AdminRewardReasonRequest>,
+) => {
+  return ['DELETE', 'admin', 'rewards', 'campaigns', campaignId, adminRewardReasonRequest] as const
+}
+
+export const getDeleteAdminRewardCampaignQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest: MaybeRefOrGetter<AdminRewardReasonRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDeleteAdminRewardCampaignQueryKey(campaignId, adminRewardReasonRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminRewardCampaign>>> = ({
+    signal,
+  }) =>
+    deleteAdminRewardCampaign(toValue(campaignId), toValue(adminRewardReasonRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(campaignId) !== null && toValue(campaignId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCampaign>>, TError, TData>
+}
+
+export type DeleteAdminRewardCampaignQueryResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAdminRewardCampaign>>
+>
+export type DeleteAdminRewardCampaignQueryError = ErrorType<unknown>
+
+export function useDeleteAdminRewardCampaign<
+  TData = Awaited<ReturnType<typeof deleteAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest: MaybeRefOrGetter<AdminRewardReasonRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteAdminRewardCampaignQueryOptions(
+    campaignId,
+    adminRewardReasonRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getIssueAdminRewardPublicCodeUrl = (campaignId: number) => {
   return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/public-code`
 }
@@ -471,6 +666,306 @@ export function useActivateAdminRewardCampaign<
   const queryOptions = getActivateAdminRewardCampaignQueryOptions(
     campaignId,
     adminRewardReasonRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getPauseAdminRewardCampaignUrl = (campaignId: number) => {
+  return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/pause`
+}
+
+export const pauseAdminRewardCampaign = async (
+  campaignId: number,
+  adminRewardReasonRequest: AdminRewardReasonRequest,
+  options?: RequestInit,
+): Promise<ApiResponseRewardCampaign> => {
+  return orvalMutator<ApiResponseRewardCampaign>(getPauseAdminRewardCampaignUrl(campaignId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRewardReasonRequest),
+  })
+}
+
+export const getPauseAdminRewardCampaignQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest?: MaybeRefOrGetter<AdminRewardReasonRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'rewards',
+    'campaigns',
+    campaignId,
+    'pause',
+    adminRewardReasonRequest,
+  ] as const
+}
+
+export const getPauseAdminRewardCampaignQueryOptions = <
+  TData = Awaited<ReturnType<typeof pauseAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest: MaybeRefOrGetter<AdminRewardReasonRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof pauseAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getPauseAdminRewardCampaignQueryKey(campaignId, adminRewardReasonRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof pauseAdminRewardCampaign>>> = ({
+    signal,
+  }) =>
+    pauseAdminRewardCampaign(toValue(campaignId), toValue(adminRewardReasonRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(campaignId) !== null && toValue(campaignId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof pauseAdminRewardCampaign>>, TError, TData>
+}
+
+export type PauseAdminRewardCampaignQueryResult = NonNullable<
+  Awaited<ReturnType<typeof pauseAdminRewardCampaign>>
+>
+export type PauseAdminRewardCampaignQueryError = ErrorType<unknown>
+
+export function usePauseAdminRewardCampaign<
+  TData = Awaited<ReturnType<typeof pauseAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest: MaybeRefOrGetter<AdminRewardReasonRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof pauseAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getPauseAdminRewardCampaignQueryOptions(
+    campaignId,
+    adminRewardReasonRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getResumeAdminRewardCampaignUrl = (campaignId: number) => {
+  return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/resume`
+}
+
+export const resumeAdminRewardCampaign = async (
+  campaignId: number,
+  adminRewardReasonRequest: AdminRewardReasonRequest,
+  options?: RequestInit,
+): Promise<ApiResponseRewardCampaign> => {
+  return orvalMutator<ApiResponseRewardCampaign>(getResumeAdminRewardCampaignUrl(campaignId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRewardReasonRequest),
+  })
+}
+
+export const getResumeAdminRewardCampaignQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest?: MaybeRefOrGetter<AdminRewardReasonRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'rewards',
+    'campaigns',
+    campaignId,
+    'resume',
+    adminRewardReasonRequest,
+  ] as const
+}
+
+export const getResumeAdminRewardCampaignQueryOptions = <
+  TData = Awaited<ReturnType<typeof resumeAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest: MaybeRefOrGetter<AdminRewardReasonRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof resumeAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getResumeAdminRewardCampaignQueryKey(campaignId, adminRewardReasonRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof resumeAdminRewardCampaign>>> = ({
+    signal,
+  }) =>
+    resumeAdminRewardCampaign(toValue(campaignId), toValue(adminRewardReasonRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(campaignId) !== null && toValue(campaignId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof resumeAdminRewardCampaign>>, TError, TData>
+}
+
+export type ResumeAdminRewardCampaignQueryResult = NonNullable<
+  Awaited<ReturnType<typeof resumeAdminRewardCampaign>>
+>
+export type ResumeAdminRewardCampaignQueryError = ErrorType<unknown>
+
+export function useResumeAdminRewardCampaign<
+  TData = Awaited<ReturnType<typeof resumeAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardReasonRequest: MaybeRefOrGetter<AdminRewardReasonRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof resumeAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getResumeAdminRewardCampaignQueryOptions(
+    campaignId,
+    adminRewardReasonRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getCancelAdminRewardCampaignUrl = (campaignId: number) => {
+  return `/admin/rewards/campaigns/${encodeURIComponent(String(campaignId))}/cancel`
+}
+
+export const cancelAdminRewardCampaign = async (
+  campaignId: number,
+  adminRewardCampaignCancelRequest: AdminRewardCampaignCancelRequest,
+  options?: RequestInit,
+): Promise<ApiResponseRewardCampaign> => {
+  return orvalMutator<ApiResponseRewardCampaign>(getCancelAdminRewardCampaignUrl(campaignId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRewardCampaignCancelRequest),
+  })
+}
+
+export const getCancelAdminRewardCampaignQueryKey = (
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCampaignCancelRequest?: MaybeRefOrGetter<AdminRewardCampaignCancelRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'rewards',
+    'campaigns',
+    campaignId,
+    'cancel',
+    adminRewardCampaignCancelRequest,
+  ] as const
+}
+
+export const getCancelAdminRewardCampaignQueryOptions = <
+  TData = Awaited<ReturnType<typeof cancelAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCampaignCancelRequest: MaybeRefOrGetter<AdminRewardCampaignCancelRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof cancelAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCancelAdminRewardCampaignQueryKey(
+    campaignId,
+    adminRewardCampaignCancelRequest,
+  )
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof cancelAdminRewardCampaign>>> = ({
+    signal,
+  }) =>
+    cancelAdminRewardCampaign(toValue(campaignId), toValue(adminRewardCampaignCancelRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(campaignId) !== null && toValue(campaignId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof cancelAdminRewardCampaign>>, TError, TData>
+}
+
+export type CancelAdminRewardCampaignQueryResult = NonNullable<
+  Awaited<ReturnType<typeof cancelAdminRewardCampaign>>
+>
+export type CancelAdminRewardCampaignQueryError = ErrorType<unknown>
+
+export function useCancelAdminRewardCampaign<
+  TData = Awaited<ReturnType<typeof cancelAdminRewardCampaign>>,
+  TError = ErrorType<unknown>,
+>(
+  campaignId: MaybeRefOrGetter<number>,
+  adminRewardCampaignCancelRequest: MaybeRefOrGetter<AdminRewardCampaignCancelRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof cancelAdminRewardCampaign>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCancelAdminRewardCampaignQueryOptions(
+    campaignId,
+    adminRewardCampaignCancelRequest,
     options,
   )
 

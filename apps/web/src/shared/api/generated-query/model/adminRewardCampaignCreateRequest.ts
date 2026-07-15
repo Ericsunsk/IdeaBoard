@@ -21,5 +21,7 @@ export interface AdminRewardCampaignCreateRequest {
   credit_amount: number
   /** @minimum 1 */
   max_redemptions: number
+  starts_at?: string
+  expires_at?: string
   reason: AdminActionReason
 }

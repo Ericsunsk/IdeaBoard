@@ -9,5 +9,10 @@ export type RewardCampaignStatus = (typeof RewardCampaignStatus)[keyof typeof Re
 
 export const RewardCampaignStatus = {
   draft: 'draft',
+  cancelled: 'cancelled',
+  expired: 'expired',
+  exhausted: 'exhausted',
+  paused: 'paused',
+  scheduled: 'scheduled',
   active: 'active',
 } as const

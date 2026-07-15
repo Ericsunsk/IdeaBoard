@@ -20,6 +20,24 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 			{
 				Kind: dbprivileges.KindTable, Names: []string{"reward_campaigns"},
 				Required: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert,
+					dbprivileges.PrivilegeUpdate, dbprivileges.PrivilegeDelete,
+				},
+				Forbidden: []dbprivileges.Privilege{
+					dbprivileges.PrivilegeTruncate,
+					dbprivileges.PrivilegeReferences, dbprivileges.PrivilegeTrigger,
+				},
+				PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind:      dbprivileges.KindTable,
+				Names:     []string{"reward_redemptions", "reward_admin_actions"},
+				Required:  []dbprivileges.Privilege{dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert},
+				Forbidden: immutableAfterInsert, PublicForbidden: allTablePrivileges,
+			},
+			{
+				Kind: dbprivileges.KindTable, Names: []string{"reward_codes"},
+				Required: []dbprivileges.Privilege{
 					dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert, dbprivileges.PrivilegeUpdate,
 				},
 				Forbidden: []dbprivileges.Privilege{
@@ -27,12 +45,6 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 					dbprivileges.PrivilegeReferences, dbprivileges.PrivilegeTrigger,
 				},
 				PublicForbidden: allTablePrivileges,
-			},
-			{
-				Kind:      dbprivileges.KindTable,
-				Names:     []string{"reward_codes", "reward_redemptions", "reward_admin_actions"},
-				Required:  []dbprivileges.Privilege{dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert},
-				Forbidden: immutableAfterInsert, PublicForbidden: allTablePrivileges,
 			},
 			{
 				Kind: dbprivileges.KindSequence, NamePrefix: "reward_", Optional: true,
@@ -44,7 +56,11 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 				},
 			},
 			{
-				Kind: dbprivileges.KindFunction, Names: []string{"prevent_reward_admin_action_mutation()"},
+				Kind: dbprivileges.KindFunction, Names: []string{
+					"prevent_reward_admin_action_mutation()",
+					"guard_reward_campaign_rule_mutation()",
+					"guard_reward_code_mutation()",
+				},
 				Forbidden:       []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},
 				PublicForbidden: []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},
 			},

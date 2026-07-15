@@ -43,7 +43,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - 每个 Command 先取得 idempotency-key advisory transaction lock，再比较服务端 canonical SHA-256 request hash。相同 key/相同 hash 返回原结果；不同 hash 返回 conflict。
 - Task Hold 不使用 Credits-owned TTL 自动解冻；只有 Task terminal transition 能在同一 transaction 中 Capture 或 Release。
 - actor、source、reason 和 business reference 必填并写入不可变 Transaction。
-- Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin、关联原 Admin Grant/Deduction/Refund，并以原 Posting 的反向 Posting 追加记录；Capture 更正使用 linked Refund。
+- Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin，并以原 Posting 的反向 Posting 追加记录；允许关联原 Admin Grant/Deduction/Refund，或固定 `source=reward_redemption` 的 user-origin Grant，其他非 Admin-origin Grant 仍拒绝。Capture 更正使用 linked Refund。
 - frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction 被拒绝；仅 authenticated Admin 的 linked Refund/Correction 可写入 frozen Wallet，余额仍被冻结而不可消费。
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。

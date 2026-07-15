@@ -10,36 +10,58 @@ type CampaignMode string
 
 const CampaignModePublic CampaignMode = "public"
 
+type CampaignLifecycleStatus string
+
+const (
+	CampaignLifecycleDraft     CampaignLifecycleStatus = "draft"
+	CampaignLifecycleActive    CampaignLifecycleStatus = "active"
+	CampaignLifecyclePaused    CampaignLifecycleStatus = "paused"
+	CampaignLifecycleCancelled CampaignLifecycleStatus = "cancelled"
+)
+
 type CampaignStatus string
 
 const (
-	CampaignStatusDraft  CampaignStatus = "draft"
-	CampaignStatusActive CampaignStatus = "active"
+	CampaignStatusDraft     CampaignStatus = "draft"
+	CampaignStatusCancelled CampaignStatus = "cancelled"
+	CampaignStatusExpired   CampaignStatus = "expired"
+	CampaignStatusExhausted CampaignStatus = "exhausted"
+	CampaignStatusPaused    CampaignStatus = "paused"
+	CampaignStatusScheduled CampaignStatus = "scheduled"
+	CampaignStatusActive    CampaignStatus = "active"
 )
 
 var (
-	ErrInvalidCommand     = errors.New("invalid reward command")
-	ErrCampaignNotFound   = errors.New("reward campaign not found")
-	ErrCampaignNotDraft   = errors.New("reward campaign is not draft")
-	ErrPublicCodeExists   = errors.New("public reward code already exists")
-	ErrPublicCodeRequired = errors.New("public reward code is required")
-	ErrCodeUnavailable    = errors.New("reward code is invalid or unavailable")
-	ErrCampaignExhausted  = errors.New("reward campaign is exhausted")
-	ErrAlreadyRedeemed    = errors.New("reward campaign already redeemed")
+	ErrInvalidCommand      = errors.New("invalid reward command")
+	ErrCampaignNotFound    = errors.New("reward campaign not found")
+	ErrCampaignNotDraft    = errors.New("reward campaign is not draft")
+	ErrCampaignNotActive   = errors.New("reward campaign is not active")
+	ErrCampaignNotPaused   = errors.New("reward campaign is not paused")
+	ErrCampaignRulesFrozen = errors.New("reward campaign rules are frozen")
+	ErrCampaignNotEmpty    = errors.New("reward campaign is not an empty draft")
+	ErrCampaignExpired     = errors.New("reward campaign is expired")
+	ErrPublicCodeExists    = errors.New("public reward code already exists")
+	ErrPublicCodeRequired  = errors.New("public reward code is required")
+	ErrCodeUnavailable     = errors.New("reward code is invalid or unavailable")
+	ErrCampaignExhausted   = errors.New("reward campaign is exhausted")
+	ErrAlreadyRedeemed     = errors.New("reward campaign already redeemed")
 )
 
 type Campaign struct {
-	ID              int64          `json:"id"`
-	DisplayName     string         `json:"display_name"`
-	InternalNote    string         `json:"internal_note"`
-	CreditAmount    int64          `json:"credit_amount"`
-	Mode            CampaignMode   `json:"mode"`
-	Status          CampaignStatus `json:"status"`
-	MaxRedemptions  int64          `json:"max_redemptions"`
-	RedemptionCount int64          `json:"redemption_count"`
-	CreatedBy       int64          `json:"created_by"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID              int64                   `json:"id"`
+	DisplayName     string                  `json:"display_name"`
+	InternalNote    string                  `json:"internal_note"`
+	CreditAmount    int64                   `json:"credit_amount"`
+	Mode            CampaignMode            `json:"mode"`
+	LifecycleStatus CampaignLifecycleStatus `json:"lifecycle_status"`
+	Status          CampaignStatus          `json:"status"`
+	MaxRedemptions  int64                   `json:"max_redemptions"`
+	RedemptionCount int64                   `json:"redemption_count"`
+	StartsAt        *time.Time              `json:"starts_at,omitempty"`
+	ExpiresAt       *time.Time              `json:"expires_at,omitempty"`
+	CreatedBy       int64                   `json:"created_by"`
+	CreatedAt       time.Time               `json:"created_at"`
+	UpdatedAt       time.Time               `json:"updated_at"`
 }
 
 type RewardCode struct {
@@ -88,6 +110,8 @@ type CreateCampaignCommand struct {
 	InternalNote   string
 	CreditAmount   int64
 	MaxRedemptions int64
+	StartsAt       *time.Time
+	ExpiresAt      *time.Time
 	ActorUserID    int64
 	Reason         string
 }
@@ -99,9 +123,46 @@ type IssuePublicCodeCommand struct {
 	Reason      string
 }
 
+type UpdateCampaignCommand struct {
+	CampaignID     int64
+	DisplayName    string
+	InternalNote   string
+	CreditAmount   int64
+	MaxRedemptions int64
+	StartsAt       *time.Time
+	ExpiresAt      *time.Time
+	ActorUserID    int64
+	Reason         string
+}
+
 type ActivateCampaignCommand struct {
 	CampaignID  int64
 	ActorUserID int64
+	Reason      string
+}
+
+type PauseCampaignCommand struct {
+	CampaignID  int64
+	ActorUserID int64
+	Reason      string
+}
+
+type ResumeCampaignCommand struct {
+	CampaignID  int64
+	ActorUserID int64
+	Reason      string
+}
+
+type DeleteCampaignCommand struct {
+	CampaignID  int64
+	ActorUserID int64
+	Reason      string
+}
+
+type CancelCampaignCommand struct {
+	CampaignID  int64
+	ActorUserID int64
+	Confirmed   bool
 	Reason      string
 }
 
@@ -112,8 +173,13 @@ type RedeemCommand struct {
 
 type AdminCommands interface {
 	CreateCampaign(context.Context, CreateCampaignCommand) (Campaign, error)
+	UpdateCampaign(context.Context, UpdateCampaignCommand) (Campaign, error)
 	IssuePublicCode(context.Context, IssuePublicCodeCommand) (IssuedPublicCode, error)
 	ActivateCampaign(context.Context, ActivateCampaignCommand) (Campaign, error)
+	PauseCampaign(context.Context, PauseCampaignCommand) (Campaign, error)
+	ResumeCampaign(context.Context, ResumeCampaignCommand) (Campaign, error)
+	DeleteCampaign(context.Context, DeleteCampaignCommand) error
+	CancelCampaign(context.Context, CancelCampaignCommand) (Campaign, error)
 }
 
 type UserCommands interface {

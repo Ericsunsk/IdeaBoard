@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { RewardCampaignLifecycleStatus } from './rewardCampaignLifecycleStatus'
 import type { RewardCampaignMode } from './rewardCampaignMode'
 import type { RewardCampaignStatus } from './rewardCampaignStatus'
 
@@ -23,11 +24,14 @@ export interface RewardCampaign {
    */
   credit_amount: number
   mode: RewardCampaignMode
+  lifecycle_status: RewardCampaignLifecycleStatus
   status: RewardCampaignStatus
   /** @minimum 1 */
   max_redemptions: number
   /** @minimum 0 */
   redemption_count: number
+  starts_at?: string
+  expires_at?: string
   /** @minimum 1 */
   created_by: number
   created_at: string
