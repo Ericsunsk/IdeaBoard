@@ -365,20 +365,41 @@ func TestRuntimeOperationalSettingsMigrationDeclaresReversibleContract(t *testin
 	}
 }
 
-func TestBaselineMigrationMatchesSchemaSnapshot(t *testing.T) {
+func TestBaselineMigrationExcludesVersionedRewardsSchema(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260609000000_baseline.sql")
 	if err != nil {
 		t.Fatalf("read baseline migration failed: %v", err)
 	}
+	baseline := extractUpSQL(string(raw))
+	for _, tableName := range []string{
+		"reward_campaigns",
+		"reward_codes",
+		"reward_redemptions",
+		"reward_admin_actions",
+	} {
+		if strings.Contains(baseline, "CREATE TABLE "+tableName) {
+			t.Fatalf("baseline migration must not create versioned Rewards table %q", tableName)
+		}
+	}
+}
+
+func TestSchemaSnapshotIncludesRewardsPublicCampaignContract(t *testing.T) {
 	schemaRaw, err := os.ReadFile("../schema/schema.sql")
 	if err != nil {
 		t.Fatalf("read schema failed: %v", err)
 	}
-
-	baselineSchema := normalizeBaselineSchema(extractUpSQL(string(raw)))
 	schema := strings.TrimSpace(string(schemaRaw))
-	if baselineSchema != schema {
-		t.Fatalf("baseline migration drifted from schema snapshot")
+	for _, expected := range []string{
+		"CREATE TABLE reward_campaigns",
+		"CREATE TABLE reward_codes",
+		"CREATE TABLE reward_redemptions",
+		"CREATE TABLE reward_admin_actions",
+		"CREATE TRIGGER reward_admin_actions_append_only",
+		"CREATE TRIGGER set_reward_campaigns_updated_at",
+	} {
+		if !strings.Contains(schema, expected) {
+			t.Fatalf("schema snapshot missing Rewards public campaign contract: %s", expected)
+		}
 	}
 }
 
@@ -480,15 +501,15 @@ func TestBaselineMigrationWrapsFunctionBlocks(t *testing.T) {
 	}
 
 	up := extractUpSQL(string(raw))
-	if starts := strings.Count(up, "-- statement:begin"); starts != 10 {
-		t.Fatalf("baseline function block starts=%d, want 10", starts)
+	if starts := strings.Count(up, "-- statement:begin"); starts != 9 {
+		t.Fatalf("baseline function block starts=%d, want 9", starts)
 	}
-	if ends := strings.Count(up, "-- statement:end"); ends != 10 {
-		t.Fatalf("baseline function block ends=%d, want 10", ends)
+	if ends := strings.Count(up, "-- statement:end"); ends != 9 {
+		t.Fatalf("baseline function block ends=%d, want 9", ends)
 	}
 	functions := strings.Count(up, "CREATE OR REPLACE FUNCTION") + strings.Count(up, "CREATE FUNCTION")
-	if functions != 10 {
-		t.Fatalf("baseline functions=%d, want 10", functions)
+	if functions != 9 {
+		t.Fatalf("baseline functions=%d, want 9", functions)
 	}
 	if statements := parseSQLStatements(up); len(statements) < 50 {
 		t.Fatalf("baseline parse produced too few statements: %d", len(statements))
@@ -683,11 +704,13 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertIndexValid(t, ctx, conn, "idx_task_stat_events_feature_api_date")
 	assertIndexValid(t, ctx, conn, "idx_credit_transactions_capture_user_created")
 	assertIndexValid(t, ctx, conn, "idx_task_billing_snapshots_user_created")
+	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_status_id")
 	assertStorageProfileSeed(t, ctx, conn)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_provider_endpoint_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
 	assertTriggerExists(t, ctx, conn, "billing_admin_actions", "billing_admin_actions_append_only")
 	assertTriggerExists(t, ctx, conn, "system_settings_admin_actions", "system_settings_admin_actions_append_only")
+	assertTriggerExists(t, ctx, conn, "reward_admin_actions", "reward_admin_actions_append_only")
 	assertFunctionSearchPath(t, ctx, conn, "apply_credit_posting_balances()")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
 	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_provider_endpoint")
@@ -697,6 +720,65 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertConstraintExists(t, ctx, conn, "board_members", "fk_board_members_board")
 	assertConstraintExists(t, ctx, conn, "board_share_tokens", "fk_board_share_tokens_board")
 	assertConstraintExists(t, ctx, conn, "task_billing_snapshots", "task_billing_snapshot_display_name_check")
+	assertConstraintExists(t, ctx, conn, "reward_redemptions", "uq_reward_redemptions_user_campaign")
+}
+
+func TestRewardsPublicCampaignMigrationUpgradesExistingSchema(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if _, err := conn.ExecContext(ctx, `
+CREATE TABLE schema_migrations (
+  version BIGINT NOT NULL PRIMARY KEY,
+  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
+)`); err != nil {
+		t.Fatal(err)
+	}
+
+	const target = "20260715010000_rewards_public_campaign.sql"
+	files, err := fs.Glob(migrationFS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		if file == target {
+			break
+		}
+		raw, err := migrationFS.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		version, err := migrationVersion(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
+			t.Fatalf("apply prerequisite migration %s: %v", file, err)
+		}
+	}
+
+	assertTableExists(t, ctx, conn, "reward_campaigns", false)
+	assertTableExists(t, ctx, conn, "reward_codes", false)
+	assertTableExists(t, ctx, conn, "reward_redemptions", false)
+	assertTableExists(t, ctx, conn, "reward_admin_actions", false)
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("upgrade existing schema with Rewards migration: %v", err)
+	}
+
+	assertMigrationApplied(t, ctx, conn, 20260715010000, true)
+	for _, tableName := range []string{
+		"reward_campaigns",
+		"reward_codes",
+		"reward_redemptions",
+		"reward_admin_actions",
+	} {
+		assertTableExists(t, ctx, conn, tableName, true)
+	}
+	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_status_id")
+	assertTriggerExists(t, ctx, conn, "reward_admin_actions", "reward_admin_actions_append_only")
+	assertConstraintExists(t, ctx, conn, "reward_redemptions", "uq_reward_redemptions_user_campaign")
 }
 
 func TestTaskBillingSnapshotDisplayNameMigrationBackfillsExistingRows(t *testing.T) {
