@@ -2,8 +2,11 @@ package migrations
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"embed"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -21,6 +24,7 @@ const migrationNoTxStatementTimeout = "2h"
 const statementNoTx = "-- statement:no-tx"
 const statementIndexNamePrefix = "-- statement:index-name="
 const baselineMigrationVersion int64 = 20260609000000
+const migrationLockNamespace = "ideaboard:migrations:v1"
 
 var baselineBusinessTableNames = map[string]struct{}{
 	"api_account_models":              {},
@@ -75,8 +79,8 @@ func Up(ctx context.Context, db *sql.DB) (err error) {
 		return fmt.Errorf("open migration connection: %w", err)
 	}
 	defer func() {
-		if closeErr := conn.Close(); err == nil && closeErr != nil {
-			err = closeErr
+		if closeErr := conn.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close migration connection: %w", closeErr))
 		}
 	}()
 
@@ -87,8 +91,8 @@ func Up(ctx context.Context, db *sql.DB) (err error) {
 	defer func() {
 		releaseCtx, cancel := context.WithTimeout(context.Background(), migrationLockReleaseTimeout)
 		defer cancel()
-		if releaseErr := release(releaseCtx); err == nil && releaseErr != nil {
-			err = releaseErr
+		if releaseErr := release(releaseCtx); releaseErr != nil {
+			err = errors.Join(err, releaseErr)
 		}
 	}()
 
@@ -581,25 +585,28 @@ func resetNoTxStatementTimeouts(ctx context.Context, conn *sql.Conn, file string
 
 func acquireMigrationLock(ctx context.Context, conn *sql.Conn) (func(context.Context) error, error) {
 	const (
-		lockKey           int64 = 7341278127769961450
-		lockTimeout             = 30 * time.Second
-		lockRetryInterval       = 250 * time.Millisecond
+		lockTimeout       = 30 * time.Second
+		lockRetryInterval = 250 * time.Millisecond
 	)
 	if conn == nil {
 		return nil, fmt.Errorf("migration lock connection is nil")
+	}
+	scope, err := resolveMigrationLockScope(ctx, conn)
+	if err != nil {
+		return nil, err
 	}
 
 	deadline := time.Now().Add(lockTimeout)
 	for {
 		var locked bool
-		if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, lockKey).Scan(&locked); err != nil {
-			return nil, fmt.Errorf("acquire migration lock: %w", err)
+		if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, scope.key).Scan(&locked); err != nil {
+			return nil, fmt.Errorf("acquire migration lock (%s): %w", scope, err)
 		}
 		if locked {
 			break
 		}
 		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("acquire migration lock: lock %d is busy", lockKey)
+			return nil, fmt.Errorf("acquire migration lock (%s): lock is busy", scope)
 		}
 		sleep := lockRetryInterval
 		if remaining := time.Until(deadline); remaining < sleep {
@@ -609,20 +616,47 @@ func acquireMigrationLock(ctx context.Context, conn *sql.Conn) (func(context.Con
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return nil, fmt.Errorf("acquire migration lock: %w", ctx.Err())
+			return nil, fmt.Errorf("acquire migration lock (%s): %w", scope, ctx.Err())
 		case <-timer.C:
 		}
 	}
 	return func(ctx context.Context) error {
 		var released bool
-		if err := conn.QueryRowContext(ctx, `SELECT pg_advisory_unlock($1)`, lockKey).Scan(&released); err != nil {
-			return fmt.Errorf("release migration lock: %w", err)
+		if err := conn.QueryRowContext(ctx, `SELECT pg_advisory_unlock($1)`, scope.key).Scan(&released); err != nil {
+			return fmt.Errorf("release migration lock (%s): %w", scope, err)
 		}
 		if !released {
-			return fmt.Errorf("release migration lock: lock %d was not held", lockKey)
+			return fmt.Errorf("release migration lock (%s): lock was not held", scope)
 		}
 		return nil
 	}, nil
+}
+
+type migrationLockScope struct {
+	database string
+	schema   string
+	key      int64
+}
+
+func (s migrationLockScope) String() string {
+	return fmt.Sprintf("database=%q schema=%q key=%d", s.database, s.schema, s.key)
+}
+
+func resolveMigrationLockScope(ctx context.Context, conn *sql.Conn) (migrationLockScope, error) {
+	var scope migrationLockScope
+	if err := conn.QueryRowContext(ctx, `SELECT current_database(), current_schema()`).Scan(&scope.database, &scope.schema); err != nil {
+		return migrationLockScope{}, fmt.Errorf("resolve migration lock scope (database=unknown schema=unknown key=unknown): %w", err)
+	}
+	if scope.database == "" || scope.schema == "" {
+		return migrationLockScope{}, fmt.Errorf("resolve migration lock scope (database=%q schema=%q key=unknown): database and schema are required", scope.database, scope.schema)
+	}
+	scope.key = deriveMigrationLockKey(scope.database, scope.schema)
+	return scope, nil
+}
+
+func deriveMigrationLockKey(database, schema string) int64 {
+	digest := sha256.Sum256([]byte(migrationLockNamespace + "\x00" + database + "\x00" + schema))
+	return int64(binary.BigEndian.Uint64(digest[:8]))
 }
 
 func migrationVersion(file string) (int64, error) {

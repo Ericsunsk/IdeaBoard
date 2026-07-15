@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -564,6 +565,77 @@ func TestUsageIndexesHaveSingleMigrationOwner(t *testing.T) {
 	}
 }
 
+func TestMigrationLocksAreScopedPerSchema(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	firstConn := openIsolatedMigrationConn(t, ctx)
+	secondConn := openIsolatedMigrationConn(t, ctx)
+
+	firstRelease, err := acquireMigrationLock(ctx, firstConn)
+	if err != nil {
+		t.Fatalf("acquire first migration lock: %v", err)
+	}
+	defer func() {
+		releaseCtx, cancel := context.WithTimeout(context.Background(), migrationLockReleaseTimeout)
+		defer cancel()
+		if err := firstRelease(releaseCtx); err != nil {
+			t.Fatalf("release first migration lock: %v", err)
+		}
+	}()
+
+	secondLockCtx, cancelSecondLock := context.WithTimeout(ctx, time.Second)
+	defer cancelSecondLock()
+	secondRelease, err := acquireMigrationLock(secondLockCtx, secondConn)
+	if err != nil {
+		t.Fatalf("different schema migration lock should not block: %v", err)
+	}
+	releaseCtx, cancelRelease := context.WithTimeout(context.Background(), migrationLockReleaseTimeout)
+	defer cancelRelease()
+	if err := secondRelease(releaseCtx); err != nil {
+		t.Fatalf("release second migration lock: %v", err)
+	}
+}
+
+func TestMigrationLocksSerializeSameSchema(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	db, quotedSchema := openIsolatedMigrationDB(t, ctx)
+	db.SetMaxOpenConns(2)
+	firstConn := openMigrationConnInSchema(t, ctx, db, quotedSchema)
+	secondConn := openMigrationConnInSchema(t, ctx, db, quotedSchema)
+
+	firstRelease, err := acquireMigrationLock(ctx, firstConn)
+	if err != nil {
+		t.Fatalf("acquire first migration lock: %v", err)
+	}
+	defer func() {
+		releaseCtx, cancel := context.WithTimeout(context.Background(), migrationLockReleaseTimeout)
+		defer cancel()
+		if err := firstRelease(releaseCtx); err != nil {
+			t.Fatalf("release first migration lock: %v", err)
+		}
+	}()
+
+	secondLockCtx, cancelSecondLock := context.WithTimeout(ctx, 750*time.Millisecond)
+	defer cancelSecondLock()
+	if _, err := acquireMigrationLock(secondLockCtx, secondConn); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("same schema migration lock error = %v, want context deadline exceeded", err)
+	}
+}
+
+func TestDeriveMigrationLockKeyIsStableAndScoped(t *testing.T) {
+	key := deriveMigrationLockKey("ideaboard", "public")
+	if key != deriveMigrationLockKey("ideaboard", "public") {
+		t.Fatal("same database and schema must derive the same migration lock key")
+	}
+	if key == deriveMigrationLockKey("ideaboard", "tenant") {
+		t.Fatal("different schemas must derive different migration lock keys")
+	}
+	if key == deriveMigrationLockKey("ideaboard_test", "public") {
+		t.Fatal("different databases must derive different migration lock keys")
+	}
+}
+
 func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -1072,6 +1144,21 @@ func openIsolatedMigrationDB(t *testing.T, ctx context.Context) (*sql.DB, string
 		t.Fatalf("set isolated migration search_path failed: %v", err)
 	}
 	return db, quotedSchema
+}
+
+func openMigrationConnInSchema(t *testing.T, ctx context.Context, db *sql.DB, quotedSchema string) *sql.Conn {
+	t.Helper()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("open migration connection failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = conn.Close()
+	})
+	if _, err := conn.ExecContext(ctx, `SET search_path TO `+quotedSchema+`, public`); err != nil {
+		t.Fatalf("set migration connection search_path failed: %v", err)
+	}
+	return conn
 }
 
 func embeddedMigrationCount(t *testing.T) int {
