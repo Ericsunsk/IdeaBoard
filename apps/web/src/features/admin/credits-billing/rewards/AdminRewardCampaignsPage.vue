@@ -253,6 +253,11 @@ import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminTo
 import AdminActionReasonDialog from '../AdminActionReasonDialog.vue'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
 import RewardCampaignSettingsFields from './RewardCampaignSettingsFields.vue'
+import {
+  getRewardCampaignActionDescriptor,
+  type RewardCampaignActionResult,
+  type RewardCampaignAuditedAction,
+} from './rewardCampaignActions'
 import { createRewardCampaignView } from './rewardCampaignPresentation'
 import {
   createAdminRewardCampaignResource,
@@ -261,8 +266,6 @@ import {
   type UpdateRewardCampaignInput,
 } from './rewardCampaignResource'
 import { isoToShanghaiDateTimeInput } from './rewardCampaignTime'
-
-type AuditedAction = 'issue' | 'activate' | 'pause' | 'resume' | 'cancel' | 'delete'
 
 const resource = createAdminRewardCampaignResource()
 const toast = useAdminToast()
@@ -274,7 +277,7 @@ const loadError = ref(false)
 const saving = ref(false)
 const issuedPlaintext = ref('')
 const publicCode = ref('')
-const pendingAction = ref<AuditedAction | null>(null)
+const pendingAction = ref<RewardCampaignAuditedAction | null>(null)
 const actionDialogVisible = ref(false)
 const editReasonError = ref('')
 
@@ -300,7 +303,11 @@ const canUpdate = computed(
     edit.maxRedemptions > 0 &&
     !editScheduleError.value,
 )
-const actionDialog = computed(() => actionDialogCopy(pendingAction.value, selected.value))
+const actionDialog = computed(() =>
+  getRewardCampaignActionDescriptor(pendingAction.value ?? 'activate').dialog(
+    selected.value?.displayName || '当前活动',
+  ),
+)
 
 onMounted(loadCampaigns)
 
@@ -382,7 +389,7 @@ function requestUpdate() {
   })
 }
 
-function requestAuditedAction(action: AuditedAction) {
+function requestAuditedAction(action: RewardCampaignAuditedAction) {
   if (!selected.value || saving.value) return
   if (action === 'issue' && !publicCode.value.trim()) {
     toast.error('请输入公共兑换码')
@@ -396,48 +403,42 @@ async function confirmAuditedAction(reason: string) {
   if (!selected.value || !pendingAction.value) return
   const action = pendingAction.value
   const campaign = selected.value
+  const descriptor = getRewardCampaignActionDescriptor(action)
   const succeeded = await runCommand(
     async () => {
-      switch (action) {
-        case 'issue': {
-          const issued = await resource.issuePublicCode(campaign.id, {
-            code: publicCode.value,
-            reason,
-          })
-          issuedPlaintext.value = issued.plaintext
-          toast.success('公共兑换码已发行')
-          break
-        }
-        case 'activate':
-          replaceCampaign(await resource.activate(campaign.id, reason))
-          toast.success('奖励活动已激活')
-          break
-        case 'pause':
-          replaceCampaign(await resource.pause(campaign.id, reason))
-          toast.success('奖励活动已暂停')
-          break
-        case 'resume':
-          replaceCampaign(await resource.resume(campaign.id, reason))
-          toast.success('奖励活动已恢复')
-          break
-        case 'cancel':
-          replaceCampaign(await resource.cancel(campaign.id, reason))
-          toast.success('奖励活动已取消')
-          break
-        case 'delete':
-          await resource.delete(campaign.id, reason)
-          campaigns.value = campaigns.value.filter((item) => item.id !== campaign.id)
-          selected.value = null
-          toast.success('空 Draft 已删除')
-          break
-      }
+      const result = await descriptor.execute({
+        resource,
+        campaign,
+        reason,
+        publicCode: publicCode.value,
+      })
+      applyAuditedActionResult(campaign, result)
+      toast.success(descriptor.successMessage)
     },
-    actionErrorFallback(action),
+    descriptor.errorFallback,
     action,
   )
   if (succeeded) {
     pendingAction.value = null
     actionDialogVisible.value = false
+  }
+}
+
+function applyAuditedActionResult(
+  campaign: RewardCampaign,
+  result: RewardCampaignActionResult,
+) {
+  switch (result.type) {
+    case 'campaign':
+      replaceCampaign(result.campaign)
+      break
+    case 'issued':
+      issuedPlaintext.value = result.plaintext
+      break
+    case 'deleted':
+      campaigns.value = campaigns.value.filter((item) => item.id !== campaign.id)
+      selected.value = null
+      break
   }
 }
 
@@ -450,7 +451,7 @@ function replaceCampaign(campaign: RewardCampaign) {
 async function runCommand(
   command: () => Promise<void>,
   fallback: string,
-  action?: AuditedAction | 'update',
+  action?: RewardCampaignAuditedAction | 'update',
 ) {
   if (saving.value) return false
   saving.value = true
@@ -482,60 +483,6 @@ async function runCommand(
 
 function scheduleError(startsAt: string, expiresAt: string) {
   return startsAt && expiresAt && startsAt >= expiresAt ? '结束时间必须晚于开始时间' : ''
-}
-
-function actionErrorFallback(action: AuditedAction) {
-  return {
-    issue: '发行公共兑换码失败',
-    activate: '激活奖励活动失败',
-    pause: '暂停奖励活动失败',
-    resume: '恢复奖励活动失败',
-    cancel: '取消奖励活动失败',
-    delete: '删除奖励活动失败',
-  }[action]
-}
-
-function actionDialogCopy(action: AuditedAction | null, campaign: RewardCampaign | null) {
-  const name = campaign?.displayName || '当前活动'
-  const definitions = {
-    issue: {
-      title: '确认发行公共兑换码',
-      message: `发行后“${name}”的核心规则将被冻结。`,
-      confirmLabel: '确认发行',
-      intent: 'warn' as const,
-    },
-    activate: {
-      title: '确认激活奖励活动',
-      message: `将激活“${name}”。`,
-      confirmLabel: '确认激活',
-      intent: 'warn' as const,
-    },
-    pause: {
-      title: '确认暂停奖励活动',
-      message: `暂停“${name}”后，新的兑换请求将被拒绝。`,
-      confirmLabel: '确认暂停',
-      intent: 'warn' as const,
-    },
-    resume: {
-      title: '确认恢复奖励活动',
-      message: `将恢复“${name}”的兑换能力。`,
-      confirmLabel: '确认恢复',
-      intent: 'warn' as const,
-    },
-    cancel: {
-      title: '确认取消奖励活动',
-      message: `取消“${name}”不可恢复，所有未兑换 Code 将被撤销。`,
-      confirmLabel: '确认取消',
-      intent: 'danger' as const,
-    },
-    delete: {
-      title: '确认删除空 Draft',
-      message: `仅未发行 Code 的空 Draft 可删除。将删除“${name}”。`,
-      confirmLabel: '确认删除',
-      intent: 'danger' as const,
-    },
-  }
-  return definitions[action || 'activate']
 }
 
 type CreateRewardCampaignForm = UpdateRewardCampaignInput

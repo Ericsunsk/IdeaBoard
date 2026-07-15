@@ -530,9 +530,6 @@ FOR UPDATE`, codeID, campaign.ID).Scan(&lockedCodeID, &revokedAt)
 		if redemption.CodeID != codeID {
 			return RedeemResult{}, ErrAlreadyRedeemed
 		}
-		if s.credits == nil {
-			return RedeemResult{}, fmt.Errorf("rewards credit service unavailable")
-		}
 		if err := tx.Rollback(ctx); err != nil {
 			return RedeemResult{}, fmt.Errorf("release reward replay locks: %w", err)
 		}
@@ -572,9 +569,6 @@ WHERE id = $1 AND status = 'active' AND redemption_count < max_redemptions`, cam
 	}
 	if !reserved {
 		return RedeemResult{}, ErrCampaignExhausted
-	}
-	if s.credits == nil {
-		return RedeemResult{}, fmt.Errorf("rewards credit service unavailable")
 	}
 	amount, err := credits.NewCreditAmount(campaign.CreditAmount)
 	if err != nil {
