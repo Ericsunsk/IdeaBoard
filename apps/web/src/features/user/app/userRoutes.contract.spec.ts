@@ -6,14 +6,10 @@ import { userRoutes } from './userRoutes'
 const routeComponents = vi.hoisted(() => ({
   layout: { name: 'UserLayoutRouteTarget' },
   home: { name: 'UserHomeRouteTarget' },
-  boards: { name: 'UserBoardsRouteTarget' },
-  canvas: { name: 'UserCanvasRouteTarget' },
 }))
 
 vi.mock('../layout/UserLayout.vue', () => ({ default: routeComponents.layout }))
 vi.mock('../../canvas/pages/CanvasLandingPage.vue', () => ({ default: routeComponents.home }))
-vi.mock('../../board-catalog/pages/BoardsPage.vue', () => ({ default: routeComponents.boards }))
-vi.mock('../../canvas/pages/CanvasPage.vue', () => ({ default: routeComponents.canvas }))
 
 type LazyRouteModule = {
   default: Component
@@ -75,7 +71,7 @@ describe('userRoutes contract', () => {
     expect(loadedHome).toBe(routeComponents.home)
     expect(loadedLogin).toBe(routeComponents.home)
     expect(loadedRegister).toBe(routeComponents.home)
-    expect(loadedBoards).toBe(routeComponents.boards)
-    expect(loadedCanvas).toBe(routeComponents.canvas)
-  })
+    expect((loadedBoards as Component & { __name?: string }).__name).toBe('BoardsPage')
+    expect((loadedCanvas as Component & { __name?: string }).__name).toBe('CanvasPage')
+  }, 15_000)
 })

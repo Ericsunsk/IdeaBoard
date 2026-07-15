@@ -18,9 +18,12 @@ import {
 } from './boardSync'
 import { deleteCanvasBoardState, duplicateCanvasBoardState } from '../persistence'
 
+export type CanvasBoardScopeChangedResult = { ok: false; reason: 'scope-changed' }
+
 export type CanvasBoardCreateResult =
   | { ok: true; board: CanvasBoardMeta }
   | { ok: false; reason: 'name-conflict' | 'sync-failed'; board: CanvasBoardMeta; error: unknown }
+  | CanvasBoardScopeChangedResult
 
 export type CanvasBoardRenameResult =
   | { ok: true; board: CanvasBoardMeta }
@@ -31,6 +34,7 @@ export type CanvasBoardRenameResult =
       boardId: string
       error: unknown
     }
+  | CanvasBoardScopeChangedResult
 
 export type CanvasBoardRenameRemoteResult =
   | { ok: true; board: CanvasBoardMeta }
@@ -51,20 +55,24 @@ export type CanvasBoardOptimisticRenameResult =
       confirm: () => Promise<CanvasBoardRenameRemoteResult>
     }
   | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
+  | CanvasBoardScopeChangedResult
 
 export type CanvasBoardRollbackRenameResult =
   | { ok: true; board: CanvasBoardMeta }
   | { ok: false; reason: 'local-name-conflict' | 'invalid-name'; error?: undefined }
+  | CanvasBoardScopeChangedResult
 
 export type CanvasBoardDuplicateResult =
   | { ok: true; board: CanvasBoardMeta }
   | { ok: false; reason: 'source-missing'; error?: undefined }
   | { ok: false; reason: 'name-conflict' | 'sync-failed'; board: CanvasBoardMeta; error: unknown }
+  | CanvasBoardScopeChangedResult
 
 export type CanvasBoardDeleteResult =
   | { ok: true; remoteWasMissing: boolean }
   | { ok: false; reason: 'sync-failed'; error: unknown }
   | { ok: false; reason: 'local-missing'; error?: undefined }
+  | CanvasBoardScopeChangedResult
 
 export interface CanvasBoardCommandDependencies {
   createBoard(name?: string): CanvasBoardMeta
@@ -83,6 +91,7 @@ export interface CanvasBoardCommandDependencies {
   isNameConflictError(error: unknown): boolean
   isNotFoundError(error: unknown): boolean
   clearSyncRollback(boardId: string): void
+  isMutationCurrent(): boolean
 }
 
 export interface CanvasBoardCommands {
@@ -112,6 +121,7 @@ const defaultDependencies: CanvasBoardCommandDependencies = {
   isNameConflictError: isBoardNameConflictError,
   isNotFoundError: isBoardNotFoundError,
   clearSyncRollback: clearPendingBoardSyncRollback,
+  isMutationCurrent: () => true,
 }
 
 export function createCanvasBoardCommands(
@@ -144,6 +154,7 @@ export function createCanvasBoardCommands(
     boardId: string
     nextName: string
   }): CanvasBoardOptimisticRenameResult {
+    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
     if (deps.isNameTaken(nextName, boardId)) {
       return { ok: false, reason: 'local-name-conflict' }
     }
@@ -172,6 +183,7 @@ export function createCanvasBoardCommands(
     boardId: string
     previousName: string
   }): CanvasBoardRollbackRenameResult {
+    if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
     if (deps.isNameTaken(previousName, boardId)) {
       return { ok: false, reason: 'local-name-conflict' }
     }
@@ -188,8 +200,10 @@ export function createCanvasBoardCommands(
       const board = deps.createBoard(input.name || 'Untitled')
       try {
         await deps.syncBoard(board.id)
+        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
         return { ok: true, board }
       } catch (error) {
+        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
         deps.deleteBoard(board.id)
         deps.deleteBoardState(board.id)
         if (deps.isNameConflictError(error)) {
@@ -204,6 +218,7 @@ export function createCanvasBoardCommands(
       const optimistic = renameOptimistic({ boardId, nextName })
       if (!optimistic.ok) return optimistic
       const remote = await optimistic.confirm()
+      if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
       if (remote.ok) return { ok: true, board: remote.board }
       {
         const isConflict = remote.reason === 'remote-name-conflict'
@@ -231,8 +246,10 @@ export function createCanvasBoardCommands(
       deps.duplicateBoardState(sourceBoardId, copy.id)
       try {
         await deps.syncBoard(copy.id)
+        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
         return { ok: true, board: copy }
       } catch (error) {
+        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
         deps.deleteBoard(copy.id)
         deps.deleteBoardState(copy.id)
         if (deps.isNameConflictError(error)) {
@@ -248,11 +265,14 @@ export function createCanvasBoardCommands(
       try {
         await deps.syncDeleteBoard(boardId)
       } catch (error) {
+        if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
         if (!deps.isNotFoundError(error)) {
           return { ok: false, reason: 'sync-failed', error }
         }
         remoteWasMissing = true
       }
+
+      if (!deps.isMutationCurrent()) return { ok: false, reason: 'scope-changed' }
 
       const deleted = deps.deleteBoard(boardId)
       if (!deleted) {

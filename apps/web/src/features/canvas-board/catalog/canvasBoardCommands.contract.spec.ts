@@ -38,6 +38,7 @@ function makeDeps(): CanvasBoardCommandDependencies {
       return typeof error === 'object' && !!error && 'status' in error && error.status === 404
     }),
     clearSyncRollback: vi.fn(),
+    isMutationCurrent: vi.fn(() => true),
   }
 }
 

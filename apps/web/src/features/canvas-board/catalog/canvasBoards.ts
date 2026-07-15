@@ -9,6 +9,11 @@ export interface CanvasBoardMeta {
 
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
 const MAX_BOARD_NAME_LEN = 60
+const boardChangeListeners = new Set<() => void>()
+
+export function publishCanvasBoardCatalogChange() {
+  boardChangeListeners.forEach((listener) => listener())
+}
 
 function readStorageValue(key: string): string | null {
   if (typeof window === 'undefined') return null
@@ -68,6 +73,11 @@ function writeRawBoards(boards: CanvasBoardMeta[]) {
   localStorage.setItem(scopedKey, JSON.stringify(boards))
 }
 
+export function subscribeCanvasBoardChanges(listener: () => void): () => void {
+  boardChangeListeners.add(listener)
+  return () => boardChangeListeners.delete(listener)
+}
+
 function compareByRecentDesc(a: CanvasBoardMeta, b: CanvasBoardMeta): number {
   return b.updatedAt - a.updatedAt
 }
@@ -76,12 +86,16 @@ export function listCanvasBoards(): CanvasBoardMeta[] {
   return readRawBoards().sort(compareByRecentDesc)
 }
 
-export function replaceCanvasBoards(boards: CanvasBoardMeta[]) {
+export function replaceCanvasBoards(
+  boards: CanvasBoardMeta[],
+  options: { publish?: boolean } = {},
+) {
   const normalized = boards
     .map(toValidBoardMeta)
     .filter((item): item is CanvasBoardMeta => !!item)
     .sort(compareByRecentDesc)
   writeRawBoards(normalized)
+  if (options.publish !== false) publishCanvasBoardCatalogChange()
 }
 
 export function getCanvasBoardById(boardId: string): CanvasBoardMeta | null {
@@ -138,6 +152,7 @@ export function createCanvasBoard(name = 'Untitled'): CanvasBoardMeta {
   }
   boards.unshift(board)
   writeRawBoards(boards)
+  publishCanvasBoardCatalogChange()
   return board
 }
 
@@ -152,6 +167,7 @@ export function renameCanvasBoard(boardId: string, nextName: string): CanvasBoar
   target.name = name
   target.updatedAt = Date.now()
   writeRawBoards(boards)
+  publishCanvasBoardCatalogChange()
   return target
 }
 
@@ -163,6 +179,7 @@ export function touchCanvasBoard(boardId: string): CanvasBoardMeta | null {
   if (!target) return null
   target.updatedAt = Date.now()
   writeRawBoards(boards)
+  publishCanvasBoardCatalogChange()
   return target
 }
 
@@ -173,6 +190,7 @@ export function deleteCanvasBoard(boardId: string): boolean {
   const nextBoards = boards.filter((board) => board.id !== id)
   if (nextBoards.length === boards.length) return false
   writeRawBoards(nextBoards)
+  publishCanvasBoardCatalogChange()
   return true
 }
 
@@ -191,5 +209,6 @@ export function duplicateCanvasBoard(boardId: string): CanvasBoardMeta | null {
   }
   boards.unshift(copy)
   writeRawBoards(boards)
+  publishCanvasBoardCatalogChange()
   return copy
 }

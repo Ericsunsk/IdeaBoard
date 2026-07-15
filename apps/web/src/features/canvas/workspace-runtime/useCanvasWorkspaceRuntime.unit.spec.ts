@@ -22,18 +22,17 @@ function createRuntimeParts() {
       isBoardMenuOpen: ref(false),
       isRenamingBoard: ref(false),
       boardNameDraft: ref('Board A'),
-      boardRenameRecovery: ref({ status: 'idle' as const }),
+      isRenamePending: ref(false),
+      catalogRecovery: ref({ status: 'idle' as const }),
       currentBoardName: ref('Board A'),
       boardOptions: ref([]),
       setBoardNameInputRef: vi.fn(),
-      refreshBoardMetas: vi.fn(),
       toggleBoardMenu: vi.fn(),
       startBoardRename: vi.fn(),
       cancelBoardRename: vi.fn(),
       closeBoardHeaderEditing: vi.fn(),
       onConfirmBoardRename: vi.fn(),
-      retryBoardRename: vi.fn(),
-      rollbackBoardRename: vi.fn(),
+      reloadCatalog: vi.fn(),
       onSelectBoard: vi.fn(),
       onNavigateRequest: vi.fn(),
       onLogoutRequest: vi.fn(),
@@ -185,14 +184,14 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     expect(workspace.commands.boardSession.onNavigateRequest).toBe(
       runtimeParts.boardChrome.onNavigateRequest,
     )
-    expect(workspace.viewModel.boardChrome.boardRenameRecovery).toBe(
-      runtimeParts.boardChrome.boardRenameRecovery,
+    expect(workspace.viewModel.boardChrome.catalogRecovery).toBe(
+      runtimeParts.boardChrome.catalogRecovery,
     )
-    expect(workspace.commands.boardSession.retryBoardRename).toBe(
-      runtimeParts.boardChrome.retryBoardRename,
+    expect(workspace.viewModel.boardChrome.isRenamePending).toBe(
+      runtimeParts.boardChrome.isRenamePending,
     )
-    expect(workspace.commands.boardSession.rollbackBoardRename).toBe(
-      runtimeParts.boardChrome.rollbackBoardRename,
+    expect(workspace.commands.boardSession.reloadCatalog).toBe(
+      runtimeParts.boardChrome.reloadCatalog,
     )
     expect(workspace.viewModel.persistence).toEqual({
       history: runtimeParts.persistence.history,

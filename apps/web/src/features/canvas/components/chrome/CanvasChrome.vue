@@ -21,10 +21,13 @@
             :ref="bindBoardNameInputRef"
             class="m-0 w-full max-w-none cursor-text overflow-hidden truncate p-0 text-[15px] leading-[1.2] font-normal text-[var(--canvas-text-strong)] outline-none"
             :class="{ 'text-clip': board.isRenaming }"
-            :contenteditable="board.isRenaming ? 'plaintext-only' : 'false'"
+            :contenteditable="
+              board.isRenaming && !board.isRenamePending ? 'plaintext-only' : 'false'
+            "
             role="textbox"
             aria-label="画布名称"
-            :aria-readonly="!board.isRenaming"
+            :aria-readonly="!board.isRenaming || board.isRenamePending"
+            :aria-busy="board.isRenamePending"
             spellcheck="false"
             title="点击重命名画布"
             @click.stop="emit('start-board-rename')"
@@ -79,49 +82,31 @@
           </Transition>
         </div>
       </div>
-
-      <Transition name="canvas-chrome-board-recovery">
-        <div
-          v-if="board.renameRecovery.status !== 'idle'"
-          class="canvas-chrome-board-recovery"
-          :class="`is-${board.renameRecovery.status}`"
-          aria-live="polite"
-          @mousedown.stop
-          @click.stop
+      <div v-if="board.isRenamePending" class="canvas-chrome-catalog-recovery" aria-live="polite">
+        <span class="canvas-chrome-catalog-recovery-label">名称同步中</span>
+      </div>
+      <div
+        v-if="board.catalogRecovery.status !== 'idle'"
+        class="canvas-chrome-catalog-recovery"
+        aria-live="polite"
+      >
+        <span class="canvas-chrome-catalog-recovery-label">
+          {{
+            board.catalogRecovery.status === 'reloading'
+              ? '正在重新加载画布列表'
+              : '画布列表需要重新加载'
+          }}
+        </span>
+        <button
+          type="button"
+          class="canvas-chrome-catalog-recovery-action"
+          aria-label="重新加载画布列表"
+          :disabled="board.catalogRecovery.status === 'reloading'"
+          @click="emit('reload-board-catalog')"
         >
-          <span class="canvas-chrome-board-recovery-label">
-            {{ boardRenameRecoveryLabel }}
-          </span>
-          <div v-if="boardRenameRecoveryHasActions" class="canvas-chrome-board-recovery-actions">
-            <button
-              v-if="board.renameRecovery.status === 'failed'"
-              type="button"
-              class="canvas-chrome-board-recovery-action"
-              aria-label="重试画布重命名同步"
-              @click="emit('retry-board-rename')"
-            >
-              重试
-            </button>
-            <button
-              v-if="board.renameRecovery.status === 'conflict'"
-              type="button"
-              class="canvas-chrome-board-recovery-action"
-              aria-label="更换画布名称"
-              @click="emit('start-board-rename')"
-            >
-              更换
-            </button>
-            <button
-              type="button"
-              class="canvas-chrome-board-recovery-action"
-              aria-label="撤回画布重命名"
-              @click="emit('rollback-board-rename')"
-            >
-              撤回
-            </button>
-          </div>
-        </div>
-      </Transition>
+          重新加载
+        </button>
+      </div>
     </div>
 
     <div class="canvas-chrome-control-group canvas-chrome-action-group">
@@ -228,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type ComponentPublicInstance } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import {
   ArrowLeft,
   Download,
@@ -270,8 +255,7 @@ const emit = defineEmits<{
   'start-board-rename': []
   'cancel-board-rename': []
   'confirm-board-rename': []
-  'retry-board-rename': []
-  'rollback-board-rename': []
+  'reload-board-catalog': []
   'select-board': [boardId: string]
   export: []
   'navigate-back': []
@@ -292,23 +276,6 @@ const canvasChromeExportControlClass = createPageChromeRoundControlClass(
 )
 const canvasChromeAvatarButtonClass = createPageChromeAccountAvatarButtonClass(
   'canvas-user-avatar-button',
-)
-
-const boardRenameRecoveryLabel = computed(() => {
-  switch (props.board.renameRecovery.status) {
-    case 'pending':
-      return '名称同步中'
-    case 'failed':
-      return '名称未同步'
-    case 'conflict':
-      return '名称冲突'
-    case 'idle':
-      return ''
-  }
-  return ''
-})
-const boardRenameRecoveryHasActions = computed(() =>
-  ['failed', 'conflict'].includes(props.board.renameRecovery.status),
 )
 
 function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null) {

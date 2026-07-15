@@ -3,13 +3,13 @@ import type {
   CanvasBoardCreateResult,
   CanvasBoardDeleteResult,
   CanvasBoardDuplicateResult,
-  CanvasBoardRenameResult,
 } from '../../canvas-board/catalog/canvasBoardCommands'
+import type { CanvasBoardCatalogRenameResult } from '../../canvas-board/catalog/canvasBoardCatalog'
 
 type BoardToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'warning' | 'error'>
 
 type FailedCreateResult = Extract<CanvasBoardCreateResult, { ok: false }>
-type FailedRenameResult = Extract<CanvasBoardRenameResult, { ok: false }>
+type FailedRenameResult = Extract<CanvasBoardCatalogRenameResult, { ok: false }>
 type RenameValidationFailure = Extract<
   FailedRenameResult,
   { reason: 'local-name-conflict' | 'invalid-name' }
@@ -31,6 +31,7 @@ export type BoardFeedback = {
   deleteFailed: (result: FailedDeleteResult) => void
   deleted: () => void
   catalogSyncFailed: () => void
+  catalogReloaded: () => void
 }
 
 export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
@@ -44,10 +45,18 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
       appToast.warning(result.reason === 'local-name-conflict' ? '名称已存在' : '画布名称不能为空')
     },
     renameSyncFailed(result) {
+      if (result.reason === 'remote-name-conflict' && result.hydrate?.ok) {
+        appToast.error('名称冲突，已重新加载画布列表')
+        return
+      }
+      if (result.reason === 'sync-failed' && result.rollback.ok) {
+        appToast.error('重命名同步失败，已恢复原名称')
+        return
+      }
       appToast.error(
         result.reason === 'remote-name-conflict'
-          ? '名称已存在，请更换后再试'
-          : '重命名同步失败，请稍后重试',
+          ? '名称冲突且恢复未完成，请重新加载画布列表'
+          : '重命名同步失败且无法恢复，请重新加载画布列表',
       )
     },
     renamed() {
@@ -75,6 +84,9 @@ export function createBoardFeedback(appToast: BoardToast): BoardFeedback {
     },
     catalogSyncFailed() {
       appToast.error('画布同步失败，请稍后重试')
+    },
+    catalogReloaded() {
+      appToast.success('画布列表已重新加载')
     },
   }
 }

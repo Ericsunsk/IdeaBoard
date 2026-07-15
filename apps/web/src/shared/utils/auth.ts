@@ -10,6 +10,18 @@ export type { AuthFailureAction, SafeInternalRedirectPath } from '../auth/sessio
 
 const USER_KEY = 'user'
 const LAST_AUTH_STORAGE_SCOPE_KEY = 'ideaboard.auth.lastStorageScope.v1'
+const authStorageScopeListeners = new Set<(scope: string | null) => void>()
+
+function notifyAuthStorageScopeChange(scope: string | null) {
+  authStorageScopeListeners.forEach((listener) => listener(scope))
+}
+
+export function subscribeAuthStorageScopeChange(
+  listener: (scope: string | null) => void,
+): () => void {
+  authStorageScopeListeners.add(listener)
+  return () => authStorageScopeListeners.delete(listener)
+}
 
 export function getStoredUser(): User | null {
   const raw = localStorage.getItem(USER_KEY)
@@ -24,13 +36,16 @@ export function getStoredUser(): User | null {
 }
 
 export function setStoredAuth(user: User) {
+  const previousScope = resolveAuthStorageUserScope(getStoredUser())
   localStorage.setItem(USER_KEY, JSON.stringify(user))
   const scope = resolveAuthStorageUserScope(user)
   if (scope) rememberAuthStorageUserScope(scope)
+  if (scope !== previousScope) notifyAuthStorageScopeChange(scope)
 }
 
 export function clearStoredAuth() {
   localStorage.removeItem(USER_KEY)
+  notifyAuthStorageScopeChange(null)
 }
 
 export function clearStoredAuthState() {

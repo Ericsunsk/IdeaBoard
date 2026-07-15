@@ -22,8 +22,7 @@
       @start-board-rename="startBoardRename"
       @cancel-board-rename="cancelBoardRename"
       @confirm-board-rename="onConfirmBoardRename"
-      @retry-board-rename="retryBoardRename"
-      @rollback-board-rename="rollbackBoardRename"
+      @reload-board-catalog="reloadCatalog"
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
       @navigate-back="canvasNavigationAdapter.navigate(USER_BOARDS_PATH)"
@@ -307,20 +306,19 @@ const {
   isBoardMenuOpen,
   isRenamingBoard,
   boardNameDraft,
-  boardRenameRecovery,
+  isRenamePending,
+  catalogRecovery,
   currentBoardName,
   boardOptions,
 } = viewModel.boardChrome
 const {
   setBoardNameInputRef,
-  refreshBoardMetas,
   toggleBoardMenu,
   startBoardRename,
   cancelBoardRename,
   closeBoardHeaderEditing,
   onConfirmBoardRename,
-  retryBoardRename,
-  rollbackBoardRename,
+  reloadCatalog,
   onSelectBoard,
   onNavigateRequest,
   onLogoutRequest,
@@ -341,7 +339,8 @@ const canvasChromeBoard = computed<CanvasChromeBoardState>(() => ({
   currentId: currentBoardId.value,
   isMenuOpen: isBoardMenuOpen.value,
   isRenaming: isRenamingBoard.value,
-  renameRecovery: boardRenameRecovery.value,
+  isRenamePending: isRenamePending.value,
+  catalogRecovery: catalogRecovery.value,
   setNameInputRef: setBoardNameInputRef,
 }))
 const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
@@ -745,7 +744,6 @@ watch(
   async () => {
     await loadCanvasBoardAndProbe()
     void reattachPendingImageResults()
-    refreshBoardMetas()
   },
 )
 
@@ -777,7 +775,6 @@ useFlowLeaveGuard({
 onMounted(async () => {
   await loadCanvasBoardAndProbe()
   void reattachPendingImageResults()
-  refreshBoardMetas()
 })
 </script>
 

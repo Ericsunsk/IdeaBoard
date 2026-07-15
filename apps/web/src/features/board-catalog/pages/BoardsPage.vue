@@ -51,6 +51,18 @@
         />
       </section>
 
+      <div v-if="catalogRecoveryBoardId" :class="boardCatalogClasses.recoveryState" role="alert">
+        <span :class="boardCatalogClasses.recoveryText">画布列表需要重新加载</span>
+        <Button
+          unstyled
+          type="button"
+          :label="isCatalogReloadPending ? '重新加载中...' : '重新加载'"
+          :disabled="isCatalogReloadPending"
+          :class="boardCatalogClasses.recoveryButton"
+          @click="reloadCatalog"
+        />
+      </div>
+
       <section v-if="isBoardsLoading" :class="boardCatalogClasses.loadingState" aria-live="polite">
         <ProgressSpinner :class="boardCatalogClasses.loadingSpinner" stroke-width="4" />
       </section>
@@ -144,15 +156,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  listCanvasBoards,
-  touchCanvasBoard,
-  type CanvasBoardMeta,
-} from '../../canvas-board/catalog/canvasBoards'
-import { hydrateCanvasBoardsFromServer } from '../../canvas-board/catalog/boardSync'
-import { createCanvasBoardCommands } from '../../canvas-board/catalog/canvasBoardCommands'
+import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
+import { useCanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
 import BoardCard from '../components/BoardCard.vue'
 import { useBoardFeedback } from '../feedback/useBoardFeedback'
 import { createBoardPreviewRefreshQueue } from '../../canvas-board/preview'
@@ -180,10 +187,10 @@ const boardFeedback = useBoardFeedback()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const { projectName } = useSiteBranding()
-const boardCommands = createCanvasBoardCommands()
+const boardCatalog = useCanvasBoardCatalog()
 const boardPreviewRefresh = createBoardPreviewRefreshQueue()
 
-const boards = ref<CanvasBoardMeta[]>([])
+const boards = boardCatalog.viewModel.boards
 const isBoardsLoading = ref(true)
 const searchKeyword = ref('')
 const sortMode = ref<'recent' | 'name'>('recent')
@@ -194,6 +201,8 @@ const activeMenuBoardId = ref<string | null>(null)
 const deleteDialogVisible = ref(false)
 const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
 const isDeleteBoardPending = ref(false)
+const catalogRecoveryBoardId = ref<string | null>(null)
+const isCatalogReloadPending = ref(false)
 const boardPreviewMap = boardPreviewRefresh.previewMap
 
 const sortOptions = [
@@ -220,11 +229,15 @@ const visibleBoards = computed(() => {
   return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt)
 })
 
-function reloadBoards() {
-  boards.value = listCanvasBoards()
-  boardPreviewRefresh.reloadFromLocal(boards.value)
-  boardPreviewRefresh.schedule(boards.value)
-}
+watch(
+  boards,
+  (nextBoards) => {
+    const snapshot = [...nextBoards]
+    boardPreviewRefresh.reloadFromLocal(snapshot)
+    boardPreviewRefresh.schedule(snapshot)
+  },
+  { immediate: true },
+)
 
 function formatDate(ts: number): string {
   if (!Number.isFinite(ts)) return '-'
@@ -241,19 +254,17 @@ function onSearchInput(value: string | undefined) {
 
 async function createAndOpenBoard() {
   activeMenuBoardId.value = null
-  const result = await boardCommands.create()
+  const result = await boardCatalog.commands.create()
   if (!result.ok) {
-    reloadBoards()
+    if (result.reason === 'scope-changed') return
     boardFeedback.createFailed(result)
     console.warn('[boards] failed to sync new board', result.error)
     return
   }
-  reloadBoards()
   router.push({ path: USER_CANVAS_PATH, query: { boardId: result.board.id } })
 }
 
 function openBoard(board: CanvasBoardMeta) {
-  touchCanvasBoard(board.id)
   router.push({ path: USER_CANVAS_PATH, query: { boardId: board.id } })
 }
 
@@ -282,9 +293,11 @@ function onRenameInput(nextName: string) {
 async function commitRename() {
   const boardId = renamingBoardId.value
   if (!boardId) return
-  const result = await boardCommands.rename({ boardId, nextName: renameDraft.value })
+  const result = await boardCatalog.commands.rename({ boardId, nextName: renameDraft.value })
   if (!result.ok) {
     switch (result.reason) {
+      case 'scope-changed':
+        return
       case 'local-name-conflict':
         boardFeedback.renameValidationFailed(result)
         return
@@ -297,16 +310,39 @@ async function commitRename() {
       case 'sync-failed':
         renamingBoardId.value = null
         suppressNextBoardOpen.value = true
-        reloadBoards()
         boardFeedback.renameSyncFailed(result)
+        catalogRecoveryBoardId.value =
+          result.reason === 'remote-name-conflict'
+            ? result.hydrate?.ok === true
+              ? null
+              : boardId
+            : result.rollback.ok
+              ? null
+              : boardId
         console.warn('[boards] failed to sync renamed board', result.error)
         return
     }
   }
   renamingBoardId.value = null
   suppressNextBoardOpen.value = true
-  reloadBoards()
   boardFeedback.renamed()
+}
+
+async function reloadCatalog() {
+  const boardId = catalogRecoveryBoardId.value
+  if (!boardId || isCatalogReloadPending.value) return
+  isCatalogReloadPending.value = true
+  const result = await boardCatalog.commands.hydrate({
+    preserveLocalNewer: false,
+    rollbackBoardIds: [boardId],
+  })
+  isCatalogReloadPending.value = false
+  if (!result.ok) {
+    boardFeedback.catalogSyncFailed()
+    return
+  }
+  catalogRecoveryBoardId.value = null
+  boardFeedback.catalogReloaded()
 }
 
 function cancelRename() {
@@ -334,16 +370,15 @@ function handleRenameAction(board: CanvasBoardMeta) {
 
 async function handleDuplicateAction(board: CanvasBoardMeta) {
   activeMenuBoardId.value = null
-  const result = await boardCommands.duplicate({ sourceBoardId: board.id })
+  const result = await boardCatalog.commands.duplicate({ sourceBoardId: board.id })
   if (!result.ok) {
-    reloadBoards()
+    if (result.reason === 'scope-changed') return
     boardFeedback.copyFailed(result)
     if (result.reason !== 'source-missing') {
       console.warn('[boards] failed to sync duplicated board', result.error)
     }
     return
   }
-  reloadBoards()
   boardFeedback.copied()
 }
 
@@ -368,8 +403,12 @@ async function confirmDeleteBoard() {
   const board = pendingDeleteBoard.value
   if (!board || isDeleteBoardPending.value) return
   isDeleteBoardPending.value = true
-  const result = await boardCommands.delete({ boardId: board.id })
+  const result = await boardCatalog.commands.delete({ boardId: board.id })
   if (!result.ok) {
+    if (result.reason === 'scope-changed') {
+      isDeleteBoardPending.value = false
+      return
+    }
     boardFeedback.deleteFailed(result)
     if (result.reason === 'sync-failed') {
       console.warn('[boards] failed to sync deleted board', result.error)
@@ -380,7 +419,6 @@ async function confirmDeleteBoard() {
   if (renamingBoardId.value === board.id) {
     cancelRename()
   }
-  reloadBoards()
   deleteDialogVisible.value = false
   pendingDeleteBoard.value = null
   isDeleteBoardPending.value = false
@@ -389,11 +427,10 @@ async function confirmDeleteBoard() {
 
 onMounted(async () => {
   try {
-    const hydrateResult = await hydrateCanvasBoardsFromServer()
+    const hydrateResult = await boardCatalog.commands.hydrate()
     if (!hydrateResult.ok) {
       boardFeedback.catalogSyncFailed()
     }
-    reloadBoards()
   } finally {
     isBoardsLoading.value = false
   }

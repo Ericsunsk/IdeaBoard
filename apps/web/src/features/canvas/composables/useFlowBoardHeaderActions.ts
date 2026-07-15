@@ -1,31 +1,11 @@
 import { computed, nextTick, ref, type Ref } from 'vue'
 import type { Router } from 'vue-router'
-import { listCanvasBoards, normalizeCanvasBoardName } from '../../canvas-board/catalog/canvasBoards'
+import { normalizeCanvasBoardName } from '../../canvas-board/catalog/canvasBoards'
 import {
-  createCanvasBoardCommands,
-  type CanvasBoardCommands,
-  type CanvasBoardRenameRemoteResult,
-} from '../../canvas-board/catalog/canvasBoardCommands'
+  useCanvasBoardCatalog,
+  type CanvasBoardCatalog,
+} from '../../canvas-board/catalog/canvasBoardCatalog'
 import { USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
-
-type BoardMeta = { id: string; name: string }
-
-export type BoardRenameRecoveryState =
-  | { status: 'idle' }
-  | {
-      status: 'pending' | 'failed' | 'conflict'
-      boardId: string
-      previousName: string
-      nextName: string
-    }
-
-type ActiveBoardRenameOperation = {
-  version: number
-  boardId: string
-  previousName: string
-  nextName: string
-  confirm: () => Promise<CanvasBoardRenameRemoteResult>
-}
 
 type UseFlowBoardHeaderActionsOptions = {
   currentBoardId: Ref<string | null | undefined>
@@ -37,83 +17,41 @@ type UseFlowBoardHeaderActionsOptions = {
   router: Router
   route: { query: Record<string, unknown> }
   flushAutosave: () => Promise<void>
-  boardCommands?: Pick<CanvasBoardCommands, 'renameOptimistic' | 'rollbackOptimisticRename'>
+  catalog?: Pick<CanvasBoardCatalog, 'viewModel' | 'commands'>
 }
 
+export type CanvasBoardCatalogRecoveryState =
+  { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
+
 export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOptions) {
-  const boardCommands = options.boardCommands ?? createCanvasBoardCommands()
+  const boardCatalog = options.catalog ?? useCanvasBoardCatalog()
   const isBoardMenuOpen = ref(false)
   const isRenamingBoard = ref(false)
   const boardNameDraft = ref('')
   const boardNameInputRef = ref<HTMLElement | null>(null)
-  const boardMetas = ref<BoardMeta[]>(listCanvasBoards())
-  const boardRenameRecovery = ref<BoardRenameRecoveryState>({ status: 'idle' })
-  let renameOperationVersion = 0
-  let activeRenameOperation: ActiveBoardRenameOperation | null = null
+  const isRenamePending = ref(false)
+  const catalogRecovery = ref<CanvasBoardCatalogRecoveryState>({ status: 'idle' })
 
   const currentBoardName = computed(() => {
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return 'Untitled Canvas'
-    return boardMetas.value.find((board) => board.id === boardId)?.name ?? boardId
+    return boardCatalog.viewModel.byId.value.get(boardId)?.name ?? boardId
   })
 
   const boardOptions = computed(() =>
-    boardMetas.value.map((board) => ({ id: board.id, name: board.name })),
+    boardCatalog.viewModel.boards.value.map((board) => ({ id: board.id, name: board.name })),
   )
 
   function setBoardNameInputRef(el: HTMLElement | null) {
     boardNameInputRef.value = el
   }
 
-  function refreshBoardMetas() {
-    boardMetas.value = listCanvasBoards()
-  }
-
-  function setIdleRenameRecovery() {
-    boardRenameRecovery.value = { status: 'idle' }
-  }
-
-  function toRecoveryState(
-    status: Exclude<BoardRenameRecoveryState['status'], 'idle'>,
-    operation: ActiveBoardRenameOperation,
-  ): BoardRenameRecoveryState {
-    return {
-      status,
-      boardId: operation.boardId,
-      previousName: operation.previousName,
-      nextName: operation.nextName,
-    }
-  }
-
-  function matchesActiveOperation(operation: ActiveBoardRenameOperation): boolean {
-    return activeRenameOperation?.version === operation.version
-  }
-
-  async function confirmRemoteBoardRename(operation: ActiveBoardRenameOperation) {
-    const result = await operation.confirm()
-    if (!matchesActiveOperation(operation)) return
-    if (result.ok) {
-      activeRenameOperation = null
-      setIdleRenameRecovery()
-      options.message.success('已重命名画布')
-      return
-    }
-
-    const isConflict = result.reason === 'remote-name-conflict'
-    boardRenameRecovery.value = toRecoveryState(isConflict ? 'conflict' : 'failed', operation)
-    options.message.error?.(
-      isConflict ? '名称冲突，请更换名称或撤回' : '重命名未同步，可重试或撤回',
-    )
-    console.warn('[canvas] failed to sync renamed board', result.error)
-  }
-
   function toggleBoardMenu() {
-    if (!isBoardMenuOpen.value) refreshBoardMetas()
     isBoardMenuOpen.value = !isBoardMenuOpen.value
   }
 
   function startBoardRename() {
-    if (boardRenameRecovery.value.status === 'pending') {
+    if (isRenamePending.value) {
       options.message.warning('画布名称正在同步，请稍后再改名')
       return
     }
@@ -146,6 +84,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
   }
 
   async function onConfirmBoardRename() {
+    if (isRenamePending.value) return
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return
     const normalized = normalizeCanvasBoardName(boardNameDraft.value)
@@ -156,78 +95,68 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
       options.message.warning('请输入画布名称')
       return
     }
-    if (normalized === currentName) {
+    if (normalized === currentName) return
+
+    isRenamePending.value = true
+    const result = await boardCatalog.commands
+      .rename({ boardId, nextName: normalized })
+      .finally(() => {
+        isRenamePending.value = false
+      })
+    if (result.ok) {
+      options.message.success('已重命名画布')
       return
     }
-    const result = boardCommands.renameOptimistic({ boardId, nextName: normalized })
-    if (!result.ok) {
-      switch (result.reason) {
-        case 'local-name-conflict':
-          options.message.warning('名称已存在')
-          return
-        case 'invalid-name':
-          options.message.warning('重命名失败')
-          return
-      }
-    }
-
-    const operation: ActiveBoardRenameOperation = {
-      version: (renameOperationVersion += 1),
-      boardId,
-      previousName: result.previousBoard.name,
-      nextName: result.board.name,
-      confirm: result.confirm,
-    }
-    activeRenameOperation = operation
-    boardRenameRecovery.value = toRecoveryState('pending', operation)
-    refreshBoardMetas()
-    await confirmRemoteBoardRename(operation)
-  }
-
-  async function retryBoardRename() {
-    const recovery = boardRenameRecovery.value
-    if (recovery.status !== 'failed') return
-    const operation = activeRenameOperation
-    if (
-      !operation ||
-      operation.boardId !== recovery.boardId ||
-      operation.nextName !== recovery.nextName
-    ) {
-      options.message.warning('没有可重试的重命名')
+    if (result.reason === 'local-name-conflict') {
+      options.message.warning('名称已存在')
       return
     }
-    boardRenameRecovery.value = toRecoveryState('pending', operation)
-    await confirmRemoteBoardRename(operation)
-  }
-
-  function rollbackBoardRename() {
-    const recovery = boardRenameRecovery.value
-    if (recovery.status === 'idle') return
-    if (recovery.status === 'pending') {
-      options.message.warning('画布名称正在同步，请稍后再撤回')
+    if (result.reason === 'invalid-name') {
+      options.message.warning('重命名失败')
       return
     }
-    const result = boardCommands.rollbackOptimisticRename({
-      boardId: recovery.boardId,
-      previousName: recovery.previousName,
-    })
-    if (!result.ok) {
+    if (result.reason === 'scope-changed') return
+    if (!('rollback' in result)) return
+    const hydrateSucceeded = result.hydrate?.ok === true
+    const rollbackSucceeded = result.rollback.ok
+    if (result.reason === 'remote-name-conflict' && hydrateSucceeded) {
+      catalogRecovery.value = { status: 'idle' }
+      options.message.error?.('名称冲突，已重新加载画布列表')
+    } else if (rollbackSucceeded && result.reason === 'sync-failed') {
+      catalogRecovery.value = { status: 'idle' }
+      options.message.error?.('重命名同步失败，已恢复原名称')
+    } else {
+      catalogRecovery.value = { status: 'reload-required', boardId }
       options.message.error?.(
-        result.reason === 'local-name-conflict' ? '原名称已被占用，无法撤回' : '撤回重命名失败',
+        result.reason === 'remote-name-conflict' && rollbackSucceeded
+          ? '名称冲突，已恢复原名称，但远端列表刷新失败，请重新加载'
+          : result.reason === 'remote-name-conflict'
+            ? '名称冲突且恢复失败，请重新加载画布列表'
+            : '重命名同步失败，无法恢复原名称，请重新加载画布列表',
       )
+    }
+    console.warn('[canvas] failed to sync renamed board', result.error)
+  }
+
+  async function reloadCatalog() {
+    const recovery = catalogRecovery.value
+    if (recovery.status !== 'reload-required') return
+    catalogRecovery.value = { status: 'reloading', boardId: recovery.boardId }
+    const result = await boardCatalog.commands.hydrate({
+      preserveLocalNewer: false,
+      rollbackBoardIds: [recovery.boardId],
+    })
+    if (result.ok) {
+      catalogRecovery.value = { status: 'idle' }
+      options.message.success('画布列表已重新加载')
       return
     }
-    if (activeRenameOperation?.boardId === recovery.boardId) {
-      activeRenameOperation = null
-    }
-    setIdleRenameRecovery()
-    refreshBoardMetas()
-    options.message.success('已撤回重命名')
+    catalogRecovery.value = { status: 'reload-required', boardId: recovery.boardId }
+    options.message.error?.('画布列表重新加载失败，请稍后重试')
   }
 
   function onSelectBoard(boardId: string) {
     if (!boardId) return
-    refreshBoardMetas()
     isBoardMenuOpen.value = false
     if (boardId === options.currentBoardId.value) return
     void navigateToBoard(boardId)
@@ -246,19 +175,17 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     isRenamingBoard,
     boardNameDraft,
     boardNameInputRef,
-    boardMetas,
-    boardRenameRecovery,
+    isRenamePending,
+    catalogRecovery,
     currentBoardName,
     boardOptions,
     setBoardNameInputRef,
-    refreshBoardMetas,
     toggleBoardMenu,
     startBoardRename,
     cancelBoardRename,
     closeBoardHeaderEditing,
     onConfirmBoardRename,
-    retryBoardRename,
-    rollbackBoardRename,
+    reloadCatalog,
     onSelectBoard,
     navigateToBoard,
   }

@@ -14,7 +14,8 @@ describe('CanvasChrome', () => {
           currentId: null,
           isMenuOpen: false,
           isRenaming: false,
-          renameRecovery: { status: 'idle' },
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -54,7 +55,8 @@ describe('CanvasChrome', () => {
           currentId: null,
           isMenuOpen: false,
           isRenaming: false,
-          renameRecovery: { status: 'idle' },
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
           setNameInputRef: vi.fn(),
         },
         account: {
@@ -79,5 +81,40 @@ describe('CanvasChrome', () => {
     expect(screen.getAllByRole('button', { name: 'Idea余额 100 Ideas' })).toHaveLength(1)
     expect(credits).toHaveTextContent('100')
     expect(credits).not.toHaveTextContent('Ideas')
+  })
+
+  it('exposes an executable catalog reload recovery action', async () => {
+    const { emitted } = render(CanvasChrome, {
+      props: {
+        inert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: null,
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          catalogRecovery: { status: 'reload-required', boardId: 'board-a' },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: { activeTool: 'select', minimapEnabled: false },
+        status: { exportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    screen.getByRole('button', { name: '重新加载画布列表' }).click()
+
+    expect(emitted()['reload-board-catalog']).toHaveLength(1)
   })
 })

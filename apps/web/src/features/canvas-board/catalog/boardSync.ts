@@ -5,11 +5,15 @@ import {
 } from '../../../shared/api/generated-query/boards/boards'
 import type { BoardStateEnvelope, UserBoardItem } from '../../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../../shared/api/apiResponse'
-import { getAuthStorageUserScope } from '../../../shared/utils/auth'
+import {
+  getAuthStorageUserScope,
+  subscribeAuthStorageScopeChange,
+} from '../../../shared/utils/auth'
 import {
   getCanvasBoardById,
   listCanvasBoards,
   normalizeCanvasBoardName,
+  publishCanvasBoardCatalogChange,
   replaceCanvasBoards,
   type CanvasBoardMeta,
 } from './canvasBoards'
@@ -30,6 +34,7 @@ export type HydrateCanvasBoardsFromServerResult = { ok: true } | { ok: false; er
 
 const hydrateInFlight = new Map<string, Promise<HydrateCanvasBoardsFromServerResult>>()
 const pendingRollbackBoardIds = new Set<string>()
+subscribeAuthStorageScopeChange(() => pendingRollbackBoardIds.clear())
 
 export type HydrateCanvasBoardsFromServerOptions = {
   preserveLocalNewer?: boolean
@@ -116,8 +121,9 @@ function applyRemoteBoardsToLocal(
     if (state) stateMap[meta.id] = state
   })
   if (!options.preserveLocalNewer) {
-    replaceCanvasBoards(metas)
+    replaceCanvasBoards(metas, { publish: false })
     replaceCanvasBoardStateMap(stateMap)
+    publishCanvasBoardCatalogChange()
     return
   }
 
@@ -165,8 +171,9 @@ function applyRemoteBoardsToLocal(
     }
   })
 
-  replaceCanvasBoards([...mergedMetas.values()])
+  replaceCanvasBoards([...mergedMetas.values()], { publish: false })
   replaceCanvasBoardStateMap(mergedStateMap)
+  publishCanvasBoardCatalogChange()
 }
 
 function normalizeRollbackBoardIds(boardIds: Iterable<string | null | undefined>): Set<string> {
@@ -210,6 +217,9 @@ export async function hydrateCanvasBoardsFromServer(
   if (inFlight) return inFlight
   const task = (async () => {
     const remoteBoards = await listRemoteBoards()
+    if (getAuthStorageUserScope() !== scope) {
+      throw new Error('CANVAS_BOARD_HYDRATE_SCOPE_CHANGED')
+    }
     applyRemoteBoardsToLocal(remoteBoards, resolvedOptions)
     resolvedOptions.rollbackBoardIds.forEach((boardId) => {
       pendingRollbackBoardIds.delete(boardId)
@@ -231,6 +241,7 @@ export async function syncCanvasBoardToServer(
   boardId: string,
   stateOverride?: CanvasBoardState | null,
 ) {
+  const syncScope = getAuthStorageUserScope()
   const board = getCanvasBoardById(boardId)
   if (!board) return
   const state =
@@ -245,9 +256,11 @@ export async function syncCanvasBoardToServer(
       }),
       '保存画布失败',
     )
-    pendingRollbackBoardIds.delete(boardId.trim())
+    if (syncScope && getAuthStorageUserScope() === syncScope) {
+      pendingRollbackBoardIds.delete(boardId.trim())
+    }
   } catch (error) {
-    if (isBoardNameConflictError(error)) {
+    if (syncScope && getAuthStorageUserScope() === syncScope && isBoardNameConflictError(error)) {
       pendingRollbackBoardIds.add(boardId.trim())
     }
     throw error

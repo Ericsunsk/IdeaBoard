@@ -13,8 +13,10 @@ vi.mock('../../../shared/api/client', () => ({
   },
 }))
 
-vi.mock('./boardSync', () => ({
-  hydrateCanvasBoardsFromServer: mocks.hydrateCanvasBoardsFromServer,
+vi.mock('./canvasBoardCatalog', () => ({
+  useCanvasBoardCatalog: () => ({
+    commands: { hydrate: mocks.hydrateCanvasBoardsFromServer },
+  }),
 }))
 
 describe('joinSharedCanvasBoardByToken', () => {

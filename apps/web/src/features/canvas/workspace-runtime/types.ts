@@ -13,7 +13,8 @@ export type CanvasWorkspaceRuntimeViewModel = {
     | 'isBoardMenuOpen'
     | 'isRenamingBoard'
     | 'boardNameDraft'
-    | 'boardRenameRecovery'
+    | 'isRenamePending'
+    | 'catalogRecovery'
     | 'currentBoardName'
     | 'boardOptions'
   >
@@ -38,14 +39,12 @@ export type CanvasWorkspaceRuntimeCommands = {
   boardSession: Pick<
     CanvasWorkspaceRuntimeParts['boardChrome'],
     | 'setBoardNameInputRef'
-    | 'refreshBoardMetas'
     | 'toggleBoardMenu'
     | 'startBoardRename'
     | 'cancelBoardRename'
     | 'closeBoardHeaderEditing'
     | 'onConfirmBoardRename'
-    | 'retryBoardRename'
-    | 'rollbackBoardRename'
+    | 'reloadCatalog'
     | 'onSelectBoard'
     | 'onNavigateRequest'
     | 'onLogoutRequest'

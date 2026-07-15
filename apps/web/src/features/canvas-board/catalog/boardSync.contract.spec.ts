@@ -5,7 +5,7 @@ import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
 import { makeCanvasBoardState } from '../testing'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
 import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../persistence'
-import { listCanvasBoards, replaceCanvasBoards } from './canvasBoards'
+import { listCanvasBoards, replaceCanvasBoards, subscribeCanvasBoardChanges } from './canvasBoards'
 import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from './boardSync'
 
 const mocks = vi.hoisted(() => {
@@ -43,6 +43,10 @@ function makeState(updatedAt: number, promptText: string): CanvasBoardState {
       },
     ],
   })
+}
+
+function boardMeta(id: string, name: string, updatedAt: number) {
+  return { id, name, createdAt: 100, updatedAt }
 }
 
 function getPromptText(boardId: string): string | undefined {
@@ -108,6 +112,31 @@ describe('boardSync', () => {
 
     expect(listCanvasBoards()[0]?.name).toBe('Local Rename')
     expect(getPromptText('board-1')).toBe('local-newer')
+  })
+
+  it('publishes remote hydrate only after metadata and board state are both committed', async () => {
+    mocks.state.listResponse = {
+      data: {
+        list: [
+          makeRemoteBoard({
+            id: 'remote-board',
+            name: 'Remote Board',
+            createdAt: 100,
+            updatedAt: 2_000,
+            state: makeState(2_000, 'remote-ready'),
+          }),
+        ],
+      },
+    }
+    const observedPromptTexts: Array<string | undefined> = []
+    const unsubscribe = subscribeCanvasBoardChanges(() => {
+      observedPromptTexts.push(getPromptText('remote-board'))
+    })
+
+    await hydrateCanvasBoardsFromServer()
+    unsubscribe()
+
+    expect(observedPromptTexts).toEqual(['remote-ready'])
   })
 
   it('preserves local-only boards while adding remote boards during hydrate', async () => {
@@ -214,6 +243,45 @@ describe('boardSync', () => {
 
     expect(result.ok).toBe(false)
     expect(listCanvasBoards()[0]?.name).toBe('Local Board')
+  })
+
+  it('rejects an in-flight hydrate response after the auth scope changes', async () => {
+    let resolveRequest!: (value: unknown) => void
+    mocks.request.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRequest = resolve
+      }),
+    )
+    const hydrateTask = hydrateCanvasBoardsFromServer()
+
+    setStoredAuth({
+      id: 2,
+      uid: 'XYZ789',
+      username: 'other-user',
+      avatar: '',
+      role: 'user',
+      status: 1,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    })
+    replaceCanvasBoards([boardMeta('board-b', 'User B Board', 3_000)])
+    resolveRequest({
+      data: {
+        list: [
+          makeRemoteBoard({
+            id: 'board-a',
+            name: 'Late User A Board',
+            createdAt: 100,
+            updatedAt: 2_000,
+            state: makeState(2_000, 'late-user-a'),
+          }),
+        ],
+      },
+    })
+
+    await expect(hydrateTask).resolves.toMatchObject({ ok: false })
+    expect(listCanvasBoards()).toEqual([boardMeta('board-b', 'User B Board', 3_000)])
+    expect(getCanvasBoardState('board-a')).toBeNull()
   })
 
   it('returns hydrate failure for a successful HTTP response with a failed business code', async () => {

@@ -21,6 +21,11 @@ export const boardCatalogClasses = {
     'mt-4 mb-[34px] text-center text-[19px] tracking-normal text-board-page-text-muted max-[860px]:text-[15px]',
   toolbar:
     'mb-6 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 max-[860px]:grid-cols-1',
+  recoveryState:
+    'mb-4 flex min-h-10 items-center justify-between gap-3 rounded-[var(--radius-ib-panel)] border border-board-card-border bg-board-control-bg px-3 py-2',
+  recoveryText: 'min-w-0 text-[13px] font-semibold text-board-control-text',
+  recoveryButton:
+    'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-board-primary px-3 text-xs font-bold text-ib-text-inverse hover:bg-board-primary-hover disabled:cursor-wait disabled:opacity-60',
   createButton:
     '!h-[42px] !rounded-full !border-0 !bg-board-primary !px-5 !text-sm !font-bold !tracking-normal !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover focus-visible:!shadow-[var(--shadow-board-focus-strong)] max-[860px]:!w-full',
   searchWrap:

@@ -5,10 +5,8 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardSession, type SaveStatus } from '../board-session'
-import {
-  useFlowBoardHeaderActions,
-  type BoardRenameRecoveryState,
-} from './useFlowBoardHeaderActions'
+import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
+import type { CanvasBoardCatalogRecoveryState } from './useFlowBoardHeaderActions'
 import type { FlowHistory } from './useFlowHistory'
 import { useFlowCanvasRuntime, type CanvasFlowGraphRuntimeControls } from './useFlowCanvasRuntime'
 import type {
@@ -60,18 +58,17 @@ type CanvasBoardRuntime = {
   isBoardMenuOpen: Ref<boolean>
   isRenamingBoard: Ref<boolean>
   boardNameDraft: Ref<string>
-  boardRenameRecovery: Ref<BoardRenameRecoveryState>
+  isRenamePending: Ref<boolean>
+  catalogRecovery: Ref<CanvasBoardCatalogRecoveryState>
   currentBoardName: ComputedRef<string>
   boardOptions: ComputedRef<BoardOption[]>
   setBoardNameInputRef: (el: HTMLElement | null) => void
-  refreshBoardMetas: () => void
   toggleBoardMenu: () => void
   startBoardRename: () => void
   cancelBoardRename: () => void
   closeBoardHeaderEditing: () => void
   onConfirmBoardRename: () => Promise<void>
-  retryBoardRename: () => Promise<void>
-  rollbackBoardRename: () => void
+  reloadCatalog: () => Promise<void>
   onSelectBoard: (boardId: string) => void
 }
 
@@ -167,18 +164,17 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     isBoardMenuOpen: boardHeader.isBoardMenuOpen,
     isRenamingBoard: boardHeader.isRenamingBoard,
     boardNameDraft: boardHeader.boardNameDraft,
-    boardRenameRecovery: boardHeader.boardRenameRecovery,
+    isRenamePending: boardHeader.isRenamePending,
+    catalogRecovery: boardHeader.catalogRecovery,
     currentBoardName: boardHeader.currentBoardName,
     boardOptions: boardHeader.boardOptions,
     setBoardNameInputRef: boardHeader.setBoardNameInputRef,
-    refreshBoardMetas: boardHeader.refreshBoardMetas,
     toggleBoardMenu: boardHeader.toggleBoardMenu,
     startBoardRename: boardHeader.startBoardRename,
     cancelBoardRename: boardHeader.cancelBoardRename,
     closeBoardHeaderEditing: boardHeader.closeBoardHeaderEditing,
     onConfirmBoardRename: boardHeader.onConfirmBoardRename,
-    retryBoardRename: boardHeader.retryBoardRename,
-    rollbackBoardRename: boardHeader.rollbackBoardRename,
+    reloadCatalog: boardHeader.reloadCatalog,
     onSelectBoard: boardHeader.onSelectBoard,
   }
 }

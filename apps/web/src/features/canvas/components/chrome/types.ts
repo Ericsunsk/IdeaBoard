@@ -8,14 +8,8 @@ export type CanvasChromeBoardOption = {
   name: string
 }
 
-export type CanvasChromeBoardRenameRecoveryState =
-  | { status: 'idle' }
-  | {
-      status: 'pending' | 'failed' | 'conflict'
-      boardId: string
-      previousName: string
-      nextName: string
-    }
+export type CanvasChromeBoardCatalogRecoveryState =
+  { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
 
 export type CanvasChromeBoardState = {
   currentName: string
@@ -23,7 +17,8 @@ export type CanvasChromeBoardState = {
   currentId: string | null
   isMenuOpen: boolean
   isRenaming: boolean
-  renameRecovery: CanvasChromeBoardRenameRecoveryState
+  isRenamePending: boolean
+  catalogRecovery: CanvasChromeBoardCatalogRecoveryState
   setNameInputRef: (el: HTMLElement | null) => void
 }
 

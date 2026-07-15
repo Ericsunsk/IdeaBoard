@@ -1,7 +1,5 @@
-import {
-  hydrateCanvasBoardsFromServer,
-  syncCanvasBoardToServer,
-} from '../../canvas-board/catalog/boardSync'
+import { syncCanvasBoardToServer } from '../../canvas-board/catalog/boardSync'
+import { useCanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
 import { getCanvasBoardById, touchCanvasBoard } from '../../canvas-board/catalog/canvasBoards'
 import {
   loadCanvasBoardState,
@@ -45,11 +43,13 @@ export function isBoardSessionRemoteSyncError(
 }
 
 export function createBoardSessionRepository(): BoardSessionRepository {
+  const boardCatalog = useCanvasBoardCatalog()
+
   async function load(boardId: string): Promise<CanvasBoardSnapshot | null> {
     const normalized = normalizeBoardId(boardId)
     if (!normalized) return null
     loadCanvasBoardState(normalized)
-    const hydrateResult = await hydrateCanvasBoardsFromServer()
+    const hydrateResult = await boardCatalog.commands.hydrate()
     if (!hydrateResult.ok && hydrateResult.error instanceof InvalidBoardStateError) {
       throw hydrateResult.error
     }

@@ -149,7 +149,7 @@
   transform-origin: top left;
 }
 
-.canvas-chrome-board-recovery {
+.canvas-chrome-catalog-recovery {
   box-sizing: border-box;
   display: flex;
   width: 100%;
@@ -158,24 +158,14 @@
   justify-content: space-between;
   gap: 8px;
   border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--canvas-surface-bg) 88%, transparent);
+  border-radius: var(--canvas-surface-radius);
+  background: var(--canvas-surface-bg);
   padding: 4px 5px 4px 10px;
   color: var(--canvas-text-body);
   backdrop-filter: blur(var(--canvas-surface-blur));
-  transform-origin: top left;
 }
 
-.canvas-chrome-board-recovery.is-pending {
-  color: var(--canvas-text-subtle);
-}
-
-.canvas-chrome-board-recovery.is-failed,
-.canvas-chrome-board-recovery.is-conflict {
-  border-color: color-mix(in srgb, var(--color-canvas-accent) 30%, var(--canvas-surface-border));
-}
-
-.canvas-chrome-board-recovery-label {
+.canvas-chrome-catalog-recovery-label {
   min-width: 0;
   overflow: hidden;
   font-size: 12px;
@@ -185,18 +175,12 @@
   white-space: nowrap;
 }
 
-.canvas-chrome-board-recovery-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-}
-
-.canvas-chrome-board-recovery-action {
+.canvas-chrome-catalog-recovery-action {
   height: 22px;
+  flex: none;
   cursor: pointer;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--canvas-surface-radius);
   background: var(--canvas-surface-muted);
   padding: 0 8px;
   color: var(--canvas-text-strong);
@@ -205,30 +189,16 @@
   font-weight: 600;
 }
 
-.canvas-chrome-board-recovery-action:hover,
-.canvas-chrome-board-recovery-action:focus-visible {
+.canvas-chrome-catalog-recovery-action:hover,
+.canvas-chrome-catalog-recovery-action:focus-visible {
   background: var(--canvas-accent-soft);
   color: var(--canvas-accent-strong);
   outline: none;
 }
 
-.canvas-chrome-board-recovery-enter-active,
-.canvas-chrome-board-recovery-leave-active {
-  transition:
-    opacity var(--canvas-motion-fast) ease-out,
-    transform var(--canvas-motion-fast) ease-out;
-}
-
-.canvas-chrome-board-recovery-enter-from,
-.canvas-chrome-board-recovery-leave-to {
-  opacity: 0;
-  transform: translateY(-4px) scale(0.98);
-}
-
-.canvas-chrome-board-recovery-enter-to,
-.canvas-chrome-board-recovery-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+.canvas-chrome-catalog-recovery-action:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .canvas-chrome-board-menu-enter-active,
@@ -342,9 +312,7 @@
 @media (prefers-reduced-motion: reduce) {
   .canvas-chrome-region,
   .canvas-chrome-board-menu-enter-active,
-  .canvas-chrome-board-menu-leave-active,
-  .canvas-chrome-board-recovery-enter-active,
-  .canvas-chrome-board-recovery-leave-active {
+  .canvas-chrome-board-menu-leave-active {
     transition-duration: 1ms;
   }
 }
