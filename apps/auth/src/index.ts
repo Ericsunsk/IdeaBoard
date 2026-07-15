@@ -2,6 +2,7 @@ import { toNodeHandler } from 'better-auth/node'
 import { auth, authDB } from './auth.js'
 import { createAuthApp } from './authApp.js'
 import { getAuthGuardSettings } from './authGuardSettings.js'
+import { createAuthInternalCommands, type InternalAuthAPI } from './authInternalCommands.js'
 import {
   deleteAuthUserSessions,
   findUserByUsernameOrEmail,
@@ -13,6 +14,20 @@ import {
 import { env } from './env.js'
 import { verifyAuthRuntimePrivileges } from './runtime-privileges.js'
 
+const authApi: InternalAuthAPI = {
+  getSession: (input) => auth.api.getSession(input),
+  signUpEmail: (input) => auth.api.signUpEmail(input),
+}
+
+const repository = {
+  findUserByUsernameOrEmail,
+  finalizeTrustedRegistrationIdentity,
+  updateAuthUserRole,
+  updateAuthUserBanState,
+  deleteAuthUserSessions,
+  removeAuthUserCascade,
+}
+
 const app = createAuthApp({
   config: {
     trustProxy: env.auth.trustProxy,
@@ -23,18 +38,9 @@ const app = createAuthApp({
     await authDB.query('SELECT 1')
   },
   authHandler: toNodeHandler(auth),
-  authApi: {
-    getSession: (input) => auth.api.getSession(input),
-    signUpEmail: (input) => auth.api.signUpEmail(input),
-  },
-  repository: {
-    findUserByUsernameOrEmail,
-    finalizeTrustedRegistrationIdentity,
-    updateAuthUserRole,
-    updateAuthUserBanState,
-    deleteAuthUserSessions,
-    removeAuthUserCascade,
-  },
+  authApi,
+  repository,
+  internalCommands: createAuthInternalCommands(authApi, repository),
   getAuthGuardSettings,
 })
 

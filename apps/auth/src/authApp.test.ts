@@ -2,12 +2,21 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { AuthAppConfig, AuthAppDependencies } from './authApp.js'
 import { createAuthApp } from './authApp.js'
-import type { AuthUserRepository, InternalAuthAPI } from './internalRoutes.js'
+import {
+  createAuthInternalCommands,
+  type AuthInternalCommandRepository,
+  type AuthInternalCommands,
+  type InternalAuthAPI,
+} from './authInternalCommands.js'
 
-type TestOverrides = Omit<Partial<AuthAppDependencies>, 'authApi' | 'config' | 'repository'> & {
+type TestOverrides = Omit<
+  Partial<AuthAppDependencies>,
+  'authApi' | 'config' | 'internalCommands' | 'repository'
+> & {
   authApi?: Partial<InternalAuthAPI>
   config?: Partial<AuthAppConfig>
-  repository?: Partial<AuthUserRepository>
+  internalCommands?: Partial<AuthInternalCommands>
+  repository?: Partial<AuthInternalCommandRepository>
 }
 
 function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
@@ -34,7 +43,7 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     }),
     ...overrides.authApi,
   }
-  const repository: AuthUserRepository = {
+  const repository: AuthInternalCommandRepository = {
     findUserByUsernameOrEmail: async () => null,
     finalizeTrustedRegistrationIdentity: async () => true,
     updateAuthUserRole: async () => true,
@@ -42,6 +51,10 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     deleteAuthUserSessions: async () => true,
     removeAuthUserCascade: async () => true,
     ...overrides.repository,
+  }
+  const internalCommands: AuthInternalCommands = {
+    ...createAuthInternalCommands(authApi, repository),
+    ...overrides.internalCommands,
   }
 
   const baseDeps: AuthAppDependencies = {
@@ -53,6 +66,7 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     },
     authApi,
     repository,
+    internalCommands,
     getAuthGuardSettings: async () => ({
       registrationEnabled: true,
       windowSeconds: 60,
@@ -65,6 +79,7 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     ...overrides,
     config,
     authApi,
+    internalCommands,
     repository,
   }
 }
@@ -213,6 +228,7 @@ describe('createAuthApp', () => {
   })
 
   it('fails loudly when incomplete trusted registration cleanup returns false', async (t) => {
+    t.mock.method(console, 'error', () => {})
     const app = createAuthApp(
       createTestDeps({
         repository: {
@@ -234,6 +250,7 @@ describe('createAuthApp', () => {
   })
 
   it('recovers the created user id and cleans up when sign-up returns an empty payload', async (t) => {
+    t.mock.method(console, 'error', () => {})
     const removed: string[] = []
     const app = createAuthApp(
       createTestDeps({
@@ -256,8 +273,56 @@ describe('createAuthApp', () => {
       payload: { username: 'empty-payload', password: 'secret123' },
     })
 
-    assert.equal(response.statusCode, 400)
+    assert.equal(response.statusCode, 500)
+    assert.equal(response.json().msg, 'registration failed')
     assert.deepEqual(removed, ['auth-empty-payload'])
+  })
+
+  it('does not expose public registration dependency errors', async (t) => {
+    t.mock.method(console, 'error', () => {})
+    const app = createAuthApp(
+      createTestDeps({
+        authApi: {
+          signUpEmail: async () => {
+            throw new Error('password=secret constraint users_email_key')
+          },
+        },
+      }),
+    )
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register/username',
+      payload: { username: 'dependency-failure', password: 'secret123' },
+    })
+
+    assert.equal(response.statusCode, 500)
+    assert.deepEqual(response.json(), { code: 500, msg: 'registration failed' })
+    assert.doesNotMatch(response.body, /password=secret|users_email_key/)
+  })
+
+  it('returns a fixed conflict for duplicate public usernames', async (t) => {
+    const app = createAuthApp(
+      createTestDeps({
+        authApi: {
+          signUpEmail: async () => {
+            throw new Error('user already exists: users_email_key')
+          },
+        },
+      }),
+    )
+    t.after(() => app.close())
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register/username',
+      payload: { username: 'duplicate-user', password: 'secret123' },
+    })
+
+    assert.equal(response.statusCode, 409)
+    assert.deepEqual(response.json(), { code: 409, msg: 'username already exists' })
+    assert.doesNotMatch(response.body, /users_email_key/)
   })
 
   for (const username of ['admin', 'ADMIN', 'deleted-user-123', 'DELETED-USER-ABC']) {
@@ -516,14 +581,30 @@ describe('createAuthApp', () => {
     })
   }
 
-  it('ensures a new internal admin with an explicit trusted claim identity contract', async (t) => {
-    const marked: Array<[string, string]> = []
-    const app = createAuthApp(createTestDeps({ repository: {
-      finalizeTrustedRegistrationIdentity: async (authUserID, claimIdentity) => {
-        marked.push([authUserID, claimIdentity])
-        return true
+  it('binds an internal ensure request and returns command data', async (t) => {
+    const inputs: unknown[] = []
+    const app = createAuthApp(createTestDeps({
+      internalCommands: {
+        ensureIdentity: async (input) => {
+          inputs.push(input)
+          return {
+            ok: true,
+            data: {
+              user: {
+                auth_user_id: 'auth-admin',
+                username: 'admin',
+                email: 'admin@users.ideaboard.local',
+                claim_identity: 'admin@users.ideaboard.local',
+                claim_identity_kind: 'trusted_canonical_registration',
+                claim_identity_verified: true,
+                role: 'admin',
+                existing: false,
+              },
+            },
+          }
+        },
       },
-    } }))
+    }))
     t.after(() => app.close())
 
     const response = await app.inject({
@@ -532,67 +613,62 @@ describe('createAuthApp', () => {
     })
 
     assert.equal(response.statusCode, 200)
-    assert.deepEqual(marked, [['auth-user-2', 'admin@users.ideaboard.local']])
-    assert.equal(response.json().data.user.claim_identity_verified, true)
+    assert.deepEqual(inputs, [{
+      username: 'Admin',
+      password: 'secret123',
+      role: 'admin',
+      allowExisting: true,
+    }])
+    assert.equal(response.json().data.user.auth_user_id, 'auth-admin')
   })
 
-  it('accepts an existing internal admin only when its trusted identity and role already match', async (t) => {
-    const marked: Array<[string, string]> = []
-    const app = createAuthApp(createTestDeps({
-      authApi: { signUpEmail: async () => { throw new Error('user already exists') } },
-      repository: {
-        findUserByUsernameOrEmail: async () => ({ id: 'auth-admin-existing', username: 'admin', email: 'admin@users.ideaboard.local', role: 'admin', emailVerified: true }),
-        finalizeTrustedRegistrationIdentity: async (authUserID, claimIdentity) => {
-          marked.push([authUserID, claimIdentity])
-          return true
+  it('translates every command failure kind through the shared HTTP result adapter', async () => {
+    const cases = [
+      ['invalid_input', 400],
+      ['not_found', 404],
+      ['conflict', 409],
+      ['repository_failure', 500],
+    ] as const
+
+    for (const [kind, status] of cases) {
+      const app = createAuthApp(createTestDeps({
+        internalCommands: {
+          ensureIdentity: async () => ({
+            ok: false,
+            kind,
+            message: `${kind} failure`,
+          }),
         },
-      },
-    }))
-    t.after(() => app.close())
-
-    const response = await app.inject({
-      method: 'POST', url: '/internal/users/ensure', headers: { 'x-internal-key': 'test-internal-key' },
-      payload: { username: 'admin', password: 'secret123', role: 'admin', allow_existing: true },
-    })
-
-    assert.equal(response.statusCode, 200)
-    assert.deepEqual(marked, [])
-    assert.equal(response.json().data.user.existing, true)
-  })
-
-  it('rejects an attacker-preclaimed admin username without promoting the existing user', async (t) => {
-    let finalized = false
-    const app = createAuthApp(createTestDeps({
-      authApi: { signUpEmail: async () => { throw new Error('user already exists') } },
-      repository: {
-        findUserByUsernameOrEmail: async () => ({
-          id: 'auth-attacker', username: 'admin', email: 'admin@users.ideaboard.local', role: 'user', emailVerified: true,
-        }),
-        finalizeTrustedRegistrationIdentity: async () => {
-          finalized = true
-          return true
+      }))
+      const response = await app.inject({
+        method: 'POST',
+        url: '/internal/users/ensure',
+        headers: { 'x-internal-key': 'test-internal-key' },
+        payload: {
+          username: 'admin', password: 'secret123', role: 'admin', allow_existing: true,
         },
-      },
-    }))
-    t.after(() => app.close())
+      })
+      await app.close()
 
-    const response = await app.inject({
-      method: 'POST', url: '/internal/users/ensure', headers: { 'x-internal-key': 'test-internal-key' },
-      payload: { username: 'admin', password: 'unknown-password', role: 'admin', allow_existing: true },
-    })
-
-    assert.equal(response.statusCode, 409)
-    assert.equal(finalized, false)
+      assert.equal(response.statusCode, status)
+      assert.deepEqual(response.json(), {
+        code: status,
+        msg: `${kind} failure`,
+      })
+    }
   })
 
   it('updates auth user role through the internal route adapter', async (t) => {
-    const updates: Array<{ authUserID: string; role: 'admin' | 'user' }> = []
+    const inputs: unknown[] = []
     const app = createAuthApp(
       createTestDeps({
-        repository: {
-          updateAuthUserRole: async (authUserID, role) => {
-            updates.push({ authUserID, role })
-            return true
+        internalCommands: {
+          setRole: async (input) => {
+            inputs.push(input)
+            return {
+              ok: true,
+              data: { auth_user_id: 'auth-user-1', role: 'admin' },
+            }
           },
         },
       }),
@@ -619,6 +695,6 @@ describe('createAuthApp', () => {
         role: 'admin',
       },
     })
-    assert.deepEqual(updates, [{ authUserID: 'auth-user-1', role: 'admin' }])
+    assert.deepEqual(inputs, [{ authUserID: 'auth-user-1', role: 'ADMIN' }])
   })
 })

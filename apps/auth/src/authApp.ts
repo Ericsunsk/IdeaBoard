@@ -1,14 +1,15 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify'
 import { createAuthEntryGuard, isAuthRoute, type AuthNodeHandler } from './authEntryGuard.js'
 import type { AuthGuardSettings } from './authGuardSettings.js'
+import type {
+  AuthInternalCommands,
+  InternalAuthAPI,
+} from './authInternalCommands.js'
 import { extractErrorMessage } from './authUtils.js'
-import {
-  type AuthUserRepository,
-  type InternalAuthAPI,
-  registerInternalRoutes,
-} from './internalRoutes.js'
+import { registerInternalRoutes } from './internalRoutes.js'
 import { getErrorStatus, sendError, sendSuccess } from './httpResponse.js'
 import { createAuthDispatchHandler } from './publicRegistration.js'
+import type { TrustedIdentityRepository } from './trustedIdentity.js'
 
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions['trustProxy']
@@ -21,7 +22,8 @@ export type AuthAppDependencies = {
   healthCheck: () => Promise<void>
   authHandler: AuthNodeHandler
   authApi: InternalAuthAPI
-  repository: AuthUserRepository
+  repository: TrustedIdentityRepository
+  internalCommands: AuthInternalCommands
   getAuthGuardSettings: () => Promise<AuthGuardSettings>
 }
 
@@ -62,7 +64,7 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
   registerInternalRoutes(app, {
     internalKey: deps.config.internalKey,
     authApi: deps.authApi,
-    repository: deps.repository,
+    commands: deps.internalCommands,
   })
 
   return app

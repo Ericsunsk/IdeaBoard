@@ -1,133 +1,389 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  runUpdateAuthUserRoleCommand,
-  type UpdateAuthUserRoleRepository,
+  createAuthInternalCommands,
+  type AuthInternalCommandRepository,
+  type TrustedIdentityAuthAPI,
 } from './authInternalCommands.js'
 
-describe('runUpdateAuthUserRoleCommand', () => {
-  it('normalizes input, updates the repository, and returns the route response data', async () => {
-    const updates: Array<{ authUserID: string; role: 'admin' | 'user' }> = []
-    const repository: UpdateAuthUserRoleRepository = {
-      updateAuthUserRole: async (authUserID, role) => {
-        updates.push({ authUserID, role })
-        return true
+type CommandOverrides = {
+  authApi?: Partial<TrustedIdentityAuthAPI>
+  repository?: Partial<AuthInternalCommandRepository>
+}
+
+function createTestCommands(overrides: CommandOverrides = {}) {
+  const authApi: TrustedIdentityAuthAPI = {
+    signUpEmail: async ({ body }) => ({
+      user: {
+        id: 'auth-created',
+        username: body.username,
+        email: body.email,
       },
-    }
+    }),
+    ...overrides.authApi,
+  }
+  const repository: AuthInternalCommandRepository = {
+    findUserByUsernameOrEmail: async () => null,
+    finalizeTrustedRegistrationIdentity: async () => true,
+    removeAuthUserCascade: async () => true,
+    updateAuthUserRole: async () => true,
+    updateAuthUserBanState: async () => true,
+    deleteAuthUserSessions: async () => true,
+    ...overrides.repository,
+  }
+  return createAuthInternalCommands(authApi, repository)
+}
 
-    const result = await runUpdateAuthUserRoleCommand(
-      { authUserID: ' auth-user-1 ', role: 'ADMIN' },
-      repository,
-    )
+describe('AuthInternalCommands', () => {
+  it('ensures a new trusted identity through the command Interface', async () => {
+    const signups: unknown[] = []
+    const finalized: unknown[] = []
+    const commands = createTestCommands({
+      authApi: {
+        signUpEmail: async ({ body }) => {
+          signups.push(body)
+          return {
+            user: { id: 'auth-admin', username: body.username, email: body.email },
+          }
+        },
+      },
+      repository: {
+        finalizeTrustedRegistrationIdentity: async (authUserID, claimIdentity, role) => {
+          finalized.push({ authUserID, claimIdentity, role })
+          return true
+        },
+      },
+    })
 
-    assert.deepEqual(updates, [{ authUserID: 'auth-user-1', role: 'admin' }])
+    const result = await commands.ensureIdentity({
+      username: ' Admin ',
+      password: 'secret123',
+      role: 'ADMIN',
+    })
+
+    assert.deepEqual(signups, [{
+      email: 'admin@users.ideaboard.local',
+      password: 'secret123',
+      name: 'admin',
+      username: 'admin',
+    }])
+    assert.deepEqual(finalized, [{
+      authUserID: 'auth-admin',
+      claimIdentity: 'admin@users.ideaboard.local',
+      role: 'admin',
+    }])
     assert.deepEqual(result, {
       ok: true,
       data: {
-        auth_user_id: 'auth-user-1',
-        role: 'admin',
+        user: {
+          auth_user_id: 'auth-admin',
+          username: 'admin',
+          email: 'admin@users.ideaboard.local',
+          claim_identity: 'admin@users.ideaboard.local',
+          claim_identity_kind: 'trusted_canonical_registration',
+          claim_identity_verified: true,
+          role: 'admin',
+          existing: false,
+        },
       },
     })
   })
 
-  it('keeps the existing default role behavior when role is omitted', async () => {
-    const updates: Array<{ authUserID: string; role: 'admin' | 'user' }> = []
-    const repository: UpdateAuthUserRoleRepository = {
-      updateAuthUserRole: async (authUserID, role) => {
-        updates.push({ authUserID, role })
-        return true
+  it('returns an existing identity only when allowExisting and every trusted claim match', async () => {
+    const commands = createTestCommands({
+      authApi: {
+        signUpEmail: async () => {
+          throw new Error('user already exists')
+        },
       },
+      repository: {
+        findUserByUsernameOrEmail: async () => ({
+          id: 'auth-existing',
+          username: 'admin',
+          email: 'admin@users.ideaboard.local',
+          emailVerified: true,
+          role: 'admin',
+        }),
+      },
+    })
+
+    const result = await commands.ensureIdentity({
+      username: 'admin',
+      password: 'secret123',
+      role: 'admin',
+      allowExisting: true,
+    })
+
+    assert.equal(result.ok, true)
+    if (result.ok) assert.equal(result.data.user.existing, true)
+  })
+
+  it('classifies duplicate and mismatched trusted identities as conflicts', async () => {
+    const duplicate = () => {
+      throw new Error('user already exists')
     }
+    const withoutReuse = createTestCommands({ authApi: { signUpEmail: duplicate } })
+    const mismatched = createTestCommands({
+      authApi: { signUpEmail: duplicate },
+      repository: {
+        findUserByUsernameOrEmail: async () => ({
+          id: 'auth-attacker',
+          username: 'admin',
+          email: 'admin@users.ideaboard.local',
+          emailVerified: true,
+          role: 'user',
+        }),
+      },
+    })
 
-    const result = await runUpdateAuthUserRoleCommand({ authUserID: 'auth-user-1' }, repository)
+    assert.deepEqual(
+      await withoutReuse.ensureIdentity({
+        username: 'admin', password: 'secret123', role: 'admin',
+      }),
+      { ok: false, kind: 'conflict', message: 'auth identity already exists' },
+    )
+    assert.deepEqual(
+      await mismatched.ensureIdentity({
+        username: 'admin', password: 'secret123', role: 'admin', allowExisting: true,
+      }),
+      {
+        ok: false,
+        kind: 'conflict',
+        message: 'existing identity conflicts with requested trusted user',
+      },
+    )
+    assert.deepEqual(
+      await withoutReuse.ensureIdentity({
+        username: 'admin', password: 'secret123', role: 'admin', allowExisting: 'true',
+      }),
+      { ok: false, kind: 'conflict', message: 'auth identity already exists' },
+    )
+  })
 
-    assert.deepEqual(updates, [{ authUserID: 'auth-user-1', role: 'user' }])
-    assert.deepEqual(result, {
+  it('executes delete, ban, unban, revoke sessions, and set role with normalized input', async () => {
+    const calls: unknown[] = []
+    const commands = createTestCommands({
+      repository: {
+        removeAuthUserCascade: async (authUserID) => {
+          calls.push(['delete-cascade', authUserID])
+          return true
+        },
+        updateAuthUserBanState: async (authUserID, banned, reason, expiresIn) => {
+          calls.push(['ban-state', authUserID, banned, reason, expiresIn])
+          return true
+        },
+        deleteAuthUserSessions: async (authUserID) => {
+          calls.push(['sessions', authUserID])
+          return true
+        },
+        updateAuthUserRole: async (authUserID, role) => {
+          calls.push(['role', authUserID, role])
+          return true
+        },
+      },
+    })
+
+    assert.deepEqual(await commands.deleteIdentity({ authUserID: ' auth-delete ' }), {
       ok: true,
-      data: {
-        auth_user_id: 'auth-user-1',
-        role: 'user',
+      data: { deleted: true, auth_user_id: 'auth-delete' },
+    })
+    assert.deepEqual(await commands.banIdentity({
+      authUserID: ' auth-ban ',
+      banReason: ' abuse ',
+      banExpiresIn: '3600',
+    }), {
+      ok: true,
+      data: { auth_user_id: 'auth-ban', banned: true },
+    })
+    assert.deepEqual(await commands.unbanIdentity({ authUserID: ' auth-unban ' }), {
+      ok: true,
+      data: { auth_user_id: 'auth-unban', banned: false },
+    })
+    assert.deepEqual(await commands.revokeSessions({ authUserID: ' auth-revoke ' }), {
+      ok: true,
+      data: { auth_user_id: 'auth-revoke', revoked: true },
+    })
+    assert.deepEqual(await commands.setRole({ authUserID: ' auth-role ', role: 'ADMIN' }), {
+      ok: true,
+      data: { auth_user_id: 'auth-role', role: 'admin' },
+    })
+    assert.deepEqual(calls, [
+      ['delete-cascade', 'auth-delete'],
+      ['ban-state', 'auth-ban', true, 'abuse', 3600],
+      ['sessions', 'auth-ban'],
+      ['ban-state', 'auth-unban', false, null, null],
+      ['sessions', 'auth-revoke'],
+      ['role', 'auth-role', 'admin'],
+    ])
+  })
+
+  it('rejects invalid inputs before calling dependencies', async () => {
+    let called = false
+    const commands = createTestCommands({
+      authApi: {
+        signUpEmail: async () => {
+          called = true
+          return {}
+        },
       },
+      repository: {
+        removeAuthUserCascade: async () => {
+          called = true
+          return true
+        },
+        updateAuthUserRole: async () => {
+          called = true
+          return true
+        },
+        updateAuthUserBanState: async () => {
+          called = true
+          return true
+        },
+        deleteAuthUserSessions: async () => {
+          called = true
+          return true
+        },
+      },
+    })
+
+    assert.deepEqual(await commands.ensureIdentity({
+      username: '', password: 'secret123', role: 'admin',
+    }), {
+      ok: false, kind: 'invalid_input', message: 'username is required',
+    })
+    for (const result of await Promise.all([
+      commands.deleteIdentity({ authUserID: ' ' }),
+      commands.banIdentity({ authUserID: ' ' }),
+      commands.unbanIdentity({ authUserID: ' ' }),
+      commands.revokeSessions({ authUserID: ' ' }),
+      commands.setRole({ authUserID: ' ', role: 'admin' }),
+    ])) {
+      assert.deepEqual(result, {
+        ok: false, kind: 'invalid_input', message: 'auth user id is required',
+      })
+    }
+    assert.deepEqual(await commands.setRole({ authUserID: 'auth-user', role: 'owner' }), {
+      ok: false, kind: 'invalid_input', message: 'role must be admin or user',
+    })
+    assert.equal(called, false)
+  })
+
+  it('classifies missing users consistently and does not revoke sessions after a failed ban', async () => {
+    let sessionsCalled = false
+    const commands = createTestCommands({
+      repository: {
+        removeAuthUserCascade: async () => false,
+        updateAuthUserRole: async () => false,
+        updateAuthUserBanState: async () => false,
+        deleteAuthUserSessions: async () => {
+          sessionsCalled = true
+          return false
+        },
+      },
+    })
+    const expected = { ok: false, kind: 'not_found', message: 'auth user not found' }
+
+    assert.deepEqual(await commands.deleteIdentity({ authUserID: 'missing' }), expected)
+    assert.deepEqual(await commands.banIdentity({ authUserID: 'missing' }), expected)
+    assert.equal(sessionsCalled, false)
+    assert.deepEqual(await commands.unbanIdentity({ authUserID: 'missing' }), expected)
+    assert.deepEqual(await commands.revokeSessions({ authUserID: 'missing' }), expected)
+    assert.deepEqual(await commands.setRole({ authUserID: 'missing', role: 'user' }), expected)
+  })
+
+  it('classifies dependency throws consistently as repository failures', async (t) => {
+    t.mock.method(console, 'error', () => {})
+    const throwingCommands = createTestCommands({
+      authApi: {
+        signUpEmail: async () => {
+          throw new Error('sign-up unavailable')
+        },
+      },
+      repository: {
+        removeAuthUserCascade: async () => {
+          throw new Error('delete unavailable')
+        },
+        updateAuthUserRole: async () => {
+          throw new Error('role unavailable')
+        },
+        updateAuthUserBanState: async (_id, banned) => {
+          throw new Error(banned ? 'ban unavailable' : 'unban unavailable')
+        },
+        deleteAuthUserSessions: async (authUserID) => {
+          throw new Error(`${authUserID} sessions unavailable`)
+        },
+      },
+    })
+
+    assert.deepEqual(await throwingCommands.ensureIdentity({
+      username: 'admin', password: 'secret123', role: 'admin',
+    }), {
+      ok: false, kind: 'repository_failure', message: 'failed to ensure user',
+    })
+    assert.deepEqual(await throwingCommands.deleteIdentity({ authUserID: 'delete' }), {
+      ok: false, kind: 'repository_failure', message: 'failed to delete auth user',
+    })
+    assert.deepEqual(await throwingCommands.banIdentity({ authUserID: 'ban' }), {
+      ok: false, kind: 'repository_failure', message: 'failed to ban auth user',
+    })
+    assert.deepEqual(await throwingCommands.unbanIdentity({ authUserID: 'unban' }), {
+      ok: false, kind: 'repository_failure', message: 'failed to unban auth user',
+    })
+    assert.deepEqual(await throwingCommands.revokeSessions({ authUserID: 'revoke' }), {
+      ok: false, kind: 'repository_failure', message: 'failed to revoke auth user sessions',
+    })
+    assert.deepEqual(await throwingCommands.setRole({ authUserID: 'role', role: 'admin' }), {
+      ok: false, kind: 'repository_failure', message: 'failed to update auth user role',
     })
   })
 
-  it('returns validation errors before calling the repository', async () => {
-    let repositoryCalled = false
-    const repository: UpdateAuthUserRoleRepository = {
-      updateAuthUserRole: async () => {
-        repositoryCalled = true
-        return true
+  it('reports duplicate lookup throws as repository failures', async (t) => {
+    t.mock.method(console, 'error', () => {})
+    const commands = createTestCommands({
+      authApi: {
+        signUpEmail: async () => {
+          throw new Error('duplicate user')
+        },
       },
-    }
+      repository: {
+        findUserByUsernameOrEmail: async () => {
+          throw new Error('lookup unavailable')
+        },
+      },
+    })
 
-    const result = await runUpdateAuthUserRoleCommand(
-      { authUserID: ' ', role: 'admin' },
-      repository,
-    )
-
-    assert.equal(repositoryCalled, false)
-    assert.deepEqual(result, {
-      ok: false,
-      status: 400,
-      message: 'auth user id is required',
+    assert.deepEqual(await commands.ensureIdentity({
+      username: 'admin', password: 'secret123', role: 'admin', allowExisting: true,
+    }), {
+      ok: false, kind: 'repository_failure', message: 'failed to locate existing user',
     })
   })
 
-  it('classifies invalid roles as bad requests before calling the repository', async () => {
-    let repositoryCalled = false
-    const repository: UpdateAuthUserRoleRepository = {
-      updateAuthUserRole: async () => {
-        repositoryCalled = true
-        return true
+  it('retries the complete ban command when mandatory session revocation fails', async (t) => {
+    t.mock.method(console, 'error', () => {})
+    const calls: string[] = []
+    let revokeAttempts = 0
+    const commands = createTestCommands({
+      repository: {
+        updateAuthUserBanState: async () => {
+          calls.push('ban')
+          return true
+        },
+        deleteAuthUserSessions: async () => {
+          calls.push('revoke')
+          revokeAttempts++
+          if (revokeAttempts === 1) throw new Error('session store unavailable')
+          return true
+        },
       },
-    }
-
-    const result = await runUpdateAuthUserRoleCommand(
-      { authUserID: 'auth-user-1', role: 'owner' },
-      repository,
-    )
-
-    assert.equal(repositoryCalled, false)
-    assert.deepEqual(result, {
-      ok: false,
-      status: 400,
-      message: 'role must be admin or user',
     })
-  })
 
-  it('classifies a missing auth user as not found', async () => {
-    const repository: UpdateAuthUserRoleRepository = {
-      updateAuthUserRole: async () => false,
-    }
-
-    const result = await runUpdateAuthUserRoleCommand(
-      { authUserID: 'auth-missing', role: 'user' },
-      repository,
-    )
-
-    assert.deepEqual(result, {
-      ok: false,
-      status: 404,
-      message: 'auth user not found',
+    assert.deepEqual(await commands.banIdentity({ authUserID: 'auth-user' }), {
+      ok: false, kind: 'repository_failure', message: 'failed to ban auth user',
     })
-  })
-
-  it('classifies repository failures as internal errors with the existing fallback message', async () => {
-    const repository: UpdateAuthUserRoleRepository = {
-      updateAuthUserRole: async () => {
-        throw new Error('database unavailable')
-      },
-    }
-
-    const result = await runUpdateAuthUserRoleCommand(
-      { authUserID: 'auth-user-1', role: 'admin' },
-      repository,
-    )
-
-    assert.deepEqual(result, {
-      ok: false,
-      status: 500,
-      message: 'database unavailable',
+    assert.deepEqual(await commands.banIdentity({ authUserID: 'auth-user' }), {
+      ok: true, data: { auth_user_id: 'auth-user', banned: true },
     })
+    assert.deepEqual(calls, ['ban', 'revoke', 'ban', 'revoke'])
   })
 })

@@ -1,10 +1,15 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthNodeHandler } from './authEntryGuard.js'
-import type { AuthUserRepository, InternalAuthAPI } from './internalRoutes.js'
 import {
-  extractAuthUser,
-  extractErrorMessage,
+  provisionTrustedCanonicalIdentity,
+  TrustedIdentityCleanupError,
+  trustedCanonicalClaimIdentity,
+  type TrustedIdentityAuthAPI,
+  type TrustedIdentityRepository,
+} from './trustedIdentity.js'
+import {
   getAuthSubpath,
+  isDuplicateUserError,
   isReservedRegistrationUsername,
   normalizeRegistrationUsername,
 } from './authUtils.js'
@@ -13,12 +18,10 @@ import { sendNodeJSON } from './httpResponse.js'
 const publicUsernameRegistrationPath = '/register/username'
 const trustedClaimIdentityKind = 'trusted_canonical_registration'
 
-export class TrustedIdentityCleanupError extends Error {}
-
 export function createAuthDispatchHandler(
   betterAuthHandler: AuthNodeHandler,
-  authApi: InternalAuthAPI,
-  repository: AuthUserRepository,
+  authApi: TrustedIdentityAuthAPI,
+  repository: TrustedIdentityRepository,
 ): AuthNodeHandler {
   return async (req, res) => {
     const path = getAuthSubpath(req.url || '')
@@ -41,8 +44,8 @@ export function createAuthDispatchHandler(
 async function registerUsername(
   req: IncomingMessage,
   res: ServerResponse,
-  authApi: InternalAuthAPI,
-  repository: AuthUserRepository,
+  authApi: TrustedIdentityAuthAPI,
+  repository: TrustedIdentityRepository,
 ) {
   if (req.method !== 'POST') {
     sendNodeJSON(res, 405, { code: 405, msg: 'method not allowed' })
@@ -103,70 +106,20 @@ async function registerUsername(
       },
     })
   } catch (error) {
-    const status = error instanceof TrustedIdentityCleanupError ? 500 : 400
-    sendNodeJSON(res, status, {
-      code: status,
-      msg: extractErrorMessage(error, 'registration failed'),
+    if (isDuplicateUserError(error)) {
+      sendNodeJSON(res, 409, { code: 409, msg: 'username already exists' })
+      return
+    }
+    console.error('[auth] trusted username registration failed', error)
+    const cleanupRequired = error instanceof TrustedIdentityCleanupError
+    const message = cleanupRequired
+      ? 'trusted identity provisioning failed and cleanup requires operator attention'
+      : 'registration failed'
+    sendNodeJSON(res, 500, {
+      code: 500,
+      msg: message,
     })
   }
-}
-
-export async function provisionTrustedCanonicalIdentity(
-  authApi: InternalAuthAPI,
-  repository: AuthUserRepository,
-  username: string,
-  password: string,
-  role: 'admin' | 'user',
-) {
-  const claimIdentity = trustedCanonicalClaimIdentity(username)
-  let createdUserID = ''
-  try {
-    const created = await authApi.signUpEmail({
-      body: { email: claimIdentity, password, name: username, username },
-    })
-    const user = extractAuthUser(created)
-    if (!user) {
-      let recovered
-      try {
-        recovered = await repository.findUserByUsernameOrEmail(username, claimIdentity)
-      } catch (lookupError) {
-        throw new TrustedIdentityCleanupError(
-          `trusted identity lookup failed after empty sign-up payload: ${extractErrorMessage(lookupError, 'unknown lookup error')}`,
-        )
-      }
-      if (!recovered?.id) {
-        throw new TrustedIdentityCleanupError(
-          'trusted identity sign-up returned an empty payload and cleanup identity could not be recovered',
-        )
-      }
-      createdUserID = recovered.id
-      throw new Error('auth user creation succeeded but user payload is empty')
-    }
-    createdUserID = user.id
-    if (!(await repository.finalizeTrustedRegistrationIdentity(user.id, claimIdentity, role))) {
-      throw new Error('failed to finalize trusted canonical registration identity')
-    }
-    return user
-  } catch (error) {
-    if (createdUserID) {
-      try {
-        const cleaned = await repository.removeAuthUserCascade(createdUserID)
-        if (!cleaned) {
-          throw new Error('created auth user was not found during cleanup')
-        }
-      } catch (cleanupError) {
-        console.error('[auth] failed to roll back incomplete trusted identity', cleanupError)
-        throw new TrustedIdentityCleanupError(
-          'trusted identity provisioning failed and cleanup requires operator attention',
-        )
-      }
-    }
-    throw error
-  }
-}
-
-export function trustedCanonicalClaimIdentity(username: string): string {
-  return `${normalizeRegistrationUsername(username)}@users.ideaboard.local`
 }
 
 async function readRequestBody(req: IncomingMessage): Promise<string> {
