@@ -8,6 +8,7 @@ import {
   type AuthInternalCommands,
   type InternalAuthAPI,
 } from './authInternalCommands.js'
+import { authInternalRoutes } from './generated/auth-internal/routes.gen.js'
 
 type TestOverrides = Omit<
   Partial<AuthAppDependencies>,
@@ -132,6 +133,34 @@ describe('createAuthApp', () => {
       msg: 'unauthorized internal request',
     })
     assert.equal(sessionChecked, false)
+  })
+
+  it('registers every operation from the generated internal contract', async (t) => {
+    const app = createAuthApp(createTestDeps())
+    t.after(() => app.close())
+    const requests = {
+      validateSession: {},
+      ensureUser: {
+        payload: { username: 'alice', password: 'secret123', allow_existing: false, role: 'user' },
+      },
+      deleteUser: {},
+      setUserRole: { payload: { role: 'user' } },
+      banUser: { payload: { userId: 'auth-user-1' } },
+      unbanUser: { payload: { userId: 'auth-user-1' } },
+      revokeUserSessions: { payload: { userId: 'auth-user-1' } },
+    } as const
+
+    for (const operationID of Object.keys(authInternalRoutes) as Array<keyof typeof authInternalRoutes>) {
+      const route = authInternalRoutes[operationID]
+      const response = await app.inject({
+        method: route.method,
+        url: route.fastifyPath.replace(':id', 'auth-user-1'),
+        headers: { 'x-internal-key': 'test-internal-key' },
+        ...requests[operationID],
+      })
+
+      assert.equal(response.statusCode, 200, `${operationID}: ${response.body}`)
+    }
   })
 
   it('returns trusted canonical identity state for Credit Wallet provisioning', async (t) => {

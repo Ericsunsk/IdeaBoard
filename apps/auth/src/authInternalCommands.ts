@@ -1,4 +1,12 @@
 import type { InternalUserShape } from './authUtils.js'
+import type {
+  BanUserData,
+  DeleteUserData,
+  EnsureUserEnvelope,
+  RevokeUserSessionsData,
+  SetUserRoleData,
+  UnbanUserData,
+} from './generated/auth-internal/types.gen.js'
 import {
   isDuplicateUserError,
   normalizeAuthRole,
@@ -69,41 +77,15 @@ export type SetRoleCommandInput = AuthUserIDCommandInput & {
   role?: unknown
 }
 
-export type TrustedIdentityData = {
-  user: {
-    auth_user_id: string
-    username: string
-    email: string
-    claim_identity: string
-    claim_identity_kind: 'trusted_canonical_registration'
-    claim_identity_verified: true
-    role: AuthRole
-    existing: boolean
-  }
-}
+export type TrustedIdentityData = EnsureUserEnvelope['data']
 
 export type AuthInternalCommands = {
   ensureIdentity(input: EnsureIdentityCommandInput): Promise<AuthInternalCommandResult<TrustedIdentityData>>
-  deleteIdentity(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<{
-    deleted: true
-    auth_user_id: string
-  }>>
-  banIdentity(input: BanIdentityCommandInput): Promise<AuthInternalCommandResult<{
-    auth_user_id: string
-    banned: true
-  }>>
-  unbanIdentity(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<{
-    auth_user_id: string
-    banned: false
-  }>>
-  revokeSessions(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<{
-    auth_user_id: string
-    revoked: true
-  }>>
-  setRole(input: SetRoleCommandInput): Promise<AuthInternalCommandResult<{
-    auth_user_id: string
-    role: AuthRole
-  }>>
+  deleteIdentity(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<DeleteUserData>>
+  banIdentity(input: BanIdentityCommandInput): Promise<AuthInternalCommandResult<BanUserData>>
+  unbanIdentity(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<UnbanUserData>>
+  revokeSessions(input: AuthUserIDCommandInput): Promise<AuthInternalCommandResult<RevokeUserSessionsData>>
+  setRole(input: SetRoleCommandInput): Promise<AuthInternalCommandResult<SetUserRoleData>>
 }
 
 export function createAuthInternalCommands(
@@ -196,7 +178,7 @@ async function deleteIdentity(
 async function banIdentity(
   input: BanIdentityCommandInput,
   repository: AuthInternalCommandRepository,
-): Promise<AuthInternalCommandResult<{ auth_user_id: string; banned: true }>> {
+): Promise<AuthInternalCommandResult<BanUserData>> {
   const authUserID = validateAuthUserID(input.authUserID)
   if (!authUserID.ok) return authUserID.result
 
@@ -245,7 +227,7 @@ async function revokeSessions(
 async function setRole(
   input: SetRoleCommandInput,
   repository: AuthInternalCommandRepository,
-): Promise<AuthInternalCommandResult<{ auth_user_id: string; role: AuthRole }>> {
+): Promise<AuthInternalCommandResult<SetUserRoleData>> {
   const authUserID = validateAuthUserID(input.authUserID)
   if (!authUserID.ok) return authUserID.result
 

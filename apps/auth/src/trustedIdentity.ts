@@ -3,8 +3,9 @@ import {
   normalizeRegistrationUsername,
   type InternalUserShape,
 } from './authUtils.js'
+import type { AuthRole } from './generated/auth-internal/types.gen.js'
 
-export type AuthRole = 'admin' | 'user'
+export type { AuthRole } from './generated/auth-internal/types.gen.js'
 
 export type TrustedIdentityAuthAPI = {
   signUpEmail(input: {

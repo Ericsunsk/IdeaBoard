@@ -1,8 +1,4 @@
-import type {
-  FastifyInstance,
-  FastifyReply,
-  preHandlerHookHandler,
-} from 'fastify'
+import type { FastifyInstance, FastifyReply, preHandlerHookHandler } from 'fastify'
 import type {
   AuthInternalCommandFailureKind,
   AuthInternalCommandResult,
@@ -14,36 +10,10 @@ import {
   extractErrorMessage,
   normalizeRegistrationUsername,
 } from './authUtils.js'
+import type { RouteHandlers } from './generated/auth-internal/fastify.gen.js'
+import { authInternalRoutes } from './generated/auth-internal/routes.gen.js'
 import { getHeaderValue, sendError, sendSuccess, toHeaders } from './httpResponse.js'
 import { trustedCanonicalClaimIdentity } from './trustedIdentity.js'
-
-type EnsureUserBody = {
-  username?: unknown
-  password?: unknown
-  allow_existing?: unknown
-  role?: unknown
-}
-
-type RoleParams = {
-  id?: string
-}
-
-type RoleBody = {
-  role?: unknown
-}
-
-type AuthUserIDParams = {
-  id?: string
-}
-
-type UserIDBody = {
-  userId?: unknown
-}
-
-type BanUserBody = UserIDBody & {
-  banReason?: unknown
-  banExpiresIn?: unknown
-}
 
 export type InternalRoutesOptions = {
   internalKey: string
@@ -60,41 +30,37 @@ const commandFailureStatuses = {
 
 export function registerInternalRoutes(app: FastifyInstance, options: InternalRoutesOptions) {
   const requireInternalKey = createRequireInternalKey(options.internalKey)
-
-  app.get('/internal/session', { preHandler: requireInternalKey }, async (request, reply) => {
-    try {
-      const session = await options.authApi.getSession({
-        headers: toHeaders(request.headers),
-      })
-      const user = extractAuthUser(session)
-      if (!user) {
-        sendError(reply, 401, 'unauthorized')
-        return
+  const handlers: RouteHandlers = {
+    validateSession: async (request, reply) => {
+      try {
+        const session = await options.authApi.getSession({
+          headers: toHeaders(request.headers),
+        })
+        const user = extractAuthUser(session)
+        if (!user) {
+          sendError(reply, 401, 'unauthorized')
+          return
+        }
+        const username = normalizeRegistrationUsername(user.username || user.name || '')
+        const claimIdentity = String(user.email || '').toLowerCase()
+        const isTrustedClaimIdentity =
+          Boolean(user.emailVerified) && claimIdentity === trustedCanonicalClaimIdentity(username)
+        sendSuccess(reply, {
+          session: {
+            auth_user_id: user.id,
+            username,
+            claim_identity: claimIdentity,
+            claim_identity_kind: isTrustedClaimIdentity
+              ? 'trusted_canonical_registration'
+              : 'untrusted',
+            claim_identity_verified: isTrustedClaimIdentity,
+          },
+        })
+      } catch (error) {
+        sendError(reply, 500, extractErrorMessage(error, 'failed to validate session'))
       }
-      const username = normalizeRegistrationUsername(user.username || user.name || '')
-      const claimIdentity = String(user.email || '').toLowerCase()
-      const isTrustedClaimIdentity =
-        Boolean(user.emailVerified) && claimIdentity === trustedCanonicalClaimIdentity(username)
-      sendSuccess(reply, {
-        session: {
-          auth_user_id: user.id,
-          username,
-          claim_identity: claimIdentity,
-          claim_identity_kind: isTrustedClaimIdentity
-            ? 'trusted_canonical_registration'
-            : 'untrusted',
-          claim_identity_verified: isTrustedClaimIdentity,
-        },
-      })
-    } catch (error) {
-      sendError(reply, 500, extractErrorMessage(error, 'failed to validate session'))
-    }
-  })
-
-  app.post<{ Body: EnsureUserBody }>(
-    '/internal/users/ensure',
-    { preHandler: requireInternalKey },
-    async (request, reply) => {
+    },
+    ensureUser: async (request, reply) => {
       sendCommandResult(
         reply,
         await options.commands.ensureIdentity({
@@ -105,12 +71,13 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
         }),
       )
     },
-  )
-
-  app.put<{ Body: RoleBody; Params: RoleParams }>(
-    '/internal/users/:id/role',
-    { preHandler: requireInternalKey },
-    async (request, reply) => {
+    deleteUser: async (request, reply) => {
+      sendCommandResult(
+        reply,
+        await options.commands.deleteIdentity({ authUserID: request.params?.id }),
+      )
+    },
+    setUserRole: async (request, reply) => {
       sendCommandResult(
         reply,
         await options.commands.setRole({
@@ -119,23 +86,7 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
         }),
       )
     },
-  )
-
-  app.delete<{ Params: AuthUserIDParams }>(
-    '/internal/users/:id',
-    { preHandler: requireInternalKey },
-    async (request, reply) => {
-      sendCommandResult(
-        reply,
-        await options.commands.deleteIdentity({ authUserID: request.params?.id }),
-      )
-    },
-  )
-
-  app.post<{ Body: BanUserBody }>(
-    '/internal/users/ban',
-    { preHandler: requireInternalKey },
-    async (request, reply) => {
+    banUser: async (request, reply) => {
       sendCommandResult(
         reply,
         await options.commands.banIdentity({
@@ -145,29 +96,62 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
         }),
       )
     },
-  )
-
-  app.post<{ Body: UserIDBody }>(
-    '/internal/users/unban',
-    { preHandler: requireInternalKey },
-    async (request, reply) => {
+    unbanUser: async (request, reply) => {
       sendCommandResult(
         reply,
         await options.commands.unbanIdentity({ authUserID: request.body?.userId }),
       )
     },
-  )
-
-  app.post<{ Body: UserIDBody }>(
-    '/internal/users/revoke-sessions',
-    { preHandler: requireInternalKey },
-    async (request, reply) => {
+    revokeUserSessions: async (request, reply) => {
       sendCommandResult(
         reply,
         await options.commands.revokeSessions({ authUserID: request.body?.userId }),
       )
     },
-  )
+  }
+
+  app.route({
+    method: authInternalRoutes.validateSession.method,
+    url: authInternalRoutes.validateSession.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.validateSession,
+  })
+  app.route({
+    method: authInternalRoutes.ensureUser.method,
+    url: authInternalRoutes.ensureUser.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.ensureUser,
+  })
+  app.route({
+    method: authInternalRoutes.deleteUser.method,
+    url: authInternalRoutes.deleteUser.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.deleteUser,
+  })
+  app.route({
+    method: authInternalRoutes.setUserRole.method,
+    url: authInternalRoutes.setUserRole.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.setUserRole,
+  })
+  app.route({
+    method: authInternalRoutes.banUser.method,
+    url: authInternalRoutes.banUser.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.banUser,
+  })
+  app.route({
+    method: authInternalRoutes.unbanUser.method,
+    url: authInternalRoutes.unbanUser.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.unbanUser,
+  })
+  app.route({
+    method: authInternalRoutes.revokeUserSessions.method,
+    url: authInternalRoutes.revokeUserSessions.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.revokeUserSessions,
+  })
 }
 
 function sendCommandResult<TData>(

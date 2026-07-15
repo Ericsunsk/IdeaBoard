@@ -1,0 +1,835 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IdeaBoard Auth Internal API",
+    "version": "1.0.0",
+    "description": "Canonical private HTTP contract between the Go API and Better Auth service."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:6001"
+    }
+  ],
+  "security": [
+    {
+      "InternalKey": []
+    }
+  ],
+  "paths": {
+    "/internal/session": {
+      "get": {
+        "operationId": "validateSession",
+        "summary": "Validate a Better Auth session forwarded by the Go API",
+        "responses": {
+          "200": {
+            "description": "Trusted or untrusted session identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/internal/users/ensure": {
+      "post": {
+        "operationId": "ensureUser",
+        "summary": "Provision or reuse a trusted canonical identity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnsureUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provisioned trusted identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnsureUserEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/internal/users/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AuthUserID"
+        }
+      ],
+      "delete": {
+        "operationId": "deleteUser",
+        "summary": "Delete an Auth identity and its Auth-owned records",
+        "responses": {
+          "200": {
+            "description": "Identity deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteUserEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/internal/users/{id}/role": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AuthUserID"
+        }
+      ],
+      "put": {
+        "operationId": "setUserRole",
+        "summary": "Set an Auth identity role",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetUserRoleEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/internal/users/ban": {
+      "post": {
+        "operationId": "banUser",
+        "summary": "Ban an Auth identity and revoke its sessions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BanUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Identity banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BanUserEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/internal/users/unban": {
+      "post": {
+        "operationId": "unbanUser",
+        "summary": "Unban an Auth identity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Identity unbanned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnbanUserEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/internal/users/revoke-sessions": {
+      "post": {
+        "operationId": "revokeUserSessions",
+        "summary": "Revoke every session for an Auth identity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessions revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeUserSessionsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "InternalKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Internal-Key"
+      }
+    },
+    "parameters": {
+      "AuthUserID": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 191
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Internal key or session rejected",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Auth identity not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Identity conflicts with requested trusted state",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Auth dependency or repository failure",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "AuthRole": {
+        "type": "string",
+        "enum": [
+          "admin",
+          "user"
+        ]
+      },
+      "TrustedClaimIdentityKind": {
+        "type": "string",
+        "enum": [
+          "trusted_canonical_registration"
+        ]
+      },
+      "SessionClaimIdentityKind": {
+        "type": "string",
+        "enum": [
+          "trusted_canonical_registration",
+          "untrusted"
+        ]
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "msg": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auth_user_id",
+          "username",
+          "claim_identity",
+          "claim_identity_kind",
+          "claim_identity_verified"
+        ],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "username": {
+            "type": "string"
+          },
+          "claim_identity": {
+            "type": "string"
+          },
+          "claim_identity_kind": {
+            "$ref": "#/components/schemas/SessionClaimIdentityKind"
+          },
+          "claim_identity_verified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProvisionedAuthUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auth_user_id",
+          "username",
+          "email",
+          "claim_identity",
+          "claim_identity_kind",
+          "claim_identity_verified",
+          "role",
+          "existing"
+        ],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "claim_identity": {
+            "type": "string"
+          },
+          "claim_identity_kind": {
+            "$ref": "#/components/schemas/TrustedClaimIdentityKind"
+          },
+          "claim_identity_verified": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          },
+          "existing": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EnsureUserRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "password",
+          "allow_existing",
+          "role"
+        ],
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "allow_existing": {
+            "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          }
+        }
+      },
+      "SetUserRoleRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          }
+        }
+      },
+      "AuthUserRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "x-go-name": "UserID"
+          }
+        }
+      },
+      "BanUserRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "x-go-name": "UserID"
+          },
+          "banReason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "banExpiresIn": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "SessionEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg",
+          "data"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "session"
+            ],
+            "properties": {
+              "session": {
+                "$ref": "#/components/schemas/SessionIdentity"
+              }
+            }
+          }
+        }
+      },
+      "EnsureUserEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg",
+          "data"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "user"
+            ],
+            "properties": {
+              "user": {
+                "$ref": "#/components/schemas/ProvisionedAuthUser"
+              }
+            }
+          }
+        }
+      },
+      "DeleteUserData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auth_user_id",
+          "deleted"
+        ],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "SetUserRoleData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auth_user_id",
+          "role"
+        ],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AuthRole"
+          }
+        }
+      },
+      "BanUserData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auth_user_id",
+          "banned"
+        ],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "banned": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "UnbanUserData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auth_user_id",
+          "banned"
+        ],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "banned": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        }
+      },
+      "RevokeUserSessionsData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "auth_user_id",
+          "revoked"
+        ],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "revoked": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "DeleteUserEnvelope": {
+        "$ref": "#/components/schemas/DeleteUserSuccessEnvelope"
+      },
+      "DeleteUserSuccessEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg",
+          "data"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeleteUserData"
+          }
+        }
+      },
+      "SetUserRoleEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg",
+          "data"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SetUserRoleData"
+          }
+        }
+      },
+      "BanUserEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg",
+          "data"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BanUserData"
+          }
+        }
+      },
+      "UnbanUserEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg",
+          "data"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UnbanUserData"
+          }
+        }
+      },
+      "RevokeUserSessionsEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "msg",
+          "data"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [
+              0
+            ]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RevokeUserSessionsData"
+          }
+        }
+      }
+    }
+  }
+}
