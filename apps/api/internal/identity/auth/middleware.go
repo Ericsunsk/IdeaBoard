@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/response"
@@ -64,17 +65,17 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository, 
 			return
 		}
 
-		principal, err := NewPrincipal(user.ID, identity.AuthUserID, user.Username, user.Role)
-		if err != nil || SetPrincipal(c, principal) != nil {
+		identityPrincipal, err := principal.New(user.ID, identity.AuthUserID, user.Username, user.Role)
+		if err != nil || principal.Set(c, identityPrincipal) != nil {
 			response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
 			c.Abort()
 			return
 		}
 
-		c.Set("user_id", principal.UserID())
-		c.Set("username", principal.Username())
-		c.Set("role", principal.Role().String())
-		c.Set("auth_user_id", principal.AuthUserID())
+		c.Set("user_id", identityPrincipal.UserID())
+		c.Set("username", identityPrincipal.Username())
+		c.Set("role", identityPrincipal.Role().String())
+		c.Set("auth_user_id", identityPrincipal.AuthUserID())
 		c.Next()
 	}
 }
@@ -120,8 +121,8 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRep
 // AdminMiddleware 管理员中间件 - 通过角色判断是否为管理员
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		principal, exists := PrincipalFrom(c)
-		if !exists || !principal.IsAdmin() {
+		identityPrincipal, exists := principal.From(c)
+		if !exists || !identityPrincipal.IsAdmin() {
 			response.Error(c, http.StatusForbidden, "需要管理员权限")
 			c.Abort()
 			return

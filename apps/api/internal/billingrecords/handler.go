@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -28,12 +29,11 @@ func (h *Handler) List(c *gin.Context) {
 		response.InternalError(c, http.StatusServiceUnavailable, "账单服务暂不可用", nil)
 		return
 	}
-	userID := c.GetInt64("user_id")
-	if userID <= 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
 		return
 	}
-	input, ok := parseListInput(c, userID)
+	input, ok := parseListInput(c, identityPrincipal.UserID())
 	if !ok {
 		return
 	}

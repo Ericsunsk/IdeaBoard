@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/testsupport"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,7 +26,7 @@ func TestHandlerListUsesAuthenticatedUserAndDefaultPage(t *testing.T) {
 	}}}}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(42))
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/records", NewHandler(reader).List)
@@ -55,7 +58,7 @@ func TestHandlerListParsesCursorAndLimit(t *testing.T) {
 	reader := &readerStub{}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(7))
+		testsupport.SetPrincipal(t, c, 7, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/records", NewHandler(reader).List)
@@ -84,7 +87,7 @@ func TestHandlerListRejectsInvalidPaginationWithoutQuerying(t *testing.T) {
 			reader := &readerStub{}
 			router := gin.New()
 			router.Use(func(c *gin.Context) {
-				c.Set("user_id", int64(7))
+				testsupport.SetPrincipal(t, c, 7, principal.RoleUser)
 				c.Next()
 			})
 			router.GET("/records", NewHandler(reader).List)

@@ -15,8 +15,10 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
@@ -72,7 +74,7 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
-	router := newSubmitHandlerTestRouter(service, 42)
+	router := newSubmitHandlerTestRouter(t, service, 42)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
@@ -154,7 +156,7 @@ func TestSubmitTaskHandlerReturnsStructuredInsufficientCreditsError(t *testing.T
 		SubmissionStore: &recordingSubmissionStore{err: taskbilling.ErrInsufficientCredits},
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
-	router := newSubmitHandlerTestRouter(service, 42)
+	router := newSubmitHandlerTestRouter(t, service, 42)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
@@ -194,7 +196,7 @@ func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T)
 		SubmissionStore: &recordingSubmissionStore{err: taskbilling.ErrPricingUnavailable},
 		MediaValidator:  testSubmitMediaValidator{},
 	}, ServiceOptions{})
-	router := newSubmitHandlerTestRouter(service, 42)
+	router := newSubmitHandlerTestRouter(t, service, 42)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
@@ -225,7 +227,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 		MediaValidator:  testSubmitMediaValidator{},
 		TaskBilling:     newHandlerTaskBillingService(),
 	}, ServiceOptions{})
-	router := newSubmitHandlerTestRouter(service, 42)
+	router := newSubmitHandlerTestRouter(t, service, 42)
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
@@ -271,7 +273,7 @@ func TestCheckSubmitTaskReadinessHandlerRequiresValidBillingQuantity(t *testing.
 	gin.SetMode(gin.TestMode)
 
 	service := NewService(ServiceDeps{}, ServiceOptions{})
-	router := newSubmitHandlerTestRouter(service, 42)
+	router := newSubmitHandlerTestRouter(t, service, 42)
 	for _, billingQuantity := range []interface{}{nil, 0, 17} {
 		t.Run(fmt.Sprint(billingQuantity), func(t *testing.T) {
 			body := map[string]interface{}{
@@ -310,7 +312,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 					handlerBillingCredits{},
 				),
 			}, ServiceOptions{})
-			router := newSubmitHandlerTestRouter(service, 42)
+			router := newSubmitHandlerTestRouter(t, service, 42)
 			rec := httptest.NewRecorder()
 			router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 				"prompt":           "生成海报",
@@ -380,15 +382,16 @@ func assertMachineErrorResponse(t *testing.T, recorder *httptest.ResponseRecorde
 	}
 }
 
-func newSubmitHandlerTestRouter(service *Service, userID int64) *gin.Engine {
+func newSubmitHandlerTestRouter(t testing.TB, service *Service, userID int64) *gin.Engine {
+	t.Helper()
 	handler := NewHandler(service)
 	router := gin.New()
 	router.POST("/submit", func(c *gin.Context) {
-		c.Set("user_id", userID)
+		testsupport.SetPrincipal(t, c, userID, principal.RoleUser)
 		handler.SubmitTask(c)
 	})
 	router.POST("/submit/readiness", func(c *gin.Context) {
-		c.Set("user_id", userID)
+		testsupport.SetPrincipal(t, c, userID, principal.RoleUser)
 		handler.CheckSubmitTaskReadiness(c)
 	})
 	return router

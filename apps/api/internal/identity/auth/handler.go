@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/response"
 
@@ -23,13 +24,12 @@ func NewAuthHandler(userService *users.UserService) *AuthHandler {
 
 // GetCurrentUser 获取当前用户信息
 func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
 		return
 	}
 
-	user, err := h.userService.GetByID(c.Request.Context(), userID)
+	user, err := h.userService.GetByID(c.Request.Context(), identityPrincipal.UserID())
 	if err != nil {
 		response.Error(c, 404, "用户不存在")
 		return

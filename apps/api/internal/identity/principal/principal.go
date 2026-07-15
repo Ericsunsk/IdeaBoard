@@ -1,4 +1,4 @@
-package auth
+package principal
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ const (
 	RoleAdmin Role = "admin"
 )
 
-var ErrInvalidPrincipal = errors.New("invalid authenticated principal")
+var ErrInvalid = errors.New("invalid authenticated principal")
 
 const principalContextKey = "ideaboard.auth.principal"
 
@@ -29,12 +29,12 @@ type Principal struct {
 	role       Role
 }
 
-func NewPrincipal(userID int64, authUserID, username, role string) (Principal, error) {
+func New(userID int64, authUserID, username, role string) (Principal, error) {
 	authUserID = strings.TrimSpace(authUserID)
 	username = strings.TrimSpace(username)
 	parsedRole, ok := parseRole(role)
 	if userID <= 0 || authUserID == "" || username == "" || !ok {
-		return Principal{}, ErrInvalidPrincipal
+		return Principal{}, ErrInvalid
 	}
 	return Principal{
 		userID:     userID,
@@ -64,20 +64,20 @@ func isValidPrincipal(principal Principal) bool {
 		principal.role.IsValid()
 }
 
-func SetPrincipal(c *gin.Context, principal Principal) error {
+func Set(c *gin.Context, principal Principal) error {
 	if c == nil {
-		return ErrInvalidPrincipal
+		return ErrInvalid
 	}
 	// Poison any previous value before validating so a failed overwrite cannot retain authority.
 	c.Set(principalContextKey, Principal{})
 	if !principal.IsValid() {
-		return ErrInvalidPrincipal
+		return ErrInvalid
 	}
 	c.Set(principalContextKey, principal)
 	return nil
 }
 
-func PrincipalFrom(c *gin.Context) (Principal, bool) {
+func From(c *gin.Context) (Principal, bool) {
 	if c == nil {
 		return Principal{}, false
 	}
@@ -89,8 +89,8 @@ func PrincipalFrom(c *gin.Context) (Principal, bool) {
 	return principal, true
 }
 
-func RequirePrincipal(c *gin.Context) (Principal, bool) {
-	principal, ok := PrincipalFrom(c)
+func Require(c *gin.Context) (Principal, bool) {
+	principal, ok := From(c)
 	if ok {
 		return principal, true
 	}

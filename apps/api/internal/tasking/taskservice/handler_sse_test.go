@@ -16,9 +16,11 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/gin-gonic/gin"
@@ -145,10 +147,11 @@ func makeStreamTask(taskID string, userID int64, status string) *tasks.Task {
 	}
 }
 
-func newStreamTestRouter(handler *Handler, userID int64) *gin.Engine {
+func newStreamTestRouter(t testing.TB, handler *Handler, userID int64) *gin.Engine {
+	t.Helper()
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
-		c.Set("user_id", userID)
+		testsupport.SetPrincipal(t, c, userID, principal.RoleUser)
 		handler.StreamUserTask(c)
 	})
 	return router
@@ -242,7 +245,7 @@ func TestStreamUserTaskKeepsHTTPNotFoundBeforeSSE(t *testing.T) {
 	taskID := "task-sse-before-prepare-not-found"
 	store := newStreamTaskStore(streamTaskFetchResult{err: sql.ErrNoRows})
 	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: NewEventHub()})
-	router := newStreamTestRouter(NewHandler(service), 11)
+	router := newStreamTestRouter(t, NewHandler(service), 11)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/events/"+taskID, nil)
@@ -270,7 +273,7 @@ func TestStreamUserTaskWritesErrorEventWhenInitialSnapshotFetchFails(t *testing.
 	)
 	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: NewEventHub()})
 	logs := captureSlogOutput(t)
-	router := newStreamTestRouter(NewHandler(service), userID)
+	router := newStreamTestRouter(t, NewHandler(service), userID)
 
 	rec := serveStreamWithTimeout(t, router, taskID, nil)
 
@@ -296,7 +299,7 @@ func TestStreamUserTaskWritesErrorEventWhenHeartbeatFetchFails(t *testing.T) {
 	)
 	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: NewEventHub()})
 	logs := captureSlogOutput(t)
-	router := newStreamTestRouter(NewHandler(service), userID)
+	router := newStreamTestRouter(t, NewHandler(service), userID)
 
 	rec := serveStreamWithTimeout(t, router, taskID, nil)
 
@@ -317,7 +320,7 @@ func TestStreamUserTaskWritesErrorEventWhenEventFetchFails(t *testing.T) {
 	)
 	service := NewService(ServiceDeps{TaskRepo: store}, ServiceOptions{EventHub: hub})
 	logs := captureSlogOutput(t)
-	router := newStreamTestRouter(NewHandler(service), userID)
+	router := newStreamTestRouter(t, NewHandler(service), userID)
 
 	rec := serveStreamWithTimeout(t, router, taskID, func() {
 		waitForTaskSubscriber(t, hub, taskID)
@@ -351,7 +354,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	handler := NewHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
-		c.Set("user_id", int64(7))
+		testsupport.SetPrincipal(t, c, 7, principal.RoleUser)
 		handler.StreamUserTask(c)
 	})
 
@@ -404,7 +407,7 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	handler := NewHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
-		c.Set("user_id", int64(8))
+		testsupport.SetPrincipal(t, c, 8, principal.RoleUser)
 		handler.StreamUserTask(c)
 	})
 
@@ -501,7 +504,7 @@ func TestStreamUserTaskReturnsJSONWhenConnectionLimitReached(t *testing.T) {
 	handler := NewHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
-		c.Set("user_id", int64(9))
+		testsupport.SetPrincipal(t, c, 9, principal.RoleUser)
 		handler.StreamUserTask(c)
 	})
 
@@ -555,7 +558,7 @@ func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.
 	handler := NewHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
-		c.Set("user_id", int64(10))
+		testsupport.SetPrincipal(t, c, 10, principal.RoleUser)
 		handler.StreamUserTask(c)
 	})
 

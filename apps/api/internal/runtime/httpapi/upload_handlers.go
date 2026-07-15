@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/response"
@@ -19,6 +20,14 @@ import (
 )
 
 var uploadLimiter = &uploadConcurrencyLimiter{}
+
+func requireAuthenticatedUserID(c *gin.Context) (int64, bool) {
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return 0, false
+	}
+	return identityPrincipal.UserID(), true
+}
 
 type uploadConcurrencyLimiter struct {
 	mu       sync.Mutex
@@ -101,9 +110,8 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		userID := c.GetInt64("user_id")
-		if userID == 0 {
-			response.Error(c, 401, "未登录")
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
 			return
 		}
 		if h.UserRepo == nil || h.StorageService == nil {
@@ -156,9 +164,8 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		userID := c.GetInt64("user_id")
-		if userID == 0 {
-			response.Error(c, 401, "未登录")
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
 			return
 		}
 		boardID := strings.TrimSpace(c.Param("board_id"))
@@ -210,9 +217,8 @@ func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, "请求参数错误")
 			return
 		}
-		userID := c.GetInt64("user_id")
-		if userID == 0 {
-			response.Error(c, 401, "未登录")
+		userID, ok := requireAuthenticatedUserID(c)
+		if !ok {
 			return
 		}
 		if h.BoardService == nil {

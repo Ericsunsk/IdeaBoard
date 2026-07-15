@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
 )
@@ -199,7 +201,7 @@ func TestUserCreditWalletHTTPScopesReadToAuthenticatedUser(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(94))
+		testsupport.SetPrincipal(t, c, 94, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/api/user/credits/wallet", handler.GetCurrentWallet)

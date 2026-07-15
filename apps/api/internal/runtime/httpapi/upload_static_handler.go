@@ -60,12 +60,8 @@ func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {
 		return false
 	}
 
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
-		return false
-	}
-	return true
+	_, ok := requireAuthenticatedUserID(c)
+	return ok
 }
 
 type staticUploadBoardAccessResolver struct {
@@ -88,7 +84,10 @@ func authorizeStaticUploadResourceRead(
 	deps StaticUploadDeps,
 	resource storage.UploadResource,
 ) (storage.ReadableUploadAccessResult, bool) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireAuthenticatedUserID(c)
+	if !ok {
+		return storage.ReadableUploadAccessResult{}, false
+	}
 	readAccess, ok := resolveStaticUploadReadAccess(c, deps, resource.Kind)
 	if !ok {
 		return storage.ReadableUploadAccessResult{}, false

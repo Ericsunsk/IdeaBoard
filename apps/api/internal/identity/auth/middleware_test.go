@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
@@ -200,14 +201,14 @@ func TestAuthMiddlewareSetsCompletePrincipal(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var got Principal
+			var got principal.Principal
 			router := gin.New()
 			router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
 				BaseURL: authServer.URL, TimeoutSeconds: 1,
 			}), userRepo, nil))
 			router.GET("/me", func(c *gin.Context) {
 				var ok bool
-				got, ok = PrincipalFrom(c)
+				got, ok = principal.From(c)
 				if !ok {
 					t.Fatal("authenticated request is missing Principal")
 				}
@@ -272,7 +273,7 @@ func TestAuthMiddlewareRejectsInvalidLocalPrincipal(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Next()
-		_, hasPrincipal := PrincipalFrom(c)
+		_, hasPrincipal := principal.From(c)
 		_, hasUserID := c.Get("user_id")
 		_, hasRole := c.Get("role")
 		authorityLeaked = hasPrincipal || hasUserID || hasRole
@@ -300,7 +301,7 @@ func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 	tests := []struct {
 		name           string
 		role           string
-		rawPrincipal   any
+		setInvalid     bool
 		setPrincipal   bool
 		wantStatus     int
 		wantHandlerRun bool
@@ -323,15 +324,8 @@ func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 			wantHandlerRun: true,
 		},
 		{
-			name:         "wrong Principal type",
-			rawPrincipal: 123,
-			wantStatus:   http.StatusForbidden,
-		},
-		{
-			name: "invalid Principal role",
-			rawPrincipal: Principal{
-				userID: 1, authUserID: "auth-1", username: "alice", role: Role("owner"),
-			},
+			name:       "invalid Principal",
+			setInvalid: true,
 			wantStatus: http.StatusForbidden,
 		},
 	}
@@ -341,11 +335,11 @@ func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 			handlerRan := false
 			router := gin.New()
 			router.Use(func(c *gin.Context) {
-				if tt.rawPrincipal != nil {
-					c.Set(principalContextKey, tt.rawPrincipal)
+				if tt.setInvalid {
+					_ = principal.Set(c, principal.Principal{})
 				} else if tt.setPrincipal {
-					principal, err := NewPrincipal(1, "auth-1", "alice", tt.role)
-					if err != nil || SetPrincipal(c, principal) != nil {
+					identityPrincipal, err := principal.New(1, "auth-1", "alice", tt.role)
+					if err != nil || principal.Set(c, identityPrincipal) != nil {
 						t.Fatalf("set test Principal: %v", err)
 					}
 				}

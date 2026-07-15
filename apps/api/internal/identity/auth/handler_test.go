@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,12 +18,12 @@ func TestGetCurrentUserRejectsInvalidUserID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
-		name      string
-		setUserID func(c *gin.Context)
+		name        string
+		setIdentity func(c *gin.Context)
 	}{
 		{name: "missing"},
-		{name: "wrong type", setUserID: func(c *gin.Context) { c.Set("user_id", "1") }},
-		{name: "zero", setUserID: func(c *gin.Context) { c.Set("user_id", int64(0)) }},
+		{name: "legacy user id is ignored", setIdentity: func(c *gin.Context) { c.Set("user_id", int64(1)) }},
+		{name: "invalid Principal", setIdentity: func(c *gin.Context) { _ = principal.Set(c, principal.Principal{}) }},
 	}
 
 	for _, tt := range tests {
@@ -29,8 +31,8 @@ func TestGetCurrentUserRejectsInvalidUserID(t *testing.T) {
 			handler := NewAuthHandler(nil)
 			router := gin.New()
 			router.GET("/api/user/info", func(c *gin.Context) {
-				if tt.setUserID != nil {
-					tt.setUserID(c)
+				if tt.setIdentity != nil {
+					tt.setIdentity(c)
 				}
 				handler.GetCurrentUser(c)
 			})
@@ -48,7 +50,7 @@ func TestGetCurrentUserReturnsNotFoundWhenUserMissing(t *testing.T) {
 	handler := NewAuthHandler(users.NewUserService(users.NewUserRepository(db), nil))
 	router := gin.New()
 	router.GET("/api/user/info", func(c *gin.Context) {
-		c.Set("user_id", int64(999))
+		testsupport.SetPrincipal(t, c, 999, principal.RoleUser)
 		handler.GetCurrentUser(c)
 	})
 

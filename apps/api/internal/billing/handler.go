@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
@@ -70,6 +71,9 @@ type setPriceEnabledRequest struct {
 }
 
 func (h *Handler) Quote(c *gin.Context) {
+	if _, ok := principal.Require(c); !ok {
+		return
+	}
 	if h == nil || h.quoter == nil {
 		writeError(c, ErrServiceUnavailable)
 		return

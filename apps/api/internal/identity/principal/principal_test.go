@@ -1,4 +1,4 @@
-package auth
+package principal
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestNewPrincipalEnforcesCompleteCanonicalIdentity(t *testing.T) {
+func TestNewEnforcesCompleteCanonicalIdentity(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -36,15 +36,15 @@ func TestNewPrincipalEnforcesCompleteCanonicalIdentity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			principal, err := NewPrincipal(tt.userID, tt.authUserID, tt.username, tt.role)
+			principal, err := New(tt.userID, tt.authUserID, tt.username, tt.role)
 			if tt.wantErr {
-				if !errors.Is(err, ErrInvalidPrincipal) || principal.IsValid() {
-					t.Fatalf("NewPrincipal() = %+v, %v; want invalid principal", principal, err)
+				if !errors.Is(err, ErrInvalid) || principal.IsValid() {
+					t.Fatalf("New() = %+v, %v; want invalid principal", principal, err)
 				}
 				return
 			}
 			if err != nil || !principal.IsValid() {
-				t.Fatalf("NewPrincipal() = %+v, %v", principal, err)
+				t.Fatalf("New() = %+v, %v", principal, err)
 			}
 			if principal.UserID() != tt.userID || principal.AuthUserID() != tt.wantAuthID || principal.Username() != tt.wantName || principal.Role() != tt.wantRole {
 				t.Fatalf("principal = %+v", principal)
@@ -58,19 +58,19 @@ func TestNewPrincipalEnforcesCompleteCanonicalIdentity(t *testing.T) {
 
 func TestPrincipalContextAccessorsFailClosed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	principal, err := NewPrincipal(7, "auth-7", "alice", "user")
+	principal, err := New(7, "auth-7", "alice", "user")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Run("set and read", func(t *testing.T) {
 		context, _ := gin.CreateTestContext(httptest.NewRecorder())
-		if err := SetPrincipal(context, principal); err != nil {
+		if err := Set(context, principal); err != nil {
 			t.Fatal(err)
 		}
-		got, ok := PrincipalFrom(context)
+		got, ok := From(context)
 		if !ok || got.UserID() != 7 || got.AuthUserID() != "auth-7" || got.Username() != "alice" || got.Role() != RoleUser {
-			t.Fatalf("PrincipalFrom() = %+v, %v", got, ok)
+			t.Fatalf("From() = %+v, %v", got, ok)
 		}
 	})
 
@@ -88,21 +88,21 @@ func TestPrincipalContextAccessorsFailClosed(t *testing.T) {
 			if tt.value != nil {
 				context.Set(principalContextKey, tt.value)
 			}
-			if got, ok := PrincipalFrom(context); ok || got.IsValid() {
-				t.Fatalf("PrincipalFrom() = %+v, %v; want fail closed", got, ok)
+			if got, ok := From(context); ok || got.IsValid() {
+				t.Fatalf("From() = %+v, %v; want fail closed", got, ok)
 			}
 		})
 	}
 
 	t.Run("invalid overwrite clears authority", func(t *testing.T) {
 		context, _ := gin.CreateTestContext(httptest.NewRecorder())
-		if err := SetPrincipal(context, principal); err != nil {
+		if err := Set(context, principal); err != nil {
 			t.Fatal(err)
 		}
-		if err := SetPrincipal(context, Principal{}); !errors.Is(err, ErrInvalidPrincipal) {
-			t.Fatalf("SetPrincipal() error = %v", err)
+		if err := Set(context, Principal{}); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("Set() error = %v", err)
 		}
-		if _, ok := PrincipalFrom(context); ok {
+		if _, ok := From(context); ok {
 			t.Fatal("invalid overwrite retained authenticated authority")
 		}
 	})
@@ -110,8 +110,8 @@ func TestPrincipalContextAccessorsFailClosed(t *testing.T) {
 	t.Run("require responds unauthorized", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		context, _ := gin.CreateTestContext(recorder)
-		if got, ok := RequirePrincipal(context); ok || got.IsValid() {
-			t.Fatalf("RequirePrincipal() = %+v, %v", got, ok)
+		if got, ok := Require(context); ok || got.IsValid() {
+			t.Fatalf("Require() = %+v, %v", got, ok)
 		}
 		if recorder.Code != http.StatusUnauthorized || !context.IsAborted() {
 			t.Fatalf("status = %d aborted = %v body = %s", recorder.Code, context.IsAborted(), recorder.Body.String())

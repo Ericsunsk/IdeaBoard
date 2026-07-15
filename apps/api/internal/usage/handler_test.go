@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/testsupport"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,7 +23,7 @@ func TestHandlerGetCurrentUsesAuthenticatedUser(t *testing.T) {
 	}}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(42))
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/usage", NewHandler(service).GetCurrent)
@@ -46,7 +49,7 @@ func TestHandlerGetCurrentDefaultsToThirtyDays(t *testing.T) {
 	}}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(42))
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/usage", NewHandler(service).GetCurrent)
@@ -67,7 +70,7 @@ func TestHandlerGetCurrentRejectsUnsupportedRange(t *testing.T) {
 	service := &usageReaderStub{}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(42))
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/usage", NewHandler(service).GetCurrent)
@@ -90,7 +93,7 @@ func TestHandlerGetCurrentReturnsRetryableInlineFailureStatus(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(42))
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/usage", NewHandler(&usageReaderStub{err: errors.New("database unavailable")}).GetCurrent)
@@ -106,7 +109,7 @@ func TestHandlerGetCurrentRejectsUnsafeNumbers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(42))
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
 		c.Next()
 	})
 	router.GET("/usage", NewHandler(&usageReaderStub{result: Usage{

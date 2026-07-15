@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/testsupport"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -64,6 +67,10 @@ func TestQuoteHandlerRejectsCallerSuppliedPrice(t *testing.T) {
 	service := &handlerServiceStub{}
 	handler := NewHandler(service, service)
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
+		c.Next()
+	})
 	router.POST("/quote", handler.Quote)
 
 	response := httptest.NewRecorder()
@@ -86,6 +93,10 @@ func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 	service := &handlerServiceStub{}
 	handler := NewHandler(service, service)
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
+		c.Next()
+	})
 	router.POST("/quote", handler.Quote)
 
 	response := httptest.NewRecorder()
@@ -98,6 +109,37 @@ func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 	}
 	if service.quoteInput.sku != "IDEABOARD:IMAGE.GENERATE" || service.quoteInput.quantity != 4 {
 		t.Fatalf("Quote input = %+v", service.quoteInput)
+	}
+}
+
+func TestQuoteHandlerRequiresTypedPrincipal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name  string
+		setup func(*gin.Context)
+	}{
+		{name: "missing"},
+		{name: "legacy key", setup: func(c *gin.Context) { c.Set("user_id", int64(42)) }},
+		{name: "invalid Principal", setup: func(c *gin.Context) { _ = principal.Set(c, principal.Principal{}) }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			service := &handlerServiceStub{}
+			router := gin.New()
+			router.POST("/quote", func(c *gin.Context) {
+				if tt.setup != nil {
+					tt.setup(c)
+				}
+				NewHandler(service, service).Quote(c)
+			})
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(`{"sku":"ideaboard:image.generate","quantity":1}`))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusUnauthorized || service.quoteInput.sku != "" || strings.Count(recorder.Body.String(), `"code"`) != 1 {
+				t.Fatalf("status = %d input = %+v body = %s", recorder.Code, service.quoteInput, recorder.Body.String())
+			}
+		})
 	}
 }
 

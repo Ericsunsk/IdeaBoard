@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/tasking/taskbilling"
@@ -100,12 +101,11 @@ func NewHandler(taskService *Service) *Handler {
 }
 
 func requireUserID(c *gin.Context) (int64, bool) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
 		return 0, false
 	}
-	return userID, true
+	return identityPrincipal.UserID(), true
 }
 
 func (h *Handler) SubmitTask(c *gin.Context) {

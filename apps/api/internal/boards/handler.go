@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
@@ -81,10 +82,17 @@ func NewBoardHandler(service *BoardService, publicURLs settings.PublicURLSetting
 	return &BoardHandler{service: service, publicURLs: publicURLs}
 }
 
+func requireBoardUserID(c *gin.Context) (int64, bool) {
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return 0, false
+	}
+	return identityPrincipal.UserID(), true
+}
+
 func (h *BoardHandler) ListBoards(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	userID, ok := requireBoardUserID(c)
+	if !ok {
 		return
 	}
 	list, err := h.service.ListBoards(c.Request.Context(), userID)
@@ -100,9 +108,8 @@ func (h *BoardHandler) ListBoards(c *gin.Context) {
 }
 
 func (h *BoardHandler) UpsertBoard(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	userID, ok := requireBoardUserID(c)
+	if !ok {
 		return
 	}
 	boardID := strings.TrimSpace(c.Param("board_id"))
@@ -140,9 +147,8 @@ func (h *BoardHandler) UpsertBoard(c *gin.Context) {
 }
 
 func (h *BoardHandler) DeleteBoard(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	userID, ok := requireBoardUserID(c)
+	if !ok {
 		return
 	}
 	boardID := strings.TrimSpace(c.Param("board_id"))
@@ -174,10 +180,9 @@ func (h *BoardHandler) DeleteBoard(c *gin.Context) {
 }
 
 func (h *BoardHandler) ListMembers(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	if !ok {
 		return
 	}
 	members, err := h.service.ListMembers(c.Request.Context(), userID, boardID)
@@ -189,10 +194,9 @@ func (h *BoardHandler) ListMembers(c *gin.Context) {
 }
 
 func (h *BoardHandler) InviteMember(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	if !ok {
 		return
 	}
 	var req InviteBoardMemberRequest
@@ -209,11 +213,10 @@ func (h *BoardHandler) InviteMember(c *gin.Context) {
 }
 
 func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	memberUID := strings.TrimSpace(c.Param("member_uid"))
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	if !ok {
 		return
 	}
 	if !users.IsValidStorageUID(memberUID) {
@@ -234,11 +237,10 @@ func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 }
 
 func (h *BoardHandler) RemoveMember(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	memberUID := strings.TrimSpace(c.Param("member_uid"))
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	if !ok {
 		return
 	}
 	if !users.IsValidStorageUID(memberUID) {
@@ -253,10 +255,9 @@ func (h *BoardHandler) RemoveMember(c *gin.Context) {
 }
 
 func (h *BoardHandler) CreateShareToken(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	if !ok {
 		return
 	}
 	var req CreateBoardShareTokenRequest
@@ -274,10 +275,9 @@ func (h *BoardHandler) CreateShareToken(c *gin.Context) {
 }
 
 func (h *BoardHandler) ListShareTokens(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	if !ok {
 		return
 	}
 	list, err := h.service.ListShareTokens(c.Request.Context(), userID, boardID)
@@ -294,11 +294,10 @@ func (h *BoardHandler) ListShareTokens(c *gin.Context) {
 }
 
 func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
 	tokenID, err := strconv.ParseInt(strings.TrimSpace(c.Param("token_id")), 10, 64)
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	if !ok {
 		return
 	}
 	if err != nil || tokenID <= 0 {
@@ -313,9 +312,8 @@ func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
 }
 
 func (h *BoardHandler) JoinByShareToken(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	userID, ok := requireBoardUserID(c)
+	if !ok {
 		return
 	}
 	var req JoinBoardByShareTokenRequest
