@@ -41,13 +41,14 @@
           />
         </label>
         <Select
-          v-model="sortMode"
+          :model-value="sortMode"
           :options="sortOptions"
           option-label="label"
           option-value="value"
           :class="boardCatalogClasses.sortSelect"
           :pt="boardCatalogSortSelectPt"
           aria-label="Sort canvases"
+          @update:model-value="setSortMode"
         />
       </section>
 
@@ -91,13 +92,13 @@
           :is-renaming="renamingBoardId === board.id"
           :rename-draft="renameDraft"
           :is-menu-open="activeMenuBoardId === board.id"
-          :display-date="formatDate(board.updatedAt)"
-          @click-board="onBoardCardClick(board)"
+          :display-date="formatBoardCatalogDate(board.updatedAt)"
+          @click-board="openBoardFromCard(board)"
           @toggle-menu="toggleBoardMenu(board.id)"
-          @rename-action="handleRenameAction(board)"
-          @duplicate-action="handleDuplicateAction(board)"
-          @delete-action="handleDeleteAction(board)"
-          @rename-input="onRenameInput"
+          @rename-action="startRename(board)"
+          @duplicate-action="duplicateBoard(board)"
+          @delete-action="requestDelete(board)"
+          @rename-input="updateRenameDraft"
           @commit-rename="commitRename"
           @cancel-rename="cancelRename"
           @menu-hidden="handleBoardMenuHidden(board.id)"
@@ -113,16 +114,17 @@
     </main>
 
     <Dialog
-      v-model:visible="deleteDialogVisible"
+      :visible="deleteDialogVisible"
       modal
-      :dismissable-mask="!isDeleteBoardPending"
-      :closable="!isDeleteBoardPending"
+      :dismissable-mask="!isDeletePending"
+      :closable="!isDeletePending"
       :draggable="false"
       :show-header="false"
       :style="boardCatalogDeleteDialogStyle"
       :pt="boardCatalogDeleteDialogPt"
       aria-labelledby="board-delete-dialog-title"
-      @hide="handleDeleteDialogHide"
+      @update:visible="setDeleteDialogVisible"
+      @hide="handleDeleteDialogHidden"
     >
       <div :class="boardCatalogClasses.deleteDialogShell">
         <h2 id="board-delete-dialog-title" :class="boardCatalogClasses.deleteDialogTitle">
@@ -137,17 +139,17 @@
             unstyled
             type="button"
             label="取消"
-            :disabled="isDeleteBoardPending"
+            :disabled="isDeletePending"
             :class="boardCatalogClasses.deleteCancelButton"
             @click="closeDeleteDialog"
           />
           <Button
             unstyled
             type="button"
-            :label="isDeleteBoardPending ? '删除中...' : '删除'"
-            :disabled="isDeleteBoardPending"
+            :label="isDeletePending ? '删除中...' : '删除'"
+            :disabled="isDeletePending"
             :class="boardCatalogClasses.deleteConfirmButton"
-            @click="confirmDeleteBoard"
+            @click="confirmDelete"
           />
         </div>
       </div>
@@ -156,9 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
 import { useCanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
 import BoardCard from '../components/BoardCard.vue'
 import { useBoardFeedback } from '../feedback/useBoardFeedback'
@@ -181,6 +181,10 @@ import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
+import {
+  formatBoardCatalogDate,
+  useBoardCatalogController,
+} from '../controller/boardCatalogController'
 
 const router = useRouter()
 const boardFeedback = useBoardFeedback()
@@ -189,21 +193,51 @@ const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout
 const { projectName } = useSiteBranding()
 const boardCatalog = useCanvasBoardCatalog()
 const boardPreviewRefresh = createBoardPreviewRefreshQueue()
-
-const boards = boardCatalog.viewModel.boards
-const isBoardsLoading = ref(true)
-const searchKeyword = ref('')
-const sortMode = ref<'recent' | 'name'>('recent')
-const renamingBoardId = ref<string | null>(null)
-const renameDraft = ref('')
-const suppressNextBoardOpen = ref(false)
-const activeMenuBoardId = ref<string | null>(null)
-const deleteDialogVisible = ref(false)
-const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
-const isDeleteBoardPending = ref(false)
-const catalogRecoveryBoardId = ref<string | null>(null)
-const isCatalogReloadPending = ref(false)
-const boardPreviewMap = boardPreviewRefresh.previewMap
+const boardCatalogController = useBoardCatalogController({
+  catalog: boardCatalog,
+  preview: boardPreviewRefresh,
+  navigation: {
+    openBoard(boardId) {
+      void router.push({ path: USER_CANVAS_PATH, query: { boardId } })
+    },
+  },
+  feedback: boardFeedback,
+  warn: console.warn,
+})
+const {
+  visibleBoards,
+  previewMap: boardPreviewMap,
+  isBoardsLoading,
+  searchKeyword,
+  sortMode,
+  activeMenuBoardId,
+  renamingBoardId,
+  renameDraft,
+  catalogRecoveryBoardId,
+  isCatalogReloadPending,
+  deleteDialogVisible,
+  pendingDeleteBoard,
+  isDeletePending,
+} = boardCatalogController.viewModel
+const {
+  setSearchKeyword: onSearchInput,
+  setSortMode,
+  toggleBoardMenu,
+  handleBoardMenuHidden,
+  createAndOpenBoard,
+  duplicateBoard,
+  startRename,
+  updateRenameDraft,
+  commitRename,
+  cancelRename,
+  reloadCatalog,
+  openBoardFromCard,
+  requestDelete,
+  closeDeleteDialog,
+  setDeleteDialogVisible,
+  handleDeleteDialogHidden,
+  confirmDelete,
+} = boardCatalogController.commands
 
 const sortOptions = [
   { label: 'Recent', value: 'recent' },
@@ -215,228 +249,5 @@ const accountControls = useUserAccountControls({
     navigate: (path) => router.push(path),
     logout: () => logoutAndRedirect(USER_HOME_PATH),
   },
-})
-
-const visibleBoards = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
-  const filtered = boards.value.filter((board) => {
-    if (!keyword) return true
-    return board.name.toLowerCase().includes(keyword)
-  })
-  if (sortMode.value === 'name') {
-    return [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
-  }
-  return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt)
-})
-
-watch(
-  boards,
-  (nextBoards) => {
-    const snapshot = [...nextBoards]
-    boardPreviewRefresh.reloadFromLocal(snapshot)
-    boardPreviewRefresh.schedule(snapshot)
-  },
-  { immediate: true },
-)
-
-function formatDate(ts: number): string {
-  if (!Number.isFinite(ts)) return '-'
-  const date = new Date(ts)
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}.${month}.${day}`
-}
-
-function onSearchInput(value: string | undefined) {
-  searchKeyword.value = (value || '').trim()
-}
-
-async function createAndOpenBoard() {
-  activeMenuBoardId.value = null
-  const result = await boardCatalog.commands.create()
-  if (!result.ok) {
-    if (result.reason === 'scope-changed') return
-    boardFeedback.createFailed(result)
-    console.warn('[boards] failed to sync new board', result.error)
-    return
-  }
-  router.push({ path: USER_CANVAS_PATH, query: { boardId: result.board.id } })
-}
-
-function openBoard(board: CanvasBoardMeta) {
-  router.push({ path: USER_CANVAS_PATH, query: { boardId: board.id } })
-}
-
-function onBoardCardClick(board: CanvasBoardMeta) {
-  if (activeMenuBoardId.value) {
-    activeMenuBoardId.value = null
-    return
-  }
-  if (renamingBoardId.value || suppressNextBoardOpen.value) {
-    suppressNextBoardOpen.value = false
-    return
-  }
-  openBoard(board)
-}
-
-function startRename(board: CanvasBoardMeta) {
-  activeMenuBoardId.value = null
-  renamingBoardId.value = board.id
-  renameDraft.value = board.name
-}
-
-function onRenameInput(nextName: string) {
-  renameDraft.value = nextName
-}
-
-async function commitRename() {
-  const boardId = renamingBoardId.value
-  if (!boardId) return
-  const result = await boardCatalog.commands.rename({ boardId, nextName: renameDraft.value })
-  if (!result.ok) {
-    switch (result.reason) {
-      case 'scope-changed':
-        return
-      case 'local-name-conflict':
-        boardFeedback.renameValidationFailed(result)
-        return
-      case 'invalid-name':
-        renamingBoardId.value = null
-        suppressNextBoardOpen.value = true
-        boardFeedback.renameValidationFailed(result)
-        return
-      case 'remote-name-conflict':
-      case 'sync-failed':
-        renamingBoardId.value = null
-        suppressNextBoardOpen.value = true
-        boardFeedback.renameSyncFailed(result)
-        catalogRecoveryBoardId.value =
-          result.reason === 'remote-name-conflict'
-            ? result.hydrate?.ok === true
-              ? null
-              : boardId
-            : result.rollback.ok
-              ? null
-              : boardId
-        console.warn('[boards] failed to sync renamed board', result.error)
-        return
-    }
-  }
-  renamingBoardId.value = null
-  suppressNextBoardOpen.value = true
-  boardFeedback.renamed()
-}
-
-async function reloadCatalog() {
-  const boardId = catalogRecoveryBoardId.value
-  if (!boardId || isCatalogReloadPending.value) return
-  isCatalogReloadPending.value = true
-  const result = await boardCatalog.commands.hydrate({
-    preserveLocalNewer: false,
-    rollbackBoardIds: [boardId],
-  })
-  isCatalogReloadPending.value = false
-  if (!result.ok) {
-    boardFeedback.catalogSyncFailed()
-    return
-  }
-  catalogRecoveryBoardId.value = null
-  boardFeedback.catalogReloaded()
-}
-
-function cancelRename() {
-  renamingBoardId.value = null
-  suppressNextBoardOpen.value = true
-}
-
-function toggleBoardMenu(boardId: string) {
-  if (activeMenuBoardId.value === boardId) {
-    activeMenuBoardId.value = null
-    return
-  }
-  activeMenuBoardId.value = boardId
-}
-
-function handleBoardMenuHidden(boardId: string) {
-  if (activeMenuBoardId.value === boardId) {
-    activeMenuBoardId.value = null
-  }
-}
-
-function handleRenameAction(board: CanvasBoardMeta) {
-  startRename(board)
-}
-
-async function handleDuplicateAction(board: CanvasBoardMeta) {
-  activeMenuBoardId.value = null
-  const result = await boardCatalog.commands.duplicate({ sourceBoardId: board.id })
-  if (!result.ok) {
-    if (result.reason === 'scope-changed') return
-    boardFeedback.copyFailed(result)
-    if (result.reason !== 'source-missing') {
-      console.warn('[boards] failed to sync duplicated board', result.error)
-    }
-    return
-  }
-  boardFeedback.copied()
-}
-
-function handleDeleteAction(board: CanvasBoardMeta) {
-  activeMenuBoardId.value = null
-  pendingDeleteBoard.value = board
-  deleteDialogVisible.value = true
-}
-
-function closeDeleteDialog() {
-  if (isDeleteBoardPending.value) return
-  deleteDialogVisible.value = false
-}
-
-function handleDeleteDialogHide() {
-  if (!isDeleteBoardPending.value) {
-    pendingDeleteBoard.value = null
-  }
-}
-
-async function confirmDeleteBoard() {
-  const board = pendingDeleteBoard.value
-  if (!board || isDeleteBoardPending.value) return
-  isDeleteBoardPending.value = true
-  const result = await boardCatalog.commands.delete({ boardId: board.id })
-  if (!result.ok) {
-    if (result.reason === 'scope-changed') {
-      isDeleteBoardPending.value = false
-      return
-    }
-    boardFeedback.deleteFailed(result)
-    if (result.reason === 'sync-failed') {
-      console.warn('[boards] failed to sync deleted board', result.error)
-    }
-    isDeleteBoardPending.value = false
-    return
-  }
-  if (renamingBoardId.value === board.id) {
-    cancelRename()
-  }
-  deleteDialogVisible.value = false
-  pendingDeleteBoard.value = null
-  isDeleteBoardPending.value = false
-  boardFeedback.deleted()
-}
-
-onMounted(async () => {
-  try {
-    const hydrateResult = await boardCatalog.commands.hydrate()
-    if (!hydrateResult.ok) {
-      boardFeedback.catalogSyncFailed()
-    }
-  } finally {
-    isBoardsLoading.value = false
-  }
-})
-
-onBeforeUnmount(() => {
-  boardPreviewRefresh.dispose()
 })
 </script>
