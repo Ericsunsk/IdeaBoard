@@ -3,6 +3,7 @@ package prompts
 import (
 	"errors"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/workflow"
 
@@ -52,6 +53,10 @@ func (h *FeaturePromptHandler) GetPrompt(c *gin.Context) {
 
 // SetPrompt 设置某功能的系统提示词
 func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
+	identityPrincipal, ok := principal.RequireAdmin(c)
+	if !ok {
+		return
+	}
 	slug, err := featurePromptSlugFromRequest(c)
 	if err != nil {
 		response.Error(c, 400, err.Error())
@@ -73,7 +78,8 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 		response.InternalError(c, 500, "读取当前配置失败", err)
 		return
 	}
-	config, err := h.promptRepo.SetPromptConfig(c.Request.Context(), slug, saveInput, promptUpdatedBy(c))
+	updatedBy := identityPrincipal.UserID()
+	config, err := h.promptRepo.SetPromptConfig(c.Request.Context(), slug, saveInput, &updatedBy)
 	if err != nil {
 		response.InternalError(c, 500, "保存失败", err)
 		return
@@ -128,20 +134,4 @@ func (h *FeaturePromptHandler) featurePromptSaveInput(c *gin.Context, slug strin
 		ModelDefaults:         modelDefaults,
 		UserPromptMergePolicy: mergePolicy,
 	}, nil
-}
-
-func promptUpdatedBy(c *gin.Context) *int64 {
-	value, ok := c.Get("user_id")
-	if !ok {
-		return nil
-	}
-	switch typed := value.(type) {
-	case int64:
-		return &typed
-	case int:
-		converted := int64(typed)
-		return &converted
-	default:
-		return nil
-	}
 }

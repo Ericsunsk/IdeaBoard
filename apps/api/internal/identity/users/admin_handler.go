@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/autherrors"
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
@@ -305,6 +306,10 @@ func (h *AdminHandler) GetOperationalSettings(c *gin.Context) {
 
 // UpdateOperationalSettings atomically persists the typed groups and their admin audit record.
 func (h *AdminHandler) UpdateOperationalSettings(c *gin.Context) {
+	identityPrincipal, ok := principal.RequireAdmin(c)
+	if !ok {
+		return
+	}
 	runtimeSettings, ok := h.requireRuntimeSettings(c)
 	if !ok {
 		return
@@ -314,7 +319,7 @@ func (h *AdminHandler) UpdateOperationalSettings(c *gin.Context) {
 		response.Error(c, 400, "参数错误，reason 与所有 operational settings 分组均为必填")
 		return
 	}
-	action, err := adminaction.New(c.GetInt64("user_id"), req.Reason)
+	action, err := adminaction.New(identityPrincipal.UserID(), req.Reason)
 	if err != nil {
 		if errors.Is(err, adminaction.ErrInvalidActor) {
 			response.Error(c, 400, "管理员身份无效")
@@ -384,6 +389,10 @@ func (h *AdminHandler) respondRuntimeSettingsReadError(c *gin.Context, err error
 }
 
 func (h *AdminHandler) BanUser(c *gin.Context) {
+	identityPrincipal, authorized := principal.RequireAdmin(c)
+	if !authorized {
+		return
+	}
 	var req AdminBanUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
@@ -394,7 +403,7 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 		return
 	}
 
-	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c)
+	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c, identityPrincipal)
 	if !ok {
 		return
 	}
@@ -407,7 +416,11 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 }
 
 func (h *AdminHandler) UnbanUser(c *gin.Context) {
-	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c)
+	identityPrincipal, authorized := principal.RequireAdmin(c)
+	if !authorized {
+		return
+	}
+	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c, identityPrincipal)
 	if !ok {
 		return
 	}
@@ -420,7 +433,11 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 }
 
 func (h *AdminHandler) RevokeUserSessions(c *gin.Context) {
-	targetUser, authUserID, _, ok := h.prepareManagedAuthUser(c)
+	identityPrincipal, authorized := principal.RequireAdmin(c)
+	if !authorized {
+		return
+	}
+	targetUser, authUserID, _, ok := h.prepareManagedAuthUser(c, identityPrincipal)
 	if !ok {
 		return
 	}
@@ -440,6 +457,10 @@ func (h *AdminHandler) RevokeUserSessions(c *gin.Context) {
 }
 
 func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
+	identityPrincipal, authorized := principal.RequireAdmin(c)
+	if !authorized {
+		return
+	}
 	var req struct {
 		Role string `json:"role" binding:"required"`
 	}
@@ -459,8 +480,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	currentUserID := c.GetInt64("user_id")
-	if currentUserID != 0 && currentUserID == targetUser.ID {
+	if identityPrincipal.UserID() == targetUser.ID {
 		response.Error(c, 400, "不能修改当前登录管理员自己的角色")
 		return
 	}
@@ -513,13 +533,16 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 
 // DeleteUser 删除用户
 func (h *AdminHandler) DeleteUser(c *gin.Context) {
+	identityPrincipal, authorized := principal.RequireAdmin(c)
+	if !authorized {
+		return
+	}
 	targetUser, ok := h.getTargetUserByParam(c)
 	if !ok {
 		return
 	}
 
-	currentUserID := c.GetInt64("user_id")
-	if currentUserID != 0 && currentUserID == targetUser.ID {
+	if identityPrincipal.UserID() == targetUser.ID {
 		response.Error(c, 400, "不能彻底注销当前登录管理员自己")
 		return
 	}
@@ -573,13 +596,12 @@ func normalizeAdminRole(role string) string {
 	return ""
 }
 
-func (h *AdminHandler) prepareManagedAuthUser(c *gin.Context) (*User, string, int16, bool) {
+func (h *AdminHandler) prepareManagedAuthUser(c *gin.Context, identityPrincipal principal.Principal) (*User, string, int16, bool) {
 	targetUser, ok := h.getTargetUserByParam(c)
 	if !ok {
 		return nil, "", 0, false
 	}
-	currentUserID := c.GetInt64("user_id")
-	if currentUserID != 0 && currentUserID == targetUser.ID {
+	if identityPrincipal.UserID() == targetUser.ID {
 		response.Error(c, 400, "不能操作当前登录管理员自己")
 		return nil, "", 0, false
 	}

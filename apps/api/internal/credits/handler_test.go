@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/adminaction"
+	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
 )
@@ -66,7 +68,7 @@ func TestStartReconciliationHandlerRequiresAndTrimsReason(t *testing.T) {
 	handler := NewHandler(service)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(7))
+		testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
 		c.Next()
 	})
 	router.POST("/runs", handler.StartReconciliation)
@@ -97,6 +99,96 @@ func TestStartReconciliationHandlerRequiresAndTrimsReason(t *testing.T) {
 	}
 	if service.startCalls != 1 || service.startInput.Action.ActorID() != 7 || service.startInput.Action.Reason() != "manual audit" || service.startInput.StaleHoldAfter != 24*time.Hour {
 		t.Fatalf("StartReconciliation input=%+v calls=%d", service.startInput, service.startCalls)
+	}
+}
+
+func TestAdminCreditHandlersRejectUserPrincipal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name   string
+		method string
+		path   string
+		route  string
+		run    gin.HandlerFunc
+	}{
+		{name: "grant", method: http.MethodPost, path: "/grants", route: "/grants", run: NewHandler(&adminHandlerServiceStub{}).Grant},
+		{name: "wallet", method: http.MethodGet, path: "/wallets/1", route: "/wallets/:user_id", run: NewHandler(&adminHandlerServiceStub{}).GetWallet},
+		{name: "ledger", method: http.MethodGet, path: "/wallets/1/ledger", route: "/wallets/:user_id/ledger", run: NewHandler(&adminHandlerServiceStub{}).ListLedger},
+		{name: "start reconciliation", method: http.MethodPost, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).StartReconciliation},
+		{name: "list reconciliation runs", method: http.MethodGet, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).ListReconciliationRuns},
+		{name: "get reconciliation run", method: http.MethodGet, path: "/runs/1", route: "/runs/:run_id", run: NewHandler(&adminHandlerServiceStub{}).GetReconciliationRun},
+		{name: "list reconciliation findings", method: http.MethodGet, path: "/runs/1/findings", route: "/runs/:run_id/findings", run: NewHandler(&adminHandlerServiceStub{}).ListReconciliationFindings},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				testsupport.SetPrincipal(t, c, 7, principal.RoleUser)
+				c.Next()
+			})
+			router.Handle(tt.method, tt.route, tt.run)
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(tt.method, tt.path, strings.NewReader(`{}`)))
+			if recorder.Code != http.StatusForbidden || strings.Count(recorder.Body.String(), `"code"`) != 1 {
+				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
+
+func TestAdminCreditReadHandlersRejectMissingPrincipal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewHandler(&adminHandlerServiceStub{})
+
+	for _, tt := range []struct {
+		name  string
+		path  string
+		route string
+		run   gin.HandlerFunc
+	}{
+		{name: "wallet", path: "/wallets/1", route: "/wallets/:user_id", run: handler.GetWallet},
+		{name: "ledger", path: "/wallets/1/ledger", route: "/wallets/:user_id/ledger", run: handler.ListLedger},
+		{name: "list reconciliation runs", path: "/runs", route: "/runs", run: handler.ListReconciliationRuns},
+		{name: "get reconciliation run", path: "/runs/1", route: "/runs/:run_id", run: handler.GetReconciliationRun},
+		{name: "list reconciliation findings", path: "/runs/1/findings", route: "/runs/:run_id/findings", run: handler.ListReconciliationFindings},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.GET(tt.route, tt.run)
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			if recorder.Code != http.StatusUnauthorized || strings.Count(recorder.Body.String(), `"code"`) != 1 {
+				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
+
+func TestAdminCreditHandlersAuthenticateBeforeServiceAvailability(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name       string
+		setup      func(*gin.Context)
+		wantStatus int
+	}{
+		{name: "missing Principal", wantStatus: http.StatusUnauthorized},
+		{name: "user Principal", setup: func(c *gin.Context) { testsupport.SetPrincipal(t, c, 7, principal.RoleUser) }, wantStatus: http.StatusForbidden},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.POST("/grants", func(c *gin.Context) {
+				if tt.setup != nil {
+					tt.setup(c)
+				}
+				NewHandler(nil).Grant(c)
+			})
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/grants", strings.NewReader(`{}`)))
+			if recorder.Code != tt.wantStatus || strings.Count(recorder.Body.String(), `"code"`) != 1 {
+				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+			}
+		})
 	}
 }
 

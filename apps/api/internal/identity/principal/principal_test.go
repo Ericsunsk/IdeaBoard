@@ -118,3 +118,40 @@ func TestPrincipalContextAccessorsFailClosed(t *testing.T) {
 		}
 	})
 }
+
+func TestRequireAdminUsesTypedRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name       string
+		role       string
+		set        bool
+		wantStatus int
+		wantOK     bool
+	}{
+		{name: "missing", wantStatus: http.StatusUnauthorized},
+		{name: "user", role: "user", set: true, wantStatus: http.StatusForbidden},
+		{name: "admin", role: "admin", set: true, wantStatus: http.StatusOK, wantOK: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+			if tt.set {
+				identityPrincipal, err := New(7, "auth-7", "alice", tt.role)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := Set(context, identityPrincipal); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, ok := RequireAdmin(context)
+			if ok != tt.wantOK || (ok && (!got.IsAdmin() || got.UserID() != 7)) {
+				t.Fatalf("RequireAdmin() = %+v, %v", got, ok)
+			}
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}

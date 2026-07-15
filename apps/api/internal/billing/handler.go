@@ -240,16 +240,15 @@ func (h *Handler) ListPrices(c *gin.Context) {
 }
 
 func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
+	identityPrincipal, ok := principal.RequireAdmin(c)
+	if !ok {
+		return 0, false
+	}
 	if h == nil || h.admin == nil {
 		writeError(c, ErrServiceUnavailable)
 		return 0, false
 	}
-	actorID := c.GetInt64("user_id")
-	if actorID <= 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
-		return 0, false
-	}
-	return actorID, true
+	return identityPrincipal.UserID(), true
 }
 
 func decodeStrictJSON(c *gin.Context, destination any) error {

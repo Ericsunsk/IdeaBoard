@@ -151,14 +151,16 @@ func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
 	for _, tt := range []struct {
 		name       string
 		actorID    int64
+		role       principal.Role
 		body       string
 		wantStatus int
 	}{
 		{name: "missing actor", body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"launch pricing"}`, wantStatus: http.StatusUnauthorized},
-		{name: "missing explicit enabled", actorID: 9, body: `{"sku":"test:item","display_name":"Item","reason":"launch pricing"}`, wantStatus: http.StatusBadRequest},
-		{name: "missing reason", actorID: 9, body: `{"sku":"test:item","display_name":"Item","enabled":true}`, wantStatus: http.StatusBadRequest},
-		{name: "blank reason", actorID: 9, body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"  "}`, wantStatus: http.StatusBadRequest},
-		{name: "valid", actorID: 9, body: `{"sku":"test:item","display_name":"Item","description":"D","enabled":true,"reason":"  launch pricing  "}`, wantStatus: http.StatusOK},
+		{name: "user role", actorID: 9, role: principal.RoleUser, body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"launch pricing"}`, wantStatus: http.StatusForbidden},
+		{name: "missing explicit enabled", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","reason":"launch pricing"}`, wantStatus: http.StatusBadRequest},
+		{name: "missing reason", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","enabled":true}`, wantStatus: http.StatusBadRequest},
+		{name: "blank reason", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"  "}`, wantStatus: http.StatusBadRequest},
+		{name: "valid", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","description":"D","enabled":true,"reason":"  launch pricing  "}`, wantStatus: http.StatusOK},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			response := httptest.NewRecorder()
@@ -170,7 +172,7 @@ func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
 			routerWithActor := gin.New()
 			routerWithActor.Use(func(c *gin.Context) {
 				if tt.actorID > 0 {
-					c.Set("user_id", tt.actorID)
+					testsupport.SetPrincipal(t, c, tt.actorID, tt.role)
 				}
 				c.Next()
 			})
@@ -186,13 +188,41 @@ func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
 	}
 }
 
+func TestAdminBillingAuthenticatesBeforeServiceAvailability(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name       string
+		setup      func(*gin.Context)
+		wantStatus int
+	}{
+		{name: "missing Principal", wantStatus: http.StatusUnauthorized},
+		{name: "user Principal", setup: func(c *gin.Context) { testsupport.SetPrincipal(t, c, 9, principal.RoleUser) }, wantStatus: http.StatusForbidden},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.POST("/skus", func(c *gin.Context) {
+				if tt.setup != nil {
+					tt.setup(c)
+				}
+				NewHandler(nil, nil).CreateSKU(c)
+			})
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/skus", strings.NewReader(`{}`)))
+			if recorder.Code != tt.wantStatus || strings.Count(recorder.Body.String(), `"code"`) != 1 {
+				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
 	handler := NewHandler(service, service)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(9))
+		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
 		c.Next()
 	})
 	router.PATCH("/skus/:sku", handler.UpdateSKU)
@@ -249,7 +279,7 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 	handler := NewHandler(service, service)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(9))
+		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
 		c.Next()
 	})
 	router.PATCH("/skus/:sku", handler.UpdateSKU)

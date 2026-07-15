@@ -23,7 +23,10 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
 	handler := NewHandler(service)
 	router := gin.New()
-	router.Use(func(c *gin.Context) { c.Set("user_id", int64(1)); c.Next() })
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
 	router.POST("/api/admin/credits/reconciliation/runs", handler.StartReconciliation)
 	router.GET("/api/admin/credits/reconciliation/runs", handler.ListReconciliationRuns)
 	router.GET("/api/admin/credits/reconciliation/runs/:run_id", handler.GetReconciliationRun)
@@ -107,6 +110,10 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 func TestAdminCreditReconciliationReadHandlersReturnServiceUnavailable(t *testing.T) {
 	handler := NewHandler(nil)
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
 	router.GET("/runs", handler.ListReconciliationRuns)
 	router.GET("/runs/:run_id", handler.GetReconciliationRun)
 	router.GET("/runs/:run_id/findings", handler.ListReconciliationFindings)
@@ -126,7 +133,7 @@ func TestAdminCreditHTTPContractGrantsAndReadsWallet(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_id", int64(7))
+		testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
 		c.Next()
 	})
 	router.POST("/api/admin/credits/grants", handler.Grant)
@@ -221,7 +228,10 @@ func TestAdminCreditHTTPBindsActorAndRejectsUnknownFields(t *testing.T) {
 	handler := NewHandler(service)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(func(c *gin.Context) { c.Set("user_id", int64(7)); c.Next() })
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
+		c.Next()
+	})
 	router.POST("/api/admin/credits/grants", handler.Grant)
 	router.POST("/api/admin/credits/deductions", handler.Deduct)
 	router.POST("/api/admin/credits/refunds", handler.Refund)

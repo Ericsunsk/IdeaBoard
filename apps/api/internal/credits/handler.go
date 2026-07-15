@@ -138,11 +138,7 @@ func (h *Handler) Correct(c *gin.Context) {
 }
 
 func (h *Handler) prepareAdminCreditCommand(c *gin.Context, request adminCreditCommandRequest) (int64, CreditAmount, bool) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
-		return 0, 0, false
-	}
-	adminID, ok := authenticatedAdminID(c)
+	adminID, ok := h.requireAdmin(c)
 	if !ok {
 		return 0, 0, false
 	}
@@ -167,13 +163,16 @@ func writeAdminCreditCommand(c *gin.Context, execute func(context.Context) (Comm
 	response.SuccessDTO(c, result)
 }
 
-func authenticatedAdminID(c *gin.Context) (int64, bool) {
-	adminID := c.GetInt64("user_id")
-	if adminID <= 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
+	identityPrincipal, ok := principal.RequireAdmin(c)
+	if !ok {
 		return 0, false
 	}
-	return adminID, true
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
+		return 0, false
+	}
+	return identityPrincipal.UserID(), true
 }
 
 func adminCommandMetadata(adminID int64, idempotencyKey, source, reason, businessReferenceID string) CommandMetadata {
@@ -190,8 +189,7 @@ func decodeAdminCreditRequest(c *gin.Context, destination any) error {
 }
 
 func (h *Handler) GetWallet(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
+	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
 	userID, ok := parsePositiveInt64(c.Param("user_id"))
@@ -225,8 +223,7 @@ func (h *Handler) GetCurrentWallet(c *gin.Context) {
 }
 
 func (h *Handler) ListLedger(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
+	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
 	userID, ok := parsePositiveInt64(c.Param("user_id"))
@@ -277,11 +274,7 @@ func authenticatedUserID(c *gin.Context) (int64, bool) {
 }
 
 func (h *Handler) StartReconciliation(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
-		return
-	}
-	adminID, ok := authenticatedAdminID(c)
+	adminID, ok := h.requireAdmin(c)
 	if !ok {
 		return
 	}
@@ -313,8 +306,7 @@ func (h *Handler) StartReconciliation(c *gin.Context) {
 }
 
 func (h *Handler) GetReconciliationRun(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
+	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
 	runID, ok := parsePositiveInt64(c.Param("run_id"))
@@ -331,8 +323,7 @@ func (h *Handler) GetReconciliationRun(c *gin.Context) {
 }
 
 func (h *Handler) ListReconciliationRuns(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
+	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
 	input, ok := parseReconciliationPage(c)
@@ -348,8 +339,7 @@ func (h *Handler) ListReconciliationRuns(c *gin.Context) {
 }
 
 func (h *Handler) ListReconciliationFindings(c *gin.Context) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "Idea对账服务暂不可用", nil)
+	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
 	runID, ok := parsePositiveInt64(c.Param("run_id"))

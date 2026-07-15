@@ -100,3 +100,16 @@ func Require(c *gin.Context) (Principal, bool) {
 	}
 	return Principal{}, false
 }
+
+func RequireAdmin(c *gin.Context) (Principal, bool) {
+	identityPrincipal, ok := Require(c)
+	if !ok {
+		return Principal{}, false
+	}
+	if !identityPrincipal.IsAdmin() {
+		response.Error(c, http.StatusForbidden, "需要管理员权限")
+		c.Abort()
+		return Principal{}, false
+	}
+	return identityPrincipal, true
+}

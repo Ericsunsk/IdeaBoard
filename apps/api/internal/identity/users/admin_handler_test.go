@@ -12,7 +12,9 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/autherrors"
+	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
 )
@@ -90,6 +92,40 @@ func (f *fakeAdminAuthManager) RevokeUserSessions(_ context.Context, authUserID 
 
 func newAdminHandlerForRuntimeSettings(db *sql.DB) *AdminHandler {
 	return NewAdminHandler(nil, settings.NewRuntimeSettingsService(settings.NewSystemConfigRepository(db)), nil)
+}
+
+func TestAdminHighRiskHandlersRejectUserPrincipal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewAdminHandler(nil, nil, nil)
+
+	for _, tt := range []struct {
+		name   string
+		method string
+		path   string
+		route  string
+		run    gin.HandlerFunc
+	}{
+		{name: "operational settings", method: http.MethodPut, path: "/settings/operational", route: "/settings/operational", run: handler.UpdateOperationalSettings},
+		{name: "role", method: http.MethodPut, path: "/users/1/role", route: "/users/:id/role", run: handler.UpdateUserRole},
+		{name: "delete", method: http.MethodDelete, path: "/users/1", route: "/users/:id", run: handler.DeleteUser},
+		{name: "ban", method: http.MethodPost, path: "/users/1/ban", route: "/users/:id/ban", run: handler.BanUser},
+		{name: "unban", method: http.MethodPost, path: "/users/1/unban", route: "/users/:id/unban", run: handler.UnbanUser},
+		{name: "revoke sessions", method: http.MethodPost, path: "/users/1/revoke", route: "/users/:id/revoke", run: handler.RevokeUserSessions},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				testsupport.SetPrincipal(t, c, 7, principal.RoleUser)
+				c.Next()
+			})
+			router.Handle(tt.method, tt.route, tt.run)
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(tt.method, tt.path, nil))
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
 }
 
 func TestAdminListUsersRejectsInvalidFilters(t *testing.T) {
@@ -220,14 +256,14 @@ func TestAdminOperationalSettingsUpdateRequiresActorReasonAndReturnsEffectiveSta
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusUnauthorized, rec.Body.String())
 		}
 	})
 
 	t.Run("missing reason", func(t *testing.T) {
 		router := gin.New()
-		router.Use(func(c *gin.Context) { c.Set("user_id", int64(42)); c.Next() })
+		router.Use(func(c *gin.Context) { testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin); c.Next() })
 		router.PUT("/admin/settings/operational", handler.UpdateOperationalSettings)
 		body := strings.Replace(validBody, `"reason":"capacity tuning"`, `"reason":""`, 1)
 		req := httptest.NewRequest(http.MethodPut, "/admin/settings/operational", strings.NewReader(body))
@@ -241,7 +277,7 @@ func TestAdminOperationalSettingsUpdateRequiresActorReasonAndReturnsEffectiveSta
 
 	t.Run("valid update", func(t *testing.T) {
 		router := gin.New()
-		router.Use(func(c *gin.Context) { c.Set("user_id", int64(42)); c.Next() })
+		router.Use(func(c *gin.Context) { testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin); c.Next() })
 		router.PUT("/admin/settings/operational", handler.UpdateOperationalSettings)
 		req := httptest.NewRequest(http.MethodPut, "/admin/settings/operational", strings.NewReader(validBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -810,7 +846,7 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	handler := NewAdminHandler(NewUserService(repo, lifecycle, &recordingUserUploadCleaner{}), nil, authManager)
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
-		c.Set("user_id", int64(999))
+		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.DeleteUser(c)
 	})
 
@@ -853,7 +889,7 @@ func TestAdminDeleteUserReportsLocalCleanupFailureAfterAuthDelete(t *testing.T) 
 	handler := NewAdminHandler(userService, nil, authManager)
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
-		c.Set("user_id", int64(999))
+		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.DeleteUser(c)
 	})
 
@@ -893,7 +929,7 @@ func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
 	handler := NewAdminHandler(NewUserService(repo, lifecycle, &recordingUserUploadCleaner{}), nil, authManager)
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
-		c.Set("user_id", int64(999))
+		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.DeleteUser(c)
 	})
 
@@ -933,7 +969,7 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 	handler := NewAdminHandler(NewUserService(repo, lifecycle), nil, authManager)
 	router := gin.New()
 	router.POST("/admin/users/:id/ban", func(c *gin.Context) {
-		c.Set("user_id", int64(999))
+		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.BanUser(c)
 	})
 
@@ -974,7 +1010,7 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 	handler := NewAdminHandler(NewUserService(repo, nil), nil, authManager)
 	router := gin.New()
 	router.POST("/admin/users/:id/revoke-sessions", func(c *gin.Context) {
-		c.Set("user_id", int64(999))
+		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.RevokeUserSessions(c)
 	})
 
