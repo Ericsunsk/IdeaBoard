@@ -24,6 +24,15 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminFeaturePromptRoutes(adminAPI, h)
 	registerAdminCreditRoutes(adminAPI, h)
 	registerAdminBillingRoutes(adminAPI, h)
+	registerAdminRewardRoutes(adminAPI, h)
+}
+
+func registerAdminRewardRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/rewards/campaigns", h.RewardHandler.ListCampaigns)
+	adminAPI.POST("/rewards/campaigns", h.RewardHandler.CreateCampaign)
+	adminAPI.GET("/rewards/campaigns/:campaign_id", h.RewardHandler.GetCampaign)
+	adminAPI.POST("/rewards/campaigns/:campaign_id/public-code", h.RewardHandler.IssuePublicCode)
+	adminAPI.POST("/rewards/campaigns/:campaign_id/activate", h.RewardHandler.ActivateCampaign)
 }
 
 func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

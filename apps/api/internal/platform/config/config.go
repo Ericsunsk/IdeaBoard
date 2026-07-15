@@ -17,10 +17,15 @@ type Config struct {
 	App      AppConfig
 	Auth     AuthServiceConfig
 	Credits  CreditsConfig
+	Rewards  RewardsConfig
 }
 
 type CreditsConfig struct {
 	WelcomeIdentityKey string
+}
+
+type RewardsConfig struct {
+	CodeHMACKeys string
 }
 
 type DatabaseConfig struct {
@@ -79,6 +84,7 @@ type envConfig struct {
 	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
 	AuthServiceInternalAPIKey string `env:"AUTH_INTERNAL_KEY"`
 	CreditsWelcomeIdentityKey string `env:"CREDITS_WELCOME_IDENTITY_KEY"`
+	RewardsCodeHMACKeys       string `env:"REWARDS_CODE_HMAC_KEYS"`
 }
 
 var loadEnvOnce sync.Once
@@ -127,6 +133,7 @@ func Load() *Config {
 			TimeoutSeconds: 5,
 		},
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
+		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 	}
 }
 

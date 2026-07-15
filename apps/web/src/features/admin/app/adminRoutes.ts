@@ -60,6 +60,12 @@ export const adminRoutes: RouteRecordRaw[] = [
             component: () =>
               import('../credits-billing/reconciliation/AdminCreditReconciliationPage.vue'),
           },
+          {
+            path: 'reward-campaigns',
+            name: 'AdminRewardCampaigns',
+            component: () =>
+              import('../credits-billing/rewards/AdminRewardCampaignsPage.vue'),
+          },
         ],
       },
     ],

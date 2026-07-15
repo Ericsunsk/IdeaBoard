@@ -7,7 +7,8 @@ type ProfileToast = Pick<ReturnType<typeof useAppToast>, 'success' | 'info' | 'w
 export type ProfileFeedback = {
   invalidAvatarFile: () => void
   logoutFailed: () => void
-  rewardRedemptionUnavailable: () => void
+  rewardRedemptionSucceeded: (creditedAmount: number, replayed: boolean) => void
+  rewardRedemptionFailed: (error: unknown) => void
   avatarUpload: AsyncActionFeedback<void>
   passwordChange: AsyncActionFeedback<boolean>
 }
@@ -20,8 +21,11 @@ export function createProfileFeedback(appToast: ProfileToast): ProfileFeedback {
     logoutFailed() {
       appToast.error('退出登录失败，请稍后重试')
     },
-    rewardRedemptionUnavailable() {
-      appToast.info('兑换服务暂未开放')
+    rewardRedemptionSucceeded(creditedAmount, replayed) {
+      appToast.success(replayed ? '奖励已兑换，未重复发放' : `${creditedAmount} Ideas 已到账`)
+    },
+    rewardRedemptionFailed(error) {
+      appToast.error(formatDisplayErrorMessage(error, '网络错误，请重试'))
     },
     avatarUpload: {
       success() {

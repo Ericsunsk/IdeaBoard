@@ -240,6 +240,51 @@ type ProviderEndpoint struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type RewardAdminAction struct {
+	ID          int64           `json:"id"`
+	CampaignID  int64           `json:"campaign_id"`
+	ActionType  string          `json:"action_type"`
+	ActorUserID int64           `json:"actor_user_id"`
+	Reason      string          `json:"reason"`
+	Metadata    json.RawMessage `json:"metadata"`
+	CreatedAt   time.Time       `json:"created_at"`
+}
+
+type RewardCampaign struct {
+	ID              int64     `json:"id"`
+	DisplayName     string    `json:"display_name"`
+	InternalNote    string    `json:"internal_note"`
+	CreditAmount    int64     `json:"credit_amount"`
+	Mode            string    `json:"mode"`
+	Status          string    `json:"status"`
+	MaxRedemptions  int64     `json:"max_redemptions"`
+	RedemptionCount int64     `json:"redemption_count"`
+	CreatedBy       int64     `json:"created_by"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type RewardCode struct {
+	ID         int64     `json:"id"`
+	CampaignID int64     `json:"campaign_id"`
+	KeyVersion string    `json:"key_version"`
+	CodeDigest []byte    `json:"code_digest"`
+	CodeHint   string    `json:"code_hint"`
+	IssuedBy   int64     `json:"issued_by"`
+	IssuedAt   time.Time `json:"issued_at"`
+}
+
+type RewardRedemption struct {
+	ID                    int64     `json:"id"`
+	CampaignID            int64     `json:"campaign_id"`
+	CodeID                int64     `json:"code_id"`
+	UserID                int64     `json:"user_id"`
+	CreditAmount          int64     `json:"credit_amount"`
+	CreditTransactionID   string    `json:"credit_transaction_id"`
+	AvailableBalanceAfter int64     `json:"available_balance_after"`
+	RedeemedAt            time.Time `json:"redeemed_at"`
+}
+
 type StorageProfile struct {
 	ProfileID string          `json:"profile_id"`
 	Name      string          `json:"name"`

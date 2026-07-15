@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/usage"
 
@@ -32,6 +33,7 @@ type appDomainServices struct {
 	billingCoverage   *billingcoverage.Service
 	creditService     *credits.Service
 	usageService      *usage.Service
+	rewardService     *rewards.Service
 	userLifecycle     *users.LifecycleService
 }
 
@@ -48,6 +50,11 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, fmt.Errorf("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
 	}
 	creditService := credits.NewService(appPool)
+	rewardKeys, err := rewards.ParseCodeKeyring(cfg.Rewards.CodeHMACKeys)
+	if err != nil {
+		return appDomainServices{}, err
+	}
+	rewardService := rewards.NewService(appPool, creditService, rewardKeys)
 	billingService := billing.NewService(appPool)
 	billingCoverage := billingcoverage.NewService(repos.accountRepo, billingService)
 	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)
@@ -66,6 +73,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		billingCoverage:   billingCoverage,
 		creditService:     creditService,
 		usageService:      usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
+		rewardService:     rewardService,
 		userLifecycle:     userLifecycle,
 	}, nil
 }

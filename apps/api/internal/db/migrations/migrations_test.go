@@ -480,14 +480,15 @@ func TestBaselineMigrationWrapsFunctionBlocks(t *testing.T) {
 	}
 
 	up := extractUpSQL(string(raw))
-	if starts := strings.Count(up, "-- statement:begin"); starts != 9 {
-		t.Fatalf("baseline function block starts=%d, want 9", starts)
+	if starts := strings.Count(up, "-- statement:begin"); starts != 10 {
+		t.Fatalf("baseline function block starts=%d, want 10", starts)
 	}
-	if ends := strings.Count(up, "-- statement:end"); ends != 9 {
-		t.Fatalf("baseline function block ends=%d, want 9", ends)
+	if ends := strings.Count(up, "-- statement:end"); ends != 10 {
+		t.Fatalf("baseline function block ends=%d, want 10", ends)
 	}
-	if functions := strings.Count(up, "CREATE OR REPLACE FUNCTION"); functions != 9 {
-		t.Fatalf("baseline functions=%d, want 9", functions)
+	functions := strings.Count(up, "CREATE OR REPLACE FUNCTION") + strings.Count(up, "CREATE FUNCTION")
+	if functions != 10 {
+		t.Fatalf("baseline functions=%d, want 10", functions)
 	}
 	if statements := parseSQLStatements(up); len(statements) < 50 {
 		t.Fatalf("baseline parse produced too few statements: %d", len(statements))

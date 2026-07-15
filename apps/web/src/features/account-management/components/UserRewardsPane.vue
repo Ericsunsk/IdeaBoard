@@ -21,6 +21,7 @@
             autocomplete="off"
             autocapitalize="characters"
             :spellcheck="false"
+            :disabled="pending"
             :class="ibFormInputClass"
             placeholder="请输入兑换码"
           />
@@ -29,6 +30,7 @@
             type="submit"
             label="兑换"
             :disabled="!canSubmit"
+            :loading="pending"
             :class="accountPrimaryActionButtonClass"
             :pt="accountButtonPt"
           />
@@ -55,16 +57,24 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
 import { useProfileFeedback } from '../useProfileFeedback'
+import { useUserRewardRedemption } from '../useUserRewardRedemption'
 import AccountManagementPane from './AccountManagementPane.vue'
 import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 
 const code = ref('')
 const profileFeedback = useProfileFeedback()
+const { pending, redeem } = useUserRewardRedemption()
 const normalizedCode = computed(() => code.value.trim())
-const canSubmit = computed(() => normalizedCode.value.length > 0)
+const canSubmit = computed(() => normalizedCode.value.length > 0 && !pending.value)
 
-function submitCode() {
+async function submitCode() {
   if (!canSubmit.value) return
-  profileFeedback.rewardRedemptionUnavailable()
+  try {
+    const result = await redeem(normalizedCode.value)
+    code.value = ''
+    profileFeedback.rewardRedemptionSucceeded(result.credited_amount, result.replayed)
+  } catch (error) {
+    profileFeedback.rewardRedemptionFailed(error)
+  }
 }
 </script>

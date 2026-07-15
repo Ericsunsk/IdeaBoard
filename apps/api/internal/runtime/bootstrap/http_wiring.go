@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/runtime/httpapi"
 	"ideaboard/api/internal/runtime/webdist"
@@ -62,6 +63,7 @@ func newAppRouter(
 			BillingRecords:   billingrecords.NewHandler(services.billingRecords),
 			CreditHandler:    credits.NewHandler(services.creditService),
 			UsageHandler:     usage.NewHandler(services.usageService),
+			RewardHandler:    rewards.NewHandler(services.rewardService),
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
@@ -82,6 +84,7 @@ func newAppRouter(
 			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			StorageService:          services.storageService,
 			UploadSettings:          services.runtimeSettings,
+			RewardHandler:           rewards.NewHandler(services.rewardService),
 		},
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,

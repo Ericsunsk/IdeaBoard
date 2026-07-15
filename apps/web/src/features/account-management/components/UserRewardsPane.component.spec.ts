@@ -4,11 +4,21 @@ import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import UserRewardsPane from './UserRewardsPane.vue'
 
-const rewardRedemptionUnavailableMock = vi.hoisted(() => vi.fn())
+const redeemMock = vi.hoisted(() => vi.fn())
+const rewardRedemptionSucceededMock = vi.hoisted(() => vi.fn())
+const rewardRedemptionFailedMock = vi.hoisted(() => vi.fn())
+
+vi.mock('../useUserRewardRedemption', async () => {
+  const { ref } = await import('vue')
+  return {
+    useUserRewardRedemption: () => ({ pending: ref(false), redeem: redeemMock }),
+  }
+})
 
 vi.mock('../useProfileFeedback', () => ({
   useProfileFeedback: () => ({
-    rewardRedemptionUnavailable: rewardRedemptionUnavailableMock,
+    rewardRedemptionSucceeded: rewardRedemptionSucceededMock,
+    rewardRedemptionFailed: rewardRedemptionFailedMock,
   }),
 }))
 
@@ -49,12 +59,28 @@ describe('UserRewardsPane', () => {
   })
 
   it('submits a trimmed redemption code through the local reward workflow', async () => {
-    rewardRedemptionUnavailableMock.mockReset()
+    redeemMock.mockReset().mockResolvedValue({ credited_amount: 80, replayed: false })
+    rewardRedemptionSucceededMock.mockReset()
     const { user } = renderRewardsPane()
 
     await user.type(screen.getByRole('textbox', { name: '输入兑换码' }), '  IDEA-2026  ')
     await user.click(screen.getByRole('button', { name: '兑换' }))
 
-    expect(rewardRedemptionUnavailableMock).toHaveBeenCalledOnce()
+    expect(redeemMock).toHaveBeenCalledWith('IDEA-2026')
+    expect(rewardRedemptionSucceededMock).toHaveBeenCalledWith(80, false)
+    expect(screen.getByRole('textbox', { name: '输入兑换码' })).toHaveValue('')
+  })
+
+  it('retains the code when redemption fails', async () => {
+    const error = new Error('network')
+    redeemMock.mockReset().mockRejectedValue(error)
+    rewardRedemptionFailedMock.mockReset()
+    const { user } = renderRewardsPane()
+
+    await user.type(screen.getByRole('textbox', { name: '输入兑换码' }), 'IDEA2026')
+    await user.click(screen.getByRole('button', { name: '兑换' }))
+
+    expect(rewardRedemptionFailedMock).toHaveBeenCalledWith(error)
+    expect(screen.getByRole('textbox', { name: '输入兑换码' })).toHaveValue('IDEA2026')
   })
 })

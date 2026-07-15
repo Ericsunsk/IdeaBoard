@@ -214,6 +214,7 @@ Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_
 | `AUTH_SERVICE_BASE_URL` | Go 调用 Auth service 的地址 |
 | `AUTH_INTERNAL_KEY` | API/Auth internal endpoint 共享密钥 |
 | `APP_SECRETS_ENCRYPTION_KEY` | API key 和 storage secret 静态加密主密钥 |
+| `REWARDS_CODE_HMAC_KEYS` | Rewards Code current/previous keyed-HMAC JSON registry；key 至少 32 bytes，不能放入 Admin settings |
 | `BETTER_AUTH_SECRET` | Better Auth 签名密钥，生产必须高熵 |
 | `BETTER_AUTH_URL` | Auth 对外基准 URL |
 

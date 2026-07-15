@@ -18,6 +18,7 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.GET("/billing/records", h.BillingRecords.List)
 	userAPI.GET("/credits/wallet", h.CreditHandler.GetCurrentWallet)
 	userAPI.GET("/usage", h.UsageHandler.GetCurrent)
+	userAPI.POST("/rewards/redeem", h.RewardHandler.Redeem)
 
 	registerUserTaskRoutes(userAPI, h)
 	registerUserBoardRoutes(userAPI, h)

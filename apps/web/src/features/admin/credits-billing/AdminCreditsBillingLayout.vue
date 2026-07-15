@@ -21,16 +21,18 @@
 
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import { Coins, Page, ShieldCheck } from '@iconoir/vue'
+import { Coins, Gift, Page, ShieldCheck } from '@iconoir/vue'
 import {
   ADMIN_CREDIT_PRICING_PATH,
   ADMIN_CREDIT_RECONCILIATION_PATH,
   ADMIN_CREDIT_WALLETS_PATH,
+  ADMIN_REWARD_CAMPAIGNS_PATH,
 } from '../../../shared/constants/routePaths'
 
 const navigationItems = [
   { path: ADMIN_CREDIT_WALLETS_PATH, label: '用户Idea账户', icon: Coins },
   { path: ADMIN_CREDIT_PRICING_PATH, label: 'SKU 与价格', icon: Page },
   { path: ADMIN_CREDIT_RECONCILIATION_PATH, label: '对账报告', icon: ShieldCheck },
+  { path: ADMIN_REWARD_CAMPAIGNS_PATH, label: '奖励活动', icon: Gift },
 ] as const
 </script>
