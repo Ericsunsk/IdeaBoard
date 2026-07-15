@@ -273,6 +273,7 @@ func newUploadStaticAuthServer(t *testing.T) *httptest.Server {
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"code": 0,
+					"msg":  "success",
 					"data": map[string]any{"session": identity},
 				})
 				return

@@ -19,6 +19,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type localUserReaderFunc func(context.Context, string) (*users.User, error)
+
+func (f localUserReaderFunc) GetByAuthUserID(ctx context.Context, authUserID string) (*users.User, error) {
+	return f(ctx, authUserID)
+}
+
 func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 	db := testdb.Open(t)
 	userRepo := users.NewUserRepository(db)
@@ -264,11 +270,12 @@ func TestAuthMiddlewareRejectsInvalidLocalPrincipal(t *testing.T) {
 	}))
 	defer authServer.Close()
 
-	userRepo := users.NewUserRepository(testdb.Open(t))
-	user := &users.User{Username: "alice", AuthUserID: &authUserID, Status: 1, Role: "owner"}
-	if err := userRepo.Create(t.Context(), user); err != nil {
-		t.Fatal(err)
-	}
+	userRepo := localUserReaderFunc(func(_ context.Context, gotAuthUserID string) (*users.User, error) {
+		if gotAuthUserID != authUserID {
+			t.Fatalf("auth user id = %q, want %q", gotAuthUserID, authUserID)
+		}
+		return &users.User{ID: 1, Username: "alice", AuthUserID: &authUserID, Status: 1, Role: "owner"}, nil
+	})
 
 	handlerRan := false
 	authorityLeaked := false

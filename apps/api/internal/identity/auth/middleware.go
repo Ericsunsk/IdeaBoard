@@ -15,8 +15,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type localUserReader interface {
+	GetByAuthUserID(context.Context, string) (*users.User, error)
+}
+
 // AuthMiddleware 认证中间件：通过 Better Auth session 校验并映射本地业务用户。
-func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository, lifecycle *users.LifecycleService) gin.HandlerFunc {
+func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecycle *users.LifecycleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if authService == nil || userRepo == nil {
 			response.InternalError(c, http.StatusInternalServerError, "认证服务未配置", fmt.Errorf("auth middleware dependencies missing"))
@@ -88,7 +92,7 @@ func isRequestCanceled(ctx context.Context, err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled)
 }
 
-func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRepository, lifecycle *users.LifecycleService, identity *SessionIdentity) (*users.User, error) {
+func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo localUserReader, lifecycle *users.LifecycleService, identity *SessionIdentity) (*users.User, error) {
 	if userRepo == nil || identity == nil {
 		return nil, fmt.Errorf("invalid auth identity mapping input")
 	}

@@ -27,7 +27,7 @@ func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T
 
 	creditService := credits.NewService(pool)
 	firstCapture := captureUsageCredits(t, ctx, creditService, userID, 20, "usage-capture-1")
-	_ = captureUsageCredits(t, ctx, creditService, userID, 100, "usage-capture-2")
+	latestCapture := captureUsageCredits(t, ctx, creditService, userID, 100, "usage-capture-2")
 	_ = captureUsageCredits(t, ctx, creditService, 902, 10, "usage-other-user-capture")
 	if _, err := creditService.Refund(ctx, credits.RefundCommand{
 		UserID:              userID,
@@ -51,13 +51,12 @@ func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T
 	setUsageTaskStatus(t, ctx, db, taskIDs[1], "failed")
 	setUsageTaskStatus(t, ctx, db, taskIDs[2], "cancelled")
 
-	location, err := time.LoadLocation(ShanghaiTimezone)
-	if err != nil {
-		t.Fatalf("load Shanghai location: %v", err)
+	newUsageService := func() *Service {
+		return NewService(creditService, taskbilling.NewUsageStore(db), ServiceOptions{Now: func() time.Time {
+			return latestCapture.CreatedAt
+		}})
 	}
-	service := NewService(creditService, taskbilling.NewUsageStore(db), ServiceOptions{Now: func() time.Time {
-		return time.Date(2026, time.July, 13, 8, 0, 0, 0, location)
-	}})
+	service := newUsageService()
 
 	beforeDelete, err := service.GetCurrent(ctx, userID, Range30Days)
 	if err != nil {
@@ -89,7 +88,7 @@ func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T
 			t.Fatalf("delete task %s: %v", taskID, err)
 		}
 	}
-	afterDelete, err := service.GetCurrent(ctx, userID, Range30Days)
+	afterDelete, err := newUsageService().GetCurrent(ctx, userID, Range30Days)
 	if err != nil {
 		t.Fatalf("GetCurrent() after task deletion error = %v", err)
 	}
