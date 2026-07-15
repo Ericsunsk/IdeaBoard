@@ -1,5 +1,5 @@
 import PrimeVue from 'primevue/config'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import UserRewardsPane from './UserRewardsPane.vue'
@@ -7,6 +7,22 @@ import UserRewardsPane from './UserRewardsPane.vue'
 const redeemMock = vi.hoisted(() => vi.fn())
 const rewardRedemptionSucceededMock = vi.hoisted(() => vi.fn())
 const rewardRedemptionFailedMock = vi.hoisted(() => vi.fn())
+const retryInitialMock = vi.hoisted(() => vi.fn())
+const loadMoreMock = vi.hoisted(() => vi.fn())
+const historyMock = vi.hoisted(() => ({
+  redemptions: [] as Array<{
+    id: number
+    campaign_display_name: string
+    credited_amount: number
+    masked_code_hint: string
+    redeemed_at: string
+  }>,
+  isInitialPending: false,
+  initialError: null as Error | null,
+  loadMoreError: null as Error | null,
+  hasNextPage: false,
+  isFetchingNextPage: false,
+}))
 
 vi.mock('../useUserRewardRedemption', async () => {
   const { ref } = await import('vue')
@@ -22,6 +38,18 @@ vi.mock('../useProfileFeedback', () => ({
   }),
 }))
 
+vi.mock('../useUserRewardRedemptions', async () => {
+  const { reactive, toRefs } = await import('vue')
+  const state = reactive(historyMock)
+  return {
+    useUserRewardRedemptions: () => ({
+      ...toRefs(state),
+      retryInitial: retryInitialMock,
+      loadMore: loadMoreMock,
+    }),
+  }
+})
+
 function renderRewardsPane() {
   return renderWithUser(UserRewardsPane, {
     global: {
@@ -34,6 +62,17 @@ function renderRewardsPane() {
 }
 
 describe('UserRewardsPane', () => {
+  beforeEach(() => {
+    historyMock.redemptions = []
+    historyMock.isInitialPending = false
+    historyMock.initialError = null
+    historyMock.loadMoreError = null
+    historyMock.hasNextPage = false
+    historyMock.isFetchingNextPage = false
+    retryInitialMock.mockReset()
+    loadMoreMock.mockReset()
+  })
+
   it('renders the redeem form and empty history state', () => {
     renderRewardsPane()
 
@@ -52,10 +91,7 @@ describe('UserRewardsPane', () => {
 
     const redeemButton = screen.getByRole('button', { name: '兑换' })
     expect(redeemButton).not.toHaveClass('p-button')
-    expect(redeemButton).toHaveClass(
-      'bg-ib-creative-accent-hover',
-      'text-ib-text-inverse',
-    )
+    expect(redeemButton).toHaveClass('bg-ib-creative-accent-hover', 'text-ib-text-inverse')
   })
 
   it('submits a trimmed redemption code through the local reward workflow', async () => {
@@ -82,5 +118,71 @@ describe('UserRewardsPane', () => {
 
     expect(rewardRedemptionFailedMock).toHaveBeenCalledWith(error)
     expect(screen.getByRole('textbox', { name: '输入兑换码' })).toHaveValue('IDEA2026')
+  })
+
+  it('shows paginated redemption details with masked codes and Shanghai time', () => {
+    historyMock.redemptions = [
+      {
+        id: 41,
+        campaign_display_name: '夏日灵感奖励',
+        credited_amount: 80,
+        masked_code_hint: '•••• 2026',
+        redeemed_at: '2026-07-15T10:00:00Z',
+      },
+      {
+        id: 40,
+        campaign_display_name: '内测奖励',
+        credited_amount: 1,
+        masked_code_hint: '•••• 0001',
+        redeemed_at: '2026-07-14T16:05:06Z',
+      },
+    ]
+    historyMock.hasNextPage = true
+    renderRewardsPane()
+
+    expect(screen.getByRole('table', { name: '兑换记录表格' })).toBeVisible()
+    expect(screen.getByText('夏日灵感奖励')).toBeVisible()
+    expect(screen.getByText('+80 Ideas')).toBeVisible()
+    expect(screen.getByText('+1 Idea')).toBeVisible()
+    expect(screen.getByText('•••• 2026')).toBeVisible()
+    expect(screen.queryByText('IDEA-2026')).not.toBeInTheDocument()
+    expect(screen.getByText('2026-07-15 18:00:00')).toBeVisible()
+    expect(screen.getByText('2026-07-15 00:05:06')).toBeVisible()
+    expect(screen.getByRole('button', { name: '加载更多' })).toBeVisible()
+  })
+
+  it('provides recovery actions for initial and load-more errors', async () => {
+    historyMock.initialError = new Error('奖励服务暂不可用')
+    const { unmount, user } = renderRewardsPane()
+
+    expect(screen.getByRole('alert')).toHaveTextContent('奖励服务暂不可用')
+    await user.click(screen.getByRole('button', { name: '重新加载' }))
+    expect(retryInitialMock).toHaveBeenCalledOnce()
+
+    unmount()
+    historyMock.initialError = null
+    historyMock.redemptions = [
+      {
+        id: 41,
+        campaign_display_name: '夏日灵感奖励',
+        credited_amount: 80,
+        masked_code_hint: '•••• 2026',
+        redeemed_at: '2026-07-15T10:00:00Z',
+      },
+    ]
+    historyMock.loadMoreError = new Error('下一页加载失败')
+    const next = renderRewardsPane()
+
+    expect(screen.getByRole('alert')).toHaveTextContent('下一页加载失败')
+    await next.user.click(screen.getByRole('button', { name: '重试加载' }))
+    expect(loadMoreMock).toHaveBeenCalledOnce()
+  })
+
+  it('announces initial loading without showing a false empty state', () => {
+    historyMock.isInitialPending = true
+    renderRewardsPane()
+
+    expect(screen.getByRole('status', { name: '正在加载兑换记录' })).toBeInTheDocument()
+    expect(screen.queryByText('暂无兑换记录')).not.toBeInTheDocument()
   })
 })

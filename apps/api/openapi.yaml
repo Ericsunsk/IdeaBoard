@@ -146,6 +146,25 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseRewardRedeemResult' }
+  /user/rewards/redemptions:
+    get:
+      tags: [UserRewards]
+      operationId: listUserRewardRedemptions
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: before_id
+          in: query
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Current authenticated user's successful Reward Redemption history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRewardRedemptionHistoryPage' }
   /user/profile/avatar:
     post:
       tags: [UserAssets]
@@ -2536,12 +2555,34 @@ components:
     RewardRedeemResult:
       type: object
       additionalProperties: false
-      required: [redemption, credited_amount, available_balance, replayed]
+      required: [redemption, history_item, credited_amount, available_balance, replayed]
       properties:
         redemption: { $ref: '#/components/schemas/RewardRedemption' }
+        history_item: { $ref: '#/components/schemas/RewardRedemptionHistoryItem' }
         credited_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         available_balance: { type: integer, format: int64, minimum: 0 }
         replayed: { type: boolean }
+
+    RewardRedemptionHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, campaign_display_name, credited_amount, masked_code_hint, redeemed_at]
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        campaign_display_name: { type: string, minLength: 1, maxLength: 120 }
+        credited_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        masked_code_hint: { type: string, minLength: 9, maxLength: 9, pattern: '^•••• [A-Z0-9]{4}$' }
+        redeemed_at: { type: string, format: date-time }
+
+    RewardRedemptionHistoryPage:
+      type: object
+      additionalProperties: false
+      required: [redemptions]
+      properties:
+        redemptions:
+          type: array
+          items: { $ref: '#/components/schemas/RewardRedemptionHistoryItem' }
+        next_before_id: { type: integer, format: int64, minimum: 1 }
 
     RewardCampaignPage:
       type: object
@@ -4523,6 +4564,13 @@ components:
         - type: object
           properties:
             data: { $ref: '#/components/schemas/RewardRedeemResult' }
+
+    ApiResponseRewardRedemptionHistoryPage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/RewardRedemptionHistoryPage' }
 
     ApiResponseCreditWallet:
       allOf:

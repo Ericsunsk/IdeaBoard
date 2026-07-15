@@ -2,7 +2,9 @@ package rewards
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1143,6 +1145,127 @@ func TestMissingWalletRollsBackWithoutConsumingCampaignCapacity(t *testing.T) {
 	}
 }
 
+func TestUserReadsListOnlyCurrentUsersSuccessfulRedemptionsWithMaskedCodes(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	for _, userID := range []int64{3, 7} {
+		provisionRewardWallet(t, pool, creditService, userID)
+	}
+	service := newTestRewardService(t, pool, creditService)
+	var reads UserReads = service
+
+	first := redeemHistoryFixture(t, service, 3, "HIST0001", "首笔兑换奖励", 15)
+	second := redeemHistoryFixture(t, service, 3, "HIST0002", "最新兑换奖励", 25)
+	if second.HistoryItem.ID != second.Redemption.ID ||
+		second.HistoryItem.CampaignDisplayName != "最新兑换奖励" ||
+		second.HistoryItem.MaskedCodeHint != "•••• 0002" {
+		t.Fatalf("Redeem() history item = %+v", second.HistoryItem)
+	}
+	_ = redeemHistoryFixture(t, service, 7, "OTHER001", "其他用户奖励", 35)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "NOT-A-REAL-CODE"}); !errors.Is(err, ErrCodeUnavailable) {
+		t.Fatalf("failed Redeem() error = %v, want ErrCodeUnavailable", err)
+	}
+	internalAmount, err := credits.NewCreditAmount(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := creditService.Grant(t.Context(), credits.GrantCommand{
+		UserID: 3,
+		Amount: internalAmount,
+		Metadata: credits.CommandMetadata{
+			IdempotencyKey: "history-internal-command",
+			Actor:          credits.Actor{Type: credits.ActorService, ID: "rewards-test"},
+			Source:         "reward_redemption",
+			Reason:         "验证内部 Credit Command 不进入兑换历史",
+			BusinessReference: credits.BusinessReference{
+				Type: "reward_redemption", ID: "history-internal-command",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("internal Grant fixture error = %v", err)
+	}
+
+	page1, err := reads.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 3, Limit: 1})
+	if err != nil {
+		t.Fatalf("ListRedemptions() page 1 error = %v", err)
+	}
+	if len(page1.Redemptions) != 1 || page1.NextBeforeID != second.Redemption.ID {
+		t.Fatalf("page 1 = %+v, want newest record and cursor %d", page1, second.Redemption.ID)
+	}
+	latest := page1.Redemptions[0]
+	if latest.ID != second.Redemption.ID || latest.CampaignDisplayName != "最新兑换奖励" ||
+		latest.CreditedAmount != 25 || latest.MaskedCodeHint != "•••• 0002" || latest.RedeemedAt.IsZero() {
+		t.Fatalf("latest history record = %+v", latest)
+	}
+
+	page2, err := reads.ListRedemptions(t.Context(), ListRedemptionsInput{
+		UserID: 3, BeforeID: page1.NextBeforeID, Limit: 1,
+	})
+	if err != nil {
+		t.Fatalf("ListRedemptions() page 2 error = %v", err)
+	}
+	if len(page2.Redemptions) != 1 || page2.Redemptions[0].ID != first.Redemption.ID || page2.NextBeforeID != 0 {
+		t.Fatalf("page 2 = %+v, want only first current-user Redemption", page2)
+	}
+
+	if _, err := pool.Exec(t.Context(), `
+UPDATE users
+SET username = 'deleted-user-tombstone', auth_user_id = NULL, storage_uid = 'TMB292',
+    avatar = '', role = 'user', status = 0, updated_at = now()
+WHERE id = 3`); err != nil {
+		t.Fatalf("tombstone user fixture: %v", err)
+	}
+	afterTombstone, err := reads.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 3})
+	if err != nil || len(afterTombstone.Redemptions) != 2 {
+		t.Fatalf("history after tombstone = %+v error=%v, want retained Redemptions", afterTombstone, err)
+	}
+	encoded, err := json.Marshal(afterTombstone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{
+		"deleted-user-tombstone", "HIST0001", "HIST0002", "code_digest", "internal_note",
+		`"user_id"`, `"code_id"`, `"credit_transaction_id"`,
+	} {
+		if bytes.Contains(encoded, []byte(forbidden)) {
+			t.Fatalf("history JSON leaked %q: %s", forbidden, encoded)
+		}
+	}
+}
+
+func TestUserReadsRedemptionHistoryDefaultsToTwentyNewestRecords(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	provisionRewardWallet(t, pool, creditService, 3)
+	service := newTestRewardService(t, pool, creditService)
+	var oldestRedemptionID int64
+	for index := 1; index <= 21; index++ {
+		result := redeemHistoryFixture(
+			t, service, 3, fmt.Sprintf("PAGE%04d", index), fmt.Sprintf("分页奖励 %02d", index), 1,
+		)
+		if index == 1 {
+			oldestRedemptionID = result.Redemption.ID
+		}
+	}
+
+	page1, err := service.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page1.Redemptions) != 20 || page1.NextBeforeID == 0 {
+		t.Fatalf("default page = %+v, want 20 records and next cursor", page1)
+	}
+	page2, err := service.ListRedemptions(t.Context(), ListRedemptionsInput{
+		UserID: 3, BeforeID: page1.NextBeforeID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page2.Redemptions) != 1 || page2.Redemptions[0].ID != oldestRedemptionID || page2.NextBeforeID != 0 {
+		t.Fatalf("second page = %+v, want oldest record only", page2)
+	}
+}
+
 func TestCreditCorrectionDoesNotReopenCampaignCapacity(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
@@ -1509,6 +1632,33 @@ func createActivePublicCampaign(
 		t.Fatalf("ActivateCampaign() error = %v", err)
 	}
 	return campaign, issued.Plaintext
+}
+
+func redeemHistoryFixture(
+	t *testing.T,
+	service *Service,
+	userID int64,
+	code string,
+	displayName string,
+	creditAmount int64,
+) RedeemResult {
+	t.Helper()
+	campaign := createRewardDraftWithAmount(t, service, displayName, creditAmount, 1)
+	if _, err := service.IssuePublicCode(t.Context(), IssuePublicCodeCommand{
+		CampaignID: campaign.ID, Code: code, ActorUserID: 1, Reason: "发行兑换历史测试 Code",
+	}); err != nil {
+		t.Fatalf("IssuePublicCode() history fixture error = %v", err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: campaign.ID, ActorUserID: 1, Reason: "激活兑换历史测试活动",
+	}); err != nil {
+		t.Fatalf("ActivateCampaign() history fixture error = %v", err)
+	}
+	result, err := service.Redeem(t.Context(), RedeemCommand{UserID: userID, Code: code})
+	if err != nil {
+		t.Fatalf("Redeem() history fixture error = %v", err)
+	}
+	return result
 }
 
 func createRewardDraft(t *testing.T, service *Service, displayName string) Campaign {

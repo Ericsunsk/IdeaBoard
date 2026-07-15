@@ -18,6 +18,7 @@ Rewards 管理平台 Idea 奖励的 Campaign、Code 与 Redemption。用户展�
 - `AdminCommands` 创建或更新 Campaign、发行唯一 Public Code 或幂等生成 Single-use Code Batch，并执行 Batch revoke、activate、pause、resume、cancel 与空 Draft delete commands。
 - `AdminReads` 提供不含 Code 明文或 digest 的 Campaign 与 keyset-paginated Code Batch metadata read。
 - `UserCommands` 同步兑换 Code，返回 Redemption、credited amount、available balance 与 replay marker。
+- `UserReads` 按 ID cursor 返回当前用户的成功 Redemption history，仅含 Campaign display name、credited amount、masked Code hint 与兑换时间。
 
 Hash normalization、HMAC candidates、row locking、persistence 和 Credits transaction orchestration 都留在 module implementation 内。
 
@@ -37,6 +38,7 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 - 首个 Code 发行后冻结 display name、Credit amount、mode、cap、schedule 与 creator；internal note 和合法 lifecycle transition 仍可变。
 - 只有无 Code 的 Draft 可物理删除；取消原子 revokes Code，但保留 Campaign、Redemption、Ledger 与 Journal。
 - 每个 User 每个 Campaign 最多一个 Redemption；Campaign row lock 使 capacity、状态切换、Redemption 和 Credits Grant 在同一 transaction 中保持一致。
+- User Redemption history 只读取已提交 Redemption，并按 `(user_id, id DESC)` 隔离和分页；不 join 或复制 Identity PII、Admin note、Code digest 或明文。
 - 每个 Single-use Code 最多一个 Redemption；service 与 database Code row lock guard 双重约束并发消费。
 - Single-use Batch capacity 使用 `completed + valid unused + new <= cap`；Draft、scheduled、active、paused 与仅因 Code 用尽的 exhausted 可追加，expired、cancelled 或总 cap 耗尽不可追加。
 - Batch revoke 与 Single-use Campaign cancel 只不可逆撤销 unused Code；已兑换 Code、Redemption 与 Credits Ledger 不变。
@@ -45,4 +47,4 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 
 ## Current Boundary
 
-当前不包含用户兑换 history、rate limiter/security expansion 或 server-side CSV persistence。CSV 由 Admin UI 仅从首次 generation response 生成；server 不保存 export 文件或可恢复 Code 明文。
+当前不包含 rate limiter/security expansion 或 server-side CSV persistence。CSV 由 Admin UI 仅从首次 generation response 生成；server 不保存 export 文件或可恢复 Code 明文。

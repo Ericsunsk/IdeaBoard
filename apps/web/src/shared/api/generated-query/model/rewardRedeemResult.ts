@@ -5,9 +5,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { RewardRedemption } from './rewardRedemption'
+import type { RewardRedemptionHistoryItem } from './rewardRedemptionHistoryItem'
 
 export interface RewardRedeemResult {
   redemption: RewardRedemption
+  history_item: RewardRedemptionHistoryItem
   /**
    * @minimum 1
    * @maximum 9000000000000000

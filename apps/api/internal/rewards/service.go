@@ -45,6 +45,12 @@ const campaignProjectionSQL = `id, display_name, internal_note, credit_amount, m
        max_redemptions, redemption_count, issued_code_count, valid_unused_code_count, starts_at, expires_at,
        created_by, created_at, updated_at`
 
+const (
+	defaultRedemptionHistoryLimit = 20
+	maxRedemptionHistoryLimit     = 100
+	maskedCodeHintPrefix          = "•••• "
+)
+
 func NewService(pool *pgxpool.Pool, creditService CreditService, keyring CodeKeyring) *Service {
 	return NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{})
 }
@@ -797,13 +803,14 @@ func (s *Service) Redeem(ctx context.Context, command RedeemCommand) (RedeemResu
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	var codeID, campaignID int64
+	var codeHint string
 	err = tx.QueryRow(ctx, `
-SELECT id, campaign_id
+SELECT id, campaign_id, code_hint
 FROM reward_codes
 WHERE (key_version = $1 AND code_digest = $2)
    OR ($3 <> '' AND key_version = $3 AND code_digest = $4)
 ORDER BY CASE WHEN key_version = $1 THEN 0 ELSE 1 END
-LIMIT 1`, current.version, current.digest, previous.version, previous.digest).Scan(&codeID, &campaignID)
+LIMIT 1`, current.version, current.digest, previous.version, previous.digest).Scan(&codeID, &campaignID, &codeHint)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return RedeemResult{}, ErrCodeUnavailable
@@ -851,7 +858,8 @@ FOR UPDATE`, codeID, campaign.ID).Scan(&lockedCodeID, &revokedAt)
 			return RedeemResult{}, fmt.Errorf("read reward replay Wallet: %w", err)
 		}
 		return RedeemResult{
-			Redemption: redemption, CreditedAmount: redemption.CreditAmount,
+			Redemption: redemption, HistoryItem: redemptionHistoryItem(redemption, campaign, codeHint),
+			CreditedAmount:   redemption.CreditAmount,
 			AvailableBalance: wallet.Available, Replayed: true,
 		}, nil
 	}
@@ -935,9 +943,82 @@ RETURNING id, campaign_id, code_id, user_id, credit_amount,
 		return RedeemResult{}, fmt.Errorf("commit reward redemption: %w", err)
 	}
 	return RedeemResult{
-		Redemption: redemption, CreditedAmount: campaign.CreditAmount,
+		Redemption: redemption, HistoryItem: redemptionHistoryItem(redemption, campaign, codeHint),
+		CreditedAmount:   campaign.CreditAmount,
 		AvailableBalance: grant.Wallet.Available,
 	}, nil
+}
+
+func redemptionHistoryItem(
+	redemption Redemption,
+	campaign Campaign,
+	codeHint string,
+) RedemptionHistoryItem {
+	return RedemptionHistoryItem{
+		ID:                  redemption.ID,
+		CampaignDisplayName: campaign.DisplayName,
+		CreditedAmount:      redemption.CreditAmount,
+		MaskedCodeHint:      maskedCodeHintPrefix + codeHint,
+		RedeemedAt:          redemption.RedeemedAt,
+	}
+}
+
+func (s *Service) ListRedemptions(
+	ctx context.Context,
+	input ListRedemptionsInput,
+) (RedemptionHistoryPage, error) {
+	if s == nil || s.pool == nil || input.UserID <= 0 || input.BeforeID < 0 {
+		return RedemptionHistoryPage{}, ErrInvalidCommand
+	}
+	limit := input.Limit
+	if limit == 0 {
+		limit = defaultRedemptionHistoryLimit
+	}
+	if limit < 1 || limit > maxRedemptionHistoryLimit {
+		return RedemptionHistoryPage{}, ErrInvalidCommand
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT redemptions.id,
+       campaigns.display_name,
+       redemptions.credit_amount,
+       codes.code_hint,
+       redemptions.redeemed_at
+FROM reward_redemptions redemptions
+JOIN reward_campaigns campaigns ON campaigns.id = redemptions.campaign_id
+JOIN reward_codes codes ON codes.id = redemptions.code_id
+WHERE redemptions.user_id = $1
+  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
+ORDER BY redemptions.id DESC
+LIMIT $3`, input.UserID, input.BeforeID, limit+1)
+	if err != nil {
+		return RedemptionHistoryPage{}, fmt.Errorf("list reward Redemption history: %w", err)
+	}
+	defer rows.Close()
+	items := make([]RedemptionHistoryItem, 0, limit+1)
+	for rows.Next() {
+		var item RedemptionHistoryItem
+		var codeHint string
+		if err := rows.Scan(
+			&item.ID,
+			&item.CampaignDisplayName,
+			&item.CreditedAmount,
+			&codeHint,
+			&item.RedeemedAt,
+		); err != nil {
+			return RedemptionHistoryPage{}, fmt.Errorf("scan reward Redemption history: %w", err)
+		}
+		item.MaskedCodeHint = maskedCodeHintPrefix + codeHint
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return RedemptionHistoryPage{}, fmt.Errorf("read reward Redemption history: %w", err)
+	}
+	page := RedemptionHistoryPage{Redemptions: items}
+	if len(items) > limit {
+		page.Redemptions = items[:limit]
+		page.NextBeforeID = page.Redemptions[len(page.Redemptions)-1].ID
+	}
+	return page, nil
 }
 
 func splitCodeDigestCandidates(candidates []codeDigest) (codeDigest, codeDigest) {

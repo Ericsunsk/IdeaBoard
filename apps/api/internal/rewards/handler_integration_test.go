@@ -189,6 +189,66 @@ func TestAdminSingleUseCodeBatchHTTPContract(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedUserRedemptionHistoryHTTPContract(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	provisionRewardWallet(t, pool, creditService, 3)
+	service := newTestRewardService(t, pool, creditService)
+	first := redeemHistoryFixture(t, service, 3, "HTTP2921", "首笔 HTTP 奖励", 12)
+	second := redeemHistoryFixture(t, service, 3, "HTTP2922", "最新 HTTP 奖励", 24)
+	handler := NewHandler(service)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 3, principal.RoleUser)
+		c.Next()
+	})
+	router.POST("/user/rewards/redeem", handler.Redeem)
+	router.GET("/user/rewards/redemptions", handler.ListRedemptions)
+
+	page1 := performRewardRequest[RedemptionHistoryPage](
+		t, router, http.MethodGet, "/user/rewards/redemptions?limit=1", nil, http.StatusOK,
+	)
+	if len(page1.Redemptions) != 1 || page1.Redemptions[0].ID != second.Redemption.ID ||
+		page1.Redemptions[0].MaskedCodeHint != "•••• 2922" || page1.NextBeforeID == 0 {
+		t.Fatalf("history page 1 = %+v", page1)
+	}
+	page2 := performRewardRequest[RedemptionHistoryPage](
+		t,
+		router,
+		http.MethodGet,
+		"/user/rewards/redemptions?limit=1&before_id="+strconv.FormatInt(page1.NextBeforeID, 10),
+		nil,
+		http.StatusOK,
+	)
+	if len(page2.Redemptions) != 1 || page2.Redemptions[0].ID != first.Redemption.ID {
+		t.Fatalf("history page 2 = %+v", page2)
+	}
+	performRewardRequest[RedemptionHistoryPage](
+		t, router, http.MethodGet, "/user/rewards/redemptions?before_id=0", nil, http.StatusBadRequest,
+	)
+	performRewardRequest[RedemptionHistoryPage](
+		t, router, http.MethodGet, "/user/rewards/redemptions?limit=101", nil, http.StatusBadRequest,
+	)
+
+	_, code := createActivePublicCampaign(t, service, "HTTP2923", 36, 1)
+	redeemed := performRewardRequest[RedeemResult](
+		t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": code}, http.StatusOK,
+	)
+	if redeemed.HistoryItem.ID != redeemed.Redemption.ID ||
+		redeemed.HistoryItem.CampaignDisplayName != "兑换测试奖励" ||
+		redeemed.HistoryItem.CreditedAmount != 36 ||
+		redeemed.HistoryItem.MaskedCodeHint != "•••• 2923" {
+		t.Fatalf("Redeem HTTP history item = %+v", redeemed.HistoryItem)
+	}
+	replayed := performRewardRequest[RedeemResult](
+		t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": code}, http.StatusOK,
+	)
+	if !replayed.Replayed || replayed.HistoryItem.ID != redeemed.HistoryItem.ID {
+		t.Fatalf("Redeem HTTP replay = %+v", replayed)
+	}
+}
+
 type rewardHTTPResponse[T any] struct {
 	Code int `json:"code"`
 	Data T   `json:"data"`

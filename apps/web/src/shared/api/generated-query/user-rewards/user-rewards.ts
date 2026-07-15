@@ -17,7 +17,12 @@ import type {
 import { toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
-import type { ApiResponseRewardRedeemResult, RewardRedeemRequest } from '../model'
+import type {
+  ApiResponseRewardRedeemResult,
+  ApiResponseRewardRedemptionHistoryPage,
+  ListUserRewardRedemptionsParams,
+  RewardRedeemRequest,
+} from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
@@ -85,6 +90,97 @@ export function useRedeemUserReward<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getRedeemUserRewardQueryOptions(rewardRedeemRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListUserRewardRedemptionsUrl = (params?: ListUserRewardRedemptionsParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/user/rewards/redemptions?${stringifiedParams}`
+    : `/user/rewards/redemptions`
+}
+
+export const listUserRewardRedemptions = async (
+  params?: ListUserRewardRedemptionsParams,
+  options?: RequestInit,
+): Promise<ApiResponseRewardRedemptionHistoryPage> => {
+  return orvalMutator<ApiResponseRewardRedemptionHistoryPage>(
+    getListUserRewardRedemptionsUrl(params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListUserRewardRedemptionsQueryKey = (
+  params?: MaybeRefOrGetter<ListUserRewardRedemptionsParams>,
+) => {
+  return ['user', 'rewards', 'redemptions', ...(params ? [params] : [])] as const
+}
+
+export const getListUserRewardRedemptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUserRewardRedemptions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<ListUserRewardRedemptionsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listUserRewardRedemptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListUserRewardRedemptionsQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserRewardRedemptions>>> = ({
+    signal,
+  }) => listUserRewardRedemptions(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUserRewardRedemptions>>,
+    TError,
+    TData
+  >
+}
+
+export type ListUserRewardRedemptionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUserRewardRedemptions>>
+>
+export type ListUserRewardRedemptionsQueryError = ErrorType<unknown>
+
+export function useListUserRewardRedemptions<
+  TData = Awaited<ReturnType<typeof listUserRewardRedemptions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<ListUserRewardRedemptionsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listUserRewardRedemptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListUserRewardRedemptionsQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

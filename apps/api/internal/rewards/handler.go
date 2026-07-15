@@ -21,6 +21,7 @@ type RewardService interface {
 	AdminCommands
 	AdminReads
 	UserCommands
+	UserReads
 }
 
 type Handler struct {
@@ -406,6 +407,43 @@ func (h *Handler) Redeem(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, result)
+}
+
+func (h *Handler) ListRedemptions(c *gin.Context) {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	input := ListRedemptionsInput{
+		UserID: identityPrincipal.UserID(),
+		Limit:  defaultRedemptionHistoryLimit,
+	}
+	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value <= 0 {
+			response.Error(c, http.StatusBadRequest, "before_id 无效")
+			return
+		}
+		input.BeforeID = value
+	}
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 || value > maxRedemptionHistoryLimit {
+			response.Error(c, http.StatusBadRequest, "limit 无效")
+			return
+		}
+		input.Limit = value
+	}
+	page, err := h.service.ListRedemptions(c.Request.Context(), input)
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, page)
 }
 
 func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {

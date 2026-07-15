@@ -120,10 +120,30 @@ type Redemption struct {
 }
 
 type RedeemResult struct {
-	Redemption       Redemption `json:"redemption"`
-	CreditedAmount   int64      `json:"credited_amount"`
-	AvailableBalance int64      `json:"available_balance"`
-	Replayed         bool       `json:"replayed"`
+	Redemption       Redemption            `json:"redemption"`
+	HistoryItem      RedemptionHistoryItem `json:"history_item"`
+	CreditedAmount   int64                 `json:"credited_amount"`
+	AvailableBalance int64                 `json:"available_balance"`
+	Replayed         bool                  `json:"replayed"`
+}
+
+type RedemptionHistoryItem struct {
+	ID                  int64     `json:"id"`
+	CampaignDisplayName string    `json:"campaign_display_name"`
+	CreditedAmount      int64     `json:"credited_amount"`
+	MaskedCodeHint      string    `json:"masked_code_hint"`
+	RedeemedAt          time.Time `json:"redeemed_at"`
+}
+
+type ListRedemptionsInput struct {
+	UserID   int64
+	BeforeID int64
+	Limit    int
+}
+
+type RedemptionHistoryPage struct {
+	Redemptions  []RedemptionHistoryItem `json:"redemptions"`
+	NextBeforeID int64                   `json:"next_before_id,omitempty"`
 }
 
 type ListCampaignsInput struct {
@@ -245,6 +265,10 @@ type AdminCommands interface {
 
 type UserCommands interface {
 	Redeem(context.Context, RedeemCommand) (RedeemResult, error)
+}
+
+type UserReads interface {
+	ListRedemptions(context.Context, ListRedemptionsInput) (RedemptionHistoryPage, error)
 }
 
 type AdminReads interface {
