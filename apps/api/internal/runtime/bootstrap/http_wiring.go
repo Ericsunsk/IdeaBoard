@@ -65,7 +65,11 @@ func newAppRouter(
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
-			AdminHandler:            users.NewAdminHandler(services.userService, services.runtimeSettings, services.authServiceClient),
+			AdminHandler: users.NewAdminHandler(
+				services.userService,
+				services.runtimeSettings,
+				users.NewIdentityAdminCommands(services.userService, services.authServiceClient),
+			),
 			BillingHandler:          billingHandler,
 			BillingCoverageHandler:  billingCoverageHandler,
 			CreditHandler:           credits.NewHandler(services.creditService),

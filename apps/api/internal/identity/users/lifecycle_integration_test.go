@@ -533,6 +533,43 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 	}
 }
 
+func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	ctx := context.Background()
+	lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
+	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
+		AuthUserID: "auth-command-delete-resume", Username: "command-delete-resume",
+		ClaimIdentity: "command-delete-resume@users.ideaboard.local", ClaimIdentityKind: "trusted_canonical_registration",
+		ClaimIdentityVerified: true, Role: "user",
+	})
+	if err != nil {
+		t.Fatalf("provision deletion user: %v", err)
+	}
+
+	cleaner := &recordingUserUploadCleaner{err: errors.New("storage unavailable")}
+	userService := NewUserService(NewUserRepository(db), lifecycle, cleaner)
+	events := &[]string{}
+	authManager := &fakeIdentityAdminAuth{events: events}
+	commands := NewIdentityAdminCommands(userService, authManager)
+	actor := identityAdminActor(t)
+
+	err = commands.Delete(ctx, actor, provisioned.User.ID)
+	assertIdentityAdminErrorKind(t, err, IdentityAdminBusinessFailure)
+	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingStorage, 0, "frozen")
+
+	cleaner.err = nil
+	if err := commands.Delete(ctx, actor, provisioned.User.ID); err != nil {
+		t.Fatalf("resume deletion from pending storage: %v", err)
+	}
+	assertDeletionState(t, pool, provisioned.User.ID, DeletionCompleted, 0, "frozen")
+
+	// A lost success response can be retried after tombstoning has cleared auth_user_id.
+	if err := commands.Delete(ctx, actor, provisioned.User.ID); err != nil {
+		t.Fatalf("retry completed deletion: %v", err)
+	}
+	assertIdentityAdminEvents(t, events, "auth-delete")
+}
+
 func TestProvisionConcurrentWithBanOrDeleteNeverLeavesInactiveUserWithActiveWallet(t *testing.T) {
 	for _, operation := range []string{"ban", "delete"} {
 		t.Run(operation, func(t *testing.T) {

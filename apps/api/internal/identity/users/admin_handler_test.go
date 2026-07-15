@@ -128,6 +128,43 @@ func TestAdminHighRiskHandlersRejectUserPrincipal(t *testing.T) {
 	}
 }
 
+func TestIdentityAdminCommandErrorsMapToHTTP(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantBody   string
+	}{
+		{name: "invalid", err: identityAdminError(IdentityAdminInvalid, "invalid", nil), wantStatus: 400, wantBody: "invalid"},
+		{name: "target not found", err: identityAdminError(IdentityAdminTargetNotFound, "target missing", nil), wantStatus: 400, wantBody: "target missing"},
+		{name: "Auth identity not found", err: identityAdminError(IdentityAdminAuthIdentityNotFound, "Auth missing", nil), wantStatus: 400, wantBody: "Auth missing"},
+		{name: "forbidden", err: identityAdminError(IdentityAdminForbidden, "forbidden", nil), wantStatus: 403, wantBody: "forbidden"},
+		{name: "Auth failure", err: identityAdminError(IdentityAdminAuthFailure, "Auth failed", errors.New("dependency failed")), wantStatus: 502, wantBody: "Auth failed"},
+		{name: "business failure", err: identityAdminError(IdentityAdminBusinessFailure, "business failed", errors.New("database failed")), wantStatus: 500, wantBody: "business failed"},
+		{name: "reconciliation required", err: identityAdminError(IdentityAdminReconciliationRequired, "reconcile", errors.New("rollback failed")), wantStatus: 500, wantBody: "reconcile"},
+		{name: "unavailable", err: identityAdminError(IdentityAdminUnavailable, "unavailable", nil), wantStatus: 500, wantBody: "unavailable"},
+		{name: "unknown typed kind", err: identityAdminError(IdentityAdminErrorKind("future"), "future failure", nil), wantStatus: 500, wantBody: "管理员操作失败"},
+		{name: "untyped error", err: errors.New("unexpected"), wantStatus: 500, wantBody: "管理员操作失败"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+
+			respondIdentityAdminCommandError(context, tt.err)
+
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d; body=%s", recorder.Code, tt.wantStatus, recorder.Body.String())
+			}
+			if !strings.Contains(recorder.Body.String(), tt.wantBody) {
+				t.Fatalf("body = %s, want %q", recorder.Body.String(), tt.wantBody)
+			}
+		})
+	}
+}
+
 func TestAdminListUsersRejectsInvalidFilters(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -843,7 +880,8 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	}
 	authManager := &fakeAdminAuthManager{deleteErr: autherrors.ErrAuthUserNotFound}
 	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
-	handler := NewAdminHandler(NewUserService(repo, lifecycle, &recordingUserUploadCleaner{}), nil, authManager)
+	userService := NewUserService(repo, lifecycle, &recordingUserUploadCleaner{})
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -886,7 +924,7 @@ func TestAdminDeleteUserReportsLocalCleanupFailureAfterAuthDelete(t *testing.T) 
 	authManager := &fakeAdminAuthManager{}
 	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
 	userService := NewUserService(repo, lifecycle, &recordingUserUploadCleaner{err: errors.New("storage down")})
-	handler := NewAdminHandler(userService, nil, authManager)
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -926,7 +964,8 @@ func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
 
 	authManager := &fakeAdminAuthManager{deleteErr: errors.New("auth unavailable")}
 	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
-	handler := NewAdminHandler(NewUserService(repo, lifecycle, &recordingUserUploadCleaner{}), nil, authManager)
+	userService := NewUserService(repo, lifecycle, &recordingUserUploadCleaner{})
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -966,7 +1005,8 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 
 	authManager := &fakeAdminAuthManager{}
 	lifecycle := &recordingUserLifecycle{}
-	handler := NewAdminHandler(NewUserService(repo, lifecycle), nil, authManager)
+	userService := NewUserService(repo, lifecycle)
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
 	router.POST("/admin/users/:id/ban", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
@@ -1007,7 +1047,8 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 	}
 
 	authManager := &fakeAdminAuthManager{}
-	handler := NewAdminHandler(NewUserService(repo, nil), nil, authManager)
+	userService := NewUserService(repo, nil)
+	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
 	router.POST("/admin/users/:id/revoke-sessions", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
