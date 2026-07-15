@@ -33,7 +33,7 @@ func TestSetPromptRequiresAdminPrincipal(t *testing.T) {
 		wantStatus int
 	}{
 		{name: "missing", wantStatus: http.StatusUnauthorized},
-		{name: "legacy key", setup: func(c *gin.Context) { c.Set("user_id", int64(7)) }, wantStatus: http.StatusUnauthorized},
+		{name: "invalid Principal", setup: func(c *gin.Context) { _ = principal.Set(c, principal.Principal{}) }, wantStatus: http.StatusUnauthorized},
 		{name: "user role", setup: func(c *gin.Context) { testsupport.SetPrincipal(t, c, 7, principal.RoleUser) }, wantStatus: http.StatusForbidden},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

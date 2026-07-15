@@ -178,7 +178,7 @@ func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
 	}
 }
 
-func TestAuthMiddlewareSetsCompletePrincipal(t *testing.T) {
+func TestAuthMiddlewareSetsOnlyCompletePrincipal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	for _, role := range []string{"user", "admin"} {
@@ -212,8 +212,10 @@ func TestAuthMiddlewareSetsCompletePrincipal(t *testing.T) {
 				if !ok {
 					t.Fatal("authenticated request is missing Principal")
 				}
-				if c.GetInt64("user_id") != user.ID || c.GetString("auth_user_id") != authUserID || c.GetString("username") != wantUsername || c.GetString("role") != role {
-					t.Fatal("migration context values do not match Principal")
+				for _, legacyKey := range []string{"user_id", "auth_user_id", "username", "role"} {
+					if _, exists := c.Get(legacyKey); exists {
+						t.Fatalf("legacy context key %q is still set", legacyKey)
+					}
 				}
 				c.Status(http.StatusOK)
 			})

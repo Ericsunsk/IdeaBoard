@@ -39,7 +39,6 @@ func TestBoardHandlersRequireTypedPrincipal(t *testing.T) {
 		setup func(*gin.Context)
 	}{
 		{name: "missing"},
-		{name: "legacy key", setup: func(c *gin.Context) { c.Set("user_id", int64(7)) }},
 		{name: "invalid Principal", setup: func(c *gin.Context) { _ = principal.Set(c, principal.Principal{}) }},
 	}
 

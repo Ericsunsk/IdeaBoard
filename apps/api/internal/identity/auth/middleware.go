@@ -72,10 +72,6 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository, 
 			return
 		}
 
-		c.Set("user_id", identityPrincipal.UserID())
-		c.Set("username", identityPrincipal.Username())
-		c.Set("role", identityPrincipal.Role().String())
-		c.Set("auth_user_id", identityPrincipal.AuthUserID())
 		c.Next()
 	}
 }

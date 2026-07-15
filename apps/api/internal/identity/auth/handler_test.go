@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestGetCurrentUserRejectsInvalidUserID(t *testing.T) {
+func TestGetCurrentUserRejectsMissingOrInvalidPrincipal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
@@ -22,7 +22,6 @@ func TestGetCurrentUserRejectsInvalidUserID(t *testing.T) {
 		setIdentity func(c *gin.Context)
 	}{
 		{name: "missing"},
-		{name: "legacy user id is ignored", setIdentity: func(c *gin.Context) { c.Set("user_id", int64(1)) }},
 		{name: "invalid Principal", setIdentity: func(c *gin.Context) { _ = principal.Set(c, principal.Principal{}) }},
 	}
 
