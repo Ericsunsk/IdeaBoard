@@ -42,6 +42,7 @@ type DatabaseConfig struct {
 type AppConfig struct {
 	Port               string
 	Host               string
+	MetricsAddr        string
 	Env                string
 	CORSAllowedOrigins []string
 }
@@ -78,6 +79,7 @@ type envConfig struct {
 
 	AppPort               string `env:"APP_PORT"`
 	AppHost               string `env:"APP_HOST"`
+	MetricsAddr           string `env:"METRICS_ADDR"`
 	AppEnv                string `env:"APP_ENV"`
 	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
 
@@ -124,6 +126,7 @@ func Load() *Config {
 		App: AppConfig{
 			Port:               stringEnvDefault(raw.AppPort, "6000"),
 			Host:               strings.TrimSpace(raw.AppHost),
+			MetricsAddr:        stringEnvDefault(raw.MetricsAddr, "127.0.0.1:9091"),
 			Env:                appEnv,
 			CORSAllowedOrigins: detectCORSAllowedOrigins(raw.AppCORSAllowedOrigins, appEnv),
 		},

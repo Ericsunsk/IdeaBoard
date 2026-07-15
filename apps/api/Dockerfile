@@ -27,9 +27,10 @@ COPY --from=builder --chown=65532:65532 /out/uploads /app/uploads
 
 ENV APP_ENV=production \
     APP_HOST=0.0.0.0 \
-    APP_PORT=6000
+    APP_PORT=6000 \
+    METRICS_ADDR=127.0.0.1:9091
 
-EXPOSE 6000
+EXPOSE 6000 9091
 
 USER 65532:65532
 

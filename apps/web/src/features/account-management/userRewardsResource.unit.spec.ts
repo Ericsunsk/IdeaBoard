@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchUserRewardRedemptions, userRewardRedemptionsQueryKeys } from './userRewardsResource'
+import {
+  fetchUserRewardRedemptions,
+  redeemUserRewardCode,
+  userRewardRedemptionsQueryKeys,
+} from './userRewardsResource'
 
 const generated = vi.hoisted(() => ({
   listUserRewardRedemptions: vi.fn(),
@@ -49,5 +53,26 @@ describe('userRewardsResource', () => {
     })
 
     await expect(fetchUserRewardRedemptions({ limit: 20 })).rejects.toThrow('奖励服务暂不可用')
+  })
+
+  it.each([
+    [400, '参数错误'],
+    [422, '兑换码无效或已失效'],
+    [409, '你已兑换过该奖励'],
+    [423, '当前账户无法兑换奖励'],
+    [429, '操作频繁，请稍后重试'],
+    [500, '网络错误，请重试'],
+  ])('maps redemption HTTP %d to stable user copy', async (status, message) => {
+    generated.redeemUserReward.mockRejectedValue(
+      Object.assign(new Error('unsafe upstream detail'), { status }),
+    )
+
+    await expect(redeemUserRewardCode('IDEA2026')).rejects.toThrow(message)
+  })
+
+  it('maps redemption transport failures to stable user copy', async () => {
+    generated.redeemUserReward.mockRejectedValue(new Error('fetch failed'))
+
+    await expect(redeemUserRewardCode('IDEA2026')).rejects.toThrow('网络错误，请重试')
   })
 })

@@ -44,7 +44,12 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 - Batch revoke 与 Single-use Campaign cancel 只不可逆撤销 unused Code；已兑换 Code、Redemption 与 Credits Ledger 不变。
 - `reward_admin_actions` 由 database trigger 和 runtime privileges 双重保证 append-only。
 - `REWARDS_CODE_HMAC_KEYS` 只接受 current 与可选 previous；每个 base64 key 解码后至少 32 bytes，配置无效时 startup fail closed。
+- Code normalization 在任何 Unicode normalization 前执行 128-byte raw bound，再做 NFKC、uppercase、trim 与 Unicode whitespace/hyphen removal；最终 payload 只接受 8–32 个 `A-Z0-9`。
+- HMAC rotation overlap 期间 lookup 同时验证 current/previous，新发行只使用 current；startup 会拒绝移除仍被可兑换或可 replay Code 依赖的 previous key。old-key Code 从未兑换且已永久失效时才可退休；存在 Redemption 时 previous 仍是 replay 依赖。
+- 用户 Redeem endpoint 自有 per-user in-process token bucket，默认 10 attempts / 10 minutes，并在流量到来时清理 idle entries；它不是跨实例业务 invariant，不扩展为 Platform interface 或持久化 bucket。
+- Redeem 的不可用 Code 状态使用统一 public error；response 与日志不得包含 raw Code、full digest 或 request body，Redeem response 始终 `no-store`。
+- Redemption observability 只记录固定 outcome、credited Ideas 与 latency；User/Campaign/Code/digest 不得成为 metrics field 或 label。
 
 ## Current Boundary
 
-当前不包含 rate limiter/security expansion 或 server-side CSV persistence。CSV 由 Admin UI 仅从首次 generation response 生成；server 不保存 export 文件或可恢复 Code 明文。
+当前不包含 distributed limiter、Platform RateLimiter abstraction、PostgreSQL/Redis bucket 或 server-side CSV persistence。CSV 由 Admin UI 仅从首次 generation response 生成；server 不保存 export 文件或可恢复 Code 明文。

@@ -21,6 +21,7 @@ var configEnvKeys = []string{
 	"APP_ENV",
 	"APP_PORT",
 	"APP_HOST",
+	"METRICS_ADDR",
 	"APP_GIN_MODE",
 	"APP_LOG_FILE",
 	"APP_CORS_ALLOWED_ORIGINS",
@@ -86,6 +87,19 @@ func TestLoadDatabaseConfig(t *testing.T) {
 			t.Fatalf("migration database credentials were not loaded")
 		}
 	})
+}
+
+func TestLoadMetricsAddress(t *testing.T) {
+	resetConfigEnv(t)
+	if got := Load().App.MetricsAddr; got != "127.0.0.1:9091" {
+		t.Fatalf("default metrics address = %q, want 127.0.0.1:9091", got)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("METRICS_ADDR", "0.0.0.0:19091")
+	if got := Load().App.MetricsAddr; got != "0.0.0.0:19091" {
+		t.Fatalf("configured metrics address = %q, want 0.0.0.0:19091", got)
+	}
 }
 
 func TestLoadIgnoresRetiredRuntimeTuningEnv(t *testing.T) {

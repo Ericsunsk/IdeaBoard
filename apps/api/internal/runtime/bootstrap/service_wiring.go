@@ -55,6 +55,9 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, err
 	}
 	rewardService := rewards.NewService(appPool, creditService, rewardKeys)
+	if err := rewardService.ValidateActiveCodeKeyVersions(ctx); err != nil {
+		return appDomainServices{}, err
+	}
 	billingService := billing.NewService(appPool)
 	billingCoverage := billingcoverage.NewService(repos.accountRepo, billingService)
 	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)

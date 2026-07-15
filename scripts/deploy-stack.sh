@@ -256,6 +256,12 @@ auth_host_port() {
   printf '%s\n' "${value:-6001}"
 }
 
+api_metrics_host_port() {
+  local value
+  value="$(env_or_file_value API_METRICS_HOST_PORT)"
+  printf '%s\n' "${value:-9091}"
+}
+
 nginx_api_upstream() {
   local value
   value="$(env_or_file_value NGINX_API_UPSTREAM)"
@@ -483,6 +489,7 @@ preflight_checks() {
   check_disk_space
   check_backup_encryption_tool
   check_port_available_or_used_by_compose "$(api_host_port)" "api" "ideaboard-api"
+  check_port_available_or_used_by_compose "$(api_metrics_host_port)" "api metrics" "ideaboard-api"
   check_port_available_or_used_by_compose "$(auth_host_port)" "auth" "ideaboard-auth"
   if [[ -n "$(nginx_real_ip_include)" && ! -r "$(nginx_real_ip_include)" ]]; then
     die "NGINX_REAL_IP_INCLUDE is not readable: $(nginx_real_ip_include)"
@@ -1009,6 +1016,7 @@ wait_for_backend_health() {
   local api_upstream
   api_upstream="$(nginx_api_upstream)"
   wait_for_http_local "api upstream" "${api_upstream%/}/api/health"
+  wait_for_http_local "api metrics" "http://127.0.0.1:$(api_metrics_host_port)/metrics"
   wait_for_http_local "auth upstream" "$(nginx_auth_health_upstream)"
 }
 

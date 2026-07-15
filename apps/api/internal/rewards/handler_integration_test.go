@@ -3,9 +3,11 @@ package rewards
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -206,9 +208,25 @@ func TestAuthenticatedUserRedemptionHistoryHTTPContract(t *testing.T) {
 	router.POST("/user/rewards/redeem", handler.Redeem)
 	router.GET("/user/rewards/redemptions", handler.ListRedemptions)
 
+	overLimitBody, err := json.Marshal(map[string]any{"code": strings.Repeat("A", maxRawCodeBytes+1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	overLimitRecorder := performRawRewardRedeem(t, router, string(overLimitBody))
+	assertRewardErrorResponse(t, overLimitRecorder, http.StatusUnprocessableEntity, "兑换码无效或已失效")
+	if got := overLimitRecorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("oversized Code Cache-Control = %q, want no-store", got)
+	}
+
 	page1 := performRewardRequest[RedemptionHistoryPage](
 		t, router, http.MethodGet, "/user/rewards/redemptions?limit=1", nil, http.StatusOK,
 	)
+	_, page1Recorder := performRewardRequestWithRecorder[RedemptionHistoryPage](
+		t, router, http.MethodGet, "/user/rewards/redemptions?limit=1", nil, http.StatusOK,
+	)
+	if got := page1Recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("history Cache-Control = %q, want no-store", got)
+	}
 	if len(page1.Redemptions) != 1 || page1.Redemptions[0].ID != second.Redemption.ID ||
 		page1.Redemptions[0].MaskedCodeHint != "•••• 2922" || page1.NextBeforeID == 0 {
 		t.Fatalf("history page 1 = %+v", page1)
@@ -232,9 +250,12 @@ func TestAuthenticatedUserRedemptionHistoryHTTPContract(t *testing.T) {
 	)
 
 	_, code := createActivePublicCampaign(t, service, "HTTP2923", 36, 1)
-	redeemed := performRewardRequest[RedeemResult](
+	redeemed, redeemRecorder := performRewardRequestWithRecorder[RedeemResult](
 		t, router, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": code}, http.StatusOK,
 	)
+	if got := redeemRecorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Redeem Cache-Control = %q, want no-store", got)
+	}
 	if redeemed.HistoryItem.ID != redeemed.Redemption.ID ||
 		redeemed.HistoryItem.CampaignDisplayName != "兑换测试奖励" ||
 		redeemed.HistoryItem.CreditedAmount != 36 ||
@@ -246,6 +267,44 @@ func TestAuthenticatedUserRedemptionHistoryHTTPContract(t *testing.T) {
 	)
 	if !replayed.Replayed || replayed.HistoryItem.ID != redeemed.HistoryItem.ID {
 		t.Fatalf("Redeem HTTP replay = %+v", replayed)
+	}
+}
+
+func TestRewardRedeemErrorsUseStableNonEnumerableCopy(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantMsg    string
+	}{
+		{name: "invalid", err: ErrCodeUnavailable, wantStatus: http.StatusUnprocessableEntity, wantMsg: "兑换码无效或已失效"},
+		{name: "invalid command", err: ErrInvalidCommand, wantStatus: http.StatusUnprocessableEntity, wantMsg: "兑换码无效或已失效"},
+		{name: "exhausted", err: ErrCampaignExhausted, wantStatus: http.StatusUnprocessableEntity, wantMsg: "兑换码无效或已失效"},
+		{name: "already redeemed", err: ErrAlreadyRedeemed, wantStatus: http.StatusConflict, wantMsg: "你已兑换过该奖励"},
+		{name: "frozen Wallet", err: credits.ErrWalletFrozen, wantStatus: http.StatusLocked, wantMsg: "当前账户无法兑换奖励"},
+		{name: "internal", err: errors.New("database unavailable"), wantStatus: http.StatusInternalServerError, wantMsg: "网络错误，请重试"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+
+			writeRewardRedeemError(context, tt.err)
+
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", recorder.Code, tt.wantStatus)
+			}
+			var payload struct {
+				Msg string `json:"msg"`
+			}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode response: %v; body=%s", err, recorder.Body.String())
+			}
+			if payload.Msg != tt.wantMsg {
+				t.Fatalf("message = %q, want %q", payload.Msg, tt.wantMsg)
+			}
+		})
 	}
 }
 

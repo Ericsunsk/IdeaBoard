@@ -72,6 +72,51 @@ func NewServiceWithOptions(
 	return &Service{pool: pool, credits: creditService, keyring: keyring, now: now, random: random}
 }
 
+// ValidateActiveCodeKeyVersions prevents removing a rotation key while Codes
+// signed by it can still redeem or authenticate an idempotent replay.
+func (s *Service) ValidateActiveCodeKeyVersions(ctx context.Context) error {
+	if s == nil || s.pool == nil {
+		return fmt.Errorf("validate reward Code key versions: service unavailable")
+	}
+	previousVersion := ""
+	if s.keyring.previous != nil {
+		previousVersion = s.keyring.previous.Version
+	}
+	var unsupportedActiveCodeExists bool
+	err := s.pool.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM reward_codes code
+  JOIN reward_campaigns campaign ON campaign.id = code.campaign_id
+  WHERE code.key_version <> $1
+    AND ($2 = '' OR code.key_version <> $2)
+    AND (
+      EXISTS (
+        SELECT 1 FROM reward_redemptions replay WHERE replay.code_id = code.id
+      )
+      OR (
+        code.revoked_at IS NULL
+        AND campaign.status <> 'cancelled'
+        AND (campaign.expires_at IS NULL OR campaign.expires_at > $3)
+        AND (campaign.max_redemptions = 0 OR campaign.redemption_count < campaign.max_redemptions)
+        AND (
+          campaign.mode = 'public'
+          OR NOT EXISTS (
+            SELECT 1 FROM reward_redemptions redemption WHERE redemption.code_id = code.id
+          )
+        )
+      )
+    )
+)`, s.keyring.current.Version, previousVersion, s.currentTime()).Scan(&unsupportedActiveCodeExists)
+	if err != nil {
+		return fmt.Errorf("validate active reward Code key versions: %w", err)
+	}
+	if unsupportedActiveCodeExists {
+		return fmt.Errorf("active or replayable reward Codes require an unconfigured HMAC key version")
+	}
+	return nil
+}
+
 func (s *Service) CreateCampaign(ctx context.Context, command CreateCampaignCommand) (Campaign, error) {
 	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
 	if err != nil {

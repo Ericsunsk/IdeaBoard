@@ -1393,6 +1393,87 @@ func TestPublicCodeCannotBeReissuedAcrossActiveHMACVersions(t *testing.T) {
 	}
 }
 
+func TestCodeKeyRotationKeepsPreviousForRedeemedCodeReplay(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	provisionRewardWallet(t, pool, creditService, 1)
+	provisionRewardWallet(t, pool, creditService, 3)
+
+	previousKey := CodeKey{Version: "v1", Secret: bytes.Repeat([]byte{0x11}, 32)}
+	oldKeyring, err := NewCodeKeyring(previousKey, nil)
+	if err != nil {
+		t.Fatalf("NewCodeKeyring(v1) error = %v", err)
+	}
+	oldService := NewService(pool, creditService, oldKeyring)
+	oldCampaign, oldCode := createActivePublicCampaign(t, oldService, "ROTATE01", 20, 2)
+
+	currentKey := CodeKey{Version: "v2", Secret: bytes.Repeat([]byte{0x22}, 32)}
+	rotatedKeyring, err := NewCodeKeyring(currentKey, &previousKey)
+	if err != nil {
+		t.Fatalf("NewCodeKeyring(v2, v1) error = %v", err)
+	}
+	rotatedService := NewService(pool, creditService, rotatedKeyring)
+	if err := rotatedService.ValidateActiveCodeKeyVersions(t.Context()); err != nil {
+		t.Fatalf("ValidateActiveCodeKeyVersions() during overlap error = %v", err)
+	}
+	if _, err := rotatedService.Redeem(t.Context(), RedeemCommand{UserID: 1, Code: oldCode}); err != nil {
+		t.Fatalf("Redeem() previous-key Code during overlap error = %v", err)
+	}
+
+	_, newCode := createActivePublicCampaign(t, rotatedService, "ROTATE02", 30, 1)
+	currentOnlyKeyring, err := NewCodeKeyring(currentKey, nil)
+	if err != nil {
+		t.Fatalf("NewCodeKeyring(v2) error = %v", err)
+	}
+	currentOnlyService := NewService(pool, creditService, currentOnlyKeyring)
+	if _, err := currentOnlyService.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: newCode}); err != nil {
+		t.Fatalf("Redeem() newly issued current-key Code error = %v", err)
+	}
+	if _, err := rotatedService.CancelCampaign(t.Context(), CancelCampaignCommand{
+		CampaignID:  oldCampaign.ID,
+		ActorUserID: 1,
+		Reason:      "结束旧 key 版本奖励活动",
+	}); err != nil {
+		t.Fatalf("CancelCampaign() old key Campaign error = %v", err)
+	}
+	replayed, err := rotatedService.Redeem(t.Context(), RedeemCommand{UserID: 1, Code: oldCode})
+	if err != nil || !replayed.Replayed {
+		t.Fatalf("Redeem() previous-key replay after cancellation = %+v, %v", replayed, err)
+	}
+	if err := currentOnlyService.ValidateActiveCodeKeyVersions(t.Context()); err == nil {
+		t.Fatal("ValidateActiveCodeKeyVersions() allowed previous removal while old Redemption remained replayable")
+	}
+}
+
+func TestCodeKeyRotationAllowsPreviousRemovalAfterUnredeemedCodesBecomeInactive(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	previousKey := CodeKey{Version: "v1", Secret: bytes.Repeat([]byte{0x11}, 32)}
+	oldKeyring, err := NewCodeKeyring(previousKey, nil)
+	if err != nil {
+		t.Fatalf("NewCodeKeyring(v1) error = %v", err)
+	}
+	oldService := NewService(pool, creditService, oldKeyring)
+	oldCampaign, _ := createActivePublicCampaign(t, oldService, "RETIRE01", 20, 1)
+	if _, err := oldService.CancelCampaign(t.Context(), CancelCampaignCommand{
+		CampaignID:  oldCampaign.ID,
+		ActorUserID: 1,
+		Reason:      "停用未兑换的旧 key Code",
+	}); err != nil {
+		t.Fatalf("CancelCampaign() unredeemed old Code error = %v", err)
+	}
+
+	currentKey := CodeKey{Version: "v2", Secret: bytes.Repeat([]byte{0x22}, 32)}
+	currentOnlyKeyring, err := NewCodeKeyring(currentKey, nil)
+	if err != nil {
+		t.Fatalf("NewCodeKeyring(v2) error = %v", err)
+	}
+	currentOnlyService := NewService(pool, creditService, currentOnlyKeyring)
+	if err := currentOnlyService.ValidateActiveCodeKeyVersions(t.Context()); err != nil {
+		t.Fatalf("ValidateActiveCodeKeyVersions() after unredeemed Code cancellation error = %v", err)
+	}
+}
+
 func TestUserRedeemCommitsWithCreditGrantAndReplaysWithoutDoubleGrant(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)

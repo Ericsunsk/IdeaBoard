@@ -18,6 +18,7 @@ import { toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  ApiResponseBase,
   ApiResponseRewardRedeemResult,
   ApiResponseRewardRedemptionHistoryPage,
   ListUserRewardRedemptionsParams,
@@ -53,7 +54,7 @@ export const getRedeemUserRewardQueryKey = (
 
 export const getRedeemUserRewardQueryOptions = <
   TData = Awaited<ReturnType<typeof redeemUserReward>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<ApiResponseBase>,
 >(
   rewardRedeemRequest: MaybeRefOrGetter<RewardRedeemRequest>,
   options?: {
@@ -76,11 +77,11 @@ export const getRedeemUserRewardQueryOptions = <
 }
 
 export type RedeemUserRewardQueryResult = NonNullable<Awaited<ReturnType<typeof redeemUserReward>>>
-export type RedeemUserRewardQueryError = ErrorType<unknown>
+export type RedeemUserRewardQueryError = ErrorType<ApiResponseBase>
 
 export function useRedeemUserReward<
   TData = Awaited<ReturnType<typeof redeemUserReward>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<ApiResponseBase>,
 >(
   rewardRedeemRequest: MaybeRefOrGetter<RewardRedeemRequest>,
   options?: {

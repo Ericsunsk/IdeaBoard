@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,8 +14,9 @@ import (
 )
 
 type runtimeApp struct {
-	container  *appContainer
-	httpServer *http.Server
+	container     *appContainer
+	httpServer    *http.Server
+	metricsServer *http.Server
 }
 
 func newRuntimeApp(cfg *config.Config) (*runtimeApp, error) {
@@ -23,8 +25,9 @@ func newRuntimeApp(cfg *config.Config) (*runtimeApp, error) {
 		return nil, err
 	}
 	return &runtimeApp{
-		container:  container,
-		httpServer: newHTTPServer(cfg, container.router),
+		container:     container,
+		httpServer:    newHTTPServer(cfg, container.router),
+		metricsServer: newMetricsServer(cfg),
 	}, nil
 }
 
@@ -42,16 +45,21 @@ func (a *runtimeApp) start() {
 		}
 	}()
 
+	startHTTPServer("HTTP", a.httpServer)
+	startHTTPServer("metrics", a.metricsServer)
+}
+
+func startHTTPServer(name string, server *http.Server) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("HTTP server goroutine panicked", "panic", r)
-				fatal("HTTP server goroutine panicked", "panic", r)
+				slog.Error(name+" server goroutine panicked", "panic", r)
+				fatal(name+" server goroutine panicked", "panic", r)
 			}
 		}()
-		slog.Info("HTTP server starting", "addr", a.httpServer.Addr)
-		if err := a.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fatal("failed to start HTTP server", "err", err)
+		slog.Info(name+" server starting", "addr", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fatal("failed to start "+name+" server", "err", err)
 		}
 	}()
 }
@@ -72,12 +80,16 @@ func (a *runtimeApp) shutdown() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	var shutdownErr error
 	if err := a.httpServer.Shutdown(ctx); err != nil {
-		return err
+		shutdownErr = errors.Join(shutdownErr, err)
+	}
+	if err := a.metricsServer.Shutdown(ctx); err != nil {
+		shutdownErr = errors.Join(shutdownErr, err)
 	}
 
 	slog.Info("server exited")
-	return nil
+	return shutdownErr
 }
 
 func (a *runtimeApp) close() error {

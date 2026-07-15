@@ -220,6 +220,10 @@ Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_
 
 Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是部署输入变量，不是 API runtime 直接读取的公开链接配置。生产部署细节见 [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)。
 
+API 在独立 `METRICS_ADDR` listener 暴露 Prometheus `/metrics`，默认 `127.0.0.1:9091`。该 listener 只用于本机或私有监控网络，不得接入用户 API 反代或 Cloudflare。
+
+轮换 `REWARDS_CODE_HMAC_KEYS` 时先部署 new current + old previous；新 Code 只使用 current，lookup 同时验证两者。只有 old previous Code 从未兑换且已全部永久失效时才能移除 previous；已有 Redemption 仍依赖 previous 完成 replay，否则 API startup 会 fail closed。
+
 ## 改动 Checklist
 
 ### 改 Canvas 或 workflow

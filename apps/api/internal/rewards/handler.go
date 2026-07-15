@@ -2,6 +2,8 @@ package rewards
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,9 +28,29 @@ type RewardService interface {
 
 type Handler struct {
 	service RewardService
+	limiter *redemptionAttemptLimiter
+	metrics redemptionMetrics
 }
 
-func NewHandler(service RewardService) *Handler { return &Handler{service: service} }
+type redemptionHandlerOptions struct {
+	Now             func() time.Time
+	MetricsRecorder redemptionMetricsRecorder
+}
+
+func NewHandler(service RewardService) *Handler {
+	return newHandlerWithOptions(service, redemptionHandlerOptions{})
+}
+
+func newHandlerWithOptions(service RewardService, options redemptionHandlerOptions) *Handler {
+	if options.MetricsRecorder == nil {
+		options.MetricsRecorder = defaultRedemptionMetricsRecorder
+	}
+	return &Handler{
+		service: service,
+		limiter: newRedemptionAttemptLimiter(options.Now),
+		metrics: newRedemptionMetrics(options.Now, options.MetricsRecorder),
+	}
+}
 
 type campaignMutationRequest struct {
 	DisplayName    string       `json:"display_name"`
@@ -386,16 +408,24 @@ func (h *Handler) GetCampaign(c *gin.Context) {
 }
 
 func (h *Handler) Redeem(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		response.Error(c, http.StatusServiceUnavailable, "网络错误，请重试")
 		return
 	}
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
 		return
 	}
+	finishMetrics := h.metrics.Start()
+	if !h.limiter.Allow(identityPrincipal.UserID()) {
+		finishMetrics(redemptionOutcomeRateLimited, 0, nil)
+		response.Error(c, http.StatusTooManyRequests, "操作频繁，请稍后重试")
+		return
+	}
 	var request redeemRequest
 	if err := decodeRewardJSON(c, &request); err != nil {
+		finishMetrics(redemptionOutcomeInvalid, 0, nil)
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
@@ -403,13 +433,47 @@ func (h *Handler) Redeem(c *gin.Context) {
 		UserID: identityPrincipal.UserID(), Code: request.Code,
 	})
 	if err != nil {
-		writeRewardError(c, err)
+		finishMetrics(redemptionOutcomeForError(err), 0, err)
+		writeRewardRedeemError(c, err)
 		return
+	}
+	if result.Replayed {
+		finishMetrics(redemptionOutcomeReplayed, 0, nil)
+	} else {
+		finishMetrics(redemptionOutcomeSuccess, result.CreditedAmount, nil)
 	}
 	response.SuccessDTO(c, result)
 }
 
+func redemptionOutcomeForError(err error) redemptionOutcome {
+	switch {
+	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeUnavailable), errors.Is(err, credits.ErrWalletFrozen):
+		return redemptionOutcomeInvalid
+	case errors.Is(err, ErrAlreadyRedeemed):
+		return redemptionOutcomeAlreadyRedeemed
+	case errors.Is(err, ErrCampaignExhausted):
+		return redemptionOutcomeExhausted
+	default:
+		return redemptionOutcomeInternalError
+	}
+}
+
+func writeRewardRedeemError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, ErrInvalidCommand), errors.Is(err, ErrCodeUnavailable), errors.Is(err, ErrCampaignExhausted):
+		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
+	case errors.Is(err, ErrAlreadyRedeemed):
+		response.Error(c, http.StatusConflict, "你已兑换过该奖励")
+	case errors.Is(err, credits.ErrWalletFrozen):
+		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
+	default:
+		slog.Warn("reward redemption failed", "outcome", "internal_error", "error_type", fmt.Sprintf("%T", err))
+		response.Error(c, http.StatusInternalServerError, "网络错误，请重试")
+	}
+}
+
 func (h *Handler) ListRedemptions(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
 		return

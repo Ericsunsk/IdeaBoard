@@ -19,7 +19,32 @@ export const userRewardRedemptionsQueryKeys = {
 }
 
 export async function redeemUserRewardCode(code: string): Promise<UserRewardRedeemResult> {
-  return resolveApiData(redeemUserReward({ code }), '网络错误，请重试')
+  try {
+    return await resolveApiData(redeemUserReward({ code }), '网络错误，请重试')
+  } catch (error) {
+    throw new Error(rewardRedemptionErrorMessage(error), { cause: error })
+  }
+}
+
+function rewardRedemptionErrorMessage(error: unknown): string {
+  const status =
+    error && typeof error === 'object' && 'status' in error
+      ? Number((error as { status?: unknown }).status)
+      : 0
+  switch (status) {
+    case 400:
+      return '参数错误'
+    case 422:
+      return '兑换码无效或已失效'
+    case 409:
+      return '你已兑换过该奖励'
+    case 423:
+      return '当前账户无法兑换奖励'
+    case 429:
+      return '操作频繁，请稍后重试'
+    default:
+      return '网络错误，请重试'
+  }
 }
 
 export async function fetchUserRewardRedemptions(

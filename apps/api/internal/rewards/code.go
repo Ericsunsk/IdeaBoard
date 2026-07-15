@@ -11,12 +11,11 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 )
 
-const maxRawCodeRunes = 128
+const maxRawCodeBytes = 128
 
 const (
 	generatedCodeEntropyBytes = 10
@@ -120,12 +119,12 @@ func validateCodeKey(key CodeKey) (CodeKey, error) {
 }
 
 func normalizeCode(raw string) (string, error) {
-	if utf8.RuneCountInString(raw) > maxRawCodeRunes {
+	if len(raw) > maxRawCodeBytes {
 		return "", ErrInvalidCommand
 	}
 	normalized := strings.ToUpper(norm.NFKC.String(strings.TrimSpace(raw)))
 	normalized = strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) || r == '-' {
+		if unicode.IsSpace(r) || unicode.Is(unicode.Hyphen, r) || unicode.Is(unicode.Dash, r) {
 			return -1
 		}
 		return r

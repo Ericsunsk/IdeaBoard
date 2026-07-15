@@ -45,6 +45,7 @@
 - Unless schema or query contracts change, do not edit migrations or generated sqlc code.
 - Credits Ledger 与 Tasking 共用 PostgreSQL；其他 context 只能通过 `credits.Commands` 写账，禁止直接改 balance projection 或 Ledger。
 - Rewards 与 Credits 共用 caller-owned PostgreSQL transaction；Rewards 只通过 `credits.Service.InTx` Grant，不直接写 Ledger 或 balance projection。
+- Rewards Redeem 使用 endpoint-private per-user in-process limiter 与 current/previous HMAC registry；startup 必须拒绝缺少 current key，或移除仍被可兑换/可 replay Code 依赖的 previous key。该 abuse control 不进入 Platform interface 或 database schema。
 - Billing 只根据全局 SKU 选择 immutable price version 并生成 Quote；不读取 Provider Account routing，也不直接写 Credits Ledger。
 - Credit Commands 需要与 caller 的业务状态原子提交时，pgx caller 使用 `credits.Service.InTx(pgx.Tx)`，database/sql caller 使用 `credits.Service.InSQLTx(*sql.Tx)`；两者都只调用同一个 typed Credit Command，且 caller 拥有 commit/rollback，禁止外部双写。
 - canonical AI Image Workflow Submit 由 Tasking 在一个 pgx transaction 内完成 Quote/Hold/snapshot/Task/River；terminal transition 由 Task Store 在一个 database/sql transaction 内完成 Capture/Release 与 Task result/status。纯本地编辑操作不进入该计费边界。

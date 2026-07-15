@@ -143,9 +143,48 @@ paths:
       responses:
         '200':
           description: Reward redeemed or the original successful redemption replayed
+          headers:
+            Cache-Control:
+              description: Sensitive redemption responses are never cached
+              schema: { type: string, enum: [no-store] }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseRewardRedeemResult' }
+        '400':
+          description: Malformed request; user copy is 参数错误
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '409':
+          description: Campaign already redeemed by the authenticated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '422':
+          description: Code is invalid or unavailable without exposing its state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '423':
+          description: Current Wallet cannot receive Rewards
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '429':
+          description: Per-user redemption attempt limit exceeded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '500':
+          description: Internal or transport failure with stable generic user copy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
   /user/rewards/redemptions:
     get:
       tags: [UserRewards]
@@ -162,6 +201,10 @@ paths:
       responses:
         '200':
           description: Current authenticated user's successful Reward Redemption history
+          headers:
+            Cache-Control:
+              description: Sensitive redemption history is never cached
+              schema: { type: string, enum: [no-store] }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseRewardRedemptionHistoryPage' }
