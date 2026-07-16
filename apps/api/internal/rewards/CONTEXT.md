@@ -52,4 +52,6 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 
 ## Current Boundary
 
-当前不包含 distributed limiter、Platform RateLimiter abstraction、PostgreSQL/Redis bucket 或 server-side CSV persistence。CSV 由 Admin UI 仅从首次 generation response 生成；server 不保存 export 文件或可恢复 Code 明文。
+当前使用普通 PostgreSQL B-tree、Campaign row lock 与精确 counter，不包含 partitioning、sharded counter、Redis/quota block、distributed limiter、Platform RateLimiter abstraction、PostgreSQL bucket 或 server-side CSV persistence。CSV 由 Admin UI 仅从首次 generation response 生成；server 不保存 export 文件或可恢复 Code 明文。
+
+显式 `REWARDS_LOAD_TEST=1` harness 在隔离 schema 中验证百万累计 Redemption 的 Code lookup、User/Admin cursor reads、Batch reads 与约 100 RPS Hot Public Campaign；命令和基线见 [rewards-million.md](../../../../docs/benchmarks/rewards-million.md)。默认 test suite 不运行该 harness。

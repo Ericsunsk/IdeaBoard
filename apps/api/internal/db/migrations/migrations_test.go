@@ -718,7 +718,8 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertIndexValid(t, ctx, conn, "uq_reward_codes_public_campaign")
 	assertIndexValid(t, ctx, conn, "idx_reward_codes_batch_id")
 	assertIndexValid(t, ctx, conn, "idx_reward_code_batches_campaign_id")
-	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id")
+	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id_desc")
+	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_mode_id")
 	assertStorageProfileSeed(t, ctx, conn)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_provider_endpoint_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
@@ -1031,6 +1032,57 @@ INSERT INTO reward_admin_actions (
 	}
 	assertMigrationApplied(t, ctx, conn, version, true)
 	assertConstraintDefinitionContains(t, ctx, conn, "reward_admin_actions", "ck_reward_admin_actions_type", "revoke_code")
+}
+
+func TestRewardsQueryIndexesMigrationRollsBackAndReapplies(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	const (
+		file    = "20260716030000_rewards_query_indexes.sql"
+		version = 20260716030000
+	)
+	assertMigrationApplied(t, ctx, conn, version, true)
+	assertIndexExists(t, ctx, conn, "idx_reward_redemptions_code_id", false)
+	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id_desc")
+	assertIndexDefinitionContains(
+		t,
+		ctx,
+		conn,
+		"idx_reward_redemptions_code_id_desc",
+		"(code_id, id DESC)",
+		"INCLUDE (redeemed_at)",
+	)
+	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_mode_id")
+	assertIndexDefinitionContains(t, ctx, conn, "idx_reward_campaigns_mode_id", "(mode, id DESC)")
+
+	rollbackNoTxMigrationForTest(t, ctx, conn, file, version)
+	assertMigrationApplied(t, ctx, conn, version, false)
+	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id")
+	assertIndexDefinitionContains(t, ctx, conn, "idx_reward_redemptions_code_id", "(code_id)")
+	assertIndexExists(t, ctx, conn, "idx_reward_redemptions_code_id_desc", false)
+	assertIndexExists(t, ctx, conn, "idx_reward_campaigns_mode_id", false)
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("reapply Rewards query index migration: %v", err)
+	}
+	assertMigrationApplied(t, ctx, conn, version, true)
+	assertIndexExists(t, ctx, conn, "idx_reward_redemptions_code_id", false)
+	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id_desc")
+	assertIndexDefinitionContains(
+		t,
+		ctx,
+		conn,
+		"idx_reward_redemptions_code_id_desc",
+		"(code_id, id DESC)",
+		"INCLUDE (redeemed_at)",
+	)
+	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_mode_id")
+	assertIndexDefinitionContains(t, ctx, conn, "idx_reward_campaigns_mode_id", "(mode, id DESC)")
 }
 
 func TestRewardGrantCorrectionMigrationRollsBackAndReapplies(t *testing.T) {
@@ -1652,6 +1704,31 @@ WHERE n.nspname = current_schema()
 	}
 	if !valid {
 		t.Fatalf("index %s is not valid", indexName)
+	}
+}
+
+func assertIndexDefinitionContains(
+	t *testing.T,
+	ctx context.Context,
+	conn *sql.Conn,
+	indexName string,
+	wantFragments ...string,
+) {
+	t.Helper()
+	var definition string
+	if err := conn.QueryRowContext(ctx, `
+SELECT pg_get_indexdef(c.oid)
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = current_schema()
+  AND c.relkind = 'i'
+  AND c.relname = $1`, indexName).Scan(&definition); err != nil {
+		t.Fatalf("read index %s definition failed: %v", indexName, err)
+	}
+	for _, want := range wantFragments {
+		if !strings.Contains(definition, want) {
+			t.Fatalf("index %s definition=%q, want fragment %q", indexName, definition, want)
+		}
 	}
 }
 

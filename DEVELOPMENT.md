@@ -97,6 +97,8 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Auth build | `cd apps/auth && npm run build` |
 | Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
 | Usage million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v` |
+| Rewards million dataset | `cd apps/api && REWARDS_LOAD_TEST=1 go test ./internal/rewards -run '^TestRewardMillionRedemptionDataset$' -count=1 -v` |
+| Rewards hot Public Campaign | `cd apps/api && REWARDS_LOAD_TEST=1 go test ./internal/rewards -run '^TestRewardHotPublicCampaign$' -count=1 -v` |
 
 修改 `apps/api/internal/db/queries` 或 schema 后：
 
@@ -156,6 +158,14 @@ git diff --exit-code -- internal/db/sqlc
 | [service.go](./apps/api/internal/credits/service.go) | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter |
 | [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md) | Credits domain language 与 invariants |
 | [credits-million.md](./docs/benchmarks/credits-million.md) | 显式百万流水 harness 与参考结果 |
+
+### Rewards
+
+| 入口 | 用途 |
+| ---- | ---- |
+| [service.go](./apps/api/internal/rewards/service.go) | Campaign、Code、Redemption command/read seams |
+| [CONTEXT.md](./apps/api/internal/rewards/CONTEXT.md) | Rewards Domain Language 与 invariants |
+| [rewards-million.md](./docs/benchmarks/rewards-million.md) | 百万 Redemption 与 Hot Public Campaign 显式 harness |
 
 ### Billing
 

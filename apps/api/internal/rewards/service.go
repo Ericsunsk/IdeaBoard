@@ -51,6 +51,72 @@ const (
 	maskedCodeHintPrefix          = "•••• "
 )
 
+const redemptionHistorySQL = `
+SELECT redemptions.id,
+       campaigns.display_name,
+       redemptions.credit_amount,
+       codes.code_hint,
+       redemptions.redeemed_at
+FROM reward_redemptions redemptions
+JOIN reward_campaigns campaigns ON campaigns.id = redemptions.campaign_id
+JOIN reward_codes codes ON codes.id = redemptions.code_id
+WHERE redemptions.user_id = $1
+  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
+ORDER BY redemptions.id DESC
+LIMIT $3`
+
+const campaignListSQL = `SELECT ` + campaignProjectionSQL + `
+FROM reward_campaigns
+WHERE ($1::BIGINT <= 0 OR id < $1)
+  AND ($3::TEXT = '' OR strpos(lower(display_name), lower($3)) > 0)
+  AND ($4::TEXT = '' OR mode = $4)
+  AND ($5::TEXT = '' OR (
+    CASE
+      WHEN status = 'draft' THEN 'draft'
+      WHEN status = 'cancelled' THEN 'cancelled'
+      WHEN expires_at IS NOT NULL AND expires_at <= $6 THEN 'expired'
+      WHEN max_redemptions > 0 AND redemption_count >= max_redemptions THEN 'exhausted'
+      WHEN issued_code_count > 0 AND valid_unused_code_count = 0 THEN 'exhausted'
+      WHEN status = 'paused' THEN 'paused'
+      WHEN starts_at IS NOT NULL AND starts_at > $6 THEN 'scheduled'
+      ELSE 'active'
+    END
+  ) = $5)
+ORDER BY id DESC
+LIMIT $2`
+
+const adminRedemptionListSQL = `
+SELECT redemptions.id, redemptions.user_id, redemptions.credit_amount,
+       $4 || codes.code_hint, redemptions.credit_transaction_id, redemptions.redeemed_at
+FROM reward_redemptions redemptions
+JOIN reward_codes codes ON codes.id = redemptions.code_id
+WHERE redemptions.campaign_id = $1
+  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
+ORDER BY redemptions.id DESC
+LIMIT $3`
+
+const adminCodeLookupSQL = `
+SELECT codes.id, codes.campaign_id, campaigns.display_name, codes.batch_id,
+       $5 || codes.code_hint,
+       CASE
+         WHEN redemption.id IS NOT NULL THEN 'redeemed'
+         WHEN codes.revoked_at IS NOT NULL THEN 'revoked'
+         ELSE 'available'
+       END,
+       codes.issued_at, codes.revoked_at, redemption.id, redemption.redeemed_at
+FROM reward_codes codes
+JOIN reward_campaigns campaigns ON campaigns.id = codes.campaign_id
+LEFT JOIN LATERAL (
+  SELECT id, redeemed_at
+  FROM reward_redemptions
+  WHERE code_id = codes.id
+  ORDER BY id DESC
+  LIMIT 1
+) redemption ON TRUE
+WHERE (codes.key_version = $1 AND codes.code_digest = $2)
+   OR ($3::TEXT <> '' AND codes.key_version = $3 AND codes.code_digest = $4)
+LIMIT 1`
+
 func NewService(pool *pgxpool.Pool, creditService CreditService, keyring CodeKeyring) *Service {
 	return NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{})
 }
@@ -449,8 +515,7 @@ func findCodeBatchByIdempotencyKey(
 ) (CodeBatch, bool, error) {
 	var batch CodeBatch
 	err := scanCodeBatch(tx.QueryRow(ctx, codeBatchMetadataSQL+`
-WHERE batches.campaign_id = $1 AND batches.idempotency_key = $2
-GROUP BY batches.id, hint_preview.masked_code_hints`, campaignID, idempotencyKey), &batch)
+WHERE batches.campaign_id = $1 AND batches.idempotency_key = $2`, campaignID, idempotencyKey), &batch)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return CodeBatch{}, false, nil
 	}
@@ -462,19 +527,31 @@ GROUP BY batches.id, hint_preview.masked_code_hints`, campaignID, idempotencyKey
 
 const codeBatchMetadataSQL = `
 SELECT batches.id, batches.campaign_id, batches.idempotency_key, batches.code_count,
-       batches.issued_by, batches.issued_at, batches.revoked_at, batches.revoked_by,
-       COUNT(DISTINCT codes.id) FILTER (
-         WHERE codes.revoked_at IS NULL AND redemptions.id IS NULL
-       )::INTEGER AS valid_unused_count,
-       COUNT(DISTINCT codes.id) FILTER (WHERE redemptions.id IS NOT NULL)::INTEGER AS redeemed_count,
-       COUNT(DISTINCT codes.id) FILTER (
-         WHERE codes.revoked_at IS NOT NULL AND redemptions.id IS NULL
-       )::INTEGER AS revoked_unused_count,
-       hint_preview.masked_code_hints
-FROM reward_code_batches batches
-LEFT JOIN reward_codes codes ON codes.batch_id = batches.id
-LEFT JOIN reward_redemptions redemptions ON redemptions.code_id = codes.id
-LEFT JOIN LATERAL (
+	       batches.issued_by, batches.issued_at, batches.revoked_at, batches.revoked_by,
+	       stats.valid_unused_count,
+	       stats.redeemed_count,
+	       stats.revoked_unused_count,
+	       hint_preview.masked_code_hints
+	FROM reward_code_batches batches
+	LEFT JOIN LATERAL (
+	  SELECT COUNT(codes.id) FILTER (
+	         WHERE codes.revoked_at IS NULL AND redemptions.id IS NULL
+	       )::INTEGER AS valid_unused_count,
+	       COUNT(redemptions.id)::INTEGER AS redeemed_count,
+	       COUNT(codes.id) FILTER (
+	         WHERE codes.revoked_at IS NOT NULL AND redemptions.id IS NULL
+	       )::INTEGER AS revoked_unused_count
+	  FROM reward_codes codes
+	  LEFT JOIN LATERAL (
+	    SELECT id
+	    FROM reward_redemptions
+	    WHERE code_id = codes.id
+	    ORDER BY id DESC
+	    LIMIT 1
+	  ) redemptions ON TRUE
+	  WHERE codes.batch_id = batches.id
+	) stats ON TRUE
+	LEFT JOIN LATERAL (
   SELECT COALESCE(array_agg('` + maskedCodeHintPrefix + `' || preview.code_hint ORDER BY preview.id), ARRAY[]::TEXT[]) AS masked_code_hints
   FROM (
     SELECT id, code_hint
@@ -507,7 +584,6 @@ func (s *Service) ListCodeBatches(ctx context.Context, input ListCodeBatchesInpu
 	}
 	rows, err := s.pool.Query(ctx, codeBatchMetadataSQL+`
 WHERE batches.campaign_id = $1 AND ($2::BIGINT <= 0 OR batches.id < $2)
-GROUP BY batches.id, hint_preview.masked_code_hints
 ORDER BY batches.id DESC
 LIMIT $3`, input.CampaignID, input.BeforeID, input.Limit+1)
 	if err != nil {
@@ -602,8 +678,7 @@ func findCodeBatchByID(
 ) (CodeBatch, bool, error) {
 	var batch CodeBatch
 	err := scanCodeBatch(tx.QueryRow(ctx, codeBatchMetadataSQL+`
-WHERE batches.campaign_id = $1 AND batches.id = $2
-GROUP BY batches.id, hint_preview.masked_code_hints`, campaignID, batchID), &batch)
+WHERE batches.campaign_id = $1 AND batches.id = $2`, campaignID, batchID), &batch)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return CodeBatch{}, false, nil
 	}
@@ -1034,19 +1109,7 @@ func (s *Service) ListRedemptions(
 	if limit < 1 || limit > maxRedemptionHistoryLimit {
 		return RedemptionHistoryPage{}, ErrInvalidCommand
 	}
-	rows, err := s.pool.Query(ctx, `
-SELECT redemptions.id,
-       campaigns.display_name,
-       redemptions.credit_amount,
-       codes.code_hint,
-       redemptions.redeemed_at
-FROM reward_redemptions redemptions
-JOIN reward_campaigns campaigns ON campaigns.id = redemptions.campaign_id
-JOIN reward_codes codes ON codes.id = redemptions.code_id
-WHERE redemptions.user_id = $1
-  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
-ORDER BY redemptions.id DESC
-LIMIT $3`, input.UserID, input.BeforeID, limit+1)
+	rows, err := s.pool.Query(ctx, redemptionHistorySQL, input.UserID, input.BeforeID, limit+1)
 	if err != nil {
 		return RedemptionHistoryPage{}, fmt.Errorf("list reward Redemption history: %w", err)
 	}
@@ -1116,25 +1179,8 @@ func (s *Service) ListCampaigns(ctx context.Context, input ListCampaignsInput) (
 		return CampaignPage{}, ErrInvalidCommand
 	}
 	now := s.currentTime()
-	rows, err := s.pool.Query(ctx, `SELECT `+campaignProjectionSQL+`
-FROM reward_campaigns
-WHERE ($1::BIGINT <= 0 OR id < $1)
-  AND ($3::TEXT = '' OR strpos(lower(display_name), lower($3)) > 0)
-  AND ($4::TEXT = '' OR mode = $4)
-  AND ($5::TEXT = '' OR (
-    CASE
-      WHEN status = 'draft' THEN 'draft'
-      WHEN status = 'cancelled' THEN 'cancelled'
-      WHEN expires_at IS NOT NULL AND expires_at <= $6 THEN 'expired'
-      WHEN max_redemptions > 0 AND redemption_count >= max_redemptions THEN 'exhausted'
-      WHEN issued_code_count > 0 AND valid_unused_code_count = 0 THEN 'exhausted'
-      WHEN status = 'paused' THEN 'paused'
-      WHEN starts_at IS NOT NULL AND starts_at > $6 THEN 'scheduled'
-      ELSE 'active'
-    END
-  ) = $5)
-ORDER BY id DESC
-LIMIT $2`, input.BeforeID, input.Limit+1, input.Search, input.Mode, input.Status, now)
+	rows, err := s.pool.Query(ctx, campaignListSQL,
+		input.BeforeID, input.Limit+1, input.Search, input.Mode, input.Status, now)
 	if err != nil {
 		return CampaignPage{}, fmt.Errorf("list reward campaigns: %w", err)
 	}
@@ -1182,15 +1228,8 @@ func (s *Service) ListAdminRedemptions(
 	if input.BeforeID < 0 || input.Limit < 1 || input.Limit > maxRedemptionHistoryLimit {
 		return AdminRedemptionPage{}, ErrInvalidCommand
 	}
-	rows, err := s.pool.Query(ctx, `
-SELECT redemptions.id, redemptions.user_id, redemptions.credit_amount,
-       $4 || codes.code_hint, redemptions.credit_transaction_id, redemptions.redeemed_at
-FROM reward_redemptions redemptions
-JOIN reward_codes codes ON codes.id = redemptions.code_id
-WHERE redemptions.campaign_id = $1
-  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
-ORDER BY redemptions.id DESC
-LIMIT $3`, input.CampaignID, input.BeforeID, input.Limit+1, maskedCodeHintPrefix)
+	rows, err := s.pool.Query(ctx, adminRedemptionListSQL,
+		input.CampaignID, input.BeforeID, input.Limit+1, maskedCodeHintPrefix)
 	if err != nil {
 		return AdminRedemptionPage{}, fmt.Errorf("list Admin reward Redemptions: %w", err)
 	}
@@ -1236,27 +1275,10 @@ func (s *Service) lookupCode(
 		previousDigest = candidates[1].digest
 	}
 	var code AdminCodeMetadata
-	err := querier.QueryRow(ctx, `
-SELECT codes.id, codes.campaign_id, campaigns.display_name, codes.batch_id,
-       $5 || codes.code_hint,
-       CASE
-         WHEN redemption.id IS NOT NULL THEN 'redeemed'
-         WHEN codes.revoked_at IS NOT NULL THEN 'revoked'
-         ELSE 'available'
-       END,
-       codes.issued_at, codes.revoked_at, redemption.id, redemption.redeemed_at
-FROM reward_codes codes
-JOIN reward_campaigns campaigns ON campaigns.id = codes.campaign_id
-LEFT JOIN LATERAL (
-  SELECT id, redeemed_at
-  FROM reward_redemptions
-  WHERE code_id = codes.id
-  ORDER BY id DESC
-  LIMIT 1
-) redemption ON TRUE
-WHERE (codes.key_version = $1 AND codes.code_digest = $2)
-   OR ($3::TEXT <> '' AND codes.key_version = $3 AND codes.code_digest = $4)
-LIMIT 1`, candidates[0].version, candidates[0].digest, previousVersion, previousDigest, maskedCodeHintPrefix).Scan(
+	err := querier.QueryRow(ctx, adminCodeLookupSQL,
+		candidates[0].version, candidates[0].digest,
+		previousVersion, previousDigest, maskedCodeHintPrefix,
+	).Scan(
 		&code.ID, &code.CampaignID, &code.CampaignDisplayName, &code.BatchID,
 		&code.MaskedCodeHint, &code.Status, &code.IssuedAt, &code.RevokedAt,
 		&code.RedemptionID, &code.RedeemedAt,

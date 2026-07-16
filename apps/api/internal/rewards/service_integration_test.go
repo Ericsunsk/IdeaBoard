@@ -1584,6 +1584,7 @@ func TestCodeKeyRotationKeepsPreviousForRedeemedCodeReplay(t *testing.T) {
 	if _, err := rotatedService.CancelCampaign(t.Context(), CancelCampaignCommand{
 		CampaignID:  oldCampaign.ID,
 		ActorUserID: 1,
+		Confirmed:   true,
 		Reason:      "结束旧 key 版本奖励活动",
 	}); err != nil {
 		t.Fatalf("CancelCampaign() old key Campaign error = %v", err)
@@ -1610,6 +1611,7 @@ func TestCodeKeyRotationAllowsPreviousRemovalAfterUnredeemedCodesBecomeInactive(
 	if _, err := oldService.CancelCampaign(t.Context(), CancelCampaignCommand{
 		CampaignID:  oldCampaign.ID,
 		ActorUserID: 1,
+		Confirmed:   true,
 		Reason:      "停用未兑换的旧 key Code",
 	}); err != nil {
 		t.Fatalf("CancelCampaign() unredeemed old Code error = %v", err)

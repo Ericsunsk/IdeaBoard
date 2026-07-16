@@ -331,6 +331,37 @@ ideaboard delete --yes
 4. 检查 `/opt/stacks/ideaboard/docker/releases/current.json` 与 `previous.json`
 5. 检查 `/opt/stacks/ideaboard-backups/`
 
+<a id="rewards-operations-and-rollback"></a>
+## Rewards 运维与回滚
+
+### HMAC two-stage rotation
+
+`REWARDS_CODE_HMAC_KEYS` 只保留 `current` 与可选 `previous`。轮换时不要直接删除旧 key：
+
+1. 生成新的高熵 key 与唯一 version，在 secret 管理边界内把新 key 配为 `current`、原 key 配为 `previous`，然后部署 API。不要把 key 明文写入日志、Issue 或未加密 artifact。
+2. 确认 API 启动成功，并用受控 Campaign 验证新 Code 可发行和兑换、旧 Code 仍可兑换或 replay。重叠期间新 Code 只使用 `current`，lookup 同时接受 `current` 与 `previous`。
+3. 保持重叠，直到旧 version 下不存在仍可兑换的 Code，也不存在依赖该 key 的 Redemption replay，再移除 `previous` 并重新部署。
+4. API startup 会 fail closed：若仍有可兑换或可 replay 的 Code 依赖未配置 key，进程拒绝启动。此时恢复上一份 secret 配置（新 key 为 `current`、旧 key 为 `previous`）并重新启动；不要通过改表绕过检查。
+
+### Batch export 丢失恢复
+
+Code 明文只在 Batch 首次成功 generation response 中返回，server 不保存明文或 CSV。同一 idempotency key replay 返回 `export_unavailable` 时，明文不可恢复：
+
+1. 在 Admin 确认目标 Batch 与丢失的 export 对应。
+2. 撤销该 Batch；操作只会不可逆撤销 unused Code，已完成的 Redemption 与 Credits Ledger 不变。
+3. 使用新的 idempotency key 生成替代 Batch，不要重试原 key。
+4. 在首次响应中立即保存并校验 UTF-8 CSV，再按 bearer reward secret 的标准限制其下载、传输与留存范围。
+
+### Route disable 与回滚
+
+Rewards 没有 Feature Flag。发生需要立即停止兑换或管理写入的事故时：
+
+1. 先在 Cloudflare 或 reverse proxy 阻断 `/api/user/rewards/*` 与 `/api/admin/rewards/*`，保留 health endpoint，并确认外部请求已被 gateway 拒绝。
+2. 再执行 `ideaboard rollback --to previous` 回滚 image，完成 API/Auth health、登录、Credits 与非 Rewards 核心路径 smoke；如回滚版本仍包含 Rewards routes，继续保留 gateway block，直到修复版本上线并通过验证。
+3. 确认修复版本稳定后再移除 gateway block。不要为事故回滚临时引入 Feature Flag、兼容 endpoint 或 dual write。
+
+一旦存在 Redemption，禁止执行会删除 Rewards 数据的 destructive down migration，也禁止删除对应 Credits Ledger facts。应用回滚保留 Rewards schema 与历史事实；旧 image 可以暂不使用这些表。DB restore 是独立、人工确认的操作，不随 image rollback 自动执行。
+
 <a id="upgrade-and-rollback"></a>
 ## 升级与回滚
 
