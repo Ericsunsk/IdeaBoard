@@ -859,6 +859,100 @@ CREATE TABLE schema_migrations (
 	assertConstraintDefinitionContains(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_status", "paused", "cancelled")
 }
 
+func TestRewardsCampaignLifecycleRepairUpgradesAppliedDraftSchema(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if _, err := conn.ExecContext(ctx, `
+CREATE TABLE schema_migrations (
+  version BIGINT NOT NULL PRIMARY KEY,
+  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
+)`); err != nil {
+		t.Fatal(err)
+	}
+
+	const lifecycleFile = "20260715020000_rewards_campaign_lifecycle.sql"
+	files, err := fs.Glob(migrationFS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		if file == lifecycleFile {
+			break
+		}
+		raw, err := migrationFS.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		version, err := migrationVersion(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
+			t.Fatalf("apply prerequisite migration %s: %v", file, err)
+		}
+	}
+
+	const appliedLifecycleDraft = `
+ALTER TABLE reward_campaigns
+  ADD COLUMN starts_at TIMESTAMPTZ(3),
+  ADD COLUMN expires_at TIMESTAMPTZ(3),
+  DROP CONSTRAINT ck_reward_campaigns_status,
+  ADD CONSTRAINT ck_reward_campaigns_status CHECK (status IN ('draft', 'active', 'paused')),
+  ADD CONSTRAINT ck_reward_campaigns_schedule CHECK (
+    starts_at IS NULL OR expires_at IS NULL OR starts_at < expires_at
+  );
+
+ALTER TABLE reward_admin_actions
+  DROP CONSTRAINT ck_reward_admin_actions_type,
+  ADD CONSTRAINT ck_reward_admin_actions_type CHECK (
+    action_type IN ('create_campaign', 'issue_public_code', 'activate_campaign', 'pause_campaign', 'resume_campaign')
+  );
+`
+	if err := applyMigration(
+		ctx,
+		conn,
+		"historical_rewards_campaign_lifecycle_draft.sql",
+		parseSQLStatements(appliedLifecycleDraft),
+		20260715020000,
+	); err != nil {
+		t.Fatalf("apply historical lifecycle draft: %v", err)
+	}
+
+	const correctionFile = "20260715030000_reward_grant_correction.sql"
+	correctionRaw, err := migrationFS.ReadFile(correctionFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyMigration(
+		ctx,
+		conn,
+		correctionFile,
+		parseSQLStatements(extractUpSQL(string(correctionRaw))),
+		20260715030000,
+	); err != nil {
+		t.Fatalf("apply reward Grant Correction migration: %v", err)
+	}
+
+	assertColumnExists(t, ctx, conn, "reward_codes", "revoked_at", false)
+	assertTriggerMissing(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
+	assertConstraintExists(t, ctx, conn, "reward_admin_actions", "fk_reward_admin_actions_campaign")
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("repair applied lifecycle draft and continue migrations: %v", err)
+	}
+
+	assertMigrationApplied(t, ctx, conn, 20260715025000, true)
+	assertMigrationApplied(t, ctx, conn, 20260715040000, true)
+	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_at", "timestamp with time zone")
+	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_by", "bigint")
+	assertTriggerExists(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
+	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_immutable")
+	assertConstraintDefinitionContains(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_status", "paused", "cancelled")
+	assertConstraintMissing(t, ctx, conn, "reward_admin_actions", "fk_reward_admin_actions_campaign")
+}
+
 func TestRewardsCampaignLifecycleMigrationRollsBackUnusedSchemaAndReapplies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -1917,6 +2011,26 @@ SELECT EXISTS (
 	}
 	if !exists {
 		t.Fatalf("constraint %s.%s is missing", tableName, constraintName)
+	}
+}
+
+func assertConstraintMissing(t *testing.T, ctx context.Context, conn *sql.Conn, tableName string, constraintName string) {
+	t.Helper()
+	var exists bool
+	if err := conn.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM pg_constraint constraint_row
+  JOIN pg_class table_class ON table_class.oid = constraint_row.conrelid
+  JOIN pg_namespace namespace ON namespace.oid = table_class.relnamespace
+  WHERE namespace.nspname = current_schema()
+    AND table_class.relname = $1
+    AND constraint_row.conname = $2
+)`, tableName, constraintName).Scan(&exists); err != nil {
+		t.Fatalf("read constraint %s.%s failed: %v", tableName, constraintName, err)
+	}
+	if exists {
+		t.Fatalf("constraint %s.%s still exists", tableName, constraintName)
 	}
 }
 
