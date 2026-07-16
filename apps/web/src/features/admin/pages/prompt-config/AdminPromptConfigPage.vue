@@ -96,19 +96,6 @@
         </template>
 
         <div class="flex flex-col gap-3">
-          <div class="flex items-center justify-between gap-2.5">
-            <Tag
-              :value="enabledMap[item.slug] ? '已启用' : '已停用'"
-              :severity="enabledMap[item.slug] ? 'success' : 'secondary'"
-              rounded
-            />
-            <ToggleSwitch
-              v-model="enabledMap[item.slug]"
-              :disabled="saving[item.slug]"
-              :aria-label="`${item.title} 启用状态`"
-            />
-          </div>
-
           <div
             v-if="getVarsForSlug(item.slug).length > 0"
             class="flex min-w-0 flex-wrap items-center gap-1.5"
@@ -177,7 +164,6 @@ import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import type { TagPassThroughOptions } from 'primevue/tag'
 import Textarea from 'primevue/textarea'
-import ToggleSwitch from 'primevue/toggleswitch'
 import { useAdminPromptConfigFeedback } from '../../prompt-config/useAdminPromptConfigFeedback'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
@@ -206,7 +192,6 @@ const promptConfigWorkspace = useAdminPromptConfigWorkspace({
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,
 })
 const {
-  enabledMap,
   getPromptVariables,
   getSavedPrompt,
   promptMap,

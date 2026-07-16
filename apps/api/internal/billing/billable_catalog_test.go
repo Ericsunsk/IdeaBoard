@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func TestBillableItemRegistryRejectsDuplicateSKUs(t *testing.T) {
@@ -83,7 +85,7 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 		{SKU: "ai-image:image-extend", Enabled: true, CurrentPrice: &activePriceTwo, UpdatedAt: now},
 		{SKU: "legacy:removed", DisplayName: "旧功能", Description: "已从 Registry 移除", Enabled: true, CurrentPrice: &archivedPrice, UpdatedAt: now},
 	}}
-	service := NewBillableItemCatalog(registry, facts, nil)
+	service := NewBillableItemCatalog(registry, &facts)
 
 	items, err := service.List(context.Background())
 	if err != nil {
@@ -107,21 +109,30 @@ func assertCatalogCard(t *testing.T, item BillableItemCatalogCard, sku string, s
 }
 
 type catalogFactReaderStub struct {
-	items []CatalogItem
-	err   error
+	items        []CatalogItem
+	err          error
+	publishInput PublishPriceInput
 }
 
-func (s catalogFactReaderStub) ListCatalogFacts(context.Context) ([]CatalogItem, error) {
+func (s *catalogFactReaderStub) ListCatalogFacts(context.Context) ([]CatalogItem, error) {
 	return s.items, s.err
 }
 
-type catalogPricePublisherStub struct {
-	input PublishPriceInput
+func (s *catalogFactReaderStub) PublishPrice(_ context.Context, input PublishPriceInput) (PriceInfo, error) {
+	s.publishInput = input
+	return PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: input.UnitCredits}, nil
 }
 
-func (s *catalogPricePublisherStub) PublishPrice(_ context.Context, input PublishPriceInput) (PriceInfo, error) {
-	s.input = input
-	return PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: input.UnitCredits}, nil
+func (s *catalogFactReaderStub) SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error) {
+	return AvailabilityInfo{}, s.err
+}
+
+func (s *catalogFactReaderStub) Quote(context.Context, string, int64) (Quote, error) {
+	return Quote{}, s.err
+}
+
+func (s *catalogFactReaderStub) QuoteInTx(context.Context, pgx.Tx, string, int64) (Quote, error) {
+	return Quote{}, s.err
 }
 
 func TestBillableCatalogPublishesOnlyRegisteredItems(t *testing.T) {
@@ -132,15 +143,15 @@ func TestBillableCatalogPublishesOnlyRegisteredItems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	publisher := &catalogPricePublisherStub{}
-	catalog := NewBillableItemCatalog(registry, catalogFactReaderStub{}, publisher)
+	store := &catalogFactReaderStub{}
+	catalog := NewBillableItemCatalog(registry, store)
 
 	price, err := catalog.PublishPrice(t.Context(), "AI-IMAGE:PARTIAL-EDIT", 0, 9)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if price.UnitCredits != 0 || publisher.input.Definition.SKU != "ai-image:partial-edit" || publisher.input.ActorID != 9 {
-		t.Fatalf("publish input = %+v price = %+v", publisher.input, price)
+	if price.UnitCredits != 0 || store.publishInput.Definition.SKU != "ai-image:partial-edit" || store.publishInput.ActorID != 9 {
+		t.Fatalf("publish input = %+v price = %+v", store.publishInput, price)
 	}
 	if _, err := catalog.PublishPrice(t.Context(), "ai-image:unknown", 1, 9); !errors.Is(err, ErrSKUNotFound) {
 		t.Fatalf("unregistered publish error = %v", err)

@@ -42,6 +42,24 @@
             @click="emit('publish', item)"
           />
         </div>
+
+        <div
+          v-if="item.status !== 'archived'"
+          class="flex min-h-8 items-center justify-between gap-3"
+        >
+          <div class="min-w-0">
+            <div class="text-admin-meta font-medium text-admin-title-color">功能状态</div>
+            <div class="text-admin-caption text-ib-text-muted">
+              {{ item.status === 'unpriced' ? '发布价格后自动启用' : '关闭后将停止新任务调用' }}
+            </div>
+          </div>
+          <ToggleSwitch
+            :model-value="item.status === 'active'"
+            :disabled="item.status === 'unpriced' || availabilityPending"
+            :aria-label="`${item.displayName}功能状态`"
+            @update:model-value="emit('availability', item, $event)"
+          />
+        </div>
       </div>
     </template>
   </Card>
@@ -52,13 +70,17 @@ import { computed } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import ToggleSwitch from 'primevue/toggleswitch'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCompactTagClass, adminMasonryCardClass } from '../../shared/lib/adminUiClasses'
 import type { AdminBillableItemCard, AdminBillableItemStatus } from './billableCatalogTypes'
 
-const props = defineProps<{ item: AdminBillableItemCard }>()
-const emit = defineEmits<{ publish: [item: AdminBillableItemCard] }>()
+const props = defineProps<{ item: AdminBillableItemCard; availabilityPending?: boolean }>()
+const emit = defineEmits<{
+  publish: [item: AdminBillableItemCard]
+  availability: [item: AdminBillableItemCard, enabled: boolean]
+}>()
 
 const statusPresentation: Record<
   AdminBillableItemStatus,

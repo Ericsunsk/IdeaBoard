@@ -13,6 +13,7 @@ var billingCommandFunctionSignatures = []string{
 	"create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
 	"update_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
 	"publish_billing_price(TEXT, TEXT, TEXT, BIGINT, BIGINT)",
+	"set_billing_item_availability(TEXT, BOOLEAN, BIGINT)",
 }
 
 var billingInternalFunctionSignatures = []string{

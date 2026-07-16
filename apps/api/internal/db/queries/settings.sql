@@ -198,9 +198,9 @@ FOR UPDATE;
 -- name: GetFeaturePrompt :one
 SELECT
   p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.enabled, r.variables,
+  r.id AS revision_id, r.prompt, r.variables,
   r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by, r.published_at,
+  r.schema_version, r.updated_by,
   p.created_at, p.updated_at, r.created_at AS revision_created_at
 FROM feature_prompts AS p
 JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
@@ -209,9 +209,9 @@ WHERE p.feature_slug = sqlc.arg(feature_slug);
 -- name: ListFeaturePrompts :many
 SELECT
   p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.enabled, r.variables,
+  r.id AS revision_id, r.prompt, r.variables,
   r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by, r.published_at,
+  r.schema_version, r.updated_by,
   p.created_at, p.updated_at, r.created_at AS revision_created_at
 FROM feature_prompts AS p
 JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
@@ -222,21 +222,18 @@ WITH input AS (
   SELECT
     sqlc.arg(feature_slug)::varchar(64) AS feature_slug,
     sqlc.arg(prompt)::text AS prompt,
-    sqlc.arg(enabled)::boolean AS enabled,
     sqlc.arg(variables)::jsonb AS variables,
     sqlc.arg(model_defaults)::jsonb AS model_defaults,
     sqlc.arg(user_prompt_merge_policy)::jsonb AS user_prompt_merge_policy,
-    sqlc.narg(updated_by)::bigint AS updated_by,
-    sqlc.narg(published_at)::timestamptz AS published_at
+    sqlc.narg(updated_by)::bigint AS updated_by
 )
 INSERT INTO feature_prompt_revisions (
-  feature_slug, prompt, enabled, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by, published_at
+  feature_slug, prompt, variables, model_defaults,
+  user_prompt_merge_policy, schema_version, updated_by
 )
 SELECT
   input.feature_slug,
   input.prompt,
-  input.enabled,
   input.variables,
   input.model_defaults,
   input.user_prompt_merge_policy,
@@ -245,12 +242,11 @@ SELECT
     FROM feature_prompt_revisions
     WHERE feature_slug = input.feature_slug
   ), 1),
-  input.updated_by,
-  input.published_at
+  input.updated_by
 FROM input
 RETURNING
-  id, feature_slug, prompt, enabled, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by, published_at, created_at;
+  id, feature_slug, prompt, variables, model_defaults,
+  user_prompt_merge_policy, schema_version, updated_by, created_at;
 
 -- name: SetFeaturePromptCurrentRevision :one
 UPDATE feature_prompts

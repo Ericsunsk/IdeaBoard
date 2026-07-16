@@ -18,9 +18,11 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  AdminBillableItemAvailabilityRequest,
   AdminBillingPricePublishRequest,
   AdminBillingSKUCreateRequest,
   AdminBillingSKUUpdateRequest,
+  ApiResponseBillableItemAvailability,
   ApiResponseBillableItemCatalog,
   ApiResponseBillingCatalogItem,
   ApiResponseBillingCatalogPage,
@@ -191,6 +193,111 @@ export function usePublishAdminBillingPrice<
   const queryOptions = getPublishAdminBillingPriceQueryOptions(
     sku,
     adminBillingPricePublishRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSetAdminBillableItemAvailabilityUrl = (sku: string) => {
+  return `/admin/billing/catalog/${encodeURIComponent(String(sku))}/availability`
+}
+
+export const setAdminBillableItemAvailability = async (
+  sku: string,
+  adminBillableItemAvailabilityRequest: AdminBillableItemAvailabilityRequest,
+  options?: RequestInit,
+): Promise<ApiResponseBillableItemAvailability> => {
+  return orvalMutator<ApiResponseBillableItemAvailability>(
+    getSetAdminBillableItemAvailabilityUrl(sku),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(adminBillableItemAvailabilityRequest),
+    },
+  )
+}
+
+export const getSetAdminBillableItemAvailabilityQueryKey = (
+  sku: MaybeRefOrGetter<string>,
+  adminBillableItemAvailabilityRequest?: MaybeRefOrGetter<AdminBillableItemAvailabilityRequest>,
+) => {
+  return [
+    'PUT',
+    'admin',
+    'billing',
+    'catalog',
+    sku,
+    'availability',
+    adminBillableItemAvailabilityRequest,
+  ] as const
+}
+
+export const getSetAdminBillableItemAvailabilityQueryOptions = <
+  TData = Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+  TError = ErrorType<unknown>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  adminBillableItemAvailabilityRequest: MaybeRefOrGetter<AdminBillableItemAvailabilityRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSetAdminBillableItemAvailabilityQueryKey(
+    sku,
+    adminBillableItemAvailabilityRequest,
+  )
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>> = ({
+    signal,
+  }) =>
+    setAdminBillableItemAvailability(toValue(sku), toValue(adminBillableItemAvailabilityRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>, TError, TData>
+}
+
+export type SetAdminBillableItemAvailabilityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof setAdminBillableItemAvailability>>
+>
+export type SetAdminBillableItemAvailabilityQueryError = ErrorType<unknown>
+
+export function useSetAdminBillableItemAvailability<
+  TData = Awaited<ReturnType<typeof setAdminBillableItemAvailability>>,
+  TError = ErrorType<unknown>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  adminBillableItemAvailabilityRequest: MaybeRefOrGetter<AdminBillableItemAvailabilityRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminBillableItemAvailability>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSetAdminBillableItemAvailabilityQueryOptions(
+    sku,
+    adminBillableItemAvailabilityRequest,
     options,
   )
 

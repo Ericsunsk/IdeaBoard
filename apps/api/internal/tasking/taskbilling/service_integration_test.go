@@ -58,37 +58,48 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 		for _, scenario := range []struct {
 			name        string
 			unitCredits int64
-			createSKU   bool
-			skuEnabled  bool
+			publish     bool
+			registered  bool
+			disabled    bool
 			wantErr     error
 			wantEnough  bool
 		}{
-			{name: "paid", unitCredits: 25, createSKU: true, skuEnabled: true, wantEnough: false},
-			{name: "free", unitCredits: 0, createSKU: true, skuEnabled: true, wantEnough: true},
-			{name: "missing", wantErr: billing.ErrSKUNotFound},
-			{name: "disabled-sku", unitCredits: 25, createSKU: true, wantErr: billing.ErrPricingUnavailable},
+			{name: "paid", unitCredits: 25, publish: true, registered: true, wantEnough: false},
+			{name: "free", unitCredits: 0, publish: true, registered: true, wantEnough: true},
+			{name: "unpriced", registered: true, wantErr: billing.ErrPricingUnavailable},
+			{name: "disabled", unitCredits: 25, publish: true, registered: true, disabled: true, wantErr: billing.ErrPricingUnavailable},
+			{name: "archived", unitCredits: 25, publish: true, wantErr: billing.ErrPricingUnavailable},
 		} {
 			scenario := scenario
 			t.Run(feature+"/"+scenario.name, func(t *testing.T) {
 				_, pool := testdb.OpenWithPool(t)
 				billingService := billing.NewService(pool)
 				creditService := credits.NewService(pool)
-				service := NewService(billingService, creditService)
 				request, err := AIImageRequest(feature, "gpt-image-1")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if scenario.createSKU {
-					sku, err := ResolveSKU(request)
-					if err != nil {
-						t.Fatal(err)
-					}
+				sku, err := ResolveSKU(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				definition := featurePriceInput(sku, feature, scenario.unitCredits).Definition
+				definitions := []billing.BillableItemDefinition{}
+				if scenario.registered {
+					definitions = append(definitions, definition)
+				}
+				registry, err := billing.NewBillableItemRegistry(definitions)
+				if err != nil {
+					t.Fatal(err)
+				}
+				catalog := billing.NewBillableItemCatalog(registry, billingService)
+				service := NewService(catalog, creditService)
+				if scenario.publish {
 					if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, feature, scenario.unitCredits)); err != nil {
 						t.Fatal(err)
 					}
-					if !scenario.skuEnabled {
-						disabled := false
-						if _, err := billingService.UpdateSKU(t.Context(), billing.UpdateSKUInput{SKU: string(sku), Enabled: &disabled, Action: testsupport.AdminAction(t, 1, "test disabled SKU")}); err != nil {
+					if scenario.disabled {
+						if _, err := catalog.SetAvailability(t.Context(), string(sku), false, 1); err != nil {
 							t.Fatal(err)
 						}
 					}
@@ -131,6 +142,70 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
+	for _, scenario := range []struct {
+		name       string
+		registered bool
+		publish    bool
+		disabled   bool
+	}{
+		{name: "unpriced", registered: true},
+		{name: "disabled", registered: true, publish: true, disabled: true},
+		{name: "archived", publish: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			db, pool := testdb.OpenWithPool(t)
+			billingService := billing.NewService(pool)
+			creditService := credits.NewService(pool)
+			request, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "gpt-image-1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			sku, err := ResolveSKU(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			definition := featurePriceInput(sku, "局部重绘", 10).Definition
+			definitions := []billing.BillableItemDefinition{}
+			if scenario.registered {
+				definitions = append(definitions, definition)
+			}
+			registry, err := billing.NewBillableItemRegistry(definitions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			catalog := billing.NewBillableItemCatalog(registry, billingService)
+			if scenario.publish {
+				if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "局部重绘", 10)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if scenario.disabled {
+				if _, err := catalog.SetAvailability(t.Context(), string(sku), false, 1); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			tx, err := pool.Begin(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback(t.Context())
+			service := NewService(catalog, creditService)
+			if _, err := service.HoldAndPersist(t.Context(), tx, "unavailable-"+scenario.name, 1, request); !errors.Is(err, ErrPricingUnavailable) {
+				t.Fatalf("HoldAndPersist error=%v, want ErrPricingUnavailable", err)
+			}
+			var count int
+			if err := db.QueryRowContext(t.Context(), `SELECT count(*) FROM task_billing_snapshots WHERE task_id = $1`, "unavailable-"+scenario.name).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatalf("persisted %d task billing snapshots for unavailable feature", count)
+			}
+		})
 	}
 }
 

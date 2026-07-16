@@ -3,6 +3,7 @@ import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import {
   createAdminBillableCatalogResource,
   publishBillableItemPrice,
+  setBillableItemAvailability,
 } from './billableCatalogResource'
 
 describe('Admin Billable Catalog resource', () => {
@@ -72,5 +73,31 @@ describe('Admin Billable Catalog resource', () => {
       createdAt: '2026-07-16T08:00:00Z',
     })
     expect(requestBody).toEqual({ unit_credits: 0 })
+  })
+
+  it('sets feature availability without a manual reason', async () => {
+    let requestBody: unknown
+    useMswHandlers(
+      http.put('/api/admin/billing/catalog/:sku/availability', async ({ request, params }) => {
+        requestBody = await request.json()
+        expect(params.sku).toBe('ai-image:partial-edit')
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            sku: 'ai-image:partial-edit',
+            status: 'disabled',
+            updated_at: '2026-07-16T10:00:00Z',
+          },
+        })
+      }),
+    )
+
+    await expect(setBillableItemAvailability('ai-image:partial-edit', false)).resolves.toEqual({
+      sku: 'ai-image:partial-edit',
+      status: 'disabled',
+      updatedAt: '2026-07-16T10:00:00Z',
+    })
+    expect(requestBody).toEqual({ enabled: false })
   })
 })

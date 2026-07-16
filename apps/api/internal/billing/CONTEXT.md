@@ -23,6 +23,8 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 - `BillableItemRegistry.Items()` 是产品计价身份的只读注册 seam；当前 Workflow adapter 使用 `ai-image:<feature-slug>`，未来产品可注册自己的 namespace。
 - `BillableItemCatalog.List(ctx)` 是 Admin 功能定价页的只读 seam；Registry 中无持久化价格的项目仍显示为 `Unpriced`，持久化项目不在 Registry 时显示为 `Archived`。
 - `BillableItemCatalog.PublishPrice(ctx, sku, unitCredits, actorID)` 是功能价格发布 seam；只接受 Registry 中的 Billable Item，首次发布原子 materialize Catalog item 并转为 `Active`。
+- `BillableItemCatalog.SetAvailability(ctx, sku, enabled, actorID)` 是 Feature availability 写 seam；只接受 Registry 中已有 current price 的项目，`Unpriced` 不可启用，重复命令保持幂等并记录真实 outcome。
+- `BillableItemCatalog.Quote/QuoteInTx` 是 Registry-aware runtime seam；`Unpriced`、`Disabled` 与 `Archived` 统一 fail closed，Task submission 通过 `QuoteInTx` 保持 Snapshot、Hold、Task 与 River enqueue 的单事务边界。
 - `Service.Quote(ctx, sku, quantity)` 是产品读取价格的主要 seam。Caller 只传 SKU 与 quantity，不能传 price。
 - `PriceSnapshot` 包含 `sku`, `display_name`, `price_version_id`, `price_version`, `unit_credits`, `quoted_at`；后续 Hold/Charge 必须保存并复用该 snapshot，不得重新报价。`display_name` 在 Quote 时固化，SKU 后续改名不得改变历史任务账单语义。
 - 用户侧 Billing Records 只读取 Task Billing Snapshot 中固化的 `display_name`；不得回查当前 SKU display fields 改写历史账单名称。
@@ -36,6 +38,7 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 - Price Version 严格 append-only，没有 mutable enabled state；恢复旧价格也必须发布一个新版本。
 - 每次发布锁定 SKU row，在一个 typed PostgreSQL command 内 materialize Catalog item（如需要）、分配单调 version、插入 price、更新 current pointer 并写 append-only audit。
 - 首次发布或尚无 current price 的项目自动启用；已有 current price 的 Disabled 项目调价后仍保持 Disabled。
+- Feature availability 只由 Billing Catalog 的 SKU enabled state 拥有；Prompt revision 不携带 enabled/published state。启停 command 自动记录 actor、target、old/new、outcome 与时间。
 - Quote 使用单条 MVCC statement 读取 SKU、current pointer 与 Price Version，不会混合并发版本。
 - quantity 必须为正 `int64`；`unit_credits × quantity` 超过 `9_000_000_000_000_000` 时 fail closed。
 - 0 Credits 是显式免费价格；SKU 不存在、SKU disabled 或没有 current price 时 fail closed。

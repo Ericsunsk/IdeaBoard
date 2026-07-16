@@ -433,6 +433,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PATCH /api/admin/billing/skus/:sku":                          false,
 		"PATCH /api/admin/billing/skus/:sku/prices/:version":          false,
 		"PUT /api/admin/accounts/:id":                                 false,
+		"PUT /api/admin/billing/catalog/:sku/availability":            false,
 		"PUT /api/admin/provider-endpoints/:id":                       false,
 		"PUT /api/admin/rewards/campaigns/:campaign_id":               false,
 		"PUT /api/admin/feature-prompts/:slug":                        false,

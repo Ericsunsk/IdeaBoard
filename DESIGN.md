@@ -109,7 +109,7 @@ NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前�
 
 ### 5. Prompt 是配置，不是隐藏执行协议
 
-系统提示词由 `feature_prompts` 驱动，按 `feature_slug` 读取启用配置并做变量替换。Prompt 只描述任务边界、允许变化、禁止变化和质量要求；媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数由运行时处理。
+系统提示词由 `feature_prompts` 驱动，按 `feature_slug` 读取 Prompt revision 并做变量替换。Prompt 只描述任务边界、允许变化、禁止变化和质量要求，不拥有 Feature availability；功能可用状态由 Billing Catalog 统一管理。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数由运行时处理。
 
 稳定变量和运营模板见 [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)。
 

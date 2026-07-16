@@ -12,13 +12,10 @@ export interface FeaturePrompt {
   slug: string
   current_revision_id?: number
   prompt: string
-  enabled: boolean
   variables: FeaturePromptVariable[]
   model_defaults: FeaturePromptModelDefaults
   user_prompt_merge_policy: FeaturePromptMergePolicy
   schema_version: number
-  /** @nullable */
-  published_at?: string | null
   /** @nullable */
   updated_at?: string | null
 }

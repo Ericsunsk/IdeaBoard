@@ -30,21 +30,18 @@ WITH input AS (
   SELECT
     $1::varchar(64) AS feature_slug,
     $2::text AS prompt,
-    $3::boolean AS enabled,
-    $4::jsonb AS variables,
-    $5::jsonb AS model_defaults,
-    $6::jsonb AS user_prompt_merge_policy,
-    $7::bigint AS updated_by,
-    $8::timestamptz AS published_at
+    $3::jsonb AS variables,
+    $4::jsonb AS model_defaults,
+    $5::jsonb AS user_prompt_merge_policy,
+    $6::bigint AS updated_by
 )
 INSERT INTO feature_prompt_revisions (
-  feature_slug, prompt, enabled, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by, published_at
+  feature_slug, prompt, variables, model_defaults,
+  user_prompt_merge_policy, schema_version, updated_by
 )
 SELECT
   input.feature_slug,
   input.prompt,
-  input.enabled,
   input.variables,
   input.model_defaults,
   input.user_prompt_merge_policy,
@@ -53,48 +50,41 @@ SELECT
     FROM feature_prompt_revisions
     WHERE feature_slug = input.feature_slug
   ), 1),
-  input.updated_by,
-  input.published_at
+  input.updated_by
 FROM input
 RETURNING
-  id, feature_slug, prompt, enabled, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by, published_at, created_at
+  id, feature_slug, prompt, variables, model_defaults,
+  user_prompt_merge_policy, schema_version, updated_by, created_at
 `
 
 type CreateFeaturePromptRevisionParams struct {
 	FeatureSlug           string          `json:"feature_slug"`
 	Prompt                string          `json:"prompt"`
-	Enabled               bool            `json:"enabled"`
 	Variables             json.RawMessage `json:"variables"`
 	ModelDefaults         json.RawMessage `json:"model_defaults"`
 	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
 	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	PublishedAt           sql.NullTime    `json:"published_at"`
 }
 
 func (q *Queries) CreateFeaturePromptRevision(ctx context.Context, arg CreateFeaturePromptRevisionParams) (FeaturePromptRevision, error) {
 	row := q.db.QueryRowContext(ctx, createFeaturePromptRevision,
 		arg.FeatureSlug,
 		arg.Prompt,
-		arg.Enabled,
 		arg.Variables,
 		arg.ModelDefaults,
 		arg.UserPromptMergePolicy,
 		arg.UpdatedBy,
-		arg.PublishedAt,
 	)
 	var i FeaturePromptRevision
 	err := row.Scan(
 		&i.ID,
 		&i.FeatureSlug,
 		&i.Prompt,
-		&i.Enabled,
 		&i.Variables,
 		&i.ModelDefaults,
 		&i.UserPromptMergePolicy,
 		&i.SchemaVersion,
 		&i.UpdatedBy,
-		&i.PublishedAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -153,9 +143,9 @@ func (q *Queries) GetActiveStorageProfileSecretVersion(ctx context.Context, arg 
 const getFeaturePrompt = `-- name: GetFeaturePrompt :one
 SELECT
   p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.enabled, r.variables,
+  r.id AS revision_id, r.prompt, r.variables,
   r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by, r.published_at,
+  r.schema_version, r.updated_by,
   p.created_at, p.updated_at, r.created_at AS revision_created_at
 FROM feature_prompts AS p
 JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
@@ -167,13 +157,11 @@ type GetFeaturePromptRow struct {
 	CurrentRevisionID     sql.NullInt64   `json:"current_revision_id"`
 	RevisionID            int64           `json:"revision_id"`
 	Prompt                string          `json:"prompt"`
-	Enabled               bool            `json:"enabled"`
 	Variables             json.RawMessage `json:"variables"`
 	ModelDefaults         json.RawMessage `json:"model_defaults"`
 	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
 	SchemaVersion         int32           `json:"schema_version"`
 	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	PublishedAt           sql.NullTime    `json:"published_at"`
 	CreatedAt             time.Time       `json:"created_at"`
 	UpdatedAt             time.Time       `json:"updated_at"`
 	RevisionCreatedAt     time.Time       `json:"revision_created_at"`
@@ -187,13 +175,11 @@ func (q *Queries) GetFeaturePrompt(ctx context.Context, featureSlug string) (Get
 		&i.CurrentRevisionID,
 		&i.RevisionID,
 		&i.Prompt,
-		&i.Enabled,
 		&i.Variables,
 		&i.ModelDefaults,
 		&i.UserPromptMergePolicy,
 		&i.SchemaVersion,
 		&i.UpdatedBy,
-		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RevisionCreatedAt,
@@ -353,9 +339,9 @@ func (q *Queries) InsertStorageProfileSecretVersion(ctx context.Context, arg Ins
 const listFeaturePrompts = `-- name: ListFeaturePrompts :many
 SELECT
   p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.enabled, r.variables,
+  r.id AS revision_id, r.prompt, r.variables,
   r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by, r.published_at,
+  r.schema_version, r.updated_by,
   p.created_at, p.updated_at, r.created_at AS revision_created_at
 FROM feature_prompts AS p
 JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
@@ -367,13 +353,11 @@ type ListFeaturePromptsRow struct {
 	CurrentRevisionID     sql.NullInt64   `json:"current_revision_id"`
 	RevisionID            int64           `json:"revision_id"`
 	Prompt                string          `json:"prompt"`
-	Enabled               bool            `json:"enabled"`
 	Variables             json.RawMessage `json:"variables"`
 	ModelDefaults         json.RawMessage `json:"model_defaults"`
 	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
 	SchemaVersion         int32           `json:"schema_version"`
 	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	PublishedAt           sql.NullTime    `json:"published_at"`
 	CreatedAt             time.Time       `json:"created_at"`
 	UpdatedAt             time.Time       `json:"updated_at"`
 	RevisionCreatedAt     time.Time       `json:"revision_created_at"`
@@ -393,13 +377,11 @@ func (q *Queries) ListFeaturePrompts(ctx context.Context) ([]ListFeaturePromptsR
 			&i.CurrentRevisionID,
 			&i.RevisionID,
 			&i.Prompt,
-			&i.Enabled,
 			&i.Variables,
 			&i.ModelDefaults,
 			&i.UserPromptMergePolicy,
 			&i.SchemaVersion,
 			&i.UpdatedBy,
-			&i.PublishedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.RevisionCreatedAt,

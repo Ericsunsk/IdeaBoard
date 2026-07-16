@@ -25,6 +25,8 @@
       v-else
       :key="item.sku"
       :item="item"
+      :availability-pending="availabilityPending[item.sku]"
+      @availability="setAvailability"
       @publish="openPriceDialog"
     />
   </AdminResourceGridFrame>
@@ -39,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
@@ -58,6 +60,7 @@ const selectedItem = ref<AdminBillableItemCard | null>(null)
 const priceDialogVisible = ref(false)
 const publishPending = ref(false)
 const publishError = ref('')
+const availabilityPending = reactive<Record<string, boolean>>({})
 const toast = useAdminToast()
 
 async function loadCatalog() {
@@ -96,6 +99,23 @@ async function publishPrice(unitCredits: number) {
     publishError.value = formatAdminDisplayError(error, '发布价格失败，请重试')
   } finally {
     publishPending.value = false
+  }
+}
+
+async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
+  if (availabilityPending[item.sku] || item.status === 'unpriced' || item.status === 'archived') {
+    return
+  }
+  availabilityPending[item.sku] = true
+  try {
+    const availability = await resource.setAvailability(item.sku, enabled)
+    item.status = availability.status
+    item.updatedAt = availability.updatedAt
+    toast.success(enabled ? '功能已启用' : '功能已停用')
+  } catch (error) {
+    toast.error(formatAdminDisplayError(error, enabled ? '启用功能失败，请重试' : '停用功能失败，请重试'))
+  } finally {
+    availabilityPending[item.sku] = false
   }
 }
 </script>

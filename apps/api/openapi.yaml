@@ -1523,6 +1523,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillingPrice'
 
+  /admin/billing/catalog/{sku}/availability:
+    put:
+      tags: [AdminBilling]
+      operationId: setAdminBillableItemAvailability
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BillingSKUPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminBillableItemAvailabilityRequest'
+      responses:
+        '200':
+          description: Billable Item availability updated with append-only audit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBillableItemAvailability'
+
   /admin/billing/skus:
     get:
       tags: [AdminBilling]
@@ -2251,12 +2273,11 @@ paths:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               required: [prompt]
               properties:
                 prompt:
                   type: string
-                enabled:
-                  type: boolean
                 variables:
                   type: array
                   items:
@@ -2512,6 +2533,30 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/BillableItemCatalogCard' }
+
+    AdminBillableItemAvailabilityRequest:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+
+    BillableItemAvailability:
+      type: object
+      required: [sku, status, updated_at]
+      properties:
+        sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        status:
+          type: string
+          enum: [active, disabled]
+        updated_at: { type: string, format: date-time }
+
+    ApiResponseBillableItemAvailability:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/BillableItemAvailability' }
 
     BillingCoverageItem:
       type: object
@@ -4370,12 +4415,11 @@ components:
 
     FeaturePrompt:
       type: object
-      required: [slug, prompt, enabled, variables, model_defaults, user_prompt_merge_policy, schema_version]
+      required: [slug, prompt, variables, model_defaults, user_prompt_merge_policy, schema_version]
       properties:
         slug: { type: string }
         current_revision_id: { type: integer }
         prompt: { type: string }
-        enabled: { type: boolean }
         variables:
           type: array
           items:
@@ -4385,9 +4429,6 @@ components:
         user_prompt_merge_policy:
           $ref: '#/components/schemas/FeaturePromptMergePolicy'
         schema_version: { type: integer }
-        published_at:
-          type: string
-          nullable: true
         updated_at:
           type: string
           nullable: true

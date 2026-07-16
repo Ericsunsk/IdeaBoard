@@ -2,7 +2,7 @@ import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { primeVueTestOptions } from '../../../../test/primeVue'
-import { renderWithUser, screen, within } from '../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
 describe('AdminBillingPricingPage', () => {
@@ -129,6 +129,40 @@ describe('AdminBillingPricingPage', () => {
     expect(within(dialog).getAllByText('1 Idea')).toHaveLength(2)
     expect(within(dialog).getByText('0 Ideas')).toBeVisible()
     expect(within(dialog).getByText('创建新版本，历史版本不变')).toBeVisible()
+  })
+
+  it('disables and re-enables a priced feature from its card', async () => {
+    const requests: boolean[] = []
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+      http.put('/api/admin/billing/catalog/:sku/availability', async ({ request, params }) => {
+        expect(params.sku).toBe('ai-image:remove-bg')
+        const body = (await request.json()) as { enabled: boolean }
+        requests.push(body.enabled)
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            sku: params.sku,
+            status: body.enabled ? 'active' : 'disabled',
+            updated_at: '2026-07-16T10:00:00Z',
+          },
+        })
+      }),
+    )
+
+    const { user } = renderPricingPage()
+    const switchControl = await screen.findByRole('switch', { name: '抠图功能状态' })
+    expect(switchControl).toBeChecked()
+    await user.click(switchControl)
+    await waitFor(() => expect(switchControl).not.toBeChecked())
+    await user.click(switchControl)
+    await waitFor(() => expect(switchControl).toBeChecked())
+    expect(requests).toEqual([false, true])
+
+    expect(screen.getByRole('switch', { name: '局部重绘功能状态' })).toBeDisabled()
   })
 
   it('keeps publish failures in the dialog and allows a single retry', async () => {

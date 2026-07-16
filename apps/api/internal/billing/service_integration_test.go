@@ -209,6 +209,70 @@ func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
 	}
 }
 
+func TestCatalogAvailabilityTransitionsRequirePriceAndPersistAudit(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	definition := testBillableDefinition("ai-image:partial-edit", "局部重绘")
+	registry, err := NewBillableItemRegistry([]BillableItemDefinition{definition})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewBillableItemCatalog(registry, service)
+
+	if _, err := catalog.SetAvailability(t.Context(), string(definition.SKU), true, 7); !errors.Is(err, ErrPricingUnavailable) {
+		t.Fatalf("enable unpriced error=%v, want ErrPricingUnavailable", err)
+	}
+	if _, err := catalog.PublishPrice(t.Context(), string(definition.SKU), 10, 7); err != nil {
+		t.Fatal(err)
+	}
+	disabled, err := catalog.SetAvailability(t.Context(), string(definition.SKU), false, 8)
+	if err != nil || disabled.Status != BillableItemStatusDisabled {
+		t.Fatalf("disable=%+v error=%v", disabled, err)
+	}
+	if _, err := catalog.Quote(t.Context(), string(definition.SKU), 1); !errors.Is(err, ErrPricingUnavailable) {
+		t.Fatalf("disabled quote error=%v, want ErrPricingUnavailable", err)
+	}
+	unchanged, err := catalog.SetAvailability(t.Context(), string(definition.SKU), false, 9)
+	if err != nil || !unchanged.UpdatedAt.Equal(disabled.UpdatedAt) {
+		t.Fatalf("unchanged=%+v disabled=%+v error=%v", unchanged, disabled, err)
+	}
+	active, err := catalog.SetAvailability(t.Context(), string(definition.SKU), true, 10)
+	if err != nil || active.Status != BillableItemStatusActive || !active.UpdatedAt.After(disabled.UpdatedAt) {
+		t.Fatalf("active=%+v disabled=%+v error=%v", active, disabled, err)
+	}
+
+	rows, err := db.QueryContext(t.Context(), `
+SELECT actor_id, metadata->>'old', metadata->>'new', metadata->>'outcome'
+FROM billing_admin_actions
+WHERE sku = $1 AND action_type = 'set_availability'
+ORDER BY id`, definition.SKU)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	want := []struct {
+		actorID          int64
+		old, new, result string
+	}{
+		{8, "active", "disabled", "changed"},
+		{9, "disabled", "disabled", "unchanged"},
+		{10, "disabled", "active", "changed"},
+	}
+	for index, expected := range want {
+		if !rows.Next() {
+			t.Fatalf("audit row %d missing", index)
+		}
+		var actorID int64
+		var oldStatus, newStatus, outcome string
+		if err := rows.Scan(&actorID, &oldStatus, &newStatus, &outcome); err != nil {
+			t.Fatal(err)
+		}
+		if actorID != expected.actorID || oldStatus != expected.old || newStatus != expected.new || outcome != expected.result {
+			t.Fatalf("audit row %d=(%d,%q,%q,%q), want %+v", index, actorID, oldStatus, newStatus, outcome, expected)
+		}
+	}
+}
+
 func TestGetSKUsReturnsConfiguredItemsAndOmitsMissingSKUs(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)

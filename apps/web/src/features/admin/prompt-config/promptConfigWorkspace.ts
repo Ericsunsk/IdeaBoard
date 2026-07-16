@@ -54,18 +54,12 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
   const loading = ref(false)
   const promptMap = reactive<Record<string, string>>({})
   const savedPromptMap = reactive<Record<string, string>>({})
-  const enabledMap = reactive<Record<string, boolean>>({})
-  const savedEnabledMap = reactive<Record<string, boolean>>({})
   const promptConfigMap = reactive<Record<string, FeaturePrompt>>({})
   const saving = reactive<Record<string, boolean>>({})
   const promptList = ref<FeaturePrompt[]>([])
 
   const validations = computed<Record<string, PromptDraftValidation>>(() => {
-    const slugs = new Set([
-      ...Object.keys(promptConfigMap),
-      ...Object.keys(promptMap),
-      ...Object.keys(enabledMap),
-    ])
+    const slugs = new Set([...Object.keys(promptConfigMap), ...Object.keys(promptMap)])
     return Object.fromEntries([...slugs].map((slug) => [slug, resolveDraftValidation(slug)]))
   })
 
@@ -105,31 +99,21 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     const slug = config.slug
     const prompt = config.prompt || ''
     const previousSavedPrompt = savedPromptMap[slug] || ''
-    const previousSavedEnabled = getSavedEnabled(slug)
     const hadPromptDraft = hasOwn(promptMap, slug)
-    const hadEnabledDraft = hasOwn(enabledMap, slug)
     const isPromptDirty = hadPromptDraft && (promptMap[slug] || '') !== previousSavedPrompt
-    const isEnabledDirty = hadEnabledDraft && (enabledMap[slug] ?? true) !== previousSavedEnabled
-    const shouldPreserveDraft = syncOptions.preserveDirtyDraft && (isPromptDirty || isEnabledDirty)
+    const shouldPreserveDraft = syncOptions.preserveDirtyDraft && isPromptDirty
 
     promptConfigMap[slug] = config
     savedPromptMap[slug] = prompt
-    savedEnabledMap[slug] = config.enabled
 
     if (!shouldPreserveDraft) {
       promptMap[slug] = prompt
-      enabledMap[slug] = config.enabled
     }
   }
 
   function updatePromptDraft(slug: string, prompt: string) {
     if (promptMap[slug] === prompt) return
     promptMap[slug] = prompt
-  }
-
-  function updateEnabledDraft(slug: string, enabled: boolean) {
-    if (enabledMap[slug] === enabled) return
-    enabledMap[slug] = enabled
   }
 
   function insertVariableIntoDraft(slug: string, variableKey: string, position?: number) {
@@ -141,7 +125,6 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
   function resetDrafts(slugs: readonly string[]) {
     for (const slug of slugs) {
       promptMap[slug] = savedPromptMap[slug] || ''
-      enabledMap[slug] = getSavedEnabled(slug)
     }
   }
 
@@ -170,7 +153,6 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
       const config = await resource.savePrompt({
         slug,
         prompt: promptMap[slug] || '',
-        enabled: enabledMap[slug] ?? true,
       })
       syncPromptConfig(config, { preserveDirtyDraft: false })
       options.feedback.promptSaved(getFeatureTitle(slug))
@@ -195,9 +177,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     }
 
     const prompt = promptMap[slug] || ''
-    const isDirty =
-      prompt !== (savedPromptMap[slug] || '') ||
-      (enabledMap[slug] ?? true) !== getSavedEnabled(slug)
+    const isDirty = prompt !== (savedPromptMap[slug] || '')
 
     if (!prompt.trim()) {
       return {
@@ -220,12 +200,7 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     return options.getFeatureTitle?.(slug) ?? slug
   }
 
-  function getSavedEnabled(slug: string) {
-    return savedEnabledMap[slug] ?? promptConfigMap[slug]?.enabled ?? true
-  }
-
   return {
-    enabledMap,
     getDraftValidation,
     getPromptVariables,
     getSavedPrompt,
@@ -238,7 +213,6 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     resetDrafts,
     savePrompt,
     saving,
-    updateEnabledDraft,
     updatePromptDraft,
     validationMap: validations,
   }

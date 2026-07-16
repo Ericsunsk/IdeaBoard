@@ -174,13 +174,11 @@ type FeaturePromptRevision struct {
 	ID                    int64           `json:"id"`
 	FeatureSlug           string          `json:"feature_slug"`
 	Prompt                string          `json:"prompt"`
-	Enabled               bool            `json:"enabled"`
 	Variables             json.RawMessage `json:"variables"`
 	ModelDefaults         json.RawMessage `json:"model_defaults"`
 	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
 	SchemaVersion         int32           `json:"schema_version"`
 	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	PublishedAt           sql.NullTime    `json:"published_at"`
 	CreatedAt             time.Time       `json:"created_at"`
 }
 

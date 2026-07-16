@@ -4,11 +4,14 @@ import (
 	"errors"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 )
+
+const maxFeaturePromptRequestBytes = 64 << 10
 
 type FeaturePromptHandler struct {
 	promptRepo *FeaturePromptRepository
@@ -16,7 +19,6 @@ type FeaturePromptHandler struct {
 
 type featurePromptPayload struct {
 	Prompt                *string                     `json:"prompt"`
-	Enabled               *bool                       `json:"enabled"`
 	Variables             []FeaturePromptVariable     `json:"variables"`
 	ModelDefaults         *FeaturePromptModelDefaults `json:"model_defaults"`
 	UserPromptMergePolicy *FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
@@ -64,7 +66,7 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 	}
 
 	var req featurePromptPayload
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxFeaturePromptRequestBytes, &req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
@@ -111,10 +113,6 @@ func (h *FeaturePromptHandler) featurePromptSaveInput(c *gin.Context, slug strin
 	if err != nil {
 		return FeaturePromptSaveInput{}, err
 	}
-	enabled := current.Enabled
-	if req.Enabled != nil {
-		enabled = *req.Enabled
-	}
 	variables := req.Variables
 	if variables == nil {
 		variables = current.Variables
@@ -129,7 +127,6 @@ func (h *FeaturePromptHandler) featurePromptSaveInput(c *gin.Context, slug strin
 	}
 	return FeaturePromptSaveInput{
 		Prompt:                *req.Prompt,
-		Enabled:               enabled,
 		Variables:             variables,
 		ModelDefaults:         modelDefaults,
 		UserPromptMergePolicy: mergePolicy,

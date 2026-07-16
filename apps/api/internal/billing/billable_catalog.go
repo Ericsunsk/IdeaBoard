@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/jackc/pgx/v5"
 )
 
 var ErrDuplicateBillableItem = errors.New("duplicate billable item SKU")
@@ -118,18 +120,25 @@ type CatalogPricePublisher interface {
 	PublishPrice(context.Context, PublishPriceInput) (PriceInfo, error)
 }
 
-type BillableItemCatalog struct {
-	registry  *BillableItemRegistry
-	facts     CatalogFactReader
-	publisher CatalogPricePublisher
+type CatalogStore interface {
+	CatalogFactReader
+	CatalogPricePublisher
+	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
+	Quote(context.Context, string, int64) (Quote, error)
+	QuoteInTx(context.Context, pgx.Tx, string, int64) (Quote, error)
 }
 
-func NewBillableItemCatalog(registry *BillableItemRegistry, facts CatalogFactReader, publisher CatalogPricePublisher) *BillableItemCatalog {
-	return &BillableItemCatalog{registry: registry, facts: facts, publisher: publisher}
+type BillableItemCatalog struct {
+	registry *BillableItemRegistry
+	store    CatalogStore
+}
+
+func NewBillableItemCatalog(registry *BillableItemRegistry, store CatalogStore) *BillableItemCatalog {
+	return &BillableItemCatalog{registry: registry, store: store}
 }
 
 func (c *BillableItemCatalog) PublishPrice(ctx context.Context, rawSKU string, unitCredits, actorID int64) (PriceInfo, error) {
-	if c == nil || c.registry == nil || c.publisher == nil {
+	if c == nil || c.registry == nil || c.store == nil {
 		return PriceInfo{}, ErrServiceUnavailable
 	}
 	definition, exists := c.registry.Find(rawSKU)
@@ -139,16 +148,62 @@ func (c *BillableItemCatalog) PublishPrice(ctx context.Context, rawSKU string, u
 	if unitCredits < 0 || unitCredits > MaxQuoteCredits || actorID <= 0 {
 		return PriceInfo{}, ErrInvalidCatalogEntry
 	}
-	return c.publisher.PublishPrice(ctx, PublishPriceInput{
+	return c.store.PublishPrice(ctx, PublishPriceInput{
 		Definition: definition, UnitCredits: unitCredits, ActorID: actorID,
 	})
 }
 
+func (c *BillableItemCatalog) SetAvailability(ctx context.Context, rawSKU string, enabled bool, actorID int64) (AvailabilityInfo, error) {
+	if c == nil || c.registry == nil || c.store == nil {
+		return AvailabilityInfo{}, ErrServiceUnavailable
+	}
+	if _, exists := c.registry.Find(rawSKU); !exists {
+		return AvailabilityInfo{}, ErrSKUNotFound
+	}
+	return c.store.SetAvailability(ctx, rawSKU, enabled, actorID)
+}
+
+func (c *BillableItemCatalog) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
+	if err := c.requireRegistered(rawSKU); err != nil {
+		return Quote{}, err
+	}
+	quote, err := c.store.Quote(ctx, rawSKU, quantity)
+	return quote, normalizeCatalogQuoteError(err)
+}
+
+func (c *BillableItemCatalog) QuoteInTx(ctx context.Context, tx pgx.Tx, rawSKU string, quantity int64) (Quote, error) {
+	if err := c.requireRegistered(rawSKU); err != nil {
+		return Quote{}, err
+	}
+	quote, err := c.store.QuoteInTx(ctx, tx, rawSKU, quantity)
+	return quote, normalizeCatalogQuoteError(err)
+}
+
+func (c *BillableItemCatalog) requireRegistered(rawSKU string) error {
+	if c == nil || c.registry == nil || c.store == nil {
+		return ErrServiceUnavailable
+	}
+	if _, err := CanonicalizeSKU(rawSKU); err != nil {
+		return err
+	}
+	if _, exists := c.registry.Find(rawSKU); !exists {
+		return ErrPricingUnavailable
+	}
+	return nil
+}
+
+func normalizeCatalogQuoteError(err error) error {
+	if errors.Is(err, ErrSKUNotFound) {
+		return ErrPricingUnavailable
+	}
+	return err
+}
+
 func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCard, error) {
-	if c == nil || c.registry == nil || c.facts == nil {
+	if c == nil || c.registry == nil || c.store == nil {
 		return nil, ErrServiceUnavailable
 	}
-	facts, err := c.facts.ListCatalogFacts(ctx)
+	facts, err := c.store.ListCatalogFacts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list billable item catalog facts: %w", err)
 	}

@@ -8,6 +8,12 @@ export interface AdminBillableItemPrice {
   createdAt: string
 }
 
+export interface AdminBillableItemAvailability {
+  sku: string
+  status: Extract<AdminBillableItemStatus, 'active' | 'disabled'>
+  updatedAt: string
+}
+
 export interface AdminBillableItemCard {
   sku: string
   namespace: string

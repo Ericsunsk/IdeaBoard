@@ -90,6 +90,12 @@ type PublishPriceInput struct {
 	ActorID     int64
 }
 
+type AvailabilityInfo struct {
+	SKU       SKU                `json:"sku"`
+	Status    BillableItemStatus `json:"status"`
+	UpdatedAt time.Time          `json:"updated_at"`
+}
+
 type ListCatalogInput struct {
 	AfterSKU string
 	Limit    int

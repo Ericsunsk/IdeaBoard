@@ -27,7 +27,6 @@ describe('prompt config resource', () => {
           code: 0,
           msg: 'ok',
           data: makePrompt({
-            enabled: false,
             prompt: 'Saved prompt',
             schema_version: 2,
           }),
@@ -40,7 +39,6 @@ describe('prompt config resource', () => {
     const saved = await resource.savePrompt({
       slug: promptSlug,
       prompt: 'Saved prompt',
-      enabled: false,
     })
 
     expect(prompts[0]?.prompt).toBe('Initial prompt')
@@ -50,12 +48,10 @@ describe('prompt config resource', () => {
         path: `/api/admin/feature-prompts/${promptSlug}`,
         body: {
           prompt: 'Saved prompt',
-          enabled: false,
         },
       },
     ])
     expect(saved.prompt).toBe('Saved prompt')
-    expect(saved.enabled).toBe(false)
     expect(saved.schema_version).toBe(2)
   })
 })
@@ -69,7 +65,6 @@ function makePrompt(overrides: Partial<FeaturePrompt> = {}): FeaturePrompt {
   return {
     slug: promptSlug,
     prompt: '',
-    enabled: true,
     variables: [{ key: '{{prompt}}', tone: 'prompt' }],
     model_defaults: {},
     user_prompt_merge_policy: {
@@ -77,7 +72,6 @@ function makePrompt(overrides: Partial<FeaturePrompt> = {}): FeaturePrompt {
       append_user_prompt_when_template_misses_placeholder: true,
     },
     schema_version: 1,
-    published_at: null,
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }

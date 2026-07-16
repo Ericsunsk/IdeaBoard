@@ -31,6 +31,7 @@ type AdminService interface {
 type BillableCatalogService interface {
 	List(context.Context) ([]BillableItemCatalogCard, error)
 	PublishPrice(context.Context, string, int64, int64) (PriceInfo, error)
+	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
 }
 
 type Handler struct {
@@ -65,6 +66,10 @@ type updateSKURequest struct {
 
 type createPriceRequest struct {
 	UnitCredits *int64 `json:"unit_credits"`
+}
+
+type setAvailabilityRequest struct {
+	Enabled *bool `json:"enabled"`
 }
 
 func (h *Handler) Quote(c *gin.Context) {
@@ -160,6 +165,28 @@ func (h *Handler) PublishPrice(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, price)
+}
+
+func (h *Handler) SetAvailability(c *gin.Context) {
+	admin, ok := principal.RequireAdmin(c)
+	if !ok {
+		return
+	}
+	var request setAvailabilityRequest
+	if err := decodeStrictJSON(c, &request); err != nil || request.Enabled == nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	if h == nil || h.catalog == nil {
+		writeError(c, ErrServiceUnavailable)
+		return
+	}
+	availability, err := h.catalog.SetAvailability(c.Request.Context(), c.Param("sku"), *request.Enabled, admin.UserID())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.SuccessDTO(c, availability)
 }
 
 func (h *Handler) ListCatalog(c *gin.Context) {

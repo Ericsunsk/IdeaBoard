@@ -62,7 +62,7 @@ func TestSetPromptRequiresPromptField(t *testing.T) {
 	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(db))
 	router := newAdminPromptTestRouter(t, handler)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/partial-edit", strings.NewReader(`{"enabled":true}`))
+	req := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/partial-edit", strings.NewReader(`{"variables":[]}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -124,14 +124,31 @@ func TestSetPromptAcceptsTypedModelDefaults(t *testing.T) {
 	}
 }
 
-func TestSetPromptAllowsPatternGenWithoutPublishGate(t *testing.T) {
+func TestSetPromptRejectsRemovedEnabledField(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := testdb.Open(t)
 	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(db))
 	router := newAdminPromptTestRouter(t, handler)
 
-	req := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/pattern-gen", strings.NewReader(`{"prompt":"Create {{missing_token}}","enabled":true}`))
+	req := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/partial-edit", strings.NewReader(`{"prompt":"hello","enabled":false}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body = %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
+func TestSetPromptAllowsPatternGenWithoutAvailabilityGate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := testdb.Open(t)
+	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(db))
+	router := newAdminPromptTestRouter(t, handler)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/pattern-gen", strings.NewReader(`{"prompt":"Create {{missing_token}}"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 

@@ -4,26 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
 	"testing"
 
-	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 )
 
-func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testing.T) {
+func TestFeaturePromptAdminConfigAndRuntimeShareSavedRevisionContent(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewFeaturePromptRepository(db)
 	slug := workflow.FeatureSlugStyleFusion
 
-	disabledConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:  "disabled prompt {{user_prompt}}",
-		Enabled: false,
+	firstConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt: "first prompt {{user_prompt}}",
 		Variables: []FeaturePromptVariable{
 			{Key: "{{user_prompt}}", Tone: "prompt"},
 			{Key: "{{fusion_input_weights}}", Tone: "control"},
@@ -35,33 +32,28 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 		},
 	}, nil)
 	if err != nil {
-		t.Fatalf("SetPromptConfig disabled returned error: %v", err)
+		t.Fatalf("SetPromptConfig first revision returned error: %v", err)
 	}
-	if disabledConfig.Enabled {
-		t.Fatalf("disabled config Enabled = true, want false")
+	if firstConfig.SchemaVersion != 1 {
+		t.Fatalf("first schema version = %d, want 1", firstConfig.SchemaVersion)
 	}
-	if disabledConfig.PublishedAt != nil {
-		t.Fatalf("disabled config PublishedAt = %v, want nil", disabledConfig.PublishedAt)
+	if firstConfig.CurrentRevisionID <= 0 {
+		t.Fatalf("first current revision id = %d, want positive id", firstConfig.CurrentRevisionID)
 	}
-	if disabledConfig.SchemaVersion != 1 {
-		t.Fatalf("disabled schema version = %d, want 1", disabledConfig.SchemaVersion)
-	}
-	if disabledConfig.CurrentRevisionID <= 0 {
-		t.Fatalf("disabled current revision id = %d, want positive id", disabledConfig.CurrentRevisionID)
-	}
-	assertFeaturePromptCurrentPointer(t, ctx, db, slug, disabledConfig.CurrentRevisionID)
+	assertFeaturePromptCurrentPointer(t, ctx, db, slug, firstConfig.CurrentRevisionID)
 	assertFeaturePromptCurrentRowHasNoCopiedConfigFacts(t, ctx, db)
 
-	if _, err := repo.GetPrompt(ctx, slug); !errors.Is(err, database.ErrNotFound) {
-		t.Fatalf("runtime GetPrompt disabled error = %v, want ErrNotFound", err)
+	runtimePrompt, err := repo.GetPrompt(ctx, slug)
+	if err != nil || runtimePrompt != firstConfig.Prompt {
+		t.Fatalf("runtime GetPrompt = %q, %v, want saved revision", runtimePrompt, err)
 	}
 
 	adminConfig, err := repo.GetPromptConfig(ctx, slug)
 	if err != nil {
 		t.Fatalf("GetPromptConfig returned error: %v", err)
 	}
-	if adminConfig.Prompt != disabledConfig.Prompt {
-		t.Fatalf("admin prompt = %q, want %q", adminConfig.Prompt, disabledConfig.Prompt)
+	if adminConfig.Prompt != firstConfig.Prompt {
+		t.Fatalf("admin prompt = %q, want %q", adminConfig.Prompt, firstConfig.Prompt)
 	}
 	if !hasPromptVariable(adminConfig.Variables, "{{fusion_input_weights}}", "control") {
 		t.Fatalf("admin variables = %#v, want fusion_input_weights control variable", adminConfig.Variables)
@@ -73,9 +65,8 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 		t.Fatalf("admin merge policy = %#v, want revision policy", adminConfig.UserPromptMergePolicy)
 	}
 
-	enabledConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:  "enabled prompt {{fusion_input_weights}}",
-		Enabled: true,
+	secondConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
+		Prompt: "second prompt {{fusion_input_weights}}",
 		Variables: []FeaturePromptVariable{
 			{Key: " {{fusion_input_weights}} ", Tone: "control"},
 			{Key: "{{fusion_input_weights}}", Tone: "prompt"},
@@ -83,42 +74,35 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 		},
 	}, nil)
 	if err != nil {
-		t.Fatalf("SetPromptConfig enabled returned error: %v", err)
+		t.Fatalf("SetPromptConfig second revision returned error: %v", err)
 	}
-	if !enabledConfig.Enabled {
-		t.Fatalf("enabled config Enabled = false, want true")
+	if secondConfig.SchemaVersion != 2 {
+		t.Fatalf("second schema version = %d, want 2", secondConfig.SchemaVersion)
 	}
-	if enabledConfig.PublishedAt == nil {
-		t.Fatalf("enabled config PublishedAt = nil, want value")
+	if !hasPromptVariable(secondConfig.Variables, "{{fusion_input_weights}}", "control") {
+		t.Fatalf("second variables = %#v, want normalized fusion_input_weights control variable", secondConfig.Variables)
 	}
-	if enabledConfig.SchemaVersion != 2 {
-		t.Fatalf("enabled schema version = %d, want 2", enabledConfig.SchemaVersion)
-	}
-	if !hasPromptVariable(enabledConfig.Variables, "{{fusion_input_weights}}", "control") {
-		t.Fatalf("enabled variables = %#v, want normalized fusion_input_weights control variable", enabledConfig.Variables)
-	}
-	if !hasPromptVariable(enabledConfig.Variables, "{{custom_context}}", "context") {
-		t.Fatalf("enabled variables = %#v, want unknown tone normalized to context", enabledConfig.Variables)
+	if !hasPromptVariable(secondConfig.Variables, "{{custom_context}}", "context") {
+		t.Fatalf("second variables = %#v, want unknown tone normalized to context", secondConfig.Variables)
 	}
 
-	runtimePrompt, err := repo.GetPrompt(ctx, slug)
+	runtimePrompt, err = repo.GetPrompt(ctx, slug)
 	if err != nil {
-		t.Fatalf("runtime GetPrompt enabled returned error: %v", err)
+		t.Fatalf("runtime GetPrompt returned error: %v", err)
 	}
-	if runtimePrompt != enabledConfig.Prompt {
-		t.Fatalf("runtime prompt = %q, want %q", runtimePrompt, enabledConfig.Prompt)
+	if runtimePrompt != secondConfig.Prompt {
+		t.Fatalf("runtime prompt = %q, want %q", runtimePrompt, secondConfig.Prompt)
 	}
 	runtimeConfig, err := repo.GetPromptRuntimeConfig(ctx, slug)
 	if err != nil {
-		t.Fatalf("runtime GetPromptRuntimeConfig enabled returned error: %v", err)
+		t.Fatalf("runtime GetPromptRuntimeConfig returned error: %v", err)
 	}
 	if !runtimeConfig.UserPromptMergePolicy.AppendBasePromptWithoutTemplate {
 		t.Fatalf("runtime merge policy = %#v, want default style-fusion append policy", runtimeConfig.UserPromptMergePolicy)
 	}
 
 	clearedConfig, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
-		Prompt:    "enabled prompt without visible variables",
-		Enabled:   true,
+		Prompt:    "prompt without visible variables",
 		Variables: []FeaturePromptVariable{},
 	}, nil)
 	if err != nil {
@@ -135,14 +119,14 @@ func TestFeaturePromptAdminConfigAndRuntimePromptHaveSeparateContracts(t *testin
 	if len(revisions) != 3 {
 		t.Fatalf("revision count = %d, want 3", len(revisions))
 	}
-	if revisions[0].SchemaVersion != 3 || !revisions[0].Enabled || !revisions[0].PublishedAt.Valid || len(revisions[0].Variables) != 0 {
-		t.Fatalf("latest revision = %#v, want enabled schema version 3 with empty variables and PublishedAt", revisions[0])
+	if revisions[0].SchemaVersion != 3 || len(revisions[0].Variables) != 0 {
+		t.Fatalf("latest revision = %#v, want schema version 3 with empty variables", revisions[0])
 	}
-	if revisions[1].SchemaVersion != 2 || !revisions[1].Enabled || !revisions[1].PublishedAt.Valid {
-		t.Fatalf("second revision = %#v, want enabled schema version 2 with PublishedAt", revisions[1])
+	if revisions[1].SchemaVersion != 2 {
+		t.Fatalf("second revision = %#v, want schema version 2", revisions[1])
 	}
-	if revisions[2].SchemaVersion != 1 || revisions[2].Enabled || revisions[2].PublishedAt.Valid {
-		t.Fatalf("old revision = %#v, want disabled schema version 1 without PublishedAt", revisions[2])
+	if revisions[2].SchemaVersion != 1 {
+		t.Fatalf("old revision = %#v, want schema version 1", revisions[2])
 	}
 	if revisions[2].ModelDefaults.Model != "image-alpha" {
 		t.Fatalf("old revision model defaults = %#v, want append-only revision payload", revisions[2].ModelDefaults)
@@ -165,7 +149,6 @@ func TestFeaturePromptConcurrentSavesCreateSequentialAppendOnlyRevisions(t *test
 			defer wg.Done()
 			_, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
 				Prompt:    fmt.Sprintf("concurrent prompt %02d {{user_prompt}}", i),
-				Enabled:   true,
 				Variables: promptVariables("{{user_prompt}}"),
 			}, nil)
 			errs <- err
@@ -248,7 +231,7 @@ func TestFeaturePromptDefaultConfigHDUpscaleUsesSingleControlVariable(t *testing
 	}
 }
 
-func TestFeaturePromptPatternGenSaveDoesNotRequirePublishGate(t *testing.T) {
+func TestFeaturePromptPatternGenSaveDoesNotRequireAvailabilityGate(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewFeaturePromptRepository(db)
@@ -256,13 +239,12 @@ func TestFeaturePromptPatternGenSaveDoesNotRequirePublishGate(t *testing.T) {
 
 	config, err := repo.SetPromptConfig(ctx, slug, FeaturePromptSaveInput{
 		Prompt:    "Create a seamless commercial pattern for {{missing_token}}",
-		Enabled:   true,
 		Variables: promptVariables("{{user_prompt}}"),
 	}, nil)
 	if err != nil {
 		t.Fatalf("SetPromptConfig returned error: %v", err)
 	}
-	if config.CurrentRevisionID <= 0 || config.SchemaVersion != 1 || config.PublishedAt == nil {
+	if config.CurrentRevisionID <= 0 || config.SchemaVersion != 1 {
 		t.Fatalf("saved config = %#v, want current saved revision", config)
 	}
 	if revisionCount := countFeaturePromptRevisionsForTest(t, ctx, db, slug); revisionCount != 1 {
@@ -313,17 +295,15 @@ type queryDB interface {
 
 type featurePromptRevisionForTest struct {
 	ID            int64
-	Enabled       bool
 	Variables     []FeaturePromptVariable
 	ModelDefaults FeaturePromptModelDefaults
 	SchemaVersion int32
-	PublishedAt   sql.NullTime
 }
 
 func listFeaturePromptRevisionsForTest(t *testing.T, ctx context.Context, db queryDB, slug string) []featurePromptRevisionForTest {
 	t.Helper()
 	rows, err := db.QueryContext(ctx, `
-SELECT id, enabled, variables, model_defaults, schema_version, published_at
+SELECT id, variables, model_defaults, schema_version
 FROM feature_prompt_revisions
 WHERE feature_slug = $1
 ORDER BY schema_version DESC, id DESC`, slug)
@@ -339,11 +319,9 @@ ORDER BY schema_version DESC, id DESC`, slug)
 		var modelDefaultsJSON json.RawMessage
 		if err := rows.Scan(
 			&revision.ID,
-			&revision.Enabled,
 			&variablesJSON,
 			&modelDefaultsJSON,
 			&revision.SchemaVersion,
-			&revision.PublishedAt,
 		); err != nil {
 			t.Fatalf("scan feature prompt revision failed: %v", err)
 		}

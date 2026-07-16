@@ -73,7 +73,7 @@ func newAppTaskRuntime(
 	eventConfig := cfg.Events
 	eventConfig.NATSRetentionDays = eventRetentionSetting.NATSRetentionDays
 
-	taskBillingService := taskbilling.NewService(services.billingService, services.creditService)
+	taskBillingService := taskbilling.NewService(services.billingCatalog, services.creditService)
 	repos.taskRepo.SetTaskBilling(taskBillingService)
 	postgresAssigner := taskqueue.NewPostgresTaskAssigner(dbs.db)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(dbs.db)

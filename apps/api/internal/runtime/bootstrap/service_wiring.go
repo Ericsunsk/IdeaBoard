@@ -65,7 +65,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, fmt.Errorf("build billable item registry: %w", err)
 	}
 	billingService := billing.NewService(appPool)
-	billingCatalog := billing.NewBillableItemCatalog(billableItemRegistry, billingService, billingService)
+	billingCatalog := billing.NewBillableItemCatalog(billableItemRegistry, billingService)
 	billingCoverage := billingcoverage.NewService(repos.accountRepo, billingService)
 	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {

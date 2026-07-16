@@ -24,11 +24,14 @@ type handlerServiceStub struct {
 }
 
 type billableCatalogReaderStub struct {
-	items          []BillableItemCatalogCard
-	err            error
-	publishSKU     string
-	publishCredits int64
-	publishActorID int64
+	items               []BillableItemCatalogCard
+	err                 error
+	publishSKU          string
+	publishCredits      int64
+	publishActorID      int64
+	availabilitySKU     string
+	availabilityEnabled bool
+	availabilityActorID int64
 }
 
 func (s *billableCatalogReaderStub) List(context.Context) ([]BillableItemCatalogCard, error) {
@@ -40,6 +43,17 @@ func (s *billableCatalogReaderStub) PublishPrice(_ context.Context, sku string, 
 	s.publishCredits = unitCredits
 	s.publishActorID = actorID
 	return PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: unitCredits}, s.err
+}
+
+func (s *billableCatalogReaderStub) SetAvailability(_ context.Context, sku string, enabled bool, actorID int64) (AvailabilityInfo, error) {
+	s.availabilitySKU = sku
+	s.availabilityEnabled = enabled
+	s.availabilityActorID = actorID
+	status := BillableItemStatusDisabled
+	if enabled {
+		status = BillableItemStatusActive
+	}
+	return AvailabilityInfo{SKU: SKU(sku), Status: status}, s.err
 }
 
 func (s *handlerServiceStub) Quote(_ context.Context, sku string, quantity int64) (Quote, error) {
@@ -353,6 +367,35 @@ func TestAdminPublishPriceUsesAuthenticatedActorWithoutReason(t *testing.T) {
 	router.ServeHTTP(missingRecorder, missingRequest)
 	if missingRecorder.Code != http.StatusBadRequest {
 		t.Fatalf("missing unit_credits status=%d body=%s", missingRecorder.Code, missingRecorder.Body.String())
+	}
+}
+
+func TestAdminSetAvailabilityUsesAuthenticatedActorWithoutReason(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	catalog := &billableCatalogReaderStub{}
+	handler := NewHandler(&handlerServiceStub{}, nil, catalog)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
+		c.Next()
+	})
+	router.PUT("/catalog/:sku/availability", handler.SetAvailability)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPut, "/catalog/ai-image:partial-edit/availability", strings.NewReader(`{"enabled":false}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK || catalog.availabilitySKU != "ai-image:partial-edit" || catalog.availabilityEnabled || catalog.availabilityActorID != 9 || !strings.Contains(recorder.Body.String(), `"status":"disabled"`) {
+		t.Fatalf("status=%d body=%s availability=%+v", recorder.Code, recorder.Body.String(), catalog)
+	}
+
+	missingRecorder := httptest.NewRecorder()
+	missingRequest := httptest.NewRequest(http.MethodPut, "/catalog/ai-image:partial-edit/availability", strings.NewReader(`{}`))
+	missingRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(missingRecorder, missingRequest)
+	if missingRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("missing enabled status=%d body=%s", missingRecorder.Code, missingRecorder.Body.String())
 	}
 }
 

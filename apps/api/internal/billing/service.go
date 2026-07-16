@@ -98,6 +98,32 @@ func (s *Service) PublishPrice(ctx context.Context, input PublishPriceInput) (Pr
 	return price, nil
 }
 
+func (s *Service) SetAvailability(ctx context.Context, rawSKU string, enabled bool, actorID int64) (AvailabilityInfo, error) {
+	sku, err := CanonicalizeSKU(rawSKU)
+	if err != nil || actorID <= 0 {
+		return AvailabilityInfo{}, ErrInvalidCatalogEntry
+	}
+	if err := s.requirePool(); err != nil {
+		return AvailabilityInfo{}, err
+	}
+	var info AvailabilityInfo
+	var persistedEnabled bool
+	err = s.pool.QueryRow(ctx, `
+SELECT sku, enabled, updated_at
+FROM set_billing_item_availability($1, $2, $3)`, sku, enabled, actorID).Scan(
+		&info.SKU, &persistedEnabled, &info.UpdatedAt,
+	)
+	if err != nil {
+		return AvailabilityInfo{}, mapDatabaseError("set item availability", err)
+	}
+	if persistedEnabled {
+		info.Status = BillableItemStatusActive
+	} else {
+		info.Status = BillableItemStatusDisabled
+	}
+	return info, nil
+}
+
 func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
 	if err := s.requirePool(); err != nil {
 		return Quote{}, err
@@ -413,6 +439,8 @@ func mapDatabaseError(action string, err error) error {
 			return ErrSKUAlreadyExists
 		case "IB103":
 			return ErrSKUNotFound
+		case "IB104":
+			return ErrPricingUnavailable
 		case "IB106":
 			return ErrPriceNotFound
 		}
