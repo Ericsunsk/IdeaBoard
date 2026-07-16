@@ -67,10 +67,10 @@ func TestBillableItemRegistryEnforcesProductKindLength(t *testing.T) {
 
 func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	now := time.Date(2026, 7, 16, 8, 0, 0, 0, time.UTC)
-	activePrice := PriceInfo{PriceVersionID: 11, Version: 2, UnitCredits: 25, Enabled: true, UpdatedAt: now}
-	disabledPrice := PriceInfo{PriceVersionID: 12, Version: 1, UnitCredits: 10, Enabled: true, UpdatedAt: now}
-	disabledPriceState := PriceInfo{PriceVersionID: 14, Version: 1, UnitCredits: 12, Enabled: false, UpdatedAt: now}
-	archivedPrice := PriceInfo{PriceVersionID: 13, Version: 3, UnitCredits: 50, Enabled: true, UpdatedAt: now}
+	activePrice := PriceInfo{PriceVersionID: 11, Version: 2, UnitCredits: 25, CreatedAt: now}
+	disabledPrice := PriceInfo{PriceVersionID: 12, Version: 1, UnitCredits: 10, CreatedAt: now}
+	activePriceTwo := PriceInfo{PriceVersionID: 14, Version: 1, UnitCredits: 12, CreatedAt: now}
+	archivedPrice := PriceInfo{PriceVersionID: 13, Version: 3, UnitCredits: 50, CreatedAt: now}
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
 		{SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", Description: "只修改选区", SortOrder: 10},
 		{SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20},
@@ -80,10 +80,10 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	facts := catalogFactReaderStub{items: []CatalogItem{
 		{SKU: "ai-image:partial-edit", Enabled: true, CurrentPrice: &activePrice, UpdatedAt: now},
 		{SKU: "ai-image:remove-bg", Enabled: false, CurrentPrice: &disabledPrice, UpdatedAt: now},
-		{SKU: "ai-image:image-extend", Enabled: true, CurrentPrice: &disabledPriceState, UpdatedAt: now},
+		{SKU: "ai-image:image-extend", Enabled: true, CurrentPrice: &activePriceTwo, UpdatedAt: now},
 		{SKU: "legacy:removed", DisplayName: "旧功能", Description: "已从 Registry 移除", Enabled: true, CurrentPrice: &archivedPrice, UpdatedAt: now},
 	}}
-	service := NewBillableItemCatalog(registry, facts)
+	service := NewBillableItemCatalog(registry, facts, nil)
 
 	items, err := service.List(context.Background())
 	if err != nil {
@@ -95,7 +95,7 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	assertCatalogCard(t, items[0], "ai-image:partial-edit", BillableItemStatusActive, "局部重绘")
 	assertCatalogCard(t, items[1], "ai-image:remove-bg", BillableItemStatusDisabled, "抠图")
 	assertCatalogCard(t, items[2], "ai-image:hd-upscale", BillableItemStatusUnpriced, "HD")
-	assertCatalogCard(t, items[3], "ai-image:image-extend", BillableItemStatusDisabled, "扩图")
+	assertCatalogCard(t, items[3], "ai-image:image-extend", BillableItemStatusActive, "扩图")
 	assertCatalogCard(t, items[4], "legacy:removed", BillableItemStatusArchived, "旧功能")
 }
 
@@ -113,4 +113,36 @@ type catalogFactReaderStub struct {
 
 func (s catalogFactReaderStub) ListCatalogFacts(context.Context) ([]CatalogItem, error) {
 	return s.items, s.err
+}
+
+type catalogPricePublisherStub struct {
+	input PublishPriceInput
+}
+
+func (s *catalogPricePublisherStub) PublishPrice(_ context.Context, input PublishPriceInput) (PriceInfo, error) {
+	s.input = input
+	return PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: input.UnitCredits}, nil
+}
+
+func TestBillableCatalogPublishesOnlyRegisteredItems(t *testing.T) {
+	registry, err := NewBillableItemRegistry([]BillableItemDefinition{{
+		SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature",
+		DisplayName: "局部重绘", Description: "只修改选区",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publisher := &catalogPricePublisherStub{}
+	catalog := NewBillableItemCatalog(registry, catalogFactReaderStub{}, publisher)
+
+	price, err := catalog.PublishPrice(t.Context(), "AI-IMAGE:PARTIAL-EDIT", 0, 9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if price.UnitCredits != 0 || publisher.input.Definition.SKU != "ai-image:partial-edit" || publisher.input.ActorID != 9 {
+		t.Fatalf("publish input = %+v price = %+v", publisher.input, price)
+	}
+	if _, err := catalog.PublishPrice(t.Context(), "ai-image:unknown", 1, 9); !errors.Is(err, ErrSKUNotFound) {
+		t.Fatalf("unregistered publish error = %v", err)
+	}
 }

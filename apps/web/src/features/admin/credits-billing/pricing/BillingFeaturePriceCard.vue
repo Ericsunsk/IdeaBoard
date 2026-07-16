@@ -33,6 +33,14 @@
           >
             {{ updatedAtLabel }}
           </div>
+          <Button
+            v-if="item.status !== 'archived'"
+            size="small"
+            severity="secondary"
+            outlined
+            :label="item.status === 'unpriced' ? '设置价格' : '调整价格'"
+            @click="emit('publish', item)"
+          />
         </div>
       </div>
     </template>
@@ -42,6 +50,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Card from 'primevue/card'
+import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -49,6 +58,7 @@ import { adminCompactTagClass, adminMasonryCardClass } from '../../shared/lib/ad
 import type { AdminBillableItemCard, AdminBillableItemStatus } from './billableCatalogTypes'
 
 const props = defineProps<{ item: AdminBillableItemCard }>()
+const emit = defineEmits<{ publish: [item: AdminBillableItemCard] }>()
 
 const statusPresentation: Record<
   AdminBillableItemStatus,

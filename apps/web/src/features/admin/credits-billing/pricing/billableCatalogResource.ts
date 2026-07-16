@@ -1,14 +1,32 @@
-import { listAdminBillableItems } from '../../../../shared/api/generated-query/admin-billing/admin-billing'
-import type { BillableItemCatalogCard } from '../../../../shared/api/generated-query/model'
+import {
+  listAdminBillableItems,
+  publishAdminBillingPrice,
+} from '../../../../shared/api/generated-query/admin-billing/admin-billing'
+import type {
+  BillableItemCatalogCard,
+  BillingPrice,
+} from '../../../../shared/api/generated-query/model'
 import { resolveApiData } from '../../../../shared/api/apiResponse'
-import type { AdminBillableItemCard } from './billableCatalogTypes'
+import type { AdminBillableItemCard, AdminBillableItemPrice } from './billableCatalogTypes'
 
 export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>
+  publishPrice: (sku: string, unitCredits: number) => Promise<AdminBillableItemPrice>
 }
 
 export function createAdminBillableCatalogResource(): AdminBillableCatalogResource {
-  return { list: fetchAdminBillableItems }
+  return { list: fetchAdminBillableItems, publishPrice: publishBillableItemPrice }
+}
+
+export async function publishBillableItemPrice(
+  sku: string,
+  unitCredits: number,
+): Promise<AdminBillableItemPrice> {
+  const data = await resolveApiData(
+    publishAdminBillingPrice(sku, { unit_credits: unitCredits }),
+    '发布价格失败',
+  )
+  return normalizePrice(data)
 }
 
 export async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
@@ -30,10 +48,20 @@ function normalizeBillableItem(item: BillableItemCatalogCard): AdminBillableItem
           priceVersionId: item.current_price.price_version_id,
           version: item.current_price.version,
           unitCredits: item.current_price.unit_credits,
-          enabled: item.current_price.enabled,
-          updatedAt: item.current_price.updated_at,
+          createdBy: item.current_price.created_by,
+          createdAt: item.current_price.created_at,
         }
       : undefined,
     updatedAt: item.updated_at,
+  }
+}
+
+function normalizePrice(price: BillingPrice): AdminBillableItemPrice {
+  return {
+    priceVersionId: price.price_version_id,
+    version: price.version,
+    unitCredits: price.unit_credits,
+    createdBy: price.created_by,
+    createdAt: price.created_at,
   }
 }

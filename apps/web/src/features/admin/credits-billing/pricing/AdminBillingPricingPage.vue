@@ -20,8 +20,22 @@
       </Button>
     </div>
 
-    <BillingFeaturePriceCard v-for="item in items" v-else :key="item.sku" :item="item" />
+    <BillingFeaturePriceCard
+      v-for="item in items"
+      v-else
+      :key="item.sku"
+      :item="item"
+      @publish="openPriceDialog"
+    />
   </AdminResourceGridFrame>
+
+  <BillingPriceDialog
+    v-model:visible="priceDialogVisible"
+    :item="selectedItem"
+    :pending="publishPending"
+    :error-message="publishError"
+    @submit="publishPrice"
+  />
 </template>
 
 <script setup lang="ts">
@@ -30,7 +44,9 @@ import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import { adminEmptyStateClass } from '../../shared/lib/adminUiClasses'
+import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
 import BillingFeaturePriceCard from './BillingFeaturePriceCard.vue'
+import BillingPriceDialog from './BillingPriceDialog.vue'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
 import type { AdminBillableItemCard } from './billableCatalogTypes'
 
@@ -38,6 +54,11 @@ const resource = createAdminBillableCatalogResource()
 const items = ref<AdminBillableItemCard[]>([])
 const isLoading = ref(true)
 const errorMessage = ref('')
+const selectedItem = ref<AdminBillableItemCard | null>(null)
+const priceDialogVisible = ref(false)
+const publishPending = ref(false)
+const publishError = ref('')
+const toast = useAdminToast()
 
 async function loadCatalog() {
   isLoading.value = true
@@ -52,4 +73,29 @@ async function loadCatalog() {
 }
 
 onMounted(loadCatalog)
+
+function openPriceDialog(item: AdminBillableItemCard) {
+  selectedItem.value = item
+  publishError.value = ''
+  priceDialogVisible.value = true
+}
+
+async function publishPrice(unitCredits: number) {
+  const item = selectedItem.value
+  if (!item || publishPending.value) return
+  publishPending.value = true
+  publishError.value = ''
+  try {
+    const price = await resource.publishPrice(item.sku, unitCredits)
+    item.currentPrice = price
+    item.updatedAt = price.createdAt
+    if (item.status === 'unpriced') item.status = 'active'
+    priceDialogVisible.value = false
+    toast.success('价格已发布')
+  } catch (error) {
+    publishError.value = formatAdminDisplayError(error, '发布价格失败，请重试')
+  } finally {
+    publishPending.value = false
+  }
+}
 </script>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 
@@ -17,42 +18,39 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	ctx := t.Context()
 
 	created, err := service.CreateSKU(ctx, CreateSKUInput{
-		SKU: "IdeaBoard:Image.Generate", DisplayName: "AI 生图", Description: "首个计费产品", Enabled: true, Action: testsupport.AdminAction(t, 7, "launch image billing"),
+		SKU: "ai-image:partial-edit", DisplayName: "局部重绘", Description: "首个计费产品", Enabled: true, Action: testsupport.AdminAction(t, 7, "launch image billing"),
 	})
 	if err != nil {
 		t.Fatalf("CreateSKU() error = %v", err)
 	}
-	if created.SKU != "ideaboard:image.generate" || created.CurrentPrice != nil {
+	if created.SKU != "ai-image:partial-edit" || created.CurrentPrice != nil {
 		t.Fatalf("CreateSKU() = %+v", created)
 	}
-	if _, err := service.Quote(ctx, "ideaboard:image.generate", 1); !errors.Is(err, ErrPricingUnavailable) {
+	if _, err := service.Quote(ctx, "ai-image:partial-edit", 1); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("Quote() before price error = %v, want ErrPricingUnavailable", err)
 	}
 	if _, err := service.Quote(ctx, "ideaboard:not-found", 1); !errors.Is(err, ErrSKUNotFound) {
 		t.Fatalf("Quote() missing SKU error = %v, want ErrSKUNotFound", err)
 	}
 
-	priceV1, err := service.CreatePrice(ctx, CreatePriceInput{
-		SKU: "ideaboard:image.generate", UnitCredits: 25, Enabled: true, Action: testsupport.AdminAction(t, 7, "publish initial price"),
-	})
+	definition := testBillableDefinition("ai-image:partial-edit", "局部重绘")
+	priceV1, err := service.PublishPrice(ctx, PublishPriceInput{Definition: definition, UnitCredits: 25, ActorID: 7})
 	if err != nil {
 		t.Fatalf("CreatePrice(v1) error = %v", err)
 	}
-	quoteV1, err := service.Quote(ctx, "IDEABOARD:IMAGE.GENERATE", 4)
+	quoteV1, err := service.Quote(ctx, "AI-IMAGE:PARTIAL-EDIT", 4)
 	if err != nil {
 		t.Fatalf("Quote(v1) error = %v", err)
 	}
-	if quoteV1.DisplayName != "AI 生图" || quoteV1.PriceVersionID != priceV1.PriceVersionID || quoteV1.PriceVersion != 1 || quoteV1.UnitCredits != 25 || quoteV1.TotalCredits != 100 {
+	if quoteV1.DisplayName != "局部重绘" || quoteV1.PriceVersionID != priceV1.PriceVersionID || quoteV1.PriceVersion != 1 || quoteV1.UnitCredits != 25 || quoteV1.TotalCredits != 100 {
 		t.Fatalf("Quote(v1) = %+v, price = %+v", quoteV1, priceV1)
 	}
 
-	priceV2, err := service.CreatePrice(ctx, CreatePriceInput{
-		SKU: "ideaboard:image.generate", UnitCredits: 40, Enabled: true, Action: testsupport.AdminAction(t, 8, "publish revised price"),
-	})
+	priceV2, err := service.PublishPrice(ctx, PublishPriceInput{Definition: definition, UnitCredits: 40, ActorID: 8})
 	if err != nil {
 		t.Fatalf("CreatePrice(v2) error = %v", err)
 	}
-	quoteV2, err := service.Quote(ctx, "ideaboard:image.generate", 3)
+	quoteV2, err := service.Quote(ctx, "ai-image:partial-edit", 3)
 	if err != nil {
 		t.Fatalf("Quote(v2) error = %v", err)
 	}
@@ -63,24 +61,10 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 		t.Fatalf("old snapshot changed after repricing: total=%d err=%v", total, err)
 	}
 
-	if _, err := service.SetPriceEnabled(ctx, SetPriceEnabledInput{
-		SKU: "ideaboard:image.generate", Version: 2, Enabled: false, Action: testsupport.AdminAction(t, 9, "pause revised price"),
-	}); err != nil {
-		t.Fatalf("SetPriceEnabled(false) error = %v", err)
-	}
-	if _, err := service.Quote(ctx, "ideaboard:image.generate", 1); !errors.Is(err, ErrPricingUnavailable) {
-		t.Fatalf("Quote() with disabled current price error = %v", err)
-	}
-	if _, err := service.SetPriceEnabled(ctx, SetPriceEnabledInput{
-		SKU: "ideaboard:image.generate", Version: 2, Enabled: true, Action: testsupport.AdminAction(t, 9, "resume revised price"),
-	}); err != nil {
-		t.Fatalf("SetPriceEnabled(true) error = %v", err)
-	}
-
 	disabled := false
 	newName := "AI Image Generation"
 	updated, err := service.UpdateSKU(ctx, UpdateSKUInput{
-		SKU: "ideaboard:image.generate", DisplayName: &newName, Enabled: &disabled, Action: testsupport.AdminAction(t, 10, "retire image SKU"),
+		SKU: "ai-image:partial-edit", DisplayName: &newName, Enabled: &disabled, Action: testsupport.AdminAction(t, 10, "retire image SKU"),
 	})
 	if err != nil {
 		t.Fatalf("UpdateSKU() error = %v", err)
@@ -88,14 +72,14 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if updated.DisplayName != newName || updated.Enabled {
 		t.Fatalf("UpdateSKU() = %+v", updated)
 	}
-	if quoteV1.DisplayName != "AI 生图" {
+	if quoteV1.DisplayName != "局部重绘" {
 		t.Fatalf("old quote display name changed after SKU update: %q", quoteV1.DisplayName)
 	}
-	if _, err := service.Quote(ctx, "ideaboard:image.generate", 1); !errors.Is(err, ErrPricingUnavailable) {
+	if _, err := service.Quote(ctx, "ai-image:partial-edit", 1); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("Quote() with disabled SKU error = %v", err)
 	}
 
-	prices, err := service.ListPrices(ctx, ListPricesInput{SKU: "ideaboard:image.generate", Limit: 10})
+	prices, err := service.ListPrices(ctx, ListPricesInput{SKU: "ai-image:partial-edit", Limit: 10})
 	if err != nil {
 		t.Fatalf("ListPrices() error = %v", err)
 	}
@@ -110,13 +94,10 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 		t.Fatalf("ListCatalog() = %+v", catalog)
 	}
 
-	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "ideaboard:free.preview", DisplayName: "Free Preview", Enabled: true, Action: testsupport.AdminAction(t, 7, "create free preview")}); err != nil {
-		t.Fatalf("CreateSKU(free) error = %v", err)
+	if _, err := service.PublishPrice(ctx, PublishPriceInput{Definition: testBillableDefinition("ai-image:remove-bg", "抠图"), UnitCredits: 0, ActorID: 7}); err != nil {
+		t.Fatalf("PublishPrice(free) error = %v", err)
 	}
-	if _, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "ideaboard:free.preview", UnitCredits: 0, Enabled: true, Action: testsupport.AdminAction(t, 7, "publish free preview")}); err != nil {
-		t.Fatalf("CreatePrice(free) error = %v", err)
-	}
-	freeQuote, err := service.Quote(ctx, "ideaboard:free.preview", 99)
+	freeQuote, err := service.Quote(ctx, "ai-image:remove-bg", 99)
 	if err != nil || freeQuote.UnitCredits != 0 || freeQuote.TotalCredits != 0 {
 		t.Fatalf("Quote(free) = %+v, %v", freeQuote, err)
 	}
@@ -138,20 +119,12 @@ func TestAdminBillingWritesRequireReasonAndPersistAppendOnlyAudit(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("UpdateSKU() error = %v", err)
 	}
-	price, err := service.CreatePrice(ctx, CreatePriceInput{
-		SKU: "test:audit", UnitCredits: 9, Enabled: true, Action: testsupport.AdminAction(t, 13, "publish audited price"),
-	})
+	price, err := service.PublishPrice(ctx, PublishPriceInput{Definition: testBillableDefinition("test:audit", "Audit"), UnitCredits: 9, ActorID: 13})
 	if err != nil {
 		t.Fatalf("CreatePrice() error = %v", err)
 	}
-	if _, err := service.SetPriceEnabled(ctx, SetPriceEnabledInput{
-		SKU: "test:audit", Version: price.Version, Enabled: false, Action: testsupport.AdminAction(t, 14, "pause audited price"),
-	}); err != nil {
-		t.Fatalf("SetPriceEnabled() error = %v", err)
-	}
-
 	rows, err := db.QueryContext(ctx, `
-SELECT action_type, actor_id, reason, COALESCE(price_version_id, 0)
+SELECT action_type, actor_id, reason, COALESCE(price_version_id, 0), metadata
 FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 	if err != nil {
 		t.Fatal(err)
@@ -165,8 +138,7 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 	}{
 		{action: "create_sku", actorID: 11, reason: "create audited SKU"},
 		{action: "update_sku", actorID: 12, reason: "update audited SKU"},
-		{action: "create_price", actorID: 13, reason: "publish audited price", priceID: price.PriceVersionID},
-		{action: "set_price_enabled", actorID: 14, reason: "pause audited price", priceID: price.PriceVersionID},
+		{action: "create_price", actorID: 13, reason: "price published", priceID: price.PriceVersionID},
 	}
 	for index, expected := range want {
 		if !rows.Next() {
@@ -174,11 +146,15 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 		}
 		var action, reason string
 		var actorID, priceID int64
-		if err := rows.Scan(&action, &actorID, &reason, &priceID); err != nil {
+		var metadata string
+		if err := rows.Scan(&action, &actorID, &reason, &priceID, &metadata); err != nil {
 			t.Fatal(err)
 		}
 		if action != expected.action || actorID != expected.actorID || reason != expected.reason || priceID != expected.priceID {
 			t.Fatalf("audit row %d = (%q,%d,%q,%d), want %+v", index, action, actorID, reason, priceID, expected)
+		}
+		if action == "create_price" && (!strings.Contains(metadata, `"old": null`) || !strings.Contains(metadata, `"new"`) || !strings.Contains(metadata, `"outcome": "published"`)) {
+			t.Fatalf("publish audit metadata = %s", metadata)
 		}
 	}
 	if rows.Next() {
@@ -204,6 +180,35 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 	}
 }
 
+func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	definition := testBillableDefinition("ai-image:partial-edit", "局部重绘")
+	if _, err := service.PublishPrice(t.Context(), PublishPriceInput{Definition: definition, UnitCredits: 10, ActorID: 1}); err != nil {
+		t.Fatal(err)
+	}
+	disabled := false
+	if _, err := service.UpdateSKU(t.Context(), UpdateSKUInput{
+		SKU: string(definition.SKU), Enabled: &disabled, Action: testsupport.AdminAction(t, 1, "disable feature"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	price, err := service.PublishPrice(t.Context(), PublishPriceInput{Definition: definition, UnitCredits: 20, ActorID: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	item, err := service.GetSKU(t.Context(), string(definition.SKU))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Enabled || item.CurrentPrice == nil || item.CurrentPrice.PriceVersionID != price.PriceVersionID || price.Version != 2 {
+		t.Fatalf("disabled repricing item=%+v price=%+v", item, price)
+	}
+	if _, err := service.Quote(t.Context(), string(definition.SKU), 1); !errors.Is(err, ErrPricingUnavailable) {
+		t.Fatalf("disabled feature quote error=%v", err)
+	}
+}
+
 func TestGetSKUsReturnsConfiguredItemsAndOmitsMissingSKUs(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
@@ -212,8 +217,8 @@ func TestGetSKUsReturnsConfiguredItemsAndOmitsMissingSKUs(t *testing.T) {
 	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:coverage-a", DisplayName: "Coverage A", Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatalf("CreateSKU(coverage-a) error = %v", err)
 	}
-	if _, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:coverage-a", UnitCredits: 8, Enabled: false, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-		t.Fatalf("CreatePrice(coverage-a) error = %v", err)
+	if _, err := service.PublishPrice(ctx, PublishPriceInput{Definition: testBillableDefinition("test:coverage-a", "Coverage A"), UnitCredits: 8, ActorID: 1}); err != nil {
+		t.Fatalf("PublishPrice(coverage-a) error = %v", err)
 	}
 	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:coverage-b", DisplayName: "Coverage B", Enabled: false, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
 		t.Fatalf("CreateSKU(coverage-b) error = %v", err)
@@ -226,7 +231,7 @@ func TestGetSKUsReturnsConfiguredItemsAndOmitsMissingSKUs(t *testing.T) {
 	if len(items) != 2 || items[0].SKU != "test:coverage-a" || items[1].SKU != "test:coverage-b" {
 		t.Fatalf("GetSKUs() items = %+v", items)
 	}
-	if items[0].CurrentPrice == nil || items[0].CurrentPrice.UnitCredits != 8 || items[0].CurrentPrice.Enabled {
+	if items[0].CurrentPrice == nil || items[0].CurrentPrice.UnitCredits != 8 {
 		t.Fatalf("GetSKUs() coverage-a = %+v", items[0])
 	}
 	if items[1].Enabled || items[1].CurrentPrice != nil {
@@ -242,7 +247,7 @@ func TestDatabasePreventsSKURenameReuseAndPriceMutation(t *testing.T) {
 	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:immutable", DisplayName: "Immutable", Enabled: true, Action: testsupport.AdminAction(t, 1, "test immutable catalog")}); err != nil {
 		t.Fatalf("CreateSKU() error = %v", err)
 	}
-	price, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:immutable", UnitCredits: 5, Enabled: true, Action: testsupport.AdminAction(t, 1, "test immutable price")})
+	price, err := service.PublishPrice(ctx, PublishPriceInput{Definition: testBillableDefinition("test:immutable", "Immutable"), UnitCredits: 5, ActorID: 1})
 	if err != nil {
 		t.Fatalf("CreatePrice() error = %v", err)
 	}
@@ -268,7 +273,8 @@ func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 	if _, err := service.CreateSKU(ctx, CreateSKUInput{SKU: "test:concurrent", DisplayName: "Concurrent", Enabled: true, Action: testsupport.AdminAction(t, 1, "test concurrent pricing")}); err != nil {
 		t.Fatalf("CreateSKU() error = %v", err)
 	}
-	initial, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:concurrent", UnitCredits: 10, Enabled: true, Action: testsupport.AdminAction(t, 1, "test initial price")})
+	definition := testBillableDefinition("test:concurrent", "Concurrent")
+	initial, err := service.PublishPrice(ctx, PublishPriceInput{Definition: definition, UnitCredits: 10, ActorID: 1})
 	if err != nil {
 		t.Fatalf("CreatePrice(initial) error = %v", err)
 	}
@@ -286,7 +292,7 @@ func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			price, err := service.CreatePrice(ctx, CreatePriceInput{SKU: "test:concurrent", UnitCredits: unitCredits, Enabled: true, Action: testsupport.AdminAction(t, 2, "test concurrent repricing")})
+			price, err := service.PublishPrice(ctx, PublishPriceInput{Definition: definition, UnitCredits: unitCredits, ActorID: 2})
 			if err != nil {
 				errCh <- fmt.Errorf("CreatePrice(%d): %w", unitCredits, err)
 				return
@@ -339,5 +345,12 @@ func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 		if quote.TotalCredits != quote.UnitCredits*3 {
 			t.Fatalf("quote total = %+v", quote)
 		}
+	}
+}
+
+func testBillableDefinition(sku SKU, displayName string) BillableItemDefinition {
+	namespace, _, _ := strings.Cut(string(sku), ":")
+	return BillableItemDefinition{
+		SKU: sku, Namespace: namespace, ProductKind: "test-feature", DisplayName: displayName,
 	}
 }

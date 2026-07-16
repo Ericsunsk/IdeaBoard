@@ -110,34 +110,41 @@ func RequiresBilling(feature string) bool {
 
 func ResolveSKU(request Request) (billing.SKU, error) {
 	feature, ok := workflow.ParseAIImageFeatureSlug(request.Feature)
-	model := canonicalizeModel(request.Model)
 	if !ok {
 		return "", ErrUnsupportedProduct
 	}
-	if model == "" {
-		return "", ErrModelRequired
-	}
-	digest := sha256.Sum256([]byte(feature + "\x00" + model))
-	return billing.SKU("ai-image:" + feature + "." + hex.EncodeToString(digest[:])), nil
+	return billing.SKU("ai-image:" + feature), nil
 }
 
 func RequestFingerprint(request Request) (string, error) {
-	sku, err := ResolveSKU(request)
+	sku, model, err := validateRequest(request)
 	if err != nil {
 		return "", err
 	}
-	if request.Quantity <= 0 {
-		return "", billing.ErrInvalidQuantity
-	}
-	digest := sha256.Sum256([]byte(string(sku) + "\x00" + strconv.FormatInt(request.Quantity, 10)))
+	digest := sha256.Sum256([]byte(string(sku) + "\x00" + model + "\x00" + strconv.FormatInt(request.Quantity, 10)))
 	return hex.EncodeToString(digest[:]), nil
+}
+
+func validateRequest(request Request) (billing.SKU, string, error) {
+	sku, err := ResolveSKU(request)
+	if err != nil {
+		return "", "", err
+	}
+	model := canonicalizeModel(request.Model)
+	if model == "" {
+		return "", "", ErrModelRequired
+	}
+	if request.Quantity <= 0 {
+		return "", "", billing.ErrInvalidQuantity
+	}
+	return sku, model, nil
 }
 
 func (s *Service) Readiness(ctx context.Context, userID int64, request Request) (Readiness, error) {
 	if s == nil || s.quoter == nil || s.credits == nil || userID <= 0 {
 		return Readiness{}, fmt.Errorf("task billing service unavailable")
 	}
-	sku, err := ResolveSKU(request)
+	sku, _, err := validateRequest(request)
 	if err != nil {
 		return Readiness{}, err
 	}
@@ -159,7 +166,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	if s == nil || s.quoter == nil || s.credits == nil || tx == nil || strings.TrimSpace(taskID) == "" || userID <= 0 {
 		return Snapshot{}, fmt.Errorf("task billing service unavailable")
 	}
-	sku, err := ResolveSKU(request)
+	sku, model, err := validateRequest(request)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -169,7 +176,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	}
 
 	snapshot := Snapshot{
-		TaskID: taskID, UserID: userID, Feature: request.Feature, Model: canonicalizeModel(request.Model),
+		TaskID: taskID, UserID: userID, Feature: request.Feature, Model: model,
 		SKU: quote.SKU, DisplayName: quote.DisplayName, PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
 		UnitCredits: quote.UnitCredits, Quantity: quote.Quantity, TotalCredits: quote.TotalCredits, QuotedAt: quote.QuotedAt,
 	}

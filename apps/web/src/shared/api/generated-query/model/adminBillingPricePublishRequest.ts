@@ -4,14 +4,11 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminActionReason } from './adminActionReason'
 
-export interface AdminBillingPriceCreateRequest {
+export interface AdminBillingPricePublishRequest {
   /**
    * @minimum 0
    * @maximum 9000000000000000
    */
   unit_credits: number
-  enabled: boolean
-  reason: AdminActionReason
 }

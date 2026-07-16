@@ -39,7 +39,7 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 	if !firstResult.Created || firstResult.HoldTransactionID == "" {
 		t.Fatalf("first result=%+v", firstResult)
 	}
-	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(mustResolveSKU(t, request)), UnitCredits: 40, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+	if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(mustResolveSKU(t, request), "Pattern Generation", 40)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -359,16 +359,14 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 			unitCredits   int64
 			createSKU     bool
 			skuEnabled    bool
-			priceEnabled  bool
 			wantErr       error
 			wantState     string
 			wantHoldCount int
 		}{
-			{name: "paid", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: true, wantState: "held", wantHoldCount: 1},
-			{name: "free", unitCredits: 0, createSKU: true, skuEnabled: true, priceEnabled: true, wantState: "free"},
+			{name: "paid", unitCredits: 25, createSKU: true, skuEnabled: true, wantState: "held", wantHoldCount: 1},
+			{name: "free", unitCredits: 0, createSKU: true, skuEnabled: true, wantState: "free"},
 			{name: "missing", wantErr: billing.ErrSKUNotFound},
-			{name: "disabled-sku", unitCredits: 25, createSKU: true, priceEnabled: true, wantErr: billing.ErrPricingUnavailable},
-			{name: "disabled-price", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: false, wantErr: billing.ErrPricingUnavailable},
+			{name: "disabled-sku", unitCredits: 25, createSKU: true, wantErr: billing.ErrPricingUnavailable},
 		} {
 			scenario := scenario
 			t.Run(feature+"/"+scenario.name, func(t *testing.T) {
@@ -381,11 +379,14 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 				}
 				if scenario.createSKU {
 					sku := mustResolveSKU(t, request)
-					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+					if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(sku, feature, scenario.unitCredits)); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-						t.Fatal(err)
+					if !scenario.skuEnabled {
+						disabled := false
+						if _, err := billingService.UpdateSKU(t.Context(), billing.UpdateSKUInput{SKU: string(sku), Enabled: &disabled, Action: testsupport.AdminAction(t, 1, "test disabled SKU")}); err != nil {
+							t.Fatal(err)
+						}
 					}
 				}
 				seedCreditWallet(t, pool, creditService, 42, 100)
@@ -436,13 +437,20 @@ func seedPatternBillingProduct(t *testing.T, service *billing.Service, model str
 		t.Fatal(err)
 	}
 	sku := mustResolveSKU(t, request)
-	if _, err := service.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern Generation", Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: unitCredits, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+	if _, err := service.PublishPrice(t.Context(), submissionPriceInput(sku, "Pattern Generation", unitCredits)); err != nil {
 		t.Fatal(err)
 	}
 	return request
+}
+
+func submissionPriceInput(sku billing.SKU, displayName string, unitCredits int64) billing.PublishPriceInput {
+	return billing.PublishPriceInput{
+		Definition: billing.BillableItemDefinition{
+			SKU: sku, Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: displayName,
+		},
+		UnitCredits: unitCredits,
+		ActorID:     1,
+	}
 }
 
 func mustResolveSKU(t *testing.T, request taskbilling.Request) billing.SKU {

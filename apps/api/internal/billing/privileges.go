@@ -5,7 +5,6 @@ import dbprivileges "ideaboard/api/internal/platform/database/privileges"
 var billingTableNames = []string{
 	"billing_skus",
 	"billing_price_versions",
-	"billing_price_version_states",
 }
 
 var billingNoDirectAccessTableNames = []string{"billing_admin_actions"}
@@ -13,14 +12,12 @@ var billingNoDirectAccessTableNames = []string{"billing_admin_actions"}
 var billingCommandFunctionSignatures = []string{
 	"create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
 	"update_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
-	"create_billing_price_version(TEXT, BIGINT, BOOLEAN, BIGINT, TEXT)",
-	"set_billing_price_version_enabled(TEXT, BIGINT, BOOLEAN, BIGINT, TEXT)",
+	"publish_billing_price(TEXT, TEXT, TEXT, BIGINT, BIGINT)",
 }
 
 var billingInternalFunctionSignatures = []string{
 	"prevent_billing_sku_identity_mutation()",
 	"prevent_billing_price_version_mutation()",
-	"prevent_billing_price_state_delete()",
 	"prevent_billing_admin_action_mutation()",
 }
 

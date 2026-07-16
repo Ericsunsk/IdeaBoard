@@ -1501,6 +1501,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillableItemCatalog'
 
+  /admin/billing/catalog/{sku}/prices:
+    post:
+      tags: [AdminBilling]
+      operationId: publishAdminBillingPrice
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BillingSKUPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminBillingPricePublishRequest'
+      responses:
+        '200':
+          description: Billable Item materialized and immutable current price published atomically
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBillingPrice'
+
   /admin/billing/skus:
     get:
       tags: [AdminBilling]
@@ -1597,53 +1619,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillingPricePage'
-    post:
-      tags: [AdminBilling]
-      operationId: createAdminBillingPrice
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/BillingSKUPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminBillingPriceCreateRequest'
-      responses:
-        '200':
-          description: New current immutable price version created atomically
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingPrice'
-
-  /admin/billing/skus/{sku}/prices/{version}:
-    patch:
-      tags: [AdminBilling]
-      operationId: setAdminBillingPriceEnabled
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/BillingSKUPath'
-        - name: version
-          in: path
-          required: true
-          schema: { type: integer, format: int64, minimum: 1 }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminBillingPriceStateRequest'
-      responses:
-        '200':
-          description: Price operational enabled state updated without mutating its price snapshot
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingPrice'
-
   /admin/accounts:
     get:
       tags: [AdminAccounts]
@@ -2482,16 +2457,13 @@ components:
 
     BillingPrice:
       type: object
-      required: [price_version_id, version, unit_credits, enabled, created_by, created_at, updated_by, updated_at]
+      required: [price_version_id, version, unit_credits, created_by, created_at]
       properties:
         price_version_id: { type: integer, format: int64, minimum: 1 }
         version: { type: integer, format: int64, minimum: 1 }
         unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
-        enabled: { type: boolean }
         created_by: { type: integer, format: int64, minimum: 1 }
         created_at: { type: string, format: date-time }
-        updated_by: { type: integer, format: int64, minimum: 1 }
-        updated_at: { type: string, format: date-time }
 
     BillingCatalogItem:
       type: object
@@ -2596,22 +2568,12 @@ components:
         enabled: { type: boolean }
         reason: { $ref: '#/components/schemas/AdminActionReason' }
 
-    AdminBillingPriceCreateRequest:
+    AdminBillingPricePublishRequest:
       type: object
       additionalProperties: false
-      required: [unit_credits, enabled, reason]
+      required: [unit_credits]
       properties:
         unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
-        enabled: { type: boolean }
-        reason: { $ref: '#/components/schemas/AdminActionReason' }
-
-    AdminBillingPriceStateRequest:
-      type: object
-      additionalProperties: false
-      required: [enabled, reason]
-      properties:
-        enabled: { type: boolean }
-        reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     AdminActionReason:
       type: string

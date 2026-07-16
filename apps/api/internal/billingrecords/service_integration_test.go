@@ -233,13 +233,10 @@ func metadata(key, actorType, actorID, source, referenceType, referenceID string
 func seedTaskSnapshot(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID int64, taskID, holdID, displayName string, amount int64) {
 	t.Helper()
 	sku := "ai-image:" + strings.ToLower(strings.ReplaceAll(taskID, "_", "-"))
-	if _, err := pool.Exec(ctx, `SELECT create_billing_sku($1, $2, '', TRUE, 7, 'billing records fixture')`, sku, displayName); err != nil {
-		t.Fatal(err)
-	}
 	var priceVersionID, priceVersion int64
 	if err := pool.QueryRow(ctx, `
 SELECT price_version_id, version
-FROM create_billing_price_version($1, $2, TRUE, 7, 'billing records fixture')`, sku, amount).Scan(&priceVersionID, &priceVersion); err != nil {
+FROM publish_billing_price($1, $2, '', $3, 7)`, sku, displayName, amount).Scan(&priceVersionID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `

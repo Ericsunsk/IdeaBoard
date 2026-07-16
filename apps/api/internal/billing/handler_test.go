@@ -19,19 +19,27 @@ type handlerServiceStub struct {
 		sku      string
 		quantity int64
 	}
-	createSKUInput   CreateSKUInput
-	updateSKUInput   UpdateSKUInput
-	createPriceInput CreatePriceInput
-	setPriceInput    SetPriceEnabledInput
+	createSKUInput CreateSKUInput
+	updateSKUInput UpdateSKUInput
 }
 
 type billableCatalogReaderStub struct {
-	items []BillableItemCatalogCard
-	err   error
+	items          []BillableItemCatalogCard
+	err            error
+	publishSKU     string
+	publishCredits int64
+	publishActorID int64
 }
 
-func (s billableCatalogReaderStub) List(context.Context) ([]BillableItemCatalogCard, error) {
+func (s *billableCatalogReaderStub) List(context.Context) ([]BillableItemCatalogCard, error) {
 	return s.items, s.err
+}
+
+func (s *billableCatalogReaderStub) PublishPrice(_ context.Context, sku string, unitCredits, actorID int64) (PriceInfo, error) {
+	s.publishSKU = sku
+	s.publishCredits = unitCredits
+	s.publishActorID = actorID
+	return PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: unitCredits}, s.err
 }
 
 func (s *handlerServiceStub) Quote(_ context.Context, sku string, quantity int64) (Quote, error) {
@@ -51,16 +59,6 @@ func (s *handlerServiceStub) CreateSKU(_ context.Context, input CreateSKUInput) 
 func (s *handlerServiceStub) UpdateSKU(_ context.Context, input UpdateSKUInput) (CatalogItem, error) {
 	s.updateSKUInput = input
 	return CatalogItem{SKU: SKU(input.SKU)}, nil
-}
-
-func (s *handlerServiceStub) CreatePrice(_ context.Context, input CreatePriceInput) (PriceInfo, error) {
-	s.createPriceInput = input
-	return PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: input.UnitCredits, Enabled: input.Enabled}, nil
-}
-
-func (s *handlerServiceStub) SetPriceEnabled(_ context.Context, input SetPriceEnabledInput) (PriceInfo, error) {
-	s.setPriceInput = input
-	return PriceInfo{PriceVersionID: 1, Version: input.Version, Enabled: input.Enabled}, nil
 }
 
 func (s *handlerServiceStub) ListCatalog(context.Context, ListCatalogInput) (CatalogPage, error) {
@@ -124,8 +122,8 @@ func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	price := &PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: 25, Enabled: true}
-	catalog := billableCatalogReaderStub{items: []BillableItemCatalogCard{
+	price := &PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: 25}
+	catalog := &billableCatalogReaderStub{items: []BillableItemCatalogCard{
 		{
 			BillableItemDefinition: BillableItemDefinition{
 				SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature",
@@ -282,7 +280,7 @@ func TestAdminBillingAuthenticatesBeforeServiceAvailability(t *testing.T) {
 	}
 }
 
-func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
+func TestAdminBillingWriteHandlerRequiresAndTrimsSKUReason(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
 	handler := NewHandler(service, service, nil)
@@ -292,8 +290,6 @@ func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 		c.Next()
 	})
 	router.PATCH("/skus/:sku", handler.UpdateSKU)
-	router.POST("/skus/:sku/prices", handler.CreatePrice)
-	router.PATCH("/skus/:sku/prices/:version", handler.SetPriceEnabled)
 
 	for _, tt := range []struct {
 		name   string
@@ -302,8 +298,6 @@ func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 		body   string
 	}{
 		{name: "update missing reason", method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false}`},
-		{name: "create price blank reason", method: http.MethodPost, path: "/skus/test:item/prices", body: `{"unit_credits":4,"enabled":true,"reason":"  "}`},
-		{name: "set state too long Unicode reason", method: http.MethodPatch, path: "/skus/test:item/prices/1", body: `{"enabled":false,"reason":"` + strings.Repeat("点", 1001) + `"}`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			response := httptest.NewRecorder()
@@ -316,15 +310,9 @@ func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 		})
 	}
 
-	validRequests := []struct {
-		method string
-		path   string
-		body   string
-	}{
-		{method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false,"reason":"  disable catalog  "}`},
-		{method: http.MethodPost, path: "/skus/test:item/prices", body: `{"unit_credits":4,"enabled":true,"reason":"  publish price  "}`},
-		{method: http.MethodPatch, path: "/skus/test:item/prices/1", body: `{"enabled":false,"reason":"  pause price  "}`},
-	}
+	validRequests := []struct{ method, path, body string }{{
+		method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false,"reason":"  disable catalog  "}`,
+	}}
 	for _, requestCase := range validRequests {
 		response := httptest.NewRecorder()
 		request := httptest.NewRequest(requestCase.method, requestCase.path, strings.NewReader(requestCase.body))
@@ -334,8 +322,37 @@ func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 			t.Fatalf("%s %s status = %d body=%s", requestCase.method, requestCase.path, response.Code, response.Body.String())
 		}
 	}
-	if service.updateSKUInput.Action.Reason() != "disable catalog" || service.createPriceInput.Action.Reason() != "publish price" || service.setPriceInput.Action.Reason() != "pause price" {
-		t.Fatalf("trimmed reasons update=%q create_price=%q set_price=%q", service.updateSKUInput.Action.Reason(), service.createPriceInput.Action.Reason(), service.setPriceInput.Action.Reason())
+	if service.updateSKUInput.Action.Reason() != "disable catalog" {
+		t.Fatalf("trimmed update reason=%q", service.updateSKUInput.Action.Reason())
+	}
+}
+
+func TestAdminPublishPriceUsesAuthenticatedActorWithoutReason(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	catalog := &billableCatalogReaderStub{}
+	handler := NewHandler(&handlerServiceStub{}, nil, catalog)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
+		c.Next()
+	})
+	router.POST("/catalog/:sku/prices", handler.PublishPrice)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:partial-edit/prices", strings.NewReader(`{"unit_credits":0}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK || catalog.publishSKU != "ai-image:partial-edit" || catalog.publishCredits != 0 || catalog.publishActorID != 9 {
+		t.Fatalf("status=%d body=%s publish=%+v", recorder.Code, recorder.Body.String(), catalog)
+	}
+
+	missingRecorder := httptest.NewRecorder()
+	missingRequest := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:partial-edit/prices", strings.NewReader(`{}`))
+	missingRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(missingRecorder, missingRequest)
+	if missingRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("missing unit_credits status=%d body=%s", missingRecorder.Code, missingRecorder.Body.String())
 	}
 }
 
@@ -351,8 +368,7 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 	router.PATCH("/skus/:sku", handler.UpdateSKU)
 	router.GET("/skus", handler.ListCatalog)
 	router.GET("/skus/:sku/prices", handler.ListPrices)
-	router.POST("/skus/:sku/prices", handler.CreatePrice)
-	router.PATCH("/skus/:sku/prices/:version", handler.SetPriceEnabled)
+	router.POST("/catalog/:sku/prices", handler.PublishPrice)
 
 	tests := []struct {
 		name   string
@@ -361,9 +377,7 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 		body   string
 	}{
 		{name: "update SKU cannot smuggle rename", method: http.MethodPatch, path: "/skus/test:item", body: `{"sku":"test:renamed"}`},
-		{name: "create price cannot use provider routing", method: http.MethodPost, path: "/skus/test:item/prices", body: `{"unit_credits":1,"enabled":true,"provider_account_id":2}`},
-		{name: "price state cannot mutate unit", method: http.MethodPatch, path: "/skus/test:item/prices/1", body: `{"enabled":true,"unit_credits":2}`},
-		{name: "price version must be positive", method: http.MethodPatch, path: "/skus/test:item/prices/0", body: `{"enabled":true}`},
+		{name: "publish price cannot use provider routing", method: http.MethodPost, path: "/catalog/test:item/prices", body: `{"unit_credits":1,"provider_account_id":2}`},
 		{name: "catalog limit is bounded", method: http.MethodGet, path: "/skus?limit=101"},
 		{name: "price cursor is positive", method: http.MethodGet, path: "/skus/test:item/prices?before_version=-1"},
 	}

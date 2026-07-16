@@ -34,6 +34,7 @@ type BillableItemDefinition struct {
 
 type BillableItemRegistry struct {
 	items []BillableItemDefinition
+	bySKU map[SKU]BillableItemDefinition
 }
 
 func NewBillableItemRegistry(definitions []BillableItemDefinition) (*BillableItemRegistry, error) {
@@ -74,7 +75,11 @@ func NewBillableItemRegistry(definitions []BillableItemDefinition) (*BillableIte
 		}
 		return items[i].SKU < items[j].SKU
 	})
-	return &BillableItemRegistry{items: items}, nil
+	bySKU := make(map[SKU]BillableItemDefinition, len(items))
+	for _, item := range items {
+		bySKU[item.SKU] = item
+	}
+	return &BillableItemRegistry{items: items, bySKU: bySKU}, nil
 }
 
 func (r *BillableItemRegistry) Items() []BillableItemDefinition {
@@ -84,6 +89,18 @@ func (r *BillableItemRegistry) Items() []BillableItemDefinition {
 	items := make([]BillableItemDefinition, len(r.items))
 	copy(items, r.items)
 	return items
+}
+
+func (r *BillableItemRegistry) Find(rawSKU string) (BillableItemDefinition, bool) {
+	if r == nil {
+		return BillableItemDefinition{}, false
+	}
+	sku, err := CanonicalizeSKU(rawSKU)
+	if err != nil {
+		return BillableItemDefinition{}, false
+	}
+	item, exists := r.bySKU[sku]
+	return item, exists
 }
 
 type BillableItemCatalogCard struct {
@@ -97,13 +114,34 @@ type CatalogFactReader interface {
 	ListCatalogFacts(context.Context) ([]CatalogItem, error)
 }
 
-type BillableItemCatalog struct {
-	registry *BillableItemRegistry
-	facts    CatalogFactReader
+type CatalogPricePublisher interface {
+	PublishPrice(context.Context, PublishPriceInput) (PriceInfo, error)
 }
 
-func NewBillableItemCatalog(registry *BillableItemRegistry, facts CatalogFactReader) *BillableItemCatalog {
-	return &BillableItemCatalog{registry: registry, facts: facts}
+type BillableItemCatalog struct {
+	registry  *BillableItemRegistry
+	facts     CatalogFactReader
+	publisher CatalogPricePublisher
+}
+
+func NewBillableItemCatalog(registry *BillableItemRegistry, facts CatalogFactReader, publisher CatalogPricePublisher) *BillableItemCatalog {
+	return &BillableItemCatalog{registry: registry, facts: facts, publisher: publisher}
+}
+
+func (c *BillableItemCatalog) PublishPrice(ctx context.Context, rawSKU string, unitCredits, actorID int64) (PriceInfo, error) {
+	if c == nil || c.registry == nil || c.publisher == nil {
+		return PriceInfo{}, ErrServiceUnavailable
+	}
+	definition, exists := c.registry.Find(rawSKU)
+	if !exists {
+		return PriceInfo{}, ErrSKUNotFound
+	}
+	if unitCredits < 0 || unitCredits > MaxQuoteCredits || actorID <= 0 {
+		return PriceInfo{}, ErrInvalidCatalogEntry
+	}
+	return c.publisher.PublishPrice(ctx, PublishPriceInput{
+		Definition: definition, UnitCredits: unitCredits, ActorID: actorID,
+	})
 }
 
 func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCard, error) {
@@ -131,7 +169,7 @@ func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCa
 			updatedAt := fact.UpdatedAt
 			card.UpdatedAt = &updatedAt
 			if fact.CurrentPrice != nil {
-				if fact.Enabled && fact.CurrentPrice.Enabled {
+				if fact.Enabled {
 					card.Status = BillableItemStatusActive
 				} else {
 					card.Status = BillableItemStatusDisabled

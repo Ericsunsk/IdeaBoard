@@ -78,7 +78,7 @@ func (service *Service) List(ctx context.Context) (Coverage, error) {
 			continue
 		}
 		items[index].PriceConfigured = true
-		items[index].PriceEnabled = catalogItem.CurrentPrice.Enabled
+		items[index].PriceEnabled = catalogItem.Enabled
 		unitCredits := catalogItem.CurrentPrice.UnitCredits
 		items[index].UnitCredits = &unitCredits
 	}

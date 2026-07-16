@@ -15,11 +15,7 @@ export interface BillingPrice {
    * @maximum 9000000000000000
    */
   unit_credits: number
-  enabled: boolean
   /** @minimum 1 */
   created_by: number
   created_at: string
-  /** @minimum 1 */
-  updated_by: number
-  updated_at: string
 }

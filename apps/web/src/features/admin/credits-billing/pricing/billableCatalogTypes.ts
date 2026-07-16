@@ -4,8 +4,8 @@ export interface AdminBillableItemPrice {
   priceVersionId: number
   version: number
   unitCredits: number
-  enabled: boolean
-  updatedAt: string
+  createdBy: number
+  createdAt: string
 }
 
 export interface AdminBillableItemCard {

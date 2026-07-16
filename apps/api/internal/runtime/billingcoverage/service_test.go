@@ -34,27 +34,25 @@ func TestServiceListsExecutableAIWorkflowModelCoverage(t *testing.T) {
 	unitCredits := int64(4)
 	reader := &stubCatalogReader{items: []billing.CatalogItem{
 		{
-			SKU:     "ai-image:sketch-to-image.77e354c1741f5880a61d0383ea0fa39a419fb2353ef77092d2e13491ef0d5c18",
+			SKU:     "ai-image:sketch-to-image",
 			Enabled: true,
 			CurrentPrice: &billing.PriceInfo{
 				UnitCredits: unitCredits,
-				Enabled:     true,
 			},
 		},
 		{
-			SKU:     "ai-image:remove-bg.33d88374630408b27e09a1f4f801f2c107d50958a5b00544589021baf4ad87a6",
+			SKU:     "ai-image:remove-bg",
 			Enabled: false,
 		},
 		{
-			SKU:     "ai-image:style-fusion.47966299eececc95808ccc96a5371dfe03ec3fe9dc3b21ac4fe207275cf82b4a",
+			SKU:     "ai-image:style-fusion",
 			Enabled: true,
 			CurrentPrice: &billing.PriceInfo{
 				UnitCredits: 9,
-				Enabled:     false,
 			},
 		},
 		{
-			SKU:     "ai-image:partial-edit.123ab0fba0b8a1df883012d03070a94885fd038434c325a802c822c819cdf495",
+			SKU:     "ai-image:partial-edit",
 			Enabled: true,
 		},
 	}}
@@ -81,30 +79,30 @@ func TestServiceListsExecutableAIWorkflowModelCoverage(t *testing.T) {
 		{
 			Feature:       workflow.FeatureSlugSketchToImage,
 			Model:         "gpt-image-1",
-			SKU:           "ai-image:sketch-to-image.77e354c1741f5880a61d0383ea0fa39a419fb2353ef77092d2e13491ef0d5c18",
+			SKU:           "ai-image:sketch-to-image",
 			SKUConfigured: true, SKUEnabled: true,
 			PriceConfigured: true, PriceEnabled: true, UnitCredits: &unitCredits,
 		},
 		{
 			Feature:       workflow.FeatureSlugPartialEdit,
 			Model:         "gpt-image-1",
-			SKU:           "ai-image:partial-edit.123ab0fba0b8a1df883012d03070a94885fd038434c325a802c822c819cdf495",
+			SKU:           "ai-image:partial-edit",
 			SKUConfigured: true, SKUEnabled: true,
 			PriceConfigured: false, PriceEnabled: false,
 		},
 		{
 			Feature:       workflow.FeatureSlugRemoveBg,
 			Model:         "gpt-image-1",
-			SKU:           "ai-image:remove-bg.33d88374630408b27e09a1f4f801f2c107d50958a5b00544589021baf4ad87a6",
+			SKU:           "ai-image:remove-bg",
 			SKUConfigured: true, SKUEnabled: false,
 			PriceConfigured: false, PriceEnabled: false,
 		},
 		{
 			Feature:       workflow.FeatureSlugStyleFusion,
 			Model:         "imagen-4",
-			SKU:           "ai-image:style-fusion.47966299eececc95808ccc96a5371dfe03ec3fe9dc3b21ac4fe207275cf82b4a",
+			SKU:           "ai-image:style-fusion",
 			SKUConfigured: true, SKUEnabled: true,
-			PriceConfigured: true, PriceEnabled: false, UnitCredits: int64Pointer(9),
+			PriceConfigured: true, PriceEnabled: true, UnitCredits: int64Pointer(9),
 		},
 	}
 	for index := range want {

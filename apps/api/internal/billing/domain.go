@@ -59,11 +59,8 @@ type PriceInfo struct {
 	PriceVersionID int64     `json:"price_version_id"`
 	Version        int64     `json:"version"`
 	UnitCredits    int64     `json:"unit_credits"`
-	Enabled        bool      `json:"enabled"`
 	CreatedBy      int64     `json:"created_by"`
 	CreatedAt      time.Time `json:"created_at"`
-	UpdatedBy      int64     `json:"updated_by"`
-	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type CatalogPage struct {
@@ -87,18 +84,10 @@ type UpdateSKUInput struct {
 	Action      adminaction.Metadata
 }
 
-type CreatePriceInput struct {
-	SKU         string
+type PublishPriceInput struct {
+	Definition  BillableItemDefinition
 	UnitCredits int64
-	Enabled     bool
-	Action      adminaction.Metadata
-}
-
-type SetPriceEnabledInput struct {
-	SKU     string
-	Version int64
-	Enabled bool
-	Action  adminaction.Metadata
+	ActorID     int64
 }
 
 type ListCatalogInput struct {

@@ -248,11 +248,8 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	if _, err := service.Grant(ctx, GrantCommand{UserID: 93, Amount: mustCreditAmount(t, 500), Metadata: testMetadata("matrix:grant", "matrix-grant")}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `SELECT create_billing_sku('test:reconciliation', 'Reconciliation Test', '', TRUE, 1, 'test setup')`); err != nil {
-		t.Fatal(err)
-	}
 	var priceID, priceVersion int64
-	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM create_billing_price_version('test:reconciliation', 5, TRUE, 1, 'test setup')`).Scan(&priceID, &priceVersion); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Reconciliation Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 
@@ -449,11 +446,8 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	if _, err := service.Grant(ctx, GrantCommand{UserID: 93, Amount: mustCreditAmount(t, 50), Metadata: testMetadata("active-held:grant", "active-held-grant")}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `SELECT create_billing_sku('test:reconciliation', 'Active Held Test', '', TRUE, 1, 'test setup')`); err != nil {
-		t.Fatal(err)
-	}
 	var priceID, priceVersion int64
-	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM create_billing_price_version('test:reconciliation', 5, TRUE, 1, 'test setup')`).Scan(&priceID, &priceVersion); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation', 'Active Held Test', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
 		t.Fatal(err)
 	}
 

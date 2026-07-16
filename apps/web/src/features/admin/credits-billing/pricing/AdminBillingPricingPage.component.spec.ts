@@ -2,7 +2,7 @@ import PrimeVue from 'primevue/config'
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { primeVueTestOptions } from '../../../../test/primeVue'
-import { renderWithUser, screen } from '../../../../test/render'
+import { renderWithUser, screen, within } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
 describe('AdminBillingPricingPage', () => {
@@ -72,6 +72,145 @@ describe('AdminBillingPricingPage', () => {
     await user.click(screen.getByRole('button', { name: '重新加载' }))
     expect(await screen.findByText('局部重绘')).toBeVisible()
   })
+
+  it('publishes an explicit zero price from the card dialog without confirmation', async () => {
+    let publishRequests = 0
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+      http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
+        publishRequests += 1
+        expect(params.sku).toBe('ai-image:partial-edit')
+        await expect(request.json()).resolves.toEqual({ unit_credits: 0 })
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            price_version_id: 8,
+            version: 1,
+            unit_credits: 0,
+            created_by: 9,
+            created_at: '2026-07-16T09:00:00Z',
+          },
+        })
+      }),
+    )
+
+    const { user } = renderPricingPage()
+    await user.click(await screen.findByRole('button', { name: '设置价格' }))
+    expect(screen.getByText('创建新版本，历史版本不变')).toBeVisible()
+    expect(screen.getByText('待输入')).toBeVisible()
+    const priceInput = screen.getByRole('spinbutton', { name: '价格' })
+    await user.type(priceInput, '0')
+    expect(priceInput).toHaveValue('0 Ideas')
+    await user.click(screen.getByRole('button', { name: '发布价格' }))
+
+    expect(await screen.findByText('0 Ideas')).toBeVisible()
+    expect(screen.getAllByText('生效中')).toHaveLength(2)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(publishRequests).toBe(1)
+  })
+
+  it('shows the current, next, delta, and immutable version impact', async () => {
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+    )
+
+    const { user } = renderPricingPage()
+    await user.click((await screen.findAllByRole('button', { name: '调整价格' }))[0])
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('当前价格')).toBeVisible()
+    expect(within(dialog).getByText('新价格')).toBeVisible()
+    expect(within(dialog).getByText('差值')).toBeVisible()
+    expect(within(dialog).getAllByText('1 Idea')).toHaveLength(2)
+    expect(within(dialog).getByText('0 Ideas')).toBeVisible()
+    expect(within(dialog).getByText('创建新版本，历史版本不变')).toBeVisible()
+  })
+
+  it('keeps publish failures in the dialog and allows a single retry', async () => {
+    let requests = 0
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+      http.post('/api/admin/billing/catalog/:sku/prices', () => {
+        requests += 1
+        if (requests === 1) {
+          return HttpResponse.json({ code: 500, msg: 'publish unavailable' }, { status: 500 })
+        }
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            price_version_id: 9,
+            version: 1,
+            unit_credits: 3,
+            created_by: 9,
+            created_at: '2026-07-16T09:00:00Z',
+          },
+        })
+      }),
+    )
+
+    const { user } = renderPricingPage()
+    await user.click(await screen.findByRole('button', { name: '设置价格' }))
+    await user.type(screen.getByRole('spinbutton', { name: '价格' }), '3')
+    await user.click(screen.getByRole('button', { name: '发布价格' }))
+
+    expect((await screen.findAllByText('publish unavailable')).length).toBeGreaterThan(0)
+    expect(screen.getByRole('dialog')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '发布价格' }))
+    expect(await screen.findByText('3 Ideas')).toBeVisible()
+    expect(requests).toBe(2)
+  })
+
+  it('validates the price and blocks duplicate publishes while pending', async () => {
+    let publishRequests = 0
+    let releasePublish!: () => void
+    const publishGate = new Promise<void>((resolve) => {
+      releasePublish = resolve
+    })
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+      http.post('/api/admin/billing/catalog/:sku/prices', async () => {
+        publishRequests += 1
+        await publishGate
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            price_version_id: 10,
+            version: 1,
+            unit_credits: 5,
+            created_by: 9,
+            created_at: '2026-07-16T09:00:00Z',
+          },
+        })
+      }),
+    )
+
+    const { user } = renderPricingPage()
+    await user.click(await screen.findByRole('button', { name: '设置价格' }))
+    const publishButton = screen.getByRole('button', { name: '发布价格' })
+    await user.click(publishButton)
+    expect(screen.getByText('请输入价格')).toBeVisible()
+    expect(publishRequests).toBe(0)
+
+    await user.type(screen.getByRole('spinbutton', { name: /价格/ }), '5')
+    await user.click(publishButton)
+    expect(publishButton).toBeDisabled()
+    await user.click(publishButton)
+    expect(publishRequests).toBe(1)
+
+    releasePublish()
+    expect(await screen.findByText('5 Ideas')).toBeVisible()
+  })
 })
 
 function renderPricingPage() {
@@ -88,11 +227,8 @@ function makeCatalogItems() {
     price_version_id: 1,
     version: 1,
     unit_credits: 1,
-    enabled: true,
     created_by: 7,
     created_at: '2026-07-12T08:00:00Z',
-    updated_by: 7,
-    updated_at: '2026-07-12T08:00:00Z',
   }
   return [
     {

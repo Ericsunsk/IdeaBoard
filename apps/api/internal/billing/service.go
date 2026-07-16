@@ -71,38 +71,29 @@ func (s *Service) UpdateSKU(ctx context.Context, input UpdateSKUInput) (CatalogI
 	return s.GetSKU(ctx, string(sku))
 }
 
-func (s *Service) CreatePrice(ctx context.Context, input CreatePriceInput) (PriceInfo, error) {
-	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || input.UnitCredits < 0 || input.UnitCredits > MaxQuoteCredits || !input.Action.IsValid() {
+func (s *Service) PublishPrice(ctx context.Context, input PublishPriceInput) (PriceInfo, error) {
+	definition := input.Definition
+	sku, err := CanonicalizeSKU(string(definition.SKU))
+	if err != nil || input.UnitCredits < 0 || input.UnitCredits > MaxQuoteCredits || input.ActorID <= 0 {
 		return PriceInfo{}, ErrInvalidCatalogEntry
+	}
+	displayName, err := normalizeDisplayName(definition.DisplayName)
+	if err != nil {
+		return PriceInfo{}, err
+	}
+	description, err := normalizeDescription(definition.Description)
+	if err != nil {
+		return PriceInfo{}, err
 	}
 	if err := s.requirePool(); err != nil {
 		return PriceInfo{}, err
 	}
 	var price PriceInfo
 	err = s.pool.QueryRow(ctx, `SELECT `+priceInfoColumns+`
-FROM create_billing_price_version($1, $2, $3, $4, $5)`, sku, input.UnitCredits, input.Enabled, input.Action.ActorID(), input.Action.Reason()).
+	FROM publish_billing_price($1, $2, $3, $4, $5)`, sku, displayName, description, input.UnitCredits, input.ActorID).
 		Scan(priceInfoScanTargets(&price)...)
 	if err != nil {
-		return PriceInfo{}, mapDatabaseError("create price version", err)
-	}
-	return price, nil
-}
-
-func (s *Service) SetPriceEnabled(ctx context.Context, input SetPriceEnabledInput) (PriceInfo, error) {
-	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || input.Version <= 0 || !input.Action.IsValid() {
-		return PriceInfo{}, ErrInvalidCatalogEntry
-	}
-	if err := s.requirePool(); err != nil {
-		return PriceInfo{}, err
-	}
-	var price PriceInfo
-	err = s.pool.QueryRow(ctx, `SELECT `+priceInfoColumns+`
-FROM set_billing_price_version_enabled($1, $2, $3, $4, $5)`, sku, input.Version, input.Enabled, input.Action.ActorID(), input.Action.Reason()).
-		Scan(priceInfoScanTargets(&price)...)
-	if err != nil {
-		return PriceInfo{}, mapDatabaseError("set price version state", err)
+		return PriceInfo{}, mapDatabaseError("publish price version", err)
 	}
 	return price, nil
 }
@@ -143,17 +134,15 @@ func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string
 	var priceVersionID pgtype.Int8
 	var priceVersion pgtype.Int8
 	var unitCredits pgtype.Int8
-	var priceEnabled pgtype.Bool
 	var quotedAt pgtype.Timestamptz
 	err = querier.QueryRow(ctx, `
 SELECT skus.enabled, skus.display_name, prices.price_version_id, prices.version, prices.unit_credits,
-       states.enabled, statement_timestamp()
+	       statement_timestamp()
 FROM billing_skus skus
 LEFT JOIN billing_price_versions prices
   ON prices.sku = skus.sku AND prices.price_version_id = skus.current_price_version_id
-LEFT JOIN billing_price_version_states states USING (price_version_id)
 WHERE skus.sku = $1`, sku).Scan(
-		&skuEnabled, &displayName, &priceVersionID, &priceVersion, &unitCredits, &priceEnabled, &quotedAt,
+		&skuEnabled, &displayName, &priceVersionID, &priceVersion, &unitCredits, &quotedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Quote{}, ErrSKUNotFound
@@ -161,7 +150,7 @@ WHERE skus.sku = $1`, sku).Scan(
 	if err != nil {
 		return Quote{}, fmt.Errorf("billing quote: %w", err)
 	}
-	if !skuEnabled || !priceVersionID.Valid || !priceVersion.Valid || !unitCredits.Valid || !priceEnabled.Valid || !priceEnabled.Bool || !quotedAt.Valid {
+	if !skuEnabled || !priceVersionID.Valid || !priceVersion.Valid || !unitCredits.Valid || !quotedAt.Valid {
 		return Quote{}, ErrPricingUnavailable
 	}
 	snapshot := PriceSnapshot{
@@ -325,9 +314,8 @@ func (s *Service) ListPrices(ctx context.Context, input ListPricesInput) (PriceP
 		return PricePage{}, err
 	}
 	rows, err := s.pool.Query(ctx, `SELECT `+priceInfoColumns+`
-FROM billing_price_versions prices
-JOIN billing_price_version_states states USING (price_version_id)
-WHERE prices.sku = $1 AND prices.version < $2
+	FROM billing_price_versions prices
+	WHERE prices.sku = $1 AND prices.version < $2
 ORDER BY prices.version DESC
 LIMIT $3`, sku, before, limit+1)
 	if err != nil {
@@ -362,14 +350,13 @@ LIMIT $3`, sku, before, limit+1)
 const catalogSelectSQL = `
 SELECT skus.sku, skus.display_name, skus.description, skus.enabled,
        skus.current_price_version_id, skus.created_at, skus.updated_at,
-       prices.price_version_id, prices.version, prices.unit_credits, states.enabled,
-       prices.created_by, prices.created_at, states.updated_by, states.updated_at
+	   prices.price_version_id, prices.version, prices.unit_credits,
+	   prices.created_by, prices.created_at
 FROM billing_skus skus
 LEFT JOIN billing_price_versions prices
-  ON prices.sku = skus.sku AND prices.price_version_id = skus.current_price_version_id
-LEFT JOIN billing_price_version_states states USING (price_version_id)`
+  ON prices.sku = skus.sku AND prices.price_version_id = skus.current_price_version_id`
 
-const priceInfoColumns = `price_version_id, version, unit_credits, enabled, created_by, created_at, updated_by, updated_at`
+const priceInfoColumns = `price_version_id, version, unit_credits, created_by, created_at`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -377,8 +364,7 @@ type rowScanner interface {
 
 func priceInfoScanTargets(price *PriceInfo) []any {
 	return []any{
-		&price.PriceVersionID, &price.Version, &price.UnitCredits, &price.Enabled,
-		&price.CreatedBy, &price.CreatedAt, &price.UpdatedBy, &price.UpdatedAt,
+		&price.PriceVersionID, &price.Version, &price.UnitCredits, &price.CreatedBy, &price.CreatedAt,
 	}
 }
 
@@ -388,16 +374,12 @@ func scanCatalogItem(row rowScanner) (CatalogItem, error) {
 	var priceID pgtype.Int8
 	var version pgtype.Int8
 	var unitCredits pgtype.Int8
-	var priceEnabled pgtype.Bool
 	var createdBy pgtype.Int8
 	var priceCreatedAt pgtype.Timestamptz
-	var updatedBy pgtype.Int8
-	var priceUpdatedAt pgtype.Timestamptz
 	if err := row.Scan(
 		&item.SKU, &item.DisplayName, &item.Description, &item.Enabled,
 		&currentID, &item.CreatedAt, &item.UpdatedAt,
-		&priceID, &version, &unitCredits, &priceEnabled,
-		&createdBy, &priceCreatedAt, &updatedBy, &priceUpdatedAt,
+		&priceID, &version, &unitCredits, &createdBy, &priceCreatedAt,
 	); err != nil {
 		return CatalogItem{}, err
 	}
@@ -405,11 +387,10 @@ func scanCatalogItem(row rowScanner) (CatalogItem, error) {
 		value := currentID.Int64
 		item.CurrentPriceVersionID = &value
 	}
-	if priceID.Valid && version.Valid && unitCredits.Valid && priceEnabled.Valid && createdBy.Valid && priceCreatedAt.Valid && updatedBy.Valid && priceUpdatedAt.Valid {
+	if priceID.Valid && version.Valid && unitCredits.Valid && createdBy.Valid && priceCreatedAt.Valid {
 		item.CurrentPrice = &PriceInfo{
 			PriceVersionID: priceID.Int64, Version: version.Int64, UnitCredits: unitCredits.Int64,
-			Enabled: priceEnabled.Bool, CreatedBy: createdBy.Int64, CreatedAt: priceCreatedAt.Time,
-			UpdatedBy: updatedBy.Int64, UpdatedAt: priceUpdatedAt.Time,
+			CreatedBy: createdBy.Int64, CreatedAt: priceCreatedAt.Time,
 		}
 	}
 	return item, nil

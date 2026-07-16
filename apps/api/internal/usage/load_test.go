@@ -16,7 +16,6 @@ import (
 	creditsloadtest "ideaboard/api/internal/credits/loadtestsupport"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/testsupport"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -175,14 +174,7 @@ func seedUsageLoadTaskSnapshots(
 	t.Helper()
 	const sku = "usage:load-test"
 	billingService := billing.NewService(pool)
-	if _, err := billingService.CreateSKU(ctx, billing.CreateSKUInput{
-		SKU: sku, DisplayName: "Usage Load Test", Enabled: true, Action: testsupport.AdminAction(t, 1, "usage load fixture"),
-	}); err != nil {
-		t.Fatalf("create Usage load SKU: %v", err)
-	}
-	price, err := billingService.CreatePrice(ctx, billing.CreatePriceInput{
-		SKU: sku, UnitCredits: 0, Enabled: true, Action: testsupport.AdminAction(t, 1, "usage load fixture"),
-	})
+	price, err := billingService.PublishPrice(ctx, usagePriceInput(sku, "Usage Load Test", 0))
 	if err != nil {
 		t.Fatalf("create Usage load price: %v", err)
 	}

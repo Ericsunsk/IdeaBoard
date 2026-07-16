@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import { createAdminBillableCatalogResource } from './billableCatalogResource'
+import {
+  createAdminBillableCatalogResource,
+  publishBillableItemPrice,
+} from './billableCatalogResource'
 
 describe('Admin Billable Catalog resource', () => {
   it('owns generated API normalization for the pricing feature', async () => {
@@ -39,5 +42,35 @@ describe('Admin Billable Catalog resource', () => {
         updatedAt: undefined,
       },
     ])
+  })
+
+  it('publishes a feature price without legacy state or reason fields', async () => {
+    let requestBody: unknown
+    useMswHandlers(
+      http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
+        requestBody = await request.json()
+        expect(params.sku).toBe('ai-image:partial-edit')
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            price_version_id: 9,
+            version: 1,
+            unit_credits: 0,
+            created_by: 7,
+            created_at: '2026-07-16T08:00:00Z',
+          },
+        })
+      }),
+    )
+
+    await expect(publishBillableItemPrice('ai-image:partial-edit', 0)).resolves.toEqual({
+      priceVersionId: 9,
+      version: 1,
+      unitCredits: 0,
+      createdBy: 7,
+      createdAt: '2026-07-16T08:00:00Z',
+    })
+    expect(requestBody).toEqual({ unit_credits: 0 })
   })
 })

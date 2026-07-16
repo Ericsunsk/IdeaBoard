@@ -16,7 +16,6 @@ import (
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -278,10 +277,7 @@ func TestBilledTerminalTransitionFailsClosedWithoutCompleteBillingFacts(t *testi
 			seedTasks(t, repo, t.Context(), task)
 			if withSnapshot {
 				sku, _ := taskbilling.ResolveSKU(request)
-				if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-					t.Fatal(err)
-				}
-				if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+				if _, err := billingService.PublishPrice(t.Context(), taskstorePriceInput(sku, "Pattern", 0)); err != nil {
 					t.Fatal(err)
 				}
 				tx, err := pool.Begin(t.Context())
@@ -393,10 +389,7 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 		t.Fatal(err)
 	}
 	sku, _ := taskbilling.ResolveSKU(request)
-	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: unit, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+	if _, err := billingService.PublishPrice(t.Context(), taskstorePriceInput(sku, feature, unit)); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := pool.Begin(t.Context())
@@ -417,6 +410,16 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 		t.Fatal(err)
 	}
 	return repo, taskBilling, request
+}
+
+func taskstorePriceInput(sku billing.SKU, displayName string, unitCredits int64) billing.PublishPriceInput {
+	return billing.PublishPriceInput{
+		Definition: billing.BillableItemDefinition{
+			SKU: sku, Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: displayName,
+		},
+		UnitCredits: unitCredits,
+		ActorID:     1,
+	}
 }
 
 func holdTaskForSettlementTest(t *testing.T, pool *pgxpool.Pool, service *taskbilling.Service, task *tasks.Task, request taskbilling.Request) {

@@ -334,6 +334,136 @@ func TestAdminBillingReasonMigrationDeclaresReversibleContract(t *testing.T) {
 	}
 }
 
+func TestFeatureLevelPricingMigrationDeclaresSchemaRollbackContract(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260716040000_feature_level_pricing.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	for _, expected := range []string{
+		"DROP TABLE billing_price_version_states",
+		"CREATE FUNCTION publish_billing_price(",
+		"'old', CASE",
+		"'new', jsonb_build_object(",
+		"'outcome', 'published'",
+		"REVOKE ALL ON FUNCTION publish_billing_price",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("up migration missing %q", expected)
+		}
+	}
+	for _, expected := range []string{
+		"CREATE TABLE billing_price_version_states",
+		"CREATE FUNCTION create_billing_price_version(",
+		"CREATE FUNCTION set_billing_price_version_enabled(",
+		"REVOKE ALL ON FUNCTION create_billing_price_version",
+		"REVOKE ALL ON FUNCTION set_billing_price_version_enabled",
+	} {
+		if !strings.Contains(down, expected) {
+			t.Fatalf("down migration missing %q", expected)
+		}
+	}
+	if err := validateMigrationStatements("20260716040000_feature_level_pricing.sql down", parseSQLStatements(down)); err != nil {
+		t.Fatalf("down migration failed validation: %v", err)
+	}
+}
+
+func TestFeatureLevelPricingMigrationPublishesAndRollsBack(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	assertTableExists(t, ctx, conn, "billing_price_version_states", false)
+	assertRegprocedureExists(t, ctx, conn, "publish_billing_price(text,text,text,bigint,bigint)", true)
+	assertRegprocedureExists(t, ctx, conn, "create_billing_price_version(text,bigint,boolean,bigint,text)", false)
+	assertRegprocedureExists(t, ctx, conn, "set_billing_price_version_enabled(text,bigint,boolean,bigint,text)", false)
+	assertFunctionSearchPath(t, ctx, conn, "publish_billing_price(text,text,text,bigint,bigint)")
+
+	var firstPriceID, firstVersion, firstCredits int64
+	if err := conn.QueryRowContext(ctx, `
+SELECT price_version_id, version, unit_credits
+FROM publish_billing_price('ai-image:partial-edit', '局部重绘', '只修改选区', 0, 7)
+`).Scan(&firstPriceID, &firstVersion, &firstCredits); err != nil {
+		t.Fatalf("publish initial free price: %v", err)
+	}
+	if firstPriceID <= 0 || firstVersion != 1 || firstCredits != 0 {
+		t.Fatalf("initial price=(%d,%d,%d)", firstPriceID, firstVersion, firstCredits)
+	}
+	var enabled bool
+	if err := conn.QueryRowContext(ctx, `SELECT enabled FROM billing_skus WHERE sku = 'ai-image:partial-edit'`).Scan(&enabled); err != nil || !enabled {
+		t.Fatalf("materialized SKU enabled=%v err=%v", enabled, err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+SELECT update_billing_sku('ai-image:partial-edit', NULL, NULL, FALSE, 8, 'disable feature')
+`); err != nil {
+		t.Fatalf("disable materialized SKU: %v", err)
+	}
+
+	var secondPriceID, secondVersion int64
+	if err := conn.QueryRowContext(ctx, `
+SELECT price_version_id, version
+FROM publish_billing_price('ai-image:partial-edit', '局部重绘', '只修改选区', 3, 9)
+`).Scan(&secondPriceID, &secondVersion); err != nil {
+		t.Fatalf("publish disabled SKU price: %v", err)
+	}
+	if secondPriceID == firstPriceID || secondVersion != 2 {
+		t.Fatalf("second price=(%d,%d), first id=%d", secondPriceID, secondVersion, firstPriceID)
+	}
+	if err := conn.QueryRowContext(ctx, `SELECT enabled FROM billing_skus WHERE sku = 'ai-image:partial-edit'`).Scan(&enabled); err != nil || enabled {
+		t.Fatalf("repriced disabled SKU enabled=%v err=%v", enabled, err)
+	}
+	if _, err := conn.ExecContext(ctx, `UPDATE billing_price_versions SET unit_credits = 4 WHERE price_version_id = $1`, secondPriceID); err == nil {
+		t.Fatal("immutable Price Version accepted an update")
+	}
+
+	var metadata string
+	if err := conn.QueryRowContext(ctx, `
+SELECT metadata::text FROM billing_admin_actions
+WHERE sku = 'ai-image:partial-edit' AND action_type = 'create_price'
+ORDER BY id DESC LIMIT 1
+`).Scan(&metadata); err != nil {
+		t.Fatalf("read publish audit: %v", err)
+	}
+	for _, fragment := range []string{`"old"`, `"new"`, `"outcome": "published"`} {
+		if !strings.Contains(metadata, fragment) {
+			t.Fatalf("publish audit metadata %q missing %q", metadata, fragment)
+		}
+	}
+
+	raw, err := migrationFS.ReadFile("20260716040000_feature_level_pricing.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
+		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	assertTableExists(t, ctx, conn, "billing_price_version_states", true)
+	assertRegprocedureExists(t, ctx, conn, "publish_billing_price(text,text,text,bigint,bigint)", false)
+	assertRegprocedureExists(t, ctx, conn, "create_billing_price_version(text,bigint,boolean,bigint,text)", true)
+	assertRegprocedureExists(t, ctx, conn, "set_billing_price_version_enabled(text,bigint,boolean,bigint,text)", true)
+	assertFunctionSearchPath(t, ctx, conn, "create_billing_price_version(text,bigint,boolean,bigint,text)")
+	assertFunctionSearchPath(t, ctx, conn, "set_billing_price_version_enabled(text,bigint,boolean,bigint,text)")
+	var stateCount int
+	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM billing_price_version_states WHERE enabled`).Scan(&stateCount); err != nil || stateCount != 2 {
+		t.Fatalf("rollback enabled states=%d err=%v", stateCount, err)
+	}
+}
+
 func TestRuntimeOperationalSettingsMigrationDeclaresReversibleContract(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260713020000_runtime_operational_settings.sql")
 	if err != nil {

@@ -22,10 +22,7 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 	sku, _ := ResolveSKU(request)
-	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: 25, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+	if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "Pattern", 25)); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := pool.Begin(t.Context())
@@ -59,19 +56,17 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		feature := feature
 		for _, scenario := range []struct {
-			name         string
-			unitCredits  int64
-			createSKU    bool
-			skuEnabled   bool
-			priceEnabled bool
-			wantErr      error
-			wantEnough   bool
+			name        string
+			unitCredits int64
+			createSKU   bool
+			skuEnabled  bool
+			wantErr     error
+			wantEnough  bool
 		}{
-			{name: "paid", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: true, wantEnough: false},
-			{name: "free", unitCredits: 0, createSKU: true, skuEnabled: true, priceEnabled: true, wantEnough: true},
+			{name: "paid", unitCredits: 25, createSKU: true, skuEnabled: true, wantEnough: false},
+			{name: "free", unitCredits: 0, createSKU: true, skuEnabled: true, wantEnough: true},
 			{name: "missing", wantErr: billing.ErrSKUNotFound},
-			{name: "disabled-sku", unitCredits: 25, createSKU: true, priceEnabled: true, wantErr: billing.ErrPricingUnavailable},
-			{name: "disabled-price", unitCredits: 25, createSKU: true, skuEnabled: true, priceEnabled: false, wantErr: billing.ErrPricingUnavailable},
+			{name: "disabled-sku", unitCredits: 25, createSKU: true, wantErr: billing.ErrPricingUnavailable},
 		} {
 			scenario := scenario
 			t.Run(feature+"/"+scenario.name, func(t *testing.T) {
@@ -88,11 +83,14 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: feature, Enabled: scenario.skuEnabled, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+					if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, feature, scenario.unitCredits)); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: scenario.unitCredits, Enabled: scenario.priceEnabled, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-						t.Fatal(err)
+					if !scenario.skuEnabled {
+						disabled := false
+						if _, err := billingService.UpdateSKU(t.Context(), billing.UpdateSKUInput{SKU: string(sku), Enabled: &disabled, Action: testsupport.AdminAction(t, 1, "test disabled SKU")}); err != nil {
+							t.Fatal(err)
+						}
 					}
 				}
 				tx, err := pool.Begin(t.Context())
@@ -143,10 +141,7 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	service := NewService(billingService, creditService)
 	request, _ := AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
 	sku, _ := ResolveSKU(request)
-	if _, err := billingService.CreateSKU(t.Context(), billing.CreateSKUInput{SKU: string(sku), DisplayName: "Pattern", Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := billingService.CreatePrice(t.Context(), billing.CreatePriceInput{SKU: string(sku), UnitCredits: 0, Enabled: true, Action: testsupport.AdminAction(t, 1, "test setup")}); err != nil {
+	if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "Pattern", 0)); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := pool.Begin(t.Context())
@@ -205,5 +200,15 @@ VALUES ('invalid-initial-settlement', 'held')`); err == nil {
 		if _, err := db.ExecContext(t.Context(), statement); err == nil {
 			t.Fatalf("statement unexpectedly succeeded: %s", fmt.Sprintf("%.80s", statement))
 		}
+	}
+}
+
+func featurePriceInput(sku billing.SKU, displayName string, unitCredits int64) billing.PublishPriceInput {
+	return billing.PublishPriceInput{
+		Definition: billing.BillableItemDefinition{
+			SKU: sku, Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: displayName,
+		},
+		UnitCredits: unitCredits,
+		ActorID:     1,
 	}
 }

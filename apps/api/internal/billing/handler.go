@@ -24,23 +24,22 @@ type QuoteService interface {
 type AdminService interface {
 	CreateSKU(context.Context, CreateSKUInput) (CatalogItem, error)
 	UpdateSKU(context.Context, UpdateSKUInput) (CatalogItem, error)
-	CreatePrice(context.Context, CreatePriceInput) (PriceInfo, error)
-	SetPriceEnabled(context.Context, SetPriceEnabledInput) (PriceInfo, error)
 	ListCatalog(context.Context, ListCatalogInput) (CatalogPage, error)
 	ListPrices(context.Context, ListPricesInput) (PricePage, error)
 }
 
-type BillableCatalogReader interface {
+type BillableCatalogService interface {
 	List(context.Context) ([]BillableItemCatalogCard, error)
+	PublishPrice(context.Context, string, int64, int64) (PriceInfo, error)
 }
 
 type Handler struct {
 	quoter  QuoteService
 	admin   AdminService
-	catalog BillableCatalogReader
+	catalog BillableCatalogService
 }
 
-func NewHandler(quoter QuoteService, admin AdminService, catalog BillableCatalogReader) *Handler {
+func NewHandler(quoter QuoteService, admin AdminService, catalog BillableCatalogService) *Handler {
 	return &Handler{quoter: quoter, admin: admin, catalog: catalog}
 }
 
@@ -65,14 +64,7 @@ type updateSKURequest struct {
 }
 
 type createPriceRequest struct {
-	UnitCredits int64  `json:"unit_credits"`
-	Enabled     *bool  `json:"enabled"`
-	Reason      string `json:"reason"`
-}
-
-type setPriceEnabledRequest struct {
-	Enabled *bool  `json:"enabled"`
-	Reason  string `json:"reason"`
+	UnitCredits *int64 `json:"unit_credits"`
 }
 
 func (h *Handler) Quote(c *gin.Context) {
@@ -148,54 +140,21 @@ func (h *Handler) UpdateSKU(c *gin.Context) {
 	response.SuccessDTO(c, item)
 }
 
-func (h *Handler) CreatePrice(c *gin.Context) {
-	actorID, ok := h.requireAdmin(c)
+func (h *Handler) PublishPrice(c *gin.Context) {
+	admin, ok := principal.RequireAdmin(c)
 	if !ok {
 		return
 	}
 	var request createPriceRequest
-	if err := decodeStrictJSON(c, &request); err != nil || request.Enabled == nil {
+	if err := decodeStrictJSON(c, &request); err != nil || request.UnitCredits == nil {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	action, err := adminaction.New(actorID, request.Reason)
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, "reason 无效")
+	if h == nil || h.catalog == nil {
+		writeError(c, ErrServiceUnavailable)
 		return
 	}
-	price, err := h.admin.CreatePrice(c.Request.Context(), CreatePriceInput{
-		SKU: c.Param("sku"), UnitCredits: request.UnitCredits, Enabled: *request.Enabled, Action: action,
-	})
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	response.SuccessDTO(c, price)
-}
-
-func (h *Handler) SetPriceEnabled(c *gin.Context) {
-	actorID, ok := h.requireAdmin(c)
-	if !ok {
-		return
-	}
-	version, ok := parsePositiveInt64(c.Param("version"))
-	if !ok {
-		response.Error(c, http.StatusBadRequest, "价格版本无效")
-		return
-	}
-	var request setPriceEnabledRequest
-	if err := decodeStrictJSON(c, &request); err != nil || request.Enabled == nil {
-		response.Error(c, http.StatusBadRequest, "参数错误")
-		return
-	}
-	action, err := adminaction.New(actorID, request.Reason)
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, "reason 无效")
-		return
-	}
-	price, err := h.admin.SetPriceEnabled(c.Request.Context(), SetPriceEnabledInput{
-		SKU: c.Param("sku"), Version: version, Enabled: *request.Enabled, Action: action,
-	})
+	price, err := h.catalog.PublishPrice(c.Request.Context(), c.Param("sku"), *request.UnitCredits, admin.UserID())
 	if err != nil {
 		writeError(c, err)
 		return

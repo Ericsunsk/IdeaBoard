@@ -61,13 +61,12 @@ func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 
 func registerAdminBillingRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/billing/catalog", h.BillingHandler.ListBillableCatalog)
+	adminAPI.POST("/billing/catalog/:sku/prices", h.BillingHandler.PublishPrice)
 	adminAPI.GET("/billing/coverage", h.BillingCoverageHandler.List)
 	adminAPI.GET("/billing/skus", h.BillingHandler.ListCatalog)
 	adminAPI.POST("/billing/skus", h.BillingHandler.CreateSKU)
 	adminAPI.PATCH("/billing/skus/:sku", h.BillingHandler.UpdateSKU)
 	adminAPI.GET("/billing/skus/:sku/prices", h.BillingHandler.ListPrices)
-	adminAPI.POST("/billing/skus/:sku/prices", h.BillingHandler.CreatePrice)
-	adminAPI.PATCH("/billing/skus/:sku/prices/:version", h.BillingHandler.SetPriceEnabled)
 }
 
 func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

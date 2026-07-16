@@ -18,8 +18,7 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
-  AdminBillingPriceCreateRequest,
-  AdminBillingPriceStateRequest,
+  AdminBillingPricePublishRequest,
   AdminBillingSKUCreateRequest,
   AdminBillingSKUUpdateRequest,
   ApiResponseBillableItemCatalog,
@@ -95,6 +94,105 @@ export function useListAdminBillableItems<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminBillableItemsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getPublishAdminBillingPriceUrl = (sku: string) => {
+  return `/admin/billing/catalog/${encodeURIComponent(String(sku))}/prices`
+}
+
+export const publishAdminBillingPrice = async (
+  sku: string,
+  adminBillingPricePublishRequest: AdminBillingPricePublishRequest,
+  options?: RequestInit,
+): Promise<ApiResponseBillingPrice> => {
+  return orvalMutator<ApiResponseBillingPrice>(getPublishAdminBillingPriceUrl(sku), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminBillingPricePublishRequest),
+  })
+}
+
+export const getPublishAdminBillingPriceQueryKey = (
+  sku: MaybeRefOrGetter<string>,
+  adminBillingPricePublishRequest?: MaybeRefOrGetter<AdminBillingPricePublishRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'billing',
+    'catalog',
+    sku,
+    'prices',
+    adminBillingPricePublishRequest,
+  ] as const
+}
+
+export const getPublishAdminBillingPriceQueryOptions = <
+  TData = Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+  TError = ErrorType<unknown>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  adminBillingPricePublishRequest: MaybeRefOrGetter<AdminBillingPricePublishRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof publishAdminBillingPrice>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getPublishAdminBillingPriceQueryKey(sku, adminBillingPricePublishRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof publishAdminBillingPrice>>> = ({
+    signal,
+  }) =>
+    publishAdminBillingPrice(toValue(sku), toValue(adminBillingPricePublishRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof publishAdminBillingPrice>>, TError, TData>
+}
+
+export type PublishAdminBillingPriceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof publishAdminBillingPrice>>
+>
+export type PublishAdminBillingPriceQueryError = ErrorType<unknown>
+
+export function usePublishAdminBillingPrice<
+  TData = Awaited<ReturnType<typeof publishAdminBillingPrice>>,
+  TError = ErrorType<unknown>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  adminBillingPricePublishRequest: MaybeRefOrGetter<AdminBillingPricePublishRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof publishAdminBillingPrice>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getPublishAdminBillingPriceQueryOptions(
+    sku,
+    adminBillingPricePublishRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -512,222 +610,6 @@ export function useListAdminBillingPrices<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminBillingPricesQueryOptions(sku, params, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getCreateAdminBillingPriceUrl = (sku: string) => {
-  return `/admin/billing/skus/${encodeURIComponent(String(sku))}/prices`
-}
-
-export const createAdminBillingPrice = async (
-  sku: string,
-  adminBillingPriceCreateRequest: AdminBillingPriceCreateRequest,
-  options?: RequestInit,
-): Promise<ApiResponseBillingPrice> => {
-  return orvalMutator<ApiResponseBillingPrice>(getCreateAdminBillingPriceUrl(sku), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(adminBillingPriceCreateRequest),
-  })
-}
-
-export const getCreateAdminBillingPriceQueryKey = (
-  sku: MaybeRefOrGetter<string>,
-  adminBillingPriceCreateRequest?: MaybeRefOrGetter<AdminBillingPriceCreateRequest>,
-) => {
-  return [
-    'POST',
-    'admin',
-    'billing',
-    'skus',
-    sku,
-    'prices',
-    adminBillingPriceCreateRequest,
-  ] as const
-}
-
-export const getCreateAdminBillingPriceQueryOptions = <
-  TData = Awaited<ReturnType<typeof createAdminBillingPrice>>,
-  TError = ErrorType<unknown>,
->(
-  sku: MaybeRefOrGetter<string>,
-  adminBillingPriceCreateRequest: MaybeRefOrGetter<AdminBillingPriceCreateRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminBillingPrice>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getCreateAdminBillingPriceQueryKey(sku, adminBillingPriceCreateRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminBillingPrice>>> = ({
-    signal,
-  }) =>
-    createAdminBillingPrice(toValue(sku), toValue(adminBillingPriceCreateRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof createAdminBillingPrice>>, TError, TData>
-}
-
-export type CreateAdminBillingPriceQueryResult = NonNullable<
-  Awaited<ReturnType<typeof createAdminBillingPrice>>
->
-export type CreateAdminBillingPriceQueryError = ErrorType<unknown>
-
-export function useCreateAdminBillingPrice<
-  TData = Awaited<ReturnType<typeof createAdminBillingPrice>>,
-  TError = ErrorType<unknown>,
->(
-  sku: MaybeRefOrGetter<string>,
-  adminBillingPriceCreateRequest: MaybeRefOrGetter<AdminBillingPriceCreateRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof createAdminBillingPrice>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateAdminBillingPriceQueryOptions(
-    sku,
-    adminBillingPriceCreateRequest,
-    options,
-  )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getSetAdminBillingPriceEnabledUrl = (sku: string, version: number) => {
-  return `/admin/billing/skus/${encodeURIComponent(String(sku))}/prices/${encodeURIComponent(String(version))}`
-}
-
-export const setAdminBillingPriceEnabled = async (
-  sku: string,
-  version: number,
-  adminBillingPriceStateRequest: AdminBillingPriceStateRequest,
-  options?: RequestInit,
-): Promise<ApiResponseBillingPrice> => {
-  return orvalMutator<ApiResponseBillingPrice>(getSetAdminBillingPriceEnabledUrl(sku, version), {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(adminBillingPriceStateRequest),
-  })
-}
-
-export const getSetAdminBillingPriceEnabledQueryKey = (
-  sku: MaybeRefOrGetter<string>,
-  version: MaybeRefOrGetter<number>,
-  adminBillingPriceStateRequest?: MaybeRefOrGetter<AdminBillingPriceStateRequest>,
-) => {
-  return [
-    'PATCH',
-    'admin',
-    'billing',
-    'skus',
-    sku,
-    'prices',
-    version,
-    adminBillingPriceStateRequest,
-  ] as const
-}
-
-export const getSetAdminBillingPriceEnabledQueryOptions = <
-  TData = Awaited<ReturnType<typeof setAdminBillingPriceEnabled>>,
-  TError = ErrorType<unknown>,
->(
-  sku: MaybeRefOrGetter<string>,
-  version: MaybeRefOrGetter<number>,
-  adminBillingPriceStateRequest: MaybeRefOrGetter<AdminBillingPriceStateRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminBillingPriceEnabled>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getSetAdminBillingPriceEnabledQueryKey(
-    sku,
-    version,
-    adminBillingPriceStateRequest,
-  )
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminBillingPriceEnabled>>> = ({
-    signal,
-  }) =>
-    setAdminBillingPriceEnabled(
-      toValue(sku),
-      toValue(version),
-      toValue(adminBillingPriceStateRequest),
-      { signal, ...requestOptions },
-    )
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(
-      () =>
-        toValue(sku) !== null &&
-        toValue(sku) !== undefined &&
-        toValue(version) !== null &&
-        toValue(version) !== undefined,
-    ),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminBillingPriceEnabled>>, TError, TData>
-}
-
-export type SetAdminBillingPriceEnabledQueryResult = NonNullable<
-  Awaited<ReturnType<typeof setAdminBillingPriceEnabled>>
->
-export type SetAdminBillingPriceEnabledQueryError = ErrorType<unknown>
-
-export function useSetAdminBillingPriceEnabled<
-  TData = Awaited<ReturnType<typeof setAdminBillingPriceEnabled>>,
-  TError = ErrorType<unknown>,
->(
-  sku: MaybeRefOrGetter<string>,
-  version: MaybeRefOrGetter<number>,
-  adminBillingPriceStateRequest: MaybeRefOrGetter<AdminBillingPriceStateRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof setAdminBillingPriceEnabled>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSetAdminBillingPriceEnabledQueryOptions(
-    sku,
-    version,
-    adminBillingPriceStateRequest,
-    options,
-  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
