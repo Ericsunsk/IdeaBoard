@@ -11,8 +11,8 @@ import {
   getTaskResultDetailImageUrl,
 } from './taskResultPresentation'
 
-export function useTaskResultDetail(
-  task: MaybeRefOrGetter<Task | null>,
+export function useTaskResultDetail<T extends Task>(
+  task: MaybeRefOrGetter<T | null>,
   options: { feedback: AdminTaskResultFeedback },
 ) {
   const detailTask = computed(() => toValue(task))

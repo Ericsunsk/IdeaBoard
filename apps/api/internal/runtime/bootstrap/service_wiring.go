@@ -24,19 +24,20 @@ import (
 )
 
 type appDomainServices struct {
-	authServiceClient *auth.ServiceClient
-	runtimeSettings   *settings.RuntimeSettingsService
-	storageService    *storage.StorageService
-	userService       *users.UserService
-	boardService      *boards.BoardService
-	billingService    *billing.Service
-	billingCatalog    *billing.BillableItemCatalog
-	billingRecords    *billingrecords.Service
-	billingCoverage   *billingcoverage.Service
-	creditService     *credits.Service
-	usageService      *usage.Service
-	rewardService     *rewards.Service
-	userLifecycle     *users.LifecycleService
+	authServiceClient    *auth.ServiceClient
+	runtimeSettings      *settings.RuntimeSettingsService
+	storageService       *storage.StorageService
+	userService          *users.UserService
+	boardService         *boards.BoardService
+	billingService       *billing.Service
+	billingCatalog       *billing.BillableItemCatalog
+	billableItemRegistry *billing.BillableItemRegistry
+	billingRecords       *billingrecords.Service
+	billingCoverage      *billingcoverage.Service
+	creditService        *credits.Service
+	usageService         *usage.Service
+	rewardService        *rewards.Service
+	userLifecycle        *users.LifecycleService
 }
 
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
@@ -73,18 +74,19 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	}
 	userService := users.NewUserService(repos.userRepo, userLifecycle, storageService)
 	return appDomainServices{
-		authServiceClient: auth.NewServiceClient(cfg.Auth),
-		runtimeSettings:   runtimeSettings,
-		storageService:    storageService,
-		userService:       userService,
-		boardService:      boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
-		billingService:    billingService,
-		billingCatalog:    billingCatalog,
-		billingRecords:    billingrecords.NewService(billingrecords.NewRepository(appPool)),
-		billingCoverage:   billingCoverage,
-		creditService:     creditService,
-		usageService:      usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
-		rewardService:     rewardService,
-		userLifecycle:     userLifecycle,
+		authServiceClient:    auth.NewServiceClient(cfg.Auth),
+		runtimeSettings:      runtimeSettings,
+		storageService:       storageService,
+		userService:          userService,
+		boardService:         boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
+		billingService:       billingService,
+		billingCatalog:       billingCatalog,
+		billableItemRegistry: billableItemRegistry,
+		billingRecords:       billingrecords.NewService(billingrecords.NewRepository(appPool)),
+		billingCoverage:      billingCoverage,
+		creditService:        creditService,
+		usageService:         usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
+		rewardService:        rewardService,
+		userLifecycle:        userLifecycle,
 	}, nil
 }

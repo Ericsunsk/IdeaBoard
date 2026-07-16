@@ -22,6 +22,7 @@ import type {
   AdminBillingPricePublishRequest,
   AdminBillingSKUCreateRequest,
   AdminBillingSKUUpdateRequest,
+  ApiResponseArchivedBillingItemDeleteResult,
   ApiResponseBillableItemAvailability,
   ApiResponseBillableItemCatalog,
   ApiResponseBillingCatalogItem,
@@ -29,6 +30,7 @@ import type {
   ApiResponseBillingCoverage,
   ApiResponseBillingPrice,
   ApiResponseBillingPricePage,
+  ListAdminBillableItemPricesParams,
   ListAdminBillingPricesParams,
   ListAdminBillingSKUsParams,
 } from '../model'
@@ -96,6 +98,102 @@ export function useListAdminBillableItems<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminBillableItemsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminBillableItemPricesUrl = (
+  sku: string,
+  params?: ListAdminBillableItemPricesParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/billing/catalog/${encodeURIComponent(String(sku))}/prices?${stringifiedParams}`
+    : `/admin/billing/catalog/${encodeURIComponent(String(sku))}/prices`
+}
+
+export const listAdminBillableItemPrices = async (
+  sku: string,
+  params?: ListAdminBillableItemPricesParams,
+  options?: RequestInit,
+): Promise<ApiResponseBillingPricePage> => {
+  return orvalMutator<ApiResponseBillingPricePage>(getListAdminBillableItemPricesUrl(sku, params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListAdminBillableItemPricesQueryKey = (
+  sku: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListAdminBillableItemPricesParams>,
+) => {
+  return ['admin', 'billing', 'catalog', sku, 'prices', ...(params ? [params] : [])] as const
+}
+
+export const getListAdminBillableItemPricesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminBillableItemPrices>>,
+  TError = ErrorType<unknown>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListAdminBillableItemPricesParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminBillableItemPrices>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminBillableItemPricesQueryKey(sku, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminBillableItemPrices>>> = ({
+    signal,
+  }) => listAdminBillableItemPrices(toValue(sku), toValue(params), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listAdminBillableItemPrices>>, TError, TData>
+}
+
+export type ListAdminBillableItemPricesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminBillableItemPrices>>
+>
+export type ListAdminBillableItemPricesQueryError = ErrorType<unknown>
+
+export function useListAdminBillableItemPrices<
+  TData = Awaited<ReturnType<typeof listAdminBillableItemPrices>>,
+  TError = ErrorType<unknown>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<ListAdminBillableItemPricesParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminBillableItemPrices>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminBillableItemPricesQueryOptions(sku, params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -195,6 +293,84 @@ export function usePublishAdminBillingPrice<
     adminBillingPricePublishRequest,
     options,
   )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getDeleteAdminArchivedBillableItemUrl = (sku: string) => {
+  return `/admin/billing/catalog/${encodeURIComponent(String(sku))}`
+}
+
+export const deleteAdminArchivedBillableItem = async (
+  sku: string,
+  options?: RequestInit,
+): Promise<ApiResponseArchivedBillingItemDeleteResult> => {
+  return orvalMutator<ApiResponseArchivedBillingItemDeleteResult>(
+    getDeleteAdminArchivedBillableItemUrl(sku),
+    {
+      ...options,
+      method: 'DELETE',
+    },
+  )
+}
+
+export const getDeleteAdminArchivedBillableItemQueryKey = (sku: MaybeRefOrGetter<string>) => {
+  return ['DELETE', 'admin', 'billing', 'catalog', sku] as const
+}
+
+export const getDeleteAdminArchivedBillableItemQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+  TError = ErrorType<void>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDeleteAdminArchivedBillableItemQueryKey(sku)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>> = ({
+    signal,
+  }) => deleteAdminArchivedBillableItem(toValue(sku), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(sku) !== null && toValue(sku) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>, TError, TData>
+}
+
+export type DeleteAdminArchivedBillableItemQueryResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>
+>
+export type DeleteAdminArchivedBillableItemQueryError = ErrorType<void>
+
+export function useDeleteAdminArchivedBillableItem<
+  TData = Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>,
+  TError = ErrorType<void>,
+>(
+  sku: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminArchivedBillableItem>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteAdminArchivedBillableItemQueryOptions(sku, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

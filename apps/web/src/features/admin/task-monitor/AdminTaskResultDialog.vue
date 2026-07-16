@@ -136,6 +136,34 @@
         </div>
       </section>
 
+      <section
+        v-if="detailTask.billing"
+        class="flex flex-col gap-2.5"
+        aria-labelledby="task-detail-billing"
+      >
+        <div
+          class="flex min-w-0 items-center gap-2 text-admin-body font-bold text-admin-title-color"
+        >
+          <LightBulb class="h-[17px] w-[17px] shrink-0 text-admin-subtitle-color" />
+          <span id="task-detail-billing">计费快照</span>
+          <Tag
+            v-if="!detailTask.billing.feature_exists"
+            value="功能已删除"
+            severity="secondary"
+            rounded
+            class="ml-auto"
+          />
+        </div>
+        <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+          <DetailMetric label="功能" :value="detailTask.billing.display_name" />
+          <DetailMetric label="SKU" :value="detailTask.billing.sku" />
+          <DetailMetric label="单价" :value="formatIdeaAmount(detailTask.billing.unit_credits)" />
+          <DetailMetric label="调用数量" :value="String(detailTask.billing.quantity)" />
+          <DetailMetric label="总消耗" :value="formatIdeaAmount(detailTask.billing.total_credits)" />
+          <DetailMetric label="报价时间" :value="formatDateTime(detailTask.billing.quoted_at)" />
+        </div>
+      </section>
+
       <section class="flex flex-col gap-2.5" aria-labelledby="task-detail-prompt">
         <div
           class="flex min-w-0 items-center gap-2 text-admin-body font-bold text-admin-title-color"
@@ -261,6 +289,7 @@ import {
   CodeBrackets,
   Copy,
   Fingerprint,
+  LightBulb,
   MediaImage,
   Terminal,
   WarningTriangle,
@@ -270,7 +299,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import PrimeImage from 'primevue/image'
 import Tag from 'primevue/tag'
-import type { Task } from '../../../shared/api/task'
+import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import { adminOverlayDialogRootClass, createAdminDialogPt } from '../shared/lib/adminOverlayPt'
 import { adminTextButtonClass } from '../shared/lib/adminUiClasses'
 import {
@@ -280,11 +309,12 @@ import {
   getTaskPriorityLabel,
 } from './taskMonitorColumns'
 import { adminTaskStatuses, getTaskStatusDefinition } from './taskMonitorStatus'
+import type { AdminTask } from './taskMonitorResource'
 import DetailMetric from './TaskResultDetailMetric.vue'
 import { useAdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
 import { useTaskResultDetail } from './useTaskResultDetail'
 
-const props = defineProps<{ visible: boolean; task: Task | null }>()
+const props = defineProps<{ visible: boolean; task: AdminTask | null }>()
 const emit = defineEmits<{ 'update:visible': [visible: boolean] }>()
 const feedback = useAdminTaskResultFeedback()
 const {

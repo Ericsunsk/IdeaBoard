@@ -373,6 +373,29 @@ LIMIT $3`, sku, before, limit+1)
 	return page, nil
 }
 
+func (s *Service) DeleteArchived(ctx context.Context, rawSKU string, actorID int64) (ArchivedItemDeleteResult, error) {
+	sku, err := CanonicalizeSKU(rawSKU)
+	if err != nil || actorID <= 0 {
+		return ArchivedItemDeleteResult{}, ErrInvalidCatalogEntry
+	}
+	if err := s.requirePool(); err != nil {
+		return ArchivedItemDeleteResult{}, err
+	}
+	var deleted SKU
+	if err := s.pool.QueryRow(ctx, `SELECT delete_archived_billing_item($1, $2)`, sku, actorID).Scan(&deleted); err != nil {
+		return ArchivedItemDeleteResult{}, mapDeleteArchivedDatabaseError(err)
+	}
+	return ArchivedItemDeleteResult{SKU: deleted}, nil
+}
+
+func mapDeleteArchivedDatabaseError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return ErrArchivedItemInUse
+	}
+	return mapDatabaseError("delete archived item", err)
+}
+
 const catalogSelectSQL = `
 SELECT skus.sku, skus.display_name, skus.description, skus.enabled,
        skus.current_price_version_id, skus.created_at, skus.updated_at,
@@ -443,6 +466,8 @@ func mapDatabaseError(action string, err error) error {
 			return ErrPricingUnavailable
 		case "IB106":
 			return ErrPriceNotFound
+		case "IB108":
+			return ErrArchivedItemInUse
 		}
 	}
 	return fmt.Errorf("billing %s: %w", action, err)

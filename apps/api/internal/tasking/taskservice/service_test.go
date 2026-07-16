@@ -193,6 +193,52 @@ func TestNormalizeTaskListStatus(t *testing.T) {
 	}
 }
 
+type adminBillingHistoryStub struct {
+	snapshots map[string]tasks.AdminBillingSnapshot
+	err       error
+}
+
+func (s adminBillingHistoryStub) ListAdminBillingSnapshots(context.Context, []string) (map[string]tasks.AdminBillingSnapshot, error) {
+	return s.snapshots, s.err
+}
+
+type billableItemLookupStub map[string]bool
+
+func (s billableItemLookupStub) Contains(sku string) bool {
+	return s[sku]
+}
+
+func TestAttachAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t *testing.T) {
+	quotedAt := time.Date(2026, 7, 16, 8, 0, 0, 0, time.UTC)
+	service := NewService(ServiceDeps{
+		AdminBillingHistory: adminBillingHistoryStub{snapshots: map[string]tasks.AdminBillingSnapshot{
+			"task-existing": {
+				SKU: "ai-image:partial-edit", DisplayName: "局部重绘", PriceVersionID: 10,
+				PriceVersion: 2, UnitCredits: 4, Quantity: 1, TotalCredits: 4, QuotedAt: quotedAt,
+			},
+			"task-deleted": {
+				SKU: "legacy:removed", DisplayName: "已移除功能", PriceVersionID: 8,
+				PriceVersion: 1, UnitCredits: 2, Quantity: 2, TotalCredits: 4, QuotedAt: quotedAt,
+			},
+		}},
+		BillableItems: billableItemLookupStub{"ai-image:partial-edit": true},
+	}, ServiceOptions{})
+	items := []*tasks.Task{{TaskID: "task-existing"}, {TaskID: "task-deleted"}}
+
+	if err := service.attachAdminBillingSnapshots(t.Context(), items); err != nil {
+		t.Fatal(err)
+	}
+	if items[0].BillingSnapshot == nil || !items[0].BillingSnapshot.FeatureExists {
+		t.Fatalf("existing feature Snapshot = %+v", items[0].BillingSnapshot)
+	}
+	if items[1].BillingSnapshot == nil || items[1].BillingSnapshot.FeatureExists {
+		t.Fatalf("deleted feature Snapshot = %+v", items[1].BillingSnapshot)
+	}
+	if items[1].BillingSnapshot.DisplayName != "已移除功能" {
+		t.Fatalf("immutable Snapshot wording changed: %+v", items[1].BillingSnapshot)
+	}
+}
+
 func TestImageExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) {
 	fullPrompt := applyTaskSystemPrompt(
 		"",

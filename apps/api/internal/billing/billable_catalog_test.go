@@ -112,6 +112,17 @@ type catalogFactReaderStub struct {
 	items        []CatalogItem
 	err          error
 	publishInput PublishPriceInput
+	pricePage    PricePage
+	deleted      ArchivedItemDeleteResult
+}
+
+func (s *catalogFactReaderStub) ListPrices(context.Context, ListPricesInput) (PricePage, error) {
+	return s.pricePage, s.err
+}
+
+func (s *catalogFactReaderStub) DeleteArchived(_ context.Context, sku string, _ int64) (ArchivedItemDeleteResult, error) {
+	s.deleted = ArchivedItemDeleteResult{SKU: SKU(sku)}
+	return s.deleted, s.err
 }
 
 func (s *catalogFactReaderStub) ListCatalogFacts(context.Context) ([]CatalogItem, error) {
@@ -155,5 +166,38 @@ func TestBillableCatalogPublishesOnlyRegisteredItems(t *testing.T) {
 	}
 	if _, err := catalog.PublishPrice(t.Context(), "ai-image:unknown", 1, 9); !errors.Is(err, ErrSKUNotFound) {
 		t.Fatalf("unregistered publish error = %v", err)
+	}
+}
+
+func TestBillableCatalogOnlyDeletesRegistryAbsentItems(t *testing.T) {
+	registry, err := NewBillableItemRegistry([]BillableItemDefinition{{
+		SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &catalogFactReaderStub{}
+	catalog := NewBillableItemCatalog(registry, store)
+
+	if _, err := catalog.DeleteArchived(t.Context(), "ai-image:partial-edit", 9); !errors.Is(err, ErrItemNotArchived) {
+		t.Fatalf("registered delete error = %v", err)
+	}
+	result, err := catalog.DeleteArchived(t.Context(), "legacy:removed", 9)
+	if err != nil || result.SKU != "legacy:removed" {
+		t.Fatalf("archived delete result = %+v error = %v", result, err)
+	}
+}
+
+func TestBillableCatalogPriceHistorySupportsRegisteredUnpricedItem(t *testing.T) {
+	registry, err := NewBillableItemRegistry([]BillableItemDefinition{{
+		SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &catalogFactReaderStub{err: ErrSKUNotFound}
+	page, err := NewBillableItemCatalog(registry, store).ListPriceHistory(t.Context(), "ai-image:partial-edit", 0, 20)
+	if err != nil || len(page.Prices) != 0 {
+		t.Fatalf("unpriced history = %+v error = %v", page, err)
 	}
 }

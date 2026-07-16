@@ -2,11 +2,13 @@ package billing
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
@@ -329,6 +331,160 @@ func TestDatabasePreventsSKURenameReuseAndPriceMutation(t *testing.T) {
 	}
 }
 
+func TestDeleteArchivedRemovesCatalogAggregateAndPreservesAudit(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	price := publishDeleteCandidate(t, service, "test:delete-success")
+
+	result, err := service.DeleteArchived(t.Context(), "test:delete-success", 17)
+	if err != nil {
+		t.Fatalf("DeleteArchived() error = %v", err)
+	}
+	if result.SKU != "test:delete-success" {
+		t.Fatalf("DeleteArchived() = %+v", result)
+	}
+
+	var skuCount, priceCount int
+	if err := db.QueryRowContext(t.Context(), `SELECT count(*) FROM billing_skus WHERE sku = $1`, result.SKU).Scan(&skuCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(t.Context(), `SELECT count(*) FROM billing_price_versions WHERE sku = $1`, result.SKU).Scan(&priceCount); err != nil {
+		t.Fatal(err)
+	}
+	if skuCount != 0 || priceCount != 0 {
+		t.Fatalf("remaining Catalog rows: sku=%d prices=%d", skuCount, priceCount)
+	}
+
+	var publishAuditCount, deleteAuditCount int
+	var deleteActorID int64
+	var deletedPriceCount string
+	if err := db.QueryRowContext(t.Context(), `
+SELECT
+  count(*) FILTER (WHERE action_type = 'create_price' AND price_version_id = $2),
+  count(*) FILTER (WHERE action_type = 'delete_archived'),
+  COALESCE(max(actor_id) FILTER (WHERE action_type = 'delete_archived'), 0),
+  COALESCE(max(metadata->>'price_version_count') FILTER (WHERE action_type = 'delete_archived'), '')
+FROM billing_admin_actions
+WHERE sku = $1`, result.SKU, price.PriceVersionID).Scan(
+		&publishAuditCount, &deleteAuditCount, &deleteActorID, &deletedPriceCount,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if publishAuditCount != 1 || deleteAuditCount != 1 || deleteActorID != 17 || deletedPriceCount != "1" {
+		t.Fatalf("audit publish=%d delete=%d actor=%d price_count=%q", publishAuditCount, deleteAuditCount, deleteActorID, deletedPriceCount)
+	}
+}
+
+func TestDeleteArchivedSnapshotConflictRollsBackCompletely(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	price := publishDeleteCandidate(t, service, "test:delete-conflict")
+	insertFreeBillingSnapshot(t, db, "snapshot-delete-conflict", "test:delete-conflict", "Delete conflict", price)
+
+	if _, err := service.DeleteArchived(t.Context(), "test:delete-conflict", 18); !errors.Is(err, ErrArchivedItemInUse) {
+		t.Fatalf("DeleteArchived() error = %v, want ErrArchivedItemInUse", err)
+	}
+
+	var skuCount, priceCount, snapshotCount, deleteAuditCount int
+	var currentPriceID int64
+	if err := db.QueryRowContext(t.Context(), `
+SELECT
+  (SELECT count(*) FROM billing_skus WHERE sku = 'test:delete-conflict'),
+  (SELECT count(*) FROM billing_price_versions WHERE sku = 'test:delete-conflict'),
+  (SELECT count(*) FROM task_billing_snapshots WHERE task_id = 'snapshot-delete-conflict'),
+  (SELECT count(*) FROM billing_admin_actions WHERE sku = 'test:delete-conflict' AND action_type = 'delete_archived'),
+  (SELECT current_price_version_id FROM billing_skus WHERE sku = 'test:delete-conflict')
+`).Scan(&skuCount, &priceCount, &snapshotCount, &deleteAuditCount, &currentPriceID); err != nil {
+		t.Fatal(err)
+	}
+	if skuCount != 1 || priceCount != 1 || snapshotCount != 1 || deleteAuditCount != 0 || currentPriceID != price.PriceVersionID {
+		t.Fatalf("rollback state sku=%d price=%d snapshot=%d delete_audit=%d current=%d", skuCount, priceCount, snapshotCount, deleteAuditCount, currentPriceID)
+	}
+}
+
+func TestDeleteArchivedSerializesConcurrentSnapshotInsertInBothLockOrders(t *testing.T) {
+	t.Run("delete lock first", func(t *testing.T) {
+		db, pool := testdb.OpenWithPool(t)
+		service := NewService(pool)
+		price := publishDeleteCandidate(t, service, "test:delete-lock-first")
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		deleteTx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = deleteTx.Rollback(context.Background()) }()
+		var deleted string
+		if err := deleteTx.QueryRow(ctx, `SELECT delete_archived_billing_item($1, $2)`, "test:delete-lock-first", 21).Scan(&deleted); err != nil {
+			t.Fatal(err)
+		}
+
+		insertDone := make(chan error, 1)
+		go func() {
+			_, err := pool.Exec(ctx, freeBillingSnapshotInsertSQL,
+				"snapshot-delete-lock-first", "test:delete-lock-first", "Delete lock first",
+				price.PriceVersionID, price.Version, price.UnitCredits)
+			insertDone <- err
+		}()
+		assertOperationBlocked(t, insertDone)
+		if err := deleteTx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := <-insertDone; err == nil {
+			t.Fatal("concurrent Snapshot insert unexpectedly succeeded after Catalog delete committed")
+		}
+		var count int
+		if err := db.QueryRowContext(ctx, `SELECT count(*) FROM billing_skus WHERE sku = 'test:delete-lock-first'`).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("deleted SKU count=%d error=%v", count, err)
+		}
+	})
+
+	t.Run("snapshot lock first", func(t *testing.T) {
+		db, pool := testdb.OpenWithPool(t)
+		service := NewService(pool)
+		price := publishDeleteCandidate(t, service, "test:snapshot-lock-first")
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		snapshotTx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = snapshotTx.Rollback(context.Background()) }()
+		if _, err := snapshotTx.Exec(ctx, freeBillingSnapshotInsertSQL,
+			"snapshot-lock-first", "test:snapshot-lock-first", "Snapshot lock first",
+			price.PriceVersionID, price.Version, price.UnitCredits); err != nil {
+			t.Fatal(err)
+		}
+
+		deleteDone := make(chan error, 1)
+		go func() {
+			_, err := service.DeleteArchived(ctx, "test:snapshot-lock-first", 22)
+			deleteDone <- err
+		}()
+		assertOperationBlocked(t, deleteDone)
+		if err := snapshotTx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := <-deleteDone; !errors.Is(err, ErrArchivedItemInUse) {
+			t.Fatalf("DeleteArchived() error = %v, want ErrArchivedItemInUse", err)
+		}
+		var skuCount, snapshotCount, deleteAuditCount int
+		if err := db.QueryRowContext(ctx, `
+SELECT
+  (SELECT count(*) FROM billing_skus WHERE sku = 'test:snapshot-lock-first'),
+  (SELECT count(*) FROM task_billing_snapshots WHERE task_id = 'snapshot-lock-first'),
+  (SELECT count(*) FROM billing_admin_actions WHERE sku = 'test:snapshot-lock-first' AND action_type = 'delete_archived')
+`).Scan(&skuCount, &snapshotCount, &deleteAuditCount); err != nil {
+			t.Fatal(err)
+		}
+		if skuCount != 1 || snapshotCount != 1 || deleteAuditCount != 0 {
+			t.Fatalf("serialized state sku=%d snapshot=%d delete_audit=%d", skuCount, snapshotCount, deleteAuditCount)
+		}
+	})
+}
+
 func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
@@ -416,5 +572,45 @@ func testBillableDefinition(sku SKU, displayName string) BillableItemDefinition 
 	namespace, _, _ := strings.Cut(string(sku), ":")
 	return BillableItemDefinition{
 		SKU: sku, Namespace: namespace, ProductKind: "test-feature", DisplayName: displayName,
+	}
+}
+
+const freeBillingSnapshotInsertSQL = `
+INSERT INTO task_billing_snapshots (
+  task_id, user_id, feature_slug, model, sku, display_name, price_version_id,
+  price_version, unit_credits, quantity, total_credits, quoted_at
+) VALUES ($1, 1, 'test-feature', 'test-model', $2, $3, $4, $5, $6, 1, 0, clock_timestamp())`
+
+func publishDeleteCandidate(t *testing.T, service *Service, sku SKU) PriceInfo {
+	t.Helper()
+	price, err := service.PublishPrice(t.Context(), PublishPriceInput{
+		Definition:  testBillableDefinition(sku, strings.TrimPrefix(string(sku), "test:")),
+		UnitCredits: 0,
+		ActorID:     7,
+	})
+	if err != nil {
+		t.Fatalf("PublishPrice(%s) error = %v", sku, err)
+	}
+	return price
+}
+
+type billingSnapshotExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func insertFreeBillingSnapshot(t *testing.T, db billingSnapshotExecer, taskID string, sku SKU, displayName string, price PriceInfo) {
+	t.Helper()
+	if _, err := db.ExecContext(t.Context(), freeBillingSnapshotInsertSQL,
+		taskID, sku, displayName, price.PriceVersionID, price.Version, price.UnitCredits); err != nil {
+		t.Fatalf("insert free Billing Snapshot: %v", err)
+	}
+}
+
+func assertOperationBlocked(t *testing.T, done <-chan error) {
+	t.Helper()
+	select {
+	case err := <-done:
+		t.Fatalf("operation completed before competing transaction released its lock: %v", err)
+	case <-time.After(100 * time.Millisecond):
 	}
 }

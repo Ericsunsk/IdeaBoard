@@ -17,12 +17,26 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/lib/pq"
 )
 
 type Repository struct {
 	db          *sql.DB
 	q           *dbsqlc.Queries
 	taskBilling *taskbilling.Service
+}
+
+type repositoryContextDB struct {
+	ctx context.Context
+	db  *sql.DB
+}
+
+func (r *Repository) dbWithContext(ctx context.Context) repositoryContextDB {
+	return repositoryContextDB{ctx: ctx, db: r.db}
+}
+
+func (q repositoryContextDB) Query(query string, args ...any) (*sql.Rows, error) {
+	return q.db.QueryContext(q.ctx, query, args...)
 }
 
 type RunningTaskLease struct {
@@ -355,6 +369,38 @@ func (r *Repository) GetByTaskID(ctx context.Context, taskID string) (*tasks.Tas
 		return nil, err
 	}
 	return &task, nil
+}
+
+func (r *Repository) ListAdminBillingSnapshots(ctx context.Context, taskIDs []string) (map[string]tasks.AdminBillingSnapshot, error) {
+	result := make(map[string]tasks.AdminBillingSnapshot)
+	if len(taskIDs) == 0 {
+		return result, nil
+	}
+	rows, err := r.dbWithContext(ctx).Query(`
+SELECT task_id, sku, display_name, price_version_id, price_version,
+       unit_credits, quantity, total_credits, quoted_at
+FROM task_billing_snapshots
+WHERE task_id = ANY($1::text[])`, pq.Array(taskIDs))
+	if err != nil {
+		return nil, fmt.Errorf("taskstore: list Admin Billing snapshots: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var taskID string
+		var snapshot tasks.AdminBillingSnapshot
+		if err := rows.Scan(
+			&taskID, &snapshot.SKU, &snapshot.DisplayName, &snapshot.PriceVersionID,
+			&snapshot.PriceVersion, &snapshot.UnitCredits, &snapshot.Quantity,
+			&snapshot.TotalCredits, &snapshot.QuotedAt,
+		); err != nil {
+			return nil, fmt.Errorf("taskstore: scan Admin Billing snapshot: %w", err)
+		}
+		result[taskID] = snapshot
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("taskstore: read Admin Billing snapshots: %w", err)
+	}
+	return result, nil
 }
 
 func (r *Repository) GetByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) (*tasks.Task, error) {

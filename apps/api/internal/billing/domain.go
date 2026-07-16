@@ -26,6 +26,8 @@ var (
 	ErrSKUNotFound         = errors.New("billing SKU not found")
 	ErrPriceNotFound       = errors.New("billing price version not found")
 	ErrPricingUnavailable  = errors.New("billing price is unavailable")
+	ErrItemNotArchived     = errors.New("billing item is not archived")
+	ErrArchivedItemInUse   = errors.New("archived billing item has durable references")
 	ErrServiceUnavailable  = errors.New("billing service is unavailable")
 )
 
@@ -110,6 +112,10 @@ type ListPricesInput struct {
 type PricePage struct {
 	Prices            []PriceInfo `json:"prices"`
 	NextBeforeVersion *int64      `json:"next_before_version,omitempty"`
+}
+
+type ArchivedItemDeleteResult struct {
+	SKU SKU `json:"sku"`
 }
 
 // PriceSnapshot is the immutable value object later Billing Commands persist.

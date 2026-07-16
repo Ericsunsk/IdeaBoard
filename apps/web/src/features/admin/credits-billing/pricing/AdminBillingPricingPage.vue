@@ -26,8 +26,11 @@
       :key="item.sku"
       :item="item"
       :availability-pending="availabilityPending[item.sku]"
+      :delete-pending="deletePending[item.sku]"
       @availability="setAvailability"
       @publish="openPriceDialog"
+      @history="openHistoryDialog"
+      @delete="confirmArchivedDelete"
     />
   </AdminResourceGridFrame>
 
@@ -37,6 +40,18 @@
     :pending="publishPending"
     :error-message="publishError"
     @submit="publishPrice"
+  />
+
+  <BillingPriceHistoryDialog
+    v-model:visible="historyDialogVisible"
+    :item="historyItem"
+    :prices="historyPrices"
+    :loading="historyLoading"
+    :loading-more="historyLoadingMore"
+    :has-more="historyNextBeforeVersion != null"
+    :error-message="historyError"
+    @retry="loadHistory"
+    @load-more="loadMoreHistory"
   />
 </template>
 
@@ -49,8 +64,10 @@ import { adminEmptyStateClass } from '../../shared/lib/adminUiClasses'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
 import BillingFeaturePriceCard from './BillingFeaturePriceCard.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
+import BillingPriceHistoryDialog from './BillingPriceHistoryDialog.vue'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
-import type { AdminBillableItemCard } from './billableCatalogTypes'
+import type { AdminBillableItemCard, AdminBillableItemPrice } from './billableCatalogTypes'
 
 const resource = createAdminBillableCatalogResource()
 const items = ref<AdminBillableItemCard[]>([])
@@ -61,7 +78,17 @@ const priceDialogVisible = ref(false)
 const publishPending = ref(false)
 const publishError = ref('')
 const availabilityPending = reactive<Record<string, boolean>>({})
+const deletePending = reactive<Record<string, boolean>>({})
 const toast = useAdminToast()
+const confirm = useAdminConfirm()
+const historyDialogVisible = ref(false)
+const historyItem = ref<AdminBillableItemCard | null>(null)
+const historyPrices = ref<AdminBillableItemPrice[]>([])
+const historyNextBeforeVersion = ref<number | undefined>()
+const historyLoading = ref(false)
+const historyLoadingMore = ref(false)
+const historyError = ref('')
+let historyRequestEpoch = 0
 
 async function loadCatalog() {
   isLoading.value = true
@@ -81,6 +108,79 @@ function openPriceDialog(item: AdminBillableItemCard) {
   selectedItem.value = item
   publishError.value = ''
   priceDialogVisible.value = true
+}
+
+function openHistoryDialog(item: AdminBillableItemCard) {
+  historyItem.value = item
+  historyDialogVisible.value = true
+  historyPrices.value = []
+  historyNextBeforeVersion.value = undefined
+  historyError.value = ''
+  historyLoadingMore.value = false
+  void loadHistory()
+}
+
+async function loadHistory() {
+  const item = historyItem.value
+  if (!item) return
+  const requestEpoch = ++historyRequestEpoch
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const page = await resource.listPriceHistory(item.sku, { limit: 50 })
+    if (requestEpoch !== historyRequestEpoch || historyItem.value?.sku !== item.sku) return
+    historyPrices.value = page.prices
+    historyNextBeforeVersion.value = page.nextBeforeVersion
+  } catch (error) {
+    if (requestEpoch !== historyRequestEpoch || historyItem.value?.sku !== item.sku) return
+    historyError.value = formatAdminDisplayError(error, '加载价格历史失败，请重试')
+  } finally {
+    if (requestEpoch === historyRequestEpoch) historyLoading.value = false
+  }
+}
+
+async function loadMoreHistory() {
+  const item = historyItem.value
+  const beforeVersion = historyNextBeforeVersion.value
+  if (!item || beforeVersion == null || historyLoadingMore.value) return
+  const requestEpoch = historyRequestEpoch
+  historyLoadingMore.value = true
+  try {
+    const page = await resource.listPriceHistory(item.sku, { limit: 50, beforeVersion })
+    if (requestEpoch !== historyRequestEpoch || historyItem.value?.sku !== item.sku) return
+    historyPrices.value.push(...page.prices)
+    historyNextBeforeVersion.value = page.nextBeforeVersion
+  } catch (error) {
+    if (requestEpoch !== historyRequestEpoch || historyItem.value?.sku !== item.sku) return
+    toast.error(formatAdminDisplayError(error, '加载更多价格历史失败，请重试'))
+  } finally {
+    if (requestEpoch === historyRequestEpoch) historyLoadingMore.value = false
+  }
+}
+
+function confirmArchivedDelete(item: AdminBillableItemCard) {
+  if (item.status !== 'archived' || deletePending[item.sku]) return
+  confirm.request({
+    title: '删除已归档功能',
+    message: `确定彻底删除“${item.displayName}”及其价格配置吗？此操作不可撤销。`,
+    confirmLabel: '确认删除',
+    intent: 'danger',
+    onConfirm: () => deleteArchived(item),
+  })
+}
+
+async function deleteArchived(item: AdminBillableItemCard) {
+  if (deletePending[item.sku]) return
+  deletePending[item.sku] = true
+  try {
+    await resource.deleteArchived(item.sku)
+    items.value = items.value.filter((candidate) => candidate.sku !== item.sku)
+    toast.success('已归档功能已删除')
+  } catch (error) {
+    toast.error(formatAdminDisplayError(error, '删除已归档功能失败，请重试'))
+  } finally {
+    deletePending[item.sku] = false
+  }
 }
 
 async function publishPrice(unitCredits: number) {

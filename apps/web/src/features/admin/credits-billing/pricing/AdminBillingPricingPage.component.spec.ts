@@ -1,11 +1,29 @@
 import PrimeVue from 'primevue/config'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { primeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
+const confirmRequestMock = vi.hoisted(() => vi.fn())
+const toast = vi.hoisted(() => ({ success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
+
+vi.mock('../../shared/composables/useAdminConfirm', () => ({
+  useAdminConfirm: () => ({ request: confirmRequestMock }),
+}))
+
+vi.mock('../../shared/lib/adminToast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../shared/lib/adminToast')>()),
+  useAdminToast: () => toast,
+}))
+
 describe('AdminBillingPricingPage', () => {
+  beforeEach(() => {
+    confirmRequestMock.mockReset()
+    toast.success.mockReset()
+    toast.warning.mockReset()
+    toast.error.mockReset()
+  })
   it('preserves the grid surface while the Catalog is loading', () => {
     useMswHandlers(
       http.get('/api/admin/billing/catalog', async () => {
@@ -244,6 +262,86 @@ describe('AdminBillingPricingPage', () => {
 
     releasePublish()
     expect(await screen.findByText('5 Ideas')).toBeVisible()
+  })
+
+  it('keeps the latest price-history request when switching cards quickly', async () => {
+    let releaseFirst!: () => void
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+      http.get('/api/admin/billing/catalog/:sku/prices', async ({ params }) => {
+        if (params.sku === 'ai-image:partial-edit') await firstGate
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            prices: [
+              {
+                price_version_id: params.sku === 'ai-image:partial-edit' ? 11 : 22,
+                version: params.sku === 'ai-image:partial-edit' ? 11 : 22,
+                unit_credits: params.sku === 'ai-image:partial-edit' ? 11 : 22,
+                created_by: 7,
+                created_at: '2026-07-16T08:00:00Z',
+              },
+            ],
+          },
+        })
+      }),
+    )
+
+    const { user } = renderPricingPage()
+    const historyButtons = await screen.findAllByRole('button', { name: '价格历史' })
+    await user.click(historyButtons[0])
+    await user.click(historyButtons[1])
+
+    expect(await screen.findByText('版本 22')).toBeVisible()
+    expect(screen.getByText('价格历史 · 抠图')).toBeVisible()
+    releaseFirst()
+    await waitFor(() => expect(screen.queryByText('版本 11')).not.toBeInTheDocument())
+    expect(screen.getByText('版本 22')).toBeVisible()
+  })
+
+  it('confirms and removes an unreferenced Archived card', async () => {
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+      http.delete('/api/admin/billing/catalog/:sku', ({ params }) =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { sku: params.sku } }),
+      ),
+    )
+
+    const { user } = renderPricingPage()
+    await user.click(await screen.findByRole('button', { name: '删除' }))
+    expect(confirmRequestMock).toHaveBeenCalledOnce()
+    const request = confirmRequestMock.mock.calls[0]?.[0] as { onConfirm: () => Promise<void> }
+    await request.onConfirm()
+
+    expect(screen.queryByText('已移除功能')).not.toBeInTheDocument()
+    expect(toast.success).toHaveBeenCalledWith('已归档功能已删除')
+  })
+
+  it('keeps the Archived card when durable history blocks deletion', async () => {
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
+      ),
+      http.delete('/api/admin/billing/catalog/:sku', () =>
+        HttpResponse.json({ code: 409, msg: '功能已有历史计费记录，无法删除' }, { status: 409 }),
+      ),
+    )
+
+    const { user } = renderPricingPage()
+    await user.click(await screen.findByRole('button', { name: '删除' }))
+    const request = confirmRequestMock.mock.calls[0]?.[0] as { onConfirm: () => Promise<void> }
+    await request.onConfirm()
+
+    expect(screen.getByText('已移除功能')).toBeVisible()
+    expect(toast.error).toHaveBeenCalledWith('功能已有历史计费记录，无法删除')
   })
 })
 

@@ -32,6 +32,25 @@ type billableCatalogReaderStub struct {
 	availabilitySKU     string
 	availabilityEnabled bool
 	availabilityActorID int64
+	historySKU          string
+	historyBefore       int64
+	historyLimit        int
+	pricePage           PricePage
+	deleted             ArchivedItemDeleteResult
+	deleteActorID       int64
+}
+
+func (s *billableCatalogReaderStub) ListPriceHistory(_ context.Context, sku string, before int64, limit int) (PricePage, error) {
+	s.historySKU = sku
+	s.historyBefore = before
+	s.historyLimit = limit
+	return s.pricePage, s.err
+}
+
+func (s *billableCatalogReaderStub) DeleteArchived(_ context.Context, sku string, actorID int64) (ArchivedItemDeleteResult, error) {
+	s.deleted = ArchivedItemDeleteResult{SKU: SKU(sku)}
+	s.deleteActorID = actorID
+	return s.deleted, s.err
 }
 
 func (s *billableCatalogReaderStub) List(context.Context) ([]BillableItemCatalogCard, error) {
@@ -436,5 +455,100 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 				t.Fatalf("status = %d body=%s, want 400", response.Code, response.Body.String())
 			}
 		})
+	}
+}
+
+func TestAdminBillableItemHistoryAndDeleteRequireAdmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, endpoint := range []struct {
+		name, method, path string
+		handler            func(*Handler) gin.HandlerFunc
+	}{
+		{name: "history", method: http.MethodGet, path: "/catalog/test:item/prices", handler: func(h *Handler) gin.HandlerFunc { return h.ListBillableItemPrices }},
+		{name: "delete", method: http.MethodDelete, path: "/catalog/test:item", handler: func(h *Handler) gin.HandlerFunc { return h.DeleteArchivedItem }},
+	} {
+		for _, identity := range []struct {
+			name       string
+			role       principal.Role
+			wantStatus int
+		}{
+			{name: "missing", wantStatus: http.StatusUnauthorized},
+			{name: "user", role: principal.RoleUser, wantStatus: http.StatusForbidden},
+		} {
+			t.Run(endpoint.name+"/"+identity.name, func(t *testing.T) {
+				router := gin.New()
+				router.Handle(endpoint.method, endpoint.path, func(c *gin.Context) {
+					if identity.role != "" {
+						testsupport.SetPrincipal(t, c, 9, identity.role)
+					}
+					endpoint.handler(NewHandler(nil, nil, nil))(c)
+				})
+				recorder := httptest.NewRecorder()
+				router.ServeHTTP(recorder, httptest.NewRequest(endpoint.method, endpoint.path, nil))
+				if recorder.Code != identity.wantStatus {
+					t.Fatalf("status=%d body=%s want=%d", recorder.Code, recorder.Body.String(), identity.wantStatus)
+				}
+			})
+		}
+	}
+}
+
+func TestAdminBillableItemPriceHistoryContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	catalog := &billableCatalogReaderStub{pricePage: PricePage{
+		Prices: []PriceInfo{{PriceVersionID: 8, Version: 2, UnitCredits: 4, CreatedBy: 9}},
+	}}
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
+		c.Next()
+	})
+	router.GET("/catalog/:sku/prices", NewHandler(nil, nil, catalog).ListBillableItemPrices)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/catalog/legacy:removed/prices?before_version=3&limit=10", nil))
+	if recorder.Code != http.StatusOK || catalog.historySKU != "legacy:removed" || catalog.historyBefore != 3 || catalog.historyLimit != 10 || !strings.Contains(recorder.Body.String(), `"price_version_id":8`) {
+		t.Fatalf("status=%d body=%s history=%+v", recorder.Code, recorder.Body.String(), catalog)
+	}
+
+	for _, query := range []string{"?before_version=-1", "?before_version=bad", "?limit=101", "?limit=bad"} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/catalog/legacy:removed/prices"+query, nil))
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("query=%q status=%d body=%s", query, recorder.Code, recorder.Body.String())
+		}
+	}
+
+	catalog.err = ErrSKUNotFound
+	notFound := httptest.NewRecorder()
+	router.ServeHTTP(notFound, httptest.NewRequest(http.MethodGet, "/catalog/missing:item/prices", nil))
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("not found status=%d body=%s", notFound.Code, notFound.Body.String())
+	}
+}
+
+func TestAdminArchivedDeleteContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	catalog := &billableCatalogReaderStub{}
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 12, principal.RoleAdmin)
+		c.Next()
+	})
+	router.DELETE("/catalog/:sku", NewHandler(nil, nil, catalog).DeleteArchivedItem)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/catalog/legacy:removed", nil))
+	if recorder.Code != http.StatusOK || catalog.deleted.SKU != "legacy:removed" || catalog.deleteActorID != 12 || !strings.Contains(recorder.Body.String(), `"sku":"legacy:removed"`) {
+		t.Fatalf("status=%d body=%s delete=%+v actor=%d", recorder.Code, recorder.Body.String(), catalog.deleted, catalog.deleteActorID)
+	}
+
+	for _, conflict := range []error{ErrItemNotArchived, ErrArchivedItemInUse} {
+		catalog.err = conflict
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/catalog/legacy:removed", nil))
+		if recorder.Code != http.StatusConflict {
+			t.Fatalf("error=%v status=%d body=%s", conflict, recorder.Code, recorder.Body.String())
+		}
 	}
 }

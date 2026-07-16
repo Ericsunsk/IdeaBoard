@@ -1502,6 +1502,26 @@ paths:
                 $ref: '#/components/schemas/ApiResponseBillableItemCatalog'
 
   /admin/billing/catalog/{sku}/prices:
+    get:
+      tags: [AdminBilling]
+      operationId: listAdminBillableItemPrices
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BillingSKUPath'
+        - name: before_version
+          in: query
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Read-only immutable price history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBillingPricePage'
     post:
       tags: [AdminBilling]
       operationId: publishAdminBillingPrice
@@ -1522,6 +1542,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillingPrice'
+
+  /admin/billing/catalog/{sku}:
+    delete:
+      tags: [AdminBilling]
+      operationId: deleteAdminArchivedBillableItem
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BillingSKUPath'
+      responses:
+        '200':
+          description: Unreferenced Archived Catalog aggregate deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseArchivedBillingItemDeleteResult'
+        '409':
+          description: Item is not Archived or has durable Task Billing references
 
   /admin/billing/catalog/{sku}/availability:
     put:
@@ -1837,7 +1875,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseTaskList'
+                $ref: '#/components/schemas/ApiResponseAdminTaskList'
   /admin/tasks/bulk-delete:
     post:
       tags: [AdminTasks]
@@ -1884,7 +1922,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseTask'
+                $ref: '#/components/schemas/ApiResponseAdminTask'
 
   /admin/monitor:
     get:
@@ -2550,6 +2588,12 @@ components:
           type: string
           enum: [active, disabled]
         updated_at: { type: string, format: date-time }
+
+    ArchivedBillingItemDeleteResult:
+      type: object
+      required: [sku]
+      properties:
+        sku: { $ref: '#/components/schemas/BillingSKUCode' }
 
     ApiResponseBillableItemAvailability:
       allOf:
@@ -3366,6 +3410,30 @@ components:
           type: integer
           nullable: true
         cancel_reason: { type: string }
+
+    AdminTaskBillingSnapshot:
+      type: object
+      required: [sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, feature_exists]
+      properties:
+        sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        display_name: { type: string, minLength: 1, maxLength: 120 }
+        price_version_id: { type: integer, format: int64, minimum: 1 }
+        price_version: { type: integer, format: int64, minimum: 1 }
+        unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
+        quantity: { type: integer, format: int64, minimum: 1 }
+        total_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
+        quoted_at: { type: string, format: date-time }
+        feature_exists:
+          type: boolean
+          description: Dynamically resolved from the current Billable Item Registry.
+
+    AdminTask:
+      allOf:
+        - $ref: '#/components/schemas/Task'
+        - type: object
+          properties:
+            billing:
+              $ref: '#/components/schemas/AdminTaskBillingSnapshot'
 
     TaskExecutionMetrics:
       type: object
@@ -4629,6 +4697,39 @@ components:
                 task:
                   $ref: '#/components/schemas/Task'
 
+    ApiResponseAdminTaskList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list, total, pending_count, running_count, completed_count, failed_count, cancelled_count, other_count]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AdminTask'
+                total: { type: integer }
+                pending_count: { type: integer }
+                running_count: { type: integer }
+                completed_count: { type: integer }
+                failed_count: { type: integer }
+                cancelled_count: { type: integer }
+                other_count: { type: integer }
+
+    ApiResponseAdminTask:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [task]
+              properties:
+                task:
+                  $ref: '#/components/schemas/AdminTask'
+
     ApiResponseAdminTaskDeleteResult:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
@@ -4919,6 +5020,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/BillingPricePage'
+
+    ApiResponseArchivedBillingItemDeleteResult:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/ArchivedBillingItemDeleteResult'
 
     ApiResponseEmpty:
       allOf:

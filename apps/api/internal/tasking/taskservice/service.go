@@ -25,17 +25,19 @@ import (
 )
 
 type Service struct {
-	accountRepo        AccountStore
-	taskRepo           TaskStore
-	submissionStore    TaskSubmissionStore
-	cancelStore        taskqueue.TaskCancellationStore
-	featurePrompts     FeaturePromptStore
-	mediaValidator     taskmedia.Validator
-	taskOutputCleaner  taskmedia.TaskOutputCleaner
-	generationSettings settings.GoogleNativeGenerationSettingProvider
-	eventHub           *EventHub
-	taskEvents         events.TaskStatusPublisher
-	taskBilling        *taskbilling.Service
+	accountRepo         AccountStore
+	taskRepo            TaskStore
+	submissionStore     TaskSubmissionStore
+	cancelStore         taskqueue.TaskCancellationStore
+	featurePrompts      FeaturePromptStore
+	mediaValidator      taskmedia.Validator
+	taskOutputCleaner   taskmedia.TaskOutputCleaner
+	generationSettings  settings.GoogleNativeGenerationSettingProvider
+	eventHub            *EventHub
+	taskEvents          events.TaskStatusPublisher
+	taskBilling         *taskbilling.Service
+	adminBillingHistory AdminBillingHistoryStore
+	billableItems       BillableItemLookup
 }
 
 type AccountStore interface {
@@ -63,16 +65,26 @@ type FeaturePromptStore interface {
 	GetPromptRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
 }
 
+type AdminBillingHistoryStore interface {
+	ListAdminBillingSnapshots(context.Context, []string) (map[string]tasks.AdminBillingSnapshot, error)
+}
+
+type BillableItemLookup interface {
+	Contains(string) bool
+}
+
 type ServiceDeps struct {
-	AccountRepo        AccountStore
-	TaskRepo           TaskStore
-	SubmissionStore    TaskSubmissionStore
-	CancelStore        taskqueue.TaskCancellationStore
-	FeaturePrompts     FeaturePromptStore
-	MediaValidator     taskmedia.Validator
-	TaskOutputCleaner  taskmedia.TaskOutputCleaner
-	GenerationSettings settings.GoogleNativeGenerationSettingProvider
-	TaskBilling        *taskbilling.Service
+	AccountRepo         AccountStore
+	TaskRepo            TaskStore
+	SubmissionStore     TaskSubmissionStore
+	CancelStore         taskqueue.TaskCancellationStore
+	FeaturePrompts      FeaturePromptStore
+	MediaValidator      taskmedia.Validator
+	TaskOutputCleaner   taskmedia.TaskOutputCleaner
+	GenerationSettings  settings.GoogleNativeGenerationSettingProvider
+	TaskBilling         *taskbilling.Service
+	AdminBillingHistory AdminBillingHistoryStore
+	BillableItems       BillableItemLookup
 }
 
 type ServiceOptions struct {
@@ -95,17 +107,19 @@ const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加�
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
-		accountRepo:        deps.AccountRepo,
-		taskRepo:           deps.TaskRepo,
-		submissionStore:    deps.SubmissionStore,
-		cancelStore:        deps.CancelStore,
-		featurePrompts:     deps.FeaturePrompts,
-		mediaValidator:     deps.MediaValidator,
-		taskOutputCleaner:  deps.TaskOutputCleaner,
-		generationSettings: deps.GenerationSettings,
-		eventHub:           opts.EventHub,
-		taskEvents:         opts.TaskEvents,
-		taskBilling:        deps.TaskBilling,
+		accountRepo:         deps.AccountRepo,
+		taskRepo:            deps.TaskRepo,
+		submissionStore:     deps.SubmissionStore,
+		cancelStore:         deps.CancelStore,
+		featurePrompts:      deps.FeaturePrompts,
+		mediaValidator:      deps.MediaValidator,
+		taskOutputCleaner:   deps.TaskOutputCleaner,
+		generationSettings:  deps.GenerationSettings,
+		eventHub:            opts.EventHub,
+		taskEvents:          opts.TaskEvents,
+		taskBilling:         deps.TaskBilling,
+		adminBillingHistory: deps.AdminBillingHistory,
+		billableItems:       deps.BillableItems,
 	}
 }
 
@@ -440,6 +454,9 @@ func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, erro
 		return nil, err
 	}
 	s.attachOutputsForTasks(ctx, []*tasks.Task{task})
+	if err := s.attachAdminBillingSnapshots(ctx, []*tasks.Task{task}); err != nil {
+		return nil, err
+	}
 	return task, nil
 }
 
@@ -470,7 +487,37 @@ func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]
 		return nil, tasks.TaskListCounts{}, err
 	}
 	s.attachOutputsForTasks(ctx, items)
+	if err := s.attachAdminBillingSnapshots(ctx, items); err != nil {
+		return nil, tasks.TaskListCounts{}, err
+	}
 	return items, counts, nil
+}
+
+func (s *Service) attachAdminBillingSnapshots(ctx context.Context, items []*tasks.Task) error {
+	if s.adminBillingHistory == nil || len(items) == 0 {
+		return nil
+	}
+	taskIDs := make([]string, 0, len(items))
+	byTaskID := make(map[string]*tasks.Task, len(items))
+	for _, task := range items {
+		if task == nil || task.TaskID == "" {
+			continue
+		}
+		taskIDs = append(taskIDs, task.TaskID)
+		byTaskID[task.TaskID] = task
+	}
+	snapshots, err := s.adminBillingHistory.ListAdminBillingSnapshots(ctx, taskIDs)
+	if err != nil {
+		return fmt.Errorf("load Admin Task Billing history: %w", err)
+	}
+	for taskID, snapshot := range snapshots {
+		if s.billableItems != nil {
+			snapshot.FeatureExists = s.billableItems.Contains(snapshot.SKU)
+		}
+		value := snapshot
+		byTaskID[taskID].BillingSnapshot = &value
+	}
+	return nil
 }
 
 func normalizeTaskListStatus(status string) (string, error) {

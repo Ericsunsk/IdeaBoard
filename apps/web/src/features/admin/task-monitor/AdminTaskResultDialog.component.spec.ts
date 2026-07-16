@@ -1,10 +1,10 @@
 import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
-import type { Task } from '../../../shared/api/task'
 import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from './taskMonitorStatus'
+import type { AdminTask } from './taskMonitorResource'
 
 const toast = vi.hoisted(() => ({
   success: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('../shared/lib/adminToast', () => ({
   useAdminToast: () => toast,
 }))
 
-function renderDialog(task: Task, visible = true) {
+function renderDialog(task: AdminTask, visible = true) {
   return renderWithUser(AdminTaskResultDialog, {
     props: { task, visible },
     global: {
@@ -48,7 +48,7 @@ describe('AdminTaskResultDialog', () => {
     },
   ] satisfies ReadonlyArray<{
     label: string
-    task: Partial<Task>
+    task: Partial<AdminTask>
     statusText: string
     detailText?: string
   }>)('renders the $label task state through the shared status definition', async (testCase) => {
@@ -107,9 +107,33 @@ describe('AdminTaskResultDialog', () => {
     const openButton = await screen.findByRole('button', { name: '在新窗口打开' })
     expect(openButton).toHaveClass('group-focus-within:!opacity-100', 'focus-visible:!opacity-100')
   })
+
+  it('marks an immutable Admin Billing snapshot when its feature no longer exists', async () => {
+    renderDialog(
+      makeTask({
+        billing: {
+          sku: 'legacy:removed',
+          display_name: '已移除功能',
+          price_version_id: 9,
+          price_version: 2,
+          unit_credits: 3,
+          quantity: 2,
+          total_credits: 6,
+          quoted_at: '2026-07-15T08:00:00Z',
+          feature_exists: false,
+        },
+      }),
+    )
+
+    expect(await screen.findByText('计费快照')).toBeVisible()
+    expect(screen.getByText('功能已删除')).toBeVisible()
+    expect(screen.getByText('已移除功能')).toBeVisible()
+    expect(screen.getByText('legacy:removed')).toBeVisible()
+    expect(screen.getByText('6 Ideas')).toBeVisible()
+  })
 })
 
-function makeTask(overrides: Partial<Task> = {}): Task {
+function makeTask(overrides: Partial<AdminTask> = {}): AdminTask {
   return {
     id: 1,
     task_id: 'task_1',

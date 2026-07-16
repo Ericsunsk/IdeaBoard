@@ -1,13 +1,12 @@
 import { computed, ref, watch } from 'vue'
-import {
-  type ApiResponseTaskListData,
-  type ListAdminTasksParams,
-  type ListAdminTasksStatus as ListAdminTasksStatusValue,
+import type {
+  ListAdminTasksParams,
+  ListAdminTasksStatus as ListAdminTasksStatusValue,
 } from '../../../shared/api/generated-query/model'
 import { useAdminPagePagination } from '../shared/composables/useAdminPagePagination'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
 import { useAdminTaskMonitorSettingQuery } from '../system-settings/taskMonitorSettingsResource'
-import { useAdminTaskListResource } from './taskMonitorResource'
+import { useAdminTaskListResource, type AdminTask } from './taskMonitorResource'
 
 type TaskStatusStats = {
   running: number
@@ -18,7 +17,7 @@ type TaskStatusStats = {
   other: number
 }
 
-export type AdminTaskRow = ApiResponseTaskListData['list'][number]
+export type AdminTaskRow = AdminTask
 
 export function useAdminTaskList() {
   const pageState = ref(1)

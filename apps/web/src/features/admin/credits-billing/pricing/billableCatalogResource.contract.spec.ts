@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import {
   createAdminBillableCatalogResource,
+  deleteArchivedBillableItem,
+  fetchBillableItemPriceHistory,
   publishBillableItemPrice,
   setBillableItemAvailability,
 } from './billableCatalogResource'
@@ -99,5 +101,57 @@ describe('Admin Billable Catalog resource', () => {
       updatedAt: '2026-07-16T10:00:00Z',
     })
     expect(requestBody).toEqual({ enabled: false })
+  })
+
+  it('normalizes immutable price history and its feature-local cursor', async () => {
+    let requestUrl = ''
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog/:sku/prices', ({ request }) => {
+        requestUrl = request.url
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            prices: [
+              {
+                price_version_id: 8,
+                version: 2,
+                unit_credits: 4,
+                created_by: 7,
+                created_at: '2026-07-16T08:00:00Z',
+              },
+            ],
+            next_before_version: 2,
+          },
+        })
+      }),
+    )
+
+    await expect(
+      fetchBillableItemPriceHistory('legacy:removed', { beforeVersion: 3, limit: 10 }),
+    ).resolves.toEqual({
+      prices: [
+        {
+          priceVersionId: 8,
+          version: 2,
+          unitCredits: 4,
+          createdBy: 7,
+          createdAt: '2026-07-16T08:00:00Z',
+        },
+      ],
+      nextBeforeVersion: 2,
+    })
+    expect(requestUrl).toContain('before_version=3')
+    expect(requestUrl).toContain('limit=10')
+  })
+
+  it('deletes an Archived item through the generated API boundary', async () => {
+    useMswHandlers(
+      http.delete('/api/admin/billing/catalog/:sku', ({ params }) =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { sku: params.sku } }),
+      ),
+    )
+
+    await expect(deleteArchivedBillableItem('legacy:removed')).resolves.toBe('legacy:removed')
   })
 })

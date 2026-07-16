@@ -60,6 +60,26 @@
             @update:model-value="emit('availability', item, $event)"
           />
         </div>
+
+        <div class="flex min-h-8 items-center justify-end gap-2 border-t border-ib-border-soft pt-4">
+          <Button
+            size="small"
+            severity="secondary"
+            text
+            label="价格历史"
+            @click="emit('history', item)"
+          />
+          <Button
+            v-if="item.status === 'archived'"
+            size="small"
+            severity="danger"
+            text
+            label="删除"
+            :loading="deletePending"
+            :disabled="deletePending"
+            @click="emit('delete', item)"
+          />
+        </div>
       </div>
     </template>
   </Card>
@@ -76,10 +96,16 @@ import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCompactTagClass, adminMasonryCardClass } from '../../shared/lib/adminUiClasses'
 import type { AdminBillableItemCard, AdminBillableItemStatus } from './billableCatalogTypes'
 
-const props = defineProps<{ item: AdminBillableItemCard; availabilityPending?: boolean }>()
+const props = defineProps<{
+  item: AdminBillableItemCard
+  availabilityPending?: boolean
+  deletePending?: boolean
+}>()
 const emit = defineEmits<{
   publish: [item: AdminBillableItemCard]
   availability: [item: AdminBillableItemCard, enabled: boolean]
+  history: [item: AdminBillableItemCard]
+  delete: [item: AdminBillableItemCard]
 }>()
 
 const statusPresentation: Record<

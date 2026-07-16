@@ -7,24 +7,26 @@ import {
 } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import type {
   AdminTaskDeleteResult,
-  ApiResponseTaskListData,
+  ApiResponseAdminTaskListData,
   ListAdminTasksParams,
 } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 
 export type AdminTaskListQueryParams = ListAdminTasksParams
+export type AdminTask = ApiResponseAdminTaskListData['list'][number]
 
 type UseAdminTaskListResourceOptions = Parameters<
-  typeof useListAdminTasks<ApiResponseTaskListData>
+  typeof useListAdminTasks<ApiResponseAdminTaskListData>
 >[1]
 
-const selectAdminTaskList = createApiDataSelector<ApiResponseTaskListData>('加载任务列表失败')
+const selectAdminTaskList =
+  createApiDataSelector<ApiResponseAdminTaskListData>('加载任务列表失败')
 
 export function useAdminTaskListResource(
   params: MaybeRef<AdminTaskListQueryParams>,
   options?: UseAdminTaskListResourceOptions,
 ) {
-  return useListAdminTasks<ApiResponseTaskListData>(params, {
+  return useListAdminTasks<ApiResponseAdminTaskListData>(params, {
     ...options,
     query: {
       ...options?.query,

@@ -51,6 +51,7 @@ type adminTaskDTO struct {
 	CancelledAt                *time.Time                  `json:"cancelled_at"`
 	CancelledBy                *int64                      `json:"cancelled_by"`
 	CancelReason               string                      `json:"cancel_reason"`
+	Billing                    *tasks.AdminBillingSnapshot `json:"billing,omitempty"`
 }
 
 type submitTaskResponse struct {
@@ -357,6 +358,7 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 		CancelledAt:                task.CancelledAt,
 		CancelledBy:                task.CancelledBy,
 		CancelReason:               task.CancelReason,
+		Billing:                    task.BillingSnapshot,
 	}
 }
 

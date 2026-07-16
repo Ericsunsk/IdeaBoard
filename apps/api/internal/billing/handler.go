@@ -32,6 +32,8 @@ type BillableCatalogService interface {
 	List(context.Context) ([]BillableItemCatalogCard, error)
 	PublishPrice(context.Context, string, int64, int64) (PriceInfo, error)
 	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
+	ListPriceHistory(context.Context, string, int64, int) (PricePage, error)
+	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
 }
 
 type Handler struct {
@@ -246,6 +248,49 @@ func (h *Handler) ListPrices(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
+func (h *Handler) ListBillableItemPrices(c *gin.Context) {
+	if _, ok := principal.RequireAdmin(c); !ok {
+		return
+	}
+	limit, ok := parseOptionalInt(c.Query("limit"))
+	if !ok {
+		response.Error(c, http.StatusBadRequest, "limit 无效")
+		return
+	}
+	beforeVersion, ok := parseOptionalPositiveInt64(c.Query("before_version"))
+	if !ok {
+		response.Error(c, http.StatusBadRequest, "before_version 无效")
+		return
+	}
+	if h == nil || h.catalog == nil {
+		writeError(c, ErrServiceUnavailable)
+		return
+	}
+	page, err := h.catalog.ListPriceHistory(c.Request.Context(), c.Param("sku"), beforeVersion, limit)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) DeleteArchivedItem(c *gin.Context) {
+	admin, ok := principal.RequireAdmin(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.catalog == nil {
+		writeError(c, ErrServiceUnavailable)
+		return
+	}
+	result, err := h.catalog.DeleteArchived(c.Request.Context(), c.Param("sku"), admin.UserID())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.SuccessDTO(c, result)
+}
+
 func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
 	identityPrincipal, ok := principal.RequireAdmin(c)
 	if !ok {
@@ -296,6 +341,10 @@ func writeError(c *gin.Context, err error) {
 		response.Error(c, http.StatusNotFound, "价格版本不存在")
 	case errors.Is(err, ErrPricingUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "SKU 当前不可计价")
+	case errors.Is(err, ErrItemNotArchived):
+		response.Error(c, http.StatusConflict, "仅已归档功能可以删除")
+	case errors.Is(err, ErrArchivedItemInUse):
+		response.Error(c, http.StatusConflict, "功能已有历史计费记录，无法删除")
 	case errors.Is(err, ErrQuoteTotalExceeded):
 		response.Error(c, http.StatusUnprocessableEntity, "Idea报价超过允许上限")
 	case errors.Is(err, ErrServiceUnavailable):

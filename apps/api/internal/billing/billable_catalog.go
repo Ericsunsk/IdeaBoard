@@ -105,6 +105,11 @@ func (r *BillableItemRegistry) Find(rawSKU string) (BillableItemDefinition, bool
 	return item, exists
 }
 
+func (r *BillableItemRegistry) Contains(rawSKU string) bool {
+	_, exists := r.Find(rawSKU)
+	return exists
+}
+
 type BillableItemCatalogCard struct {
 	BillableItemDefinition
 	Status       BillableItemStatus `json:"status"`
@@ -124,6 +129,8 @@ type CatalogStore interface {
 	CatalogFactReader
 	CatalogPricePublisher
 	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
+	ListPrices(context.Context, ListPricesInput) (PricePage, error)
+	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
 	Quote(context.Context, string, int64) (Quote, error)
 	QuoteInTx(context.Context, pgx.Tx, string, int64) (Quote, error)
 }
@@ -161,6 +168,35 @@ func (c *BillableItemCatalog) SetAvailability(ctx context.Context, rawSKU string
 		return AvailabilityInfo{}, ErrSKUNotFound
 	}
 	return c.store.SetAvailability(ctx, rawSKU, enabled, actorID)
+}
+
+func (c *BillableItemCatalog) ListPriceHistory(ctx context.Context, rawSKU string, beforeVersion int64, limit int) (PricePage, error) {
+	if c == nil || c.registry == nil || c.store == nil {
+		return PricePage{}, ErrServiceUnavailable
+	}
+	page, err := c.store.ListPrices(ctx, ListPricesInput{SKU: rawSKU, BeforeVersion: beforeVersion, Limit: limit})
+	if errors.Is(err, ErrSKUNotFound) {
+		if _, exists := c.registry.Find(rawSKU); exists {
+			return PricePage{Prices: []PriceInfo{}}, nil
+		}
+	}
+	return page, err
+}
+
+func (c *BillableItemCatalog) DeleteArchived(ctx context.Context, rawSKU string, actorID int64) (ArchivedItemDeleteResult, error) {
+	if c == nil || c.registry == nil || c.store == nil {
+		return ArchivedItemDeleteResult{}, ErrServiceUnavailable
+	}
+	if actorID <= 0 {
+		return ArchivedItemDeleteResult{}, ErrInvalidCatalogEntry
+	}
+	if _, err := CanonicalizeSKU(rawSKU); err != nil {
+		return ArchivedItemDeleteResult{}, err
+	}
+	if _, exists := c.registry.Find(rawSKU); exists {
+		return ArchivedItemDeleteResult{}, ErrItemNotArchived
+	}
+	return c.store.DeleteArchived(ctx, rawSKU, actorID)
 }
 
 func (c *BillableItemCatalog) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {

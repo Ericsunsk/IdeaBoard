@@ -18,10 +18,10 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  ApiResponseAdminTask,
   ApiResponseAdminTaskDeleteResult,
-  ApiResponseTask,
+  ApiResponseAdminTaskList,
   ApiResponseTaskId,
-  ApiResponseTaskList,
   DeleteAdminTasksRequest,
   ListAdminTasksParams,
   SubmitTaskRequest,
@@ -49,8 +49,8 @@ export const getListAdminTasksUrl = (params?: ListAdminTasksParams) => {
 export const listAdminTasks = async (
   params?: ListAdminTasksParams,
   options?: RequestInit,
-): Promise<ApiResponseTaskList> => {
-  return orvalMutator<ApiResponseTaskList>(getListAdminTasksUrl(params), {
+): Promise<ApiResponseAdminTaskList> => {
+  return orvalMutator<ApiResponseAdminTaskList>(getListAdminTasksUrl(params), {
     ...options,
     method: 'GET',
   })
@@ -258,8 +258,8 @@ export const getGetAdminTaskUrl = (taskId: string) => {
 export const getAdminTask = async (
   taskId: string,
   options?: RequestInit,
-): Promise<ApiResponseTask> => {
-  return orvalMutator<ApiResponseTask>(getGetAdminTaskUrl(taskId), {
+): Promise<ApiResponseAdminTask> => {
+  return orvalMutator<ApiResponseAdminTask>(getGetAdminTaskUrl(taskId), {
     ...options,
     method: 'GET',
   })
