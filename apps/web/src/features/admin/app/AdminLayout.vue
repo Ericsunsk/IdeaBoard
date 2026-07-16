@@ -244,6 +244,7 @@ import {
   ADMIN_DEFAULT_PATH,
   ADMIN_LOGIN_PATH,
   findAdminNavigationItemByPath,
+  resolveAdminPageTitle,
 } from './adminNavigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
@@ -377,7 +378,10 @@ const activeItem = computed(() => {
 const activeKey = computed(() => activeItem.value.key)
 
 const currentMeta = computed(() => {
-  return activeItem.value || { title: '管理后台' }
+  return {
+    ...activeItem.value,
+    title: resolveAdminPageTitle(route.path, route.meta.title),
+  }
 })
 
 function navIconClassFor(isActive: boolean) {

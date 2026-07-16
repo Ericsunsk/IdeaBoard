@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"ideaboard/api/internal/platform/adminaction"
 )
 
 const (
@@ -22,9 +20,7 @@ var (
 	ErrInvalidQuantity     = errors.New("quantity must be a positive integer")
 	ErrQuoteTotalExceeded  = errors.New("quote total exceeds allowed Credits")
 	ErrInvalidCatalogEntry = errors.New("invalid billing catalog entry")
-	ErrSKUAlreadyExists    = errors.New("billing SKU already exists")
 	ErrSKUNotFound         = errors.New("billing SKU not found")
-	ErrPriceNotFound       = errors.New("billing price version not found")
 	ErrPricingUnavailable  = errors.New("billing price is unavailable")
 	ErrItemNotArchived     = errors.New("billing item is not archived")
 	ErrArchivedItemInUse   = errors.New("archived billing item has durable references")
@@ -65,27 +61,6 @@ type PriceInfo struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-type CatalogPage struct {
-	Items        []CatalogItem `json:"items"`
-	NextAfterSKU *SKU          `json:"next_after_sku,omitempty"`
-}
-
-type CreateSKUInput struct {
-	SKU         string
-	DisplayName string
-	Description string
-	Enabled     bool
-	Action      adminaction.Metadata
-}
-
-type UpdateSKUInput struct {
-	SKU         string
-	DisplayName *string
-	Description *string
-	Enabled     *bool
-	Action      adminaction.Metadata
-}
-
 type PublishPriceInput struct {
 	Definition  BillableItemDefinition
 	UnitCredits int64
@@ -96,11 +71,6 @@ type AvailabilityInfo struct {
 	SKU       SKU                `json:"sku"`
 	Status    BillableItemStatus `json:"status"`
 	UpdatedAt time.Time          `json:"updated_at"`
-}
-
-type ListCatalogInput struct {
-	AfterSKU string
-	Limit    int
 }
 
 type ListPricesInput struct {

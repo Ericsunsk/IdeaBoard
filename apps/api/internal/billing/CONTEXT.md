@@ -32,6 +32,7 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 - `PriceSnapshot` 包含 `sku`, `display_name`, `price_version_id`, `price_version`, `unit_credits`, `quoted_at`；后续 Hold/Charge 必须保存并复用该 snapshot，不得重新报价。`display_name` 在 Quote 时固化，SKU 后续改名不得改变历史任务账单语义。
 - 用户侧 Billing Records 只读取 Task Billing Snapshot 中固化的 `display_name`；不得回查当前 SKU display fields 改写历史账单名称。
 - Admin 功能定价只发布新的 immutable Price Version；不提供 Price Version enable/disable command，也不要求 Admin 手填 reason。Database command 自动记录 actor、target、old/new 与 outcome。
+- `create_sku`、`update_sku`、`set_price_enabled` 仅作为既有 append-only Admin Audit 的 historical vocabulary 保留，不是 runtime 或 Admin command contract。
 - Registry 中的 SKU identity 没有 rename/delete contract；停用使用 `enabled=false`。只有 Registry 已移除且无 durable reference 的 Archived aggregate 可 hard delete。
 - Admin Catalog、Quote 与 Task Billing 统一使用 feature-level identity `ai-image:<feature>`。Provider Model 只属于 execution/idempotency contract，不参与用户价格 identity；切换模型不会改变功能价格。计费资格来自 Workflow registry 的 `UsesAIProvider` product contract，不来自 Provider Account。
 

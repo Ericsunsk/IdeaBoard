@@ -16,7 +16,6 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
-	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/runtime/httpapi"
 	"ideaboard/api/internal/runtime/webdist"
 	"ideaboard/api/internal/tasking/taskservice"
@@ -35,8 +34,7 @@ func newAppRouter(
 	accountHandler := accounts.NewAccountHandler(taskServices.accountService)
 	taskHandler := taskservice.NewHandler(taskServices.taskService)
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
-	billingHandler := billing.NewHandler(services.billingCatalog, services.billingService, services.billingCatalog)
-	billingCoverageHandler := billingcoverage.NewHandler(services.billingCoverage)
+	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: services.authServiceClient,
@@ -73,7 +71,6 @@ func newAppRouter(
 				users.NewIdentityAdminCommands(services.userService, services.authServiceClient),
 			),
 			BillingHandler:          billingHandler,
-			BillingCoverageHandler:  billingCoverageHandler,
 			CreditHandler:           credits.NewHandler(services.creditService),
 			AccountHandler:          accountHandler,
 			TaskHandler:             taskHandler,

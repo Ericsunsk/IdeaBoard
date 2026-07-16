@@ -19,8 +19,6 @@ type handlerServiceStub struct {
 		sku      string
 		quantity int64
 	}
-	createSKUInput CreateSKUInput
-	updateSKUInput UpdateSKUInput
 }
 
 type billableCatalogReaderStub struct {
@@ -84,28 +82,10 @@ func (s *handlerServiceStub) Quote(_ context.Context, sku string, quantity int64
 	}, nil
 }
 
-func (s *handlerServiceStub) CreateSKU(_ context.Context, input CreateSKUInput) (CatalogItem, error) {
-	s.createSKUInput = input
-	return CatalogItem{SKU: SKU(input.SKU), DisplayName: input.DisplayName, Enabled: input.Enabled}, nil
-}
-
-func (s *handlerServiceStub) UpdateSKU(_ context.Context, input UpdateSKUInput) (CatalogItem, error) {
-	s.updateSKUInput = input
-	return CatalogItem{SKU: SKU(input.SKU)}, nil
-}
-
-func (s *handlerServiceStub) ListCatalog(context.Context, ListCatalogInput) (CatalogPage, error) {
-	return CatalogPage{Items: []CatalogItem{}}, nil
-}
-
-func (s *handlerServiceStub) ListPrices(context.Context, ListPricesInput) (PricePage, error) {
-	return PricePage{Prices: []PriceInfo{}}, nil
-}
-
 func TestQuoteHandlerRejectsCallerSuppliedPrice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	handler := NewHandler(service, service, nil)
+	handler := NewHandler(service, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
@@ -131,7 +111,7 @@ func TestQuoteHandlerRejectsCallerSuppliedPrice(t *testing.T) {
 func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	handler := NewHandler(service, service, nil)
+	handler := NewHandler(service, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
@@ -186,7 +166,7 @@ func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
 			Status: BillableItemStatusArchived, CurrentPrice: price,
 		},
 	}}
-	handler := NewHandler(service, service, catalog)
+	handler := NewHandler(service, catalog)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
@@ -227,7 +207,7 @@ func TestQuoteHandlerRequiresTypedPrincipal(t *testing.T) {
 				if tt.setup != nil {
 					tt.setup(c)
 				}
-				NewHandler(service, service, nil).Quote(c)
+				NewHandler(service, nil).Quote(c)
 			})
 			recorder := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(`{"sku":"ideaboard:image.generate","quantity":1}`))
@@ -240,130 +220,10 @@ func TestQuoteHandlerRequiresTypedPrincipal(t *testing.T) {
 	}
 }
 
-func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	service := &handlerServiceStub{}
-	handler := NewHandler(service, service, nil)
-
-	for _, tt := range []struct {
-		name       string
-		actorID    int64
-		role       principal.Role
-		body       string
-		wantStatus int
-	}{
-		{name: "missing actor", body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"launch pricing"}`, wantStatus: http.StatusUnauthorized},
-		{name: "user role", actorID: 9, role: principal.RoleUser, body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"launch pricing"}`, wantStatus: http.StatusForbidden},
-		{name: "missing explicit enabled", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","reason":"launch pricing"}`, wantStatus: http.StatusBadRequest},
-		{name: "missing reason", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","enabled":true}`, wantStatus: http.StatusBadRequest},
-		{name: "blank reason", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","enabled":true,"reason":"  "}`, wantStatus: http.StatusBadRequest},
-		{name: "valid", actorID: 9, role: principal.RoleAdmin, body: `{"sku":"test:item","display_name":"Item","description":"D","enabled":true,"reason":"  launch pricing  "}`, wantStatus: http.StatusOK},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			response := httptest.NewRecorder()
-			request := httptest.NewRequest(http.MethodPost, "/skus", strings.NewReader(tt.body))
-			request.Header.Set("Content-Type", "application/json")
-			if tt.actorID > 0 {
-				request.Header.Set("X-Test-Actor", "true")
-			}
-			routerWithActor := gin.New()
-			routerWithActor.Use(func(c *gin.Context) {
-				if tt.actorID > 0 {
-					testsupport.SetPrincipal(t, c, tt.actorID, tt.role)
-				}
-				c.Next()
-			})
-			routerWithActor.POST("/skus", handler.CreateSKU)
-			routerWithActor.ServeHTTP(response, request)
-			if response.Code != tt.wantStatus {
-				t.Fatalf("status = %d body=%s, want %d", response.Code, response.Body.String(), tt.wantStatus)
-			}
-		})
-	}
-	if service.createSKUInput.Action.ActorID() != 9 || !service.createSKUInput.Enabled || service.createSKUInput.Action.Reason() != "launch pricing" {
-		t.Fatalf("CreateSKU input = %+v", service.createSKUInput)
-	}
-}
-
-func TestAdminBillingAuthenticatesBeforeServiceAvailability(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	for _, tt := range []struct {
-		name       string
-		setup      func(*gin.Context)
-		wantStatus int
-	}{
-		{name: "missing Principal", wantStatus: http.StatusUnauthorized},
-		{name: "user Principal", setup: func(c *gin.Context) { testsupport.SetPrincipal(t, c, 9, principal.RoleUser) }, wantStatus: http.StatusForbidden},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			router := gin.New()
-			router.POST("/skus", func(c *gin.Context) {
-				if tt.setup != nil {
-					tt.setup(c)
-				}
-				NewHandler(nil, nil, nil).CreateSKU(c)
-			})
-			recorder := httptest.NewRecorder()
-			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/skus", strings.NewReader(`{}`)))
-			if recorder.Code != tt.wantStatus || strings.Count(recorder.Body.String(), `"code"`) != 1 {
-				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
-			}
-		})
-	}
-}
-
-func TestAdminBillingWriteHandlerRequiresAndTrimsSKUReason(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	service := &handlerServiceStub{}
-	handler := NewHandler(service, service, nil)
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
-		c.Next()
-	})
-	router.PATCH("/skus/:sku", handler.UpdateSKU)
-
-	for _, tt := range []struct {
-		name   string
-		method string
-		path   string
-		body   string
-	}{
-		{name: "update missing reason", method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false}`},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			response := httptest.NewRecorder()
-			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
-			request.Header.Set("Content-Type", "application/json")
-			router.ServeHTTP(response, request)
-			if response.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d body=%s, want 400", response.Code, response.Body.String())
-			}
-		})
-	}
-
-	validRequests := []struct{ method, path, body string }{{
-		method: http.MethodPatch, path: "/skus/test:item", body: `{"enabled":false,"reason":"  disable catalog  "}`,
-	}}
-	for _, requestCase := range validRequests {
-		response := httptest.NewRecorder()
-		request := httptest.NewRequest(requestCase.method, requestCase.path, strings.NewReader(requestCase.body))
-		request.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(response, request)
-		if response.Code != http.StatusOK {
-			t.Fatalf("%s %s status = %d body=%s", requestCase.method, requestCase.path, response.Code, response.Body.String())
-		}
-	}
-	if service.updateSKUInput.Action.Reason() != "disable catalog" {
-		t.Fatalf("trimmed update reason=%q", service.updateSKUInput.Action.Reason())
-	}
-}
-
 func TestAdminPublishPriceUsesAuthenticatedActorWithoutReason(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	catalog := &billableCatalogReaderStub{}
-	handler := NewHandler(&handlerServiceStub{}, nil, catalog)
+	handler := NewHandler(&handlerServiceStub{}, catalog)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
@@ -392,7 +252,7 @@ func TestAdminPublishPriceUsesAuthenticatedActorWithoutReason(t *testing.T) {
 func TestAdminSetAvailabilityUsesAuthenticatedActorWithoutReason(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	catalog := &billableCatalogReaderStub{}
-	handler := NewHandler(&handlerServiceStub{}, nil, catalog)
+	handler := NewHandler(&handlerServiceStub{}, catalog)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
@@ -420,17 +280,15 @@ func TestAdminSetAvailabilityUsesAuthenticatedActorWithoutReason(t *testing.T) {
 
 func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	service := &handlerServiceStub{}
-	handler := NewHandler(service, service, nil)
+	catalog := &billableCatalogReaderStub{}
+	handler := NewHandler(&handlerServiceStub{}, catalog)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
 		c.Next()
 	})
-	router.PATCH("/skus/:sku", handler.UpdateSKU)
-	router.GET("/skus", handler.ListCatalog)
-	router.GET("/skus/:sku/prices", handler.ListPrices)
 	router.POST("/catalog/:sku/prices", handler.PublishPrice)
+	router.GET("/catalog/:sku/prices", handler.ListBillableItemPrices)
 
 	tests := []struct {
 		name   string
@@ -438,10 +296,8 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 		path   string
 		body   string
 	}{
-		{name: "update SKU cannot smuggle rename", method: http.MethodPatch, path: "/skus/test:item", body: `{"sku":"test:renamed"}`},
 		{name: "publish price cannot use provider routing", method: http.MethodPost, path: "/catalog/test:item/prices", body: `{"unit_credits":1,"provider_account_id":2}`},
-		{name: "catalog limit is bounded", method: http.MethodGet, path: "/skus?limit=101"},
-		{name: "price cursor is positive", method: http.MethodGet, path: "/skus/test:item/prices?before_version=-1"},
+		{name: "price cursor is positive", method: http.MethodGet, path: "/catalog/test:item/prices?before_version=-1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -481,7 +337,7 @@ func TestAdminBillableItemHistoryAndDeleteRequireAdmin(t *testing.T) {
 					if identity.role != "" {
 						testsupport.SetPrincipal(t, c, 9, identity.role)
 					}
-					endpoint.handler(NewHandler(nil, nil, nil))(c)
+					endpoint.handler(NewHandler(nil, nil))(c)
 				})
 				recorder := httptest.NewRecorder()
 				router.ServeHTTP(recorder, httptest.NewRequest(endpoint.method, endpoint.path, nil))
@@ -503,7 +359,7 @@ func TestAdminBillableItemPriceHistoryContract(t *testing.T) {
 		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
 		c.Next()
 	})
-	router.GET("/catalog/:sku/prices", NewHandler(nil, nil, catalog).ListBillableItemPrices)
+	router.GET("/catalog/:sku/prices", NewHandler(nil, catalog).ListBillableItemPrices)
 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/catalog/legacy:removed/prices?before_version=3&limit=10", nil))
@@ -535,7 +391,7 @@ func TestAdminArchivedDeleteContract(t *testing.T) {
 		testsupport.SetPrincipal(t, c, 12, principal.RoleAdmin)
 		c.Next()
 	})
-	router.DELETE("/catalog/:sku", NewHandler(nil, nil, catalog).DeleteArchivedItem)
+	router.DELETE("/catalog/:sku", NewHandler(nil, catalog).DeleteArchivedItem)
 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/catalog/legacy:removed", nil))

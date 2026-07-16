@@ -19,58 +19,6 @@ func NewService(pool *pgxpool.Pool) *Service {
 	return &Service{pool: pool}
 }
 
-func (s *Service) CreateSKU(ctx context.Context, input CreateSKUInput) (CatalogItem, error) {
-	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || !input.Action.IsValid() {
-		return CatalogItem{}, ErrInvalidCatalogEntry
-	}
-	displayName, err := normalizeDisplayName(input.DisplayName)
-	if err != nil {
-		return CatalogItem{}, err
-	}
-	description, err := normalizeDescription(input.Description)
-	if err != nil {
-		return CatalogItem{}, err
-	}
-	if err := s.requirePool(); err != nil {
-		return CatalogItem{}, err
-	}
-	if _, err := s.pool.Exec(ctx, `SELECT create_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.Action.ActorID(), input.Action.Reason()); err != nil {
-		return CatalogItem{}, mapDatabaseError("create SKU", err)
-	}
-	return s.GetSKU(ctx, string(sku))
-}
-
-func (s *Service) UpdateSKU(ctx context.Context, input UpdateSKUInput) (CatalogItem, error) {
-	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil || !input.Action.IsValid() || (input.DisplayName == nil && input.Description == nil && input.Enabled == nil) {
-		return CatalogItem{}, ErrInvalidCatalogEntry
-	}
-	var displayName *string
-	if input.DisplayName != nil {
-		value, err := normalizeDisplayName(*input.DisplayName)
-		if err != nil {
-			return CatalogItem{}, err
-		}
-		displayName = &value
-	}
-	var description *string
-	if input.Description != nil {
-		value, err := normalizeDescription(*input.Description)
-		if err != nil {
-			return CatalogItem{}, err
-		}
-		description = &value
-	}
-	if err := s.requirePool(); err != nil {
-		return CatalogItem{}, err
-	}
-	if _, err := s.pool.Exec(ctx, `SELECT update_billing_sku($1, $2, $3, $4, $5, $6)`, sku, displayName, description, input.Enabled, input.Action.ActorID(), input.Action.Reason()); err != nil {
-		return CatalogItem{}, mapDatabaseError("update SKU", err)
-	}
-	return s.GetSKU(ctx, string(sku))
-}
-
 func (s *Service) PublishPrice(ctx context.Context, input PublishPriceInput) (PriceInfo, error) {
 	definition := input.Definition
 	sku, err := CanonicalizeSKU(string(definition.SKU))
@@ -190,113 +138,8 @@ WHERE skus.sku = $1`, sku).Scan(
 	return Quote{PriceSnapshot: snapshot, Quantity: quantity, TotalCredits: total}, nil
 }
 
-func (s *Service) GetSKU(ctx context.Context, rawSKU string) (CatalogItem, error) {
-	sku, err := CanonicalizeSKU(rawSKU)
-	if err != nil {
-		return CatalogItem{}, err
-	}
-	if err := s.requirePool(); err != nil {
-		return CatalogItem{}, err
-	}
-	row := s.pool.QueryRow(ctx, catalogSelectSQL+` WHERE skus.sku = $1`, sku)
-	item, err := scanCatalogItem(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return CatalogItem{}, ErrSKUNotFound
-	}
-	if err != nil {
-		return CatalogItem{}, fmt.Errorf("get billing SKU: %w", err)
-	}
-	return item, nil
-}
-
-func (s *Service) GetSKUs(ctx context.Context, rawSKUs []string) ([]CatalogItem, error) {
-	if len(rawSKUs) == 0 {
-		return []CatalogItem{}, nil
-	}
-	skus := make([]string, 0, len(rawSKUs))
-	seen := make(map[SKU]struct{}, len(rawSKUs))
-	for _, rawSKU := range rawSKUs {
-		sku, err := CanonicalizeSKU(rawSKU)
-		if err != nil {
-			return nil, err
-		}
-		if _, exists := seen[sku]; exists {
-			continue
-		}
-		seen[sku] = struct{}{}
-		skus = append(skus, string(sku))
-	}
-	if err := s.requirePool(); err != nil {
-		return nil, err
-	}
-	rows, err := s.pool.Query(ctx, catalogSelectSQL+`
-WHERE skus.sku = ANY($1::text[])
-ORDER BY skus.sku`, skus)
-	if err != nil {
-		return nil, fmt.Errorf("get billing SKUs: %w", err)
-	}
-	defer rows.Close()
-	items := make([]CatalogItem, 0, len(skus))
-	for rows.Next() {
-		item, err := scanCatalogItem(rows)
-		if err != nil {
-			return nil, fmt.Errorf("scan billing SKUs: %w", err)
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read billing SKUs: %w", err)
-	}
-	return items, nil
-}
-
-func (s *Service) ListCatalog(ctx context.Context, input ListCatalogInput) (CatalogPage, error) {
-	limit, err := normalizePageLimit(input.Limit)
-	if err != nil {
-		return CatalogPage{}, err
-	}
-	afterSKU := ""
-	if input.AfterSKU != "" {
-		canonical, err := CanonicalizeSKU(input.AfterSKU)
-		if err != nil {
-			return CatalogPage{}, err
-		}
-		afterSKU = string(canonical)
-	}
-	if err := s.requirePool(); err != nil {
-		return CatalogPage{}, err
-	}
-	rows, err := s.pool.Query(ctx, catalogSelectSQL+`
-WHERE skus.sku > $1
-ORDER BY skus.sku
-LIMIT $2`, afterSKU, limit+1)
-	if err != nil {
-		return CatalogPage{}, fmt.Errorf("list billing catalog: %w", err)
-	}
-	defer rows.Close()
-	items := make([]CatalogItem, 0, limit)
-	for rows.Next() {
-		item, err := scanCatalogItem(rows)
-		if err != nil {
-			return CatalogPage{}, fmt.Errorf("scan billing catalog: %w", err)
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return CatalogPage{}, fmt.Errorf("read billing catalog: %w", err)
-	}
-	page := CatalogPage{Items: items}
-	if len(items) > limit {
-		next := items[limit-1].SKU
-		page.Items = items[:limit]
-		page.NextAfterSKU = &next
-	}
-	return page, nil
-}
-
-// ListCatalogFacts returns the complete persisted Catalog projection used by
-// the Billable Item Read Model. The Admin SKU endpoint keeps its paginated
-// contract; only the bounded Registry merge consumes this complete view.
+// ListCatalogFacts returns the complete persisted projection used by the
+// bounded Billable Item Registry merge.
 func (s *Service) ListCatalogFacts(ctx context.Context) ([]CatalogItem, error) {
 	if err := s.requirePool(); err != nil {
 		return nil, err
@@ -360,8 +203,12 @@ LIMIT $3`, sku, before, limit+1)
 		return PricePage{}, fmt.Errorf("read billing prices: %w", err)
 	}
 	if len(prices) == 0 {
-		if _, err := s.GetSKU(ctx, string(sku)); err != nil {
-			return PricePage{}, err
+		var exists bool
+		if err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing_skus WHERE sku = $1)`, sku).Scan(&exists); err != nil {
+			return PricePage{}, fmt.Errorf("check billing SKU: %w", err)
+		}
+		if !exists {
+			return PricePage{}, ErrSKUNotFound
 		}
 	}
 	page := PricePage{Prices: prices}
@@ -458,14 +305,10 @@ func mapDatabaseError(action string, err error) error {
 		switch pgErr.Code {
 		case "IB101", "22001", "23514":
 			return ErrInvalidCatalogEntry
-		case "IB102", "23505":
-			return ErrSKUAlreadyExists
 		case "IB103":
 			return ErrSKUNotFound
 		case "IB104":
 			return ErrPricingUnavailable
-		case "IB106":
-			return ErrPriceNotFound
 		case "IB108":
 			return ErrArchivedItemInUse
 		}

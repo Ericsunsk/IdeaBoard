@@ -16,7 +16,6 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -383,8 +382,7 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 						t.Fatal(err)
 					}
 					if !scenario.skuEnabled {
-						disabled := false
-						if _, err := billingService.UpdateSKU(t.Context(), billing.UpdateSKUInput{SKU: string(sku), Enabled: &disabled, Action: testsupport.AdminAction(t, 1, "test disabled SKU")}); err != nil {
+						if _, err := billingService.SetAvailability(t.Context(), string(sku), false, 1); err != nil {
 							t.Fatal(err)
 						}
 					}

@@ -375,10 +375,7 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := commands.Ban(c.Request.Context(), identityPrincipal, targetUserID, IdentityAdminBanInput{
-		Reason:        req.Reason,
-		ExpiresInDays: req.ExpiresInDays,
-	}); err != nil {
+	if err := commands.Ban(c.Request.Context(), identityPrincipal, targetUserID, IdentityAdminBanInput(req)); err != nil {
 		respondIdentityAdminCommandError(c, err)
 		return
 	}

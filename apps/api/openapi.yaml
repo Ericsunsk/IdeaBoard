@@ -1583,102 +1583,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseBillableItemAvailability'
 
-  /admin/billing/skus:
-    get:
-      tags: [AdminBilling]
-      operationId: listAdminBillingSKUs
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: after_sku
-          in: query
-          schema: { $ref: '#/components/schemas/BillingSKUCode' }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-      responses:
-        '200':
-          description: Global SKU catalog page
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingCatalogPage'
-    post:
-      tags: [AdminBilling]
-      operationId: createAdminBillingSKU
-      security:
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminBillingSKUCreateRequest'
-      responses:
-        '200':
-          description: Immutable global SKU created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingCatalogItem'
-
-  /admin/billing/coverage:
-    get:
-      tags: [AdminBilling]
-      operationId: getAdminBillingCoverage
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Executable AI workflow and provider model pricing coverage
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingCoverage'
-
-  /admin/billing/skus/{sku}:
-    patch:
-      tags: [AdminBilling]
-      operationId: updateAdminBillingSKU
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/BillingSKUPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AdminBillingSKUUpdateRequest'
-      responses:
-        '200':
-          description: Mutable SKU presentation and enabled state updated; SKU identity is unchanged
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingCatalogItem'
-
-  /admin/billing/skus/{sku}/prices:
-    get:
-      tags: [AdminBilling]
-      operationId: listAdminBillingPrices
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/BillingSKUPath'
-        - name: before_version
-          in: query
-          schema: { type: integer, format: int64, minimum: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-      responses:
-        '200':
-          description: Immutable price versions, newest first
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingPricePage'
   /admin/accounts:
     get:
       tags: [AdminAccounts]
@@ -2524,28 +2428,6 @@ components:
         created_by: { type: integer, format: int64, minimum: 1 }
         created_at: { type: string, format: date-time }
 
-    BillingCatalogItem:
-      type: object
-      required: [sku, display_name, description, enabled, created_at, updated_at]
-      properties:
-        sku: { $ref: '#/components/schemas/BillingSKUCode' }
-        display_name: { type: string, minLength: 1, maxLength: 120 }
-        description: { type: string, maxLength: 1000 }
-        enabled: { type: boolean }
-        current_price_version_id: { type: integer, format: int64, minimum: 1 }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
-        current_price: { $ref: '#/components/schemas/BillingPrice' }
-
-    BillingCatalogPage:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/BillingCatalogItem' }
-        next_after_sku: { $ref: '#/components/schemas/BillingSKUCode' }
-
     BillableItemStatus:
       type: string
       enum: [unpriced, active, disabled, archived]
@@ -2602,27 +2484,6 @@ components:
           properties:
             data: { $ref: '#/components/schemas/BillableItemAvailability' }
 
-    BillingCoverageItem:
-      type: object
-      required: [feature, model, sku, sku_configured, sku_enabled, price_configured, price_enabled]
-      properties:
-        feature: { $ref: '#/components/schemas/WorkflowFeatureSlug' }
-        model: { type: string, minLength: 1 }
-        sku: { $ref: '#/components/schemas/BillingSKUCode' }
-        sku_configured: { type: boolean }
-        sku_enabled: { type: boolean }
-        price_configured: { type: boolean }
-        price_enabled: { type: boolean }
-        unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
-
-    BillingCoverage:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/BillingCoverageItem' }
-
     BillingPricePage:
       type: object
       required: [prices]
@@ -2631,31 +2492,6 @@ components:
           type: array
           items: { $ref: '#/components/schemas/BillingPrice' }
         next_before_version: { type: integer, format: int64, minimum: 1 }
-
-    AdminBillingSKUCreateRequest:
-      type: object
-      additionalProperties: false
-      required: [sku, display_name, enabled, reason]
-      properties:
-        sku: { $ref: '#/components/schemas/BillingSKUCode' }
-        display_name: { type: string, minLength: 1, maxLength: 120 }
-        description: { type: string, maxLength: 1000, default: '' }
-        enabled: { type: boolean }
-        reason: { $ref: '#/components/schemas/AdminActionReason' }
-
-    AdminBillingSKUUpdateRequest:
-      type: object
-      additionalProperties: false
-      required: [reason]
-      anyOf:
-        - required: [display_name]
-        - required: [description]
-        - required: [enabled]
-      properties:
-        display_name: { type: string, minLength: 1, maxLength: 120 }
-        description: { type: string, maxLength: 1000 }
-        enabled: { type: boolean }
-        reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     AdminBillingPricePublishRequest:
       type: object
@@ -4973,14 +4809,6 @@ components:
             data:
               $ref: '#/components/schemas/BillingQuote'
 
-    ApiResponseBillingCatalogItem:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/BillingCatalogItem'
-
     ApiResponseBillableItemCatalog:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
@@ -4988,22 +4816,6 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/BillableItemCatalog'
-
-    ApiResponseBillingCoverage:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/BillingCoverage'
-
-    ApiResponseBillingCatalogPage:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/BillingCatalogPage'
 
     ApiResponseBillingPrice:
       allOf:

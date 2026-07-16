@@ -27,7 +27,6 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
-	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/testdb"
@@ -285,7 +284,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			TaskHandler:      taskservice.NewHandler(nil),
 			BoardHandler:     boards.NewBoardHandler(nil, nil),
 			LineDraftHandler: assets.NewLineDraftHandler(nil),
-			BillingHandler:   billing.NewHandler(nil, nil, nil),
+			BillingHandler:   billing.NewHandler(nil, nil),
 			BillingRecords:   billingrecords.NewHandler(nil),
 			CreditHandler:    credits.NewHandler(nil),
 			UsageHandler:     usage.NewHandler(nil),
@@ -296,8 +295,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 		},
 		AdminRoutes: AdminRouteDeps{
 			AdminHandler:            users.NewAdminHandler(nil, nil, nil),
-			BillingHandler:          billing.NewHandler(nil, nil, nil),
-			BillingCoverageHandler:  billingcoverage.NewHandler(nil),
+			BillingHandler:          billing.NewHandler(nil, nil),
 			CreditHandler:           credits.NewHandler(nil),
 			AccountHandler:          accounts.NewAccountHandler(nil),
 			TaskHandler:             taskservice.NewHandler(nil),
@@ -353,6 +351,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 	want := map[string]bool{
 		"DELETE /api/admin/accounts/:id":                              false,
 		"DELETE /api/admin/accounts/:id/models":                       false,
+		"DELETE /api/admin/billing/catalog/:sku":                      false,
 		"DELETE /api/admin/provider-endpoints/:id":                    false,
 		"DELETE /api/admin/rewards/campaigns/:campaign_id":            false,
 		"DELETE /api/admin/line-draft-modes/:id":                      false,
@@ -370,10 +369,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/credits/reconciliation/runs":                  false,
 		"GET /api/admin/credits/reconciliation/runs/:run_id":          false,
 		"GET /api/admin/credits/reconciliation/runs/:run_id/findings": false,
-		"GET /api/admin/billing/skus":                                 false,
 		"GET /api/admin/billing/catalog":                              false,
-		"GET /api/admin/billing/coverage":                             false,
-		"GET /api/admin/billing/skus/:sku/prices":                     false,
+		"GET /api/admin/billing/catalog/:sku/prices":                  false,
 		"GET /api/admin/rewards/campaigns":                            false,
 		"GET /api/admin/rewards/campaigns/:campaign_id":               false,
 		"GET /api/admin/rewards/campaigns/:campaign_id/batches":       false,
@@ -402,8 +399,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/credits/corrections":                         false,
 		"POST /api/admin/credits/refunds":                             false,
 		"POST /api/admin/credits/reconciliation/runs":                 false,
-		"POST /api/admin/billing/skus":                                false,
-		"POST /api/admin/billing/skus/:sku/prices":                    false,
+		"POST /api/admin/billing/catalog/:sku/prices":                 false,
 		"POST /api/admin/rewards/campaigns":                           false,
 		"POST /api/admin/rewards/campaigns/:campaign_id/public-code":  false,
 		"POST /api/admin/rewards/campaigns/:campaign_id/batches":      false,
@@ -430,8 +426,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/users/:id/revoke-sessions":                   false,
 		"POST /api/admin/users/:id/unban":                             false,
 		"PATCH /api/admin/accounts/:id/models":                        false,
-		"PATCH /api/admin/billing/skus/:sku":                          false,
-		"PATCH /api/admin/billing/skus/:sku/prices/:version":          false,
 		"PUT /api/admin/accounts/:id":                                 false,
 		"PUT /api/admin/billing/catalog/:sku/availability":            false,
 		"PUT /api/admin/provider-endpoints/:id":                       false,

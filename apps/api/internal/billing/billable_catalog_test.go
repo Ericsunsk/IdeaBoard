@@ -79,6 +79,9 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 		{SKU: "ai-image:hd-upscale", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "HD", SortOrder: 30},
 		{SKU: "ai-image:image-extend", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "扩图", SortOrder: 40},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	facts := catalogFactReaderStub{items: []CatalogItem{
 		{SKU: "ai-image:partial-edit", Enabled: true, CurrentPrice: &activePrice, UpdatedAt: now},
 		{SKU: "ai-image:remove-bg", Enabled: false, CurrentPrice: &disabledPrice, UpdatedAt: now},

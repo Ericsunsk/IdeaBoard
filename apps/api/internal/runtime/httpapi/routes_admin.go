@@ -65,11 +65,6 @@ func registerAdminBillingRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/billing/catalog/:sku/prices", h.BillingHandler.ListBillableItemPrices)
 	adminAPI.PUT("/billing/catalog/:sku/availability", h.BillingHandler.SetAvailability)
 	adminAPI.DELETE("/billing/catalog/:sku", h.BillingHandler.DeleteArchivedItem)
-	adminAPI.GET("/billing/coverage", h.BillingCoverageHandler.List)
-	adminAPI.GET("/billing/skus", h.BillingHandler.ListCatalog)
-	adminAPI.POST("/billing/skus", h.BillingHandler.CreateSKU)
-	adminAPI.PATCH("/billing/skus/:sku", h.BillingHandler.UpdateSKU)
-	adminAPI.GET("/billing/skus/:sku/prices", h.BillingHandler.ListPrices)
 }
 
 func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

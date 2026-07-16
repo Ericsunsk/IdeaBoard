@@ -369,6 +369,36 @@ func TestFeatureLevelPricingMigrationDeclaresSchemaRollbackContract(t *testing.T
 	}
 }
 
+func TestBillingCatalogSurfaceCleanupMigrationDropsLegacyCommands(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260716070000_billing_catalog_surface_cleanup.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	for _, expected := range []string{
+		"DROP FUNCTION IF EXISTS create_billing_sku",
+		"DROP FUNCTION IF EXISTS update_billing_sku",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("up migration missing %q", expected)
+		}
+	}
+	for _, expected := range []string{
+		"CREATE FUNCTION create_billing_sku(",
+		"CREATE FUNCTION update_billing_sku(",
+		"REVOKE ALL ON FUNCTION create_billing_sku",
+		"REVOKE ALL ON FUNCTION update_billing_sku",
+	} {
+		if !strings.Contains(down, expected) {
+			t.Fatalf("down migration missing %q", expected)
+		}
+	}
+	if err := validateMigrationStatements("20260716070000_billing_catalog_surface_cleanup.sql down", parseSQLStatements(down)); err != nil {
+		t.Fatalf("down migration failed validation: %v", err)
+	}
+}
+
 func TestFeatureLevelPricingMigrationPublishesAndRollsBack(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
@@ -398,7 +428,7 @@ FROM publish_billing_price('ai-image:partial-edit', '局部重绘', '只修改�
 		t.Fatalf("materialized SKU enabled=%v err=%v", enabled, err)
 	}
 	if _, err := conn.ExecContext(ctx, `
-SELECT update_billing_sku('ai-image:partial-edit', NULL, NULL, FALSE, 8, 'disable feature')
+SELECT * FROM set_billing_item_availability('ai-image:partial-edit', FALSE, 8)
 `); err != nil {
 		t.Fatalf("disable materialized SKU: %v", err)
 	}
@@ -1452,10 +1482,33 @@ func TestAdminBillingReasonMigrationRollsBackAndReapplies(t *testing.T) {
 		t.Fatalf("apply migrations: %v", err)
 	}
 
-	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", true)
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", false)
 	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint)", false)
 	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", true)
 	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint)", false)
+
+	cleanupRaw, err := migrationFS.ReadFile("20260716070000_billing_catalog_surface_cleanup.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupTx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(cleanupRaw))) {
+		if _, err := cleanupTx.ExecContext(ctx, statement.SQL); err != nil {
+			_ = cleanupTx.Rollback()
+			t.Fatalf("execute cleanup down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
+		}
+	}
+	if _, err := cleanupTx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = 20260716070000`); err != nil {
+		_ = cleanupTx.Rollback()
+		t.Fatal(err)
+	}
+	if err := cleanupTx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", true)
 
 	raw, err := migrationFS.ReadFile("20260712020000_admin_billing_reasons.sql")
 	if err != nil {
@@ -1489,7 +1542,7 @@ func TestAdminBillingReasonMigrationRollsBackAndReapplies(t *testing.T) {
 	if err := upWithConn(ctx, conn); err != nil {
 		t.Fatalf("reapply migration after down: %v", err)
 	}
-	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", true)
+	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", false)
 	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", true)
 	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "reason", true)
 	assertTableExists(t, ctx, conn, "billing_admin_actions", true)
@@ -2085,23 +2138,6 @@ func sortedStringSet(values map[string]struct{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
-}
-
-func normalizeBaselineSchema(up string) string {
-	if schema, _, ok := strings.Cut(up, "\nINSERT INTO storage_profiles "); ok {
-		up = schema
-	}
-	lines := strings.Split(up, "\n")
-	normalized := make([]string, 0, len(lines))
-	for _, line := range lines {
-		switch strings.TrimSpace(line) {
-		case "-- statement:begin", "-- statement:end":
-			continue
-		default:
-			normalized = append(normalized, line)
-		}
-	}
-	return strings.TrimSpace(strings.Join(normalized, "\n"))
 }
 
 func extractDownSQLForTest(raw string) string {

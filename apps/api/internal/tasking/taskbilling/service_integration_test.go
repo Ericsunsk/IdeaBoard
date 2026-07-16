@@ -8,7 +8,6 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -236,10 +235,7 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	renamed := "Pattern Generator"
-	if _, err := billingService.UpdateSKU(t.Context(), billing.UpdateSKUInput{
-		SKU: string(sku), DisplayName: &renamed, Action: testsupport.AdminAction(t, 1, "verify immutable snapshot name"),
-	}); err != nil {
+	if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "Pattern Generator", 0)); err != nil {
 		t.Fatal(err)
 	}
 	var persistedDisplayName string

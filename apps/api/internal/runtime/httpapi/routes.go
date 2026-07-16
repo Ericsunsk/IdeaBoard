@@ -16,7 +16,6 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
-	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/usage"
@@ -73,7 +72,6 @@ type UserRouteDeps struct {
 type AdminRouteDeps struct {
 	AdminHandler            *users.AdminHandler
 	BillingHandler          *billing.Handler
-	BillingCoverageHandler  *billingcoverage.Handler
 	CreditHandler           *credits.Handler
 	AccountHandler          *accounts.AccountHandler
 	TaskHandler             *taskservice.Handler

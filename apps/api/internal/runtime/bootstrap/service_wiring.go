@@ -16,7 +16,6 @@ import (
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/rewards"
-	"ideaboard/api/internal/runtime/billingcoverage"
 	"ideaboard/api/internal/runtime/billingregistry"
 	"ideaboard/api/internal/usage"
 
@@ -33,7 +32,6 @@ type appDomainServices struct {
 	billingCatalog       *billing.BillableItemCatalog
 	billableItemRegistry *billing.BillableItemRegistry
 	billingRecords       *billingrecords.Service
-	billingCoverage      *billingcoverage.Service
 	creditService        *credits.Service
 	usageService         *usage.Service
 	rewardService        *rewards.Service
@@ -67,7 +65,6 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	}
 	billingService := billing.NewService(appPool)
 	billingCatalog := billing.NewBillableItemCatalog(billableItemRegistry, billingService)
-	billingCoverage := billingcoverage.NewService(repos.accountRepo, billingService)
 	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		return appDomainServices{}, err
@@ -83,7 +80,6 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		billingCatalog:       billingCatalog,
 		billableItemRegistry: billableItemRegistry,
 		billingRecords:       billingrecords.NewService(billingrecords.NewRepository(appPool)),
-		billingCoverage:      billingCoverage,
 		creditService:        creditService,
 		usageService:         usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
 		rewardService:        rewardService,
