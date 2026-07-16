@@ -56,7 +56,6 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	taskRepo.SetTaskBilling(taskBilling)
 	account := createRiverTestAccount(t, db, accountRepo, "submit-worker-convergence")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
@@ -173,7 +172,6 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	taskRepo.SetTaskBilling(taskBilling)
 	account := createRiverTestAccount(t, db, accountRepo, "settlement-restart")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	innerRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())

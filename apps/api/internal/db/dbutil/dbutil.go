@@ -11,13 +11,6 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
-type DBTX interface {
-	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
-	PrepareContext(context.Context, string) (*sql.Stmt, error)
-	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
-	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
-}
-
 func WithTx(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries) error) error {
 	return WithTxDBTX(ctx, db, func(q *dbsqlc.Queries, _ *sql.Tx) error {
 		return fn(q)

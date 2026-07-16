@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -74,41 +73,36 @@ func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T
 	}
 }
 
-func TestAllAIImageWorkflowTerminalSettlementMatrix(t *testing.T) {
-	for _, feature := range workflow.AIImageFeatureSlugs() {
-		feature := feature
-		for _, terminal := range []string{"success", "failure"} {
-			terminal := terminal
-			t.Run(feature+"/"+terminal, func(t *testing.T) {
-				db, pool := testdb.OpenWithPool(t)
-				repo, taskBilling, request := newBillingSettlementFixtureForFeature(t, db, pool, feature, 1, 100, 25)
-				accountID := seedRepositoryTestAccount(t, db, 880)
-				channelID := accountID + 10000
-				credentialID := loadRepositoryTestCredentialID(t, db, accountID)
-				taskID := "billing-matrix-" + strings.ReplaceAll(feature, "-", "_") + "-" + terminal
-				task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), taskID, accountID, channelID, credentialID, "lease-"+terminal, "lease-"+terminal)
-				if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2, requested_model = $3 WHERE task_id = $1`, task.TaskID, feature, request.Model); err != nil {
-					t.Fatal(err)
-				}
-				holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
+	for _, terminal := range []string{"success", "failure"} {
+		t.Run(terminal, func(t *testing.T) {
+			db, pool := testdb.OpenWithPool(t)
+			repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
+			accountID := seedRepositoryTestAccount(t, db, 880)
+			channelID := accountID + 10000
+			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-matrix-"+terminal, accountID, channelID, credentialID, "lease-"+terminal, "lease-"+terminal)
+			if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2, requested_model = $3 WHERE task_id = $1`, task.TaskID, request.Feature, request.Model); err != nil {
+				t.Fatal(err)
+			}
+			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 
-				var rows int64
-				var err error
-				if terminal == "success" {
-					rows, err = repo.CompleteWithOutputsAndLeaseToken(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil)
-				} else {
-					rows, err = repo.MarkTaskFailedWithLease(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
-				}
-				if err != nil || rows != 1 {
-					t.Fatalf("rows=%d err=%v", rows, err)
-				}
-				wantState, wantAvailable := "captured", int64(75)
-				if terminal == "failure" {
-					wantState, wantAvailable = "released", 100
-				}
-				assertTaskBillingSettlement(t, db, task.TaskID, wantState, wantAvailable, 0)
-			})
-		}
+			var rows int64
+			var err error
+			if terminal == "success" {
+				rows, err = repo.CompleteWithOutputsAndLeaseToken(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil)
+			} else {
+				rows, err = repo.MarkTaskFailedWithLease(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
+			}
+			if err != nil || rows != 1 {
+				t.Fatalf("rows=%d err=%v", rows, err)
+			}
+			wantState, wantAvailable := "captured", int64(75)
+			if terminal == "failure" {
+				wantState, wantAvailable = "released", 100
+			}
+			assertTaskBillingSettlement(t, db, task.TaskID, wantState, wantAvailable, 0)
+		})
 	}
 }
 
@@ -219,122 +213,46 @@ BEFORE UPDATE ON task_billing_settlements FOR EACH ROW EXECUTE FUNCTION fail_tas
 	}
 }
 
-func TestTaskBillingSettlementIsIdempotentAndRejectsOppositeTerminal(t *testing.T) {
+func TestTerminalTransitionRollsBackWhenBillingSettlementIsMissing(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
-	task := &tasks.Task{TaskID: "billing-settlement-conflict", UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature, RequestedModel: request.Model}
+	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 0, 0)
+	task := &tasks.Task{TaskID: "billing-integrity-missing-settlement", UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature, RequestedModel: request.Model}
 	seedTasks(t, repo, t.Context(), task)
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-
-	settle := func(run func(context.Context, *sql.Tx, string) error) error {
-		tx, err := db.BeginTx(t.Context(), nil)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-		if err := run(t.Context(), tx, task.TaskID); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}
-	if err := settle(taskBilling.Release); err != nil {
+	if _, err := db.ExecContext(t.Context(), `DROP TRIGGER task_billing_settlements_state_machine ON task_billing_settlements`); err != nil {
 		t.Fatal(err)
 	}
-	if err := settle(taskBilling.Release); err != nil {
-		t.Fatalf("idempotent release: %v", err)
+	if _, err := db.ExecContext(t.Context(), `DELETE FROM task_billing_settlements WHERE task_id = $1`, task.TaskID); err != nil {
+		t.Fatal(err)
 	}
-	if err := settle(taskBilling.Capture); !errors.Is(err, taskbilling.ErrSettlementConflict) {
-		t.Fatalf("opposite settlement err=%v", err)
+
+	rows, err := repo.MarkTaskFailed(t.Context(), task.TaskID, []string{tasks.StatusPending}, "provider failed", `{}`, time.Now(), nil)
+	if !errors.Is(err, taskbilling.ErrIntegrity) || rows != 0 {
+		t.Fatalf("rows=%d err=%v, want billing integrity rollback", rows, err)
+	}
+	var status string
+	if err := db.QueryRowContext(t.Context(), `SELECT status FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != tasks.StatusPending {
+		t.Fatalf("status=%q, want pending after rollback", status)
+	}
+}
+
+func TestStartupRecoveryReleasesBilledHolds(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
+	accountID := seedRepositoryTestAccount(t, db, 780)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-startup-recovery", accountID, channelID, credentialID, "lease-bulk", "lease-bulk")
+	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+
+	ids, err := repo.CancelRunningTasksForStartupRecovery(t.Context(), "startup recovery", time.Now())
+	if err != nil || len(ids) != 1 || ids[0].TaskID != task.TaskID {
+		t.Fatalf("ids=%v err=%v", ids, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "released", 100, 0)
-}
-
-func TestBilledTerminalTransitionFailsClosedWithoutCompleteBillingFacts(t *testing.T) {
-	for _, testCase := range []struct {
-		configured   bool
-		withSnapshot bool
-	}{
-		{configured: false, withSnapshot: false},
-		{configured: false, withSnapshot: true},
-		{configured: true, withSnapshot: false},
-	} {
-		configured, withSnapshot := testCase.configured, testCase.withSnapshot
-		name := fmt.Sprintf("configured=%t/snapshot=%t", configured, withSnapshot)
-		t.Run(name, func(t *testing.T) {
-			db, pool := testdb.OpenWithPool(t)
-			creditService := credits.NewService(pool)
-			billingService := billing.NewService(pool)
-			taskBilling := taskbilling.NewService(billingService, creditService)
-			request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
-			if err != nil {
-				t.Fatal(err)
-			}
-			repo := NewRepository(db)
-			if configured {
-				repo.SetTaskBilling(taskBilling)
-			}
-			task := &tasks.Task{TaskID: fmt.Sprintf("billing-integrity-%t-%t", configured, withSnapshot), UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature, RequestedModel: request.Model}
-			seedTasks(t, repo, t.Context(), task)
-			if withSnapshot {
-				sku, _ := taskbilling.ResolveSKU(request)
-				if _, err := billingService.PublishPrice(t.Context(), taskstorePriceInput(sku, "Pattern", 0)); err != nil {
-					t.Fatal(err)
-				}
-				tx, err := pool.Begin(t.Context())
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), 1); err != nil {
-					t.Fatal(err)
-				}
-				if _, err := taskBilling.HoldAndPersist(t.Context(), tx, task.TaskID, task.UserID, request); err != nil {
-					t.Fatal(err)
-				}
-				if err := tx.Commit(t.Context()); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			rows, err := repo.MarkTaskFailed(t.Context(), task.TaskID, []string{tasks.StatusPending}, "provider failed", `{}`, time.Now(), nil)
-			if !errors.Is(err, taskbilling.ErrIntegrity) || rows != 0 {
-				t.Fatalf("rows=%d err=%v, want billing integrity rollback", rows, err)
-			}
-			var status string
-			if err := db.QueryRowContext(t.Context(), `SELECT status FROM tasks WHERE task_id = $1`, task.TaskID).Scan(&status); err != nil {
-				t.Fatal(err)
-			}
-			if status != tasks.StatusPending {
-				t.Fatalf("status=%q, want pending after rollback", status)
-			}
-		})
-	}
-}
-
-func TestBulkTerminalPathsReleaseBilledHolds(t *testing.T) {
-	for _, path := range []string{"account-failure", "startup-recovery"} {
-		t.Run(path, func(t *testing.T) {
-			db, pool := testdb.OpenWithPool(t)
-			repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
-			accountID := seedRepositoryTestAccount(t, db, 780)
-			channelID := accountID + 10000
-			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
-			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-bulk-"+path, accountID, channelID, credentialID, "lease-bulk", "lease-bulk")
-			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
-
-			if path == "account-failure" {
-				ids, err := repo.FailRunningByAccountID(t.Context(), accountID, "account disabled")
-				if err != nil || len(ids) != 1 || ids[0] != task.TaskID {
-					t.Fatalf("ids=%v err=%v", ids, err)
-				}
-			} else {
-				ids, err := repo.CancelRunningTasksForStartupRecovery(t.Context(), "startup recovery", time.Now())
-				if err != nil || len(ids) != 1 || ids[0].TaskID != task.TaskID {
-					t.Fatalf("ids=%v err=%v", ids, err)
-				}
-			}
-			assertTaskBillingSettlement(t, db, task.TaskID, "released", 100, 0)
-		})
-	}
 }
 
 func TestAccountStopAndArchiveReleaseBilledHoldsAtomically(t *testing.T) {
@@ -383,7 +301,6 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
 	repo := NewRepository(db)
-	repo.SetTaskBilling(taskBilling)
 	request, err := taskbilling.AIImageRequest(feature, "gpt-image-1")
 	if err != nil {
 		t.Fatal(err)

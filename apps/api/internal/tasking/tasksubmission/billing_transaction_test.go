@@ -162,7 +162,6 @@ func TestBilledDuplicateReturnsDurableClaimAfterTaskDeletion(t *testing.T) {
 	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	repo := taskstore.NewRepository(db)
-	repo.SetTaskBilling(taskbilling.NewService(billingService, creditService))
 	client := &countingRiverTxClient{inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)}
 	store := NewStore(pool, repo, client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 	original := newBilledPatternTask("task_billed_deleted", "pattern-action-deleted", request)

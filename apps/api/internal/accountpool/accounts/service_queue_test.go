@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/tasking/tasks"
@@ -86,7 +85,7 @@ type failingRunningTaskFinalizer struct {
 	err error
 }
 
-func (f failingRunningTaskFinalizer) FailRunningByAccountIDWithDBTX(context.Context, dbutil.DBTX, int64, string, time.Time) ([]string, error) {
+func (f failingRunningTaskFinalizer) FailRunningByAccountIDWithTx(context.Context, *sql.Tx, int64, string, time.Time) ([]string, error) {
 	return nil, f.err
 }
 

@@ -38,7 +38,6 @@ type Quoter interface {
 type CreditService interface {
 	credits.WalletReader
 	InTx(pgx.Tx) credits.Commands
-	InSQLTx(*sql.Tx) credits.Commands
 }
 
 type Service struct {
@@ -55,6 +54,15 @@ const (
 	SettlementStateHeld     SettlementState = "held"
 	SettlementStateCaptured SettlementState = "captured"
 	SettlementStateReleased SettlementState = "released"
+)
+
+// TerminalOutcome is the only caller choice exposed by terminal Task Billing.
+// It deliberately excludes non-terminal settlement states.
+type TerminalOutcome string
+
+const (
+	TerminalOutcomeSucceeded    TerminalOutcome = "succeeded"
+	TerminalOutcomeUnsuccessful TerminalOutcome = "unsuccessful"
 )
 
 type Request struct {
@@ -242,27 +250,25 @@ VALUES ($1, $2, $3, $4)`, userID, clientActionID, taskID, requestHash); err != n
 	return nil
 }
 
-func (s *Service) Capture(ctx context.Context, tx *sql.Tx, taskID string) error {
-	return s.settle(ctx, tx, taskID, SettlementStateCaptured)
-}
-
-func (s *Service) Release(ctx context.Context, tx *sql.Tx, taskID string) error {
-	return s.settle(ctx, tx, taskID, SettlementStateReleased)
-}
-
-func (s *Service) settle(ctx context.Context, tx *sql.Tx, taskID string, target SettlementState) error {
-	if s == nil || s.credits == nil || tx == nil {
-		return fmt.Errorf("task billing service unavailable")
+// SettleTerminal composes the Task Billing state machine and Credits command
+// into the caller-owned Task terminal transaction.
+func SettleTerminal(ctx context.Context, tx *sql.Tx, taskID string, outcome TerminalOutcome) error {
+	if tx == nil {
+		return fmt.Errorf("task billing transaction unavailable")
 	}
 	taskID = strings.TrimSpace(taskID)
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
+	target, err := terminalSettlementState(outcome)
+	if err != nil {
+		return err
+	}
 	var userID int64
 	var totalCredits int64
 	var holdTransactionID sql.NullString
 	var currentState SettlementState
-	err := tx.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 SELECT snapshots.user_id, snapshots.total_credits, snapshots.hold_transaction_id, settlements.state
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements USING (task_id)
@@ -293,7 +299,10 @@ FOR UPDATE OF settlements`, taskID).Scan(&userID, &totalCredits, &holdTransactio
 		return ErrSettlementConflict
 	}
 
-	commands := s.credits.InSQLTx(tx)
+	commands, err := credits.CommandsInSQLTx(tx)
+	if err != nil {
+		return err
+	}
 	metadata := taskCommandMetadata("task-"+string(target)+":"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务终态结算", taskID)
 	var result credits.CommandResult
 	switch target {
@@ -315,10 +324,24 @@ WHERE task_id = $1 AND state = 'held'`, taskID, target, result.TransactionID, re
 		return fmt.Errorf("persist task billing settlement: %w", err)
 	}
 	rows, err := resultUpdate.RowsAffected()
-	if err != nil || rows != 1 {
-		return fmt.Errorf("persist task billing settlement affected %d rows: %w", rows, err)
+	if err != nil {
+		return fmt.Errorf("read task billing settlement affected rows: %w", err)
+	}
+	if rows != 1 {
+		return fmt.Errorf("persist task billing settlement affected %d rows", rows)
 	}
 	return nil
+}
+
+func terminalSettlementState(outcome TerminalOutcome) (SettlementState, error) {
+	switch outcome {
+	case TerminalOutcomeSucceeded:
+		return SettlementStateCaptured, nil
+	case TerminalOutcomeUnsuccessful:
+		return SettlementStateReleased, nil
+	default:
+		return "", fmt.Errorf("invalid task billing terminal outcome %q", outcome)
+	}
 }
 
 func taskCommandMetadata(key string, actorType credits.ActorType, actorID, source, reason, taskID string) credits.CommandMetadata {

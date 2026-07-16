@@ -44,10 +44,14 @@ func (s *Service) InTx(tx pgx.Tx) Commands {
 	return &transactionCommands{tx: tx}
 }
 
-// InSQLTx composes Credits commands into an existing database/sql transaction.
-// The caller owns commit and rollback.
-func (s *Service) InSQLTx(tx *sql.Tx) Commands {
-	return &sqlTransactionCommands{tx: tx}
+// CommandsInSQLTx composes Credits commands into an existing database/sql
+// transaction without requiring an application-lifetime Service. The caller
+// owns commit and rollback.
+func CommandsInSQLTx(tx *sql.Tx) (Commands, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("credits: SQL transaction is nil")
+	}
+	return &sqlTransactionCommands{tx: tx}, nil
 }
 
 // LifecycleInTx lets Identity compose Wallet changes with user writes.

@@ -47,7 +47,7 @@ func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string,
 		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
 			return err
 		}
-		if err := r.settleTaskBilling(ctx, tx, taskID, taskbilling.SettlementStateReleased); err != nil {
+		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
 			return err
 		}
 		rowsAffected = updated
@@ -146,7 +146,7 @@ func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID s
 		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
 			return err
 		}
-		if err := r.settleTaskBilling(ctx, tx, taskID, taskbilling.SettlementStateReleased); err != nil {
+		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
 			return err
 		}
 		rowsAffected = updated
@@ -200,7 +200,7 @@ func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskI
 		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.Task.CreatedAt, metricsByTaskID[taskID], tasks.ExecutionStageCompleted, "", "", completedAt); err != nil {
 			return err
 		}
-		if err := r.settleTaskBilling(ctx, tx, taskID, taskbilling.SettlementStateCaptured); err != nil {
+		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeSucceeded); err != nil {
 			return err
 		}
 		rowsAffected = updated
@@ -434,7 +434,7 @@ func (r *Repository) MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskC
 		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
 			return err
 		}
-		if err := r.settleTaskBilling(ctx, tx, taskID, taskbilling.SettlementStateReleased); err != nil {
+		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
 			return err
 		}
 		rowsAffected = updated
@@ -512,7 +512,7 @@ func (r *Repository) CancelRunningTasksForStartupRecovery(ctx context.Context, r
 			if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, c.TaskID, c.CreatedAt, metricsByTaskID[c.TaskID], tasks.ExecutionStageCancelled, tasks.ExecutionStageAssigned, tasks.FailureCategoryCancelled, terminalAt); err != nil {
 				return fmt.Errorf("patch terminal execution metrics for task %s: %w", c.TaskID, err)
 			}
-			if err := r.settleTaskBilling(ctx, tx, c.TaskID, taskbilling.SettlementStateReleased); err != nil {
+			if err := taskbilling.SettleTerminal(ctx, tx, c.TaskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
 				return fmt.Errorf("release task billing for task %s: %w", c.TaskID, err)
 			}
 		}
@@ -576,27 +576,12 @@ func (r *Repository) ResetRunningTasksMissingLeaseTokenToPending(ctx context.Con
 	return rowsAffected, err
 }
 
-func (r *Repository) FailRunningByAccountID(ctx context.Context, accountID int64, errMsg string) ([]string, error) {
-	now := time.Now()
-	var taskIDs []string
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		var err error
-		taskIDs, err = r.failRunningByAccountIDTx(ctx, q, tx, accountID, errMsg, now)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-	return taskIDs, nil
-}
-
-func (r *Repository) FailRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Queries, accountID int64, errMsg string, completedAt time.Time) ([]string, error) {
-	return r.failRunningByAccountIDTx(ctx, q, nil, accountID, errMsg, completedAt)
-}
-
 func (r *Repository) failRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Queries, tx *sql.Tx, accountID int64, errMsg string, completedAt time.Time) ([]string, error) {
 	if q == nil {
 		return nil, fmt.Errorf("queries is nil")
+	}
+	if tx == nil {
+		return nil, fmt.Errorf("tx is nil")
 	}
 	if completedAt.IsZero() {
 		completedAt = time.Now()
@@ -653,22 +638,16 @@ func (r *Repository) failRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Que
 		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, c.TaskID, c.CreatedAt, metricsByTaskID[c.TaskID], tasks.ExecutionStageFailed, tasks.ExecutionStageAssigned, tasks.FailureCategoryCancelled, completedAt); err != nil {
 			return nil, fmt.Errorf("patch terminal execution metrics for task %s: %w", c.TaskID, err)
 		}
-		if tx != nil {
-			if err := r.settleTaskBilling(ctx, tx, c.TaskID, taskbilling.SettlementStateReleased); err != nil {
-				return nil, fmt.Errorf("release task billing for task %s: %w", c.TaskID, err)
-			}
+		if err := taskbilling.SettleTerminal(ctx, tx, c.TaskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
+			return nil, fmt.Errorf("release task billing for task %s: %w", c.TaskID, err)
 		}
 	}
 	return taskIDs, nil
 }
 
-func (r *Repository) FailRunningByAccountIDWithDBTX(ctx context.Context, tx dbutil.DBTX, accountID int64, errMsg string, completedAt time.Time) ([]string, error) {
+func (r *Repository) FailRunningByAccountIDWithTx(ctx context.Context, tx *sql.Tx, accountID int64, errMsg string, completedAt time.Time) ([]string, error) {
 	if tx == nil {
 		return nil, fmt.Errorf("tx is nil")
 	}
-	sqlTx, ok := tx.(*sql.Tx)
-	if !ok && r.taskBilling != nil {
-		return nil, fmt.Errorf("task billing requires *sql.Tx")
-	}
-	return r.failRunningByAccountIDTx(ctx, dbsqlc.New(tx), sqlTx, accountID, errMsg, completedAt)
+	return r.failRunningByAccountIDTx(ctx, dbsqlc.New(tx), tx, accountID, errMsg, completedAt)
 }

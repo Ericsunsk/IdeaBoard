@@ -1,6 +1,8 @@
 package taskbilling
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -108,5 +110,14 @@ func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 				t.Fatalf("validateRequest() error=%v, want %v", err, testCase.wantErr)
 			}
 		})
+	}
+}
+
+func TestSettleTerminalRejectsInvalidInputsBeforeDatabaseAccess(t *testing.T) {
+	if err := SettleTerminal(context.Background(), nil, "task", TerminalOutcomeSucceeded); err == nil {
+		t.Fatal("nil SQL transaction was accepted")
+	}
+	if err := SettleTerminal(context.Background(), new(sql.Tx), "task", TerminalOutcome("unexpected")); err == nil {
+		t.Fatal("invalid terminal outcome was accepted")
 	}
 }

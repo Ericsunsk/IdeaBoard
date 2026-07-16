@@ -3,7 +3,6 @@ package taskservice
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -358,8 +357,7 @@ func (handlerBillingCredits) ListLedger(context.Context, credits.ListLedgerInput
 	return credits.LedgerPage{}, nil
 }
 
-func (handlerBillingCredits) InTx(pgx.Tx) credits.Commands     { return nil }
-func (handlerBillingCredits) InSQLTx(*sql.Tx) credits.Commands { return nil }
+func (handlerBillingCredits) InTx(pgx.Tx) credits.Commands { return nil }
 
 func newHandlerTaskBillingService() *taskbilling.Service {
 	return taskbilling.NewService(handlerBillingQuoter{}, handlerBillingCredits{})

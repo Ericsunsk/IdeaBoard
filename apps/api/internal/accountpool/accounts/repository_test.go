@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/db/dbutil"
-
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -18,7 +16,7 @@ type stubRunningTaskFinalizer struct {
 	err error
 }
 
-func (f stubRunningTaskFinalizer) FailRunningByAccountIDWithDBTX(context.Context, dbutil.DBTX, int64, string, time.Time) ([]string, error) {
+func (f stubRunningTaskFinalizer) FailRunningByAccountIDWithTx(context.Context, *sql.Tx, int64, string, time.Time) ([]string, error) {
 	return nil, f.err
 }
 

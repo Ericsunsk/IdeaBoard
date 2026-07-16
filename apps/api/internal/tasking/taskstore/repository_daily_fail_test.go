@@ -53,9 +53,17 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	insertRepositoryActiveTaskLease(t, db, "acc-fail-1", accountID, accountID+10000, credentialID, "lease-acc-fail-1")
 	insertRepositoryActiveTaskLease(t, db, "acc-fail-2", accountID, accountID+10000, credentialID, "lease-acc-fail-2")
 
-	failedTaskIDs, err := taskRepo.FailRunningByAccountID(ctx, accountID, "stopped")
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		t.Fatalf("FailRunningByAccountID failed: %v", err)
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	failedTaskIDs, err := taskRepo.FailRunningByAccountIDWithTx(ctx, tx, accountID, "stopped", time.Now())
+	if err != nil {
+		t.Fatalf("FailRunningByAccountIDWithTx failed: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 	if len(failedTaskIDs) != 2 {
 		t.Fatalf("failedTaskIDs=%v, want 2 tasks", failedTaskIDs)

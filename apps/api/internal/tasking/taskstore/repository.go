@@ -21,9 +21,8 @@ import (
 )
 
 type Repository struct {
-	db          *sql.DB
-	q           *dbsqlc.Queries
-	taskBilling *taskbilling.Service
+	db *sql.DB
+	q  *dbsqlc.Queries
 }
 
 type repositoryContextDB struct {
@@ -180,10 +179,6 @@ RETURNING id, task_id`
 
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
-}
-
-func (r *Repository) SetTaskBilling(service *taskbilling.Service) {
-	r.taskBilling = service
 }
 
 func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
@@ -449,46 +444,13 @@ func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses
 		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
 			return err
 		}
-		if err := r.settleTaskBilling(ctx, tx, taskID, taskbilling.SettlementStateReleased); err != nil {
+		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
 			return err
 		}
 		rowsAffected = updated
 		return nil
 	})
 	return rowsAffected, err
-}
-
-func (r *Repository) settleTaskBilling(ctx context.Context, tx *sql.Tx, taskID string, target taskbilling.SettlementState) error {
-	if r == nil || tx == nil {
-		return fmt.Errorf("taskstore: billing transaction unavailable")
-	}
-	if r.taskBilling == nil {
-		return failIfTaskBillingSnapshotExists(ctx, tx, taskID)
-	}
-	switch target {
-	case taskbilling.SettlementStateCaptured:
-		return r.taskBilling.Capture(ctx, tx, taskID)
-	case taskbilling.SettlementStateReleased:
-		return r.taskBilling.Release(ctx, tx, taskID)
-	default:
-		return fmt.Errorf("taskstore: unsupported terminal billing settlement %q", target)
-	}
-}
-
-func failIfTaskBillingSnapshotExists(ctx context.Context, tx *sql.Tx, taskID string) error {
-	var exists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM task_billing_snapshots WHERE task_id = $1)`, taskID).Scan(&exists); err != nil {
-		return fmt.Errorf("taskstore: inspect task billing snapshot: %w", err)
-	}
-	var feature string
-	err := tx.QueryRowContext(ctx, `SELECT feature_slug FROM tasks WHERE task_id = $1`, taskID).Scan(&feature)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("taskstore: inspect task billing requirement: %w", err)
-	}
-	if exists || taskbilling.RequiresBilling(feature) {
-		return fmt.Errorf("%w: task billing settlement service not configured for task %s", taskbilling.ErrIntegrity, taskID)
-	}
-	return nil
 }
 
 func (r *Repository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error) {

@@ -25,7 +25,7 @@ type AccountRepository struct {
 }
 
 type RunningTaskFinalizer interface {
-	FailRunningByAccountIDWithDBTX(ctx context.Context, tx dbutil.DBTX, accountID int64, errMsg string, completedAt time.Time) ([]string, error)
+	FailRunningByAccountIDWithTx(ctx context.Context, tx *sql.Tx, accountID int64, errMsg string, completedAt time.Time) ([]string, error)
 }
 
 func NewAccountRepository(db *sql.DB) *AccountRepository {
@@ -320,7 +320,7 @@ func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Co
 		if r.runningTaskFinalizer == nil {
 			return errRunningTaskFinalizerNotConfigured
 		}
-		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithDBTX(ctx, tx, id, reason, time.Now())
+		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithTx(ctx, tx, id, reason, time.Now())
 		return err
 	})
 	return failedTaskIDs, err
@@ -350,7 +350,7 @@ func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Conte
 		if r.runningTaskFinalizer == nil {
 			return errRunningTaskFinalizerNotConfigured
 		}
-		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithDBTX(ctx, tx, id, reason, time.Now())
+		failedTaskIDs, err = r.runningTaskFinalizer.FailRunningByAccountIDWithTx(ctx, tx, id, reason, time.Now())
 		return err
 	})
 	return failedTaskIDs, err

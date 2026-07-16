@@ -23,7 +23,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 ## Public Seams
 
 - `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release 与 Refund；底层只调用 typed `SECURITY DEFINER execute_credit_command_v2`。
-- `Service.InTx(pgx.Tx)` 与 `Service.InSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，现有 Task Store terminal transition 使用 database/sql；caller 都拥有 commit/rollback。
+- `Service.InTx(pgx.Tx)` 与 transaction-scoped `CommandsInSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，`taskbilling.SettleTerminal` 使用 database/sql；caller 都拥有 commit/rollback。Task Repository 不持有 application-lifetime Credits/Billing dependency。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
 - `Service.GetCaptureUsage` 是已结算 Capture 的 typed-location 按用户只读聚合实现，供 caller-owned Usage interface 组合；不返回 Refund，也不授予 Ledger 写入能力。
 - 用户侧 Billing Records 是独立 caller-owned Read Model：可读取 Ledger 最终收支并组合 immutable Task Billing Snapshot，但不复用 Admin Ledger DTO、不返回 Hold/Release/Refund，也不获得 Ledger 写入能力。
