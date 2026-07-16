@@ -50,6 +50,7 @@ describe('AdminRewardCodeBatchResource', () => {
           revokedUnusedCount: 0,
           issuedBy: 1,
           issuedAt: '2026-07-16T01:00:00Z',
+          maskedCodeHintPreview: [],
           revokedAt: undefined,
           revokedBy: undefined,
         },

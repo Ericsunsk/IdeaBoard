@@ -22,6 +22,7 @@ export type RewardCodeBatch = {
   issuedAt: string
   revokedAt?: string
   revokedBy?: number
+  maskedCodeHintPreview: string[]
 }
 
 export type RewardCodeBatchPage = {
@@ -97,6 +98,7 @@ function toBatch(batch: GeneratedRewardCodeBatch): RewardCodeBatch {
     issuedAt: batch.issued_at,
     revokedAt: batch.revoked_at,
     revokedBy: batch.revoked_by,
+    maskedCodeHintPreview: [...(batch.masked_code_hint_preview ?? [])],
   }
 }
 

@@ -21,7 +21,9 @@ import (
 
 type rewardHandlerServiceStub struct {
 	RewardService
-	redeem func(context.Context, RedeemCommand) (RedeemResult, error)
+	redeem     func(context.Context, RedeemCommand) (RedeemResult, error)
+	lookupCode func(context.Context, string) (AdminCodeMetadata, error)
+	revokeCode func(context.Context, RevokeCodeCommand) (AdminCodeMetadata, error)
 }
 
 func (s rewardHandlerServiceStub) Redeem(
@@ -29,6 +31,17 @@ func (s rewardHandlerServiceStub) Redeem(
 	command RedeemCommand,
 ) (RedeemResult, error) {
 	return s.redeem(ctx, command)
+}
+
+func (s rewardHandlerServiceStub) LookupCode(ctx context.Context, code string) (AdminCodeMetadata, error) {
+	return s.lookupCode(ctx, code)
+}
+
+func (s rewardHandlerServiceStub) RevokeCode(
+	ctx context.Context,
+	command RevokeCodeCommand,
+) (AdminCodeMetadata, error) {
+	return s.revokeCode(ctx, command)
 }
 
 type captureRedemptionMetrics struct {
@@ -58,6 +71,113 @@ func TestRewardRedeemRequiresAuthenticationAndDisablesCaching(t *testing.T) {
 	}
 	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("Cache-Control = %q, want no-store", got)
+	}
+}
+
+func TestAdminCodeOperationsRequireAdminDisableCachingAndMaskResponses(t *testing.T) {
+	const rawCode = "SECRET293"
+	service := rewardHandlerServiceStub{
+		lookupCode: func(_ context.Context, code string) (AdminCodeMetadata, error) {
+			if code != rawCode {
+				t.Fatalf("LookupCode() code = %q", code)
+			}
+			return AdminCodeMetadata{
+				ID: 7, CampaignID: 9, CampaignDisplayName: "安全测试",
+				MaskedCodeHint: "•••• T293", Status: AdminCodeStatusAvailable,
+				IssuedAt: time.Date(2026, time.July, 16, 12, 0, 0, 0, time.UTC),
+			}, nil
+		},
+		revokeCode: func(_ context.Context, command RevokeCodeCommand) (AdminCodeMetadata, error) {
+			if command.CodeID != 7 || command.ActorUserID != 1 || !command.Confirmed || command.Reason != "安全撤销" {
+				t.Fatalf("RevokeCode() command = %+v", command)
+			}
+			return AdminCodeMetadata{}, ErrCodeAlreadyRedeemed
+		},
+	}
+	handler := NewHandler(service)
+	gin.SetMode(gin.TestMode)
+	unauthorized := gin.New()
+	unauthorized.POST("/admin/rewards/codes/lookup", handler.LookupCode)
+	unauthorizedRecorder := httptest.NewRecorder()
+	unauthorizedRequest := httptest.NewRequest(http.MethodPost, "/admin/rewards/codes/lookup", strings.NewReader(`{"code":"`+rawCode+`"}`))
+	unauthorizedRequest.Header.Set("Content-Type", "application/json")
+	unauthorized.ServeHTTP(unauthorizedRecorder, unauthorizedRequest)
+	if unauthorizedRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized status = %d", unauthorizedRecorder.Code)
+	}
+	if got := unauthorizedRecorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("unauthorized Cache-Control = %q", got)
+	}
+
+	admin := gin.New()
+	admin.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
+	admin.POST("/admin/rewards/codes/lookup", handler.LookupCode)
+	admin.POST("/admin/rewards/codes/:code_id/revoke", handler.RevokeCode)
+	lookupRecorder := httptest.NewRecorder()
+	lookupRequest := httptest.NewRequest(http.MethodPost, "/admin/rewards/codes/lookup", strings.NewReader(`{"code":"`+rawCode+`"}`))
+	lookupRequest.Header.Set("Content-Type", "application/json")
+	admin.ServeHTTP(lookupRecorder, lookupRequest)
+	if lookupRecorder.Code != http.StatusOK || strings.Contains(lookupRecorder.Body.String(), rawCode) ||
+		!strings.Contains(lookupRecorder.Body.String(), "•••• T293") {
+		t.Fatalf("lookup response = %d %s", lookupRecorder.Code, lookupRecorder.Body.String())
+	}
+	if got := lookupRecorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("lookup Cache-Control = %q", got)
+	}
+	revokeRecorder := httptest.NewRecorder()
+	revokeRequest := httptest.NewRequest(http.MethodPost, "/admin/rewards/codes/7/revoke", strings.NewReader(`{"confirmed":true,"reason":"安全撤销"}`))
+	revokeRequest.Header.Set("Content-Type", "application/json")
+	admin.ServeHTTP(revokeRecorder, revokeRequest)
+	assertRewardErrorResponse(t, revokeRecorder, http.StatusConflict, "已兑换的兑换码不可撤销")
+	if got := revokeRecorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("revoke Cache-Control = %q", got)
+	}
+}
+
+func TestAdminRewardOperationsRejectSignedInNonAdmin(t *testing.T) {
+	service := rewardHandlerServiceStub{
+		lookupCode: func(context.Context, string) (AdminCodeMetadata, error) {
+			t.Fatal("non-admin lookup reached Rewards service")
+			return AdminCodeMetadata{}, nil
+		},
+		revokeCode: func(context.Context, RevokeCodeCommand) (AdminCodeMetadata, error) {
+			t.Fatal("non-admin revoke reached Rewards service")
+			return AdminCodeMetadata{}, nil
+		},
+	}
+	handler := NewHandler(service)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 3, principal.RoleUser)
+		c.Next()
+	})
+	router.POST("/admin/rewards/codes/lookup", handler.LookupCode)
+	router.POST("/admin/rewards/codes/:code_id/revoke", handler.RevokeCode)
+	router.GET("/admin/rewards/campaigns/:campaign_id/redemptions", handler.ListAdminRedemptions)
+
+	tests := []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{method: http.MethodPost, path: "/admin/rewards/codes/lookup", body: `{"code":"SECURE293"}`},
+		{method: http.MethodPost, path: "/admin/rewards/codes/7/revoke", body: `{"confirmed":true,"reason":"越权操作"}`},
+		{method: http.MethodGet, path: "/admin/rewards/campaigns/9/redemptions"},
+	}
+	for _, test := range tests {
+		request := httptest.NewRequest(test.method, test.path, strings.NewReader(test.body))
+		request.Header.Set("Content-Type", "application/json")
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusForbidden {
+			t.Fatalf("%s %s status = %d, want %d", test.method, test.path, recorder.Code, http.StatusForbidden)
+		}
+		if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+			t.Fatalf("%s %s Cache-Control = %q", test.method, test.path, got)
+		}
 	}
 }
 

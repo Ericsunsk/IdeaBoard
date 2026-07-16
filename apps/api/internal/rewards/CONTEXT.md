@@ -15,8 +15,8 @@ Rewards 管理平台 Idea 奖励的 Campaign、Code 与 Redemption。用户展�
 
 ## Public Seams
 
-- `AdminCommands` 创建或更新 Campaign、发行唯一 Public Code 或幂等生成 Single-use Code Batch，并执行 Batch revoke、activate、pause、resume、cancel 与空 Draft delete commands。
-- `AdminReads` 提供不含 Code 明文或 digest 的 Campaign 与 keyset-paginated Code Batch metadata read。
+- `AdminCommands` 创建或更新 Campaign、发行唯一 Public Code 或幂等生成 Single-use Code Batch，并执行单 Code/Batch revoke、activate、pause、resume、cancel 与空 Draft delete commands。
+- `AdminReads` 提供不含 Code 明文或 digest 的 Campaign、keyset-paginated Code Batch metadata、按 Campaign 分页的 Redemption，以及基于完整 Code 的 exact masked metadata lookup。
 - `UserCommands` 同步兑换 Code，返回 Redemption、credited amount、available balance 与 replay marker。
 - `UserReads` 按 ID cursor 返回当前用户的成功 Redemption history，仅含 Campaign display name、credited amount、masked Code hint 与兑换时间。
 

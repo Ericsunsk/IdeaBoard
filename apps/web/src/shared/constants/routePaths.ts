@@ -16,6 +16,9 @@ export const ADMIN_CREDIT_WALLETS_PATH = '/admin/credits/wallets'
 export const ADMIN_CREDIT_PRICING_PATH = '/admin/credits/pricing'
 export const ADMIN_CREDIT_RECONCILIATION_PATH = '/admin/credits/reconciliation'
 export const ADMIN_REWARD_CAMPAIGNS_PATH = '/admin/credits/reward-campaigns'
+export function adminRewardCampaignDetailPath(campaignId: number | string): string {
+  return `${ADMIN_REWARD_CAMPAIGNS_PATH}/${campaignId}`
+}
 export const ADMIN_TASK_MONITOR_PATH = '/admin/task-monitor'
 export const ADMIN_FEATURE_PROMPTS_PATH = '/admin/feature-prompts'
 export const ADMIN_OSS_CONFIG_PATH = '/admin/oss-config'

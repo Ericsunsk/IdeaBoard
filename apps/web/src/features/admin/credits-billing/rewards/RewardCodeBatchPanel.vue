@@ -88,6 +88,23 @@
             </div>
           </template>
         </Column>
+        <Column header="Code Preview">
+          <template #body="{ data }">
+            <div class="flex min-w-40 flex-wrap gap-1.5">
+              <code
+                v-for="hint in data.maskedCodeHintPreview ?? []"
+                :key="hint"
+                class="rounded-[var(--radius-ib-control)] bg-admin-surface-muted px-2 py-1 text-admin-caption text-admin-text-2"
+                >{{ hint }}</code
+              >
+              <span
+                v-if="(data.maskedCodeHintPreview ?? []).length === 0"
+                class="text-admin-caption text-admin-text-3"
+                >无 Code</span
+              >
+            </div>
+          </template>
+        </Column>
         <Column header="状态">
           <template #body="{ data }">
             <Tag
@@ -200,10 +217,7 @@ import { validateAdminActionReason } from '../../shared/validation/adminActionRe
 import AdminActionReasonDialog from '../AdminActionReasonDialog.vue'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
 import type { RewardCampaign } from './rewardCampaignResource'
-import {
-  createAdminRewardCodeBatchResource,
-  type RewardCodeBatch,
-} from './rewardCodeBatchResource'
+import { createAdminRewardCodeBatchResource, type RewardCodeBatch } from './rewardCodeBatchResource'
 import { createRewardCodeBatchCsv, downloadRewardCodeBatchCsv } from './rewardCodeBatchCsv'
 import { createRewardCodeBatchIdempotencyKey } from './rewardCodeBatchIdempotency'
 import { formatShanghaiDateTime } from './rewardCampaignTime'
@@ -232,9 +246,7 @@ const projectedValidUnusedCount = computed(() =>
 const batchGenerationMaxCount = computed(() => {
   if (props.campaign.maxRedemptions === 0) return 10000
   const remaining =
-    props.campaign.maxRedemptions -
-    props.campaign.redemptionCount -
-    projectedValidUnusedCount.value
+    props.campaign.maxRedemptions - props.campaign.redemptionCount - projectedValidUnusedCount.value
   return Math.max(0, Math.min(10000, remaining))
 })
 const batchCountError = computed(() =>

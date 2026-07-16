@@ -948,6 +948,15 @@ paths:
       security:
         - cookieAuth: []
       parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 120 }
+        - name: mode
+          in: query
+          schema: { type: string, enum: [public, single_use] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, cancelled, expired, exhausted, paused, scheduled, active] }
         - name: before_id
           in: query
           schema: { type: integer, format: int64, minimum: 1 }
@@ -1107,6 +1116,32 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseGeneratedRewardCodeBatch' }
+  /admin/rewards/campaigns/{campaign_id}/redemptions:
+    get:
+      tags: [AdminRewards]
+      operationId: listAdminRewardRedemptions
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: campaign_id
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: before_id
+          in: query
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Cursor-paginated Redemptions for one Campaign
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminRewardRedemptionPage' }
   /admin/rewards/campaigns/{campaign_id}/batches/{batch_id}/revoke:
     post:
       tags: [AdminRewards]
@@ -1133,6 +1168,51 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseRewardCodeBatch' }
+  /admin/rewards/codes/lookup:
+    post:
+      tags: [AdminRewards]
+      operationId: lookupAdminRewardCode
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminRewardCodeLookupRequest' }
+      responses:
+        '200':
+          description: Exact normalized Code match with masked metadata only
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminRewardCodeMetadata' }
+  /admin/rewards/codes/{code_id}/revoke:
+    post:
+      tags: [AdminRewards]
+      operationId: revokeAdminRewardCode
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: code_id
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminRewardCodeRevokeRequest' }
+      responses:
+        '200':
+          description: Irreversibly revoked one unused Code
+          headers:
+            Cache-Control:
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminRewardCodeMetadata' }
   /admin/rewards/campaigns/{campaign_id}/activate:
     post:
       tags: [AdminRewards]
@@ -2542,7 +2622,7 @@ components:
     RewardCodeBatch:
       type: object
       additionalProperties: false
-      required: [id, campaign_id, idempotency_key, code_count, valid_unused_count, redeemed_count, revoked_unused_count, issued_by, issued_at]
+      required: [id, campaign_id, idempotency_key, code_count, valid_unused_count, redeemed_count, revoked_unused_count, issued_by, issued_at, masked_code_hint_preview]
       properties:
         id: { type: integer, format: int64, minimum: 1 }
         campaign_id: { type: integer, format: int64, minimum: 1 }
@@ -2555,6 +2635,10 @@ components:
         issued_at: { type: string, format: date-time }
         revoked_at: { type: string, format: date-time }
         revoked_by: { type: integer, format: int64, minimum: 1 }
+        masked_code_hint_preview:
+          type: array
+          maxItems: 3
+          items: { type: string, minLength: 9, maxLength: 9, pattern: '^•••• [A-Z0-9]{4}$' }
 
     GeneratedRewardCodeBatch:
       type: object
@@ -2579,6 +2663,44 @@ components:
         batches:
           type: array
           items: { $ref: '#/components/schemas/RewardCodeBatch' }
+        next_before_id: { type: integer, format: int64, minimum: 1 }
+
+    AdminRewardCodeMetadata:
+      type: object
+      additionalProperties: false
+      required: [id, campaign_id, campaign_display_name, masked_code_hint, status, issued_at]
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        campaign_id: { type: integer, format: int64, minimum: 1 }
+        campaign_display_name: { type: string, minLength: 1, maxLength: 120 }
+        batch_id: { type: integer, format: int64, minimum: 1 }
+        masked_code_hint: { type: string, minLength: 9, maxLength: 9, pattern: '^•••• [A-Z0-9]{4}$' }
+        status: { type: string, enum: [available, redeemed, revoked] }
+        issued_at: { type: string, format: date-time }
+        revoked_at: { type: string, format: date-time }
+        redemption_id: { type: integer, format: int64, minimum: 1 }
+        redeemed_at: { type: string, format: date-time }
+
+    AdminRewardRedemption:
+      type: object
+      additionalProperties: false
+      required: [id, user_id, credit_amount, masked_code_hint, credit_transaction_id, redeemed_at]
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        user_id: { type: integer, format: int64, minimum: 1 }
+        credit_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        masked_code_hint: { type: string, minLength: 9, maxLength: 9, pattern: '^•••• [A-Z0-9]{4}$' }
+        credit_transaction_id: { type: string, minLength: 1, maxLength: 64 }
+        redeemed_at: { type: string, format: date-time }
+
+    AdminRewardRedemptionPage:
+      type: object
+      additionalProperties: false
+      required: [redemptions]
+      properties:
+        redemptions:
+          type: array
+          items: { $ref: '#/components/schemas/AdminRewardRedemption' }
         next_before_id: { type: integer, format: int64, minimum: 1 }
 
     RewardRedemption:
@@ -2695,6 +2817,23 @@ components:
         reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     AdminRewardCodeBatchRevokeRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmed, reason]
+      properties:
+        confirmed:
+          type: boolean
+          enum: [true]
+        reason: { $ref: '#/components/schemas/AdminActionReason' }
+
+    AdminRewardCodeLookupRequest:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 128 }
+
+    AdminRewardCodeRevokeRequest:
       type: object
       additionalProperties: false
       required: [confirmed, reason]
@@ -4600,6 +4739,20 @@ components:
         - type: object
           properties:
             data: { $ref: '#/components/schemas/RewardCodeBatchPage' }
+
+    ApiResponseAdminRewardCodeMetadata:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminRewardCodeMetadata' }
+
+    ApiResponseAdminRewardRedemptionPage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminRewardRedemptionPage' }
 
     ApiResponseRewardRedeemResult:
       allOf:

@@ -32,4 +32,11 @@ export interface RewardCodeBatch {
   revoked_at?: string
   /** @minimum 1 */
   revoked_by?: number
+  /**
+   * @maxItems 3
+   * @items.minLength 9
+   * @items.maxLength 9
+   * @items.pattern ^•••• [A-Z0-9]{4}$
+   */
+  masked_code_hint_preview: string[]
 }

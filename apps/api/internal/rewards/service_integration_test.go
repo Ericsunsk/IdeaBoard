@@ -1393,6 +1393,158 @@ func TestPublicCodeCannotBeReissuedAcrossActiveHMACVersions(t *testing.T) {
 	}
 }
 
+func TestAdminCodeLookupRevokeAndRedemptionOperations(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	previousKey := CodeKey{Version: "v1", Secret: bytes.Repeat([]byte{0x11}, 32)}
+	previousKeyring, err := NewCodeKeyring(previousKey, nil)
+	if err != nil {
+		t.Fatalf("NewCodeKeyring(previous) error = %v", err)
+	}
+	previousService := NewService(pool, creditService, previousKeyring)
+	previousCampaign := createRewardDraft(t, previousService, "Previous key Campaign")
+	if _, err := previousService.IssuePublicCode(t.Context(), IssuePublicCodeCommand{
+		CampaignID: previousCampaign.ID, Code: "LOOKOLD1", ActorUserID: 1, Reason: "发行旧 key Code",
+	}); err != nil {
+		t.Fatalf("IssuePublicCode(previous) error = %v", err)
+	}
+
+	currentKey := CodeKey{Version: "v2", Secret: bytes.Repeat([]byte{0x22}, 32)}
+	rotatedKeyring, err := NewCodeKeyring(currentKey, &previousKey)
+	if err != nil {
+		t.Fatalf("NewCodeKeyring(rotated) error = %v", err)
+	}
+	service := NewServiceWithOptions(pool, creditService, rotatedKeyring, ServiceOptions{
+		Random: rewardEntropy(0x31),
+	})
+	previousLookup, err := service.LookupCode(t.Context(), " look-old1 ")
+	if err != nil || previousLookup.CampaignID != previousCampaign.ID || previousLookup.MaskedCodeHint != "•••• OLD1" {
+		t.Fatalf("LookupCode(previous) = %+v, %v", previousLookup, err)
+	}
+
+	publicCampaign := createRewardDraft(t, service, "Public revoke Campaign")
+	if _, err := service.IssuePublicCode(t.Context(), IssuePublicCodeCommand{
+		CampaignID: publicCampaign.ID, Code: "LOOKNEW1", ActorUserID: 1, Reason: "发行 current key Code",
+	}); err != nil {
+		t.Fatalf("IssuePublicCode(current) error = %v", err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: publicCampaign.ID, ActorUserID: 1, Reason: "激活 public revoke 测试",
+	}); err != nil {
+		t.Fatalf("ActivateCampaign(public) error = %v", err)
+	}
+	publicCode, err := service.LookupCode(t.Context(), "LOOK-NEW1")
+	if err != nil || publicCode.Status != AdminCodeStatusAvailable {
+		t.Fatalf("LookupCode(current) = %+v, %v", publicCode, err)
+	}
+	revokedPublic, err := service.RevokeCode(t.Context(), RevokeCodeCommand{
+		CodeID: publicCode.ID, ActorUserID: 1, Confirmed: true, Reason: "撤销未分发 public Code",
+	})
+	if err != nil || revokedPublic.Status != AdminCodeStatusRevoked {
+		t.Fatalf("RevokeCode(public) = %+v, %v", revokedPublic, err)
+	}
+	publicAfter, err := service.GetCampaign(t.Context(), publicCampaign.ID)
+	if err != nil || publicAfter.ValidUnusedCodeCount != 0 || publicAfter.Status != CampaignStatusExhausted {
+		t.Fatalf("public Campaign after revoke = %+v, %v", publicAfter, err)
+	}
+	if _, err := service.RevokeCode(t.Context(), RevokeCodeCommand{
+		CodeID: publicCode.ID, ActorUserID: 1, Confirmed: true, Reason: "幂等重试 public Code 撤销",
+	}); err != nil {
+		t.Fatalf("RevokeCode(public replay) error = %v", err)
+	}
+	var publicJournalCount int
+	if err := pool.QueryRow(t.Context(), `
+SELECT COUNT(*) FROM reward_admin_actions
+WHERE action_type = 'revoke_code' AND metadata->>'code_id' = $1`, strconv.FormatInt(publicCode.ID, 10)).Scan(&publicJournalCount); err != nil {
+		t.Fatalf("count public revoke Journal: %v", err)
+	}
+	if publicJournalCount != 1 {
+		t.Fatalf("public revoke Journal count = %d, want 1", publicJournalCount)
+	}
+
+	singleCampaign := createSingleUseRewardDraft(t, service, "Single-use revoke Campaign", 0)
+	generated, err := service.GenerateCodeBatch(t.Context(), GenerateCodeBatchCommand{
+		CampaignID: singleCampaign.ID, Count: 1, IdempotencyKey: "single-revoke-293",
+		ActorUserID: 1, Reason: "生成单码撤销测试 Batch",
+	})
+	if err != nil {
+		t.Fatalf("GenerateCodeBatch() error = %v", err)
+	}
+	if _, err := service.ActivateCampaign(t.Context(), ActivateCampaignCommand{
+		CampaignID: singleCampaign.ID, ActorUserID: 1, Reason: "激活 single-use revoke 测试",
+	}); err != nil {
+		t.Fatalf("ActivateCampaign(single-use) error = %v", err)
+	}
+	singleCode, err := service.LookupCode(t.Context(), generated.Plaintexts[0])
+	if err != nil {
+		t.Fatalf("LookupCode(single-use) error = %v", err)
+	}
+	if _, err := service.RevokeCode(t.Context(), RevokeCodeCommand{
+		CodeID: singleCode.ID, ActorUserID: 1, Confirmed: true, Reason: "撤销未分发 single-use Code",
+	}); err != nil {
+		t.Fatalf("RevokeCode(single-use) error = %v", err)
+	}
+	singleAfter, err := service.GetCampaign(t.Context(), singleCampaign.ID)
+	if err != nil || singleAfter.ValidUnusedCodeCount != 0 || singleAfter.Status != CampaignStatusExhausted {
+		t.Fatalf("single-use Campaign after revoke = %+v, %v", singleAfter, err)
+	}
+
+	provisionRewardWallet(t, pool, creditService, 3)
+	provisionRewardWallet(t, pool, creditService, 7)
+	usedCampaign, usedPlaintext := createActivePublicCampaign(t, service, "USED2931", 15, 2)
+	redeemed, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: usedPlaintext})
+	if err != nil {
+		t.Fatalf("Redeem(used Code) error = %v", err)
+	}
+	usedCode, err := service.LookupCode(t.Context(), usedPlaintext)
+	if err != nil || usedCode.Status != AdminCodeStatusRedeemed {
+		t.Fatalf("LookupCode(used) = %+v, %v", usedCode, err)
+	}
+	if _, err := service.RevokeCode(t.Context(), RevokeCodeCommand{
+		CodeID: usedCode.ID, ActorUserID: 1, Confirmed: true, Reason: "不应撤销已兑换 Code",
+	}); !errors.Is(err, ErrCodeAlreadyRedeemed) {
+		t.Fatalf("RevokeCode(redeemed) error = %v, want ErrCodeAlreadyRedeemed", err)
+	}
+	secondRedeemed, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: usedPlaintext})
+	if err != nil {
+		t.Fatalf("Redeem(second user) error = %v", err)
+	}
+	redemptionPage, err := service.ListAdminRedemptions(t.Context(), ListAdminRedemptionsInput{
+		CampaignID: usedCampaign.ID, Limit: 1,
+	})
+	if err != nil || len(redemptionPage.Redemptions) != 1 || redemptionPage.NextBeforeID == 0 {
+		t.Fatalf("ListAdminRedemptions() = %+v, %v", redemptionPage, err)
+	}
+	item := redemptionPage.Redemptions[0]
+	if item.ID != secondRedeemed.Redemption.ID || item.UserID != 7 || item.MaskedCodeHint != "•••• 2931" ||
+		item.CreditTransactionID != secondRedeemed.Redemption.CreditTransactionID {
+		t.Fatalf("Admin Redemption = %+v", item)
+	}
+	redemptionPage2, err := service.ListAdminRedemptions(t.Context(), ListAdminRedemptionsInput{
+		CampaignID: usedCampaign.ID, BeforeID: redemptionPage.NextBeforeID, Limit: 1,
+	})
+	if err != nil || len(redemptionPage2.Redemptions) != 1 ||
+		redemptionPage2.Redemptions[0].ID != redeemed.Redemption.ID || redemptionPage2.Redemptions[0].UserID != 3 {
+		t.Fatalf("ListAdminRedemptions(page 2) = %+v, %v", redemptionPage2, err)
+	}
+
+	filteredPage1, err := service.ListCampaigns(t.Context(), ListCampaignsInput{
+		Limit: 1, Mode: CampaignModePublic, Status: CampaignStatusExhausted,
+	})
+	if err != nil || len(filteredPage1.Campaigns) != 1 || filteredPage1.NextBeforeID == 0 {
+		t.Fatalf("ListCampaigns(filtered page 1) = %+v, %v", filteredPage1, err)
+	}
+	filteredPage2, err := service.ListCampaigns(t.Context(), ListCampaignsInput{
+		BeforeID: filteredPage1.NextBeforeID, Limit: 1,
+		Mode: CampaignModePublic, Status: CampaignStatusExhausted,
+	})
+	if err != nil || len(filteredPage2.Campaigns) != 1 ||
+		filteredPage2.Campaigns[0].ID == filteredPage1.Campaigns[0].ID ||
+		filteredPage2.Campaigns[0].Mode != CampaignModePublic {
+		t.Fatalf("ListCampaigns(filtered page 2) = %+v, %v", filteredPage2, err)
+	}
+}
+
 func TestCodeKeyRotationKeepsPreviousForRedeemedCodeReplay(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)

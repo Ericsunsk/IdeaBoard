@@ -450,7 +450,7 @@ func findCodeBatchByIdempotencyKey(
 	var batch CodeBatch
 	err := scanCodeBatch(tx.QueryRow(ctx, codeBatchMetadataSQL+`
 WHERE batches.campaign_id = $1 AND batches.idempotency_key = $2
-GROUP BY batches.id`, campaignID, idempotencyKey), &batch)
+GROUP BY batches.id, hint_preview.masked_code_hints`, campaignID, idempotencyKey), &batch)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return CodeBatch{}, false, nil
 	}
@@ -469,10 +469,21 @@ SELECT batches.id, batches.campaign_id, batches.idempotency_key, batches.code_co
        COUNT(DISTINCT codes.id) FILTER (WHERE redemptions.id IS NOT NULL)::INTEGER AS redeemed_count,
        COUNT(DISTINCT codes.id) FILTER (
          WHERE codes.revoked_at IS NOT NULL AND redemptions.id IS NULL
-       )::INTEGER AS revoked_unused_count
+       )::INTEGER AS revoked_unused_count,
+       hint_preview.masked_code_hints
 FROM reward_code_batches batches
 LEFT JOIN reward_codes codes ON codes.batch_id = batches.id
 LEFT JOIN reward_redemptions redemptions ON redemptions.code_id = codes.id
+LEFT JOIN LATERAL (
+  SELECT COALESCE(array_agg('` + maskedCodeHintPrefix + `' || preview.code_hint ORDER BY preview.id), ARRAY[]::TEXT[]) AS masked_code_hints
+  FROM (
+    SELECT id, code_hint
+    FROM reward_codes
+    WHERE batch_id = batches.id
+    ORDER BY id
+    LIMIT 3
+  ) preview
+) hint_preview ON TRUE
 `
 
 func scanCodeBatch(row rowScanner, batch *CodeBatch) error {
@@ -480,6 +491,7 @@ func scanCodeBatch(row rowScanner, batch *CodeBatch) error {
 		&batch.ID, &batch.CampaignID, &batch.IdempotencyKey, &batch.CodeCount,
 		&batch.IssuedBy, &batch.IssuedAt, &batch.RevokedAt, &batch.RevokedBy,
 		&batch.ValidUnusedCount, &batch.RedeemedCount, &batch.RevokedUnusedCount,
+		&batch.MaskedCodeHintPreview,
 	)
 }
 
@@ -495,7 +507,7 @@ func (s *Service) ListCodeBatches(ctx context.Context, input ListCodeBatchesInpu
 	}
 	rows, err := s.pool.Query(ctx, codeBatchMetadataSQL+`
 WHERE batches.campaign_id = $1 AND ($2::BIGINT <= 0 OR batches.id < $2)
-GROUP BY batches.id
+GROUP BY batches.id, hint_preview.masked_code_hints
 ORDER BY batches.id DESC
 LIMIT $3`, input.CampaignID, input.BeforeID, input.Limit+1)
 	if err != nil {
@@ -591,7 +603,7 @@ func findCodeBatchByID(
 	var batch CodeBatch
 	err := scanCodeBatch(tx.QueryRow(ctx, codeBatchMetadataSQL+`
 WHERE batches.campaign_id = $1 AND batches.id = $2
-GROUP BY batches.id`, campaignID, batchID), &batch)
+GROUP BY batches.id, hint_preview.masked_code_hints`, campaignID, batchID), &batch)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return CodeBatch{}, false, nil
 	}
@@ -1097,14 +1109,32 @@ func (s *Service) ListCampaigns(ctx context.Context, input ListCampaignsInput) (
 	if input.Limit == 0 {
 		input.Limit = 20
 	}
-	if input.BeforeID < 0 || input.Limit < 1 || input.Limit > 100 {
+	input.Search = strings.TrimSpace(input.Search)
+	if input.BeforeID < 0 || input.Limit < 1 || input.Limit > 100 ||
+		utf8.RuneCountInString(input.Search) > 120 || !validCampaignModeFilter(input.Mode) ||
+		!validCampaignStatusFilter(input.Status) {
 		return CampaignPage{}, ErrInvalidCommand
 	}
+	now := s.currentTime()
 	rows, err := s.pool.Query(ctx, `SELECT `+campaignProjectionSQL+`
 FROM reward_campaigns
 WHERE ($1::BIGINT <= 0 OR id < $1)
+  AND ($3::TEXT = '' OR strpos(lower(display_name), lower($3)) > 0)
+  AND ($4::TEXT = '' OR mode = $4)
+  AND ($5::TEXT = '' OR (
+    CASE
+      WHEN status = 'draft' THEN 'draft'
+      WHEN status = 'cancelled' THEN 'cancelled'
+      WHEN expires_at IS NOT NULL AND expires_at <= $6 THEN 'expired'
+      WHEN max_redemptions > 0 AND redemption_count >= max_redemptions THEN 'exhausted'
+      WHEN issued_code_count > 0 AND valid_unused_code_count = 0 THEN 'exhausted'
+      WHEN status = 'paused' THEN 'paused'
+      WHEN starts_at IS NOT NULL AND starts_at > $6 THEN 'scheduled'
+      ELSE 'active'
+    END
+  ) = $5)
 ORDER BY id DESC
-LIMIT $2`, input.BeforeID, input.Limit+1)
+LIMIT $2`, input.BeforeID, input.Limit+1, input.Search, input.Mode, input.Status, now)
 	if err != nil {
 		return CampaignPage{}, fmt.Errorf("list reward campaigns: %w", err)
 	}
@@ -1112,7 +1142,7 @@ LIMIT $2`, input.BeforeID, input.Limit+1)
 	campaigns := make([]Campaign, 0, input.Limit+1)
 	for rows.Next() {
 		var campaign Campaign
-		if err := scanCampaign(rows, &campaign, s.currentTime()); err != nil {
+		if err := scanCampaign(rows, &campaign, now); err != nil {
 			return CampaignPage{}, fmt.Errorf("scan reward campaign: %w", err)
 		}
 		campaigns = append(campaigns, campaign)
@@ -1126,6 +1156,237 @@ LIMIT $2`, input.BeforeID, input.Limit+1)
 		page.NextBeforeID = page.Campaigns[len(page.Campaigns)-1].ID
 	}
 	return page, nil
+}
+
+func (s *Service) LookupCode(ctx context.Context, rawCode string) (AdminCodeMetadata, error) {
+	if s == nil || s.pool == nil {
+		return AdminCodeMetadata{}, fmt.Errorf("rewards service unavailable")
+	}
+	normalized, err := normalizeCode(rawCode)
+	if err != nil {
+		return AdminCodeMetadata{}, err
+	}
+	return s.lookupCode(ctx, s.pool, s.keyring.lookupDigests(normalized))
+}
+
+func (s *Service) ListAdminRedemptions(
+	ctx context.Context,
+	input ListAdminRedemptionsInput,
+) (AdminRedemptionPage, error) {
+	if s == nil || s.pool == nil || input.CampaignID <= 0 {
+		return AdminRedemptionPage{}, ErrInvalidCommand
+	}
+	if input.Limit == 0 {
+		input.Limit = defaultRedemptionHistoryLimit
+	}
+	if input.BeforeID < 0 || input.Limit < 1 || input.Limit > maxRedemptionHistoryLimit {
+		return AdminRedemptionPage{}, ErrInvalidCommand
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT redemptions.id, redemptions.user_id, redemptions.credit_amount,
+       $4 || codes.code_hint, redemptions.credit_transaction_id, redemptions.redeemed_at
+FROM reward_redemptions redemptions
+JOIN reward_codes codes ON codes.id = redemptions.code_id
+WHERE redemptions.campaign_id = $1
+  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
+ORDER BY redemptions.id DESC
+LIMIT $3`, input.CampaignID, input.BeforeID, input.Limit+1, maskedCodeHintPrefix)
+	if err != nil {
+		return AdminRedemptionPage{}, fmt.Errorf("list Admin reward Redemptions: %w", err)
+	}
+	defer rows.Close()
+	redemptions := make([]AdminRedemption, 0, input.Limit+1)
+	for rows.Next() {
+		var redemption AdminRedemption
+		if err := rows.Scan(
+			&redemption.ID, &redemption.UserID, &redemption.CreditAmount,
+			&redemption.MaskedCodeHint, &redemption.CreditTransactionID, &redemption.RedeemedAt,
+		); err != nil {
+			return AdminRedemptionPage{}, fmt.Errorf("scan Admin reward Redemption: %w", err)
+		}
+		redemptions = append(redemptions, redemption)
+	}
+	if err := rows.Err(); err != nil {
+		return AdminRedemptionPage{}, fmt.Errorf("read Admin reward Redemptions: %w", err)
+	}
+	page := AdminRedemptionPage{Redemptions: redemptions}
+	if len(redemptions) > input.Limit {
+		page.Redemptions = redemptions[:input.Limit]
+		page.NextBeforeID = page.Redemptions[len(page.Redemptions)-1].ID
+	}
+	return page, nil
+}
+
+type rewardCodeQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func (s *Service) lookupCode(
+	ctx context.Context,
+	querier rewardCodeQuerier,
+	candidates []codeDigest,
+) (AdminCodeMetadata, error) {
+	if len(candidates) == 0 {
+		return AdminCodeMetadata{}, ErrCodeNotFound
+	}
+	previousVersion := ""
+	previousDigest := []byte(nil)
+	if len(candidates) > 1 {
+		previousVersion = candidates[1].version
+		previousDigest = candidates[1].digest
+	}
+	var code AdminCodeMetadata
+	err := querier.QueryRow(ctx, `
+SELECT codes.id, codes.campaign_id, campaigns.display_name, codes.batch_id,
+       $5 || codes.code_hint,
+       CASE
+         WHEN redemption.id IS NOT NULL THEN 'redeemed'
+         WHEN codes.revoked_at IS NOT NULL THEN 'revoked'
+         ELSE 'available'
+       END,
+       codes.issued_at, codes.revoked_at, redemption.id, redemption.redeemed_at
+FROM reward_codes codes
+JOIN reward_campaigns campaigns ON campaigns.id = codes.campaign_id
+LEFT JOIN LATERAL (
+  SELECT id, redeemed_at
+  FROM reward_redemptions
+  WHERE code_id = codes.id
+  ORDER BY id DESC
+  LIMIT 1
+) redemption ON TRUE
+WHERE (codes.key_version = $1 AND codes.code_digest = $2)
+   OR ($3::TEXT <> '' AND codes.key_version = $3 AND codes.code_digest = $4)
+LIMIT 1`, candidates[0].version, candidates[0].digest, previousVersion, previousDigest, maskedCodeHintPrefix).Scan(
+		&code.ID, &code.CampaignID, &code.CampaignDisplayName, &code.BatchID,
+		&code.MaskedCodeHint, &code.Status, &code.IssuedAt, &code.RevokedAt,
+		&code.RedemptionID, &code.RedeemedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AdminCodeMetadata{}, ErrCodeNotFound
+	}
+	if err != nil {
+		return AdminCodeMetadata{}, fmt.Errorf("lookup reward Code: %w", err)
+	}
+	return code, nil
+}
+
+func (s *Service) RevokeCode(ctx context.Context, command RevokeCodeCommand) (AdminCodeMetadata, error) {
+	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
+	if err != nil || command.CodeID <= 0 || !command.Confirmed {
+		return AdminCodeMetadata{}, errors.Join(ErrInvalidCommand, err)
+	}
+	tx, err := s.begin(ctx)
+	if err != nil {
+		return AdminCodeMetadata{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var campaignID int64
+	if err := tx.QueryRow(ctx, `SELECT campaign_id FROM reward_codes WHERE id = $1`, command.CodeID).Scan(&campaignID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AdminCodeMetadata{}, ErrCodeNotFound
+		}
+		return AdminCodeMetadata{}, fmt.Errorf("find reward Code Campaign: %w", err)
+	}
+	if _, err := s.lockCampaign(ctx, tx, campaignID); err != nil {
+		return AdminCodeMetadata{}, err
+	}
+	var batchID *int64
+	var hint string
+	var revokedAt *time.Time
+	var redeemed bool
+	err = tx.QueryRow(ctx, `
+SELECT codes.batch_id, codes.code_hint, codes.revoked_at,
+       EXISTS (SELECT 1 FROM reward_redemptions WHERE code_id = codes.id)
+FROM reward_codes codes
+WHERE codes.id = $1 AND codes.campaign_id = $2
+FOR UPDATE`, command.CodeID, campaignID).Scan(&batchID, &hint, &revokedAt, &redeemed)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AdminCodeMetadata{}, ErrCodeNotFound
+		}
+		return AdminCodeMetadata{}, fmt.Errorf("lock reward Code: %w", err)
+	}
+	if revokedAt != nil {
+		code, err := lookupCodeByID(ctx, tx, command.CodeID)
+		if err != nil {
+			return AdminCodeMetadata{}, err
+		}
+		if err := tx.Rollback(ctx); err != nil {
+			return AdminCodeMetadata{}, fmt.Errorf("release reward Code replay lock: %w", err)
+		}
+		return code, nil
+	}
+	if redeemed {
+		return AdminCodeMetadata{}, ErrCodeAlreadyRedeemed
+	}
+	revokedAtValue := s.currentTime()
+	if _, err := tx.Exec(ctx, `
+UPDATE reward_codes
+SET revoked_at = $2, revoked_by = $3
+WHERE id = $1 AND revoked_at IS NULL`, command.CodeID, revokedAtValue, metadata.ActorID()); err != nil {
+		return AdminCodeMetadata{}, fmt.Errorf("revoke reward Code: %w", err)
+	}
+	if err := insertAdminAction(ctx, tx, campaignID, "revoke_code", metadata, map[string]any{
+		"code_id": command.CodeID, "batch_id": batchID, "masked_code_hint": maskedCodeHintPrefix + hint,
+	}); err != nil {
+		return AdminCodeMetadata{}, err
+	}
+	code, err := lookupCodeByID(ctx, tx, command.CodeID)
+	if err != nil {
+		return AdminCodeMetadata{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return AdminCodeMetadata{}, fmt.Errorf("commit reward Code revocation: %w", err)
+	}
+	return code, nil
+}
+
+func lookupCodeByID(ctx context.Context, querier rewardCodeQuerier, codeID int64) (AdminCodeMetadata, error) {
+	var code AdminCodeMetadata
+	err := querier.QueryRow(ctx, `
+SELECT codes.id, codes.campaign_id, campaigns.display_name, codes.batch_id,
+       $2 || codes.code_hint,
+       CASE
+         WHEN redemption.id IS NOT NULL THEN 'redeemed'
+         WHEN codes.revoked_at IS NOT NULL THEN 'revoked'
+         ELSE 'available'
+       END,
+       codes.issued_at, codes.revoked_at, redemption.id, redemption.redeemed_at
+FROM reward_codes codes
+JOIN reward_campaigns campaigns ON campaigns.id = codes.campaign_id
+LEFT JOIN LATERAL (
+  SELECT id, redeemed_at
+  FROM reward_redemptions
+  WHERE code_id = codes.id
+  ORDER BY id DESC
+  LIMIT 1
+) redemption ON TRUE
+WHERE codes.id = $1`, codeID, maskedCodeHintPrefix).Scan(
+		&code.ID, &code.CampaignID, &code.CampaignDisplayName, &code.BatchID,
+		&code.MaskedCodeHint, &code.Status, &code.IssuedAt, &code.RevokedAt,
+		&code.RedemptionID, &code.RedeemedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AdminCodeMetadata{}, ErrCodeNotFound
+	}
+	if err != nil {
+		return AdminCodeMetadata{}, fmt.Errorf("read reward Code metadata: %w", err)
+	}
+	return code, nil
+}
+
+func validCampaignModeFilter(mode CampaignMode) bool {
+	return mode == "" || mode == CampaignModePublic || mode == CampaignModeSingleUse
+}
+
+func validCampaignStatusFilter(status CampaignStatus) bool {
+	switch status {
+	case "", CampaignStatusDraft, CampaignStatusCancelled, CampaignStatusExpired,
+		CampaignStatusExhausted, CampaignStatusPaused, CampaignStatusScheduled, CampaignStatusActive:
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeCampaignSchedule(startsAt, expiresAt *time.Time) (*time.Time, *time.Time, error) {
@@ -1182,8 +1443,7 @@ func deriveCampaignStatus(campaign Campaign, now time.Time) CampaignStatus {
 	if campaign.MaxRedemptions > 0 && campaign.RedemptionCount >= campaign.MaxRedemptions {
 		return CampaignStatusExhausted
 	}
-	if campaign.Mode == CampaignModeSingleUse &&
-		campaign.IssuedCodeCount > 0 && campaign.ValidUnusedCodeCount == 0 {
+	if campaign.IssuedCodeCount > 0 && campaign.ValidUnusedCodeCount == 0 {
 		return CampaignStatusExhausted
 	}
 	if campaign.LifecycleStatus == CampaignLifecyclePaused {

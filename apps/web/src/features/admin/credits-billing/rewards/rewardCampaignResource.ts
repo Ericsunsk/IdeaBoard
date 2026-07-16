@@ -3,6 +3,7 @@ import {
   cancelAdminRewardCampaign,
   createAdminRewardCampaign,
   deleteAdminRewardCampaign,
+  getAdminRewardCampaign,
   issueAdminRewardPublicCode,
   listAdminRewardCampaigns,
   pauseAdminRewardCampaign,
@@ -57,6 +58,12 @@ export type RewardCampaignPage = {
   nextBeforeId?: number
 }
 
+export type RewardCampaignFilters = {
+  search?: string
+  mode?: RewardCampaign['mode']
+  status?: RewardCampaign['status']
+}
+
 export type IssuedPublicCode = {
   id: number
   campaignId: number
@@ -70,14 +77,18 @@ export class RewardCampaignConflictError extends Error {
   readonly kind: RewardCampaignConflictKind
 
   constructor(kind: RewardCampaignConflictKind, options?: ErrorOptions) {
-    super(kind === 'rules_frozen' ? 'reward campaign rules are frozen' : 'reward draft is not empty', options)
+    super(
+      kind === 'rules_frozen' ? 'reward campaign rules are frozen' : 'reward draft is not empty',
+      options,
+    )
     this.name = 'RewardCampaignConflictError'
     this.kind = kind
   }
 }
 
 export type AdminRewardCampaignResource = {
-  list: (beforeId?: number) => Promise<RewardCampaignPage>
+  list: (beforeId?: number, filters?: RewardCampaignFilters) => Promise<RewardCampaignPage>
+  get: (campaignId: number) => Promise<RewardCampaign>
   create: (input: CreateRewardCampaignInput) => Promise<RewardCampaign>
   update: (campaignId: number, input: UpdateRewardCampaignInput) => Promise<RewardCampaign>
   issuePublicCode: (
@@ -93,13 +104,21 @@ export type AdminRewardCampaignResource = {
 
 export function createAdminRewardCampaignResource(): AdminRewardCampaignResource {
   return {
-    list: async (beforeId) =>
+    list: async (beforeId, filters = {}) =>
       toCampaignPage(
         await resolveApiData(
-          listAdminRewardCampaigns({ before_id: beforeId, limit: 20 }),
+          listAdminRewardCampaigns({
+            before_id: beforeId,
+            limit: 20,
+            q: filters.search?.trim() || undefined,
+            mode: filters.mode,
+            status: filters.status,
+          }),
           '加载奖励活动失败',
         ),
       ),
+    get: async (campaignId) =>
+      toCampaign(await resolveApiData(getAdminRewardCampaign(campaignId), '加载奖励活动详情失败')),
     create: async (input) =>
       toCampaign(
         await resolveApiData(

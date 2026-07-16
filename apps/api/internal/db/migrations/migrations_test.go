@@ -961,6 +961,78 @@ func TestRewardsSingleUseBatchMigrationRollsBackUnusedSchemaAndReapplies(t *test
 	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_single_use_once")
 }
 
+func TestRewardsSingleCodeRevokeMigrationFailsClosedAfterJournalFact(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	const (
+		file    = "20260716020000_rewards_single_code_revoke.sql"
+		version = 20260716020000
+	)
+	assertMigrationApplied(t, ctx, conn, version, true)
+	assertConstraintDefinitionContains(t, ctx, conn, "reward_admin_actions", "ck_reward_admin_actions_type", "revoke_code")
+
+	var actorID int64
+	if err := conn.QueryRowContext(ctx, `
+INSERT INTO users (username, storage_uid, role)
+VALUES ('reward-revoke-migration-admin', 'RVK293', 'admin')
+RETURNING id`).Scan(&actorID); err != nil {
+		t.Fatalf("insert migration actor: %v", err)
+	}
+	var campaignID int64
+	if err := conn.QueryRowContext(ctx, `
+INSERT INTO reward_campaigns (
+  display_name, credit_amount, mode, status, max_redemptions, created_by
+) VALUES ('Revoke migration Campaign', 10, 'public', 'draft', 1, $1)
+RETURNING id`, actorID).Scan(&campaignID); err != nil {
+		t.Fatalf("insert migration Campaign: %v", err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO reward_admin_actions (
+  campaign_id, action_type, actor_user_id, reason, metadata
+) VALUES ($1, 'revoke_code', $2, '验证 rollback fail closed', '{"code_id":1}')`, campaignID, actorID); err != nil {
+		t.Fatalf("insert revoke_code Journal fact: %v", err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO reward_admin_actions (
+  campaign_id, action_type, actor_user_id, reason, metadata
+) VALUES ($1, 'unknown_action', $2, '未知 action 应被拒绝', '{}')`, campaignID, actorID); err == nil {
+		t.Fatal("reward_admin_actions accepted unknown action_type")
+	}
+
+	raw, err := migrationFS.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var downErr error
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
+		if _, downErr = tx.ExecContext(ctx, statement.SQL); downErr != nil {
+			break
+		}
+	}
+	if downErr == nil {
+		_ = tx.Rollback()
+		t.Fatal("single-Code revoke down migration succeeded after Journal fact")
+	}
+	if !strings.Contains(downErr.Error(), "cannot roll back Rewards single-Code revoke") {
+		_ = tx.Rollback()
+		t.Fatalf("down migration error = %v", downErr)
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	assertMigrationApplied(t, ctx, conn, version, true)
+	assertConstraintDefinitionContains(t, ctx, conn, "reward_admin_actions", "ck_reward_admin_actions_type", "revoke_code")
+}
+
 func TestRewardGrantCorrectionMigrationRollsBackAndReapplies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()

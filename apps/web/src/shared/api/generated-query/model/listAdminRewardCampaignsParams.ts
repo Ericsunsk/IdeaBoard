@@ -4,8 +4,16 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListAdminRewardCampaignsMode } from './listAdminRewardCampaignsMode'
+import type { ListAdminRewardCampaignsStatus } from './listAdminRewardCampaignsStatus'
 
 export type ListAdminRewardCampaignsParams = {
+  /**
+   * @maxLength 120
+   */
+  q?: string
+  mode?: ListAdminRewardCampaignsMode
+  status?: ListAdminRewardCampaignsStatus
   /**
    * @minimum 1
    */

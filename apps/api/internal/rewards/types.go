@@ -49,6 +49,8 @@ var (
 	ErrCodeBatchLimit       = errors.New("reward Code Batch exceeds the synchronous generation limit")
 	ErrCodeBatchConflict    = errors.New("reward Code Batch idempotency key conflicts with another payload")
 	ErrCodeBatchNotFound    = errors.New("reward Code Batch not found")
+	ErrCodeNotFound         = errors.New("reward Code not found")
+	ErrCodeAlreadyRedeemed  = errors.New("reward Code was already redeemed")
 	ErrCodeCollision        = errors.New("generated reward Code is not unique")
 	ErrCodeUnavailable      = errors.New("reward code is invalid or unavailable")
 	ErrCampaignExhausted    = errors.New("reward campaign is exhausted")
@@ -88,17 +90,18 @@ type IssuedPublicCode struct {
 }
 
 type CodeBatch struct {
-	ID                 int64      `json:"id"`
-	CampaignID         int64      `json:"campaign_id"`
-	IdempotencyKey     string     `json:"idempotency_key"`
-	CodeCount          int        `json:"code_count"`
-	ValidUnusedCount   int        `json:"valid_unused_count"`
-	RedeemedCount      int        `json:"redeemed_count"`
-	RevokedUnusedCount int        `json:"revoked_unused_count"`
-	IssuedBy           int64      `json:"issued_by"`
-	IssuedAt           time.Time  `json:"issued_at"`
-	RevokedAt          *time.Time `json:"revoked_at,omitempty"`
-	RevokedBy          *int64     `json:"revoked_by,omitempty"`
+	ID                    int64      `json:"id"`
+	CampaignID            int64      `json:"campaign_id"`
+	IdempotencyKey        string     `json:"idempotency_key"`
+	CodeCount             int        `json:"code_count"`
+	ValidUnusedCount      int        `json:"valid_unused_count"`
+	RedeemedCount         int        `json:"redeemed_count"`
+	RevokedUnusedCount    int        `json:"revoked_unused_count"`
+	IssuedBy              int64      `json:"issued_by"`
+	IssuedAt              time.Time  `json:"issued_at"`
+	RevokedAt             *time.Time `json:"revoked_at,omitempty"`
+	RevokedBy             *int64     `json:"revoked_by,omitempty"`
+	MaskedCodeHintPreview []string   `json:"masked_code_hint_preview"`
 }
 
 type GeneratedCodeBatch struct {
@@ -149,11 +152,55 @@ type RedemptionHistoryPage struct {
 type ListCampaignsInput struct {
 	BeforeID int64
 	Limit    int
+	Search   string
+	Mode     CampaignMode
+	Status   CampaignStatus
 }
 
 type CampaignPage struct {
 	Campaigns    []Campaign `json:"campaigns"`
 	NextBeforeID int64      `json:"next_before_id,omitempty"`
+}
+
+type AdminCodeStatus string
+
+const (
+	AdminCodeStatusAvailable AdminCodeStatus = "available"
+	AdminCodeStatusRedeemed  AdminCodeStatus = "redeemed"
+	AdminCodeStatusRevoked   AdminCodeStatus = "revoked"
+)
+
+type AdminCodeMetadata struct {
+	ID                  int64           `json:"id"`
+	CampaignID          int64           `json:"campaign_id"`
+	CampaignDisplayName string          `json:"campaign_display_name"`
+	BatchID             *int64          `json:"batch_id,omitempty"`
+	MaskedCodeHint      string          `json:"masked_code_hint"`
+	Status              AdminCodeStatus `json:"status"`
+	IssuedAt            time.Time       `json:"issued_at"`
+	RevokedAt           *time.Time      `json:"revoked_at,omitempty"`
+	RedemptionID        *int64          `json:"redemption_id,omitempty"`
+	RedeemedAt          *time.Time      `json:"redeemed_at,omitempty"`
+}
+
+type AdminRedemption struct {
+	ID                  int64     `json:"id"`
+	UserID              int64     `json:"user_id"`
+	CreditAmount        int64     `json:"credit_amount"`
+	MaskedCodeHint      string    `json:"masked_code_hint"`
+	CreditTransactionID string    `json:"credit_transaction_id"`
+	RedeemedAt          time.Time `json:"redeemed_at"`
+}
+
+type ListAdminRedemptionsInput struct {
+	CampaignID int64
+	BeforeID   int64
+	Limit      int
+}
+
+type AdminRedemptionPage struct {
+	Redemptions  []AdminRedemption `json:"redemptions"`
+	NextBeforeID int64             `json:"next_before_id,omitempty"`
 }
 
 type CreateCampaignCommand struct {
@@ -179,6 +226,13 @@ type GenerateCodeBatchCommand struct {
 type RevokeCodeBatchCommand struct {
 	CampaignID  int64
 	BatchID     int64
+	ActorUserID int64
+	Confirmed   bool
+	Reason      string
+}
+
+type RevokeCodeCommand struct {
+	CodeID      int64
 	ActorUserID int64
 	Confirmed   bool
 	Reason      string
@@ -256,6 +310,7 @@ type AdminCommands interface {
 	IssuePublicCode(context.Context, IssuePublicCodeCommand) (IssuedPublicCode, error)
 	GenerateCodeBatch(context.Context, GenerateCodeBatchCommand) (GeneratedCodeBatch, error)
 	RevokeCodeBatch(context.Context, RevokeCodeBatchCommand) (CodeBatch, error)
+	RevokeCode(context.Context, RevokeCodeCommand) (AdminCodeMetadata, error)
 	ActivateCampaign(context.Context, ActivateCampaignCommand) (Campaign, error)
 	PauseCampaign(context.Context, PauseCampaignCommand) (Campaign, error)
 	ResumeCampaign(context.Context, ResumeCampaignCommand) (Campaign, error)
@@ -275,4 +330,6 @@ type AdminReads interface {
 	ListCampaigns(context.Context, ListCampaignsInput) (CampaignPage, error)
 	GetCampaign(context.Context, int64) (Campaign, error)
 	ListCodeBatches(context.Context, ListCodeBatchesInput) (CodeBatchPage, error)
+	LookupCode(context.Context, string) (AdminCodeMetadata, error)
+	ListAdminRedemptions(context.Context, ListAdminRedemptionsInput) (AdminRedemptionPage, error)
 }

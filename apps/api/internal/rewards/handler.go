@@ -83,6 +83,10 @@ type cancelCampaignRequest struct {
 	Reason    string `json:"reason"`
 }
 
+type lookupCodeRequest struct {
+	Code string `json:"code"`
+}
+
 type redeemRequest struct {
 	Code string `json:"code"`
 }
@@ -189,6 +193,7 @@ func (h *Handler) GenerateCodeBatch(c *gin.Context) {
 }
 
 func (h *Handler) ListCodeBatches(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
 	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
@@ -366,7 +371,16 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
-	input := ListCampaignsInput{Limit: 20}
+	input := ListCampaignsInput{
+		Limit:  20,
+		Search: strings.TrimSpace(c.Query("q")),
+		Mode:   CampaignMode(strings.TrimSpace(c.Query("mode"))),
+		Status: CampaignStatus(strings.TrimSpace(c.Query("status"))),
+	}
+	if !validCampaignModeFilter(input.Mode) || !validCampaignStatusFilter(input.Status) {
+		response.Error(c, http.StatusBadRequest, "筛选条件无效")
+		return
+	}
 	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || value <= 0 {
@@ -384,6 +398,83 @@ func (h *Handler) ListCampaigns(c *gin.Context) {
 		input.Limit = value
 	}
 	page, err := h.service.ListCampaigns(c.Request.Context(), input)
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) LookupCode(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	if _, ok := h.requireAdmin(c); !ok {
+		return
+	}
+	var request lookupCodeRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	code, err := h.service.LookupCode(c.Request.Context(), request.Code)
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, code)
+}
+
+func (h *Handler) RevokeCode(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return
+	}
+	codeID, ok := parseRewardPathIDParam(c, "code_id")
+	if !ok {
+		return
+	}
+	var request cancelCampaignRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	code, err := h.service.RevokeCode(c.Request.Context(), RevokeCodeCommand{
+		CodeID: codeID, ActorUserID: actorID, Confirmed: request.Confirmed, Reason: request.Reason,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, code)
+}
+
+func (h *Handler) ListAdminRedemptions(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	if _, ok := h.requireAdmin(c); !ok {
+		return
+	}
+	campaignID, ok := parseRewardPathID(c)
+	if !ok {
+		return
+	}
+	input := ListAdminRedemptionsInput{CampaignID: campaignID, Limit: defaultRedemptionHistoryLimit}
+	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value <= 0 {
+			response.Error(c, http.StatusBadRequest, "before_id 无效")
+			return
+		}
+		input.BeforeID = value
+	}
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 || value > maxRedemptionHistoryLimit {
+			response.Error(c, http.StatusBadRequest, "limit 无效")
+			return
+		}
+		input.Limit = value
+	}
+	page, err := h.service.ListAdminRedemptions(c.Request.Context(), input)
 	if err != nil {
 		writeRewardError(c, err)
 		return
@@ -547,6 +638,10 @@ func writeRewardError(c *gin.Context, err error) {
 		response.Error(c, http.StatusNotFound, "奖励活动不存在")
 	case errors.Is(err, ErrCodeBatchNotFound):
 		response.Error(c, http.StatusNotFound, "奖励码批次不存在")
+	case errors.Is(err, ErrCodeNotFound):
+		response.Error(c, http.StatusNotFound, "兑换码不存在")
+	case errors.Is(err, ErrCodeAlreadyRedeemed):
+		response.Error(c, http.StatusConflict, "已兑换的兑换码不可撤销")
 	case errors.Is(err, ErrCampaignNotDraft), errors.Is(err, ErrPublicCodeExists),
 		errors.Is(err, ErrPublicCodeRequired), errors.Is(err, ErrCampaignExhausted),
 		errors.Is(err, ErrAlreadyRedeemed), errors.Is(err, ErrCampaignNotActive),
