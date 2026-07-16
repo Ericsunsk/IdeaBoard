@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/billingcoverage"
+	"ideaboard/api/internal/runtime/billingregistry"
 	"ideaboard/api/internal/usage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,6 +30,7 @@ type appDomainServices struct {
 	userService       *users.UserService
 	boardService      *boards.BoardService
 	billingService    *billing.Service
+	billingCatalog    *billing.BillableItemCatalog
 	billingRecords    *billingrecords.Service
 	billingCoverage   *billingcoverage.Service
 	creditService     *credits.Service
@@ -59,6 +61,11 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, err
 	}
 	billingService := billing.NewService(appPool)
+	billableItemRegistry, err := billing.NewBillableItemRegistry(billingregistry.WorkflowItems())
+	if err != nil {
+		return appDomainServices{}, fmt.Errorf("build billable item registry: %w", err)
+	}
+	billingCatalog := billing.NewBillableItemCatalog(billableItemRegistry, billingService)
 	billingCoverage := billingcoverage.NewService(repos.accountRepo, billingService)
 	userLifecycle := users.NewLifecycleService(appPool, creditService, welcomeIdentityKey)
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
@@ -72,6 +79,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		userService:       userService,
 		boardService:      boards.NewBoardService(repos.boardRepo, repos.userRepo, storageService),
 		billingService:    billingService,
+		billingCatalog:    billingCatalog,
 		billingRecords:    billingrecords.NewService(billingrecords.NewRepository(appPool)),
 		billingCoverage:   billingCoverage,
 		creditService:     creditService,

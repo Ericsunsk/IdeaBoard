@@ -22,6 +22,7 @@ import type {
   AdminBillingPriceStateRequest,
   AdminBillingSKUCreateRequest,
   AdminBillingSKUUpdateRequest,
+  ApiResponseBillableItemCatalog,
   ApiResponseBillingCatalogItem,
   ApiResponseBillingCatalogPage,
   ApiResponseBillingCoverage,
@@ -35,6 +36,74 @@ import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
+
+export const getListAdminBillableItemsUrl = () => {
+  return `/admin/billing/catalog`
+}
+
+export const listAdminBillableItems = async (
+  options?: RequestInit,
+): Promise<ApiResponseBillableItemCatalog> => {
+  return orvalMutator<ApiResponseBillableItemCatalog>(getListAdminBillableItemsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListAdminBillableItemsQueryKey = () => {
+  return ['admin', 'billing', 'catalog'] as const
+}
+
+export const getListAdminBillableItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminBillableItems>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listAdminBillableItems>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminBillableItemsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminBillableItems>>> = ({ signal }) =>
+    listAdminBillableItems({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminBillableItems>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminBillableItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminBillableItems>>
+>
+export type ListAdminBillableItemsQueryError = ErrorType<unknown>
+
+export function useListAdminBillableItems<
+  TData = Awaited<ReturnType<typeof listAdminBillableItems>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminBillableItems>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminBillableItemsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
 
 export const getListAdminBillingSKUsUrl = (params?: ListAdminBillingSKUsParams) => {
   const normalizedParams = new URLSearchParams()

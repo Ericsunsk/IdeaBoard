@@ -279,6 +279,32 @@ LIMIT $2`, afterSKU, limit+1)
 	return page, nil
 }
 
+// ListCatalogFacts returns the complete persisted Catalog projection used by
+// the Billable Item Read Model. The Admin SKU endpoint keeps its paginated
+// contract; only the bounded Registry merge consumes this complete view.
+func (s *Service) ListCatalogFacts(ctx context.Context) ([]CatalogItem, error) {
+	if err := s.requirePool(); err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, catalogSelectSQL+` ORDER BY skus.sku`)
+	if err != nil {
+		return nil, fmt.Errorf("list billing catalog facts: %w", err)
+	}
+	defer rows.Close()
+	items := make([]CatalogItem, 0)
+	for rows.Next() {
+		item, err := scanCatalogItem(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan billing catalog facts: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read billing catalog facts: %w", err)
+	}
+	return items, nil
+}
+
 func (s *Service) ListPrices(ctx context.Context, input ListPricesInput) (PricePage, error) {
 	sku, err := CanonicalizeSKU(input.SKU)
 	if err != nil {

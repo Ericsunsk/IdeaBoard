@@ -30,13 +30,18 @@ type AdminService interface {
 	ListPrices(context.Context, ListPricesInput) (PricePage, error)
 }
 
-type Handler struct {
-	quoter QuoteService
-	admin  AdminService
+type BillableCatalogReader interface {
+	List(context.Context) ([]BillableItemCatalogCard, error)
 }
 
-func NewHandler(quoter QuoteService, admin AdminService) *Handler {
-	return &Handler{quoter: quoter, admin: admin}
+type Handler struct {
+	quoter  QuoteService
+	admin   AdminService
+	catalog BillableCatalogReader
+}
+
+func NewHandler(quoter QuoteService, admin AdminService, catalog BillableCatalogReader) *Handler {
+	return &Handler{quoter: quoter, admin: admin, catalog: catalog}
 }
 
 type quoteRequest struct {
@@ -213,6 +218,22 @@ func (h *Handler) ListCatalog(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) ListBillableCatalog(c *gin.Context) {
+	if _, ok := principal.RequireAdmin(c); !ok {
+		return
+	}
+	if h == nil || h.catalog == nil {
+		writeError(c, ErrServiceUnavailable)
+		return
+	}
+	items, err := h.catalog.List(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.SuccessDTO(c, gin.H{"items": items})
 }
 
 func (h *Handler) ListPrices(c *gin.Context) {

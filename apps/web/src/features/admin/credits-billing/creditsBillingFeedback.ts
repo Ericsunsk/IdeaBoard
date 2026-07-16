@@ -10,11 +10,6 @@ export type AdminCreditsBillingOperationsFeedback = {
   reconciliationStartFailed: (error: unknown) => void
 }
 
-export type AdminBillingPricingFeedback = {
-  success: (message: string) => void
-  error: (error: unknown, fallback: string) => void
-}
-
 export function createAdminCreditsBillingOperationsFeedback(
   toast: AdminToastPort,
 ): AdminCreditsBillingOperationsFeedback {
@@ -35,21 +30,8 @@ export function createAdminCreditsBillingOperationsFeedback(
   }
 }
 
-export function createAdminBillingPricingFeedback(
-  toast: AdminToastPort,
-): AdminBillingPricingFeedback {
-  return {
-    success: (message) => toast.success(message),
-    error: (error, fallback) => toast.error(formatAdminApiError(error, fallback)),
-  }
-}
-
 export function useAdminCreditsBillingOperationsFeedback() {
   return createAdminCreditsBillingOperationsFeedback(useAdminToast())
-}
-
-export function useAdminBillingPricingFeedback() {
-  return createAdminBillingPricingFeedback(useAdminToast())
 }
 
 function formatCreditsBillingError(error: unknown, fallback: string) {

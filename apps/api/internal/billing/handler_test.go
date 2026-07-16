@@ -25,6 +25,15 @@ type handlerServiceStub struct {
 	setPriceInput    SetPriceEnabledInput
 }
 
+type billableCatalogReaderStub struct {
+	items []BillableItemCatalogCard
+	err   error
+}
+
+func (s billableCatalogReaderStub) List(context.Context) ([]BillableItemCatalogCard, error) {
+	return s.items, s.err
+}
+
 func (s *handlerServiceStub) Quote(_ context.Context, sku string, quantity int64) (Quote, error) {
 	s.quoteInput.sku = sku
 	s.quoteInput.quantity = quantity
@@ -65,7 +74,7 @@ func (s *handlerServiceStub) ListPrices(context.Context, ListPricesInput) (Price
 func TestQuoteHandlerRejectsCallerSuppliedPrice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	handler := NewHandler(service, service)
+	handler := NewHandler(service, service, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
@@ -91,7 +100,7 @@ func TestQuoteHandlerRejectsCallerSuppliedPrice(t *testing.T) {
 func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	handler := NewHandler(service, service)
+	handler := NewHandler(service, service, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
@@ -112,6 +121,64 @@ func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 	}
 }
 
+func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &handlerServiceStub{}
+	price := &PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: 25, Enabled: true}
+	catalog := billableCatalogReaderStub{items: []BillableItemCatalogCard{
+		{
+			BillableItemDefinition: BillableItemDefinition{
+				SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature",
+				DisplayName: "局部重绘", Description: "仅重绘图片选定区域。", SortOrder: 10,
+			},
+			Status: BillableItemStatusUnpriced,
+		},
+		{
+			BillableItemDefinition: BillableItemDefinition{
+				SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature",
+				DisplayName: "抠图", SortOrder: 20,
+			},
+			Status: BillableItemStatusActive, CurrentPrice: price,
+		},
+		{
+			BillableItemDefinition: BillableItemDefinition{
+				SKU: "ai-image:hd-upscale", Namespace: "ai-image", ProductKind: "workflow-feature",
+				DisplayName: "HD", SortOrder: 30,
+			},
+			Status: BillableItemStatusDisabled, CurrentPrice: price,
+		},
+		{
+			BillableItemDefinition: BillableItemDefinition{
+				SKU: "legacy:removed", Namespace: "legacy", ProductKind: "legacy",
+				DisplayName: "已移除功能", SortOrder: 0,
+			},
+			Status: BillableItemStatusArchived, CurrentPrice: price,
+		},
+	}}
+	handler := NewHandler(service, service, catalog)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
+		c.Next()
+	})
+	router.GET("/catalog", handler.ListBillableCatalog)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/catalog", nil))
+
+	body := response.Body.String()
+	if response.Code != http.StatusOK ||
+		!strings.Contains(body, `"sku":"ai-image:partial-edit"`) ||
+		!strings.Contains(body, `"product_kind":"workflow-feature"`) ||
+		!strings.Contains(body, `"display_name":"局部重绘"`) ||
+		!strings.Contains(body, `"status":"unpriced"`) ||
+		!strings.Contains(body, `"status":"active"`) ||
+		!strings.Contains(body, `"status":"disabled"`) ||
+		!strings.Contains(body, `"status":"archived"`) {
+		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestQuoteHandlerRequiresTypedPrincipal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -129,7 +196,7 @@ func TestQuoteHandlerRequiresTypedPrincipal(t *testing.T) {
 				if tt.setup != nil {
 					tt.setup(c)
 				}
-				NewHandler(service, service).Quote(c)
+				NewHandler(service, service, nil).Quote(c)
 			})
 			recorder := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(`{"sku":"ideaboard:image.generate","quantity":1}`))
@@ -145,7 +212,7 @@ func TestQuoteHandlerRequiresTypedPrincipal(t *testing.T) {
 func TestAdminCreateSKURequiresActorAndExplicitState(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	handler := NewHandler(service, service)
+	handler := NewHandler(service, service, nil)
 
 	for _, tt := range []struct {
 		name       string
@@ -204,7 +271,7 @@ func TestAdminBillingAuthenticatesBeforeServiceAvailability(t *testing.T) {
 				if tt.setup != nil {
 					tt.setup(c)
 				}
-				NewHandler(nil, nil).CreateSKU(c)
+				NewHandler(nil, nil, nil).CreateSKU(c)
 			})
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/skus", strings.NewReader(`{}`)))
@@ -218,7 +285,7 @@ func TestAdminBillingAuthenticatesBeforeServiceAvailability(t *testing.T) {
 func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	handler := NewHandler(service, service)
+	handler := NewHandler(service, service, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
@@ -275,7 +342,7 @@ func TestAdminBillingWriteHandlersRequireAndTrimReason(t *testing.T) {
 func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	handler := NewHandler(service, service)
+	handler := NewHandler(service, service, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)

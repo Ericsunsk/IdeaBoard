@@ -7,6 +7,9 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 | Term | Meaning |
 | ---- | ------- |
 | SKU | 全局 immutable 商品代码，格式为 `<namespace>:<local-key>`；canonicalization 为 trim + lowercase ASCII，最长 128 字符 |
+| Billable Item | 产品 context 注册到 Billing 的可计价能力；包含稳定 SKU、namespace、product kind、展示文案与排序，不包含 Provider Model |
+| Billable Item Registry | Billing-owned immutable registration seam；runtime 组合各产品 context 的定义，拒绝 duplicate SKU，并返回 deterministic copy |
+| Catalog Read Model | 将当前 Registry 与持久化 SKU/current price facts 动态合并为 Admin 卡片；不依赖 startup write 或同步任务 |
 | SKU namespace | 产品拥有的 1–32 字符 lowercase ASCII namespace，可含 `-` |
 | local key | namespace 内的 1–95 字符商品 key，可含 `.`, `_`, `-` |
 | Price Version | 某 SKU 的 append-only 单价事实；`version` 在 SKU 内单调递增，`unit_credits` 是不可拆分整数且可显式为 0 |
@@ -18,12 +21,14 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 
 ## Public Seams
 
+- `BillableItemRegistry.Items()` 是产品计价身份的只读注册 seam；当前 Workflow adapter 使用 `ai-image:<feature-slug>`，未来产品可注册自己的 namespace。
+- `BillableItemCatalog.List(ctx)` 是 Admin 功能定价页的只读 seam；Registry 中无持久化价格的项目仍显示为 `Unpriced`，持久化项目不在 Registry 时显示为 `Archived`。
 - `Service.Quote(ctx, sku, quantity)` 是产品读取价格的主要 seam。Caller 只传 SKU 与 quantity，不能传 price。
 - `PriceSnapshot` 包含 `sku`, `display_name`, `price_version_id`, `price_version`, `unit_credits`, `quoted_at`；后续 Hold/Charge 必须保存并复用该 snapshot，不得重新报价。`display_name` 在 Quote 时固化，SKU 后续改名不得改变历史任务账单语义。
 - 用户侧 Billing Records 只读取 Task Billing Snapshot 中固化的 `display_name`；不得回查当前 SKU display fields 改写历史账单名称。
 - Admin handler 创建 SKU、修改 display fields/SKU enabled、追加 Price Version、修改 Price State，以及读取 Catalog/Price history。
 - SKU identity 没有 rename/delete contract；停用使用 `enabled=false`。
-- AI Image Workflow 的 SKU 由 canonical `feature/model` 确定性计算：`ai-image:<feature>.<sha256-hex(feature + "\\x00" + lower(trim(model)))>`。计费资格来自 Workflow registry 的 `UsesAIProvider` product contract，不来自 Provider Account；Admin 必须先创建对应 SKU 与 current Price，Readiness/Submit 才可用，`models/` 等 provider path alias 不会被折叠。
+- Admin Billable Item Catalog 使用 feature-level identity `ai-image:<feature>`。当前 Task Quote 路径仍使用既有 canonical `feature/model` SKU：`ai-image:<feature>.<sha256-hex(feature + "\\x00" + lower(trim(model)))>`；后续 feature-level Quote 切换前，两者是明确分离的 read/write contracts。计费资格来自 Workflow registry 的 `UsesAIProvider` product contract，不来自 Provider Account。
 
 ## Invariants
 
@@ -35,6 +40,7 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 - quantity 必须为正 `int64`；`unit_credits × quantity` 超过 `9_000_000_000_000_000` 时 fail closed。
 - 0 Credits 是显式免费价格；SKU 不存在、SKU/price disabled 或没有 current price 时 fail closed。
 - Billing 不 import `internal/accountpool`，价格不随 Provider Account routing 变化。
+- Registry 是 constructor-owned immutable value，不使用 global mutable registration，避免并发启动和测试污染。
 - API runtime 对 Catalog/Price tables 只有 SELECT，对 `billing_admin_actions` 无直接权限，所有写入都通过 typed `SECURITY DEFINER` functions；functions 固定 trusted schema、`pg_catalog`, `pg_temp` search path 并 `REVOKE PUBLIC`。
 
 ## Non-goals

@@ -61,8 +61,8 @@ export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
     key: 'credits',
     path: ADMIN_CREDITS_PATH,
     childPath: 'credits',
-    label: 'Idea与计费',
-    title: 'Idea与计费',
+    label: '积分运营',
+    title: '积分运营',
     routeName: 'AdminCredits',
   },
   {

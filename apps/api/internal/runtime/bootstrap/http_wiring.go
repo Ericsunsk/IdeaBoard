@@ -35,7 +35,7 @@ func newAppRouter(
 	accountHandler := accounts.NewAccountHandler(taskServices.accountService)
 	taskHandler := taskservice.NewHandler(taskServices.taskService)
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
-	billingHandler := billing.NewHandler(services.billingService, services.billingService)
+	billingHandler := billing.NewHandler(services.billingService, services.billingService, services.billingCatalog)
 	billingCoverageHandler := billingcoverage.NewHandler(services.billingCoverage)
 
 	authDeps := httpapi.AuthDeps{

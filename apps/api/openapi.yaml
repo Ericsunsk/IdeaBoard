@@ -1487,6 +1487,20 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseCreditReconciliationFindingPage' }
 
+  /admin/billing/catalog:
+    get:
+      tags: [AdminBilling]
+      operationId: listAdminBillableItems
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Product-oriented Billable Item catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBillableItemCatalog'
+
   /admin/billing/skus:
     get:
       tags: [AdminBilling]
@@ -2500,6 +2514,32 @@ components:
           type: array
           items: { $ref: '#/components/schemas/BillingCatalogItem' }
         next_after_sku: { $ref: '#/components/schemas/BillingSKUCode' }
+
+    BillableItemStatus:
+      type: string
+      enum: [unpriced, active, disabled, archived]
+
+    BillableItemCatalogCard:
+      type: object
+      required: [sku, namespace, product_kind, display_name, description, sort_order, status]
+      properties:
+        sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        namespace: { type: string, minLength: 1, maxLength: 32 }
+        product_kind: { type: string, minLength: 1, maxLength: 64 }
+        display_name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 1000 }
+        sort_order: { type: integer, minimum: 0 }
+        status: { $ref: '#/components/schemas/BillableItemStatus' }
+        current_price: { $ref: '#/components/schemas/BillingPrice' }
+        updated_at: { type: string, format: date-time }
+
+    BillableItemCatalog:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BillableItemCatalogCard' }
 
     BillingCoverageItem:
       type: object
@@ -4836,6 +4876,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/BillingCatalogItem'
+
+    ApiResponseBillableItemCatalog:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/BillableItemCatalog'
 
     ApiResponseBillingCoverage:
       allOf:

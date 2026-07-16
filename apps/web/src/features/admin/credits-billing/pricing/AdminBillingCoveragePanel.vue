@@ -133,7 +133,7 @@ import {
   adminEmptyStateClass,
   adminFramedIconButtonClass,
 } from '../../shared/lib/adminUiClasses'
-import type { AdminBillingCoverageItem } from './billingPricingTypes'
+import type { AdminBillingCoverageItem } from './billingCoverageTypes'
 
 const props = defineProps<{
   items: AdminBillingCoverageItem[]

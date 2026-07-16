@@ -41,7 +41,7 @@ export const adminRoutes: RouteRecordRaw[] = [
       {
         path: 'credits',
         component: adminPageComponents.credits,
-        meta: { requiresAuth: true, title: 'Idea与计费' },
+        meta: { requiresAuth: true, title: '积分运营' },
         children: [
           { path: '', redirect: ADMIN_CREDIT_WALLETS_PATH },
           {
@@ -53,6 +53,7 @@ export const adminRoutes: RouteRecordRaw[] = [
             path: 'pricing',
             name: 'AdminCreditPricing',
             component: () => import('../credits-billing/pricing/AdminBillingPricingPage.vue'),
+            meta: { requiresAuth: true, title: '功能定价' },
           },
           {
             path: 'reconciliation',
