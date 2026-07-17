@@ -74,7 +74,7 @@ const renderLayerStackFileMock = vi.mocked(renderImageEditorLayerStackFile)
 const imageNodeFixtures: Record<
   string,
   {
-    display: { url: string; ratio: number }
+    display: { url: string; ratio: number } | null
     snapshot: ImageNodeItem
   }
 > = {
@@ -123,6 +123,21 @@ const imageNodeFixtures: Record<
       outputImages: [],
     },
   },
+  'empty-image': {
+    display: null,
+    snapshot: {
+      id: 4,
+      type: 'image-node',
+      title: 'Empty',
+      x: 40,
+      y: 50,
+      width: 280,
+      sourceImageUrl: '',
+      sourceImageRatio: 1,
+      outputStatus: 'idle',
+      outputImages: [],
+    },
+  },
 }
 
 function createStageElement() {
@@ -141,6 +156,7 @@ function mountCanvasImageTools() {
   const isCanvasInteractionLocked = ref(false)
   const currentBoardId = ref('board-1')
   const generationAvailable = ref(true)
+  const directActionRunningNodeIds = ref<Set<string>>(new Set())
   const nodes: Ref<Node[]> = shallowRef(
     Object.keys(imageNodeFixtures).map((id) => ({ id, data: { kind: 'image' } })) as Node[],
   )
@@ -199,7 +215,7 @@ function mountCanvasImageTools() {
           isImageActionPanelVisible: (nodeId) => nodeId === 'image-1',
           isImagePromptComposerVisible: (nodeId) => nodeId === 'image-1',
           isGenerationAvailable: () => generationAvailable.value,
-          isDirectActionRunning: () => false,
+          isDirectActionRunning: (nodeId) => directActionRunningNodeIds.value.has(nodeId),
           strengthControl: {
             activeAction: activeStrengthAction,
             getValue: () => 50,
@@ -229,6 +245,7 @@ function mountCanvasImageTools() {
     connectionAdapter,
     createImageNodeFromFile,
     currentBoardId,
+    directActionRunningNodeIds,
     generationAvailable,
     host,
     isCanvasInteractionLocked,
@@ -557,7 +574,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     }
   })
 
-  it('disables generation controls while the generation provider is unavailable', () => {
+  it('keeps provider availability separate from per-node generation state', () => {
     const harness = mountCanvasImageTools()
 
     try {
@@ -572,9 +589,21 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       harness.generationAvailable.value = false
       const actionAfter = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
-      expect(actionAfter).not.toBe(actionBefore)
-      expect(actionAfter.directGenerating).toBe(true)
+      expect(actionAfter).toBe(actionBefore)
+      expect(actionAfter.directGenerating).toBe(false)
+      expect(
+        harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating,
+      ).toBe(false)
+      expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
+
+      harness.directActionRunningNodeIds.value = new Set(['image-1'])
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(true)
+      expect(
+        harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating,
+      ).toBe(false)
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(true)
+
+      harness.directActionRunningNodeIds.value = new Set()
 
       harness.generationAvailable.value = true
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(

@@ -103,7 +103,9 @@ const maxSubmitTaskImageURLBytes = 4096
 const maxSubmitTaskClientActionIDBytes = 128
 const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
 const maxSubmitTaskParamsDepth = 24
-const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加账号"
+const providerUnavailableMessage = "生图服务暂不可用，请稍后重试"
+
+var errNoAvailableAPIAccount = errors.New("no available API account")
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
@@ -321,7 +323,7 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 		return nil, nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 	if len(apiAccounts) == 0 {
-		return nil, nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
+		return nil, nil, nil, "", "", errNoAvailableAPIAccount
 	}
 
 	params := make(map[string]interface{}, len(req.Params)+2)
@@ -381,7 +383,7 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 		return nil, nil, nil, "", "", err
 	}
 	if len(apiAccounts) == 0 {
-		return nil, nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
+		return nil, nil, nil, "", "", errNoAvailableAPIAccount
 	}
 
 	fullPrompt := req.Prompt
@@ -425,7 +427,7 @@ func (s *Service) filterGoogleNativeAccountsForSubmit(ctx context.Context, userI
 	if evaluation.Message != "" {
 		return nil, errors.New(evaluation.Message)
 	}
-	return nil, errors.New(noAvailableAPIAccountMessage)
+	return nil, errNoAvailableAPIAccount
 }
 
 func accountUsesGoogleNativeAPI(account *accounts.ApiAccount) bool {

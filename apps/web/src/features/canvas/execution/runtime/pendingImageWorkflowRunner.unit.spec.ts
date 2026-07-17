@@ -104,6 +104,39 @@ describe('pendingImageWorkflowRunner', () => {
     expect(submitTask).toHaveBeenCalledOnce()
   })
 
+  it('does not reserve or mutate result nodes when provider readiness fails', async () => {
+    const pendingResults = createPendingResults(async () => makeRunSummary())
+    const setNodeRunning = vi.fn()
+    const onWarning = vi.fn()
+    const submitTask = vi.fn(async () => ({ taskId: 'task-1' }))
+    const runner = createPendingImageWorkflowRunner({
+      pendingResults,
+      isBoardCurrent: () => true,
+      setNodeRunning,
+      onSuccess: vi.fn(),
+      onWarning,
+    })
+
+    await runner.run({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      boardId: 'board-a',
+      activationId: 'canvas:activation-provider-unavailable',
+      outputCount: 1,
+      assertReady: vi.fn(async () => {
+        throw new Error('生图服务暂不可用，请稍后重试')
+      }),
+      submitTask,
+      resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
+      fallbackErrorMessage: '执行失败',
+    })
+
+    expect(pendingResults.runPendingResults).not.toHaveBeenCalled()
+    expect(submitTask).not.toHaveBeenCalled()
+    expect(setNodeRunning).not.toHaveBeenCalled()
+    expect(onWarning).toHaveBeenCalledWith('生图服务暂不可用，请稍后重试')
+  })
+
   it('runs the prepared pending workflow lifecycle and always clears running state', async () => {
     const events: string[] = []
     const afterTaskIdAttached = vi.fn(async ({ resultNodeId, taskId }) => {

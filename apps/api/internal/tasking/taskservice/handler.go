@@ -237,12 +237,14 @@ func userFacingSubmitError(err error) string {
 	if err == nil {
 		return "未知错误"
 	}
+	if errors.Is(err, errNoAvailableAPIAccount) {
+		return providerUnavailableMessage
+	}
 	msg := err.Error()
 	// Known user-facing messages from the validation layer are safe to expose.
 	if strings.Contains(msg, "提示词") || strings.Contains(msg, "图片") || strings.Contains(msg, "参数") ||
 		strings.Contains(msg, "格式") || strings.Contains(msg, "数量") || strings.Contains(msg, "大小") ||
-		strings.Contains(msg, "feature") || strings.Contains(msg, "API 账号") ||
-		strings.Contains(msg, "任务提交失败") || strings.Contains(msg, "请先添加账号") {
+		strings.Contains(msg, "feature") || strings.Contains(msg, "任务提交失败") {
 		return msg
 	}
 	return "任务提交失败，请稍后重试"

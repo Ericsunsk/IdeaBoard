@@ -268,6 +268,43 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	}
 }
 
+func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	service := NewService(ServiceDeps{
+		AccountRepo:     &fakeSubmitAccountStore{},
+		SubmissionStore: &recordingSubmissionStore{},
+		MediaValidator:  testSubmitMediaValidator{},
+	}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(t, service, 42)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
+		"prompt":           "生成海报",
+		"client_action_id": "handler-provider-unavailable",
+		"billing_quantity": 1,
+		"feature":          workflow.FeatureSlugPatternGen,
+	}))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var body struct {
+		Code int                         `json:"code"`
+		Msg  string                      `json:"msg"`
+		Data submitTaskReadinessResponse `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != 0 || body.Msg != "success" || body.Data.Ready {
+		t.Fatalf("unexpected readiness response: %+v", body)
+	}
+	if body.Data.Message != "生图服务暂不可用，请稍后重试" {
+		t.Fatalf("message=%q, want user-facing provider unavailable copy", body.Data.Message)
+	}
+}
+
 func TestCheckSubmitTaskReadinessHandlerRequiresValidBillingQuantity(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

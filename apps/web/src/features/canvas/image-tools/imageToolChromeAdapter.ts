@@ -45,7 +45,7 @@ export function createImageToolChromeAdapter(
         outputCount: session.maskChromeState.activeMaskEditorOutputCount.value,
         referenceImages: session.maskChromeState.maskEditorReferenceImages.value,
         directGenerating: nodeId
-          ? !options.isGenerationAvailable() || options.isDirectActionRunning(nodeId)
+          ? options.isDirectActionRunning(nodeId)
           : false,
         canUndo: session.maskEditor.canUndoMask.value,
         canRedo: session.maskEditor.canRedoMask.value,
