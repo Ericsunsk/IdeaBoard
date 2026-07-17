@@ -33,7 +33,6 @@ function makeRun(overrides: Partial<AdminCreditRun> = {}): AdminCreditRun {
     id: 11,
     status: 'completed',
     trigger: 'scheduled',
-    stale_hold_after_seconds: 86400,
     finding_count: 0,
     critical_count: 0,
     isolated_wallet_count: 0,

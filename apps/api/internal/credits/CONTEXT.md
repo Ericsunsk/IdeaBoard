@@ -53,7 +53,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
 - Credit Health 状态固定为 `unchecked | healthy | attention | critical | stale | failed`。判定优先级为：open high-risk Finding 或其精确 active `ledger_integrity/reconciliation` Restriction → critical；最新 failed Run 晚于最近成功 Run → failed；从未成功且无 failed → unchecked；最近成功严格超过 48 小时 → stale；其余 open Finding → attention；否则 healthy。active Run 单独返回，不覆盖状态。
-- Reconciliation 的 Stale Hold 策略固定为 24 小时并由 DB snapshot/constraint 作为事实源；Admin API/UI 不接受阈值。
+- Reconciliation 的 Stale Hold 策略固定为 24 小时并由 DB per-Run snapshot/constraint 作为事实源；Admin API/UI 不接受阈值，public Run DTO 也不暴露这一内部固定值。
 - manual Reconciliation 必须提供真实 Admin 与 trim 后 1–1000 字符的 reason；scheduled Run 的 actor/reason 必须为空。每天 03:00 Asia/Shanghai 调度，River leader 启动时若 24 小时无成功 Run 则触发 catch-up。
 - manual、daily 与 catch-up 共用同一 transaction-bound start seam。DB advisory lock、active-run unique、scheduled slot unique 与 `enqueue_required` 返回值保证多实例/重复调度只 enqueue 一次；Run insert/reset 与 River enqueue 必须同 transaction。ScheduleJob 遇到其他 active Run 时必须 snooze，不能吞掉目标 slot；仍 overdue 的 failed target slot 复用原 Run、清理终态字段并重新入队。
 - `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 Finding 与 run report 同一 transaction 内幂等创建绑定该 Finding 的 `ledger_integrity/reconciliation` Restriction。Finding resolved、降为 low、失去或改变 Wallet 归属时只精确解除其自身 Restriction；Reconciliation alerts 已删除。

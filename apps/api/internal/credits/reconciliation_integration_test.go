@@ -96,7 +96,7 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 		t.Fatalf("StartReconciliation() error = %v", err)
 	}
 	if run.Trigger != ReconciliationTriggerManual || run.RequestedBy == nil || *run.RequestedBy != 1 ||
-		run.Reason != "integration reconciliation" || run.StaleHoldAfterSecs != 86400 {
+		run.Reason != "integration reconciliation" {
 		t.Fatalf("manual run audit = %+v", run)
 	}
 	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {

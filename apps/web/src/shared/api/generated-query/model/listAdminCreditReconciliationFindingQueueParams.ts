@@ -4,10 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ListAdminCreditReconciliationFindingQueueStatus } from './listAdminCreditReconciliationFindingQueueStatus'
+import type { CreditReconciliationFindingStatus } from './creditReconciliationFindingStatus'
 
 export type ListAdminCreditReconciliationFindingQueueParams = {
-  status: ListAdminCreditReconciliationFindingQueueStatus
+  status: CreditReconciliationFindingStatus
   /**
    * @minimum 1
    */

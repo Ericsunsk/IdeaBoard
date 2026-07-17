@@ -15,7 +15,6 @@ export interface CreditReconciliationRun {
   requested_by?: number
   reason?: AdminActionReason
   scheduled_for?: string
-  stale_hold_after_seconds: number
   finding_count: number
   critical_count: number
   isolated_wallet_count: number

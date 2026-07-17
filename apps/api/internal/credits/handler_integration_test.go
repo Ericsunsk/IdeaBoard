@@ -34,7 +34,7 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 	router.GET("/api/admin/credits/reconciliation/findings", handler.ListGlobalReconciliationFindings)
 
 	unknown := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"unknown":true}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"reason":"manual audit","unknown":true}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(unknown, request)
 	if unknown.Code != http.StatusBadRequest {
@@ -48,14 +48,6 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 	if oversized.Code != http.StatusBadRequest {
 		t.Fatalf("oversized status = %d, body=%s", oversized.Code, oversized.Body.String())
 	}
-	legacyThreshold := httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"stale_hold_after_seconds":86400,"reason":"manual audit"}`))
-	request.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(legacyThreshold, request)
-	if legacyThreshold.Code != http.StatusBadRequest {
-		t.Fatalf("legacy threshold status = %d, body=%s", legacyThreshold.Code, legacyThreshold.Body.String())
-	}
-
 	for _, body := range []string{`{}`, `{"reason":"  "}`, `{"reason":"` + strings.Repeat("r", 1001) + `"}`} {
 		rejected := httptest.NewRecorder()
 		request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(body))
@@ -75,6 +67,7 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 		!bytes.Contains(created.Body.Bytes(), []byte(`"trigger":"manual"`)) {
 		t.Fatalf("created response = %d %s", created.Code, created.Body.String())
 	}
+	assertNoPublicStaleHoldThreshold(t, created.Body.Bytes())
 	var runID int64
 	var trigger string
 	var requestedBy int64
@@ -101,6 +94,7 @@ FROM credit_reconciliation_runs
 		!bytes.Contains(healthRecorder.Body.Bytes(), []byte(`"restricted_wallet_count":0`)) {
 		t.Fatalf("health response = %d %s", healthRecorder.Code, healthRecorder.Body.String())
 	}
+	assertNoPublicStaleHoldThreshold(t, healthRecorder.Body.Bytes())
 
 	for path := range map[string]struct{}{
 		"/api/admin/credits/reconciliation/runs?limit=1":                 {},
@@ -112,6 +106,7 @@ FROM credit_reconciliation_runs
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("GET %s status = %d body=%s", path, recorder.Code, recorder.Body.String())
 		}
+		assertNoPublicStaleHoldThreshold(t, recorder.Body.Bytes())
 	}
 	invalid := httptest.NewRecorder()
 	router.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/api/admin/credits/reconciliation/runs?limit=201", nil))
@@ -127,6 +122,13 @@ FROM credit_reconciliation_runs
 	router.ServeHTTP(missingGlobalStatus, httptest.NewRequest(http.MethodGet, "/api/admin/credits/reconciliation/findings", nil))
 	if missingGlobalStatus.Code != http.StatusBadRequest {
 		t.Fatalf("missing global finding status = %d", missingGlobalStatus.Code)
+	}
+}
+
+func assertNoPublicStaleHoldThreshold(t testing.TB, body []byte) {
+	t.Helper()
+	if bytes.Contains(body, []byte(`"stale_hold_after_seconds"`)) {
+		t.Fatalf("public reconciliation response exposes internal Stale Hold threshold: %s", body)
 	}
 }
 

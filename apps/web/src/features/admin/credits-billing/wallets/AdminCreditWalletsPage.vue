@@ -533,6 +533,6 @@ function getWalletRestrictionTypeLabel(type: string) {
 }
 
 function getWalletRestrictionSourceLabel(source: string) {
-  return source === 'reconciliation' ? '对账扫描' : source
+  return source === 'reconciliation' ? '账本检查' : source
 }
 </script>

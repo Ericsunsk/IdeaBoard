@@ -156,6 +156,7 @@ git diff --exit-code -- internal/db/sqlc
 | 入口 | 用途 |
 | ---- | ---- |
 | [service.go](./apps/api/internal/credits/service.go) | Grant/Hold/Capture/Release/Refund Command seam 与 caller-owned transaction adapter |
+| [reconciliation.go](./apps/api/internal/credits/reconciliation.go) | 自动账本检查、Run history 与全局 Finding queue；Stale Hold 固定 24 小时且不接受 Admin 配置 |
 | [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md) | Credits domain language 与 invariants |
 | [credits-million.md](./docs/benchmarks/credits-million.md) | 显式百万流水 harness 与参考结果 |
 

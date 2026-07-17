@@ -64,7 +64,7 @@ func (s *Service) GetCreditHealth(ctx context.Context) (CreditHealth, error) {
 	}()
 
 	activeRun, err := queryOptionalReconciliationRun(ctx, tx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs
 WHERE status IN ('queued', 'running')
@@ -74,7 +74,7 @@ LIMIT 1`)
 		return CreditHealth{}, fmt.Errorf("credits health: read active run: %w", err)
 	}
 	latestSuccessfulRun, err := queryOptionalReconciliationRun(ctx, tx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs
 WHERE status = 'completed'
@@ -85,7 +85,7 @@ LIMIT 1`)
 	}
 
 	latestFailedRun, err := queryOptionalReconciliationRun(ctx, tx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs
 WHERE status = 'failed'

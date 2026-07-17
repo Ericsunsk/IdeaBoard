@@ -60,5 +60,5 @@ export function getRunStatusSeverity(status: CreditReconciliationRun['status']) 
 }
 
 export function formatReconciliationRunError(message?: string) {
-  return sanitizeApiErrorMessage(message, '对账执行失败，请查看服务日志并重试')
+  return sanitizeApiErrorMessage(message, '账本检查失败，请查看服务日志并重试')
 }

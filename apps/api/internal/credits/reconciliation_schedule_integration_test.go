@@ -193,7 +193,7 @@ func TestScheduledReconciliationRollsBackRunWhenEnqueueFails(t *testing.T) {
 	}
 	if run == nil || run.Trigger != ReconciliationTriggerScheduled || run.RequestedBy != nil ||
 		run.Reason != "" || run.ScheduledFor == nil || !run.ScheduledFor.Equal(slot) ||
-		run.StaleHoldAfterSecs != 86400 || len(enqueuer.calls) != 1 {
+		len(enqueuer.calls) != 1 {
 		t.Fatalf("recovered schedule run=%+v enqueue calls=%d", run, len(enqueuer.calls))
 	}
 }

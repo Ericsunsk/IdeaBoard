@@ -351,7 +351,7 @@ func (h *Handler) ListGlobalReconciliationFindings(c *gin.Context) {
 		return
 	}
 	status, ok := parseReconciliationFindingStatus(c.Query("status"))
-	if !ok || status == "" {
+	if !ok {
 		response.Error(c, http.StatusBadRequest, "status 无效")
 		return
 	}
@@ -365,7 +365,7 @@ func (h *Handler) ListGlobalReconciliationFindings(c *gin.Context) {
 
 func parseReconciliationFindingStatus(value string) (ReconciliationFindingStatus, bool) {
 	status := ReconciliationFindingStatus(strings.TrimSpace(value))
-	return status, status == "" || status == ReconciliationFindingOpen || status == ReconciliationFindingResolved
+	return status, status == ReconciliationFindingOpen || status == ReconciliationFindingResolved
 }
 
 func parseReconciliationPage(c *gin.Context) (ListReconciliationInput, bool) {

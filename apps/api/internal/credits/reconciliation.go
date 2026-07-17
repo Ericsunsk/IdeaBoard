@@ -43,7 +43,6 @@ type ReconciliationRun struct {
 	RequestedBy         *int64                  `json:"requested_by,omitempty"`
 	Reason              string                  `json:"reason,omitempty"`
 	ScheduledFor        *time.Time              `json:"scheduled_for,omitempty"`
-	StaleHoldAfterSecs  int64                   `json:"stale_hold_after_seconds"`
 	FindingCount        int64                   `json:"finding_count"`
 	CriticalCount       int64                   `json:"critical_count"`
 	IsolatedWalletCount int64                   `json:"isolated_wallet_count"`
@@ -262,7 +261,7 @@ func (s *Service) GetReconciliationRun(ctx context.Context, runID int64) (Reconc
 		return ReconciliationRun{}, ErrInvalidCommand
 	}
 	row := s.pool.QueryRow(ctx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs WHERE id = $1`, runID)
 	run, err := scanReconciliationRun(row)
@@ -281,7 +280,7 @@ func (s *Service) ListReconciliationRuns(ctx context.Context, input ListReconcil
 		return ReconciliationRunPage{}, ErrInvalidCommand
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT id, status, trigger_type, requested_by, reason, scheduled_for, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, reason, scheduled_for, finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DESC LIMIT $2`, input.BeforeID, limit+1)
 	if err != nil {
@@ -313,7 +312,6 @@ type reconciliationRunScanner interface {
 func scanReconciliationRun(scanner reconciliationRunScanner) (ReconciliationRun, error) {
 	var run ReconciliationRun
 	var reason *string
-	var staleSeconds float64
 	if err := scanner.Scan(
 		&run.ID,
 		&run.Status,
@@ -321,7 +319,6 @@ func scanReconciliationRun(scanner reconciliationRunScanner) (ReconciliationRun,
 		&run.RequestedBy,
 		&reason,
 		&run.ScheduledFor,
-		&staleSeconds,
 		&run.FindingCount,
 		&run.CriticalCount,
 		&run.IsolatedWalletCount,
@@ -336,7 +333,6 @@ func scanReconciliationRun(scanner reconciliationRunScanner) (ReconciliationRun,
 	if reason != nil {
 		run.Reason = *reason
 	}
-	run.StaleHoldAfterSecs = int64(staleSeconds)
 	return run, nil
 }
 
