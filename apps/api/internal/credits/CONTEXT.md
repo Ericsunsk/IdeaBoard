@@ -52,8 +52,8 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
 - 启动 Reconciliation 必须提供 trim 后 1–1000 字符的 reason；active run 的重复 start 返回原 run，禁止覆盖首次请求的 actor/reason。
-- `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 finding、alert 与 run report 同一 transaction 内冻结相关 Wallet。扫描不得修改 Ledger、projection 或自动创建 Correction。
-- Finding fingerprint 不包含 run ID；重复异常复用 open finding 并增加 occurrence/run link，异常消失后标记 resolved。frozen Wallet 的历史 read contract 不变。
+- `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 Finding 与 run report 同一 transaction 内幂等创建绑定该 Finding 的 `ledger_integrity/reconciliation` Restriction。Finding resolved、降为 low、失去或改变 Wallet 归属时只精确解除其自身 Restriction；Reconciliation alerts 已删除。
+- Finding fingerprint 不包含 run ID；重复异常复用 open Finding 并增加 occurrence/run link，异常消失后标记 resolved，reopen 会创建新的 Restriction history row。Finding 的 `isolated` 从精确 active Restriction 推导；扫描不修改 Wallet lifecycle status、Ledger、projection，也不自动创建 Correction。
 - Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 lifecycle status，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 `100 Ideas` Welcome Grant；Ban/Unban/删除不得创建或清除独立 Restriction，claim identity 明文不进入 Credits schema。
 - Welcome identity HMAC key 首次使用时通过 typed `SECURITY DEFINER` command 永久绑定数据库 fingerprint；配置误变更时 startup/provision fail closed，避免同一身份生成新 claim。
 - 删除业务用户先在本地事务冻结 Wallet 并记录 durable deletion phase，再依次幂等删除 Auth、清理 Storage、写 user tombstone；失败请求可从持久 phase 重试收敛。最终保留 user tombstone 主键、Task、Wallet、Ledger 与 Welcome claim；相同领取身份重新注册不会再次获得 Welcome Grant。

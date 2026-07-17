@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func (e *reconciliationEnqueuerStub) InsertTx(_ context.Context, _ pgx.Tx, args 
 	return &rivertype.JobInsertResult{}, nil
 }
 
-func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) {
+func TestReconciliationRestrictionsTrackIndependentFindingsAndRecoverCommands(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
 	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
@@ -46,15 +47,40 @@ func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) 
 	if _, err := service.Grant(ctx, GrantCommand{UserID: 94, Amount: mustCreditAmount(t, 100), Metadata: testMetadata("reconcile:grant", "reconcile-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
 	}
-	var accountID int64
-	var originalBalance int64
-	if err := db.QueryRowContext(ctx, `SELECT id, balance FROM credit_accounts WHERE wallet_user_id = 94 AND account_role = 'user_available'`).Scan(&accountID, &originalBalance); err != nil {
-		t.Fatalf("read account error = %v", err)
+	type accountProjection struct {
+		id      int64
+		balance int64
+	}
+	accounts := make(map[string]accountProjection)
+	rows, err := db.QueryContext(ctx, `
+SELECT account_role, id, balance
+FROM credit_accounts
+WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var role string
+		var account accountProjection
+		if err := rows.Scan(&role, &account.id, &account.balance); err != nil {
+			rows.Close()
+			t.Fatal(err)
+		}
+		accounts[role] = account
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if len(accounts) != 2 {
+		t.Fatalf("accounts = %+v, want available and reserved", accounts)
 	}
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = balance + 7 WHERE id = $1`, accountID); err != nil {
+	if _, err := db.ExecContext(ctx, `
+UPDATE credit_accounts
+SET balance = balance + CASE account_role WHEN 'user_available' THEN 7 ELSE 3 END
+WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
@@ -77,27 +103,52 @@ func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) 
 		t.Fatalf("completed run = %+v, err = %v", run, err)
 	}
 	wallet, err := service.GetWallet(ctx, 94)
-	if err != nil || wallet.Status != WalletStatusFrozen {
+	if err != nil || wallet.Status != WalletStatusActive || len(wallet.ActiveRestrictions) != 2 {
 		t.Fatalf("wallet = %+v, err = %v", wallet, err)
 	}
 	page, err := service.ListReconciliationFindings(ctx, run.ID, "open", ListReconciliationInput{Limit: 50})
 	if err != nil || len(page.Findings) == 0 {
 		t.Fatalf("findings = %+v, err = %v", page, err)
 	}
-	var projectionFinding ReconciliationFinding
+	projectionFindings := make(map[string]ReconciliationFinding)
 	for _, finding := range page.Findings {
 		if finding.FindingType == "wallet_projection_mismatch" {
-			projectionFinding = finding
+			projectionFindings[finding.SubjectID] = finding
 		}
 	}
-	if projectionFinding.ID == 0 || !projectionFinding.Isolated || projectionFinding.Risk != "high" {
-		t.Fatalf("projection finding = %+v", projectionFinding)
+	if len(projectionFindings) != 2 {
+		t.Fatalf("projection findings = %+v, want two independent account findings", projectionFindings)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_alerts WHERE finding_id = $1`, projectionFinding.ID); got != 1 {
-		t.Fatalf("alert count = %d, want 1", got)
+	availableFinding := projectionFindings[strconv.FormatInt(accounts["user_available"].id, 10)]
+	reservedFinding := projectionFindings[strconv.FormatInt(accounts["user_reserved"].id, 10)]
+	for _, finding := range []ReconciliationFinding{availableFinding, reservedFinding} {
+		if finding.ID == 0 || !finding.Isolated || finding.Risk != ReconciliationRiskHigh {
+			t.Fatalf("projection finding = %+v", finding)
+		}
+	}
+	if got := countRows(t, db, `
+SELECT COUNT(*)
+FROM credit_wallet_restrictions
+WHERE wallet_user_id = 94
+  AND restriction_type = 'ledger_integrity'
+  AND source = 'reconciliation'
+  AND related_object_type = 'finding'
+  AND released_at IS NULL`); got != 2 {
+		t.Fatalf("active reconciliation restriction count = %d, want 2", got)
 	}
 	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_transactions`); got != ledgerBefore {
 		t.Fatalf("ledger transactions changed from %d to %d", ledgerBefore, got)
+	}
+	if _, err := service.Grant(ctx, GrantCommand{UserID: 94, Amount: mustCreditAmount(t, 1), Metadata: testMetadata("reconcile:blocked-grant", "reconcile-blocked-grant")}); !errors.Is(err, ErrWalletRestricted) {
+		t.Fatalf("Grant() error = %v, want ErrWalletRestricted", err)
+	}
+	deductMetadata := testMetadata("reconcile:blocked-deduct", "reconcile-blocked-deduct")
+	deductMetadata.Actor = Actor{Type: ActorAdmin, ID: "1"}
+	if _, err := service.Deduct(ctx, DeductionCommand{UserID: 94, Amount: mustCreditAmount(t, 1), Metadata: deductMetadata}); !errors.Is(err, ErrWalletRestricted) {
+		t.Fatalf("Deduct() error = %v, want ErrWalletRestricted", err)
+	}
+	if _, err := service.Hold(ctx, HoldCommand{UserID: 94, Amount: mustCreditAmount(t, 1), Metadata: testMetadata("reconcile:blocked-hold", "reconcile-blocked-hold")}); !errors.Is(err, ErrWalletRestricted) {
+		t.Fatalf("Hold() error = %v, want ErrWalletRestricted", err)
 	}
 
 	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
@@ -107,20 +158,25 @@ func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) 
 	if err := service.ExecuteReconciliation(ctx, second.ID); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_findings WHERE fingerprint = $1`, projectionFinding.Fingerprint); got != 1 {
-		t.Fatalf("deduplicated finding count = %d, want 1", got)
-	}
-	if got := countRows(t, db, `SELECT occurrence_count FROM credit_reconciliation_findings WHERE id = $1`, projectionFinding.ID); got != 2 {
-		t.Fatalf("occurrence count = %d, want 2", got)
-	}
-	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE finding_id = $1`, projectionFinding.ID); got != 2 {
-		t.Fatalf("run history links = %d, want 2", got)
+	for _, finding := range []ReconciliationFinding{availableFinding, reservedFinding} {
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_findings WHERE fingerprint = $1`, finding.Fingerprint); got != 1 {
+			t.Fatalf("deduplicated finding count = %d, want 1", got)
+		}
+		if got := countRows(t, db, `SELECT occurrence_count FROM credit_reconciliation_findings WHERE id = $1`, finding.ID); got != 2 {
+			t.Fatalf("occurrence count = %d, want 2", got)
+		}
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE finding_id = $1`, finding.ID); got != 2 {
+			t.Fatalf("run history links = %d, want 2", got)
+		}
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(finding.ID, 10)); got != 1 {
+			t.Fatalf("active restriction count for finding %d = %d, want 1", finding.ID, got)
+		}
 	}
 
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = $2 WHERE id = $1`, accountID, originalBalance); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = $2 WHERE id = $1`, accounts["user_available"].id, accounts["user_available"].balance); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
@@ -134,16 +190,84 @@ func TestReconciliationRunPersistsFindingsIsolatesAndDeduplicates(t *testing.T) 
 		t.Fatal(err)
 	}
 	var status string
-	if err := db.QueryRowContext(ctx, `SELECT status FROM credit_reconciliation_findings WHERE id = $1`, projectionFinding.ID).Scan(&status); err != nil || status != "resolved" {
+	if err := db.QueryRowContext(ctx, `SELECT status FROM credit_reconciliation_findings WHERE id = $1`, availableFinding.ID).Scan(&status); err != nil || status != "resolved" {
 		t.Fatalf("resolved status = %q, err = %v", status, err)
 	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE wallet_user_id = 94 AND released_at IS NULL`); got != 1 {
+		t.Fatalf("active restriction count after one repair = %d, want 1", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(reservedFinding.ID, 10)); got != 1 {
+		t.Fatalf("reserved finding active restriction count = %d, want 1", got)
+	}
+	if _, err := service.Grant(ctx, GrantCommand{UserID: 94, Amount: mustCreditAmount(t, 1), Metadata: testMetadata("reconcile:still-blocked", "reconcile-still-blocked")}); !errors.Is(err, ErrWalletRestricted) {
+		t.Fatalf("Grant() after one repair error = %v, want ErrWalletRestricted", err)
+	}
+
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = $2 WHERE id = $1`, accounts["user_reserved"].id, accounts["user_reserved"].balance); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	fourth, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, fourth.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE wallet_user_id = 94 AND released_at IS NULL`); got != 0 {
+		t.Fatalf("active restriction count after all repairs = %d, want 0", got)
+	}
+	if _, err := service.Grant(ctx, GrantCommand{UserID: 94, Amount: mustCreditAmount(t, 1), Metadata: testMetadata("reconcile:recovered", "reconcile-recovered")}); err != nil {
+		t.Fatalf("Grant() after all repairs error = %v", err)
+	}
+
+	var recoveredAvailableBalance int64
+	if err := db.QueryRowContext(ctx, `SELECT balance FROM credit_accounts WHERE id = $1`, accounts["user_available"].id).Scan(&recoveredAvailableBalance); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts DISABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_accounts SET balance = $2 WHERE id = $1`, accounts["user_available"].id, recoveredAvailableBalance+7); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
+		t.Fatal(err)
+	}
+	fifth, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, fifth.ID); err != nil {
+		t.Fatal(err)
+	}
+	var reopenedStatus string
+	var reopenedOccurrence int64
+	if err := db.QueryRowContext(ctx, `SELECT status, occurrence_count FROM credit_reconciliation_findings WHERE id = $1`, availableFinding.ID).Scan(&reopenedStatus, &reopenedOccurrence); err != nil {
+		t.Fatal(err)
+	}
+	if reopenedStatus != string(ReconciliationFindingOpen) || reopenedOccurrence != 3 {
+		t.Fatalf("reopened finding status=%q occurrence=%d, want open/3", reopenedStatus, reopenedOccurrence)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_id = $1`, strconv.FormatInt(availableFinding.ID, 10)); got != 2 {
+		t.Fatalf("restriction history count after reopen = %d, want 2", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(availableFinding.ID, 10)); got != 1 {
+		t.Fatalf("active restriction count after reopen = %d, want 1", got)
+	}
+
 	historical, err := service.ListReconciliationFindings(ctx, run.ID, "open", ListReconciliationInput{Limit: 50})
 	if err != nil {
 		t.Fatal(err)
 	}
 	historicalFound := false
 	for _, finding := range historical.Findings {
-		if finding.ID == projectionFinding.ID {
+		if finding.ID == availableFinding.ID {
 			historicalFound = true
 			if finding.Status != ReconciliationFindingOpen || !finding.Isolated {
 				t.Fatalf("historical snapshot = %+v", finding)
@@ -181,21 +305,57 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
+	var staleFinding ReconciliationFinding
 	for _, finding := range page.Findings {
 		if finding.FindingType == "stale_hold" {
-			found = true
+			staleFinding = finding
 			if finding.Risk != "low" || finding.Severity != "warning" || finding.Isolated {
 				t.Fatalf("stale finding = %+v", finding)
 			}
 		}
 	}
-	if !found {
+	if staleFinding.ID == 0 {
 		t.Fatal("stale_hold finding not reported")
 	}
 	wallet, err := service.GetWallet(ctx, 95)
 	if err != nil || wallet.Status != WalletStatusActive {
 		t.Fatalf("wallet = %+v, err = %v", wallet, err)
+	}
+
+	if _, err := db.ExecContext(ctx, `UPDATE credit_reconciliation_findings SET risk = 'high', isolated = TRUE WHERE id = $1`, staleFinding.ID); err != nil {
+		t.Fatal(err)
+	}
+	restriction, err := service.RestrictWallet(ctx, RestrictWalletCommand{
+		UserID: 95,
+		Type:   "ledger_integrity",
+		Source: "reconciliation",
+		RelatedObject: BusinessReference{
+			Type: "finding",
+			ID:   strconv.FormatInt(staleFinding.ID, 10),
+		},
+		Reason: "test prior high-risk reconciliation isolation",
+		Actor:  Actor{Type: ActorSystem, ID: "credits-reconciliation"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t, time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(ctx, second.ID); err != nil {
+		t.Fatal(err)
+	}
+	var risk string
+	var isolated bool
+	if err := db.QueryRowContext(ctx, `SELECT risk, isolated FROM credit_reconciliation_findings WHERE id = $1`, staleFinding.ID).Scan(&risk, &isolated); err != nil {
+		t.Fatal(err)
+	}
+	if risk != string(ReconciliationRiskLow) || isolated {
+		t.Fatalf("downgraded stale finding risk=%q isolated=%v, want low/false", risk, isolated)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE restriction_id = $1 AND released_at IS NOT NULL`, restriction.RestrictionID); got != 1 {
+		t.Fatalf("released downgraded restriction count = %d, want 1", got)
 	}
 }
 

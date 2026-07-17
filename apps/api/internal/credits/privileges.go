@@ -15,7 +15,6 @@ var creditTableNames = []string{
 	"credit_reconciliation_runs",
 	"credit_reconciliation_findings",
 	"credit_reconciliation_run_findings",
-	"credit_reconciliation_alerts",
 }
 
 var creditInternalFunctionSignatures = []string{

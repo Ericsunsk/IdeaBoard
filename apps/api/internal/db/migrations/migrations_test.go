@@ -616,6 +616,154 @@ func TestSchemaSnapshotIncludesCreditWalletRestrictionContract(t *testing.T) {
 	}
 }
 
+func TestReconciliationLedgerIntegrityRestrictionMigrationContract(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260717020000_reconciliation_ledger_integrity_restrictions.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	schemaRaw, err := os.ReadFile("../schema/schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := string(schemaRaw)
+	for _, expected := range []string{
+		"DROP FUNCTION execute_credit_reconciliation(BIGINT)",
+		"DROP TABLE credit_reconciliation_alerts",
+		"create_credit_wallet_restriction(",
+		"release_credit_wallet_restriction(",
+		"'ledger_integrity'",
+		"'reconciliation'",
+		"'finding'",
+		"ORDER BY restrictions.wallet_user_id, findings.id",
+		"ORDER BY findings.wallet_user_id, findings.id",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("Reconciliation Restriction migration missing %q", expected)
+		}
+	}
+	if strings.Count(up, "credit_reconciliation_alerts") != 1 {
+		t.Fatal("Reconciliation Restriction migration must only reference alerts while dropping the obsolete table")
+	}
+	if strings.Contains(up, "UPDATE credit_wallets") || strings.Contains(up, "SET status = 'frozen'") {
+		t.Fatal("Reconciliation must not mutate Wallet lifecycle status")
+	}
+	if strings.Contains(up, "execute_credit_reconciliation_before_wallet_restrictions") {
+		t.Fatal("Reconciliation Restriction migration must not retain an archived executable producer")
+	}
+	for _, expected := range []string{
+		"CREATE TABLE credit_reconciliation_runs",
+		"CREATE TABLE credit_reconciliation_findings",
+		"CREATE TABLE credit_reconciliation_run_findings",
+		"CREATE FUNCTION start_credit_reconciliation(",
+		"CREATE FUNCTION fail_credit_reconciliation(",
+		"CREATE FUNCTION execute_credit_reconciliation(",
+		"create_credit_wallet_restriction(",
+		"release_credit_wallet_restriction(",
+		"'ledger_integrity'",
+		"'reconciliation'",
+		"'finding'",
+	} {
+		if !strings.Contains(schema, expected) {
+			t.Fatalf("schema snapshot missing Reconciliation Restriction contract: %s", expected)
+		}
+	}
+	if strings.Contains(schema, "credit_reconciliation_alerts") {
+		t.Fatal("schema snapshot must not retain obsolete Reconciliation alerts")
+	}
+	schemaExecute := schema[strings.Index(schema, "CREATE FUNCTION execute_credit_reconciliation("):strings.Index(schema, "CREATE OR REPLACE FUNCTION prevent_credit_ledger_mutation()")]
+	if strings.Contains(schemaExecute, "UPDATE credit_wallets") || strings.Contains(schemaExecute, "SET status = 'frozen'") {
+		t.Fatal("schema snapshot Reconciliation must not mutate Wallet lifecycle status")
+	}
+	for _, expected := range []string{
+		"CREATE TABLE credit_reconciliation_alerts",
+		"CREATE OR REPLACE FUNCTION execute_credit_reconciliation(",
+		"UPDATE credit_reconciliation_alerts",
+		"UPDATE credit_wallets",
+		"SECURITY DEFINER",
+	} {
+		if !strings.Contains(down, expected) {
+			t.Fatalf("Reconciliation Restriction down migration missing %q", expected)
+		}
+	}
+	if err := validateMigrationStatements("20260717020000_reconciliation_ledger_integrity_restrictions.sql down", parseSQLStatements(down)); err != nil {
+		t.Fatalf("Reconciliation Restriction down migration failed validation: %v", err)
+	}
+}
+
+func TestReconciliationLedgerIntegrityRestrictionMigrationRollsBackAndReapplies(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	const (
+		file    = "20260717020000_reconciliation_ledger_integrity_restrictions.sql"
+		version = 20260717020000
+	)
+	readDefinition := func() string {
+		t.Helper()
+		var definition string
+		if err := conn.QueryRowContext(ctx, `
+SELECT pg_get_functiondef(to_regprocedure($1))
+`, "execute_credit_reconciliation(bigint)").Scan(&definition); err != nil {
+			t.Fatalf("read Reconciliation function definition: %v", err)
+		}
+		return definition
+	}
+	assertCurrent := func() {
+		t.Helper()
+		assertTableExists(t, ctx, conn, "credit_reconciliation_alerts", false)
+		assertRegprocedureExists(t, ctx, conn, "execute_credit_reconciliation_before_wallet_restrictions(bigint)", false)
+		definition := readDefinition()
+		for _, forbidden := range []string{"credit_reconciliation_alerts", "UPDATE credit_wallets", "SET status = 'frozen'"} {
+			if strings.Contains(definition, forbidden) {
+				t.Fatalf("current Reconciliation function retains %q", forbidden)
+			}
+		}
+	}
+	assertCurrent()
+
+	raw, err := migrationFS.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
+		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	assertTableExists(t, ctx, conn, "credit_reconciliation_alerts", true)
+	assertRegprocedureExists(t, ctx, conn, "execute_credit_reconciliation_before_wallet_restrictions(bigint)", false)
+	rolledBackDefinition := readDefinition()
+	for _, expected := range []string{"credit_reconciliation_alerts", "UPDATE credit_wallets", "SET status = 'frozen'"} {
+		if !strings.Contains(rolledBackDefinition, expected) {
+			t.Fatalf("rolled-back Reconciliation function missing %q", expected)
+		}
+	}
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("reapply migration: %v", err)
+	}
+	assertCurrent()
+}
+
 func TestBaselineBusinessTableGuardMatchesBaselineTables(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260609000000_baseline.sql")
 	if err != nil {
@@ -946,6 +1094,20 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_consume_single_use_code")
 	assertFunctionSearchPath(t, ctx, conn, "apply_credit_posting_balances()")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
+	assertTableExists(t, ctx, conn, "credit_reconciliation_alerts", false)
+	assertRegprocedureExists(t, ctx, conn, "execute_credit_reconciliation(bigint)", true)
+	assertRegprocedureExists(t, ctx, conn, "execute_credit_reconciliation_before_wallet_restrictions(bigint)", false)
+	var reconciliationDefinition string
+	if err := conn.QueryRowContext(ctx, `
+SELECT pg_get_functiondef('execute_credit_reconciliation(bigint)'::regprocedure)
+`).Scan(&reconciliationDefinition); err != nil {
+		t.Fatalf("read active Reconciliation function definition: %v", err)
+	}
+	for _, forbidden := range []string{"credit_reconciliation_alerts", "UPDATE credit_wallets", "SET status = 'frozen'"} {
+		if strings.Contains(reconciliationDefinition, forbidden) {
+			t.Fatalf("active Reconciliation function retains forbidden producer behavior %q", forbidden)
+		}
+	}
 	assertConstraintExists(t, ctx, conn, "tasks", "fk_tasks_account_provider_endpoint")
 	assertConstraintExists(t, ctx, conn, "media_assets", "fk_media_assets_storage_profile_id")
 	assertConstraintExists(t, ctx, conn, "boards", "uq_boards_board_id")

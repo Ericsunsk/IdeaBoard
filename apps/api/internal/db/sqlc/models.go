@@ -136,6 +136,56 @@ type CreditPosting struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+type CreditReconciliationFinding struct {
+	ID              int64           `json:"id"`
+	Fingerprint     string          `json:"fingerprint"`
+	FindingType     string          `json:"finding_type"`
+	Severity        string          `json:"severity"`
+	Risk            string          `json:"risk"`
+	WalletUserID    sql.NullInt64   `json:"wallet_user_id"`
+	SubjectType     string          `json:"subject_type"`
+	SubjectID       string          `json:"subject_id"`
+	Details         json.RawMessage `json:"details"`
+	Status          string          `json:"status"`
+	Isolated        bool            `json:"isolated"`
+	FirstSeenRunID  int64           `json:"first_seen_run_id"`
+	LastSeenRunID   int64           `json:"last_seen_run_id"`
+	OccurrenceCount int64           `json:"occurrence_count"`
+	FirstSeenAt     time.Time       `json:"first_seen_at"`
+	LastSeenAt      time.Time       `json:"last_seen_at"`
+	ResolvedAt      sql.NullTime    `json:"resolved_at"`
+}
+
+type CreditReconciliationRun struct {
+	ID                  int64        `json:"id"`
+	Status              string       `json:"status"`
+	RequestedBy         int64        `json:"requested_by"`
+	Reason              string       `json:"reason"`
+	StaleHoldAfter      int64        `json:"stale_hold_after"`
+	FindingCount        int64        `json:"finding_count"`
+	CriticalCount       int64        `json:"critical_count"`
+	IsolatedWalletCount int64        `json:"isolated_wallet_count"`
+	AttemptCount        int32        `json:"attempt_count"`
+	ErrorMessage        string       `json:"error_message"`
+	RequestedAt         time.Time    `json:"requested_at"`
+	StartedAt           sql.NullTime `json:"started_at"`
+	CompletedAt         sql.NullTime `json:"completed_at"`
+}
+
+type CreditReconciliationRunFinding struct {
+	RunID                   int64           `json:"run_id"`
+	FindingID               int64           `json:"finding_id"`
+	ObservedSeverity        string          `json:"observed_severity"`
+	ObservedRisk            string          `json:"observed_risk"`
+	ObservedDetails         json.RawMessage `json:"observed_details"`
+	ObservedStatus          string          `json:"observed_status"`
+	ObservedIsolated        bool            `json:"observed_isolated"`
+	ObservedOccurrenceCount int64           `json:"observed_occurrence_count"`
+	ObservedFirstSeenAt     time.Time       `json:"observed_first_seen_at"`
+	ObservedLastSeenAt      time.Time       `json:"observed_last_seen_at"`
+	ObservedResolvedAt      sql.NullTime    `json:"observed_resolved_at"`
+}
+
 type CreditTransaction struct {
 	ID                    int64          `json:"id"`
 	TransactionID         string         `json:"transaction_id"`

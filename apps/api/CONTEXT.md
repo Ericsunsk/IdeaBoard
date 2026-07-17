@@ -53,6 +53,7 @@
 - River drawing job 在最终执行失败且 terminal convergence 暂时不可写时，会持久化 settlement-only marker 并 snooze；重启后的 retry 只做 terminal convergence，不再调用 Provider。若 marker 记录本身失败，则 enqueue 专用 settlement-only River job 作为 durable fallback。
 - Identity 的用户生命周期可通过 `credits.WalletLifecycle` typed seam 原子 provision/freeze Wallet 与领取 Welcome Grant；该 seam 仍由 Credits 独占 Ledger 写入和 runtime privilege。
 - Wallet lifecycle status 与原因化 Restriction 独立；`credits.WalletRestrictionCommands` 是 Restriction 唯一写入 seam。新 Grant/Deduction/Hold 同时受 lifecycle 与 active Restriction gate 约束，既有 Hold 的 Capture/Release 和 authenticated Admin repair commands 必须可收敛。
+- Reconciliation 的 high-risk open Finding 通过绑定 Finding 的 Ledger Integrity Restriction 隔离消费；成功扫描确认 resolved、high→low 或 Wallet 归属变化时只解除对应 Restriction，不修改 Wallet lifecycle status。
 - 用户删除以 `user_deletion_requests` 为 durable state：先冻结业务用户与 Wallet，再按 Auth → Storage → tombstone phase 幂等收敛；跨服务失败不得恢复 active Wallet。
 - Usage range 是 typed `7d | 30d | 1y`，对应包含今天的 7 / 30 / 365 个 `Asia/Shanghai` daily buckets；range 只过滤 Trend，Lifetime 口径不变。
 - Usage 实时组合 immutable Credit Capture 与 Task Billing snapshot，并使用 feature-local、容量 2,048、TTL 约 30 秒的 per-process LRU cache。cache 必须按 `(user_id, range)` 隔离并 copy-on-read/write；多实例最多约 30 秒 eventual freshness，不引入 Redis invalidation 或 Daily Projection。
