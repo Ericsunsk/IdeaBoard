@@ -1,7 +1,11 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import type { CreditReconciliationRequest } from '../../../../shared/api/generated-query/model'
+import type {
+  CreditHealth,
+  CreditReconciliationRequest,
+} from '../../../../shared/api/generated-query/model'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../creditsBillingApi'
+import { adminCreditRunHistoryQueryRoot } from './adminCreditRunHistoryResource'
 
 export const adminCreditHealthQueryKey = ['admin', 'credits', 'health'] as const
 
@@ -20,8 +24,12 @@ export function useAdminCreditHealthResource(
   })
   const startMutation = useMutation({
     mutationFn: (request: CreditReconciliationRequest) => api.startReconciliation(request),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: adminCreditHealthQueryKey })
+    onSuccess: (run) => {
+      queryClient.setQueryData<CreditHealth>(adminCreditHealthQueryKey, (current) =>
+        current ? { ...current, active_run: run } : current,
+      )
+      void queryClient.invalidateQueries({ queryKey: adminCreditHealthQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminCreditRunHistoryQueryRoot })
     },
   })
 

@@ -3,7 +3,7 @@ import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { primeVueTestOptions } from '../../../../test/primeVue'
-import { renderWithUser, screen, waitFor } from '../../../../test/render'
+import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
 import AdminCreditHealthPage from './AdminCreditHealthPage.vue'
 
 const pushMock = vi.hoisted(() => vi.fn())
@@ -110,7 +110,7 @@ describe('AdminCreditHealthPage', () => {
     expect(screen.getByText('检查进行中 · Run #12')).toBeVisible()
     expect(screen.getByText('Run #11')).toBeVisible()
     expect(screen.getByText('待处理异常')).toBeVisible()
-    expect(screen.getByRole('button', { name: '检查进行中' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '检查中' })).toBeDisabled()
     expect(screen.queryByText(/健康分数/)).not.toBeInTheDocument()
     expect(document.querySelector('canvas')).toBeNull()
   })
@@ -159,27 +159,118 @@ describe('AdminCreditHealthPage', () => {
 
   it('starts a manual check with an audited reason and refreshes health', async () => {
     const requests: unknown[] = []
+    let health = makeHealth()
     useMswHandlers(
       http.get('/api/admin/credits/health', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+        HttpResponse.json({ code: 0, msg: 'ok', data: health }),
       ),
       http.post('/api/admin/credits/reconciliation/runs', async ({ request }) => {
         requests.push(await request.json())
+        const activeRun = makeRun({ id: 14, status: 'queued', completed_at: undefined })
+        health = makeHealth({ active_run: activeRun })
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: makeRun({ id: 14, status: 'queued', completed_at: undefined }),
+          data: activeRun,
         })
       }),
     )
-    const { user } = renderPage()
+    const { user, queryClient } = renderPage()
 
-    await user.click(await screen.findByRole('button', { name: '立即检查' }))
+    await user.click(await screen.findByRole('button', { name: '重新检查' }))
     await user.type(screen.getByRole('textbox', { name: /操作原因/ }), '  运营复核  ')
     await user.click(screen.getByRole('button', { name: '启动检查' }))
 
     await waitFor(() => expect(requests).toEqual([{ reason: '运营复核' }]))
+    expect(await screen.findByText('检查进行中 · Run #14')).toBeVisible()
+    expect(screen.getByRole('button', { name: '检查中' })).toBeDisabled()
     expect(toastMocks.success).toHaveBeenCalledWith('账本检查已启动')
+
+    health = makeHealth({ latest_successful_run: makeRun({ id: 14 }) })
+    await queryClient.refetchQueries({ queryKey: ['admin', 'credits', 'health'] })
+
+    await waitFor(() => expect(screen.queryByText('检查进行中 · Run #14')).not.toBeInTheDocument())
+    expect(screen.getByText('Run #14')).toBeVisible()
+    expect(screen.getByRole('button', { name: '重新检查' })).toBeEnabled()
+  })
+
+  it('shows keyset-paginated check history and expands technical details on demand', async () => {
+    const runRequests: Array<string | null> = []
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      ),
+      http.get('/api/admin/credits/reconciliation/runs', ({ request }) => {
+        const beforeId = new URL(request.url).searchParams.get('before_id')
+        runRequests.push(beforeId)
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            runs:
+              beforeId === null
+                ? [
+                    makeRun({
+                      id: 21,
+                      trigger: 'manual',
+                      requested_by: 7,
+                      reason: '人工复核账本',
+                      finding_count: 3,
+                      critical_count: 1,
+                      isolated_wallet_count: 1,
+                      attempt_count: 2,
+                      error_message: 'provider timeout',
+                    }),
+                  ]
+                : [makeRun({ id: 20 })],
+            next_before_id: beforeId === null ? 21 : undefined,
+          },
+        })
+      }),
+      http.get('/api/admin/credits/reconciliation/runs/:runId', ({ params }) =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: makeRun({
+            id: Number(params.runId),
+            trigger: 'manual',
+            requested_by: 7,
+            reason: '人工复核账本',
+            finding_count: 3,
+            critical_count: 1,
+            isolated_wallet_count: 1,
+            attempt_count: 2,
+            error_message: 'provider timeout',
+          }),
+        }),
+      ),
+    )
+    const { user } = renderPage()
+
+    await user.click(await screen.findByRole('button', { name: '检查记录' }))
+    const dialog = await screen.findByRole('dialog', { name: '检查记录' })
+    expect(within(dialog).getByRole('columnheader', { name: '时间' })).toBeVisible()
+    expect(within(dialog).getByRole('columnheader', { name: '状态' })).toBeVisible()
+    expect(within(dialog).getByRole('columnheader', { name: 'Trigger' })).toBeVisible()
+    expect(within(dialog).getByRole('columnheader', { name: '结果' })).toBeVisible()
+    expect(within(dialog).getByRole('columnheader', { name: '耗时' })).toBeVisible()
+    expect(await within(dialog).findByText('人工触发')).toBeVisible()
+    expect(within(dialog).getByText('3 异常 · 1 严重 · 1 Wallet')).toBeVisible()
+
+    const runRow = within(dialog).getByRole('row', { name: /人工触发/ })
+    await user.click(within(runRow).getByRole('button'))
+    expect(await within(dialog).findByText('技术 ID')).toBeVisible()
+    expect(within(dialog).getByText('Run #21')).toBeVisible()
+    expect(within(dialog).getByText('人工复核账本')).toBeVisible()
+    expect(within(dialog).getByText('provider timeout')).toBeVisible()
+    expect(within(dialog).getByText('2')).toBeVisible()
+
+    const nextButton = within(dialog).getByRole('button', { name: '下一页' })
+    await waitFor(() => expect(nextButton).toBeEnabled())
+    await user.click(nextButton)
+    await waitFor(() => expect(runRequests).toContain('21'))
+    expect(await within(dialog).findByText('0 异常 · 0 严重 · 0 Wallet')).toBeVisible()
+    expect(within(dialog).queryByText('人工复核账本')).not.toBeInTheDocument()
   })
 
   it('shows a global open finding queue and opens complete diagnostics without manual resolution actions', async () => {

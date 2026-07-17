@@ -37,17 +37,17 @@ async function getCreditHealth(...args: Parameters<typeof getAdminCreditHealth>)
 }
 
 async function startReconciliation(...args: Parameters<typeof startAdminCreditReconciliation>) {
-  return resolveApiData(startAdminCreditReconciliation(...args), '启动Idea对账失败')
+  return resolveApiData(startAdminCreditReconciliation(...args), '启动账本检查失败')
 }
 
 async function listReconciliationRuns(
   ...args: Parameters<typeof listAdminCreditReconciliationRuns>
 ) {
-  return resolveApiData(listAdminCreditReconciliationRuns(...args), '加载Idea对账记录失败')
+  return resolveApiData(listAdminCreditReconciliationRuns(...args), '加载账本检查记录失败')
 }
 
 async function getReconciliationRun(...args: Parameters<typeof getAdminCreditReconciliationRun>) {
-  return resolveApiData(getAdminCreditReconciliationRun(...args), '加载Idea对账详情失败')
+  return resolveApiData(getAdminCreditReconciliationRun(...args), '加载账本检查详情失败')
 }
 
 async function listReconciliationFindingQueue(

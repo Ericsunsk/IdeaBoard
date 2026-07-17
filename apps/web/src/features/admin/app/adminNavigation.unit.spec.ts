@@ -13,11 +13,11 @@ describe('resolveAdminPageTitle', () => {
 })
 
 describe('Admin Credit Health routes', () => {
-  it('publishes the health route while retaining the legacy reconciliation route', () => {
+  it('publishes health as the only ledger integrity route', () => {
     const creditsRoute = adminRoutes[0]?.children?.find((route) => route.path === 'credits')
     const childPaths = creditsRoute?.children?.map((route) => route.path)
 
     expect(childPaths).toContain('health')
-    expect(childPaths).toContain('reconciliation')
+    expect(childPaths).not.toContain('reconciliation')
   })
 })

@@ -56,9 +56,14 @@
           </div>
 
           <div class="flex shrink-0 flex-wrap items-center gap-2">
-            <Button label="运行历史" severity="secondary" text @click="openRunHistory" />
             <Button
-              :label="health.active_run ? '检查进行中' : '立即检查'"
+              label="检查记录"
+              severity="secondary"
+              text
+              @click="historyDialogVisible = true"
+            />
+            <Button
+              :label="health.active_run ? '检查中' : '重新检查'"
               severity="secondary"
               outlined
               :disabled="Boolean(health.active_run)"
@@ -123,34 +128,35 @@
 
   <AdminActionReasonDialog
     v-model:visible="startDialogVisible"
-    title="立即检查账本"
-    message="将启动一次完整账本检查。检查期间继续显示上一次可信结果。"
+    title="重新检查账本"
+    message="将启动一次完整账本检查。高风险异常可能限制相关 Wallet 的新消费。"
     confirm-label="启动检查"
     :loading="resource.startPending.value"
     @confirm="startReconciliation"
   />
+
+  <AdminCreditRunHistoryDialog v-model:visible="historyDialogVisible" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { CheckCircle, Clock, WarningTriangle, XmarkCircle } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
-import { ADMIN_CREDIT_RECONCILIATION_PATH } from '../../../../shared/constants/routePaths'
 import AdminSurfaceFrame from '../../shared/components/AdminSurfaceFrame.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
 import AdminActionReasonDialog from '../AdminActionReasonDialog.vue'
 import { formatAdminDateTime, formatReconciliationRunError } from '../creditsBillingFormat'
 import AdminCreditFindingQueue from './AdminCreditFindingQueue.vue'
+import AdminCreditRunHistoryDialog from './AdminCreditRunHistoryDialog.vue'
 import { useAdminCreditHealthResource } from './adminCreditHealthResource'
 import { getCreditHealthPresentation } from './creditHealthPresentation'
 
-const router = useRouter()
 const toast = useAdminToast()
 const resource = useAdminCreditHealthResource()
 const startDialogVisible = ref(false)
+const historyDialogVisible = ref(false)
 const health = resource.health
 const showLoading = computed(() => resource.query.isLoading.value && !health.value)
 const loadError = computed(() => resource.query.isError.value && !health.value)
@@ -192,10 +198,6 @@ const facts = computed(() => {
     },
   ]
 })
-
-function openRunHistory() {
-  void router.push(ADMIN_CREDIT_RECONCILIATION_PATH)
-}
 
 async function startReconciliation(reason: string) {
   try {

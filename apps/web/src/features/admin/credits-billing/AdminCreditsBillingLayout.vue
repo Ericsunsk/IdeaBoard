@@ -38,7 +38,6 @@ import SelectButton from 'primevue/selectbutton'
 import {
   ADMIN_CREDIT_HEALTH_PATH,
   ADMIN_CREDIT_PRICING_PATH,
-  ADMIN_CREDIT_RECONCILIATION_PATH,
   ADMIN_CREDIT_WALLETS_PATH,
   ADMIN_REWARD_CAMPAIGNS_PATH,
   isPathUnderRoute,
@@ -81,18 +80,14 @@ const healthBadge = computed(() => {
     ? { label: '未知', className: 'border-admin-border text-admin-text-3' }
     : null
 })
-const activeNavigationPath = computed<NavigationPath | undefined>(() => {
-  if (isPathUnderRoute(route.path, ADMIN_CREDIT_RECONCILIATION_PATH)) {
-    return undefined
-  }
-  return (
+const activeNavigationPath = computed<NavigationPath>(
+  () =>
     navigationItems.find((item) => isPathUnderRoute(route.path, item.path))?.path ??
-    ADMIN_CREDIT_WALLETS_PATH
-  )
-})
+    ADMIN_CREDIT_WALLETS_PATH,
+)
 
-function navigate(path: NavigationPath | undefined) {
-  if (!path || isPathUnderRoute(route.path, path)) return
+function navigate(path: NavigationPath) {
+  if (isPathUnderRoute(route.path, path)) return
   void router.push(path)
 }
 </script>

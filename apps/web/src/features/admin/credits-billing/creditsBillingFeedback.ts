@@ -5,9 +5,6 @@ export type AdminCreditsBillingOperationsFeedback = {
   ledgerLoadFailed: (error: unknown) => void
   commandSucceeded: (label: string, replayed: boolean) => void
   commandFailed: (error: unknown, label: string) => void
-  reconciliationLoadFailed: (error: unknown) => void
-  reconciliationStarted: () => void
-  reconciliationStartFailed: (error: unknown) => void
 }
 
 export function createAdminCreditsBillingOperationsFeedback(
@@ -22,11 +19,6 @@ export function createAdminCreditsBillingOperationsFeedback(
       toast.success(replayed ? `${label}已安全重放，未重复记账` : `${label}成功`),
     commandFailed: (error, label) =>
       toast.error(formatCreditsBillingError(error, `${label}失败，请刷新后重试`)),
-    reconciliationLoadFailed: (error) =>
-      toast.error(formatCreditsBillingError(error, '加载对账报告失败，请稍后重试')),
-    reconciliationStarted: () => toast.success('对账任务已提交'),
-    reconciliationStartFailed: (error) =>
-      toast.error(formatCreditsBillingError(error, '启动对账失败，请稍后重试')),
   }
 }
 

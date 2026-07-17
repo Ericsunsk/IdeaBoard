@@ -56,7 +56,7 @@ describe('credits billing API adapter', () => {
       charge_transaction_id: 'charge-1',
     } as never)
     const startedRun = await adminCreditsBillingApi.startReconciliation({
-      reason: '运营例行对账',
+      reason: '运营例行检查',
     })
     const runs = await adminCreditsBillingApi.listReconciliationRuns({ limit: 20 })
     const run = await adminCreditsBillingApi.getReconciliationRun(7)
@@ -86,7 +86,7 @@ describe('credits billing API adapter', () => {
     expect(apiMocks.deductAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.refundAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.startAdminCreditReconciliation).toHaveBeenCalledWith({
-      reason: '运营例行对账',
+      reason: '运营例行检查',
     })
     expect(apiMocks.listAdminCreditReconciliationRuns).toHaveBeenCalledWith({ limit: 20 })
     expect(apiMocks.getAdminCreditReconciliationRun).toHaveBeenCalledWith(7)
@@ -110,12 +110,12 @@ describe('credits billing API adapter', () => {
       [adminCreditsBillingApi.refund(request as never), '退款Idea失败'],
       [
         adminCreditsBillingApi.startReconciliation({
-          reason: '运营例行对账',
+          reason: '运营例行检查',
         }),
-        '启动Idea对账失败',
+        '启动账本检查失败',
       ],
-      [adminCreditsBillingApi.listReconciliationRuns(), '加载Idea对账记录失败'],
-      [adminCreditsBillingApi.getReconciliationRun(7), '加载Idea对账详情失败'],
+      [adminCreditsBillingApi.listReconciliationRuns(), '加载账本检查记录失败'],
+      [adminCreditsBillingApi.getReconciliationRun(7), '加载账本检查详情失败'],
       [
         adminCreditsBillingApi.listReconciliationFindingQueue({ status: 'open' }),
         '加载账本异常队列失败',

@@ -62,13 +62,6 @@ export const adminRoutes: RouteRecordRaw[] = [
             meta: { requiresAuth: true, title: '账本健康' },
           },
           {
-            path: 'reconciliation',
-            name: 'AdminCreditReconciliation',
-            component: () =>
-              import('../credits-billing/reconciliation/AdminCreditReconciliationPage.vue'),
-            meta: { requiresAuth: true, title: '对账报告' },
-          },
-          {
             path: 'reward-campaigns',
             name: 'AdminRewardCampaigns',
             component: () => import('../credits-billing/rewards/AdminRewardCampaignsPage.vue'),
