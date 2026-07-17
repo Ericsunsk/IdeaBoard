@@ -376,6 +376,19 @@ func TestBillingCatalogSurfaceCleanupMigrationDropsLegacyCommands(t *testing.T) 
 	}
 	up := extractUpSQL(string(raw))
 	down := extractDownSQLForTest(string(raw))
+	upStatements := parseSQLStatements(up)
+	wantUpStatements := []string{
+		"DROP FUNCTION IF EXISTS create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
+		"DROP FUNCTION IF EXISTS update_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT)",
+	}
+	if len(upStatements) != len(wantUpStatements) {
+		t.Fatalf("up migration statements=%d, want %d", len(upStatements), len(wantUpStatements))
+	}
+	for i, want := range wantUpStatements {
+		if got := firstSQLLine(upStatements[i].SQL); got != want {
+			t.Fatalf("up migration statement %d starts with %q, want %q", i, got, want)
+		}
+	}
 	for _, expected := range []string{
 		"DROP FUNCTION IF EXISTS create_billing_sku",
 		"DROP FUNCTION IF EXISTS update_billing_sku",

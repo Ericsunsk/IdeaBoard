@@ -1,6 +1,6 @@
 -- migrate:up
 -- Billable Item Registry + Catalog commands are now the only Admin write seam.
--- Historical audit action values remain valid append-only facts; this migration
+-- Historical audit action values remain valid append-only facts. This migration
 -- removes command functions without rewriting rows or tightening their CHECK.
 DROP FUNCTION IF EXISTS create_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT);
 DROP FUNCTION IF EXISTS update_billing_sku(TEXT, TEXT, TEXT, BOOLEAN, BIGINT, TEXT);
