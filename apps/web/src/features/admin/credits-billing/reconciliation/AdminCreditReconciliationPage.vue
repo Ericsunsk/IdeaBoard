@@ -7,7 +7,7 @@
         <div class="min-w-0">
           <h2 class="m-0 text-admin-modal-title font-[780] text-admin-title-color">Idea对账</h2>
           <p class="mt-1 mb-0 text-admin-body text-admin-text-3">
-            检查 Wallet、Ledger、Task Billing 与结算状态的一致性。异常仅报告和隔离，不执行自动修复。
+            检查 Wallet、Ledger、Task Billing 与结算状态的一致性。异常统一在账本健康页处理。
           </p>
         </div>
         <div class="flex flex-wrap items-end gap-2">
@@ -21,15 +21,11 @@
             body-class="flex min-w-0 w-72 flex-col gap-1.5"
             @update:model-value="reasonError = ''"
           />
-          <Button
-            label="启动对账"
-            :loading="startPending"
-            @click="requestStart"
-          />
+          <Button label="启动对账" :loading="startPending" @click="requestStart" />
         </div>
       </div>
       <Message class="mt-4" severity="warn" :closable="false">
-        Stale Hold 固定按 24 小时检查。高风险异常会隔离消费，但不会修改 Wallet 生命周期、覆盖余额或自动修复。
+        Stale Hold 固定按 24 小时检查。高风险异常会限制消费，但不会覆盖余额或自动修复。
       </Message>
     </section>
 
@@ -69,7 +65,16 @@
       </template>
 
       <Message v-if="runsError" class="m-5" severity="error" :closable="false">
-        对账运行记录加载失败，请刷新重试。
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span>对账运行记录加载失败。</span>
+          <Button
+            label="重新加载运行记录"
+            severity="secondary"
+            outlined
+            :loading="runsLoading"
+            @click="resource.runsQuery.refetch()"
+          />
+        </div>
       </Message>
       <DataTableFrame
         v-else
@@ -99,13 +104,13 @@
             />
           </template>
         </Column>
-        <Column header="异常" style="width: 180px">
+        <Column header="结果" style="width: 210px">
           <template #body="{ data }">
-            <span>{{ data.finding_count }} 项</span>
+            <span>{{ data.finding_count }} 项异常</span>
             <span class="ml-2 text-admin-danger">{{ data.critical_count }} 严重</span>
           </template>
         </Column>
-        <Column header="隔离 Wallet" field="isolated_wallet_count" style="width: 130px" />
+        <Column header="受限 Wallet" field="isolated_wallet_count" style="width: 130px" />
         <Column header="触发方式" style="width: 120px">
           <template #body="{ data }">
             <Tag
@@ -137,67 +142,6 @@
       v-if="selectedRunId"
       class="min-w-0 rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface"
     >
-      <div
-        class="flex flex-col gap-3 border-b border-admin-border-soft px-5 py-4 lg:flex-row lg:items-center lg:justify-between"
-      >
-        <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2">
-            <h3 class="m-0 text-admin-title-sm font-[760] text-admin-title-color">
-              Run #{{ selectedRunId }}
-            </h3>
-            <Tag
-              v-if="selectedRun"
-              :value="getRunStatusLabel(selectedRun.status)"
-              :severity="getRunStatusSeverity(selectedRun.status)"
-              :class="adminCompactTagClass"
-            />
-          </div>
-          <div v-if="selectedRun" class="mt-1 text-admin-caption text-admin-text-3">
-            尝试 {{ selectedRun.attempt_count }} 次 · {{ selectedRun.finding_count }} 项异常 ·
-            {{ selectedRun.isolated_wallet_count }} 个 Wallet 已隔离
-          </div>
-          <div
-            v-if="selectedRun?.reason"
-            class="mt-1 max-w-3xl break-words text-admin-caption text-admin-text-2"
-          >
-            <span class="font-[680]">启动原因：</span>{{ selectedRun.reason }}
-          </div>
-          <div
-            v-else-if="selectedRun?.scheduled_for"
-            class="mt-1 text-admin-caption text-admin-text-2"
-          >
-            <span class="font-[680]">计划时间：</span
-            >{{ formatAdminDateTime(selectedRun.scheduled_for) }}
-          </div>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <Select
-            v-model="findingStatusFilter"
-            :options="findingStatusOptions"
-            option-label="label"
-            option-value="value"
-            aria-label="异常状态筛选"
-            class="w-36"
-          />
-          <AdminPagerControls
-            :current-page="findingPage"
-            :total-pages="findingKnownPageCount"
-            :prev-disabled="!findingCanRetreat"
-            :next-disabled="!findingCanAdvance"
-            @prev="previousFindingPage"
-            @next="nextFindingPage"
-          />
-        </div>
-      </div>
-
-      <Message
-        v-if="selectedRun?.error_message"
-        class="mx-5 mt-4"
-        severity="error"
-        :closable="false"
-      >
-        {{ formatReconciliationRunError(selectedRun.error_message) }}
-      </Message>
       <Message v-if="runDetailError" class="m-5" severity="error" :closable="false">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>Run 详情加载失败。</span>
@@ -209,101 +153,80 @@
           />
         </div>
       </Message>
-      <Message v-if="findingsError" class="m-5" severity="error" :closable="false">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <span>异常列表加载失败。</span>
-          <Button
-            label="重试异常列表"
-            text
-            :loading="findingsLoading"
-            @click="resource.findingsQuery.refetch()"
-          />
+      <template v-else-if="selectedRun">
+        <div
+          class="flex flex-col gap-3 border-b border-admin-border-soft px-5 py-4 lg:flex-row lg:items-center lg:justify-between"
+        >
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="m-0 text-admin-title-sm font-[760] text-admin-title-color">
+                Run #{{ selectedRun.id }}
+              </h3>
+              <Tag
+                :value="getRunStatusLabel(selectedRun.status)"
+                :severity="getRunStatusSeverity(selectedRun.status)"
+                :class="adminCompactTagClass"
+              />
+            </div>
+            <div class="mt-1 text-admin-caption text-admin-text-3">
+              尝试 {{ selectedRun.attempt_count }} 次 · {{ selectedRun.finding_count }} 项异常 ·
+              {{ selectedRun.isolated_wallet_count }} 个 Wallet 受限
+            </div>
+          </div>
+          <div class="text-admin-caption text-admin-text-3">
+            {{ selectedRun.trigger === 'scheduled' ? '自动调度' : '人工触发' }}
+          </div>
         </div>
-      </Message>
-      <DataTableFrame
-        v-else
-        :value="findings"
-        data-key="id"
-        :loading="findingsLoading || runDetailLoading"
-        scrollable
-        table-style="min-width: 1120px"
-      >
-        <template #empty>
-          <div class="py-12 text-center text-admin-body text-admin-text-3">当前筛选下暂无异常</div>
-        </template>
-        <Column header="异常" style="min-width: 230px">
-          <template #body="{ data }">
-            <div class="font-[700] text-admin-text-1">{{ data.finding_type }}</div>
-            <div class="mt-1 flex gap-1.5">
-              <Tag
-                :value="getFindingSeverityLabel(data.severity)"
-                :severity="getFindingSeverityTag(data.severity)"
-                :class="adminCompactTagClass"
-              />
-              <Tag
-                :value="data.risk === 'high' ? '高风险' : '低风险'"
-                :severity="data.risk === 'high' ? 'danger' : 'secondary'"
-                :class="adminCompactTagClass"
-              />
-            </div>
-          </template>
-        </Column>
-        <Column header="关联对象" style="min-width: 250px">
-          <template #body="{ data }">
-            <div class="flex flex-wrap gap-1.5">
-              <span
-                v-if="data.wallet_user_id"
-                class="rounded-[var(--radius-ib-pill)] bg-ib-surface-muted px-2 py-1 text-admin-caption font-[680]"
-              >
-                Wallet · User #{{ data.wallet_user_id }}
-              </span>
-              <span
-                class="rounded-[var(--radius-ib-control)] border border-admin-border-soft px-2 py-1 text-admin-caption font-[680]"
-              >
-                {{ data.subject_type }} · {{ data.subject_id }}
-              </span>
-            </div>
-            <div
-              class="mt-1 max-w-96 truncate text-admin-caption text-admin-text-3"
-              :title="formatFindingDetails(data.details)"
-            >
-              {{ formatFindingDetails(data.details) }}
-            </div>
-          </template>
-        </Column>
-        <Column header="隔离状态" style="width: 130px">
-          <template #body="{ data }">
-            <Tag
-              :value="data.isolated ? '已隔离' : '未隔离'"
-              :severity="data.isolated ? 'danger' : 'secondary'"
-              :class="adminCompactTagClass"
-            />
-          </template>
-        </Column>
-        <Column header="处理状态" style="width: 120px">
-          <template #body="{ data }">
-            <Tag
-              :value="data.status === 'open' ? '待处理' : '已解决'"
-              :severity="data.status === 'open' ? 'warn' : 'success'"
-              :class="adminCompactTagClass"
-            />
-          </template>
-        </Column>
-        <Column header="次数" style="width: 90px">
-          <template #body="{ data }">{{ data.occurrence_count }}</template>
-        </Column>
-        <Column header="最近发现" style="width: 190px">
-          <template #body="{ data }">{{ formatAdminDateTime(data.last_seen_at) }}</template>
-        </Column>
-      </DataTableFrame>
+
+        <Message
+          v-if="selectedRun.error_message"
+          class="mx-5 mt-4"
+          severity="error"
+          :closable="false"
+        >
+          {{ formatReconciliationRunError(selectedRun.error_message) }}
+        </Message>
+
+        <dl class="grid gap-x-6 gap-y-4 px-5 py-5 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <dt class="text-admin-caption font-[700] text-admin-text-3">发起时间</dt>
+            <dd class="mt-1 mb-0 text-admin-body text-admin-text-1">
+              {{ formatAdminDateTime(selectedRun.requested_at) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-admin-caption font-[700] text-admin-text-3">开始时间</dt>
+            <dd class="mt-1 mb-0 text-admin-body text-admin-text-1">
+              {{ formatAdminDateTime(selectedRun.started_at) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-admin-caption font-[700] text-admin-text-3">完成时间</dt>
+            <dd class="mt-1 mb-0 text-admin-body text-admin-text-1">
+              {{ formatAdminDateTime(selectedRun.completed_at) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-admin-caption font-[700] text-admin-text-3">计划时间</dt>
+            <dd class="mt-1 mb-0 text-admin-body text-admin-text-1">
+              {{ formatAdminDateTime(selectedRun.scheduled_for) }}
+            </dd>
+          </div>
+          <div class="sm:col-span-2 xl:col-span-4">
+            <dt class="text-admin-caption font-[700] text-admin-text-3">审计原因</dt>
+            <dd class="mt-1 mb-0 break-words text-admin-body text-admin-text-1">
+              {{ selectedRun.reason || '每日账本健康检查' }}
+            </dd>
+          </div>
+        </dl>
+      </template>
     </section>
 
     <div
       v-else
-      class="flex min-h-52 flex-col items-center justify-center rounded-[var(--radius-ib-panel)] border border-dashed border-admin-border-soft bg-ib-surface text-center"
+      class="flex min-h-40 items-center justify-center rounded-[var(--radius-ib-panel)] border border-dashed border-admin-border-soft bg-ib-surface text-admin-body text-admin-text-3"
     >
-      <div class="text-admin-title-sm font-[720] text-admin-title-color">选择一条 Run 查看异常</div>
-      <div class="mt-1 text-admin-body text-admin-text-3">这里不会提供自动修复按钮。</div>
+      选择一条 Run 查看运行详情
     </div>
   </div>
 </template>
@@ -314,7 +237,6 @@ import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Message from 'primevue/message'
-import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
@@ -328,10 +250,7 @@ import { validateAdminActionReason } from '../../shared/validation/adminActionRe
 import { useAdminCreditsBillingOperationsFeedback } from '../creditsBillingFeedback'
 import {
   formatAdminDateTime,
-  formatFindingDetails,
   formatReconciliationRunError,
-  getFindingSeverityLabel,
-  getFindingSeverityTag,
   getRunStatusLabel,
   getRunStatusSeverity,
 } from '../creditsBillingFormat'
@@ -343,35 +262,15 @@ import {
 const startReason = ref('')
 const reasonError = ref('')
 const selectedRunId = ref<number | null>(null)
-const findingStatusFilter = ref<'all' | 'open' | 'resolved'>('all')
-const findingStatusOptions = [
-  { label: '全部状态', value: 'all' },
-  { label: '待处理', value: 'open' },
-  { label: '已解决', value: 'resolved' },
-] satisfies Array<{ label: string; value: 'all' | 'open' | 'resolved' }>
-
 const confirm = useAdminConfirm()
 const feedback = useAdminCreditsBillingOperationsFeedback()
 const runPagination = useAdminCursorPagination<number>({
   pending: () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
 })
-const findingPagination = useAdminCursorPagination<number>({
-  pending: () => resource.findingsQuery.isLoading.value || resource.findingsQuery.isFetching.value,
-})
 const runBeforeId = runPagination.cursor
-const findingBeforeId = findingPagination.cursor
-const findingStatus = computed(() =>
-  findingStatusFilter.value === 'all' ? undefined : findingStatusFilter.value,
-)
-const resource = useAdminCreditReconciliationResource({
-  runBeforeId,
-  selectedRunId,
-  findingStatus,
-  findingBeforeId,
-})
+const resource = useAdminCreditReconciliationResource({ runBeforeId, selectedRunId })
 const { selectedRun, startPending } = resource
 const runs = computed(() => resource.runs.value?.runs ?? [])
-const findings = computed(() => resource.findings.value?.findings ?? [])
 const selectedRunRow = computed(
   () => runs.value.find((run) => run.id === selectedRunId.value) ?? null,
 )
@@ -379,28 +278,19 @@ const runPage = runPagination.currentPage
 const runKnownPageCount = runPagination.knownPageCount
 const runCanAdvance = runPagination.canAdvance
 const runCanRetreat = runPagination.canRetreat
-const findingPage = findingPagination.currentPage
-const findingKnownPageCount = findingPagination.knownPageCount
-const findingCanAdvance = findingPagination.canAdvance
-const findingCanRetreat = findingPagination.canRetreat
 const runsLoading = computed(
   () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
 )
 const runDetailLoading = computed(
   () => resource.runQuery.isLoading.value || resource.runQuery.isFetching.value,
 )
-const findingsLoading = computed(
-  () => resource.findingsQuery.isLoading.value || resource.findingsQuery.isFetching.value,
-)
 const runsError = computed(() => resource.runsQuery.error.value)
 const runDetailError = computed(() => resource.runQuery.error.value)
-const findingsError = computed(() => resource.findingsQuery.error.value)
 
 watch(runsError, (error) => {
   if (error) feedback.reconciliationLoadFailed(error)
 })
-watch([runDetailError, findingsError], ([runError, listError]) => {
-  const error = runError || listError
+watch(runDetailError, (error) => {
   if (error) feedback.reconciliationLoadFailed(error)
 })
 watch(
@@ -425,35 +315,6 @@ watch(
   },
   { immediate: true },
 )
-watch(
-  [
-    () => resource.findingsQuery.dataUpdatedAt.value,
-    () => resource.findingsQuery.isFetching.value,
-    () => resource.findingsQuery.isPlaceholderData.value,
-    () => resource.findingsDataCriteria.value,
-    () => selectedRunId.value,
-    () => findingStatus.value,
-    () => findingBeforeId.value,
-  ],
-  () => {
-    const criteria = resource.findingsDataCriteria.value
-    if (
-      resource.findingsQuery.isFetching.value ||
-      resource.findingsQuery.isPlaceholderData.value ||
-      !criteria ||
-      criteria.runId !== (selectedRunId.value ?? 0) ||
-      criteria.status !== findingStatus.value ||
-      criteria.beforeId !== findingBeforeId.value
-    ) {
-      return
-    }
-    findingPagination.setNextCursor(resource.findings.value?.next_before_id)
-  },
-  { immediate: true },
-)
-watch([selectedRunId, findingStatusFilter], () => {
-  findingPagination.reset()
-})
 
 function requestStart() {
   const reasonValidation = validateAdminActionReason(startReason.value)
@@ -464,7 +325,7 @@ function requestStart() {
   confirm.request({
     title: '确认启动Idea对账',
     message:
-      '将扫描 Ledger 与 Task Billing，一旦发现高风险不一致可能隔离 Wallet。Stale Hold 固定按 24 小时检查。',
+      '将扫描 Ledger 与 Task Billing，一旦发现高风险不一致可能限制 Wallet。Stale Hold 固定按 24 小时检查。',
     confirmLabel: '启动对账',
     intent: 'warn',
     onConfirm: async () => {
@@ -492,13 +353,5 @@ function nextRunPage() {
 function previousRunPage() {
   if (!runPagination.retreat()) return
   selectedRunId.value = null
-}
-
-function nextFindingPage() {
-  findingPagination.advance()
-}
-
-function previousFindingPage() {
-  findingPagination.retreat()
 }
 </script>

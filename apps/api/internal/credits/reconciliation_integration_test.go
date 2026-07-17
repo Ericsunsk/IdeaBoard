@@ -110,7 +110,7 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 	if err != nil || wallet.Status != WalletStatusActive || len(wallet.ActiveRestrictions) != 2 {
 		t.Fatalf("wallet = %+v, err = %v", wallet, err)
 	}
-	page, err := service.ListReconciliationFindings(ctx, run.ID, "open", ListReconciliationInput{Limit: 50})
+	page, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{Limit: 50})
 	if err != nil || len(page.Findings) == 0 {
 		t.Fatalf("findings = %+v, err = %v", page, err)
 	}
@@ -122,6 +122,17 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 	}
 	if len(projectionFindings) != 2 {
 		t.Fatalf("projection findings = %+v, want two independent account findings", projectionFindings)
+	}
+	globalOpen, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{Limit: 1})
+	if err != nil || len(globalOpen.Findings) != 1 || globalOpen.NextBeforeID == 0 {
+		t.Fatalf("global open findings first page = %+v, err = %v", globalOpen, err)
+	}
+	globalOpenNext, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{
+		BeforeID: globalOpen.NextBeforeID,
+		Limit:    1,
+	})
+	if err != nil || len(globalOpenNext.Findings) != 1 || globalOpenNext.Findings[0].ID >= globalOpen.Findings[0].ID {
+		t.Fatalf("global open findings next page = %+v, err = %v", globalOpenNext, err)
 	}
 	availableFinding := projectionFindings[strconv.FormatInt(accounts["user_available"].id, 10)]
 	reservedFinding := projectionFindings[strconv.FormatInt(accounts["user_reserved"].id, 10)]
@@ -197,6 +208,10 @@ WHERE wallet_user_id = 94
 	if err := db.QueryRowContext(ctx, `SELECT status FROM credit_reconciliation_findings WHERE id = $1`, availableFinding.ID).Scan(&status); err != nil || status != "resolved" {
 		t.Fatalf("resolved status = %q, err = %v", status, err)
 	}
+	globalResolved, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingResolved, ListReconciliationInput{Limit: 50})
+	if err != nil || len(globalResolved.Findings) != 1 || globalResolved.Findings[0].ID != availableFinding.ID || globalResolved.Findings[0].ResolvedAt == nil {
+		t.Fatalf("global resolved findings = %+v, err = %v", globalResolved, err)
+	}
 	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE wallet_user_id = 94 AND released_at IS NULL`); got != 1 {
 		t.Fatalf("active restriction count after one repair = %d, want 1", got)
 	}
@@ -265,21 +280,16 @@ WHERE wallet_user_id = 94
 		t.Fatalf("active restriction count after reopen = %d, want 1", got)
 	}
 
-	historical, err := service.ListReconciliationFindings(ctx, run.ID, "open", ListReconciliationInput{Limit: 50})
-	if err != nil {
+	var observedStatus string
+	var observedIsolated bool
+	if err := db.QueryRowContext(ctx, `
+SELECT observed_status, observed_isolated
+FROM credit_reconciliation_run_findings
+WHERE run_id = $1 AND finding_id = $2`, run.ID, availableFinding.ID).Scan(&observedStatus, &observedIsolated); err != nil {
 		t.Fatal(err)
 	}
-	historicalFound := false
-	for _, finding := range historical.Findings {
-		if finding.ID == availableFinding.ID {
-			historicalFound = true
-			if finding.Status != ReconciliationFindingOpen || !finding.Isolated {
-				t.Fatalf("historical snapshot = %+v", finding)
-			}
-		}
-	}
-	if !historicalFound {
-		t.Fatal("original run lost its open finding snapshot")
+	if observedStatus != string(ReconciliationFindingOpen) || !observedIsolated {
+		t.Fatalf("historical run snapshot status=%q isolated=%v", observedStatus, observedIsolated)
 	}
 }
 
@@ -305,7 +315,7 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
 		t.Fatal(err)
 	}
-	page, err := service.ListReconciliationFindings(ctx, run.ID, "open", ListReconciliationInput{})
+	page, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -584,13 +594,13 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
 		t.Fatal(err)
 	}
-	page, err := service.ListReconciliationFindings(ctx, run.ID, "open", ListReconciliationInput{Limit: 200})
+	page, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{Limit: 200})
 	if err != nil {
 		t.Fatal(err)
 	}
 	found := make(map[string]bool)
 	for _, finding := range page.Findings {
-		found[finding.FindingType] = true
+		found[string(finding.FindingType)] = true
 	}
 	for _, expected := range []string{
 		"ledger_postings_invalid", "wallet_projection_mismatch", "task_hold_missing_task",
@@ -643,7 +653,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
 		t.Fatal(err)
 	}
-	page, err := service.ListReconciliationFindings(ctx, run.ID, ReconciliationFindingOpen, ListReconciliationInput{Limit: 200})
+	page, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{Limit: 200})
 	if err != nil {
 		t.Fatal(err)
 	}

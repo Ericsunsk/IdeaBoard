@@ -7,7 +7,7 @@ const apiMocks = vi.hoisted(() => ({
   getAdminCreditWallet: vi.fn(),
   grantAdminCredits: vi.fn(),
   listAdminCreditLedger: vi.fn(),
-  listAdminCreditReconciliationFindings: vi.fn(),
+  listAdminCreditReconciliationFindingQueue: vi.fn(),
   listAdminCreditReconciliationRuns: vi.fn(),
   refundAdminCredits: vi.fn(),
   startAdminCreditReconciliation: vi.fn(),
@@ -41,7 +41,7 @@ describe('credits billing API adapter', () => {
     apiMocks.startAdminCreditReconciliation.mockResolvedValue(success(run))
     apiMocks.listAdminCreditReconciliationRuns.mockResolvedValue(success(runs))
     apiMocks.getAdminCreditReconciliationRun.mockResolvedValue(success(run))
-    apiMocks.listAdminCreditReconciliationFindings.mockResolvedValue(success(findings))
+    apiMocks.listAdminCreditReconciliationFindingQueue.mockResolvedValue(success(findings))
     apiMocks.getAdminCreditHealth.mockResolvedValue(success(health))
   })
 
@@ -60,7 +60,9 @@ describe('credits billing API adapter', () => {
     })
     const runs = await adminCreditsBillingApi.listReconciliationRuns({ limit: 20 })
     const run = await adminCreditsBillingApi.getReconciliationRun(7)
-    const findings = await adminCreditsBillingApi.listReconciliationFindings(7, { status: 'open' })
+    const findingQueue = await adminCreditsBillingApi.listReconciliationFindingQueue({
+      status: 'open',
+    })
     const health = await adminCreditsBillingApi.getCreditHealth()
 
     expect(wallet).toEqual({ user_id: 12, available_credits: 1200 })
@@ -71,7 +73,7 @@ describe('credits billing API adapter', () => {
     expect(startedRun).toEqual({ id: 7, status: 'completed' })
     expect(runs).toEqual({ runs: [{ id: 7, status: 'completed' }] })
     expect(run).toEqual({ id: 7, status: 'completed' })
-    expect(findings).toEqual({ findings: [] })
+    expect(findingQueue).toEqual({ findings: [] })
     expect(health).toEqual({
       status: 'healthy',
       open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
@@ -88,7 +90,7 @@ describe('credits billing API adapter', () => {
     })
     expect(apiMocks.listAdminCreditReconciliationRuns).toHaveBeenCalledWith({ limit: 20 })
     expect(apiMocks.getAdminCreditReconciliationRun).toHaveBeenCalledWith(7)
-    expect(apiMocks.listAdminCreditReconciliationFindings).toHaveBeenCalledWith(7, {
+    expect(apiMocks.listAdminCreditReconciliationFindingQueue).toHaveBeenCalledWith({
       status: 'open',
     })
     expect(apiMocks.getAdminCreditHealth).toHaveBeenCalledOnce()
@@ -114,7 +116,10 @@ describe('credits billing API adapter', () => {
       ],
       [adminCreditsBillingApi.listReconciliationRuns(), '加载Idea对账记录失败'],
       [adminCreditsBillingApi.getReconciliationRun(7), '加载Idea对账详情失败'],
-      [adminCreditsBillingApi.listReconciliationFindings(7), '加载Idea对账异常失败'],
+      [
+        adminCreditsBillingApi.listReconciliationFindingQueue({ status: 'open' }),
+        '加载账本异常队列失败',
+      ],
       [adminCreditsBillingApi.getCreditHealth(), '加载账本健康状态失败'],
     ]
 

@@ -68,7 +68,7 @@ func (s *adminHandlerServiceStub) ListReconciliationRuns(context.Context, ListRe
 	return ReconciliationRunPage{}, nil
 }
 
-func (s *adminHandlerServiceStub) ListReconciliationFindings(context.Context, int64, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error) {
+func (s *adminHandlerServiceStub) ListGlobalReconciliationFindings(context.Context, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error) {
 	return ReconciliationFindingPage{}, nil
 }
 
@@ -128,7 +128,7 @@ func TestAdminCreditHandlersRejectUserPrincipal(t *testing.T) {
 		{name: "start reconciliation", method: http.MethodPost, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).StartReconciliation},
 		{name: "list reconciliation runs", method: http.MethodGet, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).ListReconciliationRuns},
 		{name: "get reconciliation run", method: http.MethodGet, path: "/runs/1", route: "/runs/:run_id", run: NewHandler(&adminHandlerServiceStub{}).GetReconciliationRun},
-		{name: "list reconciliation findings", method: http.MethodGet, path: "/runs/1/findings", route: "/runs/:run_id/findings", run: NewHandler(&adminHandlerServiceStub{}).ListReconciliationFindings},
+		{name: "list global reconciliation findings", method: http.MethodGet, path: "/findings?status=open", route: "/findings", run: NewHandler(&adminHandlerServiceStub{}).ListGlobalReconciliationFindings},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
@@ -160,7 +160,7 @@ func TestAdminCreditReadHandlersRejectMissingPrincipal(t *testing.T) {
 		{name: "ledger", path: "/wallets/1/ledger", route: "/wallets/:user_id/ledger", run: handler.ListLedger},
 		{name: "list reconciliation runs", path: "/runs", route: "/runs", run: handler.ListReconciliationRuns},
 		{name: "get reconciliation run", path: "/runs/1", route: "/runs/:run_id", run: handler.GetReconciliationRun},
-		{name: "list reconciliation findings", path: "/runs/1/findings", route: "/runs/:run_id/findings", run: handler.ListReconciliationFindings},
+		{name: "list global reconciliation findings", path: "/findings?status=open", route: "/findings", run: handler.ListGlobalReconciliationFindings},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()

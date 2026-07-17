@@ -57,7 +57,7 @@ type ReconciliationRun struct {
 type ReconciliationFinding struct {
 	ID              int64                       `json:"id"`
 	Fingerprint     string                      `json:"fingerprint"`
-	FindingType     string                      `json:"finding_type"`
+	FindingType     ReconciliationFindingType   `json:"finding_type"`
 	Severity        ReconciliationSeverity      `json:"severity"`
 	Risk            ReconciliationRisk          `json:"risk"`
 	WalletUserID    *int64                      `json:"wallet_user_id,omitempty"`
@@ -75,23 +75,43 @@ type ReconciliationFinding struct {
 type ReconciliationRunStatus string
 type ReconciliationTrigger string
 type ReconciliationFindingStatus string
+type ReconciliationFindingType string
 type ReconciliationSeverity string
 type ReconciliationRisk string
 
 const (
-	ReconciliationTriggerManual    ReconciliationTrigger       = "manual"
-	ReconciliationTriggerScheduled ReconciliationTrigger       = "scheduled"
-	ReconciliationRunQueued        ReconciliationRunStatus     = "queued"
-	ReconciliationRunRunning       ReconciliationRunStatus     = "running"
-	ReconciliationRunCompleted     ReconciliationRunStatus     = "completed"
-	ReconciliationRunFailed        ReconciliationRunStatus     = "failed"
-	ReconciliationFindingOpen      ReconciliationFindingStatus = "open"
-	ReconciliationFindingResolved  ReconciliationFindingStatus = "resolved"
-	ReconciliationSeverityWarning  ReconciliationSeverity      = "warning"
-	ReconciliationSeverityError    ReconciliationSeverity      = "error"
-	ReconciliationSeverityCritical ReconciliationSeverity      = "critical"
-	ReconciliationRiskLow          ReconciliationRisk          = "low"
-	ReconciliationRiskHigh         ReconciliationRisk          = "high"
+	ReconciliationTriggerManual                         ReconciliationTrigger       = "manual"
+	ReconciliationTriggerScheduled                      ReconciliationTrigger       = "scheduled"
+	ReconciliationRunQueued                             ReconciliationRunStatus     = "queued"
+	ReconciliationRunRunning                            ReconciliationRunStatus     = "running"
+	ReconciliationRunCompleted                          ReconciliationRunStatus     = "completed"
+	ReconciliationRunFailed                             ReconciliationRunStatus     = "failed"
+	ReconciliationFindingOpen                           ReconciliationFindingStatus = "open"
+	ReconciliationFindingResolved                       ReconciliationFindingStatus = "resolved"
+	ReconciliationFindingLedgerPostingsInvalid          ReconciliationFindingType   = "ledger_postings_invalid"
+	ReconciliationFindingCommandShapeInvalid            ReconciliationFindingType   = "command_shape_invalid"
+	ReconciliationFindingWalletProjectionMismatch       ReconciliationFindingType   = "wallet_projection_mismatch"
+	ReconciliationFindingStaleHold                      ReconciliationFindingType   = "stale_hold"
+	ReconciliationFindingTaskHoldMissingTask            ReconciliationFindingType   = "task_hold_missing_task"
+	ReconciliationFindingTaskBillingFactMissing         ReconciliationFindingType   = "task_billing_fact_missing"
+	ReconciliationFindingActiveTaskNotHeld              ReconciliationFindingType   = "active_task_not_held"
+	ReconciliationFindingCompletedTaskNotCaptured       ReconciliationFindingType   = "completed_task_not_captured"
+	ReconciliationFindingFailedTaskNotReleased          ReconciliationFindingType   = "failed_task_not_released"
+	ReconciliationFindingTaskTerminalTransactionCount   ReconciliationFindingType   = "task_terminal_transaction_count"
+	ReconciliationFindingIdempotencyRequestHashConflict ReconciliationFindingType   = "idempotency_request_hash_conflict"
+	ReconciliationFindingTaskSettlementReferenceInvalid ReconciliationFindingType   = "task_settlement_reference_invalid"
+	ReconciliationFindingDuplicateBusinessReference     ReconciliationFindingType   = "duplicate_business_reference"
+	ReconciliationFindingCorrectionExceedsOriginal      ReconciliationFindingType   = "correction_amount_exceeds_original"
+	ReconciliationFindingRefundAmountInvalid            ReconciliationFindingType   = "refund_amount_invalid"
+	ReconciliationFindingIllegalReferenceChain          ReconciliationFindingType   = "illegal_reference_chain"
+	ReconciliationFindingHoldStateInvalid               ReconciliationFindingType   = "hold_state_invalid"
+	ReconciliationFindingHoldTerminalTransactionCount   ReconciliationFindingType   = "hold_terminal_transaction_count"
+	ReconciliationFindingChargeStateInvalid             ReconciliationFindingType   = "charge_state_invalid"
+	ReconciliationSeverityWarning                       ReconciliationSeverity      = "warning"
+	ReconciliationSeverityError                         ReconciliationSeverity      = "error"
+	ReconciliationSeverityCritical                      ReconciliationSeverity      = "critical"
+	ReconciliationRiskLow                               ReconciliationRisk          = "low"
+	ReconciliationRiskHigh                              ReconciliationRisk          = "high"
 )
 
 type ReconciliationRunPage struct {
@@ -320,23 +340,31 @@ func scanReconciliationRun(scanner reconciliationRunScanner) (ReconciliationRun,
 	return run, nil
 }
 
-func (s *Service) ListReconciliationFindings(ctx context.Context, runID int64, status ReconciliationFindingStatus, input ListReconciliationInput) (ReconciliationFindingPage, error) {
+func (s *Service) ListGlobalReconciliationFindings(ctx context.Context, status ReconciliationFindingStatus, input ListReconciliationInput) (ReconciliationFindingPage, error) {
 	limit, err := normalizeReconciliationLimit(input.Limit)
-	if err != nil || runID <= 0 || input.BeforeID < 0 || (status != "" && status != ReconciliationFindingOpen && status != ReconciliationFindingResolved) || s == nil || s.pool == nil {
+	if err != nil || input.BeforeID < 0 || (status != ReconciliationFindingOpen && status != ReconciliationFindingResolved) || s == nil || s.pool == nil {
 		return ReconciliationFindingPage{}, ErrInvalidCommand
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT findings.id, findings.fingerprint, findings.finding_type, links.observed_severity, links.observed_risk,
-       findings.wallet_user_id, findings.subject_type, findings.subject_id, links.observed_details, links.observed_status,
-       links.observed_isolated, links.observed_occurrence_count, links.observed_first_seen_at, links.observed_last_seen_at, links.observed_resolved_at
-FROM credit_reconciliation_findings findings
-JOIN credit_reconciliation_run_findings links ON links.finding_id = findings.id
-WHERE links.run_id = $1 AND ($2 = '' OR links.observed_status = $2) AND ($3::BIGINT = 0 OR findings.id < $3)
-ORDER BY findings.id DESC LIMIT $4`, runID, string(status), input.BeforeID, limit+1)
+SELECT id, fingerprint, finding_type, severity, risk, wallet_user_id, subject_type, subject_id, details, status,
+       isolated, occurrence_count, first_seen_at, last_seen_at, resolved_at
+FROM credit_reconciliation_findings
+WHERE status = $1 AND ($2::BIGINT = 0 OR id < $2)
+ORDER BY id DESC LIMIT $3`, string(status), input.BeforeID, limit+1)
 	if err != nil {
-		return ReconciliationFindingPage{}, fmt.Errorf("credits reconciliation: list findings: %w", err)
+		return ReconciliationFindingPage{}, fmt.Errorf("credits reconciliation: list global findings: %w", err)
 	}
 	defer rows.Close()
+	return scanReconciliationFindingPage(rows, limit)
+}
+
+type reconciliationFindingRows interface {
+	Next() bool
+	Scan(...any) error
+	Err() error
+}
+
+func scanReconciliationFindingPage(rows reconciliationFindingRows, limit int) (ReconciliationFindingPage, error) {
 	page := ReconciliationFindingPage{Findings: make([]ReconciliationFinding, 0, limit)}
 	for rows.Next() {
 		var finding ReconciliationFinding

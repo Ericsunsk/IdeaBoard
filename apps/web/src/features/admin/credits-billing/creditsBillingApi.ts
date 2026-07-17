@@ -5,7 +5,7 @@ import {
   getAdminCreditWallet,
   grantAdminCredits,
   listAdminCreditLedger,
-  listAdminCreditReconciliationFindings,
+  listAdminCreditReconciliationFindingQueue,
   listAdminCreditReconciliationRuns,
   refundAdminCredits,
   startAdminCreditReconciliation,
@@ -50,10 +50,10 @@ async function getReconciliationRun(...args: Parameters<typeof getAdminCreditRec
   return resolveApiData(getAdminCreditReconciliationRun(...args), '加载Idea对账详情失败')
 }
 
-async function listReconciliationFindings(
-  ...args: Parameters<typeof listAdminCreditReconciliationFindings>
+async function listReconciliationFindingQueue(
+  ...args: Parameters<typeof listAdminCreditReconciliationFindingQueue>
 ) {
-  return resolveApiData(listAdminCreditReconciliationFindings(...args), '加载Idea对账异常失败')
+  return resolveApiData(listAdminCreditReconciliationFindingQueue(...args), '加载账本异常队列失败')
 }
 
 export const adminCreditsBillingApi = {
@@ -66,7 +66,7 @@ export const adminCreditsBillingApi = {
   startReconciliation,
   listReconciliationRuns,
   getReconciliationRun,
-  listReconciliationFindings,
+  listReconciliationFindingQueue,
 }
 
 export type AdminCreditsBillingApi = typeof adminCreditsBillingApi

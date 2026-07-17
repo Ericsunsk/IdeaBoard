@@ -20,6 +20,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 | Refund | System Revenue → User Available，累计不得超过原 Charge |
 | Reconciliation Run | 由 `manual` 或 `scheduled` Trigger 启动、River 异步执行的全量一致性扫描；manual 持久化真实 Admin/reason，scheduled 持久化 schedule slot 且不伪造 actor |
 | Finding | 由 finding type + Wallet + subject 生成稳定 fingerprint 的可重跑异常事实 |
+| Finding Type | Credits 拥有的稳定 typed anomaly contract；Admin 对已知类型提供统一名称与摘要，未知类型必须安全降级 |
 
 ## Public Seams
 
@@ -29,7 +30,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - `WalletRestrictionCommands` 通过 transaction-capable typed seam 幂等创建和精确解除 Restriction；其他 context 不得直接写 Restriction table。
 - `Service.GetCaptureUsage` 是已结算 Capture 的 typed-location 按用户只读聚合实现，供 caller-owned Usage interface 组合；不返回 Refund，也不授予 Ledger 写入能力。
 - 用户侧 Billing Records 是独立 caller-owned Read Model：可读取 Ledger 最终收支并组合 immutable Task Billing Snapshot，但不复用 Admin Ledger DTO、不返回 Hold/Release/Refund，也不获得 Ledger 写入能力。
-- `Reconciliation` 通过独立 River queue 运行，Admin 可读取 run history、summary 和 keyset-paginated findings。
+- `Reconciliation` 通过独立 River queue 运行，Admin 可读取 run history、summary，以及不依赖 Run ID 的 open/resolved 全局 keyset Finding queue。
 - Admin HTTP 提供单用户 Wallet/Ledger read、Grant、Deduction、linked Refund 与 Correction；不提供 set balance、更新或删除账本历史。Ledger read 显式返回 Hold/Charge reference，避免 Admin 以裸关联 ID 推断结算状态。
 
 其他 context 不得直接更新 `credit_accounts.balance`、插入 Ledger 或自行计算幂等 hash。
@@ -57,6 +58,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - manual、daily 与 catch-up 共用同一 transaction-bound start seam。DB advisory lock、active-run unique、scheduled slot unique 与 `enqueue_required` 返回值保证多实例/重复调度只 enqueue 一次；Run insert/reset 与 River enqueue 必须同 transaction。ScheduleJob 遇到其他 active Run 时必须 snooze，不能吞掉目标 slot；仍 overdue 的 failed target slot 复用原 Run、清理终态字段并重新入队。
 - `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 Finding 与 run report 同一 transaction 内幂等创建绑定该 Finding 的 `ledger_integrity/reconciliation` Restriction。Finding resolved、降为 low、失去或改变 Wallet 归属时只精确解除其自身 Restriction；Reconciliation alerts 已删除。
 - Finding fingerprint 不包含 run ID；重复异常复用 open Finding 并增加 occurrence/run link，异常消失后标记 resolved，reopen 会创建新的 Restriction history row。Finding 的 `isolated` 从精确 active Restriction 推导；扫描不修改 Wallet lifecycle status、Ledger、projection，也不自动创建 Correction。
+- Run-Finding link 仅保留内部 historical snapshot 和审计关联；Admin Finding read contract 只有全局 open/resolved queue，不提供 Run-scoped 双轨查询。
 - Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 lifecycle status，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 `100 Ideas` Welcome Grant；Ban/Unban/删除不得创建或清除独立 Restriction，claim identity 明文不进入 Credits schema。
 - Welcome identity HMAC key 首次使用时通过 typed `SECURITY DEFINER` command 永久绑定数据库 fingerprint；配置误变更时 startup/provision fail closed，避免同一身份生成新 claim。
 - 删除业务用户先在本地事务冻结 Wallet 并记录 durable deletion phase，再依次幂等删除 Auth、清理 Storage、写 user tombstone；失败请求可从持久 phase 重试收敛。最终保留 user tombstone 主键、Task、Wallet、Ledger 与 Welcome claim；相同领取身份重新注册不会再次获得 Welcome Grant。

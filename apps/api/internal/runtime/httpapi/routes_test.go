@@ -347,6 +347,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 	t.Helper()
 
 	const rewardBatchRevokeRoute = "POST /api/admin/rewards/campaigns/:campaign_id/batches/:batch_id/revoke"
+	const adminCreditReconciliationGlobalFindingQueueRouteUnderContract = "GET /api/admin/credits/reconciliation/findings"
 
 	want := map[string]bool{
 		"DELETE /api/admin/accounts/:id":                              false,
@@ -369,7 +370,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/credits/health":                               false,
 		"GET /api/admin/credits/reconciliation/runs":                  false,
 		"GET /api/admin/credits/reconciliation/runs/:run_id":          false,
-		"GET /api/admin/credits/reconciliation/runs/:run_id/findings": false,
+		adminCreditReconciliationGlobalFindingQueueRouteUnderContract: false,
 		"GET /api/admin/billing/catalog":                              false,
 		"GET /api/admin/billing/catalog/:sku/prices":                  false,
 		"GET /api/admin/rewards/campaigns":                            false,

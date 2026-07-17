@@ -7,6 +7,7 @@ import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminCreditWalletsPage from './AdminCreditWalletsPage.vue'
 
 const confirmRequestMock = vi.hoisted(() => vi.fn())
+const routeQueryMock = vi.hoisted(() => ({ user_id: undefined as string | undefined }))
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
   warning: vi.fn(),
@@ -16,6 +17,11 @@ const toastMocks = vi.hoisted(() => ({
 vi.mock('../../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({ request: confirmRequestMock }),
 }))
+
+vi.mock('vue-router', async (importOriginal) => {
+  const original = await importOriginal<typeof import('vue-router')>()
+  return { ...original, useRoute: () => ({ query: routeQueryMock }) }
+})
 
 vi.mock('../../../../shared/composables/useAppToast', () => ({
   useAppToast: () => toastMocks,
@@ -37,6 +43,7 @@ describe('AdminCreditWalletsPage', () => {
     ledgerRequestCount = 0
     commandRequests = []
     commandBusinessErrorKind = null
+    routeQueryMock.user_id = undefined
     useMswHandlers(
       http.get('/api/admin/users', () =>
         HttpResponse.json({
@@ -83,6 +90,16 @@ describe('AdminCreditWalletsPage', () => {
     expect(screen.getByText('原 Charge')).toBeVisible()
     expect(screen.getByText('剩余可退：20 Ideas')).toBeVisible()
     expect(screen.getByText('charge-1')).toBeVisible()
+  })
+
+  it('opens the linked Wallet and Ledger from the route query', async () => {
+    routeQueryMock.user_id = '12'
+    renderPage()
+
+    expect(await screen.findByText('1,200 Ideas')).toBeVisible()
+    expect(screen.getByRole('spinbutton', { name: '用户 ID' })).toHaveValue('12')
+    expect(walletRequestCount).toBe(1)
+    expect(ledgerRequestCount).toBe(1)
   })
 
   it('confirms auditable Grant, Deduction, and Refund commands and refreshes Wallet data', async () => {

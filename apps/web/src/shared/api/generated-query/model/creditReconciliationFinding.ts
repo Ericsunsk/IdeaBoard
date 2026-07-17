@@ -8,12 +8,13 @@ import type { CreditReconciliationFindingDetails } from './creditReconciliationF
 import type { CreditReconciliationFindingRisk } from './creditReconciliationFindingRisk'
 import type { CreditReconciliationFindingSeverity } from './creditReconciliationFindingSeverity'
 import type { CreditReconciliationFindingStatus } from './creditReconciliationFindingStatus'
+import type { CreditReconciliationFindingType } from './creditReconciliationFindingType'
 
 export interface CreditReconciliationFinding {
   id: number
   /** @pattern ^[0-9a-f]{64}$ */
   fingerprint: string
-  finding_type: string
+  finding_type: CreditReconciliationFindingType
   severity: CreditReconciliationFindingSeverity
   risk: CreditReconciliationFindingRisk
   wallet_user_id?: number

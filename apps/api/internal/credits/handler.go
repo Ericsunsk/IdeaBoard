@@ -26,7 +26,7 @@ type AdminService interface {
 	StartReconciliation(context.Context, StartManualReconciliationInput) (ReconciliationRun, error)
 	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
 	ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error)
-	ListReconciliationFindings(context.Context, int64, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error)
+	ListGlobalReconciliationFindings(context.Context, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error)
 }
 
 type Handler struct {
@@ -342,13 +342,8 @@ func (h *Handler) ListReconciliationRuns(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
-func (h *Handler) ListReconciliationFindings(c *gin.Context) {
+func (h *Handler) ListGlobalReconciliationFindings(c *gin.Context) {
 	if _, ok := h.requireAdmin(c); !ok {
-		return
-	}
-	runID, ok := parsePositiveInt64(c.Param("run_id"))
-	if !ok {
-		response.Error(c, http.StatusBadRequest, "run_id 无效")
 		return
 	}
 	input, ok := parseReconciliationPage(c)
@@ -356,11 +351,11 @@ func (h *Handler) ListReconciliationFindings(c *gin.Context) {
 		return
 	}
 	status, ok := parseReconciliationFindingStatus(c.Query("status"))
-	if !ok {
+	if !ok || status == "" {
 		response.Error(c, http.StatusBadRequest, "status 无效")
 		return
 	}
-	page, err := h.service.ListReconciliationFindings(c.Request.Context(), runID, status, input)
+	page, err := h.service.ListGlobalReconciliationFindings(c.Request.Context(), status, input)
 	if err != nil {
 		writeCreditError(c, err)
 		return

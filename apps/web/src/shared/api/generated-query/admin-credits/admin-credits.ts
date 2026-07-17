@@ -31,7 +31,7 @@ import type {
   ApiResponseCreditWallet,
   CreditReconciliationRequest,
   ListAdminCreditLedgerParams,
-  ListAdminCreditReconciliationFindingsParams,
+  ListAdminCreditReconciliationFindingQueueParams,
   ListAdminCreditReconciliationRunsParams,
 } from '../model'
 
@@ -830,9 +830,8 @@ export function useGetAdminCreditReconciliationRun<
   return query
 }
 
-export const getListAdminCreditReconciliationFindingsUrl = (
-  runId: number,
-  params?: ListAdminCreditReconciliationFindingsParams,
+export const getListAdminCreditReconciliationFindingQueueUrl = (
+  params: ListAdminCreditReconciliationFindingQueueParams,
 ) => {
   const normalizedParams = new URLSearchParams()
 
@@ -845,17 +844,16 @@ export const getListAdminCreditReconciliationFindingsUrl = (
   const stringifiedParams = normalizedParams.toString()
 
   return stringifiedParams.length > 0
-    ? `/admin/credits/reconciliation/runs/${encodeURIComponent(String(runId))}/findings?${stringifiedParams}`
-    : `/admin/credits/reconciliation/runs/${encodeURIComponent(String(runId))}/findings`
+    ? `/admin/credits/reconciliation/findings?${stringifiedParams}`
+    : `/admin/credits/reconciliation/findings`
 }
 
-export const listAdminCreditReconciliationFindings = async (
-  runId: number,
-  params?: ListAdminCreditReconciliationFindingsParams,
+export const listAdminCreditReconciliationFindingQueue = async (
+  params: ListAdminCreditReconciliationFindingQueueParams,
   options?: RequestInit,
 ): Promise<ApiResponseCreditReconciliationFindingPage> => {
   return orvalMutator<ApiResponseCreditReconciliationFindingPage>(
-    getListAdminCreditReconciliationFindingsUrl(runId, params),
+    getListAdminCreditReconciliationFindingQueueUrl(params),
     {
       ...options,
       method: 'GET',
@@ -863,31 +861,21 @@ export const listAdminCreditReconciliationFindings = async (
   )
 }
 
-export const getListAdminCreditReconciliationFindingsQueryKey = (
-  runId: MaybeRefOrGetter<number>,
-  params?: MaybeRefOrGetter<ListAdminCreditReconciliationFindingsParams>,
+export const getListAdminCreditReconciliationFindingQueueQueryKey = (
+  params?: MaybeRefOrGetter<ListAdminCreditReconciliationFindingQueueParams>,
 ) => {
-  return [
-    'admin',
-    'credits',
-    'reconciliation',
-    'runs',
-    runId,
-    'findings',
-    ...(params ? [params] : []),
-  ] as const
+  return ['admin', 'credits', 'reconciliation', 'findings', ...(params ? [params] : [])] as const
 }
 
-export const getListAdminCreditReconciliationFindingsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+export const getListAdminCreditReconciliationFindingQueueQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationFindingQueue>>,
   TError = ErrorType<unknown>,
 >(
-  runId: MaybeRefOrGetter<number>,
-  params?: MaybeRefOrGetter<ListAdminCreditReconciliationFindingsParams>,
+  params: MaybeRefOrGetter<ListAdminCreditReconciliationFindingQueueParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+        Awaited<ReturnType<typeof listAdminCreditReconciliationFindingQueue>>,
         TError,
         TData
       >
@@ -897,43 +885,34 @@ export const getListAdminCreditReconciliationFindingsQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getListAdminCreditReconciliationFindingsQueryKey(runId, params)
+  const queryKey = getListAdminCreditReconciliationFindingQueueQueryKey(params)
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>
+    Awaited<ReturnType<typeof listAdminCreditReconciliationFindingQueue>>
   > = ({ signal }) =>
-    listAdminCreditReconciliationFindings(toValue(runId), toValue(params), {
-      signal,
-      ...requestOptions,
-    })
+    listAdminCreditReconciliationFindingQueue(toValue(params), { signal, ...requestOptions })
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(runId) !== null && toValue(runId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminCreditReconciliationFindingQueue>>,
     TError,
     TData
   >
 }
 
-export type ListAdminCreditReconciliationFindingsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>
+export type ListAdminCreditReconciliationFindingQueueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminCreditReconciliationFindingQueue>>
 >
-export type ListAdminCreditReconciliationFindingsQueryError = ErrorType<unknown>
+export type ListAdminCreditReconciliationFindingQueueQueryError = ErrorType<unknown>
 
-export function useListAdminCreditReconciliationFindings<
-  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+export function useListAdminCreditReconciliationFindingQueue<
+  TData = Awaited<ReturnType<typeof listAdminCreditReconciliationFindingQueue>>,
   TError = ErrorType<unknown>,
 >(
-  runId: MaybeRefOrGetter<number>,
-  params?: MaybeRefOrGetter<ListAdminCreditReconciliationFindingsParams>,
+  params: MaybeRefOrGetter<ListAdminCreditReconciliationFindingQueueParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<
-        Awaited<ReturnType<typeof listAdminCreditReconciliationFindings>>,
+        Awaited<ReturnType<typeof listAdminCreditReconciliationFindingQueue>>,
         TError,
         TData
       >
@@ -942,7 +921,7 @@ export function useListAdminCreditReconciliationFindings<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListAdminCreditReconciliationFindingsQueryOptions(runId, params, options)
+  const queryOptions = getListAdminCreditReconciliationFindingQueueQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

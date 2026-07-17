@@ -1482,19 +1482,18 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseCreditReconciliationRun' }
 
-  /admin/credits/reconciliation/runs/{run_id}/findings:
+  /admin/credits/reconciliation/findings:
     get:
       tags: [AdminCredits]
-      operationId: listAdminCreditReconciliationFindings
+      operationId: listAdminCreditReconciliationFindingQueue
       security: [{ cookieAuth: [] }]
       parameters:
-        - { name: run_id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
-        - { name: status, in: query, schema: { type: string, enum: [open, resolved] } }
+        - { name: status, in: query, required: true, schema: { type: string, enum: [open, resolved] } }
         - { name: before_id, in: query, schema: { type: integer, format: int64, minimum: 1 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
       responses:
         '200':
-          description: Structured reconciliation findings
+          description: Global reconciliation finding queue
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseCreditReconciliationFindingPage' }
@@ -3048,7 +3047,7 @@ components:
       properties:
         id: { type: integer, format: int64 }
         fingerprint: { type: string, pattern: '^[0-9a-f]{64}$' }
-        finding_type: { type: string }
+        finding_type: { $ref: '#/components/schemas/CreditReconciliationFindingType' }
         severity: { type: string, enum: [warning, error, critical] }
         risk: { type: string, enum: [low, high] }
         wallet_user_id: { type: integer, format: int64 }
@@ -3061,6 +3060,29 @@ components:
         first_seen_at: { type: string, format: date-time }
         last_seen_at: { type: string, format: date-time }
         resolved_at: { type: string, format: date-time }
+
+    CreditReconciliationFindingType:
+      type: string
+      enum:
+        - ledger_postings_invalid
+        - command_shape_invalid
+        - wallet_projection_mismatch
+        - stale_hold
+        - task_hold_missing_task
+        - task_billing_fact_missing
+        - active_task_not_held
+        - completed_task_not_captured
+        - failed_task_not_released
+        - task_terminal_transaction_count
+        - idempotency_request_hash_conflict
+        - task_settlement_reference_invalid
+        - duplicate_business_reference
+        - correction_amount_exceeds_original
+        - refund_amount_invalid
+        - illegal_reference_chain
+        - hold_state_invalid
+        - hold_terminal_transaction_count
+        - charge_state_invalid
 
     CreditReconciliationRunPage:
       type: object

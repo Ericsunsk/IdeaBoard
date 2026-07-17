@@ -57,7 +57,7 @@ func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.POST("/credits/reconciliation/runs", h.CreditHandler.StartReconciliation)
 	adminAPI.GET("/credits/reconciliation/runs", h.CreditHandler.ListReconciliationRuns)
 	adminAPI.GET("/credits/reconciliation/runs/:run_id", h.CreditHandler.GetReconciliationRun)
-	adminAPI.GET("/credits/reconciliation/runs/:run_id/findings", h.CreditHandler.ListReconciliationFindings)
+	adminAPI.GET("/credits/reconciliation/findings", h.CreditHandler.ListGlobalReconciliationFindings)
 }
 
 func registerAdminBillingRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

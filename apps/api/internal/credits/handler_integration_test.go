@@ -31,7 +31,7 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 	router.GET("/api/admin/credits/health", handler.GetCreditHealth)
 	router.GET("/api/admin/credits/reconciliation/runs", handler.ListReconciliationRuns)
 	router.GET("/api/admin/credits/reconciliation/runs/:run_id", handler.GetReconciliationRun)
-	router.GET("/api/admin/credits/reconciliation/runs/:run_id/findings", handler.ListReconciliationFindings)
+	router.GET("/api/admin/credits/reconciliation/findings", handler.ListGlobalReconciliationFindings)
 
 	unknown := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"unknown":true}`))
@@ -103,9 +103,9 @@ FROM credit_reconciliation_runs
 	}
 
 	for path := range map[string]struct{}{
-		"/api/admin/credits/reconciliation/runs?limit=1":                                             {},
-		fmt.Sprintf("/api/admin/credits/reconciliation/runs/%d", runID):                              {},
-		fmt.Sprintf("/api/admin/credits/reconciliation/runs/%d/findings?limit=1&status=open", runID): {},
+		"/api/admin/credits/reconciliation/runs?limit=1":                 {},
+		fmt.Sprintf("/api/admin/credits/reconciliation/runs/%d", runID):  {},
+		"/api/admin/credits/reconciliation/findings?limit=1&status=open": {},
 	} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
@@ -119,9 +119,14 @@ FROM credit_reconciliation_runs
 		t.Fatalf("invalid pagination status = %d", invalid.Code)
 	}
 	invalidStatus := httptest.NewRecorder()
-	router.ServeHTTP(invalidStatus, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/admin/credits/reconciliation/runs/%d/findings?status=pending", runID), nil))
+	router.ServeHTTP(invalidStatus, httptest.NewRequest(http.MethodGet, "/api/admin/credits/reconciliation/findings?status=pending", nil))
 	if invalidStatus.Code != http.StatusBadRequest {
 		t.Fatalf("invalid finding status = %d", invalidStatus.Code)
+	}
+	missingGlobalStatus := httptest.NewRecorder()
+	router.ServeHTTP(missingGlobalStatus, httptest.NewRequest(http.MethodGet, "/api/admin/credits/reconciliation/findings", nil))
+	if missingGlobalStatus.Code != http.StatusBadRequest {
+		t.Fatalf("missing global finding status = %d", missingGlobalStatus.Code)
 	}
 }
 
@@ -135,8 +140,8 @@ func TestAdminCreditReconciliationReadHandlersReturnServiceUnavailable(t *testin
 	router.GET("/runs", handler.ListReconciliationRuns)
 	router.GET("/health", handler.GetCreditHealth)
 	router.GET("/runs/:run_id", handler.GetReconciliationRun)
-	router.GET("/runs/:run_id/findings", handler.ListReconciliationFindings)
-	for _, path := range []string{"/health", "/runs", "/runs/1", "/runs/1/findings"} {
+	router.GET("/findings", handler.ListGlobalReconciliationFindings)
+	for _, path := range []string{"/health", "/runs", "/runs/1", "/findings?status=open"} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
 		if recorder.Code != http.StatusServiceUnavailable {

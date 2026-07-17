@@ -315,6 +315,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -346,8 +347,10 @@ import {
 import CreditCommandDialog from './CreditCommandDialog.vue'
 import type { AdminCreditCommandDraft, AdminCreditCommandKind } from './creditCommandContract'
 
-const directUserId = ref<number | null>(null)
-const selectedUserId = ref<number | null>(null)
+const route = useRoute()
+const linkedUserId = parseLinkedUserId(route.query.user_id)
+const directUserId = ref<number | null>(linkedUserId)
+const selectedUserId = ref<number | null>(linkedUserId)
 const selectedUser = ref<AdminUserListItem | null>(null)
 const userSearchKeyword = ref('')
 const appliedUserSearch = ref('')
@@ -426,6 +429,17 @@ watch(selectedUserId, () => {
   ledgerPagination.reset()
 })
 
+watch(
+  () => route.query.user_id,
+  (value) => {
+    const userId = parseLinkedUserId(value)
+    if (!userId) return
+    directUserId.value = userId
+    selectedUser.value = null
+    selectedUserId.value = userId
+  },
+)
+
 function searchUsers() {
   const nextKeyword = userSearchKeyword.value.trim()
   if (appliedUserSearch.value === nextKeyword) {
@@ -446,6 +460,13 @@ function openDirectUser() {
   selectedUser.value =
     userSearchResults.value.find((user) => user.id === directUserId.value) ?? null
   selectedUserId.value = directUserId.value
+}
+
+function parseLinkedUserId(value: unknown): number | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) return null
+  const userId = Number(raw)
+  return Number.isSafeInteger(userId) && userId > 0 ? userId : null
 }
 
 function refreshWallet() {

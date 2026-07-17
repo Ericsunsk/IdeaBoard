@@ -19,8 +19,74 @@ vi.mock('../../../../shared/composables/useAppToast', () => ({
 }))
 
 describe('AdminCreditHealthPage', () => {
+  let findingRequests: Array<{ status: string | null; beforeId: string | null }>
+  let findingsShouldFail: boolean
+  let findings: Record<string, unknown>[]
+  let delayResolvedFindings: boolean
+  let releaseResolvedFindings: (() => void) | undefined
+  let delayNextFindingPage: boolean
+  let releaseNextFindingPage: (() => void) | undefined
+
   beforeEach(() => {
     vi.clearAllMocks()
+    findingRequests = []
+    findingsShouldFail = false
+    findings = [makeFinding()]
+    delayResolvedFindings = false
+    releaseResolvedFindings = undefined
+    delayNextFindingPage = false
+    releaseNextFindingPage = undefined
+    useMswHandlers(
+      http.get('/api/admin/credits/reconciliation/findings', async ({ request }) => {
+        if (findingsShouldFail) {
+          return HttpResponse.json({ code: 503, msg: 'unavailable' }, { status: 503 })
+        }
+        const query = new URL(request.url).searchParams
+        const status = query.get('status')
+        const beforeId = query.get('before_id')
+        findingRequests.push({ status, beforeId })
+        if (status === 'resolved' && delayResolvedFindings) {
+          await new Promise<void>((resolve) => {
+            releaseResolvedFindings = resolve
+          })
+        }
+        if (beforeId !== null && delayNextFindingPage) {
+          await new Promise<void>((resolve) => {
+            releaseNextFindingPage = resolve
+          })
+        }
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            findings:
+              status === 'resolved'
+                ? [
+                    makeFinding({
+                      id: 40,
+                      status: 'resolved',
+                      isolated: false,
+                      resolved_at: '2026-07-17T03:00:00Z',
+                    }),
+                  ]
+                : beforeId !== null
+                  ? [
+                      makeFinding({
+                        id: 39,
+                        finding_type: 'stale_hold',
+                        severity: 'warning',
+                        risk: 'low',
+                        isolated: false,
+                        subject_type: 'hold',
+                        subject_id: 'hold-39',
+                      }),
+                    ]
+                  : findings,
+            next_before_id: beforeId === null ? 40 : undefined,
+          },
+        })
+      }),
+    )
   })
 
   it('shows one operational health panel while an active Run preserves the trusted result', async () => {
@@ -115,6 +181,116 @@ describe('AdminCreditHealthPage', () => {
     await waitFor(() => expect(requests).toEqual([{ reason: '运营复核' }]))
     expect(toastMocks.success).toHaveBeenCalledWith('账本检查已启动')
   })
+
+  it('shows a global open finding queue and opens complete diagnostics without manual resolution actions', async () => {
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      ),
+    )
+    const { user } = renderPage()
+
+    expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
+    expect(findingRequests).toContainEqual({ status: 'open', beforeId: null })
+    expect(screen.getByText('严重 · 高风险 · Wallet 已限制')).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: '异常摘要' })).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: '影响对象' })).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: '风险' })).toBeVisible()
+    expect(screen.getByRole('columnheader', { name: '最近发现' })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '查看Wallet 余额投影不一致诊断' }))
+    expect(await screen.findByText('Fingerprint')).toBeVisible()
+    expect(screen.getByText('a'.repeat(64))).toBeVisible()
+    expect(screen.getByText('account_id')).toBeVisible()
+    expect(screen.getAllByText('17')).toHaveLength(2)
+    expect(screen.getByText('首次发现')).toBeVisible()
+    expect(screen.getByText('出现次数')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /忽略|关闭|标记解决/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '打开 Wallet / Ledger · User #12' }))
+    expect(pushMock).toHaveBeenCalledWith({
+      path: '/admin/credits/wallets',
+      query: { user_id: '12' },
+    })
+  })
+
+  it('supports only open and resolved views and resets keyset pagination on view changes', async () => {
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      ),
+    )
+    const { user } = renderPage()
+
+    expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
+    expect(screen.queryByRole('button', { name: '全部状态' })).not.toBeInTheDocument()
+    const nextButton = screen.getByRole('button', { name: '下一页' })
+    await waitFor(() => expect(nextButton).toBeEnabled())
+    await user.click(nextButton)
+    await waitFor(() => expect(findingRequests).toContainEqual({ status: 'open', beforeId: '40' }))
+
+    await user.click(screen.getByRole('button', { name: '已解决' }))
+    await waitFor(() =>
+      expect(findingRequests).toContainEqual({ status: 'resolved', beforeId: null }),
+    )
+    expect(await screen.findByText('严重 · 高风险 · 未限制')).toBeVisible()
+  })
+
+  it('does not leak open rows while the resolved view is loading', async () => {
+    delayResolvedFindings = true
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      ),
+    )
+    const { user } = renderPage()
+
+    expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '已解决' }))
+    await waitFor(() =>
+      expect(findingRequests).toContainEqual({ status: 'resolved', beforeId: null }),
+    )
+    expect(screen.queryByText('Wallet 余额投影不一致')).not.toBeInTheDocument()
+
+    releaseResolvedFindings?.()
+    expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
+  })
+
+  it('does not display previous-page rows while the next keyset page is loading', async () => {
+    delayNextFindingPage = true
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      ),
+    )
+    const { user } = renderPage()
+
+    expect(await screen.findByText('Wallet 余额投影不一致')).toBeVisible()
+    const nextButton = screen.getByRole('button', { name: '下一页' })
+    await waitFor(() => expect(nextButton).toBeEnabled())
+    await user.click(nextButton)
+    await waitFor(() => expect(findingRequests).toContainEqual({ status: 'open', beforeId: '40' }))
+    expect(screen.queryByText('Wallet 余额投影不一致')).not.toBeInTheDocument()
+
+    releaseNextFindingPage?.()
+    expect(await screen.findByText('Hold 长时间未结算')).toBeVisible()
+  })
+
+  it('renders finding empty state and recovers from an initial queue error', async () => {
+    findingsShouldFail = true
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: makeHealth() }),
+      ),
+    )
+    const { user } = renderPage()
+
+    expect(await screen.findByText('异常队列加载失败。')).toBeVisible()
+    findingsShouldFail = false
+    findings = []
+    await user.click(screen.getByRole('button', { name: '重新加载异常队列' }))
+    expect(await screen.findByText('暂无待处理异常')).toBeVisible()
+  })
 })
 
 function renderPage() {
@@ -123,13 +299,19 @@ function renderPage() {
   })
   return {
     ...renderWithUser(AdminCreditHealthPage, {
-    global: {
-      plugins: [
-        [PrimeVue, primeVueTestOptions],
-        [VueQueryPlugin, { queryClient }],
-      ],
-      stubs: { CheckCircle: true, Clock: true, WarningTriangle: true, XmarkCircle: true },
-    },
+      global: {
+        plugins: [
+          [PrimeVue, primeVueTestOptions],
+          [VueQueryPlugin, { queryClient }],
+        ],
+        stubs: {
+          CheckCircle: true,
+          Clock: true,
+          Refresh: true,
+          WarningTriangle: true,
+          XmarkCircle: true,
+        },
+      },
     }),
     queryClient,
   }
@@ -157,6 +339,26 @@ function makeRun(overrides: Record<string, unknown> = {}) {
     requested_at: '2026-07-17T02:00:00Z',
     started_at: '2026-07-17T02:00:01Z',
     completed_at: '2026-07-17T02:00:04Z',
+    ...overrides,
+  }
+}
+
+function makeFinding(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 41,
+    fingerprint: 'a'.repeat(64),
+    finding_type: 'wallet_projection_mismatch',
+    severity: 'critical',
+    risk: 'high',
+    wallet_user_id: 12,
+    subject_type: 'credit_account',
+    subject_id: '17',
+    details: { account_id: 17, ledger_balance: 10, projected_balance: 17 },
+    status: 'open',
+    isolated: true,
+    occurrence_count: 3,
+    first_seen_at: '2026-07-17T01:00:00Z',
+    last_seen_at: '2026-07-17T02:00:00Z',
     ...overrides,
   }
 }

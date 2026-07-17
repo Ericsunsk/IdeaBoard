@@ -1,6 +1,5 @@
 import type {
   CreditLedgerTransaction,
-  CreditReconciliationFinding,
   CreditReconciliationRun,
 } from '../../../shared/api/generated-query/model'
 import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
@@ -60,31 +59,6 @@ export function getRunStatusSeverity(status: CreditReconciliationRun['status']) 
   return 'warn'
 }
 
-export function getFindingSeverityLabel(severity: CreditReconciliationFinding['severity']) {
-  return { warning: '警告', error: '错误', critical: '严重' }[severity]
-}
-
-export function getFindingSeverityTag(severity: CreditReconciliationFinding['severity']) {
-  return severity === 'warning' ? 'warn' : 'danger'
-}
-
-export function formatFindingDetails(details: CreditReconciliationFinding['details']) {
-  const entries = Object.entries(details)
-  if (entries.length === 0) return '-'
-  return entries
-    .slice(0, 4)
-    .map(([key, value]) => `${key}: ${formatFindingDetailValue(value)}`)
-    .join(' · ')
-}
-
 export function formatReconciliationRunError(message?: string) {
   return sanitizeApiErrorMessage(message, '对账执行失败，请查看服务日志并重试')
-}
-
-function formatFindingDetailValue(value: unknown) {
-  if (value == null) return '-'
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-  return JSON.stringify(value)
 }

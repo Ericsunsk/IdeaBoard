@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type {
   CreditReconciliationRequest,
   CreditReconciliationRun,
-  ListAdminCreditReconciliationFindingsParams,
   ListAdminCreditReconciliationRunsParams,
 } from '../../../../shared/api/generated-query/model'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../creditsBillingApi'
@@ -16,18 +15,10 @@ interface ReconciliationRunsCriteria {
   beforeId?: number
 }
 
-interface ReconciliationFindingsCriteria {
-  runId: number
-  status?: 'open' | 'resolved'
-  beforeId?: number
-}
-
 export function useAdminCreditReconciliationResource(
   input: {
     runBeforeId: MaybeRefOrGetter<number | undefined>
     selectedRunId: MaybeRefOrGetter<number | null>
-    findingStatus: MaybeRefOrGetter<'open' | 'resolved' | undefined>
-    findingBeforeId: MaybeRefOrGetter<number | undefined>
   },
   dependencies: { api?: AdminCreditsBillingApi } = {},
 ) {
@@ -37,12 +28,6 @@ export function useAdminCreditReconciliationResource(
   const runsCriteria = computed<ReconciliationRunsCriteria>(() => ({
     beforeId: toValue(input.runBeforeId),
   }))
-  const findingsCriteria = computed<ReconciliationFindingsCriteria>(() => ({
-    runId: normalizedRunId.value,
-    status: toValue(input.findingStatus),
-    beforeId: toValue(input.findingBeforeId),
-  }))
-
   const runsQuery = useQuery({
     queryKey: computed(() => [...reconciliationQueryRoot, 'runs', runsCriteria.value]),
     queryFn: async ({ queryKey, signal }) => {
@@ -68,29 +53,6 @@ export function useAdminCreditReconciliationResource(
       return status === 'queued' || status === 'running' ? 3_000 : false
     },
   })
-  const findingsQuery = useQuery({
-    queryKey: computed(() => [
-      ...reconciliationQueryRoot,
-      'runs',
-      findingsCriteria.value.runId,
-      'findings',
-      findingsCriteria.value,
-    ]),
-    queryFn: async ({ queryKey, signal }) => {
-      const criteria = queryKey.at(-1) as ReconciliationFindingsCriteria
-      const params: ListAdminCreditReconciliationFindingsParams = {
-        status: criteria.status,
-        before_id: criteria.beforeId,
-        limit: 25,
-      }
-      return {
-        criteria,
-        page: await api.listReconciliationFindings(criteria.runId, params, { signal }),
-      }
-    },
-    enabled: computed(() => normalizedRunId.value > 0),
-    placeholderData: (previous) => previous,
-  })
   const startMutation = useMutation({
     mutationFn: (request: CreditReconciliationRequest) => api.startReconciliation(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: reconciliationQueryRoot }),
@@ -99,12 +61,9 @@ export function useAdminCreditReconciliationResource(
   return {
     runsQuery,
     runQuery,
-    findingsQuery,
     runs: computed(() => runsQuery.data.value?.page),
     runsDataCriteria: computed(() => runsQuery.data.value?.criteria),
     selectedRun: computed(() => runQuery.data.value),
-    findings: computed(() => findingsQuery.data.value?.page),
-    findingsDataCriteria: computed(() => findingsQuery.data.value?.criteria),
     startPending: computed(() => startMutation.isPending.value),
     start: (request: CreditReconciliationRequest) => startMutation.mutateAsync(request),
   }
