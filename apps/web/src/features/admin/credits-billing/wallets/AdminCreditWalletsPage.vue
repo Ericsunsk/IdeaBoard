@@ -65,17 +65,79 @@
     </section>
 
     <template v-if="selectedUserId">
-      <section class="grid grid-cols-1 gap-3.5 md:grid-cols-3">
+      <section class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
         <AdminSummaryCard label="可用Idea" :value="formatCredits(wallet?.available_credits ?? 0)" />
         <AdminSummaryCard label="冻结Idea" :value="formatCredits(wallet?.reserved_credits ?? 0)" />
         <AdminSummaryCard
-          label="Wallet 状态"
+          label="生命周期状态"
           :value="
             wallet?.status === 'active' ? '正常' : wallet?.status === 'frozen' ? '已冻结' : '-'
           "
           :footer="selectedUserLabel"
         />
+        <AdminSummaryCard
+          label="有效限制"
+          :value="String(activeRestrictions.length)"
+          :footer="activeRestrictions.length > 0 ? '新业务写入受限' : '无限制'"
+        />
       </section>
+
+      <AdminTablePanel v-if="activeRestrictions.length > 0">
+        <template #toolbar>
+          <AdminResourceToolbar>
+            <template #start>
+              <div class="min-w-0">
+                <div class="text-admin-title-sm font-[740] text-admin-title-color">有效限制</div>
+                <div class="mt-0.5 text-admin-caption text-admin-text-3">
+                  限制与生命周期状态独立，解除一个来源不会影响其他来源。
+                </div>
+              </div>
+            </template>
+          </AdminResourceToolbar>
+        </template>
+        <DataTableFrame
+          :value="activeRestrictions"
+          data-key="restriction_id"
+          scrollable
+          table-style="min-width: 760px"
+        >
+          <Column header="限制类型" style="min-width: 210px">
+            <template #body="{ data }">
+              <Tag
+                :value="getWalletRestrictionTypeLabel(data.type)"
+                severity="danger"
+                :class="adminCompactTagClass"
+              />
+              <div class="mt-1 max-w-72 text-admin-caption text-admin-text-3" :title="data.reason">
+                {{ data.reason }}
+              </div>
+            </template>
+          </Column>
+          <Column header="来源" style="min-width: 190px">
+            <template #body="{ data }">
+              <div class="font-[680] text-admin-text-1">
+                {{ getWalletRestrictionSourceLabel(data.source) }}
+              </div>
+              <div class="mt-1 text-admin-caption text-admin-text-3">
+                {{ data.created_by.type }} · {{ data.created_by.id }}
+              </div>
+            </template>
+          </Column>
+          <Column header="关联对象" style="min-width: 220px">
+            <template #body="{ data }">
+              <span
+                class="inline-flex max-w-72 truncate rounded-[var(--radius-ib-control)] border border-admin-border-soft px-2 py-1 font-mono text-admin-caption"
+                :title="`${data.related_object.type} · ${data.related_object.id}`"
+              >
+                {{ data.related_object.type }} · {{ data.related_object.id }}
+              </span>
+            </template>
+          </Column>
+          <Column header="生效时间" style="width: 180px">
+            <template #body="{ data }">{{ formatAdminDateTime(data.created_at) }}</template>
+          </Column>
+        </DataTableFrame>
+      </AdminTablePanel>
 
       <AdminTablePanel>
         <template #toolbar>
@@ -316,6 +378,7 @@ const ledgerBeforeSequence = ledgerPagination.cursor
 const walletResource = useAdminCreditWalletResource(selectedUserId, ledgerBeforeSequence)
 const { wallet, ledger, commandPending } = walletResource
 const transactions = computed(() => ledger.value?.transactions ?? [])
+const activeRestrictions = computed(() => wallet.value?.active_restrictions ?? [])
 const walletLoading = computed(
   () => walletResource.walletQuery.isLoading.value || walletResource.walletQuery.isFetching.value,
 )
@@ -442,5 +505,13 @@ function requestCommandConfirmation(draft: AdminCreditCommandDraft) {
       }
     },
   })
+}
+
+function getWalletRestrictionTypeLabel(type: string) {
+  return type === 'ledger_integrity' ? '账本完整性' : type
+}
+
+function getWalletRestrictionSourceLabel(source: string) {
+  return source === 'reconciliation' ? '对账扫描' : source
 }
 </script>

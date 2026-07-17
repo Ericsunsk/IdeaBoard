@@ -120,7 +120,7 @@ Better Auth Service 负责登录、注册、session、身份侧字段和凭据�
 高风险身份动作必须经由 Go Admin API 编排：
 
 - 角色升降级需要同时同步 Auth Service 与业务侧 `users.role`。
-- 彻底注销必须先在 Go API 的 PostgreSQL transaction 中停用业务用户、冻结 Credit Wallet 并记录 durable deletion phase，再按 Auth identity → Media Storage → business tombstone 顺序幂等收敛；跨服务失败期间 Wallet 不得恢复 active。
+- 彻底注销必须先在 Go API 的 PostgreSQL transaction 中停用业务用户、冻结 Credit Wallet lifecycle status 并记录 durable deletion phase，再按 Auth identity → Media Storage → business tombstone 顺序幂等收敛；跨服务失败期间 Wallet 不得恢复 active，Identity lifecycle 不得清除 Credits 拥有的原因化 Restriction。
 - 前端不得直接调用 Better Auth admin client 执行跨库高风险动作。
 
 运行规则见 [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md)。

@@ -55,11 +55,31 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		_ = tx.Rollback(ctx)
 		t.Fatalf("runtime role Grant() error = %v", err)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		t.Fatalf("runtime role command commit error = %v", err)
-	}
 	if result.Wallet.Available != 25 {
 		t.Fatalf("runtime role Grant() result = %+v", result)
+	}
+	restriction, err := service.RestrictionsInTx(tx).RestrictWallet(ctx, RestrictWalletCommand{
+		UserID:        42,
+		Type:          "runtime_test",
+		Source:        "privilege_test",
+		RelatedObject: BusinessReference{Type: "test", ID: "runtime-role"},
+		Reason:        "verify restricted write capability",
+		Actor:         Actor{Type: ActorService, ID: "runtime-test"},
+	})
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("runtime role RestrictWallet() error = %v", err)
+	}
+	if _, err := service.RestrictionsInTx(tx).ReleaseWalletRestriction(ctx, ReleaseWalletRestrictionCommand{
+		RestrictionID: restriction.RestrictionID,
+		Reason:        "verify restriction release capability",
+		Actor:         Actor{Type: ActorService, ID: "runtime-test"},
+	}); err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("runtime role ReleaseWalletRestriction() error = %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("runtime role command commit error = %v", err)
 	}
 	denialTx, err := pool.Begin(ctx)
 	if err != nil {
@@ -114,6 +134,11 @@ VALUES ('ctx_runtime_bypass', 42, 'grant', 'runtime-role:bypass', repeat('0', 64
 	}
 	assertRuntimeCreditStatementDenied(t, ctx, pool, roleSQL,
 		`DELETE FROM user_deletion_requests WHERE user_id = 42`)
+	assertRuntimeCreditStatementDenied(t, ctx, pool, roleSQL, `
+INSERT INTO credit_wallet_restrictions (
+  wallet_user_id, restriction_type, source, related_object_type, related_object_id,
+  reason, created_by_actor_type, created_by_actor_id
+) VALUES (42, 'bypass', 'bypass', 'test', 'bypass', 'bypass', 'service', 'bypass')`)
 
 	assertTemporaryCreditTablesCannotShadowLedger(t, ctx, pool, roleSQL)
 
@@ -121,6 +146,9 @@ VALUES ('ctx_runtime_bypass', 42, 'grant', 'runtime-role:bypass', repeat('0', 64
 	var canInsertAPIUser bool
 	var canInsertAuthUser bool
 	var canExecuteCommand bool
+	var canCreateRestriction bool
+	var canReleaseRestriction bool
+	var canExecuteLegacyCommand bool
 	if err := db.QueryRowContext(ctx, `
 SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
        has_table_privilege($1, 'users', 'INSERT'),
@@ -129,16 +157,43 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
          $1,
          'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
          'EXECUTE'
-	       )`, runtimeRole).Scan(&canInsertLedger, &canInsertAPIUser, &canInsertAuthUser, &canExecuteCommand); err != nil {
+	       ),
+       has_function_privilege(
+         $1,
+         'create_credit_wallet_restriction(bigint,text,text,text,text,text,text,text)',
+         'EXECUTE'
+       ),
+       has_function_privilege(
+         $1,
+         'release_credit_wallet_restriction(text,text,text,text)',
+         'EXECUTE'
+       ),
+       has_function_privilege(
+         $1,
+         'execute_credit_command_v2_before_wallet_restrictions(text,bigint,bigint,text,text,text,text,text,text,text,text)',
+         'EXECUTE'
+       )`, runtimeRole).Scan(
+		&canInsertLedger,
+		&canInsertAPIUser,
+		&canInsertAuthUser,
+		&canExecuteCommand,
+		&canCreateRestriction,
+		&canReleaseRestriction,
+		&canExecuteLegacyCommand,
+	); err != nil {
 		t.Fatalf("read runtime privileges error = %v", err)
 	}
-	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand {
+	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand ||
+		!canCreateRestriction || !canReleaseRestriction || canExecuteLegacyCommand {
 		t.Fatalf(
-			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v",
+			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v create_restriction=%v release_restriction=%v legacy_command=%v",
 			canInsertLedger,
 			canInsertAPIUser,
 			canInsertAuthUser,
 			canExecuteCommand,
+			canCreateRestriction,
+			canReleaseRestriction,
+			canExecuteLegacyCommand,
 		)
 	}
 	var securityDefiner bool
@@ -153,6 +208,22 @@ WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,te
 	}
 	if !securityDefiner || !isTrustedFunctionSearchPath(functionConfig, trustedSchema) {
 		t.Fatalf("command function security_definer=%v config=%v", securityDefiner, functionConfig)
+	}
+	for _, functionName := range []string{
+		"create_credit_wallet_restriction(bigint,text,text,text,text,text,text,text)",
+		"release_credit_wallet_restriction(text,text,text,text)",
+	} {
+		var restrictionSecurityDefiner bool
+		var restrictionFunctionConfig string
+		if err := db.QueryRowContext(ctx, `
+SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), '')
+FROM pg_proc
+WHERE oid = $1::regprocedure`, functionName).Scan(&restrictionSecurityDefiner, &restrictionFunctionConfig); err != nil {
+			t.Fatalf("read %s security config error = %v", functionName, err)
+		}
+		if !restrictionSecurityDefiner || !isTrustedFunctionSearchPath(restrictionFunctionConfig, trustedSchema) {
+			t.Fatalf("restriction function=%s security_definer=%v config=%v", functionName, restrictionSecurityDefiner, restrictionFunctionConfig)
+		}
 	}
 	var postingFunctionConfig string
 	if err := db.QueryRowContext(ctx, `
@@ -222,6 +293,24 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 	if result.Wallet.Available != 32 {
 		t.Fatalf("Grant() under temp shadow attack result = %+v", result)
 	}
+	restriction, err := NewService(pool).RestrictionsInTx(tx).RestrictWallet(ctx, RestrictWalletCommand{
+		UserID:        42,
+		Type:          "temp_shadow",
+		Source:        "privilege_test",
+		RelatedObject: BusinessReference{Type: "test", ID: "temp-shadow"},
+		Reason:        "verify trusted restriction table",
+		Actor:         Actor{Type: ActorService, ID: "runtime-test"},
+	})
+	if err != nil {
+		t.Fatalf("RestrictWallet() under temp shadow attack error = %v", err)
+	}
+	if _, err := NewService(pool).RestrictionsInTx(tx).ReleaseWalletRestriction(ctx, ReleaseWalletRestrictionCommand{
+		RestrictionID: restriction.RestrictionID,
+		Reason:        "complete temp shadow verification",
+		Actor:         Actor{Type: ActorService, ID: "runtime-test"},
+	}); err != nil {
+		t.Fatalf("ReleaseWalletRestriction() under temp shadow attack error = %v", err)
+	}
 	for _, tableName := range creditTableNames {
 		var rowCount int
 		if err := tx.QueryRow(ctx, `SELECT count(*) FROM pg_temp.`+pgx.Identifier{tableName}.Sanitize()).Scan(&rowCount); err != nil {
@@ -238,6 +327,14 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 	}
 	if trustedTransactions != 1 {
 		t.Fatalf("trusted Credit transactions = %d, want 1", trustedTransactions)
+	}
+	var trustedRestrictions int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{trustedSchema, "credit_wallet_restrictions"}.Sanitize()+
+		` WHERE related_object_id = 'temp-shadow'`).Scan(&trustedRestrictions); err != nil {
+		t.Fatalf("count trusted Credit Wallet restrictions error = %v", err)
+	}
+	if trustedRestrictions != 1 {
+		t.Fatalf("trusted Credit Wallet restrictions = %d, want 1", trustedRestrictions)
 	}
 }
 

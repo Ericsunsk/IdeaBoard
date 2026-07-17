@@ -27,7 +27,9 @@ func TestOnlyCreditsModuleOwnsCreditCommandSQL(t *testing.T) {
 			}
 			return nil
 		}
-		if filepath.Ext(path) != ".go" {
+		// This guard protects runtime capability ownership. Test fixtures may
+		// legitimately describe forbidden SQL and are never linked into production.
+		if filepath.Ext(path) != ".go" || strings.HasSuffix(entry.Name(), "_test.go") {
 			return nil
 		}
 		contents, err := os.ReadFile(path)

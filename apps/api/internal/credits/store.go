@@ -135,6 +135,10 @@ func mapCreditDatabaseError(err error) error {
 		return ErrInvalidCommand
 	case "IB010":
 		return ErrWelcomeIdentityKeyMismatch
+	case "IB011":
+		return ErrWalletRestricted
+	case "IB012":
+		return ErrWalletRestrictionNotFound
 	default:
 		return fmt.Errorf("credits service: execute command: %w", err)
 	}

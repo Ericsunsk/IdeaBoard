@@ -219,7 +219,7 @@ func (h *Handler) GetCurrentWallet(c *gin.Context) {
 		writeCreditError(c, err)
 		return
 	}
-	response.SuccessDTO(c, wallet)
+	response.SuccessDTO(c, wallet.WalletBalance)
 }
 
 func (h *Handler) ListLedger(c *gin.Context) {
@@ -405,6 +405,8 @@ func writeCreditError(c *gin.Context, err error) {
 		response.Error(c, http.StatusNotFound, "Idea钱包不存在")
 	case errors.Is(err, ErrWalletFrozen):
 		response.Error(c, http.StatusLocked, "Idea钱包已冻结")
+	case errors.Is(err, ErrWalletRestricted):
+		response.Error(c, http.StatusLocked, "Idea钱包当前受限")
 	case errors.Is(err, ErrInsufficientCredits):
 		response.Error(c, http.StatusUnprocessableEntity, "Idea不足")
 	case errors.Is(err, ErrChargeNotFound):

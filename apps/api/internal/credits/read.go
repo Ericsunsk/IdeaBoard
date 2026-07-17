@@ -2,6 +2,7 @@ package credits
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -15,24 +16,63 @@ func (s *Service) GetWallet(ctx context.Context, userID int64) (WalletDetails, e
 	if userID <= 0 {
 		return WalletDetails{}, ErrInvalidCommand
 	}
-	wallet := WalletDetails{WalletBalance: WalletBalance{UserID: userID}}
+	wallet := WalletDetails{
+		WalletBalance:      WalletBalance{UserID: userID},
+		ActiveRestrictions: make([]WalletRestriction, 0),
+	}
+	var activeRestrictionsJSON []byte
 	err := s.pool.QueryRow(ctx, `
-SELECT
-	  (SELECT status FROM credit_wallets WHERE user_id = $1),
-  MAX(balance) FILTER (WHERE account_role = 'user_available'),
-  MAX(balance) FILTER (WHERE account_role = 'user_reserved')
-FROM credit_accounts
-WHERE wallet_user_id = $1
-HAVING COUNT(*) FILTER (WHERE account_role IN ('user_available', 'user_reserved')) = 2`, userID).Scan(
+	WITH wallet_balance AS (
+	  SELECT wallets.user_id,
+	         wallets.status,
+	         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available') AS available_credits,
+	         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved') AS reserved_credits
+	  FROM credit_wallets wallets
+	  JOIN credit_accounts accounts ON accounts.wallet_user_id = wallets.user_id
+	  WHERE wallets.user_id = $1
+	  GROUP BY wallets.user_id, wallets.status
+	  HAVING COUNT(*) FILTER (WHERE accounts.account_role IN ('user_available', 'user_reserved')) = 2
+	)
+	SELECT wallet_balance.status,
+	       wallet_balance.available_credits,
+	       wallet_balance.reserved_credits,
+	       COALESCE((
+	         SELECT jsonb_agg(
+	           jsonb_build_object(
+	             'restriction_id', restrictions.restriction_id,
+	             'user_id', restrictions.wallet_user_id,
+	             'type', restrictions.restriction_type,
+	             'source', restrictions.source,
+	             'related_object', jsonb_build_object(
+	               'type', restrictions.related_object_type,
+	               'id', restrictions.related_object_id
+	             ),
+	             'reason', restrictions.reason,
+	             'created_by', jsonb_build_object(
+	               'type', restrictions.created_by_actor_type,
+	               'id', restrictions.created_by_actor_id
+	             ),
+	             'created_at', restrictions.created_at
+	           ) ORDER BY restrictions.created_at, restrictions.restriction_id
+	         )
+	         FROM credit_wallet_restrictions restrictions
+	         WHERE restrictions.wallet_user_id = wallet_balance.user_id
+	           AND restrictions.released_at IS NULL
+	       ), '[]'::jsonb)
+	FROM wallet_balance`, userID).Scan(
 		&wallet.Status,
 		&wallet.Available,
 		&wallet.Reserved,
+		&activeRestrictionsJSON,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return WalletDetails{}, ErrWalletNotFound
 	}
 	if err != nil {
 		return WalletDetails{}, fmt.Errorf("credits service: read wallet: %w", err)
+	}
+	if err := json.Unmarshal(activeRestrictionsJSON, &wallet.ActiveRestrictions); err != nil {
+		return WalletDetails{}, fmt.Errorf("credits service: decode active Wallet restrictions: %w", err)
 	}
 	return wallet, nil
 }

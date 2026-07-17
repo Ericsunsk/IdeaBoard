@@ -41,6 +41,8 @@ var (
 	ErrInvalidCommand             = errors.New("invalid credit command")
 	ErrWalletNotFound             = errors.New("credit wallet not found")
 	ErrWalletFrozen               = errors.New("credit wallet is frozen")
+	ErrWalletRestricted           = errors.New("credit wallet is restricted")
+	ErrWalletRestrictionNotFound  = errors.New("credit wallet restriction not found")
 	ErrInsufficientCredits        = errors.New("insufficient credits")
 	ErrIdempotencyConflict        = errors.New("credit idempotency key conflicts with a different request")
 	ErrHoldNotFound               = errors.New("credit hold not found")
@@ -133,6 +135,11 @@ type WalletLifecycle interface {
 	ClaimWelcomeGrant(context.Context, string, GrantCommand) (CommandResult, bool, error)
 }
 
+type WalletRestrictionCommands interface {
+	RestrictWallet(context.Context, RestrictWalletCommand) (WalletRestrictionChange, error)
+	ReleaseWalletRestriction(context.Context, ReleaseWalletRestrictionCommand) (WalletRestrictionChange, error)
+}
+
 type WalletReader interface {
 	GetWallet(context.Context, int64) (WalletDetails, error)
 	ListLedger(context.Context, ListLedgerInput) (LedgerPage, error)
@@ -148,7 +155,8 @@ type WalletBalance struct {
 // WalletBalance only, preserving its transaction-time balance snapshot.
 type WalletDetails struct {
 	WalletBalance
-	Status WalletStatus `json:"status"`
+	Status             WalletStatus        `json:"status"`
+	ActiveRestrictions []WalletRestriction `json:"active_restrictions"`
 }
 
 type WalletStatus string
@@ -157,6 +165,37 @@ const (
 	WalletStatusActive WalletStatus = "active"
 	WalletStatusFrozen WalletStatus = "frozen"
 )
+
+type WalletRestriction struct {
+	RestrictionID string            `json:"restriction_id"`
+	UserID        int64             `json:"user_id"`
+	Type          string            `json:"type"`
+	Source        string            `json:"source"`
+	RelatedObject BusinessReference `json:"related_object"`
+	Reason        string            `json:"reason"`
+	CreatedBy     Actor             `json:"created_by"`
+	CreatedAt     time.Time         `json:"created_at"`
+}
+
+type RestrictWalletCommand struct {
+	UserID        int64
+	Type          string
+	Source        string
+	RelatedObject BusinessReference
+	Reason        string
+	Actor         Actor
+}
+
+type ReleaseWalletRestrictionCommand struct {
+	RestrictionID string
+	Reason        string
+	Actor         Actor
+}
+
+type WalletRestrictionChange struct {
+	RestrictionID string `json:"restriction_id"`
+	Replayed      bool   `json:"replayed"`
+}
 
 type CommandResult struct {
 	TransactionID string        `json:"transaction_id"`

@@ -166,10 +166,24 @@ func TestAdminCreditHTTPContractGrantsAndReadsWallet(t *testing.T) {
 	if grantResponse.Code != 0 || grantResponse.Data.Wallet.Available != 125 {
 		t.Fatalf("grant response = %+v", grantResponse)
 	}
+	if _, err := service.RestrictWallet(t.Context(), RestrictWalletCommand{
+		UserID:        94,
+		Type:          "ledger_integrity",
+		Source:        "reconciliation",
+		RelatedObject: BusinessReference{Type: "finding", ID: "http-contract-finding"},
+		Reason:        "verify Wallet restriction HTTP read model",
+		Actor:         Actor{Type: ActorSystem, ID: "reconciliation"},
+	}); err != nil {
+		t.Fatalf("RestrictWallet() error = %v", err)
+	}
 
 	walletRecorder := httptest.NewRecorder()
 	router.ServeHTTP(walletRecorder, httptest.NewRequest(http.MethodGet, "/api/admin/credits/wallets/94", nil))
-	if walletRecorder.Code != http.StatusOK || !bytes.Contains(walletRecorder.Body.Bytes(), []byte(`"available_credits":125`)) {
+	if walletRecorder.Code != http.StatusOK ||
+		!bytes.Contains(walletRecorder.Body.Bytes(), []byte(`"available_credits":125`)) ||
+		!bytes.Contains(walletRecorder.Body.Bytes(), []byte(`"active_restrictions":[{`)) ||
+		!bytes.Contains(walletRecorder.Body.Bytes(), []byte(`"source":"reconciliation"`)) ||
+		!bytes.Contains(walletRecorder.Body.Bytes(), []byte(`"id":"http-contract-finding"`)) {
 		t.Fatalf("wallet status = %d body=%s", walletRecorder.Code, walletRecorder.Body.String())
 	}
 

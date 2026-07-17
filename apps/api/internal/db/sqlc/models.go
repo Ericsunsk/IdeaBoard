@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type ApiAccount struct {
@@ -161,6 +163,23 @@ type CreditWallet struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type CreditWalletRestriction struct {
+	RestrictionID       uuid.UUID      `json:"restriction_id"`
+	WalletUserID        int64          `json:"wallet_user_id"`
+	RestrictionType     string         `json:"restriction_type"`
+	Source              string         `json:"source"`
+	RelatedObjectType   string         `json:"related_object_type"`
+	RelatedObjectID     string         `json:"related_object_id"`
+	Reason              string         `json:"reason"`
+	CreatedByActorType  string         `json:"created_by_actor_type"`
+	CreatedByActorID    string         `json:"created_by_actor_id"`
+	CreatedAt           time.Time      `json:"created_at"`
+	ReleasedAt          sql.NullTime   `json:"released_at"`
+	ReleasedByActorType sql.NullString `json:"released_by_actor_type"`
+	ReleasedByActorID   sql.NullString `json:"released_by_actor_id"`
+	ReleaseReason       sql.NullString `json:"release_reason"`
 }
 
 type FeaturePrompt struct {

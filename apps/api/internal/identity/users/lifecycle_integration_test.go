@@ -207,6 +207,17 @@ func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProvisionIdentity() error = %v", err)
 	}
+	restriction, err := creditService.RestrictWallet(ctx, credits.RestrictWalletCommand{
+		UserID:        result.User.ID,
+		Type:          "ledger_integrity",
+		Source:        "reconciliation",
+		RelatedObject: credits.BusinessReference{Type: "finding", ID: "identity-status-finding"},
+		Reason:        "verify Identity lifecycle isolation",
+		Actor:         credits.Actor{Type: credits.ActorSystem, ID: "reconciliation"},
+	})
+	if err != nil {
+		t.Fatalf("RestrictWallet() error = %v", err)
+	}
 
 	if err := service.SetUserStatus(ctx, result.User.ID, 0); err != nil {
 		t.Fatalf("SetUserStatus(banned) error = %v", err)
@@ -229,8 +240,25 @@ WHERE users.id = $1`, result.User.ID).Scan(&userStatus, &walletStatus); err != n
 	if err := service.SetUserStatus(ctx, result.User.ID, 1); err != nil {
 		t.Fatalf("SetUserStatus(active) error = %v", err)
 	}
+	wallet, err := creditService.GetWallet(ctx, result.User.ID)
+	if err != nil {
+		t.Fatalf("GetWallet(restored lifecycle) error = %v", err)
+	}
+	if wallet.Status != credits.WalletStatusActive || len(wallet.ActiveRestrictions) != 1 || wallet.ActiveRestrictions[0].RestrictionID != restriction.RestrictionID {
+		t.Fatalf("restored lifecycle cleared independent restriction: %+v", wallet)
+	}
+	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:active-restricted")); !errors.Is(err, credits.ErrWalletRestricted) {
+		t.Fatalf("Hold(restored but restricted Wallet) error = %v, want ErrWalletRestricted", err)
+	}
+	if _, err := creditService.ReleaseWalletRestriction(ctx, credits.ReleaseWalletRestrictionCommand{
+		RestrictionID: restriction.RestrictionID,
+		Reason:        "identity lifecycle test complete",
+		Actor:         credits.Actor{Type: credits.ActorSystem, ID: "reconciliation"},
+	}); err != nil {
+		t.Fatalf("ReleaseWalletRestriction() error = %v", err)
+	}
 	if _, err := creditService.Hold(ctx, lifecycleHold(result.User.ID, "status:active")); err != nil {
-		t.Fatalf("Hold(restored wallet) error = %v", err)
+		t.Fatalf("Hold(after explicit restriction release) error = %v", err)
 	}
 }
 
@@ -256,6 +284,17 @@ func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T)
 	})
 	if err != nil {
 		t.Fatalf("ProvisionIdentity(first) error = %v", err)
+	}
+	restriction, err := creditService.RestrictWallet(ctx, credits.RestrictWalletCommand{
+		UserID:        first.User.ID,
+		Type:          "ledger_integrity",
+		Source:        "reconciliation",
+		RelatedObject: credits.BusinessReference{Type: "finding", ID: "deletion-finding"},
+		Reason:        "verify deletion preserves restrictions",
+		Actor:         credits.Actor{Type: credits.ActorSystem, ID: "reconciliation"},
+	})
+	if err != nil {
+		t.Fatalf("RestrictWallet(deletion) error = %v", err)
 	}
 	oldPredictableUsername := "deleted-user-" + fmt.Sprint(first.User.ID)
 	if _, err := pool.Exec(ctx, `
@@ -288,6 +327,13 @@ FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.
 	}
 	if !strings.HasPrefix(username, "deleted-user-") || username == oldPredictableUsername || authUserID != nil || avatar != "" || status != 0 || walletStatus != "frozen" {
 		t.Fatalf("tombstone username=%q auth=%v avatar=%q status=%d wallet=%q", username, authUserID, avatar, status, walletStatus)
+	}
+	tombstoneWallet, err := creditService.GetWallet(ctx, first.User.ID)
+	if err != nil {
+		t.Fatalf("GetWallet(tombstone) error = %v", err)
+	}
+	if len(tombstoneWallet.ActiveRestrictions) != 1 || tombstoneWallet.ActiveRestrictions[0].RestrictionID != restriction.RestrictionID {
+		t.Fatalf("tombstone cleared independent restriction: %+v", tombstoneWallet.ActiveRestrictions)
 	}
 
 	second, err := service.ProvisionIdentity(ctx, VerifiedIdentity{

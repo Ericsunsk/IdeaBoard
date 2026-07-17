@@ -1,8 +1,8 @@
 import { getUserCreditWallet } from '../../shared/api/generated-query/user-credits/user-credits'
-import type { CreditWalletDetails } from '../../shared/api/generated-query/model'
+import type { CreditWallet } from '../../shared/api/generated-query/model'
 import { resolveApiData } from '../../shared/api/apiResponse'
 
-export type UserCreditWallet = CreditWalletDetails
+export type UserCreditWallet = CreditWallet
 
 export const userCreditsQueryKeys = {
   all: ['user', 'credits'] as const,

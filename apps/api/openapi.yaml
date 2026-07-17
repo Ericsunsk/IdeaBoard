@@ -104,7 +104,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseCreditWallet'
+                $ref: '#/components/schemas/ApiResponseCreditWalletBalance'
   /user/usage:
     get:
       tags: [UserUsage]
@@ -2797,12 +2797,35 @@ components:
 
     CreditWalletDetails:
       type: object
-      required: [user_id, status, available_credits, reserved_credits]
+      required: [user_id, status, available_credits, reserved_credits, active_restrictions]
       properties:
         user_id: { type: integer, format: int64 }
         status: { type: string, enum: [active, frozen] }
         available_credits: { type: integer, format: int64, minimum: 0 }
         reserved_credits: { type: integer, format: int64, minimum: 0 }
+        active_restrictions:
+          type: array
+          items: { $ref: '#/components/schemas/CreditWalletRestriction' }
+
+    CreditWalletRestriction:
+      type: object
+      required: [restriction_id, user_id, type, source, related_object, reason, created_by, created_at]
+      properties:
+        restriction_id: { type: string, format: uuid }
+        user_id: { type: integer, format: int64 }
+        type: { type: string }
+        source: { type: string }
+        related_object: { $ref: '#/components/schemas/CreditBusinessReference' }
+        reason: { type: string }
+        created_by: { $ref: '#/components/schemas/CreditWalletRestrictionActor' }
+        created_at: { type: string, format: date-time }
+
+    CreditWalletRestrictionActor:
+      type: object
+      required: [type, id]
+      properties:
+        type: { type: string, enum: [admin, system, service] }
+        id: { type: string }
 
     BillingRecord:
       type: object
@@ -4755,6 +4778,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/CreditWalletDetails'
+
+    ApiResponseCreditWalletBalance:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/CreditWallet'
 
     ApiResponseBillingRecordPage:
       allOf:

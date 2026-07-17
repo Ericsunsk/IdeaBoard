@@ -317,11 +317,13 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 	if err := creditService.LifecycleInTx(tx).ProvisionWallet(t.Context(), userID); err != nil {
 		t.Fatal(err)
 	}
-	amount, _ := credits.NewCreditAmount(grant)
-	if _, err := creditService.InTx(tx).Grant(t.Context(), credits.GrantCommand{UserID: userID, Amount: amount, Metadata: credits.CommandMetadata{
-		IdempotencyKey: fmt.Sprintf("settlement-grant:%d", userID), Actor: credits.Actor{Type: credits.ActorSystem, ID: "test"}, Source: "test", Reason: "test grant", BusinessReference: credits.BusinessReference{Type: "test", ID: fmt.Sprint(userID)},
-	}}); err != nil {
-		t.Fatal(err)
+	if grant > 0 {
+		amount, _ := credits.NewCreditAmount(grant)
+		if _, err := creditService.InTx(tx).Grant(t.Context(), credits.GrantCommand{UserID: userID, Amount: amount, Metadata: credits.CommandMetadata{
+			IdempotencyKey: fmt.Sprintf("settlement-grant:%d", userID), Actor: credits.Actor{Type: credits.ActorSystem, ID: "test"}, Source: "test", Reason: "test grant", BusinessReference: credits.BusinessReference{Type: "test", ID: fmt.Sprint(userID)},
+		}}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)

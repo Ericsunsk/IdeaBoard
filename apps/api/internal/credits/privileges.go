@@ -11,6 +11,7 @@ var creditTableNames = []string{
 	"credit_charges",
 	"credit_welcome_claims",
 	"credit_welcome_identity_key_guard",
+	"credit_wallet_restrictions",
 	"credit_reconciliation_runs",
 	"credit_reconciliation_findings",
 	"credit_reconciliation_run_findings",
@@ -23,6 +24,7 @@ var creditInternalFunctionSignatures = []string{
 	"apply_credit_posting_balances()",
 	"validate_credit_transaction_balance()",
 	"guard_credit_posting_transaction_scope()",
+	"execute_credit_command_v2_before_wallet_restrictions(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)",
 }
 
 const creditCommandFunctionSignature = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
@@ -34,6 +36,11 @@ var creditLifecycleFunctionSignatures = []string{
 	"claim_credit_welcome(TEXT, BIGINT)",
 }
 
+var creditRestrictionFunctionSignatures = []string{
+	"create_credit_wallet_restriction(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)",
+	"release_credit_wallet_restriction(TEXT, TEXT, TEXT, TEXT)",
+}
+
 var creditReconciliationFunctionSignatures = []string{
 	"start_credit_reconciliation(BIGINT, BIGINT, TEXT)",
 	"execute_credit_reconciliation(BIGINT)",
@@ -43,6 +50,7 @@ var creditReconciliationFunctionSignatures = []string{
 func RuntimePrivilegePolicy() dbprivileges.Policy {
 	requiredFunctions := []string{creditCommandFunctionSignature}
 	requiredFunctions = append(requiredFunctions, creditLifecycleFunctionSignatures...)
+	requiredFunctions = append(requiredFunctions, creditRestrictionFunctionSignatures...)
 	requiredFunctions = append(requiredFunctions, creditReconciliationFunctionSignatures...)
 	allTablePrivileges := []dbprivileges.Privilege{
 		dbprivileges.PrivilegeSelect,

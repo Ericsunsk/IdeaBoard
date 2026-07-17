@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CreditWalletDetailsStatus } from './creditWalletDetailsStatus'
+import type { CreditWalletRestriction } from './creditWalletRestriction'
 
 export interface CreditWalletDetails {
   user_id: number
@@ -13,4 +14,5 @@ export interface CreditWalletDetails {
   available_credits: number
   /** @minimum 0 */
   reserved_credits: number
+  active_restrictions: CreditWalletRestriction[]
 }

@@ -578,6 +578,44 @@ func TestSchemaSnapshotIncludesRewardsCampaignContract(t *testing.T) {
 	}
 }
 
+func TestSchemaSnapshotIncludesCreditWalletRestrictionContract(t *testing.T) {
+	schemaRaw, err := os.ReadFile("../schema/schema.sql")
+	if err != nil {
+		t.Fatalf("read schema failed: %v", err)
+	}
+	migrationRaw, err := migrationFS.ReadFile("20260717010000_credit_wallet_restrictions.sql")
+	if err != nil {
+		t.Fatalf("read Wallet Restriction migration failed: %v", err)
+	}
+	schema := string(schemaRaw)
+	migrationUp := extractUpSQL(string(migrationRaw))
+	for _, expected := range []string{
+		"CREATE TABLE credit_wallet_restrictions",
+		"CREATE UNIQUE INDEX uq_credit_wallet_restrictions_active_source",
+		"CREATE FUNCTION create_credit_wallet_restriction",
+		"CREATE FUNCTION release_credit_wallet_restriction",
+		"CREATE FUNCTION execute_credit_command_v2",
+		"released_at >= created_at",
+		"created_by_actor_type IN ('admin', 'system', 'service')",
+		"p_command_type IN ('grant', 'deduction', 'hold')",
+		"ERRCODE = 'IB011'",
+	} {
+		if !strings.Contains(schema, expected) {
+			t.Fatalf("schema snapshot missing Wallet Restriction contract: %s", expected)
+		}
+		if !strings.Contains(migrationUp, expected) {
+			t.Fatalf("Wallet Restriction migration missing contract: %s", expected)
+		}
+	}
+	schemaRestrictionFunctions := schema[strings.Index(schema, "CREATE FUNCTION create_credit_wallet_restriction"):strings.Index(schema, "CREATE FUNCTION execute_credit_command_v2")]
+	migrationRestrictionFunctions := migrationUp[strings.Index(migrationUp, "CREATE FUNCTION create_credit_wallet_restriction"):strings.Index(migrationUp, "CREATE FUNCTION execute_credit_command_v2")]
+	if strings.Contains(schema, "created_by_actor_type IN ('admin', 'system', 'service', 'user')") ||
+		strings.Contains(schemaRestrictionFunctions, "p_actor_type NOT IN ('admin', 'system', 'service', 'user')") ||
+		strings.Contains(migrationRestrictionFunctions, "p_actor_type NOT IN ('admin', 'system', 'service', 'user')") {
+		t.Fatal("Wallet Restriction management must not accept user actors")
+	}
+}
+
 func TestBaselineBusinessTableGuardMatchesBaselineTables(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260609000000_baseline.sql")
 	if err != nil {

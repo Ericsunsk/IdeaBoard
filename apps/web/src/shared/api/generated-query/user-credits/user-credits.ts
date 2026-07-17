@@ -16,7 +16,7 @@ import type {
 
 import { unref } from 'vue'
 
-import type { ApiResponseCreditWallet } from '../model'
+import type { ApiResponseCreditWalletBalance } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
@@ -29,8 +29,8 @@ export const getGetUserCreditWalletUrl = () => {
 
 export const getUserCreditWallet = async (
   options?: RequestInit,
-): Promise<ApiResponseCreditWallet> => {
-  return orvalMutator<ApiResponseCreditWallet>(getGetUserCreditWalletUrl(), {
+): Promise<ApiResponseCreditWalletBalance> => {
+  return orvalMutator<ApiResponseCreditWalletBalance>(getGetUserCreditWalletUrl(), {
     ...options,
     method: 'GET',
   })

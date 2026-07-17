@@ -8,6 +8,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 | ---- | ------- |
 | Credit | 不可拆分的整数货币单位，禁止 floating point |
 | Credit Wallet | 单个用户在 Credits context 中的账户边界 |
+| Wallet Restriction | 与 Wallet 生命周期状态独立的原因化消费限制；按 type、source 与 related object 追溯，可由各来源独立解除 |
 | Credit Account | Double-entry posting 的落点；每个 Wallet 有 available/reserved，System account 按 Wallet shard |
 | Ledger Transaction | 一次不可变的账务事实，包含同一 asset 下至少两条 Posting |
 | Posting | 对一个 Credit Account 的有符号增减；同一 Transaction 的合计必须为 0 |
@@ -25,6 +26,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release 与 Refund；底层只调用 typed `SECURITY DEFINER execute_credit_command_v2`。
 - `Service.InTx(pgx.Tx)` 与 transaction-scoped `CommandsInSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，`taskbilling.SettleTerminal` 使用 database/sql；caller 都拥有 commit/rollback。Task Repository 不持有 application-lifetime Credits/Billing dependency。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
+- `WalletRestrictionCommands` 通过 transaction-capable typed seam 幂等创建和精确解除 Restriction；其他 context 不得直接写 Restriction table。
 - `Service.GetCaptureUsage` 是已结算 Capture 的 typed-location 按用户只读聚合实现，供 caller-owned Usage interface 组合；不返回 Refund，也不授予 Ledger 写入能力。
 - 用户侧 Billing Records 是独立 caller-owned Read Model：可读取 Ledger 最终收支并组合 immutable Task Billing Snapshot，但不复用 Admin Ledger DTO、不返回 Hold/Release/Refund，也不获得 Ledger 写入能力。
 - `Reconciliation` 通过独立 River queue 运行，Admin 可读取 run history、summary 和 keyset-paginated findings。
@@ -44,13 +46,15 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - Task Hold 不使用 Credits-owned TTL 自动解冻；只有 Task terminal transition 能在同一 transaction 中 Capture 或 Release。
 - actor、source、reason 和 business reference 必填并写入不可变 Transaction。
 - Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin，并以原 Posting 的反向 Posting 追加记录；允许关联原 Admin Grant/Deduction/Refund，或固定 `source=reward_redemption` 的 user-origin Grant，其他非 Admin-origin Grant 仍拒绝。Capture 更正使用 linked Refund。
-- frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction 被拒绝；仅 authenticated Admin 的 linked Refund/Correction 可写入 frozen Wallet，余额仍被冻结而不可消费。
+- frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction/Hold 被拒绝；既有 Hold 的 Capture/Release 必须继续收敛，authenticated Admin linked Refund/Correction 仍可用于修复，Wallet 不可开始新的消费。
+- Wallet lifecycle status 与 active Restriction 是正交状态。Grant、Deduction、Hold 仅在 lifecycle active 且不存在 active Restriction 时允许；Capture、Release 必须继续收敛既有 Hold，authenticated Admin linked Refund/Correction 继续承担修复职责。Command 的 idempotency replay 在当前 gate 前返回原结果。
+- Restriction create/release 先锁 Wallet row，与 Credit Command gate 线性化；同一 `(Wallet, type, source, related object)` 仅允许一个 active row，解除保留历史且不会清除其他来源的 Restriction。
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
 - 启动 Reconciliation 必须提供 trim 后 1–1000 字符的 reason；active run 的重复 start 返回原 run，禁止覆盖首次请求的 actor/reason。
 - `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 finding、alert 与 run report 同一 transaction 内冻结相关 Wallet。扫描不得修改 Ledger、projection 或自动创建 Correction。
 - Finding fingerprint 不包含 run ID；重复异常复用 open finding 并增加 occurrence/run link，异常消失后标记 resolved。frozen Wallet 的历史 read contract 不变。
-- Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 Wallet，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 `100 Ideas` Welcome Grant；claim identity 明文不进入 Credits schema。
+- Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 lifecycle status，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 `100 Ideas` Welcome Grant；Ban/Unban/删除不得创建或清除独立 Restriction，claim identity 明文不进入 Credits schema。
 - Welcome identity HMAC key 首次使用时通过 typed `SECURITY DEFINER` command 永久绑定数据库 fingerprint；配置误变更时 startup/provision fail closed，避免同一身份生成新 claim。
 - 删除业务用户先在本地事务冻结 Wallet 并记录 durable deletion phase，再依次幂等删除 Auth、清理 Storage、写 user tombstone；失败请求可从持久 phase 重试收敛。最终保留 user tombstone 主键、Task、Wallet、Ledger 与 Welcome claim；相同领取身份重新注册不会再次获得 Welcome Grant。
 
