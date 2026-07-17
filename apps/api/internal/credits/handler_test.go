@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/adminaction"
@@ -16,7 +15,7 @@ import (
 )
 
 type adminHandlerServiceStub struct {
-	startInput StartReconciliationInput
+	startInput StartManualReconciliationInput
 	startCalls int
 }
 
@@ -44,10 +43,17 @@ func (s *adminHandlerServiceStub) ListLedger(context.Context, ListLedgerInput) (
 	return LedgerPage{}, nil
 }
 
-func (s *adminHandlerServiceStub) StartReconciliation(_ context.Context, input StartReconciliationInput) (ReconciliationRun, error) {
+func (s *adminHandlerServiceStub) StartReconciliation(_ context.Context, input StartManualReconciliationInput) (ReconciliationRun, error) {
 	s.startInput = input
 	s.startCalls++
-	return ReconciliationRun{ID: 1, Status: ReconciliationRunQueued, RequestedBy: input.Action.ActorID(), Reason: input.Action.Reason()}, nil
+	requestedBy := input.Action.ActorID()
+	return ReconciliationRun{
+		ID:          1,
+		Status:      ReconciliationRunQueued,
+		Trigger:     ReconciliationTriggerManual,
+		RequestedBy: &requestedBy,
+		Reason:      input.Action.Reason(),
+	}, nil
 }
 
 func (s *adminHandlerServiceStub) GetReconciliationRun(context.Context, int64) (ReconciliationRun, error) {
@@ -97,7 +103,7 @@ func TestStartReconciliationHandlerRequiresAndTrimsReason(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d response=%s", response.Code, response.Body.String())
 	}
-	if service.startCalls != 1 || service.startInput.Action.ActorID() != 7 || service.startInput.Action.Reason() != "manual audit" || service.startInput.StaleHoldAfter != 24*time.Hour {
+	if service.startCalls != 1 || service.startInput.Action.ActorID() != 7 || service.startInput.Action.Reason() != "manual audit" {
 		t.Fatalf("StartReconciliation input=%+v calls=%d", service.startInput, service.startCalls)
 	}
 }

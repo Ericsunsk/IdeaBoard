@@ -49,7 +49,6 @@ describe('credits billing API adapter', () => {
       charge_transaction_id: 'charge-1',
     } as never)
     const startedRun = await adminCreditsBillingApi.startReconciliation({
-      stale_hold_after_seconds: 3600,
       reason: '运营例行对账',
     })
     const runs = await adminCreditsBillingApi.listReconciliationRuns({ limit: 20 })
@@ -72,7 +71,6 @@ describe('credits billing API adapter', () => {
     expect(apiMocks.deductAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.refundAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.startAdminCreditReconciliation).toHaveBeenCalledWith({
-      stale_hold_after_seconds: 3600,
       reason: '运营例行对账',
     })
     expect(apiMocks.listAdminCreditReconciliationRuns).toHaveBeenCalledWith({ limit: 20 })
@@ -96,7 +94,6 @@ describe('credits billing API adapter', () => {
       [adminCreditsBillingApi.refund(request as never), '退款Idea失败'],
       [
         adminCreditsBillingApi.startReconciliation({
-          stale_hold_after_seconds: 3600,
           reason: '运营例行对账',
         }),
         '启动Idea对账失败',

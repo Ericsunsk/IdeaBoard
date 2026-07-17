@@ -54,6 +54,7 @@
 - Identity 的用户生命周期可通过 `credits.WalletLifecycle` typed seam 原子 provision/freeze Wallet 与领取 Welcome Grant；该 seam 仍由 Credits 独占 Ledger 写入和 runtime privilege。
 - Wallet lifecycle status 与原因化 Restriction 独立；`credits.WalletRestrictionCommands` 是 Restriction 唯一写入 seam。新 Grant/Deduction/Hold 同时受 lifecycle 与 active Restriction gate 约束，既有 Hold 的 Capture/Release 和 authenticated Admin repair commands 必须可收敛。
 - Reconciliation 的 high-risk open Finding 通过绑定 Finding 的 Ledger Integrity Restriction 隔离消费；成功扫描确认 resolved、high→low 或 Wallet 归属变化时只解除对应 Restriction，不修改 Wallet lifecycle status。
+- Reconciliation Run 明确区分 manual/scheduled Trigger；Stale Hold 固定 24 小时。River PeriodicJobs 每天 03:00 Asia/Shanghai 安排 daily ScheduleJob，并在 leader 启动时用 catch-up ScheduleJob 检查是否超过 24 小时无成功 Run；ScheduleJob 只调用 Credits 内部 transaction-bound start seam，遇到其他 active Run 时 snooze，failed target slot 可复用原 Run 重新入队。
 - 用户删除以 `user_deletion_requests` 为 durable state：先冻结业务用户与 Wallet，再按 Auth → Storage → tombstone phase 幂等收敛；跨服务失败不得恢复 active Wallet。
 - Usage range 是 typed `7d | 30d | 1y`，对应包含今天的 7 / 30 / 365 个 `Asia/Shanghai` daily buckets；range 只过滤 Trend，Lifetime 口径不变。
 - Usage 实时组合 immutable Credit Capture 与 Task Billing snapshot，并使用 feature-local、容量 2,048、TTL 约 30 秒的 per-process LRU cache。cache 必须按 `(user_id, range)` 隔离并 copy-on-read/write；多实例最多约 30 秒 eventual freshness，不引入 Redis invalidation 或 Daily Projection。

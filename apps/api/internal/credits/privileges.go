@@ -41,7 +41,7 @@ var creditRestrictionFunctionSignatures = []string{
 }
 
 var creditReconciliationFunctionSignatures = []string{
-	"start_credit_reconciliation(BIGINT, BIGINT, TEXT)",
+	"start_credit_reconciliation(TEXT, BIGINT, TEXT, TIMESTAMPTZ, BOOLEAN)",
 	"execute_credit_reconciliation(BIGINT)",
 	"fail_credit_reconciliation(BIGINT, TEXT)",
 }

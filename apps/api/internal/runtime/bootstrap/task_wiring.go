@@ -124,7 +124,9 @@ func newAppTaskRuntime(
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, credits.NewReconciliationWorker(services.creditService))
+			river.AddWorker(workers, credits.NewReconciliationScheduleWorker(services.creditService))
 		},
+		PeriodicJobs: credits.ReconciliationPeriodicJobs(),
 	})
 	if err != nil {
 		if eventBus != nil {

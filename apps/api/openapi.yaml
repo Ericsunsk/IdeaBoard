@@ -2985,17 +2985,18 @@ components:
       additionalProperties: false
       required: [reason]
       properties:
-        stale_hold_after_seconds: { type: integer, format: int64, minimum: 60, maximum: 31536000, default: 86400 }
         reason: { $ref: '#/components/schemas/AdminActionReason' }
 
     CreditReconciliationRun:
       type: object
-      required: [id, status, requested_by, reason, stale_hold_after_seconds, finding_count, critical_count, isolated_wallet_count, attempt_count, requested_at]
+      required: [id, status, trigger, stale_hold_after_seconds, finding_count, critical_count, isolated_wallet_count, attempt_count, requested_at]
       properties:
         id: { type: integer, format: int64 }
         status: { type: string, enum: [queued, running, completed, failed] }
+        trigger: { type: string, enum: [manual, scheduled] }
         requested_by: { type: integer, format: int64 }
         reason: { $ref: '#/components/schemas/AdminActionReason' }
+        scheduled_for: { type: string, format: date-time }
         stale_hold_after_seconds: { type: integer, format: int64 }
         finding_count: { type: integer, format: int64 }
         critical_count: { type: integer, format: int64 }

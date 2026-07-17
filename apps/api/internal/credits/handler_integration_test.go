@@ -47,12 +47,12 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 	if oversized.Code != http.StatusBadRequest {
 		t.Fatalf("oversized status = %d, body=%s", oversized.Code, oversized.Body.String())
 	}
-	overflow := httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"stale_hold_after_seconds":36028797018964028,"reason":"manual audit"}`))
+	legacyThreshold := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"stale_hold_after_seconds":86400,"reason":"manual audit"}`))
 	request.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(overflow, request)
-	if overflow.Code != http.StatusBadRequest {
-		t.Fatalf("overflow duration status = %d, body=%s", overflow.Code, overflow.Body.String())
+	router.ServeHTTP(legacyThreshold, request)
+	if legacyThreshold.Code != http.StatusBadRequest {
+		t.Fatalf("legacy threshold status = %d, body=%s", legacyThreshold.Code, legacyThreshold.Body.String())
 	}
 
 	for _, body := range []string{`{}`, `{"reason":"  "}`, `{"reason":"` + strings.Repeat("r", 1001) + `"}`} {
@@ -69,16 +69,24 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 	request = httptest.NewRequest(http.MethodPost, "/api/admin/credits/reconciliation/runs", bytes.NewBufferString(`{"reason":"  manual audit  "}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(created, request)
-	if created.Code != http.StatusOK || !bytes.Contains(created.Body.Bytes(), []byte(`"status":"queued"`)) {
+	if created.Code != http.StatusOK ||
+		!bytes.Contains(created.Body.Bytes(), []byte(`"status":"queued"`)) ||
+		!bytes.Contains(created.Body.Bytes(), []byte(`"trigger":"manual"`)) {
 		t.Fatalf("created response = %d %s", created.Code, created.Body.String())
 	}
 	var runID int64
+	var trigger string
+	var requestedBy int64
 	var storedReason string
-	if err := pool.QueryRow(t.Context(), `SELECT id, reason FROM credit_reconciliation_runs`).Scan(&runID, &storedReason); err != nil {
+	var staleSeconds float64
+	if err := pool.QueryRow(t.Context(), `
+SELECT id, trigger_type, requested_by, reason, EXTRACT(EPOCH FROM stale_hold_after)
+FROM credit_reconciliation_runs
+`).Scan(&runID, &trigger, &requestedBy, &storedReason, &staleSeconds); err != nil {
 		t.Fatal(err)
 	}
-	if storedReason != "manual audit" {
-		t.Fatalf("stored reason = %q", storedReason)
+	if trigger != "manual" || requestedBy != 1 || storedReason != "manual audit" || int64(staleSeconds) != 86400 {
+		t.Fatalf("stored trigger=%q requestedBy=%d reason=%q stale=%v", trigger, requestedBy, storedReason, staleSeconds)
 	}
 	if err := service.ExecuteReconciliation(t.Context(), runID); err != nil {
 		t.Fatal(err)

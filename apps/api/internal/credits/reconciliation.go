@@ -16,7 +16,10 @@ import (
 
 const ReconciliationQueue = "credit_reconciliation"
 
-const reconciliationFinalFailureTimeout = 5 * time.Second
+const (
+	reconciliationTriggerLookupTimeout = 2 * time.Second
+	reconciliationFinalFailureTimeout  = 5 * time.Second
+)
 
 var (
 	ErrReconciliationUnavailable = errors.New("credit reconciliation unavailable")
@@ -36,8 +39,10 @@ type ReconciliationEnqueuer interface {
 type ReconciliationRun struct {
 	ID                  int64                   `json:"id"`
 	Status              ReconciliationRunStatus `json:"status"`
-	RequestedBy         int64                   `json:"requested_by"`
-	Reason              string                  `json:"reason"`
+	Trigger             ReconciliationTrigger   `json:"trigger"`
+	RequestedBy         *int64                  `json:"requested_by,omitempty"`
+	Reason              string                  `json:"reason,omitempty"`
+	ScheduledFor        *time.Time              `json:"scheduled_for,omitempty"`
 	StaleHoldAfterSecs  int64                   `json:"stale_hold_after_seconds"`
 	FindingCount        int64                   `json:"finding_count"`
 	CriticalCount       int64                   `json:"critical_count"`
@@ -68,11 +73,14 @@ type ReconciliationFinding struct {
 }
 
 type ReconciliationRunStatus string
+type ReconciliationTrigger string
 type ReconciliationFindingStatus string
 type ReconciliationSeverity string
 type ReconciliationRisk string
 
 const (
+	ReconciliationTriggerManual    ReconciliationTrigger       = "manual"
+	ReconciliationTriggerScheduled ReconciliationTrigger       = "scheduled"
 	ReconciliationRunQueued        ReconciliationRunStatus     = "queued"
 	ReconciliationRunRunning       ReconciliationRunStatus     = "running"
 	ReconciliationRunCompleted     ReconciliationRunStatus     = "completed"
@@ -101,21 +109,75 @@ type ListReconciliationInput struct {
 	Limit    int
 }
 
-type StartReconciliationInput struct {
-	Action         adminaction.Metadata
-	StaleHoldAfter time.Duration
+type StartManualReconciliationInput struct {
+	Action adminaction.Metadata
 }
 
-func (s *Service) StartReconciliation(ctx context.Context, input StartReconciliationInput) (ReconciliationRun, error) {
-	if s == nil || s.pool == nil || s.reconciliationEnqueuer == nil {
-		return ReconciliationRun{}, ErrReconciliationUnavailable
+type startReconciliationInput struct {
+	trigger       ReconciliationTrigger
+	action        adminaction.Metadata
+	scheduledFor  *time.Time
+	onlyIfOverdue bool
+}
+
+func (s *Service) StartReconciliation(
+	ctx context.Context,
+	input StartManualReconciliationInput,
+) (ReconciliationRun, error) {
+	run, err := s.startReconciliation(ctx, startReconciliationInput{
+		trigger: ReconciliationTriggerManual,
+		action:  input.Action,
+	})
+	if err != nil {
+		return ReconciliationRun{}, err
 	}
-	if !input.Action.IsValid() || input.StaleHoldAfter < time.Minute || input.StaleHoldAfter > 365*24*time.Hour {
+	if run == nil {
 		return ReconciliationRun{}, ErrInvalidCommand
+	}
+	return *run, nil
+}
+
+func (s *Service) ScheduleReconciliation(
+	ctx context.Context,
+	scheduledFor time.Time,
+	onlyIfOverdue bool,
+) (*ReconciliationRun, error) {
+	return s.startReconciliation(ctx, startReconciliationInput{
+		trigger:       ReconciliationTriggerScheduled,
+		scheduledFor:  &scheduledFor,
+		onlyIfOverdue: onlyIfOverdue,
+	})
+}
+
+func (s *Service) startReconciliation(
+	ctx context.Context,
+	input startReconciliationInput,
+) (*ReconciliationRun, error) {
+	if s == nil || s.pool == nil || s.reconciliationEnqueuer == nil {
+		return nil, ErrReconciliationUnavailable
+	}
+	var requestedBy any
+	var reason any
+	var scheduledFor any
+	switch input.trigger {
+	case ReconciliationTriggerManual:
+		if !input.action.IsValid() {
+			return nil, ErrInvalidCommand
+		}
+		requestedBy = input.action.ActorID()
+		reason = input.action.Reason()
+	case ReconciliationTriggerScheduled:
+		if input.scheduledFor == nil || input.scheduledFor.IsZero() {
+			return nil, ErrInvalidCommand
+		}
+		normalized := input.scheduledFor.UTC().Truncate(time.Second)
+		scheduledFor = normalized
+	default:
+		return nil, ErrInvalidCommand
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return ReconciliationRun{}, fmt.Errorf("credits reconciliation: begin: %w", err)
+		return nil, fmt.Errorf("credits reconciliation: begin: %w", err)
 	}
 	defer func() {
 		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
@@ -124,20 +186,34 @@ func (s *Service) StartReconciliation(ctx context.Context, input StartReconcilia
 			slog.Warn("failed to roll back Credits reconciliation transaction", "err", rollbackErr)
 		}
 	}()
-	var runID int64
-	if err := tx.QueryRow(ctx, `SELECT start_credit_reconciliation($1, $2, $3)`, input.Action.ActorID(), int64(input.StaleHoldAfter/time.Second), input.Action.Reason()).Scan(&runID); err != nil {
-		return ReconciliationRun{}, fmt.Errorf("credits reconciliation: create run: %w", err)
+	var runID *int64
+	var enqueueRequired bool
+	if err := tx.QueryRow(ctx, `SELECT run_id, enqueue_required FROM start_credit_reconciliation($1, $2, $3, $4, $5)`,
+		string(input.trigger), requestedBy, reason, scheduledFor, input.onlyIfOverdue,
+	).Scan(&runID, &enqueueRequired); err != nil {
+		return nil, fmt.Errorf("credits reconciliation: create run: %w", err)
 	}
-	if _, err := s.reconciliationEnqueuer.InsertTx(ctx, tx, ReconciliationJobArgs{RunID: runID}, &river.InsertOpts{
-		Queue: ReconciliationQueue, MaxAttempts: 5, Priority: 4,
-		UniqueOpts: river.UniqueOpts{ByArgs: true},
-	}); err != nil {
-		return ReconciliationRun{}, fmt.Errorf("credits reconciliation: enqueue run: %w", err)
+	if enqueueRequired {
+		if runID == nil || *runID <= 0 {
+			return nil, fmt.Errorf("credits reconciliation: enqueue-required run has invalid ID")
+		}
+		if _, err := s.reconciliationEnqueuer.InsertTx(ctx, tx, ReconciliationJobArgs{RunID: *runID}, &river.InsertOpts{
+			Queue: ReconciliationQueue, MaxAttempts: 5, Priority: 4,
+		}); err != nil {
+			return nil, fmt.Errorf("credits reconciliation: enqueue run: %w", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return ReconciliationRun{}, fmt.Errorf("credits reconciliation: commit: %w", err)
+		return nil, fmt.Errorf("credits reconciliation: commit: %w", err)
 	}
-	return s.GetReconciliationRun(ctx, runID)
+	if runID == nil {
+		return nil, nil
+	}
+	run, err := s.GetReconciliationRun(ctx, *runID)
+	if err != nil {
+		return nil, err
+	}
+	return &run, nil
 }
 
 func (s *Service) ExecuteReconciliation(ctx context.Context, runID int64) error {
@@ -165,22 +241,17 @@ func (s *Service) GetReconciliationRun(ctx context.Context, runID int64) (Reconc
 	if s == nil || s.pool == nil || runID <= 0 {
 		return ReconciliationRun{}, ErrInvalidCommand
 	}
-	var run ReconciliationRun
-	var staleSeconds float64
-	err := s.pool.QueryRow(ctx, `
-SELECT id, status, requested_by, reason, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+	row := s.pool.QueryRow(ctx, `
+SELECT id, status, trigger_type, requested_by, reason, scheduled_for, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
-FROM credit_reconciliation_runs WHERE id = $1`, runID).Scan(
-		&run.ID, &run.Status, &run.RequestedBy, &run.Reason, &staleSeconds, &run.FindingCount, &run.CriticalCount,
-		&run.IsolatedWalletCount, &run.AttemptCount, &run.ErrorMessage, &run.RequestedAt, &run.StartedAt, &run.CompletedAt,
-	)
+FROM credit_reconciliation_runs WHERE id = $1`, runID)
+	run, err := scanReconciliationRun(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ReconciliationRun{}, ErrReconciliationNotFound
 	}
 	if err != nil {
 		return ReconciliationRun{}, fmt.Errorf("credits reconciliation: get run: %w", err)
 	}
-	run.StaleHoldAfterSecs = int64(staleSeconds)
 	return run, nil
 }
 
@@ -190,7 +261,7 @@ func (s *Service) ListReconciliationRuns(ctx context.Context, input ListReconcil
 		return ReconciliationRunPage{}, ErrInvalidCommand
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT id, status, requested_by, reason, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
+SELECT id, status, trigger_type, requested_by, reason, scheduled_for, EXTRACT(EPOCH FROM stale_hold_after), finding_count, critical_count,
        isolated_wallet_count, attempt_count, error_message, requested_at, started_at, completed_at
 FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DESC LIMIT $2`, input.BeforeID, limit+1)
 	if err != nil {
@@ -199,13 +270,10 @@ FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DE
 	defer rows.Close()
 	page := ReconciliationRunPage{Runs: make([]ReconciliationRun, 0, limit)}
 	for rows.Next() {
-		var run ReconciliationRun
-		var staleSeconds float64
-		if err := rows.Scan(&run.ID, &run.Status, &run.RequestedBy, &run.Reason, &staleSeconds, &run.FindingCount, &run.CriticalCount,
-			&run.IsolatedWalletCount, &run.AttemptCount, &run.ErrorMessage, &run.RequestedAt, &run.StartedAt, &run.CompletedAt); err != nil {
+		run, err := scanReconciliationRun(rows)
+		if err != nil {
 			return ReconciliationRunPage{}, fmt.Errorf("credits reconciliation: scan run: %w", err)
 		}
-		run.StaleHoldAfterSecs = int64(staleSeconds)
 		page.Runs = append(page.Runs, run)
 	}
 	if err := rows.Err(); err != nil {
@@ -216,6 +284,40 @@ FROM credit_reconciliation_runs WHERE ($1::BIGINT = 0 OR id < $1) ORDER BY id DE
 		page.Runs = page.Runs[:limit]
 	}
 	return page, nil
+}
+
+type reconciliationRunScanner interface {
+	Scan(...any) error
+}
+
+func scanReconciliationRun(scanner reconciliationRunScanner) (ReconciliationRun, error) {
+	var run ReconciliationRun
+	var reason *string
+	var staleSeconds float64
+	if err := scanner.Scan(
+		&run.ID,
+		&run.Status,
+		&run.Trigger,
+		&run.RequestedBy,
+		&reason,
+		&run.ScheduledFor,
+		&staleSeconds,
+		&run.FindingCount,
+		&run.CriticalCount,
+		&run.IsolatedWalletCount,
+		&run.AttemptCount,
+		&run.ErrorMessage,
+		&run.RequestedAt,
+		&run.StartedAt,
+		&run.CompletedAt,
+	); err != nil {
+		return ReconciliationRun{}, err
+	}
+	if reason != nil {
+		run.Reason = *reason
+	}
+	run.StaleHoldAfterSecs = int64(staleSeconds)
+	return run, nil
 }
 
 func (s *Service) ListReconciliationFindings(ctx context.Context, runID int64, status ReconciliationFindingStatus, input ListReconciliationInput) (ReconciliationFindingPage, error) {
@@ -273,6 +375,7 @@ type ReconciliationWorker struct {
 type reconciliationWorkerService interface {
 	ExecuteReconciliation(context.Context, int64) error
 	FailReconciliation(context.Context, int64, error) error
+	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
 }
 
 func NewReconciliationWorker(service reconciliationWorkerService) *ReconciliationWorker {
@@ -284,13 +387,42 @@ func (w *ReconciliationWorker) Work(ctx context.Context, job *river.Job[Reconcil
 		return ErrInvalidCommand
 	}
 	err := w.service.ExecuteReconciliation(ctx, job.Args.RunID)
-	if err != nil && job.Attempt >= job.MaxAttempts {
-		failCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), reconciliationFinalFailureTimeout)
-		defer cancel()
-		if failErr := w.service.FailReconciliation(failCtx, job.Args.RunID, err); failErr != nil {
-			return errors.Join(err, failErr)
-		}
+	if err == nil {
 		return nil
 	}
-	return err
+	lookupCtx, cancelLookup := context.WithTimeout(context.WithoutCancel(ctx), reconciliationTriggerLookupTimeout)
+	run, runErr := w.service.GetReconciliationRun(lookupCtx, job.Args.RunID)
+	cancelLookup()
+	if runErr == nil && run.Trigger == ReconciliationTriggerScheduled {
+		slog.Error("scheduled Credit reconciliation execution failed",
+			"run_id", job.Args.RunID,
+			"attempt", job.Attempt,
+			"max_attempts", job.MaxAttempts,
+			"err", err,
+		)
+	} else if runErr != nil {
+		slog.Error("Credit reconciliation trigger lookup failed",
+			"run_id", job.Args.RunID,
+			"attempt", job.Attempt,
+			"max_attempts", job.MaxAttempts,
+			"err", err,
+			"trigger_lookup_err", runErr,
+		)
+	}
+	if job.Attempt < job.MaxAttempts {
+		return err
+	}
+	failCtx, cancelFail := context.WithTimeout(context.WithoutCancel(ctx), reconciliationFinalFailureTimeout)
+	defer cancelFail()
+	if failErr := w.service.FailReconciliation(failCtx, job.Args.RunID, err); failErr != nil {
+		slog.Error("Credit reconciliation final failure persistence failed",
+			"run_id", job.Args.RunID,
+			"attempt", job.Attempt,
+			"max_attempts", job.MaxAttempts,
+			"err", err,
+			"mark_failed_err", failErr,
+		)
+		return errors.Join(err, failErr)
+	}
+	return nil
 }

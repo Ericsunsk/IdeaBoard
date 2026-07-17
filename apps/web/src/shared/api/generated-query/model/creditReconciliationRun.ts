@@ -6,12 +6,15 @@
  */
 import type { AdminActionReason } from './adminActionReason'
 import type { CreditReconciliationRunStatus } from './creditReconciliationRunStatus'
+import type { CreditReconciliationRunTrigger } from './creditReconciliationRunTrigger'
 
 export interface CreditReconciliationRun {
   id: number
   status: CreditReconciliationRunStatus
-  requested_by: number
-  reason: AdminActionReason
+  trigger: CreditReconciliationRunTrigger
+  requested_by?: number
+  reason?: AdminActionReason
+  scheduled_for?: string
   stale_hold_after_seconds: number
   finding_count: number
   critical_count: number

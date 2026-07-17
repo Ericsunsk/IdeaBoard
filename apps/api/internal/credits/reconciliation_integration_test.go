@@ -1,10 +1,13 @@
 package credits
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,12 +91,13 @@ WHERE wallet_user_id = 94 AND account_role IN ('user_available', 'user_reserved'
 	}
 
 	ledgerBefore := countRows(t, db, `SELECT COUNT(*) FROM credit_transactions`)
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatalf("StartReconciliation() error = %v", err)
 	}
-	if run.Reason != "integration reconciliation" {
-		t.Fatalf("run reason = %q", run.Reason)
+	if run.Trigger != ReconciliationTriggerManual || run.RequestedBy == nil || *run.RequestedBy != 1 ||
+		run.Reason != "integration reconciliation" || run.StaleHoldAfterSecs != 86400 {
+		t.Fatalf("manual run audit = %+v", run)
 	}
 	if err := service.ExecuteReconciliation(ctx, run.ID); err != nil {
 		t.Fatalf("ExecuteReconciliation() error = %v", err)
@@ -151,7 +155,7 @@ WHERE wallet_user_id = 94
 		t.Fatalf("Hold() error = %v, want ErrWalletRestricted", err)
 	}
 
-	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +186,7 @@ WHERE wallet_user_id = 94
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
 		t.Fatal(err)
 	}
-	third, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	third, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +216,7 @@ WHERE wallet_user_id = 94
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
 		t.Fatal(err)
 	}
-	fourth, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	fourth, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +243,7 @@ WHERE wallet_user_id = 94
 	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_accounts ENABLE TRIGGER guard_credit_account_projection`); err != nil {
 		t.Fatal(err)
 	}
-	fifth, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	fifth, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,10 +295,10 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE credit_holds SET created_at = clock_timestamp() - INTERVAL '2 hours' WHERE hold_transaction_id = $1`, hold.TransactionID); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE credit_holds SET created_at = clock_timestamp() - INTERVAL '25 hours' WHERE hold_transaction_id = $1`, hold.TransactionID); err != nil {
 		t.Fatal(err)
 	}
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +343,7 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t, time.Hour))
+	second, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,16 +368,16 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	service := NewService(pool)
 	enqueuer := &reconciliationEnqueuerStub{}
 	service.SetReconciliationEnqueuer(enqueuer)
-	invalid := reconciliationStartInput(t, 24*time.Hour)
+	invalid := reconciliationStartInput(t)
 	invalid.Action = adminaction.Metadata{}
 	if _, err := service.StartReconciliation(t.Context(), invalid); !errors.Is(err, ErrInvalidCommand) {
 		t.Fatalf("StartReconciliation(blank reason) error = %v, want ErrInvalidCommand", err)
 	}
-	first, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t, 24*time.Hour))
+	first, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondInput := reconciliationStartInput(t, 24*time.Hour)
+	secondInput := reconciliationStartInput(t)
 	secondInput.Action = testsupport.AdminAction(t, 1, "second request must not overwrite active run reason")
 	second, err := service.StartReconciliation(t.Context(), secondInput)
 	if err != nil {
@@ -381,6 +385,9 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	}
 	if first.ID != second.ID || second.Reason != first.Reason {
 		t.Fatalf("concurrent active runs = %d and %d", first.ID, second.ID)
+	}
+	if len(enqueuer.calls) != 1 {
+		t.Fatalf("active Run enqueue calls = %d, want 1", len(enqueuer.calls))
 	}
 	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
 		t.Fatalf("run count = %d", got)
@@ -392,7 +399,7 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	failing := NewService(pool)
 	riverErr := errors.New("river unavailable")
 	failing.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{err: riverErr})
-	if _, err := failing.StartReconciliation(t.Context(), reconciliationStartInput(t, 24*time.Hour)); !errors.Is(err, riverErr) {
+	if _, err := failing.StartReconciliation(t.Context(), reconciliationStartInput(t)); !errors.Is(err, riverErr) {
 		t.Fatalf("StartReconciliation() error = %v, want wrapped River error", err)
 	}
 	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_runs`); got != 1 {
@@ -570,7 +577,7 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 		t.Fatal(err)
 	}
 
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -629,7 +636,7 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	}
 	createReconciliationTaskFixture(t, db, service, "active-held", "pending", "", 93, priceID, priceVersion)
 
-	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t, 24*time.Hour))
+	run, err := service.StartReconciliation(ctx, reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -663,7 +670,7 @@ func TestReconciliationWorkerRetriesTransientFailureAndMarksOnlyFinalFailure(t *
 	db, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
 	var runID int64
-	if err := db.QueryRowContext(t.Context(), `SELECT start_credit_reconciliation(1, 86400, 'worker execution test')`).Scan(&runID); err != nil {
+	if err := db.QueryRowContext(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'worker execution test', NULL, FALSE)`).Scan(&runID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(t.Context(), `DROP TABLE credit_postings CASCADE`); err != nil {
@@ -692,7 +699,7 @@ func TestReconciliationWorkerMarksFinalFailureAfterParentCancellation(t *testing
 	db, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
 	var runID int64
-	if err := db.QueryRowContext(t.Context(), `SELECT start_credit_reconciliation(1, 86400, 'worker failure test')`).Scan(&runID); err != nil {
+	if err := db.QueryRowContext(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'worker failure test', NULL, FALSE)`).Scan(&runID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -732,9 +739,46 @@ func TestReconciliationWorkerBoundsFinalFailureContextAndJoinsErrors(t *testing.
 	}
 }
 
+func TestScheduledReconciliationWorkerLogsEveryExecutionFailure(t *testing.T) {
+	executeErr := errors.New("scheduled scan failed")
+	service := &reconciliationWorkerServiceStub{
+		executeErr: executeErr,
+		run: ReconciliationRun{
+			ID:      42,
+			Trigger: ReconciliationTriggerScheduled,
+		},
+	}
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	job := &river.Job[ReconciliationJobArgs]{
+		JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 3},
+		Args:   ReconciliationJobArgs{RunID: 42},
+	}
+	if err := NewReconciliationWorker(service).Work(t.Context(), job); !errors.Is(err, executeErr) {
+		t.Fatalf("Work() error = %v, want execute error", err)
+	}
+	logged := logs.String()
+	for _, expected := range []string{
+		"scheduled Credit reconciliation execution failed",
+		"run_id=42",
+		"attempt=1",
+		"max_attempts=3",
+		"scheduled scan failed",
+	} {
+		if !strings.Contains(logged, expected) {
+			t.Fatalf("scheduled failure log missing %q: %s", expected, logged)
+		}
+	}
+}
+
 type reconciliationWorkerServiceStub struct {
 	executeErr     error
 	failErr        error
+	getErr         error
+	run            ReconciliationRun
 	failContextErr error
 	failDeadline   time.Time
 }
@@ -747,6 +791,10 @@ func (s *reconciliationWorkerServiceStub) FailReconciliation(ctx context.Context
 	s.failContextErr = ctx.Err()
 	s.failDeadline, _ = ctx.Deadline()
 	return s.failErr
+}
+
+func (s *reconciliationWorkerServiceStub) GetReconciliationRun(context.Context, int64) (ReconciliationRun, error) {
+	return s.run, s.getErr
 }
 
 func TestReconciliationScanDoesNotWaitOnNormalWalletHotRows(t *testing.T) {
@@ -764,7 +812,7 @@ func TestReconciliationScanDoesNotWaitOnNormalWalletHotRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	var runID int64
-	if err := pool.QueryRow(t.Context(), `SELECT start_credit_reconciliation(1, 86400, 'hot row test')`).Scan(&runID); err != nil {
+	if err := pool.QueryRow(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'hot row test', NULL, FALSE)`).Scan(&runID); err != nil {
 		t.Fatal(err)
 	}
 	finished := make(chan error, 1)
@@ -808,8 +856,8 @@ func taskReconciliationMetadata(key, taskID string) CommandMetadata {
 	return CommandMetadata{IdempotencyKey: key, Actor: Actor{Type: ActorService, ID: "reconciliation-test"}, Source: "test", Reason: "reconciliation matrix", BusinessReference: BusinessReference{Type: "task", ID: taskID}}
 }
 
-func reconciliationStartInput(t testing.TB, staleHoldAfter time.Duration) StartReconciliationInput {
-	return StartReconciliationInput{Action: testsupport.AdminAction(t, 1, "integration reconciliation"), StaleHoldAfter: staleHoldAfter}
+func reconciliationStartInput(t testing.TB) StartManualReconciliationInput {
+	return StartManualReconciliationInput{Action: testsupport.AdminAction(t, 1, "integration reconciliation")}
 }
 
 func countRows(t testing.TB, db interface {

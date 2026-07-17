@@ -269,6 +269,7 @@ type RiverServerOptions struct {
 	MaxRetry         int
 	AdditionalQueues map[string]river.QueueConfig
 	RegisterWorkers  func(*river.Workers)
+	PeriodicJobs     []*river.PeriodicJob
 }
 
 type riverFinalFailureRuntime interface {
@@ -358,6 +359,7 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 		JobTimeout:   jobTimeout,
 		ErrorHandler: errorHandler,
 		Schema:       schema,
+		PeriodicJobs: opts.PeriodicJobs,
 	})
 }
 

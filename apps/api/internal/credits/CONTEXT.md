@@ -18,7 +18,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 | Capture | User Reserved → System Revenue |
 | Release | User Reserved → User Available |
 | Refund | System Revenue → User Available，累计不得超过原 Charge |
-| Reconciliation Run | Admin 以 non-empty reason 触发、River 异步执行的全量一致性扫描；run 持久化原始 actor/reason，只检测、报告和隔离 |
+| Reconciliation Run | 由 `manual` 或 `scheduled` Trigger 启动、River 异步执行的全量一致性扫描；manual 持久化真实 Admin/reason，scheduled 持久化 schedule slot 且不伪造 actor |
 | Finding | 由 finding type + Wallet + subject 生成稳定 fingerprint 的可重跑异常事实 |
 
 ## Public Seams
@@ -51,7 +51,9 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - Restriction create/release 先锁 Wallet row，与 Credit Command gate 线性化；同一 `(Wallet, type, source, related object)` 仅允许一个 active row，解除保留历史且不会清除其他来源的 Restriction。
 - Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
-- 启动 Reconciliation 必须提供 trim 后 1–1000 字符的 reason；active run 的重复 start 返回原 run，禁止覆盖首次请求的 actor/reason。
+- Reconciliation 的 Stale Hold 策略固定为 24 小时并由 DB snapshot/constraint 作为事实源；Admin API/UI 不接受阈值。
+- manual Reconciliation 必须提供真实 Admin 与 trim 后 1–1000 字符的 reason；scheduled Run 的 actor/reason 必须为空。每天 03:00 Asia/Shanghai 调度，River leader 启动时若 24 小时无成功 Run 则触发 catch-up。
+- manual、daily 与 catch-up 共用同一 transaction-bound start seam。DB advisory lock、active-run unique、scheduled slot unique 与 `enqueue_required` 返回值保证多实例/重复调度只 enqueue 一次；Run insert/reset 与 River enqueue 必须同 transaction。ScheduleJob 遇到其他 active Run 时必须 snooze，不能吞掉目标 slot；仍 overdue 的 failed target slot 复用原 Run、清理终态字段并重新入队。
 - `warning/low`（当前为长期 Hold）只报告；`error|critical/high` 会在 Finding 与 run report 同一 transaction 内幂等创建绑定该 Finding 的 `ledger_integrity/reconciliation` Restriction。Finding resolved、降为 low、失去或改变 Wallet 归属时只精确解除其自身 Restriction；Reconciliation alerts 已删除。
 - Finding fingerprint 不包含 run ID；重复异常复用 open Finding 并增加 occurrence/run link，异常消失后标记 resolved，reopen 会创建新的 Restriction history row。Finding 的 `isolated` 从精确 active Restriction 推导；扫描不修改 Wallet lifecycle status、Ledger、projection，也不自动创建 Correction。
 - Identity 通过 typed Wallet lifecycle seam 原子 provision Wallet、冻结/恢复 lifecycle status，并以 trusted canonical registration identity 的 keyed HMAC claim 幂等发放 `100 Ideas` Welcome Grant；Ban/Unban/删除不得创建或清除独立 Restriction，claim identity 明文不进入 Credits schema。

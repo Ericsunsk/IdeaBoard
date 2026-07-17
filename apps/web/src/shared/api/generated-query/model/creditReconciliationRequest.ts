@@ -7,10 +7,5 @@
 import type { AdminActionReason } from './adminActionReason'
 
 export interface CreditReconciliationRequest {
-  /**
-   * @minimum 60
-   * @maximum 31536000
-   */
-  stale_hold_after_seconds?: number
   reason: AdminActionReason
 }

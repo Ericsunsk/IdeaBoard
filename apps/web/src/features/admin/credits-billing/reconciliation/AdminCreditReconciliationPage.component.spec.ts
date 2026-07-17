@@ -28,6 +28,7 @@ describe('AdminCreditReconciliationPage', () => {
   let findingsShouldFail: boolean
   let startBusinessError: boolean
   let runsRequestCount: number
+  let runResponse: Record<string, unknown>
 
   beforeEach(() => {
     confirmRequestMock.mockReset()
@@ -37,24 +38,25 @@ describe('AdminCreditReconciliationPage', () => {
     findingsShouldFail = false
     startBusinessError = false
     runsRequestCount = 0
+    runResponse = makeRun()
     vi.clearAllMocks()
     useMswHandlers(
       http.get('/api/admin/credits/reconciliation/runs', () => {
         runsRequestCount += 1
-        return HttpResponse.json({ code: 0, msg: 'ok', data: { runs: [makeRun()] } })
+        return HttpResponse.json({ code: 0, msg: 'ok', data: { runs: [runResponse] } })
       }),
       http.post('/api/admin/credits/reconciliation/runs', async ({ request }) => {
         startRequests.push(await request.json())
         if (startBusinessError) {
           return HttpResponse.json({ code: 503, msg: 'api key invalid' })
         }
-        return HttpResponse.json({ code: 0, msg: 'ok', data: makeRun() })
+        return HttpResponse.json({ code: 0, msg: 'ok', data: runResponse })
       }),
       http.get('/api/admin/credits/reconciliation/runs/7', () => {
         if (runDetailShouldFail) {
           return HttpResponse.json({ code: 503, msg: 'run detail unavailable' }, { status: 503 })
         }
-        return HttpResponse.json({ code: 0, msg: 'ok', data: makeRun() })
+        return HttpResponse.json({ code: 0, msg: 'ok', data: runResponse })
       }),
       http.get('/api/admin/credits/reconciliation/runs/7/findings', ({ request }) => {
         if (findingsShouldFail) {
@@ -117,7 +119,7 @@ describe('AdminCreditReconciliationPage', () => {
       onConfirm: () => Promise<void>
     }
     await confirmation.onConfirm()
-    expect(startRequests).toEqual([{ stale_hold_after_seconds: 86_400, reason: '运营抽查' }])
+    expect(startRequests).toEqual([{ reason: '运营抽查' }])
   })
 
   it('sends the selected finding status and renders the matching Task and Transaction details', async () => {
@@ -137,6 +139,23 @@ describe('AdminCreditReconciliationPage', () => {
     expect(screen.getByText('task_id: task-88 · transaction_id: refund-2')).toBeVisible()
     expect(screen.getAllByText('已解决')).toHaveLength(2)
     expect(screen.getByText('未隔离')).toBeVisible()
+  })
+
+  it('renders scheduled Runs without a synthetic Admin or reason', async () => {
+    runResponse = {
+      ...makeRun(),
+      trigger: 'scheduled',
+      requested_by: undefined,
+      reason: undefined,
+      scheduled_for: '2026-07-17T19:00:00Z',
+    }
+    const { user } = renderPage()
+
+    expect(await screen.findByText('自动调度')).toBeVisible()
+    expect(screen.getByText('系统')).toBeVisible()
+    expect(screen.getByText('每日账本健康检查')).toBeVisible()
+    await user.click(screen.getByText('#7'))
+    expect(await screen.findByText(/计划时间：/)).toBeVisible()
   })
 
   it('resets the findings cursor when the selected status changes', async () => {
@@ -235,6 +254,7 @@ function makeRun() {
   return {
     id: 7,
     status: 'completed',
+    trigger: 'manual',
     requested_by: 1,
     reason: '月度例行对账',
     stale_hold_after_seconds: 86400,

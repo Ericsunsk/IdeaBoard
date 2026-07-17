@@ -764,6 +764,93 @@ SELECT pg_get_functiondef(to_regprocedure($1))
 	assertCurrent()
 }
 
+func TestReconciliationAutomationMigrationContract(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260717030000_reconciliation_automation.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	schemaRaw, err := os.ReadFile("../schema/schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := string(schemaRaw)
+	for _, expected := range []string{
+		"ADD COLUMN trigger_type VARCHAR(16)",
+		"ADD COLUMN scheduled_for TIMESTAMPTZ(3)",
+		"ck_credit_reconciliation_run_audit",
+		"ck_credit_reconciliation_run_stale_hold_fixed",
+		"uq_credit_reconciliation_scheduled_for",
+		"RETURNS TABLE (run_id BIGINT, enqueue_required BOOLEAN)",
+		"p_trigger_type IS NULL",
+		"p_only_if_overdue",
+		"completed_at >= clock_timestamp() - INTERVAL '24 hours'",
+		"RETURN QUERY SELECT NULL::BIGINT, FALSE",
+		"v_run_status = 'failed'",
+		"SET status = 'queued'",
+		"RETURN QUERY SELECT v_run_id, FALSE",
+		"RETURN QUERY SELECT v_run_id, TRUE",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("Reconciliation automation migration missing %q", expected)
+		}
+	}
+	for _, forbidden := range []string{
+		"DROP COLUMN stale_hold_after",
+		"CREATE FUNCTION execute_credit_reconciliation",
+		"p_stale_hold_seconds",
+	} {
+		if strings.Contains(up, forbidden) {
+			t.Fatalf("Reconciliation automation migration retains forbidden contract %q", forbidden)
+		}
+	}
+	for _, expected := range []string{
+		"trigger_type VARCHAR(16) NOT NULL",
+		"scheduled_for TIMESTAMPTZ(3)",
+		"ck_credit_reconciliation_run_audit",
+		"ck_credit_reconciliation_run_stale_hold_fixed",
+		"CREATE UNIQUE INDEX uq_credit_reconciliation_scheduled_for",
+		"RETURNS TABLE (run_id BIGINT, enqueue_required BOOLEAN)",
+	} {
+		if !strings.Contains(schema, expected) {
+			t.Fatalf("schema snapshot missing Reconciliation automation contract %q", expected)
+		}
+	}
+}
+
+func TestReconciliationAutomationMigrationRollsBackAndReapplies(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	const (
+		file    = "20260717030000_reconciliation_automation.sql"
+		version = 20260717030000
+	)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(text,bigint,text,timestamp with time zone,boolean)", true)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "trigger_type", true)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "scheduled_for", true)
+
+	rollbackTxMigrationForTest(t, ctx, conn, file, version)
+
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(text,bigint,text,timestamp with time zone,boolean)", false)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", true)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "trigger_type", false)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "scheduled_for", false)
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("reapply Reconciliation automation migration: %v", err)
+	}
+	assertMigrationApplied(t, ctx, conn, version, true)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(text,bigint,text,timestamp with time zone,boolean)", true)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", false)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "trigger_type", true)
+	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "scheduled_for", true)
+}
+
 func TestBaselineBusinessTableGuardMatchesBaselineTables(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260609000000_baseline.sql")
 	if err != nil {
@@ -1094,9 +1181,16 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_consume_single_use_code")
 	assertFunctionSearchPath(t, ctx, conn, "apply_credit_posting_balances()")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
+	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "trigger_type", "character varying")
+	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "scheduled_for", "timestamp with time zone")
 	assertTableExists(t, ctx, conn, "credit_reconciliation_alerts", false)
 	assertRegprocedureExists(t, ctx, conn, "execute_credit_reconciliation(bigint)", true)
 	assertRegprocedureExists(t, ctx, conn, "execute_credit_reconciliation_before_wallet_restrictions(bigint)", false)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(text,bigint,text,timestamp with time zone,boolean)", true)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", false)
+	assertConstraintExists(t, ctx, conn, "credit_reconciliation_runs", "ck_credit_reconciliation_run_audit")
+	assertConstraintExists(t, ctx, conn, "credit_reconciliation_runs", "ck_credit_reconciliation_run_stale_hold_fixed")
+	assertIndexValid(t, ctx, conn, "uq_credit_reconciliation_scheduled_for")
 	var reconciliationDefinition string
 	if err := conn.QueryRowContext(ctx, `
 SELECT pg_get_functiondef('execute_credit_reconciliation(bigint)'::regprocedure)
@@ -1695,6 +1789,14 @@ func TestAdminBillingReasonMigrationRollsBackAndReapplies(t *testing.T) {
 		t.Fatalf("apply migrations: %v", err)
 	}
 
+	rollbackTxMigrationForTest(
+		t,
+		ctx,
+		conn,
+		"20260717030000_reconciliation_automation.sql",
+		20260717030000,
+	)
+
 	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", false)
 	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint)", false)
 	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", true)
@@ -1756,7 +1858,8 @@ func TestAdminBillingReasonMigrationRollsBackAndReapplies(t *testing.T) {
 		t.Fatalf("reapply migration after down: %v", err)
 	}
 	assertRegprocedureExists(t, ctx, conn, "create_billing_sku(text,text,text,boolean,bigint,text)", false)
-	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", true)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(bigint,bigint,text)", false)
+	assertRegprocedureExists(t, ctx, conn, "start_credit_reconciliation(text,bigint,text,timestamp with time zone,boolean)", true)
 	assertColumnExists(t, ctx, conn, "credit_reconciliation_runs", "reason", true)
 	assertTableExists(t, ctx, conn, "billing_admin_actions", true)
 }
@@ -2205,6 +2308,37 @@ func rollbackNoTxMigrationForTest(
 	}
 	if _, err := conn.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
 		t.Fatalf("remove migration %s marker: %v", file, err)
+	}
+}
+
+func rollbackTxMigrationForTest(
+	t *testing.T,
+	ctx context.Context,
+	conn *sql.Conn,
+	file string,
+	version int64,
+) {
+	t.Helper()
+	raw, err := migrationFS.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read migration %s: %v", file, err)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin migration %s rollback: %v", file, err)
+	}
+	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
+		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("execute migration %s down statement %q: %v", file, firstSQLLine(meaningfulSQL(statement.SQL)), err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("remove migration %s marker: %v", file, err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit migration %s rollback: %v", file, err)
 	}
 }
 

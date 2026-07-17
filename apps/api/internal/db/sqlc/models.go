@@ -157,19 +157,21 @@ type CreditReconciliationFinding struct {
 }
 
 type CreditReconciliationRun struct {
-	ID                  int64        `json:"id"`
-	Status              string       `json:"status"`
-	RequestedBy         int64        `json:"requested_by"`
-	Reason              string       `json:"reason"`
-	StaleHoldAfter      int64        `json:"stale_hold_after"`
-	FindingCount        int64        `json:"finding_count"`
-	CriticalCount       int64        `json:"critical_count"`
-	IsolatedWalletCount int64        `json:"isolated_wallet_count"`
-	AttemptCount        int32        `json:"attempt_count"`
-	ErrorMessage        string       `json:"error_message"`
-	RequestedAt         time.Time    `json:"requested_at"`
-	StartedAt           sql.NullTime `json:"started_at"`
-	CompletedAt         sql.NullTime `json:"completed_at"`
+	ID                  int64          `json:"id"`
+	Status              string         `json:"status"`
+	TriggerType         string         `json:"trigger_type"`
+	RequestedBy         sql.NullInt64  `json:"requested_by"`
+	Reason              sql.NullString `json:"reason"`
+	ScheduledFor        sql.NullTime   `json:"scheduled_for"`
+	StaleHoldAfter      int64          `json:"stale_hold_after"`
+	FindingCount        int64          `json:"finding_count"`
+	CriticalCount       int64          `json:"critical_count"`
+	IsolatedWalletCount int64          `json:"isolated_wallet_count"`
+	AttemptCount        int32          `json:"attempt_count"`
+	ErrorMessage        string         `json:"error_message"`
+	RequestedAt         time.Time      `json:"requested_at"`
+	StartedAt           sql.NullTime   `json:"started_at"`
+	CompletedAt         sql.NullTime   `json:"completed_at"`
 }
 
 type CreditReconciliationRunFinding struct {

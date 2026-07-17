@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/adminaction"
@@ -23,7 +22,7 @@ type AdminService interface {
 	Refund(context.Context, RefundCommand) (CommandResult, error)
 	GetWallet(context.Context, int64) (WalletDetails, error)
 	ListLedger(context.Context, ListLedgerInput) (LedgerPage, error)
-	StartReconciliation(context.Context, StartReconciliationInput) (ReconciliationRun, error)
+	StartReconciliation(context.Context, StartManualReconciliationInput) (ReconciliationRun, error)
 	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
 	ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error)
 	ListReconciliationFindings(context.Context, int64, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error)
@@ -71,8 +70,7 @@ func (r *adminRefundRequest) creditAmount() int64     { return r.AmountCredits }
 func (r *adminCorrectionRequest) creditAmount() int64 { return r.AmountCredits }
 
 type adminReconciliationRequest struct {
-	StaleHoldAfterSeconds int64  `json:"stale_hold_after_seconds"`
-	Reason                string `json:"reason"`
+	Reason string `json:"reason"`
 }
 
 const maxAdminCreditRequestBytes = 16 << 10
@@ -283,20 +281,13 @@ func (h *Handler) StartReconciliation(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	if request.StaleHoldAfterSeconds == 0 {
-		request.StaleHoldAfterSeconds = 86400
-	}
-	if request.StaleHoldAfterSeconds < 60 || request.StaleHoldAfterSeconds > 31536000 {
-		response.Error(c, http.StatusBadRequest, "stale_hold_after_seconds 无效")
-		return
-	}
 	action, err := adminaction.New(adminID, request.Reason)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "reason 无效")
 		return
 	}
-	run, err := h.service.StartReconciliation(c.Request.Context(), StartReconciliationInput{
-		Action: action, StaleHoldAfter: time.Duration(request.StaleHoldAfterSeconds) * time.Second,
+	run, err := h.service.StartReconciliation(c.Request.Context(), StartManualReconciliationInput{
+		Action: action,
 	})
 	if err != nil {
 		writeCreditError(c, err)

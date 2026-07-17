@@ -21,30 +21,15 @@
             body-class="flex min-w-0 w-72 flex-col gap-1.5"
             @update:model-value="reasonError = ''"
           />
-          <AdminFormField
-            label="Stale Hold 阈值（小时）"
-            for="admin-credit-reconciliation-hours"
-            hint="最小 1 小时"
-          >
-            <InputNumber
-              v-model="staleHoldHours"
-              input-id="admin-credit-reconciliation-hours"
-              :min="1"
-              :max="8760"
-              :use-grouping="false"
-              class="w-44"
-            />
-          </AdminFormField>
           <Button
             label="启动对账"
             :loading="startPending"
-            :disabled="!canStart"
             @click="requestStart"
           />
         </div>
       </div>
       <Message class="mt-4" severity="warn" :closable="false">
-        对账可能冻结高风险 Wallet。该动作不会覆盖余额、修改历史 Ledger 或自动修复异常。
+        Stale Hold 固定按 24 小时检查。高风险异常会隔离消费，但不会修改 Wallet 生命周期、覆盖余额或自动修复。
       </Message>
     </section>
 
@@ -94,7 +79,7 @@
         scrollable
         selection-mode="single"
         :selection="selectedRunRow"
-        table-style="min-width: 1160px"
+        table-style="min-width: 1100px"
         @update:selection="selectRun"
       >
         <template #empty>
@@ -121,17 +106,25 @@
           </template>
         </Column>
         <Column header="隔离 Wallet" field="isolated_wallet_count" style="width: 130px" />
-        <Column header="阈值" style="width: 130px">
-          <template #body="{ data }"
-            >{{ Math.round(data.stale_hold_after_seconds / 3600) }} 小时</template
-          >
+        <Column header="触发方式" style="width: 120px">
+          <template #body="{ data }">
+            <Tag
+              :value="data.trigger === 'scheduled' ? '自动调度' : '人工触发'"
+              :severity="data.trigger === 'scheduled' ? 'info' : 'secondary'"
+              :class="adminCompactTagClass"
+            />
+          </template>
         </Column>
         <Column header="发起人" style="width: 110px">
-          <template #body="{ data }">User #{{ data.requested_by }}</template>
+          <template #body="{ data }">
+            {{ data.requested_by ? `User #${data.requested_by}` : '系统' }}
+          </template>
         </Column>
         <Column header="启动原因" style="min-width: 240px">
           <template #body="{ data }">
-            <span class="block max-w-72 truncate" :title="data.reason">{{ data.reason }}</span>
+            <span class="block max-w-72 truncate" :title="data.reason || ''">
+              {{ data.reason || '每日账本健康检查' }}
+            </span>
           </template>
         </Column>
         <Column header="发起时间" style="width: 190px">
@@ -164,10 +157,17 @@
             {{ selectedRun.isolated_wallet_count }} 个 Wallet 已隔离
           </div>
           <div
-            v-if="selectedRun"
+            v-if="selectedRun?.reason"
             class="mt-1 max-w-3xl break-words text-admin-caption text-admin-text-2"
           >
             <span class="font-[680]">启动原因：</span>{{ selectedRun.reason }}
+          </div>
+          <div
+            v-else-if="selectedRun?.scheduled_for"
+            class="mt-1 text-admin-caption text-admin-text-2"
+          >
+            <span class="font-[680]">计划时间：</span
+            >{{ formatAdminDateTime(selectedRun.scheduled_for) }}
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -313,11 +313,9 @@ import { computed, ref, watch } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
@@ -342,7 +340,6 @@ import {
   type AdminCreditReconciliationRun,
 } from './adminCreditReconciliationResource'
 
-const staleHoldHours = ref<number | null>(24)
 const startReason = ref('')
 const reasonError = ref('')
 const selectedRunId = ref<number | null>(null)
@@ -386,13 +383,6 @@ const findingPage = findingPagination.currentPage
 const findingKnownPageCount = findingPagination.knownPageCount
 const findingCanAdvance = findingPagination.canAdvance
 const findingCanRetreat = findingPagination.canRetreat
-const canStart = computed(
-  () =>
-    staleHoldHours.value != null &&
-    Number.isInteger(staleHoldHours.value) &&
-    staleHoldHours.value >= 1 &&
-    staleHoldHours.value <= 8760,
-)
 const runsLoading = computed(
   () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
 )
@@ -466,8 +456,6 @@ watch([selectedRunId, findingStatusFilter], () => {
 })
 
 function requestStart() {
-  const hours = staleHoldHours.value
-  if (hours == null || !Number.isInteger(hours) || hours < 1) return
   const reasonValidation = validateAdminActionReason(startReason.value)
   reasonError.value = reasonValidation.error
   if (!reasonValidation.valid) return
@@ -475,15 +463,13 @@ function requestStart() {
   const reason = reasonValidation.normalizedReason
   confirm.request({
     title: '确认启动Idea对账',
-    message: `将扫描 Ledger 与 Task Billing，一旦发现高风险不一致可能隔离 Wallet。Stale Hold 阈值为 ${hours} 小时。`,
+    message:
+      '将扫描 Ledger 与 Task Billing，一旦发现高风险不一致可能隔离 Wallet。Stale Hold 固定按 24 小时检查。',
     confirmLabel: '启动对账',
     intent: 'warn',
     onConfirm: async () => {
       try {
-        const response = await resource.start({
-          stale_hold_after_seconds: hours * 3600,
-          reason,
-        })
+        const response = await resource.start({ reason })
         selectedRunId.value = response.id
         startReason.value = ''
         feedback.reconciliationStarted()
