@@ -1426,6 +1426,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseCreditLedgerPage'
 
+  /admin/credits/health:
+    get:
+      tags: [AdminCredits]
+      operationId: getAdminCreditHealth
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Current Credit ledger health read model
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseCreditHealth' }
+
   /admin/credits/reconciliation/runs:
     post:
       tags: [AdminCredits]
@@ -2986,6 +2998,29 @@ components:
       required: [reason]
       properties:
         reason: { $ref: '#/components/schemas/AdminActionReason' }
+
+    CreditHealthFindingSummary:
+      type: object
+      required: [total, warning, error, critical, high_risk]
+      properties:
+        total: { type: integer, format: int64, minimum: 0 }
+        warning: { type: integer, format: int64, minimum: 0 }
+        error: { type: integer, format: int64, minimum: 0 }
+        critical: { type: integer, format: int64, minimum: 0 }
+        high_risk: { type: integer, format: int64, minimum: 0 }
+
+    CreditHealth:
+      type: object
+      required: [status, open_findings, restricted_wallet_count]
+      properties:
+        status:
+          type: string
+          enum: [unchecked, healthy, attention, critical, stale, failed]
+        active_run: { $ref: '#/components/schemas/CreditReconciliationRun' }
+        latest_successful_run: { $ref: '#/components/schemas/CreditReconciliationRun' }
+        latest_failed_run: { $ref: '#/components/schemas/CreditReconciliationRun' }
+        open_findings: { $ref: '#/components/schemas/CreditHealthFindingSummary' }
+        restricted_wallet_count: { type: integer, format: int64, minimum: 0 }
 
     CreditReconciliationRun:
       type: object
@@ -4811,6 +4846,13 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/UserUsage'
+
+    ApiResponseCreditHealth:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/CreditHealth' }
 
     ApiResponseCreditReconciliationRun:
       allOf:

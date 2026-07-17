@@ -43,6 +43,10 @@ func (s *adminHandlerServiceStub) ListLedger(context.Context, ListLedgerInput) (
 	return LedgerPage{}, nil
 }
 
+func (s *adminHandlerServiceStub) GetCreditHealth(context.Context) (CreditHealth, error) {
+	return CreditHealth{Status: CreditHealthHealthy}, nil
+}
+
 func (s *adminHandlerServiceStub) StartReconciliation(_ context.Context, input StartManualReconciliationInput) (ReconciliationRun, error) {
 	s.startInput = input
 	s.startCalls++

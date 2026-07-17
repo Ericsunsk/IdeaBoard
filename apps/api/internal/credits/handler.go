@@ -22,6 +22,7 @@ type AdminService interface {
 	Refund(context.Context, RefundCommand) (CommandResult, error)
 	GetWallet(context.Context, int64) (WalletDetails, error)
 	ListLedger(context.Context, ListLedgerInput) (LedgerPage, error)
+	GetCreditHealth(context.Context) (CreditHealth, error)
 	StartReconciliation(context.Context, StartManualReconciliationInput) (ReconciliationRun, error)
 	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
 	ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error)
@@ -171,6 +172,18 @@ func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return identityPrincipal.UserID(), true
+}
+
+func (h *Handler) GetCreditHealth(c *gin.Context) {
+	if _, ok := h.requireAdmin(c); !ok {
+		return
+	}
+	health, err := h.service.GetCreditHealth(c.Request.Context())
+	if err != nil {
+		writeCreditError(c, err)
+		return
+	}
+	response.SuccessDTO(c, health)
 }
 
 func adminCommandMetadata(adminID int64, idempotencyKey, source, reason, businessReferenceID string) CommandMetadata {

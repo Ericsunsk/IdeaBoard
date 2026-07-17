@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveAdminPageTitle } from './adminNavigation'
+import { adminRoutes } from './adminRoutes'
 
 describe('resolveAdminPageTitle', () => {
   it('uses the leaf route title for the pricing page', () => {
@@ -8,5 +9,15 @@ describe('resolveAdminPageTitle', () => {
 
   it('falls back to the parent navigation title', () => {
     expect(resolveAdminPageTitle('/admin/credits/wallets', undefined)).toBe('积分运营')
+  })
+})
+
+describe('Admin Credit Health routes', () => {
+  it('publishes the health route while retaining the legacy reconciliation route', () => {
+    const creditsRoute = adminRoutes[0]?.children?.find((route) => route.path === 'credits')
+    const childPaths = creditsRoute?.children?.map((route) => route.path)
+
+    expect(childPaths).toContain('health')
+    expect(childPaths).toContain('reconciliation')
   })
 })

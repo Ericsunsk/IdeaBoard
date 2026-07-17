@@ -28,6 +28,7 @@ func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing
 		c.Next()
 	})
 	router.POST("/api/admin/credits/reconciliation/runs", handler.StartReconciliation)
+	router.GET("/api/admin/credits/health", handler.GetCreditHealth)
 	router.GET("/api/admin/credits/reconciliation/runs", handler.ListReconciliationRuns)
 	router.GET("/api/admin/credits/reconciliation/runs/:run_id", handler.GetReconciliationRun)
 	router.GET("/api/admin/credits/reconciliation/runs/:run_id/findings", handler.ListReconciliationFindings)
@@ -91,6 +92,15 @@ FROM credit_reconciliation_runs
 	if err := service.ExecuteReconciliation(t.Context(), runID); err != nil {
 		t.Fatal(err)
 	}
+	healthRecorder := httptest.NewRecorder()
+	router.ServeHTTP(healthRecorder, httptest.NewRequest(http.MethodGet, "/api/admin/credits/health", nil))
+	if healthRecorder.Code != http.StatusOK ||
+		!bytes.Contains(healthRecorder.Body.Bytes(), []byte(`"status":"healthy"`)) ||
+		!bytes.Contains(healthRecorder.Body.Bytes(), []byte(`"latest_successful_run":{"id":`)) ||
+		!bytes.Contains(healthRecorder.Body.Bytes(), []byte(`"open_findings":{"total":0`)) ||
+		!bytes.Contains(healthRecorder.Body.Bytes(), []byte(`"restricted_wallet_count":0`)) {
+		t.Fatalf("health response = %d %s", healthRecorder.Code, healthRecorder.Body.String())
+	}
 
 	for path := range map[string]struct{}{
 		"/api/admin/credits/reconciliation/runs?limit=1":                                             {},
@@ -123,9 +133,10 @@ func TestAdminCreditReconciliationReadHandlersReturnServiceUnavailable(t *testin
 		c.Next()
 	})
 	router.GET("/runs", handler.ListReconciliationRuns)
+	router.GET("/health", handler.GetCreditHealth)
 	router.GET("/runs/:run_id", handler.GetReconciliationRun)
 	router.GET("/runs/:run_id/findings", handler.ListReconciliationFindings)
-	for _, path := range []string{"/runs", "/runs/1", "/runs/1/findings"} {
+	for _, path := range []string{"/health", "/runs", "/runs/1", "/runs/1/findings"} {
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
 		if recorder.Code != http.StatusServiceUnavailable {

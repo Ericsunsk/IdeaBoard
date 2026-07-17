@@ -23,6 +23,7 @@ import type {
   AdminCreditGrantRequest,
   AdminCreditRefundRequest,
   ApiResponseCreditCommandResult,
+  ApiResponseCreditHealth,
   ApiResponseCreditLedgerPage,
   ApiResponseCreditReconciliationFindingPage,
   ApiResponseCreditReconciliationRun,
@@ -490,6 +491,72 @@ export function useListAdminCreditLedger<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminCreditLedgerQueryOptions(userId, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminCreditHealthUrl = () => {
+  return `/admin/credits/health`
+}
+
+export const getAdminCreditHealth = async (
+  options?: RequestInit,
+): Promise<ApiResponseCreditHealth> => {
+  return orvalMutator<ApiResponseCreditHealth>(getGetAdminCreditHealthUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminCreditHealthQueryKey = () => {
+  return ['admin', 'credits', 'health'] as const
+}
+
+export const getGetAdminCreditHealthQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminCreditHealth>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditHealth>>, TError, TData>>
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminCreditHealthQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminCreditHealth>>> = ({ signal }) =>
+    getAdminCreditHealth({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminCreditHealth>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminCreditHealthQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminCreditHealth>>
+>
+export type GetAdminCreditHealthQueryError = ErrorType<unknown>
+
+export function useGetAdminCreditHealth<
+  TData = Awaited<ReturnType<typeof getAdminCreditHealth>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditHealth>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminCreditHealthQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

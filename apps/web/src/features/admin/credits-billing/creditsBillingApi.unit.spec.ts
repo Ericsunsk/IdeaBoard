@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
   deductAdminCredits: vi.fn(),
+  getAdminCreditHealth: vi.fn(),
   getAdminCreditReconciliationRun: vi.fn(),
   getAdminCreditWallet: vi.fn(),
   grantAdminCredits: vi.fn(),
@@ -26,6 +27,11 @@ describe('credits billing API adapter', () => {
     const run = { id: 7, status: 'completed' }
     const runs = { runs: [run] }
     const findings = { findings: [] }
+    const health = {
+      status: 'healthy',
+      open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
+      restricted_wallet_count: 0,
+    }
 
     apiMocks.getAdminCreditWallet.mockResolvedValue(success(wallet))
     apiMocks.listAdminCreditLedger.mockResolvedValue(success(ledger))
@@ -36,6 +42,7 @@ describe('credits billing API adapter', () => {
     apiMocks.listAdminCreditReconciliationRuns.mockResolvedValue(success(runs))
     apiMocks.getAdminCreditReconciliationRun.mockResolvedValue(success(run))
     apiMocks.listAdminCreditReconciliationFindings.mockResolvedValue(success(findings))
+    apiMocks.getAdminCreditHealth.mockResolvedValue(success(health))
   })
 
   it('keeps every generated Admin Credits call behind the feature-local adapter and returns domain data', async () => {
@@ -54,6 +61,7 @@ describe('credits billing API adapter', () => {
     const runs = await adminCreditsBillingApi.listReconciliationRuns({ limit: 20 })
     const run = await adminCreditsBillingApi.getReconciliationRun(7)
     const findings = await adminCreditsBillingApi.listReconciliationFindings(7, { status: 'open' })
+    const health = await adminCreditsBillingApi.getCreditHealth()
 
     expect(wallet).toEqual({ user_id: 12, available_credits: 1200 })
     expect(ledger).toEqual({ transactions: [] })
@@ -64,6 +72,11 @@ describe('credits billing API adapter', () => {
     expect(runs).toEqual({ runs: [{ id: 7, status: 'completed' }] })
     expect(run).toEqual({ id: 7, status: 'completed' })
     expect(findings).toEqual({ findings: [] })
+    expect(health).toEqual({
+      status: 'healthy',
+      open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
+      restricted_wallet_count: 0,
+    })
 
     expect(apiMocks.getAdminCreditWallet).toHaveBeenCalledWith(12)
     expect(apiMocks.listAdminCreditLedger).toHaveBeenCalledWith(12, { limit: 25 })
@@ -78,6 +91,7 @@ describe('credits billing API adapter', () => {
     expect(apiMocks.listAdminCreditReconciliationFindings).toHaveBeenCalledWith(7, {
       status: 'open',
     })
+    expect(apiMocks.getAdminCreditHealth).toHaveBeenCalledOnce()
   })
 
   it('rejects every Admin Credits business failure with its sanitized domain fallback', async () => {
@@ -101,6 +115,7 @@ describe('credits billing API adapter', () => {
       [adminCreditsBillingApi.listReconciliationRuns(), '加载Idea对账记录失败'],
       [adminCreditsBillingApi.getReconciliationRun(7), '加载Idea对账详情失败'],
       [adminCreditsBillingApi.listReconciliationFindings(7), '加载Idea对账异常失败'],
+      [adminCreditsBillingApi.getCreditHealth(), '加载账本健康状态失败'],
     ]
 
     for (const [operation, fallback] of cases) {

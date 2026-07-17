@@ -14,6 +14,7 @@ export const ADMIN_USERS_PATH = '/admin/users'
 export const ADMIN_CREDITS_PATH = '/admin/credits'
 export const ADMIN_CREDIT_WALLETS_PATH = '/admin/credits/wallets'
 export const ADMIN_CREDIT_PRICING_PATH = '/admin/credits/pricing'
+export const ADMIN_CREDIT_HEALTH_PATH = '/admin/credits/health'
 export const ADMIN_CREDIT_RECONCILIATION_PATH = '/admin/credits/reconciliation'
 export const ADMIN_REWARD_CAMPAIGNS_PATH = '/admin/credits/reward-campaigns'
 export function adminRewardCampaignDetailPath(campaignId: number | string): string {

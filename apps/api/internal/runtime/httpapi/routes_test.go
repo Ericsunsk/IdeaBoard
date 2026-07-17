@@ -366,6 +366,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/feature-prompts/:slug":                        false,
 		"GET /api/admin/credits/wallets/:user_id":                     false,
 		"GET /api/admin/credits/wallets/:user_id/ledger":              false,
+		"GET /api/admin/credits/health":                               false,
 		"GET /api/admin/credits/reconciliation/runs":                  false,
 		"GET /api/admin/credits/reconciliation/runs/:run_id":          false,
 		"GET /api/admin/credits/reconciliation/runs/:run_id/findings": false,

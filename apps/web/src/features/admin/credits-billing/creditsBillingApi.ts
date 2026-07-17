@@ -1,5 +1,6 @@
 import {
   deductAdminCredits,
+  getAdminCreditHealth,
   getAdminCreditReconciliationRun,
   getAdminCreditWallet,
   grantAdminCredits,
@@ -31,6 +32,10 @@ async function refund(...args: Parameters<typeof refundAdminCredits>) {
   return resolveApiData(refundAdminCredits(...args), '退款Idea失败')
 }
 
+async function getCreditHealth(...args: Parameters<typeof getAdminCreditHealth>) {
+  return resolveApiData(getAdminCreditHealth(...args), '加载账本健康状态失败')
+}
+
 async function startReconciliation(...args: Parameters<typeof startAdminCreditReconciliation>) {
   return resolveApiData(startAdminCreditReconciliation(...args), '启动Idea对账失败')
 }
@@ -57,6 +62,7 @@ export const adminCreditsBillingApi = {
   grant,
   deduct,
   refund,
+  getCreditHealth,
   startReconciliation,
   listReconciliationRuns,
   getReconciliationRun,
