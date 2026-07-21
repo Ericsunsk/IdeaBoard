@@ -3,1586 +3,399 @@ package rewards
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/platform/adminaction"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type CreditService interface {
-	InTx(pgx.Tx) credits.Commands
-	GetWallet(context.Context, int64) (credits.WalletDetails, error)
-}
+const rewardCodeProjectionSQL = `id, display_name, code_hint, credit_amount, max_redemptions,
+       redemption_count, expires_at, enabled, created_by, created_at, updated_at`
 
-type Service struct {
-	pool    *pgxpool.Pool
-	credits CreditService
-	keyring CodeKeyring
-	now     func() time.Time
-	random  io.Reader
-}
-
-type ServiceOptions struct {
-	Now    func() time.Time
-	Random io.Reader
-}
-
-const campaignProjectionSQL = `id, display_name, internal_note, credit_amount, mode, status,
-       max_redemptions, redemption_count, issued_code_count, valid_unused_code_count, starts_at, expires_at,
-       created_by, created_at, updated_at`
-
-const (
-	defaultRedemptionHistoryLimit = 20
-	maxRedemptionHistoryLimit     = 100
-	maskedCodeHintPrefix          = "•••• "
-)
-
-const redemptionHistorySQL = `
-SELECT redemptions.id,
-       campaigns.display_name,
-       redemptions.credit_amount,
-       codes.code_hint,
-       redemptions.redeemed_at
-FROM reward_redemptions redemptions
-JOIN reward_campaigns campaigns ON campaigns.id = redemptions.campaign_id
-JOIN reward_codes codes ON codes.id = redemptions.code_id
-WHERE redemptions.user_id = $1
-  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
-ORDER BY redemptions.id DESC
-LIMIT $3`
-
-const campaignListSQL = `SELECT ` + campaignProjectionSQL + `
-FROM reward_campaigns
-WHERE ($1::BIGINT <= 0 OR id < $1)
-  AND ($3::TEXT = '' OR strpos(lower(display_name), lower($3)) > 0)
-  AND ($4::TEXT = '' OR mode = $4)
-  AND ($5::TEXT = '' OR (
-    CASE
-      WHEN status = 'draft' THEN 'draft'
-      WHEN status = 'cancelled' THEN 'cancelled'
-      WHEN expires_at IS NOT NULL AND expires_at <= $6 THEN 'expired'
-      WHEN max_redemptions > 0 AND redemption_count >= max_redemptions THEN 'exhausted'
-      WHEN issued_code_count > 0 AND valid_unused_code_count = 0 THEN 'exhausted'
-      WHEN status = 'paused' THEN 'paused'
-      WHEN starts_at IS NOT NULL AND starts_at > $6 THEN 'scheduled'
-      ELSE 'active'
-    END
-  ) = $5)
-ORDER BY id DESC
-LIMIT $2`
-
-const adminRedemptionListSQL = `
-SELECT redemptions.id, redemptions.user_id, redemptions.credit_amount,
-       $4 || codes.code_hint, redemptions.credit_transaction_id, redemptions.redeemed_at
-FROM reward_redemptions redemptions
-JOIN reward_codes codes ON codes.id = redemptions.code_id
-WHERE redemptions.campaign_id = $1
-  AND ($2::BIGINT <= 0 OR redemptions.id < $2)
-ORDER BY redemptions.id DESC
-LIMIT $3`
-
-const adminCodeLookupSQL = `
-SELECT codes.id, codes.campaign_id, campaigns.display_name, codes.batch_id,
-       $5 || codes.code_hint,
-       CASE
-         WHEN redemption.id IS NOT NULL THEN 'redeemed'
-         WHEN codes.revoked_at IS NOT NULL THEN 'revoked'
-         ELSE 'available'
-       END,
-       codes.issued_at, codes.revoked_at, redemption.id, redemption.redeemed_at
-FROM reward_codes codes
-JOIN reward_campaigns campaigns ON campaigns.id = codes.campaign_id
-LEFT JOIN LATERAL (
-  SELECT id, redeemed_at
-  FROM reward_redemptions
-  WHERE code_id = codes.id
-  ORDER BY id DESC
-  LIMIT 1
-) redemption ON TRUE
-WHERE (codes.key_version = $1 AND codes.code_digest = $2)
-   OR ($3::TEXT <> '' AND codes.key_version = $3 AND codes.code_digest = $4)
-LIMIT 1`
-
-func NewService(pool *pgxpool.Pool, creditService CreditService, keyring CodeKeyring) *Service {
-	return NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{})
-}
-
-func NewServiceWithOptions(
-	pool *pgxpool.Pool,
-	creditService CreditService,
-	keyring CodeKeyring,
-	options ServiceOptions,
-) *Service {
-	now := options.Now
-	if now == nil {
-		now = time.Now
-	}
-	random := options.Random
-	if random == nil {
-		random = rand.Reader
-	}
-	return &Service{pool: pool, credits: creditService, keyring: keyring, now: now, random: random}
-}
-
-// ValidateActiveCodeKeyVersions prevents removing a rotation key while Codes
-// signed by it can still redeem or authenticate an idempotent replay.
-func (s *Service) ValidateActiveCodeKeyVersions(ctx context.Context) error {
-	if s == nil || s.pool == nil {
-		return fmt.Errorf("validate reward Code key versions: service unavailable")
-	}
-	previousVersion := ""
-	if s.keyring.previous != nil {
-		previousVersion = s.keyring.previous.Version
-	}
-	var unsupportedActiveCodeExists bool
-	err := s.pool.QueryRow(ctx, `
-SELECT EXISTS (
-  SELECT 1
-  FROM reward_codes code
-  JOIN reward_campaigns campaign ON campaign.id = code.campaign_id
-  WHERE code.key_version <> $1
-    AND ($2 = '' OR code.key_version <> $2)
-    AND (
-      EXISTS (
-        SELECT 1 FROM reward_redemptions replay WHERE replay.code_id = code.id
-      )
-      OR (
-        code.revoked_at IS NULL
-        AND campaign.status <> 'cancelled'
-        AND (campaign.expires_at IS NULL OR campaign.expires_at > $3)
-        AND (campaign.max_redemptions = 0 OR campaign.redemption_count < campaign.max_redemptions)
-        AND (
-          campaign.mode = 'public'
-          OR NOT EXISTS (
-            SELECT 1 FROM reward_redemptions redemption WHERE redemption.code_id = code.id
-          )
-        )
-      )
-    )
-)`, s.keyring.current.Version, previousVersion, s.currentTime()).Scan(&unsupportedActiveCodeExists)
-	if err != nil {
-		return fmt.Errorf("validate active reward Code key versions: %w", err)
-	}
-	if unsupportedActiveCodeExists {
-		return fmt.Errorf("active or replayable reward Codes require an unconfigured HMAC key version")
-	}
-	return nil
-}
-
-func (s *Service) CreateCampaign(ctx context.Context, command CreateCampaignCommand) (Campaign, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
+func (s *Service) CreateRewardCode(ctx context.Context, command CreateRewardCodeCommand) (CreatedRewardCode, error) {
+	if s == nil || s.pool == nil || command.ActorUserID <= 0 {
+		return CreatedRewardCode{}, ErrInvalidCommand
 	}
 	displayName := strings.TrimSpace(command.DisplayName)
-	internalNote := strings.TrimSpace(command.InternalNote)
-	mode := command.Mode
-	if mode == "" {
-		mode = CampaignModePublic
-	}
-	if displayName == "" || utf8.RuneCountInString(displayName) > 120 ||
-		utf8.RuneCountInString(internalNote) > 1000 ||
-		(mode != CampaignModePublic && mode != CampaignModeSingleUse) ||
-		(mode == CampaignModePublic && command.MaxRedemptions <= 0) ||
-		(mode == CampaignModeSingleUse && command.MaxRedemptions < 0) {
-		return Campaign{}, ErrInvalidCommand
-	}
-	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
-	}
-	startsAt, expiresAt, err := normalizeCampaignSchedule(command.StartsAt, command.ExpiresAt)
-	if err != nil {
-		return Campaign{}, err
-	}
-
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return Campaign{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	var campaign Campaign
-	err = scanCampaign(tx.QueryRow(ctx, `
-INSERT INTO reward_campaigns (
-  display_name, internal_note, credit_amount, mode, status,
-  max_redemptions, starts_at, expires_at, created_by
-) VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8)
-RETURNING `+campaignProjectionSQL,
-		displayName, internalNote, command.CreditAmount, mode, command.MaxRedemptions,
-		startsAt, expiresAt, metadata.ActorID(),
-	), &campaign, s.currentTime())
-	if err != nil {
-		return Campaign{}, fmt.Errorf("create reward campaign: %w", err)
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "create_campaign", metadata, map[string]any{
-		"display_name": displayName, "credit_amount": command.CreditAmount,
-		"mode": mode, "max_redemptions": command.MaxRedemptions, "starts_at": startsAt, "expires_at": expiresAt,
-	}); err != nil {
-		return Campaign{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return Campaign{}, fmt.Errorf("commit reward campaign creation: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) UpdateCampaign(ctx context.Context, command UpdateCampaignCommand) (Campaign, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
-	}
-	displayName := strings.TrimSpace(command.DisplayName)
-	internalNote := strings.TrimSpace(command.InternalNote)
-	if displayName == "" || utf8.RuneCountInString(displayName) > 120 ||
-		utf8.RuneCountInString(internalNote) > 1000 || command.MaxRedemptions < 0 {
-		return Campaign{}, ErrInvalidCommand
-	}
-	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
-	}
-	startsAt, expiresAt, err := normalizeCampaignSchedule(command.StartsAt, command.ExpiresAt)
-	if err != nil {
-		return Campaign{}, err
-	}
-
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return Campaign{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	campaign, err := s.lockCampaign(ctx, tx, command.CampaignID)
-	if err != nil {
-		return Campaign{}, err
-	}
-	if campaign.Mode == CampaignModePublic && command.MaxRedemptions <= 0 {
-		return Campaign{}, ErrInvalidCommand
-	}
-	var codeIssued bool
-	if err := tx.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM reward_codes WHERE campaign_id = $1)`, campaign.ID,
-	).Scan(&codeIssued); err != nil {
-		return Campaign{}, fmt.Errorf("check reward campaign issuance: %w", err)
-	}
-	if codeIssued && campaignRulesChanged(campaign, displayName, command.CreditAmount, command.MaxRedemptions, startsAt, expiresAt) {
-		return Campaign{}, ErrCampaignRulesFrozen
-	}
-	if err := scanCampaign(tx.QueryRow(ctx, `
-UPDATE reward_campaigns
-SET display_name = $2,
-    internal_note = $3,
-    credit_amount = $4,
-    max_redemptions = $5,
-    starts_at = $6,
-    expires_at = $7
-WHERE id = $1
-RETURNING `+campaignProjectionSQL,
-		campaign.ID, displayName, internalNote, command.CreditAmount,
-		command.MaxRedemptions, startsAt, expiresAt,
-	), &campaign, s.currentTime()); err != nil {
-		return Campaign{}, fmt.Errorf("update reward campaign: %w", err)
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "update_campaign", metadata, map[string]any{
-		"display_name": displayName, "credit_amount": command.CreditAmount,
-		"max_redemptions": command.MaxRedemptions, "starts_at": startsAt, "expires_at": expiresAt,
-	}); err != nil {
-		return Campaign{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return Campaign{}, fmt.Errorf("commit reward campaign update: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) IssuePublicCode(ctx context.Context, command IssuePublicCodeCommand) (IssuedPublicCode, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 {
-		return IssuedPublicCode{}, errors.Join(ErrInvalidCommand, err)
-	}
-	plaintext, err := normalizeCode(command.Code)
-	if err != nil {
-		return IssuedPublicCode{}, err
-	}
-	current, previous := splitCodeDigestCandidates(s.keyring.lookupDigests(plaintext))
-
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return IssuedPublicCode{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	var status CampaignLifecycleStatus
-	var mode CampaignMode
-	if err := tx.QueryRow(ctx,
-		`SELECT status, mode FROM reward_campaigns WHERE id = $1 FOR UPDATE`, command.CampaignID,
-	).Scan(&status, &mode); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return IssuedPublicCode{}, ErrCampaignNotFound
-		}
-		return IssuedPublicCode{}, fmt.Errorf("lock reward campaign: %w", err)
-	}
-	if mode != CampaignModePublic {
-		return IssuedPublicCode{}, ErrCampaignModeMismatch
-	}
-	if status != CampaignLifecycleDraft {
-		return IssuedPublicCode{}, ErrCampaignNotDraft
-	}
-	var codeExists bool
-	if err := tx.QueryRow(ctx, `
-SELECT EXISTS (
-  SELECT 1
-  FROM reward_codes
-  WHERE (key_version = $1 AND code_digest = $2)
-     OR ($3 <> '' AND key_version = $3 AND code_digest = $4)
-)`, current.version, current.digest, previous.version, previous.digest).Scan(&codeExists); err != nil {
-		return IssuedPublicCode{}, fmt.Errorf("check reward code reuse: %w", err)
-	}
-	if codeExists {
-		return IssuedPublicCode{}, ErrPublicCodeExists
-	}
-	var code RewardCode
-	err = tx.QueryRow(ctx, `
-INSERT INTO reward_codes (
-  campaign_id, key_version, code_digest, code_hint, issued_by
-) VALUES ($1, $2, $3, $4, $5)
-RETURNING id, campaign_id, code_hint, issued_by, issued_at`,
-		command.CampaignID, current.version, current.digest, plaintext[len(plaintext)-4:], metadata.ActorID(),
-	).Scan(&code.ID, &code.CampaignID, &code.Hint, &code.IssuedBy, &code.IssuedAt)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return IssuedPublicCode{}, ErrPublicCodeExists
-		}
-		return IssuedPublicCode{}, fmt.Errorf("issue public reward code: %w", err)
-	}
-	if err := insertAdminAction(ctx, tx, command.CampaignID, "issue_public_code", metadata, map[string]any{
-		"code_id": code.ID, "code_hint": code.Hint, "key_version": current.version,
-	}); err != nil {
-		return IssuedPublicCode{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return IssuedPublicCode{}, fmt.Errorf("commit public reward code issuance: %w", err)
-	}
-	return IssuedPublicCode{Code: code, Plaintext: plaintext}, nil
-}
-
-const maxSynchronousCodeBatchSize = 10000
-
-func (s *Service) GenerateCodeBatch(
-	ctx context.Context,
-	command GenerateCodeBatchCommand,
-) (GeneratedCodeBatch, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
 	idempotencyKey := strings.TrimSpace(command.IdempotencyKey)
-	if err != nil || command.CampaignID <= 0 || command.Count <= 0 ||
-		command.Count > maxSynchronousCodeBatchSize || idempotencyKey == "" ||
-		utf8.RuneCountInString(idempotencyKey) > 128 {
-		if command.Count > maxSynchronousCodeBatchSize {
-			return GeneratedCodeBatch{}, ErrCodeBatchLimit
-		}
-		return GeneratedCodeBatch{}, errors.Join(ErrInvalidCommand, err)
+	if displayName == "" || utf8.RuneCountInString(displayName) > 120 ||
+		idempotencyKey == "" || utf8.RuneCountInString(idempotencyKey) > 128 ||
+		command.MaxRedemptions < 0 {
+		return CreatedRewardCode{}, ErrInvalidCommand
 	}
-	fingerprint := sha256.Sum256([]byte("count:" + strconv.Itoa(command.Count)))
+	if _, err := credits.NewCreditAmount(command.CreditAmount); err != nil {
+		return CreatedRewardCode{}, errors.Join(ErrInvalidCommand, err)
+	}
+	normalized, err := normalizeCode(command.Code)
+	if err != nil {
+		return CreatedRewardCode{}, ErrInvalidCommand
+	}
+	expiresAt := cloneOptionalTime(command.ExpiresAt)
+	if expiresAt != nil && !s.currentTime().Before(*expiresAt) {
+		return CreatedRewardCode{}, ErrInvalidCommand
+	}
+	digests := s.keyring.lookupDigests(normalized)
+	current, previous := splitCodeDigestCandidates(digests)
+	fingerprint, err := rewardCodeCreateFingerprint(displayName, command.CreditAmount, command.MaxRedemptions, expiresAt)
+	if err != nil {
+		return CreatedRewardCode{}, fmt.Errorf("fingerprint reward Code creation: %w", err)
+	}
 
 	tx, err := s.begin(ctx)
 	if err != nil {
-		return GeneratedCodeBatch{}, err
+		return CreatedRewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	campaign, err := s.lockCampaign(ctx, tx, command.CampaignID)
-	if err != nil {
-		return GeneratedCodeBatch{}, err
+	if err := lockRewardCodeIdentity(ctx, tx, normalized); err != nil {
+		return CreatedRewardCode{}, err
 	}
-	if campaign.Mode != CampaignModeSingleUse {
-		return GeneratedCodeBatch{}, ErrCampaignModeMismatch
-	}
-
-	batch, found, err := findCodeBatchByIdempotencyKey(ctx, tx, campaign.ID, idempotencyKey)
-	if err != nil {
-		return GeneratedCodeBatch{}, err
-	}
-	if found {
-		var persistedFingerprint []byte
-		if err := tx.QueryRow(ctx,
-			`SELECT request_fingerprint FROM reward_code_batches WHERE id = $1`, batch.ID,
-		).Scan(&persistedFingerprint); err != nil {
-			return GeneratedCodeBatch{}, fmt.Errorf("read reward Code Batch fingerprint: %w", err)
+	var rewardCode RewardCode
+	var persistedFingerprint []byte
+	err = scanRewardCodeWithFingerprint(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`, request_fingerprint
+FROM reward_codes
+WHERE created_by = $1 AND idempotency_key = $2`, command.ActorUserID, idempotencyKey), &rewardCode, &persistedFingerprint, s.currentTime())
+	if err == nil {
+		matches, err := rewardCodeReplayMatches(ctx, tx, rewardCode.ID, persistedFingerprint, fingerprint, digests)
+		if err != nil {
+			return CreatedRewardCode{}, err
 		}
-		if !bytes.Equal(persistedFingerprint, fingerprint[:]) {
-			return GeneratedCodeBatch{}, ErrCodeBatchConflict
+		if !matches {
+			return CreatedRewardCode{}, ErrRewardCodeConflict
 		}
 		if err := tx.Rollback(ctx); err != nil {
-			return GeneratedCodeBatch{}, fmt.Errorf("release reward Code Batch replay lock: %w", err)
+			return CreatedRewardCode{}, fmt.Errorf("release reward Code creation replay: %w", err)
 		}
-		return GeneratedCodeBatch{
-			Batch: batch, ExportUnavailable: true, Replayed: true,
-		}, nil
+		return CreatedRewardCode{RewardCode: rewardCode, Replayed: true}, nil
 	}
-
-	now := s.currentTime()
-	if campaign.LifecycleStatus == CampaignLifecycleCancelled {
-		return GeneratedCodeBatch{}, ErrCampaignNotActive
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return CreatedRewardCode{}, fmt.Errorf("load idempotent reward Code creation: %w", err)
 	}
-	if campaign.ExpiresAt != nil && !now.Before(*campaign.ExpiresAt) {
-		return GeneratedCodeBatch{}, ErrCampaignExpired
+	var codeExists bool
+	if err := tx.QueryRow(ctx, `SELECT
+  EXISTS (SELECT 1 FROM reward_code_digest_aliases
+		  WHERE (key_version = $1 AND code_digest = $2)
+             OR ($3 <> '' AND key_version = $3 AND code_digest = $4))`,
+		current.version, current.digest, previous.version, previous.digest,
+	).Scan(&codeExists); err != nil {
+		return CreatedRewardCode{}, fmt.Errorf("check reward Code uniqueness: %w", err)
 	}
-	if campaign.MaxRedemptions > 0 &&
-		campaign.RedemptionCount+campaign.ValidUnusedCodeCount+int64(command.Count) > campaign.MaxRedemptions {
-		return GeneratedCodeBatch{}, ErrCampaignExhausted
+	if codeExists {
+		return CreatedRewardCode{}, ErrCodeCollision
 	}
-
-	err = tx.QueryRow(ctx, `
-INSERT INTO reward_code_batches (
-  campaign_id, idempotency_key, request_fingerprint, code_count, issued_by
-) VALUES ($1, $2, $3, $4, $5)
-RETURNING id, campaign_id, idempotency_key, code_count, issued_by, issued_at, revoked_at, revoked_by`,
-		campaign.ID, idempotencyKey, fingerprint[:], command.Count, metadata.ActorID(),
-	).Scan(
-		&batch.ID, &batch.CampaignID, &batch.IdempotencyKey, &batch.CodeCount,
-		&batch.IssuedBy, &batch.IssuedAt, &batch.RevokedAt, &batch.RevokedBy,
-	)
-	if err != nil {
-		return GeneratedCodeBatch{}, fmt.Errorf("create reward Code Batch: %w", err)
-	}
-
-	plaintexts := make([]string, 0, command.Count)
-	for range command.Count {
-		plaintext, err := generateSingleUseCode(s.random)
-		if err != nil {
-			return GeneratedCodeBatch{}, err
-		}
-		normalized, err := normalizeCode(plaintext)
-		if err != nil {
-			return GeneratedCodeBatch{}, fmt.Errorf("normalize generated reward Code: %w", err)
-		}
-		digest := s.keyring.issueDigest(normalized)
-		if s.keyring.previous != nil {
-			previousDigest := calculateCodeDigest(s.keyring.previous.Secret, normalized)
-			var collidesWithPrevious bool
-			if err := tx.QueryRow(ctx, `
-SELECT EXISTS (
-  SELECT 1 FROM reward_codes WHERE key_version = $1 AND code_digest = $2
-)`, s.keyring.previous.Version, previousDigest).Scan(&collidesWithPrevious); err != nil {
-				return GeneratedCodeBatch{}, fmt.Errorf("check previous-key reward Code collision: %w", err)
-			}
-			if collidesWithPrevious {
-				return GeneratedCodeBatch{}, ErrCodeCollision
-			}
-		}
-		if _, err := tx.Exec(ctx, `
+	err = scanRewardCode(tx.QueryRow(ctx, `
 INSERT INTO reward_codes (
-  campaign_id, batch_id, key_version, code_digest, code_hint, issued_by
-) VALUES ($1, $2, $3, $4, $5, $6)`,
-			campaign.ID, batch.ID, digest.version, digest.digest,
-			normalized[len(normalized)-4:], metadata.ActorID(),
-		); err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				return GeneratedCodeBatch{}, ErrCodeCollision
-			}
-			return GeneratedCodeBatch{}, fmt.Errorf("issue single-use reward Code: %w", err)
+  display_name, key_version, code_digest, code_hint, credit_amount,
+  max_redemptions, expires_at, created_by, idempotency_key, request_fingerprint
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (created_by, idempotency_key) DO NOTHING
+RETURNING `+rewardCodeProjectionSQL,
+		displayName, current.version, current.digest, normalized[len(normalized)-4:], command.CreditAmount,
+		command.MaxRedemptions, expiresAt, command.ActorUserID, idempotencyKey, fingerprint,
+	), &rewardCode, s.currentTime())
+	if errors.Is(err, pgx.ErrNoRows) {
+		persistedFingerprint = nil
+		err = scanRewardCodeWithFingerprint(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`, request_fingerprint
+FROM reward_codes
+WHERE created_by = $1 AND idempotency_key = $2`, command.ActorUserID, idempotencyKey), &rewardCode, &persistedFingerprint, s.currentTime())
+		if err != nil {
+			return CreatedRewardCode{}, fmt.Errorf("load idempotent reward Code creation: %w", err)
 		}
-		plaintexts = append(plaintexts, plaintext)
+		matches, err := rewardCodeReplayMatches(ctx, tx, rewardCode.ID, persistedFingerprint, fingerprint, digests)
+		if err != nil {
+			return CreatedRewardCode{}, err
+		}
+		if !matches {
+			return CreatedRewardCode{}, ErrRewardCodeConflict
+		}
+		if err := tx.Rollback(ctx); err != nil {
+			return CreatedRewardCode{}, fmt.Errorf("release reward Code creation replay: %w", err)
+		}
+		return CreatedRewardCode{RewardCode: rewardCode, Replayed: true}, nil
 	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "issue_code_batch", metadata, map[string]any{
-		"batch_id": batch.ID, "code_count": batch.CodeCount, "idempotency_key": batch.IdempotencyKey,
-	}); err != nil {
-		return GeneratedCodeBatch{}, err
+	if err != nil {
+		var postgresError *pgconn.PgError
+		if errors.As(err, &postgresError) && postgresError.Code == "23505" {
+			return CreatedRewardCode{}, ErrCodeCollision
+		}
+		return CreatedRewardCode{}, fmt.Errorf("create reward Code: %w", err)
+	}
+	for _, candidate := range digests {
+		if _, err := tx.Exec(ctx, `INSERT INTO reward_code_digest_aliases (reward_code_id, key_version, code_digest)
+VALUES ($1, $2, $3)`, rewardCode.ID, candidate.version, candidate.digest); err != nil {
+			var postgresError *pgconn.PgError
+			if errors.As(err, &postgresError) && postgresError.Code == "23505" {
+				return CreatedRewardCode{}, ErrCodeCollision
+			}
+			return CreatedRewardCode{}, fmt.Errorf("record reward Code digest alias: %w", err)
+		}
+	}
+	metadata, err := json.Marshal(map[string]any{
+		"display_name": displayName, "credit_amount": command.CreditAmount,
+		"max_redemptions": command.MaxRedemptions, "expires_at": expiresAt,
+		"masked_code_hint": rewardCode.MaskedCodeHint,
+	})
+	if err != nil {
+		return CreatedRewardCode{}, fmt.Errorf("encode reward Code journal metadata: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO reward_admin_actions (reward_code_id, action_type, actor_user_id, metadata)
+VALUES ($1, 'create_reward_code', $2, $3::JSONB)`, rewardCode.ID, command.ActorUserID, string(metadata)); err != nil {
+		return CreatedRewardCode{}, fmt.Errorf("record reward Code creation: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return GeneratedCodeBatch{}, fmt.Errorf("commit reward Code Batch generation: %w", err)
+		return CreatedRewardCode{}, fmt.Errorf("commit reward Code creation: %w", err)
 	}
-	batch.ValidUnusedCount = batch.CodeCount
-	return GeneratedCodeBatch{Batch: batch, Plaintexts: plaintexts}, nil
+	return CreatedRewardCode{RewardCode: rewardCode, Plaintext: normalized}, nil
 }
 
-func findCodeBatchByIdempotencyKey(
-	ctx context.Context,
-	tx pgx.Tx,
-	campaignID int64,
-	idempotencyKey string,
-) (CodeBatch, bool, error) {
-	var batch CodeBatch
-	err := scanCodeBatch(tx.QueryRow(ctx, codeBatchMetadataSQL+`
-WHERE batches.campaign_id = $1 AND batches.idempotency_key = $2`, campaignID, idempotencyKey), &batch)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return CodeBatch{}, false, nil
+func (s *Service) ListRewardCodes(ctx context.Context, input ListRewardCodesInput) (RewardCodePage, error) {
+	if s == nil || s.pool == nil || input.BeforeID < 0 {
+		return RewardCodePage{}, ErrInvalidCommand
 	}
+	limit := input.Limit
+	if limit == 0 {
+		limit = 20
+	}
+	if limit < 1 || limit > 100 {
+		return RewardCodePage{}, ErrInvalidCommand
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+rewardCodeProjectionSQL+`
+FROM reward_codes
+WHERE ($1::BIGINT <= 0 OR id < $1)
+ORDER BY id DESC
+LIMIT $2`, input.BeforeID, limit+1)
 	if err != nil {
-		return CodeBatch{}, false, fmt.Errorf("find reward Code Batch idempotency claim: %w", err)
-	}
-	return batch, true, nil
-}
-
-const codeBatchMetadataSQL = `
-SELECT batches.id, batches.campaign_id, batches.idempotency_key, batches.code_count,
-	       batches.issued_by, batches.issued_at, batches.revoked_at, batches.revoked_by,
-	       stats.valid_unused_count,
-	       stats.redeemed_count,
-	       stats.revoked_unused_count,
-	       hint_preview.masked_code_hints
-	FROM reward_code_batches batches
-	LEFT JOIN LATERAL (
-	  SELECT COUNT(codes.id) FILTER (
-	         WHERE codes.revoked_at IS NULL AND redemptions.id IS NULL
-	       )::INTEGER AS valid_unused_count,
-	       COUNT(redemptions.id)::INTEGER AS redeemed_count,
-	       COUNT(codes.id) FILTER (
-	         WHERE codes.revoked_at IS NOT NULL AND redemptions.id IS NULL
-	       )::INTEGER AS revoked_unused_count
-	  FROM reward_codes codes
-	  LEFT JOIN LATERAL (
-	    SELECT id
-	    FROM reward_redemptions
-	    WHERE code_id = codes.id
-	    ORDER BY id DESC
-	    LIMIT 1
-	  ) redemptions ON TRUE
-	  WHERE codes.batch_id = batches.id
-	) stats ON TRUE
-	LEFT JOIN LATERAL (
-  SELECT COALESCE(array_agg('` + maskedCodeHintPrefix + `' || preview.code_hint ORDER BY preview.id), ARRAY[]::TEXT[]) AS masked_code_hints
-  FROM (
-    SELECT id, code_hint
-    FROM reward_codes
-    WHERE batch_id = batches.id
-    ORDER BY id
-    LIMIT 3
-  ) preview
-) hint_preview ON TRUE
-`
-
-func scanCodeBatch(row rowScanner, batch *CodeBatch) error {
-	return row.Scan(
-		&batch.ID, &batch.CampaignID, &batch.IdempotencyKey, &batch.CodeCount,
-		&batch.IssuedBy, &batch.IssuedAt, &batch.RevokedAt, &batch.RevokedBy,
-		&batch.ValidUnusedCount, &batch.RedeemedCount, &batch.RevokedUnusedCount,
-		&batch.MaskedCodeHintPreview,
-	)
-}
-
-func (s *Service) ListCodeBatches(ctx context.Context, input ListCodeBatchesInput) (CodeBatchPage, error) {
-	if s == nil || s.pool == nil || input.CampaignID <= 0 {
-		return CodeBatchPage{}, ErrInvalidCommand
-	}
-	if input.Limit == 0 {
-		input.Limit = 20
-	}
-	if input.BeforeID < 0 || input.Limit < 1 || input.Limit > 100 {
-		return CodeBatchPage{}, ErrInvalidCommand
-	}
-	rows, err := s.pool.Query(ctx, codeBatchMetadataSQL+`
-WHERE batches.campaign_id = $1 AND ($2::BIGINT <= 0 OR batches.id < $2)
-ORDER BY batches.id DESC
-LIMIT $3`, input.CampaignID, input.BeforeID, input.Limit+1)
-	if err != nil {
-		return CodeBatchPage{}, fmt.Errorf("list reward Code Batches: %w", err)
+		return RewardCodePage{}, fmt.Errorf("list reward Codes: %w", err)
 	}
 	defer rows.Close()
-	batches := make([]CodeBatch, 0, input.Limit+1)
+	items := make([]RewardCode, 0, limit+1)
 	for rows.Next() {
-		var batch CodeBatch
-		if err := scanCodeBatch(rows, &batch); err != nil {
-			return CodeBatchPage{}, fmt.Errorf("scan reward Code Batch: %w", err)
+		var item RewardCode
+		if err := scanRewardCode(rows, &item, s.currentTime()); err != nil {
+			return RewardCodePage{}, fmt.Errorf("scan reward Code list: %w", err)
 		}
-		batches = append(batches, batch)
+		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return CodeBatchPage{}, fmt.Errorf("read reward Code Batches: %w", err)
+		return RewardCodePage{}, fmt.Errorf("read reward Code list: %w", err)
 	}
-	page := CodeBatchPage{Batches: batches}
-	if len(batches) > input.Limit {
-		page.Batches = batches[:input.Limit]
-		page.NextBeforeID = page.Batches[len(page.Batches)-1].ID
+	page := RewardCodePage{RewardCodes: items}
+	if len(items) > limit {
+		page.RewardCodes = items[:limit]
+		page.NextBeforeID = page.RewardCodes[len(page.RewardCodes)-1].ID
 	}
 	return page, nil
 }
 
-func (s *Service) RevokeCodeBatch(ctx context.Context, command RevokeCodeBatchCommand) (CodeBatch, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 || command.BatchID <= 0 || !command.Confirmed {
-		return CodeBatch{}, errors.Join(ErrInvalidCommand, err)
-	}
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return CodeBatch{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	campaign, err := s.lockCampaign(ctx, tx, command.CampaignID)
-	if err != nil {
-		return CodeBatch{}, err
-	}
-	if campaign.Mode != CampaignModeSingleUse {
-		return CodeBatch{}, ErrCampaignModeMismatch
-	}
-	batch, found, err := findCodeBatchByID(ctx, tx, campaign.ID, command.BatchID)
-	if err != nil {
-		return CodeBatch{}, err
-	}
-	if !found {
-		return CodeBatch{}, ErrCodeBatchNotFound
-	}
-	if batch.RevokedAt != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return CodeBatch{}, fmt.Errorf("release reward Code Batch replay lock: %w", err)
-		}
-		return batch, nil
-	}
-	revokedAt := s.currentTime()
-	result, err := tx.Exec(ctx, `
-UPDATE reward_codes codes
-SET revoked_at = $2, revoked_by = $3
-WHERE codes.batch_id = $1 AND codes.revoked_at IS NULL
-  AND NOT EXISTS (SELECT 1 FROM reward_redemptions WHERE code_id = codes.id)`,
-		batch.ID, revokedAt, metadata.ActorID())
-	if err != nil {
-		return CodeBatch{}, fmt.Errorf("revoke unused reward Batch Codes: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-UPDATE reward_code_batches
-SET revoked_at = $2, revoked_by = $3
-WHERE id = $1 AND revoked_at IS NULL`, batch.ID, revokedAt, metadata.ActorID()); err != nil {
-		return CodeBatch{}, fmt.Errorf("mark reward Code Batch revoked: %w", err)
-	}
-	batch, _, err = findCodeBatchByID(ctx, tx, campaign.ID, batch.ID)
-	if err != nil {
-		return CodeBatch{}, err
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "revoke_code_batch", metadata, map[string]any{
-		"batch_id": batch.ID, "revoked_unused_count": result.RowsAffected(),
-	}); err != nil {
-		return CodeBatch{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return CodeBatch{}, fmt.Errorf("commit reward Code Batch revocation: %w", err)
-	}
-	return batch, nil
-}
-
-func findCodeBatchByID(
+func (s *Service) redeemRewardCode(
 	ctx context.Context,
-	tx pgx.Tx,
-	campaignID int64,
-	batchID int64,
-) (CodeBatch, bool, error) {
-	var batch CodeBatch
-	err := scanCodeBatch(tx.QueryRow(ctx, codeBatchMetadataSQL+`
-WHERE batches.campaign_id = $1 AND batches.id = $2`, campaignID, batchID), &batch)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return CodeBatch{}, false, nil
-	}
-	if err != nil {
-		return CodeBatch{}, false, fmt.Errorf("find reward Code Batch: %w", err)
-	}
-	return batch, true, nil
-}
-
-func (s *Service) ActivateCampaign(ctx context.Context, command ActivateCampaignCommand) (Campaign, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
-	}
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return Campaign{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	var campaign Campaign
-	err = scanCampaign(tx.QueryRow(ctx, `SELECT `+campaignProjectionSQL+`
-FROM reward_campaigns
-WHERE id = $1
-FOR UPDATE`, command.CampaignID), &campaign, s.currentTime())
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Campaign{}, ErrCampaignNotFound
-		}
-		return Campaign{}, fmt.Errorf("lock reward campaign: %w", err)
-	}
-	if campaign.LifecycleStatus != CampaignLifecycleDraft {
-		return Campaign{}, ErrCampaignNotDraft
-	}
-	if campaign.ExpiresAt != nil && !s.currentTime().Before(*campaign.ExpiresAt) {
-		return Campaign{}, ErrCampaignExpired
-	}
-	var codeExists bool
-	if err := tx.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM reward_codes WHERE campaign_id = $1 AND revoked_at IS NULL)`, campaign.ID,
-	).Scan(&codeExists); err != nil {
-		return Campaign{}, fmt.Errorf("check public reward code: %w", err)
-	}
-	if !codeExists || campaign.CreditAmount <= 0 ||
-		(campaign.Mode == CampaignModePublic && campaign.MaxRedemptions <= 0) {
-		return Campaign{}, ErrPublicCodeRequired
-	}
-	err = scanCampaign(tx.QueryRow(ctx, `
-UPDATE reward_campaigns
-SET status = 'active'
-WHERE id = $1 AND status = 'draft'
-RETURNING `+campaignProjectionSQL, campaign.ID), &campaign, s.currentTime())
-	if err != nil {
-		return Campaign{}, fmt.Errorf("activate reward campaign: %w", err)
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "activate_campaign", metadata, map[string]any{}); err != nil {
-		return Campaign{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return Campaign{}, fmt.Errorf("commit reward campaign activation: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) PauseCampaign(ctx context.Context, command PauseCampaignCommand) (Campaign, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
-	}
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return Campaign{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	campaign, err := s.lockCampaign(ctx, tx, command.CampaignID)
-	if err != nil {
-		return Campaign{}, err
-	}
-	if campaign.LifecycleStatus != CampaignLifecycleActive {
-		return Campaign{}, ErrCampaignNotActive
-	}
-	if err := s.updateCampaignLifecycle(ctx, tx, &campaign, CampaignLifecyclePaused); err != nil {
-		return Campaign{}, err
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "pause_campaign", metadata, map[string]any{}); err != nil {
-		return Campaign{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return Campaign{}, fmt.Errorf("commit reward campaign pause: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) ResumeCampaign(ctx context.Context, command ResumeCampaignCommand) (Campaign, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
-	}
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return Campaign{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	campaign, err := s.lockCampaign(ctx, tx, command.CampaignID)
-	if err != nil {
-		return Campaign{}, err
-	}
-	if campaign.LifecycleStatus != CampaignLifecyclePaused {
-		return Campaign{}, ErrCampaignNotPaused
-	}
-	if campaign.MaxRedemptions > 0 && campaign.RedemptionCount >= campaign.MaxRedemptions {
-		return Campaign{}, ErrCampaignExhausted
-	}
-	if campaign.ExpiresAt != nil && !s.currentTime().Before(*campaign.ExpiresAt) {
-		return Campaign{}, ErrCampaignExpired
-	}
-	codeExists := campaign.ValidUnusedCodeCount > 0
-	if !codeExists {
-		return Campaign{}, ErrPublicCodeRequired
-	}
-	if err := s.updateCampaignLifecycle(ctx, tx, &campaign, CampaignLifecycleActive); err != nil {
-		return Campaign{}, err
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "resume_campaign", metadata, map[string]any{}); err != nil {
-		return Campaign{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return Campaign{}, fmt.Errorf("commit reward campaign resume: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) DeleteCampaign(ctx context.Context, command DeleteCampaignCommand) error {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 {
-		return errors.Join(ErrInvalidCommand, err)
-	}
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	campaign, err := s.lockCampaign(ctx, tx, command.CampaignID)
-	if err != nil {
-		return err
-	}
-	if campaign.LifecycleStatus != CampaignLifecycleDraft {
-		return ErrCampaignNotEmpty
-	}
-	var codeIssued bool
-	if err := tx.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM reward_codes WHERE campaign_id = $1)`, campaign.ID,
-	).Scan(&codeIssued); err != nil {
-		return fmt.Errorf("check deletable reward campaign: %w", err)
-	}
-	if codeIssued {
-		return ErrCampaignNotEmpty
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "delete_campaign", metadata, map[string]any{
-		"display_name": campaign.DisplayName,
-	}); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM reward_campaigns WHERE id = $1`, campaign.ID); err != nil {
-		return fmt.Errorf("delete empty reward Draft: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit reward campaign deletion: %w", err)
-	}
-	return nil
-}
-
-func (s *Service) CancelCampaign(ctx context.Context, command CancelCampaignCommand) (Campaign, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CampaignID <= 0 || !command.Confirmed {
-		return Campaign{}, errors.Join(ErrInvalidCommand, err)
-	}
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return Campaign{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	campaign, err := s.lockCampaign(ctx, tx, command.CampaignID)
-	if err != nil {
-		return Campaign{}, err
-	}
-	if campaign.LifecycleStatus == CampaignLifecycleCancelled {
-		return campaign, nil
-	}
-	var codeExists bool
-	if err := tx.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM reward_codes WHERE campaign_id = $1)`, campaign.ID,
-	).Scan(&codeExists); err != nil {
-		return Campaign{}, fmt.Errorf("check cancellable reward campaign: %w", err)
-	}
-	if !codeExists {
-		return Campaign{}, ErrPublicCodeRequired
-	}
-	if err := s.updateCampaignLifecycle(ctx, tx, &campaign, CampaignLifecycleCancelled); err != nil {
-		return Campaign{}, err
-	}
-	revokedAt := s.currentTime()
-	result, err := tx.Exec(ctx, `
-UPDATE reward_codes
-SET revoked_at = $2, revoked_by = $3
-WHERE campaign_id = $1 AND revoked_at IS NULL
-  AND ($4::BOOLEAN OR NOT EXISTS (
-    SELECT 1 FROM reward_redemptions WHERE code_id = reward_codes.id
-  ))`, campaign.ID, revokedAt, metadata.ActorID(), campaign.Mode == CampaignModePublic)
-	if err != nil {
-		return Campaign{}, fmt.Errorf("revoke cancelled reward Codes: %w", err)
-	}
-	if campaign.Mode == CampaignModeSingleUse {
-		if _, err := tx.Exec(ctx, `
-UPDATE reward_code_batches
-SET revoked_at = $2, revoked_by = $3
-WHERE campaign_id = $1 AND revoked_at IS NULL`, campaign.ID, revokedAt, metadata.ActorID()); err != nil {
-			return Campaign{}, fmt.Errorf("revoke cancelled reward Code Batches: %w", err)
-		}
-	}
-	if err := insertAdminAction(ctx, tx, campaign.ID, "cancel_campaign", metadata, map[string]any{
-		"revoked_code_count": result.RowsAffected(),
-	}); err != nil {
-		return Campaign{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return Campaign{}, fmt.Errorf("commit reward campaign cancellation: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) Redeem(ctx context.Context, command RedeemCommand) (RedeemResult, error) {
-	if command.UserID <= 0 {
-		return RedeemResult{}, ErrInvalidCommand
-	}
-	if s == nil || s.credits == nil {
-		return RedeemResult{}, fmt.Errorf("rewards credit service unavailable")
-	}
-	if _, err := s.credits.GetWallet(ctx, command.UserID); err != nil {
-		if errors.Is(err, credits.ErrWalletNotFound) {
-			slog.Error("reward redemption Wallet is missing")
-		}
-		return RedeemResult{}, err
-	}
-	normalized, err := normalizeCode(command.Code)
-	if err != nil {
-		return RedeemResult{}, ErrCodeUnavailable
-	}
-	candidates := s.keyring.lookupDigests(normalized)
+	command RedeemCommand,
+	candidates []codeDigest,
+) (RedeemResult, bool, error) {
 	current, previous := splitCodeDigestCandidates(candidates)
-
 	tx, err := s.begin(ctx)
 	if err != nil {
-		return RedeemResult{}, err
+		return RedeemResult{}, false, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	var codeID, campaignID int64
-	var codeHint string
-	err = tx.QueryRow(ctx, `
-SELECT id, campaign_id, code_hint
+	var rewardCode RewardCode
+	err = scanRewardCode(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`
 FROM reward_codes
-WHERE (key_version = $1 AND code_digest = $2)
-   OR ($3 <> '' AND key_version = $3 AND code_digest = $4)
-ORDER BY CASE WHEN key_version = $1 THEN 0 ELSE 1 END
-LIMIT 1`, current.version, current.digest, previous.version, previous.digest).Scan(&codeID, &campaignID, &codeHint)
+WHERE id = (
+  SELECT reward_code_id
+  FROM reward_code_digest_aliases
+  WHERE (key_version = $1 AND code_digest = $2)
+     OR ($3 <> '' AND key_version = $3 AND code_digest = $4)
+  ORDER BY CASE WHEN key_version = $1 THEN 0 ELSE 1 END
+  LIMIT 1
+)
+FOR UPDATE`, current.version, current.digest, previous.version, previous.digest), &rewardCode, s.currentTime())
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RedeemResult{}, false, nil
+	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return RedeemResult{}, ErrCodeUnavailable
-		}
-		return RedeemResult{}, fmt.Errorf("lookup reward code: %w", err)
+		return RedeemResult{}, true, fmt.Errorf("lock reward Code: %w", err)
 	}
-
-	var campaign Campaign
-	if err := scanCampaign(tx.QueryRow(ctx, `SELECT `+campaignProjectionSQL+`
-FROM reward_campaigns
-WHERE id = $1
-FOR UPDATE`, campaignID), &campaign, s.currentTime()); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return RedeemResult{}, ErrCodeUnavailable
-		}
-		return RedeemResult{}, fmt.Errorf("lock reward campaign: %w", err)
-	}
-	var lockedCodeID int64
-	var revokedAt *time.Time
-	err = tx.QueryRow(ctx, `
-SELECT id, revoked_at
-FROM reward_codes
-WHERE id = $1 AND campaign_id = $2
-FOR UPDATE`, codeID, campaign.ID).Scan(&lockedCodeID, &revokedAt)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return RedeemResult{}, ErrCodeUnavailable
-		}
-		return RedeemResult{}, fmt.Errorf("lock reward code: %w", err)
-	}
-
-	redemption, found, err := findRedemption(ctx, tx, command.UserID, campaign.ID)
-	if err != nil {
-		return RedeemResult{}, err
-	}
-	if found {
-		if redemption.CodeID != codeID {
-			return RedeemResult{}, ErrAlreadyRedeemed
-		}
+	var redemption Redemption
+	err = tx.QueryRow(ctx, `SELECT id, reward_code_id, user_id, credit_amount,
+       credit_transaction_id, available_balance_after, redeemed_at
+FROM reward_redemptions
+WHERE user_id = $1 AND reward_code_id = $2`, command.UserID, rewardCode.ID).Scan(
+		&redemption.ID, &redemption.RewardCodeID, &redemption.UserID, &redemption.CreditAmount,
+		&redemption.CreditTransactionID, &redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
+	)
+	if err == nil {
 		if err := tx.Rollback(ctx); err != nil {
-			return RedeemResult{}, fmt.Errorf("release reward replay locks: %w", err)
+			return RedeemResult{}, true, fmt.Errorf("release reward Code replay lock: %w", err)
 		}
 		wallet, err := s.credits.GetWallet(ctx, command.UserID)
 		if err != nil {
-			return RedeemResult{}, fmt.Errorf("read reward replay Wallet: %w", err)
+			return RedeemResult{}, true, fmt.Errorf("read reward Code replay Wallet: %w", err)
 		}
-		return RedeemResult{
-			Redemption: redemption, HistoryItem: redemptionHistoryItem(redemption, campaign, codeHint),
-			CreditedAmount:   redemption.CreditAmount,
-			AvailableBalance: wallet.Available, Replayed: true,
-		}, nil
+		return canonicalRedeemResult(redemption, rewardCode, wallet.Available, true), true, nil
 	}
-	if campaign.Mode == CampaignModeSingleUse {
-		var codeRedeemed bool
-		if err := tx.QueryRow(ctx,
-			`SELECT EXISTS (SELECT 1 FROM reward_redemptions WHERE code_id = $1)`, codeID,
-		).Scan(&codeRedeemed); err != nil {
-			return RedeemResult{}, fmt.Errorf("check single-use reward Code redemption: %w", err)
-		}
-		if codeRedeemed {
-			return RedeemResult{}, ErrCodeUnavailable
-		}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return RedeemResult{}, true, fmt.Errorf("find reward Code redemption: %w", err)
 	}
-	now := s.currentTime()
-	if revokedAt != nil || campaign.LifecycleStatus != CampaignLifecycleActive ||
-		(campaign.StartsAt != nil && now.Before(*campaign.StartsAt)) ||
-		(campaign.ExpiresAt != nil && !now.Before(*campaign.ExpiresAt)) {
-		return RedeemResult{}, ErrCodeUnavailable
+	if rewardCode.Status != RewardCodeStatusEnabled {
+		return RedeemResult{}, true, ErrCodeUnavailable
 	}
 	var redemptionID int64
-	if err := tx.QueryRow(ctx,
-		`SELECT nextval(pg_get_serial_sequence('reward_redemptions', 'id'))`,
-	).Scan(&redemptionID); err != nil {
-		return RedeemResult{}, fmt.Errorf("allocate reward redemption id: %w", err)
+	if err := tx.QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('reward_redemptions', 'id'))`).Scan(&redemptionID); err != nil {
+		return RedeemResult{}, true, fmt.Errorf("allocate reward Code redemption id: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `
-UPDATE reward_campaigns
+	result, err := tx.Exec(ctx, `UPDATE reward_codes
 SET redemption_count = redemption_count + 1
-WHERE id = $1 AND status = 'active'
-  AND (max_redemptions = 0 OR redemption_count < max_redemptions)`, campaign.ID); err != nil {
-		return RedeemResult{}, fmt.Errorf("reserve reward campaign capacity: %w", err)
-	}
-	var reserved bool
-	if err := tx.QueryRow(ctx,
-		`SELECT (max_redemptions = 0 OR redemption_count <= max_redemptions) AND redemption_count > $2 FROM reward_campaigns WHERE id = $1`,
-		campaign.ID, campaign.RedemptionCount,
-	).Scan(&reserved); err != nil {
-		return RedeemResult{}, fmt.Errorf("verify reward campaign capacity: %w", err)
-	}
-	if !reserved {
-		return RedeemResult{}, ErrCampaignExhausted
-	}
-	amount, err := credits.NewCreditAmount(campaign.CreditAmount)
+WHERE id = $1 AND enabled = TRUE
+  AND (expires_at IS NULL OR expires_at > $2)
+  AND (max_redemptions = 0 OR redemption_count < max_redemptions)`, rewardCode.ID, s.currentTime())
 	if err != nil {
-		return RedeemResult{}, errors.Join(ErrInvalidCommand, err)
+		return RedeemResult{}, true, fmt.Errorf("reserve reward Code capacity: %w", err)
 	}
-	redemptionReference := strconv.FormatInt(redemptionID, 10)
+	if result.RowsAffected() != 1 {
+		return RedeemResult{}, true, ErrCodeUnavailable
+	}
+	amount, err := credits.NewCreditAmount(rewardCode.CreditAmount)
+	if err != nil {
+		return RedeemResult{}, true, errors.Join(ErrInvalidCommand, err)
+	}
+	reference := strconv.FormatInt(redemptionID, 10)
 	grant, err := s.credits.InTx(tx).Grant(ctx, credits.GrantCommand{
 		UserID: command.UserID,
 		Amount: amount,
 		Metadata: credits.CommandMetadata{
-			IdempotencyKey:    "reward-redemption:" + redemptionReference,
+			IdempotencyKey:    "reward-code-redemption:" + reference,
 			Actor:             credits.Actor{Type: credits.ActorUser, ID: strconv.FormatInt(command.UserID, 10)},
 			Source:            "reward_redemption",
 			Reason:            "兑换奖励",
-			BusinessReference: credits.BusinessReference{Type: "reward_redemption", ID: redemptionReference},
+			BusinessReference: credits.BusinessReference{Type: "reward_code_redemption", ID: "rc:" + reference},
 		},
 	})
 	if err != nil {
-		return RedeemResult{}, err
+		return RedeemResult{}, true, err
 	}
-	err = tx.QueryRow(ctx, `
-INSERT INTO reward_redemptions (
-  id, campaign_id, code_id, user_id, credit_amount,
-  credit_transaction_id, available_balance_after
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, campaign_id, code_id, user_id, credit_amount,
-          credit_transaction_id, available_balance_after, redeemed_at`,
-		redemptionID, campaign.ID, codeID, command.UserID, campaign.CreditAmount,
+	err = tx.QueryRow(ctx, `INSERT INTO reward_redemptions (
+  id, reward_code_id, user_id, credit_amount, credit_transaction_id, available_balance_after
+) VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, reward_code_id, user_id, credit_amount, credit_transaction_id, available_balance_after, redeemed_at`,
+		redemptionID, rewardCode.ID, command.UserID, rewardCode.CreditAmount,
 		grant.TransactionID, grant.Wallet.Available,
 	).Scan(
-		&redemption.ID, &redemption.CampaignID, &redemption.CodeID, &redemption.UserID,
-		&redemption.CreditAmount, &redemption.CreditTransactionID,
-		&redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
+		&redemption.ID, &redemption.RewardCodeID, &redemption.UserID, &redemption.CreditAmount,
+		&redemption.CreditTransactionID, &redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
 	)
 	if err != nil {
-		return RedeemResult{}, fmt.Errorf("record reward redemption: %w", err)
+		return RedeemResult{}, true, fmt.Errorf("record reward Code redemption: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return RedeemResult{}, fmt.Errorf("commit reward redemption: %w", err)
+		return RedeemResult{}, true, fmt.Errorf("commit reward Code redemption: %w", err)
 	}
+	return canonicalRedeemResult(redemption, rewardCode, grant.Wallet.Available, false), true, nil
+}
+
+func canonicalRedeemResult(redemption Redemption, rewardCode RewardCode, balance int64, replayed bool) RedeemResult {
 	return RedeemResult{
-		Redemption: redemption, HistoryItem: redemptionHistoryItem(redemption, campaign, codeHint),
-		CreditedAmount:   campaign.CreditAmount,
-		AvailableBalance: grant.Wallet.Available,
-	}, nil
-}
-
-func redemptionHistoryItem(
-	redemption Redemption,
-	campaign Campaign,
-	codeHint string,
-) RedemptionHistoryItem {
-	return RedemptionHistoryItem{
-		ID:                  redemption.ID,
-		CampaignDisplayName: campaign.DisplayName,
-		CreditedAmount:      redemption.CreditAmount,
-		MaskedCodeHint:      maskedCodeHintPrefix + codeHint,
-		RedeemedAt:          redemption.RedeemedAt,
+		Redemption: redemption,
+		HistoryItem: RedemptionHistoryItem{
+			ID: redemption.ID, RewardCodeDisplayName: rewardCode.DisplayName,
+			CreditedAmount: redemption.CreditAmount, MaskedCodeHint: rewardCode.MaskedCodeHint,
+			RedeemedAt: redemption.RedeemedAt,
+		},
+		CreditedAmount: redemption.CreditAmount, AvailableBalance: balance, Replayed: replayed,
 	}
 }
 
-func (s *Service) ListRedemptions(
-	ctx context.Context,
-	input ListRedemptionsInput,
-) (RedemptionHistoryPage, error) {
-	if s == nil || s.pool == nil || input.UserID <= 0 || input.BeforeID < 0 {
-		return RedemptionHistoryPage{}, ErrInvalidCommand
-	}
-	limit := input.Limit
-	if limit == 0 {
-		limit = defaultRedemptionHistoryLimit
-	}
-	if limit < 1 || limit > maxRedemptionHistoryLimit {
-		return RedemptionHistoryPage{}, ErrInvalidCommand
-	}
-	rows, err := s.pool.Query(ctx, redemptionHistorySQL, input.UserID, input.BeforeID, limit+1)
-	if err != nil {
-		return RedemptionHistoryPage{}, fmt.Errorf("list reward Redemption history: %w", err)
-	}
-	defer rows.Close()
-	items := make([]RedemptionHistoryItem, 0, limit+1)
-	for rows.Next() {
-		var item RedemptionHistoryItem
-		var codeHint string
-		if err := rows.Scan(
-			&item.ID,
-			&item.CampaignDisplayName,
-			&item.CreditedAmount,
-			&codeHint,
-			&item.RedeemedAt,
-		); err != nil {
-			return RedemptionHistoryPage{}, fmt.Errorf("scan reward Redemption history: %w", err)
-		}
-		item.MaskedCodeHint = maskedCodeHintPrefix + codeHint
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return RedemptionHistoryPage{}, fmt.Errorf("read reward Redemption history: %w", err)
-	}
-	page := RedemptionHistoryPage{Redemptions: items}
-	if len(items) > limit {
-		page.Redemptions = items[:limit]
-		page.NextBeforeID = page.Redemptions[len(page.Redemptions)-1].ID
-	}
-	return page, nil
-}
-
-func splitCodeDigestCandidates(candidates []codeDigest) (codeDigest, codeDigest) {
-	current := candidates[0]
-	if len(candidates) == 1 {
-		return current, codeDigest{}
-	}
-	return current, candidates[1]
-}
-
-func (s *Service) GetCampaign(ctx context.Context, campaignID int64) (Campaign, error) {
-	if s == nil || s.pool == nil || campaignID <= 0 {
-		return Campaign{}, ErrCampaignNotFound
-	}
-	var campaign Campaign
-	if err := scanCampaign(s.pool.QueryRow(ctx, `SELECT `+campaignProjectionSQL+`
-FROM reward_campaigns
-WHERE id = $1`, campaignID), &campaign, s.currentTime()); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Campaign{}, ErrCampaignNotFound
-		}
-		return Campaign{}, fmt.Errorf("get reward campaign: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) ListCampaigns(ctx context.Context, input ListCampaignsInput) (CampaignPage, error) {
-	if s == nil || s.pool == nil {
-		return CampaignPage{}, fmt.Errorf("rewards service unavailable")
-	}
-	if input.Limit == 0 {
-		input.Limit = 20
-	}
-	input.Search = strings.TrimSpace(input.Search)
-	if input.BeforeID < 0 || input.Limit < 1 || input.Limit > 100 ||
-		utf8.RuneCountInString(input.Search) > 120 || !validCampaignModeFilter(input.Mode) ||
-		!validCampaignStatusFilter(input.Status) {
-		return CampaignPage{}, ErrInvalidCommand
-	}
-	now := s.currentTime()
-	rows, err := s.pool.Query(ctx, campaignListSQL,
-		input.BeforeID, input.Limit+1, input.Search, input.Mode, input.Status, now)
-	if err != nil {
-		return CampaignPage{}, fmt.Errorf("list reward campaigns: %w", err)
-	}
-	defer rows.Close()
-	campaigns := make([]Campaign, 0, input.Limit+1)
-	for rows.Next() {
-		var campaign Campaign
-		if err := scanCampaign(rows, &campaign, now); err != nil {
-			return CampaignPage{}, fmt.Errorf("scan reward campaign: %w", err)
-		}
-		campaigns = append(campaigns, campaign)
-	}
-	if err := rows.Err(); err != nil {
-		return CampaignPage{}, fmt.Errorf("read reward campaigns: %w", err)
-	}
-	page := CampaignPage{Campaigns: campaigns}
-	if len(campaigns) > input.Limit {
-		page.Campaigns = campaigns[:input.Limit]
-		page.NextBeforeID = page.Campaigns[len(page.Campaigns)-1].ID
-	}
-	return page, nil
-}
-
-func (s *Service) LookupCode(ctx context.Context, rawCode string) (AdminCodeMetadata, error) {
-	if s == nil || s.pool == nil {
-		return AdminCodeMetadata{}, fmt.Errorf("rewards service unavailable")
-	}
-	normalized, err := normalizeCode(rawCode)
-	if err != nil {
-		return AdminCodeMetadata{}, err
-	}
-	return s.lookupCode(ctx, s.pool, s.keyring.lookupDigests(normalized))
-}
-
-func (s *Service) ListAdminRedemptions(
-	ctx context.Context,
-	input ListAdminRedemptionsInput,
-) (AdminRedemptionPage, error) {
-	if s == nil || s.pool == nil || input.CampaignID <= 0 {
-		return AdminRedemptionPage{}, ErrInvalidCommand
-	}
-	if input.Limit == 0 {
-		input.Limit = defaultRedemptionHistoryLimit
-	}
-	if input.BeforeID < 0 || input.Limit < 1 || input.Limit > maxRedemptionHistoryLimit {
-		return AdminRedemptionPage{}, ErrInvalidCommand
-	}
-	rows, err := s.pool.Query(ctx, adminRedemptionListSQL,
-		input.CampaignID, input.BeforeID, input.Limit+1, maskedCodeHintPrefix)
-	if err != nil {
-		return AdminRedemptionPage{}, fmt.Errorf("list Admin reward Redemptions: %w", err)
-	}
-	defer rows.Close()
-	redemptions := make([]AdminRedemption, 0, input.Limit+1)
-	for rows.Next() {
-		var redemption AdminRedemption
-		if err := rows.Scan(
-			&redemption.ID, &redemption.UserID, &redemption.CreditAmount,
-			&redemption.MaskedCodeHint, &redemption.CreditTransactionID, &redemption.RedeemedAt,
-		); err != nil {
-			return AdminRedemptionPage{}, fmt.Errorf("scan Admin reward Redemption: %w", err)
-		}
-		redemptions = append(redemptions, redemption)
-	}
-	if err := rows.Err(); err != nil {
-		return AdminRedemptionPage{}, fmt.Errorf("read Admin reward Redemptions: %w", err)
-	}
-	page := AdminRedemptionPage{Redemptions: redemptions}
-	if len(redemptions) > input.Limit {
-		page.Redemptions = redemptions[:input.Limit]
-		page.NextBeforeID = page.Redemptions[len(page.Redemptions)-1].ID
-	}
-	return page, nil
-}
-
-type rewardCodeQuerier interface {
-	QueryRow(context.Context, string, ...any) pgx.Row
-}
-
-func (s *Service) lookupCode(
-	ctx context.Context,
-	querier rewardCodeQuerier,
-	candidates []codeDigest,
-) (AdminCodeMetadata, error) {
-	if len(candidates) == 0 {
-		return AdminCodeMetadata{}, ErrCodeNotFound
-	}
-	previousVersion := ""
-	previousDigest := []byte(nil)
-	if len(candidates) > 1 {
-		previousVersion = candidates[1].version
-		previousDigest = candidates[1].digest
-	}
-	var code AdminCodeMetadata
-	err := querier.QueryRow(ctx, adminCodeLookupSQL,
-		candidates[0].version, candidates[0].digest,
-		previousVersion, previousDigest, maskedCodeHintPrefix,
-	).Scan(
-		&code.ID, &code.CampaignID, &code.CampaignDisplayName, &code.BatchID,
-		&code.MaskedCodeHint, &code.Status, &code.IssuedAt, &code.RevokedAt,
-		&code.RedemptionID, &code.RedeemedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return AdminCodeMetadata{}, ErrCodeNotFound
-	}
-	if err != nil {
-		return AdminCodeMetadata{}, fmt.Errorf("lookup reward Code: %w", err)
-	}
-	return code, nil
-}
-
-func (s *Service) RevokeCode(ctx context.Context, command RevokeCodeCommand) (AdminCodeMetadata, error) {
-	metadata, err := adminaction.New(command.ActorUserID, command.Reason)
-	if err != nil || command.CodeID <= 0 || !command.Confirmed {
-		return AdminCodeMetadata{}, errors.Join(ErrInvalidCommand, err)
-	}
-	tx, err := s.begin(ctx)
-	if err != nil {
-		return AdminCodeMetadata{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	var campaignID int64
-	if err := tx.QueryRow(ctx, `SELECT campaign_id FROM reward_codes WHERE id = $1`, command.CodeID).Scan(&campaignID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return AdminCodeMetadata{}, ErrCodeNotFound
-		}
-		return AdminCodeMetadata{}, fmt.Errorf("find reward Code Campaign: %w", err)
-	}
-	if _, err := s.lockCampaign(ctx, tx, campaignID); err != nil {
-		return AdminCodeMetadata{}, err
-	}
-	var batchID *int64
-	var hint string
-	var revokedAt *time.Time
-	var redeemed bool
-	err = tx.QueryRow(ctx, `
-SELECT codes.batch_id, codes.code_hint, codes.revoked_at,
-       EXISTS (SELECT 1 FROM reward_redemptions WHERE code_id = codes.id)
-FROM reward_codes codes
-WHERE codes.id = $1 AND codes.campaign_id = $2
-FOR UPDATE`, command.CodeID, campaignID).Scan(&batchID, &hint, &revokedAt, &redeemed)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return AdminCodeMetadata{}, ErrCodeNotFound
-		}
-		return AdminCodeMetadata{}, fmt.Errorf("lock reward Code: %w", err)
-	}
-	if revokedAt != nil {
-		code, err := lookupCodeByID(ctx, tx, command.CodeID)
-		if err != nil {
-			return AdminCodeMetadata{}, err
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			return AdminCodeMetadata{}, fmt.Errorf("release reward Code replay lock: %w", err)
-		}
-		return code, nil
-	}
-	if redeemed {
-		return AdminCodeMetadata{}, ErrCodeAlreadyRedeemed
-	}
-	revokedAtValue := s.currentTime()
-	if _, err := tx.Exec(ctx, `
-UPDATE reward_codes
-SET revoked_at = $2, revoked_by = $3
-WHERE id = $1 AND revoked_at IS NULL`, command.CodeID, revokedAtValue, metadata.ActorID()); err != nil {
-		return AdminCodeMetadata{}, fmt.Errorf("revoke reward Code: %w", err)
-	}
-	if err := insertAdminAction(ctx, tx, campaignID, "revoke_code", metadata, map[string]any{
-		"code_id": command.CodeID, "batch_id": batchID, "masked_code_hint": maskedCodeHintPrefix + hint,
-	}); err != nil {
-		return AdminCodeMetadata{}, err
-	}
-	code, err := lookupCodeByID(ctx, tx, command.CodeID)
-	if err != nil {
-		return AdminCodeMetadata{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return AdminCodeMetadata{}, fmt.Errorf("commit reward Code revocation: %w", err)
-	}
-	return code, nil
-}
-
-func lookupCodeByID(ctx context.Context, querier rewardCodeQuerier, codeID int64) (AdminCodeMetadata, error) {
-	var code AdminCodeMetadata
-	err := querier.QueryRow(ctx, `
-SELECT codes.id, codes.campaign_id, campaigns.display_name, codes.batch_id,
-       $2 || codes.code_hint,
-       CASE
-         WHEN redemption.id IS NOT NULL THEN 'redeemed'
-         WHEN codes.revoked_at IS NOT NULL THEN 'revoked'
-         ELSE 'available'
-       END,
-       codes.issued_at, codes.revoked_at, redemption.id, redemption.redeemed_at
-FROM reward_codes codes
-JOIN reward_campaigns campaigns ON campaigns.id = codes.campaign_id
-LEFT JOIN LATERAL (
-  SELECT id, redeemed_at
-  FROM reward_redemptions
-  WHERE code_id = codes.id
-  ORDER BY id DESC
-  LIMIT 1
-) redemption ON TRUE
-WHERE codes.id = $1`, codeID, maskedCodeHintPrefix).Scan(
-		&code.ID, &code.CampaignID, &code.CampaignDisplayName, &code.BatchID,
-		&code.MaskedCodeHint, &code.Status, &code.IssuedAt, &code.RevokedAt,
-		&code.RedemptionID, &code.RedeemedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return AdminCodeMetadata{}, ErrCodeNotFound
-	}
-	if err != nil {
-		return AdminCodeMetadata{}, fmt.Errorf("read reward Code metadata: %w", err)
-	}
-	return code, nil
-}
-
-func validCampaignModeFilter(mode CampaignMode) bool {
-	return mode == "" || mode == CampaignModePublic || mode == CampaignModeSingleUse
-}
-
-func validCampaignStatusFilter(status CampaignStatus) bool {
-	switch status {
-	case "", CampaignStatusDraft, CampaignStatusCancelled, CampaignStatusExpired,
-		CampaignStatusExhausted, CampaignStatusPaused, CampaignStatusScheduled, CampaignStatusActive:
-		return true
-	default:
-		return false
-	}
-}
-
-func normalizeCampaignSchedule(startsAt, expiresAt *time.Time) (*time.Time, *time.Time, error) {
-	startsAt = cloneCampaignTime(startsAt)
-	expiresAt = cloneCampaignTime(expiresAt)
-	if startsAt != nil && expiresAt != nil && !startsAt.Before(*expiresAt) {
-		return nil, nil, ErrInvalidCommand
-	}
-	return startsAt, expiresAt, nil
-}
-
-func cloneCampaignTime(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	cloned := value.UTC().Truncate(time.Millisecond)
-	return &cloned
-}
-
-func campaignRulesChanged(
-	campaign Campaign,
+func rewardCodeCreateFingerprint(
 	displayName string,
 	creditAmount int64,
 	maxRedemptions int64,
-	startsAt *time.Time,
 	expiresAt *time.Time,
-) bool {
-	return campaign.DisplayName != displayName ||
-		campaign.CreditAmount != creditAmount ||
-		campaign.MaxRedemptions != maxRedemptions ||
-		!sameCampaignTime(campaign.StartsAt, startsAt) ||
-		!sameCampaignTime(campaign.ExpiresAt, expiresAt)
+) ([]byte, error) {
+	payload, err := json.Marshal(struct {
+		DisplayName    string     `json:"display_name"`
+		CreditAmount   int64      `json:"credit_amount"`
+		MaxRedemptions int64      `json:"max_redemptions"`
+		ExpiresAt      *time.Time `json:"expires_at"`
+	}{displayName, creditAmount, maxRedemptions, expiresAt})
+	if err != nil {
+		return nil, err
+	}
+	fingerprint := sha256.Sum256(payload)
+	return fingerprint[:], nil
 }
 
-func sameCampaignTime(left, right *time.Time) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return left.Equal(*right)
-}
-
-func deriveCampaignStatus(campaign Campaign, now time.Time) CampaignStatus {
-	switch campaign.LifecycleStatus {
-	case CampaignLifecycleDraft:
-		return CampaignStatusDraft
-	case CampaignLifecycleCancelled:
-		return CampaignStatusCancelled
-	case CampaignLifecyclePaused:
-		// Time and capacity remain higher-precedence facts than an operational pause.
-	}
-	if campaign.ExpiresAt != nil && !now.Before(*campaign.ExpiresAt) {
-		return CampaignStatusExpired
-	}
-	if campaign.MaxRedemptions > 0 && campaign.RedemptionCount >= campaign.MaxRedemptions {
-		return CampaignStatusExhausted
-	}
-	if campaign.IssuedCodeCount > 0 && campaign.ValidUnusedCodeCount == 0 {
-		return CampaignStatusExhausted
-	}
-	if campaign.LifecycleStatus == CampaignLifecyclePaused {
-		return CampaignStatusPaused
-	}
-	if campaign.StartsAt != nil && now.Before(*campaign.StartsAt) {
-		return CampaignStatusScheduled
-	}
-	return CampaignStatusActive
-}
-
-func (s *Service) currentTime() time.Time {
-	if s != nil && s.now != nil {
-		return s.now().UTC()
-	}
-	return time.Now().UTC()
-}
-
-func (s *Service) lockCampaign(ctx context.Context, tx pgx.Tx, campaignID int64) (Campaign, error) {
-	var campaign Campaign
-	if err := scanCampaign(tx.QueryRow(ctx, `SELECT `+campaignProjectionSQL+`
-FROM reward_campaigns
-WHERE id = $1
-FOR UPDATE`, campaignID), &campaign, s.currentTime()); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Campaign{}, ErrCampaignNotFound
-		}
-		return Campaign{}, fmt.Errorf("lock reward campaign: %w", err)
-	}
-	return campaign, nil
-}
-
-func (s *Service) updateCampaignLifecycle(
+func rewardCodeReplayMatches(
 	ctx context.Context,
 	tx pgx.Tx,
-	campaign *Campaign,
-	status CampaignLifecycleStatus,
-) error {
-	if err := scanCampaign(tx.QueryRow(ctx, `
-UPDATE reward_campaigns
-SET status = $2
-WHERE id = $1
-RETURNING `+campaignProjectionSQL, campaign.ID, status), campaign, s.currentTime()); err != nil {
-		return fmt.Errorf("update reward campaign lifecycle: %w", err)
+	rewardCodeID int64,
+	persistedFingerprint []byte,
+	expectedFingerprint []byte,
+	digests []codeDigest,
+) (bool, error) {
+	if !bytes.Equal(persistedFingerprint, expectedFingerprint) {
+		return false, nil
 	}
-	return nil
+	current, previous := splitCodeDigestCandidates(digests)
+	var aliasMatches bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (
+  SELECT 1
+  FROM reward_code_digest_aliases
+  WHERE reward_code_id = $1
+    AND ((key_version = $2 AND code_digest = $3)
+      OR ($4 <> '' AND key_version = $4 AND code_digest = $5))
+)`, rewardCodeID, current.version, current.digest, previous.version, previous.digest).Scan(&aliasMatches); err != nil {
+		return false, fmt.Errorf("verify idempotent reward Code creation: %w", err)
+	}
+	return aliasMatches, nil
 }
 
-type rowScanner interface {
-	Scan(...any) error
-}
-
-func scanCampaign(row rowScanner, campaign *Campaign, now time.Time) error {
+func scanRewardCode(row rowScanner, rewardCode *RewardCode, now time.Time) error {
+	var hint string
 	if err := row.Scan(
-		&campaign.ID, &campaign.DisplayName, &campaign.InternalNote, &campaign.CreditAmount,
-		&campaign.Mode, &campaign.LifecycleStatus, &campaign.MaxRedemptions, &campaign.RedemptionCount,
-		&campaign.IssuedCodeCount, &campaign.ValidUnusedCodeCount,
-		&campaign.StartsAt, &campaign.ExpiresAt,
-		&campaign.CreatedBy, &campaign.CreatedAt, &campaign.UpdatedAt,
+		&rewardCode.ID, &rewardCode.DisplayName, &hint, &rewardCode.CreditAmount,
+		&rewardCode.MaxRedemptions, &rewardCode.RedemptionCount, &rewardCode.ExpiresAt,
+		&rewardCode.Enabled, &rewardCode.CreatedBy, &rewardCode.CreatedAt, &rewardCode.UpdatedAt,
 	); err != nil {
 		return err
 	}
-	campaign.Status = deriveCampaignStatus(*campaign, now)
+	rewardCode.MaskedCodeHint = maskedCodeHintPrefix + hint
+	rewardCode.Status = deriveRewardCodeStatus(*rewardCode, now)
 	return nil
 }
 
-func findRedemption(ctx context.Context, tx pgx.Tx, userID, campaignID int64) (Redemption, bool, error) {
-	var redemption Redemption
-	err := tx.QueryRow(ctx, `
-SELECT id, campaign_id, code_id, user_id, credit_amount,
-       credit_transaction_id, available_balance_after, redeemed_at
-FROM reward_redemptions
-WHERE user_id = $1 AND campaign_id = $2`, userID, campaignID).Scan(
-		&redemption.ID, &redemption.CampaignID, &redemption.CodeID, &redemption.UserID,
-		&redemption.CreditAmount, &redemption.CreditTransactionID,
-		&redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Redemption{}, false, nil
+func scanRewardCodeWithFingerprint(row rowScanner, rewardCode *RewardCode, fingerprint *[]byte, now time.Time) error {
+	var hint string
+	if err := row.Scan(
+		&rewardCode.ID, &rewardCode.DisplayName, &hint, &rewardCode.CreditAmount,
+		&rewardCode.MaxRedemptions, &rewardCode.RedemptionCount, &rewardCode.ExpiresAt,
+		&rewardCode.Enabled, &rewardCode.CreatedBy, &rewardCode.CreatedAt, &rewardCode.UpdatedAt,
+		fingerprint,
+	); err != nil {
+		return err
 	}
-	if err != nil {
-		return Redemption{}, false, fmt.Errorf("find reward redemption replay: %w", err)
-	}
-	return redemption, true, nil
-}
-
-func (s *Service) begin(ctx context.Context) (pgx.Tx, error) {
-	if s == nil || s.pool == nil {
-		return nil, fmt.Errorf("rewards service unavailable")
-	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin rewards transaction: %w", err)
-	}
-	return tx, nil
-}
-
-func insertAdminAction(
-	ctx context.Context,
-	tx pgx.Tx,
-	campaignID int64,
-	actionType string,
-	metadata adminaction.Metadata,
-	actionMetadata map[string]any,
-) error {
-	encoded, err := json.Marshal(actionMetadata)
-	if err != nil {
-		return fmt.Errorf("encode reward Admin action: %w", err)
-	}
-	_, err = tx.Exec(ctx, `
-INSERT INTO reward_admin_actions (
-  campaign_id, action_type, actor_user_id, reason, metadata
-) VALUES ($1, $2, $3, $4, $5::JSONB)`,
-		campaignID, actionType, metadata.ActorID(), metadata.Reason(), string(encoded),
-	)
-	if err != nil {
-		return fmt.Errorf("record reward Admin action: %w", err)
-	}
+	rewardCode.MaskedCodeHint = maskedCodeHintPrefix + hint
+	rewardCode.Status = deriveRewardCodeStatus(*rewardCode, now)
 	return nil
+}
+
+func deriveRewardCodeStatus(rewardCode RewardCode, now time.Time) RewardCodeStatus {
+	if rewardCode.ExpiresAt != nil && !now.Before(*rewardCode.ExpiresAt) {
+		return RewardCodeStatusExpired
+	}
+	if rewardCode.MaxRedemptions > 0 && rewardCode.RedemptionCount >= rewardCode.MaxRedemptions {
+		return RewardCodeStatusExhausted
+	}
+	if !rewardCode.Enabled {
+		return RewardCodeStatusDisabled
+	}
+	return RewardCodeStatusEnabled
 }

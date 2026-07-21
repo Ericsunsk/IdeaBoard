@@ -12,7 +12,7 @@ const loadMoreMock = vi.hoisted(() => vi.fn())
 const historyMock = vi.hoisted(() => ({
   redemptions: [] as Array<{
     id: number
-    campaign_display_name: string
+    reward_code_display_name: string
     credited_amount: number
     masked_code_hint: string
     redeemed_at: string
@@ -124,14 +124,14 @@ describe('UserRewardsPane', () => {
     historyMock.redemptions = [
       {
         id: 41,
-        campaign_display_name: '夏日灵感奖励',
+        reward_code_display_name: '夏日灵感奖励',
         credited_amount: 80,
         masked_code_hint: '•••• 2026',
         redeemed_at: '2026-07-15T10:00:00Z',
       },
       {
         id: 40,
-        campaign_display_name: '内测奖励',
+        reward_code_display_name: '内测奖励',
         credited_amount: 1,
         masked_code_hint: '•••• 0001',
         redeemed_at: '2026-07-14T16:05:06Z',
@@ -164,7 +164,7 @@ describe('UserRewardsPane', () => {
     historyMock.redemptions = [
       {
         id: 41,
-        campaign_display_name: '夏日灵感奖励',
+        reward_code_display_name: '夏日灵感奖励',
         credited_amount: 80,
         masked_code_hint: '•••• 2026',
         redeemed_at: '2026-07-15T10:00:00Z',

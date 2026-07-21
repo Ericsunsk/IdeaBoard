@@ -20,7 +20,7 @@ const RewardsHost = defineComponent({
   template: `
     <button type="button" @click="loadMore()">加载更多</button>
     <button type="button" @click="retryInitial()">重新加载</button>
-    <output data-testid="campaigns">{{ redemptions.map((item) => item.campaign_display_name).join(',') }}</output>
+    <output data-testid="reward-codes">{{ redemptions.map((item) => item.reward_code_display_name).join(',') }}</output>
     <output data-testid="initial-error">{{ initialError?.message }}</output>
     <output data-testid="load-more-error">{{ loadMoreError?.message }}</output>
     <output data-testid="has-more">{{ hasNextPage }}</output>
@@ -36,7 +36,7 @@ describe('useUserRewardRedemptions', () => {
       .mockResolvedValueOnce(buildPage('新用户奖励'))
     const { user } = renderRewardsHost()
 
-    await waitFor(() => expect(screen.getByTestId('campaigns')).toHaveTextContent('夏日灵感奖励'))
+    await waitFor(() => expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励'))
     expect(fetchUserRewardRedemptionsMock).toHaveBeenNthCalledWith(
       1,
       { limit: 20 },
@@ -46,7 +46,7 @@ describe('useUserRewardRedemptions', () => {
     await user.click(screen.getByRole('button', { name: '加载更多' }))
 
     await waitFor(() =>
-      expect(screen.getByTestId('campaigns')).toHaveTextContent('夏日灵感奖励,新用户奖励'),
+      expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励,新用户奖励'),
     )
     expect(fetchUserRewardRedemptionsMock).toHaveBeenNthCalledWith(
       2,
@@ -67,7 +67,7 @@ describe('useUserRewardRedemptions', () => {
       expect(screen.getByTestId('initial-error')).toHaveTextContent('首次加载失败'),
     )
     await user.click(screen.getByRole('button', { name: '重新加载' }))
-    await waitFor(() => expect(screen.getByTestId('campaigns')).toHaveTextContent('夏日灵感奖励'))
+    await waitFor(() => expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励'))
 
     await user.click(screen.getByRole('button', { name: '加载更多' }))
     await waitFor(() =>
@@ -75,7 +75,7 @@ describe('useUserRewardRedemptions', () => {
     )
     await user.click(screen.getByRole('button', { name: '加载更多' }))
     await waitFor(() =>
-      expect(screen.getByTestId('campaigns')).toHaveTextContent('夏日灵感奖励,新用户奖励'),
+      expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励,新用户奖励'),
     )
   })
 })
@@ -89,12 +89,12 @@ function renderRewardsHost() {
   })
 }
 
-function buildPage(campaignDisplayName: string, nextBeforeID?: number): UserRewardRedemptionPage {
+function buildPage(rewardCodeDisplayName: string, nextBeforeID?: number): UserRewardRedemptionPage {
   return {
     redemptions: [
       {
-        id: campaignDisplayName.length,
-        campaign_display_name: campaignDisplayName,
+        id: rewardCodeDisplayName.length,
+        reward_code_display_name: rewardCodeDisplayName,
         credited_amount: 80,
         masked_code_hint: '•••• 2922',
         redeemed_at: '2026-07-15T10:00:00Z',

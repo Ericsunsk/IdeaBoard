@@ -62,14 +62,9 @@ export const adminRoutes: RouteRecordRaw[] = [
             meta: { requiresAuth: true, title: '账本健康' },
           },
           {
-            path: 'reward-campaigns',
-            name: 'AdminRewardCampaigns',
-            component: () => import('../credits-billing/rewards/AdminRewardCampaignsPage.vue'),
-          },
-          {
-            path: 'reward-campaigns/:campaignId',
-            name: 'AdminRewardCampaignDetail',
-            component: () => import('../credits-billing/rewards/AdminRewardCampaignDetailPage.vue'),
+            path: 'reward-codes',
+            name: 'AdminRewardCodes',
+            component: () => import('../credits-billing/rewards/AdminRewardCodesPage.vue'),
           },
         ],
       },

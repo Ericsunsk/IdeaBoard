@@ -39,7 +39,7 @@ import {
   ADMIN_CREDIT_HEALTH_PATH,
   ADMIN_CREDIT_PRICING_PATH,
   ADMIN_CREDIT_WALLETS_PATH,
-  ADMIN_REWARD_CAMPAIGNS_PATH,
+  ADMIN_REWARD_CODES_PATH,
   isPathUnderRoute,
 } from '../../../shared/constants/routePaths'
 import { useAdminCreditHealthResource } from './health/adminCreditHealthResource'
@@ -49,13 +49,13 @@ type NavigationPath =
   | typeof ADMIN_CREDIT_WALLETS_PATH
   | typeof ADMIN_CREDIT_PRICING_PATH
   | typeof ADMIN_CREDIT_HEALTH_PATH
-  | typeof ADMIN_REWARD_CAMPAIGNS_PATH
+  | typeof ADMIN_REWARD_CODES_PATH
 
 const navigationItems: Array<{ key: string; path: NavigationPath; label: string }> = [
   { key: 'wallets', path: ADMIN_CREDIT_WALLETS_PATH, label: '用户Idea账户' },
   { key: 'pricing', path: ADMIN_CREDIT_PRICING_PATH, label: '功能定价' },
   { key: 'health', path: ADMIN_CREDIT_HEALTH_PATH, label: '账本健康' },
-  { key: 'rewards', path: ADMIN_REWARD_CAMPAIGNS_PATH, label: '奖励活动' },
+  { key: 'rewards', path: ADMIN_REWARD_CODES_PATH, label: '兑换码' },
 ]
 
 const route = useRoute()

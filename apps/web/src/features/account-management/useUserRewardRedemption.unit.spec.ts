@@ -10,8 +10,7 @@ import {
 const redeemed = {
   redemption: {
     id: 41,
-    campaign_id: 7,
-    code_id: 9,
+    reward_code_id: 9,
     user_id: 1,
     credit_amount: 80,
     credit_transaction_id: 'credit-tx-41',
@@ -23,7 +22,7 @@ const redeemed = {
   replayed: false,
   history_item: {
     id: 41,
-    campaign_display_name: '夏日灵感奖励',
+    reward_code_display_name: '夏日灵感奖励',
     credited_amount: 80,
     masked_code_hint: '•••• 2026',
     redeemed_at: '2026-07-15T10:00:00Z',
@@ -100,7 +99,7 @@ describe('createUserRewardRedemptionWorkflow', () => {
             redemptions: [
               {
                 id: 40,
-                campaign_display_name: '新用户奖励',
+                reward_code_display_name: '新用户奖励',
                 credited_amount: 20,
                 masked_code_hint: '•••• 0001',
                 redeemed_at: '2026-07-14T10:00:00Z',

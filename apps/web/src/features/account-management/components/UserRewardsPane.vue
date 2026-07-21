@@ -60,15 +60,15 @@
           </template>
         </Column>
 
-        <Column field="campaign_display_name" header="奖励内容" :style="{ minWidth: '220px' }">
+        <Column field="reward_code_display_name" header="奖励内容" :style="{ minWidth: '220px' }">
           <template #body="{ data }">
             <Skeleton v-if="isSkeletonRow(data)" width="7rem" />
             <span
               v-else
               class="block max-w-[320px] truncate font-semibold"
-              :title="data.campaign_display_name"
+              :title="data.reward_code_display_name"
             >
-              {{ data.campaign_display_name }}
+              {{ data.reward_code_display_name }}
             </span>
           </template>
         </Column>

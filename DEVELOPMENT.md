@@ -97,8 +97,6 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Auth build | `cd apps/auth && npm run build` |
 | Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
 | Usage million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v` |
-| Rewards million dataset | `cd apps/api && REWARDS_LOAD_TEST=1 go test ./internal/rewards -run '^TestRewardMillionRedemptionDataset$' -count=1 -v` |
-| Rewards hot Public Campaign | `cd apps/api && REWARDS_LOAD_TEST=1 go test ./internal/rewards -run '^TestRewardHotPublicCampaign$' -count=1 -v` |
 
 修改 `apps/api/internal/db/queries` 或 schema 后：
 
@@ -164,9 +162,8 @@ git diff --exit-code -- internal/db/sqlc
 
 | 入口 | 用途 |
 | ---- | ---- |
-| [service.go](./apps/api/internal/rewards/service.go) | Campaign、Code、Redemption command/read seams |
+| [service.go](./apps/api/internal/rewards/service.go) | RewardCode、Redemption create/list/redeem/history 与 Credits Grant 编排 |
 | [CONTEXT.md](./apps/api/internal/rewards/CONTEXT.md) | Rewards Domain Language 与 invariants |
-| [rewards-million.md](./docs/benchmarks/rewards-million.md) | 百万 Redemption 与 Hot Public Campaign 显式 harness |
 
 ### Billing
 
@@ -233,7 +230,7 @@ Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是部署输入
 
 API 在独立 `METRICS_ADDR` listener 暴露 Prometheus `/metrics`，默认 `127.0.0.1:9091`。该 listener 只用于本机或私有监控网络，不得接入用户 API 反代或 Cloudflare。
 
-轮换 `REWARDS_CODE_HMAC_KEYS` 时先部署 new current + old previous；新 Code 只使用 current，lookup 同时验证两者。只有 old previous Code 从未兑换且已全部永久失效时才能移除 previous；已有 Redemption 仍依赖 previous 完成 replay，否则 API startup 会 fail closed。
+轮换 `REWARDS_CODE_HMAC_KEYS` 时先部署 new current + old previous；新 Code 只使用 current，lookup 同时验证两者。任何 persisted RewardCode 的 primary `key_version` 未配置时，API startup 都会 fail closed；disabled、expired 或未兑换都不例外。只有数据库中不再存在依赖 old version 的 RewardCode 时，才能移除 previous。
 
 ## 改动 Checklist
 

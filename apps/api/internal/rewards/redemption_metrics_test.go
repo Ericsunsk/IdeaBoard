@@ -140,7 +140,7 @@ ideaboard_rewards_redemptions_total{outcome="success"} 1
 		for _, metric := range family.Metric {
 			for _, label := range metric.Label {
 				switch label.GetName() {
-				case "user_id", "campaign_id", "code", "digest":
+				case "user_id", "reward_code_id", "code", "digest":
 					t.Fatalf("metric %q contains forbidden label %q", family.GetName(), label.GetName())
 				}
 			}

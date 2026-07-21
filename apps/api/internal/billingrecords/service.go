@@ -84,8 +84,6 @@ func describeLedgerRecord(raw ledgerRecord) (Kind, string, int64, error) {
 			return KindReward, "欢迎奖励", raw.amount, nil
 		case ledgerSourceRewardRedemption:
 			return KindReward, "兑换奖励", raw.amount, nil
-		case ledgerSourceRewardCampaign:
-			return KindReward, "活动奖励", raw.amount, nil
 		case ledgerSourceCreditPurchase:
 			return KindTopUp, "Idea 充值", raw.amount, nil
 		case ledgerSourceAdminGrant:

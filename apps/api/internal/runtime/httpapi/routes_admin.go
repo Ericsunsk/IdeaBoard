@@ -28,22 +28,8 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 }
 
 func registerAdminRewardRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.GET("/rewards/campaigns", h.RewardHandler.ListCampaigns)
-	adminAPI.POST("/rewards/campaigns", h.RewardHandler.CreateCampaign)
-	adminAPI.GET("/rewards/campaigns/:campaign_id", h.RewardHandler.GetCampaign)
-	adminAPI.PUT("/rewards/campaigns/:campaign_id", h.RewardHandler.UpdateCampaign)
-	adminAPI.DELETE("/rewards/campaigns/:campaign_id", h.RewardHandler.DeleteCampaign)
-	adminAPI.POST("/rewards/campaigns/:campaign_id/public-code", h.RewardHandler.IssuePublicCode)
-	adminAPI.POST("/rewards/campaigns/:campaign_id/batches", h.RewardHandler.GenerateCodeBatch)
-	adminAPI.GET("/rewards/campaigns/:campaign_id/batches", h.RewardHandler.ListCodeBatches)
-	adminAPI.GET("/rewards/campaigns/:campaign_id/redemptions", h.RewardHandler.ListAdminRedemptions)
-	adminAPI.POST("/rewards/campaigns/:campaign_id/batches/:batch_id/revoke", h.RewardHandler.RevokeCodeBatch)
-	adminAPI.POST("/rewards/codes/lookup", h.RewardHandler.LookupCode)
-	adminAPI.POST("/rewards/codes/:code_id/revoke", h.RewardHandler.RevokeCode)
-	adminAPI.POST("/rewards/campaigns/:campaign_id/activate", h.RewardHandler.ActivateCampaign)
-	adminAPI.POST("/rewards/campaigns/:campaign_id/pause", h.RewardHandler.PauseCampaign)
-	adminAPI.POST("/rewards/campaigns/:campaign_id/resume", h.RewardHandler.ResumeCampaign)
-	adminAPI.POST("/rewards/campaigns/:campaign_id/cancel", h.RewardHandler.CancelCampaign)
+	adminAPI.GET("/rewards/codes", h.RewardHandler.ListRewardCodes)
+	adminAPI.POST("/rewards/codes", h.RewardHandler.CreateRewardCode)
 }
 
 func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

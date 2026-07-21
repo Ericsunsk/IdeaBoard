@@ -18,7 +18,6 @@ type ledgerSource string
 const (
 	ledgerSourceWelcomeGrant     ledgerSource = "welcome_grant"
 	ledgerSourceRewardRedemption ledgerSource = "reward_redemption"
-	ledgerSourceRewardCampaign   ledgerSource = "reward_campaign"
 	ledgerSourceCreditPurchase   ledgerSource = "credit_purchase"
 	ledgerSourceAdminGrant       ledgerSource = "admin_grant"
 )

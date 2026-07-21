@@ -310,62 +310,41 @@ type ProviderEndpoint struct {
 }
 
 type RewardAdminAction struct {
-	ID          int64           `json:"id"`
-	CampaignID  int64           `json:"campaign_id"`
-	ActionType  string          `json:"action_type"`
-	ActorUserID int64           `json:"actor_user_id"`
-	Reason      string          `json:"reason"`
-	Metadata    json.RawMessage `json:"metadata"`
-	CreatedAt   time.Time       `json:"created_at"`
-}
-
-type RewardCampaign struct {
-	ID                   int64        `json:"id"`
-	DisplayName          string       `json:"display_name"`
-	InternalNote         string       `json:"internal_note"`
-	CreditAmount         int64        `json:"credit_amount"`
-	Mode                 string       `json:"mode"`
-	Status               string       `json:"status"`
-	MaxRedemptions       int64        `json:"max_redemptions"`
-	RedemptionCount      int64        `json:"redemption_count"`
-	IssuedCodeCount      int64        `json:"issued_code_count"`
-	ValidUnusedCodeCount int64        `json:"valid_unused_code_count"`
-	StartsAt             sql.NullTime `json:"starts_at"`
-	ExpiresAt            sql.NullTime `json:"expires_at"`
-	CreatedBy            int64        `json:"created_by"`
-	CreatedAt            time.Time    `json:"created_at"`
-	UpdatedAt            time.Time    `json:"updated_at"`
+	ID           int64           `json:"id"`
+	RewardCodeID int64           `json:"reward_code_id"`
+	ActionType   string          `json:"action_type"`
+	ActorUserID  int64           `json:"actor_user_id"`
+	Metadata     json.RawMessage `json:"metadata"`
+	CreatedAt    time.Time       `json:"created_at"`
 }
 
 type RewardCode struct {
-	ID         int64         `json:"id"`
-	CampaignID int64         `json:"campaign_id"`
-	BatchID    sql.NullInt64 `json:"batch_id"`
-	KeyVersion string        `json:"key_version"`
-	CodeDigest []byte        `json:"code_digest"`
-	CodeHint   string        `json:"code_hint"`
-	IssuedBy   int64         `json:"issued_by"`
-	IssuedAt   time.Time     `json:"issued_at"`
-	RevokedAt  sql.NullTime  `json:"revoked_at"`
-	RevokedBy  sql.NullInt64 `json:"revoked_by"`
+	ID                 int64        `json:"id"`
+	DisplayName        string       `json:"display_name"`
+	KeyVersion         string       `json:"key_version"`
+	CodeDigest         []byte       `json:"code_digest"`
+	CodeHint           string       `json:"code_hint"`
+	CreditAmount       int64        `json:"credit_amount"`
+	MaxRedemptions     int64        `json:"max_redemptions"`
+	RedemptionCount    int64        `json:"redemption_count"`
+	ExpiresAt          sql.NullTime `json:"expires_at"`
+	Enabled            bool         `json:"enabled"`
+	CreatedBy          int64        `json:"created_by"`
+	IdempotencyKey     string       `json:"idempotency_key"`
+	RequestFingerprint []byte       `json:"request_fingerprint"`
+	CreatedAt          time.Time    `json:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
-type RewardCodeBatch struct {
-	ID                 int64         `json:"id"`
-	CampaignID         int64         `json:"campaign_id"`
-	IdempotencyKey     string        `json:"idempotency_key"`
-	RequestFingerprint []byte        `json:"request_fingerprint"`
-	CodeCount          int32         `json:"code_count"`
-	IssuedBy           int64         `json:"issued_by"`
-	IssuedAt           time.Time     `json:"issued_at"`
-	RevokedAt          sql.NullTime  `json:"revoked_at"`
-	RevokedBy          sql.NullInt64 `json:"revoked_by"`
+type RewardCodeDigestAlias struct {
+	RewardCodeID int64  `json:"reward_code_id"`
+	KeyVersion   string `json:"key_version"`
+	CodeDigest   []byte `json:"code_digest"`
 }
 
 type RewardRedemption struct {
 	ID                    int64     `json:"id"`
-	CampaignID            int64     `json:"campaign_id"`
-	CodeID                int64     `json:"code_id"`
+	RewardCodeID          int64     `json:"reward_code_id"`
 	UserID                int64     `json:"user_id"`
 	CreditAmount          int64     `json:"credit_amount"`
 	CreditTransactionID   string    `json:"credit_transaction_id"`

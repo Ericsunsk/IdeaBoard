@@ -339,18 +339,9 @@ ideaboard delete --yes
 `REWARDS_CODE_HMAC_KEYS` 只保留 `current` 与可选 `previous`。轮换时不要直接删除旧 key：
 
 1. 生成新的高熵 key 与唯一 version，在 secret 管理边界内把新 key 配为 `current`、原 key 配为 `previous`，然后部署 API。不要把 key 明文写入日志、Issue 或未加密 artifact。
-2. 确认 API 启动成功，并用受控 Campaign 验证新 Code 可发行和兑换、旧 Code 仍可兑换或 replay。重叠期间新 Code 只使用 `current`，lookup 同时接受 `current` 与 `previous`。
-3. 保持重叠，直到旧 version 下不存在仍可兑换的 Code，也不存在依赖该 key 的 Redemption replay，再移除 `previous` 并重新部署。
-4. API startup 会 fail closed：若仍有可兑换或可 replay 的 Code 依赖未配置 key，进程拒绝启动。此时恢复上一份 secret 配置（新 key 为 `current`、旧 key 为 `previous`）并重新启动；不要通过改表绕过检查。
-
-### Batch export 丢失恢复
-
-Code 明文只在 Batch 首次成功 generation response 中返回，server 不保存明文或 CSV。同一 idempotency key replay 返回 `export_unavailable` 时，明文不可恢复：
-
-1. 在 Admin 确认目标 Batch 与丢失的 export 对应。
-2. 撤销该 Batch；操作只会不可逆撤销 unused Code，已完成的 Redemption 与 Credits Ledger 不变。
-3. 使用新的 idempotency key 生成替代 Batch，不要重试原 key。
-4. 在首次响应中立即保存并校验 UTF-8 CSV，再按 bearer reward secret 的标准限制其下载、传输与留存范围。
+2. 确认 API 启动成功，并用受控 RewardCode 验证新 Code 可创建和兑换、旧 Code 仍可兑换或 replay。重叠期间新 Code 只使用 `current`，lookup 同时接受 `current` 与 `previous`。
+3. 只要任何 persisted RewardCode 仍使用旧 version，就保持重叠；确认不存在依赖旧 version 的记录后，才可移除 `previous` 并重新部署。
+4. API startup 会 fail closed：若任何 persisted RewardCode 依赖未配置 key，进程拒绝启动。此时恢复上一份 secret 配置（新 key 为 `current`、旧 key 为 `previous`）并重新启动；不要通过改表绕过检查。
 
 ### Route disable 与回滚
 

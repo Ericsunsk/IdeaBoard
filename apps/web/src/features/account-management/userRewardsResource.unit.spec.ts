@@ -22,7 +22,7 @@ describe('userRewardsResource', () => {
         redemptions: [
           {
             id: 42,
-            campaign_display_name: '夏日灵感奖励',
+            reward_code_display_name: '夏日灵感奖励',
             credited_amount: 80,
             masked_code_hint: '•••• 2922',
             redeemed_at: '2026-07-15T10:00:00Z',
@@ -36,7 +36,7 @@ describe('userRewardsResource', () => {
     await expect(
       fetchUserRewardRedemptions({ before_id: 50, limit: 20 }, controller.signal),
     ).resolves.toMatchObject({
-      redemptions: [{ id: 42, campaign_display_name: '夏日灵感奖励' }],
+      redemptions: [{ id: 42, reward_code_display_name: '夏日灵感奖励' }],
       next_before_id: 40,
     })
     expect(generated.listUserRewardRedemptions).toHaveBeenCalledWith(

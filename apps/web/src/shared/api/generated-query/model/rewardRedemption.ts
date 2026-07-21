@@ -9,9 +9,7 @@ export interface RewardRedemption {
   /** @minimum 1 */
   id: number
   /** @minimum 1 */
-  campaign_id: number
-  /** @minimum 1 */
-  code_id: number
+  reward_code_id: number
   /** @minimum 1 */
   user_id: number
   /**

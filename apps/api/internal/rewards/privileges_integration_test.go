@@ -20,8 +20,13 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 	db, pool := testdb.OpenWithPool(t)
 	ctx := t.Context()
 	service := newTestRewardService(t, pool, credits.NewService(pool))
-	emptyDraft := createRewardDraft(t, service, "可删除空 Draft")
-	issuedCampaign, _ := createActivePublicCampaign(t, service, "RUNTIME26", 20, 2)
+	created, err := service.CreateRewardCode(ctx, CreateRewardCodeCommand{
+		DisplayName: "Runtime 权限奖励", Code: "RUNTIME26", CreditAmount: 20,
+		MaxRedemptions: 2, IdempotencyKey: "runtime-privileges", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatalf("create RewardCode fixture: %v", err)
+	}
 
 	runtimeRole := fmt.Sprintf("rewards_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
 	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
@@ -52,37 +57,23 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 		t.Fatalf("verify runtime privilege policies: %v", err)
 	}
 
-	if _, err := conn.ExecContext(ctx, `DELETE FROM reward_campaigns WHERE id = $1`, emptyDraft.ID); err != nil {
-		t.Fatalf("delete empty Draft through guarded runtime privilege: %v", err)
+	if _, err := conn.ExecContext(ctx, `UPDATE reward_codes SET enabled = FALSE WHERE id = $1`, created.RewardCode.ID); err != nil {
+		t.Fatalf("disable RewardCode through guarded runtime privilege: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `UPDATE reward_campaigns SET internal_note = 'runtime note' WHERE id = $1`, issuedCampaign.ID); err != nil {
-		t.Fatalf("update mutable internal note through guarded runtime privilege: %v", err)
-	}
-
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
-		`UPDATE reward_campaigns SET credit_amount = credit_amount + 1 WHERE id = $1`, issuedCampaign.ID)
+		`UPDATE reward_codes SET code_hint = 'ABCD' WHERE id = $1`, created.RewardCode.ID)
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
-		`DELETE FROM reward_campaigns WHERE id = $1`, issuedCampaign.ID)
+		`UPDATE reward_codes SET credit_amount = credit_amount + 1 WHERE id = $1`, created.RewardCode.ID)
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
-		`UPDATE reward_codes SET code_hint = 'ABCD' WHERE campaign_id = $1`, issuedCampaign.ID)
+		`UPDATE reward_codes SET redemption_count = redemption_count + 2 WHERE id = $1`, created.RewardCode.ID)
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
-		`DELETE FROM reward_codes WHERE campaign_id = $1`, issuedCampaign.ID)
-
-	if _, err := conn.ExecContext(ctx, `
-UPDATE reward_codes
-SET revoked_at = clock_timestamp(), revoked_by = 1
-WHERE campaign_id = $1`, issuedCampaign.ID); err != nil {
-		t.Fatalf("revoke Code through guarded runtime privilege: %v", err)
-	}
-	assertRuntimeRewardStatementDenied(t, ctx, conn, `
-UPDATE reward_codes
-SET revoked_at = clock_timestamp(), revoked_by = 1
-WHERE campaign_id = $1`, issuedCampaign.ID)
+		`DELETE FROM reward_codes WHERE id = $1`, created.RewardCode.ID)
+	assertRuntimeRewardStatementDenied(t, ctx, conn,
+		`UPDATE reward_admin_actions SET metadata = '{}'::JSONB WHERE reward_code_id = $1`, created.RewardCode.ID)
 
 	for _, signature := range []string{
 		"prevent_reward_admin_action_mutation()",
-		"guard_reward_campaign_rule_mutation()",
-		"guard_reward_code_mutation()",
+		"guard_reward_code_identity()",
 	} {
 		var runtimeCanExecute, publicCanExecute bool
 		if err := db.QueryRowContext(ctx, `

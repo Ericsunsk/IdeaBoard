@@ -143,7 +143,7 @@ Admin route pages 不直接依赖 generated API。每个 Admin vertical context 
 | `features/admin/storage` | `internal/media/storage` | storage provider/profile、secret masking、bucket test/apply |
 | `features/admin/task-monitor` | `internal/tasking` | task list/detail、runtime monitor、stream/poll fallback |
 | `features/admin/statistics` | `internal/tasking/taskstats` | statistics aggregation、backfill status、range contract |
-| `features/admin/credits-billing` | `internal/billing`, `internal/credits`, `internal/rewards` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health 与奖励活动 |
+| `features/admin/credits-billing` | `internal/billing`, `internal/credits`, `internal/rewards` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health 与 RewardCode 运营 |
 
 ### 9. Generated code 是边界，不是业务模型
 
@@ -177,7 +177,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Billing | `internal/billing` | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot |
 | Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入 |
 | Credits | `internal/credits` | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands |
-| Rewards | `internal/rewards` | 奖励 Campaign、HMAC-only Code、Redemption、用户 history 与 Credits Grant 编排 |
+| Rewards | `internal/rewards` | RewardCode、Redemption、用户 history 与 Credits Grant 编排 |
 | Usage | `internal/usage` | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入 |
 
 Dependency direction:
@@ -188,7 +188,7 @@ Dependency direction:
 - `internal/platform` must not import business contexts.
 - Cross-context collaboration should use small service/repository interfaces at the caller boundary.
 - Products consume Credits through the `credits.Commands` seam; only Credits owns Ledger writes and balance projections.
-- Rewards owns Campaign/Code/Redemption but must grant Ideas through transaction-bound `credits.Commands`; Code plaintext is never persisted.
+- Rewards owns RewardCode/Redemption but must grant Ideas through transaction-bound `credits.Commands`; Code plaintext is never persisted.
 - Products ask Billing for an immutable `PriceSnapshot`; Provider Account routing must not influence SKU price. Billing does not write the Credits Ledger.
 - Tasking 通过 `internal/tasking/taskbilling` 编排 Billing Quote 与 Credits Commands，并持久化不可变 Task Billing snapshot；Billing/Credits 仍分别拥有价格事实和 Ledger 写入。
 

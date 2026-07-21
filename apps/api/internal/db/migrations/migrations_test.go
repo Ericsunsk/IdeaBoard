@@ -556,24 +556,28 @@ func TestBaselineMigrationExcludesVersionedRewardsSchema(t *testing.T) {
 	}
 }
 
-func TestSchemaSnapshotIncludesRewardsCampaignContract(t *testing.T) {
+func TestSchemaSnapshotIncludesCanonicalRewardCodeContract(t *testing.T) {
 	schemaRaw, err := os.ReadFile("../schema/schema.sql")
 	if err != nil {
 		t.Fatalf("read schema failed: %v", err)
 	}
 	schema := strings.TrimSpace(string(schemaRaw))
 	for _, expected := range []string{
-		"CREATE TABLE reward_campaigns",
 		"CREATE TABLE reward_codes",
-		"CREATE TABLE reward_code_batches",
+		"CREATE TABLE reward_code_digest_aliases",
 		"CREATE TABLE reward_redemptions",
 		"CREATE TABLE reward_admin_actions",
 		"CREATE TRIGGER reward_admin_actions_append_only",
-		"CREATE TRIGGER reward_redemptions_single_use_once",
-		"CREATE TRIGGER set_reward_campaigns_updated_at",
+		"CREATE TRIGGER reward_codes_identity_immutable",
+		"CREATE TRIGGER set_reward_codes_updated_at",
 	} {
 		if !strings.Contains(schema, expected) {
-			t.Fatalf("schema snapshot missing Rewards public campaign contract: %s", expected)
+			t.Fatalf("schema snapshot missing canonical RewardCode contract: %s", expected)
+		}
+	}
+	for _, forbidden := range []string{"reward_campaigns", "reward_code_batches", "reward_code_definitions"} {
+		if strings.Contains(schema, forbidden) {
+			t.Fatalf("schema snapshot retains legacy Rewards surface: %s", forbidden)
 		}
 	}
 }
@@ -1144,14 +1148,20 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertColumnDataType(t, ctx, conn, "boards", "state", "jsonb")
 	assertColumnDataType(t, ctx, conn, "task_billing_snapshots", "display_name", "character varying")
 	assertColumnNullable(t, ctx, conn, "task_billing_snapshots", "display_name", false)
-	assertColumnDataType(t, ctx, conn, "reward_campaigns", "starts_at", "timestamp with time zone")
-	assertColumnDataType(t, ctx, conn, "reward_campaigns", "expires_at", "timestamp with time zone")
-	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_at", "timestamp with time zone")
-	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_by", "bigint")
-	assertColumnDataType(t, ctx, conn, "reward_codes", "batch_id", "bigint")
-	assertColumnDataType(t, ctx, conn, "reward_campaigns", "issued_code_count", "bigint")
-	assertColumnDataType(t, ctx, conn, "reward_campaigns", "valid_unused_code_count", "bigint")
-	assertTableExists(t, ctx, conn, "reward_code_batches", true)
+	for _, tableName := range []string{
+		"reward_codes",
+		"reward_code_digest_aliases",
+		"reward_redemptions",
+		"reward_admin_actions",
+	} {
+		assertTableExists(t, ctx, conn, tableName, true)
+	}
+	for _, tableName := range []string{"reward_campaigns", "reward_code_batches", "reward_code_definitions", "reward_code_redemptions", "reward_code_admin_actions"} {
+		assertTableExists(t, ctx, conn, tableName, false)
+	}
+	assertColumnDataType(t, ctx, conn, "reward_codes", "code_digest", "bytea")
+	assertColumnDataType(t, ctx, conn, "reward_codes", "expires_at", "timestamp with time zone")
+	assertColumnDataType(t, ctx, conn, "reward_code_digest_aliases", "code_digest", "bytea")
 	assertIndexValid(t, ctx, conn, "idx_tasks_terminal_created_at")
 	assertIndexValid(t, ctx, conn, "idx_tasks_pending_updated_at")
 	assertIndexValid(t, ctx, conn, "idx_task_attempts_running_created_at")
@@ -1160,25 +1170,21 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertIndexValid(t, ctx, conn, "idx_task_stat_events_feature_api_date")
 	assertIndexValid(t, ctx, conn, "idx_credit_transactions_capture_user_created")
 	assertIndexValid(t, ctx, conn, "idx_task_billing_snapshots_user_created")
-	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_status_id")
-	assertIndexValid(t, ctx, conn, "uq_reward_codes_public_campaign")
-	assertIndexValid(t, ctx, conn, "idx_reward_codes_batch_id")
-	assertIndexValid(t, ctx, conn, "idx_reward_code_batches_campaign_id")
-	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id_desc")
-	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_mode_id")
+	assertIndexValid(t, ctx, conn, "idx_reward_codes_list")
+	assertIndexValid(t, ctx, conn, "idx_reward_code_digest_aliases_code")
+	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_user")
+	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code")
+	assertIndexValid(t, ctx, conn, "idx_reward_admin_actions_code")
 	assertStorageProfileSeed(t, ctx, conn)
 	assertTriggerExists(t, ctx, conn, "api_accounts", "prevent_api_account_provider_endpoint_change")
 	assertTriggerExists(t, ctx, conn, "users", "set_users_updated_at")
 	assertTriggerExists(t, ctx, conn, "billing_admin_actions", "billing_admin_actions_append_only")
 	assertTriggerExists(t, ctx, conn, "system_settings_admin_actions", "system_settings_admin_actions_append_only")
 	assertTriggerExists(t, ctx, conn, "reward_admin_actions", "reward_admin_actions_append_only")
-	assertTriggerExists(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
-	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_immutable")
-	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_validate_mode")
-	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_project_counts")
-	assertTriggerExists(t, ctx, conn, "reward_code_batches", "reward_code_batches_immutable")
-	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_single_use_once")
-	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_consume_single_use_code")
+	assertTriggerExists(t, ctx, conn, "reward_codes", "set_reward_codes_updated_at")
+	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_identity_immutable")
+	assertRegprocedureExists(t, ctx, conn, "prevent_reward_admin_action_mutation()", true)
+	assertRegprocedureExists(t, ctx, conn, "guard_reward_code_identity()", true)
 	assertFunctionSearchPath(t, ctx, conn, "apply_credit_posting_balances()")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "trigger_type", "character varying")
@@ -1209,347 +1215,138 @@ SELECT pg_get_functiondef('execute_credit_reconciliation(bigint)'::regprocedure)
 	assertConstraintExists(t, ctx, conn, "board_members", "fk_board_members_board")
 	assertConstraintExists(t, ctx, conn, "board_share_tokens", "fk_board_share_tokens_board")
 	assertConstraintExists(t, ctx, conn, "task_billing_snapshots", "task_billing_snapshot_display_name_check")
-	assertConstraintExists(t, ctx, conn, "reward_redemptions", "uq_reward_redemptions_user_campaign")
-	assertConstraintExists(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_schedule")
-	assertConstraintExists(t, ctx, conn, "reward_codes", "ck_reward_codes_revocation")
-	assertConstraintExists(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_code_counts")
-	assertConstraintExists(t, ctx, conn, "reward_code_batches", "uq_reward_code_batches_campaign_key")
+	assertConstraintExists(t, ctx, conn, "reward_codes", "uq_reward_codes_creator_idempotency")
+	assertConstraintExists(t, ctx, conn, "reward_codes", "fk_reward_codes_created_by")
+	assertConstraintExists(t, ctx, conn, "reward_code_digest_aliases", "pk_reward_code_digest_aliases")
+	assertConstraintExists(t, ctx, conn, "reward_code_digest_aliases", "fk_reward_code_digest_aliases_code")
+	assertConstraintExists(t, ctx, conn, "reward_redemptions", "uq_reward_redemptions_user_code")
+	assertConstraintExists(t, ctx, conn, "reward_redemptions", "fk_reward_redemptions_credit_transaction")
+	assertConstraintExists(t, ctx, conn, "reward_admin_actions", "fk_reward_admin_actions_code")
 }
 
-func TestRewardsPublicCampaignMigrationUpgradesExistingSchema(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-	conn := openIsolatedMigrationConn(t, ctx)
-	if _, err := conn.ExecContext(ctx, `
+func TestRewardCodeCoreMigrationRejectsLegacyMonetaryFacts(t *testing.T) {
+	tests := []struct {
+		name            string
+		businessRefType string
+		seedRedemption  bool
+	}{
+		{
+			name:            "Credits Ledger reference",
+			businessRefType: "reward_redemption",
+		},
+		{
+			name:            "Redemption row",
+			businessRefType: "migration_test",
+			seedRedemption:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+			defer cancel()
+			conn := openIsolatedMigrationConn(t, ctx)
+
+			if _, err := conn.ExecContext(ctx, `
 CREATE TABLE schema_migrations (
   version BIGINT NOT NULL PRIMARY KEY,
   applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
 )`); err != nil {
-		t.Fatal(err)
-	}
+				t.Fatal(err)
+			}
 
-	const target = "20260715010000_rewards_public_campaign.sql"
-	files, err := fs.Glob(migrationFS, "*.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	sort.Strings(files)
-	for _, file := range files {
-		if file == target {
-			break
-		}
-		raw, err := migrationFS.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		version, err := migrationVersion(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
-			t.Fatalf("apply prerequisite migration %s: %v", file, err)
-		}
-	}
+			const target = "20260721010000_reward_code_core.sql"
+			files, err := fs.Glob(migrationFS, "*.sql")
+			if err != nil {
+				t.Fatal(err)
+			}
+			sort.Strings(files)
+			for _, file := range files {
+				if file == target {
+					break
+				}
+				raw, err := migrationFS.ReadFile(file)
+				if err != nil {
+					t.Fatal(err)
+				}
+				version, err := migrationVersion(file)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
+					t.Fatalf("apply prerequisite migration %s: %v", file, err)
+				}
+			}
 
-	assertTableExists(t, ctx, conn, "reward_campaigns", false)
-	assertTableExists(t, ctx, conn, "reward_codes", false)
-	assertTableExists(t, ctx, conn, "reward_redemptions", false)
-	assertTableExists(t, ctx, conn, "reward_admin_actions", false)
+			var userID int64
+			if err := conn.QueryRowContext(ctx, `
+INSERT INTO users (username, storage_uid)
+VALUES ('reward-core-migration-user', 'RCM001')
+RETURNING id`).Scan(&userID); err != nil {
+				t.Fatalf("insert legacy Rewards user: %v", err)
+			}
+			if _, err := conn.ExecContext(ctx, `INSERT INTO credit_wallets (user_id) VALUES ($1)`, userID); err != nil {
+				t.Fatalf("insert legacy Rewards Wallet: %v", err)
+			}
+			var transactionID string
+			if err := conn.QueryRowContext(ctx, `
+SELECT transaction_id
+FROM execute_credit_command_v2(
+  'grant', $1, 1, '', 'reward-core-migration-key',
+  'system', 'migration-test', 'rewards', 'migration safety test',
+  $2, 'legacy-fact'
+)`, userID, tt.businessRefType).Scan(&transactionID); err != nil {
+				t.Fatalf("insert legacy Rewards Ledger fact: %v", err)
+			}
 
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("upgrade existing schema with Rewards migration: %v", err)
-	}
-
-	assertMigrationApplied(t, ctx, conn, 20260715010000, true)
-	for _, tableName := range []string{
-		"reward_campaigns",
-		"reward_codes",
-		"reward_redemptions",
-		"reward_admin_actions",
-	} {
-		assertTableExists(t, ctx, conn, tableName, true)
-	}
-	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_status_id")
-	assertTriggerExists(t, ctx, conn, "reward_admin_actions", "reward_admin_actions_append_only")
-	assertConstraintExists(t, ctx, conn, "reward_redemptions", "uq_reward_redemptions_user_campaign")
-}
-
-func TestRewardsCampaignLifecycleMigrationUpgradesPublicCampaignSchema(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-	conn := openIsolatedMigrationConn(t, ctx)
-	if _, err := conn.ExecContext(ctx, `
-CREATE TABLE schema_migrations (
-  version BIGINT NOT NULL PRIMARY KEY,
-  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
-)`); err != nil {
-		t.Fatal(err)
-	}
-
-	const target = "20260715020000_rewards_campaign_lifecycle.sql"
-	files, err := fs.Glob(migrationFS, "*.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	sort.Strings(files)
-	for _, file := range files {
-		if file == target {
-			break
-		}
-		raw, err := migrationFS.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		version, err := migrationVersion(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
-			t.Fatalf("apply prerequisite migration %s: %v", file, err)
-		}
-	}
-
-	assertMigrationApplied(t, ctx, conn, 20260715010000, true)
-	assertColumnExists(t, ctx, conn, "reward_campaigns", "starts_at", false)
-	assertColumnExists(t, ctx, conn, "reward_codes", "revoked_at", false)
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("upgrade public Campaign schema with lifecycle migration: %v", err)
-	}
-
-	assertMigrationApplied(t, ctx, conn, 20260715020000, true)
-	assertColumnDataType(t, ctx, conn, "reward_campaigns", "starts_at", "timestamp with time zone")
-	assertColumnDataType(t, ctx, conn, "reward_campaigns", "expires_at", "timestamp with time zone")
-	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_at", "timestamp with time zone")
-	assertColumnDataType(t, ctx, conn, "reward_codes", "revoked_by", "bigint")
-	assertTriggerExists(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
-	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_immutable")
-	assertConstraintDefinitionContains(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_status", "paused", "cancelled")
-}
-
-func TestRewardsCampaignLifecycleMigrationRollsBackUnusedSchemaAndReapplies(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-	conn := openIsolatedMigrationConn(t, ctx)
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("apply migrations: %v", err)
-	}
-
-	const (
-		file    = "20260715020000_rewards_campaign_lifecycle.sql"
-		version = 20260715020000
-	)
-	raw, err := migrationFS.ReadFile(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
-		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
-			_ = tx.Rollback()
-			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
-		_ = tx.Rollback()
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	assertColumnExists(t, ctx, conn, "reward_campaigns", "starts_at", false)
-	assertColumnExists(t, ctx, conn, "reward_campaigns", "expires_at", false)
-	assertColumnExists(t, ctx, conn, "reward_codes", "revoked_at", false)
-	assertColumnExists(t, ctx, conn, "reward_codes", "revoked_by", false)
-	assertTriggerMissing(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
-	assertTriggerMissing(t, ctx, conn, "reward_codes", "reward_codes_immutable")
-	assertConstraintExists(t, ctx, conn, "reward_admin_actions", "fk_reward_admin_actions_campaign")
-	assertConstraintDefinitionContains(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_status", "draft", "active")
-
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("reapply lifecycle migration: %v", err)
-	}
-	assertMigrationApplied(t, ctx, conn, version, true)
-	assertTriggerExists(t, ctx, conn, "reward_campaigns", "reward_campaign_rules_frozen")
-	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_immutable")
-}
-
-func TestRewardsSingleUseBatchMigrationRollsBackUnusedSchemaAndReapplies(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-	conn := openIsolatedMigrationConn(t, ctx)
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("apply migrations: %v", err)
-	}
-
-	const (
-		file    = "20260715040000_rewards_single_use_batches.sql"
-		version = 20260715040000
-	)
-	raw, err := migrationFS.ReadFile(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
-		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
-			_ = tx.Rollback()
-			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
-		_ = tx.Rollback()
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	assertTableExists(t, ctx, conn, "reward_code_batches", false)
-	assertColumnExists(t, ctx, conn, "reward_codes", "batch_id", false)
-	assertColumnExists(t, ctx, conn, "reward_campaigns", "issued_code_count", false)
-	assertColumnExists(t, ctx, conn, "reward_campaigns", "valid_unused_code_count", false)
-	assertTriggerMissing(t, ctx, conn, "reward_codes", "reward_codes_validate_mode")
-	assertTriggerMissing(t, ctx, conn, "reward_redemptions", "reward_redemptions_single_use_once")
-	assertConstraintDefinitionContains(t, ctx, conn, "reward_campaigns", "ck_reward_campaigns_mode", "public")
-
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("reapply single-use Batch migration: %v", err)
-	}
-	assertMigrationApplied(t, ctx, conn, version, true)
-	assertTableExists(t, ctx, conn, "reward_code_batches", true)
-	assertColumnDataType(t, ctx, conn, "reward_codes", "batch_id", "bigint")
-	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_validate_mode")
-	assertTriggerExists(t, ctx, conn, "reward_redemptions", "reward_redemptions_single_use_once")
-}
-
-func TestRewardsSingleCodeRevokeMigrationFailsClosedAfterJournalFact(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-	conn := openIsolatedMigrationConn(t, ctx)
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("apply migrations: %v", err)
-	}
-
-	const (
-		file    = "20260716020000_rewards_single_code_revoke.sql"
-		version = 20260716020000
-	)
-	assertMigrationApplied(t, ctx, conn, version, true)
-	assertConstraintDefinitionContains(t, ctx, conn, "reward_admin_actions", "ck_reward_admin_actions_type", "revoke_code")
-
-	var actorID int64
-	if err := conn.QueryRowContext(ctx, `
-INSERT INTO users (username, storage_uid, role)
-VALUES ('reward-revoke-migration-admin', 'RVK293', 'admin')
-RETURNING id`).Scan(&actorID); err != nil {
-		t.Fatalf("insert migration actor: %v", err)
-	}
-	var campaignID int64
-	if err := conn.QueryRowContext(ctx, `
+			if tt.seedRedemption {
+				var campaignID int64
+				if err := conn.QueryRowContext(ctx, `
 INSERT INTO reward_campaigns (
   display_name, credit_amount, mode, status, max_redemptions, created_by
-) VALUES ('Revoke migration Campaign', 10, 'public', 'draft', 1, $1)
-RETURNING id`, actorID).Scan(&campaignID); err != nil {
-		t.Fatalf("insert migration Campaign: %v", err)
-	}
-	if _, err := conn.ExecContext(ctx, `
-INSERT INTO reward_admin_actions (
-  campaign_id, action_type, actor_user_id, reason, metadata
-) VALUES ($1, 'revoke_code', $2, '验证 rollback fail closed', '{"code_id":1}')`, campaignID, actorID); err != nil {
-		t.Fatalf("insert revoke_code Journal fact: %v", err)
-	}
-	if _, err := conn.ExecContext(ctx, `
-INSERT INTO reward_admin_actions (
-  campaign_id, action_type, actor_user_id, reason, metadata
-) VALUES ($1, 'unknown_action', $2, '未知 action 应被拒绝', '{}')`, campaignID, actorID); err == nil {
-		t.Fatal("reward_admin_actions accepted unknown action_type")
-	}
+) VALUES ('Legacy migration Campaign', 1, 'public', 'draft', 1, $1)
+RETURNING id`, userID).Scan(&campaignID); err != nil {
+					t.Fatalf("insert legacy Rewards Campaign: %v", err)
+				}
+				var codeID int64
+				if err := conn.QueryRowContext(ctx, `
+INSERT INTO reward_codes (campaign_id, key_version, code_digest, code_hint, issued_by)
+VALUES ($1, 'v1', decode(repeat('01', 32), 'hex'), 'R001', $2)
+RETURNING id`, campaignID, userID).Scan(&codeID); err != nil {
+					t.Fatalf("insert legacy Rewards Code: %v", err)
+				}
+				if _, err := conn.ExecContext(ctx, `
+INSERT INTO reward_redemptions (
+  campaign_id, code_id, user_id, credit_amount,
+  credit_transaction_id, available_balance_after
+) VALUES ($1, $2, $3, 1, $4, 1)`, campaignID, codeID, userID, transactionID); err != nil {
+					t.Fatalf("insert legacy Rewards Redemption: %v", err)
+				}
+			}
 
-	raw, err := migrationFS.ReadFile(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var downErr error
-	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
-		if _, downErr = tx.ExecContext(ctx, statement.SQL); downErr != nil {
-			break
-		}
-	}
-	if downErr == nil {
-		_ = tx.Rollback()
-		t.Fatal("single-Code revoke down migration succeeded after Journal fact")
-	}
-	if !strings.Contains(downErr.Error(), "cannot roll back Rewards single-Code revoke") {
-		_ = tx.Rollback()
-		t.Fatalf("down migration error = %v", downErr)
-	}
-	if err := tx.Rollback(); err != nil {
-		t.Fatal(err)
-	}
-	assertMigrationApplied(t, ctx, conn, version, true)
-	assertConstraintDefinitionContains(t, ctx, conn, "reward_admin_actions", "ck_reward_admin_actions_type", "revoke_code")
-}
+			raw, err := migrationFS.ReadFile(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			version, err := migrationVersion(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = applyMigration(ctx, conn, target, parseSQLStatements(extractUpSQL(string(raw))), version)
+			if err == nil {
+				t.Fatal("canonical RewardCode migration accepted legacy monetary facts")
+			}
+			for _, fragment := range []string{"legacy Rewards monetary facts detected", "Fresh DB"} {
+				if !strings.Contains(err.Error(), fragment) {
+					t.Fatalf("migration error=%q, want %q", err, fragment)
+				}
+			}
 
-func TestRewardsQueryIndexesMigrationRollsBackAndReapplies(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-	conn := openIsolatedMigrationConn(t, ctx)
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("apply migrations: %v", err)
+			assertMigrationApplied(t, ctx, conn, version, false)
+			assertTableExists(t, ctx, conn, "reward_campaigns", true)
+			assertTableExists(t, ctx, conn, "reward_code_digest_aliases", false)
+		})
 	}
-
-	const (
-		file    = "20260716030000_rewards_query_indexes.sql"
-		version = 20260716030000
-	)
-	assertMigrationApplied(t, ctx, conn, version, true)
-	assertIndexExists(t, ctx, conn, "idx_reward_redemptions_code_id", false)
-	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id_desc")
-	assertIndexDefinitionContains(
-		t,
-		ctx,
-		conn,
-		"idx_reward_redemptions_code_id_desc",
-		"(code_id, id DESC)",
-		"INCLUDE (redeemed_at)",
-	)
-	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_mode_id")
-	assertIndexDefinitionContains(t, ctx, conn, "idx_reward_campaigns_mode_id", "(mode, id DESC)")
-
-	rollbackNoTxMigrationForTest(t, ctx, conn, file, version)
-	assertMigrationApplied(t, ctx, conn, version, false)
-	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id")
-	assertIndexDefinitionContains(t, ctx, conn, "idx_reward_redemptions_code_id", "(code_id)")
-	assertIndexExists(t, ctx, conn, "idx_reward_redemptions_code_id_desc", false)
-	assertIndexExists(t, ctx, conn, "idx_reward_campaigns_mode_id", false)
-
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("reapply Rewards query index migration: %v", err)
-	}
-	assertMigrationApplied(t, ctx, conn, version, true)
-	assertIndexExists(t, ctx, conn, "idx_reward_redemptions_code_id", false)
-	assertIndexValid(t, ctx, conn, "idx_reward_redemptions_code_id_desc")
-	assertIndexDefinitionContains(
-		t,
-		ctx,
-		conn,
-		"idx_reward_redemptions_code_id_desc",
-		"(code_id, id DESC)",
-		"INCLUDE (redeemed_at)",
-	)
-	assertIndexValid(t, ctx, conn, "idx_reward_campaigns_mode_id")
-	assertIndexDefinitionContains(t, ctx, conn, "idx_reward_campaigns_mode_id", "(mode, id DESC)")
 }
 
 func TestRewardGrantCorrectionMigrationRollsBackAndReapplies(t *testing.T) {
@@ -2206,31 +2003,6 @@ WHERE n.nspname = current_schema()
 	}
 }
 
-func assertIndexDefinitionContains(
-	t *testing.T,
-	ctx context.Context,
-	conn *sql.Conn,
-	indexName string,
-	wantFragments ...string,
-) {
-	t.Helper()
-	var definition string
-	if err := conn.QueryRowContext(ctx, `
-SELECT pg_get_indexdef(c.oid)
-FROM pg_class c
-JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = current_schema()
-  AND c.relkind = 'i'
-  AND c.relname = $1`, indexName).Scan(&definition); err != nil {
-		t.Fatalf("read index %s definition failed: %v", indexName, err)
-	}
-	for _, want := range wantFragments {
-		if !strings.Contains(definition, want) {
-			t.Fatalf("index %s definition=%q, want fragment %q", indexName, definition, want)
-		}
-	}
-}
-
 func assertIndexExists(t *testing.T, ctx context.Context, conn *sql.Conn, indexName string, want bool) {
 	t.Helper()
 	var exists bool
@@ -2379,54 +2151,6 @@ SELECT EXISTS (
 	}
 	if !exists {
 		t.Fatalf("trigger %s.%s is missing", tableName, triggerName)
-	}
-}
-
-func assertTriggerMissing(t *testing.T, ctx context.Context, conn *sql.Conn, tableName string, triggerName string) {
-	t.Helper()
-	var exists bool
-	if err := conn.QueryRowContext(ctx, `
-SELECT EXISTS (
-  SELECT 1
-  FROM pg_trigger trigger
-  JOIN pg_class table_relation ON table_relation.oid = trigger.tgrelid
-  JOIN pg_namespace namespace ON namespace.oid = table_relation.relnamespace
-  WHERE namespace.nspname = current_schema()
-    AND table_relation.relname = $1
-    AND trigger.tgname = $2
-    AND NOT trigger.tgisinternal
-)`, tableName, triggerName).Scan(&exists); err != nil {
-		t.Fatalf("read trigger %s on %s: %v", triggerName, tableName, err)
-	}
-	if exists {
-		t.Fatalf("trigger %s on %s still exists", triggerName, tableName)
-	}
-}
-
-func assertConstraintDefinitionContains(
-	t *testing.T,
-	ctx context.Context,
-	conn *sql.Conn,
-	tableName string,
-	constraintName string,
-	want ...string,
-) {
-	t.Helper()
-	var definition string
-	if err := conn.QueryRowContext(ctx, `
-SELECT pg_get_constraintdef(constraint_relation.oid)
-FROM pg_constraint constraint_relation
-JOIN pg_class table_relation ON table_relation.oid = constraint_relation.conrelid
-JOIN pg_namespace namespace ON namespace.oid = table_relation.relnamespace
-WHERE namespace.nspname = current_schema()
-  AND table_relation.relname = $1
-  AND constraint_relation.conname = $2`, tableName, constraintName).Scan(&definition); err != nil {
-		t.Fatalf("read constraint %s on %s: %v", constraintName, tableName, err)
-	}
-	for _, fragment := range want {
-		if !strings.Contains(definition, fragment) {
-			t.Fatalf("constraint %s on %s definition %q missing %q", constraintName, tableName, definition, fragment)
-		}
 	}
 }
 

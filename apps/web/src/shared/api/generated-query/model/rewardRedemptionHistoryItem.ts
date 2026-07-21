@@ -12,7 +12,7 @@ export interface RewardRedemptionHistoryItem {
    * @minLength 1
    * @maxLength 120
    */
-  campaign_display_name: string
+  reward_code_display_name: string
   /**
    * @minimum 1
    * @maximum 9000000000000000

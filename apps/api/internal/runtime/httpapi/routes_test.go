@@ -346,7 +346,6 @@ func collectAdminRoutes(t *testing.T, router *gin.Engine) []adminRouteUnderTest 
 func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 	t.Helper()
 
-	const rewardBatchRevokeRoute = "POST /api/admin/rewards/campaigns/:campaign_id/batches/:batch_id/revoke"
 	const adminCreditReconciliationGlobalFindingQueueRouteUnderContract = "GET /api/admin/credits/reconciliation/findings"
 
 	want := map[string]bool{
@@ -354,7 +353,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"DELETE /api/admin/accounts/:id/models":                       false,
 		"DELETE /api/admin/billing/catalog/:sku":                      false,
 		"DELETE /api/admin/provider-endpoints/:id":                    false,
-		"DELETE /api/admin/rewards/campaigns/:campaign_id":            false,
 		"DELETE /api/admin/line-draft-modes/:id":                      false,
 		"DELETE /api/admin/storage/profiles/:id":                      false,
 		"DELETE /api/admin/users/:id":                                 false,
@@ -373,10 +371,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		adminCreditReconciliationGlobalFindingQueueRouteUnderContract: false,
 		"GET /api/admin/billing/catalog":                              false,
 		"GET /api/admin/billing/catalog/:sku/prices":                  false,
-		"GET /api/admin/rewards/campaigns":                            false,
-		"GET /api/admin/rewards/campaigns/:campaign_id":               false,
-		"GET /api/admin/rewards/campaigns/:campaign_id/batches":       false,
-		"GET /api/admin/rewards/campaigns/:campaign_id/redemptions":   false,
+		"GET /api/admin/rewards/codes":                                false,
 		"GET /api/admin/line-draft-modes":                             false,
 		"GET /api/admin/monitor":                                      false,
 		"GET /api/admin/monitor/stream":                               false,
@@ -402,16 +397,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/credits/refunds":                             false,
 		"POST /api/admin/credits/reconciliation/runs":                 false,
 		"POST /api/admin/billing/catalog/:sku/prices":                 false,
-		"POST /api/admin/rewards/campaigns":                           false,
-		"POST /api/admin/rewards/campaigns/:campaign_id/public-code":  false,
-		"POST /api/admin/rewards/campaigns/:campaign_id/batches":      false,
-		rewardBatchRevokeRoute:                                        false,
-		"POST /api/admin/rewards/codes/lookup":                        false,
-		"POST /api/admin/rewards/codes/:code_id/revoke":               false,
-		"POST /api/admin/rewards/campaigns/:campaign_id/activate":     false,
-		"POST /api/admin/rewards/campaigns/:campaign_id/cancel":       false,
-		"POST /api/admin/rewards/campaigns/:campaign_id/pause":        false,
-		"POST /api/admin/rewards/campaigns/:campaign_id/resume":       false,
+		"POST /api/admin/rewards/codes":                               false,
 		"POST /api/admin/accounts/:id/start":                          false,
 		"POST /api/admin/accounts/:id/stop":                           false,
 		"POST /api/admin/provider-endpoints":                          false,
@@ -431,7 +417,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/accounts/:id":                                 false,
 		"PUT /api/admin/billing/catalog/:sku/availability":            false,
 		"PUT /api/admin/provider-endpoints/:id":                       false,
-		"PUT /api/admin/rewards/campaigns/:campaign_id":               false,
 		"PUT /api/admin/feature-prompts/:slug":                        false,
 		"PUT /api/admin/line-draft-modes/:id":                         false,
 		"PUT /api/admin/settings/branding":                            false,
