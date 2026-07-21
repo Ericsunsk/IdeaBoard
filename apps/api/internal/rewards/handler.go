@@ -61,6 +61,18 @@ type createRewardCodeRequest struct {
 	IdempotencyKey string     `json:"idempotency_key"`
 }
 
+type updateRewardCodeRequest struct {
+	DisplayName    string     `json:"display_name"`
+	CreditAmount   int64      `json:"credit_amount"`
+	MaxRedemptions int64      `json:"max_redemptions"`
+	ExpiresAt      *time.Time `json:"expires_at"`
+	Code           *string    `json:"code"`
+}
+
+type setRewardCodeEnabledRequest struct {
+	Enabled *bool `json:"enabled"`
+}
+
 type redeemRequest struct {
 	Code string `json:"code"`
 }
@@ -86,6 +98,66 @@ func (h *Handler) CreateRewardCode(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, created)
+}
+
+func (h *Handler) UpdateRewardCode(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	rewardCodeID, actorID, ok := h.requireAdminRewardCode(c)
+	if !ok {
+		return
+	}
+	var request updateRewardCodeRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	updated, err := h.service.UpdateRewardCode(c.Request.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: rewardCodeID, DisplayName: request.DisplayName,
+		CreditAmount: request.CreditAmount, MaxRedemptions: request.MaxRedemptions,
+		ExpiresAt: request.ExpiresAt, Code: request.Code, ActorUserID: actorID,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, updated)
+}
+
+func (h *Handler) SetRewardCodeEnabled(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	rewardCodeID, actorID, ok := h.requireAdminRewardCode(c)
+	if !ok {
+		return
+	}
+	var request setRewardCodeEnabledRequest
+	if err := decodeRewardJSON(c, &request); err != nil || request.Enabled == nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	updated, err := h.service.SetRewardCodeEnabled(c.Request.Context(), SetRewardCodeEnabledCommand{
+		RewardCodeID: rewardCodeID, Enabled: *request.Enabled, ActorUserID: actorID,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, updated)
+}
+
+func (h *Handler) DeleteRewardCode(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	rewardCodeID, actorID, ok := h.requireAdminRewardCode(c)
+	if !ok {
+		return
+	}
+	deleted, err := h.service.DeleteRewardCode(c.Request.Context(), DeleteRewardCodeCommand{
+		RewardCodeID: rewardCodeID, ActorUserID: actorID,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, deleted)
 }
 
 func (h *Handler) ListRewardCodes(c *gin.Context) {
@@ -224,6 +296,19 @@ func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
 	return identityPrincipal.UserID(), true
 }
 
+func (h *Handler) requireAdminRewardCode(c *gin.Context) (int64, int64, bool) {
+	actorID, ok := h.requireAdmin(c)
+	if !ok {
+		return 0, 0, false
+	}
+	rewardCodeID, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
+	if err != nil || rewardCodeID <= 0 {
+		response.Error(c, http.StatusBadRequest, "兑换码 ID 无效")
+		return 0, 0, false
+	}
+	return rewardCodeID, actorID, true
+}
+
 func decodeRewardJSON(c *gin.Context, destination any) error {
 	return jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxRewardRequestBytes, destination)
 }
@@ -236,11 +321,18 @@ func writeRewardError(c *gin.Context, err error) {
 		response.Error(c, http.StatusConflict, "幂等请求与原创建参数不一致")
 	case errors.Is(err, ErrCodeCollision):
 		response.Error(c, http.StatusConflict, "兑换码已存在")
+	case errors.Is(err, ErrRewardCodeNotFound):
+		response.Error(c, http.StatusNotFound, "兑换码不存在")
+	case errors.Is(err, ErrCapBelowRedemptions):
+		response.Error(c, http.StatusConflict, "兑换上限不能低于已兑换次数")
+	case errors.Is(err, ErrRewardCodeRedeemed):
+		response.Error(c, http.StatusConflict, "已有兑换记录，只能停用该兑换码")
 	case errors.Is(err, ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
 	case errors.Is(err, credits.ErrWalletFrozen):
 		response.Error(c, http.StatusLocked, "当前账户无法兑换奖励")
 	default:
-		response.InternalError(c, http.StatusInternalServerError, "奖励操作失败", err)
+		slog.Warn("reward admin operation failed", "error_type", fmt.Sprintf("%T", err))
+		response.Error(c, http.StatusInternalServerError, "奖励操作失败")
 	}
 }

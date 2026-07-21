@@ -1162,6 +1162,10 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertColumnDataType(t, ctx, conn, "reward_codes", "code_digest", "bytea")
 	assertColumnDataType(t, ctx, conn, "reward_codes", "expires_at", "timestamp with time zone")
 	assertColumnDataType(t, ctx, conn, "reward_code_digest_aliases", "code_digest", "bytea")
+	assertColumnDataType(t, ctx, conn, "reward_redemptions", "reward_code_display_name", "character varying")
+	assertColumnDataType(t, ctx, conn, "reward_redemptions", "masked_code_hint", "character varying")
+	assertColumnNullable(t, ctx, conn, "reward_redemptions", "reward_code_display_name", false)
+	assertColumnNullable(t, ctx, conn, "reward_redemptions", "masked_code_hint", false)
 	assertIndexValid(t, ctx, conn, "idx_tasks_terminal_created_at")
 	assertIndexValid(t, ctx, conn, "idx_tasks_pending_updated_at")
 	assertIndexValid(t, ctx, conn, "idx_task_attempts_running_created_at")
@@ -1185,6 +1189,17 @@ func TestMigrationsFreshDatabaseAppliesAllVersionsInIsolatedSchema(t *testing.T)
 	assertTriggerExists(t, ctx, conn, "reward_codes", "reward_codes_identity_immutable")
 	assertRegprocedureExists(t, ctx, conn, "prevent_reward_admin_action_mutation()", true)
 	assertRegprocedureExists(t, ctx, conn, "guard_reward_code_identity()", true)
+	assertRegprocedureExists(t, ctx, conn, "reserve_reward_code_redemption_v1(bigint)", true)
+	assertRegprocedureExists(t, ctx, conn, "reserve_reward_code_redemption_v1(bigint,timestamp with time zone)", false)
+	for _, signature := range []string{
+		"update_reward_code_definition_v1(bigint,text,bigint,bigint,timestamp with time zone,bigint)",
+		"set_reward_code_enabled_v1(bigint,boolean,bigint)",
+		"rotate_reward_code_v1(bigint,text,bytea,text,text,bytea,bigint)",
+		"delete_reward_code_v1(bigint,bigint)",
+		"reserve_reward_code_redemption_v1(bigint)",
+	} {
+		assertFunctionSearchPath(t, ctx, conn, signature)
+	}
 	assertFunctionSearchPath(t, ctx, conn, "apply_credit_posting_balances()")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "reason", "character varying")
 	assertColumnDataType(t, ctx, conn, "credit_reconciliation_runs", "trigger_type", "character varying")
@@ -1221,7 +1236,174 @@ SELECT pg_get_functiondef('execute_credit_reconciliation(bigint)'::regprocedure)
 	assertConstraintExists(t, ctx, conn, "reward_code_digest_aliases", "fk_reward_code_digest_aliases_code")
 	assertConstraintExists(t, ctx, conn, "reward_redemptions", "uq_reward_redemptions_user_code")
 	assertConstraintExists(t, ctx, conn, "reward_redemptions", "fk_reward_redemptions_credit_transaction")
+	assertConstraintExists(t, ctx, conn, "reward_redemptions", "ck_reward_redemptions_display_name")
+	assertConstraintExists(t, ctx, conn, "reward_redemptions", "ck_reward_redemptions_masked_code_hint")
 	assertConstraintExists(t, ctx, conn, "reward_admin_actions", "fk_reward_admin_actions_code")
+}
+
+func TestRewardCodeManagementMigrationBackfillsCreateJournalDefaults(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if _, err := conn.ExecContext(ctx, `
+CREATE TABLE schema_migrations (
+  version BIGINT NOT NULL PRIMARY KEY,
+  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
+)`); err != nil {
+		t.Fatal(err)
+	}
+
+	const target = "20260722010000_reward_code_management.sql"
+	files, err := fs.Glob(migrationFS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		if file == target {
+			break
+		}
+		raw, err := migrationFS.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		version, err := migrationVersion(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
+			t.Fatalf("apply prerequisite migration %s: %v", file, err)
+		}
+	}
+
+	var actorID int64
+	if err := conn.QueryRowContext(ctx, `
+INSERT INTO users (username, storage_uid)
+VALUES ('reward-management-backfill', 'RMB001')
+RETURNING id`).Scan(&actorID); err != nil {
+		t.Fatal(err)
+	}
+	var rewardCodeID int64
+	if err := conn.QueryRowContext(ctx, `
+INSERT INTO reward_codes (
+  display_name, key_version, code_digest, code_hint, credit_amount,
+  max_redemptions, created_by, idempotency_key, request_fingerprint
+) VALUES (
+  'Created Reward', 'v1', decode(repeat('01', 32), 'hex'), '2026', 10,
+  5, $1, 'journal-create-defaults', decode(repeat('02', 32), 'hex')
+)
+RETURNING id`, actorID).Scan(&rewardCodeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO reward_admin_actions (reward_code_id, action_type, actor_user_id, metadata)
+VALUES ($1, 'create_reward_code', $2, '{}'::JSONB)`, rewardCodeID, actorID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+UPDATE reward_codes SET redemption_count = 1, enabled = FALSE WHERE id = $1`, rewardCodeID); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := migrationFS.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version, err := migrationVersion(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyMigration(ctx, conn, target, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
+		t.Fatalf("apply management migration: %v", err)
+	}
+
+	var redemptionCount int64
+	var enabled bool
+	if err := conn.QueryRowContext(ctx, `
+SELECT (target_snapshot->>'redemption_count')::BIGINT,
+       (target_snapshot->>'enabled')::BOOLEAN
+FROM reward_admin_actions
+WHERE reward_code_id_snapshot = $1`, rewardCodeID).Scan(&redemptionCount, &enabled); err != nil {
+		t.Fatal(err)
+	}
+	if redemptionCount != 0 || !enabled {
+		t.Fatalf("create Journal snapshot redemption_count=%d enabled=%t, want creation defaults 0/true", redemptionCount, enabled)
+	}
+}
+
+func TestRewardCodeManagementMigrationRollsBackReappliesAndAllowsOnlyReferentialNullification(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	const (
+		file    = "20260722010000_reward_code_management.sql"
+		version = 20260722010000
+	)
+	rollbackTxMigrationForTest(t, ctx, conn, file, version)
+	assertColumnExists(t, ctx, conn, "reward_admin_actions", "reward_code_id_snapshot", false)
+	assertColumnExists(t, ctx, conn, "reward_admin_actions", "target_snapshot", false)
+	assertTriggerExists(t, ctx, conn, "reward_admin_actions", "reward_admin_actions_append_only")
+
+	var actorID int64
+	if err := conn.QueryRowContext(ctx, `
+INSERT INTO users (username, storage_uid)
+VALUES ('reward-management-rollback', 'RMR001')
+RETURNING id`).Scan(&actorID); err != nil {
+		t.Fatal(err)
+	}
+	var rewardCodeID int64
+	if err := conn.QueryRowContext(ctx, `
+INSERT INTO reward_codes (
+  display_name, key_version, code_digest, code_hint, credit_amount,
+  max_redemptions, created_by, idempotency_key, request_fingerprint
+) VALUES (
+  'Rollback Reward', 'v1', decode(repeat('03', 32), 'hex'), '2030', 10,
+  0, $1, 'rollback-reapply', decode(repeat('04', 32), 'hex')
+)
+RETURNING id`, actorID).Scan(&rewardCodeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO reward_admin_actions (reward_code_id, action_type, actor_user_id, metadata)
+VALUES ($1, 'create_reward_code', $2, '{}'::JSONB)`, rewardCodeID, actorID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(ctx, `UPDATE reward_admin_actions SET metadata = '{"changed":true}'::JSONB WHERE reward_code_id = $1`, rewardCodeID); err == nil {
+		t.Fatal("rolled-back append-only trigger accepted a Journal update")
+	}
+
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("reapply RewardCode management migration: %v", err)
+	}
+	assertMigrationApplied(t, ctx, conn, version, true)
+	assertColumnExists(t, ctx, conn, "reward_admin_actions", "reward_code_id_snapshot", true)
+	assertColumnExists(t, ctx, conn, "reward_admin_actions", "target_snapshot", true)
+	if _, err := conn.ExecContext(ctx, `UPDATE reward_admin_actions SET reward_code_id = NULL WHERE reward_code_id = $1`, rewardCodeID); err == nil {
+		t.Fatal("append-only trigger accepted manual FK nullification while parent exists")
+	}
+
+	var deleted bool
+	if err := conn.QueryRowContext(ctx, `SELECT delete_reward_code_v1($1, $2)`, rewardCodeID, actorID).Scan(&deleted); err != nil {
+		t.Fatalf("delete RewardCode through command function: %v", err)
+	}
+	if !deleted {
+		t.Fatal("delete RewardCode command returned false")
+	}
+	var codes, actions, nullReferences int
+	if err := conn.QueryRowContext(ctx, `SELECT
+  (SELECT COUNT(*) FROM reward_codes WHERE id = $1),
+  (SELECT COUNT(*) FROM reward_admin_actions WHERE reward_code_id_snapshot = $1),
+  (SELECT COUNT(*) FROM reward_admin_actions WHERE reward_code_id_snapshot = $1 AND reward_code_id IS NULL)`,
+		rewardCodeID).Scan(&codes, &actions, &nullReferences); err != nil {
+		t.Fatal(err)
+	}
+	if codes != 0 || actions != 2 || nullReferences != 2 {
+		t.Fatalf("delete facts codes=%d actions=%d null_references=%d, want 0/2/2", codes, actions, nullReferences)
+	}
 }
 
 func TestRewardCodeCoreMigrationRejectsLegacyMonetaryFacts(t *testing.T) {

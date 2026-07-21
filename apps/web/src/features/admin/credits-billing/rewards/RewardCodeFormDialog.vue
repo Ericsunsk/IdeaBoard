@@ -1,16 +1,12 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    header="创建兑换码"
+    :header="isEditing ? '编辑兑换码' : '创建兑换码'"
     size="form"
     :busy="pending"
     @update:visible="emit('update:visible', $event)"
   >
-    <form
-      id="reward-code-create-form"
-      class="flex flex-col gap-4"
-      @submit.prevent="submit"
-    >
+    <form id="reward-code-form" class="flex flex-col gap-4" @submit.prevent="submit">
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
         label="名称"
@@ -33,7 +29,8 @@
 
       <div class="flex min-w-0 flex-col gap-1.5">
         <label for="reward-code-value" class="text-admin-meta font-[680] text-admin-text-2">
-          Code <span class="text-admin-danger" aria-hidden="true">*</span>
+          Code
+          <span v-if="!isEditing" class="text-admin-danger" aria-hidden="true">*</span>
         </label>
         <div class="flex gap-2">
           <InputText
@@ -41,24 +38,35 @@
             v-model="form.code"
             fluid
             maxlength="128"
-            required
-            aria-required="true"
+            :required="!isEditing"
+            :aria-required="!isEditing"
             autocomplete="off"
             :spellcheck="false"
             class="min-w-0 flex-1 font-mono"
             :invalid="Boolean(shownErrors.code)"
-            :aria-describedby="
-              shownErrors.code
-                ? 'reward-code-value-hint reward-code-value-error'
-                : 'reward-code-value-hint'
-            "
+            :aria-describedby="codeDescribedby"
             @input="clearError('code')"
           />
-          <Button label="重新生成" type="button" severity="secondary" outlined @click="regenerate" />
+          <Button
+            :label="isEditing ? '生成新 Code' : '重新生成'"
+            type="button"
+            severity="secondary"
+            outlined
+            @click="regenerate"
+          />
         </div>
         <p id="reward-code-value-hint" class="m-0 text-admin-caption text-admin-text-3">
-          保存后仅能查看末四位
+          {{ isEditing ? '留空则保留当前 Code；填写或生成后将更换 Code' : '保存后仅能查看末四位' }}
         </p>
+        <Message
+          v-if="isEditing && form.code.trim()"
+          id="reward-code-rotation-warning"
+          severity="warn"
+          size="small"
+          :closable="false"
+        >
+          保存后旧 Code 将立即失效，新 Code 将立即生效。
+        </Message>
         <Message
           v-if="shownErrors.code"
           id="reward-code-value-error"
@@ -97,7 +105,7 @@
           label="兑换上限"
           for="reward-code-cap"
           required
-          hint="0 表示无限"
+          :hint="capHint"
           :error="shownErrors.maxRedemptions"
         >
           <InputNumber
@@ -116,7 +124,12 @@
       </div>
 
       <AdminFormField label="过期时间" for="reward-code-expires-at" hint="留空表示永不过期">
-        <InputText id="reward-code-expires-at" v-model="form.expiresAt" type="datetime-local" fluid />
+        <InputText
+          id="reward-code-expires-at"
+          v-model="form.expiresAt"
+          type="datetime-local"
+          fluid
+        />
       </AdminFormField>
 
       <Message v-if="errorMessage" severity="error" :closable="false" role="alert">
@@ -134,9 +147,9 @@
         @click="close"
       />
       <Button
-        label="创建兑换码"
+        :label="isEditing ? '保存更改' : '创建兑换码'"
         type="submit"
-        form="reward-code-create-form"
+        form="reward-code-form"
         :loading="pending"
         :disabled="pending"
       />
@@ -145,50 +158,78 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
-import type { CreateRewardCodeInput } from './rewardCodeAdminResource'
+import type { RewardCode, UpdateRewardCodeInput } from './rewardCodeAdminResource'
 import { generateRewardCode } from './rewardCodeGenerator'
+import { isoToShanghaiDateTimeInput } from './rewardCodeTime'
+
+export type RewardCodeFormValue = UpdateRewardCodeInput & {
+  code: string
+  idempotencyKey: string
+}
 
 type FieldName = 'displayName' | 'code' | 'creditAmount' | 'maxRedemptions'
 
 const props = withDefaults(
-  defineProps<{ visible: boolean; pending?: boolean; errorMessage?: string }>(),
-  { pending: false, errorMessage: '' },
+  defineProps<{
+    visible: boolean
+    rewardCode?: RewardCode | null
+    pending?: boolean
+    errorMessage?: string
+  }>(),
+  { rewardCode: null, pending: false, errorMessage: '' },
 )
 const emit = defineEmits<{
   'update:visible': [visible: boolean]
-  submit: [input: CreateRewardCodeInput]
+  submit: [input: RewardCodeFormValue]
 }>()
 
 const maxCredits = 9_000_000_000_000_000
-const form = reactive<CreateRewardCodeInput>(emptyForm())
+const isEditing = computed(() => props.rewardCode != null)
+const form = reactive<RewardCodeFormValue>(emptyCreateForm())
 const shownErrors = reactive<Record<FieldName, string>>({
   displayName: '',
   code: '',
   creditAmount: '',
   maxRedemptions: '',
 })
+const codeDescribedby = computed(() =>
+  [
+    'reward-code-value-hint',
+    isEditing.value && form.code.trim() ? 'reward-code-rotation-warning' : '',
+    shownErrors.code ? 'reward-code-value-error' : '',
+  ]
+    .filter(Boolean)
+    .join(' '),
+)
+const capHint = computed(() => {
+  if (!props.rewardCode) return '0 表示无限'
+  return `0 表示无限；当前已兑换 ${props.rewardCode.redemptionCount} 次`
+})
 
 watch(
   () => props.visible,
   (visible) => {
-    if (visible) {
-      Object.assign(form, emptyForm())
-    } else {
-      form.code = ''
-      form.idempotencyKey = ''
-    }
+    if (visible) resetForm()
+    else clearSensitiveFields()
     clearErrors()
   },
 )
 
-function emptyForm(): CreateRewardCodeInput {
+watch(
+  () => props.rewardCode,
+  () => {
+    if (props.visible) resetForm()
+  },
+)
+
+function emptyCreateForm(): RewardCodeFormValue {
   return {
     displayName: '',
     code: generateRewardCode(),
@@ -199,26 +240,51 @@ function emptyForm(): CreateRewardCodeInput {
   }
 }
 
+function resetForm() {
+  const rewardCode = props.rewardCode
+  Object.assign(
+    form,
+    rewardCode
+      ? {
+          displayName: rewardCode.displayName,
+          code: '',
+          creditAmount: rewardCode.creditAmount,
+          maxRedemptions: rewardCode.maxRedemptions,
+          expiresAt: rewardCode.expiresAt ? isoToShanghaiDateTimeInput(rewardCode.expiresAt) : '',
+          idempotencyKey: '',
+        }
+      : emptyCreateForm(),
+  )
+}
+
 function validate(): boolean {
   shownErrors.displayName = form.displayName.trim() ? '' : '请输入名称'
-  shownErrors.code = form.code.trim() ? '' : '请输入 Code'
+  const codeLength = form.code.trim().length
+  shownErrors.code =
+    !isEditing.value && codeLength === 0
+      ? '请输入 Code'
+      : codeLength > 0 && codeLength < 8
+        ? 'Code 至少需要 8 个字符'
+        : ''
   shownErrors.creditAmount =
     Number.isSafeInteger(form.creditAmount) &&
     form.creditAmount >= 1 &&
     form.creditAmount <= maxCredits
       ? ''
       : '奖励 Idea 必须为正整数'
+  const minimumCap = props.rewardCode?.redemptionCount ?? 0
   shownErrors.maxRedemptions =
-    Number.isSafeInteger(form.maxRedemptions) && form.maxRedemptions >= 0
-      ? ''
-      : '兑换上限必须为非负整数'
+    !Number.isSafeInteger(form.maxRedemptions) || form.maxRedemptions < 0
+      ? '兑换上限必须为非负整数'
+      : form.maxRedemptions > 0 && form.maxRedemptions < minimumCap
+        ? `兑换上限不能低于当前兑换次数 ${minimumCap}`
+        : ''
   return Object.values(shownErrors).every((value) => !value)
 }
 
 function submit() {
-  if (props.pending) return
-  if (!validate()) return
-  emit('submit', { ...form })
+  if (props.pending || !validate()) return
+  emit('submit', { ...form, code: form.code.trim() })
 }
 
 function regenerate() {
@@ -232,6 +298,11 @@ function clearError(field: FieldName) {
 
 function clearErrors() {
   for (const field of Object.keys(shownErrors) as FieldName[]) shownErrors[field] = ''
+}
+
+function clearSensitiveFields() {
+  form.code = ''
+  form.idempotencyKey = ''
 }
 
 function close() {

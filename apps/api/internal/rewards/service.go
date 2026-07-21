@@ -146,9 +146,16 @@ VALUES ($1, $2, $3)`, rewardCode.ID, candidate.version, candidate.digest); err !
 	if err != nil {
 		return CreatedRewardCode{}, fmt.Errorf("encode reward Code journal metadata: %w", err)
 	}
+	targetSnapshot, err := json.Marshal(rewardCodeJournalSnapshot(rewardCode))
+	if err != nil {
+		return CreatedRewardCode{}, fmt.Errorf("encode reward Code journal target: %w", err)
+	}
 	if _, err := tx.Exec(ctx, `
-INSERT INTO reward_admin_actions (reward_code_id, action_type, actor_user_id, metadata)
-VALUES ($1, 'create_reward_code', $2, $3::JSONB)`, rewardCode.ID, command.ActorUserID, string(metadata)); err != nil {
+INSERT INTO reward_admin_actions (
+  reward_code_id, reward_code_id_snapshot, action_type, actor_user_id, metadata, target_snapshot
+)
+VALUES ($1, $1, 'create_reward_code', $2, $3::JSONB, $4::JSONB)`,
+		rewardCode.ID, command.ActorUserID, string(metadata), string(targetSnapshot)); err != nil {
 		return CreatedRewardCode{}, fmt.Errorf("record reward Code creation: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -226,11 +233,12 @@ FOR UPDATE`, current.version, current.digest, previous.version, previous.digest)
 		return RedeemResult{}, true, fmt.Errorf("lock reward Code: %w", err)
 	}
 	var redemption Redemption
-	err = tx.QueryRow(ctx, `SELECT id, reward_code_id, user_id, credit_amount,
-       credit_transaction_id, available_balance_after, redeemed_at
+	err = tx.QueryRow(ctx, `SELECT id, reward_code_id, user_id, reward_code_display_name,
+       masked_code_hint, credit_amount, credit_transaction_id, available_balance_after, redeemed_at
 FROM reward_redemptions
 WHERE user_id = $1 AND reward_code_id = $2`, command.UserID, rewardCode.ID).Scan(
-		&redemption.ID, &redemption.RewardCodeID, &redemption.UserID, &redemption.CreditAmount,
+		&redemption.ID, &redemption.RewardCodeID, &redemption.UserID,
+		&redemption.RewardCodeDisplayName, &redemption.MaskedCodeHint, &redemption.CreditAmount,
 		&redemption.CreditTransactionID, &redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
 	)
 	if err == nil {
@@ -241,27 +249,20 @@ WHERE user_id = $1 AND reward_code_id = $2`, command.UserID, rewardCode.ID).Scan
 		if err != nil {
 			return RedeemResult{}, true, fmt.Errorf("read reward Code replay Wallet: %w", err)
 		}
-		return canonicalRedeemResult(redemption, rewardCode, wallet.Available, true), true, nil
+		return canonicalRedeemResult(redemption, wallet.Available, true), true, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return RedeemResult{}, true, fmt.Errorf("find reward Code redemption: %w", err)
-	}
-	if rewardCode.Status != RewardCodeStatusEnabled {
-		return RedeemResult{}, true, ErrCodeUnavailable
 	}
 	var redemptionID int64
 	if err := tx.QueryRow(ctx, `SELECT nextval(pg_get_serial_sequence('reward_redemptions', 'id'))`).Scan(&redemptionID); err != nil {
 		return RedeemResult{}, true, fmt.Errorf("allocate reward Code redemption id: %w", err)
 	}
-	result, err := tx.Exec(ctx, `UPDATE reward_codes
-SET redemption_count = redemption_count + 1
-WHERE id = $1 AND enabled = TRUE
-  AND (expires_at IS NULL OR expires_at > $2)
-  AND (max_redemptions = 0 OR redemption_count < max_redemptions)`, rewardCode.ID, s.currentTime())
-	if err != nil {
+	var capacityReserved bool
+	if err := tx.QueryRow(ctx, `SELECT reserve_reward_code_redemption_v1($1)`, rewardCode.ID).Scan(&capacityReserved); err != nil {
 		return RedeemResult{}, true, fmt.Errorf("reserve reward Code capacity: %w", err)
 	}
-	if result.RowsAffected() != 1 {
+	if !capacityReserved {
 		return RedeemResult{}, true, ErrCodeUnavailable
 	}
 	amount, err := credits.NewCreditAmount(rewardCode.CreditAmount)
@@ -284,13 +285,17 @@ WHERE id = $1 AND enabled = TRUE
 		return RedeemResult{}, true, err
 	}
 	err = tx.QueryRow(ctx, `INSERT INTO reward_redemptions (
-  id, reward_code_id, user_id, credit_amount, credit_transaction_id, available_balance_after
-) VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, reward_code_id, user_id, credit_amount, credit_transaction_id, available_balance_after, redeemed_at`,
-		redemptionID, rewardCode.ID, command.UserID, rewardCode.CreditAmount,
+  id, reward_code_id, user_id, reward_code_display_name, masked_code_hint,
+  credit_amount, credit_transaction_id, available_balance_after
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, reward_code_id, user_id, reward_code_display_name, masked_code_hint,
+          credit_amount, credit_transaction_id, available_balance_after, redeemed_at`,
+		redemptionID, rewardCode.ID, command.UserID, rewardCode.DisplayName, rewardCode.MaskedCodeHint,
+		rewardCode.CreditAmount,
 		grant.TransactionID, grant.Wallet.Available,
 	).Scan(
-		&redemption.ID, &redemption.RewardCodeID, &redemption.UserID, &redemption.CreditAmount,
+		&redemption.ID, &redemption.RewardCodeID, &redemption.UserID,
+		&redemption.RewardCodeDisplayName, &redemption.MaskedCodeHint, &redemption.CreditAmount,
 		&redemption.CreditTransactionID, &redemption.AvailableBalanceAfter, &redemption.RedeemedAt,
 	)
 	if err != nil {
@@ -299,15 +304,15 @@ RETURNING id, reward_code_id, user_id, credit_amount, credit_transaction_id, ava
 	if err := tx.Commit(ctx); err != nil {
 		return RedeemResult{}, true, fmt.Errorf("commit reward Code redemption: %w", err)
 	}
-	return canonicalRedeemResult(redemption, rewardCode, grant.Wallet.Available, false), true, nil
+	return canonicalRedeemResult(redemption, grant.Wallet.Available, false), true, nil
 }
 
-func canonicalRedeemResult(redemption Redemption, rewardCode RewardCode, balance int64, replayed bool) RedeemResult {
+func canonicalRedeemResult(redemption Redemption, balance int64, replayed bool) RedeemResult {
 	return RedeemResult{
 		Redemption: redemption,
 		HistoryItem: RedemptionHistoryItem{
-			ID: redemption.ID, RewardCodeDisplayName: rewardCode.DisplayName,
-			CreditedAmount: redemption.CreditAmount, MaskedCodeHint: rewardCode.MaskedCodeHint,
+			ID: redemption.ID, RewardCodeDisplayName: redemption.RewardCodeDisplayName,
+			CreditedAmount: redemption.CreditAmount, MaskedCodeHint: redemption.MaskedCodeHint,
 			RedeemedAt: redemption.RedeemedAt,
 		},
 		CreditedAmount: redemption.CreditAmount, AvailableBalance: balance, Replayed: replayed,
@@ -398,4 +403,13 @@ func deriveRewardCodeStatus(rewardCode RewardCode, now time.Time) RewardCodeStat
 		return RewardCodeStatusDisabled
 	}
 	return RewardCodeStatusEnabled
+}
+
+func rewardCodeJournalSnapshot(rewardCode RewardCode) map[string]any {
+	return map[string]any{
+		"id": rewardCode.ID, "display_name": rewardCode.DisplayName,
+		"masked_code_hint": rewardCode.MaskedCodeHint, "credit_amount": rewardCode.CreditAmount,
+		"max_redemptions": rewardCode.MaxRedemptions, "redemption_count": rewardCode.RedemptionCount,
+		"expires_at": rewardCode.ExpiresAt, "enabled": rewardCode.Enabled,
+	}
 }

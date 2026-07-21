@@ -22,6 +22,14 @@ import (
 type rewardHandlerServiceStub struct {
 	RewardService
 	redeem func(context.Context, RedeemCommand) (RedeemResult, error)
+	update func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error)
+}
+
+func (s rewardHandlerServiceStub) UpdateRewardCode(
+	ctx context.Context,
+	command UpdateRewardCodeCommand,
+) (UpdatedRewardCode, error) {
+	return s.update(ctx, command)
 }
 
 func (s rewardHandlerServiceStub) Redeem(
@@ -192,6 +200,67 @@ func TestRewardRedeemDoesNotLogOrReturnSensitiveCodeMaterial(t *testing.T) {
 	}
 }
 
+func TestRewardCodeUpdateWithCodeRequiresAdminAndDoesNotExposeSensitiveMaterial(t *testing.T) {
+	const rawCode = "ADMIN-SECRET-294"
+	const fullDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	requestBody := `{"code":"` + rawCode + `"}`
+	serviceCalls := 0
+	service := rewardHandlerServiceStub{update: func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error) {
+		serviceCalls++
+		return UpdatedRewardCode{}, errors.New("rotation failed code=" + rawCode + " digest=" + fullDigest)
+	}}
+	handler := NewHandler(service)
+	gin.SetMode(gin.TestMode)
+	unauthenticated := gin.New()
+	unauthenticated.PATCH("/admin/rewards/codes/:id", handler.UpdateRewardCode)
+	responseRecorder := performRawAdminRewardRequest(t, unauthenticated, http.MethodPatch,
+		"/admin/rewards/codes/1", requestBody)
+	if responseRecorder.Code != http.StatusUnauthorized || serviceCalls != 0 {
+		t.Fatalf("unauthenticated rotate status=%d calls=%d", responseRecorder.Code, serviceCalls)
+	}
+
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+	admin := gin.New()
+	admin.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
+	admin.PATCH("/admin/rewards/codes/:id", handler.UpdateRewardCode)
+	responseRecorder = performRawAdminRewardRequest(t, admin, http.MethodPatch,
+		"/admin/rewards/codes/1", `{"display_name":"Secure","credit_amount":1,"max_redemptions":0,"code":"`+rawCode+`"}`)
+	assertRewardErrorResponse(t, responseRecorder, http.StatusInternalServerError, "奖励操作失败")
+	if responseRecorder.Header().Get("Cache-Control") != "no-store" || serviceCalls != 1 {
+		t.Fatalf("admin rotate Cache-Control=%q calls=%d", responseRecorder.Header().Get("Cache-Control"), serviceCalls)
+	}
+	observable := logs.String() + responseRecorder.Body.String()
+	for _, forbidden := range []string{rawCode, fullDigest, requestBody} {
+		if strings.Contains(observable, forbidden) {
+			t.Fatalf("rotate logs or response exposed sensitive value %q: %s", forbidden, observable)
+		}
+	}
+}
+
+func TestRewardCodeManagementRejectsUnknownJSONFields(t *testing.T) {
+	service := rewardHandlerServiceStub{update: func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error) {
+		t.Fatal("invalid management request reached Rewards service")
+		return UpdatedRewardCode{}, nil
+	}}
+	handler := NewHandler(service)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
+	router.PATCH("/admin/rewards/codes/:id", handler.UpdateRewardCode)
+	recorder := performRawAdminRewardRequest(t, router, http.MethodPatch,
+		"/admin/rewards/codes/1", `{"display_name":"Secure","credit_amount":1,"max_redemptions":0,"code":"SECURE01","user_id":42}`)
+	assertRewardErrorResponse(t, recorder, http.StatusBadRequest, "参数错误")
+}
+
 func rewardRedeemRouter(t *testing.T, handler *Handler, userID int64) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -207,6 +276,21 @@ func rewardRedeemRouter(t *testing.T, handler *Handler, userID int64) http.Handl
 func performRawRewardRedeem(t *testing.T, router http.Handler, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodPost, "/user/rewards/redeem", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func performRawAdminRewardRequest(
+	t *testing.T,
+	router http.Handler,
+	method string,
+	path string,
+	body string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	request := httptest.NewRequest(method, path, strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)

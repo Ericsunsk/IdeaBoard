@@ -36,10 +36,9 @@ const (
 )
 
 const redemptionHistorySQL = `
-SELECT redemptions.id, codes.display_name, redemptions.credit_amount,
-       codes.code_hint, redemptions.redeemed_at
+SELECT redemptions.id, redemptions.reward_code_display_name, redemptions.credit_amount,
+       redemptions.masked_code_hint, redemptions.redeemed_at
 FROM reward_redemptions redemptions
-JOIN reward_codes codes ON codes.id = redemptions.reward_code_id
 WHERE redemptions.user_id = $1
   AND ($2::BIGINT <= 0 OR redemptions.id < $2)
 ORDER BY redemptions.id DESC
@@ -137,17 +136,15 @@ func (s *Service) ListRedemptions(
 	items := make([]RedemptionHistoryItem, 0, limit+1)
 	for rows.Next() {
 		var item RedemptionHistoryItem
-		var codeHint string
 		if err := rows.Scan(
 			&item.ID,
 			&item.RewardCodeDisplayName,
 			&item.CreditedAmount,
-			&codeHint,
+			&item.MaskedCodeHint,
 			&item.RedeemedAt,
 		); err != nil {
 			return RedemptionHistoryPage{}, fmt.Errorf("scan reward Redemption history: %w", err)
 		}
-		item.MaskedCodeHint = maskedCodeHintPrefix + codeHint
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {

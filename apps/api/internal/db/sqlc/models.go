@@ -310,12 +310,14 @@ type ProviderEndpoint struct {
 }
 
 type RewardAdminAction struct {
-	ID           int64           `json:"id"`
-	RewardCodeID int64           `json:"reward_code_id"`
-	ActionType   string          `json:"action_type"`
-	ActorUserID  int64           `json:"actor_user_id"`
-	Metadata     json.RawMessage `json:"metadata"`
-	CreatedAt    time.Time       `json:"created_at"`
+	ID                   int64           `json:"id"`
+	RewardCodeID         sql.NullInt64   `json:"reward_code_id"`
+	RewardCodeIDSnapshot int64           `json:"reward_code_id_snapshot"`
+	ActionType           string          `json:"action_type"`
+	ActorUserID          int64           `json:"actor_user_id"`
+	Metadata             json.RawMessage `json:"metadata"`
+	TargetSnapshot       json.RawMessage `json:"target_snapshot"`
+	CreatedAt            time.Time       `json:"created_at"`
 }
 
 type RewardCode struct {
@@ -346,6 +348,8 @@ type RewardRedemption struct {
 	ID                    int64     `json:"id"`
 	RewardCodeID          int64     `json:"reward_code_id"`
 	UserID                int64     `json:"user_id"`
+	RewardCodeDisplayName string    `json:"reward_code_display_name"`
+	MaskedCodeHint        string    `json:"masked_code_hint"`
 	CreditAmount          int64     `json:"credit_amount"`
 	CreditTransactionID   string    `json:"credit_transaction_id"`
 	AvailableBalanceAfter int64     `json:"available_balance_after"`

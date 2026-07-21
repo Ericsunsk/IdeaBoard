@@ -7,10 +7,13 @@ import (
 )
 
 var (
-	ErrInvalidCommand     = errors.New("invalid reward command")
-	ErrCodeCollision      = errors.New("reward Code is not unique")
-	ErrRewardCodeConflict = errors.New("reward Code idempotency key conflicts with another payload")
-	ErrCodeUnavailable    = errors.New("reward Code is invalid or unavailable")
+	ErrInvalidCommand      = errors.New("invalid reward command")
+	ErrCodeCollision       = errors.New("reward Code is not unique")
+	ErrRewardCodeConflict  = errors.New("reward Code idempotency key conflicts with another payload")
+	ErrCodeUnavailable     = errors.New("reward Code is invalid or unavailable")
+	ErrRewardCodeNotFound  = errors.New("reward Code not found")
+	ErrCapBelowRedemptions = errors.New("reward Code cap is below its redemption count")
+	ErrRewardCodeRedeemed  = errors.New("redeemed reward Code cannot be deleted")
 )
 
 type RewardCodeStatus string
@@ -53,6 +56,37 @@ type CreateRewardCodeCommand struct {
 	ActorUserID    int64
 }
 
+type UpdateRewardCodeCommand struct {
+	RewardCodeID   int64
+	DisplayName    string
+	CreditAmount   int64
+	MaxRedemptions int64
+	ExpiresAt      *time.Time
+	Code           *string
+	ActorUserID    int64
+}
+
+type UpdatedRewardCode struct {
+	RewardCode RewardCode `json:"reward_code"`
+	Plaintext  string     `json:"plaintext,omitempty"`
+	Replayed   *bool      `json:"replayed,omitempty"`
+}
+
+type SetRewardCodeEnabledCommand struct {
+	RewardCodeID int64
+	Enabled      bool
+	ActorUserID  int64
+}
+
+type DeleteRewardCodeCommand struct {
+	RewardCodeID int64
+	ActorUserID  int64
+}
+
+type DeletedRewardCode struct {
+	RewardCodeID int64 `json:"reward_code_id"`
+}
+
 type ListRewardCodesInput struct {
 	BeforeID int64
 	Limit    int
@@ -67,6 +101,8 @@ type Redemption struct {
 	ID                    int64     `json:"id"`
 	RewardCodeID          int64     `json:"reward_code_id"`
 	UserID                int64     `json:"user_id"`
+	RewardCodeDisplayName string    `json:"-"`
+	MaskedCodeHint        string    `json:"-"`
 	CreditAmount          int64     `json:"credit_amount"`
 	CreditTransactionID   string    `json:"credit_transaction_id"`
 	AvailableBalanceAfter int64     `json:"available_balance_after"`
@@ -107,6 +143,9 @@ type RedeemCommand struct {
 
 type AdminCommands interface {
 	CreateRewardCode(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error)
+	UpdateRewardCode(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error)
+	SetRewardCodeEnabled(context.Context, SetRewardCodeEnabledCommand) (RewardCode, error)
+	DeleteRewardCode(context.Context, DeleteRewardCodeCommand) (DeletedRewardCode, error)
 }
 
 type AdminReads interface {

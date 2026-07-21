@@ -532,7 +532,7 @@ func withMigrationTx(ctx context.Context, conn *sql.Conn, file string, fn func(*
 func execMigrationStatements(ctx context.Context, tx *sql.Tx, file string, statements []migrationStatement) error {
 	for _, statement := range statements {
 		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
-			return fmt.Errorf("apply migration %s: %w", file, err)
+			return fmt.Errorf("apply migration %s statement %q: %w", file, firstSQLLine(statement.SQL), err)
 		}
 	}
 	return nil

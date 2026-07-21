@@ -10,13 +10,16 @@ export function shanghaiDateTimeInputToISO(value: string): string | undefined {
   }
 
   const date = new Date(`${normalized}:00${SHANGHAI_OFFSET}`)
-  if (Number.isNaN(date.getTime()) || isoToShanghaiDateTimeInput(date.toISOString()) !== normalized) {
+  if (
+    Number.isNaN(date.getTime()) ||
+    isoToShanghaiDateTimeInput(date.toISOString()) !== normalized
+  ) {
     throw new Error('时间格式无效')
   }
   return date.toISOString()
 }
 
-function isoToShanghaiDateTimeInput(value: string): string {
+export function isoToShanghaiDateTimeInput(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
 

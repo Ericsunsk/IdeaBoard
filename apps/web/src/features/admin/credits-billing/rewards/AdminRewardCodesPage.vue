@@ -9,12 +9,7 @@
           <Button text :class="iconButtonClass" aria-label="刷新兑换码" @click="loadRewardCodes">
             <template #icon><Refresh class="size-4 text-admin-text-2" /></template>
           </Button>
-          <Button
-            label="创建兑换码"
-            size="small"
-            :disabled="creating"
-            @click="openCreateDialog"
-          />
+          <Button label="创建兑换码" size="small" :disabled="saving" @click="openCreateDialog" />
         </template>
         <template #pager>
           <AdminPagerControls
@@ -47,7 +42,7 @@
       scroll-aria-label="兑换码列表横向滚动区域"
       empty-title="暂无兑换码"
       empty-description="创建第一个兑换码后，用户即可在奖励中心兑换 Idea。"
-      :table-style="{ minWidth: '860px' }"
+      :table-style="{ minWidth: '980px' }"
     >
       <Column field="displayName" header="兑换码" :style="{ minWidth: '220px' }">
         <template #body="{ data }">
@@ -64,12 +59,23 @@
       <Column field="creditAmount" header="奖励 Idea" :style="{ width: '140px' }">
         <template #body="{ data }">{{ formatIdeaAmount(data.creditAmount) }}</template>
       </Column>
-      <Column field="status" header="状态" :style="{ width: '112px' }">
+      <Column field="status" header="有效状态" :style="{ width: '112px' }">
         <template #body="{ data }">
           <Tag
             :value="statusPresentation(data.status).label"
             :severity="statusPresentation(data.status).severity"
             rounded
+          />
+        </template>
+      </Column>
+      <Column header="启用状态" :style="{ width: '100px' }">
+        <template #body="{ data }">
+          <ToggleSwitch
+            :key="`${data.id}:${data.enabled}:${Boolean(enabledPending[data.id])}`"
+            :model-value="data.enabled"
+            :disabled="Boolean(enabledPending[data.id])"
+            :aria-label="`${data.displayName}启用状态`"
+            @update:model-value="setRewardCodeEnabled(data, $event)"
           />
         </template>
       </Column>
@@ -85,55 +91,96 @@
           }}</span>
         </template>
       </Column>
+      <Column header="更多" :style="{ width: '72px' }">
+        <template #body="{ data }">
+          <Button
+            text
+            rounded
+            size="small"
+            severity="secondary"
+            aria-haspopup="dialog"
+            :aria-label="`${data.displayName} 操作菜单`"
+            @click="toggleActionMenu($event, data)"
+          >
+            <template #icon><MoreHoriz class="size-4 text-admin-text-2" /></template>
+          </Button>
+        </template>
+      </Column>
     </DataTableFrame>
   </AdminTablePanel>
 
-  <RewardCodeCreateDialog
+  <AdminRowActionsPopover
+    ref="actionPopoverRef"
+    :items="rewardCodeActionItems"
+    @select="selectAction"
+    @hide="activeRewardCode = null"
+  />
+
+  <RewardCodeFormDialog
     v-model:visible="createDialogVisible"
-    :pending="creating"
-    :error-message="createError"
-    @submit="createRewardCode"
+    :reward-code="editingRewardCode"
+    :pending="saving"
+    :error-message="saveError"
+    @submit="saveRewardCode"
   />
   <RewardCodePlaintextDialog
     :visible="plaintextDialogVisible"
     :plaintext="createdPlaintext"
+    :header="plaintextHeader"
     @update:visible="handlePlaintextDialogVisible"
   />
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { Refresh } from '@iconoir/vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { MoreHoriz, Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
+import ToggleSwitch from 'primevue/toggleswitch'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
+import AdminRowActionsPopover from '../../shared/components/AdminRowActionsPopover.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
-import RewardCodeCreateDialog from './RewardCodeCreateDialog.vue'
+import RewardCodeFormDialog, { type RewardCodeFormValue } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
-import {
-  createAdminRewardCodeResource,
-  type CreateRewardCodeInput,
-  type RewardCode,
-} from './rewardCodeAdminResource'
+import { createAdminRewardCodeResource, type RewardCode } from './rewardCodeAdminResource'
 
 const resource = createAdminRewardCodeResource()
 const toast = useAdminToast()
 const rewardCodes = ref<RewardCode[]>([])
 const loading = ref(true)
 const loadError = ref(false)
-const creating = ref(false)
-const createError = ref('')
+const saving = ref(false)
+const saveError = ref('')
 const createDialogVisible = ref(false)
+const editingRewardCode = ref<RewardCode | null>(null)
 const plaintextDialogVisible = ref(false)
 const createdPlaintext = ref('')
+const plaintextHeader = ref('保存兑换码')
+const enabledPending = reactive<Record<number, boolean>>({})
+const deletePending = reactive<Record<number, boolean>>({})
+const activeRewardCode = ref<RewardCode | null>(null)
+const actionPopoverRef = ref<PrimePopupPanel | null>(null)
+const rewardCodeActionItems = computed(() => [
+  { key: 'edit', label: '编辑' },
+  {
+    key: 'delete',
+    label: '删除',
+    danger: true,
+    disabled: Boolean(deletePending[activeRewardCode.value?.id ?? 0]),
+  },
+])
 const pagination = useAdminCursorPagination<number>({ pending: loading })
+const confirm = useAdminConfirm()
+
+type PrimePopupPanel = { toggle: (event: Event) => void; hide?: () => void }
 
 onMounted(loadRewardCodes)
 
@@ -153,27 +200,112 @@ async function loadRewardCodes() {
 }
 
 function openCreateDialog() {
-  if (creating.value) return
-  createError.value = ''
+  if (saving.value) return
+  editingRewardCode.value = null
+  saveError.value = ''
   createDialogVisible.value = true
 }
 
-async function createRewardCode(input: CreateRewardCodeInput) {
-  creating.value = true
-  createError.value = ''
+async function saveRewardCode(input: RewardCodeFormValue) {
+  if (saving.value) return
+  saving.value = true
+  saveError.value = ''
   try {
-    const created = await resource.create(input)
+    const editing = editingRewardCode.value
+    if (!editing) {
+      const created = await resource.create(input)
+      createdPlaintext.value = created.plaintext || input.code
+      plaintextHeader.value = '保存兑换码'
+      plaintextDialogVisible.value = true
+      toast.success('兑换码已创建')
+    } else {
+      const updated = await resource.update(editing.id, {
+        displayName: input.displayName,
+        creditAmount: input.creditAmount,
+        maxRedemptions: input.maxRedemptions,
+        expiresAt: input.expiresAt,
+        ...(input.code ? { code: input.code } : {}),
+      })
+      replaceRewardCode(updated.rewardCode)
+      if (input.code) {
+        createdPlaintext.value = updated.plaintext || input.code
+        plaintextHeader.value = '保存新 Code'
+        plaintextDialogVisible.value = true
+      }
+      toast.success(input.code ? '兑换码与 Code 已更新' : '兑换码已更新')
+    }
     createDialogVisible.value = false
-    createdPlaintext.value = created.plaintext || input.code
-    plaintextDialogVisible.value = true
-    toast.success('兑换码已创建')
     pagination.reset()
     void loadRewardCodes()
   } catch (error) {
-    createError.value = formatAdminDisplayError(error, '创建兑换码失败')
+    saveError.value = formatAdminDisplayError(
+      error,
+      editingRewardCode.value ? '更新兑换码失败' : '创建兑换码失败',
+    )
   } finally {
-    creating.value = false
+    saving.value = false
   }
+}
+
+function toggleActionMenu(event: Event, rewardCode: RewardCode) {
+  activeRewardCode.value = rewardCode
+  actionPopoverRef.value?.toggle(event)
+}
+
+function selectAction(action: string) {
+  const rewardCode = activeRewardCode.value
+  actionPopoverRef.value?.hide?.()
+  if (!rewardCode) return
+  if (action === 'edit') {
+    editingRewardCode.value = rewardCode
+    saveError.value = ''
+    createDialogVisible.value = true
+    return
+  }
+  if (action === 'delete') confirmDelete(rewardCode)
+}
+
+function confirmDelete(rewardCode: RewardCode) {
+  if (deletePending[rewardCode.id]) return
+  confirm.request({
+    title: '删除兑换码',
+    message: `确定永久删除“${rewardCode.displayName}”吗？没有 Redemption 的兑换码才可删除。`,
+    confirmLabel: '确认删除',
+    intent: 'danger',
+    onConfirm: () => deleteRewardCode(rewardCode),
+  })
+}
+
+async function deleteRewardCode(rewardCode: RewardCode) {
+  if (deletePending[rewardCode.id]) return
+  deletePending[rewardCode.id] = true
+  try {
+    await resource.delete(rewardCode.id)
+    rewardCodes.value = rewardCodes.value.filter((candidate) => candidate.id !== rewardCode.id)
+    toast.success('兑换码已删除')
+  } catch (error) {
+    toast.error(formatAdminDisplayError(error, '删除兑换码失败'))
+  } finally {
+    deletePending[rewardCode.id] = false
+  }
+}
+
+async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
+  if (enabledPending[rewardCode.id]) return
+  enabledPending[rewardCode.id] = true
+  try {
+    replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled))
+    toast.success(enabled ? '兑换码已启用' : '兑换码已停用')
+  } catch (error) {
+    toast.error(formatAdminDisplayError(error, enabled ? '启用兑换码失败' : '停用兑换码失败'))
+  } finally {
+    enabledPending[rewardCode.id] = false
+  }
+}
+
+function replaceRewardCode(updated: RewardCode) {
+  const index = rewardCodes.value.findIndex((candidate) => candidate.id === updated.id)
+  if (index >= 0) rewardCodes.value[index] = updated
 }
 
 function previousPage() {

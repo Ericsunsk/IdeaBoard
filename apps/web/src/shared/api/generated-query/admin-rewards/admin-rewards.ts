@@ -14,13 +14,18 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { toValue, unref } from 'vue'
+import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   AdminRewardCodeCreateRequest,
+  AdminRewardCodeEnabledRequest,
+  AdminRewardCodeUpdateRequest,
   ApiResponseCreatedRewardCode,
+  ApiResponseDeletedRewardCode,
+  ApiResponseRewardCode,
   ApiResponseRewardCodePage,
+  ApiResponseUpdatedRewardCode,
   ListAdminRewardCodesParams,
 } from '../model'
 
@@ -183,6 +188,268 @@ export function useCreateAdminRewardCode<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getCreateAdminRewardCodeQueryOptions(adminRewardCodeCreateRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getUpdateAdminRewardCodeUrl = (id: number) => {
+  return `/admin/rewards/codes/${encodeURIComponent(String(id))}`
+}
+
+export const updateAdminRewardCode = async (
+  id: number,
+  adminRewardCodeUpdateRequest: AdminRewardCodeUpdateRequest,
+  options?: RequestInit,
+): Promise<ApiResponseUpdatedRewardCode> => {
+  return orvalMutator<ApiResponseUpdatedRewardCode>(getUpdateAdminRewardCodeUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRewardCodeUpdateRequest),
+  })
+}
+
+export const getUpdateAdminRewardCodeQueryKey = (
+  id: MaybeRefOrGetter<number>,
+  adminRewardCodeUpdateRequest?: MaybeRefOrGetter<AdminRewardCodeUpdateRequest>,
+) => {
+  return ['PATCH', 'admin', 'rewards', 'codes', id, adminRewardCodeUpdateRequest] as const
+}
+
+export const getUpdateAdminRewardCodeQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminRewardCode>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  adminRewardCodeUpdateRequest: MaybeRefOrGetter<AdminRewardCodeUpdateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCode>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminRewardCodeQueryKey(id, adminRewardCodeUpdateRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRewardCode>>> = ({ signal }) =>
+    updateAdminRewardCode(toValue(id), toValue(adminRewardCodeUpdateRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCode>>, TError, TData>
+}
+
+export type UpdateAdminRewardCodeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminRewardCode>>
+>
+export type UpdateAdminRewardCodeQueryError = ErrorType<unknown>
+
+export function useUpdateAdminRewardCode<
+  TData = Awaited<ReturnType<typeof updateAdminRewardCode>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  adminRewardCodeUpdateRequest: MaybeRefOrGetter<AdminRewardCodeUpdateRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRewardCode>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminRewardCodeQueryOptions(
+    id,
+    adminRewardCodeUpdateRequest,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getDeleteAdminRewardCodeUrl = (id: number) => {
+  return `/admin/rewards/codes/${encodeURIComponent(String(id))}`
+}
+
+export const deleteAdminRewardCode = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApiResponseDeletedRewardCode> => {
+  return orvalMutator<ApiResponseDeletedRewardCode>(getDeleteAdminRewardCodeUrl(id), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getDeleteAdminRewardCodeQueryKey = (id: MaybeRefOrGetter<number>) => {
+  return ['DELETE', 'admin', 'rewards', 'codes', id] as const
+}
+
+export const getDeleteAdminRewardCodeQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCode>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDeleteAdminRewardCodeQueryKey(id)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminRewardCode>>> = ({ signal }) =>
+    deleteAdminRewardCode(toValue(id), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCode>>, TError, TData>
+}
+
+export type DeleteAdminRewardCodeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAdminRewardCode>>
+>
+export type DeleteAdminRewardCodeQueryError = ErrorType<unknown>
+
+export function useDeleteAdminRewardCode<
+  TData = Awaited<ReturnType<typeof deleteAdminRewardCode>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof deleteAdminRewardCode>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteAdminRewardCodeQueryOptions(id, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSetAdminRewardCodeEnabledUrl = (id: number) => {
+  return `/admin/rewards/codes/${encodeURIComponent(String(id))}/enabled`
+}
+
+export const setAdminRewardCodeEnabled = async (
+  id: number,
+  adminRewardCodeEnabledRequest: AdminRewardCodeEnabledRequest,
+  options?: RequestInit,
+): Promise<ApiResponseRewardCode> => {
+  return orvalMutator<ApiResponseRewardCode>(getSetAdminRewardCodeEnabledUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminRewardCodeEnabledRequest),
+  })
+}
+
+export const getSetAdminRewardCodeEnabledQueryKey = (
+  id: MaybeRefOrGetter<number>,
+  adminRewardCodeEnabledRequest?: MaybeRefOrGetter<AdminRewardCodeEnabledRequest>,
+) => {
+  return [
+    'PATCH',
+    'admin',
+    'rewards',
+    'codes',
+    id,
+    'enabled',
+    adminRewardCodeEnabledRequest,
+  ] as const
+}
+
+export const getSetAdminRewardCodeEnabledQueryOptions = <
+  TData = Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  adminRewardCodeEnabledRequest: MaybeRefOrGetter<AdminRewardCodeEnabledRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSetAdminRewardCodeEnabledQueryKey(id, adminRewardCodeEnabledRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>> = ({
+    signal,
+  }) =>
+    setAdminRewardCodeEnabled(toValue(id), toValue(adminRewardCodeEnabledRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>, TError, TData>
+}
+
+export type SetAdminRewardCodeEnabledQueryResult = NonNullable<
+  Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>
+>
+export type SetAdminRewardCodeEnabledQueryError = ErrorType<unknown>
+
+export function useSetAdminRewardCodeEnabled<
+  TData = Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  adminRewardCodeEnabledRequest: MaybeRefOrGetter<AdminRewardCodeEnabledRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminRewardCodeEnabled>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSetAdminRewardCodeEnabledQueryOptions(
+    id,
+    adminRewardCodeEnabledRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

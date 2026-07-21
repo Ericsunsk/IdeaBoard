@@ -3,6 +3,7 @@ package rewards
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,6 +31,9 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	})
 	adminRouter.POST("/admin/rewards/codes", handler.CreateRewardCode)
 	adminRouter.GET("/admin/rewards/codes", handler.ListRewardCodes)
+	adminRouter.PATCH("/admin/rewards/codes/:id", handler.UpdateRewardCode)
+	adminRouter.PATCH("/admin/rewards/codes/:id/enabled", handler.SetRewardCodeEnabled)
+	adminRouter.DELETE("/admin/rewards/codes/:id", handler.DeleteRewardCode)
 
 	request := map[string]any{
 		"display_name":    "HTTP 新用户奖励",
@@ -77,6 +81,58 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		strings.Contains(conflictRecorder.Body.String(), "HTTP-REWARD-2026") {
 		t.Fatalf("conflict response leaked raw Code: %s", conflictRecorder.Body.String())
 	}
+	codePath := fmt.Sprintf("/admin/rewards/codes/%d", created.RewardCode.ID)
+	updated, updateRecorder := performRewardRequestWithRecorder[UpdatedRewardCode](
+		t, adminRouter, http.MethodPatch, codePath, map[string]any{
+			"display_name": "HTTP 新用户奖励", "credit_amount": 25, "max_redemptions": 0,
+		}, http.StatusOK,
+	)
+	if updateRecorder.Header().Get("Cache-Control") != "no-store" || updated.RewardCode.ID != created.RewardCode.ID ||
+		updated.Plaintext != "" || updated.Replayed != nil || strings.Contains(updateRecorder.Body.String(), "plaintext") ||
+		strings.Contains(updateRecorder.Body.String(), "replayed") {
+		t.Fatalf("update = %+v Cache-Control=%q", updated, updateRecorder.Header().Get("Cache-Control"))
+	}
+	disabled, _ := performRewardRequestWithRecorder[RewardCode](
+		t, adminRouter, http.MethodPatch, codePath+"/enabled", map[string]any{"enabled": false}, http.StatusOK,
+	)
+	if disabled.Enabled || disabled.Status != RewardCodeStatusDisabled {
+		t.Fatalf("disabled RewardCode = %+v", disabled)
+	}
+	performRewardRequestWithRecorder[RewardCode](
+		t, adminRouter, http.MethodPatch, codePath+"/enabled", map[string]any{"enabled": true}, http.StatusOK,
+	)
+	rotated, rotateRecorder := performRewardRequestWithRecorder[UpdatedRewardCode](
+		t, adminRouter, http.MethodPatch, codePath, map[string]any{
+			"display_name": "HTTP 新用户奖励", "credit_amount": 25, "max_redemptions": 0,
+			"code": "HTTP-ROTATED-2026",
+		}, http.StatusOK,
+	)
+	if rotateRecorder.Header().Get("Cache-Control") != "no-store" ||
+		rotated.Plaintext != "HTTPROTATED2026" || rotated.Replayed == nil || *rotated.Replayed {
+		t.Fatalf("rotate = %+v Cache-Control=%q", rotated, rotateRecorder.Header().Get("Cache-Control"))
+	}
+	rotateReplay, _ := performRewardRequestWithRecorder[UpdatedRewardCode](
+		t, adminRouter, http.MethodPatch, codePath, map[string]any{
+			"display_name": "HTTP 新用户奖励", "credit_amount": 25, "max_redemptions": 0,
+			"code": "HTTP-ROTATED-2026",
+		}, http.StatusOK,
+	)
+	if rotateReplay.Replayed == nil || !*rotateReplay.Replayed || rotateReplay.Plaintext != "" {
+		t.Fatalf("rotate replay = %+v", rotateReplay)
+	}
+	temporary, _ := performRewardRequestWithRecorder[CreatedRewardCode](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
+			"display_name": "待删除", "code": "HTTP-DELETE-2026", "credit_amount": 1,
+			"max_redemptions": 0, "idempotency_key": "http-delete",
+		}, http.StatusOK,
+	)
+	deleted, _ := performRewardRequestWithRecorder[DeletedRewardCode](
+		t, adminRouter, http.MethodDelete,
+		fmt.Sprintf("/admin/rewards/codes/%d", temporary.RewardCode.ID), nil, http.StatusOK,
+	)
+	if deleted.RewardCodeID != temporary.RewardCode.ID {
+		t.Fatalf("delete = %+v", deleted)
+	}
 
 	provisionRewardWallet(t, pool, creditService, 3)
 	userRouter := gin.New()
@@ -87,10 +143,29 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	userRouter.POST("/user/rewards/redeem", handler.Redeem)
 	userRouter.GET("/user/rewards/redemptions", handler.ListRedemptions)
 	redeemed, redeemRecorder := performRewardRequestWithRecorder[RedeemResult](
-		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "HTTP-REWARD-2026"}, http.StatusOK,
+		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "HTTP-ROTATED-2026"}, http.StatusOK,
 	)
 	if redeemRecorder.Header().Get("Cache-Control") != "no-store" || redeemed.CreditedAmount != 25 {
 		t.Fatalf("redeem = %+v Cache-Control=%q", redeemed, redeemRecorder.Header().Get("Cache-Control"))
+	}
+	var redeemPayload struct {
+		Data struct {
+			Redemption map[string]json.RawMessage `json:"redemption"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(redeemRecorder.Body.Bytes(), &redeemPayload); err != nil {
+		t.Fatalf("decode redeem response: %v", err)
+	}
+	for _, field := range []string{"reward_code_display_name", "masked_code_hint"} {
+		if _, found := redeemPayload.Data.Redemption[field]; found {
+			t.Fatalf("redeem redemption unexpectedly exposed snapshot field %q", field)
+		}
+	}
+	_, redeemedDeleteRecorder := performRewardRequestWithRecorder[struct{}](
+		t, adminRouter, http.MethodDelete, codePath, nil, http.StatusConflict,
+	)
+	if redeemedDeleteRecorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("redeemed delete Cache-Control=%q", redeemedDeleteRecorder.Header().Get("Cache-Control"))
 	}
 	invalidRaw := "INVALID-SECRET-9999"
 	_, invalidRecorder := performRewardRequestWithRecorder[struct{}](

@@ -188,24 +188,12 @@
     </DataTableFrame>
   </AdminTablePanel>
 
-  <Popover ref="userActionPopoverRef" :pt="userActionPopoverPt" @hide="handleUserActionPopoverHide">
-    <div :class="userActionPopoverClass">
-      <template v-for="item in userActionItems" :key="item.key">
-        <div v-if="item.divided" class="my-1 h-px bg-admin-border-soft" aria-hidden="true" />
-        <Button
-          :label="item.label"
-          text
-          :severity="item.key === 'delete' ? 'danger' : 'secondary'"
-          :disabled="item.disabled"
-          :class="[
-            adminTextButtonClass,
-            '!w-full !justify-start !rounded-md !px-3 !py-2.5 !text-admin-meta !font-[650]',
-          ]"
-          @click="handleActionSelect(item.key)"
-        />
-      </template>
-    </div>
-  </Popover>
+  <AdminRowActionsPopover
+    ref="userActionPopoverRef"
+    :items="userRowActionItems"
+    @select="handleActionSelect"
+    @hide="clearActiveActionUser"
+  />
 
   <AdminUserBanDialog
     v-model:expires-in-days="banForm.expiresInDays"
@@ -222,30 +210,25 @@
 
 <script setup lang="ts">
 import { Refresh, Search } from '@iconoir/vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../shared/components/AdminPagerControls.vue'
+import AdminRowActionsPopover from '../shared/components/AdminRowActionsPopover.vue'
 import AdminResourceToolbar from '../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
-import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
-import { adminTextButtonClass } from '../shared/lib/adminUiClasses'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'
 import type { AdminUserRowView, UserActionKey } from './adminUserView'
 import { useAdminUsersFeedback } from './useAdminUsersFeedback'
-
-const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
-const userActionPopoverPt = createAdminPopoverPt({ contentClass: '!p-1.5' })
 
 type PrimePopupPanel = {
   toggle: (event: Event) => void
@@ -295,18 +278,18 @@ const {
 } = adminUsers.commands
 
 const { userRoleFilterOptions, userStatusFilterOptions } = adminUsers.view
+const userRowActionItems = computed(() =>
+  userActionItems.value.map((item) => ({ ...item, danger: item.key === 'delete' })),
+)
 
 function toggleUserActionMenu(event: Event, user: AdminUserRowView) {
   openUserActionMenu(user)
   userActionPopoverRef.value?.toggle(event)
 }
 
-function handleUserActionPopoverHide() {
-  clearActiveActionUser()
-}
-
-function handleActionSelect(key: UserActionKey) {
-  selectUserAction(key)
+function handleActionSelect(key: string) {
+  if (!userActionItems.value.some((item) => item.key === key)) return
+  selectUserAction(key as UserActionKey)
   userActionPopoverRef.value?.hide?.()
 }
 </script>

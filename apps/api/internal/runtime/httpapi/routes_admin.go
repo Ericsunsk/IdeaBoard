@@ -30,6 +30,9 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 func registerAdminRewardRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/rewards/codes", h.RewardHandler.ListRewardCodes)
 	adminAPI.POST("/rewards/codes", h.RewardHandler.CreateRewardCode)
+	adminAPI.PATCH("/rewards/codes/:id", h.RewardHandler.UpdateRewardCode)
+	adminAPI.PATCH("/rewards/codes/:id/enabled", h.RewardHandler.SetRewardCodeEnabled)
+	adminAPI.DELETE("/rewards/codes/:id", h.RewardHandler.DeleteRewardCode)
 }
 
 func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

@@ -1,11 +1,15 @@
 import {
   createAdminRewardCode,
+  deleteAdminRewardCode,
   listAdminRewardCodes,
+  setAdminRewardCodeEnabled,
+  updateAdminRewardCode,
 } from '../../../../shared/api/generated-query/admin-rewards/admin-rewards'
 import type {
   CreatedRewardCode as GeneratedCreatedRewardCode,
   RewardCode as GeneratedRewardCode,
   RewardCodePage as GeneratedRewardCodePage,
+  UpdatedRewardCode as GeneratedUpdatedRewardCode,
 } from '../../../../shared/api/generated-query/model'
 import { resolveApiData } from '../../../../shared/api/apiResponse'
 import { shanghaiDateTimeInputToISO } from './rewardCodeTime'
@@ -40,6 +44,20 @@ export type CreatedRewardCode = {
   replayed: boolean
 }
 
+export type UpdateRewardCodeInput = {
+  displayName: string
+  creditAmount: number
+  maxRedemptions: number
+  expiresAt: string
+  code?: string
+}
+
+export type UpdatedRewardCode = {
+  rewardCode: RewardCode
+  plaintext?: string
+  replayed?: boolean
+}
+
 export type RewardCodePage = {
   rewardCodes: RewardCode[]
   nextBeforeId?: number
@@ -48,6 +66,9 @@ export type RewardCodePage = {
 export type AdminRewardCodeResource = {
   list: (beforeId?: number) => Promise<RewardCodePage>
   create: (input: CreateRewardCodeInput) => Promise<CreatedRewardCode>
+  update: (id: number, input: UpdateRewardCodeInput) => Promise<UpdatedRewardCode>
+  setEnabled: (id: number, enabled: boolean) => Promise<RewardCode>
+  delete: (id: number) => Promise<void>
 }
 
 export function createAdminRewardCodeResource(): AdminRewardCodeResource {
@@ -59,8 +80,9 @@ export function createAdminRewardCodeResource(): AdminRewardCodeResource {
           '加载兑换码失败',
         ),
       ),
-    create: async (input) =>
-      toCreatedRewardCode(
+    create: async (input) => {
+      const expiresAt = shanghaiDateTimeInputToISO(input.expiresAt)
+      return toCreatedRewardCode(
         await resolveApiData(
           createAdminRewardCode({
             display_name: input.displayName.trim(),
@@ -68,13 +90,35 @@ export function createAdminRewardCodeResource(): AdminRewardCodeResource {
             credit_amount: input.creditAmount,
             max_redemptions: input.maxRedemptions,
             idempotency_key: input.idempotencyKey,
-            ...(shanghaiDateTimeInputToISO(input.expiresAt)
-              ? { expires_at: shanghaiDateTimeInputToISO(input.expiresAt) }
-              : {}),
+            ...(expiresAt ? { expires_at: expiresAt } : {}),
           }),
           '创建兑换码失败',
         ),
+      )
+    },
+    update: async (id, input) =>
+      toUpdatedRewardCode(
+        await resolveApiData(
+          updateAdminRewardCode(id, {
+            display_name: input.displayName.trim(),
+            credit_amount: input.creditAmount,
+            max_redemptions: input.maxRedemptions,
+            expires_at: shanghaiDateTimeInputToISO(input.expiresAt) ?? null,
+            ...(input.code?.trim() ? { code: input.code.trim() } : {}),
+          }),
+          '更新兑换码失败',
+        ),
       ),
+    setEnabled: async (id, enabled) =>
+      toRewardCode(
+        await resolveApiData(
+          setAdminRewardCodeEnabled(id, { enabled }),
+          enabled ? '启用兑换码失败' : '停用兑换码失败',
+        ),
+      ),
+    delete: async (id) => {
+      await resolveApiData(deleteAdminRewardCode(id), '删除兑换码失败')
+    },
   }
 }
 
@@ -96,6 +140,14 @@ function toRewardCode(value: GeneratedRewardCode): RewardCode {
 }
 
 function toCreatedRewardCode(value: GeneratedCreatedRewardCode): CreatedRewardCode {
+  return {
+    rewardCode: toRewardCode(value.reward_code),
+    plaintext: value.plaintext,
+    replayed: value.replayed,
+  }
+}
+
+function toUpdatedRewardCode(value: GeneratedUpdatedRewardCode): UpdatedRewardCode {
   return {
     rewardCode: toRewardCode(value.reward_code),
     plaintext: value.plaintext,

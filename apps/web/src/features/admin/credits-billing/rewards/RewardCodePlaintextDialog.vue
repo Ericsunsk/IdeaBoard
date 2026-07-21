@@ -1,7 +1,7 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    header="保存兑换码"
+    :header="header"
     size="compact"
     @update:visible="emit('update:visible', $event)"
   >
@@ -31,7 +31,10 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 
-const props = defineProps<{ visible: boolean; plaintext: string }>()
+const props = withDefaults(
+  defineProps<{ visible: boolean; plaintext: string; header?: string }>(),
+  { header: '保存兑换码' },
+)
 const emit = defineEmits<{ 'update:visible': [visible: boolean] }>()
 const copied = ref(false)
 const copyError = ref(false)

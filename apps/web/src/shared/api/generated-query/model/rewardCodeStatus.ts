@@ -8,8 +8,8 @@
 export type RewardCodeStatus = (typeof RewardCodeStatus)[keyof typeof RewardCodeStatus]
 
 export const RewardCodeStatus = {
+  disabled: 'disabled',
   expired: 'expired',
   exhausted: 'exhausted',
-  disabled: 'disabled',
   enabled: 'enabled',
 } as const

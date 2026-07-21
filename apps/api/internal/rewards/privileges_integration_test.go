@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,10 +57,27 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 	if err := dbprivileges.Verify(ctx, conn, policies...); err != nil {
 		t.Fatalf("verify runtime privilege policies: %v", err)
 	}
-
-	if _, err := conn.ExecContext(ctx, `UPDATE reward_codes SET enabled = FALSE WHERE id = $1`, created.RewardCode.ID); err != nil {
-		t.Fatalf("disable RewardCode through guarded runtime privilege: %v", err)
+	if _, err := db.ExecContext(ctx, `
+UPDATE reward_codes
+SET expires_at = clock_timestamp() - INTERVAL '1 second'
+WHERE id = $1`, created.RewardCode.ID); err != nil {
+		t.Fatalf("expire RewardCode fixture: %v", err)
 	}
+	var reserved bool
+	if err := conn.QueryRowContext(ctx, `SELECT reserve_reward_code_redemption_v1($1)`, created.RewardCode.ID).Scan(&reserved); err != nil {
+		t.Fatalf("reserve expired RewardCode through runtime capability: %v", err)
+	}
+	if reserved {
+		t.Fatal("runtime reserve bypassed database-authoritative expiry")
+	}
+
+	var changed bool
+	if err := conn.QueryRowContext(ctx, `SELECT set_reward_code_enabled_v1($1, FALSE, $2)`,
+		created.RewardCode.ID, int64(1)).Scan(&changed); err != nil || !changed {
+		t.Fatalf("disable RewardCode through controlled command: changed=%t error=%v", changed, err)
+	}
+	assertRuntimeRewardStatementDenied(t, ctx, conn,
+		`UPDATE reward_codes SET enabled = TRUE WHERE id = $1`, created.RewardCode.ID)
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
 		`UPDATE reward_codes SET code_hint = 'ABCD' WHERE id = $1`, created.RewardCode.ID)
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
@@ -68,6 +86,8 @@ func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T
 		`UPDATE reward_codes SET redemption_count = redemption_count + 2 WHERE id = $1`, created.RewardCode.ID)
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
 		`DELETE FROM reward_codes WHERE id = $1`, created.RewardCode.ID)
+	assertRuntimeRewardStatementDenied(t, ctx, conn,
+		`DELETE FROM reward_code_digest_aliases WHERE reward_code_id = $1`, created.RewardCode.ID)
 	assertRuntimeRewardStatementDenied(t, ctx, conn,
 		`UPDATE reward_admin_actions SET metadata = '{}'::JSONB WHERE reward_code_id = $1`, created.RewardCode.ID)
 
@@ -88,6 +108,52 @@ SELECT has_function_privilege($1, $2, 'EXECUTE'),
 			t.Fatalf("guard %s execute privileges runtime=%v public=%v", signature, runtimeCanExecute, publicCanExecute)
 		}
 	}
+	commandFunctions := []string{
+		"update_reward_code_definition_v1(bigint,text,bigint,bigint,timestamp with time zone,bigint)",
+		"set_reward_code_enabled_v1(bigint,boolean,bigint)",
+		"rotate_reward_code_v1(bigint,text,bytea,text,text,bytea,bigint)",
+		"delete_reward_code_v1(bigint,bigint)",
+		"reserve_reward_code_redemption_v1(bigint)",
+	}
+	for _, signature := range commandFunctions {
+		var securityDefiner bool
+		var owner string
+		var config string
+		var trustedSchema string
+		if err := db.QueryRowContext(ctx, `
+SELECT functions.prosecdef,
+       pg_get_userbyid(functions.proowner),
+       COALESCE(array_to_string(functions.proconfig, ','), ''),
+       current_schema()
+FROM pg_proc AS functions
+WHERE functions.oid = $1::regprocedure`, signature).Scan(
+			&securityDefiner, &owner, &config, &trustedSchema,
+		); err != nil {
+			t.Fatalf("read command hardening for %s: %v", signature, err)
+		}
+		if !securityDefiner || owner == runtimeRole || !isTrustedRewardFunctionSearchPath(config, trustedSchema) {
+			t.Fatalf("command %s security_definer=%v owner=%q runtime=%q config=%q", signature, securityDefiner, owner, runtimeRole, config)
+		}
+	}
+	for _, signature := range commandFunctions {
+		var runtimeCanExecute, publicCanExecute bool
+		if err := db.QueryRowContext(ctx, `
+SELECT has_function_privilege($1, $2, 'EXECUTE'),
+       has_function_privilege('public', $2, 'EXECUTE')`, runtimeRole, signature).Scan(
+			&runtimeCanExecute,
+			&publicCanExecute,
+		); err != nil {
+			t.Fatalf("read command privileges for %s: %v", signature, err)
+		}
+		if !runtimeCanExecute || publicCanExecute {
+			t.Fatalf("command %s execute privileges runtime=%v public=%v", signature, runtimeCanExecute, publicCanExecute)
+		}
+	}
+}
+
+func isTrustedRewardFunctionSearchPath(config, schema string) bool {
+	return strings.Contains(config, "search_path="+schema+", pg_catalog, pg_temp") &&
+		!strings.Contains(config, "$user") && !strings.Contains(config, "public")
 }
 
 func assertRuntimeRewardStatementDenied(

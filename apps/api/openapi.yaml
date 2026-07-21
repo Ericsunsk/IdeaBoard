@@ -983,6 +983,68 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseCreatedRewardCode' }
 
+  /admin/rewards/codes/{id}:
+    patch:
+      tags: [AdminRewards]
+      operationId: updateAdminRewardCode
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RewardCodeIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminRewardCodeUpdateRequest' }
+      responses:
+        '200':
+          description: Updated future RewardCode rules with optional Code rotation result
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUpdatedRewardCode' }
+    delete:
+      tags: [AdminRewards]
+      operationId: deleteAdminRewardCode
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RewardCodeIdPath'
+      responses:
+        '200':
+          description: Deleted never-redeemed RewardCode
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseDeletedRewardCode' }
+
+  /admin/rewards/codes/{id}/enabled:
+    patch:
+      tags: [AdminRewards]
+      operationId: setAdminRewardCodeEnabled
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RewardCodeIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminRewardCodeEnabledRequest' }
+      responses:
+        '200':
+          description: Updated RewardCode enabled intent
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRewardCode' }
+
   /admin/credits/grants:
     post:
       tags: [AdminCredits]
@@ -1950,6 +2012,11 @@ components:
       in: path
       required: true
       schema: { type: integer }
+    RewardCodeIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
     StorageProfileId:
       name: id
       in: path
@@ -2210,7 +2277,7 @@ components:
         redemption_count: { type: integer, format: int64, minimum: 0 }
         expires_at: { type: string, format: date-time }
         enabled: { type: boolean }
-        status: { type: string, enum: [expired, exhausted, disabled, enabled] }
+        status: { type: string, enum: [disabled, expired, exhausted, enabled] }
         created_by: { type: integer, format: int64, minimum: 1 }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
@@ -2226,6 +2293,27 @@ components:
           maxLength: 32
           description: Present only for the first successful create response; empty on idempotent replay.
         replayed: { type: boolean }
+
+    UpdatedRewardCode:
+      type: object
+      additionalProperties: false
+      required: [reward_code]
+      properties:
+        reward_code: { $ref: '#/components/schemas/RewardCode' }
+        plaintext:
+          type: string
+          maxLength: 32
+          description: Present only when optional Code rotation succeeds with a new Code.
+        replayed:
+          type: boolean
+          description: Present only when the PATCH supplied Code; true when that Code was already current.
+
+    DeletedRewardCode:
+      type: object
+      additionalProperties: false
+      required: [reward_code_id]
+      properties:
+        reward_code_id: { type: integer, format: int64, minimum: 1 }
 
     RewardCodePage:
       type: object
@@ -2248,6 +2336,24 @@ components:
         max_redemptions: { type: integer, format: int64, minimum: 0 }
         expires_at: { type: string, format: date-time }
         idempotency_key: { type: string, minLength: 1, maxLength: 128 }
+
+    AdminRewardCodeUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [display_name, credit_amount, max_redemptions]
+      properties:
+        display_name: { type: string, minLength: 1, maxLength: 120 }
+        credit_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        max_redemptions: { type: integer, format: int64, minimum: 0 }
+        expires_at: { type: string, format: date-time, nullable: true }
+        code: { type: string, minLength: 8, maxLength: 128 }
+
+    AdminRewardCodeEnabledRequest:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
 
     RewardRedemption:
       type: object
@@ -4271,6 +4377,27 @@ components:
         - type: object
           properties:
             data: { $ref: '#/components/schemas/CreatedRewardCode' }
+
+    ApiResponseRewardCode:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/RewardCode' }
+
+    ApiResponseUpdatedRewardCode:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/UpdatedRewardCode' }
+
+    ApiResponseDeletedRewardCode:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/DeletedRewardCode' }
 
     ApiResponseRewardCodePage:
       allOf:

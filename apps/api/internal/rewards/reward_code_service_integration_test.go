@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -118,11 +119,8 @@ func TestRewardCodeGrantFailureRollsBackCapacityAndRedemption(t *testing.T) {
 func TestRewardCodeExpirationIsEndExclusive(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
-	now := time.Date(2030, 7, 21, 8, 0, 0, 0, time.UTC)
-	expiresAt := now.Add(time.Hour)
-	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
-		Now: func() time.Time { return now },
-	})
+	service := newTestRewardService(t, pool, creditService)
+	expiresAt := time.Now().UTC().Add(time.Hour)
 	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
 		DisplayName: "限时奖励", Code: "EXPIRES-2030", CreditAmount: 5,
 		ExpiresAt: &expiresAt, IdempotencyKey: "expires-boundary", ActorUserID: 1,
@@ -131,7 +129,12 @@ func TestRewardCodeExpirationIsEndExclusive(t *testing.T) {
 		t.Fatal(err)
 	}
 	provisionRewardWallet(t, pool, creditService, 3)
-	now = expiresAt
+	if _, err := pool.Exec(t.Context(), `
+UPDATE reward_codes
+SET expires_at = clock_timestamp()
+WHERE id = $1`, created.RewardCode.ID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "EXPIRES-2030"}); !errors.Is(err, ErrCodeUnavailable) {
 		t.Fatalf("Redeem() at expires_at error = %v, want unified ErrCodeUnavailable", err)
 	}
@@ -141,6 +144,34 @@ func TestRewardCodeExpirationIsEndExclusive(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatalf("redemption_count=%d at expiry boundary, want 0", count)
+	}
+}
+
+func TestRewardCodeRedemptionUsesDatabaseTimeWhenApplicationClockIsAhead(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	service := newTestRewardService(t, pool, creditService)
+	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "数据库时间奖励", Code: "DB-CLOCK-2030", CreditAmount: 5,
+		ExpiresAt: &expiresAt, IdempotencyKey: "database-clock-authority", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	skewedService := newTestRewardServiceAt(t, pool, creditService, expiresAt.Add(time.Hour))
+	result, err := skewedService.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "DB-CLOCK-2030"})
+	if err != nil || result.CreditedAmount != 5 {
+		t.Fatalf("Redeem() with ahead application clock = %+v error=%v", result, err)
+	}
+	var redemptionCount int64
+	if err := pool.QueryRow(t.Context(), `SELECT redemption_count FROM reward_codes WHERE id = $1`,
+		created.RewardCode.ID).Scan(&redemptionCount); err != nil {
+		t.Fatal(err)
+	}
+	if redemptionCount != 1 {
+		t.Fatalf("redemption_count=%d, want database-authoritative reservation", redemptionCount)
 	}
 }
 
@@ -182,8 +213,8 @@ func TestRewardCodeMigrationCatalogAndAppendOnlyGuards(t *testing.T) {
 	if _, err := pool.Exec(t.Context(), `UPDATE reward_codes SET idempotency_key = 'changed' WHERE id = $1`, created.RewardCode.ID); err == nil {
 		t.Fatal("immutable RewardCode identity update unexpectedly succeeded")
 	}
-	if _, err := pool.Exec(t.Context(), `UPDATE reward_codes SET credit_amount = credit_amount + 1 WHERE id = $1`, created.RewardCode.ID); err == nil {
-		t.Fatal("immutable RewardCode amount update unexpectedly succeeded")
+	if _, err := pool.Exec(t.Context(), `UPDATE reward_codes SET redemption_count = redemption_count + 2 WHERE id = $1`, created.RewardCode.ID); err == nil {
+		t.Fatal("invalid RewardCode counter update unexpectedly succeeded")
 	}
 }
 
@@ -497,8 +528,432 @@ func TestRewardCodeKeyRetirementRejectsDisabledAndExpiredDefinitions(t *testing.
 	}
 }
 
+func TestRewardCodeManagementChangesOnlyFutureRedemptionsAndEnforcesCap(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	now := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
+	service := newTestRewardServiceAt(t, pool, creditService, now)
+	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "初始奖励", Code: "MANAGE-CODE-2030", CreditAmount: 10,
+		IdempotencyKey: "manage-code", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	provisionRewardWallet(t, pool, creditService, 7)
+	first, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "MANAGE-CODE-2030"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updated, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
+		MaxRedemptions: 1, ActorUserID: 1,
+	})
+	if err != nil || updated.RewardCode.Status != RewardCodeStatusExhausted {
+		t.Fatalf("exhausting update = %+v error=%v", updated, err)
+	}
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "MANAGE-CODE-2030"}); !errors.Is(err, ErrCodeUnavailable) {
+		t.Fatalf("exhausted Redeem() error = %v", err)
+	}
+	updated, err = service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
+		MaxRedemptions: 0, ActorUserID: 1,
+	})
+	if err != nil || updated.RewardCode.Status != RewardCodeStatusEnabled {
+		t.Fatalf("unlimited update = %+v error=%v", updated, err)
+	}
+	second, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "MANAGE-CODE-2030"})
+	if err != nil || second.CreditedAmount != 20 {
+		t.Fatalf("future redemption = %+v error=%v", second, err)
+	}
+	if _, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
+		MaxRedemptions: 1, ActorUserID: 1,
+	}); !errors.Is(err, ErrCapBelowRedemptions) {
+		t.Fatalf("cap below redemption count error = %v", err)
+	}
+
+	var persistedAmount int64
+	var transactionID string
+	var redeemedAt time.Time
+	if err := pool.QueryRow(t.Context(), `SELECT credit_amount, credit_transaction_id, redeemed_at
+FROM reward_redemptions WHERE id = $1`, first.Redemption.ID).Scan(
+		&persistedAmount, &transactionID, &redeemedAt,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if persistedAmount != first.Redemption.CreditAmount || transactionID != first.Redemption.CreditTransactionID ||
+		!redeemedAt.Equal(first.Redemption.RedeemedAt) {
+		t.Fatalf("historical Redemption changed amount=%d transaction=%q time=%v", persistedAmount, transactionID, redeemedAt)
+	}
+
+	expiredAt := now.Add(-time.Minute)
+	updated, err = service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: created.RewardCode.ID, DisplayName: "后续奖励", CreditAmount: 20,
+		MaxRedemptions: 0, ExpiresAt: &expiredAt, ActorUserID: 1,
+	})
+	if err != nil || updated.RewardCode.Status != RewardCodeStatusExpired {
+		t.Fatalf("expired update = %+v error=%v", updated, err)
+	}
+	enabledUpdated, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+		RewardCodeID: created.RewardCode.ID, Enabled: false, ActorUserID: 1,
+	})
+	if err != nil || enabledUpdated.Enabled || enabledUpdated.Status != RewardCodeStatusExpired {
+		t.Fatalf("expired state takes precedence over disabled intent = %+v error=%v", enabledUpdated, err)
+	}
+	var actionsBefore int
+	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM reward_admin_actions`).Scan(&actionsBefore); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+		RewardCodeID: created.RewardCode.ID, Enabled: false, ActorUserID: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var actionsAfter int
+	if err := pool.QueryRow(t.Context(), `SELECT COUNT(*) FROM reward_admin_actions`).Scan(&actionsAfter); err != nil {
+		t.Fatal(err)
+	}
+	if actionsAfter != actionsBefore {
+		t.Fatalf("set-state replay appended Journal actions before=%d after=%d", actionsBefore, actionsAfter)
+	}
+}
+
+func TestRewardCodeRedemptionSnapshotsSurviveRenameAndRotation(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := newTestRewardService(t, pool, creditService)
+	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "兑换时名称", Code: "SNAPSHOT-OLD-2030", CreditAmount: 10,
+		IdempotencyKey: "redemption-snapshot", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	provisionRewardWallet(t, pool, creditService, 7)
+	first, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "SNAPSHOT-OLD-2030"})
+	if err != nil || first.HistoryItem.RewardCodeDisplayName != "兑换时名称" || first.HistoryItem.MaskedCodeHint != "•••• 2030" {
+		t.Fatalf("first redemption = %+v error=%v", first, err)
+	}
+	if _, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: created.RewardCode.ID, DisplayName: "未来名称", CreditAmount: 20,
+		MaxRedemptions: 0, Code: rewardCodeString("SNAPSHOT-NEW-2040"), ActorUserID: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	replay, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "SNAPSHOT-NEW-2040"})
+	if err != nil || !replay.Replayed || replay.HistoryItem != first.HistoryItem {
+		t.Fatalf("replayed redemption = %+v error=%v, want original snapshot %+v", replay, err, first.HistoryItem)
+	}
+	oldHistory, err := service.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 3})
+	if err != nil || len(oldHistory.Redemptions) != 1 || oldHistory.Redemptions[0] != first.HistoryItem {
+		t.Fatalf("old user history = %+v error=%v, want original snapshot %+v", oldHistory, err, first.HistoryItem)
+	}
+
+	second, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "SNAPSHOT-NEW-2040"})
+	if err != nil || second.Replayed || second.HistoryItem.RewardCodeDisplayName != "未来名称" || second.HistoryItem.MaskedCodeHint != "•••• 2040" {
+		t.Fatalf("future redemption = %+v error=%v", second, err)
+	}
+	newHistory, err := service.ListRedemptions(t.Context(), ListRedemptionsInput{UserID: 7})
+	if err != nil || len(newHistory.Redemptions) != 1 || newHistory.Redemptions[0] != second.HistoryItem {
+		t.Fatalf("new user history = %+v error=%v, want future snapshot %+v", newHistory, err, second.HistoryItem)
+	}
+}
+
+func TestRewardCodeDeleteAndRedeemSerializeWithoutOrphanFacts(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := newTestRewardService(t, pool, creditService)
+	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "Delete Redeem Race", Code: "DELETE-REDEEM-2030", CreditAmount: 9,
+		IdempotencyKey: "delete-redeem-race", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+
+	lockTx, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lockTx.Rollback(t.Context()) }()
+	var lockedID int64
+	if err := lockTx.QueryRow(t.Context(), `SELECT id FROM reward_codes WHERE id = $1 FOR UPDATE`, created.RewardCode.ID).Scan(&lockedID); err != nil {
+		t.Fatal(err)
+	}
+
+	type deleteOutcome struct {
+		deleted DeletedRewardCode
+		err     error
+	}
+	deleteReady := make(chan struct{})
+	deleteDone := make(chan deleteOutcome, 1)
+	redeemReady := make(chan struct{})
+	redeemDone := make(chan error, 1)
+	start := make(chan struct{})
+	go func() {
+		close(deleteReady)
+		<-start
+		deleted, err := service.DeleteRewardCode(t.Context(), DeleteRewardCodeCommand{
+			RewardCodeID: created.RewardCode.ID, ActorUserID: 1,
+		})
+		deleteDone <- deleteOutcome{deleted: deleted, err: err}
+	}()
+	go func() {
+		close(redeemReady)
+		<-start
+		_, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "DELETE-REDEEM-2030"})
+		redeemDone <- err
+	}()
+	<-deleteReady
+	<-redeemReady
+	close(start)
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		var lockWaiters int
+		if err := pool.QueryRow(t.Context(), `
+SELECT COUNT(*)
+FROM pg_stat_activity
+WHERE datname = current_database()
+  AND wait_event_type = 'Lock'
+  AND query LIKE '%reward_codes%'
+  AND query LIKE '%FOR UPDATE%'`).Scan(&lockWaiters); err != nil {
+			t.Fatal(err)
+		}
+		if lockWaiters >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Delete and Redeem did not both wait on held RewardCode lock; waiters=%d", lockWaiters)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := lockTx.Commit(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	deleteResult := <-deleteDone
+	redeemErr := <-redeemDone
+	var rewardCodes, redemptions, grants, orphanRedemptions, orphanGrants int
+	if err := pool.QueryRow(t.Context(), `SELECT
+  (SELECT COUNT(*) FROM reward_codes WHERE id = $1),
+  (SELECT COUNT(*) FROM reward_redemptions WHERE reward_code_id = $1),
+  (SELECT COUNT(*) FROM credit_transactions WHERE business_reference_type = 'reward_code_redemption'),
+  (SELECT COUNT(*)
+   FROM reward_redemptions redemptions
+   LEFT JOIN reward_codes codes ON codes.id = redemptions.reward_code_id
+   WHERE codes.id IS NULL),
+  (SELECT COUNT(*)
+   FROM credit_transactions transactions
+   LEFT JOIN reward_redemptions redemptions
+     ON transactions.business_reference_type = 'reward_code_redemption'
+    AND transactions.business_reference_id = 'rc:' || redemptions.id::TEXT
+   WHERE transactions.business_reference_type = 'reward_code_redemption'
+     AND redemptions.id IS NULL)`, created.RewardCode.ID).Scan(
+		&rewardCodes, &redemptions, &grants, &orphanRedemptions, &orphanGrants,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if orphanRedemptions != 0 || orphanGrants != 0 {
+		t.Fatalf("orphan Reward facts redemptions=%d grants=%d", orphanRedemptions, orphanGrants)
+	}
+	switch {
+	case deleteResult.err == nil && errors.Is(redeemErr, ErrCodeUnavailable):
+		if deleteResult.deleted.RewardCodeID != created.RewardCode.ID || rewardCodes != 0 || redemptions != 0 || grants != 0 {
+			t.Fatalf("delete-first facts deleted=%+v codes=%d redemptions=%d grants=%d", deleteResult.deleted, rewardCodes, redemptions, grants)
+		}
+	case errors.Is(deleteResult.err, ErrRewardCodeRedeemed) && redeemErr == nil:
+		if rewardCodes != 1 || redemptions != 1 || grants != 1 {
+			t.Fatalf("redeem-first facts codes=%d redemptions=%d grants=%d", rewardCodes, redemptions, grants)
+		}
+	default:
+		t.Fatalf("Delete/Redeem race outcomes delete=%+v error=%v redeemError=%v", deleteResult.deleted, deleteResult.err, redeemErr)
+	}
+}
+
+func TestRewardCodeRotationIsAtomicReplaySafeAndRevokesOldCode(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := newTestRewardService(t, pool, creditService)
+	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "轮换奖励", Code: "OLD-ROTATE-2030", CreditAmount: 12,
+		IdempotencyKey: "rotate-management", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "其他奖励", Code: "OTHER-ROTATE-2030", CreditAmount: 1,
+		IdempotencyKey: "rotate-other", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rotations := make([]UpdatedRewardCode, 2)
+	rotationErrors := make([]error, 2)
+	start := make(chan struct{})
+	var wait sync.WaitGroup
+	for index := range rotations {
+		wait.Add(1)
+		go func(index int) {
+			defer wait.Done()
+			<-start
+			rotations[index], rotationErrors[index] = service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+				RewardCodeID: created.RewardCode.ID, DisplayName: "轮换奖励", CreditAmount: 12,
+				MaxRedemptions: 0, Code: rewardCodeString("NEW-ROTATE-2030"), ActorUserID: 1,
+			})
+		}(index)
+	}
+	close(start)
+	wait.Wait()
+	replayed, plaintextResponses := 0, 0
+	for index, rotationError := range rotationErrors {
+		if rotationError != nil {
+			t.Fatalf("concurrent UpdateRewardCode() %d error = %v", index, rotationError)
+		}
+		if rotations[index].Replayed != nil && *rotations[index].Replayed {
+			replayed++
+		}
+		if rotations[index].Plaintext == "NEWROTATE2030" {
+			plaintextResponses++
+		}
+		if rotations[index].RewardCode.MaskedCodeHint != "•••• 2030" {
+			t.Fatalf("concurrent rotation %d = %+v", index, rotations[index])
+		}
+	}
+	if replayed != 1 || plaintextResponses != 1 {
+		t.Fatalf("concurrent rotations = %+v, want one rotation and one replay", rotations)
+	}
+	replay, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: created.RewardCode.ID, DisplayName: "轮换奖励", CreditAmount: 12,
+		MaxRedemptions: 0, Code: rewardCodeString("NEW-ROTATE-2030"), ActorUserID: 1,
+	})
+	if err != nil || replay.Replayed == nil || !*replay.Replayed || replay.Plaintext != "" {
+		t.Fatalf("rotation replay = %+v error=%v", replay, err)
+	}
+	if _, err := service.UpdateRewardCode(t.Context(), UpdateRewardCodeCommand{
+		RewardCodeID: created.RewardCode.ID, DisplayName: "不应提交", CreditAmount: 99,
+		MaxRedemptions: 0, Code: rewardCodeString("OTHER-ROTATE-2030"), ActorUserID: 1,
+	}); !errors.Is(err, ErrCodeCollision) {
+		t.Fatalf("rotation collision error = %v", err)
+	}
+	var displayName string
+	var creditAmount int64
+	if err := pool.QueryRow(t.Context(), `SELECT display_name, credit_amount FROM reward_codes WHERE id = $1`,
+		created.RewardCode.ID).Scan(&displayName, &creditAmount); err != nil {
+		t.Fatal(err)
+	}
+	if displayName != "轮换奖励" || creditAmount != 12 {
+		t.Fatalf("collision committed rule update display_name=%q credit_amount=%d", displayName, creditAmount)
+	}
+	if other.RewardCode.ID == created.RewardCode.ID {
+		t.Fatal("rotation collision fixture reused RewardCode")
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "OLD-ROTATE-2030"}); !errors.Is(err, ErrCodeUnavailable) {
+		t.Fatalf("old Code Redeem() error = %v", err)
+	}
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "NEW-ROTATE-2030"}); err != nil {
+		t.Fatalf("new Code Redeem() error = %v", err)
+	}
+	var totalActions, rotationActions int
+	var sensitiveJournal bool
+	if err := pool.QueryRow(t.Context(), `SELECT
+  COUNT(*),
+  COUNT(*) FILTER (WHERE action_type = 'rotate_reward_code'),
+  bool_or((metadata || target_snapshot)::TEXT LIKE '%NEWROTATE2030%'
+    OR (metadata || target_snapshot)::TEXT LIKE '%OLDROTATE2030%')
+FROM reward_admin_actions WHERE reward_code_id_snapshot = $1`, created.RewardCode.ID).Scan(
+		&totalActions, &rotationActions, &sensitiveJournal,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if totalActions != 2 || rotationActions != 1 || sensitiveJournal {
+		t.Fatalf("rotation Journal total=%d rotations=%d sensitive=%t", totalActions, rotationActions, sensitiveJournal)
+	}
+	var fullDigest, journalText string
+	if err := pool.QueryRow(t.Context(), `SELECT encode(code_digest, 'hex') FROM reward_codes WHERE id = $1`,
+		created.RewardCode.ID).Scan(&fullDigest); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(t.Context(), `SELECT string_agg((metadata || target_snapshot)::TEXT, '')
+FROM reward_admin_actions WHERE reward_code_id_snapshot = $1`, created.RewardCode.ID).Scan(&journalText); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(journalText, fullDigest) {
+		t.Fatal("rotation Journal exposed a full Code digest")
+	}
+}
+
+func TestRewardCodeDeleteRequiresZeroRedemptionsAndPreservesJournalSnapshot(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	service := newTestRewardService(t, pool, creditService)
+	deletable, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "误建奖励", Code: "DELETE-CODE-2030", CreditAmount: 3,
+		IdempotencyKey: "delete-code", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := service.DeleteRewardCode(t.Context(), DeleteRewardCodeCommand{
+		RewardCodeID: deletable.RewardCode.ID, ActorUserID: 1,
+	})
+	if err != nil || deleted.RewardCodeID != deletable.RewardCode.ID {
+		t.Fatalf("DeleteRewardCode() = %+v error=%v", deleted, err)
+	}
+	var definitions, aliases int
+	var journalCodeID *int64
+	var journalSnapshotID int64
+	var journalSnapshotName string
+	if err := pool.QueryRow(t.Context(), `SELECT
+  (SELECT COUNT(*) FROM reward_codes WHERE id = $1),
+  (SELECT COUNT(*) FROM reward_code_digest_aliases WHERE reward_code_id = $1),
+  reward_code_id,
+  reward_code_id_snapshot,
+  target_snapshot->>'display_name'
+FROM reward_admin_actions
+WHERE reward_code_id_snapshot = $1 AND action_type = 'delete_reward_code'`, deletable.RewardCode.ID).Scan(
+		&definitions, &aliases, &journalCodeID, &journalSnapshotID, &journalSnapshotName,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if definitions != 0 || aliases != 0 || journalCodeID != nil ||
+		journalSnapshotID != deletable.RewardCode.ID || journalSnapshotName != "误建奖励" {
+		t.Fatalf("delete facts definitions=%d aliases=%d code_id=%v snapshot_id=%d name=%q",
+			definitions, aliases, journalCodeID, journalSnapshotID, journalSnapshotName)
+	}
+
+	redeemed, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "已兑奖励", Code: "REDEEMED-DELETE-2030", CreditAmount: 4,
+		IdempotencyKey: "redeemed-delete", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "REDEEMED-DELETE-2030"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.DeleteRewardCode(t.Context(), DeleteRewardCodeCommand{
+		RewardCodeID: redeemed.RewardCode.ID, ActorUserID: 1,
+	}); !errors.Is(err, ErrRewardCodeRedeemed) {
+		t.Fatalf("redeemed DeleteRewardCode() error = %v", err)
+	}
+}
+
 type failingGrantCreditService struct {
 	reader *credits.Service
+}
+
+func rewardCodeString(value string) *string {
+	return &value
 }
 
 func (service failingGrantCreditService) InTx(pgx.Tx) credits.Commands {
