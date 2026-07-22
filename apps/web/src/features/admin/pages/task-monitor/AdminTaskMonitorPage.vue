@@ -101,6 +101,7 @@
           <template #search>
             <AdminToolbarSearch
               v-model="searchKeyword"
+              input-label="搜索任务"
               @enter="handleTaskSearch"
               @clear="clearSearch"
             />

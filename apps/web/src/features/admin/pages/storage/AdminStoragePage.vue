@@ -10,7 +10,7 @@
     <template #toolbar>
       <AdminResourceToolbar>
         <template #search>
-          <AdminToolbarSearch v-model="searchKeyword" />
+          <AdminToolbarSearch v-model="searchKeyword" input-label="搜索存储对象" />
         </template>
 
         <template #metrics="{ metricClass }">

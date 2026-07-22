@@ -22,7 +22,15 @@ import (
 type rewardHandlerServiceStub struct {
 	RewardService
 	redeem func(context.Context, RedeemCommand) (RedeemResult, error)
+	search func(context.Context, SearchRewardCodesInput) (RewardCodePage, error)
 	update func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error)
+}
+
+func (s rewardHandlerServiceStub) SearchRewardCodes(
+	ctx context.Context,
+	input SearchRewardCodesInput,
+) (RewardCodePage, error) {
+	return s.search(ctx, input)
 }
 
 func (s rewardHandlerServiceStub) UpdateRewardCode(
@@ -239,6 +247,43 @@ func TestRewardCodeUpdateWithCodeRequiresAdminAndDoesNotExposeSensitiveMaterial(
 	for _, forbidden := range []string{rawCode, fullDigest, requestBody} {
 		if strings.Contains(observable, forbidden) {
 			t.Fatalf("rotate logs or response exposed sensitive value %q: %s", forbidden, observable)
+		}
+	}
+}
+
+func TestRewardCodeSearchDoesNotLogOrReturnSensitiveCodeMaterial(t *testing.T) {
+	const rawCode = "ADMIN-LOOKUP-294"
+	const fullDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+	service := rewardHandlerServiceStub{search: func(_ context.Context, input SearchRewardCodesInput) (RewardCodePage, error) {
+		if input.Query != rawCode {
+			t.Fatalf("search query = %q, want request body Code", input.Query)
+		}
+		return RewardCodePage{}, errors.New("lookup failed code=" + rawCode + " digest=" + fullDigest)
+	}}
+	handler := NewHandler(service)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
+	router.POST("/admin/rewards/codes/search", handler.SearchRewardCodes)
+	responseRecorder := performRawAdminRewardRequest(
+		t, router, http.MethodPost, "/admin/rewards/codes/search", `{"query":"`+rawCode+`"}`,
+	)
+	assertRewardErrorResponse(t, responseRecorder, http.StatusInternalServerError, "奖励操作失败")
+	if responseRecorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("search Cache-Control=%q", responseRecorder.Header().Get("Cache-Control"))
+	}
+	observable := logs.String() + responseRecorder.Body.String()
+	for _, forbidden := range []string{rawCode, fullDigest} {
+		if strings.Contains(observable, forbidden) {
+			t.Fatalf("search logs or response exposed sensitive value %q: %s", forbidden, observable)
 		}
 	}
 }

@@ -8,6 +8,8 @@ import type { RewardCode } from './rewardCode'
 
 export interface RewardCodePage {
   reward_codes: RewardCode[]
+  /** @minimum 0 */
+  total: number
   /** @minimum 1 */
   next_before_id?: number
 }

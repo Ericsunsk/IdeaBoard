@@ -164,8 +164,10 @@ VALUES ($1, $1, 'create_reward_code', $2, $3::JSONB, $4::JSONB)`,
 	return CreatedRewardCode{RewardCode: rewardCode, Plaintext: normalized}, nil
 }
 
-func (s *Service) ListRewardCodes(ctx context.Context, input ListRewardCodesInput) (RewardCodePage, error) {
-	if s == nil || s.pool == nil || input.BeforeID < 0 {
+func (s *Service) SearchRewardCodes(ctx context.Context, input SearchRewardCodesInput) (RewardCodePage, error) {
+	query := strings.TrimSpace(input.Query)
+	if s == nil || s.pool == nil || input.BeforeID < 0 || !validRewardCodeStatusFilter(input.Status) ||
+		utf8.RuneCountInString(query) > maxRawCodeBytes {
 		return RewardCodePage{}, ErrInvalidCommand
 	}
 	limit := input.Limit
@@ -175,32 +177,92 @@ func (s *Service) ListRewardCodes(ctx context.Context, input ListRewardCodesInpu
 	if limit < 1 || limit > 100 {
 		return RewardCodePage{}, ErrInvalidCommand
 	}
-	rows, err := s.pool.Query(ctx, `SELECT `+rewardCodeProjectionSQL+`
-FROM reward_codes
-WHERE ($1::BIGINT <= 0 OR id < $1)
-ORDER BY id DESC
-LIMIT $2`, input.BeforeID, limit+1)
+	var current, previous codeDigest
+	nameQuery := query
+	// Code-shaped input stays out of PostgreSQL text parameters so database error logs cannot expose it.
+	if normalized, err := normalizeCode(query); err == nil {
+		current, previous = splitCodeDigestCandidates(s.keyring.lookupDigests(normalized))
+		nameQuery = ""
+	}
+	now := s.currentTime()
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
-		return RewardCodePage{}, fmt.Errorf("list reward Codes: %w", err)
+		return RewardCodePage{}, fmt.Errorf("begin reward Code search: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	arguments := []any{
+		query != "", nameQuery, current.version, current.digest, previous.version, previous.digest,
+		string(input.Status), now,
+	}
+	var total int64
+	if err := tx.QueryRow(ctx, `SELECT COUNT(*)
+FROM reward_codes codes
+WHERE `+rewardCodeSearchPredicateSQL, arguments...).Scan(&total); err != nil {
+		return RewardCodePage{}, fmt.Errorf("count filtered reward Codes: %w", err)
+	}
+	rows, err := tx.Query(ctx, `SELECT `+rewardCodeProjectionSQL+`
+FROM reward_codes codes
+WHERE `+rewardCodeSearchPredicateSQL+`
+  AND ($9::BIGINT <= 0 OR id < $9)
+ORDER BY id DESC
+LIMIT $10`, append(arguments, input.BeforeID, limit+1)...)
+	if err != nil {
+		return RewardCodePage{}, fmt.Errorf("search reward Codes: %w", err)
 	}
 	defer rows.Close()
 	items := make([]RewardCode, 0, limit+1)
 	for rows.Next() {
 		var item RewardCode
-		if err := scanRewardCode(rows, &item, s.currentTime()); err != nil {
-			return RewardCodePage{}, fmt.Errorf("scan reward Code list: %w", err)
+		if err := scanRewardCode(rows, &item, now); err != nil {
+			return RewardCodePage{}, fmt.Errorf("scan reward Code search: %w", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return RewardCodePage{}, fmt.Errorf("read reward Code list: %w", err)
+		return RewardCodePage{}, fmt.Errorf("read reward Code search: %w", err)
 	}
-	page := RewardCodePage{RewardCodes: items}
+	rows.Close()
+	if err := tx.Commit(ctx); err != nil {
+		return RewardCodePage{}, fmt.Errorf("commit reward Code search: %w", err)
+	}
+	page := RewardCodePage{RewardCodes: items, Total: total}
 	if len(items) > limit {
 		page.RewardCodes = items[:limit]
 		page.NextBeforeID = page.RewardCodes[len(page.RewardCodes)-1].ID
 	}
 	return page, nil
+}
+
+const rewardCodeSearchPredicateSQL = `
+(
+  NOT $1::BOOLEAN
+  OR ($2::TEXT <> '' AND STRPOS(LOWER(codes.display_name), LOWER($2)) > 0)
+  OR EXISTS (
+    SELECT 1
+    FROM reward_code_digest_aliases aliases
+    WHERE aliases.reward_code_id = codes.id
+      AND (($3::TEXT <> '' AND aliases.key_version = $3 AND aliases.code_digest = $4::BYTEA)
+        OR ($5::TEXT <> '' AND aliases.key_version = $5 AND aliases.code_digest = $6::BYTEA))
+  )
+)
+AND (
+  $7::TEXT = ''
+  OR CASE
+    WHEN codes.expires_at IS NOT NULL AND $8::TIMESTAMPTZ >= codes.expires_at THEN 'expired'
+    WHEN codes.max_redemptions > 0 AND codes.redemption_count >= codes.max_redemptions THEN 'exhausted'
+    WHEN NOT codes.enabled THEN 'disabled'
+    ELSE 'enabled'
+  END = $7
+)`
+
+func validRewardCodeStatusFilter(status RewardCodeStatus) bool {
+	switch status {
+	case "", RewardCodeStatusExpired, RewardCodeStatusExhausted,
+		RewardCodeStatusDisabled, RewardCodeStatusEnabled:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) redeemRewardCode(

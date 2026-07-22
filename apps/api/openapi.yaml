@@ -942,27 +942,6 @@ paths:
                 $ref: '#/components/schemas/ApiResponseEmpty'
 
   /admin/rewards/codes:
-    get:
-      tags: [AdminRewards]
-      operationId: listAdminRewardCodes
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: before_id
-          in: query
-          schema: { type: integer, format: int64, minimum: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-      responses:
-        '200':
-          description: RewardCode page
-          headers:
-            Cache-Control:
-              schema: { type: string, enum: [no-store] }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseRewardCodePage' }
     post:
       tags: [AdminRewards]
       operationId: createAdminRewardCode
@@ -982,6 +961,27 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseCreatedRewardCode' }
+
+  /admin/rewards/codes/search:
+    post:
+      tags: [AdminRewards]
+      operationId: searchAdminRewardCodes
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminRewardCodeSearchRequest' }
+      responses:
+        '200':
+          description: Filtered RewardCode keyset page
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRewardCodePage' }
 
   /admin/rewards/codes/{id}:
     patch:
@@ -2318,12 +2318,27 @@ components:
     RewardCodePage:
       type: object
       additionalProperties: false
-      required: [reward_codes]
+      required: [reward_codes, total]
       properties:
         reward_codes:
           type: array
           items: { $ref: '#/components/schemas/RewardCode' }
+        total: { type: integer, format: int64, minimum: 0 }
         next_before_id: { type: integer, format: int64, minimum: 1 }
+
+    AdminRewardCodeSearchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        query:
+          type: string
+          maxLength: 128
+          description: Display-name substring or complete RewardCode; valid Code syntax is treated as an exact HMAC lookup and sent only in this request body.
+        status:
+          type: string
+          enum: [enabled, disabled, expired, exhausted]
+        before_id: { type: integer, format: int64, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100, default: 20 }
 
     AdminRewardCodeCreateRequest:
       type: object

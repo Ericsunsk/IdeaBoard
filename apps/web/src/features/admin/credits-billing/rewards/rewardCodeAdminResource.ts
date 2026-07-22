@@ -1,7 +1,7 @@
 import {
   createAdminRewardCode,
   deleteAdminRewardCode,
-  listAdminRewardCodes,
+  searchAdminRewardCodes,
   setAdminRewardCodeEnabled,
   updateAdminRewardCode,
 } from '../../../../shared/api/generated-query/admin-rewards/admin-rewards'
@@ -28,6 +28,8 @@ export type RewardCode = {
   createdAt: string
   updatedAt: string
 }
+
+export type RewardCodeStatus = RewardCode['status']
 
 export type CreateRewardCodeInput = {
   displayName: string
@@ -60,11 +62,20 @@ export type UpdatedRewardCode = {
 
 export type RewardCodePage = {
   rewardCodes: RewardCode[]
+  total: number
   nextBeforeId?: number
 }
 
+export type SearchRewardCodesInput = {
+  query: string
+  status?: RewardCodeStatus
+  beforeId?: number
+  limit?: number
+  signal?: AbortSignal
+}
+
 export type AdminRewardCodeResource = {
-  list: (beforeId?: number) => Promise<RewardCodePage>
+  search: (input: SearchRewardCodesInput) => Promise<RewardCodePage>
   create: (input: CreateRewardCodeInput) => Promise<CreatedRewardCode>
   update: (id: number, input: UpdateRewardCodeInput) => Promise<UpdatedRewardCode>
   setEnabled: (id: number, enabled: boolean) => Promise<RewardCode>
@@ -73,10 +84,18 @@ export type AdminRewardCodeResource = {
 
 export function createAdminRewardCodeResource(): AdminRewardCodeResource {
   return {
-    list: async (beforeId) =>
+    search: async ({ query, status, beforeId, limit = 20, signal }) =>
       toRewardCodePage(
         await resolveApiData(
-          listAdminRewardCodes({ before_id: beforeId, limit: 20 }),
+          searchAdminRewardCodes(
+            {
+              ...(query.trim() ? { query: query.trim() } : {}),
+              ...(status ? { status } : {}),
+              ...(beforeId !== undefined ? { before_id: beforeId } : {}),
+              limit,
+            },
+            signal ? { signal } : undefined,
+          ),
           '加载兑换码失败',
         ),
       ),
@@ -158,6 +177,7 @@ function toUpdatedRewardCode(value: GeneratedUpdatedRewardCode): UpdatedRewardCo
 function toRewardCodePage(value: GeneratedRewardCodePage): RewardCodePage {
   return {
     rewardCodes: value.reward_codes.map(toRewardCode),
+    total: value.total,
     nextBeforeId: value.next_before_id,
   }
 }

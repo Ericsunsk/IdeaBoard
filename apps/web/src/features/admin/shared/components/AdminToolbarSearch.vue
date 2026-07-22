@@ -5,6 +5,7 @@
     </InputIcon>
     <InputText
       :model-value="modelValue"
+      :aria-label="inputLabel"
       :placeholder="placeholder"
       fluid
       :class="adminToolbarSearchInputClass"
@@ -37,6 +38,7 @@ import { adminTextButtonClass, adminToolbarSearchInputClass } from '../lib/admin
 withDefaults(
   defineProps<{
     modelValue: string
+    inputLabel: string
     placeholder?: string
   }>(),
   {

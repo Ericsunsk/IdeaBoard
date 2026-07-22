@@ -19,8 +19,8 @@ func TestAdminRewardRoutesExposeOnlyCanonicalRewardCodes(t *testing.T) {
 		routes[route.Method+" "+route.Path] = struct{}{}
 	}
 	for _, expected := range []string{
-		"GET /api/admin/rewards/codes",
 		"POST /api/admin/rewards/codes",
+		"POST /api/admin/rewards/codes/search",
 		"PATCH /api/admin/rewards/codes/:id",
 		"PATCH /api/admin/rewards/codes/:id/enabled",
 		"DELETE /api/admin/rewards/codes/:id",

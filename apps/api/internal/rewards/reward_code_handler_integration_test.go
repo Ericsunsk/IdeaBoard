@@ -30,7 +30,7 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		c.Next()
 	})
 	adminRouter.POST("/admin/rewards/codes", handler.CreateRewardCode)
-	adminRouter.GET("/admin/rewards/codes", handler.ListRewardCodes)
+	adminRouter.POST("/admin/rewards/codes/search", handler.SearchRewardCodes)
 	adminRouter.PATCH("/admin/rewards/codes/:id", handler.UpdateRewardCode)
 	adminRouter.PATCH("/admin/rewards/codes/:id/enabled", handler.SetRewardCodeEnabled)
 	adminRouter.DELETE("/admin/rewards/codes/:id", handler.DeleteRewardCode)
@@ -56,15 +56,84 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		!replay.Replayed || replay.Plaintext != "" || replay.RewardCode.ID != created.RewardCode.ID {
 		t.Fatalf("create replay = %+v Cache-Control=%q", replay, replayRecorder.Header().Get("Cache-Control"))
 	}
-	page, listRecorder := performRewardRequestWithRecorder[RewardCodePage](
-		t, adminRouter, http.MethodGet, "/admin/rewards/codes?limit=20", nil, http.StatusOK,
+	page, searchRecorder := performRewardRequestWithRecorder[RewardCodePage](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search", map[string]any{"limit": 20}, http.StatusOK,
 	)
-	if listRecorder.Header().Get("Cache-Control") != "no-store" || len(page.RewardCodes) != 1 {
-		t.Fatalf("list = %+v Cache-Control=%q", page, listRecorder.Header().Get("Cache-Control"))
+	if searchRecorder.Header().Get("Cache-Control") != "no-store" || len(page.RewardCodes) != 1 || page.Total != 1 {
+		t.Fatalf("search = %+v Cache-Control=%q", page, searchRecorder.Header().Get("Cache-Control"))
 	}
-	if strings.Contains(listRecorder.Body.String(), "HTTPREWARD2026") ||
-		strings.Contains(listRecorder.Body.String(), "HTTP-REWARD-2026") {
-		t.Fatalf("list response leaked raw Code: %s", listRecorder.Body.String())
+	if strings.Contains(searchRecorder.Body.String(), "HTTPREWARD2026") ||
+		strings.Contains(searchRecorder.Body.String(), "HTTP-REWARD-2026") {
+		t.Fatalf("search response leaked raw Code: %s", searchRecorder.Body.String())
+	}
+	exactPage, exactRecorder := performRewardRequestWithRecorder[RewardCodePage](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search",
+		map[string]any{"query": "HTTP-REWARD-2026"}, http.StatusOK,
+	)
+	if len(exactPage.RewardCodes) != 1 || exactPage.RewardCodes[0].ID != created.RewardCode.ID ||
+		exactRecorder.Header().Get("Cache-Control") != "no-store" ||
+		strings.Contains(exactRecorder.Body.String(), "HTTP-REWARD-2026") ||
+		strings.Contains(exactRecorder.Body.String(), "HTTPREWARD2026") {
+		t.Fatalf("exact Code search = %+v body=%s", exactPage, exactRecorder.Body.String())
+	}
+	enabledForPagination, _ := performRewardRequestWithRecorder[CreatedRewardCode](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
+			"display_name": "HTTP 分页奖励", "code": "HTTP-PAGE-ENABLED-2026", "credit_amount": 5,
+			"max_redemptions": 0, "idempotency_key": "http-page-enabled",
+		}, http.StatusOK,
+	)
+	disabledForFilter, _ := performRewardRequestWithRecorder[CreatedRewardCode](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes", map[string]any{
+			"display_name": "HTTP 停用奖励", "code": "HTTP-PAGE-DISABLED-2026", "credit_amount": 5,
+			"max_redemptions": 0, "idempotency_key": "http-page-disabled",
+		}, http.StatusOK,
+	)
+	disabledPath := fmt.Sprintf("/admin/rewards/codes/%d/enabled", disabledForFilter.RewardCode.ID)
+	performRewardRequestWithRecorder[RewardCode](
+		t, adminRouter, http.MethodPatch, disabledPath, map[string]any{"enabled": false}, http.StatusOK,
+	)
+	firstEnabledPage, _ := performRewardRequestWithRecorder[RewardCodePage](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search",
+		map[string]any{"status": RewardCodeStatusEnabled, "limit": 1}, http.StatusOK,
+	)
+	if firstEnabledPage.Total != 2 || len(firstEnabledPage.RewardCodes) != 1 ||
+		firstEnabledPage.RewardCodes[0].ID != enabledForPagination.RewardCode.ID ||
+		firstEnabledPage.NextBeforeID != enabledForPagination.RewardCode.ID {
+		t.Fatalf("first enabled search page = %+v", firstEnabledPage)
+	}
+	secondEnabledPage, _ := performRewardRequestWithRecorder[RewardCodePage](
+		t, adminRouter, http.MethodPost, "/admin/rewards/codes/search", map[string]any{
+			"status": RewardCodeStatusEnabled, "before_id": firstEnabledPage.NextBeforeID, "limit": 1,
+		}, http.StatusOK,
+	)
+	if secondEnabledPage.Total != 2 || len(secondEnabledPage.RewardCodes) != 1 ||
+		secondEnabledPage.RewardCodes[0].ID != created.RewardCode.ID || secondEnabledPage.NextBeforeID != 0 ||
+		secondEnabledPage.RewardCodes[0].ID == firstEnabledPage.RewardCodes[0].ID {
+		t.Fatalf("second enabled search page = %+v; first page = %+v", secondEnabledPage, firstEnabledPage)
+	}
+	for _, testCase := range []struct {
+		name string
+		path string
+		body string
+	}{
+		{name: "unknown field", path: "/admin/rewards/codes/search", body: `{"unknown":true}`},
+		{name: "unknown status", path: "/admin/rewards/codes/search", body: `{"status":"unknown"}`},
+		{name: "zero cursor", path: "/admin/rewards/codes/search", body: `{"before_id":0}`},
+		{name: "oversized limit", path: "/admin/rewards/codes/search", body: `{"limit":101}`},
+		{name: "malformed body", path: "/admin/rewards/codes/search", body: `{"query":`},
+		{name: "URL input", path: "/admin/rewards/codes/search?query=HTTP-REWARD-2026", body: `{}`},
+	} {
+		t.Run("search rejects "+testCase.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, testCase.path, strings.NewReader(testCase.body))
+			request.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+			adminRouter.ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusBadRequest || recorder.Header().Get("Cache-Control") != "no-store" ||
+				strings.Contains(recorder.Body.String(), "HTTP-REWARD-2026") {
+				t.Fatalf("response status=%d Cache-Control=%q body=%s", recorder.Code,
+					recorder.Header().Get("Cache-Control"), recorder.Body.String())
+			}
+		})
 	}
 	conflictRequest := map[string]any{
 		"display_name":    "重复 Code",

@@ -87,13 +87,16 @@ type DeletedRewardCode struct {
 	RewardCodeID int64 `json:"reward_code_id"`
 }
 
-type ListRewardCodesInput struct {
+type SearchRewardCodesInput struct {
+	Query    string
+	Status   RewardCodeStatus
 	BeforeID int64
 	Limit    int
 }
 
 type RewardCodePage struct {
 	RewardCodes  []RewardCode `json:"reward_codes"`
+	Total        int64        `json:"total"`
 	NextBeforeID int64        `json:"next_before_id,omitempty"`
 }
 
@@ -149,7 +152,7 @@ type AdminCommands interface {
 }
 
 type AdminReads interface {
-	ListRewardCodes(context.Context, ListRewardCodesInput) (RewardCodePage, error)
+	SearchRewardCodes(context.Context, SearchRewardCodesInput) (RewardCodePage, error)
 }
 
 type UserCommands interface {

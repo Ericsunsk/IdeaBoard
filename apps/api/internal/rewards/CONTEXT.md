@@ -13,7 +13,7 @@ Rewards 管理平台 Idea 奖励的 RewardCode 与 Redemption。用户展示使�
 ## Public Seams
 
 - `AdminCommands` 提供 Create、Update、SetEnabled 与 Delete：Create 以 client idempotency key 创建；Update 在单个 transaction 内保存规则并可选轮换 bearer Code；SetEnabled 是 set-state；Delete 仅接受零 Redemption aggregate。
-- `AdminReads.ListRewardCodes` 提供不含 plaintext/full digest 的 keyset-paginated 列表。
+- `AdminReads.SearchRewardCodes` 通过 no-store POST body 提供名称模糊搜索、完整 Code HMAC lookup、effective status filter、filtered total 与 keyset page，结果不含 plaintext/full digest。
 - `UserCommands.Redeem` 同步兑换 RewardCode，返回 Redemption、credited amount、available balance 与 replay marker。
 - `UserReads.ListRedemptions` 按 ID cursor 返回当前用户的成功 Redemption history，仅含 RewardCode display name、credited amount、masked Code hint 与兑换时间。
 
@@ -31,6 +31,7 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 - Update 将规则变更与 optional Code rotation 收敛为单个 Admin PATCH 和同一 transaction；任一校验、collision 或 persistence 失败会整体 rollback。新 Code 会替换 primary digest 与全部 current/previous aliases，旧 Code commit 后立即失效；提交 Code 已命中目标当前 alias 时视为 replay，不重复 rotation Journal 且不返回 plaintext。
 - Update/SetEnabled 对相同目标状态不重复 Journal。零 Redemption RewardCode 可 hard delete；Journal 的 nullable FK 使用 `ON DELETE SET NULL`，并永久保留 immutable target ID 与 safe target snapshot。
 - Code 明文或可逆密文不得进入 database、Admin list、URL、Journal 或日志；只保存 key version、HMAC-SHA256 digest 与四字符 hint。
+- Admin search 只接受 POST body；可归一化为完整 Code 的 query 仅生成 current/previous HMAC candidates，不得作为名称查询参数发送到 PostgreSQL。名称、effective status、filtered total 与 keyset page 必须来自同一 read snapshot。
 - Rewards 拥有 caller transaction，并只通过 `credits.Service.InTx(tx).Grant` 写入 Credits Ledger；capacity、Grant 与 Redemption 同时 commit 或 rollback。
 - Runtime role 执行 `reserve_reward_code_redemption_v1` 是受限能力，仍可消耗一条当前 eligible RewardCode 的 cap；expiry 只由数据库时间判定，Grant 与 Redemption insert 继续由 application transaction 编排。
 - Credit Grant 固定使用 source `reward_redemption`、reason `兑换奖励` 和 Redemption ID business reference。

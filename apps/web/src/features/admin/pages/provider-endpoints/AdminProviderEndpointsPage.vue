@@ -11,7 +11,7 @@
       <template #toolbar>
         <AdminResourceToolbar>
           <template #search>
-            <AdminToolbarSearch v-model="searchKeyword" />
+            <AdminToolbarSearch v-model="searchKeyword" input-label="搜索供应商端点" />
           </template>
 
           <template #metrics="{ metricClass }">

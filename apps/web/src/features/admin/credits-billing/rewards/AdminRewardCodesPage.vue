@@ -2,11 +2,52 @@
   <AdminTablePanel viewport-height content-class="min-h-0 flex-1 overflow-hidden px-6 pb-6">
     <template #toolbar>
       <AdminResourceToolbar>
+        <template #search>
+          <AdminToolbarSearch
+            v-model="searchKeyword"
+            input-label="搜索兑换码"
+            placeholder="搜索名称或完整 Code"
+            @enter="searchRewardCodes"
+            @clear="clearSearch"
+          />
+        </template>
         <template #metrics="{ metricClass }">
-          <span :class="metricClass">当前页 {{ rewardCodes.length }} 个兑换码</span>
+          <span :class="metricClass">
+            <span class="h-2.5 w-2.5 rounded-full bg-admin-success"></span>
+            <span>{{ totalRewardCodesLabel }}</span>
+          </span>
+        </template>
+        <template #filters>
+          <AdminFilterPopover
+            :active="Boolean(statusFilter)"
+            filter-label="筛选兑换码状态"
+            @reset="resetStatusFilter"
+          >
+            <label
+              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+            >
+              <span>有效状态</span>
+              <Select
+                v-model="statusFilter"
+                :options="statusOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="全部状态"
+                size="small"
+                show-clear
+                fluid
+              />
+            </label>
+          </AdminFilterPopover>
         </template>
         <template #actions="{ iconButtonClass }">
-          <Button text :class="iconButtonClass" aria-label="刷新兑换码" @click="loadRewardCodes">
+          <Button
+            text
+            :class="iconButtonClass"
+            :disabled="loading"
+            aria-label="刷新兑换码"
+            @click="refreshRewardCodes"
+          >
             <template #icon><Refresh class="size-4 text-admin-text-2" /></template>
           </Button>
           <Button label="创建兑换码" size="small" :disabled="saving" @click="openCreateDialog" />
@@ -24,14 +65,34 @@
       </AdminResourceToolbar>
     </template>
 
-    <Message v-if="loadError" severity="error" :closable="false" class="m-5">
+    <Message v-if="initialError" severity="error" :closable="false" class="m-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <span>兑换码加载失败，请重试。</span>
-        <Button label="重试" severity="secondary" size="small" outlined @click="loadRewardCodes" />
+        <Button
+          label="重试"
+          severity="secondary"
+          size="small"
+          outlined
+          :disabled="loading"
+          @click="refreshRewardCodes"
+        />
+      </div>
+    </Message>
+    <Message v-else-if="backgroundError" severity="warn" :closable="false" class="mx-5 mt-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <span>刷新兑换码失败，正在显示上次成功的数据。</span>
+        <Button
+          label="重试"
+          severity="secondary"
+          size="small"
+          outlined
+          :disabled="loading"
+          @click="refreshRewardCodes"
+        />
       </div>
     </Message>
     <DataTableFrame
-      v-else
+      v-if="!initialError"
       :value="rewardCodes"
       :loading="loading"
       data-key="id"
@@ -40,8 +101,8 @@
       frame-class="h-full min-h-0"
       table-aria-label="兑换码列表"
       scroll-aria-label="兑换码列表横向滚动区域"
-      empty-title="暂无兑换码"
-      empty-description="创建第一个兑换码后，用户即可在奖励中心兑换 Idea。"
+      :empty-title="emptyTitle"
+      :empty-description="emptyDescription"
       :table-style="{ minWidth: '980px' }"
     >
       <Column field="displayName" header="兑换码" :style="{ minWidth: '220px' }">
@@ -59,24 +120,22 @@
       <Column field="creditAmount" header="奖励 Idea" :style="{ width: '140px' }">
         <template #body="{ data }">{{ formatIdeaAmount(data.creditAmount) }}</template>
       </Column>
-      <Column field="status" header="有效状态" :style="{ width: '112px' }">
+      <Column field="status" header="状态" :style="{ width: '180px' }">
         <template #body="{ data }">
-          <Tag
-            :value="statusPresentation(data.status).label"
-            :severity="statusPresentation(data.status).severity"
-            rounded
-          />
-        </template>
-      </Column>
-      <Column header="启用状态" :style="{ width: '100px' }">
-        <template #body="{ data }">
-          <ToggleSwitch
-            :key="`${data.id}:${data.enabled}:${Boolean(enabledPending[data.id])}`"
-            :model-value="data.enabled"
-            :disabled="Boolean(enabledPending[data.id])"
-            :aria-label="`${data.displayName}启用状态`"
-            @update:model-value="setRewardCodeEnabled(data, $event)"
-          />
+          <div class="flex items-center gap-3">
+            <Tag
+              :value="statusPresentation(data.status).label"
+              :severity="statusPresentation(data.status).severity"
+              rounded
+            />
+            <ToggleSwitch
+              :key="`${data.id}:${data.enabled}:${Boolean(enabledPending[data.id])}`"
+              :model-value="data.enabled"
+              :disabled="Boolean(enabledPending[data.id])"
+              :aria-label="`${data.displayName}启用状态`"
+              @update:model-value="setRewardCodeEnabled(data, $event)"
+            />
+          </div>
         </template>
       </Column>
       <Column header="兑换进度" :style="{ width: '150px' }">
@@ -132,11 +191,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { MoreHoriz, Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Message from 'primevue/message'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
@@ -145,18 +205,30 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminRowActionsPopover from '../../shared/components/AdminRowActionsPopover.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
+import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
+import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
 import RewardCodeFormDialog, { type RewardCodeFormValue } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
-import { createAdminRewardCodeResource, type RewardCode } from './rewardCodeAdminResource'
+import {
+  createAdminRewardCodeResource,
+  type RewardCode,
+  type RewardCodeStatus,
+} from './rewardCodeAdminResource'
 
 const resource = createAdminRewardCodeResource()
 const toast = useAdminToast()
 const rewardCodes = ref<RewardCode[]>([])
 const loading = ref(true)
-const loadError = ref(false)
+const initialError = ref(false)
+const backgroundError = ref(false)
+const totalRewardCodes = ref(0)
+const searchKeyword = ref('')
+const appliedSearchKeyword = ref('')
+const statusFilter = ref<RewardCodeStatus>()
+const hasLoadedResult = ref(false)
 const saving = ref(false)
 const saveError = ref('')
 const createDialogVisible = ref(false)
@@ -179,24 +251,95 @@ const rewardCodeActionItems = computed(() => [
 ])
 const pagination = useAdminCursorPagination<number>({ pending: loading })
 const confirm = useAdminConfirm()
+const totalRewardCodesLabel = computed(() => '共 ' + totalRewardCodes.value + ' 个兑换码')
+const emptyTitle = computed(() =>
+  appliedSearchKeyword.value.trim() || statusFilter.value ? '未找到匹配的兑换码' : '暂无兑换码',
+)
+const emptyDescription = computed(() =>
+  appliedSearchKeyword.value.trim() || statusFilter.value
+    ? '调整搜索或筛选条件后重试。'
+    : '创建第一个兑换码后，用户即可在奖励中心兑换 Idea。',
+)
+const statusOptions = [
+  { label: '可兑换', value: 'enabled' },
+  { label: '已停用', value: 'disabled' },
+  { label: '已过期', value: 'expired' },
+  { label: '已耗尽', value: 'exhausted' },
+] satisfies Array<{ label: string; value: RewardCodeStatus }>
+let requestEpoch = 0
+let activeRequest: AbortController | undefined
 
 type PrimePopupPanel = { toggle: (event: Event) => void; hide?: () => void }
 
-onMounted(loadRewardCodes)
+onMounted(() => {
+  void loadRewardCodes()
+})
 
-async function loadRewardCodes() {
+onBeforeUnmount(() => activeRequest?.abort())
+
+watch(statusFilter, () => {
+  resetCriteriaAndLoad()
+})
+
+async function loadRewardCodes({ preserveData = false }: { preserveData?: boolean } = {}) {
+  const epoch = ++requestEpoch
+  activeRequest?.abort()
+  const controller = new AbortController()
+  activeRequest = controller
+  if (!preserveData) {
+    rewardCodes.value = []
+    totalRewardCodes.value = 0
+    hasLoadedResult.value = false
+  }
   loading.value = true
-  loadError.value = false
+  initialError.value = false
+  backgroundError.value = false
   try {
-    const page = await resource.list(pagination.cursor.value)
+    const page = await resource.search({
+      query: appliedSearchKeyword.value,
+      status: statusFilter.value,
+      beforeId: pagination.cursor.value,
+      signal: controller.signal,
+    })
+    if (epoch !== requestEpoch) return
     rewardCodes.value = page.rewardCodes
+    totalRewardCodes.value = page.total
+    hasLoadedResult.value = true
     pagination.setNextCursor(page.nextBeforeId)
   } catch (error) {
-    loadError.value = true
-    toast.error(formatAdminDisplayError(error, '兑换码加载失败'))
+    if (epoch !== requestEpoch || controller.signal.aborted) return
+    if (hasLoadedResult.value && preserveData) {
+      backgroundError.value = true
+    } else {
+      initialError.value = true
+      toast.error(formatAdminDisplayError(error, '兑换码加载失败'))
+    }
   } finally {
-    loading.value = false
+    if (epoch === requestEpoch) loading.value = false
   }
+}
+
+function refreshRewardCodes() {
+  void loadRewardCodes({ preserveData: true })
+}
+
+function searchRewardCodes() {
+  appliedSearchKeyword.value = searchKeyword.value
+  resetCriteriaAndLoad()
+}
+
+function clearSearch() {
+  appliedSearchKeyword.value = ''
+  resetCriteriaAndLoad()
+}
+
+function resetStatusFilter() {
+  statusFilter.value = undefined
+}
+
+function resetCriteriaAndLoad() {
+  pagination.reset()
+  void loadRewardCodes()
 }
 
 function openCreateDialog() {
@@ -283,6 +426,7 @@ async function deleteRewardCode(rewardCode: RewardCode) {
     await resource.delete(rewardCode.id)
     rewardCodes.value = rewardCodes.value.filter((candidate) => candidate.id !== rewardCode.id)
     toast.success('兑换码已删除')
+    void loadRewardCodes({ preserveData: true })
   } catch (error) {
     toast.error(formatAdminDisplayError(error, '删除兑换码失败'))
   } finally {
@@ -296,6 +440,7 @@ async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
   try {
     replaceRewardCode(await resource.setEnabled(rewardCode.id, enabled))
     toast.success(enabled ? '兑换码已启用' : '兑换码已停用')
+    void loadRewardCodes({ preserveData: true })
   } catch (error) {
     toast.error(formatAdminDisplayError(error, enabled ? '启用兑换码失败' : '停用兑换码失败'))
   } finally {

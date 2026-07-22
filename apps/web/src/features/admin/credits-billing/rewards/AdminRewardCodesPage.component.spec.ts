@@ -8,7 +8,7 @@ import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
 const resource = vi.hoisted(() => ({
   create: vi.fn(),
   delete: vi.fn(),
-  list: vi.fn(),
+  search: vi.fn(),
   setEnabled: vi.fn(),
   update: vi.fn(),
 }))
@@ -31,7 +31,7 @@ vi.mock('../../shared/composables/useAdminConfirm', () => ({
 describe('AdminRewardCodesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    resource.list.mockResolvedValue({ rewardCodes: [makeRewardCode()], nextBeforeId: 6 })
+    resource.search.mockResolvedValue({ rewardCodes: [makeRewardCode()], total: 21, nextBeforeId: 6 })
     resource.create.mockResolvedValue({
       rewardCode: makeRewardCode({ id: 8 }),
       plaintext: 'ABCD12342026',
@@ -46,16 +46,114 @@ describe('AdminRewardCodesPage', () => {
     resource.delete.mockResolvedValue(undefined)
   })
 
-  it('renders the canonical RewardCode list and pages with the keyset cursor', async () => {
+  it('renders the canonical RewardCode list, filtered total, and pages with the keyset cursor', async () => {
     const { user } = renderPage()
 
     expect(await screen.findByText('新用户奖励')).toBeVisible()
     expect(screen.getByText('•••• 2026')).toBeVisible()
     expect(screen.getByText('80 Ideas')).toBeVisible()
     expect(screen.getByText('12 / 100')).toBeVisible()
+    expect(screen.getByText('共 21 个兑换码')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: '下一页' }))
-    await waitFor(() => expect(resource.list).toHaveBeenLastCalledWith(6))
+    await waitFor(() =>
+      expect(resource.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ beforeId: 6 }),
+      ),
+    )
+  })
+
+  it('sends a complete Code through the search request body without changing the route', async () => {
+    const { user } = renderPage()
+    await screen.findByText('新用户奖励')
+
+    const search = screen.getByRole('textbox', { name: '搜索兑换码' })
+    await user.type(search, 'ABCD-1234-2026')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() =>
+      expect(resource.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: 'ABCD-1234-2026', beforeId: undefined }),
+      ),
+    )
+    expect(window.location.search).toBe('')
+  })
+
+  it('searches by a fuzzy name and clears the applied query from the clear action', async () => {
+    const { user } = renderPage()
+    await screen.findByText('新用户奖励')
+
+    const search = screen.getByRole('textbox', { name: '搜索兑换码' })
+    await user.type(search, '新用')
+    await user.keyboard('{Enter}')
+    await waitFor(() =>
+      expect(resource.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: '新用', beforeId: undefined }),
+      ),
+    )
+
+    await user.click(screen.getByRole('button', { name: '清空搜索' }))
+    await waitFor(() =>
+      expect(resource.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: '', beforeId: undefined }),
+      ),
+    )
+    expect(search).toHaveValue('')
+  })
+
+  it('filters by effective status and clears the keyset page before requesting', async () => {
+    const { user } = renderPage()
+    await screen.findByText('新用户奖励')
+
+    await user.click(screen.getByRole('button', { name: '筛选兑换码状态' }))
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByRole('option', { name: '已过期' }))
+
+    await waitFor(() =>
+      expect(resource.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'expired', beforeId: undefined }),
+      ),
+    )
+  })
+
+  it('keeps the newest result when an older search response resolves late', async () => {
+    let resolveOld: (value: unknown) => void = () => undefined
+    const oldRequest = new Promise((resolve) => {
+      resolveOld = resolve
+    })
+    const { user } = renderPage()
+    await screen.findByText('新用户奖励')
+
+    resource.search.mockImplementationOnce(() => oldRequest)
+    const search = screen.getByRole('textbox', { name: '搜索兑换码' })
+    await user.type(search, '旧兑换码')
+    await user.keyboard('{Enter}')
+    resource.search.mockResolvedValueOnce({
+      rewardCodes: [makeRewardCode({ displayName: '最新兑换码' })],
+      total: 1,
+    })
+    await user.clear(search)
+    await user.type(search, '最新兑换码')
+    await user.keyboard('{Enter}')
+    expect(await screen.findByText('最新兑换码')).toBeVisible()
+
+    resolveOld({ rewardCodes: [makeRewardCode({ displayName: '旧兑换码' })], total: 1 })
+    await Promise.resolve()
+    expect(screen.queryByText('旧兑换码')).not.toBeInTheDocument()
+  })
+
+  it('distinguishes initial errors from a failed background refresh and recovers', async () => {
+    resource.search.mockRejectedValueOnce(new Error('network unavailable'))
+    const { user } = renderPage()
+    expect(await screen.findByText('兑换码加载失败，请重试。')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '重试' }))
+    expect(await screen.findByText('新用户奖励')).toBeVisible()
+
+    resource.search.mockRejectedValueOnce(new Error('network unavailable'))
+    await user.click(screen.getByRole('button', { name: '刷新兑换码' }))
+    expect(await screen.findByText('刷新兑换码失败，正在显示上次成功的数据。')).toBeVisible()
+    expect(screen.getByText('新用户奖励')).toBeVisible()
   })
 
   it('creates from the focused Dialog and shows the one-time plaintext result', async () => {
@@ -64,7 +162,7 @@ describe('AdminRewardCodesPage', () => {
 
     await user.click(screen.getAllByRole('button', { name: '创建兑换码' }).at(-1)!)
     await user.type(screen.getByRole('textbox', { name: '名称' }), '八月奖励')
-    resource.list.mockReturnValueOnce(new Promise(() => {}))
+    resource.search.mockReturnValueOnce(new Promise(() => {}))
     await user.click(screen.getAllByRole('button', { name: '创建兑换码' }).at(-1)!)
 
     await waitFor(() => expect(resource.create).toHaveBeenCalledTimes(1))

@@ -4,7 +4,7 @@ import { createAdminRewardCodeResource } from './rewardCodeAdminResource'
 const generated = vi.hoisted(() => ({
   create: vi.fn(),
   delete: vi.fn(),
-  list: vi.fn(),
+  search: vi.fn(),
   setEnabled: vi.fn(),
   update: vi.fn(),
 }))
@@ -12,7 +12,7 @@ const generated = vi.hoisted(() => ({
 vi.mock('../../../../shared/api/generated-query/admin-rewards/admin-rewards', () => ({
   createAdminRewardCode: generated.create,
   deleteAdminRewardCode: generated.delete,
-  listAdminRewardCodes: generated.list,
+  searchAdminRewardCodes: generated.search,
   setAdminRewardCodeEnabled: generated.setEnabled,
   updateAdminRewardCode: generated.update,
 }))
@@ -34,16 +34,25 @@ const rewardCode = {
 describe('AdminRewardCodeResource', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('maps list metadata without exposing digest or plaintext', async () => {
-    generated.list.mockResolvedValue({
+  it('maps search metadata without exposing digest or plaintext', async () => {
+    generated.search.mockResolvedValue({
       code: 0,
       msg: 'ok',
-      data: { reward_codes: [rewardCode], next_before_id: 6 },
+      data: { reward_codes: [rewardCode], total: 42, next_before_id: 6 },
+    })
+    const signal = new AbortController().signal
+
+    const page = await createAdminRewardCodeResource().search({
+      query: ' 新用户奖励 ',
+      status: 'enabled',
+      beforeId: 8,
+      signal,
     })
 
-    const page = await createAdminRewardCodeResource().list(8)
-
-    expect(generated.list).toHaveBeenCalledWith({ before_id: 8, limit: 20 })
+    expect(generated.search).toHaveBeenCalledWith(
+      { query: '新用户奖励', status: 'enabled', before_id: 8, limit: 20 },
+      { signal },
+    )
     expect(page).toEqual({
       rewardCodes: [
         expect.objectContaining({
@@ -53,8 +62,21 @@ describe('AdminRewardCodeResource', () => {
           status: 'enabled',
         }),
       ],
+      total: 42,
       nextBeforeId: 6,
     })
+  })
+
+  it('omits an empty query and unset status from the body', async () => {
+    generated.search.mockResolvedValue({
+      code: 0,
+      msg: 'ok',
+      data: { reward_codes: [], total: 0 },
+    })
+
+    await createAdminRewardCodeResource().search({ query: '   ' })
+
+    expect(generated.search).toHaveBeenCalledWith({ limit: 20 }, undefined)
   })
 
   it('preserves the client idempotency key and converts Shanghai expiration', async () => {

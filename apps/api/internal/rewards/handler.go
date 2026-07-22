@@ -73,6 +73,13 @@ type setRewardCodeEnabledRequest struct {
 	Enabled *bool `json:"enabled"`
 }
 
+type searchRewardCodesRequest struct {
+	Query    string           `json:"query"`
+	Status   RewardCodeStatus `json:"status"`
+	BeforeID *int64           `json:"before_id"`
+	Limit    *int             `json:"limit"`
+}
+
 type redeemRequest struct {
 	Code string `json:"code"`
 }
@@ -160,29 +167,36 @@ func (h *Handler) DeleteRewardCode(c *gin.Context) {
 	response.SuccessDTO(c, deleted)
 }
 
-func (h *Handler) ListRewardCodes(c *gin.Context) {
+func (h *Handler) SearchRewardCodes(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if _, ok := h.requireAdmin(c); !ok {
 		return
 	}
-	input := ListRewardCodesInput{Limit: 20}
-	if raw := strings.TrimSpace(c.Query("before_id")); raw != "" {
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || value <= 0 {
-			response.Error(c, http.StatusBadRequest, "before_id 无效")
+	if c.Request.URL.RawQuery != "" {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	var request searchRewardCodesRequest
+	if err := decodeRewardJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	input := SearchRewardCodesInput{Query: request.Query, Status: request.Status, Limit: 20}
+	if request.BeforeID != nil {
+		if *request.BeforeID <= 0 {
+			response.Error(c, http.StatusBadRequest, "参数错误")
 			return
 		}
-		input.BeforeID = value
+		input.BeforeID = *request.BeforeID
 	}
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 || value > 100 {
-			response.Error(c, http.StatusBadRequest, "limit 无效")
+	if request.Limit != nil {
+		if *request.Limit < 1 || *request.Limit > 100 {
+			response.Error(c, http.StatusBadRequest, "参数错误")
 			return
 		}
-		input.Limit = value
+		input.Limit = *request.Limit
 	}
-	page, err := h.service.ListRewardCodes(c.Request.Context(), input)
+	page, err := h.service.SearchRewardCodes(c.Request.Context(), input)
 	if err != nil {
 		writeRewardError(c, err)
 		return

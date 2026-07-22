@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func TestRewardCodeCreateListRedeemAndReplay(t *testing.T) {
+func TestRewardCodeCreateSearchRedeemAndReplay(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
@@ -40,9 +40,9 @@ func TestRewardCodeCreateListRedeemAndReplay(t *testing.T) {
 	if replay.RewardCode.ID != created.RewardCode.ID || !replay.Replayed || replay.Plaintext != "" {
 		t.Fatalf("replayed RewardCode = %+v, want same metadata without plaintext", replay)
 	}
-	page, err := service.ListRewardCodes(t.Context(), ListRewardCodesInput{})
+	page, err := service.SearchRewardCodes(t.Context(), SearchRewardCodesInput{})
 	if err != nil || len(page.RewardCodes) != 1 || page.RewardCodes[0].ID != created.RewardCode.ID {
-		t.Fatalf("ListRewardCodes() = %+v error=%v", page, err)
+		t.Fatalf("SearchRewardCodes() = %+v error=%v", page, err)
 	}
 	var definitions, actions int
 	var plaintextPersisted bool
@@ -84,6 +84,163 @@ func TestRewardCodeCreateListRedeemAndReplay(t *testing.T) {
 	}
 	if redemptionCount != 1 || grants != 1 {
 		t.Fatalf("atomic facts redemption_count=%d grants=%d, want 1/1", redemptionCount, grants)
+	}
+}
+
+func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	now := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
+	service := NewServiceWithOptions(pool, creditService, newTestRewardKeyring(t), ServiceOptions{
+		Now: func() time.Time { return now },
+	})
+
+	create := func(displayName, code, idempotencyKey string, maxRedemptions int64, expiresAt *time.Time) CreatedRewardCode {
+		t.Helper()
+		created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+			DisplayName: displayName, Code: code, CreditAmount: 10,
+			MaxRedemptions: maxRedemptions, ExpiresAt: expiresAt,
+			IdempotencyKey: idempotencyKey, ActorUserID: 1,
+		})
+		if err != nil {
+			t.Fatalf("CreateRewardCode(%q) error = %v", displayName, err)
+		}
+		return created
+	}
+
+	summer := create("夏季迎新奖励", "SUMMER-WELCOME-2030", "search-summer", 0, nil)
+	premium := create("夏季高级奖励", "SUMMER-PREMIUM-2030", "search-premium", 0, nil)
+	expiresAt := now.Add(time.Hour)
+	expired := create("冬季限时奖励", "WINTER-EXPIRED-2030", "search-expired", 1, &expiresAt)
+	exhausted := create("容量奖励", "CAPACITY-2030", "search-exhausted", 1, nil)
+	if _, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+		RewardCodeID: premium.RewardCode.ID, Enabled: false, ActorUserID: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 3)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "CAPACITY-2030"}); err != nil {
+		t.Fatal(err)
+	}
+	provisionRewardWallet(t, pool, creditService, 4)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 4, Code: "WINTER-EXPIRED-2030"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{
+		RewardCodeID: expired.RewardCode.ID, Enabled: false, ActorUserID: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(2 * time.Hour)
+
+	assertSearch := func(input SearchRewardCodesInput, wantIDs ...int64) RewardCodePage {
+		t.Helper()
+		page, err := service.SearchRewardCodes(t.Context(), input)
+		if err != nil {
+			t.Fatalf("SearchRewardCodes(%+v) error = %v", input, err)
+		}
+		if page.Total != int64(len(wantIDs)) || len(page.RewardCodes) != len(wantIDs) {
+			t.Fatalf("SearchRewardCodes(%+v) = %+v, want IDs %v", input, page, wantIDs)
+		}
+		for index, wantID := range wantIDs {
+			if page.RewardCodes[index].ID != wantID {
+				t.Fatalf("SearchRewardCodes(%+v) IDs = %+v, want %v", input, page.RewardCodes, wantIDs)
+			}
+		}
+		return page
+	}
+
+	assertSearch(SearchRewardCodesInput{Query: "夏季"}, premium.RewardCode.ID, summer.RewardCode.ID)
+	assertSearch(SearchRewardCodesInput{Query: "summer-premium-2030"}, premium.RewardCode.ID)
+	previousKey := CodeKey{Version: "test-v1", Secret: bytes.Repeat([]byte{0x2a}, 32)}
+	rollingKeyring, err := NewCodeKeyring(
+		CodeKey{Version: "test-v2", Secret: bytes.Repeat([]byte{0x2b}, 32)},
+		&previousKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollingService := NewServiceWithOptions(pool, creditService, rollingKeyring, ServiceOptions{
+		Now: func() time.Time { return now },
+	})
+	rollingPage, err := rollingService.SearchRewardCodes(t.Context(), SearchRewardCodesInput{
+		Query: "SUMMER-PREMIUM-2030",
+	})
+	if err != nil || rollingPage.Total != 1 || len(rollingPage.RewardCodes) != 1 ||
+		rollingPage.RewardCodes[0].ID != premium.RewardCode.ID {
+		t.Fatalf("rolling HMAC search = %+v error=%v", rollingPage, err)
+	}
+	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusDisabled}, premium.RewardCode.ID)
+	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusExpired}, expired.RewardCode.ID)
+	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusExhausted}, exhausted.RewardCode.ID)
+	assertSearch(SearchRewardCodesInput{Status: RewardCodeStatusEnabled}, summer.RewardCode.ID)
+
+	first, err := service.SearchRewardCodes(t.Context(), SearchRewardCodesInput{Limit: 2})
+	if err != nil || first.Total != 4 || len(first.RewardCodes) != 2 || first.NextBeforeID == 0 {
+		t.Fatalf("first keyset page = %+v error=%v", first, err)
+	}
+	second, err := service.SearchRewardCodes(t.Context(), SearchRewardCodesInput{
+		BeforeID: first.NextBeforeID, Limit: 2,
+	})
+	if err != nil || second.Total != 4 || len(second.RewardCodes) != 2 || second.NextBeforeID != 0 {
+		t.Fatalf("second keyset page = %+v error=%v", second, err)
+	}
+	for _, firstItem := range first.RewardCodes {
+		for _, secondItem := range second.RewardCodes {
+			if firstItem.ID == secondItem.ID {
+				t.Fatalf("keyset pages overlap at RewardCode ID %d", firstItem.ID)
+			}
+		}
+	}
+
+	invalidInputs := []SearchRewardCodesInput{
+		{Status: "unknown"},
+		{BeforeID: -1},
+		{Limit: 101},
+		{Query: strings.Repeat("x", 129)},
+	}
+	for _, input := range invalidInputs {
+		if _, err := service.SearchRewardCodes(t.Context(), input); !errors.Is(err, ErrInvalidCommand) {
+			t.Fatalf("SearchRewardCodes(%+v) error = %v, want ErrInvalidCommand", input, err)
+		}
+	}
+}
+
+func TestSearchRewardCodesUsesSingleTimestampForFilterAndRowStatus(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	createdAt := time.Date(2030, time.July, 22, 8, 0, 0, 0, time.UTC)
+	keyring := newTestRewardKeyring(t)
+	createService := NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{
+		Now: func() time.Time { return createdAt },
+	})
+	expiresAt := createdAt.Add(time.Hour)
+	created, err := createService.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
+		DisplayName: "边界状态奖励", Code: "SNAPSHOT-STATUS-2030", CreditAmount: 10,
+		MaxRedemptions: 0, ExpiresAt: &expiresAt, IdempotencyKey: "snapshot-status", ActorUserID: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clockCalls := 0
+	searchService := NewServiceWithOptions(pool, creditService, keyring, ServiceOptions{
+		Now: func() time.Time {
+			clockCalls++
+			if clockCalls == 1 {
+				return expiresAt.Add(-time.Second)
+			}
+			return expiresAt.Add(time.Second)
+		},
+	})
+
+	page, err := searchService.SearchRewardCodes(t.Context(), SearchRewardCodesInput{
+		Status: RewardCodeStatusEnabled,
+	})
+	if err != nil || page.Total != 1 || len(page.RewardCodes) != 1 ||
+		page.RewardCodes[0].ID != created.RewardCode.ID || page.RewardCodes[0].Status != RewardCodeStatusEnabled ||
+		clockCalls != 1 {
+		t.Fatalf("snapshot search = %+v error=%v clockCalls=%d", page, err, clockCalls)
 	}
 }
 
@@ -509,7 +666,7 @@ func TestRewardCodeKeyRetirementRejectsDisabledAndExpiredDefinitions(t *testing.
 			} else {
 				now = now.Add(2 * time.Hour)
 				var page RewardCodePage
-				page, err = oldService.ListRewardCodes(t.Context(), ListRewardCodesInput{})
+				page, err = oldService.SearchRewardCodes(t.Context(), SearchRewardCodesInput{})
 				if err == nil && (len(page.RewardCodes) != 1 || page.RewardCodes[0].Status != RewardCodeStatusExpired) {
 					t.Fatalf("expired RewardCode page = %+v", page)
 				}

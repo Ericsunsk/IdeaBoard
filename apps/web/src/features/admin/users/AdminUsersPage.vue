@@ -3,7 +3,12 @@
     <template #toolbar>
       <AdminResourceToolbar>
         <template #search>
-          <AdminToolbarSearch v-model="searchKeyword" @enter="loadUsers" @clear="clearSearch" />
+          <AdminToolbarSearch
+            v-model="searchKeyword"
+            input-label="搜索用户"
+            @enter="loadUsers"
+            @clear="clearSearch"
+          />
         </template>
 
         <template #metrics="{ metricClass }">
