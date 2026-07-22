@@ -64,6 +64,16 @@ describe('AdminRewardCodesPage', () => {
     )
   })
 
+  it('uses the compact Admin table empty state without instructional copy', async () => {
+    resource.search.mockResolvedValueOnce({ rewardCodes: [], total: 0 })
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('暂无兑换码')).toBeVisible())
+    expect(
+      screen.queryByText('创建第一个兑换码后，用户即可在奖励中心兑换 Idea。'),
+    ).not.toBeInTheDocument()
+  })
+
   it('sends a complete Code through the search request body without changing the route', async () => {
     const { user } = renderPage()
     await screen.findByText('新用户奖励')

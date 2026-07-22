@@ -101,8 +101,6 @@
       frame-class="h-full min-h-0"
       table-aria-label="兑换码列表"
       scroll-aria-label="兑换码列表横向滚动区域"
-      :empty-title="emptyTitle"
-      :empty-description="emptyDescription"
       :table-style="{ minWidth: '980px' }"
     >
       <Column field="displayName" header="兑换码" :style="{ minWidth: '220px' }">
@@ -165,6 +163,12 @@
           </Button>
         </template>
       </Column>
+
+      <template #empty>
+        <div class="py-8 text-center text-admin-body text-admin-text-3">
+          {{ emptyTitle }}
+        </div>
+      </template>
     </DataTableFrame>
   </AdminTablePanel>
 
@@ -263,11 +267,6 @@ const confirm = useAdminConfirm()
 const totalRewardCodesLabel = computed(() => '共 ' + totalRewardCodes.value + ' 个兑换码')
 const emptyTitle = computed(() =>
   appliedSearchKeyword.value.trim() || statusFilter.value ? '未找到匹配的兑换码' : '暂无兑换码',
-)
-const emptyDescription = computed(() =>
-  appliedSearchKeyword.value.trim() || statusFilter.value
-    ? '调整搜索或筛选条件后重试。'
-    : '创建第一个兑换码后，用户即可在奖励中心兑换 Idea。',
 )
 const statusOptions = [
   { label: '可兑换', value: 'enabled' },
