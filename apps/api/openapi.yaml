@@ -1022,6 +1022,49 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseDeletedRewardCode' }
 
+  /admin/rewards/codes/{id}/redemptions:
+    get:
+      tags: [AdminRewards]
+      operationId: listAdminRewardCodeRedemptions
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RewardCodeIdPath'
+        - name: before_id
+          in: query
+          schema: { type: integer, format: int64, minimum: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: RewardCode-scoped Redemption keyset page
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminRewardCodeRedemptionPage' }
+
+  /admin/rewards/codes/{id}/redemptions/{redemption_id}:
+    get:
+      tags: [AdminRewards]
+      operationId: getAdminRewardCodeRedemption
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RewardCodeIdPath'
+        - $ref: '#/components/parameters/RewardRedemptionIdPath'
+      responses:
+        '200':
+          description: RewardCode-scoped Redemption technical detail
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminRewardCodeRedemptionDetail' }
+
   /admin/rewards/codes/{id}/enabled:
     patch:
       tags: [AdminRewards]
@@ -2017,6 +2060,11 @@ components:
       in: path
       required: true
       schema: { type: integer, format: int64, minimum: 1 }
+    RewardRedemptionIdPath:
+      name: redemption_id
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
     StorageProfileId:
       name: id
       in: path
@@ -2325,6 +2373,40 @@ components:
           items: { $ref: '#/components/schemas/RewardCode' }
         total: { type: integer, format: int64, minimum: 0 }
         next_before_id: { type: integer, format: int64, minimum: 1 }
+
+    AdminRewardCodeRedemptionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, reward_code_id, user_id, credited_amount, redeemed_at]
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        reward_code_id: { type: integer, format: int64, minimum: 1 }
+        user_id: { type: integer, format: int64, minimum: 1 }
+        credited_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        redeemed_at: { type: string, format: date-time }
+
+    AdminRewardCodeRedemptionPage:
+      type: object
+      additionalProperties: false
+      required: [redemptions]
+      properties:
+        redemptions:
+          type: array
+          items: { $ref: '#/components/schemas/AdminRewardCodeRedemptionSummary' }
+        next_before_id: { type: integer, format: int64, minimum: 1 }
+
+    AdminRewardCodeRedemptionDetail:
+      type: object
+      additionalProperties: false
+      required: [id, reward_code_id, user_id, credited_amount, redeemed_at, credit_transaction_id, masked_code_hint]
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        reward_code_id: { type: integer, format: int64, minimum: 1 }
+        user_id: { type: integer, format: int64, minimum: 1 }
+        credited_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
+        redeemed_at: { type: string, format: date-time }
+        credit_transaction_id: { type: string, minLength: 1, maxLength: 64 }
+        masked_code_hint: { type: string, minLength: 9, maxLength: 9, pattern: '^•••• [A-Z0-9]{4}$' }
 
     AdminRewardCodeSearchRequest:
       type: object
@@ -4420,6 +4502,20 @@ components:
         - type: object
           properties:
             data: { $ref: '#/components/schemas/RewardCodePage' }
+
+    ApiResponseAdminRewardCodeRedemptionPage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminRewardCodeRedemptionPage' }
+
+    ApiResponseAdminRewardCodeRedemptionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminRewardCodeRedemptionDetail' }
 
     ApiResponseRewardRedeemResult:
       allOf:

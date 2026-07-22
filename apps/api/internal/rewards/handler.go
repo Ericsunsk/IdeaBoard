@@ -204,6 +204,61 @@ func (h *Handler) SearchRewardCodes(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
+func (h *Handler) ListAdminRedemptions(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	rewardCodeID, _, ok := h.requireAdminRewardCode(c)
+	if !ok {
+		return
+	}
+	input := ListAdminRedemptionsInput{RewardCodeID: rewardCodeID, Limit: defaultRedemptionHistoryLimit}
+	if raw, exists := c.GetQuery("before_id"); exists {
+		raw = strings.TrimSpace(raw)
+		value, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || value <= 0 {
+			response.Error(c, http.StatusBadRequest, "before_id 无效")
+			return
+		}
+		input.BeforeID = value
+	}
+	if raw, exists := c.GetQuery("limit"); exists {
+		raw = strings.TrimSpace(raw)
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 || value > maxRedemptionHistoryLimit {
+			response.Error(c, http.StatusBadRequest, "limit 无效")
+			return
+		}
+		input.Limit = value
+	}
+	page, err := h.service.ListAdminRedemptions(c.Request.Context(), input)
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) GetAdminRedemption(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	rewardCodeID, _, ok := h.requireAdminRewardCode(c)
+	if !ok {
+		return
+	}
+	redemptionID, err := strconv.ParseInt(strings.TrimSpace(c.Param("redemption_id")), 10, 64)
+	if err != nil || redemptionID <= 0 {
+		response.Error(c, http.StatusBadRequest, "兑换记录 ID 无效")
+		return
+	}
+	detail, err := h.service.GetAdminRedemption(c.Request.Context(), GetAdminRedemptionInput{
+		RewardCodeID: rewardCodeID,
+		RedemptionID: redemptionID,
+	})
+	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	response.SuccessDTO(c, detail)
+}
+
 func (h *Handler) Redeem(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
@@ -341,6 +396,8 @@ func writeRewardError(c *gin.Context, err error) {
 		response.Error(c, http.StatusConflict, "兑换上限不能低于已兑换次数")
 	case errors.Is(err, ErrRewardCodeRedeemed):
 		response.Error(c, http.StatusConflict, "已有兑换记录，只能停用该兑换码")
+	case errors.Is(err, ErrRedemptionNotFound):
+		response.Error(c, http.StatusNotFound, "兑换记录不存在")
 	case errors.Is(err, ErrCodeUnavailable):
 		response.Error(c, http.StatusUnprocessableEntity, "兑换码无效或已失效")
 	case errors.Is(err, credits.ErrWalletFrozen):

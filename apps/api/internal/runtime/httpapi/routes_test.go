@@ -372,6 +372,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		adminCreditReconciliationGlobalFindingQueueRouteUnderContract: false,
 		"GET /api/admin/billing/catalog":                              false,
 		"GET /api/admin/billing/catalog/:sku/prices":                  false,
+		"GET /api/admin/rewards/codes/:id/redemptions":                false,
+		"GET /api/admin/rewards/codes/:id/redemptions/:redemption_id": false,
 		"GET /api/admin/line-draft-modes":                             false,
 		"GET /api/admin/monitor":                                      false,
 		"GET /api/admin/monitor/stream":                               false,

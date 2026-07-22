@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PrimeVue from 'primevue/config'
 import { fireEvent } from '@testing-library/vue'
+import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { primeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminRewardCodesPage from './AdminRewardCodesPage.vue'
@@ -275,6 +276,30 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.queryByText('NEWC-ODE1-WXYZ')).not.toBeInTheDocument()
   })
 
+  it('opens and loads redemption records for the selected RewardCode through the HTTP seam', async () => {
+    let requestedRewardCodeId = ''
+    useMswHandlers(
+      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', ({ params, request }) => {
+        requestedRewardCodeId = String(params.rewardCodeId)
+        expect(new URL(request.url).searchParams.get('limit')).toBe('20')
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: { redemptions: [makeRedemptionSummary()] },
+        })
+      }),
+    )
+    const { user } = renderPage()
+    await screen.findByText('新用户奖励')
+
+    await user.click(screen.getByRole('button', { name: '新用户奖励 操作菜单' }))
+    await user.click(await screen.findByRole('button', { name: '兑换记录' }))
+
+    expect(screen.getByRole('dialog', { name: '新用户奖励 · 兑换记录' })).toBeVisible()
+    expect(await screen.findByText('用户 #23')).toBeVisible()
+    expect(requestedRewardCodeId).toBe('7')
+  })
+
   it('omits a blank Code from rule-only updates and does not show plaintext', async () => {
     resource.update.mockResolvedValueOnce({ rewardCode: makeRewardCode() })
     const { user } = renderPage()
@@ -379,6 +404,17 @@ function makeRewardCode(overrides: Record<string, unknown> = {}) {
     createdBy: 1,
     createdAt: '2026-07-20T10:00:00Z',
     updatedAt: '2026-07-20T10:00:00Z',
+    ...overrides,
+  }
+}
+
+function makeRedemptionSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 51,
+    reward_code_id: 7,
+    user_id: 23,
+    credited_amount: 80,
+    redeemed_at: '2026-07-22T03:04:05Z',
     ...overrides,
   }
 }

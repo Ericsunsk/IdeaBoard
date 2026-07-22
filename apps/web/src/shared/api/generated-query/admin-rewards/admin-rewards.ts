@@ -22,11 +22,14 @@ import type {
   AdminRewardCodeEnabledRequest,
   AdminRewardCodeSearchRequest,
   AdminRewardCodeUpdateRequest,
+  ApiResponseAdminRewardCodeRedemptionDetail,
+  ApiResponseAdminRewardCodeRedemptionPage,
   ApiResponseCreatedRewardCode,
   ApiResponseDeletedRewardCode,
   ApiResponseRewardCode,
   ApiResponseRewardCodePage,
   ApiResponseUpdatedRewardCode,
+  ListAdminRewardCodeRedemptionsParams,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -341,6 +344,196 @@ export function useDeleteAdminRewardCode<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getDeleteAdminRewardCodeQueryOptions(id, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminRewardCodeRedemptionsUrl = (
+  id: number,
+  params?: ListAdminRewardCodeRedemptionsParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/rewards/codes/${encodeURIComponent(String(id))}/redemptions?${stringifiedParams}`
+    : `/admin/rewards/codes/${encodeURIComponent(String(id))}/redemptions`
+}
+
+export const listAdminRewardCodeRedemptions = async (
+  id: number,
+  params?: ListAdminRewardCodeRedemptionsParams,
+  options?: RequestInit,
+): Promise<ApiResponseAdminRewardCodeRedemptionPage> => {
+  return orvalMutator<ApiResponseAdminRewardCodeRedemptionPage>(
+    getListAdminRewardCodeRedemptionsUrl(id, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getListAdminRewardCodeRedemptionsQueryKey = (
+  id: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminRewardCodeRedemptionsParams>,
+) => {
+  return ['admin', 'rewards', 'codes', id, 'redemptions', ...(params ? [params] : [])] as const
+}
+
+export const getListAdminRewardCodeRedemptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminRewardCodeRedemptions>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminRewardCodeRedemptionsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminRewardCodeRedemptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminRewardCodeRedemptionsQueryKey(id, params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminRewardCodeRedemptions>>> = ({
+    signal,
+  }) => listAdminRewardCodeRedemptions(toValue(id), toValue(params), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listAdminRewardCodeRedemptions>>, TError, TData>
+}
+
+export type ListAdminRewardCodeRedemptionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminRewardCodeRedemptions>>
+>
+export type ListAdminRewardCodeRedemptionsQueryError = ErrorType<unknown>
+
+export function useListAdminRewardCodeRedemptions<
+  TData = Awaited<ReturnType<typeof listAdminRewardCodeRedemptions>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  params?: MaybeRefOrGetter<ListAdminRewardCodeRedemptionsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminRewardCodeRedemptions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminRewardCodeRedemptionsQueryOptions(id, params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminRewardCodeRedemptionUrl = (id: number, redemptionId: number) => {
+  return `/admin/rewards/codes/${encodeURIComponent(String(id))}/redemptions/${encodeURIComponent(String(redemptionId))}`
+}
+
+export const getAdminRewardCodeRedemption = async (
+  id: number,
+  redemptionId: number,
+  options?: RequestInit,
+): Promise<ApiResponseAdminRewardCodeRedemptionDetail> => {
+  return orvalMutator<ApiResponseAdminRewardCodeRedemptionDetail>(
+    getGetAdminRewardCodeRedemptionUrl(id, redemptionId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetAdminRewardCodeRedemptionQueryKey = (
+  id: MaybeRefOrGetter<number>,
+  redemptionId: MaybeRefOrGetter<number>,
+) => {
+  return ['admin', 'rewards', 'codes', id, 'redemptions', redemptionId] as const
+}
+
+export const getGetAdminRewardCodeRedemptionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminRewardCodeRedemption>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  redemptionId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminRewardCodeRedemption>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminRewardCodeRedemptionQueryKey(id, redemptionId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRewardCodeRedemption>>> = ({
+    signal,
+  }) =>
+    getAdminRewardCodeRedemption(toValue(id), toValue(redemptionId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(id) !== null &&
+        toValue(id) !== undefined &&
+        toValue(redemptionId) !== null &&
+        toValue(redemptionId) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAdminRewardCodeRedemption>>, TError, TData>
+}
+
+export type GetAdminRewardCodeRedemptionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminRewardCodeRedemption>>
+>
+export type GetAdminRewardCodeRedemptionQueryError = ErrorType<unknown>
+
+export function useGetAdminRewardCodeRedemption<
+  TData = Awaited<ReturnType<typeof getAdminRewardCodeRedemption>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  redemptionId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminRewardCodeRedemption>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminRewardCodeRedemptionQueryOptions(id, redemptionId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

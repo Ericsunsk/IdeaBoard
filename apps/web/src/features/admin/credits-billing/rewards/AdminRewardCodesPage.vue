@@ -188,6 +188,11 @@
     :header="plaintextHeader"
     @update:visible="handlePlaintextDialogVisible"
   />
+  <RewardCodeRedemptionsDialog
+    v-if="redemptionsRewardCode"
+    v-model:visible="redemptionsDialogVisible"
+    :reward-code="redemptionsRewardCode"
+  />
 </template>
 
 <script setup lang="ts">
@@ -212,6 +217,7 @@ import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
 import RewardCodeFormDialog, { type RewardCodeFormValue } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
+import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'
 import {
   createAdminRewardCodeResource,
   type RewardCode,
@@ -239,8 +245,11 @@ const plaintextHeader = ref('保存兑换码')
 const enabledPending = reactive<Record<number, boolean>>({})
 const deletePending = reactive<Record<number, boolean>>({})
 const activeRewardCode = ref<RewardCode | null>(null)
+const redemptionsRewardCode = ref<RewardCode | null>(null)
+const redemptionsDialogVisible = ref(false)
 const actionPopoverRef = ref<PrimePopupPanel | null>(null)
 const rewardCodeActionItems = computed(() => [
+  { key: 'redemptions', label: '兑换记录' },
   { key: 'edit', label: '编辑' },
   {
     key: 'delete',
@@ -399,6 +408,11 @@ function selectAction(action: string) {
   const rewardCode = activeRewardCode.value
   actionPopoverRef.value?.hide?.()
   if (!rewardCode) return
+  if (action === 'redemptions') {
+    redemptionsRewardCode.value = rewardCode
+    redemptionsDialogVisible.value = true
+    return
+  }
   if (action === 'edit') {
     editingRewardCode.value = rewardCode
     saveError.value = ''

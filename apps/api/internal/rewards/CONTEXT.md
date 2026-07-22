@@ -14,6 +14,7 @@ Rewards 管理平台 Idea 奖励的 RewardCode 与 Redemption。用户展示使�
 
 - `AdminCommands` 提供 Create、Update、SetEnabled 与 Delete：Create 以 client idempotency key 创建；Update 在单个 transaction 内保存规则并可选轮换 bearer Code；SetEnabled 是 set-state；Delete 仅接受零 Redemption aggregate。
 - `AdminReads.SearchRewardCodes` 通过 no-store POST body 提供名称模糊搜索、完整 Code HMAC lookup、effective status filter、filtered total 与 keyset page，结果不含 plaintext/full digest。
+- `AdminReads.ListAdminRedemptions` 按 RewardCode scope 提供成功 Redemption 的 keyset summary page；`GetAdminRedemption` 仅在相同 RewardCode scope 内按需返回 Credits Transaction ID 与 masked Code hint。
 - `UserCommands.Redeem` 同步兑换 RewardCode，返回 Redemption、credited amount、available balance 与 replay marker。
 - `UserReads.ListRedemptions` 按 ID cursor 返回当前用户的成功 Redemption history，仅含 RewardCode display name、credited amount、masked Code hint 与兑换时间。
 
@@ -37,6 +38,7 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 - Credit Grant 固定使用 source `reward_redemption`、reason `兑换奖励` 和 Redemption ID business reference。
 - authenticated Admin 可通过 Credits Correction 逆转 Grant 的账务结果；Correction 是新的 Ledger 事实，不删除 Redemption，也不恢复 RewardCode capacity。
 - User Redemption history 只读取已提交 Redemption，并按 `(user_id, id DESC)` 隔离和分页；不 join 或复制 Identity PII、Code digest 或明文。
+- Admin Redemption read 只按 `(reward_code_id, id DESC)` 读取已提交事实；summary 不含技术详情，detail 必须同时匹配 RewardCode ID 与 Redemption ID，且两者都不 join Identity、Journal 或 Code digest/plaintext。
 - `reward_admin_actions` 自动记录 actor/action/time/safe metadata，不接收手填 reason，并由 database trigger 与 runtime privileges 双重保证 append-only。Guard 只放行 `ON DELETE SET NULL` 引发的 FK referential nullification：parent 必须已不存在且其他 Journal 字段完全不变。Runtime 不拥有 RewardCode/Alias/Journal 的直接 UPDATE/DELETE，只能执行 transaction-bound Rewards command functions，避免绕过 Journal。
 - `REWARDS_CODE_HMAC_KEYS` 只接受 current 与可选 previous；每个 base64 key 解码后至少 32 bytes，配置无效时 startup fail closed。
 - Code normalization 在任何 Unicode normalization 前执行 128-byte raw bound，再做 NFKC、uppercase、trim 与 Unicode whitespace/hyphen removal；最终 payload 只接受 8–32 个 `A-Z0-9`。

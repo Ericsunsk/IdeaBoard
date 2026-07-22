@@ -21,6 +21,8 @@ func TestAdminRewardRoutesExposeOnlyCanonicalRewardCodes(t *testing.T) {
 	for _, expected := range []string{
 		"POST /api/admin/rewards/codes",
 		"POST /api/admin/rewards/codes/search",
+		"GET /api/admin/rewards/codes/:id/redemptions",
+		"GET /api/admin/rewards/codes/:id/redemptions/:redemption_id",
 		"PATCH /api/admin/rewards/codes/:id",
 		"PATCH /api/admin/rewards/codes/:id/enabled",
 		"DELETE /api/admin/rewards/codes/:id",
@@ -29,7 +31,7 @@ func TestAdminRewardRoutesExposeOnlyCanonicalRewardCodes(t *testing.T) {
 			t.Fatalf("route %q is not registered: %#v", expected, routes)
 		}
 	}
-	if len(routes) != 5 {
+	if len(routes) != 7 {
 		t.Fatalf("unexpected legacy Reward routes remain registered: %#v", routes)
 	}
 }

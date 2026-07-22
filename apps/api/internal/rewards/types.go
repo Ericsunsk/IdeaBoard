@@ -14,6 +14,7 @@ var (
 	ErrRewardCodeNotFound  = errors.New("reward Code not found")
 	ErrCapBelowRedemptions = errors.New("reward Code cap is below its redemption count")
 	ErrRewardCodeRedeemed  = errors.New("redeemed reward Code cannot be deleted")
+	ErrRedemptionNotFound  = errors.New("reward Redemption not found")
 )
 
 type RewardCodeStatus string
@@ -100,6 +101,40 @@ type RewardCodePage struct {
 	NextBeforeID int64        `json:"next_before_id,omitempty"`
 }
 
+type AdminRedemptionSummary struct {
+	ID             int64     `json:"id"`
+	RewardCodeID   int64     `json:"reward_code_id"`
+	UserID         int64     `json:"user_id"`
+	CreditedAmount int64     `json:"credited_amount"`
+	RedeemedAt     time.Time `json:"redeemed_at"`
+}
+
+type ListAdminRedemptionsInput struct {
+	RewardCodeID int64
+	BeforeID     int64
+	Limit        int
+}
+
+type AdminRedemptionPage struct {
+	Redemptions  []AdminRedemptionSummary `json:"redemptions"`
+	NextBeforeID int64                    `json:"next_before_id,omitempty"`
+}
+
+type GetAdminRedemptionInput struct {
+	RewardCodeID int64
+	RedemptionID int64
+}
+
+type AdminRedemptionDetail struct {
+	ID                  int64     `json:"id"`
+	RewardCodeID        int64     `json:"reward_code_id"`
+	UserID              int64     `json:"user_id"`
+	CreditedAmount      int64     `json:"credited_amount"`
+	RedeemedAt          time.Time `json:"redeemed_at"`
+	CreditTransactionID string    `json:"credit_transaction_id"`
+	MaskedCodeHint      string    `json:"masked_code_hint"`
+}
+
 type Redemption struct {
 	ID                    int64     `json:"id"`
 	RewardCodeID          int64     `json:"reward_code_id"`
@@ -153,6 +188,8 @@ type AdminCommands interface {
 
 type AdminReads interface {
 	SearchRewardCodes(context.Context, SearchRewardCodesInput) (RewardCodePage, error)
+	ListAdminRedemptions(context.Context, ListAdminRedemptionsInput) (AdminRedemptionPage, error)
+	GetAdminRedemption(context.Context, GetAdminRedemptionInput) (AdminRedemptionDetail, error)
 }
 
 type UserCommands interface {
