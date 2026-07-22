@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T) {
@@ -148,6 +149,82 @@ SELECT has_function_privilege($1, $2, 'EXECUTE'),
 		if !runtimeCanExecute || publicCanExecute {
 			t.Fatalf("command %s execute privileges runtime=%v public=%v", signature, runtimeCanExecute, publicCanExecute)
 		}
+	}
+}
+
+func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
+	db, ownerPool := testdb.OpenWithPool(t)
+	ctx := t.Context()
+	ownerService := newTestRewardService(t, ownerPool, credits.NewService(ownerPool))
+	createFixture := func(name, code, idempotencyKey string) CreatedRewardCode {
+		t.Helper()
+		created, err := ownerService.CreateRewardCode(ctx, CreateRewardCodeCommand{
+			DisplayName: name, Code: code, CreditAmount: 20,
+			MaxRedemptions: 2, IdempotencyKey: idempotencyKey, ActorUserID: 1,
+		})
+		if err != nil {
+			t.Fatalf("create RewardCode fixture %q: %v", name, err)
+		}
+		return created
+	}
+	deletable := createFixture("Runtime 删除奖励", "RUNTIME-DELETE-26", "runtime-delete")
+	updatable := createFixture("Runtime 更新奖励", "RUNTIME-UPDATE-26", "runtime-update")
+	redeemable := createFixture("Runtime 兑换奖励", "RUNTIME-REDEEM-26", "runtime-redeem")
+	provisionRewardWallet(t, ownerPool, credits.NewService(ownerPool), 3)
+
+	runtimeRole := fmt.Sprintf("rewards_service_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
+	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
+	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
+		t.Fatalf("create runtime role: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, _ = db.ExecContext(cleanupCtx, `DROP OWNED BY `+roleSQL)
+		_, _ = db.ExecContext(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
+	})
+	policies := []dbprivileges.Policy{
+		database.RuntimePrivilegePolicy(), credits.RuntimePrivilegePolicy(), RuntimePrivilegePolicy(),
+	}
+	if err := dbprivileges.Configure(ctx, db, runtimeRole, policies...); err != nil {
+		t.Fatalf("configure runtime privilege policies: %v", err)
+	}
+
+	runtimePoolConfig := ownerPool.Config().Copy()
+	runtimePoolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, `SET ROLE `+roleSQL)
+		return err
+	}
+	runtimePool, err := pgxpool.NewWithConfig(ctx, runtimePoolConfig)
+	if err != nil {
+		t.Fatalf("open runtime Rewards pool: %v", err)
+	}
+	t.Cleanup(runtimePool.Close)
+	if err := runtimePool.Ping(ctx); err != nil {
+		t.Fatalf("ping runtime Rewards pool: %v", err)
+	}
+	runtimeService := newTestRewardService(t, runtimePool, credits.NewService(runtimePool))
+
+	if _, err := runtimeService.DeleteRewardCode(ctx, DeleteRewardCodeCommand{
+		RewardCodeID: deletable.RewardCode.ID, ActorUserID: 1,
+	}); err != nil {
+		t.Fatalf("delete RewardCode through runtime service: %v", err)
+	}
+	if _, err := runtimeService.UpdateRewardCode(ctx, UpdateRewardCodeCommand{
+		RewardCodeID: updatable.RewardCode.ID, ActorUserID: 1,
+		DisplayName: "Runtime 已更新奖励", CreditAmount: 30, MaxRedemptions: 3,
+	}); err != nil {
+		t.Fatalf("update RewardCode through runtime service: %v", err)
+	}
+	if _, err := runtimeService.SetRewardCodeEnabled(ctx, SetRewardCodeEnabledCommand{
+		RewardCodeID: updatable.RewardCode.ID, ActorUserID: 1, Enabled: false,
+	}); err != nil {
+		t.Fatalf("disable RewardCode through runtime service: %v", err)
+	}
+	if result, err := runtimeService.Redeem(ctx, RedeemCommand{
+		UserID: 3, Code: "RUNTIME-REDEEM-26",
+	}); err != nil || result.Redemption.RewardCodeID != redeemable.RewardCode.ID {
+		t.Fatalf("redeem RewardCode through runtime service: result=%+v error=%v", result, err)
 	}
 }
 

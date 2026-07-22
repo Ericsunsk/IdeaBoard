@@ -44,14 +44,9 @@ func (s *Service) UpdateRewardCode(ctx context.Context, command UpdateRewardCode
 			return UpdatedRewardCode{}, err
 		}
 	}
-	current, err := s.lockRewardCode(ctx, tx, command.RewardCodeID)
-	if err != nil {
+	if err := lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return UpdatedRewardCode{}, err
 	}
-	if command.MaxRedemptions > 0 && command.MaxRedemptions < current.RedemptionCount {
-		return UpdatedRewardCode{}, ErrCapBelowRedemptions
-	}
-
 	rotationReplayed := false
 	if command.Code != nil {
 		aliasOwnerID, aliasExists, err := findRewardCodeAliasOwner(ctx, tx, currentDigest, previousDigest)
@@ -119,7 +114,7 @@ func (s *Service) SetRewardCodeEnabled(ctx context.Context, command SetRewardCod
 		return RewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := s.lockRewardCode(ctx, tx, command.RewardCodeID); err != nil {
+	if err := lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return RewardCode{}, err
 	}
 	var found bool
@@ -150,12 +145,8 @@ func (s *Service) DeleteRewardCode(ctx context.Context, command DeleteRewardCode
 		return DeletedRewardCode{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	rewardCode, err := s.lockRewardCode(ctx, tx, command.RewardCodeID)
-	if err != nil {
+	if err := lockRewardCodeID(ctx, tx, command.RewardCodeID); err != nil {
 		return DeletedRewardCode{}, err
-	}
-	if rewardCode.RedemptionCount != 0 {
-		return DeletedRewardCode{}, ErrRewardCodeRedeemed
 	}
 	var deleted bool
 	if err := tx.QueryRow(ctx, `SELECT delete_reward_code_v1($1, $2)`,
@@ -174,19 +165,6 @@ func (s *Service) DeleteRewardCode(ctx context.Context, command DeleteRewardCode
 
 func (s *Service) validAdminMutation(rewardCodeID, actorUserID int64) bool {
 	return s != nil && s.pool != nil && rewardCodeID > 0 && actorUserID > 0
-}
-
-func (s *Service) lockRewardCode(ctx context.Context, tx pgx.Tx, rewardCodeID int64) (RewardCode, error) {
-	var rewardCode RewardCode
-	err := scanRewardCode(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`
-FROM reward_codes WHERE id = $1 FOR UPDATE`, rewardCodeID), &rewardCode, s.currentTime())
-	if errors.Is(err, pgx.ErrNoRows) {
-		return RewardCode{}, ErrRewardCodeNotFound
-	}
-	if err != nil {
-		return RewardCode{}, fmt.Errorf("lock reward Code: %w", err)
-	}
-	return rewardCode, nil
 }
 
 func (s *Service) loadRewardCode(ctx context.Context, tx pgx.Tx, rewardCodeID int64) (RewardCode, error) {

@@ -276,23 +276,29 @@ func (s *Service) redeemRewardCode(
 		return RedeemResult{}, false, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	var rewardCode RewardCode
-	err = scanRewardCode(tx.QueryRow(ctx, `SELECT `+rewardCodeProjectionSQL+`
-FROM reward_codes
-WHERE id = (
-  SELECT reward_code_id
-  FROM reward_code_digest_aliases
-  WHERE (key_version = $1 AND code_digest = $2)
-     OR ($3 <> '' AND key_version = $3 AND code_digest = $4)
-  ORDER BY CASE WHEN key_version = $1 THEN 0 ELSE 1 END
-  LIMIT 1
-)
-FOR UPDATE`, current.version, current.digest, previous.version, previous.digest), &rewardCode, s.currentTime())
-	if errors.Is(err, pgx.ErrNoRows) {
+	rewardCodeID, found, err := findRewardCodeAliasOwner(ctx, tx, current, previous)
+	if err != nil {
+		return RedeemResult{}, true, err
+	}
+	if !found {
+		return RedeemResult{}, false, nil
+	}
+	if err := lockRewardCodeID(ctx, tx, rewardCodeID); err != nil {
+		return RedeemResult{}, true, err
+	}
+	lockedOwnerID, stillExists, err := findRewardCodeAliasOwner(ctx, tx, current, previous)
+	if err != nil {
+		return RedeemResult{}, true, err
+	}
+	if !stillExists || lockedOwnerID != rewardCodeID {
+		return RedeemResult{}, false, nil
+	}
+	rewardCode, err := s.loadRewardCode(ctx, tx, rewardCodeID)
+	if errors.Is(err, ErrRewardCodeNotFound) {
 		return RedeemResult{}, false, nil
 	}
 	if err != nil {
-		return RedeemResult{}, true, fmt.Errorf("lock reward Code: %w", err)
+		return RedeemResult{}, true, err
 	}
 	var redemption Redemption
 	err = tx.QueryRow(ctx, `SELECT id, reward_code_id, user_id, reward_code_display_name,

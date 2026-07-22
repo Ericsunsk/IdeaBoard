@@ -24,7 +24,7 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 
 - RewardCode 创建以 normalized Code 的 key-independent PostgreSQL advisory transaction lock 串行化；HMAC digest alias 同时覆盖 current/previous key，避免 rolling rotation 期间相同 plaintext 的双写。
 - RewardCode create idempotency 以非敏感业务字段 fingerprint 和 persisted digest alias 双重校验；old-only 与 current+previous 实例在 rotation overlap 期间可对称 replay，同时不同 Code 或不同业务 payload 仍 conflict。
-- RewardCode row lock、same-user replay、有效性/cap gate、capacity counter、Credits Grant 与 Redemption insert 严格位于同一 PostgreSQL transaction；Credit business reference 使用独立 `reward_code_redemption` namespace。
+- RewardCode mutation 与 Redeem 先按 RewardCode ID 获取 PostgreSQL advisory transaction lock，再由受控 database function 获取 row lock；same-user replay、有效性/cap gate、capacity counter、Credits Grant 与 Redemption insert 严格位于同一 transaction。Runtime 不需要也不得获得 RewardCode table 的直接 UPDATE privilege；Credit business reference 使用独立 `reward_code_redemption` namespace。
 - 每个 User 每个 RewardCode 最多成功兑换一次；`max_redemptions = 0` 表示 unlimited。
 - RewardCode plaintext 只允许出现在首次 successful create，或携带新 Code 的 successful update response；create replay、普通 update、Code replay、list、history、Journal、日志与错误均不得包含 plaintext 或 full digest，相关 HTTP response 始终 `Cache-Control: no-store`。
 - Update 只改变后续 Redemption 使用的名称、Credit amount、cap 与 expiry；历史 Redemption 的 amount、Credit Transaction ID 与时间保持不可变。有限 cap 不得低于当前 Redemption count，`0` 恢复 unlimited。

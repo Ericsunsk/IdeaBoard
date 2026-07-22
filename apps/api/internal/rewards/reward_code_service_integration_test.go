@@ -839,8 +839,7 @@ func TestRewardCodeDeleteAndRedeemSerializeWithoutOrphanFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = lockTx.Rollback(t.Context()) }()
-	var lockedID int64
-	if err := lockTx.QueryRow(t.Context(), `SELECT id FROM reward_codes WHERE id = $1 FOR UPDATE`, created.RewardCode.ID).Scan(&lockedID); err != nil {
+	if err := lockRewardCodeID(t.Context(), lockTx, created.RewardCode.ID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -879,8 +878,7 @@ SELECT COUNT(*)
 FROM pg_stat_activity
 WHERE datname = current_database()
   AND wait_event_type = 'Lock'
-  AND query LIKE '%reward_codes%'
-  AND query LIKE '%FOR UPDATE%'`).Scan(&lockWaiters); err != nil {
+  AND query LIKE '%pg_advisory_xact_lock%'`).Scan(&lockWaiters); err != nil {
 			t.Fatal(err)
 		}
 		if lockWaiters >= 2 {
