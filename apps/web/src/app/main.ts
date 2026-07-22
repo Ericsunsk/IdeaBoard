@@ -4,6 +4,7 @@ import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import { queryClient } from '../shared/query/queryClient'
 import { ideaBoardPrimePt } from './primePassThrough'
+import { ideaBoardPrimeLocale } from './primeLocale'
 import { ideaBoardPrimePreset } from './primeTheme'
 import router from './router'
 import App from './App.vue'
@@ -15,6 +16,7 @@ const app = createApp(App)
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
 app.use(PrimeVue, {
+  locale: ideaBoardPrimeLocale,
   pt: ideaBoardPrimePt,
   ptOptions: {
     mergeSections: true,

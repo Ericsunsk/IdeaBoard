@@ -218,6 +218,21 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.getByRole('textbox', { name: 'Code' })).not.toHaveValue('OLD-CODE-1234')
   })
 
+  it('uses the Admin date-time picker language for RewardCode expiry', async () => {
+    const { user } = renderPage()
+    await screen.findByText('新用户奖励')
+
+    await user.click(screen.getByRole('button', { name: '创建兑换码' }))
+    const expiresAt = screen.getByRole('combobox', { name: /^过期时间/ })
+    expect(expiresAt).toHaveAttribute('placeholder', '永久有效')
+
+    await user.click(expiresAt)
+    expect(screen.getByRole('dialog', { name: '选择日期和时间' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '上个月' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '下个月' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '永久有效' })).toBeVisible()
+  })
+
   it('uses native form submission and retries an ambiguous create with the same idempotency key', async () => {
     resource.create.mockRejectedValueOnce(new Error('network unavailable')).mockResolvedValueOnce({
       rewardCode: makeRewardCode({ id: 8 }),

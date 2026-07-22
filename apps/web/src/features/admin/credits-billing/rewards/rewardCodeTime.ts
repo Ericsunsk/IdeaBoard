@@ -2,6 +2,26 @@ const SHANGHAI_OFFSET = '+08:00'
 const SHANGHAI_TIME_ZONE = 'Asia/Shanghai'
 const DATE_TIME_INPUT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 
+export function shanghaiDateTimeInputToPickerDate(value: string): Date | null {
+  const match = DATE_TIME_INPUT_PATTERN.exec(value.trim())
+  if (!match) return null
+  const [, year, month, day, hour, minute] = match
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+  )
+  return pickerDateToShanghaiDateTimeInput(date) === value.trim() ? date : null
+}
+
+export function pickerDateToShanghaiDateTimeInput(value: Date | null | undefined): string {
+  if (!value || Number.isNaN(value.getTime())) return ''
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`
+}
+
 export function shanghaiDateTimeInputToISO(value: string): string | undefined {
   const normalized = value.trim()
   if (!normalized) return undefined

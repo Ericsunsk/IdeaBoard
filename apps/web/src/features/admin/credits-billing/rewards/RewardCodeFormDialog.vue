@@ -123,13 +123,46 @@
         </AdminFormField>
       </div>
 
-      <AdminFormField label="过期时间" for="reward-code-expires-at" hint="留空表示永不过期">
-        <InputText
-          id="reward-code-expires-at"
-          v-model="form.expiresAt"
-          type="datetime-local"
+      <AdminFormField
+        v-slot="{ describedbyId }"
+        label="过期时间"
+        for="reward-code-expires-at"
+        hint="上海时间；清除后永久有效"
+      >
+        <DatePicker
+          v-model="expiresAtDate"
+          input-id="reward-code-expires-at"
+          date-format="yy-mm-dd"
+          placeholder="永久有效"
+          show-icon
+          icon-display="input"
+          show-time
+          show-button-bar
+          hour-format="24"
+          :manual-input="false"
+          :disabled="pending"
+          :aria-describedby="describedbyId"
+          :pt="adminDateTimePickerPt"
+          unstyled
           fluid
-        />
+        >
+          <template #buttonbar="{ todayCallback, clearCallback }">
+            <button
+              type="button"
+              :class="adminDateTimePickerActionClass"
+              @click="todayCallback"
+            >
+              今天
+            </button>
+            <button
+              type="button"
+              :class="adminDateTimePickerActionClass"
+              @click="clearCallback"
+            >
+              永久有效
+            </button>
+          </template>
+        </DatePicker>
       </AdminFormField>
 
       <Message v-if="errorMessage" severity="error" :closable="false" role="alert">
@@ -160,14 +193,23 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import Button from 'primevue/button'
+import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
+import {
+  adminDateTimePickerActionClass,
+  adminDateTimePickerPt,
+} from '../../shared/lib/adminDateTimePickerPt'
 import type { RewardCode, UpdateRewardCodeInput } from './rewardCodeAdminResource'
 import { generateRewardCode } from './rewardCodeGenerator'
-import { isoToShanghaiDateTimeInput } from './rewardCodeTime'
+import {
+  isoToShanghaiDateTimeInput,
+  pickerDateToShanghaiDateTimeInput,
+  shanghaiDateTimeInputToPickerDate,
+} from './rewardCodeTime'
 
 export type RewardCodeFormValue = UpdateRewardCodeInput & {
   code: string
@@ -193,6 +235,12 @@ const emit = defineEmits<{
 const maxCredits = 9_000_000_000_000_000
 const isEditing = computed(() => props.rewardCode != null)
 const form = reactive<RewardCodeFormValue>(emptyCreateForm())
+const expiresAtDate = computed<Date | null>({
+  get: () => shanghaiDateTimeInputToPickerDate(form.expiresAt),
+  set: (value) => {
+    form.expiresAt = pickerDateToShanghaiDateTimeInput(value)
+  },
+})
 const shownErrors = reactive<Record<FieldName, string>>({
   displayName: '',
   code: '',
