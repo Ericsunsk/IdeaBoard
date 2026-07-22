@@ -43,7 +43,11 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 				PublicForbidden: allTablePrivileges,
 			},
 			{
-				Kind: dbprivileges.KindSequence, NamePrefix: "reward_", Optional: true,
+				Kind: dbprivileges.KindSequence, Names: []string{
+					"reward_codes_id_seq",
+					"reward_redemptions_id_seq",
+					"reward_admin_actions_id_seq",
+				},
 				Required: []dbprivileges.Privilege{
 					dbprivileges.PrivilegeUsage, dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeUpdate,
 				},

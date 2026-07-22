@@ -46,6 +46,7 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 - 用户 Redeem endpoint 自有 per-user in-process token bucket，默认 10 attempts / 10 minutes，并在流量到来时清理 idle entries；它不是跨实例业务 invariant，不扩展为 Platform interface 或持久化 bucket。
 - Redeem 的不可用 Code 状态使用统一 public error；response 与日志不得包含 raw Code、full digest 或 request body，Redeem response 始终 `no-store`。
 - Redemption observability 只记录固定 outcome、credited Ideas 与 latency；User/RewardCode/Code/digest 不得成为 metrics field 或 label。
+- RewardCode schema 只从单一 canonical migration 创建，不重放已删除的 Campaign/Batch 演进链。数据库若带有 removed migration version、Rewards Ledger reference 或既有 RewardCode facts，migration/rollback 必须 fail closed，并要求显式 Fresh Database reset；不得自动清理或孤立 Credits Ledger。
 
 ## Current Boundary
 

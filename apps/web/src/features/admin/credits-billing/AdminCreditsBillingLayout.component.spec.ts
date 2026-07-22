@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
-import { ADMIN_CREDIT_WALLETS_PATH } from '../../../shared/constants/routePaths'
+import {
+  ADMIN_CREDIT_WALLETS_PATH,
+  ADMIN_REWARD_CODES_PATH,
+} from '../../../shared/constants/routePaths'
 import AdminCreditsBillingLayout from './AdminCreditsBillingLayout.vue'
 
 const routerMocks = vi.hoisted(() => ({
@@ -56,4 +59,22 @@ describe('AdminCreditsBillingLayout', () => {
     expect(screen.getByText('账本健康')).toBeVisible()
   })
 
+  it('exposes only the canonical reward code navigation entry', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { user } = renderWithUser(AdminCreditsBillingLayout, {
+      global: {
+        plugins: [
+          [PrimeVue, primeVueTestOptions],
+          [VueQueryPlugin, { queryClient }],
+        ],
+        stubs: { RouterView: true },
+      },
+    })
+
+    expect(screen.getByText('兑换码')).toBeVisible()
+
+    await user.click(screen.getByText('兑换码'))
+
+    expect(routerMocks.push).toHaveBeenCalledWith(ADMIN_REWARD_CODES_PATH)
+  })
 })

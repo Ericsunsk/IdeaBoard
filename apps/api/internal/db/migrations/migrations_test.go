@@ -1241,10 +1241,68 @@ SELECT pg_get_functiondef('execute_credit_reconciliation(bigint)'::regprocedure)
 	assertConstraintExists(t, ctx, conn, "reward_admin_actions", "fk_reward_admin_actions_code")
 }
 
-func TestRewardCodeManagementMigrationBackfillsCreateJournalDefaults(t *testing.T) {
+func TestRewardCodeCoreMigrationIsCanonicalFreshSchema(t *testing.T) {
+	files, err := fs.Glob(migrationFS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		for _, forbidden := range []string{
+			"rewards_public_campaign",
+			"rewards_campaign_lifecycle",
+			"rewards_single_use_batches",
+			"rewards_redemption_code_index",
+			"rewards_single_code_revoke",
+			"rewards_query_indexes",
+			"reward_code_core",
+			"reward_code_management",
+		} {
+			if strings.Contains(file, forbidden) {
+				t.Fatalf("embedded migrations retain removed Rewards contract %q", file)
+			}
+		}
+	}
+
+	raw, err := migrationFS.ReadFile("20260722020000_reward_code_contract.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	if err := validateMigrationStatements("RewardCode core down", parseSQLStatements(down)); err != nil {
+		t.Fatalf("canonical RewardCode down contract is invalid: %v", err)
+	}
+	for _, expected := range []string{
+		"CREATE TABLE reward_codes",
+		"CREATE TABLE reward_code_digest_aliases",
+		"CREATE TABLE reward_redemptions",
+		"CREATE TABLE reward_admin_actions",
+		"CREATE FUNCTION update_reward_code_definition_v1",
+		"CREATE FUNCTION reserve_reward_code_redemption_v1",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("canonical RewardCode migration missing %q", expected)
+		}
+	}
+	for _, forbidden := range []string{
+		"reward_campaigns",
+		"reward_code_batches",
+		"campaign_id",
+		"\n  code_id BIGINT",
+		"single_use",
+		"internal_note",
+	} {
+		if strings.Contains(up, forbidden) {
+			t.Fatalf("canonical RewardCode migration retains removed contract %q", forbidden)
+		}
+	}
+}
+
+func TestRewardCodeCoreMigrationRejectsExistingLedgerFacts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 	conn := openIsolatedMigrationConn(t, ctx)
+
 	if _, err := conn.ExecContext(ctx, `
 CREATE TABLE schema_migrations (
   version BIGINT NOT NULL PRIMARY KEY,
@@ -1253,7 +1311,7 @@ CREATE TABLE schema_migrations (
 		t.Fatal(err)
 	}
 
-	const target = "20260722010000_reward_code_management.sql"
+	const target = "20260722020000_reward_code_contract.sql"
 	files, err := fs.Glob(migrationFS, "*.sql")
 	if err != nil {
 		t.Fatal(err)
@@ -1276,33 +1334,25 @@ CREATE TABLE schema_migrations (
 		}
 	}
 
-	var actorID int64
+	var userID int64
 	if err := conn.QueryRowContext(ctx, `
 INSERT INTO users (username, storage_uid)
-VALUES ('reward-management-backfill', 'RMB001')
-RETURNING id`).Scan(&actorID); err != nil {
-		t.Fatal(err)
+VALUES ('reward-core-migration-user', 'RCM001')
+RETURNING id`).Scan(&userID); err != nil {
+		t.Fatalf("insert Rewards migration user: %v", err)
 	}
-	var rewardCodeID int64
+	if _, err := conn.ExecContext(ctx, `INSERT INTO credit_wallets (user_id) VALUES ($1)`, userID); err != nil {
+		t.Fatalf("insert Rewards migration Wallet: %v", err)
+	}
+	var transactionID string
 	if err := conn.QueryRowContext(ctx, `
-INSERT INTO reward_codes (
-  display_name, key_version, code_digest, code_hint, credit_amount,
-  max_redemptions, created_by, idempotency_key, request_fingerprint
-) VALUES (
-  'Created Reward', 'v1', decode(repeat('01', 32), 'hex'), '2026', 10,
-  5, $1, 'journal-create-defaults', decode(repeat('02', 32), 'hex')
-)
-RETURNING id`, actorID).Scan(&rewardCodeID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := conn.ExecContext(ctx, `
-INSERT INTO reward_admin_actions (reward_code_id, action_type, actor_user_id, metadata)
-VALUES ($1, 'create_reward_code', $2, '{}'::JSONB)`, rewardCodeID, actorID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := conn.ExecContext(ctx, `
-UPDATE reward_codes SET redemption_count = 1, enabled = FALSE WHERE id = $1`, rewardCodeID); err != nil {
-		t.Fatal(err)
+SELECT transaction_id
+FROM execute_credit_command_v2(
+  'grant', $1, 1, '', 'reward-core-migration-key',
+  'system', 'migration-test', 'rewards', 'migration safety test',
+  'reward_redemption', 'existing-fact'
+)`, userID).Scan(&transactionID); err != nil {
+		t.Fatalf("insert Rewards Ledger fact: %v", err)
 	}
 
 	raw, err := migrationFS.ReadFile(target)
@@ -1313,25 +1363,32 @@ UPDATE reward_codes SET redemption_count = 1, enabled = FALSE WHERE id = $1`, re
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := applyMigration(ctx, conn, target, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
-		t.Fatalf("apply management migration: %v", err)
+	err = applyMigration(ctx, conn, target, parseSQLStatements(extractUpSQL(string(raw))), version)
+	if err == nil {
+		t.Fatal("canonical RewardCode migration accepted an existing Rewards Ledger fact")
+	}
+	for _, fragment := range []string{"Rewards Ledger facts detected", "Fresh DB"} {
+		if !strings.Contains(err.Error(), fragment) {
+			t.Fatalf("migration error=%q, want %q", err, fragment)
+		}
 	}
 
-	var redemptionCount int64
-	var enabled bool
-	if err := conn.QueryRowContext(ctx, `
-SELECT (target_snapshot->>'redemption_count')::BIGINT,
-       (target_snapshot->>'enabled')::BOOLEAN
-FROM reward_admin_actions
-WHERE reward_code_id_snapshot = $1`, rewardCodeID).Scan(&redemptionCount, &enabled); err != nil {
+	assertMigrationApplied(t, ctx, conn, version, false)
+	assertTableExists(t, ctx, conn, "reward_codes", false)
+	var ledgerFacts int
+	if err := conn.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*) FROM credit_transactions WHERE transaction_id = $1`,
+		transactionID,
+	).Scan(&ledgerFacts); err != nil {
 		t.Fatal(err)
 	}
-	if redemptionCount != 0 || !enabled {
-		t.Fatalf("create Journal snapshot redemption_count=%d enabled=%t, want creation defaults 0/true", redemptionCount, enabled)
+	if ledgerFacts != 1 {
+		t.Fatalf("failed migration mutated immutable Ledger fact count=%d, want 1", ledgerFacts)
 	}
 }
 
-func TestRewardCodeManagementMigrationRollsBackReappliesAndAllowsOnlyReferentialNullification(t *testing.T) {
+func TestRewardCodeCoreMigrationDownRejectsDomainFacts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
 	conn := openIsolatedMigrationConn(t, ctx)
@@ -1339,19 +1396,10 @@ func TestRewardCodeManagementMigrationRollsBackReappliesAndAllowsOnlyReferential
 		t.Fatalf("apply migrations: %v", err)
 	}
 
-	const (
-		file    = "20260722010000_reward_code_management.sql"
-		version = 20260722010000
-	)
-	rollbackTxMigrationForTest(t, ctx, conn, file, version)
-	assertColumnExists(t, ctx, conn, "reward_admin_actions", "reward_code_id_snapshot", false)
-	assertColumnExists(t, ctx, conn, "reward_admin_actions", "target_snapshot", false)
-	assertTriggerExists(t, ctx, conn, "reward_admin_actions", "reward_admin_actions_append_only")
-
 	var actorID int64
 	if err := conn.QueryRowContext(ctx, `
 INSERT INTO users (username, storage_uid)
-VALUES ('reward-management-rollback', 'RMR001')
+VALUES ('reward-core-down-user', 'RCD001')
 RETURNING id`).Scan(&actorID); err != nil {
 		t.Fatal(err)
 	}
@@ -1361,190 +1409,14 @@ INSERT INTO reward_codes (
   display_name, key_version, code_digest, code_hint, credit_amount,
   max_redemptions, created_by, idempotency_key, request_fingerprint
 ) VALUES (
-  'Rollback Reward', 'v1', decode(repeat('03', 32), 'hex'), '2030', 10,
-  0, $1, 'rollback-reapply', decode(repeat('04', 32), 'hex')
+  'Down guard Reward', 'v1', decode(repeat('05', 32), 'hex'), '2040', 10,
+  0, $1, 'down-guard', decode(repeat('06', 32), 'hex')
 )
 RETURNING id`, actorID).Scan(&rewardCodeID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.ExecContext(ctx, `
-INSERT INTO reward_admin_actions (reward_code_id, action_type, actor_user_id, metadata)
-VALUES ($1, 'create_reward_code', $2, '{}'::JSONB)`, rewardCodeID, actorID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := conn.ExecContext(ctx, `UPDATE reward_admin_actions SET metadata = '{"changed":true}'::JSONB WHERE reward_code_id = $1`, rewardCodeID); err == nil {
-		t.Fatal("rolled-back append-only trigger accepted a Journal update")
-	}
 
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("reapply RewardCode management migration: %v", err)
-	}
-	assertMigrationApplied(t, ctx, conn, version, true)
-	assertColumnExists(t, ctx, conn, "reward_admin_actions", "reward_code_id_snapshot", true)
-	assertColumnExists(t, ctx, conn, "reward_admin_actions", "target_snapshot", true)
-	if _, err := conn.ExecContext(ctx, `UPDATE reward_admin_actions SET reward_code_id = NULL WHERE reward_code_id = $1`, rewardCodeID); err == nil {
-		t.Fatal("append-only trigger accepted manual FK nullification while parent exists")
-	}
-
-	var deleted bool
-	if err := conn.QueryRowContext(ctx, `SELECT delete_reward_code_v1($1, $2)`, rewardCodeID, actorID).Scan(&deleted); err != nil {
-		t.Fatalf("delete RewardCode through command function: %v", err)
-	}
-	if !deleted {
-		t.Fatal("delete RewardCode command returned false")
-	}
-	var codes, actions, nullReferences int
-	if err := conn.QueryRowContext(ctx, `SELECT
-  (SELECT COUNT(*) FROM reward_codes WHERE id = $1),
-  (SELECT COUNT(*) FROM reward_admin_actions WHERE reward_code_id_snapshot = $1),
-  (SELECT COUNT(*) FROM reward_admin_actions WHERE reward_code_id_snapshot = $1 AND reward_code_id IS NULL)`,
-		rewardCodeID).Scan(&codes, &actions, &nullReferences); err != nil {
-		t.Fatal(err)
-	}
-	if codes != 0 || actions != 2 || nullReferences != 2 {
-		t.Fatalf("delete facts codes=%d actions=%d null_references=%d, want 0/2/2", codes, actions, nullReferences)
-	}
-}
-
-func TestRewardCodeCoreMigrationRejectsLegacyMonetaryFacts(t *testing.T) {
-	tests := []struct {
-		name            string
-		businessRefType string
-		seedRedemption  bool
-	}{
-		{
-			name:            "Credits Ledger reference",
-			businessRefType: "reward_redemption",
-		},
-		{
-			name:            "Redemption row",
-			businessRefType: "migration_test",
-			seedRedemption:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-			defer cancel()
-			conn := openIsolatedMigrationConn(t, ctx)
-
-			if _, err := conn.ExecContext(ctx, `
-CREATE TABLE schema_migrations (
-  version BIGINT NOT NULL PRIMARY KEY,
-  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
-)`); err != nil {
-				t.Fatal(err)
-			}
-
-			const target = "20260721010000_reward_code_core.sql"
-			files, err := fs.Glob(migrationFS, "*.sql")
-			if err != nil {
-				t.Fatal(err)
-			}
-			sort.Strings(files)
-			for _, file := range files {
-				if file == target {
-					break
-				}
-				raw, err := migrationFS.ReadFile(file)
-				if err != nil {
-					t.Fatal(err)
-				}
-				version, err := migrationVersion(file)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := applyMigration(ctx, conn, file, parseSQLStatements(extractUpSQL(string(raw))), version); err != nil {
-					t.Fatalf("apply prerequisite migration %s: %v", file, err)
-				}
-			}
-
-			var userID int64
-			if err := conn.QueryRowContext(ctx, `
-INSERT INTO users (username, storage_uid)
-VALUES ('reward-core-migration-user', 'RCM001')
-RETURNING id`).Scan(&userID); err != nil {
-				t.Fatalf("insert legacy Rewards user: %v", err)
-			}
-			if _, err := conn.ExecContext(ctx, `INSERT INTO credit_wallets (user_id) VALUES ($1)`, userID); err != nil {
-				t.Fatalf("insert legacy Rewards Wallet: %v", err)
-			}
-			var transactionID string
-			if err := conn.QueryRowContext(ctx, `
-SELECT transaction_id
-FROM execute_credit_command_v2(
-  'grant', $1, 1, '', 'reward-core-migration-key',
-  'system', 'migration-test', 'rewards', 'migration safety test',
-  $2, 'legacy-fact'
-)`, userID, tt.businessRefType).Scan(&transactionID); err != nil {
-				t.Fatalf("insert legacy Rewards Ledger fact: %v", err)
-			}
-
-			if tt.seedRedemption {
-				var campaignID int64
-				if err := conn.QueryRowContext(ctx, `
-INSERT INTO reward_campaigns (
-  display_name, credit_amount, mode, status, max_redemptions, created_by
-) VALUES ('Legacy migration Campaign', 1, 'public', 'draft', 1, $1)
-RETURNING id`, userID).Scan(&campaignID); err != nil {
-					t.Fatalf("insert legacy Rewards Campaign: %v", err)
-				}
-				var codeID int64
-				if err := conn.QueryRowContext(ctx, `
-INSERT INTO reward_codes (campaign_id, key_version, code_digest, code_hint, issued_by)
-VALUES ($1, 'v1', decode(repeat('01', 32), 'hex'), 'R001', $2)
-RETURNING id`, campaignID, userID).Scan(&codeID); err != nil {
-					t.Fatalf("insert legacy Rewards Code: %v", err)
-				}
-				if _, err := conn.ExecContext(ctx, `
-INSERT INTO reward_redemptions (
-  campaign_id, code_id, user_id, credit_amount,
-  credit_transaction_id, available_balance_after
-) VALUES ($1, $2, $3, 1, $4, 1)`, campaignID, codeID, userID, transactionID); err != nil {
-					t.Fatalf("insert legacy Rewards Redemption: %v", err)
-				}
-			}
-
-			raw, err := migrationFS.ReadFile(target)
-			if err != nil {
-				t.Fatal(err)
-			}
-			version, err := migrationVersion(target)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = applyMigration(ctx, conn, target, parseSQLStatements(extractUpSQL(string(raw))), version)
-			if err == nil {
-				t.Fatal("canonical RewardCode migration accepted legacy monetary facts")
-			}
-			for _, fragment := range []string{"legacy Rewards monetary facts detected", "Fresh DB"} {
-				if !strings.Contains(err.Error(), fragment) {
-					t.Fatalf("migration error=%q, want %q", err, fragment)
-				}
-			}
-
-			assertMigrationApplied(t, ctx, conn, version, false)
-			assertTableExists(t, ctx, conn, "reward_campaigns", true)
-			assertTableExists(t, ctx, conn, "reward_code_digest_aliases", false)
-		})
-	}
-}
-
-func TestRewardGrantCorrectionMigrationRollsBackAndReapplies(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-	conn := openIsolatedMigrationConn(t, ctx)
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("apply migrations: %v", err)
-	}
-
-	const (
-		file    = "20260715030000_reward_grant_correction.sql"
-		version = 20260715030000
-	)
-	assertCreditCommandAllowsRewardGrantCorrection(t, ctx, conn, true)
-
+	const file = "20260722020000_reward_code_contract.sql"
 	raw, err := migrationFS.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
@@ -1553,25 +1425,29 @@ func TestRewardGrantCorrectionMigrationRollsBackAndReapplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
-		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
-			_ = tx.Rollback()
-			t.Fatalf("execute down statement %q: %v", firstSQLLine(meaningfulSQL(statement.SQL)), err)
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version); err != nil {
+	statements := parseSQLStatements(extractDownSQLForTest(string(raw)))
+	if len(statements) == 0 {
 		_ = tx.Rollback()
-		t.Fatal(err)
+		t.Fatal("canonical RewardCode migration has no down contract")
 	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
+	_, err = tx.ExecContext(ctx, statements[0].SQL)
+	_ = tx.Rollback()
+	if err == nil || !strings.Contains(err.Error(), "Fresh DB") {
+		t.Fatalf("RewardCode down guard error=%v, want Fresh DB failure", err)
 	}
 
-	assertCreditCommandAllowsRewardGrantCorrection(t, ctx, conn, false)
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("reapply migration: %v", err)
+	var remaining int
+	if err := conn.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*) FROM reward_codes WHERE id = $1`,
+		rewardCodeID,
+	).Scan(&remaining); err != nil {
+		t.Fatal(err)
 	}
-	assertCreditCommandAllowsRewardGrantCorrection(t, ctx, conn, true)
+	if remaining != 1 {
+		t.Fatalf("failed down migration mutated RewardCode count=%d, want 1", remaining)
+	}
+	assertMigrationApplied(t, ctx, conn, 20260722020000, true)
 }
 
 func TestTaskBillingSnapshotDisplayNameMigrationBackfillsExistingRows(t *testing.T) {
@@ -1843,7 +1719,7 @@ func TestAdminBillingReasonMigrationRollsBackAndReapplies(t *testing.T) {
 	assertTableExists(t, ctx, conn, "billing_admin_actions", true)
 }
 
-func TestMigrationsRejectUnknownAppliedVersions(t *testing.T) {
+func TestMigrationsRejectRemovedRewardsVersion(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 	defer cancel()
 	conn := openIsolatedMigrationConn(t, ctx)
@@ -1855,13 +1731,13 @@ CREATE TABLE schema_migrations (
 )`); err != nil {
 		t.Fatalf("create schema_migrations failed: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `INSERT INTO schema_migrations (version) VALUES (20260602000100)`); err != nil {
-		t.Fatalf("insert legacy migration version failed: %v", err)
+	if _, err := conn.ExecContext(ctx, `INSERT INTO schema_migrations (version) VALUES (20260721010000)`); err != nil {
+		t.Fatalf("insert removed Rewards migration version failed: %v", err)
 	}
 
 	err := upWithConn(ctx, conn)
 	if err == nil {
-		t.Fatalf("upWithConn succeeded with unknown legacy migration version")
+		t.Fatalf("upWithConn succeeded with a removed Rewards migration version")
 	}
 	if !strings.Contains(err.Error(), "not present in this binary") {
 		t.Fatalf("upWithConn error=%q, want unknown version guard", err.Error())
@@ -2212,27 +2088,6 @@ func assertMigrationApplied(t *testing.T, ctx context.Context, conn *sql.Conn, v
 	}
 	if applied != want {
 		t.Fatalf("migration %d applied=%v, want %v", version, applied, want)
-	}
-}
-
-func assertCreditCommandAllowsRewardGrantCorrection(
-	t *testing.T,
-	ctx context.Context,
-	conn *sql.Conn,
-	want bool,
-) {
-	t.Helper()
-	functionName := "execute" + "_credit" + "_command_v2"
-	signature := functionName + "(text,bigint,bigint,text,text,text,text,text,text,text,text)"
-	var definition string
-	if err := conn.QueryRowContext(ctx, `
-SELECT pg_get_functiondef($1::regprocedure)
-`, signature).Scan(&definition); err != nil {
-		t.Fatalf("read Credit command function definition: %v", err)
-	}
-	const predicate = "v_original_command_type = 'grant' AND v_original_source = 'reward_redemption'"
-	if got := strings.Contains(definition, predicate); got != want {
-		t.Fatalf("reward Grant Correction predicate present=%v, want %v", got, want)
 	}
 }
 

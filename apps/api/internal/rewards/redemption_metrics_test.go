@@ -62,7 +62,7 @@ func TestRedemptionMetricsDefaultsToSafeObservationValues(t *testing.T) {
 	finish := metrics.Start()
 
 	now = now.Add(-time.Second)
-	finish(redemptionOutcome("user-41-campaign-9"), -10, nil)
+	finish(redemptionOutcome("unexpected-sensitive-value"), -10, nil)
 
 	observation := recorder.Observations()[0]
 	if observation != (redemptionMetricObservation{Outcome: redemptionOutcomeInternalError}) {

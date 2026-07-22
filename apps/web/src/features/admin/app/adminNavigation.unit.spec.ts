@@ -21,3 +21,21 @@ describe('Admin Credit Health routes', () => {
     expect(childPaths).not.toContain('reconciliation')
   })
 })
+
+describe('Admin Reward Code routes', () => {
+  it('publishes only the canonical reward code route', () => {
+    const creditsRoute = adminRoutes[0]?.children?.find((route) => route.path === 'credits')
+    const childPaths = creditsRoute?.children?.map((route) => route.path)
+    const rewardCodeRoute = creditsRoute?.children?.find(
+      (route) => route.path === 'reward-codes',
+    )
+
+    expect(childPaths).toEqual(['', 'wallets', 'pricing', 'health', 'reward-codes'])
+    expect(rewardCodeRoute).toMatchObject({
+      path: 'reward-codes',
+      name: 'AdminRewardCodes',
+    })
+    expect(rewardCodeRoute?.component).toEqual(expect.any(Function))
+    expect(rewardCodeRoute?.redirect).toBeUndefined()
+  })
+})

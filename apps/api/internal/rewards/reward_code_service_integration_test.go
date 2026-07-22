@@ -122,8 +122,8 @@ func TestSearchRewardCodesFiltersCountsAndPaginates(t *testing.T) {
 	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 3, Code: "CAPACITY-2030"}); err != nil {
 		t.Fatal(err)
 	}
-	provisionRewardWallet(t, pool, creditService, 4)
-	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 4, Code: "WINTER-EXPIRED-2030"}); err != nil {
+	provisionRewardWallet(t, pool, creditService, 7)
+	if _, err := service.Redeem(t.Context(), RedeemCommand{UserID: 7, Code: "WINTER-EXPIRED-2030"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.SetRewardCodeEnabled(t.Context(), SetRewardCodeEnabledCommand{

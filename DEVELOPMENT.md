@@ -106,6 +106,8 @@ go tool sqlc generate
 git diff --exit-code -- internal/db/sqlc
 ```
 
+Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration 创建。若本地数据库包含已删除的 Rewards migration version 或历史 Rewards Ledger fact，`go run ./cmd migrate` 会 fail closed；请显式重建 Fresh Database，不要补空 migration、手删 Ledger 或尝试兼容性回放。
+
 ## 常用入口
 
 ### Canvas workflow

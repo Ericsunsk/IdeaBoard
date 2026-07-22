@@ -212,6 +212,7 @@ Frontend context rules:
 - River concurrency/retry/timeout、NATS retention 与 outbound allowlist 属于 typed Operational System Settings。River/NATS 采用 startup snapshot 并显式报告 restart requirement；outbound allowlist request-time 动态读取并 fail closed。所有 Admin operational writes 必须与 append-only actor/reason audit 原子提交。
 - Cloudflare proxied API domains need explicit cache bypass for API/Auth/SSE/upload writes and careful real-client-IP handling.
 - Rewards Redeem 在应用内按 User 执行 10 attempts / 10 minutes 的 instance-local limit；生产 Cloudflare/reverse proxy 必须另对 `/api/user/rewards/redeem` 按可信客户端 IP 执行初始 60 attempts / 10 minutes 的 coarse limit。
+- Rewards rollout 只支持 canonical RewardCode schema 的 Fresh Database path。检测到已删除的 Rewards migration version 或 immutable Ledger reference 时 migration 必须 fail closed，禁止兼容性 replay、静默删除或语义 orphan。
 - PostgreSQL backup contains credentials and user/session data; treat `postgres-*.dump[.age|.gpg]` as secret artifacts.
 - DB restore and migration rollback are human-confirmed operations; runtime image rollback does not imply automatic database restore.
 

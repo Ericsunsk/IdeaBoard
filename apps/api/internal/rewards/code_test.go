@@ -146,17 +146,3 @@ func TestNormalizeCodeEnforcesPublicPayloadAlphabetAndLength(t *testing.T) {
 		})
 	}
 }
-
-func TestGeneratedSingleUseCodeUsesCanonicalInputFormat(t *testing.T) {
-	generated, err := generateSingleUseCode(bytes.NewReader(make([]byte, generatedCodeEntropyBytes)))
-	if err != nil {
-		t.Fatalf("generateSingleUseCode() error = %v", err)
-	}
-	if generated != "0000-0000-0000-0000" {
-		t.Fatalf("generateSingleUseCode() = %q, want canonical grouped format", generated)
-	}
-	normalized, err := normalizeCode(generated)
-	if err != nil || normalized != "0000000000000000" {
-		t.Fatalf("normalizeCode(generated) = %q, %v; want canonical payload", normalized, err)
-	}
-}
