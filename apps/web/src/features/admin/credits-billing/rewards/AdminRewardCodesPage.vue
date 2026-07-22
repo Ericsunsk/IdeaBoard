@@ -91,8 +91,15 @@
         />
       </div>
     </Message>
+    <div
+      v-if="showEmptyState"
+      class="grid h-full min-h-0 place-items-center text-admin-body text-admin-text-3"
+      role="status"
+    >
+      {{ emptyTitle }}
+    </div>
     <DataTableFrame
-      v-if="!initialError"
+      v-else-if="!initialError"
       :value="rewardCodes"
       :loading="loading"
       data-key="id"
@@ -164,11 +171,6 @@
         </template>
       </Column>
 
-      <template #empty>
-        <div class="py-8 text-center text-admin-body text-admin-text-3">
-          {{ emptyTitle }}
-        </div>
-      </template>
     </DataTableFrame>
   </AdminTablePanel>
 
@@ -265,6 +267,9 @@ const rewardCodeActionItems = computed(() => [
 const pagination = useAdminCursorPagination<number>({ pending: loading })
 const confirm = useAdminConfirm()
 const totalRewardCodesLabel = computed(() => '共 ' + totalRewardCodes.value + ' 个兑换码')
+const showEmptyState = computed(
+  () => !loading.value && !initialError.value && rewardCodes.value.length === 0,
+)
 const emptyTitle = computed(() =>
   appliedSearchKeyword.value.trim() || statusFilter.value ? '未找到匹配的兑换码' : '暂无兑换码',
 )

@@ -69,6 +69,7 @@ describe('AdminRewardCodesPage', () => {
     renderPage()
 
     await waitFor(() => expect(screen.getByText('暂无兑换码')).toBeVisible())
+    expect(screen.queryByRole('columnheader', { name: '兑换码' })).not.toBeInTheDocument()
     expect(
       screen.queryByText('创建第一个兑换码后，用户即可在奖励中心兑换 Idea。'),
     ).not.toBeInTheDocument()
