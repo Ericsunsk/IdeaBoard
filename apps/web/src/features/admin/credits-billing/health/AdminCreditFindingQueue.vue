@@ -78,7 +78,7 @@
       data-key="id"
       :loading="loading"
       scrollable
-      table-style="min-width: 980px"
+      table-style="min-width: 760px; width: 100%"
       table-aria-label="账本异常队列"
     >
       <template #empty>
@@ -87,7 +87,7 @@
         </div>
       </template>
 
-      <Column header="异常摘要" style="min-width: 320px">
+      <Column header="异常摘要" style="width: 38%; min-width: 260px">
         <template #body="{ data }">
           <button
             type="button"
@@ -104,7 +104,7 @@
           </button>
         </template>
       </Column>
-      <Column header="影响对象" style="min-width: 250px">
+      <Column header="影响对象" style="width: 28%; min-width: 190px">
         <template #body="{ data }">
           <div class="flex min-w-0 flex-col gap-1">
             <span v-if="data.wallet_user_id" class="text-admin-body font-[700] text-admin-text-1">
@@ -119,7 +119,7 @@
           </div>
         </template>
       </Column>
-      <Column header="风险" style="min-width: 240px">
+      <Column header="风险" style="width: 18%; min-width: 140px">
         <template #body="{ data }">
           <Tag
             :value="getFindingRiskPresentation(data).label"
@@ -128,7 +128,7 @@
           />
         </template>
       </Column>
-      <Column header="最近发现" style="width: 190px">
+      <Column header="最近发现" style="width: 16%; min-width: 170px">
         <template #body="{ data }">
           <span class="whitespace-nowrap">{{ formatAdminDateTime(data.last_seen_at) }}</span>
         </template>
