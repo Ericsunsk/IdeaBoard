@@ -173,7 +173,7 @@
             text
             size="small"
             severity="secondary"
-            class="!px-2 font-mono !font-[760]"
+            class="!-ml-2 !justify-start !px-2 font-mono !font-[760]"
             aria-haspopup="dialog"
             :aria-label="`打开 ${user.username} 的账户详情`"
             @click="openWalletDialog(user)"
