@@ -1,5 +1,6 @@
-import type { User } from '../../../shared/api/generated-query/model'
+import type { AdminUserListItem } from '../../../shared/api/generated-query/model'
 import { formatDateOnly } from '../../../shared/utils/dateTime'
+import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 
 export type AdminUserRole = 'admin' | 'user'
 export type AdminUserStatus = 0 | 1
@@ -15,6 +16,8 @@ export type AdminUserCommandTarget = {
 }
 
 export type AdminUserRowView = AdminUserCommandTarget & {
+  availableCredits: number
+  availableCreditsLabel: string
   avatarUrl: string
   initial: string
   authUserIdLabel: string
@@ -66,7 +69,7 @@ export function getUserInitial(user: Pick<AdminUserCommandTarget, 'username' | '
   return (user.username || user.uid || '?').slice(0, 1).toUpperCase()
 }
 
-export function createAdminUserRowView(user: User): AdminUserRowView {
+export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowView {
   const authUserId = user.auth_user_id || ''
   const isAdmin = isAdminUser(user)
   const isActive = isActiveUser(user)
@@ -78,6 +81,8 @@ export function createAdminUserRowView(user: User): AdminUserRowView {
     authUserId,
     role: user.role,
     status: user.status,
+    availableCredits: user.available_credits,
+    availableCreditsLabel: formatIdeaAmount(user.available_credits),
     avatarUrl: user.avatar || '',
     initial: getUserInitial(user),
     authUserIdLabel: authUserId || '-',

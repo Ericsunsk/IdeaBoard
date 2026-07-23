@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { User } from '../../../shared/api/generated-query/model'
+import type { AdminUserListItem } from '../../../shared/api/generated-query/model'
 import {
   createAdminUserRowView,
   getUserActionItems,
@@ -26,6 +26,7 @@ describe('admin user view model', () => {
   it('maps backend user fields into row presentation fields', () => {
     const row = createAdminUserRowView(
       makeUser({
+        available_credits: 125,
         role: 'admin',
         status: 0,
         auth_user_id: 'auth-1',
@@ -37,6 +38,8 @@ describe('admin user view model', () => {
     expect(row).toMatchObject({
       authUserId: 'auth-1',
       authUserIdLabel: 'auth-1',
+      availableCredits: 125,
+      availableCreditsLabel: '125 Ideas',
       avatarUrl: '/avatar.png',
       initial: 'U',
       isAdmin: true,
@@ -71,13 +74,14 @@ describe('admin user view model', () => {
   })
 })
 
-function makeUser(overrides: Partial<User> = {}): User {
+function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem {
   return {
     id: 1,
     uid: 'user-1',
     username: 'user',
     role: 'user',
     status: 1,
+    available_credits: 0,
     avatar: '',
     auth_user_id: '',
     created_at: '',

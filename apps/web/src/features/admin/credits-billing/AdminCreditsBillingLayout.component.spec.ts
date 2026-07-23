@@ -5,14 +5,14 @@ import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import {
-  ADMIN_CREDIT_WALLETS_PATH,
+  ADMIN_CREDIT_PRICING_PATH,
   ADMIN_REWARD_CODES_PATH,
 } from '../../../shared/constants/routePaths'
 import AdminCreditsBillingLayout from './AdminCreditsBillingLayout.vue'
 
 const routerMocks = vi.hoisted(() => ({
   push: vi.fn(),
-  route: { path: '/admin/credits/wallets' },
+  route: { path: '/admin/credits/pricing' },
 }))
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -27,7 +27,7 @@ vi.mock('vue-router', async (importOriginal) => {
 describe('AdminCreditsBillingLayout', () => {
   beforeEach(() => {
     routerMocks.push.mockReset()
-    routerMocks.route.path = ADMIN_CREDIT_WALLETS_PATH
+    routerMocks.route.path = ADMIN_CREDIT_PRICING_PATH
   })
 
   it('shows a non-healthy Badge on the health navigation entry', async () => {
@@ -60,6 +60,19 @@ describe('AdminCreditsBillingLayout', () => {
   })
 
   it('exposes only the canonical reward code navigation entry', async () => {
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            status: 'healthy',
+            open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
+            restricted_wallet_count: 0,
+          },
+        }),
+      ),
+    )
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const { user } = renderWithUser(AdminCreditsBillingLayout, {
       global: {
@@ -72,6 +85,7 @@ describe('AdminCreditsBillingLayout', () => {
     })
 
     expect(screen.getByText('兑换码')).toBeVisible()
+    expect(screen.queryByText('用户Idea账户')).not.toBeInTheDocument()
 
     await user.click(screen.getByText('兑换码'))
 

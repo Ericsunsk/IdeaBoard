@@ -9,6 +9,80 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func (s *Service) GetAvailableBalances(
+	ctx context.Context,
+	userIDs []int64,
+) (map[int64]int64, error) {
+	if s == nil || s.pool == nil {
+		return nil, fmt.Errorf("credits service: database pool not configured")
+	}
+	if len(userIDs) == 0 {
+		return map[int64]int64{}, nil
+	}
+	for _, userID := range userIDs {
+		if userID <= 0 {
+			return nil, ErrInvalidCommand
+		}
+	}
+
+	rows, err := s.pool.Query(ctx, `
+SELECT requested.user_id,
+       wallets.user_id IS NOT NULL AS wallet_exists,
+       available.id IS NOT NULL AS available_exists,
+       reserved.id IS NOT NULL AS reserved_exists,
+       COALESCE(available.balance, 0)
+FROM unnest($1::bigint[]) AS requested(user_id)
+LEFT JOIN credit_wallets wallets ON wallets.user_id = requested.user_id
+LEFT JOIN credit_accounts available
+  ON available.wallet_user_id = requested.user_id
+ AND available.asset_code = 'credits'
+ AND available.account_role = 'user_available'
+LEFT JOIN credit_accounts reserved
+  ON reserved.wallet_user_id = requested.user_id
+ AND reserved.asset_code = 'credits'
+ AND reserved.account_role = 'user_reserved'
+ORDER BY requested.user_id`, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("credits service: read available balances: %w", err)
+	}
+	defer rows.Close()
+
+	balances := make(map[int64]int64, len(userIDs))
+	for rows.Next() {
+		var (
+			userID          int64
+			walletExists    bool
+			availableExists bool
+			reservedExists  bool
+			available       int64
+		)
+		if err := rows.Scan(
+			&userID,
+			&walletExists,
+			&availableExists,
+			&reservedExists,
+			&available,
+		); err != nil {
+			return nil, fmt.Errorf("credits service: scan available balance: %w", err)
+		}
+		if !walletExists || !availableExists || !reservedExists {
+			return nil, fmt.Errorf(
+				"%w for user %d (wallet=%t available=%t reserved=%t)",
+				ErrWalletBalanceIntegrity,
+				userID,
+				walletExists,
+				availableExists,
+				reservedExists,
+			)
+		}
+		balances[userID] = available
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("credits service: iterate available balances: %w", err)
+	}
+	return balances, nil
+}
+
 func (s *Service) GetWallet(ctx context.Context, userID int64) (WalletDetails, error) {
 	if s == nil || s.pool == nil {
 		return WalletDetails{}, fmt.Errorf("credits service: database pool not configured")

@@ -498,7 +498,7 @@ VALUES ('delete-convergence-task', $1, '', '', '', 'pending', '', '')`, provisio
 
 	authDeleter := &recordingAuthUserDeleter{err: errors.New("auth unavailable")}
 	cleaner := &recordingUserUploadCleaner{err: errors.New("storage unavailable")}
-	service := NewUserService(NewUserRepository(db), lifecycle, cleaner)
+	service := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
 	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err == nil {
 		t.Fatal("Auth failure should stop deletion")
 	}
@@ -593,7 +593,7 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	}
 
 	cleaner := &recordingUserUploadCleaner{err: errors.New("storage unavailable")}
-	userService := NewUserService(NewUserRepository(db), lifecycle, cleaner)
+	userService := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
 	events := &[]string{}
 	authManager := &fakeIdentityAdminAuth{events: events}
 	commands := NewIdentityAdminCommands(userService, authManager)

@@ -296,13 +296,11 @@ describe('AdminCreditHealthPage', () => {
     expect(screen.getAllByText('17')).toHaveLength(2)
     expect(screen.getByText('首次发现')).toBeVisible()
     expect(screen.getByText('出现次数')).toBeVisible()
-    expect(screen.queryByRole('button', { name: /忽略|关闭|标记解决/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /忽略|标记解决/ })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '打开 Wallet / Ledger · User #12' }))
-    expect(pushMock).toHaveBeenCalledWith({
-      path: '/admin/credits/wallets',
-      query: { user_id: '12' },
-    })
+    expect(screen.getAllByText('Wallet · User #12')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /打开 Wallet|Wallet · User/ })).not.toBeInTheDocument()
+    expect(pushMock).not.toHaveBeenCalled()
   })
 
   it('supports only open and resolved views and resets keyset pagination on view changes', async () => {

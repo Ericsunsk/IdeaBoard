@@ -16,9 +16,10 @@ import (
 const maxUserKeywordLength = 64
 
 type UserService struct {
-	repo          *UserRepository
-	uploadCleaner UserUploadCleaner
-	lifecycle     UserLifecycle
+	repo                *UserRepository
+	creditBalanceReader UserCreditBalanceReader
+	uploadCleaner       UserUploadCleaner
+	lifecycle           UserLifecycle
 }
 
 type UserLifecycle interface {
@@ -36,15 +37,25 @@ type UserUploadCleaner interface {
 	DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error
 }
 
-func NewUserService(repo *UserRepository, lifecycle UserLifecycle, uploadCleaner ...UserUploadCleaner) *UserService {
+type UserCreditBalanceReader interface {
+	GetAvailableBalances(context.Context, []int64) (map[int64]int64, error)
+}
+
+func NewUserService(
+	repo *UserRepository,
+	lifecycle UserLifecycle,
+	creditBalanceReader UserCreditBalanceReader,
+	uploadCleaner ...UserUploadCleaner,
+) *UserService {
 	var cleaner UserUploadCleaner
 	if len(uploadCleaner) > 0 {
 		cleaner = uploadCleaner[0]
 	}
 	return &UserService{
-		repo:          repo,
-		uploadCleaner: cleaner,
-		lifecycle:     lifecycle,
+		repo:                repo,
+		creditBalanceReader: creditBalanceReader,
+		uploadCleaner:       cleaner,
+		lifecycle:           lifecycle,
 	}
 }
 
@@ -79,9 +90,34 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 		return nil, err
 	}
 
+	list := make([]*AdminUserListItem, 0, len(users))
+	if len(users) > 0 {
+		if s.creditBalanceReader == nil {
+			return nil, errors.New("用户Idea余额读取服务未配置")
+		}
+		userIDs := make([]int64, 0, len(users))
+		for _, user := range users {
+			userIDs = append(userIDs, user.ID)
+		}
+		balances, err := s.creditBalanceReader.GetAvailableBalances(ctx, userIDs)
+		if err != nil {
+			return nil, fmt.Errorf("读取用户Idea余额失败: %w", err)
+		}
+		for _, user := range users {
+			availableCredits, ok := balances[user.ID]
+			if !ok {
+				return nil, fmt.Errorf("用户 %d 的Idea余额缺失", user.ID)
+			}
+			list = append(list, &AdminUserListItem{
+				User:             *user,
+				AvailableCredits: availableCredits,
+			})
+		}
+	}
+
 	return &UserListResponse{
 		UserListCounts: counts,
-		List:           users,
+		List:           list,
 	}, nil
 }
 

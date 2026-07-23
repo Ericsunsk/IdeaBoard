@@ -69,7 +69,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		return appDomainServices{}, err
 	}
-	userService := users.NewUserService(repos.userRepo, userLifecycle, storageService)
+	userService := users.NewUserService(repos.userRepo, userLifecycle, creditService, storageService)
 	return appDomainServices{
 		authServiceClient:    auth.NewServiceClient(cfg.Auth),
 		runtimeSettings:      runtimeSettings,

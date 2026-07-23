@@ -1,1 +1,1 @@
-export { default as AdminCreditWalletsPage } from './AdminCreditWalletsPage.vue'
+export { default as AdminUserWalletDialog } from './AdminUserWalletDialog.vue'

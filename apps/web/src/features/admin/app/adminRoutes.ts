@@ -2,7 +2,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import { adminNavigationRouteDefs, ADMIN_DEFAULT_PATH } from './adminNavigationMeta'
 import type { AdminNavigationKey } from './adminNavigationMeta'
 import { ADMIN_ROOT_PATH } from '../../../shared/constants/routePaths'
-import { ADMIN_CREDIT_WALLETS_PATH } from '../../../shared/constants/routePaths'
+import { ADMIN_CREDIT_PRICING_PATH } from '../../../shared/constants/routePaths'
 
 const adminPageComponents = {
   users: () => import('../users/AdminUsersPage.vue'),
@@ -43,12 +43,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: adminPageComponents.credits,
         meta: { requiresAuth: true, title: '积分运营' },
         children: [
-          { path: '', redirect: ADMIN_CREDIT_WALLETS_PATH },
-          {
-            path: 'wallets',
-            name: 'AdminCreditWallets',
-            component: () => import('../credits-billing/wallets/AdminCreditWalletsPage.vue'),
-          },
+          { path: '', redirect: ADMIN_CREDIT_PRICING_PATH },
           {
             path: 'pricing',
             name: 'AdminCreditPricing',

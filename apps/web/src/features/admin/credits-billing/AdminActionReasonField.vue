@@ -12,6 +12,7 @@
       :id="inputId"
       :model-value="modelValue"
       :rows="rows"
+      :disabled="disabled"
       fluid
       :invalid="invalid"
       :aria-describedby="describedbyId"
@@ -33,6 +34,7 @@ withDefaults(
     hint?: string
     rows?: number
     bodyClass?: string
+    disabled?: boolean
   }>(),
   {
     error: '',
@@ -40,6 +42,7 @@ withDefaults(
     hint: '将进入不可变审计记录，请说明原因与影响范围。',
     rows: 3,
     bodyClass: '',
+    disabled: false,
   },
 )
 

@@ -4,12 +4,12 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { User } from './user'
+import type { AdminUserListItem } from './adminUserListItem'
 
 export type ApiResponseUserListData = {
   total: number
   active_count: number
   banned_count: number
   admin_count: number
-  list: User[]
+  list: AdminUserListItem[]
 }

@@ -93,7 +93,7 @@
       scrollable
       scroll-height="flex"
       frame-class="h-full min-h-0"
-      :table-style="{ minWidth: '920px' }"
+      :table-style="{ minWidth: '1040px' }"
     >
       <Column selection-mode="multiple" style="width: 3rem" />
 
@@ -167,6 +167,22 @@
         </template>
       </Column>
 
+      <Column field="availableCredits" header="账户余额" :style="{ width: '148px' }">
+        <template #body="{ data: user }">
+          <Button
+            text
+            size="small"
+            severity="secondary"
+            class="!px-2 font-mono !font-[760]"
+            aria-haspopup="dialog"
+            :aria-label="`打开 ${user.username} 的账户详情`"
+            @click="openWalletDialog(user)"
+          >
+            {{ user.availableCreditsLabel }}
+          </Button>
+        </template>
+      </Column>
+
       <Column header="更多" :style="{ width: '72px' }">
         <template #body="{ data: user }">
           <Button
@@ -211,6 +227,13 @@
     @cancel="closeBanModal"
     @confirm="confirmBanUser"
   />
+
+  <AdminUserWalletDialog
+    v-if="walletDialogUser"
+    v-model:visible="walletDialogVisible"
+    :user="walletDialogUser"
+    @refresh-users="loadUsers"
+  />
 </template>
 
 <script setup lang="ts">
@@ -230,6 +253,7 @@ import AdminToolbarSearch from '../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
+import { AdminUserWalletDialog } from '../credits-billing/wallets'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'
 import type { AdminUserRowView, UserActionKey } from './adminUserView'
@@ -243,6 +267,13 @@ type PrimePopupPanel = {
 const feedback = useAdminUsersFeedback()
 const adminConfirm = useAdminConfirm()
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
+const walletDialogUser = ref<AdminUserRowView | null>(null)
+const walletDialogVisible = computed({
+  get: () => Boolean(walletDialogUser.value),
+  set: (visible: boolean) => {
+    if (!visible) walletDialogUser.value = null
+  },
+})
 const adminUsers = useAdminUsersContext({
   feedback,
   confirm: adminConfirm,
@@ -296,5 +327,9 @@ function handleActionSelect(key: string) {
   if (!userActionItems.value.some((item) => item.key === key)) return
   selectUserAction(key as UserActionKey)
   userActionPopoverRef.value?.hide?.()
+}
+
+function openWalletDialog(user: AdminUserRowView) {
+  walletDialogUser.value = user
 }
 </script>

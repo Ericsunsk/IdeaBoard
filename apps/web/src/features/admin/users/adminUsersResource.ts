@@ -4,13 +4,13 @@ import {
   useListAdminUsers,
 } from '../../../shared/api/generated-query/admin-users/admin-users'
 import type {
+  AdminUserListItem as GeneratedAdminUserListItem,
   ApiResponseUserListData,
   ListAdminUsersParams,
-  User,
 } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector } from '../../../shared/api/apiResponse'
 
-export type AdminUserListItem = User
+export type AdminUserListItem = GeneratedAdminUserListItem
 export type AdminUsersRoleFilterValue = 'admin' | 'user'
 export type AdminUsersStatusFilterValue = 0 | 1
 

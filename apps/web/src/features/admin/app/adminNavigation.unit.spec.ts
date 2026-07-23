@@ -7,8 +7,8 @@ describe('resolveAdminPageTitle', () => {
     expect(resolveAdminPageTitle('/admin/credits/pricing', '功能定价')).toBe('功能定价')
   })
 
-  it('falls back to the parent navigation title', () => {
-    expect(resolveAdminPageTitle('/admin/credits/wallets', undefined)).toBe('积分运营')
+  it('falls back to the parent navigation title for a remaining credits route', () => {
+    expect(resolveAdminPageTitle('/admin/credits/pricing', undefined)).toBe('积分运营')
   })
 })
 
@@ -23,14 +23,21 @@ describe('Admin Credit Health routes', () => {
 })
 
 describe('Admin Reward Code routes', () => {
-  it('publishes only the canonical reward code route', () => {
+  it('publishes only the remaining Credits routes', () => {
     const creditsRoute = adminRoutes[0]?.children?.find((route) => route.path === 'credits')
     const childPaths = creditsRoute?.children?.map((route) => route.path)
     const rewardCodeRoute = creditsRoute?.children?.find(
       (route) => route.path === 'reward-codes',
     )
 
-    expect(childPaths).toEqual(['', 'wallets', 'pricing', 'health', 'reward-codes'])
+    expect(creditsRoute?.redirect).toBeUndefined()
+    expect(creditsRoute?.children?.[0]).toMatchObject({
+      path: '',
+      redirect: '/admin/credits/pricing',
+    })
+    expect(childPaths).toEqual(['', 'pricing', 'health', 'reward-codes'])
+    expect(childPaths).not.toContain('wallets')
+    expect(creditsRoute?.children?.some((route) => route.name === 'AdminCreditWallets')).toBe(false)
     expect(rewardCodeRoute).toMatchObject({
       path: 'reward-codes',
       name: 'AdminRewardCodes',

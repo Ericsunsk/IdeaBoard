@@ -107,14 +107,9 @@
       <Column header="影响对象" style="min-width: 250px">
         <template #body="{ data }">
           <div class="flex min-w-0 flex-col gap-1">
-            <button
-              v-if="data.wallet_user_id"
-              type="button"
-              class="w-fit rounded-[var(--radius-ib-control)] text-admin-body font-[700] text-admin-accent underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-admin-accent"
-              @click="openWallet(data.wallet_user_id)"
-            >
+            <span v-if="data.wallet_user_id" class="text-admin-body font-[700] text-admin-text-1">
               Wallet · User #{{ data.wallet_user_id }}
-            </button>
+            </span>
             <span
               class="max-w-72 truncate text-admin-caption text-admin-text-2"
               :title="`${data.subject_type} · ${data.subject_id}`"
@@ -192,13 +187,9 @@
 
       <section v-if="selectedFinding.wallet_user_id">
         <div class="text-admin-caption font-[700] text-admin-text-3">关联 Wallet</div>
-        <Button
-          class="mt-2"
-          :label="`打开 Wallet / Ledger · User #${selectedFinding.wallet_user_id}`"
-          severity="secondary"
-          outlined
-          @click="openWallet(selectedFinding.wallet_user_id)"
-        />
+        <div class="mt-2 text-admin-body font-[680] text-admin-text-1">
+          Wallet · User #{{ selectedFinding.wallet_user_id }}
+        </div>
       </section>
 
       <section class="min-w-0">
@@ -234,7 +225,6 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -242,7 +232,6 @@ import Drawer from 'primevue/drawer'
 import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
-import { ADMIN_CREDIT_WALLETS_PATH } from '../../../../shared/constants/routePaths'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
@@ -266,7 +255,6 @@ const statusOptions = [
   { label: '已解决', value: 'resolved' },
 ] satisfies Array<{ label: string; value: AdminCreditFindingStatus }>
 
-const router = useRouter()
 const status = ref<AdminCreditFindingStatus>('open')
 const selectedFinding = ref<AdminCreditFinding | null>(null)
 const drawerVisible = ref(false)
@@ -330,7 +318,4 @@ function openFinding(finding: AdminCreditFinding) {
   drawerVisible.value = true
 }
 
-function openWallet(userId: number) {
-  void router.push({ path: ADMIN_CREDIT_WALLETS_PATH, query: { user_id: String(userId) } })
-}
 </script>

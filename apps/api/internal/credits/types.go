@@ -40,6 +40,7 @@ const (
 var (
 	ErrInvalidCommand             = errors.New("invalid credit command")
 	ErrWalletNotFound             = errors.New("credit wallet not found")
+	ErrWalletBalanceIntegrity     = errors.New("credit wallet balance projection is incomplete")
 	ErrWalletFrozen               = errors.New("credit wallet is frozen")
 	ErrWalletRestricted           = errors.New("credit wallet is restricted")
 	ErrWalletRestrictionNotFound  = errors.New("credit wallet restriction not found")

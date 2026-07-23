@@ -46,7 +46,7 @@ func TestGetCurrentUserReturnsNotFoundWhenUserMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db := testdb.Open(t)
-	handler := NewAuthHandler(users.NewUserService(users.NewUserRepository(db), nil))
+	handler := NewAuthHandler(users.NewUserService(users.NewUserRepository(db), nil, nil))
 	router := gin.New()
 	router.GET("/api/user/info", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleUser)

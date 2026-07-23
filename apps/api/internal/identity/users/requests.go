@@ -17,7 +17,12 @@ type UserListCounts struct {
 
 type UserListResponse struct {
 	UserListCounts
-	List []*User `json:"list"`
+	List []*AdminUserListItem `json:"list"`
+}
+
+type AdminUserListItem struct {
+	User
+	AvailableCredits int64 `json:"available_credits"`
 }
 
 type AdminBanUserRequest struct {

@@ -2141,6 +2141,18 @@ components:
         created_at: { type: string }
         updated_at: { type: string }
 
+    AdminUserListItem:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required: [available_credits]
+          properties:
+            available_credits:
+              type: integer
+              format: int64
+              minimum: 0
+              maximum: 9000000000000000
+
     AdminCreditGrantRequest:
       type: object
       additionalProperties: false
@@ -4458,7 +4470,7 @@ components:
                 list:
                   type: array
                   items:
-                    $ref: '#/components/schemas/User'
+                    $ref: '#/components/schemas/AdminUserListItem'
 
     ApiResponseCreditCommandResult:
       allOf:
