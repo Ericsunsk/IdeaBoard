@@ -15,7 +15,6 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestRuntimeRoleLifecycleWritesRemainConstrainedByRewardsGuards(t *testing.T) {
@@ -172,17 +171,7 @@ func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
 	redeemable := createFixture("Runtime 兑换奖励", "RUNTIME-REDEEM-26", "runtime-redeem")
 	provisionRewardWallet(t, ownerPool, credits.NewService(ownerPool), 3)
 
-	runtimeRole := fmt.Sprintf("rewards_service_runtime_test_%d_%d", os.Getpid(), time.Now().UnixNano())
-	roleSQL := pgx.Identifier{runtimeRole}.Sanitize()
-	if _, err := db.ExecContext(ctx, `CREATE ROLE `+roleSQL+` NOLOGIN`); err != nil {
-		t.Fatalf("create runtime role: %v", err)
-	}
-	t.Cleanup(func() {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_, _ = db.ExecContext(cleanupCtx, `DROP OWNED BY `+roleSQL)
-		_, _ = db.ExecContext(cleanupCtx, `DROP ROLE IF EXISTS `+roleSQL)
-	})
+	runtimeRole := testdb.CreateRestrictedRole(t, db, "rewards_service_runtime")
 	policies := []dbprivileges.Policy{
 		database.RuntimePrivilegePolicy(), credits.RuntimePrivilegePolicy(), RuntimePrivilegePolicy(),
 	}
@@ -190,19 +179,7 @@ func TestRuntimeRoleCanUseRewardAdminServiceCommands(t *testing.T) {
 		t.Fatalf("configure runtime privilege policies: %v", err)
 	}
 
-	runtimePoolConfig := ownerPool.Config().Copy()
-	runtimePoolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		_, err := conn.Exec(ctx, `SET ROLE `+roleSQL)
-		return err
-	}
-	runtimePool, err := pgxpool.NewWithConfig(ctx, runtimePoolConfig)
-	if err != nil {
-		t.Fatalf("open runtime Rewards pool: %v", err)
-	}
-	t.Cleanup(runtimePool.Close)
-	if err := runtimePool.Ping(ctx); err != nil {
-		t.Fatalf("ping runtime Rewards pool: %v", err)
-	}
+	runtimePool := testdb.OpenPoolAsRole(t, ownerPool, runtimeRole)
 	runtimeService := newTestRewardService(t, runtimePool, credits.NewService(runtimePool))
 
 	if _, err := runtimeService.DeleteRewardCode(ctx, DeleteRewardCodeCommand{

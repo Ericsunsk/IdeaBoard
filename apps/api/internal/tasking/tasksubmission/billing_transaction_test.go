@@ -12,14 +12,94 @@ import (
 
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/platform/database"
+	dbprivileges "ideaboard/api/internal/platform/database/privileges"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
+
+type noOpRiverTxClient struct{}
+
+func (noOpRiverTxClient) InsertTx(
+	context.Context,
+	pgx.Tx,
+	river.JobArgs,
+	*river.InsertOpts,
+) (*rivertype.JobInsertResult, error) {
+	return nil, nil
+}
+
+func TestBilledStyleVariationSubmissionSucceedsAsRuntimeRole(t *testing.T) {
+	db, ownerPool := testdb.OpenWithPool(t)
+	ownerCredits := credits.NewService(ownerPool)
+	ownerBilling := billing.NewService(ownerPool)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation, "gpt-image-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sku := mustResolveSKU(t, request)
+	if _, err := ownerBilling.PublishPrice(t.Context(), submissionPriceInput(sku, "Style Variation", 20)); err != nil {
+		t.Fatal(err)
+	}
+	seedCreditWallet(t, ownerPool, ownerCredits, 42, 200)
+
+	policies := []dbprivileges.Policy{
+		database.RuntimePrivilegePolicy(),
+		credits.RuntimePrivilegePolicy(),
+		billing.RuntimePrivilegePolicy(),
+		taskbilling.RuntimePrivilegePolicy(),
+	}
+	runtimeRole := testdb.CreateRestrictedRole(t, db, "task_submission_runtime")
+	if err := dbprivileges.Configure(t.Context(), db, runtimeRole, policies...); err != nil {
+		t.Fatalf("configure task submission runtime role: %v", err)
+	}
+	runtimePool := testdb.OpenPoolAsRole(t, ownerPool, runtimeRole)
+	var canReadClaims, canUpdateClaims bool
+	if err := runtimePool.QueryRow(t.Context(), `
+SELECT has_table_privilege(current_user, 'task_submission_claims', 'SELECT'),
+       has_table_privilege(current_user, 'task_submission_claims', 'UPDATE')
+`).Scan(&canReadClaims, &canUpdateClaims); err != nil {
+		t.Fatalf("inspect task submission runtime privileges: %v", err)
+	}
+	if !canReadClaims || canUpdateClaims {
+		t.Fatalf("runtime task submission claim privileges read/update=%t/%t", canReadClaims, canUpdateClaims)
+	}
+	store := NewStore(
+		runtimePool,
+		taskstore.NewRepository(db),
+		noOpRiverTxClient{},
+		submissionRiverTestQueue,
+		submissionRiverTestMaxAttempts,
+		taskbilling.NewService(billing.NewService(runtimePool), credits.NewService(runtimePool)),
+	)
+	task := newBilledAIImageTask("task_style_variation_runtime_role", "style-variation-runtime-role", request)
+
+	result, err := store.SubmitTask(t.Context(), task, newTaskSubmissionQueueTask(task))
+	if err != nil {
+		t.Fatalf("submit billed style variation as runtime role: %v", err)
+	}
+	if !result.Created || result.HoldTransactionID == "" {
+		t.Fatalf("submission result=%+v", result)
+	}
+	assertTaskRowCount(t, db, task.TaskID, 1)
+	assertBillingSnapshotCount(t, db, task.TaskID, 1)
+	assertCreditCommandCount(t, db, task.TaskID, "hold", 1)
+	var claimCount int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM task_submission_claims WHERE task_id = $1`, task.TaskID).Scan(&claimCount); err != nil {
+		t.Fatalf("count task submission claim: %v", err)
+	}
+	if claimCount != 1 {
+		t.Fatalf("task submission claim count=%d want=1", claimCount)
+	}
+}
 
 func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)

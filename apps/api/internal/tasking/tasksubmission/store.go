@@ -11,6 +11,7 @@ import (
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5"
@@ -19,31 +20,23 @@ import (
 
 const rollbackTimeout = 5 * time.Second
 
-type TaskInserter interface {
-	CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks.Task) (bool, error)
-}
-
-type idempotentTaskFinder interface {
-	FindSubmissionByClientActionWithPGXTx(context.Context, pgx.Tx, int64, string, taskbilling.Request) (tasks.TaskSubmissionResult, bool, error)
-}
-
 type Store struct {
-	pool      *pgxpool.Pool
-	tasks     TaskInserter
-	client    taskqueue.RiverTxClient
-	queueName string
-	maxRetry  int
-	billing   *taskbilling.Service
+	pool       *pgxpool.Pool
+	repository *taskstore.Repository
+	client     taskqueue.RiverTxClient
+	queueName  string
+	maxRetry   int
+	billing    *taskbilling.Service
 }
 
-func NewStore(pool *pgxpool.Pool, tasks TaskInserter, client taskqueue.RiverTxClient, queueName string, maxRetry int, billingService *taskbilling.Service) *Store {
+func NewStore(pool *pgxpool.Pool, repository *taskstore.Repository, client taskqueue.RiverTxClient, queueName string, maxRetry int, billingService *taskbilling.Service) *Store {
 	return &Store{
-		pool:      pool,
-		tasks:     tasks,
-		client:    client,
-		queueName: queueName,
-		maxRetry:  maxRetry,
-		billing:   billingService,
+		pool:       pool,
+		repository: repository,
+		client:     client,
+		queueName:  queueName,
+		maxRetry:   maxRetry,
+		billing:    billingService,
 	}
 }
 
@@ -55,8 +48,8 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	if s.client == nil {
 		return emptyResult, fmt.Errorf("submit task: river client not configured")
 	}
-	if s.tasks == nil {
-		return emptyResult, fmt.Errorf("submit task: task inserter not configured")
+	if s.repository == nil {
+		return emptyResult, fmt.Errorf("submit task: repository not configured")
 	}
 	if task == nil {
 		return emptyResult, fmt.Errorf("submit task: task is nil")
@@ -124,15 +117,13 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	}()
 
 	if task.BillingRequest != nil && strings.TrimSpace(task.ClientActionID) != "" {
-		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
-			fmt.Sprintf("task-submit:%d:%s", task.UserID, strings.TrimSpace(task.ClientActionID))); err != nil {
-			return emptyResult, fmt.Errorf("submit task: acquire idempotency lock: %w", err)
-		}
-		finder, ok := s.tasks.(idempotentTaskFinder)
-		if !ok {
-			return emptyResult, fmt.Errorf("submit task: idempotent task finder not configured")
-		}
-		existing, found, err := finder.FindSubmissionByClientActionWithPGXTx(ctx, tx, task.UserID, task.ClientActionID, billingRequest)
+		existing, found, err := s.repository.LockAndFindSubmissionByClientActionWithPGXTx(
+			ctx,
+			tx,
+			task.UserID,
+			task.ClientActionID,
+			billingRequest,
+		)
 		if err != nil {
 			return emptyResult, fmt.Errorf("submit task: find existing task: %w", err)
 		}
@@ -146,7 +137,7 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 		}
 	}
 
-	created, err := s.tasks.CreateWithPGXTx(ctx, tx, task)
+	created, err := s.repository.CreateWithPGXTx(ctx, tx, task)
 	if err != nil {
 		return emptyResult, fmt.Errorf("submit task: insert task: %w", err)
 	}

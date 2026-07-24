@@ -232,28 +232,34 @@ func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks
 	return true, nil
 }
 
-func (r *Repository) FindSubmissionByClientActionWithPGXTx(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string, request taskbilling.Request) (tasks.TaskSubmissionResult, bool, error) {
+func (r *Repository) LockAndFindSubmissionByClientActionWithPGXTx(ctx context.Context, tx pgx.Tx, userID int64, clientActionID string, request taskbilling.Request) (tasks.TaskSubmissionResult, bool, error) {
 	if tx == nil || userID <= 0 || strings.TrimSpace(clientActionID) == "" {
 		return tasks.TaskSubmissionResult{}, false, nil
 	}
+	clientActionID = strings.TrimSpace(clientActionID)
 	expectedHash, err := taskbilling.RequestFingerprint(request)
 	if err != nil {
 		return tasks.TaskSubmissionResult{}, false, err
+	}
+	if _, err := tx.Exec(
+		ctx,
+		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+		fmt.Sprintf("task-submit:%d:%s", userID, clientActionID),
+	); err != nil {
+		return tasks.TaskSubmissionResult{}, false, fmt.Errorf("taskstore: lock submission claim: %w", err)
 	}
 	var result tasks.TaskSubmissionResult
 	var actualHash string
 	err = tx.QueryRow(ctx, `
 SELECT task_id, request_hash
 FROM task_submission_claims
-WHERE user_id = $1 AND client_action_id = $2
-	FOR UPDATE`, userID, strings.TrimSpace(clientActionID)).Scan(&result.TaskID, &actualHash)
+WHERE user_id = $1 AND client_action_id = $2`, userID, clientActionID).Scan(&result.TaskID, &actualHash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var existingTaskID, feature string
 		taskErr := tx.QueryRow(ctx, `
 SELECT task_id, feature_slug
 FROM tasks
-WHERE user_id = $1 AND client_action_id = $2
-FOR UPDATE`, userID, strings.TrimSpace(clientActionID)).Scan(&existingTaskID, &feature)
+WHERE user_id = $1 AND client_action_id = $2`, userID, clientActionID).Scan(&existingTaskID, &feature)
 		if errors.Is(taskErr, pgx.ErrNoRows) {
 			return tasks.TaskSubmissionResult{}, false, nil
 		}
